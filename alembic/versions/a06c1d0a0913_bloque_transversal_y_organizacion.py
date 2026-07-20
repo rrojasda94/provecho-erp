@@ -46,7 +46,6 @@ def upgrade() -> None:
     sa.Column('id', sa.Uuid(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
-    sa.ForeignKeyConstraint(['unidad_base_id'], ['unidad_medida.id'], name=op.f('fk_categoria_udm_unidad_base_id_unidad_medida'), use_alter=True),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_categoria_udm')),
     sa.UniqueConstraint('nombre', name=op.f('uq_categoria_udm_nombre'))
     )
@@ -168,6 +167,15 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['empresa_id'], ['empresa.id'], name=op.f('fk_almacen_empresa_id_empresa')),
     sa.ForeignKeyConstraint(['sucursal_id'], ['sucursal.id'], name=op.f('fk_almacen_sucursal_id_sucursal')),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_almacen'))
+    )
+    # FK circular categoria_udm→unidad_medida: Alembic no emite FKs con
+    # use_alter dentro de create_table, así que se crea explícita al final.
+    op.create_foreign_key(
+        op.f('fk_categoria_udm_unidad_base_id_unidad_medida'),
+        'categoria_udm',
+        'unidad_medida',
+        ['unidad_base_id'],
+        ['id'],
     )
     # ### end Alembic commands ###
 

@@ -6,8 +6,8 @@
 ## Misión del puesto
 
 Stock exacto, ordenado por FEFO/FIFO y disponible a tiempo para cada
-sucursal — que ninguna cocina pare por falta de insumo que sí estaba en
-Almacén Central pero mal contado o mal ubicado.
+sucursal — que ninguna cocina u operación pare por falta de insumo que sí 
+estaba en Almacén Central pero mal contado o mal ubicado.
 
 ## Funciones principales
 

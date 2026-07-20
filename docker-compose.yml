@@ -6,7 +6,9 @@ services:
       POSTGRES_PASSWORD: provecho
       POSTGRES_DB: provecho
     ports:
-      - "5432:5432"
+      # Host 5433: el 5432 local lo ocupa la plataforma de Charlie's Pizzas.
+      # Dentro de la red de compose sigue siendo db:5432.
+      - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:

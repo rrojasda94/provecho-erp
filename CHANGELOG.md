@@ -63,7 +63,11 @@ Versionado: [SemVer](https://semver.org/lang/es/).
   `SoftDeleteMixin`, `JsonB`) en `src/core/model_base.py`; naming
   convention de constraints en `Base.metadata`; registro central
   `src/core/models_registry.py` cableado a Alembic; migración inicial
-  Alembic; tests de esquema (`tests/test_models.py`).
+  Alembic validada contra Postgres 16 (ciclo upgrade/downgrade/upgrade);
+  tests de esquema (`tests/test_models.py`).
+- Puerto de Postgres en el host movido a **5433** (`docker-compose.yml`,
+  `.env.example`) — el 5432 local lo ocupa la plataforma de Charlie's
+  Pizzas; dentro de la red de compose sigue siendo `db:5432`.
 - `reporte_escalamiento` definido con el negocio: cadena atención al
   cliente → supervisor (redacta solución) → comercial/gerencia; se
   almacena para mejora continua (`data-model.md` §6).
