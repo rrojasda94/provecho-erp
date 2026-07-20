@@ -873,6 +873,17 @@ de su módulo y se prueban de forma aislada.
 - **RN-COM-013** El abandono de carrito/pedido se registra en cualquier
   canal y en cualquier paso (motivo si se conoce) — insumo para análisis
   de embudo/conversión, no solo para resolución en el momento.
+- **RN-COM-014** Toda venta confirmada recibe un `numero_orden`
+  correlativo, único por sucursal y día — es el número que ve el
+  personal (cocina, mostrador, KDS); no se confunde con
+  `idempotency_key` (técnico) ni con el correlativo del comprobante
+  (fiscal, vía Nubefact). Aplica tenga o no `cotizacion_id` — toda venta
+  confirmada ya es una Orden de Pedido (glosario) por sí misma.
+- **RN-COM-015** La cuenta web de un cliente (`cliente.usuario_id`) es
+  opcional y solo habilita autoservicio (ver historial, pedir online);
+  nunca es requisito para comprar en sucursal o por Central de Pedidos
+  — esas ventas enrutan al mismo `cliente` por sus datos (persona/
+  contacto), sin necesidad de login.
 
 ## Comercial — estrategia
 

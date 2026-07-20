@@ -3,6 +3,11 @@
 Natural (liga a persona) o jurídico (razón social + RUC propios).
 `cliente_id` es opcional en `venta` — cliente anónimo es válido
 (RN-PER-005).
+
+`usuario_id` es opcional (2026-07-20, decisión del usuario): cuenta propia
+solo para autoservicio web (ver historial, pedir online) — comprar en
+sucursal o por Central de Pedidos NUNCA exige login, esas ventas igual
+enrutan al mismo `cliente` por sus datos (persona/contacto).
 """
 
 import uuid
@@ -29,3 +34,8 @@ class Cliente(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin):
     razon_social: Mapped[str | None] = mapped_column(String(255), nullable=True)
     ruc: Mapped[str | None] = mapped_column(String(11), nullable=True)
     contacto: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Cuenta de autoservicio web — opcional, NUNCA requerida para comprar
+    # en sucursal/Central de Pedidos. Un usuario es de a lo más un cliente.
+    usuario_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("usuario.id"), unique=True, nullable=True
+    )

@@ -90,6 +90,15 @@ Versionado: [SemVer](https://semver.org/lang/es/).
   de ventas por trabajador — ambos probados en
   `tests/test_venta_slice.py`. Migración `08c7aa59dd6e` aplicada y
   verificada en Supabase (ciclo upgrade/downgrade/upgrade).
+- **`venta.numero_orden`** (RN-COM-014, nueva): correlativo legible por
+  sucursal y día (único junto a `sucursal_id`+`fecha_orden`) — lo que ve
+  el personal en cocina/mostrador/KDS; distinto de `idempotency_key`
+  (técnico) y del correlativo del comprobante (fiscal). Aplica tenga o
+  no `cotizacion_id` la venta.
+- **`cliente.usuario_id`** opcional (RN-COM-015, nueva): cuenta de
+  autoservicio web — nunca requerida para comprar en sucursal o Central
+  de Pedidos, esas ventas enrutan al mismo `cliente` sin login.
+  Migración `90116965bfa8` aplicada y verificada en Supabase.
 
 - Branding Provecho aplicado: paleta, tipografías (Anton Italic + Inter) y
   tokens CSS (`docs/product/ui-ux.md`).

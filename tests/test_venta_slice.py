@@ -9,6 +9,7 @@ from decimal import Decimal
 
 import pytest
 from sqlalchemy import create_engine, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 import src.core.models_registry  # noqa: F401
@@ -170,9 +171,11 @@ def test_historial_de_compras_por_cliente(session):
     session.add(cliente)
     session.flush()
 
-    for _ in range(3):
+    for numero in range(1, 4):
         venta = Venta(
             sucursal_id=sucursal.id,
+            fecha_orden=date(2026, 7, 20),
+            numero_orden=numero,
             punto_venta_id=punto_venta.id,
             canal="pdv",
             modalidad="mesa",
@@ -210,11 +213,14 @@ def test_ranking_de_ventas_por_trabajador(session):
     )
 
     montos = {usuario_ana.id: [Decimal("50"), Decimal("30")], usuario_luis.id: [Decimal("100")]}
+    numero_orden = 1
     for usuario_id, ventas_montos in montos.items():
         for monto in ventas_montos:
             session.add(
                 Venta(
                     sucursal_id=sucursal.id,
+                    fecha_orden=date(2026, 7, 20),
+                    numero_orden=numero_orden,
                     punto_venta_id=punto_venta.id,
                     canal="pdv",
                     modalidad="mesa",
@@ -223,6 +229,7 @@ def test_ranking_de_ventas_por_trabajador(session):
                     idempotency_key=str(uuid.uuid4()),
                 )
             )
+            numero_orden += 1
     session.commit()
 
     # Ranking: total vendido por trabajador (join usuario_id -> trabajador).
@@ -237,3 +244,101 @@ def test_ranking_de_ventas_por_trabajador(session):
     assert ranking[1].total_vendido == Decimal("80")  # Ana (50+30)
     assert trabajador_ana.cargo == "Cajero"
     assert trabajador_luis.usuario_id == usuario_luis.id
+
+
+def test_cliente_con_cuenta_web_acumula_historial_sin_login_en_sucursal(session):
+    """cliente.usuario_id es opcional: la cuenta web es autoservicio, no un
+    requisito para comprar en sucursal — ambos canales enrutan al mismo
+    cliente.
+    """
+    empresa, sucursal, producto, punto_venta = _crear_cadena_base(session)
+    usuario_cajero, _ = _crear_trabajador(session, empresa, "Ana", "Cajera", "10000004")
+
+    persona_cliente = Persona(
+        nombres="Rosa",
+        apellidos="García",
+        tipo_documento="dni",
+        numero_documento="20000004",
+        telefono="987654321",
+    )
+    session.add(persona_cliente)
+    session.flush()
+
+    cuenta_web = Usuario(
+        username="rosa.garcia",
+        pin_hash="argon2id$fake-hash-para-test",
+        persona_id=persona_cliente.id,
+        tipo="humano",
+    )
+    session.add(cuenta_web)
+    session.flush()
+
+    grupo = session.get(Grupo, empresa.grupo_id)
+    cliente = Cliente(
+        grupo_id=grupo.id,
+        tipo="natural",
+        persona_id=persona_cliente.id,
+        usuario_id=cuenta_web.id,  # tiene cuenta web
+        contacto=persona_cliente.telefono,
+    )
+    session.add(cliente)
+    session.flush()
+
+    # Compra en sucursal — sin login, solo referencia el mismo cliente_id
+    # (en producción: encontrado por teléfono/DNI, lógica de aplicación).
+    venta_sucursal = Venta(
+        sucursal_id=sucursal.id,
+        fecha_orden=date(2026, 7, 20),
+        numero_orden=1,
+        punto_venta_id=punto_venta.id,
+        canal="pdv",
+        modalidad="mesa",
+        cliente_id=cliente.id,
+        usuario_id=usuario_cajero.id,
+        total=Decimal("60.00"),
+        idempotency_key=str(uuid.uuid4()),
+    )
+    session.add(venta_sucursal)
+    session.commit()
+
+    historial = session.scalars(
+        select(Venta).where(Venta.cliente_id == cliente.id)
+    ).all()
+    assert len(historial) == 1
+    assert cliente.usuario_id == cuenta_web.id
+
+
+def test_numero_orden_es_unico_por_sucursal_y_dia(session):
+    empresa, sucursal, producto, punto_venta = _crear_cadena_base(session)
+    usuario, _ = _crear_trabajador(session, empresa, "Ana", "Cajera", "10000005")
+
+    session.add(
+        Venta(
+            sucursal_id=sucursal.id,
+            fecha_orden=date(2026, 7, 20),
+            numero_orden=1,
+            punto_venta_id=punto_venta.id,
+            canal="pdv",
+            modalidad="mesa",
+            usuario_id=usuario.id,
+            total=Decimal("10.00"),
+            idempotency_key=str(uuid.uuid4()),
+        )
+    )
+    session.commit()
+
+    session.add(
+        Venta(
+            sucursal_id=sucursal.id,
+            fecha_orden=date(2026, 7, 20),
+            numero_orden=1,  # mismo número, misma sucursal, mismo día
+            punto_venta_id=punto_venta.id,
+            canal="pdv",
+            modalidad="mesa",
+            usuario_id=usuario.id,
+            total=Decimal("20.00"),
+            idempotency_key=str(uuid.uuid4()),
+        )
+    )
+    with pytest.raises(IntegrityError):
+        session.commit()

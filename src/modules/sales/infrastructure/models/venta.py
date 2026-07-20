@@ -2,14 +2,22 @@
 del pedido a cocina y el cobro. Preparación/entrega pertenecen al futuro
 proceso "cumplimiento de pedido", aún sin definir.
 
+Toda venta confirmada ya ES una Orden de Pedido (glosario), tenga o no
+`cotizacion_id` — `numero_orden` es el correlativo legible por sucursal y
+día que ve el personal (cocina/mostrador/KDS); `idempotency_key` es
+técnico (anti-duplicado), no se muestra a nadie. La generación del
+correlativo (siguiente número del día para esa sucursal) es lógica de
+aplicación, aún no construida — el esquema solo declara la unicidad.
+
 Medio de pago, pago, comprobante y demás entidades de PROC-COM-002 (Cobro)
 se modelan en un slice posterior de este mismo proceso Venta.
 """
 
 import uuid
+from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import Enum, ForeignKey, Numeric, String
+from sqlalchemy import Enum, ForeignKey, Integer, Numeric, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -18,8 +26,14 @@ from src.core.model_base import TimestampMixin, UuidPkMixin
 
 class Venta(Base, UuidPkMixin, TimestampMixin):
     __tablename__ = "venta"
+    __table_args__ = (UniqueConstraint("sucursal_id", "fecha_orden", "numero_orden"),)
 
     sucursal_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("sucursal.id"))
+    # Día de negocio de la orden (lo fija la aplicación al crear) — base
+    # estable para el correlativo, independiente de la hora exacta de
+    # created_at.
+    fecha_orden: Mapped[date] = mapped_column(default=date.today)
+    numero_orden: Mapped[int] = mapped_column(Integer)
     punto_venta_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("punto_venta.id"))
     canal: Mapped[str] = mapped_column(
         Enum("pdv", "agente_ia", "delivery", name="canal_venta", native_enum=False)

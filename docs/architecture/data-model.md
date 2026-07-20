@@ -438,7 +438,13 @@ Nota: al confirmarse, el pedido del cliente se convierte en una **Orden de
 Pedido** (mandatoria hacia cocina/producción, RN-DOC-006) — ya no es una
 Solicitud.
 
-- **venta**: sucursal_id, punto_venta_id, canal (`pdv` | `agente_ia` |
+- **venta**: sucursal_id, fecha_orden (día de negocio, lo fija la
+  aplicación), numero_orden (correlativo por sucursal y día — RN-COM-014,
+  único junto a sucursal_id+fecha_orden; es lo que ve el personal en
+  cocina/mostrador/KDS, ej. "Orden #45"; `idempotency_key` sigue siendo
+  técnico, anti-duplicado, nunca se muestra — toda venta confirmada YA es
+  una Orden de Pedido por definición del glosario, tenga o no
+  cotizacion_id), punto_venta_id, canal (`pdv` | `agente_ia` |
   `delivery`), modalidad (`mesa` | `takeout` | `delivery` — determina si se
   descuenta empaque según config del producto comercial), cotizacion_id
   (opcional — venta de servicio o del área comercial originada en una
@@ -512,9 +518,13 @@ Solicitud.
 - **cliente**: grupo_id (transversal al grupo, no a una empresa —
   RN-PTS-001), tipo (`natural` | `juridico` — ej. cliente corporativo:
   catering/eventos), persona_id (si `natural`) o razon_social + ruc (si
-  `juridico`), contacto (base para CRM futuro). Si natural, nombre y
-  documento se leen de `persona` — no se duplican (RN-GEN-007). `cliente_id`
-  es opcional en `venta` — cliente anónimo es un caso válido (RN-PER-005).
+  `juridico`), contacto (base para CRM futuro), usuario_id (opcional,
+  único — cuenta de autoservicio web: ver su historial, pedir online.
+  Decisión 2026-07-20: **nunca requerida** para comprar en sucursal o
+  Central de Pedidos — esas ventas enrutan al mismo `cliente` por sus
+  datos, sin login). Si natural, nombre y documento se leen de `persona`
+  — no se duplican (RN-GEN-007). `cliente_id` es opcional en `venta` —
+  cliente anónimo es un caso válido (RN-PER-005).
 - **cuenta_puntos**: cliente_id, saldo. Un solo saldo válido en todas las
   marcas/empresas del grupo (RN-PTS-001).
 - **puntos_movimiento**: cuenta_puntos_id, tipo (`acumulacion` | `canje` |
