@@ -7,6 +7,13 @@ y gestionar el flujo solicitud → aprobación → picking → transferencia →
 
 ## Entidades
 
+**Estado de implementación (2026-07-20):** modeladas las entidades base de
+productos como dependencia del slice Venta — `articulo`, `sku`, `receta`,
+`receta_item` (`src/modules/inventory/infrastructure/models/`), además
+del bloque transversal ya existente (`categoria`, `categoria_udm`,
+`unidad_medida`). `stock`, movimientos, transferencias, `lote` y demás
+del flujo de almacén siguen pendientes del slice de Inventario.
+
 `articulo` (tipos `insumo` | `subreceta` | `mercaderia` | `empaque` |
 `repuesto` | `suministro` — enum extensible), `categoria`, `stock`,
 `stock_lote` (detalle por lote — base de FEFO/FIFO), `stock_merma`

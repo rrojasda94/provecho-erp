@@ -13,7 +13,7 @@ Registro de lo construido y lo pendiente. Actualizar en cada cambio relevante.
 | Modelo de datos (v1, documento) | ✅ 2026-07-04 | `docs/architecture/data-model.md` |
 | Modelo de datos ampliado (bloques Inventario, Documentos, Movimientos, Operación comercial, Recursos, Información, RRHH, Actores) | ✅ 2026-07-14 | `docs/architecture/data-model.md` — ~50 entidades nuevas/enriquecidas; ver detalle abajo |
 | Core (app factory, settings, db, event bus) | ✅ 2026-07-04 | Endpoint `/health` operativo |
-| Modelado de base de datos completo (SQLAlchemy + Alembic) | 🔶 iniciado 2026-07-20 | Bloque transversal + organización modelado (11 tablas): `persona`, `grupo`, `empresa`, `marca`, `licencia_marca`, `sucursal`, `almacen`, `categoria`, `categoria_udm`, `unidad_medida`, `archivo` — modelos en `src/modules/*/infrastructure/models/` y `src/shared/models/`, registro en `src/core/models_registry.py`, tests de esquema. BD de desarrollo corre en **Supabase** (Postgres gestionado, solo BD — sin su Auth/RLS, ver `docs/engineering/devops.md`); Docker local sigue disponible como alternativa. Resto por slice vertical. |
+| Modelado de base de datos completo (SQLAlchemy + Alembic) | 🔶 en curso 2026-07-20 | Bloque transversal + organización (11 tablas) + slice Venta núcleo (11 tablas más, 22 en total) — ver detalle del slice Venta abajo. BD de desarrollo corre en **Supabase** (Postgres gestionado, solo BD — sin su Auth/RLS, ver `docs/engineering/devops.md`); Docker local sigue disponible como alternativa. Resto por slice vertical. |
 | Módulo `users` (auth JWT + PIN + RBAC) | ⬜ | Tras el modelado de BD — contrato ya especificado |
 | Migraciones Alembic iniciales | ⬜ | Junto con el modelado de BD completo (no incremental por módulo) |
 | Seeders (admin / PIN 123456, org base) | ⬜ | |
@@ -480,6 +480,39 @@ Pendiente (declarado, no bloquea): frecuencia exacta de conteo cíclico y
 margen de error de ajuste (quedan `[[ COMPLETAR ]]`, a definir con
 Contabilidad); quién autoriza ajustes (admin vs. supervisor de logística,
 rol aún no existe formalmente).
+
+### Slice Venta — núcleo de datos (2026-07-20)
+
+Primer slice vertical de datos completo, a pedido del usuario: conectar
+venta con cliente y trabajador para habilitar **historial de compras del
+cliente** y **ranking de ventas por trabajador**. Ambas consultas ya
+funcionan y están probadas (`tests/test_venta_slice.py`).
+
+Antes de modelar se corrigieron 2 inconsistencias reales encontradas:
+`data-model.md` §6 `venta.estado` seguía listando el enum viejo de 8
+estados; `state-machines.md` ya lo había corregido a 4
+(`orden|pagada|facturada|anulada`) el 2026-07-14 — quedó desalineado.
+`articulo` no tenía `empresa_id` directo, rompiendo la convención de
+tenant (ADR-004) porque `categoria_id` es opcional. Ambas corregidas en
+`data-model.md` antes de generar el modelo.
+
+11 tablas nuevas (22 en total con el bloque transversal):
+- `usuario` (alcance mínimo — sin rol/permiso/RBAC todavía, eso es el
+  slice de auth dedicado).
+- `trabajador` (RRHH — nuevo módulo `src/modules/rrhh/`, solo esta
+  entidad; el resto de §8b sigue pendiente del slice de RRHH).
+- `articulo`, `sku`, `receta`, `receta_item` (base de productos —
+  inventory), `cliente`, `punto_venta`, `producto_comercial`, `venta`,
+  `venta_item` (sales, módulo nuevo).
+
+Deliberadamente diferido (no bloquea historial/ranking, se agrega
+cuando se aborde PROC-COM-002 o el pricing): `modificador`,
+`variante_producto`, `combo`, `lista_precio`, `precio`, `promocion`,
+`medio_pago`, `pago`, `comprobante`, `carrito`, `central_pedidos`,
+`cuenta_puntos`.
+
+Migración `08c7aa59dd6e`, aplicada y verificada en Supabase (ciclo
+upgrade/downgrade/upgrade limpio, igual que el bloque anterior).
 
 ### Revisión de consistencia y correcciones (2026-07-20)
 

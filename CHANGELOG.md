@@ -81,6 +81,15 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 - `reporte_escalamiento` definido con el negocio: cadena atención al
   cliente → supervisor (redacta solución) → comercial/gerencia; se
   almacena para mejora continua (`data-model.md` §6).
+- **Slice Venta — núcleo de datos** (11 tablas nuevas, 22 en total):
+  `usuario` (mínimo), `trabajador` (nuevo módulo `src/modules/rrhh/`),
+  `articulo`/`sku`/`receta`/`receta_item` (base de productos, inventory),
+  `cliente`/`punto_venta`/`producto_comercial`/`venta`/`venta_item`
+  (nuevo módulo `src/modules/sales/`). Conecta venta con cliente y
+  trabajador para habilitar historial de compras del cliente y ranking
+  de ventas por trabajador — ambos probados en
+  `tests/test_venta_slice.py`. Migración `08c7aa59dd6e` aplicada y
+  verificada en Supabase (ciclo upgrade/downgrade/upgrade).
 
 - Branding Provecho aplicado: paleta, tipografías (Anton Italic + Inter) y
   tokens CSS (`docs/product/ui-ux.md`).
@@ -110,6 +119,16 @@ Versionado: [SemVer](https://semver.org/lang/es/).
   picking y despacho en almacén central, recepción y devoluciones en
   local — nueva área `Logistica-Almacen` en
   `docs/diagrams/Procesos/`.
+
+### Fixed
+
+- `data-model.md` §6 `venta.estado`: seguía con el enum viejo de 8
+  estados; corregido al enum vigente desde 2026-07-14
+  (`orden|pagada|facturada|anulada`, RN-COM-005) — `state-machines.md`
+  ya lo tenía correcto, quedaron desalineados.
+- `data-model.md` §3 `articulo`: le faltaba `empresa_id` directo,
+  rompiendo la convención de tenant (ADR-004) porque `categoria_id` es
+  opcional.
 
 ### Changed
 

@@ -11,6 +11,17 @@ electrónicos vía Nubefact.
 `producto_comercial`, `receta`, `receta_item`, `lista_precio`, `venta`,
 `venta_item`, `pago`, `comprobante`, `cliente`. Detalle en `docs/architecture/data-model.md` §3, §6.
 
+**Estado de implementación (2026-07-20):** modelado el núcleo del slice
+Venta — `cliente`, `punto_venta`, `producto_comercial`, `venta`,
+`venta_item` (`src/modules/sales/infrastructure/models/`). `venta_item`
+guarda su propio `precio_unitario` (snapshot), por eso no depende de
+`lista_precio`/`precio` para existir. Diferido a un slice posterior:
+`modificador`, `variante_producto`, `combo`, `lista_precio`, `precio`,
+`promocion`, `medio_pago`, `pago`, `comprobante` (PROC-COM-002), `carrito`,
+`central_pedidos`, `cuenta_puntos`/`puntos_movimiento`.
+`venta.estado` implementado con el enum vigente (`orden`|`pagada`|
+`facturada`|`anulada`, RN-COM-005) — no el enum viejo de 8 estados.
+
 ## Casos de uso
 
 - CRUD de productos comerciales y recetas (separados de artículos inventariables).

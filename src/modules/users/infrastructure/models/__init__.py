@@ -1,4 +1,7 @@
-"""Modelos del módulo users: persona y organización (data-model §1, §2)."""
+"""Modelos del módulo users: persona, organización y usuario mínimo
+(data-model §1, §2). RBAC completo (rol, permiso, refresh_token,
+audit_log) se modela en el slice dedicado de auth.
+"""
 
 from src.modules.users.infrastructure.models.almacen import Almacen
 from src.modules.users.infrastructure.models.empresa import Empresa
@@ -7,6 +10,7 @@ from src.modules.users.infrastructure.models.licencia_marca import LicenciaMarca
 from src.modules.users.infrastructure.models.marca import Marca
 from src.modules.users.infrastructure.models.persona import Persona
 from src.modules.users.infrastructure.models.sucursal import Sucursal
+from src.modules.users.infrastructure.models.usuario import Usuario
 
 __all__ = [
     "Almacen",
@@ -16,4 +20,5 @@ __all__ = [
     "Marca",
     "Persona",
     "Sucursal",
+    "Usuario",
 ]

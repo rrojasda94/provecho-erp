@@ -187,9 +187,10 @@ erDiagram
   categoría — ej. Doypack 2kg = 2:1 sobre Kilo). Un artículo/receta/
   producto comercial solo admite UdM de su propia categoría (RN-UDM-001).
   Default: categoría "Unidades" con UdM base "Unidad".
-- **articulo** (inventariable): id_interno (4 alfanuméricos, autogenerado,
-  inmutable, único — RN-GEN-005), nombre, categoria_id (opcional),
-  unidad_medida_id, tipo (`insumo` | `subreceta` | `mercaderia` | `empaque`
+- **articulo** (inventariable): empresa_id (tenant directo — `categoria_id`
+  es opcional, no sirve de puente de tenant por sí solo), id_interno (4
+  alfanuméricos, autogenerado, inmutable, único — RN-GEN-005), nombre,
+  categoria_id (opcional), unidad_medida_id, tipo (`insumo` | `subreceta` | `mercaderia` | `empaque`
   | `repuesto` | `suministro` — **enum extensible**: se agregan tipos
   nuevos cuando el negocio lo requiera, sin migración destructiva),
   costo promedio, archivado (bool — al descontinuarse, oculta sin
@@ -442,9 +443,13 @@ Solicitud.
   descuenta empaque según config del producto comercial), cotizacion_id
   (opcional — venta de servicio o del área comercial originada en una
   cotización aceptada por el cliente, RN-COM-004), cliente_id (opcional),
-  usuario_id (cajero o agente), estado (`orden` | `preparacion` | `listo` |
-  `entrega` | `pagada` | `facturada` | `entregado` | `devolucion` |
-  `anulada` — pago y comprobante en orden flexible, RN-COM-005/006), total,
+  usuario_id (cajero o agente), estado (`orden` | `pagada` | `facturada` |
+  `anulada` — alcance de Venta corregido 2026-07-14: termina en envío a
+  cocina + cobro, RN-COM-005; pago y comprobante en orden flexible,
+  RN-COM-006; ver [state-machines.md](../domain/state-machines.md#venta).
+  `preparacion`/`listo`/`entrega`/`entregado`/`devolucion` pertenecen al
+  futuro proceso "cumplimiento de pedido", aún sin definir — no son
+  estados de `venta`), total,
   idempotency_key, repartidor_externo_plataforma (nullable — `rappi` |
   `ubereats` | `pedidosya`... si el delivery lo hizo un rider de
   plataforma externa, sin vínculo laboral ni gestión como Vehículo/

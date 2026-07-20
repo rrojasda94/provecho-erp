@@ -15,6 +15,7 @@ catálogo: [../architecture/events.md](../architecture/events.md).
 | sales | [src/modules/sales/README.md](../../src/modules/sales/README.md) | Spec lista |
 | purchases | [src/modules/purchases/README.md](../../src/modules/purchases/README.md) | Spec lista |
 | accounting | [src/modules/accounting/README.md](../../src/modules/accounting/README.md) | Spec lista |
+| rrhh | [src/modules/rrhh/README.md](../../src/modules/rrhh/README.md) | Abierto parcialmente (solo `trabajador`), spec completa pendiente |
 
 ## Futuros (se especifican antes de construirse)
 
