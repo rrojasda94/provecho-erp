@@ -1,0 +1,1116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="Definitions_Venta" targetNamespace="http://www.bizagi.com/definitions/_venta_provecho" xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL">
+  <process id="Process_VENTA" name="VENTA (Web / Central de Pedidos / Sucursal)">
+    <documentation>Alcance: Venta termina con el envio del pedido a cocina y el cobro (RN-COM-005). Generado a partir de docs/domain/use-cases.md CU-COM-001/002/003.</documentation>
+    <laneSet id="LaneSet_1">
+      <lane id="Lane_0" name="Cliente"><childLaneSet id="cls_Lane_0" /></lane>
+      <lane id="Lane_1" name="Web / Kiosko"><childLaneSet id="cls_Lane_1" /></lane>
+      <lane id="Lane_2" name="Central de Pedidos"><childLaneSet id="cls_Lane_2" /></lane>
+      <lane id="Lane_3" name="Atencion al Cliente"><childLaneSet id="cls_Lane_3" /></lane>
+      <lane id="Lane_4" name="Cocina"><childLaneSet id="cls_Lane_4" /></lane>
+    </laneSet>
+    <startEvent id="start" name="Cliente decide contactar a una marca"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#E6FF97" /><bizagi:BizagiProperty name="borderColor" value="#62A716" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <outgoing>e_start__gw_canal</outgoing>
+    </startEvent>
+    <exclusiveGateway id="gw_canal" name="Canal?" gatewayDirection="Diverging"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFFFCC" /><bizagi:BizagiProperty name="borderColor" value="#A6A61D" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_start__gw_canal</incoming>
+      <outgoing>e_gw_canal__w_ingresa</outgoing>
+      <outgoing>e_gw_canal__cp_saludo</outgoing>
+      <outgoing>e_gw_canal__s_saludo</outgoing>
+    </exclusiveGateway>
+    <endEvent id="end_venta" name="Fin de Venta: pedido en cocina + comprobante"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFD9D9" /><bizagi:BizagiProperty name="borderColor" value="#C0392B" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_w_tiempo__end_venta</incoming>
+      <incoming>e_cp_emite__end_venta</incoming>
+      <incoming>e_s_indica__end_venta</incoming>
+    </endEvent>
+    <endEvent id="end_perdida" name="Venta perdida / cliente desiste"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFD9D9" /><bizagi:BizagiProperty name="borderColor" value="#C0392B" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_gw_cp_valido__end_perdida</incoming>
+      <incoming>e_gw_cp_precio_retry__end_perdida</incoming>
+    </endEvent>
+    <task id="w_ingresa" name="Ingresa con datos o se registra"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_gw_canal__w_ingresa</incoming>
+      <outgoing>e_w_ingresa__w_explora</outgoing>
+    </task>
+    <task id="w_explora" name="Presenta catalogo y promociones"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_w_ingresa__w_explora</incoming>
+      <outgoing>e_w_explora__w_carrito</outgoing>
+    </task>
+    <task id="w_carrito" name="Agrega productos al carrito"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_w_explora__w_carrito</incoming>
+      <outgoing>e_w_carrito__gw_w_modalidad</outgoing>
+    </task>
+    <exclusiveGateway id="gw_w_modalidad" name="Recojo o delivery?" gatewayDirection="Diverging"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFFFCC" /><bizagi:BizagiProperty name="borderColor" value="#A6A61D" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_w_carrito__gw_w_modalidad</incoming>
+      <outgoing>e_gw_w_modalidad__w_sucursal</outgoing>
+      <outgoing>e_gw_w_modalidad__w_direccion</outgoing>
+    </exclusiveGateway>
+    <task id="w_sucursal" name="Elige sucursal de recojo"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_gw_w_modalidad__w_sucursal</incoming>
+      <outgoing>e_w_sucursal__gw_w_modalidad_m</outgoing>
+    </task>
+    <task id="w_direccion" name="Ingresa direccion de delivery"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_gw_w_modalidad__w_direccion</incoming>
+      <outgoing>e_w_direccion__gw_w_modalidad_m</outgoing>
+    </task>
+    <exclusiveGateway id="gw_w_modalidad_m" name="" gatewayDirection="Converging"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFFFCC" /><bizagi:BizagiProperty name="borderColor" value="#A6A61D" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_w_sucursal__gw_w_modalidad_m</incoming>
+      <incoming>e_w_direccion__gw_w_modalidad_m</incoming>
+      <outgoing>e_gw_w_modalidad_m__w_upsell</outgoing>
+    </exclusiveGateway>
+    <task id="w_upsell" name="Ofrece upsell"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_gw_w_modalidad_m__w_upsell</incoming>
+      <outgoing>e_w_upsell__gw_w_upsell</outgoing>
+    </task>
+    <exclusiveGateway id="gw_w_upsell" name="Acepta upsell?" gatewayDirection="Diverging"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFFFCC" /><bizagi:BizagiProperty name="borderColor" value="#A6A61D" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_w_upsell__gw_w_upsell</incoming>
+      <outgoing>e_gw_w_upsell__w_add_upsell</outgoing>
+      <outgoing>e_gw_w_upsell__gw_w_upsell_m</outgoing>
+    </exclusiveGateway>
+    <task id="w_add_upsell" name="Agrega upsell al carrito"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_gw_w_upsell__w_add_upsell</incoming>
+      <outgoing>e_w_add_upsell__gw_w_upsell_m</outgoing>
+    </task>
+    <exclusiveGateway id="gw_w_upsell_m" name="" gatewayDirection="Converging"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFFFCC" /><bizagi:BizagiProperty name="borderColor" value="#A6A61D" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_gw_w_upsell__gw_w_upsell_m</incoming>
+      <incoming>e_w_add_upsell__gw_w_upsell_m</incoming>
+      <outgoing>e_gw_w_upsell_m__w_comprobante_tipo</outgoing>
+    </exclusiveGateway>
+    <task id="w_comprobante_tipo" name="Elige tipo de comprobante"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_gw_w_upsell_m__w_comprobante_tipo</incoming>
+      <outgoing>e_w_comprobante_tipo__w_pago</outgoing>
+    </task>
+    <task id="w_pago" name="Realiza el pago (pasarela)"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_w_comprobante_tipo__w_pago</incoming>
+      <outgoing>e_w_pago__w_emite</outgoing>
+    </task>
+    <task id="w_emite" name="Emite comprobante"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_w_pago__w_emite</incoming>
+      <outgoing>e_w_emite__w_envia</outgoing>
+    </task>
+    <task id="w_envia" name="Envia pedido a la sucursal"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_w_emite__w_envia</incoming>
+      <outgoing>e_w_envia__w_tiempo</outgoing>
+    </task>
+    <task id="w_tiempo" name="Muestra tiempo aproximado al cliente"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_w_envia__w_tiempo</incoming>
+      <outgoing>e_w_tiempo__end_venta</outgoing>
+    </task>
+    <task id="cp_saludo" name="Saludo de bienvenida"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_gw_canal__cp_saludo</incoming>
+      <outgoing>e_cp_saludo__gw_cp_valido</outgoing>
+    </task>
+    <exclusiveGateway id="gw_cp_valido" name="Numero correcto?" gatewayDirection="Diverging"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFFFCC" /><bizagi:BizagiProperty name="borderColor" value="#A6A61D" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_cp_saludo__gw_cp_valido</incoming>
+      <outgoing>e_gw_cp_valido__end_perdida</outgoing>
+      <outgoing>e_gw_cp_valido__gw_cp_registrado</outgoing>
+    </exclusiveGateway>
+    <exclusiveGateway id="gw_cp_registrado" name="Cliente registrado?" gatewayDirection="Diverging"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFFFCC" /><bizagi:BizagiProperty name="borderColor" value="#A6A61D" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_gw_cp_valido__gw_cp_registrado</incoming>
+      <outgoing>e_gw_cp_registrado__cp_valida</outgoing>
+      <outgoing>e_gw_cp_registrado__cp_datos</outgoing>
+    </exclusiveGateway>
+    <task id="cp_valida" name="Pide DNI/telefono y valida"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_gw_cp_registrado__cp_valida</incoming>
+      <outgoing>e_cp_valida__gw_cp_registrado_m</outgoing>
+    </task>
+    <task id="cp_datos" name="Entrega datos (tel + nombre de referencia)"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_gw_cp_registrado__cp_datos</incoming>
+      <outgoing>e_cp_datos__gw_cp_registrado_m</outgoing>
+    </task>
+    <exclusiveGateway id="gw_cp_registrado_m" name="" gatewayDirection="Converging"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFFFCC" /><bizagi:BizagiProperty name="borderColor" value="#A6A61D" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_cp_valida__gw_cp_registrado_m</incoming>
+      <incoming>e_cp_datos__gw_cp_registrado_m</incoming>
+      <outgoing>e_gw_cp_registrado_m__gw_cp_modalidad</outgoing>
+    </exclusiveGateway>
+    <exclusiveGateway id="gw_cp_modalidad" name="Delivery o recojo?" gatewayDirection="Diverging"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFFFCC" /><bizagi:BizagiProperty name="borderColor" value="#A6A61D" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_gw_cp_registrado_m__gw_cp_modalidad</incoming>
+      <outgoing>e_gw_cp_modalidad__cp_direccion</outgoing>
+      <outgoing>e_gw_cp_modalidad__cp_sucursal</outgoing>
+    </exclusiveGateway>
+    <task id="cp_direccion" name="Indica direccion"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_gw_cp_modalidad__cp_direccion</incoming>
+      <outgoing>e_cp_direccion__gw_cp_modalidad_m</outgoing>
+    </task>
+    <task id="cp_sucursal" name="Elige sucursal de recojo"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_gw_cp_modalidad__cp_sucursal</incoming>
+      <outgoing>e_cp_sucursal__gw_cp_modalidad_m</outgoing>
+    </task>
+    <exclusiveGateway id="gw_cp_modalidad_m" name="" gatewayDirection="Converging"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFFFCC" /><bizagi:BizagiProperty name="borderColor" value="#A6A61D" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_cp_direccion__gw_cp_modalidad_m</incoming>
+      <incoming>e_cp_sucursal__gw_cp_modalidad_m</incoming>
+      <outgoing>e_gw_cp_modalidad_m__gw_cp_conoce</outgoing>
+    </exclusiveGateway>
+    <exclusiveGateway id="gw_cp_conoce" name="Conoce su pedido?" gatewayDirection="Diverging"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFFFCC" /><bizagi:BizagiProperty name="borderColor" value="#A6A61D" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_gw_cp_modalidad_m__gw_cp_conoce</incoming>
+      <outgoing>e_gw_cp_conoce__cp_carta</outgoing>
+      <outgoing>e_gw_cp_conoce__gw_cp_conoce_m</outgoing>
+    </exclusiveGateway>
+    <task id="cp_carta" name="Envia carta (web o WhatsApp)"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_gw_cp_conoce__cp_carta</incoming>
+      <outgoing>e_cp_carta__cp_revisa</outgoing>
+    </task>
+    <task id="cp_revisa" name="Revisa la carta"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_cp_carta__cp_revisa</incoming>
+      <outgoing>e_cp_revisa__gw_cp_conoce_m</outgoing>
+    </task>
+    <exclusiveGateway id="gw_cp_conoce_m" name="" gatewayDirection="Converging"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFFFCC" /><bizagi:BizagiProperty name="borderColor" value="#A6A61D" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_gw_cp_conoce__gw_cp_conoce_m</incoming>
+      <incoming>e_cp_revisa__gw_cp_conoce_m</incoming>
+      <outgoing>e_gw_cp_conoce_m__cp_arma</outgoing>
+    </exclusiveGateway>
+    <task id="cp_arma" name="Solicita el pedido y arma el carrito"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_gw_cp_conoce_m__cp_arma</incoming>
+      <outgoing>e_cp_arma__gw_cp_stock</outgoing>
+    </task>
+    <exclusiveGateway id="gw_cp_stock" name="Producto disponible / con stock?" gatewayDirection="Diverging"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFFFCC" /><bizagi:BizagiProperty name="borderColor" value="#A6A61D" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_cp_arma__gw_cp_stock</incoming>
+      <outgoing>e_gw_cp_stock__cp_alterna</outgoing>
+      <outgoing>e_gw_cp_stock__cp_upsell</outgoing>
+    </exclusiveGateway>
+    <task id="cp_alterna" name="Ofrece alternativas"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_gw_cp_stock__cp_alterna</incoming>
+      <outgoing>e_cp_alterna__cp_upsell</outgoing>
+    </task>
+    <task id="cp_upsell" name="Ofrece upsell"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_gw_cp_stock__cp_upsell</incoming>
+      <incoming>e_cp_alterna__cp_upsell</incoming>
+      <outgoing>e_cp_upsell__gw_cp_upsell</outgoing>
+    </task>
+    <exclusiveGateway id="gw_cp_upsell" name="Acepta?" gatewayDirection="Diverging"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFFFCC" /><bizagi:BizagiProperty name="borderColor" value="#A6A61D" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_cp_upsell__gw_cp_upsell</incoming>
+      <outgoing>e_gw_cp_upsell__cp_add_upsell</outgoing>
+      <outgoing>e_gw_cp_upsell__gw_cp_upsell_m</outgoing>
+    </exclusiveGateway>
+    <task id="cp_add_upsell" name="Agrega al carrito"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_gw_cp_upsell__cp_add_upsell</incoming>
+      <outgoing>e_cp_add_upsell__gw_cp_upsell_m</outgoing>
+    </task>
+    <exclusiveGateway id="gw_cp_upsell_m" name="" gatewayDirection="Converging"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFFFCC" /><bizagi:BizagiProperty name="borderColor" value="#A6A61D" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_gw_cp_upsell__gw_cp_upsell_m</incoming>
+      <incoming>e_cp_add_upsell__gw_cp_upsell_m</incoming>
+      <outgoing>e_gw_cp_upsell_m__cp_repite</outgoing>
+    </exclusiveGateway>
+    <task id="cp_repite" name="Repite el pedido completo"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_gw_cp_upsell_m__cp_repite</incoming>
+      <outgoing>e_cp_repite__cp_monto</outgoing>
+    </task>
+    <task id="cp_monto" name="Presenta el monto total"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_cp_repite__cp_monto</incoming>
+      <outgoing>e_cp_monto__gw_cp_precio</outgoing>
+    </task>
+    <exclusiveGateway id="gw_cp_precio" name="Precio conveniente?" gatewayDirection="Diverging"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFFFCC" /><bizagi:BizagiProperty name="borderColor" value="#A6A61D" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_cp_monto__gw_cp_precio</incoming>
+      <outgoing>e_gw_cp_precio__cp_medio_pago</outgoing>
+      <outgoing>e_gw_cp_precio__cp_alt_precio</outgoing>
+    </exclusiveGateway>
+    <task id="cp_alt_precio" name="Ofrece opciones mas economicas o promocion"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_gw_cp_precio__cp_alt_precio</incoming>
+      <outgoing>e_cp_alt_precio__gw_cp_precio_retry</outgoing>
+    </task>
+    <exclusiveGateway id="gw_cp_precio_retry" name="Acepta la alternativa?" gatewayDirection="Diverging"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFFFCC" /><bizagi:BizagiProperty name="borderColor" value="#A6A61D" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_cp_alt_precio__gw_cp_precio_retry</incoming>
+      <outgoing>e_gw_cp_precio_retry__cp_medio_pago</outgoing>
+      <outgoing>e_gw_cp_precio_retry__end_perdida</outgoing>
+    </exclusiveGateway>
+    <task id="cp_medio_pago" name="Elige medio de pago: link / contra entrega / al recoger"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_gw_cp_precio__cp_medio_pago</incoming>
+      <incoming>e_gw_cp_precio_retry__cp_medio_pago</incoming>
+      <outgoing>e_cp_medio_pago__cp_envia</outgoing>
+    </task>
+    <task id="cp_envia" name="Envia pedido a cocina de la sucursal"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_cp_medio_pago__cp_envia</incoming>
+      <outgoing>e_cp_envia__cp_tiempo</outgoing>
+    </task>
+    <task id="cp_tiempo" name="Entrega tiempo promedio"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_cp_envia__cp_tiempo</incoming>
+      <outgoing>e_cp_tiempo__gw_cp_tiempo</outgoing>
+    </task>
+    <exclusiveGateway id="gw_cp_tiempo" name="Tiempo aceptable?" gatewayDirection="Diverging"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFFFCC" /><bizagi:BizagiProperty name="borderColor" value="#A6A61D" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_cp_tiempo__gw_cp_tiempo</incoming>
+      <outgoing>e_gw_cp_tiempo__cp_emite</outgoing>
+      <outgoing>e_gw_cp_tiempo__cp_alt_tiempo</outgoing>
+    </exclusiveGateway>
+    <task id="cp_alt_tiempo" name="Sugiere otra sucursal o cambia a recojo"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_gw_cp_tiempo__cp_alt_tiempo</incoming>
+      <outgoing>e_cp_alt_tiempo__cp_emite</outgoing>
+    </task>
+    <task id="cp_emite" name="Emite comprobante (fisico o WhatsApp)"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_gw_cp_tiempo__cp_emite</incoming>
+      <incoming>e_cp_alt_tiempo__cp_emite</incoming>
+      <outgoing>e_cp_emite__end_venta</outgoing>
+    </task>
+    <task id="s_saludo" name="Saludo de bienvenida"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_gw_canal__s_saludo</incoming>
+      <outgoing>e_s_saludo__s_tipo</outgoing>
+    </task>
+    <task id="s_tipo" name="Pregunta tipo de pedido: mesa, takeout o delivery"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_s_saludo__s_tipo</incoming>
+      <outgoing>e_s_tipo__gw_s_registrado</outgoing>
+    </task>
+    <exclusiveGateway id="gw_s_registrado" name="Cliente registrado?" gatewayDirection="Diverging"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFFFCC" /><bizagi:BizagiProperty name="borderColor" value="#A6A61D" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_s_tipo__gw_s_registrado</incoming>
+      <outgoing>e_gw_s_registrado__s_valida</outgoing>
+      <outgoing>e_gw_s_registrado__s_datos</outgoing>
+    </exclusiveGateway>
+    <task id="s_valida" name="Pide DNI/telefono"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_gw_s_registrado__s_valida</incoming>
+      <outgoing>e_s_valida__gw_s_registrado_m</outgoing>
+    </task>
+    <task id="s_datos" name="Entrega datos"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_gw_s_registrado__s_datos</incoming>
+      <outgoing>e_s_datos__gw_s_registrado_m</outgoing>
+    </task>
+    <exclusiveGateway id="gw_s_registrado_m" name="" gatewayDirection="Converging"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFFFCC" /><bizagi:BizagiProperty name="borderColor" value="#A6A61D" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_s_valida__gw_s_registrado_m</incoming>
+      <incoming>e_s_datos__gw_s_registrado_m</incoming>
+      <outgoing>e_gw_s_registrado_m__s_carta</outgoing>
+    </exclusiveGateway>
+    <task id="s_carta" name="Presenta la carta / pantalla"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_gw_s_registrado_m__s_carta</incoming>
+      <outgoing>e_s_carta__s_elige</outgoing>
+    </task>
+    <task id="s_elige" name="Elige productos"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_s_carta__s_elige</incoming>
+      <outgoing>e_s_elige__s_arma</outgoing>
+    </task>
+    <task id="s_arma" name="Arma el carrito en el ERP"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_s_elige__s_arma</incoming>
+      <outgoing>e_s_arma__gw_s_stock</outgoing>
+    </task>
+    <exclusiveGateway id="gw_s_stock" name="Stock disponible?" gatewayDirection="Diverging"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFFFCC" /><bizagi:BizagiProperty name="borderColor" value="#A6A61D" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_s_arma__gw_s_stock</incoming>
+      <outgoing>e_gw_s_stock__s_alterna</outgoing>
+      <outgoing>e_gw_s_stock__s_upsell</outgoing>
+    </exclusiveGateway>
+    <task id="s_alterna" name="Ofrece alternativas"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_gw_s_stock__s_alterna</incoming>
+      <outgoing>e_s_alterna__s_upsell</outgoing>
+    </task>
+    <task id="s_upsell" name="Ofrece upsell"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_gw_s_stock__s_upsell</incoming>
+      <incoming>e_s_alterna__s_upsell</incoming>
+      <outgoing>e_s_upsell__gw_s_upsell</outgoing>
+    </task>
+    <exclusiveGateway id="gw_s_upsell" name="Acepta?" gatewayDirection="Diverging"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFFFCC" /><bizagi:BizagiProperty name="borderColor" value="#A6A61D" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_s_upsell__gw_s_upsell</incoming>
+      <outgoing>e_gw_s_upsell__s_add_upsell</outgoing>
+      <outgoing>e_gw_s_upsell__gw_s_upsell_m</outgoing>
+    </exclusiveGateway>
+    <task id="s_add_upsell" name="Suma al carrito"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_gw_s_upsell__s_add_upsell</incoming>
+      <outgoing>e_s_add_upsell__gw_s_upsell_m</outgoing>
+    </task>
+    <exclusiveGateway id="gw_s_upsell_m" name="" gatewayDirection="Converging"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFFFCC" /><bizagi:BizagiProperty name="borderColor" value="#A6A61D" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_gw_s_upsell__gw_s_upsell_m</incoming>
+      <incoming>e_s_add_upsell__gw_s_upsell_m</incoming>
+      <outgoing>e_gw_s_upsell_m__s_repite</outgoing>
+    </exclusiveGateway>
+    <task id="s_repite" name="Repite el pedido completo"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_gw_s_upsell_m__s_repite</incoming>
+      <outgoing>e_s_repite__s_total</outgoing>
+    </task>
+    <task id="s_total" name="Presenta el total"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_s_repite__s_total</incoming>
+      <outgoing>e_s_total__gw_s_mesa</outgoing>
+    </task>
+    <exclusiveGateway id="gw_s_mesa" name="Es mesa?" gatewayDirection="Diverging"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFFFCC" /><bizagi:BizagiProperty name="borderColor" value="#A6A61D" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_s_total__gw_s_mesa</incoming>
+      <outgoing>e_gw_s_mesa__s_cuando</outgoing>
+      <outgoing>e_gw_s_mesa__gw_s_mesa_m</outgoing>
+    </exclusiveGateway>
+    <task id="s_cuando" name="Decide pagar ahora o al finalizar (RN-POS-005)"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_gw_s_mesa__s_cuando</incoming>
+      <outgoing>e_s_cuando__gw_s_mesa_m</outgoing>
+    </task>
+    <exclusiveGateway id="gw_s_mesa_m" name="" gatewayDirection="Converging"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFFFCC" /><bizagi:BizagiProperty name="borderColor" value="#A6A61D" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_gw_s_mesa__gw_s_mesa_m</incoming>
+      <incoming>e_s_cuando__gw_s_mesa_m</incoming>
+      <outgoing>e_gw_s_mesa_m__s_medio</outgoing>
+    </exclusiveGateway>
+    <task id="s_medio" name="Presenta medio de pago"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_gw_s_mesa_m__s_medio</incoming>
+      <outgoing>e_s_medio__s_recibe</outgoing>
+    </task>
+    <task id="s_recibe" name="Recibe pago, pregunta tipo de comprobante"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_s_medio__s_recibe</incoming>
+      <outgoing>e_s_recibe__gw_s_boleta</outgoing>
+    </task>
+    <exclusiveGateway id="gw_s_boleta" name="Es boleta?" gatewayDirection="Diverging"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFFFCC" /><bizagi:BizagiProperty name="borderColor" value="#A6A61D" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_s_recibe__gw_s_boleta</incoming>
+      <outgoing>e_gw_s_boleta__s_dni</outgoing>
+      <outgoing>e_gw_s_boleta__gw_s_boleta_m</outgoing>
+    </exclusiveGateway>
+    <task id="s_dni" name="Solicita DNI"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_gw_s_boleta__s_dni</incoming>
+      <outgoing>e_s_dni__gw_s_boleta_m</outgoing>
+    </task>
+    <exclusiveGateway id="gw_s_boleta_m" name="" gatewayDirection="Converging"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFFFCC" /><bizagi:BizagiProperty name="borderColor" value="#A6A61D" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_gw_s_boleta__gw_s_boleta_m</incoming>
+      <incoming>e_s_dni__gw_s_boleta_m</incoming>
+      <outgoing>e_gw_s_boleta_m__s_efectua</outgoing>
+    </exclusiveGateway>
+    <task id="s_efectua" name="Efectua el pago"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_gw_s_boleta_m__s_efectua</incoming>
+      <outgoing>e_s_efectua__s_envia</outgoing>
+    </task>
+    <task id="s_envia" name="Envia orden a cocina"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_s_efectua__s_envia</incoming>
+      <outgoing>e_s_envia__s_indica</outgoing>
+    </task>
+    <task id="s_indica" name="Indica tiempo de espera al cliente"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>e_s_envia__s_indica</incoming>
+      <outgoing>e_s_indica__end_venta</outgoing>
+    </task>
+    <sequenceFlow id="e_start__gw_canal" sourceRef="start" targetRef="gw_canal"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_gw_canal__w_ingresa" name="Web" sourceRef="gw_canal" targetRef="w_ingresa"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_w_ingresa__w_explora" sourceRef="w_ingresa" targetRef="w_explora"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_w_explora__w_carrito" sourceRef="w_explora" targetRef="w_carrito"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_w_carrito__gw_w_modalidad" sourceRef="w_carrito" targetRef="gw_w_modalidad"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_gw_w_modalidad__w_sucursal" name="Recojo" sourceRef="gw_w_modalidad" targetRef="w_sucursal"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_gw_w_modalidad__w_direccion" name="Delivery" sourceRef="gw_w_modalidad" targetRef="w_direccion"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_w_sucursal__gw_w_modalidad_m" sourceRef="w_sucursal" targetRef="gw_w_modalidad_m"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_w_direccion__gw_w_modalidad_m" sourceRef="w_direccion" targetRef="gw_w_modalidad_m"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_gw_w_modalidad_m__w_upsell" sourceRef="gw_w_modalidad_m" targetRef="w_upsell"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_w_upsell__gw_w_upsell" sourceRef="w_upsell" targetRef="gw_w_upsell"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_gw_w_upsell__w_add_upsell" name="Si" sourceRef="gw_w_upsell" targetRef="w_add_upsell"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_gw_w_upsell__gw_w_upsell_m" name="No" sourceRef="gw_w_upsell" targetRef="gw_w_upsell_m"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_w_add_upsell__gw_w_upsell_m" sourceRef="w_add_upsell" targetRef="gw_w_upsell_m"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_gw_w_upsell_m__w_comprobante_tipo" sourceRef="gw_w_upsell_m" targetRef="w_comprobante_tipo"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_w_comprobante_tipo__w_pago" sourceRef="w_comprobante_tipo" targetRef="w_pago"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_w_pago__w_emite" sourceRef="w_pago" targetRef="w_emite"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_w_emite__w_envia" sourceRef="w_emite" targetRef="w_envia"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_w_envia__w_tiempo" sourceRef="w_envia" targetRef="w_tiempo"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_w_tiempo__end_venta" sourceRef="w_tiempo" targetRef="end_venta"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_gw_canal__cp_saludo" name="Central de Pedidos" sourceRef="gw_canal" targetRef="cp_saludo"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_cp_saludo__gw_cp_valido" sourceRef="cp_saludo" targetRef="gw_cp_valido"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_gw_cp_valido__end_perdida" name="No, numero equivocado" sourceRef="gw_cp_valido" targetRef="end_perdida"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_gw_cp_valido__gw_cp_registrado" name="Si" sourceRef="gw_cp_valido" targetRef="gw_cp_registrado"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_gw_cp_registrado__cp_valida" name="Si" sourceRef="gw_cp_registrado" targetRef="cp_valida"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_gw_cp_registrado__cp_datos" name="No" sourceRef="gw_cp_registrado" targetRef="cp_datos"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_cp_valida__gw_cp_registrado_m" sourceRef="cp_valida" targetRef="gw_cp_registrado_m"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_cp_datos__gw_cp_registrado_m" sourceRef="cp_datos" targetRef="gw_cp_registrado_m"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_gw_cp_registrado_m__gw_cp_modalidad" sourceRef="gw_cp_registrado_m" targetRef="gw_cp_modalidad"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_gw_cp_modalidad__cp_direccion" name="Delivery" sourceRef="gw_cp_modalidad" targetRef="cp_direccion"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_gw_cp_modalidad__cp_sucursal" name="Recojo" sourceRef="gw_cp_modalidad" targetRef="cp_sucursal"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_cp_direccion__gw_cp_modalidad_m" sourceRef="cp_direccion" targetRef="gw_cp_modalidad_m"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_cp_sucursal__gw_cp_modalidad_m" sourceRef="cp_sucursal" targetRef="gw_cp_modalidad_m"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_gw_cp_modalidad_m__gw_cp_conoce" sourceRef="gw_cp_modalidad_m" targetRef="gw_cp_conoce"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_gw_cp_conoce__cp_carta" name="No, requiere carta" sourceRef="gw_cp_conoce" targetRef="cp_carta"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_gw_cp_conoce__gw_cp_conoce_m" name="Si" sourceRef="gw_cp_conoce" targetRef="gw_cp_conoce_m"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_cp_carta__cp_revisa" sourceRef="cp_carta" targetRef="cp_revisa"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_cp_revisa__gw_cp_conoce_m" sourceRef="cp_revisa" targetRef="gw_cp_conoce_m"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_gw_cp_conoce_m__cp_arma" sourceRef="gw_cp_conoce_m" targetRef="cp_arma"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_cp_arma__gw_cp_stock" sourceRef="cp_arma" targetRef="gw_cp_stock"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_gw_cp_stock__cp_alterna" name="No" sourceRef="gw_cp_stock" targetRef="cp_alterna"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_gw_cp_stock__cp_upsell" name="Si" sourceRef="gw_cp_stock" targetRef="cp_upsell"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_cp_alterna__cp_upsell" sourceRef="cp_alterna" targetRef="cp_upsell"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_cp_upsell__gw_cp_upsell" sourceRef="cp_upsell" targetRef="gw_cp_upsell"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_gw_cp_upsell__cp_add_upsell" name="Si" sourceRef="gw_cp_upsell" targetRef="cp_add_upsell"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_gw_cp_upsell__gw_cp_upsell_m" name="No" sourceRef="gw_cp_upsell" targetRef="gw_cp_upsell_m"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_cp_add_upsell__gw_cp_upsell_m" sourceRef="cp_add_upsell" targetRef="gw_cp_upsell_m"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_gw_cp_upsell_m__cp_repite" sourceRef="gw_cp_upsell_m" targetRef="cp_repite"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_cp_repite__cp_monto" sourceRef="cp_repite" targetRef="cp_monto"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_cp_monto__gw_cp_precio" sourceRef="cp_monto" targetRef="gw_cp_precio"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_gw_cp_precio__cp_medio_pago" name="Si" sourceRef="gw_cp_precio" targetRef="cp_medio_pago"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_gw_cp_precio__cp_alt_precio" name="No" sourceRef="gw_cp_precio" targetRef="cp_alt_precio"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_cp_alt_precio__gw_cp_precio_retry" sourceRef="cp_alt_precio" targetRef="gw_cp_precio_retry"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_gw_cp_precio_retry__cp_medio_pago" name="Si" sourceRef="gw_cp_precio_retry" targetRef="cp_medio_pago"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_gw_cp_precio_retry__end_perdida" name="No" sourceRef="gw_cp_precio_retry" targetRef="end_perdida"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_cp_medio_pago__cp_envia" sourceRef="cp_medio_pago" targetRef="cp_envia"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_cp_envia__cp_tiempo" sourceRef="cp_envia" targetRef="cp_tiempo"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_cp_tiempo__gw_cp_tiempo" sourceRef="cp_tiempo" targetRef="gw_cp_tiempo"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_gw_cp_tiempo__cp_emite" name="Si" sourceRef="gw_cp_tiempo" targetRef="cp_emite"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_gw_cp_tiempo__cp_alt_tiempo" name="No" sourceRef="gw_cp_tiempo" targetRef="cp_alt_tiempo"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_cp_alt_tiempo__cp_emite" sourceRef="cp_alt_tiempo" targetRef="cp_emite"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_cp_emite__end_venta" sourceRef="cp_emite" targetRef="end_venta"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_gw_canal__s_saludo" name="Sucursal" sourceRef="gw_canal" targetRef="s_saludo"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_s_saludo__s_tipo" sourceRef="s_saludo" targetRef="s_tipo"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_s_tipo__gw_s_registrado" sourceRef="s_tipo" targetRef="gw_s_registrado"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_gw_s_registrado__s_valida" name="Si" sourceRef="gw_s_registrado" targetRef="s_valida"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_gw_s_registrado__s_datos" name="No" sourceRef="gw_s_registrado" targetRef="s_datos"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_s_valida__gw_s_registrado_m" sourceRef="s_valida" targetRef="gw_s_registrado_m"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_s_datos__gw_s_registrado_m" sourceRef="s_datos" targetRef="gw_s_registrado_m"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_gw_s_registrado_m__s_carta" sourceRef="gw_s_registrado_m" targetRef="s_carta"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_s_carta__s_elige" sourceRef="s_carta" targetRef="s_elige"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_s_elige__s_arma" sourceRef="s_elige" targetRef="s_arma"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_s_arma__gw_s_stock" sourceRef="s_arma" targetRef="gw_s_stock"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_gw_s_stock__s_alterna" name="No" sourceRef="gw_s_stock" targetRef="s_alterna"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_gw_s_stock__s_upsell" name="Si" sourceRef="gw_s_stock" targetRef="s_upsell"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_s_alterna__s_upsell" sourceRef="s_alterna" targetRef="s_upsell"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_s_upsell__gw_s_upsell" sourceRef="s_upsell" targetRef="gw_s_upsell"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_gw_s_upsell__s_add_upsell" name="Si" sourceRef="gw_s_upsell" targetRef="s_add_upsell"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_gw_s_upsell__gw_s_upsell_m" name="No" sourceRef="gw_s_upsell" targetRef="gw_s_upsell_m"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_s_add_upsell__gw_s_upsell_m" sourceRef="s_add_upsell" targetRef="gw_s_upsell_m"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_gw_s_upsell_m__s_repite" sourceRef="gw_s_upsell_m" targetRef="s_repite"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_s_repite__s_total" sourceRef="s_repite" targetRef="s_total"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_s_total__gw_s_mesa" sourceRef="s_total" targetRef="gw_s_mesa"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_gw_s_mesa__s_cuando" name="Si" sourceRef="gw_s_mesa" targetRef="s_cuando"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_gw_s_mesa__gw_s_mesa_m" name="No" sourceRef="gw_s_mesa" targetRef="gw_s_mesa_m"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_s_cuando__gw_s_mesa_m" sourceRef="s_cuando" targetRef="gw_s_mesa_m"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_gw_s_mesa_m__s_medio" sourceRef="gw_s_mesa_m" targetRef="s_medio"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_s_medio__s_recibe" sourceRef="s_medio" targetRef="s_recibe"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_s_recibe__gw_s_boleta" sourceRef="s_recibe" targetRef="gw_s_boleta"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_gw_s_boleta__s_dni" name="Si" sourceRef="gw_s_boleta" targetRef="s_dni"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_gw_s_boleta__gw_s_boleta_m" name="No" sourceRef="gw_s_boleta" targetRef="gw_s_boleta_m"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_s_dni__gw_s_boleta_m" sourceRef="s_dni" targetRef="gw_s_boleta_m"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_gw_s_boleta_m__s_efectua" sourceRef="gw_s_boleta_m" targetRef="s_efectua"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_s_efectua__s_envia" sourceRef="s_efectua" targetRef="s_envia"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_s_envia__s_indica" sourceRef="s_envia" targetRef="s_indica"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <sequenceFlow id="e_s_indica__end_venta" sourceRef="s_indica" targetRef="end_venta"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="White" /><bizagi:BizagiProperty name="borderColor" value="#000000" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements></sequenceFlow>
+    <textAnnotation id="ann_web"><text>El cliente puede desistir en cualquier paso. Registrar sales.carrito_abandonado (RN-COM-013).</text></textAnnotation>
+    <association id="assoc_ann_web" sourceRef="w_carrito" targetRef="ann_web" associationDirection="None" />
+    <textAnnotation id="ann_cp"><text>El cliente puede desistir en cualquier paso. Registrar sales.carrito_abandonado (RN-COM-013).</text></textAnnotation>
+    <association id="assoc_ann_cp" sourceRef="cp_arma" targetRef="ann_cp" associationDirection="None" />
+    <textAnnotation id="ann_s"><text>El cliente puede desistir en cualquier paso. Registrar sales.carrito_abandonado (RN-COM-013).</text></textAnnotation>
+    <association id="assoc_ann_s" sourceRef="s_arma" targetRef="ann_s" associationDirection="None" />
+  </process>
+  <collaboration id="Collab_1" name="Venta - Provecho ERP">
+    <participant id="Participant_VENTA" name="VENTA" processRef="Process_VENTA" />
+  </collaboration>
+  <bpmndi:BPMNDiagram xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:omgdc="http://www.omg.org/spec/DD/20100524/DC" xmlns:omgdi="http://www.omg.org/spec/DD/20100524/DI" id="Diagram_1">
+    <bpmndi:BPMNPlane id="Plane_1" bpmnElement="Collab_1">
+      <bpmndi:BPMNShape id="DE_Participant_VENTA" bpmnElement="Participant_VENTA" isHorizontal="true">
+        <omgdc:Bounds x="20" y="20" width="5210" height="1250" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_Lane_0" bpmnElement="Lane_0" isHorizontal="true">
+        <omgdc:Bounds x="50" y="90" width="5180" height="370" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_Lane_1" bpmnElement="Lane_1" isHorizontal="true">
+        <omgdc:Bounds x="50" y="460" width="5180" height="220" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_Lane_2" bpmnElement="Lane_2" isHorizontal="true">
+        <omgdc:Bounds x="50" y="680" width="5180" height="220" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_Lane_3" bpmnElement="Lane_3" isHorizontal="true">
+        <omgdc:Bounds x="50" y="900" width="5180" height="220" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_Lane_4" bpmnElement="Lane_4" isHorizontal="true">
+        <omgdc:Bounds x="50" y="1120" width="5180" height="220" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_start" bpmnElement="start">
+        <omgdc:Bounds x="90" y="120" width="30" height="30" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_gw_canal" bpmnElement="gw_canal">
+        <omgdc:Bounds x="240" y="120" width="40" height="40" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_end_venta" bpmnElement="end_venta">
+        <omgdc:Bounds x="4890" y="1150" width="30" height="30" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_end_perdida" bpmnElement="end_perdida">
+        <omgdc:Bounds x="3990" y="120" width="30" height="30" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_w_ingresa" bpmnElement="w_ingresa">
+        <omgdc:Bounds x="390" y="120" width="90" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_w_explora" bpmnElement="w_explora">
+        <omgdc:Bounds x="540" y="490" width="90" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_w_carrito" bpmnElement="w_carrito">
+        <omgdc:Bounds x="690" y="120" width="90" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_gw_w_modalidad" bpmnElement="gw_w_modalidad">
+        <omgdc:Bounds x="840" y="120" width="40" height="40" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_w_sucursal" bpmnElement="w_sucursal">
+        <omgdc:Bounds x="990" y="120" width="90" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_w_direccion" bpmnElement="w_direccion">
+        <omgdc:Bounds x="990" y="230" width="90" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_gw_w_modalidad_m" bpmnElement="gw_w_modalidad_m">
+        <omgdc:Bounds x="1140" y="120" width="40" height="40" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_w_upsell" bpmnElement="w_upsell">
+        <omgdc:Bounds x="1290" y="490" width="90" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_gw_w_upsell" bpmnElement="gw_w_upsell">
+        <omgdc:Bounds x="1440" y="120" width="40" height="40" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_w_add_upsell" bpmnElement="w_add_upsell">
+        <omgdc:Bounds x="1590" y="120" width="90" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_gw_w_upsell_m" bpmnElement="gw_w_upsell_m">
+        <omgdc:Bounds x="1740" y="120" width="40" height="40" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_w_comprobante_tipo" bpmnElement="w_comprobante_tipo">
+        <omgdc:Bounds x="1890" y="120" width="90" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_w_pago" bpmnElement="w_pago">
+        <omgdc:Bounds x="2040" y="120" width="90" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_w_emite" bpmnElement="w_emite">
+        <omgdc:Bounds x="2190" y="490" width="90" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_w_envia" bpmnElement="w_envia">
+        <omgdc:Bounds x="2340" y="490" width="90" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_w_tiempo" bpmnElement="w_tiempo">
+        <omgdc:Bounds x="2490" y="490" width="90" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cp_saludo" bpmnElement="cp_saludo">
+        <omgdc:Bounds x="390" y="710" width="90" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_gw_cp_valido" bpmnElement="gw_cp_valido">
+        <omgdc:Bounds x="540" y="710" width="40" height="40" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_gw_cp_registrado" bpmnElement="gw_cp_registrado">
+        <omgdc:Bounds x="690" y="710" width="40" height="40" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cp_valida" bpmnElement="cp_valida">
+        <omgdc:Bounds x="840" y="710" width="90" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cp_datos" bpmnElement="cp_datos">
+        <omgdc:Bounds x="840" y="230" width="90" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_gw_cp_registrado_m" bpmnElement="gw_cp_registrado_m">
+        <omgdc:Bounds x="990" y="710" width="40" height="40" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_gw_cp_modalidad" bpmnElement="gw_cp_modalidad">
+        <omgdc:Bounds x="1140" y="710" width="40" height="40" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cp_direccion" bpmnElement="cp_direccion">
+        <omgdc:Bounds x="1290" y="120" width="90" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cp_sucursal" bpmnElement="cp_sucursal">
+        <omgdc:Bounds x="1290" y="230" width="90" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_gw_cp_modalidad_m" bpmnElement="gw_cp_modalidad_m">
+        <omgdc:Bounds x="1440" y="710" width="40" height="40" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_gw_cp_conoce" bpmnElement="gw_cp_conoce">
+        <omgdc:Bounds x="1590" y="710" width="40" height="40" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cp_carta" bpmnElement="cp_carta">
+        <omgdc:Bounds x="1740" y="710" width="90" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cp_revisa" bpmnElement="cp_revisa">
+        <omgdc:Bounds x="1890" y="230" width="90" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_gw_cp_conoce_m" bpmnElement="gw_cp_conoce_m">
+        <omgdc:Bounds x="2040" y="710" width="40" height="40" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cp_arma" bpmnElement="cp_arma">
+        <omgdc:Bounds x="2190" y="710" width="90" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_gw_cp_stock" bpmnElement="gw_cp_stock">
+        <omgdc:Bounds x="2340" y="710" width="40" height="40" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cp_alterna" bpmnElement="cp_alterna">
+        <omgdc:Bounds x="2490" y="710" width="90" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cp_upsell" bpmnElement="cp_upsell">
+        <omgdc:Bounds x="2640" y="710" width="90" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_gw_cp_upsell" bpmnElement="gw_cp_upsell">
+        <omgdc:Bounds x="2790" y="710" width="40" height="40" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cp_add_upsell" bpmnElement="cp_add_upsell">
+        <omgdc:Bounds x="2940" y="120" width="90" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_gw_cp_upsell_m" bpmnElement="gw_cp_upsell_m">
+        <omgdc:Bounds x="3090" y="710" width="40" height="40" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cp_repite" bpmnElement="cp_repite">
+        <omgdc:Bounds x="3240" y="710" width="90" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cp_monto" bpmnElement="cp_monto">
+        <omgdc:Bounds x="3390" y="710" width="90" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_gw_cp_precio" bpmnElement="gw_cp_precio">
+        <omgdc:Bounds x="3540" y="120" width="40" height="40" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cp_alt_precio" bpmnElement="cp_alt_precio">
+        <omgdc:Bounds x="3690" y="710" width="90" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_gw_cp_precio_retry" bpmnElement="gw_cp_precio_retry">
+        <omgdc:Bounds x="3840" y="120" width="40" height="40" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cp_medio_pago" bpmnElement="cp_medio_pago">
+        <omgdc:Bounds x="3990" y="230" width="90" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cp_envia" bpmnElement="cp_envia">
+        <omgdc:Bounds x="4140" y="710" width="90" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cp_tiempo" bpmnElement="cp_tiempo">
+        <omgdc:Bounds x="4290" y="710" width="90" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_gw_cp_tiempo" bpmnElement="gw_cp_tiempo">
+        <omgdc:Bounds x="4440" y="120" width="40" height="40" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cp_alt_tiempo" bpmnElement="cp_alt_tiempo">
+        <omgdc:Bounds x="4590" y="710" width="90" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cp_emite" bpmnElement="cp_emite">
+        <omgdc:Bounds x="4740" y="710" width="90" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_s_saludo" bpmnElement="s_saludo">
+        <omgdc:Bounds x="390" y="930" width="90" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_s_tipo" bpmnElement="s_tipo">
+        <omgdc:Bounds x="540" y="930" width="90" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_gw_s_registrado" bpmnElement="gw_s_registrado">
+        <omgdc:Bounds x="690" y="930" width="40" height="40" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_s_valida" bpmnElement="s_valida">
+        <omgdc:Bounds x="840" y="930" width="90" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_s_datos" bpmnElement="s_datos">
+        <omgdc:Bounds x="840" y="340" width="90" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_gw_s_registrado_m" bpmnElement="gw_s_registrado_m">
+        <omgdc:Bounds x="990" y="930" width="40" height="40" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_s_carta" bpmnElement="s_carta">
+        <omgdc:Bounds x="1140" y="930" width="90" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_s_elige" bpmnElement="s_elige">
+        <omgdc:Bounds x="1290" y="340" width="90" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_s_arma" bpmnElement="s_arma">
+        <omgdc:Bounds x="1440" y="930" width="90" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_gw_s_stock" bpmnElement="gw_s_stock">
+        <omgdc:Bounds x="1590" y="930" width="40" height="40" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_s_alterna" bpmnElement="s_alterna">
+        <omgdc:Bounds x="1740" y="930" width="90" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_s_upsell" bpmnElement="s_upsell">
+        <omgdc:Bounds x="1890" y="930" width="90" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_gw_s_upsell" bpmnElement="gw_s_upsell">
+        <omgdc:Bounds x="2040" y="930" width="40" height="40" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_s_add_upsell" bpmnElement="s_add_upsell">
+        <omgdc:Bounds x="2190" y="120" width="90" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_gw_s_upsell_m" bpmnElement="gw_s_upsell_m">
+        <omgdc:Bounds x="2340" y="930" width="40" height="40" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_s_repite" bpmnElement="s_repite">
+        <omgdc:Bounds x="2490" y="930" width="90" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_s_total" bpmnElement="s_total">
+        <omgdc:Bounds x="2640" y="930" width="90" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_gw_s_mesa" bpmnElement="gw_s_mesa">
+        <omgdc:Bounds x="2790" y="930" width="40" height="40" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_s_cuando" bpmnElement="s_cuando">
+        <omgdc:Bounds x="2940" y="230" width="90" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_gw_s_mesa_m" bpmnElement="gw_s_mesa_m">
+        <omgdc:Bounds x="3090" y="930" width="40" height="40" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_s_medio" bpmnElement="s_medio">
+        <omgdc:Bounds x="3240" y="120" width="90" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_s_recibe" bpmnElement="s_recibe">
+        <omgdc:Bounds x="3390" y="930" width="90" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_gw_s_boleta" bpmnElement="gw_s_boleta">
+        <omgdc:Bounds x="3540" y="930" width="40" height="40" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_s_dni" bpmnElement="s_dni">
+        <omgdc:Bounds x="3690" y="930" width="90" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_gw_s_boleta_m" bpmnElement="gw_s_boleta_m">
+        <omgdc:Bounds x="3840" y="930" width="40" height="40" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_s_efectua" bpmnElement="s_efectua">
+        <omgdc:Bounds x="3990" y="930" width="90" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_s_envia" bpmnElement="s_envia">
+        <omgdc:Bounds x="4140" y="930" width="90" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_s_indica" bpmnElement="s_indica">
+        <omgdc:Bounds x="4290" y="930" width="90" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="DE_e_start__gw_canal" bpmnElement="e_start__gw_canal">
+        <omgdi:waypoint x="120" y="135" />
+        <omgdi:waypoint x="240" y="140" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_gw_canal__w_ingresa" bpmnElement="e_gw_canal__w_ingresa">
+        <omgdi:waypoint x="280" y="140" />
+        <omgdi:waypoint x="390" y="150" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_w_ingresa__w_explora" bpmnElement="e_w_ingresa__w_explora">
+        <omgdi:waypoint x="480" y="150" />
+        <omgdi:waypoint x="540" y="520" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_w_explora__w_carrito" bpmnElement="e_w_explora__w_carrito">
+        <omgdi:waypoint x="630" y="520" />
+        <omgdi:waypoint x="690" y="150" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_w_carrito__gw_w_modalidad" bpmnElement="e_w_carrito__gw_w_modalidad">
+        <omgdi:waypoint x="780" y="150" />
+        <omgdi:waypoint x="840" y="140" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_gw_w_modalidad__w_sucursal" bpmnElement="e_gw_w_modalidad__w_sucursal">
+        <omgdi:waypoint x="880" y="140" />
+        <omgdi:waypoint x="990" y="150" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_gw_w_modalidad__w_direccion" bpmnElement="e_gw_w_modalidad__w_direccion">
+        <omgdi:waypoint x="880" y="140" />
+        <omgdi:waypoint x="990" y="260" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_w_sucursal__gw_w_modalidad_m" bpmnElement="e_w_sucursal__gw_w_modalidad_m">
+        <omgdi:waypoint x="1080" y="150" />
+        <omgdi:waypoint x="1140" y="140" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_w_direccion__gw_w_modalidad_m" bpmnElement="e_w_direccion__gw_w_modalidad_m">
+        <omgdi:waypoint x="1080" y="260" />
+        <omgdi:waypoint x="1140" y="140" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_gw_w_modalidad_m__w_upsell" bpmnElement="e_gw_w_modalidad_m__w_upsell">
+        <omgdi:waypoint x="1180" y="140" />
+        <omgdi:waypoint x="1290" y="520" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_w_upsell__gw_w_upsell" bpmnElement="e_w_upsell__gw_w_upsell">
+        <omgdi:waypoint x="1380" y="520" />
+        <omgdi:waypoint x="1440" y="140" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_gw_w_upsell__w_add_upsell" bpmnElement="e_gw_w_upsell__w_add_upsell">
+        <omgdi:waypoint x="1480" y="140" />
+        <omgdi:waypoint x="1590" y="150" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_gw_w_upsell__gw_w_upsell_m" bpmnElement="e_gw_w_upsell__gw_w_upsell_m">
+        <omgdi:waypoint x="1480" y="140" />
+        <omgdi:waypoint x="1740" y="140" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_w_add_upsell__gw_w_upsell_m" bpmnElement="e_w_add_upsell__gw_w_upsell_m">
+        <omgdi:waypoint x="1680" y="150" />
+        <omgdi:waypoint x="1740" y="140" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_gw_w_upsell_m__w_comprobante_tipo" bpmnElement="e_gw_w_upsell_m__w_comprobante_tipo">
+        <omgdi:waypoint x="1780" y="140" />
+        <omgdi:waypoint x="1890" y="150" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_w_comprobante_tipo__w_pago" bpmnElement="e_w_comprobante_tipo__w_pago">
+        <omgdi:waypoint x="1980" y="150" />
+        <omgdi:waypoint x="2040" y="150" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_w_pago__w_emite" bpmnElement="e_w_pago__w_emite">
+        <omgdi:waypoint x="2130" y="150" />
+        <omgdi:waypoint x="2190" y="520" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_w_emite__w_envia" bpmnElement="e_w_emite__w_envia">
+        <omgdi:waypoint x="2280" y="520" />
+        <omgdi:waypoint x="2340" y="520" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_w_envia__w_tiempo" bpmnElement="e_w_envia__w_tiempo">
+        <omgdi:waypoint x="2430" y="520" />
+        <omgdi:waypoint x="2490" y="520" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_w_tiempo__end_venta" bpmnElement="e_w_tiempo__end_venta">
+        <omgdi:waypoint x="2580" y="520" />
+        <omgdi:waypoint x="4890" y="1165" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_gw_canal__cp_saludo" bpmnElement="e_gw_canal__cp_saludo">
+        <omgdi:waypoint x="280" y="140" />
+        <omgdi:waypoint x="390" y="740" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_cp_saludo__gw_cp_valido" bpmnElement="e_cp_saludo__gw_cp_valido">
+        <omgdi:waypoint x="480" y="740" />
+        <omgdi:waypoint x="540" y="730" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_gw_cp_valido__end_perdida" bpmnElement="e_gw_cp_valido__end_perdida">
+        <omgdi:waypoint x="580" y="730" />
+        <omgdi:waypoint x="3990" y="135" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_gw_cp_valido__gw_cp_registrado" bpmnElement="e_gw_cp_valido__gw_cp_registrado">
+        <omgdi:waypoint x="580" y="730" />
+        <omgdi:waypoint x="690" y="730" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_gw_cp_registrado__cp_valida" bpmnElement="e_gw_cp_registrado__cp_valida">
+        <omgdi:waypoint x="730" y="730" />
+        <omgdi:waypoint x="840" y="740" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_gw_cp_registrado__cp_datos" bpmnElement="e_gw_cp_registrado__cp_datos">
+        <omgdi:waypoint x="730" y="730" />
+        <omgdi:waypoint x="840" y="260" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_cp_valida__gw_cp_registrado_m" bpmnElement="e_cp_valida__gw_cp_registrado_m">
+        <omgdi:waypoint x="930" y="740" />
+        <omgdi:waypoint x="990" y="730" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_cp_datos__gw_cp_registrado_m" bpmnElement="e_cp_datos__gw_cp_registrado_m">
+        <omgdi:waypoint x="930" y="260" />
+        <omgdi:waypoint x="990" y="730" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_gw_cp_registrado_m__gw_cp_modalidad" bpmnElement="e_gw_cp_registrado_m__gw_cp_modalidad">
+        <omgdi:waypoint x="1030" y="730" />
+        <omgdi:waypoint x="1140" y="730" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_gw_cp_modalidad__cp_direccion" bpmnElement="e_gw_cp_modalidad__cp_direccion">
+        <omgdi:waypoint x="1180" y="730" />
+        <omgdi:waypoint x="1290" y="150" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_gw_cp_modalidad__cp_sucursal" bpmnElement="e_gw_cp_modalidad__cp_sucursal">
+        <omgdi:waypoint x="1180" y="730" />
+        <omgdi:waypoint x="1290" y="260" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_cp_direccion__gw_cp_modalidad_m" bpmnElement="e_cp_direccion__gw_cp_modalidad_m">
+        <omgdi:waypoint x="1380" y="150" />
+        <omgdi:waypoint x="1440" y="730" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_cp_sucursal__gw_cp_modalidad_m" bpmnElement="e_cp_sucursal__gw_cp_modalidad_m">
+        <omgdi:waypoint x="1380" y="260" />
+        <omgdi:waypoint x="1440" y="730" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_gw_cp_modalidad_m__gw_cp_conoce" bpmnElement="e_gw_cp_modalidad_m__gw_cp_conoce">
+        <omgdi:waypoint x="1480" y="730" />
+        <omgdi:waypoint x="1590" y="730" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_gw_cp_conoce__cp_carta" bpmnElement="e_gw_cp_conoce__cp_carta">
+        <omgdi:waypoint x="1630" y="730" />
+        <omgdi:waypoint x="1740" y="740" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_gw_cp_conoce__gw_cp_conoce_m" bpmnElement="e_gw_cp_conoce__gw_cp_conoce_m">
+        <omgdi:waypoint x="1630" y="730" />
+        <omgdi:waypoint x="2040" y="730" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_cp_carta__cp_revisa" bpmnElement="e_cp_carta__cp_revisa">
+        <omgdi:waypoint x="1830" y="740" />
+        <omgdi:waypoint x="1890" y="260" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_cp_revisa__gw_cp_conoce_m" bpmnElement="e_cp_revisa__gw_cp_conoce_m">
+        <omgdi:waypoint x="1980" y="260" />
+        <omgdi:waypoint x="2040" y="730" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_gw_cp_conoce_m__cp_arma" bpmnElement="e_gw_cp_conoce_m__cp_arma">
+        <omgdi:waypoint x="2080" y="730" />
+        <omgdi:waypoint x="2190" y="740" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_cp_arma__gw_cp_stock" bpmnElement="e_cp_arma__gw_cp_stock">
+        <omgdi:waypoint x="2280" y="740" />
+        <omgdi:waypoint x="2340" y="730" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_gw_cp_stock__cp_alterna" bpmnElement="e_gw_cp_stock__cp_alterna">
+        <omgdi:waypoint x="2380" y="730" />
+        <omgdi:waypoint x="2490" y="740" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_gw_cp_stock__cp_upsell" bpmnElement="e_gw_cp_stock__cp_upsell">
+        <omgdi:waypoint x="2380" y="730" />
+        <omgdi:waypoint x="2640" y="740" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_cp_alterna__cp_upsell" bpmnElement="e_cp_alterna__cp_upsell">
+        <omgdi:waypoint x="2580" y="740" />
+        <omgdi:waypoint x="2640" y="740" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_cp_upsell__gw_cp_upsell" bpmnElement="e_cp_upsell__gw_cp_upsell">
+        <omgdi:waypoint x="2730" y="740" />
+        <omgdi:waypoint x="2790" y="730" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_gw_cp_upsell__cp_add_upsell" bpmnElement="e_gw_cp_upsell__cp_add_upsell">
+        <omgdi:waypoint x="2830" y="730" />
+        <omgdi:waypoint x="2940" y="150" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_gw_cp_upsell__gw_cp_upsell_m" bpmnElement="e_gw_cp_upsell__gw_cp_upsell_m">
+        <omgdi:waypoint x="2830" y="730" />
+        <omgdi:waypoint x="3090" y="730" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_cp_add_upsell__gw_cp_upsell_m" bpmnElement="e_cp_add_upsell__gw_cp_upsell_m">
+        <omgdi:waypoint x="3030" y="150" />
+        <omgdi:waypoint x="3090" y="730" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_gw_cp_upsell_m__cp_repite" bpmnElement="e_gw_cp_upsell_m__cp_repite">
+        <omgdi:waypoint x="3130" y="730" />
+        <omgdi:waypoint x="3240" y="740" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_cp_repite__cp_monto" bpmnElement="e_cp_repite__cp_monto">
+        <omgdi:waypoint x="3330" y="740" />
+        <omgdi:waypoint x="3390" y="740" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_cp_monto__gw_cp_precio" bpmnElement="e_cp_monto__gw_cp_precio">
+        <omgdi:waypoint x="3480" y="740" />
+        <omgdi:waypoint x="3540" y="140" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_gw_cp_precio__cp_medio_pago" bpmnElement="e_gw_cp_precio__cp_medio_pago">
+        <omgdi:waypoint x="3580" y="140" />
+        <omgdi:waypoint x="3990" y="260" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_gw_cp_precio__cp_alt_precio" bpmnElement="e_gw_cp_precio__cp_alt_precio">
+        <omgdi:waypoint x="3580" y="140" />
+        <omgdi:waypoint x="3690" y="740" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_cp_alt_precio__gw_cp_precio_retry" bpmnElement="e_cp_alt_precio__gw_cp_precio_retry">
+        <omgdi:waypoint x="3780" y="740" />
+        <omgdi:waypoint x="3840" y="140" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_gw_cp_precio_retry__cp_medio_pago" bpmnElement="e_gw_cp_precio_retry__cp_medio_pago">
+        <omgdi:waypoint x="3880" y="140" />
+        <omgdi:waypoint x="3990" y="260" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_gw_cp_precio_retry__end_perdida" bpmnElement="e_gw_cp_precio_retry__end_perdida">
+        <omgdi:waypoint x="3880" y="140" />
+        <omgdi:waypoint x="3990" y="135" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_cp_medio_pago__cp_envia" bpmnElement="e_cp_medio_pago__cp_envia">
+        <omgdi:waypoint x="4080" y="260" />
+        <omgdi:waypoint x="4140" y="740" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_cp_envia__cp_tiempo" bpmnElement="e_cp_envia__cp_tiempo">
+        <omgdi:waypoint x="4230" y="740" />
+        <omgdi:waypoint x="4290" y="740" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_cp_tiempo__gw_cp_tiempo" bpmnElement="e_cp_tiempo__gw_cp_tiempo">
+        <omgdi:waypoint x="4380" y="740" />
+        <omgdi:waypoint x="4440" y="140" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_gw_cp_tiempo__cp_emite" bpmnElement="e_gw_cp_tiempo__cp_emite">
+        <omgdi:waypoint x="4480" y="140" />
+        <omgdi:waypoint x="4740" y="740" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_gw_cp_tiempo__cp_alt_tiempo" bpmnElement="e_gw_cp_tiempo__cp_alt_tiempo">
+        <omgdi:waypoint x="4480" y="140" />
+        <omgdi:waypoint x="4590" y="740" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_cp_alt_tiempo__cp_emite" bpmnElement="e_cp_alt_tiempo__cp_emite">
+        <omgdi:waypoint x="4680" y="740" />
+        <omgdi:waypoint x="4740" y="740" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_cp_emite__end_venta" bpmnElement="e_cp_emite__end_venta">
+        <omgdi:waypoint x="4830" y="740" />
+        <omgdi:waypoint x="4890" y="1165" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_gw_canal__s_saludo" bpmnElement="e_gw_canal__s_saludo">
+        <omgdi:waypoint x="280" y="140" />
+        <omgdi:waypoint x="390" y="960" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_s_saludo__s_tipo" bpmnElement="e_s_saludo__s_tipo">
+        <omgdi:waypoint x="480" y="960" />
+        <omgdi:waypoint x="540" y="960" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_s_tipo__gw_s_registrado" bpmnElement="e_s_tipo__gw_s_registrado">
+        <omgdi:waypoint x="630" y="960" />
+        <omgdi:waypoint x="690" y="950" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_gw_s_registrado__s_valida" bpmnElement="e_gw_s_registrado__s_valida">
+        <omgdi:waypoint x="730" y="950" />
+        <omgdi:waypoint x="840" y="960" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_gw_s_registrado__s_datos" bpmnElement="e_gw_s_registrado__s_datos">
+        <omgdi:waypoint x="730" y="950" />
+        <omgdi:waypoint x="840" y="370" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_s_valida__gw_s_registrado_m" bpmnElement="e_s_valida__gw_s_registrado_m">
+        <omgdi:waypoint x="930" y="960" />
+        <omgdi:waypoint x="990" y="950" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_s_datos__gw_s_registrado_m" bpmnElement="e_s_datos__gw_s_registrado_m">
+        <omgdi:waypoint x="930" y="370" />
+        <omgdi:waypoint x="990" y="950" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_gw_s_registrado_m__s_carta" bpmnElement="e_gw_s_registrado_m__s_carta">
+        <omgdi:waypoint x="1030" y="950" />
+        <omgdi:waypoint x="1140" y="960" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_s_carta__s_elige" bpmnElement="e_s_carta__s_elige">
+        <omgdi:waypoint x="1230" y="960" />
+        <omgdi:waypoint x="1290" y="370" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_s_elige__s_arma" bpmnElement="e_s_elige__s_arma">
+        <omgdi:waypoint x="1380" y="370" />
+        <omgdi:waypoint x="1440" y="960" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_s_arma__gw_s_stock" bpmnElement="e_s_arma__gw_s_stock">
+        <omgdi:waypoint x="1530" y="960" />
+        <omgdi:waypoint x="1590" y="950" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_gw_s_stock__s_alterna" bpmnElement="e_gw_s_stock__s_alterna">
+        <omgdi:waypoint x="1630" y="950" />
+        <omgdi:waypoint x="1740" y="960" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_gw_s_stock__s_upsell" bpmnElement="e_gw_s_stock__s_upsell">
+        <omgdi:waypoint x="1630" y="950" />
+        <omgdi:waypoint x="1890" y="960" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_s_alterna__s_upsell" bpmnElement="e_s_alterna__s_upsell">
+        <omgdi:waypoint x="1830" y="960" />
+        <omgdi:waypoint x="1890" y="960" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_s_upsell__gw_s_upsell" bpmnElement="e_s_upsell__gw_s_upsell">
+        <omgdi:waypoint x="1980" y="960" />
+        <omgdi:waypoint x="2040" y="950" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_gw_s_upsell__s_add_upsell" bpmnElement="e_gw_s_upsell__s_add_upsell">
+        <omgdi:waypoint x="2080" y="950" />
+        <omgdi:waypoint x="2190" y="150" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_gw_s_upsell__gw_s_upsell_m" bpmnElement="e_gw_s_upsell__gw_s_upsell_m">
+        <omgdi:waypoint x="2080" y="950" />
+        <omgdi:waypoint x="2340" y="950" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_s_add_upsell__gw_s_upsell_m" bpmnElement="e_s_add_upsell__gw_s_upsell_m">
+        <omgdi:waypoint x="2280" y="150" />
+        <omgdi:waypoint x="2340" y="950" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_gw_s_upsell_m__s_repite" bpmnElement="e_gw_s_upsell_m__s_repite">
+        <omgdi:waypoint x="2380" y="950" />
+        <omgdi:waypoint x="2490" y="960" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_s_repite__s_total" bpmnElement="e_s_repite__s_total">
+        <omgdi:waypoint x="2580" y="960" />
+        <omgdi:waypoint x="2640" y="960" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_s_total__gw_s_mesa" bpmnElement="e_s_total__gw_s_mesa">
+        <omgdi:waypoint x="2730" y="960" />
+        <omgdi:waypoint x="2790" y="950" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_gw_s_mesa__s_cuando" bpmnElement="e_gw_s_mesa__s_cuando">
+        <omgdi:waypoint x="2830" y="950" />
+        <omgdi:waypoint x="2940" y="260" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_gw_s_mesa__gw_s_mesa_m" bpmnElement="e_gw_s_mesa__gw_s_mesa_m">
+        <omgdi:waypoint x="2830" y="950" />
+        <omgdi:waypoint x="3090" y="950" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_s_cuando__gw_s_mesa_m" bpmnElement="e_s_cuando__gw_s_mesa_m">
+        <omgdi:waypoint x="3030" y="260" />
+        <omgdi:waypoint x="3090" y="950" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_gw_s_mesa_m__s_medio" bpmnElement="e_gw_s_mesa_m__s_medio">
+        <omgdi:waypoint x="3130" y="950" />
+        <omgdi:waypoint x="3240" y="150" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_s_medio__s_recibe" bpmnElement="e_s_medio__s_recibe">
+        <omgdi:waypoint x="3330" y="150" />
+        <omgdi:waypoint x="3390" y="960" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_s_recibe__gw_s_boleta" bpmnElement="e_s_recibe__gw_s_boleta">
+        <omgdi:waypoint x="3480" y="960" />
+        <omgdi:waypoint x="3540" y="950" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_gw_s_boleta__s_dni" bpmnElement="e_gw_s_boleta__s_dni">
+        <omgdi:waypoint x="3580" y="950" />
+        <omgdi:waypoint x="3690" y="960" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_gw_s_boleta__gw_s_boleta_m" bpmnElement="e_gw_s_boleta__gw_s_boleta_m">
+        <omgdi:waypoint x="3580" y="950" />
+        <omgdi:waypoint x="3840" y="950" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_s_dni__gw_s_boleta_m" bpmnElement="e_s_dni__gw_s_boleta_m">
+        <omgdi:waypoint x="3780" y="960" />
+        <omgdi:waypoint x="3840" y="950" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_gw_s_boleta_m__s_efectua" bpmnElement="e_gw_s_boleta_m__s_efectua">
+        <omgdi:waypoint x="3880" y="950" />
+        <omgdi:waypoint x="3990" y="960" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_s_efectua__s_envia" bpmnElement="e_s_efectua__s_envia">
+        <omgdi:waypoint x="4080" y="960" />
+        <omgdi:waypoint x="4140" y="960" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_s_envia__s_indica" bpmnElement="e_s_envia__s_indica">
+        <omgdi:waypoint x="4230" y="960" />
+        <omgdi:waypoint x="4290" y="960" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_e_s_indica__end_venta" bpmnElement="e_s_indica__end_venta">
+        <omgdi:waypoint x="4380" y="960" />
+        <omgdi:waypoint x="4890" y="1165" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</definitions>
