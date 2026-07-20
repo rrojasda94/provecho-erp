@@ -68,6 +68,16 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 - Puerto de Postgres en el host movido a **5433** (`docker-compose.yml`,
   `.env.example`) — el 5432 local lo ocupa la plataforma de Charlie's
   Pizzas; dentro de la red de compose sigue siendo `db:5432`.
+- **BD de desarrollo movida a Supabase** (Postgres gestionado): la
+  migración inicial (`a06c1d0a0913`) se aplicó contra el proyecto
+  Supabase del usuario — 11 tablas + `alembic_version` verificadas.
+  Motivo: visualización (Table Editor) y disponibilidad en línea de cara
+  al despliegue futuro. Explícitamente **no** se activa Supabase
+  Auth/RLS — sigue rigiendo `users` (JWT+PIN+Argon2id+RBAC) y el
+  aislamiento de tenant por filtro de aplicación (ADR-004). Detalle y
+  cómo alternar con el contenedor Docker local:
+  `docs/engineering/devops.md`. Connection string solo en `.env`
+  (gitignorado), plantilla sin secretos en `.env.example`.
 - `reporte_escalamiento` definido con el negocio: cadena atención al
   cliente → supervisor (redacta solución) → comercial/gerencia; se
   almacena para mejora continua (`data-model.md` §6).
