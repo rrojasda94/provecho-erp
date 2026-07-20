@@ -54,6 +54,19 @@ Versionado: [SemVer](https://semver.org/lang/es/).
   reemplazan "horario de trabajo").
 - Repositorio git inicializado (commit inicial con el estado
   pre-correcciones para trazabilidad).
+- Modelado de BD — bloque transversal + organización (11 tablas):
+  `persona`, `grupo`, `empresa`, `marca`, `licencia_marca`, `sucursal`,
+  `almacen`, `categoria`, `categoria_udm`, `unidad_medida`, `archivo`.
+  Modelos SQLAlchemy 2.0 tipados en
+  `src/modules/{users,inventory}/infrastructure/models/` y
+  `src/shared/models/`; mixins comunes (`UuidPkMixin`, `TimestampMixin`,
+  `SoftDeleteMixin`, `JsonB`) en `src/core/model_base.py`; naming
+  convention de constraints en `Base.metadata`; registro central
+  `src/core/models_registry.py` cableado a Alembic; migración inicial
+  Alembic; tests de esquema (`tests/test_models.py`).
+- `reporte_escalamiento` definido con el negocio: cadena atención al
+  cliente → supervisor (redacta solución) → comercial/gerencia; se
+  almacena para mejora continua (`data-model.md` §6).
 
 - Branding Provecho aplicado: paleta, tipografías (Anton Italic + Inter) y
   tokens CSS (`docs/product/ui-ux.md`).

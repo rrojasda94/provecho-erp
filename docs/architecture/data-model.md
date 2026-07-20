@@ -482,10 +482,17 @@ Solicitud.
   realizado_por, monto_esperado, monto_contado, diferencia, acta_id.
   Verificación puntual de caja fuera del ciclo apertura/cierre.
 - **reporte_escalamiento**: origen (`central_pedidos` | `punto_venta`),
-  venta_id o carrito_id, motivo (`queja` | `demora` | `error_sistema` |
-  `desistimiento_no_resuelto` | ...), escalado_a (`supervisor` |
-  `encargado_sucursal`), estado, resolucion. *Definición inicial mínima —
-  validar alcance con el negocio (ver ROADMAP, pendientes).*
+  sucursal_id, venta_id o carrito_id (opcional), reportado_por (personal
+  de atención al cliente), motivo (`queja` | `demora` | `error_sistema` |
+  `desistimiento_no_resuelto` | ...), descripcion del problema. Flujo de
+  escalamiento en cadena: alerta al **supervisor**, que intenta
+  resolverlo y redacta su solución en el reporte; si no puede, escala al
+  **área comercial o gerencia**, que realiza acciones y las reporta en el
+  mismo documento. Campos: nivel_actual (`supervisor` | `comercial` |
+  `gerencia`), acciones (historial por nivel: quién, qué, cuándo),
+  estado (`abierto` | `resuelto_supervisor` | `escalado` | `resuelto` |
+  `cerrado`). Se almacena en el ERP para **mejora continua** (insumo del
+  SOP de mejora continua de experiencia de cliente, área Comercial).
 - **carta_disputa_pago**: operacion_id (venta/pago), fecha, hora,
   cliente_id, referencia_pago, lote, monto, procedencia (o motivo de
   ausencia), emitida_por (área contable, RN-MDP-004).

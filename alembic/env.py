@@ -1,5 +1,6 @@
 from sqlalchemy import engine_from_config, pool
 
+import src.core.models_registry  # noqa: F401  (puebla Base.metadata)
 from alembic import context
 from src.config.settings import settings
 from src.core.database import Base

@@ -13,7 +13,7 @@ Registro de lo construido y lo pendiente. Actualizar en cada cambio relevante.
 | Modelo de datos (v1, documento) | ✅ 2026-07-04 | `docs/architecture/data-model.md` |
 | Modelo de datos ampliado (bloques Inventario, Documentos, Movimientos, Operación comercial, Recursos, Información, RRHH, Actores) | ✅ 2026-07-14 | `docs/architecture/data-model.md` — ~50 entidades nuevas/enriquecidas; ver detalle abajo |
 | Core (app factory, settings, db, event bus) | ✅ 2026-07-04 | Endpoint `/health` operativo |
-| Modelado de base de datos completo (SQLAlchemy + Alembic) | ⬜ | Ya no es el siguiente paso único — ver "Orden sugerido de desarrollo" (slices verticales). El detalle relevado sigue siendo insumo válido, ver abajo. |
+| Modelado de base de datos completo (SQLAlchemy + Alembic) | 🔶 iniciado 2026-07-20 | Bloque transversal + organización modelado (11 tablas): `persona`, `grupo`, `empresa`, `marca`, `licencia_marca`, `sucursal`, `almacen`, `categoria`, `categoria_udm`, `unidad_medida`, `archivo` — modelos en `src/modules/*/infrastructure/models/` y `src/shared/models/`, registro en `src/core/models_registry.py`, tests de esquema. Resto por slice vertical. |
 | Módulo `users` (auth JWT + PIN + RBAC) | ⬜ | Tras el modelado de BD — contrato ya especificado |
 | Migraciones Alembic iniciales | ⬜ | Junto con el modelado de BD completo (no incremental por módulo) |
 | Seeders (admin / PIN 123456, org base) | ⬜ | |
@@ -61,8 +61,10 @@ contiene, buscando su `[[ COMPLETAR ]]`):
   cuando hay faltante en descuento (con contador).
 - ⬜ Plazo interno de envío de comprobantes al contador.
 - ⬜ Rangos salariales de los 7 perfiles de puesto (con administración).
-- ⬜ `reporte_escalamiento`: validar alcance y campos con el negocio
-  (definición mínima ya en `data-model.md` §6).
+- ✅ 2026-07-20 `reporte_escalamiento`: definido con el usuario — cadena
+  atención al cliente → supervisor (redacta solución) → comercial/gerencia
+  (acciones reportadas); se almacena para mejora continua
+  (`data-model.md` §6).
 - ⬜ Cumplimiento de pedido: ¿1 proceso o 2 (Producción/Cocina +
   Despacho/Entrega)? Bloquea `venta_entregada`/`encuesta_enviada`.
 - ⬜ Módulo `marketing`: README/contrato propio.
