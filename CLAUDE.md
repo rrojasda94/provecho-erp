@@ -1,6 +1,7 @@
 # Provecho ERP — Reglas del juego
 
 ERP modular para grupo de restaurantes (multi-marca, multi-sucursal, una empresa).
+**Provecho** = el ERP (software). **Grupo Majambo** = el grupo empresarial que lo usa.
 Estas reglas son obligatorias durante todo el desarrollo.
 
 ## Arquitectura (no romper)
@@ -43,7 +44,7 @@ su dominio. Bajo acoplamiento, alta cohesión.
 
 1. **Especificación y contratos ANTES de implementar** (README del módulo + docs).
 2. Todo cambio lleva **pruebas** y **documentación actualizada** en el mismo cambio.
-3. Explicar decisiones arquitectónicas cuando haya alternativas (ADR en `docs/adr/`).
+3. Explicar decisiones arquitectónicas cuando haya alternativas (ADR en `docs/architecture/adr/`).
 4. El código pasa `ruff` (backend) y `eslint` (frontend) antes de commit.
 5. Commits: **Conventional Commits**. Versionado: **SemVer**. Actualizar `CHANGELOG.md`.
 6. Actualizar `ROADMAP.md` al construir algo nuevo.
@@ -65,7 +66,7 @@ el código no sea expresivo.
 
 ## Integraciones externas
 
-Nubefact (facturación PE), Google API, Meta API, Izipay (ADR 0003).
+Nubefact (facturación PE), Google API, Meta API, Izipay (ADR-003).
 Siempre detrás de adaptadores en `src/shared/integrations/` — nunca llamar
 APIs externas desde el dominio.
 

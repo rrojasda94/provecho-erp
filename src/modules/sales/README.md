@@ -46,6 +46,8 @@ Producto comercial → receta → confirmar venta → evento `sales.venta_confir
 
 ## Relaciones
 
-- Publica: `sales.venta_confirmada`, `sales.venta_anulada`, `sales.pago_registrado`.
+- Publica: `sales.venta_confirmada`, `sales.venta_anulada`, `sales.pago_registrado`,
+  `sales.comprobante_emitido` (respuesta OK de Nubefact),
+  `sales.carrito_abandonado` (analítica de embudo, RN-COM-013).
 - Escucha: nada (consulta stock vía contrato público de inventory).
 - Integraciones: Nubefact, Izipay, Meta API (pedidos por WhatsApp).

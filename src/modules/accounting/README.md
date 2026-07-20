@@ -31,5 +31,11 @@ Evento operativo → regla de mapeo contable → asiento generado → mayor/bala
 ## Relaciones
 
 - Escucha: `sales.venta_confirmada`, `sales.pago_registrado`,
-  `purchases.compra_recibida`, `inventory.*` (ajustes).
-- Publica: `accounting.periodo_cerrado`.
+  `sales.comprobante_emitido`, `purchases.oc_emitida` (provisiona),
+  `purchases.compra_recibida`, `purchases.comprobante_conforme` (decide y
+  ejecuta el pago según condición del proveedor),
+  `purchases.caja_chica_rendida` (concilia y repone fondo),
+  `inventory.transferencia_recibida`, `inventory.merma_registrada`
+  (reporte de pérdidas), `inventory.ajuste_fuera_margen` (alerta de
+  auditoría).
+- Publica: `accounting.asiento_generado`, `accounting.periodo_cerrado`.

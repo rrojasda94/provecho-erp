@@ -76,6 +76,8 @@ Compra directa → Caja chica → Rendición semanal → `accounting`.
 
 ## Relaciones
 
+- Escucha: `inventory.devolucion_a_proveedor` (gestiona reclamo/nota de
+  crédito con el proveedor).
 - Publica: `purchases.compra_recibida` (inventory suma stock),
   `purchases.oc_emitida` (accounting provisiona),
   `purchases.comprobante_conforme` (accounting ejecuta pago según

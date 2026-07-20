@@ -110,7 +110,7 @@ v1.1)`).
 
 | Código | Nombre | Versión | Estado | Fuente |
 |---|---|---|---|---|
-| PROC-CMP-001 | Compras | v1.0 | Vigente | [workflows.md](workflows.md#compras) |
+| PROC-CMP-001 | Compras | v2.0 | Vigente | [workflows.md](workflows.md#compras); v2.0 introduce los 3 caminos de compra (informal/caja chica, preferente sin cotización, estándar/activo con RFQ) y traslada la ejecución del pago a Contabilidad — cambio de resultado y actores (MAYOR) |
 | PROC-PRD-001 | Producción | v0.1 | Borrador | [workflows.md](workflows.md#producción-si-existe) |
 | PROC-INV-001 | Abastecimiento de locales | v0.2 | Borrador | [workflows.md](workflows.md#abastecimiento-de-locales); v0.2 detalla el conteo de fin de jornada en sucursal (balanzas, QR, ventana de refrigeración, alerta por margen de error RN-INV-015, cálculo de sugerido RN-INV-013); picking/packing/transporte en almacén central sigue sin este nivel de detalle |
 | PROC-COM-001 | Venta | v1.0 | Vigente | [workflows.md](workflows.md#venta), decisión de alcance 2026-07-14 |

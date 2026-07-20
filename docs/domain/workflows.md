@@ -6,11 +6,25 @@ estado de cada uno: [tabla](process-nomenclature.md#registro-maestro).
 
 ## Compras
 
-`PROC-CMP-001` · v1.0 · Vigente
+`PROC-CMP-001` · v2.0 · Vigente
+
+v2.0 (2026-07-19/20): el flujo único proveedor→OC→recepción se reemplaza
+por **tres caminos de compra** según proveedor y tipo (decisión del
+usuario tras revisar el flujo real); **Contabilidad ejecuta el pago**,
+Compras solo sustenta el comprobante conforme. Detalle narrativo y SOPs:
+[docs/compras/README.md](../compras/README.md) y
+[docs/diagrams/Procesos/Compras/](../diagrams/Procesos/Compras/).
 
 ```mermaid
-flowchart LR
-    P[Proveedor] --> OC[Orden de Compra] --> R[Recepción] --> AC[Almacén Central]
+flowchart TB
+    N[Necesidad / requerimiento] --> T{Tipo de compra}
+    T -->|Menor, proveedor informal| CD[Compra directa con caja chica] --> RD[Rendición semanal] --> CTB
+    T -->|Proveedor preferente recurrente| OCS[OC directa sin cotización] --> R
+    T -->|Estándar o activo/equipamiento| RFQ[Cotización comparativa RFQ] --> AP{¿Sobre umbral / activo?}
+    AP -->|Sí| VAL[Aprobación admin / área + gerencia] --> OC[Orden de Compra]
+    AP -->|No| OC
+    OCS -.-> OC
+    OC --> R[Recepción en Almacén Central] --> CF[Conformidad de comprobante] --> CTB[Contabilidad ejecuta pago]
 ```
 
 ## Producción (si existe)

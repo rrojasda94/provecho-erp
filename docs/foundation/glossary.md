@@ -66,6 +66,7 @@ documentación. Prohibido usar sinónimos ambiguos.
 | **Almacén** | Contenedor de stock. Tipos: `central`, `produccion`, `sucursal`. |
 | **Cocina de Producción** | Espacio donde se producen subrecetas y se mantiene el estándar de sabor/calidad de sus productos; despacha solo al almacén central. Ver [vision.md](vision.md#cocina-de-producción). |
 | **Tenant** | Contexto de aislamiento de datos (empresa/marca/sucursal). |
+| **Horario de atención** | Rango horario en el que la empresa está disponible al público o clientes. Puede variar por marca, por sucursal e incluso por área de la empresa (ej. la Central de Pedidos puede atender en un horario distinto al de una sucursal). No confundir con **Horario laboral** (jornada asignada al trabajador). |
 
 ## Geografía
 
@@ -142,6 +143,7 @@ documentación. Prohibido usar sinónimos ambiguos.
 | Término | Definición |
 |---------|-----------|
 | **Trabajador** | Persona con vínculo laboral en una empresa (planilla). Distinto de `usuario` (identidad de login): un trabajador puede o no tener usuario, y no todo usuario es trabajador. |
+| **Horario laboral** | Horario asignado a un trabajador para ejecutar su trabajo (su jornada). Término oficial — no usar "horario de trabajo". No confundir con **Horario de atención** (disponibilidad de la empresa al público, que varía por marca/sucursal/área). |
 | **Boleta de pago** | Comprobante mensual de remuneración y descuentos (ONP/AFP, renta 5ta, adelantos) y aportes del empleador; refleja la PLAME. Entrega ≤ 3.er día hábil del mes siguiente. |
 | **Certificado de trabajo** | Documento emitido al cese (≤48 h) con tiempo de servicios y cargo(s); opcional conducta/desempeño a solicitud. |
 | **Liquidación de beneficios sociales** | Cálculo y pago al cese (≤48 h): CTS, vacaciones y gratificación truncas, otros adeudos. |

@@ -7,7 +7,9 @@ y gestionar el flujo solicitud → aprobación → picking → transferencia →
 
 ## Entidades
 
-`articulo` (insumo | subreceta), `categoria`, `stock`, `stock_merma`
+`articulo` (tipos `insumo` | `subreceta` | `mercaderia` | `empaque` |
+`repuesto` | `suministro` — enum extensible), `categoria`, `stock`,
+`stock_lote` (detalle por lote — base de FEFO/FIFO), `stock_merma`
 (subtipo de stock reservado), `movimiento_inventario` (inmutable, solo
 inserción), `solicitud_insumos`, `solicitud_item`, `transferencia`,
 `transferencia_item`, `lote` (código, fecha_vencimiento, condiciones de
@@ -66,8 +68,11 @@ salida → transferencia en tránsito → recepción (local) → stock actualiza
 - Escucha: `sales.venta_confirmada` (descuenta insumos según receta),
   `purchases.compra_recibida` (suma stock central),
   `production.orden_completada` (consume insumos, produce subrecetas).
-- Publica: `inventory.stock_bajo_minimo`, `inventory.transferencia_recibida`,
+- Publica: `inventory.stock_consumido` (auditoría del descuento por venta/
+  producción), `inventory.stock_bajo_minimo`, `inventory.transferencia_recibida`,
   `inventory.merma_registrada` (accounting recibe para su reporte de
   pérdidas), `inventory.devolucion_a_proveedor` (purchases gestiona
   reclamo/nota de crédito), `inventory.ajuste_fuera_margen` (accounting/
-  administrador reciben alerta de auditoría).
+  administrador reciben alerta de auditoría),
+  `inventory.lote_vencido_detectado` (notifica y dispara memorándum al
+  responsable si el lote vencido seguía disponible).

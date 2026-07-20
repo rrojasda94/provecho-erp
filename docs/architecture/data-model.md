@@ -6,7 +6,10 @@ se versionan con Alembic y se reflejan aquí.
 Convenciones: tablas y columnas en `snake_case`, PK `id` (UUID), timestamps
 `created_at`/`updated_at`, borrado lógico `deleted_at` donde aplique.
 Toda tabla de negocio referencia su tenant (directa o transitivamente).
-Migraciones SOLO vía Alembic — nunca cambios manuales en producción.
+**Aislamiento de tenant: filtro a nivel de aplicación con `empresa_id`
+obligatorio + tests; RLS de Postgres solo si hiciera falta después
+(ADR-004).** Migraciones SOLO vía Alembic — nunca cambios manuales en
+producción.
 
 Todo **Documento** de negocio (OC, venta, comprobante, asiento, guía de
 remisión, solicitud, transferencia, contrato, planilla, reporte...) lleva:
@@ -19,6 +22,17 @@ una vez emitido (RN-GEN-002).
   entidad_id (vínculo polimórfico a cualquier entidad, RN-ARC-001),
   plantilla_id (si `generado`), subido_por (usuario_id, si `subido`),
   timestamp.
+- **plantilla**: nombre, area (rrhh, compras, comercial...), version,
+  ruta_fuente (doc en `docs/templates/`), requiere_visado_legal (bool),
+  vigente (bool). Base de los documentos generados por el ERP
+  (`archivo.plantilla_id`, `contrato.plantilla_id`); una plantilla nueva
+  se versiona, nunca se edita la vigente en silencio.
+- **contrato** (transversal — lo suscriben distintas áreas): empresa_id,
+  tipo (`laboral` | `alquiler` | `prestacion_servicios` | `comercial` |
+  ...), plantilla_id, partes (contraparte + datos), objeto, motivo,
+  area_suscriptora, visado_por (abogado, RN-CTR-002), autorizado_por
+  (gerencia, RN-CTR-003), vigencia, estado. Todo contrato se registra en
+  el ERP (RN-CTR-004).
 
 ## 1. Organización (transversal)
 
@@ -46,7 +60,9 @@ erDiagram
   empresas (modelo franquicia interna). *Pendiente: condiciones/regalías.*
 - **sucursal**: marca_id (una sola), empresa_id (vía licencia), nombre,
   dirección, estado, tenencia (`propia` | `alquilada` | `del_grupo` —
-  `propia` paga predial/arbitrios, RN-IMP-004), horario de trabajo. Se
+  `propia` paga predial/arbitrios, RN-IMP-004), horario_atencion
+  (disponibilidad al público — el horario laboral de cada trabajador vive
+  en `asistencia`/`contrato_laboral`, no aquí). Se
   abastece del almacén central de su empresa (excepción: gas/bebidas
   embotelladas directo de proveedor, gestión fuera de la sucursal).
 - **almacen**: empresa_id, sucursal_id (NULL si central o de activos), tipo
@@ -79,6 +95,10 @@ erDiagram
   (trabajador), induccion_recibida (bool, RN-EQP-002). Reporte de avería
   → `orden_mantenimiento` (ver Mantenimiento). Mal uso comprobado → reporte
   a RRHH → `memorandum` o `amonestacion` (RN-EQP-003).
+- **flota**: empresa_id, nombre, tipo_vehiculo predominante (`moto` |
+  `carro` | `camion` | ...), descripcion. Agrupador de vehículos de la
+  empresa — funciona como una categoría por la cual ubicar un vehículo
+  (ej. "flota de reparto en moto", "flota de abastecimiento").
 - **vehiculo**: activo_id (extiende `activo` 1:1), flota_id, tipo (`moto` |
   `carro` | `camion` | ...), placa, numero_motor, numero_chasis,
   kilometraje, tenencia (`propio` | `alquilado`), responsable_id
@@ -170,13 +190,18 @@ erDiagram
 - **articulo** (inventariable): id_interno (4 alfanuméricos, autogenerado,
   inmutable, único — RN-GEN-005), nombre, categoria_id (opcional),
   unidad_medida_id, tipo (`insumo` | `subreceta` | `mercaderia` | `empaque`
-  | `repuesto`),
+  | `repuesto` | `suministro` — **enum extensible**: se agregan tipos
+  nuevos cuando el negocio lo requiera, sin migración destructiva),
   costo promedio, archivado (bool — al descontinuarse, oculta sin
   eliminar, RN-GEN-006). Es el concepto genérico (ej. "Harina de Trigo");
   vive en almacenes a través de sus SKU. `mercaderia` es de venta directa
   (sin receta transformadora), se vende vía un producto_comercial cuya
   receta es 1 unidad de sí misma. `empaque` no se incluye en receta_item;
-  su consumo se configura en producto_comercial (ver abajo).
+  su consumo se configura en producto_comercial (ver abajo); cubre también
+  consumibles que acompañan la venta (servilletas, sachets de salsa) — se
+  descuentan por venta según configuración. `suministro` es de consumo
+  interno, no ligado a venta ni a receta: productos de limpieza, útiles de
+  oficina, etc. — se descuenta por movimiento de consumo del área.
 - **sku**: articulo_id, código (mayúsculas sin tildes, números, guiones —
   nomenclatura y formato del área de compras), codigo_barras (EAN/UPC del
   proveedor, opcional — no todo SKU lo tiene, RN-COD-001), prioridad,
@@ -219,6 +244,14 @@ erDiagram
 - **variante_producto**: producto_comercial_id (base), modificadores
   aplicados (ordenados), receta_resultante_id, precio_resultante. Es el
   producto comercial final vendido.
+- **combo**: es un producto_comercial (extiende 1:1 o flag `es_combo`)
+  que une varios productos comerciales para venderse juntos bajo un nombre
+  y precio propios — sube el ticket medio y ayuda a rotar inventarios.
+  Ítems en **combo_item** (producto_comercial_id componente, cantidad).
+  El descuento de stock se hace por la receta de cada componente; el
+  precio del combo es propio (normalmente menor a la suma de los
+  componentes) y su margen de contribución se calcula sobre el costo
+  variable agregado de los componentes.
 
 Separación clave: producto comercial ≠ artículo inventariable. La venta
 descuenta stock vía la receta (ver [../domain/domain-model.md](../domain/domain-model.md)).
@@ -255,6 +288,16 @@ descuenta stock vía la receta (ver [../domain/domain-model.md](../domain/domain
   fecha_apertura, condicion_almacenamiento (`refrigerado` | `congelado` |
   `ambiente`) — nullable, para calcular vida útil tras apertura
   (RN-VNC-003).
+- **stock_lote**: almacen_id, sku_id, lote_id, cantidad, estado
+  (`disponible` | `bloqueado` | `agotado`). Detalle del stock por lote —
+  la suma de sus cantidades por almacén/SKU cuadra con `stock.cantidad`.
+  Es lo que hace implementable FEFO/FIFO: el picking sugiere el lote
+  según `lote.fecha_vencimiento` (o fecha de ingreso); alerta de
+  vencimiento próximo con ventana configurable por artículo. Un lote
+  vencido hallado aún `disponible` se bloquea de inmediato y dispara
+  `inventory.lote_vencido_detectado` → notificación + memorándum al
+  responsable del almacén (vía RRHH), para que no se repita — apoya la
+  rotación de inventarios (RN-VNC-001..003).
 - **reserva_stock**: almacen_id, sku_id, cantidad, tipo (`solicitud` |
   `produccion` | `merma` | `carrito`), referencia_id (solicitud_id/
   orden_produccion_id/carrito_id; o motivo `devolucion`|`rechazo_sucursal`|
@@ -264,8 +307,14 @@ descuenta stock vía la receta (ver [../domain/domain-model.md](../domain/domain
   físico − Σ reservas activas (RN-INV-009).
 - **conteo**: almacen_id, tipo (`rutina` | `ajuste` | `auditoria`), fecha,
   usuario_id. Ítems en **conteo_item** (sku_id, cantidad_contada,
-  cantidad_sistema, diferencia). Una diferencia genera un
-  `movimiento_inventario` tipo `ajuste`.
+  cantidad_sistema, diferencia). Una diferencia genera un `ajuste`.
+- **ajuste**: almacen_id, conteo_id (opcional — origen), motivo
+  (`sobrante` | `faltante` | `merma` | `error_registro`), solicitado_por,
+  aprobado_por (permisos separados `inventory.solicitar_ajuste` /
+  `inventory.aprobar_ajuste`, nunca el mismo usuario), dentro_margen
+  (bool — fuera del margen de error exige investigación documentada y
+  dispara `inventory.ajuste_fuera_margen`, RN-INV-015), estado. Al
+  aprobarse genera el `movimiento_inventario` tipo `ajuste`.
 - **movimiento_inventario**: almacen_id, sku_id, cantidad (+/-), tipo
   (`recepcion_compra` | `transferencia_salida` | `transferencia_entrada` |
   `consumo_venta` | `consumo_produccion` | `produccion_entrada` | `ajuste` |
@@ -295,19 +344,24 @@ descuenta stock vía la receta (ver [../domain/domain-model.md](../domain/domain
   ruc_emisor, ruc_receptor, lugar_origen, lugar_destino, motivo_traslado,
   chofer, vehiculo_id. Emitida por el área de almacén (RN-GDR-002);
   resguardada por contabilidad (RN-GDR-003).
-- **contrato**: empresa_id, tipo (`laboral` | `alquiler` |
-  `prestacion_servicios` | `comercial` | ...), plantilla_id, partes
-  (contraparte + datos), objeto, motivo, area_suscriptora, visado_por
-  (abogado, RN-CTR-002), autorizado_por (gerencia, RN-CTR-003), vigencia,
-  estado. Todo contrato se registra en el ERP (RN-CTR-004).
 
 ## 5. Compras (módulo purchases)
 
 - **proveedor**: RUC + razon_social (si empresa) o persona_id (si persona
-  natural, ej. RHE), contacto, condiciones, afecto_igv (bool — dentro/fuera
-  de región amazónica, RN-IMP-002), sujeto_spot (bool + porcentaje_deteccion,
-  RN-IMP-003). Si natural, nombre/documento se leen de `persona`
-  (RN-GEN-007).
+  natural, ej. RHE), contacto, condiciones (condición de pago: contado o
+  crédito + plazo pactado — accounting la usa al ejecutar el pago),
+  formal (bool — `false` para proveedor informal de mercado/supermercado:
+  sin RUC obligatorio, compra sin OC vía caja chica, RN-CMP-011..016),
+  clasificacion (`regular` | `preferente` — preferente habilita el camino
+  simplificado de OC sin cotización comparativa), afecto_igv (bool —
+  dentro/fuera de región amazónica, RN-IMP-002), sujeto_spot (bool +
+  porcentaje_deteccion, RN-IMP-003). Si natural, nombre/documento se leen
+  de `persona` (RN-GEN-007).
+- **evaluacion_proveedor**: proveedor_id, indicador_automatico (JSONB —
+  cumplimiento de plazo, conformidad de recepción, variación de precio;
+  recalculado en cada recepción, sin batch aparte), registro_cualitativo
+  (revisión humana solo sobre alertas), periodo, estado. Emite
+  `purchases.evaluacion_proveedor_actualizada`.
 - **cotizacion**: dirección (`de_proveedor` | `a_cliente`), proveedor_id
   (si es de proveedor) o cliente_id (si es a cliente), emisor, receptor,
   items (descripcion, precio_unitario, cantidad, total), condiciones_pago,
@@ -315,15 +369,42 @@ descuenta stock vía la receta (ver [../domain/domain-model.md](../domain/domain
   la compra (RN-DOC-007); de proveedor la solicita compras y la evalúa
   contabilidad/finanzas (RN-DOC-008); a cliente la emite comercial según
   tarifario/lista de precios (RN-DOC-009).
-- **orden_compra**: proveedor_id, cotizacion_id (opcional — origen;
-  precios unitarios se actualizan con la respuesta, RN-CMP-004),
-  almacen_destino_id, estado (`borrador` | `emitida` | `recibida_parcial` |
-  `recibida` | `anulada`), idempotency_key. Ítems en **orden_compra_item**
-  (articulo, cantidad, costo).
+- **orden_compra**: proveedor_id, tipo (`insumo` | `activo`),
+  cotizacion_id (opcional — origen; precios unitarios se actualizan con la
+  respuesta, RN-CMP-004; camino simplificado: proveedor `preferente` +
+  ítem recurrente emite sin cotización, sustento = requerimiento de
+  almacén + factura), requerimiento_activo_id (obligatorio si tipo
+  `activo`), almacen_destino_id, estado (`borrador` | `emitida` |
+  `recibida_parcial` | `recibida` | `anulada`), idempotency_key. Ítems en
+  **orden_compra_item** (articulo, cantidad, costo).
+- **requerimiento_activo**: area_solicitante, especificacion (ficha
+  técnica requerida), aprobado_area (bool + aprobador), aprobado_gerencia
+  (bool + aprobador — dos aprobaciones distintas, ambas registradas,
+  bloqueo a nivel de dominio antes de emitir la OC tipo `activo`),
+  cotizaciones vinculadas (mínimo 2), estado.
 - **recepcion_compra**: orden_compra_id, comprobante_id (sustento,
   RN-CMP-005), asiento_id, movimiento_dinero_id (egreso o crédito con
-  plazo, RN-CMP-006/007 — módulo tesorería, ver sección 9), ítems recibidos
-  → genera `movimiento_inventario` en almacén central.
+  plazo, RN-CMP-006/007 — módulo tesorería, ver sección 9), ítems
+  recibidos en **recepcion_item** → genera `movimiento_inventario` en
+  almacén central y recalcula `evaluacion_proveedor.indicador_automatico`.
+  La conformidad del comprobante emite `purchases.comprobante_conforme`;
+  **accounting ejecuta el pago** según la condición de la ficha del
+  proveedor — purchases nunca paga.
+- **caja_chica_compras**: empresa_id, responsable_id (encargado de
+  compras), fondo_fijo (monto), estado. Fondo fijo para compra menor a
+  proveedor informal.
+- **caja_chica_movimiento**: caja_chica_id, compra_directa_id (o concepto),
+  monto, comprobante_id (obligatorio — sin comprobante no se persiste),
+  fecha. Solo inserción.
+- **compra_directa**: proveedor_id (informal), requerimiento origen
+  (sucursal/área), items, monto, comprobante_id (obligatorio),
+  caja_chica_movimiento_id, idempotency_key. Compra sin OC (RN-CMP-011).
+- **rendicion_caja_chica**: caja_chica_id, periodo (semana), gasto_total,
+  efectivo_restante, diferencia (gasto + efectivo − fondo_fijo), estado
+  (`conforme` | `con_diferencia` — no se repone el fondo hasta resolverse;
+  faltante no sustentado → reporte a RRHH, memorándum y descuento por
+  planilla, RN-CMP-017), conciliado_por (accounting). Emite
+  `purchases.caja_chica_rendida`.
 
 ## 6. Ventas (módulo sales)
 
@@ -381,6 +462,30 @@ Solicitud.
   estado (`en_caja` | `en_supervisor` | `en_contabilidad` | `disponible`),
   timestamps por relevo (RN-MDP-002). Cada transición exige confirmación
   de valores correctos por el receptor.
+- **apertura_caja** (PROC-CTB-002): punto_venta_id, cajero_id,
+  relevo_encargado_id (relevo autenticado por ambas partes con
+  usuario+PIN), monto_apertura (RN-POS-003), detalle_denominaciones
+  (JSONB — conteo por billete/moneda), diferencia_reportada (opcional —
+  no se apertura sin registrarla; notifica a contabilidad y gerencia),
+  pos_verificados (JSONB — serie/código de comercio de cada POS de
+  tarjeta, RN-POS-010), timestamp. Inicia la cadena de custodia inversa
+  (RN-MDP-002).
+- **cierre_caja** (PROC-CTB-001 v1.1): apertura_caja_id, cajero_id,
+  montos_esperados (JSONB por medio de pago), montos_reales (JSONB),
+  descuadre (monto + atribución: `cajero` | `tercero_reportado` |
+  `encargado` — según reporte previo y validación del relevo),
+  reportes_pos (archivos de cierre de lote), relevos (cajero → encargado
+  → contabilidad, cada uno autenticado con usuario+PIN, timestamps),
+  custodia (`local_caja_fuerte` | `traslado_contabilidad`, RN-MDP-006),
+  estado. Irregularidades notifican a contabilidad, gerencia y RRHH.
+- **arqueo**: punto_venta_id, tipo (`sorpresa` | `programado`),
+  realizado_por, monto_esperado, monto_contado, diferencia, acta_id.
+  Verificación puntual de caja fuera del ciclo apertura/cierre.
+- **reporte_escalamiento**: origen (`central_pedidos` | `punto_venta`),
+  venta_id o carrito_id, motivo (`queja` | `demora` | `error_sistema` |
+  `desistimiento_no_resuelto` | ...), escalado_a (`supervisor` |
+  `encargado_sucursal`), estado, resolucion. *Definición inicial mínima —
+  validar alcance con el negocio (ver ROADMAP, pendientes).*
 - **carta_disputa_pago**: operacion_id (venta/pago), fecha, hora,
   cliente_id, referencia_pago, lote, monto, procedencia (o motivo de
   ausencia), emitida_por (área contable, RN-MDP-004).
@@ -462,7 +567,8 @@ un trabajador puede o no tener usuario, y no todo usuario es trabajador
 - **socio**: grupo_id o empresa_id, persona_id o razon_social+ruc,
   porcentaje_participacion. Referenciado en aprobaciones (RN-GRP-006,
   RN-MAR-004); no implica `trabajador` ni `usuario`.
-- **contrato_laboral**: es un `contrato` tipo `laboral` (ver §7) — modalidad
+- **contrato_laboral**: es un `contrato` tipo `laboral` (entidad
+  transversal, ver convenciones al inicio del documento) — modalidad
   (`indeterminado` | `plazo_fijo` | `parcial` | ...), trabajador_id,
   jornada, remuneracion, fecha_inicio, fecha_fin (si plazo fijo).
 - **boleta_pago**: trabajador_id, periodo (mes/año), dias_laborados,
@@ -501,6 +607,6 @@ manuales, y visadas por abogado antes de uso (RN-CTR-002).
 
 ## 9. Módulos futuros
 
-Transporte (ruta, despacho), caja (apertura/cierre, arqueo), tesorería,
-activos, proyectos, BI/reportes: se especifican en su módulo antes de
-implementarse.
+Transporte (ruta, despacho), tesorería, activos, proyectos, BI/reportes:
+se especifican en su módulo antes de implementarse. Caja ya no es futuro:
+apertura/cierre/arqueo quedaron especificados en §6 (PROC-CTB-001/002).

@@ -1,4 +1,4 @@
-# ADR 0001 — Modular Monolith
+# ADR-001 — Modular Monolith
 
 - Estado: aceptado
 - Fecha: 2026-07-04

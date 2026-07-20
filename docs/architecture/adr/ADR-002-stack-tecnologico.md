@@ -1,4 +1,4 @@
-# ADR 0002 — Stack tecnológico
+# ADR-002 — Stack tecnológico
 
 - Estado: aceptado
 - Fecha: 2026-07-04
@@ -18,6 +18,6 @@
 
 ## Pendientes (ADRs futuros)
 
-- ~~Pasarela de pago~~: resuelto en ADR 0003 (Izipay).
+- ~~Pasarela de pago~~: resuelto en ADR-003 (Izipay).
 - App Android 15+: PWA (TWA) vs app nativa/React Native. La API REST sirve a ambas.
 - Broker de notificaciones y canales.

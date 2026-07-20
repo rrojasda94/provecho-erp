@@ -1,4 +1,4 @@
-# ADR 0003 — Pasarela de pago: Izipay
+# ADR-003 — Pasarela de pago: Izipay
 
 - Estado: aceptado
 - Fecha: 2026-07-04

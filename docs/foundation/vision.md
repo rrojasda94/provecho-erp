@@ -112,7 +112,7 @@ Tenencia: propia de la empresa, alquilada a un tercero ajeno, o propiedad
 del grupo empresarial.
 
 Responsabilidades: operar la marca asignada; custodiar su almacén; mantener
-personal designado por la empresa vía ERP bajo un horario de trabajo definido;
+personal designado por la empresa vía ERP bajo un horario laboral definido;
 mantener bienes muebles, material de marca y equipamiento según los manuales
 comerciales de la marca; mantener vigentes autorizaciones municipales y
 regulatorias; mantener dispositivos de seguridad; recibir mantenimiento y
@@ -166,7 +166,7 @@ eliminación a la empresa operadora y luego desinfección total antes de
 reanudar; debe estar homologada con todas las cocinas de producción del
 grupo.
 
-Configurable en el ERP: horario de trabajo, cronograma de producción por
+Configurable en el ERP: horario laboral, cronograma de producción por
 tipo de receta/proceso, equipamiento completo y calibrado (balanzas,
 medidores de pH, viscosidad, salinidad, azúcar, alcohol, etc.), plan de
 mantenimiento rutinario de equipos, control de temperatura/humedad

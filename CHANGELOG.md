@@ -7,9 +7,57 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Added
 
+- **Área RRHH** (2026-07-19): `docs/rrhh/` (marco legal laboral REMYPE,
+  perfiles de puesto), 13 SOPs en
+  `docs/diagrams/Procesos/Recursos-Humanos/` (Reclutamiento, Contratación,
+  Inducción), 9 plantillas en `docs/templates/rrhh/`. Reglas RN-RRHH-012 a
+  RN-RRHH-014; RN-RRHH-005 corregida (15 días de vacaciones REMYPE).
+- **Área Compras** (2026-07-19): `docs/compras/` (marco legal-tributario
+  Amazonía/SPOT, perfil de encargado), 11 SOPs en
+  `docs/diagrams/Procesos/Compras/` (Proveedores, Cotización-OC,
+  Recepción-Pago, Caja-Chica, Activos-Equipamiento), 6 plantillas.
+  Reglas RN-CMP-008 a RN-CMP-017. Spec `src/modules/purchases/README.md`
+  actualizada (3 caminos de compra, caja chica, OC tipo activo, pago lo
+  ejecuta accounting).
+- **Área Comercial** (2026-07-19): `docs/comercial/` (política de
+  precio/margen/promociones/metas, perfil de jefe comercial), 9 SOPs
+  nuevos en `docs/diagrams/Procesos/Comercial/` (Estrategia-Mercado,
+  Precios-Promociones, Metas-Desempeno), 5 plantillas. Reglas RN-CML-001
+  a RN-CML-006; glosario: Margen de Contribución. Spec
+  `src/modules/sales/README.md` actualizada (vigencia de promoción,
+  margen de contribución, precio por nueva versión).
+- **Área Almacén y Logística** (2026-07-19): `docs/almacen-logistica/`
+  (política FEFO/FIFO, conteo/ajuste, perfiles de almacén y chofer),
+  8 SOPs nuevos en `docs/diagrams/Procesos/Logistica-Almacen/`
+  (Conteo-Auditoria, Vencimientos-Mermas, Transporte-Transferencias),
+  6 plantillas. Spec `src/modules/inventory/README.md` actualizada
+  (lote, merma, ajuste solicitar/aprobar, transferencia lateral).
+- ADR-004: aislamiento de tenant por filtro de aplicación con
+  `empresa_id` obligatorio + tests (RLS de Postgres como refuerzo futuro).
+- Catálogo de eventos completado con los eventos ya declarados en las
+  specs de módulos: `inventory.merma_registrada`,
+  `inventory.devolucion_a_proveedor`, `inventory.ajuste_fuera_margen`,
+  `inventory.lote_vencido_detectado` (nuevo — lote vencido hallado
+  disponible notifica y dispara memorándum), `purchases.comprobante_conforme`,
+  `purchases.caja_chica_rendida`, `purchases.evaluacion_proveedor_actualizada`,
+  `users.sesion_iniciada`, `accounting.asiento_generado`,
+  `accounting.periodo_cerrado` (`docs/architecture/events.md`).
+- Modelo de datos: entidades `plantilla`, `flota`, `combo`/`combo_item`,
+  `stock_lote` (stock por lote — hace implementable FEFO/FIFO),
+  `ajuste`, `apertura_caja`, `cierre_caja`, `arqueo`,
+  `reporte_escalamiento` (definición mínima, por validar), y bloque de
+  Compras (`caja_chica_compras`, `caja_chica_movimiento`,
+  `compra_directa`, `rendicion_caja_chica`, `evaluacion_proveedor`,
+  `requerimiento_activo`); `articulo.tipo` gana `suministro` (consumo
+  interno: limpieza, oficina) y queda declarado como enum extensible.
+- Glosario: "Horario laboral" y "Horario de atención" (términos oficiales,
+  reemplazan "horario de trabajo").
+- Repositorio git inicializado (commit inicial con el estado
+  pre-correcciones para trazabilidad).
+
 - Branding Provecho aplicado: paleta, tipografías (Anton Italic + Inter) y
   tokens CSS (`docs/product/ui-ux.md`).
-- ADR 0003: Izipay como pasarela de pago.
+- ADR-003: Izipay como pasarela de pago.
 - `PROC-COM-002` Cobro y Emisión de Comprobante de Pago v1.0: narrativa +
   Mermaid en `docs/domain/workflows.md`, diagrama BPMN 2.0 en
   `docs/diagrams/Procesos/Comercial/PROC-COM-002-v1.0.bpmn` (detalle del
@@ -38,6 +86,26 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Changed
 
+- `PROC-CMP-001` Compras v1.0 → v2.0: tres caminos de compra (informal/
+  caja chica, preferente sin cotización comparativa, estándar/activo con
+  RFQ) y ejecución del pago trasladada a Contabilidad (Compras solo
+  sustenta el comprobante conforme). Registro maestro y `workflows.md`
+  actualizados.
+- Identidad de nombres unificada: **Provecho** = ERP, **Grupo Majambo** =
+  grupo empresarial (corregido `docs/00_PROJECT.md`, aclarado en
+  `CLAUDE.md`).
+- Referencias de ADR normalizadas a 3 dígitos (`ADR-001`..`ADR-004`);
+  ruta corregida en `CLAUDE.md` (`docs/architecture/adr/`).
+- Entidad `contrato` reubicada como transversal (antes aparecía dentro de
+  la sección de Inventario del data-model); referencia rota de
+  `contrato_laboral` corregida.
+- Specs de módulos sincronizadas con el catálogo de eventos (secciones
+  Publica/Escucha de sales, inventory, purchases, accounting) y mapa
+  `docs/diagrams/modules.md` regenerado.
+- `docs/diagrams/README.md` actualizado a la convención real: SOPs
+  primero y BPMN después, taxonomía `Procesos/<Área>/<Grupo>/`, versiones
+  antiguas de BPMN se conservan para análisis.
+
 - `PROC-INV-001` Abastecimiento de locales v0.1 → v0.2: detalla el conteo
   de fin de jornada en sucursal (balanzas, lector QR, ventana de 5 min
   fuera de refrigeración, alerta por margen de error RN-INV-015, cálculo
@@ -58,6 +126,15 @@ Versionado: [SemVer](https://semver.org/lang/es/).
   eventos, máquinas de estado, autorización (RBAC, separada de seguridad).
 - `AI_RULES` → `engineering/engineering-guide.md` (guía extensa; `/CLAUDE.md`
   la resume y apunta a ella).
+
+### Removed
+
+- Borradores duplicados de Venta: carpeta `docs/diagrams/Procesos/Ventas/`
+  (BPMN/BPM de borrador — el vigente es
+  `Comercial/PROC-COM-001-v1.0.bpmn`) y `docs/diagrams/Ventas.bpm`.
+  `Cobro-PROC-COM-002-v1.0.bpmn.bpm` renombrado a
+  `PROC-COM-002-v1.0.bpm` (archivo de proyecto Bizagi, doble extensión
+  corregida).
 
 ## [0.1.0] - 2026-07-04
 

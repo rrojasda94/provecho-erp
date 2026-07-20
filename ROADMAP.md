@@ -24,14 +24,14 @@ Registro de lo construido y lo pendiente. Actualizar en cada cambio relevante.
 | Producción (fabricación) | ⬜ | Módulo futuro `production` |
 | Solicitudes / picking / transporte | ⬜ | Módulos futuros `requests`, `logistics` |
 | RRHH: procesos y plantillas (reclutamiento, contratación, inducción) | ✅ 2026-07-19 | `docs/rrhh/`, 13 SOPs, 9 plantillas — ver detalle abajo. Módulo backend `rrhh` sigue pendiente |
-| Compras: procesos y plantillas (proveedores, cotización, OC, recepción, pago, caja chica, activos) | ✅ 2026-07-19 | `docs/compras/`, 9 SOPs, 6 plantillas — ver detalle abajo. Módulo backend `purchases` actualizado conforme al flujo |
+| Compras: procesos y plantillas (proveedores, cotización, OC, recepción, pago, caja chica, activos) | ✅ 2026-07-19 | `docs/compras/`, 11 SOPs, 6 plantillas — ver detalle abajo. Módulo backend `purchases` actualizado conforme al flujo |
 | Comercial: procesos y plantillas (precio/margen, promociones, mercado, metas, desempeño, capacitación) | ✅ 2026-07-19 | `docs/comercial/`, 9 SOPs, 5 plantillas — ver detalle abajo. Módulo backend `sales` ajustado (margen, vigencia de promoción) |
 | Almacén-Logística: procesos y plantillas (conteo, vencimientos/merma, transporte/transferencias) | ✅ 2026-07-19 | `docs/almacen-logistica/`, 8 SOPs, 6 plantillas — ver detalle abajo. Módulo backend `inventory` ajustado (lote, merma, ajuste solicitar/aprobar) |
 | Producción, Contabilidad, Marketing, Gerencia: procesos y plantillas | ⬜ | Mismo patrón que RRHH/Compras/Comercial/Almacén-Logística — pendiente, un área a la vez |
 | Mantenimiento, Sistemas/TI como áreas propias | ⬜ | Definidas como áreas del negocio (posible tercerización); documentación pendiente, desactivadas por ahora |
 | RRHH backend, supervisión, CRM, tesorería, activos, proyectos, BI, reportes | ⬜ | Módulos futuros |
 | Integración Nubefact | ⬜ | Adaptador en `src/shared/integrations/` |
-| Integración Izipay | ⬜ | Proveedor decidido (ADR 0003) |
+| Integración Izipay | ⬜ | Proveedor decidido (ADR-003) |
 | Integraciones Google / Meta | ⬜ | |
 | Agentes IA para pedidos | ⬜ | |
 | Notificaciones | ⬜ | Celery + canales por definir |
@@ -41,6 +41,43 @@ Registro de lo construido y lo pendiente. Actualizar en cada cambio relevante.
 | Observabilidad (métricas, trazas, logs centralizados) | ⬜ | |
 | UX: menús, buscadores, breadcrumbs, atajos, sidebars, dashboards | ⬜ | Definición pendiente con el usuario |
 | Branding (paleta, tipografías, tokens CSS) | ✅ 2026-07-04 | Brandboard aplicado — `docs/product/ui-ux.md` |
+
+## Pendientes de decisión (registro vivo)
+
+Marcar aquí cuando cada uno se resuelva (y actualizar el doc que lo
+contiene, buscando su `[[ COMPLETAR ]]`):
+
+- ⬜ Umbral de aprobación de OC en soles (`marco-legal-compras.md`,
+  plantilla de OC, SOP de aprobación; ¿umbral separado para activos?).
+- ⬜ Aprobador suplente de OC en ausencia del administrador.
+- ⬜ Margen de contribución mínimo objetivo (con contabilidad).
+- ⬜ Esquema de incentivo/comisión de metas de venta (Comercial + RRHH +
+  Gerencia, nunca retroactivo).
+- ⬜ Frecuencia de conteo cíclico y de conteo general de Almacén Central.
+- ⬜ Margen de error de ajuste de inventario (con Contabilidad).
+- ⬜ Quién autoriza ajustes de inventario (admin vs. supervisor de
+  logística — rol aún no existe formalmente).
+- ⬜ Monto del fondo de caja chica de compras + mecanismo de reposición
+  cuando hay faltante en descuento (con contador).
+- ⬜ Plazo interno de envío de comprobantes al contador.
+- ⬜ Rangos salariales de los 7 perfiles de puesto (con administración).
+- ⬜ `reporte_escalamiento`: validar alcance y campos con el negocio
+  (definición mínima ya en `data-model.md` §6).
+- ⬜ Cumplimiento de pedido: ¿1 proceso o 2 (Producción/Cocina +
+  Despacho/Entrega)? Bloquea `venta_entregada`/`encuesta_enviada`.
+- ⬜ Módulo `marketing`: README/contrato propio.
+- ⬜ Tratamiento de contratos vigentes al salir de REMYPE (~jul 2027).
+- ⬜ Entidades de datos de Comercial-estrategia (metas de venta,
+  evaluación de desempeño comercial, plan de capacitación, hallazgos de
+  mercado) y de RRHH-proceso (convocatoria, entrevista/evaluación,
+  inducción, evaluación de periodo de prueba) — SOPs y plantillas ya
+  existen, falta llevarlas a `data-model.md`.
+- ⬜ BPMN de las áreas nuevas (RRHH, Compras, Comercial-estrategia,
+  Almacén-Logística): enfoque vigente es **primero SOP, luego BPMN** —
+  los BPMN se agregan por área cuando sus SOPs estén estables, y en ese
+  momento se registran los PROC en el registro maestro.
+- ⬜ BPMN pendientes ya declarados: contingencias de personal faltante
+  (RN-RRHH-011) y tardanza/falta del encargado (RN-RRHH-010).
 
 ## Orden sugerido de desarrollo
 
@@ -292,7 +329,8 @@ Incorporado:
   evaluación, evaluación periódica), `Cotizacion-OC/` (solicitud de
   cotización, emisión de OC, aprobación sobre umbral), `Recepcion-Pago/`
   (recepción en Almacén Central, conformidad de comprobante, pago a
-  proveedor). 7 SOPs.
+  proveedor). 8 SOPs (con el ajuste posterior de caja chica y activos:
+  11 en total).
 - `docs/templates/compras/` — 4 plantillas: ficha de proveedor, solicitud
   de cotización (RFQ), orden de compra, evaluación de proveedor.
 - `business-rules.md` — RN-CMP-008 a RN-CMP-010 (bloqueo de OC sobre
@@ -440,6 +478,35 @@ Pendiente (declarado, no bloquea): frecuencia exacta de conteo cíclico y
 margen de error de ajuste (quedan `[[ COMPLETAR ]]`, a definir con
 Contabilidad); quién autoriza ajustes (admin vs. supervisor de logística,
 rol aún no existe formalmente).
+
+### Revisión de consistencia y correcciones (2026-07-20)
+
+Revisión completa del proyecto (SOPs, áreas, docs transversales, specs).
+Correcciones aplicadas en la misma sesión:
+
+- **git init** con commit inicial del estado previo (trazabilidad).
+- Identidad: Provecho = ERP, Grupo Majambo = grupo (00_PROJECT, CLAUDE).
+- ADRs normalizados a 3 dígitos; ruta corregida en CLAUDE.md; **ADR-004**
+  nuevo: tenant por filtro de aplicación (`empresa_id` obligatorio +
+  tests; RLS como refuerzo futuro).
+- Glosario: **Horario laboral** vs **Horario de atención** definidos;
+  "horario de trabajo" reemplazado; `sucursal.horario_atencion` en
+  data-model.
+- Catálogo de eventos sincronizado con las specs (10 eventos agregados,
+  incl. `inventory.lote_vencido_detectado`); READMEs de módulos y mapa
+  `diagrams/modules.md` alineados.
+- Data-model: bloque Compras completo (caja chica, compra directa,
+  evaluación de proveedor, requerimiento de activo), `stock_lote`
+  (FEFO/FIFO implementable + bloqueo de vencidos con memorándum),
+  `ajuste`, `apertura_caja`/`cierre_caja`/`arqueo` (caja ya no es módulo
+  "futuro"), `flota`, `combo`, `plantilla`; `contrato` reubicado como
+  transversal; `articulo.tipo` + `suministro` (enum extensible).
+- `PROC-CMP-001` v1.0 → v2.0 (3 caminos de compra, pago en Contabilidad).
+- Limpieza: borradores `Procesos/Ventas/` y `diagrams/Ventas.bpm`
+  eliminados; doble extensión `.bpmn.bpm` corregida; `diagrams/README.md`
+  reescrito (SOP primero → BPMN después; versiones antiguas se conservan).
+- CHANGELOG puesto al día (todo el trabajo del 2026-07-19 + esta sesión).
+- Skill `sop-creator` endurecida para no dejar cabos sueltos (ver skill).
 
 ### Fase de procesos (tras el modelado de BD)
 
