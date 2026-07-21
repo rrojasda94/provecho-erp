@@ -121,6 +121,8 @@ def _crear_cadena_base(session):
     punto_venta = PuntoVenta(
         sucursal_id=sucursal.id,
         canal="trabajador",
+        serie_boleta="B001",
+        serie_factura="F001",
         politica_pago="al_finalizar",
     )
     session.add(punto_venta)

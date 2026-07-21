@@ -410,7 +410,9 @@ descuenta stock vía la receta (ver [../domain/domain-model.md](../domain/domain
 ## 6. Ventas (módulo sales)
 
 - **punto_venta**: sucursal_id, canal (`trabajador` | `web` | `kiosko`),
-  hardware_id (NULL si web), modalidades_habilitadas (array
+  hardware_id (NULL si web), serie_boleta, serie_factura (series SUNAT
+  separadas por punto de venta — decisión 2026-07-20; `comprobante.serie`
+  copia el valor vigente al emitir, es snapshot inmutable), modalidades_habilitadas (array
   `mesa`|`takeout`|`delivery`, RN-MDC-001), datos_minimos_por_modalidad
   (JSONB — ej. delivery exige dirección, RN-MDC-002), política de pago
   (`adelantado` | `al_finalizar` — según autoatención o atención en mesa).
@@ -461,14 +463,20 @@ Solicitud.
   plataforma externa, sin vínculo laboral ni gestión como Vehículo/
   Mantenimiento propio, RN-PER-003).
 - **venta_item**: producto_comercial_id, cantidad, precio unitario, descuento.
-- **medio_pago**: nombre, direccion (`cobro` | `pago` | `ambos`), tipo
+- **medio_pago**: empresa_id (catálogo por empresa, no global del grupo —
+  decisión 2026-07-20: cada empresa pacta su propia pasarela/comisión),
+  nombre, direccion (`cobro` | `pago` | `ambos`), tipo
   (`efectivo` | `tarjeta_credito` | `tarjeta_debito` | `billetera_digital`
   | `transferencia` | `cheque` | `credito_empresarial`), comision_pct,
   activo (puede desactivarse/rechazarse), activa_promocion (bool),
   lista_precio_credito_id (opcional, si a crédito aplica otra lista de
   precios, RN-MDP-001).
-- **pago**: venta_id, medio_pago_id, pasarela (izipay), referencia
-  externa, estado.
+- **pago**: venta_id, medio_pago_id, monto (obligatorio — una venta puede
+  cobrarse con varios `pago`, confirmado 2026-07-20 como caso real del
+  negocio, no solo capacidad técnica; suma de `pago.monto` debe igualar
+  `venta.total` antes de `estado=pagada`, RN-COM-016), pasarela (izipay),
+  referencia externa, idempotency_key (obligatoria al registrar pago,
+  RN-COM-002), estado.
 - **custodia_efectivo**: apertura_caja_id, monto, responsable_actual_id,
   estado (`en_caja` | `en_supervisor` | `en_contabilidad` | `disponible`),
   timestamps por relevo (RN-MDP-002). Cada transición exige confirmación
@@ -507,14 +515,21 @@ Solicitud.
 - **carta_disputa_pago**: operacion_id (venta/pago), fecha, hora,
   cliente_id, referencia_pago, lote, monto, procedencia (o motivo de
   ausencia), emitida_por (área contable, RN-MDP-004).
-- **comprobante**: empresa_id, venta_id (o compra_id si es de egreso),
+- **comprobante** (entidad transversal — sirve tanto a `sales` emitiendo
+  como a `purchases`/`accounting` recibiendo; vive en `shared`, no en un
+  módulo dueño único): empresa_id, venta_id (si `emitido`) o compra_id
+  (si `recibido` — FK diferida, `purchases` aún no modela sus tablas de
+  recepción), punto_venta_id (si `emitido` — origen de la serie),
   direccion (`emitido` | `recibido`), tipo (`boleta` | `factura` | `nc` si
   emitido; `factura` | `rhe` | `boleta` | `ticket_compra` si recibido,
-  RN-CPP-001/002), serie (asignada por punto_venta_id), correlativo (único
-  por serie/empresa — nunca se repite, RN-CPP-007), sustento (`efectivo` |
-  `voucher_medio_pago` | `movimiento_bancario` | `contrato_credito`,
-  RN-CPP-003), idempotency_key (anti-duplicado/reemisión, RN-CPP-008),
-  estado Nubefact, respuesta (JSONB).
+  RN-CPP-001/002 — el conjunto válido según dirección se valida en el
+  dominio, no en el esquema), serie (snapshot de
+  `punto_venta.serie_boleta`/`serie_factura` al momento de emitir —
+  inmutable aunque el punto de venta cambie de serie después), correlativo
+  (único por empresa+serie — nunca se repite, RN-CPP-007), sustento
+  (`efectivo` | `voucher_medio_pago` | `movimiento_bancario` |
+  `contrato_credito`, RN-CPP-003), idempotency_key (anti-duplicado/
+  reemisión, RN-CPP-008), estado Nubefact, respuesta (JSONB).
 - **cliente**: grupo_id (transversal al grupo, no a una empresa —
   RN-PTS-001), tipo (`natural` | `juridico` — ej. cliente corporativo:
   catering/eventos), persona_id (si `natural`) o razon_social + ruc (si

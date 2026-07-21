@@ -15,12 +15,25 @@ electrónicos vía Nubefact.
 Venta — `cliente`, `punto_venta`, `producto_comercial`, `venta`,
 `venta_item` (`src/modules/sales/infrastructure/models/`). `venta_item`
 guarda su propio `precio_unitario` (snapshot), por eso no depende de
-`lista_precio`/`precio` para existir. Diferido a un slice posterior:
-`modificador`, `variante_producto`, `combo`, `lista_precio`, `precio`,
-`promocion`, `medio_pago`, `pago`, `comprobante` (PROC-COM-002), `carrito`,
-`central_pedidos`, `cuenta_puntos`/`puntos_movimiento`.
-`venta.estado` implementado con el enum vigente (`orden`|`pagada`|
-`facturada`|`anulada`, RN-COM-005) — no el enum viejo de 8 estados.
+`lista_precio`/`precio` para existir. `venta.estado` implementado con el
+enum vigente (`orden`|`pagada`|`facturada`|`anulada`, RN-COM-005) — no
+el enum viejo de 8 estados. `venta.numero_orden` (RN-COM-014) es el
+correlativo por sucursal+día que ve el personal; `cliente.usuario_id`
+(RN-COM-015) es la cuenta web opcional, nunca requerida en sucursal/
+Central de Pedidos.
+
+**Cobro (PROC-COM-002, mismo día):** `medio_pago` (catálogo por
+empresa), `pago` (RN-COM-002/016 — una venta admite varios `pago`, pago
+dividido confirmado como caso real; suma de montos debe igualar
+`venta.total`). `comprobante` vive en `shared` (transversal a sales/
+purchases/accounting, no en este módulo). `punto_venta.serie_boleta`/
+`serie_factura` (series SUNAT separadas) alimentan el `comprobante.serie`
+al emitir.
+
+Diferido a un slice posterior: `modificador`, `variante_producto`,
+`combo`, `lista_precio`, `precio`, `promocion`, `carrito`,
+`central_pedidos`, `cuenta_puntos`/`puntos_movimiento`,
+`carta_disputa_pago`.
 
 ## Casos de uso
 

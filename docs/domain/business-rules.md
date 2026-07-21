@@ -884,6 +884,10 @@ de su módulo y se prueban de forma aislada.
   nunca es requisito para comprar en sucursal o por Central de Pedidos
   — esas ventas enrutan al mismo `cliente` por sus datos (persona/
   contacto), sin necesidad de login.
+- **RN-COM-016** Una venta puede cobrarse con más de un medio de pago
+  (ej. mitad efectivo, mitad tarjeta) — confirmado 2026-07-20 como caso
+  real del negocio. La suma de `pago.monto` de una venta debe igualar
+  `venta.total` antes de que la venta pase a `estado=pagada`.
 
 ## Comercial — estrategia
 

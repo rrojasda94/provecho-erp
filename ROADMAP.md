@@ -13,7 +13,7 @@ Registro de lo construido y lo pendiente. Actualizar en cada cambio relevante.
 | Modelo de datos (v1, documento) | ✅ 2026-07-04 | `docs/architecture/data-model.md` |
 | Modelo de datos ampliado (bloques Inventario, Documentos, Movimientos, Operación comercial, Recursos, Información, RRHH, Actores) | ✅ 2026-07-14 | `docs/architecture/data-model.md` — ~50 entidades nuevas/enriquecidas; ver detalle abajo |
 | Core (app factory, settings, db, event bus) | ✅ 2026-07-04 | Endpoint `/health` operativo |
-| Modelado de base de datos completo (SQLAlchemy + Alembic) | 🔶 en curso 2026-07-20 | Bloque transversal + organización (11 tablas) + slice Venta núcleo (11 tablas más, 22 en total) — ver detalle del slice Venta abajo. BD de desarrollo corre en **Supabase** (Postgres gestionado, solo BD — sin su Auth/RLS, ver `docs/engineering/devops.md`); Docker local sigue disponible como alternativa. Resto por slice vertical. |
+| Modelado de base de datos completo (SQLAlchemy + Alembic) | 🔶 en curso 2026-07-20 | Bloque transversal + organización (11) + slice Venta núcleo (11) + slice Cobro/Comprobante/Caja (8) — 30 tablas en total. BD de desarrollo corre en **Supabase** (Postgres gestionado, solo BD — sin su Auth/RLS, ver `docs/engineering/devops.md`); Docker local sigue disponible como alternativa. Resto por slice vertical. |
 | Módulo `users` (auth JWT + PIN + RBAC) | ⬜ | Tras el modelado de BD — contrato ya especificado |
 | Migraciones Alembic iniciales | ⬜ | Junto con el modelado de BD completo (no incremental por módulo) |
 | Seeders (admin / PIN 123456, org base) | ⬜ | |
@@ -513,6 +513,44 @@ cuando se aborde PROC-COM-002 o el pricing): `modificador`,
 
 Migración `08c7aa59dd6e`, aplicada y verificada en Supabase (ciclo
 upgrade/downgrade/upgrade limpio, igual que el bloque anterior).
+
+### Slice Cobro, Comprobante y Caja (2026-07-20)
+
+Segundo incremento del proceso Venta, a pedido del usuario: PROC-COM-002
+(Cobro y Emisión de Comprobante) + el ciclo de caja completo
+(PROC-CTB-001/002), que el cobro en efectivo necesita para cerrar su
+cadena de custodia. Antes de modelar, alineamos 4 decisiones reales con
+el usuario (no asumidas):
+
+1. Alcance: caja completa (apertura/cierre/custodia) esta misma vuelta,
+   no diferida.
+2. Series de comprobante separadas por punto de venta (boleta ≠
+   factura, típico SUNAT) — `punto_venta.serie_boleta`/`serie_factura`.
+3. `medio_pago` es catálogo **por empresa**, no global del grupo.
+4. Pago dividido (varios medios en una misma venta) es un caso real del
+   negocio, no solo capacidad técnica — RN-COM-016 nueva.
+
+Gaps reales encontrados y corregidos en `data-model.md` antes de
+modelar: `pago` no tenía `monto` ni `idempotency_key` (imposible validar
+pago dividido sin monto por fila); `medio_pago` no tenía `empresa_id`;
+`punto_venta` no tenía dónde vivir la serie que `comprobante.serie`
+dice heredar.
+
+8 tablas nuevas (30 en total): `medio_pago`, `pago` (sales);
+`comprobante` (nuevo módulo transversal `src/shared/models/` — sirve a
+sales/purchases/accounting, ningún módulo lo posee en exclusiva);
+`apertura_caja`, `custodia_efectivo`, `cierre_caja`, `arqueo` (nuevo
+módulo `src/modules/accounting/`, solo el ciclo de caja — plan de
+cuentas/asiento/periodo_contable siguen pendientes). 3 eventos nuevos en
+`events.md`: `accounting.apertura_caja_registrada`,
+`accounting.cierre_caja_registrado`, `accounting.cierre_caja_irregular`.
+
+Deliberadamente diferido: `carta_disputa_pago` (RN-MDP-004, camino de
+excepción — reclamo de doble cobro).
+
+Migración `8cde35e4f3f2`, verificada en Supabase (ciclo upgrade/
+downgrade/upgrade). 13/13 tests pasan (3 nuevos en
+`tests/test_cobro_caja_slice.py`).
 
 ### Revisión de consistencia y correcciones (2026-07-20)
 

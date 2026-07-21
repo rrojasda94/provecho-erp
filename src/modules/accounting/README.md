@@ -11,6 +11,14 @@ controlados. Base para tesorería y reportes financieros futuros.
 `cuenta_contable` (plan de cuentas), `asiento`, `asiento_linea` (debe/haber),
 `periodo_contable`. Detalle en `docs/architecture/data-model.md` §8 (se refina antes de implementar).
 
+**Estado de implementación (2026-07-20):** módulo abierto parcialmente
+con el ciclo de caja (PROC-CTB-001/002) — `apertura_caja`, `custodia_efectivo`,
+`cierre_caja`, `arqueo` (`src/modules/accounting/infrastructure/models/`),
+dependencia del slice de Cobro (PROC-COM-002). El resto de este README
+(plan de cuentas, asiento, periodo_contable) sigue pendiente del slice
+dedicado de Contabilidad. `comprobante` NO vive aquí — es transversal,
+está en `src/shared/models/`.
+
 ## Casos de uso
 
 - Mantener plan de cuentas.

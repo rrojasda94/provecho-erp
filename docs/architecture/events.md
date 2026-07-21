@@ -51,6 +51,9 @@ accounting.asiento_generado
 | `users.sesion_iniciada` | users | — (auditoría) | usuario_id, ip | Login exitoso | — |
 | `accounting.asiento_generado` | accounting | — (auditoría/BI) | asiento_id, evento_origen | Al generar asiento desde un evento operativo | — |
 | `accounting.periodo_cerrado` | accounting | todos (bloquean escrituras del periodo) | periodo_id, fecha_cierre | Al cerrar un periodo contable | — |
+| `accounting.apertura_caja_registrada` | accounting | users (alerta si hay diferencia) | apertura_caja_id, punto_venta_id, diferencia_reportada | Al aperturar caja | RN-POS-003, RN-MDP-002 |
+| `accounting.cierre_caja_registrado` | accounting | — (auditoría/BI) | cierre_caja_id, apertura_caja_id, descuadre_monto | Al confirmar el cierre | PROC-CTB-001 |
+| `accounting.cierre_caja_irregular` | accounting | users (notifica gerencia/RRHH) | cierre_caja_id, descuadre_monto, descuadre_atribucion | Cierre con descuadre/irregularidad detectada | RN-MDP-005 |
 
 `*` = módulo futuro. Reglas referenciadas en
 [../domain/business-rules.md](../domain/business-rules.md).

@@ -20,6 +20,10 @@ class PuntoVenta(Base, UuidPkMixin, TimestampMixin):
     )
     # NULL si canal=web.
     hardware_id: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    # Series SUNAT separadas (decisión 2026-07-20) — comprobante.serie
+    # copia el valor vigente al emitir (snapshot inmutable).
+    serie_boleta: Mapped[str] = mapped_column(String(10))
+    serie_factura: Mapped[str] = mapped_column(String(10))
     # Array `mesa`|`takeout`|`delivery` (RN-MDC-001).
     modalidades_habilitadas: Mapped[list | None] = mapped_column(JsonB, nullable=True)
     # Ej. delivery exige dirección (RN-MDC-002).

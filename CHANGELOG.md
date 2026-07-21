@@ -99,6 +99,22 @@ Versionado: [SemVer](https://semver.org/lang/es/).
   autoservicio web — nunca requerida para comprar en sucursal o Central
   de Pedidos, esas ventas enrutan al mismo `cliente` sin login.
   Migración `90116965bfa8` aplicada y verificada en Supabase.
+- **Slice Cobro y Comprobante (PROC-COM-002) + ciclo de caja
+  (PROC-CTB-001/002)** — 8 tablas nuevas (30 en total): `medio_pago`
+  (catálogo por empresa, decisión 2026-07-20), `pago` (RN-COM-016 —
+  pago dividido confirmado real, suma de montos debe igualar
+  `venta.total`), `comprobante` (nuevo módulo transversal en
+  `src/shared/models/` — sirve a sales/purchases/accounting, correlativo
+  único por empresa+serie, RN-CPP-007), `apertura_caja`,
+  `custodia_efectivo`, `cierre_caja`, `arqueo` (nuevo módulo
+  `src/modules/accounting/`, ciclo completo de caja). `punto_venta` gana
+  `serie_boleta`/`serie_factura` (series SUNAT separadas por punto de
+  venta, decisión 2026-07-20) — `comprobante.serie` las copia como
+  snapshot inmutable al emitir. 3 tests nuevos
+  (`tests/test_cobro_caja_slice.py`): pago dividido, unicidad de
+  correlativo, cadena apertura→custodia→cierre. 13/13 tests pasan.
+  Migración `8cde35e4f3f2` aplicada y verificada en Supabase (ciclo
+  upgrade/downgrade/upgrade).
 
 - Branding Provecho aplicado: paleta, tipografías (Anton Italic + Inter) y
   tokens CSS (`docs/product/ui-ux.md`).
