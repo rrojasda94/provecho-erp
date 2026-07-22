@@ -27,16 +27,44 @@ flowchart TB
     OC --> R[Recepción en Almacén Central] --> CF[Conformidad de comprobante] --> CTB[Contabilidad ejecuta pago]
 ```
 
-## Producción (si existe)
+## Producción
 
-`PROC-PRD-001` · v0.1 · Borrador
+`PROC-PRD-001` · v1.0 · Borrador (spec completa; sin operación real —
+primera cocina de producción planeada 2027, ver
+[docs/produccion/README.md](../produccion/README.md))
 
 ```mermaid
-flowchart LR
-    H[Insumos: harina...] --> M[Subreceta: masa] --> E[Empacado]
-    E --> AP[Almacén de producción]
-    E --> D[Despacho inmediato]
+flowchart TB
+    PL[Plan de producción: cronograma fijo] --> OP[Orden de producción]
+    NEC[Necesidad urgente Almacén Central, RN-PRD-007] -.ajuste.-> OP
+    OP --> CONS[Consumo de insumos/subrecetas] --> ELAB[Elaboración según receta]
+    ELAB --> CC{Control de calidad}
+    CC -->|Conforme| EMP[Empacado y etiquetado] --> AP[Almacén de producción] --> DESP[Despacho a Almacén Central]
+    CC -->|No conforme, corregible| RPR[Reproceso] --> CC
+    CC -->|No conforme, no corregible| DESC[Desecho con evidencia] --> ESC[Reporte de escalamiento]
+    RPR -.también.-> ESC
 ```
+
+Cronograma fijo por tipo de receta/proceso (evita contaminación cruzada,
+RN-PRD-012) más ajuste por necesidad de Almacén Central (RN-PRD-011).
+Toda orden pasa control de calidad antes de despachar (RN-PRD-013); no
+conformidad —corregida o desechada— siempre genera reporte de
+escalamiento, con evidencia de destrucción si termina en desecho
+(RN-PRD-014/015). Detalle narrativo, SOPs y plantillas:
+[docs/produccion/README.md](../produccion/README.md) y
+[docs/diagrams/Procesos/Produccion/](../diagrams/Procesos/Produccion/).
+
+Producción también da soporte técnico a I+D+i/Comercial para viabilidad
+de nuevo producto (RN-PRD-017) y ejecuta su propio conteo cíclico de
+inventario (RN-PRD-016) — ambos fuera de este diagrama por no ser parte
+del flujo de una orden de producción.
+
+Dos controles automáticos transversales al flujo, sin mano humana que
+transcriba: el ERP calcula el costo real de cada orden (insumos + mano de
+obra, con el desperdicio por insumo/tipo contrastado contra lo esperado
+en la receta, RN-PRD-018), y el checklist de turno bloquea la cocina y
+alerta a Gerencia de inmediato si un equipo de frío queda fuera de rango
+(RN-CDP-005).
 
 ## Abastecimiento de locales
 

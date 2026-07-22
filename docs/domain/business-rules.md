@@ -537,6 +537,65 @@ de su módulo y se prueban de forma aislada.
   insumos por sabor o calidad; el criterio de ajuste lo asigna el área de
   Producción.
 
+## Producción — cronograma, calidad y cocina
+
+Spec a futuro (2026-07-20): documentada antes de existir físicamente —
+la primera cocina de producción está planeada para 2027; hoy la
+producción se hace en cocinas de sucursal. Ver
+[docs/produccion/README.md](../produccion/README.md).
+
+- **RN-PRD-011** La cocina de producción opera bajo un **plan de
+  producción** (cronograma fijo por tipo de receta/proceso, ej. días y
+  turnos), definido por Producción junto con Gerencia y Almacén según
+  demanda. El plan se **ajusta por necesidad** (pedido urgente de Almacén
+  Central por quiebre de stock, RN-PRD-007) sin reemplazar la
+  planificación base — la orden de producción generada por necesidad
+  también queda vinculada al plan vigente cuando aplica.
+- **RN-PRD-012** El cronograma agrupa órdenes de producción por tipo de
+  receta/proceso para evitar contaminación cruzada; no se alternan
+  procesos incompatibles en la misma línea sin limpieza/desinfección
+  intermedia documentada.
+- **RN-PRD-013** Toda orden de producción pasa por **control de calidad**
+  antes de habilitarse para despacho al almacén central. Ante un
+  resultado no conforme, el jefe de cocina evalúa si el lote es
+  corregible (reproceso) o debe desecharse — en ambos casos continúa en
+  RN-PRD-014.
+- **RN-PRD-014** Todo hallazgo de no conformidad de calidad genera un
+  **reporte de escalamiento** (`reporte_escalamiento`, origen
+  `produccion`), se corrija o se deseche el lote — nunca queda sin
+  registro. El jefe de cocina redacta el hallazgo y la acción tomada;
+  reincidencia por el mismo motivo escala a Comercial/Gerencia para
+  revisión de receta o proceso, igual que el resto de reportes de
+  escalamiento del ERP. Un solo asiento contable posible por hallazgo,
+  según el estadio final: si se desecha, el registro de merma (RN-INV-017)
+  es ese asiento; si se reprocesa, no hay merma ni asiento — el reporte
+  solo detalla cómo se corrigió.
+- **RN-PRD-015** La destrucción de un lote no conforme se realiza dentro
+  del establecimiento, en zona cubierta por cámaras de videovigilancia
+  (nunca fuera del local) y dentro del horario laboral. El video de la
+  destrucción y el desecho final a la basura son la evidencia adjunta al
+  reporte de escalamiento — previene sustracción del producto declarado
+  como merma.
+- **RN-PRD-016** El inventario de la cocina de producción (insumos,
+  subrecetas en elaboración, producto terminado) sigue el mismo esquema
+  de conteo cíclico y margen de error que Almacén Central (RN-INV-007/
+  014/015), adaptado a su propio almacén tipo `produccion`.
+- **RN-PRD-017** Producción evalúa la viabilidad técnica (costo real de
+  insumos, tiempo de preparación, ajuste sugerido) de todo requerimiento
+  de nuevo producto antes de que Comercial comprometa una fecha de
+  lanzamiento (ver
+  [ficha-requerimiento-nuevo-producto.md](../templates/comercial/ficha-requerimiento-nuevo-producto.md)).
+  La misma evaluación aplica a mejoras continuas de receta impulsadas por
+  I+D+i o Comercial.
+- **RN-PRD-018** El costo real de una subreceta/producto aprovechable lo
+  calcula el ERP automáticamente por orden de producción, nunca a mano:
+  costo de insumos consumidos (el insumo completo comprado, no solo la
+  parte aprovechable — ej. el tomate entero, no solo la pulpa) más costo
+  de mano de obra (horas-hombre registradas × tarifa de producción). El
+  desperdicio de cada insumo (tipo y peso) se registra por orden contra
+  el desperdicio esperado de la receta (`receta_item.merma_pct`) — toda
+  desviación relevante queda visible, no oculta en el costo promedio.
+
 ## Fecha de vencimiento
 
 - **RN-VNC-001** La fecha de vencimiento de un producto elaborado en
@@ -706,6 +765,14 @@ de su módulo y se prueban de forma aislada.
 - **RN-CDP-003** No puede ingresar personal sin elementos de bioseguridad.
 - **RN-CDP-004** Toda devolución de SKUs sobrantes al almacén central exige
   guía de remisión.
+- **RN-CDP-005** Todo equipo de frío (refrigeración/congelación) de la
+  cocina de producción se verifica en rango de temperatura en el
+  checklist de cada turno. Fuera de rango: los insumos/subrecetas
+  comprometidos se marcan "NO USAR" (mismo criterio RN-ALS-004) y se
+  trasladan a un equipo en buen estado si existe; se reporta de
+  inmediato a Gerencia (mismo criterio que la falla de frío en apertura
+  de sucursal, RN-SUC-009) y la producción no continúa en ese equipo
+  hasta resolver.
 
 ## Almacén central
 

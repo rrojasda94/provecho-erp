@@ -32,6 +32,24 @@ Versionado: [SemVer](https://semver.org/lang/es/).
   (Conteo-Auditoria, Vencimientos-Mermas, Transporte-Transferencias),
   6 plantillas. Spec `src/modules/inventory/README.md` actualizada
   (lote, merma, ajuste solicitar/aprobar, transferencia lateral).
+- **Área Producción** (2026-07-20, spec a futuro — primera cocina de
+  producción planeada 2027): `docs/produccion/` (política de cronograma,
+  calidad/no conformidad, inocuidad, inventario de cocina, soporte a
+  I+D+i; perfiles de jefe de cocina y cocinero), 4 SOPs nuevos en
+  `docs/diagrams/Procesos/Produccion/` (Planificacion, Calidad-Inocuidad,
+  Inventario-Cocina, Soporte-IDI), 5 plantillas en
+  `docs/templates/produccion/`. Reglas RN-PRD-011 a RN-PRD-017; entidad
+  `plan_produccion` nueva, `orden_produccion`/`reporte_escalamiento`
+  ampliadas. Nuevo módulo `src/modules/production/README.md` (spec
+  técnica, sin implementar) y evento
+  `production.no_conformidad_detectada`.
+- **Producción — costeo, desperdicio e inocuidad** (2026-07-20, mismo
+  día): tabla de desperdicio por insumo/tipo/peso en `orden-produccion.md`;
+  costeo real automático (insumos + mano de obra, RN-PRD-018); reporte de
+  conteo de cocina pasa a autogenerado, el jefe de cocina solo visa;
+  verificación de temperatura de equipos de frío con alerta automática a
+  Gerencia (RN-CDP-005). Nuevas entidades `consumo_produccion_item` y
+  `checklist_inocuidad_turno`; evento `production.equipo_frio_fuera_rango`.
 - ADR-004: aislamiento de tenant por filtro de aplicación con
   `empresa_id` obligatorio + tests (RLS de Postgres como refuerzo futuro).
 - Catálogo de eventos completado con los eventos ya declarados en las

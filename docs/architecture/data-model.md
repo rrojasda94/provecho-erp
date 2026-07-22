@@ -227,7 +227,10 @@ erDiagram
   imprime en la etiqueta de cada artículo producido (cantidad, UdM, código
   de barras/QR, lote, fecha de vencimiento, condiciones de almacenamiento/
   transporte — RN-LOT-002).
-- **receta_item**: receta_id, articulo_id, cantidad, merma_pct.
+- **receta_item**: receta_id, articulo_id, cantidad, merma_pct (desperdicio
+  esperado del insumo, ej. cáscara/semilla del tomate — base del costeo
+  real de producción, RN-PRD-018), tipo_desperdicio (texto descriptivo,
+  opcional — ej. "cáscara y semilla").
 - **producto_comercial** (vendible): id_interno (4 alfanuméricos,
   autogenerado, inmutable, único), marca_id, nombre, receta_id, categoría
   de carta, activo (bool — al descontinuarse pasa a false/archivado, nunca
@@ -500,10 +503,17 @@ Solicitud.
 - **arqueo**: punto_venta_id, tipo (`sorpresa` | `programado`),
   realizado_por, monto_esperado, monto_contado, diferencia, acta_id.
   Verificación puntual de caja fuera del ciclo apertura/cierre.
-- **reporte_escalamiento**: origen (`central_pedidos` | `punto_venta`),
-  sucursal_id, venta_id o carrito_id (opcional), reportado_por (personal
-  de atención al cliente), motivo (`queja` | `demora` | `error_sistema` |
-  `desistimiento_no_resuelto` | ...), descripcion del problema. Flujo de
+- **reporte_escalamiento** (entidad transversal — el escalamiento es
+  parte de la naturaleza de todo reporte del ERP, no un concepto propio
+  de `sales`; vive en `shared`, no en un módulo dueño único, mismo patrón
+  que `comprobante`): origen (`central_pedidos` | `punto_venta` |
+  `produccion`), sucursal_id, venta_id o carrito_id (opcional; nulo si
+  origen=`produccion`, usa orden_produccion_id en su lugar), reportado_por
+  (personal de atención al cliente, o jefe de cocina si origen=
+  `produccion`), motivo (`queja` | `demora` | `error_sistema` |
+  `desistimiento_no_resuelto` | `no_conformidad_calidad` | ...),
+  descripcion del problema; evidencia_id (FK `archivo`, obligatorio si
+  motivo=`no_conformidad_calidad` y termina en desecho, RN-PRD-015). Flujo de
   escalamiento en cadena: alerta al **supervisor**, que intenta
   resolverlo y redacta su solución en el reporte; si no puede, escala al
   **área comercial o gerencia**, que realiza acciones y las reporta en el
@@ -560,17 +570,55 @@ Evento `sales.venta_confirmada` → inventory descuenta insumos según receta.
 
 ## 7. Producción (módulo futuro production)
 
-- **orden_produccion**: articulo_id (subreceta), cantidad, almacen_id, estado.
-  Consume insumos (`consumo_produccion`) y produce (`produccion_entrada`).
-  desperdicio_articulo_id (FK articulo, opcional — producto derivado
-  aprovechable, ligado a la receta, RN-INV-018), merma_cantidad +
-  merma_motivo (opcional — pérdida no aprovechable de la orden,
-  RN-INV-017).
+Spec a futuro (2026-07-20) — primera cocina de producción planeada 2027,
+sin operación real hoy. Ver [docs/produccion/README.md](../produccion/README.md).
+
+- **plan_produccion**: cocina_produccion_id (almacén tipo `produccion`),
+  fecha, turno, linea_produccion/tipo_receta (RN-PRD-012, evita
+  contaminación cruzada), origen (`cronograma_fijo` | `ajuste_por_necesidad`
+  — RN-PRD-011), creado_por, estado (`planificado` | `en_ejecucion` |
+  `cerrado`). Agrupa una o más `orden_produccion`.
+- **orden_produccion**: articulo_id (subreceta), cantidad, almacen_id,
+  plan_produccion_id (opcional — nulo si la orden nace 100% por necesidad
+  puntual sin cronograma), estado (incluye paso de control de calidad,
+  RN-PRD-013). Produce (`produccion_entrada`). desperdicio_articulo_id
+  (FK articulo, opcional — producto derivado aprovechable, ligado a la
+  receta, RN-INV-018), merma_cantidad + merma_motivo (opcional — pérdida
+  no aprovechable de la orden, RN-INV-017). control_calidad_resultado
+  (`conforme` | `no_conforme_reprocesado` | `no_conforme_desechado`,
+  RN-PRD-013) — cualquier valor `no_conforme_*` genera un
+  `reporte_escalamiento` (origen `produccion`, RN-PRD-014/015).
+  **Costeo (RN-PRD-018, calculado por el ERP, nunca manual):**
+  horas_hombre (registrado por el cocinero/jefe de cocina),
+  costo_insumos (= Σ `consumo_produccion_item.cantidad_consumida` ×
+  `consumo_produccion_item.costo_unitario`), costo_mano_obra (=
+  horas_hombre × tarifa_hora_produccion, definida por Contabilidad
+  [[ COMPLETAR ]]), costo_real_unitario (= (costo_insumos +
+  costo_mano_obra) / cantidad producida aprovechable).
+- **consumo_produccion_item**: orden_produccion_id, articulo_id (insumo o
+  subreceta consumido), cantidad_consumida, costo_unitario (snapshot al
+  momento del consumo), peso_desperdicio_real (opcional), tipo_desperdicio
+  (texto, opcional — puede haber más de una fila por insumo si genera más
+  de un tipo de desperdicio, ej. tomate → una fila "cáscara", otra
+  "semilla"). El desperdicio real se contrasta contra el esperado de
+  `receta_item.merma_pct` — desviación relevante es visible por fila, no
+  se diluye en el promedio.
+- **checklist_inocuidad_turno**: cocina_produccion_id, turno, fecha,
+  verificado_por, bioseguridad_ok (bool), superficies_ok (bool),
+  limpieza_intermedia_ok (bool, solo aplica si cambió el tipo de proceso
+  respecto al turno anterior, RN-PRD-012), equipos_frio (JSONB —
+  `[{equipo_id, temperatura_c, dentro_rango}]`, RN-CDP-005),
+  plaga_indicio (bool), estado (`aprobado` | `bloqueado`). Cualquier
+  equipo de frío fuera de rango o `plaga_indicio=true` pone
+  estado=`bloqueado` (no habilita nuevas órdenes de producción) y dispara
+  alerta automática a Gerencia (RN-CDP-002/005) — no depende de que
+  alguien redacte un reporte aparte.
 - **reporte_produccion**: jornada (fecha/turno), visado_por (encargado o
   jefe de cocina, RN-DOC-010), ordenes_produccion (consumo por receta,
   lotes producidos), solicitudes_cubiertas, solicitudes_pendientes,
   observaciones, merma_total, desperdicio_total. Generado automáticamente
-  al finalizar la jornada con los datos registrados durante esta.
+  al finalizar la jornada con los datos registrados durante esta — el
+  jefe de cocina visa, no redacta (RN-DOC-010).
 
 ## 8. Contabilidad (módulo accounting — spec inicial)
 

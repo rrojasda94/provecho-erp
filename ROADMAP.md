@@ -27,7 +27,8 @@ Registro de lo construido y lo pendiente. Actualizar en cada cambio relevante.
 | Compras: procesos y plantillas (proveedores, cotización, OC, recepción, pago, caja chica, activos) | ✅ 2026-07-19 | `docs/compras/`, 11 SOPs, 6 plantillas — ver detalle abajo. Módulo backend `purchases` actualizado conforme al flujo |
 | Comercial: procesos y plantillas (precio/margen, promociones, mercado, metas, desempeño, capacitación) | ✅ 2026-07-19 | `docs/comercial/`, 9 SOPs, 5 plantillas — ver detalle abajo. Módulo backend `sales` ajustado (margen, vigencia de promoción) |
 | Almacén-Logística: procesos y plantillas (conteo, vencimientos/merma, transporte/transferencias) | ✅ 2026-07-19 | `docs/almacen-logistica/`, 8 SOPs, 6 plantillas — ver detalle abajo. Módulo backend `inventory` ajustado (lote, merma, ajuste solicitar/aprobar) |
-| Producción, Contabilidad, Marketing, Gerencia: procesos y plantillas | ⬜ | Mismo patrón que RRHH/Compras/Comercial/Almacén-Logística — pendiente, un área a la vez |
+| Producción: procesos y plantillas (cronograma, calidad/no conformidad, inocuidad, inventario de cocina, soporte a I+D+i) | ✅ 2026-07-20 | `docs/produccion/`, 4 SOPs, 5 plantillas — ver detalle abajo. Spec a futuro: primera cocina de producción planeada 2027, hoy sin operación real. Módulo backend `production` nuevo (spec técnica, sin implementar) |
+| Contabilidad, Marketing, Gerencia: procesos y plantillas | ⬜ | Mismo patrón que RRHH/Compras/Comercial/Almacén-Logística/Producción — pendiente, un área a la vez |
 | Mantenimiento, Sistemas/TI como áreas propias | ⬜ | Definidas como áreas del negocio (posible tercerización); documentación pendiente, desactivadas por ahora |
 | RRHH backend, supervisión, CRM, tesorería, activos, proyectos, BI, reportes | ⬜ | Módulos futuros |
 | Integración Nubefact | ⬜ | Adaptador en `src/shared/integrations/` |
@@ -580,6 +581,109 @@ Correcciones aplicadas en la misma sesión:
   reescrito (SOP primero → BPMN después; versiones antiguas se conservan).
 - CHANGELOG puesto al día (todo el trabajo del 2026-07-19 + esta sesión).
 - Skill `sop-creator` endurecida para no dejar cabos sueltos (ver skill).
+
+### Área Producción — cronograma, calidad, inocuidad e inventario de cocina (2026-07-20)
+
+Documentación del área Producción a partir de la descripción de alcance
+dada por el usuario: elaboración de subrecetas/procesamiento de insumos
+por lotes, área metódica con foco fuerte en inocuidad y calidad (de ahí
+depende gran parte de la calidad del producto final), responsable de la
+cocina de producción y su mantenimiento, produce según cronograma +
+necesidades de la empresa/almacén, da soporte a I+D+i/Comercial para
+nuevo producto y mejora continua, e inventario propio similar al de
+cocina de sucursal. Roles: cocinero, jefe de cocina.
+
+Antes de modelar se resolvieron 2 decisiones reales con el usuario:
+
+1. **Alcance temporal**: `domain-model.md` ya documentaba que la primera
+   cocina de producción recién está planeada para 2027 — hoy la
+   producción se hace en cocinas de sucursal. El usuario confirmó que
+   esta sesión documenta **spec a futuro** (diseño/preparación), no un
+   área operando hoy; la cocina de sucursal actual sigue bajo
+   Operaciones/RRHH sin cambio.
+2. **No conformidad de calidad**: se evalúa si el lote es corregible
+   (reproceso) o no (desecho); en ambos casos se genera un
+   `reporte_escalamiento` (reutiliza el patrón ya definido para
+   atención al cliente); el desecho exige evidencia de destrucción
+   (foto/video + testigo) para prevenir sustracción disfrazada de merma.
+3. **Cronograma**: plan fijo por tipo de receta/proceso (evita
+   contaminación cruzada) + ajuste por necesidad urgente de Almacén
+   Central — no es puramente reactivo.
+
+Incorporado:
+- `docs/produccion/` (nuevo): `README.md` (mapa de responsabilidades),
+  `politica-produccion.md` (cronograma, calidad/no conformidad, inocuidad
+  referida a RN-CDP-*, inventario de cocina, soporte a I+D+i),
+  `perfiles/` (jefe de cocina, cocinero de producción).
+- `docs/diagrams/Procesos/Produccion/` (área nueva): 4 SOPs —
+  `Planificacion/` (plan de producción, cronograma fijo + ajuste),
+  `Calidad-Inocuidad/` (control de calidad y no conformidad, checklist de
+  inocuidad de turno), `Inventario-Cocina/` (conteo cíclico de cocina de
+  producción), `Soporte-IDI/` (soporte técnico a nuevo producto/mejora
+  continua).
+- `docs/templates/produccion/` — 5 plantillas: orden de producción,
+  reporte de producción, ficha de no conformidad, checklist de inocuidad,
+  reporte de conteo de cocina. Nuevo producto reutiliza la ficha ya
+  existente de Comercial (no se duplica).
+- `business-rules.md` — nueva sección "Producción — cronograma, calidad
+  y cocina": RN-PRD-011 a RN-PRD-017 (plan de producción, agrupación por
+  tipo de receta, control de calidad, no conformidad→escalamiento,
+  evidencia de destrucción, inventario de cocina, viabilidad técnica
+  antes de comprometer lanzamiento).
+- `data-model.md` §7 — nueva entidad `plan_produccion`; `orden_produccion`
+  ampliada con `plan_produccion_id` y `control_calidad_resultado`;
+  `reporte_escalamiento` ampliado con origen `produccion` y motivo
+  `no_conformidad_calidad` + `evidencia_id`.
+- `workflows.md` — placeholder "Producción (si existe)" reemplazado por
+  narrativa + Mermaid real; `PROC-PRD-001` v0.1→v1.0 (sigue Borrador:
+  spec completa, sin operación real hasta 2027).
+- `process-nomenclature.md` — registro maestro actualizado.
+- `glossary.md` — término **Jefe de Cocina (Producción)** agregado a
+  Actores.
+- `events.md` — nuevo evento `production.no_conformidad_detectada`.
+- **`src/modules/production/README.md`** (nuevo, spec técnica) — módulo
+  backend `production` especificado conforme a este flujo.
+- `00_PROJECT.md` — entrada `produccion/` y `templates/produccion/` en el
+  mapa.
+
+Pendiente (declarado, no bloquea): frecuencia exacta de cronograma y de
+conteo cíclico de cocina (quedan `[[ COMPLETAR ]]`, a definir con
+Gerencia/Contabilidad al diseñar la primera cocina de producción);
+criterios técnicos de aceptación/rechazo de calidad por receta (a definir
+con Producción/I+D+i cuando exista personal del área).
+
+**Ajuste de costeo, desperdicio e inocuidad (mismo día, 2026-07-20):** el
+usuario detalló 4 puntos que faltaban en la primera pasada:
+
+1. El desperdicio de un insumo no es un número único: cada insumo puede
+   tener más de un tipo de desperdicio (ej. tomate → pulpa aprovechable,
+   más cáscara y semilla como desperdicio) y cada tipo tiene su propio
+   peso real. `orden-produccion.md` pasa de un campo libre a una tabla
+   insumo/tipo de desperdicio/peso.
+2. El ERP debe calcular el **costo real** del producto aprovechable
+   sumando el costo de insumos (el insumo completo comprado, no solo la
+   parte aprovechable) más horas-hombre — nunca a mano.
+3. Ningún documento de conteo se llena a mano: `reporte-conteo-cocina.md`
+   pasa de plantilla rellenable a documento autogenerado por el ERP, el
+   jefe de cocina solo visa — mismo principio que ya regía
+   `reporte-produccion.md`, ahora explícito para evitar error humano de
+   transcripción.
+4. Parte de la inocuidad es revisar que los equipos de frío estén en
+   rango de temperatura; fuera de rango, reporte automático a Gerencia
+   (mismo criterio que la falla de frío en apertura de sucursal,
+   RN-SUC-009).
+
+Incorporado: RN-PRD-018 (costeo automático) y RN-CDP-005 (equipos de
+frío) en `business-rules.md`; `receta_item.tipo_desperdicio`,
+`consumo_produccion_item` y `checklist_inocuidad_turno` nuevas en
+`data-model.md` §7; `orden_produccion` ampliada con costeo
+(horas_hombre, costo_insumos, costo_mano_obra, costo_real_unitario);
+evento `production.equipo_frio_fuera_rango` en `events.md`; plantillas
+`orden-produccion.md` (tabla de desperdicio + costeo), `reporte-conteo-cocina.md`
+(autogenerado) y `checklist-inocuidad.md` (tabla de equipos de frío)
+reescritas; SOPs `plan-produccion-cronograma.md`,
+`checklist-inocuidad-cocina.md` y `conteo-ciclico-cocina-produccion.md`
+actualizados; perfiles de jefe de cocina y cocinero ajustados.
 
 ### Fase de procesos (tras el modelado de BD)
 

@@ -54,11 +54,13 @@ renumera nada). Este archivo define el orden de lectura recomendado.
 | | [templates/compras/](templates/compras/) | Plantillas de Compras (ficha de proveedor, RFQ, orden de compra, evaluación) |
 | | [templates/comercial/](templates/comercial/) | Plantillas de Comercial (precio/margen, brief de promoción, nuevo producto, desempeño, capacitación) |
 | | [templates/almacen-logistica/](templates/almacen-logistica/) | Plantillas de Almacén-Logística (conteo, ajuste, merma, transferencia, devolución, hoja de ruta) |
+| | [templates/produccion/](templates/produccion/) | Plantillas de Producción (orden de producción, reporte de producción, no conformidad, checklist de inocuidad, conteo de cocina) |
 | **rrhh/** | [rrhh/](rrhh/) | Área de RRHH: marco legal laboral (régimen microempresa REMYPE), perfiles de puesto, flujo completo de incorporación |
 | **compras/** | [compras/](compras/) | Área de Compras: marco legal-tributario (régimen Amazonía, SPOT, comprobantes), perfil de encargado de compras, flujo de abastecimiento |
 | **comercial/** | [comercial/](comercial/) | Área Comercial: política de precio/margen/promociones/metas, perfil de jefe comercial, coordinación con Marketing y Producción/I+D+i |
 | **almacen-logistica/** | [almacen-logistica/](almacen-logistica/) | Área Almacén y Logística: FEFO/FIFO, conteo/ajuste, vencimientos/merma, transferencias/transporte, perfiles de almacén y chofer |
-| **diagrams/** | [diagrams/](diagrams/) | Diagramas Mermaid transversales; [Procesos/](diagrams/Procesos/) tiene los SOPs y BPMN por área (Operaciones, Comercial, Contabilidad, Logística-Almacén, Recursos-Humanos, Compras) — carpeta física `Logistica-Almacen/`, área de negocio "Almacén y Logística"; la venta vive en `Comercial/` |
+| **produccion/** | [produccion/](produccion/) | Área Producción (spec a futuro, cocina 2027): cronograma, control de calidad/no conformidad, inocuidad, inventario de cocina, soporte a I+D+i, perfiles de jefe de cocina y cocinero |
+| **diagrams/** | [diagrams/](diagrams/) | Diagramas Mermaid transversales; [Procesos/](diagrams/Procesos/) tiene los SOPs y BPMN por área (Operaciones, Comercial, Contabilidad, Logística-Almacén, Recursos-Humanos, Compras, Producción) — carpeta física `Logistica-Almacen/`, área de negocio "Almacén y Logística"; la venta vive en `Comercial/` |
 | **prompts/** | [prompts/](prompts/) | Guías de contexto por área para agentes de IA |
 
 ## Fuentes de verdad en la raíz del repo

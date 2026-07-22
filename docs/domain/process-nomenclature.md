@@ -111,7 +111,7 @@ v1.1)`).
 | Código | Nombre | Versión | Estado | Fuente |
 |---|---|---|---|---|
 | PROC-CMP-001 | Compras | v2.0 | Vigente | [workflows.md](workflows.md#compras); v2.0 introduce los 3 caminos de compra (informal/caja chica, preferente sin cotización, estándar/activo con RFQ) y traslada la ejecución del pago a Contabilidad — cambio de resultado y actores (MAYOR) |
-| PROC-PRD-001 | Producción | v0.1 | Borrador | [workflows.md](workflows.md#producción-si-existe) |
+| PROC-PRD-001 | Producción | v1.0 | Borrador | [workflows.md](workflows.md#producción); v1.0 (2026-07-20): spec completa (cronograma fijo + ajuste por necesidad, control de calidad/no conformidad con evidencia, inventario de cocina, soporte a I+D+i) — sigue Borrador porque la primera cocina de producción recién opera en 2027, ver [docs/produccion/README.md](../produccion/README.md) |
 | PROC-INV-001 | Abastecimiento de locales | v0.2 | Borrador | [workflows.md](workflows.md#abastecimiento-de-locales); v0.2 detalla el conteo de fin de jornada en sucursal (balanzas, QR, ventana de refrigeración, alerta por margen de error RN-INV-015, cálculo de sugerido RN-INV-013); picking/packing/transporte en almacén central sigue sin este nivel de detalle |
 | PROC-COM-001 | Venta | v1.0 | Vigente | [workflows.md](workflows.md#venta), decisión de alcance 2026-07-14 |
 | PROC-COM-002 | Cobro y Emisión de Comprobante de Pago | v1.0 | Vigente | [workflows.md](workflows.md#cobro-y-emisión-de-comprobante-de-pago), detalle del paso "cobro" de PROC-COM-001 (RN-COM-005), decisión de área 2026-07-15 |
