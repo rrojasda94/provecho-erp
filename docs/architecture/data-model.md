@@ -690,6 +690,61 @@ Los documentos de RRHH que son cartas/actas usan plantillas versionadas
 (ver `docs/templates/rrhh/`), rellenadas con datos del ERP + campos
 manuales, y visadas por abogado antes de uso (RN-CTR-002).
 
+## 8c. Gerencia y gobierno (transversal)
+
+Gerencia es autoridad (RBAC) + documentos, no un módulo con lógica de
+negocio propia — la facultad de aprobar es un permiso de rol, no una
+tabla. Ver [docs/gerencia/README.md](../gerencia/README.md).
+
+- **decision_gerencial** (documento transversal, vive en `shared`):
+  empresa_id, tipo (`aprobacion` | `directiva` | `accion_correctiva` |
+  `decision_estrategica`), referencia_tipo + referencia_id (a qué
+  propuesta/proceso aplica, polimórfico — ej. una OC, un requerimiento de
+  activo, una evaluación de nuevo mercado), decidido_por (trabajador con
+  rol gerencial), sustento, resultado (`aprobado` | `aprobado_con_condiciones`
+  | `rechazado` | `diferido` | `elevado_a_socios`), condiciones,
+  ejecuta_area (quién ejecuta la decisión — ej. `rrhh` para una sanción),
+  fecha, archivo_id (opcional). Materializa el acta de decisión gerencial
+  (RN-GER-002); toda aprobación de la matriz de aprobaciones (RN-GER-003)
+  genera una fila.
+- **Matriz de aprobaciones**: es configuración/política, no una tabla de
+  transacciones — vive en
+  [gerencia/politica-gerencia.md](../gerencia/politica-gerencia.md#matriz-de-aprobaciones).
+  Los umbrales que consulta (ej. umbral de OC RN-CMP-008) son settings por
+  empresa, no se hardcodean en cada módulo.
+
+## 8d. Marketing (módulo futuro marketing)
+
+Marketing atrae demanda y cuida la marca; **Comercial** cierra la venta.
+Ver [docs/marketing/README.md](../marketing/README.md). `encuesta_satisfaccion`
+(hoy descrita en §6 como "módulo futuro marketing") pertenece a este
+módulo.
+
+- **campana**: empresa_id, marca_id, nombre (naming, RN-MKT-007), tipo
+  (`notoriedad` | `impulso_venta` | `lanzamiento` | `medios` | `evento`),
+  objetivo, publico_objetivo, canal, presupuesto, kpi, estado
+  (`brief` | `aprobada` | `en_curso` | `cerrada`), aprobada_por (referencia
+  a `decision_gerencial` solo si el gasto sale del presupuesto anual o
+  supera el límite, RN-GER-007), objetivo_comercial_id (opcional — enlaza
+  con Comercial si es impulso de venta). Sin brief aprobado no pasa de
+  `brief` (RN-MKT-003).
+- **pieza_contenido**: campana_id (opcional), marca_id, canal, fecha_publicacion,
+  pertinente_marca (bool — filtro RN-MKT-002), uso_marca_validado (bool,
+  RN-MKT-001), metricas (JSONB — alcance/interacción). Se planifica en un
+  calendario; solo se publica si `pertinente_marca` y `uso_marca_validado`.
+- **lead**: campana_id, canal, tipo (`contacto` | `visita` | `cupon` |
+  `registro`), cliente_id (opcional), venta_id (opcional — atribución a la
+  venta real cuando Comercial cierra, RN-MKT-003). El valor de la campaña
+  se mide por leads con `venta_id` no nulo, no por volumen bruto.
+- **implementacion_material_sucursal**: campana_id, sucursal_id, fecha,
+  verificado_por, completa (bool — producto nuevo y clásico, RN-MKT-005),
+  incidencia (opcional). Registra la verificación en sitio, no solo el
+  envío.
+
+La adquisición de material y la contratación de agencia **no** son
+entidades de marketing: usan el flujo de `purchases` (OC/caja chica) y
+`contrato` (transversal), RN-MKT-004/006.
+
 ## 9. Módulos futuros
 
 Transporte (ruta, despacho), tesorería, activos, proyectos, BI/reportes:

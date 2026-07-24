@@ -28,7 +28,9 @@ Registro de lo construido y lo pendiente. Actualizar en cada cambio relevante.
 | Comercial: procesos y plantillas (precio/margen, promociones, mercado, metas, desempeño, capacitación) | ✅ 2026-07-19 | `docs/comercial/`, 9 SOPs, 5 plantillas — ver detalle abajo. Módulo backend `sales` ajustado (margen, vigencia de promoción) |
 | Almacén-Logística: procesos y plantillas (conteo, vencimientos/merma, transporte/transferencias) | ✅ 2026-07-19 | `docs/almacen-logistica/`, 8 SOPs, 6 plantillas — ver detalle abajo. Módulo backend `inventory` ajustado (lote, merma, ajuste solicitar/aprobar) |
 | Producción: procesos y plantillas (cronograma, calidad/no conformidad, inocuidad, inventario de cocina, soporte a I+D+i) | ✅ 2026-07-20 | `docs/produccion/`, 4 SOPs, 5 plantillas — ver detalle abajo. Spec a futuro: primera cocina de producción planeada 2027, hoy sin operación real. Módulo backend `production` nuevo (spec técnica, sin implementar) |
-| Contabilidad, Marketing, Gerencia: procesos y plantillas | ⬜ | Mismo patrón que RRHH/Compras/Comercial/Almacén-Logística/Producción — pendiente, un área a la vez |
+| Gerencia: gobierno + matriz de aprobaciones + presupuesto anual | ✅ 2026-07-22 | `docs/gerencia/`, política + perfil + 3 plantillas + 1 SOP (definición de presupuesto anual, PROC-GER-001) — ver detalle abajo. Área de autoridad/estrategia/control; sin módulo backend (RBAC + documentos) |
+| Marketing: procesos y plantillas (marca/naming, contenido, campañas, material en sucursal, agencias) | ✅ 2026-07-22 | `docs/marketing/`, 6 SOPs, 4 plantillas — ver detalle abajo. Módulo backend `marketing` nuevo (spec técnica); PROC-MKT-001 registrado. Resuelve el pendiente "módulo marketing README/contrato propio" |
+| Contabilidad: procesos y plantillas | ⬜ | Mismo patrón que las áreas ya documentadas — último de las áreas operativas, pendiente |
 | Mantenimiento, Sistemas/TI como áreas propias | ⬜ | Definidas como áreas del negocio (posible tercerización); documentación pendiente, desactivadas por ahora |
 | RRHH backend, supervisión, CRM, tesorería, activos, proyectos, BI, reportes | ⬜ | Módulos futuros |
 | Integración Nubefact | ⬜ | Adaptador en `src/shared/integrations/` |
@@ -68,7 +70,8 @@ contiene, buscando su `[[ COMPLETAR ]]`):
   (`data-model.md` §6).
 - ⬜ Cumplimiento de pedido: ¿1 proceso o 2 (Producción/Cocina +
   Despacho/Entrega)? Bloquea `venta_entregada`/`encuesta_enviada`.
-- ⬜ Módulo `marketing`: README/contrato propio.
+- ✅ 2026-07-22 Módulo `marketing`: README/contrato propio —
+  `src/modules/marketing/README.md` + área documentada en `docs/marketing/`.
 - ⬜ Tratamiento de contratos vigentes al salir de REMYPE (~jul 2027).
 - ⬜ Entidades de datos de Comercial-estrategia (metas de venta,
   evaluación de desempeño comercial, plan de capacitación, hallazgos de
@@ -684,6 +687,146 @@ evento `production.equipo_frio_fuera_rango` en `events.md`; plantillas
 reescritas; SOPs `plan-produccion-cronograma.md`,
 `checklist-inocuidad-cocina.md` y `conteo-ciclico-cocina-produccion.md`
 actualizados; perfiles de jefe de cocina y cocinero ajustados.
+
+### Área Gerencia — gobierno y matriz de aprobaciones (2026-07-22)
+
+Documentación del área Gerencia a partir de la descripción del usuario:
+parte estratégica y de autoridad, guía a nuevos mercados/marcas, último
+visado cuando las áreas necesitan aprobar propuestas, y vela por que
+empresa y trabajadores cumplan. Gerencia ya aparecía en ~57 archivos como
+"aprobador final" pero sin dueño ni matriz propia — esta sesión lo
+formaliza.
+
+3 decisiones con el usuario antes de escribir:
+
+1. **Actor**: Gerente General **delegado por los socios** — se respeta la
+   línea del glosario (Gerencia/Directivo = trabajador con facultades
+   delegadas; Socio = dueño). Decisiones reservadas a socios (PI, marca,
+   alta/baja de empresa) quedan fuera del alcance del gerente.
+2. **Control/disciplina**: Gerencia **decide/ordena, RRHH ejecuta** con
+   el debido proceso ya documentado (RN-RRHH-004) — Gerencia no aplica la
+   sanción por sí misma.
+3. **Alcance ligero** (elección del usuario): **matriz de aprobaciones +
+   política de gobierno**, sin SOPs estratégicos paso a paso. La
+   estrategia se registra por decisión (acta), no por procedimiento fijo.
+
+Consecuencia de diseño: **sin módulo backend** `gerencia` — la facultad
+de aprobar es un permiso RBAC, no una tabla; Gerencia es autoridad +
+documentos. Único artefacto de datos: `decision_gerencial` (transversal,
+`shared`).
+
+Incorporado:
+- `docs/gerencia/` (nuevo): `README.md` (qué hace / qué no duplica),
+  `politica-gerencia.md` (gobierno corporativo, **matriz de aprobaciones**
+  como fuente única de umbrales, dirección estratégica, supervisión y
+  control), `perfiles/gerente-general.md`.
+- `docs/templates/gerencia/` — 2 plantillas: acta de decisión gerencial,
+  ficha de evaluación de nuevo mercado/marca.
+- `business-rules.md` — nueva sección "Gerencia — dirección y gobierno":
+  RN-GER-001 a RN-GER-006 (facultades delegadas, decisión siempre
+  documentada, matriz de aprobaciones como fuente única, abstención por
+  conflicto de interés, decide→ejecuta el área competente, entrada a
+  nuevo mercado con estudio previo).
+- `data-model.md` §8c (nueva) — entidad transversal `decision_gerencial`;
+  la matriz de aprobaciones queda como política/config, no tabla.
+- `glossary.md` — **Gerente General**, **Matriz de aprobaciones**, **Acta
+  de decisión gerencial** agregados.
+- `00_PROJECT.md` — entrada `gerencia/` y `templates/gerencia/` en el mapa.
+
+No genera PROC (no hay SOPs de proceso), ni evento, ni módulo — coherente
+con el alcance ligero elegido.
+
+Pendiente (declarado, no bloquea): umbral exacto de OC y de escalamiento
+de lanzamientos a Gerencia (quedan `[[ COMPLETAR ]]` en la matriz, se
+resuelven con los mismos pendientes de Compras/Comercial ya listados);
+rango salarial del Gerente General (con los socios).
+
+### Reglas de conducta laboral (2026-07-22)
+
+A pedido del usuario, 4 reglas de conducta agregadas a `business-rules.md`
+(sección RRHH): **RN-RRHH-015** (uniforme completo, limpio y presentable
+toda la jornada), **RN-RRHH-016** (no contratar parientes de 1.er/2.º
+grado — conflicto de interés/trato preferente, RN-GRP-001; parentesco
+sobreviniente se declara y puede exigir reubicación), **RN-RRHH-017** (no
+relaciones sentimentales en el mismo centro laboral ni con subordinación
+directa; se declara y reubica para eliminar el conflicto), **RN-RRHH-018**
+(no usar conocimiento ni recursos de la empresa para terceros o beneficio
+personal — extiende confidencialidad RN-EMP-002/RN-GRP-004 y conflicto de
+interés RN-GER-004 al personal operativo, falta grave).
+
+### Área Marketing — marca, contenido, campañas y material (2026-07-22)
+
+Documentación completa del área Marketing a partir del alcance dado por el
+usuario. Frontera clave confirmada: **Marketing atrae el lead, Comercial
+cierra la venta e investiga la oportunidad**. Marketing = crecimiento,
+notoriedad, marca, contenido; Comercial = conversión y exploración de
+mercado. Puesto dedicado: **jefe/encargado de Marketing**.
+
+Distinción respetada: `MKT` (Marketing, ejecución) ≠ `MRC` (Manejo de
+marca, identidad del holding) — Marketing asegura el **buen uso** de la
+marca, no modifica su identidad (reservado, RN-MAR-004). Consecuencia de
+diseño: Marketing sí tiene módulo backend (a diferencia de Gerencia),
+porque maneja entidades propias (campaña, contenido, lead, material).
+
+Incorporado:
+- `docs/marketing/` (nuevo): `README.md` (frontera con Comercial y qué NO
+  hace), `politica-marketing.md` (uso de marca, pertinencia sobre
+  viralidad, brief/aprobación de campañas, material vía Compras, agencias),
+  `perfiles/jefe-marketing.md`.
+- `docs/diagrams/Procesos/Marketing/` (área nueva) — 6 SOPs:
+  `Marca-Contenido/` (uso de marca + naming, plan de contenido y redes),
+  `Campanas/` (lanzamiento de producto, medios y eventos),
+  `Proveedores-Agencias/` (material promocional e implementación en
+  sucursal, evaluación de propuesta de agencia/interna).
+- `docs/templates/marketing/` — 4 plantillas: brief de campaña, calendario
+  de contenido, evaluación de propuesta de agencia, checklist de material
+  en sucursal.
+- `business-rules.md` — nueva sección "Marketing": RN-MKT-001 a RN-MKT-007
+  (uso de marca sin modificarla, pertinencia sobre viralidad, brief +
+  handoff de leads con Comercial, material vía Compras, verificación en
+  sucursal, evaluación de agencia con matriz de aprobaciones, naming).
+- `data-model.md` §8d (nueva) — entidades `campana`, `pieza_contenido`,
+  `lead`, `implementacion_material_sucursal`; `encuesta_satisfaccion`
+  reasignada a este módulo.
+- `events.md` — `marketing.campana_lanzada`, `marketing.lead_generado`
+  (consumido por `sales` para atribución lead→venta).
+- `workflows.md` + `process-nomenclature.md` — **PROC-MKT-001** (Campaña
+  de marketing) v1.0 Borrador con narrativa + Mermaid.
+- `glossary.md` — **Lead**, **Campaña**, **Naming**, **Jefe de Marketing**.
+- **`src/modules/marketing/README.md`** (nuevo, spec técnica) — resuelve
+  el pendiente de "módulo marketing README/contrato propio".
+- `00_PROJECT.md` — entradas `marketing/` y `templates/marketing/`.
+
+Pendiente (declarado, no bloquea): periodicidad del calendario de
+contenido.
+
+### Ajustes de Marketing y Gerencia — feedback del usuario (2026-07-22)
+
+Tras revisar el primer borrador de Marketing, el usuario corrigió 3 cosas:
+
+1. **Marketing gestiona las marcas sin burocracia extra** — RN-MKT-001
+   reescrita: Marketing es dueño operativo de las marcas (uso,
+   consistencia, contenido, naming); solo lo reservado a socios
+   (modificación estructural de identidad, venta de PI — RN-MAR-004,
+   RN-GRP-006) lo excede. Se eliminó la capa de "elevar a Manejo de marca"
+   para el trabajo cotidiano.
+2. **Agencias las evalúa Marketing, Gerencia valida** — RN-MKT-006
+   reescrita: la agencia es un servicio; Marketing la evalúa por su
+   conocimiento, Gerencia valida, se formaliza por contrato y paga
+   Contabilidad — **no pasa por Compras**. El **material** (bien) sí sigue
+   vía Compras (RN-MKT-004). Ajustados el SOP de evaluación de agencia, la
+   plantilla, el SOP de medios/eventos, el módulo backend y `data-model`.
+3. **Presupuesto anual — nuevo proceso en Gerencia** — el usuario pidió un
+   mecanismo para definir presupuestos: reunión anual donde cada área
+   presenta propuesta y Gerencia designa presupuesto + límite de gasto
+   autónomo por área (bajo el límite, el área ejecuta sin aprobación
+   puntual; sobre él o fuera de presupuesto, aprueba Gerencia). Nuevo
+   **RN-GER-007**, **PROC-GER-001** (workflows + registro), SOP
+   `definicion-presupuesto-anual.md`, plantilla `propuesta-presupuesto-anual.md`,
+   y fila en la matriz de aprobaciones. Reemplaza el `[[ COMPLETAR ]]` de
+   "umbral de presupuesto de campaña" por el marco de presupuesto anual
+   (los montos/límites por área siguen `[[ COMPLETAR ]]`, se fijan en la
+   reunión).
 
 ### Fase de procesos (tras el modelado de BD)
 

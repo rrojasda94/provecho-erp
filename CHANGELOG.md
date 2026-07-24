@@ -50,6 +50,37 @@ Versionado: [SemVer](https://semver.org/lang/es/).
   verificación de temperatura de equipos de frío con alerta automática a
   Gerencia (RN-CDP-005). Nuevas entidades `consumo_produccion_item` y
   `checklist_inocuidad_turno`; evento `production.equipo_frio_fuera_rango`.
+- **Área Gerencia** (2026-07-22, versión ligera — autoridad/estrategia/
+  control, sin módulo backend): `docs/gerencia/` (política de gobierno
+  corporativo + matriz de aprobaciones como fuente única de umbrales,
+  perfil de Gerente General), 2 plantillas en `docs/templates/gerencia/`
+  (acta de decisión gerencial, evaluación de nuevo mercado/marca). Reglas
+  RN-GER-001 a RN-GER-006; entidad transversal `decision_gerencial`
+  (`data-model.md` §8c); glosario: Gerente General, Matriz de
+  aprobaciones, Acta de decisión gerencial. Sin PROC ni evento ni módulo
+  (la facultad de aprobar es RBAC, no una tabla).
+- **Área Marketing** (2026-07-22): `docs/marketing/` (política de uso de
+  marca/contenido/campañas, perfil de jefe de Marketing), 6 SOPs en
+  `docs/diagrams/Procesos/Marketing/` (Marca-Contenido, Campanas,
+  Proveedores-Agencias), 4 plantillas. Reglas RN-MKT-001 a RN-MKT-007;
+  entidades `campana`, `pieza_contenido`, `lead`,
+  `implementacion_material_sucursal` (`data-model.md` §8d); eventos
+  `marketing.campana_lanzada`, `marketing.lead_generado`; PROC-MKT-001
+  (Campaña de marketing, Borrador). Módulo `src/modules/marketing/README.md`
+  (spec técnica). Glosario: Lead, Campaña, Naming, Jefe de Marketing.
+  Frontera: Marketing atrae leads, Comercial cierra.
+- **Presupuesto anual (Gerencia)** (2026-07-22): RN-GER-007, PROC-GER-001
+  (reunión anual donde cada área presenta propuesta y Gerencia designa
+  presupuesto + límite de gasto autónomo), SOP `definicion-presupuesto-anual.md`,
+  plantilla `propuesta-presupuesto-anual.md`, fila en la matriz de
+  aprobaciones. Ajuste Marketing: RN-MKT-001 (Marketing gestiona las
+  marcas sin burocracia extra), RN-MKT-006 (agencias las evalúa Marketing
+  y valida Gerencia, no pasan por Compras; el material sí).
+- **Reglas de conducta laboral** (2026-07-22): RN-RRHH-015 (uniforme
+  completo/limpio/presentable en jornada), RN-RRHH-016 (no contratar
+  parientes de 1.er/2.º grado), RN-RRHH-017 (no relaciones sentimentales
+  en el mismo centro ni con subordinación directa), RN-RRHH-018 (no usar
+  conocimiento ni recursos de la empresa para terceros/beneficio personal).
 - ADR-004: aislamiento de tenant por filtro de aplicación con
   `empresa_id` obligatorio + tests (RLS de Postgres como refuerzo futuro).
 - Catálogo de eventos completado con los eventos ya declarados en las

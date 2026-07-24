@@ -242,6 +242,42 @@ de su módulo y se prueban de forma aislada.
   procesos) por la empresa dueña del holding, a través del área de manejo de
   marca.
 
+## Gerencia — dirección y gobierno
+
+- **RN-GER-001** El Gerente General ejerce por facultades **delegadas por
+  los socios**; las decisiones reservadas a la sociedad —venta de
+  propiedad intelectual (RN-GRP-006), modificación de marca (RN-MAR-004),
+  incorporación o salida de una empresa del Grupo (RN-EMP-001)— no las
+  toma solo.
+- **RN-GER-002** Toda aprobación/rechazo de una propuesta escalada y toda
+  directiva gerencial se registra en un **acta de decisión gerencial**
+  (quién decide, qué, cuándo, sustento, condiciones), archivada en el
+  ERP; una decisión verbal no tiene validez operativa.
+- **RN-GER-003** La **matriz de aprobaciones** (política de Gerencia) es
+  la fuente única de qué requiere visado gerencial, su umbral y el
+  aprobador; ninguna área fija un umbral propio por fuera de ella.
+- **RN-GER-004** Un directivo con interés personal o parte relacionada en
+  una propuesta se **abstiene** de aprobarla y deriva la decisión a otro
+  nivel (alinea RN-GRP-001: sin trato preferente).
+- **RN-GER-005** Gerencia **decide/ordena** la acción correctiva o
+  disciplinaria cuando la situación lo amerita, pero su **ejecución
+  formal la realiza el área competente** con el debido proceso: la
+  sanción a un trabajador la ejecuta RRHH (RN-RRHH-004), nunca aplicada
+  directamente por Gerencia saltando el proceso.
+- **RN-GER-006** La entrada a un nuevo mercado, marca o línea de negocio
+  requiere **estudio previo** documentado (mercado + viabilidad
+  económica); Gerencia decide con sustento, no por intuición — usa el
+  estudio de mercado de Comercial y la viabilidad económica de
+  Contabilidad (mismo principio que RN-EMP-006).
+- **RN-GER-007** El **presupuesto anual** de cada área se define en una
+  reunión anual de presupuesto: cada área presenta su propuesta, Gerencia
+  la revisa y designa el presupuesto del año. Dentro de su presupuesto
+  aprobado y **bajo el límite** definido, cada área ejecuta el gasto de
+  forma autónoma (sin aprobación puntual); **sobre el límite o fuera de lo
+  presupuestado**, requiere aprobación puntual de Gerencia (matriz de
+  aprobaciones, RN-GER-003). Los límites por área se definen en esa
+  reunión (`[[ COMPLETAR ]]`).
+
 ## Sucursal
 
 - **RN-SUC-001** Una sucursal opera exactamente una marca.
@@ -407,6 +443,28 @@ de su módulo y se prueban de forma aislada.
 - **RN-RRHH-014** El uniforme y EPP son condición de trabajo: se entregan y
   devuelven con acta firmada, y su movimiento se registra en el ERP como
   artículo de almacén.
+- **RN-RRHH-015** Durante toda la jornada, el trabajador porta el uniforme
+  **completo, limpio y presentable** (incluye EPP cuando el puesto lo
+  exige). El incumplimiento reiterado es falta de conducta y se maneja
+  por el proceso disciplinario (RN-RRHH-004).
+- **RN-RRHH-016** No se contrata a personas con parentesco de primer o
+  segundo grado (consanguinidad o afinidad) con un trabajador vigente del
+  grupo, para prevenir conflicto de interés y trato preferente
+  (RN-GRP-001). El parentesco sobreviniente a la contratación se declara
+  y puede exigir reubicación para eliminar la relación de
+  subordinación/control.
+- **RN-RRHH-017** No se admiten relaciones sentimentales entre
+  trabajadores del **mismo centro laboral**, ni ninguna relación
+  sentimental que implique **subordinación directa** (jefe–subordinado).
+  La relación preexistente o sobreviniente se declara; de existir
+  subordinación o mismo centro, la empresa reubica para eliminar el
+  conflicto de interés.
+- **RN-RRHH-018** El trabajador no usa el **conocimiento de la empresa**
+  (know-how, procesos, recetas, datos, cartera) para prestar servicios a
+  terceros, ni **recursos de la empresa** (equipos, insumos, marca,
+  tiempo pagado) para beneficio personal. Extiende la confidencialidad de
+  RN-EMP-002/RN-GRP-004 y el criterio de conflicto de interés de
+  RN-GER-004 al personal operativo; su infracción es falta grave.
 
 ## Auditoría
 
@@ -981,6 +1039,40 @@ producción se hace en cocinas de sucursal. Ver
   investigación de mercado requiere el hallazgo documentado (pregunta,
   fuente, fecha) — sin esto, se registra como apuesta, no como decisión
   basada en datos.
+
+## Marketing
+
+- **RN-MKT-001** Marketing **gestiona las marcas** del grupo: su buen uso,
+  consistencia, contenido, campañas y naming. Aplica los lineamientos de
+  identidad (RN-MAR-003) sin una capa de aprobación extra para el trabajo
+  de marca cotidiano. Solo las decisiones **reservadas a la sociedad**
+  —modificación estructural de la identidad de una marca o cesión/venta de
+  propiedad intelectual (RN-MAR-004, RN-GRP-006)— exceden a Marketing y
+  las deciden los socios/holding.
+- **RN-MKT-002** Todo contenido publicado responde a la marca y su público
+  objetivo, no solo a la viralidad; contenido que gana alcance a costa de
+  la coherencia de marca no se publica.
+- **RN-MKT-003** Toda campaña tiene un **brief aprobado** antes de salir a
+  canal (objetivo, público, canal, mensaje, presupuesto, KPI). La campaña
+  de impulso de venta define su objetivo comercial con Comercial:
+  **Marketing atrae el lead, Comercial cierra la venta e investiga la
+  oportunidad**; la conversión se mide contra la venta real en el ERP.
+- **RN-MKT-004** El **material** promocional (bien) lo especifica y valida
+  Marketing, pero su compra pasa por el flujo de Compras (OC o caja chica
+  según monto, RN-CMP-*); Marketing no compra por fuera. La **agencia**
+  (servicio) no pasa por Compras — ver RN-MKT-006.
+- **RN-MKT-005** Toda sucursal debe quedar **correctamente implementada**
+  con el material vigente —producto nuevo y clásico—; Marketing verifica
+  la implementación en sucursal, no basta con enviar el material.
+- **RN-MKT-006** La evaluación de una propuesta de agencia externa (o de la
+  alternativa interna) la realiza **Marketing**, por su conocimiento del
+  servicio, contra el objetivo y el presupuesto; **Gerencia valida** la
+  decisión. La agencia (servicio) no pasa por la evaluación de Compras: se
+  formaliza por contrato (RN-CTR-002/003) y el pago lo ejecuta Contabilidad
+  (RN-CPP-006).
+- **RN-MKT-007** El naming de un producto o campaña lo define/valida
+  Marketing, asegurando disponibilidad, coherencia con la marca y ausencia
+  de conflicto (verificación de registro/legal si aplica).
 
 ## Contabilidad
 

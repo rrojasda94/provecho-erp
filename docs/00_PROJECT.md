@@ -55,12 +55,16 @@ renumera nada). Este archivo define el orden de lectura recomendado.
 | | [templates/comercial/](templates/comercial/) | Plantillas de Comercial (precio/margen, brief de promoción, nuevo producto, desempeño, capacitación) |
 | | [templates/almacen-logistica/](templates/almacen-logistica/) | Plantillas de Almacén-Logística (conteo, ajuste, merma, transferencia, devolución, hoja de ruta) |
 | | [templates/produccion/](templates/produccion/) | Plantillas de Producción (orden de producción, reporte de producción, no conformidad, checklist de inocuidad, conteo de cocina) |
+| | [templates/gerencia/](templates/gerencia/) | Plantillas de Gerencia (acta de decisión gerencial, evaluación de nuevo mercado/marca) |
+| | [templates/marketing/](templates/marketing/) | Plantillas de Marketing (brief de campaña, calendario de contenido, evaluación de propuesta de agencia, checklist de material en sucursal) |
 | **rrhh/** | [rrhh/](rrhh/) | Área de RRHH: marco legal laboral (régimen microempresa REMYPE), perfiles de puesto, flujo completo de incorporación |
 | **compras/** | [compras/](compras/) | Área de Compras: marco legal-tributario (régimen Amazonía, SPOT, comprobantes), perfil de encargado de compras, flujo de abastecimiento |
 | **comercial/** | [comercial/](comercial/) | Área Comercial: política de precio/margen/promociones/metas, perfil de jefe comercial, coordinación con Marketing y Producción/I+D+i |
 | **almacen-logistica/** | [almacen-logistica/](almacen-logistica/) | Área Almacén y Logística: FEFO/FIFO, conteo/ajuste, vencimientos/merma, transferencias/transporte, perfiles de almacén y chofer |
 | **produccion/** | [produccion/](produccion/) | Área Producción (spec a futuro, cocina 2027): cronograma, control de calidad/no conformidad, inocuidad, inventario de cocina, soporte a I+D+i, perfiles de jefe de cocina y cocinero |
-| **diagrams/** | [diagrams/](diagrams/) | Diagramas Mermaid transversales; [Procesos/](diagrams/Procesos/) tiene los SOPs y BPMN por área (Operaciones, Comercial, Contabilidad, Logística-Almacén, Recursos-Humanos, Compras, Producción) — carpeta física `Logistica-Almacen/`, área de negocio "Almacén y Logística"; la venta vive en `Comercial/` |
+| **gerencia/** | [gerencia/](gerencia/) | Área Gerencia: gobierno corporativo, matriz de aprobaciones (fuente única de umbrales), dirección estratégica, supervisión/control, perfil de Gerente General |
+| **marketing/** | [marketing/](marketing/) | Área Marketing: uso de marca/naming, contenido pertinente, campañas (lanzamiento/medios/eventos), material en sucursal, agencias; frontera con Comercial (atrae leads vs. cierra) |
+| **diagrams/** | [diagrams/](diagrams/) | Diagramas Mermaid transversales; [Procesos/](diagrams/Procesos/) tiene los SOPs y BPMN por área (Operaciones, Comercial, Contabilidad, Logística-Almacén, Recursos-Humanos, Compras, Producción, Marketing) — carpeta física `Logistica-Almacen/`, área de negocio "Almacén y Logística"; la venta vive en `Comercial/` |
 | **prompts/** | [prompts/](prompts/) | Guías de contexto por área para agentes de IA |
 
 ## Fuentes de verdad en la raíz del repo

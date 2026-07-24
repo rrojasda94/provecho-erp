@@ -66,6 +66,58 @@ en la receta, RN-PRD-018), y el checklist de turno bloquea la cocina y
 alerta a Gerencia de inmediato si un equipo de frío queda fuera de rango
 (RN-CDP-005).
 
+## Definición del presupuesto anual
+
+`PROC-GER-001` · v1.0 · Borrador (spec del proceso; límites de gasto por
+área aún `[[ COMPLETAR ]]`, ver
+[docs/gerencia/README.md](../gerencia/README.md))
+
+```mermaid
+flowchart TB
+    CONV[Gerencia convoca reunión anual + marco financiero] --> PROP[Cada área presenta su propuesta]
+    PROP --> REV[Gerencia revisa vs. proyección y prioridades]
+    REV --> DES[Gerencia designa presupuesto por área, en acta]
+    DES --> LIM[Gerencia fija límite de gasto autónomo por área]
+    LIM --> REG[Presupuesto y límites registrados en el ERP]
+    REG --> EJE{Gasto del año}
+    EJE -->|Dentro de presupuesto y bajo límite| AUT[Área ejecuta autónoma]
+    EJE -->|Sobre límite o fuera de presupuesto| GER[Aprobación puntual de Gerencia]
+```
+
+Cada área presenta su propuesta una vez al año; Gerencia designa el
+presupuesto y fija el límite de gasto autónomo por área (RN-GER-007) —
+dentro del presupuesto y bajo el límite el área ejecuta sin aprobación
+caso por caso; sobre el límite o fuera de lo presupuestado, aprueba
+Gerencia (matriz de aprobaciones, RN-GER-003). Detalle:
+[docs/diagrams/Procesos/Gerencia/Presupuesto/](../diagrams/Procesos/Gerencia/Presupuesto/).
+
+## Campaña de marketing
+
+`PROC-MKT-001` · v1.0 · Borrador (spec completa; sin ejecución real aún —
+área Marketing recién documentada, ver
+[docs/marketing/README.md](../marketing/README.md))
+
+```mermaid
+flowchart TB
+    OBJ[Objetivo con Comercial si es impulso de venta] --> BR[Brief: público, canal, mensaje, presupuesto, KPI]
+    BR --> AP{¿Presupuesto sobre umbral?}
+    AP -->|Sí| GER[Aprobación de Gerencia] --> NAM
+    AP -->|No| NAM[Naming + uso de marca validados]
+    NAM --> MAT[Material vía Compras + agencia evaluada]
+    MAT --> LAN[Lanzamiento en canal]
+    LAN --> LEAD[Leads registrados] --> ATR[Atribución lead→venta con Comercial/sales]
+    ATR --> CIE[Cierre: medir resultado vs. objetivo]
+```
+
+Marketing atrae el lead, Comercial cierra la venta e investiga la
+oportunidad (RN-MKT-003). Toda campaña sale con brief aprobado; el
+contenido es pertinente a la marca, no viral por viral (RN-MKT-002); el
+naming y el uso de marca se validan antes (RN-MKT-001/007); el material se
+compra vía Compras y se **verifica implementado** en sucursal, no solo
+enviado (RN-MKT-004/005). Detalle narrativo, SOPs y plantillas:
+[docs/marketing/README.md](../marketing/README.md) y
+[docs/diagrams/Procesos/Marketing/](../diagrams/Procesos/Marketing/).
+
 ## Abastecimiento de locales
 
 `PROC-INV-001` · v0.2 · Borrador

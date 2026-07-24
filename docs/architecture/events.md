@@ -49,6 +49,8 @@ accounting.asiento_generado
 | `production.orden_completada` | production* | inventory | orden_id, articulo_id, cantidad | Al terminar producción | RN-PRD-003 |
 | `production.no_conformidad_detectada` | production* | users (alerta Comercial/Gerencia si reincidencia) | orden_id, resultado (`no_conforme_reprocesado`\|`no_conforme_desechado`), reporte_escalamiento_id | Al registrar control de calidad no conforme — un solo asiento contable posible por lote, y solo si `resultado=no_conforme_desechado`: ese caso también dispara `inventory.merma_registrada` (vía merma_cantidad/merma_motivo de la orden). `no_conforme_reprocesado` no genera merma ni asiento, solo el detalle de la corrección en el reporte de escalamiento | RN-PRD-013/014/015 |
 | `production.equipo_frio_fuera_rango` | production* | users (alerta inmediata a Gerencia) | cocina_produccion_id, equipo_id, temperatura_c, rango_esperado | Checklist de turno detecta equipo de frío fuera de rango — bloquea nuevas órdenes en ese equipo (`checklist_inocuidad_turno.estado=bloqueado`) | RN-CDP-005 |
+| `marketing.campana_lanzada` | marketing* | — (informativo/BI) | campana_id, marca_id, tipo, presupuesto | Al lanzar una campaña con brief aprobado | RN-MKT-003 |
+| `marketing.lead_generado` | marketing* | sales (atribución lead→venta) | lead_id, campana_id, canal, cliente_id | Al registrar un lead de campaña; sales lo enlaza a la venta cuando Comercial cierra | RN-MKT-003 |
 | `users.usuario_creado` | users | — | usuario_id, tipo | Al crear usuario | — |
 | `users.sesion_iniciada` | users | — (auditoría) | usuario_id, ip | Login exitoso | — |
 | `accounting.asiento_generado` | accounting | — (auditoría/BI) | asiento_id, evento_origen | Al generar asiento desde un evento operativo | — |
