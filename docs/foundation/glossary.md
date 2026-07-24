@@ -164,5 +164,25 @@ documentación. Prohibido usar sinónimos ambiguos.
 > Terminología de RRHH alineada a la legislación laboral peruana; las
 > plantillas asociadas (`docs/templates/rrhh/`) requieren visado legal.
 
+## Contabilidad y finanzas
+
+| Término | Definición | No confundir con |
+|---------|-----------|------------------|
+| **Contabilidad (área)** | Área que registra, controla y mueve el dinero del grupo; hoy concentra tesorería, finanzas y registro contable en un solo responsable, bajo supervisión de Gerencia (RN-CTB-004). Ver [área](../contabilidad/README.md). | Módulo `accounting` (es el software; el área es el negocio) |
+| **Tesorería** | Función que **mueve** el dinero: caja, bancos, custodia de efectivo, pagos a proveedor, reposición de caja chica, depósitos. Hoy dentro de Contabilidad. | Finanzas (planea; Tesorería ejecuta) |
+| **Finanzas** | Función que **planea** el dinero: flujo de caja proyectado, liquidez, insumos de presupuesto (con Gerencia), margen mínimo (con Comercial). Hoy dentro de Contabilidad. | Tesorería |
+| **Flujo de caja** | Proyección de ingresos y egresos en un horizonte (semanal) para anticipar la liquidez; una alerta de liquidez sube a Gerencia. | Margen de Contribución (es por venta, no de liquidez) |
+| **Conciliación bancaria** | Cuadre de los movimientos del ERP contra el extracto del banco; toda diferencia se explica y documenta. Visada por Gerencia, es requisito del cierre de periodo (RN-CTB-006). | Arqueo (la conciliación es contra el banco; el arqueo es contra el efectivo físico) |
+| **Arqueo** | Conteo del efectivo y fondos bajo custodia comparado contra el saldo esperado del ERP; sorpresivo y ejecutado por alguien distinto del custodio (control de Gerencia, PROC-CTB-005). | Conciliación bancaria |
+| **Orden de pago** | Documento interno que autoriza y sustenta el pago a un proveedor: comprobante conforme, importe, detracción si aplica y aprobación de Gerencia sobre umbral. | Comprobante de Pago (lo emite/recibe el proveedor; la orden es interna) |
+| **Detracción (SPOT)** | Porcentaje del pago de ciertos bienes/servicios que se deposita en la cuenta de detracciones del proveedor; su omisión hace perder el crédito fiscal y genera multa. | IGV (la detracción es un depósito, no un impuesto en sí) |
+| **Activo No Corriente (activo fijo)** | Bien de uso duradero (equipamiento, vehículo, mobiliario) que se registra, deprecia según su tipo y se da de baja al fin de su vida útil o por venta. Su compra cruza con Compras y Gerencia. | Insumo/existencia (se consume; el activo se deprecia) |
+| **Depreciación** | Reconocimiento contable del desgaste de un activo no corriente a lo largo de su vida útil. | Merma (es de existencias, no de activos) |
+| **Periodo contable** | Intervalo (mensual) cuyos asientos se cierran y quedan inmutables; corrección solo por asiento inverso (RN-CTB-002). Su cierre exige conciliación visada (RN-CTB-006). | — |
+
+> Terminología contable alineada al marco tributario peruano; ver
+> [marco-legal-contabilidad.md](../contabilidad/marco-legal-contabilidad.md).
+> Los importes/tasas concretos viven en configuración, no en el glosario.
+
 > Al introducir un concepto nuevo del negocio, primero se agrega aquí, luego se
 > usa en código.

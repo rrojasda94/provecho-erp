@@ -1,10 +1,17 @@
 # Módulo `accounting` — Contabilidad
 
+> Área de negocio documentada en [docs/contabilidad/](../../../docs/contabilidad/README.md).
+> El área concentra hoy **tesorería, finanzas y registro contable** en un solo
+> responsable, bajo supervisión de Gerencia (RN-CTB-004); este módulo es su
+> soporte de software.
+
 ## Objetivo
 
 Registrar asientos contables generados por los eventos de los módulos
-operativos (ventas, compras, inventario) y permitir asientos manuales
-controlados. Base para tesorería y reportes financieros futuros.
+operativos (ventas, compras, inventario), permitir asientos manuales
+controlados y dar soporte a **tesorería** (ciclo de caja, pago a proveedor,
+conciliación bancaria, arqueos) y a **finanzas** (flujo de caja, insumos de
+presupuesto).
 
 ## Entidades
 
@@ -46,4 +53,23 @@ Evento operativo → regla de mapeo contable → asiento generado → mayor/bala
   `inventory.transferencia_recibida`, `inventory.merma_registrada`
   (reporte de pérdidas), `inventory.ajuste_fuera_margen` (alerta de
   auditoría).
-- Publica: `accounting.asiento_generado`, `accounting.periodo_cerrado`.
+- Publica: `accounting.asiento_generado`, `accounting.periodo_cerrado`,
+  `accounting.apertura_caja_registrada`, `accounting.cierre_caja_registrado`,
+  `accounting.cierre_caja_irregular`, `accounting.pago_ejecutado`,
+  `accounting.pago_requiere_aprobacion`, `accounting.arqueo_registrado`
+  (ver [events.md](../../../docs/architecture/events.md)).
+
+## Tesorería y finanzas (procesos del área)
+
+Además del registro contable, el módulo soporta los procesos de tesorería/
+finanzas documentados en el área:
+
+- **Pago a proveedor** (PROC-CTB-003): ejecuta el pago con comprobante conforme
+  (RN-CMP-014), umbral de aprobación de Gerencia (RN-CTB-005), detracción SPOT
+  e idempotencia contra doble pago (RN-CTB-008).
+- **Conciliación bancaria** (PROC-CTB-004): cuadra movimientos vs. extracto;
+  visada por Gerencia, requisito de cierre de periodo (RN-CTB-006).
+- **Arqueo sorpresa** (PROC-CTB-005): control de Gerencia sobre el efectivo
+  (RN-CTB-007).
+- **Flujo de caja** y **activo fijo/depreciación**: pendientes de slice
+  dedicado (PROC-CTB-007/010, propuestos).

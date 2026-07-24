@@ -53,10 +53,10 @@ donde diga "supuesto"):
 
 | Código previo | Qué es | Área dueña |
 |---|---|---|
-| CAJ (Caja) | Proceso de cobro/manejo de efectivo | Contabilidad (supuesto) |
+| CAJ (Caja) | Proceso de cobro/manejo de efectivo | Contabilidad |
 | CRM | Proceso de fidelización/gestión de clientes | Comercial (supuesto, con insumos de Marketing) |
-| TES (Tesorería) | Proceso de flujo de caja y pagos | Finanzas (supuesto) |
-| ACT (Activos) | Proceso de control de activos no corrientes | Contabilidad (supuesto) |
+| TES (Tesorería) | Proceso de flujo de caja y pagos | Contabilidad (absorbe Finanzas a la escala actual, ver [área](../contabilidad/README.md)) |
+| ACT (Activos) | Proceso de control de activos no corrientes | Contabilidad |
 | PRY (Proyectos) | Función transversal de seguimiento de proyectos | Gerencia (supuesto) |
 | USR, REP, SUP, CFG | Usuarios/accesos, BI/reportes, supervisión/auditoría, settings | Funciones del ERP en sí — no tienen área de negocio dueña; si se necesita rastrearlas, usar `SIS` (Sistemas/TI) |
 
@@ -119,6 +119,9 @@ v1.1)`).
 | PROC-COM-002 | Cobro y Emisión de Comprobante de Pago | v1.0 | Vigente | [workflows.md](workflows.md#cobro-y-emisión-de-comprobante-de-pago), detalle del paso "cobro" de PROC-COM-001 (RN-COM-005), decisión de área 2026-07-15 |
 | PROC-CTB-001 | Cierre de caja | v1.1 | Vigente | [workflows.md](workflows.md#cierre-de-caja); área dueña Contabilidad, ver tabla "Procesos/funciones que NO son área" (CAJ); v1.1 agrega la bifurcación de custodia local vs. traslado a oficinas (RN-MDP-006) |
 | PROC-CTB-002 | Apertura de caja | v1.0 | Vigente | [workflows.md](workflows.md#apertura-de-caja); área dueña Contabilidad, ver tabla "Procesos/funciones que NO son área" (CAJ); decisión de alcance 2026-07-16 |
+| PROC-CTB-003 | Pago a proveedor | v1.0 | Vigente | [SOP](../diagrams/Procesos/Contabilidad/Tesoreria/pago-a-proveedor.md); Tesorería ejecuta el pago tras comprobante conforme (RN-CMP-014) con umbral de aprobación de Gerencia (RN-CTB-005) |
+| PROC-CTB-004 | Conciliación bancaria | v1.0 | Vigente | [SOP](../diagrams/Procesos/Contabilidad/Tesoreria/conciliacion-bancaria.md); cuadra ERP vs. extracto; visada por Gerencia, requisito de cierre de periodo (RN-CTB-006) |
+| PROC-CTB-005 | Arqueo sorpresa | v1.0 | Vigente | [SOP](../diagrams/Procesos/Contabilidad/Control/arqueo-sorpresa.md); control de Gerencia, conteo no anunciado por persona distinta del custodio (RN-CTB-007) |
 | PROC-OPE-001 | Apertura de sucursal | v1.0 | Vigente | [workflows.md](workflows.md#apertura-de-sucursal); área dueña Operaciones (nueva, ver tabla de áreas); referencia a PROC-CTB-002 (apertura de caja) y a los pasos 6-9 de PROC-INV-001 (recepción del pedido de almacén central); decisión de alcance 2026-07-16 |
 
 Al crear o versionar un proceso: actualizar esta tabla en el mismo cambio.

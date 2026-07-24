@@ -30,7 +30,7 @@ Registro de lo construido y lo pendiente. Actualizar en cada cambio relevante.
 | Producción: procesos y plantillas (cronograma, calidad/no conformidad, inocuidad, inventario de cocina, soporte a I+D+i) | ✅ 2026-07-20 | `docs/produccion/`, 4 SOPs, 5 plantillas — ver detalle abajo. Spec a futuro: primera cocina de producción planeada 2027, hoy sin operación real. Módulo backend `production` nuevo (spec técnica, sin implementar) |
 | Gerencia: gobierno + matriz de aprobaciones + presupuesto anual | ✅ 2026-07-22 | `docs/gerencia/`, política + perfil + 3 plantillas + 1 SOP (definición de presupuesto anual, PROC-GER-001) — ver detalle abajo. Área de autoridad/estrategia/control; sin módulo backend (RBAC + documentos) |
 | Marketing: procesos y plantillas (marca/naming, contenido, campañas, material en sucursal, agencias) | ✅ 2026-07-22 | `docs/marketing/`, 6 SOPs, 4 plantillas — ver detalle abajo. Módulo backend `marketing` nuevo (spec técnica); PROC-MKT-001 registrado. Resuelve el pendiente "módulo marketing README/contrato propio" |
-| Contabilidad: procesos y plantillas | ⬜ | Mismo patrón que las áreas ya documentadas — último de las áreas operativas, pendiente |
+| Contabilidad: procesos y plantillas | ✅ 2026-07-24 | `docs/contabilidad/` (política + marco legal + perfil contador/tesorero), 3 SOPs nuevos (pago a proveedor PROC-CTB-003, conciliación bancaria PROC-CTB-004, arqueo sorpresa PROC-CTB-005), 4 plantillas — ver detalle abajo. Área = tesorería + finanzas + registro en un solo responsable, supervisada por Gerencia (RN-CTB-004..008). Quedan propuestos PROC-CTB-006..011 |
 | Mantenimiento, Sistemas/TI como áreas propias | ⬜ | Definidas como áreas del negocio (posible tercerización); documentación pendiente, desactivadas por ahora |
 | RRHH backend, supervisión, CRM, tesorería, activos, proyectos, BI, reportes | ⬜ | Módulos futuros |
 | Integración Nubefact | ⬜ | Adaptador en `src/shared/integrations/` |
@@ -72,6 +72,13 @@ contiene, buscando su `[[ COMPLETAR ]]`):
   Despacho/Entrega)? Bloquea `venta_entregada`/`encuesta_enviada`.
 - ✅ 2026-07-22 Módulo `marketing`: README/contrato propio —
   `src/modules/marketing/README.md` + área documentada en `docs/marketing/`.
+- ✅ 2026-07-24 Área Contabilidad documentada — `docs/contabilidad/`
+  (tesorería + finanzas + registro en un responsable, supervisada por
+  Gerencia); resuelve el pendiente "Contabilidad: procesos y plantillas" y
+  confirma CAJ/TES/ACT bajo Contabilidad. Propuestos PROC-CTB-006..011.
+  Pendientes de este mismo pendiente: separar tesorería/registro al salir de
+  REMYPE, y llevar entidades contables (asiento, plan de cuentas, activo
+  fijo, conciliación) a `data-model.md` en su slice.
 - ⬜ Tratamiento de contratos vigentes al salir de REMYPE (~jul 2027).
 - ⬜ Entidades de datos de Comercial-estrategia (metas de venta,
   evaluación de desempeño comercial, plan de capacitación, hallazgos de

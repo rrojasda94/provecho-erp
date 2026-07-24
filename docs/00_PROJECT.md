@@ -57,6 +57,7 @@ renumera nada). Este archivo define el orden de lectura recomendado.
 | | [templates/produccion/](templates/produccion/) | Plantillas de Producción (orden de producción, reporte de producción, no conformidad, checklist de inocuidad, conteo de cocina) |
 | | [templates/gerencia/](templates/gerencia/) | Plantillas de Gerencia (acta de decisión gerencial, evaluación de nuevo mercado/marca) |
 | | [templates/marketing/](templates/marketing/) | Plantillas de Marketing (brief de campaña, calendario de contenido, evaluación de propuesta de agencia, checklist de material en sucursal) |
+| | [templates/contabilidad/](templates/contabilidad/) | Plantillas de Contabilidad (arqueo de caja, conciliación bancaria, orden de pago, flujo de caja semanal) |
 | **rrhh/** | [rrhh/](rrhh/) | Área de RRHH: marco legal laboral (régimen microempresa REMYPE), perfiles de puesto, flujo completo de incorporación |
 | **compras/** | [compras/](compras/) | Área de Compras: marco legal-tributario (régimen Amazonía, SPOT, comprobantes), perfil de encargado de compras, flujo de abastecimiento |
 | **comercial/** | [comercial/](comercial/) | Área Comercial: política de precio/margen/promociones/metas, perfil de jefe comercial, coordinación con Marketing y Producción/I+D+i |
@@ -64,6 +65,7 @@ renumera nada). Este archivo define el orden de lectura recomendado.
 | **produccion/** | [produccion/](produccion/) | Área Producción (spec a futuro, cocina 2027): cronograma, control de calidad/no conformidad, inocuidad, inventario de cocina, soporte a I+D+i, perfiles de jefe de cocina y cocinero |
 | **gerencia/** | [gerencia/](gerencia/) | Área Gerencia: gobierno corporativo, matriz de aprobaciones (fuente única de umbrales), dirección estratégica, supervisión/control, perfil de Gerente General |
 | **marketing/** | [marketing/](marketing/) | Área Marketing: uso de marca/naming, contenido pertinente, campañas (lanzamiento/medios/eventos), material en sucursal, agencias; frontera con Comercial (atrae leads vs. cierra) |
+| **contabilidad/** | [contabilidad/](contabilidad/) | Área Contabilidad (tesorería + finanzas + registro en un solo responsable, supervisada por Gerencia): política de segregación/control, marco tributario PE, perfil de contador/tesorero, SOPs de pago/conciliación/arqueo |
 | **diagrams/** | [diagrams/](diagrams/) | Diagramas Mermaid transversales; [Procesos/](diagrams/Procesos/) tiene los SOPs y BPMN por área (Operaciones, Comercial, Contabilidad, Logística-Almacén, Recursos-Humanos, Compras, Producción, Marketing) — carpeta física `Logistica-Almacen/`, área de negocio "Almacén y Logística"; la venta vive en `Comercial/` |
 | **prompts/** | [prompts/](prompts/) | Guías de contexto por área para agentes de IA |
 

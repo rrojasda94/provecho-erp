@@ -7,6 +7,20 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Added
 
+- **Área Contabilidad** (2026-07-24): `docs/contabilidad/` (política de
+  segregación de funciones/supervisión de Gerencia, marco legal tributario PE,
+  perfil de contador/tesorero), 3 SOPs nuevos en
+  `docs/diagrams/Procesos/Contabilidad/` (Tesorería: pago a proveedor
+  PROC-CTB-003, conciliación bancaria PROC-CTB-004; Control: arqueo sorpresa
+  PROC-CTB-005), 4 plantillas en `docs/templates/contabilidad/`. Reglas
+  RN-CTB-004 a RN-CTB-008; glosario: Tesorería, Finanzas, Flujo de caja,
+  Conciliación bancaria, Arqueo, Orden de pago, Detracción, Activo No
+  Corriente, Depreciación, Periodo contable. Nomenclatura: CAJ/TES/ACT
+  confirmadas bajo Contabilidad. Eventos `accounting.pago_ejecutado`,
+  `accounting.pago_requiere_aprobacion`, `accounting.arqueo_registrado`. Spec
+  `src/modules/accounting/README.md` actualizada (tesorería/finanzas).
+  Propuestos PROC-CTB-006..011 (reposición caja chica, flujo de caja, cierre
+  de periodo, depósito, activo fijo, contador externo).
 - **Área RRHH** (2026-07-19): `docs/rrhh/` (marco legal laboral REMYPE,
   perfiles de puesto), 13 SOPs en
   `docs/diagrams/Procesos/Recursos-Humanos/` (Reclutamiento, Contratación,

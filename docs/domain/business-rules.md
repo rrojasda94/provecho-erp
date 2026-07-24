@@ -1080,6 +1080,23 @@ producción se hace en cocinas de sucursal. Ver
 - **RN-CTB-002** Los asientos de un periodo cerrado son inmutables; correcciones
   por asiento inverso.
 - **RN-CTB-003** La contabilidad refleja los eventos operativos, no los sustituye.
+- **RN-CTB-004** El área concentra hoy tesorería, finanzas y registro en un solo
+  responsable; se acepta el riesgo de falta de segregación de forma explícita y
+  se compensa con supervisión de Gerencia (aprobación de egresos, arqueos
+  sorpresa, visto de conciliaciones y cierres). Ver
+  [política de Contabilidad](../contabilidad/politica-contabilidad.md).
+- **RN-CTB-005** Todo egreso que supere el umbral configurado requiere
+  aprobación previa de Gerencia antes de ejecutarse; el pago sin aprobación no
+  puede ejecutarse en el ERP.
+- **RN-CTB-006** El cierre de un periodo contable exige la conciliación
+  bancaria del periodo revisada y visada por Gerencia; sin conciliación visada
+  no cierra el periodo.
+- **RN-CTB-007** Todo faltante o sobrante detectado en un arqueo se documenta en
+  acta, se atribuye al responsable (mismo criterio de descuadre que el cierre de
+  caja) y notifica a RRHH cuando corresponde.
+- **RN-CTB-008** Un mismo comprobante no se paga dos veces; el ERP bloquea el
+  doble pago (idempotencia). El pago a proveedor solo procede con comprobante
+  conforme entregado por Compras (RN-CMP-014).
 
 > Nota: esta lista crece con cada módulo. Al implementar un módulo se agregan
 > aquí sus reglas antes de codificarlas.
