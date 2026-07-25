@@ -1,0 +1,148 @@
+"""Tests del slice auth/RBAC: login, lockout, rotación de refresh, /me, RBAC.
+
+Usa SQLite en memoria (StaticPool = una sola conexión compartida) y sobreescribe
+la dependencia get_db.
+"""
+
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
+
+import src.core.models_registry  # noqa: F401  (puebla Base.metadata)
+from src.core.app import create_app
+from src.core.database import Base
+from src.modules.users.api.deps import get_db
+from src.modules.users.domain import rules
+
+
+@pytest.fixture()
+def client():
+    engine = create_engine(
+        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
+    )
+    Base.metadata.create_all(engine)
+    TestSession = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+
+    from src.seeders.seed import seed
+
+    with TestSession() as s:
+        seed(s)
+
+    app = create_app()
+
+    def _override_get_db():
+        session = TestSession()
+        try:
+            yield session
+        finally:
+            session.close()
+
+    app.dependency_overrides[get_db] = _override_get_db
+    with TestClient(app) as c:
+        yield c
+
+
+def _login(client, username="admin", pin="123456"):
+    return client.post("/api/v1/auth/login", json={"username": username, "pin": pin})
+
+
+def _auth(token):
+    return {"Authorization": f"Bearer {token}"}
+
+
+def test_login_ok_devuelve_tokens(client):
+    r = _login(client)
+    assert r.status_code == 200
+    body = r.json()
+    assert body["access_token"] and body["refresh_token"]
+    assert body["token_type"] == "bearer"
+
+
+def test_login_pin_incorrecto_401(client):
+    r = _login(client, pin="000000")
+    assert r.status_code == 401
+
+
+def test_login_usuario_inexistente_401(client):
+    r = _login(client, username="fantasma")
+    assert r.status_code == 401
+
+
+def test_lockout_tras_max_intentos(client):
+    for _i in range(rules.MAX_INTENTOS_FALLIDOS):
+        assert _login(client, pin="000000").status_code in (401, 423)
+    # Siguiente intento (incluso con PIN correcto) → bloqueado.
+    r = _login(client, pin="123456")
+    assert r.status_code == 423
+
+
+def test_me_devuelve_roles_y_permisos(client):
+    token = _login(client).json()["access_token"]
+    r = client.get("/api/v1/users/me", headers=_auth(token))
+    assert r.status_code == 200
+    body = r.json()
+    assert body["username"] == "admin"
+    assert "admin" in body["roles"]
+    assert "*" in body["permisos"]
+
+
+def test_me_sin_token_401(client):
+    assert client.get("/api/v1/users/me").status_code == 401  # sin credenciales
+
+
+def test_refresh_rota_y_reuso_revoca_cadena(client):
+    tokens = _login(client).json()
+    old = tokens["refresh_token"]
+
+    r1 = client.post("/api/v1/auth/refresh", json={"refresh_token": old})
+    assert r1.status_code == 200
+    nuevo = r1.json()["refresh_token"]
+    assert nuevo != old
+
+    # Reusar el viejo (ya rotado) → 401 y revoca toda la sesión.
+    r2 = client.post("/api/v1/auth/refresh", json={"refresh_token": old})
+    assert r2.status_code == 401
+
+    # El nuevo también quedó revocado por la detección de reuso.
+    r3 = client.post("/api/v1/auth/refresh", json={"refresh_token": nuevo})
+    assert r3.status_code == 401
+
+
+def test_logout_revoca_refresh(client):
+    tokens = _login(client).json()
+    assert client.post(
+        "/api/v1/auth/logout", json={"refresh_token": tokens["refresh_token"]}
+    ).status_code == 204
+    r = client.post(
+        "/api/v1/auth/refresh", json={"refresh_token": tokens["refresh_token"]}
+    )
+    assert r.status_code == 401
+
+
+def test_rbac_deny_por_defecto_403(client):
+    # admin crea un usuario sin roles.
+    admin_token = _login(client).json()["access_token"]
+    r = client.post(
+        "/api/v1/users",
+        headers=_auth(admin_token),
+        json={"username": "cajero1", "pin": "654321"},
+    )
+    assert r.status_code == 201
+
+    # Ese usuario, sin permisos, no puede usar endpoints admin.
+    token = _login(client, "cajero1", "654321").json()["access_token"]
+    assert client.get("/api/v1/users", headers=_auth(token)).status_code == 403
+    # Pero sí puede ver su propio perfil.
+    assert client.get("/api/v1/users/me", headers=_auth(token)).status_code == 200
+
+
+def test_crear_usuario_pin_invalido_422(client):
+    admin_token = _login(client).json()["access_token"]
+    r = client.post(
+        "/api/v1/users",
+        headers=_auth(admin_token),
+        json={"username": "malpin", "pin": "12ab"},
+    )
+    assert r.status_code == 422

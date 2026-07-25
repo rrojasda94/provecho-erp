@@ -7,8 +7,9 @@ slice dedicado de auth (data-model.md §2).
 """
 
 import uuid
+from datetime import datetime
 
-from sqlalchemy import Boolean, Enum, ForeignKey, String
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -31,3 +32,8 @@ class Usuario(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin):
         Enum("humano", "agente_ia", name="tipo_usuario", native_enum=False)
     )
     activo: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Lockout: 5 intentos fallidos en ventana de 15 min bloquean el login.
+    intentos_fallidos: Mapped[int] = mapped_column(Integer, default=0)
+    bloqueado_hasta: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )

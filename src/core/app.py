@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 
 from src.config.settings import settings
+from src.modules.users.api.routers import router as users_router
 
 
 def create_app() -> FastAPI:
@@ -15,6 +16,5 @@ def create_app() -> FastAPI:
     def health() -> dict[str, str]:
         return {"status": "ok", "app": settings.app_name, "environment": settings.environment}
 
-    # Los módulos se registran aquí al implementarse:
-    # app.include_router(users_router, prefix="/api/v1")
+    app.include_router(users_router, prefix="/api/v1")
     return app

@@ -7,6 +7,20 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Added
 
+- **Módulo `users` — slice auth + RBAC + CRUD** (2026-07-25): primer código de
+  negocio del ERP. Migración `c16d615f6afd` con 7 tablas (`rol`, `permiso`,
+  `usuario_rol`, `rol_permiso`, `usuario_sucursal`, `refresh_token`,
+  `audit_log`) + columnas de lockout (`intentos_fallidos`, `bloqueado_hasta`)
+  en `usuario`, aplicada a la BD dev. Endpoints `POST /api/v1/auth/login`
+  (username + PIN 6 dígitos, Argon2id), `/auth/refresh` (rotativo con
+  detección de reuso que revoca la cadena), `/auth/logout`, `GET /users/me`, y
+  CRUD admin de usuarios/roles/permisos/asignaciones bajo `require_permission`
+  (deny por defecto, comodín `*`). Access token JWT (claims: sub, tipo, roles,
+  sucursales, empresa_id) 15 min + refresh 7 días. Lockout tras 5 intentos
+  fallidos (ventana 15 min). Seeder `src/seeders/seed.py` (idempotente,
+  prohibido en prod): org base Majambo + matriz de roles/permisos + `admin`
+  (PIN `123456`). Tests en `tests/test_users_auth.py`. Router montado en
+  `src/core/app.py`. Pendiente: aplicar restricciones JSONB por permiso.
 - **Área Contabilidad** (2026-07-24): `docs/contabilidad/` (política de
   segregación de funciones/supervisión de Gerencia, marco legal tributario PE,
   perfil de contador/tesorero), 3 SOPs nuevos en

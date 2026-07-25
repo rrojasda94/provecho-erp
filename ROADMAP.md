@@ -13,10 +13,10 @@ Registro de lo construido y lo pendiente. Actualizar en cada cambio relevante.
 | Modelo de datos (v1, documento) | ✅ 2026-07-04 | `docs/architecture/data-model.md` |
 | Modelo de datos ampliado (bloques Inventario, Documentos, Movimientos, Operación comercial, Recursos, Información, RRHH, Actores) | ✅ 2026-07-14 | `docs/architecture/data-model.md` — ~50 entidades nuevas/enriquecidas; ver detalle abajo |
 | Core (app factory, settings, db, event bus) | ✅ 2026-07-04 | Endpoint `/health` operativo |
-| Modelado de base de datos completo (SQLAlchemy + Alembic) | 🔶 en curso 2026-07-20 | Bloque transversal + organización (11) + slice Venta núcleo (11) + slice Cobro/Comprobante/Caja (8) — 30 tablas en total. BD de desarrollo corre en **Supabase** (Postgres gestionado, solo BD — sin su Auth/RLS, ver `docs/engineering/devops.md`); Docker local sigue disponible como alternativa. Resto por slice vertical. |
-| Módulo `users` (auth JWT + PIN + RBAC) | ⬜ | Tras el modelado de BD — contrato ya especificado |
-| Migraciones Alembic iniciales | ⬜ | Junto con el modelado de BD completo (no incremental por módulo) |
-| Seeders (admin / PIN 123456, org base) | ⬜ | |
+| Modelado de base de datos completo (SQLAlchemy + Alembic) | 🔶 en curso 2026-07-25 | Bloque transversal + organización (11) + slice Venta núcleo (11) + slice Cobro/Comprobante/Caja (8) + slice auth/RBAC (7) — 37 tablas en total. BD de desarrollo corre en **Supabase** (Postgres gestionado, solo BD — sin su Auth/RLS, ver `docs/engineering/devops.md`); Docker local sigue disponible como alternativa. Resto por slice vertical. |
+| Módulo `users` (auth JWT + PIN + RBAC) | ✅ 2026-07-25 | Slice auth+CRUD implementado: 7 tablas RBAC (`rol`, `permiso`, `usuario_rol`, `rol_permiso`, `usuario_sucursal`, `refresh_token`, `audit_log`) + lockout en `usuario`. Login/refresh(rotativo+detección de reuso)/logout/me + CRUD admin de usuarios/roles/permisos/asignaciones. Argon2id, JWT, `require_permission` deny por defecto. `docs/security/authorization.md`. Restricciones JSONB por permiso: pendientes de aplicar (hoy solo chequeo por código). |
+| Migraciones Alembic iniciales | 🔶 en curso 2026-07-25 | 5 migraciones aplicadas a la BD dev (head `c16d615f6afd`): transversal+org, slice Venta, cobro/caja, cliente opcional, slice auth/RBAC. |
+| Seeders (admin / PIN 123456, org base) | ✅ 2026-07-25 | `src/seeders/seed.py` (idempotente, prohibido en prod): Grupo Majambo + empresa + marca, matriz de roles/permisos semilla, `admin`/PIN `123456`. Correr: `python -m src.seeders.seed`. |
 | Módulo `inventory` | ⬜ | Almacenes, stock, movimientos, transferencias |
 | Módulo `purchases` | ⬜ | Proveedores, OC, recepción |
 | Módulo `sales` (PDV) | ⬜ | Venta, recetas, descuento de insumos, branding por marca |

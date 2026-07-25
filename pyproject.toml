@@ -40,6 +40,8 @@ select = ["E", "F", "I", "UP", "B", "C901"]
 [tool.ruff.lint.per-file-ignores]
 # Migraciones autogeneradas por Alembic: no se reformatean a mano.
 "alembic/versions/*" = ["E501"]
+# B008: FastAPI usa `Depends(...)` en valores por defecto (patrón idiomático).
+"src/modules/*/api/*" = ["B008"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 10

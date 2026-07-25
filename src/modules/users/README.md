@@ -30,9 +30,36 @@ Detalle en `docs/architecture/data-model.md` (§1, §2).
 | POST | `/api/v1/auth/login` | `{username, pin}` | `{access_token, refresh_token, token_type}` |
 | POST | `/api/v1/auth/refresh` | `{refresh_token}` | tokens nuevos (rotación) |
 | POST | `/api/v1/auth/logout` | `{refresh_token}` | 204 |
-| GET | `/api/v1/users/me` | — | usuario + roles + sucursales |
+| GET | `/api/v1/users/me` | — | usuario + roles + sucursales + permisos |
 
-Claims del JWT: `sub` (usuario_id), `roles`, `sucursales`, `empresa_id`, `exp`.
+Claims del JWT: `sub` (usuario_id), `tipo`, `roles`, `sucursales`, `empresa_id`, `iat`, `exp`, `jti`.
+
+### Administración (requiere permiso `users.gestionar` o comodín `*`)
+
+| Método | Ruta | Acción |
+|--------|------|--------|
+| POST/GET | `/api/v1/users` | Crear / listar usuarios |
+| PATCH | `/api/v1/users/{id}` | Editar usuario |
+| POST | `/api/v1/users/{id}/pin` | Cambiar PIN |
+| POST/DELETE | `/api/v1/users/{id}/roles[/{rol_id}]` | Asignar / quitar rol |
+| POST/DELETE | `/api/v1/users/{id}/sucursales[/{suc_id}]` | Asignar / quitar sucursal (alcance) |
+| POST/GET | `/api/v1/roles` | Crear / listar roles |
+| POST/DELETE | `/api/v1/roles/{id}/permisos[/{permiso_id}]` | Asignar / quitar permiso a rol |
+| POST/GET | `/api/v1/permisos` | Crear / listar permisos |
+
+## Estado (implementado 2026-07-25)
+
+Slice auth + RBAC + CRUD operativo. Capas: `domain/rules.py` (formato de PIN,
+umbrales de lockout, deny por defecto), `infrastructure/` (modelos, `security.py`
+con Argon2id + JWT, `repositories.py`), `application/` (`auth.py`, `admin.py`),
+`api/` (`schemas.py`, `deps.py`, `routers.py`). Seeder:
+
+```
+python -m src.seeders.seed
+```
+
+Pendiente: aplicar las `restricciones` (JSONB) de cada permiso — hoy la
+autorización solo valida el código, no la condición (monto/estado/horario).
 
 ## Reglas
 
