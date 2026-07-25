@@ -188,6 +188,71 @@ def on_compra_recibida(payload: dict) -> None:
         )
 
 
+def on_consumo_registrado(payload: dict) -> None:
+    try:
+        with session_factory() as session:
+            almacen_id = uuid.UUID(payload["almacen_id"])
+            for it in payload["items"]:
+                sku_id = _sku_de_articulo(session, uuid.UUID(it["articulo_id"]))
+                if sku_id is None:
+                    log.warning(
+                        "orden %s: artículo %s sin SKU activo, consumo omitido",
+                        payload["orden_produccion_id"], it["articulo_id"],
+                    )
+                    continue
+                try:
+                    stock_uc.registrar_movimiento(
+                        session,
+                        almacen_id=almacen_id,
+                        sku_id=sku_id,
+                        cantidad=-Decimal(it["cantidad"]),
+                        tipo="consumo_produccion",
+                        referencia=payload["orden_produccion_id"],
+                    )
+                except StockInsuficiente:
+                    # ponytail: mismo criterio que venta — el consumo real ya
+                    # ocurrió en cocina, el stock teórico no lo bloquea.
+                    log.warning(
+                        "orden %s: stock insuficiente de sku %s, consumo omitido",
+                        payload["orden_produccion_id"], sku_id,
+                    )
+            session.commit()
+    except Exception:
+        log.exception(
+            "fallo consumiendo stock de la orden %s", payload.get("orden_produccion_id")
+        )
+
+
+def on_orden_completada(payload: dict) -> None:
+    try:
+        with session_factory() as session:
+            almacen_id = uuid.UUID(payload["almacen_id"])
+            sku_id = _sku_de_articulo(session, uuid.UUID(payload["articulo_id"]))
+            if sku_id is None:
+                log.warning(
+                    "orden %s: artículo %s sin SKU activo, ingreso omitido",
+                    payload["orden_produccion_id"], payload["articulo_id"],
+                )
+                session.commit()
+                return
+            cantidad = Decimal(payload["cantidad_producida"])
+            costo_unitario = Decimal(payload["costo_unitario"])
+            _actualizar_costo_promedio(session, almacen_id, sku_id, cantidad, costo_unitario)
+            stock_uc.registrar_movimiento(
+                session,
+                almacen_id=almacen_id,
+                sku_id=sku_id,
+                cantidad=cantidad,
+                tipo="produccion_entrada",
+                referencia=payload["orden_produccion_id"],
+            )
+            session.commit()
+    except Exception:
+        log.exception(
+            "fallo ingresando stock de la orden %s", payload.get("orden_produccion_id")
+        )
+
+
 _registrado = False
 
 
@@ -200,3 +265,5 @@ def register() -> None:
     event_bus.subscribe("sales.venta_confirmada", on_venta_confirmada)
     event_bus.subscribe("sales.venta_anulada", on_venta_anulada)
     event_bus.subscribe("purchases.compra_recibida", on_compra_recibida)
+    event_bus.subscribe("production.consumo_registrado", on_consumo_registrado)
+    event_bus.subscribe("production.orden_completada", on_orden_completada)

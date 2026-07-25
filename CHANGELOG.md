@@ -7,6 +7,51 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Added
 
+- **Persona CRUD + lock optimista + matriz de aprobaciones + contrato
+  público de lectura** (2026-07-25): migración `af8a246e2c25`.
+  - `feat(users)`: CRUD de `persona` sin Delete (`POST/GET/PATCH
+    /api/v1/personas`, permiso `users.gestionar`) — antes solo se creaba
+    de rebote vía trabajador/cliente/proveedor. `PATCH` exige `version`
+    vigente (lock optimista, `VersionedMixin` nuevo en
+    `src/core/model_base.py`): dos ediciones concurrentes ya no se pisan
+    en silencio, la segunda recibe 409.
+  - `feat(shared)`: `regla_aprobacion` (nuevo, `src/shared/`) — la matriz
+    de aprobaciones deja de ser solo un documento con `[[COMPLETAR]]`;
+    umbral de OC de `purchases` migrado a leerla (con fallback al valor
+    semilla de config si la empresa no configuró ninguna fila). Admin en
+    `/api/v1/reglas-aprobacion`, permiso
+    `gerencia.gestionar_reglas_aprobacion`.
+  - `feat(sales)`: primer contrato público de lectura cross-módulo del
+    repo (`application/queries_publicas.py`) — `GET /api/v1/sales/clientes`
+    expone `cliente` (join con `persona` si es natural) para que
+    `marketing`/`comercial` lo consuman sin importar el dominio de
+    `sales`, permiso `sales.leer_clientes_externos`. Patrón documentado en
+    `docs/architecture/events.md` para replicar cuando `inventory`
+    implemente `solicitud_insumos` (caso `purchases` ↔ `inventory`, hoy
+    bloqueado).
+  - Tests: `tests/test_users_persona.py` (CRUD + lock optimista),
+    `tests/test_sales_clientes_publico.py`, nuevo caso en
+    `tests/test_purchases.py` (override de umbral por empresa).
+- **Módulo `production` — slice core** (2026-07-25): migración
+  `f78501175fba` (orden_produccion, consumo_produccion_item,
+  receta.articulo_id) aplicada. Construido antes de tiempo (primera
+  cocina real planeada 2027) a pedido explícito del usuario, mismo
+  patrón slice-por-slice. `receta.articulo_id` nuevo (nullable) liga una
+  receta a la subreceta que produce — separado del uso existente de
+  `producto_comercial.receta_id`. Endpoints
+  `/api/v1/production`: crear orden ad-hoc (sin plan/cronograma),
+  registrar consumo real de insumos, completar con resultado de control
+  de calidad (`conforme`/`no_conforme_reprocesado`/`no_conforme_desechado`)
+  y costeo automático (`costo_insumos` + `costo_mano_obra` vía tarifa
+  configurable `production_costo_hora_mano_obra` → `costo_real_unitario`).
+  Desecho exige merma + motivo + evidencia (RN-PRD-015). **Listeners en
+  inventory**: `consumo_registrado` descuenta insumos,
+  `orden_completada` suma el producto terminado y recalcula su
+  `costo_promedio` (mismo patrón que `purchases.compra_recibida`). Rol
+  semilla `jefe_cocina`. Sin migración generada aún. Tests en
+  `tests/test_production.py`. Deuda registrada en ROADMAP (cronograma,
+  checklist de inocuidad, reporte consolidado, reporte de escalamiento
+  real, merma→accounting, lote/trazabilidad, subrecetas anidadas).
 - **Módulo `purchases` — slice core** (2026-07-25): migración `4ff85f833b29`
   (proveedor, orden_compra, orden_compra_item, recepcion_compra,
   recepcion_item) aplicada a la BD dev (Supabase). Endpoints

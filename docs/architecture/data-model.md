@@ -137,11 +137,16 @@ erDiagram
 
 - **persona**: nombres, apellidos, tipo_documento (`dni` | `ce` |
   `pasaporte`), numero_documento (único), fecha_nacimiento, domicilio,
-  contacto (teléfono/email). **Fuente única de datos de personas
-  naturales** (party model): `trabajador`, `cliente` (natural) y `usuario`
-  (humano) la referencian por `persona_id`, para no duplicar nombres. Los
-  roles de un documento (emisor, destinatario, representante, aprobador)
-  no son tablas: se atan a un `trabajador`/`persona` al emitir.
+  contacto (teléfono/email), `version` (lock optimista — cada `UPDATE`
+  exige la `version` vigente; si no coincide, 409, en vez de pisar en
+  silencio el cambio de otro editor concurrente). **Fuente única de datos
+  de personas naturales** (party model): `trabajador`, `cliente` (natural)
+  y `usuario` (humano) la referencian por `persona_id`, para no duplicar
+  nombres. Los roles de un documento (emisor, destinatario, representante,
+  aprobador) no son tablas: se atan a un `trabajador`/`persona` al emitir.
+  CRUD propio en `/api/v1/personas` (Create/Read/Update — sin Delete: el
+  ciclo de vida real se maneja en la entidad que la referencia, ej.
+  `trabajador.estado=cesado`, no borrando la persona).
 - **usuario**: username, pin_hash (Argon2id), persona_id (nullable — NULL
   si `agente_ia`), nombre_display (fallback para agente_ia), email, tipo
   (`humano` | `agente_ia`), activo.
@@ -549,7 +554,11 @@ Solicitud.
   Central de Pedidos — esas ventas enrutan al mismo `cliente` por sus
   datos, sin login). Si natural, nombre y documento se leen de `persona`
   — no se duplican (RN-GEN-007). `cliente_id` es opcional en `venta` —
-  cliente anónimo es un caso válido (RN-PER-005).
+  cliente anónimo es un caso válido (RN-PER-005). Lectura para análisis
+  cross-módulo (marketing/comercial) vía el contrato público
+  `sales/application/queries_publicas.py::listar_clientes_para_analisis`
+  (`GET /api/v1/sales/clientes`, permiso `sales.leer_clientes_externos`) —
+  ver [events.md#eventos-vs-contratos-públicos-de-lectura](events.md).
 - **cuenta_puntos**: cliente_id, saldo. Un solo saldo válido en todas las
   marcas/empresas del grupo (RN-PTS-001).
 - **puntos_movimiento**: cuenta_puntos_id, tipo (`acumulacion` | `canje` |
@@ -707,11 +716,22 @@ tabla. Ver [docs/gerencia/README.md](../gerencia/README.md).
   fecha, archivo_id (opcional). Materializa el acta de decisión gerencial
   (RN-GER-002); toda aprobación de la matriz de aprobaciones (RN-GER-003)
   genera una fila.
-- **Matriz de aprobaciones**: es configuración/política, no una tabla de
-  transacciones — vive en
-  [gerencia/politica-gerencia.md](../gerencia/politica-gerencia.md#matriz-de-aprobaciones).
-  Los umbrales que consulta (ej. umbral de OC RN-CMP-008) son settings por
-  empresa, no se hardcodean en cada módulo.
+- **regla_aprobacion** (entidad transversal, vive en `shared` — mismo
+  criterio que `Comprobante`): empresa_id, modulo (ej. `purchases`), codigo
+  (ej. `oc_umbral`), umbral, permiso_requerido (informativo — la
+  verificación real del permiso la hace el módulo consumidor), vigente.
+  Reemplaza el umbral fijo en config para reglas cuantitativas (RN-GER-003:
+  fuente única, ninguna área fija su propio umbral por fuera de la matriz).
+  Si no hay fila para una empresa/módulo/código, el módulo consumidor usa
+  su valor semilla de config como fallback (no rompe lo ya sembrado).
+  Administrado vía `/api/v1/reglas-aprobacion` (permiso
+  `gerencia.gestionar_reglas_aprobacion`).
+- **Matriz de aprobaciones**: la narrativa de gobierno (qué requiere
+  visado, quién aprueba) vive en
+  [gerencia/politica-gerencia.md](../gerencia/politica-gerencia.md#matriz-de-aprobaciones);
+  los umbrales cuantitativos que esa narrativa referencia (ej. umbral de OC
+  RN-CMP-008) ahora son filas de `regla_aprobacion`, no texto
+  `[[COMPLETAR]]` ni config estático por módulo.
 
 ## 8d. Marketing (módulo futuro marketing)
 

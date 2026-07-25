@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     # Monto sobre el cual emitir una OC exige permiso purchases.aprobar
     # (RN-CMP — umbral configurable, valor semilla a ajustar por el negocio).
     purchases_umbral_aprobacion_oc: Decimal = Decimal("2000")
+    # Tarifa única de mano de obra para costeo de producción (RN-PRD-018)
+    # — valor semilla, ajustar cuando el negocio defina la tarifa real.
+    production_costo_hora_mano_obra: Decimal = Decimal("15.00")
 
 
 settings = Settings()

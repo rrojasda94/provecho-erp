@@ -12,7 +12,7 @@ from src.modules.users.api.deps import (
     get_db,
     require_permission,
 )
-from src.modules.users.application import admin, auth
+from src.modules.users.application import admin, auth, gerencia
 from src.modules.users.application.errors import (
     Conflicto,
     CredencialesInvalidas,
@@ -28,6 +28,7 @@ from src.modules.users.infrastructure.repositories import UsuarioRepo
 router = APIRouter()
 
 GESTIONAR = "users.gestionar"  # permiso para el CRUD administrativo
+GESTIONAR_REGLAS = "gerencia.gestionar_reglas_aprobacion"
 
 _HTTP_STATUS: dict[type[UsersError], int] = {
     CredencialesInvalidas: status.HTTP_401_UNAUTHORIZED,
@@ -88,6 +89,62 @@ def me(
         empresa_id=claims["empresa_id"],
         permisos=sorted(UsuarioRepo(session).permiso_codigos(usuario.id)),
     )
+
+
+# --- Persona (party model) ---------------------------------------------------
+@router.post(
+    "/personas",
+    response_model=schemas.PersonaOut,
+    status_code=status.HTTP_201_CREATED,
+    tags=["personas"],
+)
+def crear_persona(
+    body: schemas.PersonaCreate,
+    _: Usuario = Depends(require_permission(GESTIONAR)),
+    session: Session = Depends(get_db),
+):
+    try:
+        persona = admin.crear_persona(session, **body.model_dump())
+    except Conflicto as e:
+        raise _http(e) from e
+    session.commit()
+    return persona
+
+
+@router.get("/personas", response_model=list[schemas.PersonaOut], tags=["personas"])
+def listar_personas(
+    q: str | None = None,
+    _: Usuario = Depends(require_permission(GESTIONAR)),
+    session: Session = Depends(get_db),
+):
+    return admin.listar_personas(session, q)
+
+
+@router.get("/personas/{persona_id}", response_model=schemas.PersonaOut, tags=["personas"])
+def obtener_persona(
+    persona_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(GESTIONAR)),
+    session: Session = Depends(get_db),
+):
+    try:
+        return admin.obtener_persona(session, persona_id)
+    except NoEncontrado as e:
+        raise _http(e) from e
+
+
+@router.patch("/personas/{persona_id}", response_model=schemas.PersonaOut, tags=["personas"])
+def editar_persona(
+    persona_id: uuid.UUID,
+    body: schemas.PersonaUpdate,
+    _: Usuario = Depends(require_permission(GESTIONAR)),
+    session: Session = Depends(get_db),
+):
+    try:
+        persona = admin.editar_persona(session, persona_id, **body.model_dump())
+    except (NoEncontrado, Conflicto) as e:
+        raise _http(e) from e
+    session.commit()
+    return persona
 
 
 # --- Administración (CRUD) --------------------------------------------------
@@ -327,3 +384,53 @@ def listar_permisos(
     session: Session = Depends(get_db),
 ):
     return admin.listar_permisos(session)
+
+
+# --- Reglas de aprobación (matriz de aprobaciones) --------------------------
+@router.post(
+    "/reglas-aprobacion",
+    response_model=schemas.ReglaAprobacionOut,
+    status_code=status.HTTP_201_CREATED,
+    tags=["gerencia"],
+)
+def crear_regla_aprobacion(
+    body: schemas.ReglaAprobacionCreate,
+    _: Usuario = Depends(require_permission(GESTIONAR_REGLAS)),
+    session: Session = Depends(get_db),
+):
+    try:
+        regla = gerencia.crear_regla(session, **body.model_dump())
+    except Conflicto as e:
+        raise _http(e) from e
+    session.commit()
+    return regla
+
+
+@router.get(
+    "/reglas-aprobacion", response_model=list[schemas.ReglaAprobacionOut], tags=["gerencia"]
+)
+def listar_reglas_aprobacion(
+    empresa_id: uuid.UUID | None = None,
+    _: Usuario = Depends(require_permission(GESTIONAR_REGLAS)),
+    session: Session = Depends(get_db),
+):
+    return gerencia.listar_reglas(session, empresa_id)
+
+
+@router.patch(
+    "/reglas-aprobacion/{regla_id}",
+    response_model=schemas.ReglaAprobacionOut,
+    tags=["gerencia"],
+)
+def editar_regla_aprobacion(
+    regla_id: uuid.UUID,
+    body: schemas.ReglaAprobacionUpdate,
+    _: Usuario = Depends(require_permission(GESTIONAR_REGLAS)),
+    session: Session = Depends(get_db),
+):
+    try:
+        regla = gerencia.editar_regla(session, regla_id, **body.model_dump())
+    except NoEncontrado as e:
+        raise _http(e) from e
+    session.commit()
+    return regla

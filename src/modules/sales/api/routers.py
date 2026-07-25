@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from src.modules.sales.api import schemas
-from src.modules.sales.application import catalogo, ventas
+from src.modules.sales.application import catalogo, queries_publicas, ventas
 from src.modules.sales.application.errors import (
     Conflicto,
     NoEncontrado,
@@ -23,6 +23,7 @@ COBRAR = "sales.cobrar"
 LEER = "sales.leer"
 ANULAR = "sales.anular"
 CATALOGO = "sales.gestionar_catalogo"
+LEER_CLIENTES_EXTERNOS = "sales.leer_clientes_externos"
 
 _HTTP_STATUS: dict[type[SalesError], int] = {
     NoEncontrado: status.HTTP_404_NOT_FOUND,
@@ -109,6 +110,17 @@ def anular_venta(
         raise _http(e) from e
     session.commit()
     return venta
+
+
+# --- Contrato público de lectura (marketing/comercial/análisis) -------------
+@router.get("/clientes", response_model=list[schemas.ClientePublicoOut])
+def listar_clientes_publico(
+    grupo_id: uuid.UUID,
+    tipo: str | None = None,
+    _: Usuario = Depends(require_permission(LEER_CLIENTES_EXTERNOS)),
+    session: Session = Depends(get_db),
+):
+    return queries_publicas.listar_clientes_para_analisis(session, grupo_id, tipo=tipo)
 
 
 # --- Catálogo comercial -----------------------------------------------------

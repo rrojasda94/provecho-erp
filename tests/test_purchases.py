@@ -257,6 +257,39 @@ def test_emitir_oc_sobre_umbral_sin_permiso_aprobar_409(env):
     assert r2.status_code == 200
 
 
+def test_regla_aprobacion_override_por_empresa_permite_sin_umbral_semilla(env):
+    """Con una fila `regla_aprobacion` que sube el umbral para esta empresa,
+    una OC que antes exigía `purchases.aprobar` (sobre el umbral semilla
+    S/2000) ya no lo exige."""
+    client, ids, _ = env
+    h_admin = _token(client)
+    h_comprador = _token(client, "comprador1", "111111")
+
+    r = client.post(
+        "/api/v1/reglas-aprobacion",
+        headers=h_admin,
+        json={
+            "empresa_id": ids["empresa_id"],
+            "modulo": "purchases",
+            "codigo": "oc_umbral",
+            "umbral": "10000",
+            "permiso_requerido": "purchases.aprobar",
+        },
+    )
+    assert r.status_code == 201
+
+    proveedor_id = _crear_proveedor(client, h_admin, ids).json()["id"]
+    # 100 * 50 = 5000: bajo el umbral semilla (2000) hubiera exigido aprobar,
+    # pero bajo el umbral configurado (10000) ya no.
+    oc = _crear_oc(
+        client, h_comprador, ids, proveedor_id, idempotency_key="oc-key-regla", costo="50.00"
+    )
+    r2 = client.post(
+        f"/api/v1/purchases/ordenes-compra/{oc.json()['id']}/emitir", headers=h_comprador
+    )
+    assert r2.status_code == 200
+
+
 def test_anular_oc_borrador_ok_y_recibida_409(env):
     client, ids, TestSession = env
     h = _token(client)

@@ -13,6 +13,29 @@ importando el dominio de otro módulo. Ver mapa:
   cambio incompatible (nueva versión del evento).
 - Idempotencia: los consumidores toleran recibir el mismo evento dos veces.
 
+## Eventos vs. contratos públicos de lectura
+
+El event bus (`src/core/events.py`) sirve para **notificar un hecho ya
+ocurrido** de forma asíncrona (el emisor no sabe quién escucha). Para una
+**consulta síncrona bajo demanda** ("dame los clientes de este grupo para
+analizarlos") un evento no encaja — ahí el módulo dueño expone un **contrato
+público de lectura**: un archivo `application/queries_publicas.py` con
+funciones que devuelven DTOs (nunca el modelo ORM ni tipos de `domain`),
+protegidas por su propio permiso RBAC. Otro módulo solo puede importar de
+ese archivo — nunca de `domain`/`infrastructure` del módulo dueño
+(CLAUDE.md: "nunca importar el dominio de otro módulo").
+
+Mientras el módulo consumidor no exista todavía como código (ej.
+`marketing`, hoy solo README), el contrato también se expone como endpoint
+HTTP — así cualquier rol autorizado lo usa ya (análisis manual, integración
+futura). Cuando el módulo consumidor exista, su capa de aplicación importa
+la función directamente (llamada Python en proceso, sin HTTP).
+
+| Contrato | Dueño | Consumidores | Función | Permiso |
+|---|---|---|---|---|
+| Lectura de clientes | `sales` | `marketing`/`comercial` (análisis, targeting de campañas) | `sales/application/queries_publicas.py::listar_clientes_para_analisis` (`GET /api/v1/sales/clientes`) | `sales.leer_clientes_externos` |
+| Solicitudes por usuario | `inventory` (`solicitud_insumos`) | `purchases` (qué usuarios/sucursales piden más — insumo para negociar con proveedores) | **bloqueado** — `solicitud_insumos` aún no existe en código (deuda de `inventory`, ver ROADMAP) | — |
+
 ## Cadena de referencia (venta → contabilidad)
 
 ```

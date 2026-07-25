@@ -1,9 +1,10 @@
 # Módulo `production` — Producción de subrecetas
 
-**Estado (2026-07-20):** spec técnica, sin implementación — primera
-cocina de producción planeada para 2027 (`docs/produccion/README.md`).
-Documentado antes por dependencia de otros módulos: `inventory` ya
-referencia `production.orden_completada` como evento consumido.
+**Estado (2026-07-25):** slice core implementado (código, sin operación
+real — primera cocina de producción planeada para 2027,
+`docs/produccion/README.md`). Se construyó antes de esa fecha por pedido
+explícito, siguiendo el mismo patrón slice-por-slice que
+purchases/inventory/sales.
 
 ## Objetivo
 
@@ -30,6 +31,45 @@ cierre). Detalle en `docs/architecture/data-model.md` §7.
 vive en `shared`, no en un módulo dueño único (`docs/architecture/
 data-model.md` §6) — y `lote` está modelada por `inventory`; `production`
 las reutiliza, no las duplica.
+
+## Estado (slice core implementado 2026-07-25)
+
+Operativo en `/api/v1/production`: `orden_produccion` ad-hoc (sin
+`plan_produccion`/cronograma — diferido) crear (borrador) → registrar
+consumo real de insumos (`consumo_produccion_item`, transición a
+`en_proceso`) → completar con resultado de control de calidad
+(`conforme` | `no_conforme_reprocesado` | `no_conforme_desechado`).
+Costeo automático al completar (RN-PRD-018): `costo_insumos` (suma de
+consumo real), `costo_mano_obra` (`horas_hombre` × tarifa única
+configurable `production_costo_hora_mano_obra`), `costo_real_unitario`.
+Resuelve la receta de la subreceta vía el nuevo `receta.articulo_id`
+(nullable — liga una receta a la subreceta que produce, distinto del uso
+existente `producto_comercial.receta_id` de venta directa). Capas
+`domain/rules.py`, `infrastructure/repositories.py`, `application/`
+(`ordenes.py`), `api/`. Migración `f78501175fba` aplicada.
+
+| Método | Ruta | Permiso |
+|--------|------|---------|
+| POST | `/ordenes` | `production.crear` |
+| GET | `/ordenes/{id}` | `production.leer` |
+| POST | `/ordenes/{id}/consumo` | `production.crear` |
+| POST | `/ordenes/{id}/completar` | `production.completar` |
+
+Eventos: publica `production.consumo_registrado` (inventory descuenta
+insumos, tipo `consumo_produccion`), `production.orden_completada`
+(inventory suma stock del artículo terminado, tipo `produccion_entrada`,
+y recalcula su `costo_promedio` — mismo listener/patrón que
+`purchases.compra_recibida`) y `production.no_conformidad_detectada`
+(sin consumidor todavía). Rol semilla `jefe_cocina`.
+
+Deuda del slice (ver ROADMAP): `plan_produccion`/cronograma (hoy la
+orden se crea sin plan), `checklist_inocuidad_turno` (bloqueo de cocina
+por fallo de inocuidad), `reporte_produccion` consolidado,
+`reporte_escalamiento` real ante no conformidad (hoy solo el evento, sin
+entidad), `inventory.merma_registrada` → `accounting` en desecho (bloqueado
+por `stock_merma`, deuda de inventory), lote/trazabilidad del producto
+terminado (bloqueado por lote/FEFO, deuda de inventory), subrecetas
+anidadas (una orden que consume otra subreceta con su propia orden).
 
 ## Casos de uso
 

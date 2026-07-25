@@ -89,6 +89,13 @@ class MedioPagoCreate(BaseModel):
     comision_pct: Decimal = Decimal(0)
 
 
+class ClientePublicoOut(BaseModel):
+    id: uuid.UUID
+    tipo: str
+    nombre: str | None
+    contacto: str | None
+
+
 class MedioPagoOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID

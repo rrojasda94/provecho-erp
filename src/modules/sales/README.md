@@ -52,6 +52,7 @@ CRUD de productos comerciales y medios de pago. Capas `domain/rules.py`,
 | POST | `/ventas/{id}/anular` | `sales.anular` |
 | POST/GET/PATCH | `/productos[/{id}]` | `gestionar_catalogo` / `leer` |
 | POST/GET | `/medios-pago` | `gestionar_catalogo` / `leer` |
+| GET | `/clientes?grupo_id=` | `sales.leer_clientes_externos` |
 
 **Kiosk y Central de Pedidos NO son módulos**: son clientes del mismo
 contrato `POST /ventas` (`punto_venta.canal = kiosko|web|trabajador`),
@@ -60,6 +61,14 @@ igual que agente_ia. El carrito vive en el cliente, no en el servidor.
 Eventos: publica `sales.venta_confirmada` (inventory descuenta insumos
 por receta + merma % + empaque según modalidad), `sales.venta_pagada`,
 `sales.venta_anulada` (inventory repone).
+
+**Contrato público de lectura** (`application/queries_publicas.py`,
+primero de este tipo en el repo — ver
+`docs/architecture/events.md#eventos-vs-contratos-públicos-de-lectura`):
+`listar_clientes_para_analisis` expone `cliente` (join con `persona` si es
+natural) para que `marketing`/`comercial` lo consuman sin importar el
+dominio de `sales` — hoy vía `GET /clientes`, mañana vía import directo de
+la función cuando `marketing` exista como módulo.
 
 Deuda del slice (ver ROADMAP): precio server-side vía `lista_precio`
 (hoy el PDV manda `precio_unitario`), comprobante (Nubefact), nota de

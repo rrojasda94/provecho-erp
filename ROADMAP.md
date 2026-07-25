@@ -20,14 +20,15 @@ Registro de lo construido y lo pendiente. Actualizar en cada cambio relevante.
 | Módulo `inventory` | 🔶 slice 1 ✅ 2026-07-25 | Catálogo (CRUD artículos/categorías/SKUs), stock por almacén (vía `movimiento_inventario` inmutable) y ajuste con segregación (`solicitar_ajuste` ≠ `aprobar_ajuste`, aprobador ≠ solicitante). Migración `be914c92a94b`. Diferido: lote/FEFO, reservas, conteo, transferencias, devolución, guía remisión, listeners de eventos. |
 | Módulo `purchases` | 🔶 slice core ✅ 2026-07-25 | CRUD de proveedores (natural liga a `persona`, jurídico con RUC propio) y ciclo de OC tipo `insumo` (crear → emitir → recibir → anular), con idempotencia y umbral de aprobación configurable. `purchases.compra_recibida` → inventory suma stock y recalcula `costo_promedio`. Migración `4ff85f833b29` aplicada. Diferido: ver Deuda técnica. |
 | Módulo `sales` (PDV) | 🔶 slices 1-2 ✅ 2026-07-25 | Venta con correlativo+idempotencia → `sales.venta_confirmada` → inventory descuenta por receta (+merma+empaque); cobro con pagos parciales → `pagada`; anulación pre-pago repone stock; CRUD productos/medios de pago. **KDS** (slice 2): pantallas configurables por sucursal y categorías (`kds_pantalla`, migración `7672566bf189`), avance por ítem en `venta_item.estado_preparacion` (fuente única → todas las pantallas ven el avance real), tipos preparación/despacho, comanda imprimible con contador de reimpresiones, evento `sales.pedido_listo`, rol `cocinero`. Kiosk/Central de Pedidos = clientes del mismo contrato, no módulos. Diferido: ver Deuda técnica. |
+| Persona CRUD + lock optimista + matriz de aprobaciones + contrato público | ✅ 2026-07-25 | `POST/GET/PATCH /api/v1/personas` (sin Delete); `persona.version` con lock optimista (409 si desactualizada); `regla_aprobacion` (nuevo, `src/shared/`) reemplaza el umbral fijo de `purchases` por empresa, admin en `/api/v1/reglas-aprobacion`; primer contrato público de lectura cross-módulo (`sales.cliente` para marketing/comercial, `GET /api/v1/sales/clientes`). Migración `af8a246e2c25`. Ver detalle abajo. |
 | Módulo `accounting` | ⬜ | |
-| Producción (fabricación) | ⬜ | Módulo futuro `production` |
+| Producción (fabricación) | 🔶 slice core ✅ 2026-07-25 | Orden de producción ad-hoc (crear → registrar consumo → completar con resultado de control de calidad) y costeo automático. Construido antes de tiempo a pedido del usuario — primera cocina real sigue planeada 2027. `receta.articulo_id` nuevo liga receta↔subreceta. Diferido: ver Deuda técnica. |
 | Solicitudes / picking / transporte | ⬜ | Módulos futuros `requests`, `logistics` |
 | RRHH: procesos y plantillas (reclutamiento, contratación, inducción) | ✅ 2026-07-19 | `docs/rrhh/`, 13 SOPs, 9 plantillas — ver detalle abajo. Módulo backend `rrhh` sigue pendiente |
 | Compras: procesos y plantillas (proveedores, cotización, OC, recepción, pago, caja chica, activos) | ✅ 2026-07-19 | `docs/compras/`, 11 SOPs, 6 plantillas — ver detalle abajo. Módulo backend `purchases` actualizado conforme al flujo |
 | Comercial: procesos y plantillas (precio/margen, promociones, mercado, metas, desempeño, capacitación) | ✅ 2026-07-19 | `docs/comercial/`, 9 SOPs, 5 plantillas — ver detalle abajo. Módulo backend `sales` ajustado (margen, vigencia de promoción) |
 | Almacén-Logística: procesos y plantillas (conteo, vencimientos/merma, transporte/transferencias) | ✅ 2026-07-19 | `docs/almacen-logistica/`, 8 SOPs, 6 plantillas — ver detalle abajo. Módulo backend `inventory` ajustado (lote, merma, ajuste solicitar/aprobar) |
-| Producción: procesos y plantillas (cronograma, calidad/no conformidad, inocuidad, inventario de cocina, soporte a I+D+i) | ✅ 2026-07-20 | `docs/produccion/`, 4 SOPs, 5 plantillas — ver detalle abajo. Spec a futuro: primera cocina de producción planeada 2027, hoy sin operación real. Módulo backend `production` nuevo (spec técnica, sin implementar) |
+| Producción: procesos y plantillas (cronograma, calidad/no conformidad, inocuidad, inventario de cocina, soporte a I+D+i) | ✅ 2026-07-20 | `docs/produccion/`, 4 SOPs, 5 plantillas — ver detalle abajo. Spec a futuro: primera cocina de producción planeada 2027, hoy sin operación real. Módulo backend `production` — slice core implementado 2026-07-25 |
 | Gerencia: gobierno + matriz de aprobaciones + presupuesto anual | ✅ 2026-07-22 | `docs/gerencia/`, política + perfil + 3 plantillas + 1 SOP (definición de presupuesto anual, PROC-GER-001) — ver detalle abajo. Área de autoridad/estrategia/control; sin módulo backend (RBAC + documentos) |
 | Marketing: procesos y plantillas (marca/naming, contenido, campañas, material en sucursal, agencias) | ✅ 2026-07-22 | `docs/marketing/`, 6 SOPs, 4 plantillas — ver detalle abajo. Módulo backend `marketing` nuevo (spec técnica); PROC-MKT-001 registrado. Resuelve el pendiente "módulo marketing README/contrato propio" |
 | Contabilidad: procesos y plantillas | ✅ 2026-07-24 | `docs/contabilidad/` (política + marco legal + perfil contador/tesorero), 3 SOPs nuevos (pago a proveedor PROC-CTB-003, conciliación bancaria PROC-CTB-004, arqueo sorpresa PROC-CTB-005), 4 plantillas — ver detalle abajo. Área = tesorería + finanzas + registro + auditoría interna en un solo responsable, supervisada por Gerencia (RN-CTB-004..009; control en dos niveles: Contabilidad audita a las operativas, Gerencia audita a Contabilidad). Quedan propuestos PROC-CTB-006..013 |
@@ -106,6 +107,17 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
 - ⬜ `users`: aplicar **restricciones JSONB** por permiso (hoy autoriza solo
   por código, no por condición monto/estado/horario).
 - ⬜ `users`: auth de **`agente_ia` por token** (hoy exige PIN como humano).
+- ✅ 2026-07-25 **Lock optimista en `persona`** (`VersionedMixin`,
+  `src/core/model_base.py`): `PATCH /api/v1/personas/{id}` exige `version`
+  vigente, 409 si está desactualizada. Aplicado solo a `persona` por
+  ahora — extender a otras entidades compartidas si aparecen más choques
+  reales de edición concurrente.
+- ⬜ **Contrato de lectura `purchases` ↔ `inventory.solicitud_insumos`**
+  ("qué usuarios/sucursales piden más productos"): bloqueado hasta que
+  `solicitud_insumos` exista en código (deuda de `inventory`, ver abajo).
+  El patrón de contrato público ya está establecido (`sales.cliente`, ver
+  `docs/architecture/events.md`) — replicar cuando `solicitud_insumos`
+  se implemente.
 
 ### Módulo inventory (slices siguientes)
 - ✅ 2026-07-25 **Listener `sales.venta_confirmada`** → consumo por receta
@@ -189,6 +201,43 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
 - ⬜ **Listener `inventory.devolucion_a_proveedor`**: gestionar reclamo/
   nota de crédito con el proveedor (bloqueado por `devolucion` en
   inventory, ver arriba).
+
+### Módulo production (slices siguientes)
+- ✅ 2026-07-25 **Migración Alembic** `f78501175fba` (orden_produccion,
+  consumo_produccion_item, receta.articulo_id) aplicada a la BD dev
+  (Supabase).
+- ⬜ **`plan_produccion`** (cronograma fijo por tipo de receta/turno,
+  evita contaminación cruzada): hoy toda orden se crea ad-hoc, sin plan.
+- ⬜ **`checklist_inocuidad_turno`**: bioseguridad, superficies, equipos
+  de frío (JSONB), indicio de plaga — bloquea la cocina si algo falla
+  (RN-CDP-005), igual criterio que falla de frío en apertura de sucursal.
+- ⬜ **`reporte_produccion`** consolidado automático al cierre de jornada
+  (RN-DOC-010), visado por el jefe de cocina, no redactado a mano.
+- ⬜ **`reporte_escalamiento` real**: hoy `production.no_conformidad_detectada`
+  se publica pero nadie lo consume — falta la entidad (vive en `shared`)
+  y quién la genera/resuelve.
+- ⬜ **Merma → `accounting`**: `no_conforme_desechado` registra
+  `merma_cantidad`/`merma_motivo` en la orden pero no dispara
+  `inventory.merma_registrada` (bloqueado por `stock_merma`, deuda de
+  inventory) — sin ese evento, el asiento contable de la merma no llega.
+  Mismo bloqueo para el costeo por lote (ver siguiente punto).
+  Reproceso (`no_conforme_reprocesado`) correctamente no genera merma ni
+  asiento (RN-PRD — solo detalle en el reporte de escalamiento).
+- ⬜ **Lote/trazabilidad del producto terminado**: el ingreso a stock por
+  `orden_completada` no genera `lote` (bloqueado por lote/FEFO, deuda de
+  inventory) — sin eso no hay manipulador/envasador/variables de proceso
+  trazables por lote (RN-PRD).
+- ⬜ **Subrecetas anidadas**: una orden que consume otra subreceta (con su
+  propia orden de producción) no está resuelta — hoy `registrar_consumo`
+  espera insumos ya disponibles en stock.
+- ⬜ **Conteo cíclico del almacén de producción**: mismo esquema que
+  `inventory` en Almacén Central (bloqueado por conteo, deuda de
+  inventory).
+- ⬜ **Segregación quien crea vs. quien completa la orden**: hoy
+  `production.crear`/`production.completar` son permisos distintos pero
+  nada impide que el mismo usuario tenga ambos y haga las dos acciones
+  (a diferencia de `inventory.ajuste`, que sí exige aprobador≠solicitante) —
+  evaluar si el negocio lo requiere para producción.
 
 ## Orden sugerido de desarrollo
 

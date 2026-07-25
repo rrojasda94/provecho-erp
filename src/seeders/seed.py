@@ -51,6 +51,11 @@ PERMISOS = [
     ("purchases.recepcionar", "Registrar recepción de una OC"),
     ("purchases.anular", "Anular una OC sin recepción registrada"),
     ("purchases.aprobar", "Aprobar orden de compra"),
+    ("production.crear", "Crear orden de producción y registrar consumo"),
+    ("production.leer", "Consultar órdenes de producción"),
+    ("production.completar", "Registrar control de calidad y completar la orden"),
+    ("gerencia.gestionar_reglas_aprobacion", "Administrar la matriz de aprobaciones"),
+    ("sales.leer_clientes_externos", "Consultar clientes para análisis fuera de sales"),
 ]
 
 ROLES = {
@@ -66,6 +71,7 @@ ROLES = {
         "inventory.leer",
         "inventory.gestionar_catalogo",
         "inventory.aprobar_ajuste",
+        "sales.leer_clientes_externos",
     ],
     "cajero": ["sales.crear", "sales.cobrar", "sales.leer", "kds.operar"],
     "cocinero": ["kds.operar", "sales.leer"],
@@ -83,6 +89,11 @@ ROLES = {
         "purchases.leer",
         "purchases.recepcionar",
         "purchases.anular",
+    ],
+    "jefe_cocina": [
+        "production.crear",
+        "production.leer",
+        "production.completar",
     ],
 }
 

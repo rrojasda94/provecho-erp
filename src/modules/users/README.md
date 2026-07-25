@@ -10,7 +10,8 @@ Provee el contexto de tenant a todos los demás módulos y la auditoría central
 
 `usuario` (username, pin_hash Argon2id, tipo humano|agente_ia), `rol`, `permiso`
 (código `modulo.accion` + restricciones), `usuario_rol`, `rol_permiso`,
-`usuario_sucursal`, `refresh_token`, `audit_log`.
+`usuario_sucursal`, `refresh_token`, `audit_log`. `persona` (party model,
+`version` para lock optimista — ver Estado abajo).
 Incluye además la organización: `grupo`, `empresa`, `marca`, `sucursal`, `almacen`.
 Detalle en `docs/architecture/data-model.md` (§1, §2).
 
@@ -19,6 +20,13 @@ Detalle en `docs/architecture/data-model.md` (§1, §2).
 - Login con username + PIN (6 dígitos) → access token (15 min) + refresh (7 días, rotativo).
 - Refresh y logout (revocación de refresh token).
 - CRUD de usuarios, roles y permisos (solo admin).
+- CRUD de `persona` (Create/Read/Update — sin Delete, el ciclo de vida real
+  se maneja en la entidad que la referencia). `PATCH` exige la `version`
+  vigente (lock optimista): `version` desactualizada → 409, en vez de
+  pisar en silencio el cambio de otro editor concurrente.
+- Administrar la matriz de aprobaciones (`regla_aprobacion`, entidad de
+  `shared` — umbrales cuantitativos que otros módulos, ej. `purchases`,
+  consultan en vez de hardcodear).
 - Asignar usuario a sucursales (alcance).
 - Consultar permisos efectivos de un usuario.
 - Registrar entrada en `audit_log` (consumido por todos los módulos).
@@ -46,6 +54,8 @@ Claims del JWT: `sub` (usuario_id), `tipo`, `roles`, `sucursales`, `empresa_id`,
 | POST/GET | `/api/v1/roles` | Crear / listar roles |
 | POST/DELETE | `/api/v1/roles/{id}/permisos[/{permiso_id}]` | Asignar / quitar permiso a rol |
 | POST/GET | `/api/v1/permisos` | Crear / listar permisos |
+| POST/GET/PATCH | `/api/v1/personas[/{id}]` | CRUD de persona (party model) — `PATCH` exige `version` |
+| POST/GET/PATCH | `/api/v1/reglas-aprobacion[/{id}]` | CRUD de la matriz de aprobaciones (permiso `gerencia.gestionar_reglas_aprobacion`) |
 
 ## Estado (implementado 2026-07-25)
 

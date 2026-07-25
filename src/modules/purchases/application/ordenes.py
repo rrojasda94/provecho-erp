@@ -32,6 +32,7 @@ from src.modules.purchases.infrastructure.repositories import (
     RecepcionCompraRepo,
 )
 from src.modules.users.infrastructure.models import Almacen
+from src.shared import aprobaciones
 
 
 def _construir_items(session: Session, items: list[dict]) -> tuple[list[OrdenCompraItem], Decimal]:
@@ -117,9 +118,13 @@ def emitir_orden_compra(
         raise NoEncontrado("orden de compra no encontrada")
     if not rules.puede_emitir(orden.estado):
         raise Conflicto(f"la OC está {orden.estado}; no admite emisión")
-    if rules.requiere_aprobacion(orden.total, umbral_aprobacion) and not puede_aprobar_monto:
+    proveedor = ProveedorRepo(session).get(orden.proveedor_id)
+    umbral = aprobaciones.umbral_vigente(
+        session, proveedor.empresa_id, "purchases", "oc_umbral", default=umbral_aprobacion
+    )
+    if rules.requiere_aprobacion(orden.total, umbral) and not puede_aprobar_monto:
         raise ReglaNegocio(
-            f"total {orden.total} supera el umbral {umbral_aprobacion}; "
+            f"total {orden.total} supera el umbral {umbral}; "
             "requiere permiso purchases.aprobar"
         )
     orden.estado = "emitida"
