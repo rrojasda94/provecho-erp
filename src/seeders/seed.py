@@ -33,6 +33,8 @@ PERMISOS = [
     ("sales.crear", "Crear venta"),
     ("sales.cobrar", "Cobrar venta"),
     ("sales.leer", "Consultar ventas"),
+    ("sales.anular", "Anular orden no pagada"),
+    ("sales.gestionar_catalogo", "CRUD de productos comerciales y medios de pago"),
     ("sales.crear_pedido", "Crear pedido (canal agente IA)"),
     ("inventory.transferir", "Transferir stock"),
     ("inventory.recepcion", "Recepcionar mercadería"),
@@ -50,6 +52,8 @@ ROLES = {
     "supervisor": [
         "purchases.aprobar",
         "sales.leer",
+        "sales.anular",
+        "sales.gestionar_catalogo",
         "inventory.leer",
         "inventory.gestionar_catalogo",
         "inventory.aprobar_ajuste",

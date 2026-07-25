@@ -35,6 +35,37 @@ Diferido a un slice posterior: `modificador`, `variante_producto`,
 `central_pedidos`, `cuenta_puntos`/`puntos_movimiento`,
 `carta_disputa_pago`.
 
+## Estado (slice PDV implementado 2026-07-25)
+
+Operativo en `/api/v1/sales`: crear venta (= confirmar orden, con
+correlativo por sucursal+día e idempotencia), cobrar (pagos parciales;
+al cubrir el total → `pagada`), anular orden no pagada (repone stock),
+CRUD de productos comerciales y medios de pago. Capas `domain/rules.py`,
+`infrastructure/repositories.py`, `application/` (`ventas.py`,
+`catalogo.py`), `api/`. Sin migración — esquema ya existía.
+
+| Método | Ruta | Permiso |
+|--------|------|---------|
+| POST | `/ventas` | `sales.crear` |
+| GET | `/ventas/{id}` | `sales.leer` |
+| POST | `/ventas/{id}/pagos` | `sales.cobrar` |
+| POST | `/ventas/{id}/anular` | `sales.anular` |
+| POST/GET/PATCH | `/productos[/{id}]` | `gestionar_catalogo` / `leer` |
+| POST/GET | `/medios-pago` | `gestionar_catalogo` / `leer` |
+
+**Kiosk y Central de Pedidos NO son módulos**: son clientes del mismo
+contrato `POST /ventas` (`punto_venta.canal = kiosko|web|trabajador`),
+igual que agente_ia. El carrito vive en el cliente, no en el servidor.
+
+Eventos: publica `sales.venta_confirmada` (inventory descuenta insumos
+por receta + merma % + empaque según modalidad), `sales.venta_pagada`,
+`sales.venta_anulada` (inventory repone).
+
+Deuda del slice (ver ROADMAP): precio server-side vía `lista_precio`
+(hoy el PDV manda `precio_unitario`), comprobante (Nubefact), nota de
+crédito post-pago, webhook de pasarela (pago nace `confirmado`),
+apertura/cierre de caja enlazados a la venta.
+
 ## Casos de uso
 
 - CRUD de productos comerciales y recetas (separados de artículos inventariables).

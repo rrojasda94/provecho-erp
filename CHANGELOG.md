@@ -7,6 +7,20 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Added
 
+- **Módulo `sales` — slice PDV** (2026-07-25): sin migración (esquema del
+  slice Venta/Cobro ya existía). Endpoints `/api/v1/sales`: crear venta
+  (correlativo `numero_orden` por sucursal+día, idempotencia por
+  `idempotency_key`, total server-side), cobro con pagos parciales (suma ==
+  total → `pagada`, sin sobrepago), anulación de orden no pagada, CRUD de
+  productos comerciales y medios de pago. Eventos `sales.venta_confirmada` /
+  `venta_pagada` / `venta_anulada`. **Listener en inventory**: consume insumos
+  por receta (+merma % + empaque según modalidad RN-EMP-003) al confirmar y
+  repone al anular; nunca bloquea la venta (omisiones se loguean). Kiosk y
+  Central de Pedidos definidos como clientes del mismo contrato de venta, no
+  módulos. Permisos `sales.anular` y `sales.gestionar_catalogo` en el seeder.
+  Tests en `tests/test_sales.py`. Deuda registrada en ROADMAP (precio
+  server-side, comprobante, nota de crédito, webhook pasarela, enlace caja,
+  subrecetas anidadas).
 - **Módulo `inventory` — slice core** (2026-07-25): migración `be914c92a94b`
   con 3 tablas (`stock`, `movimiento_inventario` insert-only, `ajuste`).
   Endpoints `/api/v1/inventory`: CRUD de artículos/categorías/SKUs, consulta de

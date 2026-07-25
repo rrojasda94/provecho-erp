@@ -1,0 +1,96 @@
+"""DTOs (pydantic) del módulo sales."""
+
+import uuid
+from datetime import date
+from decimal import Decimal
+
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class VentaItemIn(BaseModel):
+    producto_comercial_id: uuid.UUID
+    cantidad: Decimal = Field(gt=0)
+    precio_unitario: Decimal = Field(ge=0)
+    descuento: Decimal = Decimal(0)
+
+
+class VentaCreate(BaseModel):
+    sucursal_id: uuid.UUID
+    punto_venta_id: uuid.UUID
+    canal: str
+    modalidad: str
+    idempotency_key: str = Field(min_length=8, max_length=100)
+    items: list[VentaItemIn] = Field(min_length=1)
+    cliente_id: uuid.UUID | None = None
+
+
+class VentaOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    sucursal_id: uuid.UUID
+    fecha_orden: date
+    numero_orden: int
+    canal: str
+    modalidad: str
+    estado: str
+    total: Decimal
+
+
+class PagoCreate(BaseModel):
+    medio_pago_id: uuid.UUID
+    monto: Decimal = Field(gt=0)
+    idempotency_key: str = Field(min_length=8, max_length=100)
+    referencia_externa: str | None = None
+
+
+class PagoOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    venta_id: uuid.UUID
+    medio_pago_id: uuid.UUID
+    monto: Decimal
+    estado: str
+
+
+class ProductoCreate(BaseModel):
+    id_interno: str = Field(min_length=1, max_length=4)
+    marca_id: uuid.UUID
+    nombre: str = Field(min_length=1, max_length=150)
+    receta_id: uuid.UUID
+    empaque_id: uuid.UUID | None = None
+    modalidades_empaque: list[str] | None = None
+
+
+class ProductoUpdate(BaseModel):
+    nombre: str | None = None
+    activo: bool | None = None
+    empaque_id: uuid.UUID | None = None
+    modalidades_empaque: list[str] | None = None
+
+
+class ProductoOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    id_interno: str
+    marca_id: uuid.UUID
+    nombre: str
+    receta_id: uuid.UUID
+    activo: bool
+
+
+class MedioPagoCreate(BaseModel):
+    empresa_id: uuid.UUID
+    nombre: str = Field(min_length=1, max_length=50)
+    direccion: str = "cobro"
+    tipo: str
+    comision_pct: Decimal = Decimal(0)
+
+
+class MedioPagoOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    empresa_id: uuid.UUID
+    nombre: str
+    tipo: str
+    comision_pct: Decimal
+    activo: bool

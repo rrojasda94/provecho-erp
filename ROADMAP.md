@@ -19,7 +19,7 @@ Registro de lo construido y lo pendiente. Actualizar en cada cambio relevante.
 | Seeders (admin / PIN 123456, org base) | ✅ 2026-07-25 | `src/seeders/seed.py` (idempotente, prohibido en prod): Grupo Majambo + empresa + marca, matriz de roles/permisos semilla, `admin`/PIN `123456`. Correr: `python -m src.seeders.seed`. |
 | Módulo `inventory` | 🔶 slice 1 ✅ 2026-07-25 | Catálogo (CRUD artículos/categorías/SKUs), stock por almacén (vía `movimiento_inventario` inmutable) y ajuste con segregación (`solicitar_ajuste` ≠ `aprobar_ajuste`, aprobador ≠ solicitante). Migración `be914c92a94b`. Diferido: lote/FEFO, reservas, conteo, transferencias, devolución, guía remisión, listeners de eventos. |
 | Módulo `purchases` | ⬜ | Proveedores, OC, recepción |
-| Módulo `sales` (PDV) | ⬜ | Venta, recetas, descuento de insumos, branding por marca |
+| Módulo `sales` (PDV) | 🔶 slice 1 ✅ 2026-07-25 | Venta con correlativo+idempotencia → `sales.venta_confirmada` → inventory descuenta por receta (+merma+empaque); cobro con pagos parciales → `pagada`; anulación pre-pago repone stock; CRUD productos/medios de pago. Kiosk/Central de Pedidos = clientes del mismo contrato, no módulos. Sin migración (esquema ya existía). Diferido: ver Deuda técnica. |
 | Módulo `accounting` | ⬜ | |
 | Producción (fabricación) | ⬜ | Módulo futuro `production` |
 | Solicitudes / picking / transporte | ⬜ | Módulos futuros `requests`, `logistics` |
@@ -108,9 +108,12 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
 - ⬜ `users`: auth de **`agente_ia` por token** (hoy exige PIN como humano).
 
 ### Módulo inventory (slices siguientes)
-- ⬜ **Listeners de eventos**: `sales.venta_confirmada` → consumo de insumos
-  por receta; `purchases.compra_recibida` → suma stock central. (Va con el
-  slice Sales/PDV — el más cercano.)
+- ✅ 2026-07-25 **Listener `sales.venta_confirmada`** → consumo por receta
+  (+merma % + empaque por modalidad) y `sales.venta_anulada` → reposición.
+  Pendiente el de `purchases.compra_recibida` (slice Compras).
+- ⬜ **Consumo omitido por configuración**: si falta almacén/SKU o el stock
+  teórico no alcanza, el listener loguea y omite (la venta nunca se
+  bloquea) — falta superficie de alerta/reporte de esas omisiones.
 - ⬜ **`reserva_stock`**: disponible = físico − reservas activas
   (carrito / solicitud / producción / merma), RN-INV-009.
 - ⬜ **Lote / FEFO**: `lote` + `stock_lote`; picking sugiere lote por
@@ -128,6 +131,22 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   consolidado a `accounting`.
 - ⬜ **Alerta `inventory.stock_bajo_minimo`** como evento (hoy solo flag
   `bajo_minimo` derivado en la consulta de stock).
+
+### Módulo sales (slices siguientes)
+- ⬜ **Precio server-side** (`lista_precio`/`precio`/`promocion`): hoy el
+  PDV manda `precio_unitario` en el request. RN-COM: el precio lo fija el
+  sistema por sucursal/canal.
+- ⬜ **Comprobante** (boleta/factura vía Nubefact) — venta `pagada` →
+  `facturada`; series por `punto_venta`.
+- ⬜ **Nota de crédito** (anulación post-pago).
+- ⬜ **Webhook de pasarela** (Izipay): hoy el pago nace `confirmado`
+  (PDV presencial); pago online requiere estado `pendiente` + confirmación.
+- ⬜ **Enlace con caja** (`apertura_caja`/`cierre_caja` de accounting):
+  validar que el punto de venta tenga caja abierta al cobrar.
+- ⬜ **Consumo de subrecetas anidadas**: el listener expande un solo nivel
+  de receta; una receta cuyo ítem es `subreceta` no explota recursivo aún.
+- ⬜ Modificadores/variantes/combos, `central_pedidos` (pantalla y
+  agregación), puntos/loyalty, kiosk UI.
 
 ## Orden sugerido de desarrollo
 
