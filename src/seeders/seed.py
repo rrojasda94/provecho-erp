@@ -37,14 +37,32 @@ PERMISOS = [
     ("inventory.transferir", "Transferir stock"),
     ("inventory.recepcion", "Recepcionar mercadería"),
     ("inventory.ajustar", "Ajustar inventario"),
+    ("inventory.leer", "Consultar stock y catálogo"),
+    ("inventory.gestionar_catalogo", "CRUD de artículos, categorías y SKUs"),
+    ("inventory.registrar_movimiento", "Registrar movimiento de stock"),
+    ("inventory.solicitar_ajuste", "Solicitar ajuste de inventario"),
+    ("inventory.aprobar_ajuste", "Aprobar ajuste de inventario"),
     ("purchases.aprobar", "Aprobar orden de compra"),
 ]
 
 ROLES = {
     "admin": ["*"],
-    "supervisor": ["purchases.aprobar", "sales.leer"],
+    "supervisor": [
+        "purchases.aprobar",
+        "sales.leer",
+        "inventory.leer",
+        "inventory.gestionar_catalogo",
+        "inventory.aprobar_ajuste",
+    ],
     "cajero": ["sales.crear", "sales.cobrar", "sales.leer"],
-    "almacenero": ["inventory.transferir", "inventory.recepcion", "inventory.ajustar"],
+    "almacenero": [
+        "inventory.transferir",
+        "inventory.recepcion",
+        "inventory.ajustar",
+        "inventory.leer",
+        "inventory.registrar_movimiento",
+        "inventory.solicitar_ajuste",
+    ],
     "agente_ia": ["sales.crear_pedido"],
 }
 

@@ -7,6 +7,18 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Added
 
+- **Módulo `inventory` — slice core** (2026-07-25): migración `be914c92a94b`
+  con 3 tablas (`stock`, `movimiento_inventario` insert-only, `ajuste`).
+  Endpoints `/api/v1/inventory`: CRUD de artículos/categorías/SKUs, consulta de
+  stock por almacén con alerta `bajo_minimo`, registro de movimientos (el stock
+  nunca se edita directo; salida no deja negativo) y ajuste con segregación de
+  funciones (`inventory.solicitar_ajuste` ≠ `inventory.aprobar_ajuste`, y el
+  aprobador no puede ser el solicitante; al aprobar genera el movimiento y
+  refleja el stock). Evento `inventory.ajuste_fuera_margen`. Permisos nuevos en
+  el seeder, asignados a roles `almacenero`/`supervisor`. Reusa el auth/RBAC de
+  `users`. Tests en `tests/test_inventory.py`. Diferido: lote/FEFO,
+  `reserva_stock`, conteo, transferencias, devolución, guía de remisión,
+  listeners de eventos, tenant desde el JWT.
 - **Módulo `users` — slice auth + RBAC + CRUD** (2026-07-25): primer código de
   negocio del ERP. Migración `c16d615f6afd` con 7 tablas (`rol`, `permiso`,
   `usuario_rol`, `rol_permiso`, `usuario_sucursal`, `refresh_token`,

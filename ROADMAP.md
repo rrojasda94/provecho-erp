@@ -13,11 +13,11 @@ Registro de lo construido y lo pendiente. Actualizar en cada cambio relevante.
 | Modelo de datos (v1, documento) | ✅ 2026-07-04 | `docs/architecture/data-model.md` |
 | Modelo de datos ampliado (bloques Inventario, Documentos, Movimientos, Operación comercial, Recursos, Información, RRHH, Actores) | ✅ 2026-07-14 | `docs/architecture/data-model.md` — ~50 entidades nuevas/enriquecidas; ver detalle abajo |
 | Core (app factory, settings, db, event bus) | ✅ 2026-07-04 | Endpoint `/health` operativo |
-| Modelado de base de datos completo (SQLAlchemy + Alembic) | 🔶 en curso 2026-07-25 | Bloque transversal + organización (11) + slice Venta núcleo (11) + slice Cobro/Comprobante/Caja (8) + slice auth/RBAC (7) — 37 tablas en total. BD de desarrollo corre en **Supabase** (Postgres gestionado, solo BD — sin su Auth/RLS, ver `docs/engineering/devops.md`); Docker local sigue disponible como alternativa. Resto por slice vertical. |
+| Modelado de base de datos completo (SQLAlchemy + Alembic) | 🔶 en curso 2026-07-25 | Bloque transversal + organización (11) + slice Venta núcleo (11) + slice Cobro/Comprobante/Caja (8) + slice auth/RBAC (7) + slice inventory core (3) — 40 tablas en total. BD de desarrollo corre en **Supabase** (Postgres gestionado, solo BD — sin su Auth/RLS, ver `docs/engineering/devops.md`); Docker local sigue disponible como alternativa. Resto por slice vertical. |
 | Módulo `users` (auth JWT + PIN + RBAC) | ✅ 2026-07-25 | Slice auth+CRUD implementado: 7 tablas RBAC (`rol`, `permiso`, `usuario_rol`, `rol_permiso`, `usuario_sucursal`, `refresh_token`, `audit_log`) + lockout en `usuario`. Login/refresh(rotativo+detección de reuso)/logout/me + CRUD admin de usuarios/roles/permisos/asignaciones. Argon2id, JWT, `require_permission` deny por defecto. `docs/security/authorization.md`. Restricciones JSONB por permiso: pendientes de aplicar (hoy solo chequeo por código). |
-| Migraciones Alembic iniciales | 🔶 en curso 2026-07-25 | 5 migraciones aplicadas a la BD dev (head `c16d615f6afd`): transversal+org, slice Venta, cobro/caja, cliente opcional, slice auth/RBAC. |
+| Migraciones Alembic iniciales | 🔶 en curso 2026-07-25 | 6 migraciones aplicadas a la BD dev (head `be914c92a94b`): transversal+org, slice Venta, cobro/caja, cliente opcional, slice auth/RBAC, slice inventory core (stock/movimiento/ajuste). |
 | Seeders (admin / PIN 123456, org base) | ✅ 2026-07-25 | `src/seeders/seed.py` (idempotente, prohibido en prod): Grupo Majambo + empresa + marca, matriz de roles/permisos semilla, `admin`/PIN `123456`. Correr: `python -m src.seeders.seed`. |
-| Módulo `inventory` | ⬜ | Almacenes, stock, movimientos, transferencias |
+| Módulo `inventory` | 🔶 slice 1 ✅ 2026-07-25 | Catálogo (CRUD artículos/categorías/SKUs), stock por almacén (vía `movimiento_inventario` inmutable) y ajuste con segregación (`solicitar_ajuste` ≠ `aprobar_ajuste`, aprobador ≠ solicitante). Migración `be914c92a94b`. Diferido: lote/FEFO, reservas, conteo, transferencias, devolución, guía remisión, listeners de eventos. |
 | Módulo `purchases` | ⬜ | Proveedores, OC, recepción |
 | Módulo `sales` (PDV) | ⬜ | Venta, recetas, descuento de insumos, branding por marca |
 | Módulo `accounting` | ⬜ | |
@@ -93,6 +93,41 @@ contiene, buscando su `[[ COMPLETAR ]]`):
   momento se registran los PROC en el registro maestro.
 - ⬜ BPMN pendientes ya declarados: contingencias de personal faltante
   (RN-RRHH-011) y tardanza/falta del encargado (RN-RRHH-010).
+
+## Deuda técnica pendiente (backlog)
+
+Registro vivo de deuda técnica declarada al cerrar cada slice — para que no
+se olvide. Marcar ✅ al resolverse en el slice indicado.
+
+### Transversal
+- ⬜ **Contexto de tenant desde el JWT** (ADR-004): hoy varios endpoints
+  reciben `empresa_id` en el body (ej. catálogo de inventory). Derivarlo de
+  los claims + validar alcance en cada query. Afecta a todo módulo nuevo.
+- ⬜ `users`: aplicar **restricciones JSONB** por permiso (hoy autoriza solo
+  por código, no por condición monto/estado/horario).
+- ⬜ `users`: auth de **`agente_ia` por token** (hoy exige PIN como humano).
+
+### Módulo inventory (slices siguientes)
+- ⬜ **Listeners de eventos**: `sales.venta_confirmada` → consumo de insumos
+  por receta; `purchases.compra_recibida` → suma stock central. (Va con el
+  slice Sales/PDV — el más cercano.)
+- ⬜ **`reserva_stock`**: disponible = físico − reservas activas
+  (carrito / solicitud / producción / merma), RN-INV-009.
+- ⬜ **Lote / FEFO**: `lote` + `stock_lote`; picking sugiere lote por
+  `fecha_vencimiento`; bloqueo de vencidos + evento
+  `inventory.lote_vencido_detectado`. **El lote lo genera tanto la recepción
+  de compra como la producción**: un SKU producido recibe su lote al
+  fabricarse — coordinar con el módulo `production`.
+- ⬜ **Conteo cíclico**: `conteo` + `conteo_item`; la diferencia genera un
+  `ajuste`.
+- ⬜ **Transferencias + `solicitud_insumos`**: solicitud → aprobación →
+  picking → en tránsito → recepción; incluye transferencia lateral
+  sucursal↔sucursal.
+- ⬜ **Devolución** (`devolucion`) + **`guia_remision`**.
+- ⬜ **`stock_merma`** (subtipo reservado, no disponible) + reporte
+  consolidado a `accounting`.
+- ⬜ **Alerta `inventory.stock_bajo_minimo`** como evento (hoy solo flag
+  `bajo_minimo` derivado en la consulta de stock).
 
 ## Orden sugerido de desarrollo
 

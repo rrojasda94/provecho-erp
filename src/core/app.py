@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 
 from src.config.settings import settings
+from src.modules.inventory.api.routers import router as inventory_router
 from src.modules.users.api.routers import router as users_router
 
 
@@ -17,4 +18,5 @@ def create_app() -> FastAPI:
         return {"status": "ok", "app": settings.app_name, "environment": settings.environment}
 
     app.include_router(users_router, prefix="/api/v1")
+    app.include_router(inventory_router, prefix="/api/v1")
     return app

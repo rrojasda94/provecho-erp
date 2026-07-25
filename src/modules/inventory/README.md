@@ -65,6 +65,36 @@ almacenamiento), `conteo`, `ajuste` (motivo, solicitante, aprobador),
 - Movimiento de salida siempre respeta FEFO/FIFO — el picking no permite
   tomar un lote distinto al sugerido sin override explícito y motivo.
 
+## Estado (slice 1 implementado 2026-07-25)
+
+Operativo: catálogo (CRUD artículos/categorías/SKUs), stock por almacén y
+ajuste con segregación de funciones. Capas `domain/rules.py`,
+`infrastructure/` (modelos `stock`, `movimiento_inventario`, `ajuste` +
+`repositories.py`), `application/` (`catalogo.py`, `stock.py`, `ajustes.py`),
+`api/`. Migración `be914c92a94b`. Reusa auth/RBAC de `users`.
+
+Endpoints `/api/v1/inventory`:
+
+| Método | Ruta | Permiso |
+|--------|------|---------|
+| POST/GET | `/categorias` | `gestionar_catalogo` / `leer` |
+| POST/GET/PATCH | `/articulos[/{id}]` | `gestionar_catalogo` / `leer` |
+| POST | `/skus` | `gestionar_catalogo` |
+| GET | `/stock` | `leer` |
+| POST | `/movimientos` | `registrar_movimiento` |
+| POST | `/ajustes` | `solicitar_ajuste` |
+| POST | `/ajustes/{id}/aprobar` \| `/rechazar` | `aprobar_ajuste` |
+
+Reglas ya aplicadas: stock solo cambia vía `movimiento_inventario`; salida no
+deja stock negativo; ajuste `solicitar` ≠ `aprobar` y aprobador ≠ solicitante;
+alerta `bajo_minimo` derivada en la consulta; evento
+`inventory.ajuste_fuera_margen` al aprobar fuera de margen.
+
+**Diferido (deuda del módulo):** `stock_lote`/FEFO, `reserva_stock`, conteo
+cíclico, transferencias/`solicitud_insumos`, devolución, guía de remisión,
+listeners de eventos (`sales.venta_confirmada` → consumo por receta),
+contexto de tenant desde el JWT (hoy `empresa_id` viene en el body).
+
 ## Flujo
 
 Solicitud (local) → aprobación (supervisor) → picking/packing (central) →

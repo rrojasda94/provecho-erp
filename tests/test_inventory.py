@@ -1,0 +1,201 @@
+"""Tests del slice inventory core: catálogo, stock/movimientos y ajuste
+(segregación de funciones). SQLite en memoria + override de get_db.
+"""
+
+from decimal import Decimal
+
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine, select
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
+
+import src.core.models_registry  # noqa: F401
+from src.core.app import create_app
+from src.core.database import Base
+from src.modules.inventory.infrastructure.models import (
+    Articulo,
+    CategoriaUdm,
+    Sku,
+    UnidadMedida,
+)
+from src.modules.users.api.deps import get_db
+from src.modules.users.infrastructure.models import Almacen, Empresa, Rol, Usuario, UsuarioRol
+from src.modules.users.infrastructure.security import hash_pin
+
+
+@pytest.fixture()
+def env():
+    engine = create_engine(
+        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
+    )
+    Base.metadata.create_all(engine)
+    TestSession = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+
+    from src.seeders.seed import seed
+
+    ids = {}
+    with TestSession() as s:
+        seed(s)
+        empresa = s.scalar(select(Empresa))
+        udm_cat = CategoriaUdm(nombre="Peso")
+        s.add(udm_cat)
+        s.flush()
+        udm = UnidadMedida(categoria_udm_id=udm_cat.id, nombre="Kilo", ratio=Decimal(1))
+        almacen = Almacen(empresa_id=empresa.id, nombre="Central", tipo="central")
+        art = Articulo(
+            empresa_id=empresa.id, id_interno="H001", nombre="Harina",
+            unidad_medida_id=None, tipo="insumo",
+        )
+        s.add_all([udm, almacen])
+        s.flush()
+        art.unidad_medida_id = udm.id
+        s.add(art)
+        s.flush()
+        sku = Sku(articulo_id=art.id, codigo="SKU-HARINA")
+        s.add(sku)
+        s.flush()
+        # Segundo usuario con rol almacenero (permiso inventory.solicitar_ajuste).
+        almacenero = Usuario(
+            username="almacenero1", pin_hash=hash_pin("654321"), tipo="humano",
+        )
+        s.add(almacenero)
+        s.flush()
+        rol_alm = s.scalar(select(Rol).where(Rol.nombre == "almacenero"))
+        s.add(UsuarioRol(usuario_id=almacenero.id, rol_id=rol_alm.id))
+        ids.update(
+            empresa_id=str(empresa.id), udm_id=str(udm.id),
+            almacen_id=str(almacen.id), articulo_id=str(art.id), sku_id=str(sku.id),
+        )
+        s.commit()
+
+    app = create_app()
+
+    def _override_get_db():
+        session = TestSession()
+        try:
+            yield session
+        finally:
+            session.close()
+
+    app.dependency_overrides[get_db] = _override_get_db
+    with TestClient(app) as c:
+        yield c, ids, TestSession
+
+
+def _token(client, username="admin", pin="123456"):
+    r = client.post("/api/v1/auth/login", json={"username": username, "pin": pin})
+    return {"Authorization": f"Bearer {r.json()['access_token']}"}
+
+
+def test_crear_articulo_y_sku(env):
+    client, ids, _ = env
+    h = _token(client)
+    r = client.post("/api/v1/inventory/articulos", headers=h, json={
+        "empresa_id": ids["empresa_id"], "id_interno": "Q001", "nombre": "Queso",
+        "unidad_medida_id": ids["udm_id"], "tipo": "insumo",
+    })
+    assert r.status_code == 201
+    art_id = r.json()["id"]
+    r2 = client.post("/api/v1/inventory/skus", headers=h, json={
+        "articulo_id": art_id, "codigo": "SKU-QUESO",
+    })
+    assert r2.status_code == 201
+
+
+def test_id_interno_duplicado_409(env):
+    client, ids, _ = env
+    h = _token(client)
+    body = {
+        "empresa_id": ids["empresa_id"], "id_interno": "H001", "nombre": "Otra",
+        "unidad_medida_id": ids["udm_id"], "tipo": "insumo",
+    }
+    assert client.post("/api/v1/inventory/articulos", headers=h, json=body).status_code == 409
+
+
+def test_movimiento_actualiza_stock(env):
+    client, ids, _ = env
+    h = _token(client)
+    r = client.post("/api/v1/inventory/movimientos", headers=h, json={
+        "almacen_id": ids["almacen_id"], "sku_id": ids["sku_id"],
+        "cantidad": "100", "tipo": "recepcion_compra",
+    })
+    assert r.status_code == 201
+    stock = client.get(
+        f"/api/v1/inventory/stock?almacen_id={ids['almacen_id']}", headers=h
+    ).json()
+    assert len(stock) == 1
+    assert Decimal(stock[0]["cantidad"]) == Decimal("100")
+
+
+def test_salida_mayor_que_stock_409(env):
+    client, ids, _ = env
+    h = _token(client)
+    client.post("/api/v1/inventory/movimientos", headers=h, json={
+        "almacen_id": ids["almacen_id"], "sku_id": ids["sku_id"],
+        "cantidad": "10", "tipo": "recepcion_compra",
+    })
+    r = client.post("/api/v1/inventory/movimientos", headers=h, json={
+        "almacen_id": ids["almacen_id"], "sku_id": ids["sku_id"],
+        "cantidad": "-50", "tipo": "consumo_venta",
+    })
+    assert r.status_code == 409
+
+
+def test_ajuste_mismo_usuario_no_aprueba(env):
+    client, ids, _ = env
+    h = _token(client)  # admin (tiene solicitar y aprobar vía *)
+    aj = client.post("/api/v1/inventory/ajustes", headers=h, json={
+        "almacen_id": ids["almacen_id"], "sku_id": ids["sku_id"],
+        "cantidad": "5", "motivo": "sobrante",
+    }).json()
+    r = client.post(f"/api/v1/inventory/ajustes/{aj['id']}/aprobar", headers=h)
+    assert r.status_code == 409  # aprobador == solicitante
+
+
+def test_ajuste_flujo_segregado_ok(env):
+    client, ids, _ = env
+    h_alm = _token(client, "almacenero1", "654321")
+    h_admin = _token(client)
+    aj = client.post("/api/v1/inventory/ajustes", headers=h_alm, json={
+        "almacen_id": ids["almacen_id"], "sku_id": ids["sku_id"],
+        "cantidad": "7", "motivo": "sobrante",
+    })
+    assert aj.status_code == 201
+    r = client.post(
+        f"/api/v1/inventory/ajustes/{aj.json()['id']}/aprobar", headers=h_admin
+    )
+    assert r.status_code == 200
+    assert r.json()["estado"] == "aprobado"
+    stock = client.get(
+        f"/api/v1/inventory/stock?almacen_id={ids['almacen_id']}", headers=h_admin
+    ).json()
+    assert Decimal(stock[0]["cantidad"]) == Decimal("7")
+
+
+def test_stock_bajo_minimo_flag(env):
+    client, ids, TestSession = env
+    h = _token(client)
+    client.post("/api/v1/inventory/movimientos", headers=h, json={
+        "almacen_id": ids["almacen_id"], "sku_id": ids["sku_id"],
+        "cantidad": "3", "tipo": "recepcion_compra",
+    })
+    # Fija stock_minimo directo (no hay API para ello en este slice).
+    from src.modules.inventory.infrastructure.models import Stock
+    with TestSession() as s:
+        st = s.scalar(select(Stock))
+        st.stock_minimo = Decimal("5")
+        s.commit()
+    stock = client.get("/api/v1/inventory/stock", headers=h).json()
+    assert stock[0]["bajo_minimo"] is True
+
+
+def test_leer_sin_permiso_403(env):
+    client, ids, _ = env
+    h = _token(client, "almacenero1", "654321")  # tiene inventory.leer
+    assert client.get("/api/v1/inventory/stock", headers=h).status_code == 200
+    # crear_categoria exige gestionar_catalogo, que almacenero no tiene.
+    r = client.post("/api/v1/inventory/categorias", headers=h, json={
+        "empresa_id": ids["empresa_id"], "nombre": "Lácteos",
+    })
+    assert r.status_code == 403
