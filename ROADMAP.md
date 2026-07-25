@@ -44,6 +44,7 @@ Registro de lo construido y lo pendiente. Actualizar en cada cambio relevante.
 | Observabilidad (métricas, trazas, logs centralizados) | ⬜ | |
 | UX: menús, buscadores, breadcrumbs, atajos, sidebars, dashboards | ⬜ | Definición pendiente con el usuario |
 | Branding (paleta, tipografías, tokens CSS) | ✅ 2026-07-04 | Brandboard aplicado — `docs/product/ui-ux.md` |
+| Skins multi-marca (PDV/Kiosk por marca vs Provecho/Majambo en el resto), accesibilidad (daltonismo, tamaño de fuente) y plataformas por módulo (táctil Android en PDV/Kiosk/KDS/Inventario, PC-first en el resto) | 🔶 spec 2026-07-25 | `docs/product/ui-ux.md` — solo especificado, falta implementar (resolver de tema por marca, preferencias de accesibilidad en perfil de usuario) |
 
 ## Pendientes de decisión (registro vivo)
 
@@ -93,6 +94,11 @@ contiene, buscando su `[[ COMPLETAR ]]`):
   momento se registran los PROC en el registro maestro.
 - ⬜ BPMN pendientes ya declarados: contingencias de personal faltante
   (RN-RRHH-011) y tardanza/falta del encargado (RN-RRHH-010).
+- ⬜ Catálogo exacto de paletas de accesibilidad (daltonismo) y niveles de
+  tamaño de fuente (`docs/product/ui-ux.md`).
+- ⬜ Si Grupo Majambo tiene tema propio distinto al de Provecho, o si
+  Provecho es también el tema por defecto de Grupo Majambo
+  (`docs/product/ui-ux.md`).
 
 ## Deuda técnica pendiente (backlog)
 
@@ -106,6 +112,10 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
 - ⬜ `users`: aplicar **restricciones JSONB** por permiso (hoy autoriza solo
   por código, no por condición monto/estado/horario).
 - ⬜ `users`: auth de **`agente_ia` por token** (hoy exige PIN como humano).
+- ⬜ **Theming multi-marca + accesibilidad** (frontend, spec en
+  `docs/product/ui-ux.md`): resolver de tema por marca/sucursal para
+  PDV/Kiosk, preferencias de accesibilidad (paleta daltonismo, tamaño de
+  fuente) persistidas en el perfil de `usuario`. Sin implementar.
 
 ### Módulo inventory (slices siguientes)
 - ✅ 2026-07-25 **Listener `sales.venta_confirmada`** → consumo por receta

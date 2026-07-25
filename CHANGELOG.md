@@ -7,6 +7,15 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Added
 
+- **Spec de theming multi-marca, accesibilidad y plataformas** (2026-07-25,
+  `docs/product/ui-ux.md`, `docs/prompts/frontend.md`): PDV/Kiosk = mayor
+  variación de skin (branding por marca de Grupo Majambo), resto de módulos
+  usa Provecho/Majambo; modo daltonismo y tamaño de fuente ajustable como
+  preferencia por usuario; táctil obligatorio en Android para
+  PDV/Kiosk/KDS/Inventario, resto de módulos PC-first pero responsive. Solo
+  especificado, implementación pendiente (ver ROADMAP — Deuda técnica
+  transversal).
+
 - **Módulo `sales` — KDS** (2026-07-25): migración `7672566bf189` —
   `kds_pantalla` (pantallas por sucursal, tipo preparación/despacho, filtro
   por categorías de producto comercial), `venta_item.estado_preparacion`
