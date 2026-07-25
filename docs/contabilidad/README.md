@@ -36,6 +36,32 @@ Cobros a crédito empresarial                  Tributos y detracciones (SUNAT)
                       CIERRE DE PERIODO → libros y declaración (contador)
 ```
 
+## Control y auditoría interna
+
+Además de mover, planear y registrar, Contabilidad ejerce **control interno**:
+audita a las áreas operativas que están *aguas arriba* de ella. Puede hacerlo
+porque es independiente de ellas — no compra, no almacena, no cobra en el POS.
+
+**Regla que lo rige (RN-CTB-009):** una auditoría/arqueo la ejecuta **quien no
+custodia** ese fondo o dato. De ahí salen dos niveles:
+
+| Auditor | Audita a | Qué revisa |
+|---|---|---|
+| **Contabilidad** (control interno) | **Compras** | Arqueo inopinado de la caja chica de compras; match factura ↔ OC ↔ recepción (3-way, PROC-CTB-013) |
+| | **Almacén** | Conteo inopinado o disparado por alerta `inventory.ajuste_fuera_margen` (RN-INV-015), con el encargado de almacén como testigo (PROC-CTB-012) |
+| | **Sucursales** | Arqueo inopinado de la caja del POS |
+| **Gerencia** | **Contabilidad** | Su propia tesorería: depósitos, pagos ejecutados, conciliación bancaria (visado), custodia de efectivo propia |
+
+> **Contabilidad no se audita a sí misma** (RN-CTB-009). La conciliación
+> semanal de cuentas y depósitos la *ejecuta* Contabilidad (operativo), pero el
+> *visado* de esa conciliación lo da Gerencia (auditoría) — RN-CTB-006. Es el
+> nivel superior el que cierra el hueco de segregación del inferior.
+
+Los arqueos de caja de sucursal y de caja chica de compras **reusan el SOP de
+[arqueo sorpresa](../diagrams/Procesos/Contabilidad/Control/arqueo-sorpresa.md)
+(PROC-CTB-005)** — es genérico; solo cambian el custodio y el ejecutor según la
+regla de arriba.
+
 ## Procesos del área (SOPs)
 
 Ubicación: [docs/diagrams/Procesos/Contabilidad/](../diagrams/Procesos/Contabilidad/).
@@ -46,7 +72,9 @@ Ubicación: [docs/diagrams/Procesos/Contabilidad/](../diagrams/Procesos/Contabil
 | Cierre de caja (PROC-CTB-001) | `Caja/` | ✅ Vigente | Cierre de turno, cuadre, relevo de custodia |
 | Pago a proveedor (PROC-CTB-003) | `Tesoreria/` | ✅ Vigente | Ejecuta el pago tras comprobante conforme; umbral de aprobación de Gerencia |
 | Conciliación bancaria (PROC-CTB-004) | `Tesoreria/` | ✅ Vigente | Cuadra movimientos ERP vs. extracto bancario |
-| Arqueo sorpresa (PROC-CTB-005) | `Control/` | ✅ Vigente | Control de Gerencia: conteo no anunciado de caja/fondos |
+| Arqueo sorpresa (PROC-CTB-005) | `Control/` | ✅ Vigente | Conteo no anunciado de caja/fondos; ejecuta quien no custodia (RN-CTB-009) |
+| Auditoría inopinada de almacén (PROC-CTB-012) | `Auditoria/` | ⬜ Propuesto | Conteo sorpresa o por alerta (RN-INV-015), con encargado como testigo |
+| Conciliación de facturas y comprobantes (PROC-CTB-013) | `Auditoria/` | ⬜ Propuesto | 3-way match factura ↔ OC ↔ recepción; control sobre Compras |
 | Reposición de caja chica (PROC-CTB-006) | `Tesoreria/` | ⬜ Propuesto | Concilia la rendición semanal y repone el fondo |
 | Flujo de caja semanal (PROC-CTB-007) | `Finanzas/` | ⬜ Propuesto | Proyección de ingresos/egresos, alerta de liquidez |
 | Cierre mensual / periodo contable (PROC-CTB-008) | `Cierre/` | ⬜ Propuesto | Bloqueo de periodo, entrega al contador (RN-CTB-002) |

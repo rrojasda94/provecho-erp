@@ -13,14 +13,17 @@ Versionado: [SemVer](https://semver.org/lang/es/).
   `docs/diagrams/Procesos/Contabilidad/` (Tesorería: pago a proveedor
   PROC-CTB-003, conciliación bancaria PROC-CTB-004; Control: arqueo sorpresa
   PROC-CTB-005), 4 plantillas en `docs/templates/contabilidad/`. Reglas
-  RN-CTB-004 a RN-CTB-008; glosario: Tesorería, Finanzas, Flujo de caja,
-  Conciliación bancaria, Arqueo, Orden de pago, Detracción, Activo No
-  Corriente, Depreciación, Periodo contable. Nomenclatura: CAJ/TES/ACT
-  confirmadas bajo Contabilidad. Eventos `accounting.pago_ejecutado`,
-  `accounting.pago_requiere_aprobacion`, `accounting.arqueo_registrado`. Spec
-  `src/modules/accounting/README.md` actualizada (tesorería/finanzas).
-  Propuestos PROC-CTB-006..011 (reposición caja chica, flujo de caja, cierre
-  de periodo, depósito, activo fijo, contador externo).
+  RN-CTB-004 a RN-CTB-009 (incluye auditoría interna: Contabilidad audita a las
+  áreas operativas aguas arriba pero no a sí misma; su tesorería la audita
+  Gerencia — modelo de control en dos niveles). Glosario: Tesorería, Finanzas,
+  Flujo de caja, Conciliación bancaria, Arqueo, Auditoría interna, Orden de
+  pago, Detracción, Activo No Corriente, Depreciación, Periodo contable.
+  Nomenclatura: CAJ/TES/ACT confirmadas bajo Contabilidad. Eventos
+  `accounting.pago_ejecutado`, `accounting.pago_requiere_aprobacion`,
+  `accounting.arqueo_registrado`. Spec `src/modules/accounting/README.md`
+  actualizada (tesorería/finanzas). Propuestos PROC-CTB-006..013 (reposición
+  caja chica, flujo de caja, cierre de periodo, depósito, activo fijo, contador
+  externo, auditoría de almacén, conciliación de facturas/comprobantes).
 - **Área RRHH** (2026-07-19): `docs/rrhh/` (marco legal laboral REMYPE,
   perfiles de puesto), 13 SOPs en
   `docs/diagrams/Procesos/Recursos-Humanos/` (Reclutamiento, Contratación,

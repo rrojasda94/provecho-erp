@@ -64,6 +64,22 @@ ya distinguen por función (grupos `Tesoreria/`, `Finanzas/`, `Cierre/`).
 - **La caja chica se concilia antes de reponer** — sin rendición conciliada no
   hay reposición del fondo (RN-CMP-013).
 
+## Control y auditoría interna
+
+- **RN-CTB-009 — Auditoría independiente.** Contabilidad audita a las áreas
+  operativas aguas arriba (Compras, Almacén, cajas de sucursal); no se audita a
+  sí misma. Su tesorería la audita Gerencia. Dos niveles: el superior cierra el
+  hueco de segregación del inferior.
+- **Quien no custodia, audita.** Un arqueo/auditoría lo ejecuta alguien
+  distinto del custodio del fondo o dato revisado; el custodio está presente
+  como testigo (dos firmas), no cuenta por el auditor.
+- **La conciliación se hace abajo, se visa arriba.** Contabilidad ejecuta la
+  conciliación semanal de cuentas y depósitos; Gerencia la visa (RN-CTB-006).
+  Ejecutar y aprobar no pueden ser la misma mano.
+- **La auditoría dispara por sorpresa o por alerta.** Inopinada (sin
+  calendario) o gatillada por una señal del ERP (p. ej.
+  `inventory.ajuste_fuera_margen`, RN-INV-015). Ambas dejan acta.
+
 ## Principios de finanzas
 
 - **El flujo de caja se proyecta, no se adivina** — la liquidez se anticipa

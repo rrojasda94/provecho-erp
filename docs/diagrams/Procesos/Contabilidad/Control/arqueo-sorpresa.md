@@ -14,15 +14,21 @@ Sorpresiva, sin calendario fijo (esa es la razón de ser). Recomendado varias
 veces al año y ante cualquier señal de descuadre recurrente.
 
 ## Responsable
-Gerencia (o persona que Gerencia delegue), **distinta** de quien custodia el
-efectivo arqueado. El custodio está presente pero no cuenta por Gerencia.
+**Quien no custodia el fondo arqueado** (RN-CTB-009). Según el fondo:
+- Caja de sucursal o caja chica de compras → la arquea **Contabilidad**
+  (control interno; es independiente de esas áreas).
+- Efectivo/fondos en custodia de la propia **Contabilidad** → la arquea
+  **Gerencia** (o su delegado); Contabilidad no se audita a sí misma.
+
+El custodio (cajero, encargado de compras, supervisor o contador según el
+fondo) está presente como testigo, pero no cuenta por el auditor.
 
 ## Materiales y equipo
 - ERP con el saldo esperado de caja/fondo al momento del arqueo
 - Acta de arqueo (plantilla [arqueo-de-caja](../../../../templates/contabilidad/arqueo-de-caja.md))
 - Presencia del custodio (cajero, supervisor o contador según el fondo)
 
-## Pasos — Gerencia (o delegado)
+## Pasos — Auditor (Contabilidad o Gerencia, según el fondo)
 1. Presentarse sin aviso en el punto a arquear (caja de sucursal, fondo de caja
    chica, efectivo en custodia de Contabilidad).
 2. Congelar el fondo: no se hacen más movimientos hasta terminar el conteo.

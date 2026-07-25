@@ -1097,6 +1097,12 @@ producción se hace en cocinas de sucursal. Ver
 - **RN-CTB-008** Un mismo comprobante no se paga dos veces; el ERP bloquea el
   doble pago (idempotencia). El pago a proveedor solo procede con comprobante
   conforme entregado por Compras (RN-CMP-014).
+- **RN-CTB-009** Contabilidad ejerce auditoría interna sobre las áreas
+  operativas aguas arriba (Compras, Almacén, cajas de sucursal); **no se audita
+  a sí misma**: su tesorería (depósitos, pagos, conciliación, custodia propia)
+  la audita Gerencia. Toda auditoría/arqueo la ejecuta quien **no custodia** el
+  fondo o dato revisado; el custodio está presente como testigo, no cuenta por
+  el auditor.
 
 > Nota: esta lista crece con cada módulo. Al implementar un módulo se agregan
 > aquí sus reglas antes de codificarlas.
