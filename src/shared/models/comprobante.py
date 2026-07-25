@@ -3,9 +3,12 @@
 dueño único (Clean Architecture: ningún módulo importa el dominio de
 otro).
 
-`compra_id` queda sin FK — `purchases` aún no modela sus tablas de
-recepción. El conjunto válido de `tipo` según `direccion` (RN-CPP-001/002)
-se valida en el dominio, no en el esquema.
+`compra_id` queda sin FK a propósito — referencia `orden_compra.id`, dominio
+de `purchases`; un FK cruzaría el módulo dueño único (CLAUDE.md: nunca
+importar el dominio de otro módulo), mismo criterio que
+`accounting.MovimientoDinero.proveedor_id`/`orden_compra_id`. El conjunto
+válido de `tipo` según `direccion` (RN-CPP-001/002) se valida en el
+dominio, no en el esquema.
 """
 
 import uuid

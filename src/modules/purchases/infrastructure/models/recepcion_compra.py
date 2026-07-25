@@ -1,7 +1,7 @@
 """Recepción de una OC (total o parcial). `comprobante_id` es el sustento
-(RN-CMP-005) — opcional en este slice porque `purchases` aún no emite el
-`comprobante` recibido (deuda técnica: conformidad → `comprobante_conforme`
-→ `accounting` ejecuta el pago)."""
+(RN-CMP-005) — se completa cuando `application/comprobantes.py` da
+conformidad (`dar_conformidad_comprobante`), que dispara
+`purchases.comprobante_conforme` y con él la cola de pago en `accounting`."""
 
 import uuid
 from datetime import datetime

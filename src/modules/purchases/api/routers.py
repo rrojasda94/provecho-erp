@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from src.config.settings import settings
 from src.modules.purchases.api import schemas
-from src.modules.purchases.application import ordenes, proveedores
+from src.modules.purchases.application import comprobantes, ordenes, proveedores
 from src.modules.purchases.application.errors import (
     Conflicto,
     NoEncontrado,
@@ -26,6 +26,7 @@ LEER = "purchases.leer"
 RECEPCIONAR = "purchases.recepcionar"
 ANULAR = "purchases.anular"
 APROBAR = "purchases.aprobar"
+DAR_CONFORMIDAD = "purchases.dar_conformidad"
 
 _HTTP_STATUS: dict[type[PurchasesError], int] = {
     NoEncontrado: status.HTTP_404_NOT_FOUND,
@@ -172,3 +173,24 @@ def anular_orden_compra(
         raise _http(e) from e
     session.commit()
     return orden
+
+
+@router.post(
+    "/ordenes-compra/{orden_compra_id}/conformidad-comprobante",
+    response_model=schemas.ComprobanteOut,
+    status_code=201,
+)
+def dar_conformidad_comprobante(
+    orden_compra_id: uuid.UUID,
+    body: schemas.ConformidadComprobanteCreate,
+    _: Usuario = Depends(require_permission(DAR_CONFORMIDAD)),
+    session: Session = Depends(get_db),
+):
+    try:
+        comprobante = comprobantes.dar_conformidad_comprobante(
+            session, orden_compra_id, **body.model_dump()
+        )
+    except (NoEncontrado, Conflicto) as e:
+        raise _http(e) from e
+    session.commit()
+    return comprobante

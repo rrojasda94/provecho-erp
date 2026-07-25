@@ -84,3 +84,10 @@ class RecepcionCompraRepo:
                 )
             )
         )
+
+    def ultima_de_orden(self, orden_compra_id: uuid.UUID) -> RecepcionCompra | None:
+        return self.s.scalar(
+            select(RecepcionCompra)
+            .where(RecepcionCompra.orden_compra_id == orden_compra_id)
+            .order_by(RecepcionCompra.fecha.desc())
+        )

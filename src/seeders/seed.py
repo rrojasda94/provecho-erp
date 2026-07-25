@@ -51,6 +51,10 @@ PERMISOS = [
     ("purchases.recepcionar", "Registrar recepción de una OC"),
     ("purchases.anular", "Anular una OC sin recepción registrada"),
     ("purchases.aprobar", "Aprobar orden de compra"),
+    (
+        "purchases.dar_conformidad",
+        "Dar conformidad al comprobante recibido (dispara el pago)",
+    ),
     ("production.crear", "Crear orden de producción y registrar consumo"),
     ("production.leer", "Consultar órdenes de producción"),
     ("production.completar", "Registrar control de calidad y completar la orden"),
@@ -61,6 +65,11 @@ PERMISOS = [
     ("accounting.periodo_administrar", "Abrir y cerrar periodos contables"),
     ("accounting.asiento_manual", "Registrar y anular asientos manuales"),
     ("accounting.leer", "Consultar plan de cuentas, asientos y periodos"),
+    (
+        "accounting.pago_gestionar",
+        "Registrar, ejecutar y rechazar pagos a proveedor bajo el umbral",
+    ),
+    ("accounting.pago_aprobar", "Aprobar pagos a proveedor sobre el umbral"),
     ("gerencia.gestionar_reglas_aprobacion", "Administrar la matriz de aprobaciones"),
     ("sales.leer_clientes_externos", "Consultar clientes para análisis fuera de sales"),
 ]
@@ -79,6 +88,7 @@ ROLES = {
         "inventory.gestionar_catalogo",
         "inventory.aprobar_ajuste",
         "sales.leer_clientes_externos",
+        "accounting.pago_aprobar",
     ],
     "cajero": ["sales.crear", "sales.cobrar", "sales.leer", "kds.operar"],
     "cocinero": ["kds.operar", "sales.leer"],
@@ -96,6 +106,7 @@ ROLES = {
         "purchases.leer",
         "purchases.recepcionar",
         "purchases.anular",
+        "purchases.dar_conformidad",
     ],
     "jefe_cocina": [
         "production.crear",
@@ -107,6 +118,7 @@ ROLES = {
         "accounting.periodo_administrar",
         "accounting.asiento_manual",
         "accounting.leer",
+        "accounting.pago_gestionar",
     ],
 }
 

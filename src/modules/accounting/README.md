@@ -16,18 +16,34 @@ presupuesto).
 ## Entidades
 
 `cuenta_contable` (plan de cuentas), `asiento`, `asiento_linea` (debe/haber),
-`periodo_contable`. Detalle en `docs/architecture/data-model.md` §8 (se refina antes de implementar).
+`periodo_contable`, `regla_asiento` (mapeo evento→cuentas),
+`movimiento_dinero` (tesorería — pago a proveedor). Detalle en
+`docs/architecture/data-model.md` §8.
 
 **Estado de implementación (2026-07-25):** libro contable núcleo construido
 — `cuenta_contable` (plan de cuentas), `periodo_contable` (abrir/cerrar),
 `asiento`/`asiento_linea` (manual con permiso `accounting.asiento_manual`,
 cuadre RN-CTB-001, anulación por asiento inverso RN-CTB-002) y
 `regla_asiento` (mapeo configurable evento→cuentas que alimenta la
-generación automática, `application/listeners.py`). Cubre hoy los 3 eventos
+generación automática, `application/listeners.py`). Cubre hoy los 4 eventos
 operativos que sus módulos de origen ya publican en código
 (`purchases.oc_emitida`, `purchases.compra_recibida`,
-`sales.venta_confirmada`); el resto de eventos listados abajo quedan
-pendientes de que esos módulos los publiquen (deuda técnica, ver ROADMAP).
+`sales.venta_confirmada`, `purchases.comprobante_conforme`); el resto de
+eventos listados abajo quedan pendientes de que esos módulos los publiquen
+(deuda técnica, ver ROADMAP).
+
+**Pago a proveedor (PROC-CTB-003, mismo día):** `movimiento_dinero`
+(tesorería, genérico egreso/ingreso) — `purchases.comprobante_conforme`
+encola un pago `pendiente` (`application/pagos.registrar_pago`, idempotente
+por `comprobante_id`, RN-CTB-008); `application/pagos.ejecutar_pago` exige
+permiso `accounting.pago_gestionar`, revisa el umbral configurable
+(`regla_aprobacion`, código `pago_umbral`, RN-CTB-005 — sobre el umbral
+exige además `accounting.pago_aprobar`) y genera el asiento vía
+`regla_asiento` (evento `accounting.pago_ejecutado`; sin mapeo configurado,
+el pago igual se ejecuta y el asiento se omite). `rechazar_pago` cierra la
+cola sin ejecutar. Detracción SPOT se calcula (`monto_detraccion`) pero el
+asiento no la desglosa en cuenta propia — ver deuda técnica en ROADMAP.
+
 Ciclo de caja (PROC-CTB-001/002) ya existía — `apertura_caja`,
 `custodia_efectivo`, `cierre_caja`, `arqueo`
 (`src/modules/accounting/infrastructure/models/`), dependencia del slice de
@@ -41,6 +57,8 @@ todavía). `comprobante` NO vive aquí — es transversal, está en
 - Generación automática de asientos desde eventos (venta, compra, ajuste de inventario).
 - Asientos manuales con permiso `accounting.asiento_manual`.
 - Cierre de periodo (bloquea modificaciones).
+- Pago a proveedor: registrar (cola) → ejecutar (permiso + umbral) →
+  asiento automático, o rechazar.
 
 ## Reglas
 
@@ -73,9 +91,10 @@ Evento operativo → regla de mapeo contable → asiento generado → mayor/bala
 Además del registro contable, el módulo soporta los procesos de tesorería/
 finanzas documentados en el área:
 
-- **Pago a proveedor** (PROC-CTB-003): ejecuta el pago con comprobante conforme
-  (RN-CMP-014), umbral de aprobación de Gerencia (RN-CTB-005), detracción SPOT
-  e idempotencia contra doble pago (RN-CTB-008).
+- **Pago a proveedor** (PROC-CTB-003, implementado 2026-07-25): ejecuta el
+  pago con comprobante conforme (RN-CMP-014), umbral de aprobación de
+  Gerencia (RN-CTB-005), detracción SPOT (calculada, sin desglose contable
+  propio aún) e idempotencia contra doble pago (RN-CTB-008).
 - **Conciliación bancaria** (PROC-CTB-004): cuadra movimientos vs. extracto;
   visada por Gerencia, requisito de cierre de periodo (RN-CTB-006).
 - **Arqueo sorpresa** (PROC-CTB-005): control de Gerencia sobre el efectivo

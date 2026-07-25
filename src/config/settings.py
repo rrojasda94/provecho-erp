@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     # Tarifa única de mano de obra para costeo de producción (RN-PRD-018)
     # — valor semilla, ajustar cuando el negocio defina la tarifa real.
     production_costo_hora_mano_obra: Decimal = Decimal("15.00")
+    # Monto sobre el cual ejecutar un pago a proveedor exige permiso
+    # accounting.pago_aprobar (RN-CTB-005) — valor semilla.
+    accounting_umbral_aprobacion_pago: Decimal = Decimal("2000")
 
 
 settings = Settings()

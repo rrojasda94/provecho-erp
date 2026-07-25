@@ -10,6 +10,7 @@ from src.modules.accounting.infrastructure.models import (
     Asiento,
     AsientoLinea,
     CuentaContable,
+    MovimientoDinero,
     PeriodoContable,
     ReglaAsiento,
 )
@@ -146,3 +147,30 @@ class ReglaAsientoRepo:
         self.s.add(regla)
         self.s.flush()
         return regla
+
+
+class MovimientoDineroRepo:
+    def __init__(self, session: Session) -> None:
+        self.s = session
+
+    def get(self, movimiento_id: uuid.UUID) -> MovimientoDinero | None:
+        return self.s.get(MovimientoDinero, movimiento_id)
+
+    def get_by_comprobante(self, comprobante_id: uuid.UUID) -> MovimientoDinero | None:
+        return self.s.scalar(
+            select(MovimientoDinero).where(MovimientoDinero.comprobante_id == comprobante_id)
+        )
+
+    def list(self, empresa_id: uuid.UUID) -> list[MovimientoDinero]:
+        return list(
+            self.s.scalars(
+                select(MovimientoDinero)
+                .where(MovimientoDinero.empresa_id == empresa_id)
+                .order_by(MovimientoDinero.created_at.desc())
+            )
+        )
+
+    def add(self, movimiento: MovimientoDinero) -> MovimientoDinero:
+        self.s.add(movimiento)
+        self.s.flush()
+        return movimiento

@@ -83,3 +83,23 @@ class RecepcionOut(BaseModel):
     id: uuid.UUID
     orden_compra_id: uuid.UUID
     recibido_por: uuid.UUID
+
+
+class ConformidadComprobanteCreate(BaseModel):
+    idempotency_key: str = Field(min_length=8, max_length=100)
+    tipo: str
+    serie: str = Field(min_length=1, max_length=10)
+    correlativo: int = Field(gt=0)
+    sustento: str
+
+
+class ComprobanteOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    empresa_id: uuid.UUID
+    compra_id: uuid.UUID | None
+    direccion: str
+    tipo: str
+    serie: str
+    correlativo: int
+    sustento: str

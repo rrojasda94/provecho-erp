@@ -15,6 +15,10 @@ def puede_recibir(estado: str) -> bool:
     return estado in ("emitida", "recibida_parcial")
 
 
+def puede_dar_conformidad(estado: str) -> bool:
+    return estado in ("recibida", "recibida_parcial")
+
+
 def puede_anular(estado: str) -> bool:
     """Anulación solo antes de cualquier recepción; después, corrección vía
     nota de crédito/nueva versión (RN-CMP — OC emitida es inmutable)."""

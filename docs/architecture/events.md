@@ -66,7 +66,7 @@ accounting.asiento_generado
 | `inventory.lote_vencido_detectado` | inventory | users (notifica), rrhh* (memorándum al responsable) | lote_id, almacen_id, sku_id, fecha_vencimiento, responsable_id | Al hallar un lote vencido aún disponible en stock | RN-VNC-001..003 |
 | `purchases.oc_emitida` | purchases | accounting | oc_id, proveedor_id, empresa_id, total | Al emitir OC | RN-CMP-001 |
 | `purchases.compra_recibida` | purchases | inventory, accounting | oc_id, almacen_id, items[] | Al recibir mercadería | RN-CMP-003 |
-| `purchases.comprobante_conforme` | purchases | accounting | comprobante_id, oc_id, proveedor_id, condicion_pago | Compras da conformidad al comprobante; accounting decide y ejecuta el pago | RN-CMP-005 |
+| `purchases.comprobante_conforme` | purchases | accounting | comprobante_id, orden_compra_id, proveedor_id, empresa_id, condicion_pago, sujeto_spot, porcentaje_deteccion, monto | Compras da conformidad al comprobante; accounting encola el pago (`movimiento_dinero` pendiente) | RN-CMP-005, RN-CMP-014 |
 | `purchases.caja_chica_rendida` | purchases | accounting | rendicion_id, gasto_total, efectivo_restante, diferencia | Al cerrar la rendición semanal de caja chica | RN-CMP-017 |
 | `purchases.evaluacion_proveedor_actualizada` | purchases | — (informativo) | proveedor_id, indicador_automatico | En cada recepción (cumplimiento, conformidad, variación de precio) | — |
 | `production.orden_completada` | production* | inventory | orden_id, articulo_id, cantidad | Al terminar producción | RN-PRD-003 |
@@ -81,8 +81,8 @@ accounting.asiento_generado
 | `accounting.apertura_caja_registrada` | accounting | users (alerta si hay diferencia) | apertura_caja_id, punto_venta_id, diferencia_reportada | Al aperturar caja | RN-POS-003, RN-MDP-002 |
 | `accounting.cierre_caja_registrado` | accounting | — (auditoría/BI) | cierre_caja_id, apertura_caja_id, descuadre_monto | Al confirmar el cierre | PROC-CTB-001 |
 | `accounting.cierre_caja_irregular` | accounting | users (notifica gerencia/RRHH) | cierre_caja_id, descuadre_monto, descuadre_atribucion | Cierre con descuadre/irregularidad detectada | RN-MDP-005 |
-| `accounting.pago_ejecutado` | accounting | purchases (marca OC pagada), auditoría/BI | comprobante_id, oc_id, proveedor_id, monto, detraccion_monto, aprobado_por | Al ejecutar el pago a proveedor | RN-CMP-014, RN-CTB-005, RN-CTB-008 |
-| `accounting.pago_requiere_aprobacion` | accounting | users (notifica gerencia) | comprobante_id, proveedor_id, monto, umbral | Pago sobre umbral en espera de aprobación de Gerencia | RN-CTB-005 |
+| `accounting.pago_ejecutado` | accounting | purchases (marca OC pagada — sin consumidor todavía), auditoría/BI | movimiento_dinero_id, comprobante_id, orden_compra_id, proveedor_id, monto, detraccion_monto, aprobado_por | Al ejecutar el pago a proveedor | RN-CMP-014, RN-CTB-005, RN-CTB-008 |
+| `accounting.pago_requiere_aprobacion` | accounting | users (notifica gerencia — sin consumidor todavía) | movimiento_dinero_id, proveedor_id, monto, umbral | Pago sobre umbral en espera de aprobación de Gerencia | RN-CTB-005 |
 | `accounting.arqueo_registrado` | accounting | users (notifica gerencia/RRHH si hay diferencia) | arqueo_id, punto, diferencia_monto, diferencia_atribucion | Al registrar un arqueo (sorpresa) | RN-CTB-007 |
 
 `*` = módulo futuro. Reglas referenciadas en

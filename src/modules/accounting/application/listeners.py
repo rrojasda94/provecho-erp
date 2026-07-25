@@ -4,9 +4,14 @@ para la empresa+evento, o sin periodo contable abierto, el asiento se omite
 (se loguea) — nunca bloquea el proceso de origen, mismo criterio que
 `inventory.application.listeners`.
 
-Cubre hoy los 3 eventos operativos que ya se publican en el código
-(`purchases.oc_emitida`, `purchases.compra_recibida`, `sales.venta_confirmada`).
-El resto de eventos documentados en `events.md` (pago, comprobante, ajuste,
+`purchases.comprobante_conforme` no genera asiento directamente — encola un
+`movimiento_dinero` pendiente (`application/pagos.registrar_pago`); el asiento
+se genera recién al ejecutar el pago (`application/pagos.ejecutar_pago`).
+
+Cubre hoy los 4 eventos operativos que ya se publican en el código
+(`purchases.oc_emitida`, `purchases.compra_recibida`, `sales.venta_confirmada`,
+`purchases.comprobante_conforme`). El resto de eventos documentados en
+`events.md` (pago registrado, comprobante emitido de venta, ajuste,
 transferencia, caja chica...) no se generan aún porque los módulos de origen
 todavía no los publican — ver ROADMAP, deuda técnica de accounting.
 """
@@ -19,7 +24,7 @@ from decimal import Decimal
 from src.core.database import SessionLocal
 from src.core.events import event_bus
 from src.modules.accounting.application import asientos as asientos_uc
-from src.modules.accounting.infrastructure.repositories import ReglaAsientoRepo
+from src.modules.accounting.application import pagos as pagos_uc
 from src.modules.users.infrastructure.models import Almacen, Sucursal
 
 log = logging.getLogger(__name__)
@@ -39,14 +44,7 @@ def _empresa_de_sucursal(session, sucursal_id: str) -> uuid.UUID | None:
 
 
 def _generar(session, *, empresa_id, evento, referencia_origen, monto, glosa) -> None:
-    regla = ReglaAsientoRepo(session).get_vigente(empresa_id, evento)
-    if regla is None:
-        log.info(
-            "evento %s: sin regla_asiento configurada para empresa %s, asiento omitido",
-            evento, empresa_id,
-        )
-        return
-    asientos_uc.crear_asiento_automatico(
+    asiento = asientos_uc.crear_asiento_automatico_si_hay_regla(
         session,
         empresa_id=empresa_id,
         evento=evento,
@@ -54,9 +52,12 @@ def _generar(session, *, empresa_id, evento, referencia_origen, monto, glosa) ->
         glosa=glosa,
         referencia_origen=referencia_origen,
         monto=monto,
-        cuenta_debe_id=regla.cuenta_debe_id,
-        cuenta_haber_id=regla.cuenta_haber_id,
     )
+    if asiento is None:
+        log.info(
+            "evento %s: sin regla_asiento configurada para empresa %s, asiento omitido",
+            evento, empresa_id,
+        )
 
 
 def on_oc_emitida(payload: dict) -> None:
@@ -128,6 +129,30 @@ def on_venta_confirmada(payload: dict) -> None:
         log.exception("fallo generando asiento de venta %s", payload.get("venta_id"))
 
 
+def on_comprobante_conforme(payload: dict) -> None:
+    try:
+        with session_factory() as session:
+            monto_detraccion = None
+            if payload.get("sujeto_spot") and payload.get("porcentaje_deteccion"):
+                monto_detraccion = (
+                    Decimal(payload["monto"]) * Decimal(payload["porcentaje_deteccion"]) / 100
+                )
+            pagos_uc.registrar_pago(
+                session,
+                empresa_id=uuid.UUID(payload["empresa_id"]),
+                comprobante_id=uuid.UUID(payload["comprobante_id"]),
+                proveedor_id=uuid.UUID(payload["proveedor_id"]),
+                orden_compra_id=uuid.UUID(payload["orden_compra_id"]),
+                monto=Decimal(payload["monto"]),
+                monto_detraccion=monto_detraccion,
+            )
+            session.commit()
+    except Exception:
+        log.exception(
+            "fallo encolando pago del comprobante %s", payload.get("comprobante_id")
+        )
+
+
 _registrado = False
 
 
@@ -140,3 +165,4 @@ def register() -> None:
     event_bus.subscribe("purchases.oc_emitida", on_oc_emitida)
     event_bus.subscribe("purchases.compra_recibida", on_compra_recibida)
     event_bus.subscribe("sales.venta_confirmada", on_venta_confirmada)
+    event_bus.subscribe("purchases.comprobante_conforme", on_comprobante_conforme)

@@ -41,23 +41,27 @@ cualquier recepción). Capas `domain/rules.py`,
 | POST | `/ordenes-compra/{id}/emitir` | `purchases.crear` (+ `aprobar` sobre umbral) |
 | POST | `/ordenes-compra/{id}/recepciones` | `purchases.recepcionar` |
 | POST | `/ordenes-compra/{id}/anular` | `purchases.anular` |
+| POST | `/ordenes-compra/{id}/conformidad-comprobante` | `purchases.dar_conformidad` |
 
 Eventos: publica `purchases.oc_emitida` y `purchases.compra_recibida`
 (inventory suma stock en el almacén destino y recalcula
 `articulo.costo_promedio` — promedio ponderado solo contra el stock del
 almacén que recibe, ver `ponytail:` en
-`inventory/application/listeners.py`) y `purchases.oc_anulada`. Rol
-semilla `comprador` (crear/leer/recepcionar/anular); `supervisor` y
-`admin` tienen `purchases.aprobar`.
+`inventory/application/listeners.py`), `purchases.oc_anulada` y
+`purchases.comprobante_conforme` (2026-07-25 — registra `comprobante`
+recibido, transversal en `src/shared/models/`, y dispara en `accounting`
+la cola de pago a proveedor, `application/pagos.registrar_pago`). Rol
+semilla `comprador` (crear/leer/recepcionar/anular/dar_conformidad);
+`supervisor` y `admin` tienen `purchases.aprobar`.
 
 Deuda del slice (ver ROADMAP): `cotizacion` (camino no-preferente sin
 modelar — hoy toda OC insumo emite sin cotización comparativa),
 OC tipo `activo` + `requerimiento_activo` con doble aprobación,
 `compra_directa` + `caja_chica_compras`/`caja_chica_movimiento` +
 `rendicion_caja_chica` (compra a proveedor informal), `evaluacion_proveedor`
-automática por recepción, `comprobante` recibido y evento
-`purchases.comprobante_conforme` (accounting aún no lo consume), listener
-de `inventory.devolucion_a_proveedor`.
+automática por recepción, listener de `inventory.devolucion_a_proveedor`.
+La OC no queda marcada como "pagada" tras el pago (RN-CMP-014 vive del
+lado de `accounting`, `orden_compra.estado` no tiene ese valor todavía).
 
 ## Casos de uso
 
@@ -101,9 +105,11 @@ de `inventory.devolucion_a_proveedor`.
   — bloqueo a nivel de dominio, no solo de UI.
 - `compra_directa` exige comprobante adjunto antes de guardarse; sin
   comprobante no se persiste.
-- `purchases` **no ejecuta pagos** — solo marca el comprobante como
-  `conforme` y lo entrega (evento) a `accounting`, que decide y ejecuta el
-  pago según la condición de la ficha del proveedor.
+- `purchases` **no ejecuta pagos** — solo registra el `comprobante`
+  recibido como conforme (`purchases.dar_conformidad`, exige OC con
+  recepción registrada) y lo entrega (evento `purchases.comprobante_conforme`)
+  a `accounting`, que decide y ejecuta el pago según la condición de la
+  ficha del proveedor (RN-CMP-014).
 - Cierre de `caja_chica_compras` (rendición) requiere que
   `gasto_total + efectivo_restante == fondo_fijo`; si no cuadra, el cierre
   queda `con_diferencia` y no repone el fondo hasta resolverse.

@@ -6,8 +6,9 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from src.config.settings import settings
 from src.modules.accounting.api import schemas
-from src.modules.accounting.application import asientos, cuentas, periodos, reglas
+from src.modules.accounting.application import asientos, cuentas, pagos, periodos, reglas
 from src.modules.accounting.application.errors import (
     AccountingError,
     Conflicto,
@@ -16,7 +17,9 @@ from src.modules.accounting.application.errors import (
 )
 from src.modules.accounting.infrastructure.repositories import AsientoRepo
 from src.modules.users.api.deps import get_db, require_permission
+from src.modules.users.domain.rules import permite
 from src.modules.users.infrastructure.models import Usuario
+from src.modules.users.infrastructure.repositories import UsuarioRepo
 
 router = APIRouter(prefix="/accounting", tags=["accounting"])
 
@@ -24,6 +27,8 @@ CUENTA_ADMINISTRAR = "accounting.cuenta_administrar"
 PERIODO_ADMINISTRAR = "accounting.periodo_administrar"
 ASIENTO_MANUAL = "accounting.asiento_manual"
 LEER = "accounting.leer"
+PAGO_GESTIONAR = "accounting.pago_gestionar"
+PAGO_APROBAR = "accounting.pago_aprobar"
 
 _HTTP_STATUS: dict[type[AccountingError], int] = {
     NoEncontrado: status.HTTP_404_NOT_FOUND,
@@ -201,3 +206,69 @@ def listar_reglas_asiento(
     session: Session = Depends(get_db),
 ):
     return reglas.listar_reglas_asiento(session, empresa_id)
+
+
+# --- Pago a proveedor (PROC-CTB-003) --------------------------------------------
+@router.post("/pagos-proveedor", response_model=schemas.MovimientoDineroOut, status_code=201)
+def registrar_pago(
+    body: schemas.PagoProveedorCreate,
+    actor: Usuario = Depends(require_permission(PAGO_GESTIONAR)),
+    session: Session = Depends(get_db),
+):
+    try:
+        movimiento = pagos.registrar_pago(session, solicitado_por=actor.id, **body.model_dump())
+    except ReglaNegocio as e:
+        raise _http(e) from e
+    session.commit()
+    return movimiento
+
+
+@router.get("/pagos-proveedor", response_model=list[schemas.MovimientoDineroOut])
+def listar_pagos(
+    empresa_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(LEER)),
+    session: Session = Depends(get_db),
+):
+    return pagos.listar_pagos(session, empresa_id)
+
+
+@router.post(
+    "/pagos-proveedor/{movimiento_id}/ejecutar", response_model=schemas.MovimientoDineroOut
+)
+def ejecutar_pago(
+    movimiento_id: uuid.UUID,
+    body: schemas.EjecutarPagoIn,
+    actor: Usuario = Depends(require_permission(PAGO_GESTIONAR)),
+    session: Session = Depends(get_db),
+):
+    puede_aprobar = permite(UsuarioRepo(session).permiso_codigos(actor.id), PAGO_APROBAR)
+    try:
+        movimiento = pagos.ejecutar_pago(
+            session,
+            movimiento_id,
+            actor_id=actor.id,
+            puede_aprobar_monto=puede_aprobar,
+            umbral=settings.accounting_umbral_aprobacion_pago,
+            medio_pago=body.medio_pago,
+            constancia=body.constancia,
+        )
+    except (NoEncontrado, Conflicto, ReglaNegocio) as e:
+        raise _http(e) from e
+    session.commit()
+    return movimiento
+
+
+@router.post(
+    "/pagos-proveedor/{movimiento_id}/rechazar", response_model=schemas.MovimientoDineroOut
+)
+def rechazar_pago(
+    movimiento_id: uuid.UUID,
+    actor: Usuario = Depends(require_permission(PAGO_GESTIONAR)),
+    session: Session = Depends(get_db),
+):
+    try:
+        movimiento = pagos.rechazar_pago(session, movimiento_id, actor_id=actor.id)
+    except (NoEncontrado, Conflicto) as e:
+        raise _http(e) from e
+    session.commit()
+    return movimiento

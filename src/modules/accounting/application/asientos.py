@@ -14,7 +14,11 @@ from src.modules.accounting.application import periodos
 from src.modules.accounting.application.errors import Conflicto, NoEncontrado, ReglaNegocio
 from src.modules.accounting.domain import rules
 from src.modules.accounting.infrastructure.models import Asiento, AsientoLinea
-from src.modules.accounting.infrastructure.repositories import AsientoRepo, CuentaContableRepo
+from src.modules.accounting.infrastructure.repositories import (
+    AsientoRepo,
+    CuentaContableRepo,
+    ReglaAsientoRepo,
+)
 
 
 def _construir_lineas(
@@ -174,3 +178,33 @@ def crear_asiento_automatico(
         "accounting.asiento_generado", {"asiento_id": str(asiento.id), "evento_origen": evento}
     )
     return asiento
+
+
+def crear_asiento_automatico_si_hay_regla(
+    session: Session,
+    *,
+    empresa_id: uuid.UUID,
+    evento: str,
+    fecha: date,
+    glosa: str,
+    referencia_origen: str,
+    monto: Decimal,
+) -> Asiento | None:
+    """Busca la `regla_asiento` vigente de la empresa para `evento` y genera
+    el asiento si existe. `None` si no hay regla configurada (se omite, se
+    audita en el log del llamador) — mismo criterio no bloqueante que el
+    resto de la generación automática."""
+    regla = ReglaAsientoRepo(session).get_vigente(empresa_id, evento)
+    if regla is None:
+        return None
+    return crear_asiento_automatico(
+        session,
+        empresa_id=empresa_id,
+        evento=evento,
+        fecha=fecha,
+        glosa=glosa,
+        referencia_origen=referencia_origen,
+        monto=monto,
+        cuenta_debe_id=regla.cuenta_debe_id,
+        cuenta_haber_id=regla.cuenta_haber_id,
+    )

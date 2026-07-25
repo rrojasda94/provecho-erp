@@ -7,6 +7,31 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Added
 
+- **Pago a proveedor (PROC-CTB-003) — tesorería en `accounting`** (2026-07-25):
+  migración `cbf904a9fc1b` (`movimiento_dinero`). `feat(purchases)`: nuevo
+  `application/comprobantes.py::dar_conformidad_comprobante` (permiso
+  `purchases.dar_conformidad`) registra el `comprobante` recibido
+  (transversal, `shared`), lo liga a la última `recepcion_compra` de la OC
+  y publica `purchases.comprobante_conforme` (empresa_id, condición de
+  pago, `sujeto_spot`/`porcentaje_deteccion`, monto). `feat(accounting)`:
+  `application/pagos.py` — `registrar_pago` encola un `movimiento_dinero`
+  `pendiente` (idempotente por `comprobante_id`, RN-CTB-008), `ejecutar_pago`
+  exige permiso `accounting.pago_gestionar` y revisa el umbral configurable
+  (`regla_aprobacion`, código `pago_umbral`, RN-CTB-005 — sobre el umbral
+  exige además `accounting.pago_aprobar`) antes de generar el asiento vía
+  `regla_asiento` (evento `accounting.pago_ejecutado`; sin mapeo
+  configurado, el pago igual se ejecuta y el asiento se omite),
+  `rechazar_pago` cierra la cola sin ejecutar. Nuevo helper compartido
+  `asientos.crear_asiento_automatico_si_hay_regla` (usado también por
+  `application/listeners.py`, dedup de la búsqueda de `regla_asiento`).
+  Endpoints `/api/v1/accounting/pagos-proveedor` (registrar, listar,
+  ejecutar, rechazar) y `/api/v1/purchases/ordenes-compra/{id}/conformidad-comprobante`.
+  Roles: `comprador` gana `purchases.dar_conformidad`; `contador` gana
+  `accounting.pago_gestionar`; `supervisor` gana `accounting.pago_aprobar`.
+  Tests en `tests/test_accounting.py`. Deuda: detracción SPOT se calcula
+  pero el asiento no la desglosa en cuenta propia; `purchases` no marca la
+  OC como pagada; `rechazar_pago` no libera el comprobante para reintentar
+  — ver ROADMAP.
 - **Módulo `accounting` — slice core (libro contable)** (2026-07-25): migración
   `5402d99333fa` (`cuenta_contable`, `periodo_contable`, `asiento`,
   `asiento_linea`, `regla_asiento`) aplicada. Endpoints `/api/v1/accounting`:

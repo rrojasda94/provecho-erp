@@ -654,17 +654,33 @@ Implementado (2026-07-25) — libro contable núcleo, además del ciclo de caja
   bloquea el proceso operativo de origen). Mismo criterio que
   `regla_aprobacion` (RN-GER-003): la empresa configura su plan de cuentas,
   el código no lo hardcodea.
+- **movimiento_dinero** (implementado 2026-07-25, tesorería/PROC-CTB-003):
+  empresa_id, tipo (`egreso`\|`ingreso`), concepto (hoy solo
+  `pago_proveedor`), comprobante_id (FK `comprobante`, único cuando no NULL
+  — guardián de RN-CTB-008, un mismo comprobante no se paga dos veces),
+  proveedor_id/orden_compra_id (UUID sin FK — dominio de `purchases`, mismo
+  criterio que `Comprobante.compra_id`), monto, monto_detraccion, medio_pago
+  (`transferencia`\|`cheque`\|`efectivo`, solo al ejecutar), estado
+  (`pendiente`\|`ejecutado`\|`rechazado`), solicitado_por, aprobado_por,
+  asiento_id (FK `asiento`, NULL si no había `regla_asiento` configurada),
+  fecha_ejecucion, constancia. `purchases.comprobante_conforme` lo encola
+  (`pendiente`); ejecutar exige permiso sobre el umbral (`regla_aprobacion`,
+  código `pago_umbral`, RN-CTB-005) y genera el asiento vía `regla_asiento`
+  (evento `accounting.pago_ejecutado`).
 - **declaracion_itan**: empresa_id, periodo, activos_netos, umbral_legal,
   base_imponible (excedente), monto, credito_ir_aplicado (RN-IMP-006).
 
-Pendiente (deuda técnica, ver ROADMAP): generación automática solo cubre los
-3 eventos que los módulos de origen ya publican en código
-(`purchases.oc_emitida`, `purchases.compra_recibida`, `sales.venta_confirmada`)
-— el resto de eventos documentados en `events.md` (pago, comprobante,
+Pendiente (deuda técnica, ver ROADMAP): generación automática de asientos
+operativos solo cubre los 4 eventos que sus módulos de origen ya publican
+en código (`purchases.oc_emitida`, `purchases.compra_recibida`,
+`sales.venta_confirmada`, `purchases.comprobante_conforme`) — el resto de
+eventos documentados en `events.md` (pago de venta, comprobante emitido,
 transferencia, merma, ajuste, caja chica) no se generan aún porque esos
-módulos todavía no los publican. Ejecución real de pago a proveedor
-(detracción SPOT, idempotencia RN-CTB-008), conciliación bancaria y arqueo
-también quedan para un slice de tesorería dedicado.
+módulos todavía no los publican. La detracción SPOT se calcula pero el
+asiento de pago no la desglosa en una cuenta propia (queda en el debe/haber
+único del total); `purchases.orden_compra` no queda marcada como pagada;
+conciliación bancaria y arqueo backend también quedan para un slice de
+tesorería dedicado.
 
 ## 8b. Recursos humanos (módulo rrhh — spec inicial)
 

@@ -11,6 +11,9 @@ from src.modules.accounting.infrastructure.models.cuenta_contable import CuentaC
 from src.modules.accounting.infrastructure.models.custodia_efectivo import (
     CustodiaEfectivo,
 )
+from src.modules.accounting.infrastructure.models.movimiento_dinero import (
+    MovimientoDinero,
+)
 from src.modules.accounting.infrastructure.models.periodo_contable import (
     PeriodoContable,
 )
@@ -24,6 +27,7 @@ __all__ = [
     "CierreCaja",
     "CuentaContable",
     "CustodiaEfectivo",
+    "MovimientoDinero",
     "PeriodoContable",
     "ReglaAsiento",
 ]

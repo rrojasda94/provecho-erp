@@ -21,3 +21,15 @@ def puede_registrar(periodo_estado: str) -> bool:
 
 def puede_cerrar(periodo_estado: str) -> bool:
     return periodo_estado == "abierto"
+
+
+def requiere_aprobacion_pago(monto: Decimal, umbral: Decimal) -> bool:
+    return monto > umbral
+
+
+def puede_ejecutar_pago(estado: str) -> bool:
+    return estado == "pendiente"
+
+
+def puede_rechazar_pago(estado: str) -> bool:
+    return estado == "pendiente"

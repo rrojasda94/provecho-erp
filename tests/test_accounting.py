@@ -438,3 +438,189 @@ def test_venta_confirmada_con_regla_configurada_genera_asiento_automatico(env):
     generado = [a for a in asientos if a["referencia_origen"] == venta_id]
     assert len(generado) == 1
     assert generado[0]["evento_origen"] == "sales.venta_confirmada"
+
+
+# --- Pago a proveedor (PROC-CTB-003) ------------------------------------------
+
+def _dar_conformidad(client, h, oc_id, idempotency_key="conf-key-1"):
+    return client.post(
+        f"/api/v1/purchases/ordenes-compra/{oc_id}/conformidad-comprobante",
+        headers=h,
+        json={
+            "idempotency_key": idempotency_key,
+            "tipo": "factura",
+            "serie": "F001",
+            "correlativo": 1,
+            "sustento": "efectivo",
+        },
+    )
+
+
+def _flujo_oc_recibida(
+    client, h, ids, TestSession, costo_unitario="5.00", idempotency_key="oc-pago-1"
+):
+    articulo_id = _crear_articulo_insumo(TestSession, ids["empresa_id"])
+    proveedor = _crear_proveedor(client, h, ids)
+    oc = client.post(
+        "/api/v1/purchases/ordenes-compra",
+        headers=h,
+        json={
+            "proveedor_id": proveedor["id"],
+            "almacen_destino_id": ids["almacen_id"],
+            "idempotency_key": idempotency_key,
+            "items": [
+                {"articulo_id": articulo_id, "cantidad": "10", "costo_unitario": costo_unitario}
+            ],
+        },
+    ).json()
+    client.post(f"/api/v1/purchases/ordenes-compra/{oc['id']}/emitir", headers=h)
+
+    from src.modules.purchases.infrastructure.models import OrdenCompraItem
+
+    with TestSession() as s:
+        item = s.scalar(
+            select(OrdenCompraItem).where(OrdenCompraItem.orden_compra_id == uuid.UUID(oc["id"]))
+        )
+        item_id = str(item.id)
+    client.post(
+        f"/api/v1/purchases/ordenes-compra/{oc['id']}/recepciones", headers=h, json={
+            "idempotency_key": f"recep-{idempotency_key}",
+            "items": [{"orden_compra_item_id": item_id, "cantidad_recibida": "10"}],
+        },
+    )
+    return oc
+
+
+def test_conformidad_comprobante_encola_pago_pendiente(env):
+    client, ids, TestSession = env
+    h = _token(client)
+    oc = _flujo_oc_recibida(client, h, ids, TestSession)
+
+    conf = _dar_conformidad(client, h, oc["id"])
+    assert conf.status_code == 201
+
+    pagos = client.get(
+        f"/api/v1/accounting/pagos-proveedor?empresa_id={ids['empresa_id']}", headers=h
+    ).json()
+    generado = [p for p in pagos if p["orden_compra_id"] == oc["id"]]
+    assert len(generado) == 1
+    assert generado[0]["estado"] == "pendiente"
+    assert Decimal(generado[0]["monto"]) == Decimal("50.00")
+
+
+def test_conformidad_comprobante_reintento_no_duplica_pago(env):
+    client, ids, TestSession = env
+    h = _token(client)
+    oc = _flujo_oc_recibida(client, h, ids, TestSession)
+
+    _dar_conformidad(client, h, oc["id"], idempotency_key="conf-dup")
+    _dar_conformidad(client, h, oc["id"], idempotency_key="conf-dup")
+
+    pagos = client.get(
+        f"/api/v1/accounting/pagos-proveedor?empresa_id={ids['empresa_id']}", headers=h
+    ).json()
+    generado = [p for p in pagos if p["orden_compra_id"] == oc["id"]]
+    assert len(generado) == 1
+
+
+def test_ejecutar_pago_bajo_umbral_genera_asiento(env):
+    client, ids, TestSession = env
+    h = _token(client)
+    _abrir_periodo_actual(client, h, ids)
+    banco_id = _crear_cuenta(client, h, ids, "10", "Bancos", "activo").json()["id"]
+    cxp_id = _crear_cuenta(client, h, ids, "42", "Cuentas por pagar", "pasivo").json()["id"]
+    _crear_regla_asiento(client, h, ids, "accounting.pago_ejecutado", cxp_id, banco_id)
+
+    oc = _flujo_oc_recibida(client, h, ids, TestSession)
+    _dar_conformidad(client, h, oc["id"])
+    pago = client.get(
+        f"/api/v1/accounting/pagos-proveedor?empresa_id={ids['empresa_id']}", headers=h
+    ).json()[0]
+
+    ejecutado = client.post(
+        f"/api/v1/accounting/pagos-proveedor/{pago['id']}/ejecutar",
+        headers=h,
+        json={"medio_pago": "transferencia", "constancia": "OP-001"},
+    )
+    assert ejecutado.status_code == 200
+    assert ejecutado.json()["estado"] == "ejecutado"
+    assert ejecutado.json()["asiento_id"] is not None
+
+    lineas = client.get(
+        f"/api/v1/accounting/asientos/{ejecutado.json()['asiento_id']}/lineas", headers=h
+    ).json()
+    montos = {li["tipo"]: Decimal(li["monto"]) for li in lineas}
+    assert montos == {"debe": Decimal("50.00"), "haber": Decimal("50.00")}
+
+    doble = client.post(
+        f"/api/v1/accounting/pagos-proveedor/{pago['id']}/ejecutar",
+        headers=h,
+        json={"medio_pago": "transferencia"},
+    )
+    assert doble.status_code == 409
+
+
+def test_ejecutar_pago_sobre_umbral_requiere_permiso_aprobar(env):
+    client, ids, TestSession = env
+    h_admin = _token(client)
+    h_contador = _token(client, "contador1", "333333")
+
+    oc = _flujo_oc_recibida(client, h_admin, ids, TestSession, costo_unitario="250.00")
+    _dar_conformidad(client, h_admin, oc["id"])
+    pago = client.get(
+        f"/api/v1/accounting/pagos-proveedor?empresa_id={ids['empresa_id']}", headers=h_admin
+    ).json()[0]
+    assert Decimal(pago["monto"]) == Decimal("2500.00")
+
+    r = client.post(
+        f"/api/v1/accounting/pagos-proveedor/{pago['id']}/ejecutar",
+        headers=h_contador,
+        json={"medio_pago": "transferencia"},
+    )
+    assert r.status_code == 409
+
+    r2 = client.post(
+        f"/api/v1/accounting/pagos-proveedor/{pago['id']}/ejecutar",
+        headers=h_admin,
+        json={"medio_pago": "transferencia"},
+    )
+    assert r2.status_code == 200
+
+
+def test_rechazar_pago_bloquea_ejecucion_posterior(env):
+    client, ids, TestSession = env
+    h = _token(client)
+    oc = _flujo_oc_recibida(client, h, ids, TestSession)
+    _dar_conformidad(client, h, oc["id"])
+    pago = client.get(
+        f"/api/v1/accounting/pagos-proveedor?empresa_id={ids['empresa_id']}", headers=h
+    ).json()[0]
+
+    r = client.post(f"/api/v1/accounting/pagos-proveedor/{pago['id']}/rechazar", headers=h)
+    assert r.status_code == 200
+    assert r.json()["estado"] == "rechazado"
+
+    r2 = client.post(
+        f"/api/v1/accounting/pagos-proveedor/{pago['id']}/ejecutar",
+        headers=h,
+        json={"medio_pago": "efectivo"},
+    )
+    assert r2.status_code == 409
+
+
+def test_dar_conformidad_sin_permiso_403(env):
+    client, ids, TestSession = env
+    h_admin = _token(client)
+    oc = _flujo_oc_recibida(client, h_admin, ids, TestSession)
+
+    with TestSession() as s:
+        cocinero = Usuario(username="cocinero_pago", pin_hash=hash_pin("444444"), tipo="humano")
+        s.add(cocinero)
+        s.flush()
+        rol = s.scalar(select(Rol).where(Rol.nombre == "cocinero"))
+        s.add(UsuarioRol(usuario_id=cocinero.id, rol_id=rol.id))
+        s.commit()
+    h_cocinero = _token(client, "cocinero_pago", "444444")
+
+    r = _dar_conformidad(client, h_cocinero, oc["id"])
+    assert r.status_code == 403
