@@ -88,7 +88,7 @@ def crear_articulo(
             categoria_id=body.categoria_id,
             costo_promedio=body.costo_promedio,
         )
-    except Conflicto as e:
+    except (Conflicto, NoEncontrado) as e:
         raise _http(e) from e
     session.commit()
     return art

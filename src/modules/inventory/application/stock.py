@@ -24,7 +24,7 @@ def aplicar_a_stock(
     """Suma `delta` (con signo) a la fila de stock; la crea si no existe.
     Rechaza dejar la cantidad en negativo."""
     repo = StockRepo(session)
-    stock = repo.get(almacen_id, sku_id)
+    stock = repo.get(almacen_id, sku_id, for_update=True)
     if stock is None:
         stock = repo.add(Stock(almacen_id=almacen_id, sku_id=sku_id, cantidad=Decimal(0)))
     nueva = stock.cantidad + delta
@@ -50,6 +50,10 @@ def registrar_movimiento(
     """`cantidad` con signo: + ingreso, − salida."""
     if tipo not in rules.TIPOS_MOVIMIENTO:
         raise ReglaNegocio(f"tipo de movimiento inválido: {tipo}")
+    if not rules.signo_movimiento_valido(tipo, cantidad):
+        raise ReglaNegocio(
+            f"signo de cantidad ({cantidad}) inválido para tipo '{tipo}'"
+        )
     stock = aplicar_a_stock(session, almacen_id, sku_id, cantidad)
     mov = MovimientoRepo(session).add(
         MovimientoInventario(

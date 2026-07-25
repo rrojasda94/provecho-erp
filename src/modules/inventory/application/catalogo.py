@@ -6,12 +6,22 @@ from decimal import Decimal
 from sqlalchemy.orm import Session
 
 from src.modules.inventory.application.errors import Conflicto, NoEncontrado
-from src.modules.inventory.infrastructure.models import Articulo, Categoria, Sku
+from src.modules.inventory.infrastructure.models import (
+    Articulo,
+    Categoria,
+    Sku,
+    UnidadMedida,
+)
 from src.modules.inventory.infrastructure.repositories import (
     ArticuloRepo,
     CategoriaRepo,
     SkuRepo,
 )
+
+
+def _existe(session: Session, model, entidad_id, nombre: str) -> None:
+    if entidad_id is not None and session.get(model, entidad_id) is None:
+        raise NoEncontrado(f"{nombre} no encontrado")
 
 
 def crear_categoria(
@@ -50,6 +60,8 @@ def crear_articulo(
     categoria_id: uuid.UUID | None = None,
     costo_promedio: Decimal = Decimal(0),
 ) -> Articulo:
+    _existe(session, UnidadMedida, unidad_medida_id, "unidad de medida")
+    _existe(session, Categoria, categoria_id, "categoría")
     repo = ArticuloRepo(session)
     if repo.get_by_id_interno(id_interno):
         raise Conflicto(f"id_interno '{id_interno}' ya existe")

@@ -83,12 +83,17 @@ class StockRepo:
     def __init__(self, session: Session) -> None:
         self.s = session
 
-    def get(self, almacen_id: uuid.UUID, sku_id: uuid.UUID) -> Stock | None:
-        return self.s.scalar(
-            select(Stock).where(
-                Stock.almacen_id == almacen_id, Stock.sku_id == sku_id
-            )
+    def get(
+        self, almacen_id: uuid.UUID, sku_id: uuid.UUID, for_update: bool = False
+    ) -> Stock | None:
+        q = select(Stock).where(
+            Stock.almacen_id == almacen_id, Stock.sku_id == sku_id
         )
+        if for_update:
+            # Bloqueo de fila para evitar lost-update en movimientos
+            # concurrentes (no-op en SQLite; efectivo en Postgres).
+            q = q.with_for_update()
+        return self.s.scalar(q)
 
     def list(self, almacen_id: uuid.UUID | None = None) -> list[Stock]:
         q = select(Stock)

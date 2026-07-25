@@ -29,6 +29,10 @@ def solicitar_ajuste(
 ) -> Ajuste:
     if motivo not in rules.MOTIVOS_AJUSTE:
         raise ReglaNegocio(f"motivo de ajuste inválido: {motivo}")
+    if not rules.signo_ajuste_valido(motivo, cantidad):
+        raise ReglaNegocio(
+            f"signo de cantidad ({cantidad}) inválido para motivo '{motivo}'"
+        )
     return AjusteRepo(session).add(
         Ajuste(
             almacen_id=almacen_id,

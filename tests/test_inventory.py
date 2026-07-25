@@ -190,6 +190,38 @@ def test_stock_bajo_minimo_flag(env):
     assert stock[0]["bajo_minimo"] is True
 
 
+def test_movimiento_signo_invalido_409(env):
+    client, ids, _ = env
+    h = _token(client)
+    # recepción (ingreso) con cantidad negativa → inválido.
+    r = client.post("/api/v1/inventory/movimientos", headers=h, json={
+        "almacen_id": ids["almacen_id"], "sku_id": ids["sku_id"],
+        "cantidad": "-5", "tipo": "recepcion_compra",
+    })
+    assert r.status_code == 409
+
+
+def test_ajuste_signo_no_coincide_motivo_409(env):
+    client, ids, _ = env
+    h = _token(client, "almacenero1", "654321")
+    # motivo faltante debería ser negativo; +5 es incoherente.
+    r = client.post("/api/v1/inventory/ajustes", headers=h, json={
+        "almacen_id": ids["almacen_id"], "sku_id": ids["sku_id"],
+        "cantidad": "5", "motivo": "faltante",
+    })
+    assert r.status_code == 409
+
+
+def test_crear_articulo_udm_inexistente_404(env):
+    client, ids, _ = env
+    h = _token(client)
+    r = client.post("/api/v1/inventory/articulos", headers=h, json={
+        "empresa_id": ids["empresa_id"], "id_interno": "X001", "nombre": "Fantasma",
+        "unidad_medida_id": "00000000-0000-0000-0000-000000000000", "tipo": "insumo",
+    })
+    assert r.status_code == 404
+
+
 def test_leer_sin_permiso_403(env):
     client, ids, _ = env
     h = _token(client, "almacenero1", "654321")  # tiene inventory.leer
