@@ -16,6 +16,11 @@ frontend/out/
 .env.*
 !.env.example
 
+# Guiones de capacitación (working files de producción de video, no versionados)
+docs/capacitacion/*-guion-video.md
+docs/capacitacion/*-ayudamemoria.md
+docs/capacitacion/*-shotlist.html
+
 # IDE / SO
 .idea/
 .vscode/
