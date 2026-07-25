@@ -21,7 +21,7 @@ Registro de lo construido y lo pendiente. Actualizar en cada cambio relevante.
 | Módulo `purchases` | 🔶 slice core ✅ 2026-07-25 | CRUD de proveedores (natural liga a `persona`, jurídico con RUC propio) y ciclo de OC tipo `insumo` (crear → emitir → recibir → anular), con idempotencia y umbral de aprobación configurable. `purchases.compra_recibida` → inventory suma stock y recalcula `costo_promedio`. Migración `4ff85f833b29` aplicada. Diferido: ver Deuda técnica. |
 | Módulo `sales` (PDV) | 🔶 slices 1-2 ✅ 2026-07-25 | Venta con correlativo+idempotencia → `sales.venta_confirmada` → inventory descuenta por receta (+merma+empaque); cobro con pagos parciales → `pagada`; anulación pre-pago repone stock; CRUD productos/medios de pago. **KDS** (slice 2): pantallas configurables por sucursal y categorías (`kds_pantalla`, migración `7672566bf189`), avance por ítem en `venta_item.estado_preparacion` (fuente única → todas las pantallas ven el avance real), tipos preparación/despacho, comanda imprimible con contador de reimpresiones, evento `sales.pedido_listo`, rol `cocinero`. Kiosk/Central de Pedidos = clientes del mismo contrato, no módulos. Diferido: ver Deuda técnica. |
 | Persona CRUD + lock optimista + matriz de aprobaciones + contrato público | ✅ 2026-07-25 | `POST/GET/PATCH /api/v1/personas` (sin Delete); `persona.version` con lock optimista (409 si desactualizada); `regla_aprobacion` (nuevo, `src/shared/`) reemplaza el umbral fijo de `purchases` por empresa, admin en `/api/v1/reglas-aprobacion`; primer contrato público de lectura cross-módulo (`sales.cliente` para marketing/comercial, `GET /api/v1/sales/clientes`). Migración `af8a246e2c25`. Ver detalle abajo. |
-| Módulo `accounting` | ⬜ | |
+| Módulo `accounting` | 🔶 slice core ✅ 2026-07-25 | Libro contable núcleo: plan de cuentas (`cuenta_contable`), periodo (`periodo_contable`, abrir/cerrar), asiento manual (`asiento`/`asiento_linea`, cuadre RN-CTB-001, anulación por asiento inverso RN-CTB-002) y mapeo configurable evento→cuentas (`regla_asiento`) que alimenta la generación automática para los 3 eventos operativos que ya se publican en código (`purchases.oc_emitida`, `purchases.compra_recibida`, `sales.venta_confirmada`). Migración `5402d99333fa` aplicada. Diferido: ver Deuda técnica. |
 | Producción (fabricación) | 🔶 slice core ✅ 2026-07-25 | Orden de producción ad-hoc (crear → registrar consumo → completar con resultado de control de calidad) y costeo automático. Construido antes de tiempo a pedido del usuario — primera cocina real sigue planeada 2027. `receta.articulo_id` nuevo liga receta↔subreceta. Diferido: ver Deuda técnica. |
 | Solicitudes / picking / transporte | ⬜ | Módulos futuros `requests`, `logistics` |
 | RRHH: procesos y plantillas (reclutamiento, contratación, inducción) | ✅ 2026-07-19 | `docs/rrhh/`, 13 SOPs, 9 plantillas — ver detalle abajo. Módulo backend `rrhh` sigue pendiente |
@@ -238,6 +238,42 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   nada impide que el mismo usuario tenga ambos y haga las dos acciones
   (a diferencia de `inventory.ajuste`, que sí exige aprobador≠solicitante) —
   evaluar si el negocio lo requiere para producción.
+
+### Módulo accounting (slices siguientes)
+- ⬜ **Resto de eventos → asiento automático**: `sales.pago_registrado`,
+  `sales.comprobante_emitido`, `purchases.comprobante_conforme`,
+  `purchases.caja_chica_rendida`, `inventory.transferencia_recibida`,
+  `inventory.merma_registrada`, `inventory.ajuste_fuera_margen` están
+  documentados en `events.md` pero sus módulos de origen aún no los
+  publican en código (o, en el caso de `sales`, el evento real ya publicado
+  se llama `sales.venta_pagada`, no `sales.pago_registrado` — desalineación
+  de nombre entre spec y código, revisar). Cuando existan, agregar su
+  extractor de monto/empresa en `accounting/application/listeners.py`.
+- ⬜ **Pago a proveedor (PROC-CTB-003)**: ejecución real del pago con
+  comprobante conforme (RN-CMP-014), umbral de aprobación de Gerencia
+  (RN-CTB-005, vía `regla_aprobacion` igual que `purchases`), detracción
+  SPOT e idempotencia contra doble pago (RN-CTB-008) — hoy no hay caso de
+  uso ni endpoint, solo la regla documentada.
+  Eventos `accounting.pago_ejecutado`/`pago_requiere_aprobacion` sin emisor.
+- ⬜ **Conciliación bancaria (PROC-CTB-004)** y **arqueo backend
+  (PROC-CTB-005)**: `Arqueo` ya existe como modelo pero sin caso de
+  uso/endpoint; conciliación bancaria no tiene ni modelo. RN-CTB-006 (cierre
+  de periodo exige conciliación visada) no se valida todavía —
+  `cerrar_periodo` hoy no lo comprueba.
+  Bloquea implementar rigurosamente RN-CTB-006.
+- ⬜ **Ciclo de caja → libro contable**: `apertura_caja`/`cierre_caja`/`arqueo`
+  (PROC-CTB-001/002) no generan asiento ni publican los eventos
+  `accounting.apertura_caja_registrada`/`cierre_caja_registrado`/
+  `cierre_caja_irregular` que `events.md` documenta — están construidos
+  pero no conectados entre sí.
+- ⬜ **Activo fijo/depreciación y flujo de caja** (PROC-CTB-007/010,
+  propuestos): sin modelar, dependen de que exista el módulo de activos.
+- ⬜ **`declaracion_itan`**: entidad documentada en data-model §8, sin
+  slice propio (depende del ciclo tributario anual, RN-IMP-006).
+- ⬜ **`regla_asiento` de una sola línea debe/haber**: el mapeo actual
+  genera exactamente 2 líneas por evento (una cuenta debe, una haber) —
+  suficiente para provisión/recepción/venta simples; un asiento con más de
+  2 líneas (ej. IGV desglosado) requiere asiento manual o ampliar el mapeo.
 
 ## Orden sugerido de desarrollo
 

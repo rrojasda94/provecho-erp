@@ -64,7 +64,7 @@ accounting.asiento_generado
 | `inventory.devolucion_a_proveedor` | inventory | purchases | devolucion_id, proveedor_id, items[], motivo | Al registrar devolución a proveedor (purchases gestiona reclamo/nota de crédito) | RN-INV-020 |
 | `inventory.ajuste_fuera_margen` | inventory | accounting, users (alerta admin) | ajuste_id, almacen_id, sku_id, diferencia, margen | Ajuste excede el margen de error configurado | RN-INV-015 |
 | `inventory.lote_vencido_detectado` | inventory | users (notifica), rrhh* (memorándum al responsable) | lote_id, almacen_id, sku_id, fecha_vencimiento, responsable_id | Al hallar un lote vencido aún disponible en stock | RN-VNC-001..003 |
-| `purchases.oc_emitida` | purchases | accounting | oc_id, proveedor_id, total | Al emitir OC | RN-CMP-001 |
+| `purchases.oc_emitida` | purchases | accounting | oc_id, proveedor_id, empresa_id, total | Al emitir OC | RN-CMP-001 |
 | `purchases.compra_recibida` | purchases | inventory, accounting | oc_id, almacen_id, items[] | Al recibir mercadería | RN-CMP-003 |
 | `purchases.comprobante_conforme` | purchases | accounting | comprobante_id, oc_id, proveedor_id, condicion_pago | Compras da conformidad al comprobante; accounting decide y ejecuta el pago | RN-CMP-005 |
 | `purchases.caja_chica_rendida` | purchases | accounting | rendicion_id, gasto_total, efectivo_restante, diferencia | Al cerrar la rendición semanal de caja chica | RN-CMP-017 |

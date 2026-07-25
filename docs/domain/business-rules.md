@@ -1103,6 +1103,14 @@ producción se hace en cocinas de sucursal. Ver
   la audita Gerencia. Toda auditoría/arqueo la ejecuta quien **no custodia** el
   fondo o dato revisado; el custodio está presente como testigo, no cuenta por
   el auditor.
+- **RN-CTB-010** Ningún asiento se registra fuera de un periodo contable
+  abierto; un asiento manual sobre un periodo sin abrir o ya cerrado se
+  rechaza (409).
+- **RN-CTB-011** La generación automática de asientos usa el mapeo
+  configurable evento→cuentas (`regla_asiento`) por empresa; si la empresa no
+  configuró mapeo para un evento, el asiento se omite (se audita en el log)
+  — nunca bloquea el proceso operativo que lo originó (mismo criterio de
+  módulos operativos con dependencias sin configurar, ej. inventory).
 
 > Nota: esta lista crece con cada módulo. Al implementar un módulo se agregan
 > aquí sus reglas antes de codificarlas.

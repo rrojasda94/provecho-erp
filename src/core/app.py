@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 
 from src.config.settings import settings
+from src.modules.accounting.api.routers import router as accounting_router
+from src.modules.accounting.application import listeners as accounting_listeners
 from src.modules.inventory.api.routers import router as inventory_router
 from src.modules.inventory.application import listeners as inventory_listeners
 from src.modules.production.api.routers import router as production_router
@@ -28,5 +30,7 @@ def create_app() -> FastAPI:
     app.include_router(kds_router, prefix="/api/v1")
     app.include_router(purchases_router, prefix="/api/v1")
     app.include_router(production_router, prefix="/api/v1")
+    app.include_router(accounting_router, prefix="/api/v1")
     inventory_listeners.register()
+    accounting_listeners.register()
     return app

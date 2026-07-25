@@ -18,13 +18,22 @@ presupuesto).
 `cuenta_contable` (plan de cuentas), `asiento`, `asiento_linea` (debe/haber),
 `periodo_contable`. Detalle en `docs/architecture/data-model.md` §8 (se refina antes de implementar).
 
-**Estado de implementación (2026-07-20):** módulo abierto parcialmente
-con el ciclo de caja (PROC-CTB-001/002) — `apertura_caja`, `custodia_efectivo`,
-`cierre_caja`, `arqueo` (`src/modules/accounting/infrastructure/models/`),
-dependencia del slice de Cobro (PROC-COM-002). El resto de este README
-(plan de cuentas, asiento, periodo_contable) sigue pendiente del slice
-dedicado de Contabilidad. `comprobante` NO vive aquí — es transversal,
-está en `src/shared/models/`.
+**Estado de implementación (2026-07-25):** libro contable núcleo construido
+— `cuenta_contable` (plan de cuentas), `periodo_contable` (abrir/cerrar),
+`asiento`/`asiento_linea` (manual con permiso `accounting.asiento_manual`,
+cuadre RN-CTB-001, anulación por asiento inverso RN-CTB-002) y
+`regla_asiento` (mapeo configurable evento→cuentas que alimenta la
+generación automática, `application/listeners.py`). Cubre hoy los 3 eventos
+operativos que sus módulos de origen ya publican en código
+(`purchases.oc_emitida`, `purchases.compra_recibida`,
+`sales.venta_confirmada`); el resto de eventos listados abajo quedan
+pendientes de que esos módulos los publiquen (deuda técnica, ver ROADMAP).
+Ciclo de caja (PROC-CTB-001/002) ya existía — `apertura_caja`,
+`custodia_efectivo`, `cierre_caja`, `arqueo`
+(`src/modules/accounting/infrastructure/models/`), dependencia del slice de
+Cobro (PROC-COM-002), aún sin conectar al libro contable (no genera asiento
+todavía). `comprobante` NO vive aquí — es transversal, está en
+`src/shared/models/`.
 
 ## Casos de uso
 

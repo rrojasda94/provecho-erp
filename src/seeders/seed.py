@@ -54,6 +54,13 @@ PERMISOS = [
     ("production.crear", "Crear orden de producción y registrar consumo"),
     ("production.leer", "Consultar órdenes de producción"),
     ("production.completar", "Registrar control de calidad y completar la orden"),
+    (
+        "accounting.cuenta_administrar",
+        "Administrar plan de cuentas y mapeo de asientos automáticos",
+    ),
+    ("accounting.periodo_administrar", "Abrir y cerrar periodos contables"),
+    ("accounting.asiento_manual", "Registrar y anular asientos manuales"),
+    ("accounting.leer", "Consultar plan de cuentas, asientos y periodos"),
     ("gerencia.gestionar_reglas_aprobacion", "Administrar la matriz de aprobaciones"),
     ("sales.leer_clientes_externos", "Consultar clientes para análisis fuera de sales"),
 ]
@@ -94,6 +101,12 @@ ROLES = {
         "production.crear",
         "production.leer",
         "production.completar",
+    ],
+    "contador": [
+        "accounting.cuenta_administrar",
+        "accounting.periodo_administrar",
+        "accounting.asiento_manual",
+        "accounting.leer",
     ],
 }
 

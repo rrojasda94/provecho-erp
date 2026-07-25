@@ -135,6 +135,7 @@ def emitir_orden_compra(
         {
             "orden_compra_id": str(orden.id),
             "proveedor_id": str(orden.proveedor_id),
+            "empresa_id": str(proveedor.empresa_id),
             "total": str(orden.total),
         },
     )

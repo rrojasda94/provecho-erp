@@ -629,13 +629,42 @@ sin operación real hoy. Ver [docs/produccion/README.md](../produccion/README.md
   al finalizar la jornada con los datos registrados durante esta — el
   jefe de cocina visa, no redacta (RN-DOC-010).
 
-## 8. Contabilidad (módulo accounting — spec inicial)
+## 8. Contabilidad (módulo accounting)
 
-- **cuenta_contable** (plan de cuentas), **asiento**, **asiento_linea**
-  (debe/haber), **periodo_contable**. Los módulos operativos publican eventos
-  que generan asientos. Detalle al implementar.
+Implementado (2026-07-25) — libro contable núcleo, además del ciclo de caja
+(`apertura_caja`, `cierre_caja`, `custodia_efectivo`, `arqueo`, ya existentes):
+
+- **cuenta_contable**: empresa_id, codigo (único por empresa), nombre, tipo
+  (`activo`\|`pasivo`\|`patrimonio`\|`ingreso`\|`gasto`), cuenta_padre_id
+  (árbol simple), activa.
+- **periodo_contable**: empresa_id, anio, mes (único por empresa), estado
+  (`abierto`\|`cerrado`), cerrado_por, fecha_cierre. Ningún asiento se
+  registra fuera de un periodo abierto (RN-CTB-001... RN-CTB-002).
+- **asiento**: empresa_id, periodo_contable_id, fecha, glosa, origen
+  (`manual`\|`automatico`), evento_origen (NULL si manual), referencia_origen
+  (NULL si manual), estado (`registrado`\|`anulado`), creado_por (NULL si
+  automático), asiento_reversa_de_id (autorreferencia — anular crea un
+  asiento inverso, nunca borra/edita, RN-CTB-002).
+- **asiento_linea**: asiento_id, cuenta_contable_id, tipo (`debe`\|`haber`),
+  monto. La suma de líneas `debe` = suma `haber` por asiento (RN-CTB-001).
+- **regla_asiento**: empresa_id, evento (ej. `purchases.oc_emitida`, único
+  por empresa), cuenta_debe_id, cuenta_haber_id, activa. Mapeo configurable
+  evento→contrapartida que alimenta la generación automática de asientos —
+  sin regla vigente, el evento no genera asiento (se omite y loguea, nunca
+  bloquea el proceso operativo de origen). Mismo criterio que
+  `regla_aprobacion` (RN-GER-003): la empresa configura su plan de cuentas,
+  el código no lo hardcodea.
 - **declaracion_itan**: empresa_id, periodo, activos_netos, umbral_legal,
   base_imponible (excedente), monto, credito_ir_aplicado (RN-IMP-006).
+
+Pendiente (deuda técnica, ver ROADMAP): generación automática solo cubre los
+3 eventos que los módulos de origen ya publican en código
+(`purchases.oc_emitida`, `purchases.compra_recibida`, `sales.venta_confirmada`)
+— el resto de eventos documentados en `events.md` (pago, comprobante,
+transferencia, merma, ajuste, caja chica) no se generan aún porque esos
+módulos todavía no los publican. Ejecución real de pago a proveedor
+(detracción SPOT, idempotencia RN-CTB-008), conciliación bancaria y arqueo
+también quedan para un slice de tesorería dedicado.
 
 ## 8b. Recursos humanos (módulo rrhh — spec inicial)
 

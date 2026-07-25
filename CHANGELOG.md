@@ -7,6 +7,26 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Added
 
+- **Módulo `accounting` — slice core (libro contable)** (2026-07-25): migración
+  `5402d99333fa` (`cuenta_contable`, `periodo_contable`, `asiento`,
+  `asiento_linea`, `regla_asiento`) aplicada. Endpoints `/api/v1/accounting`:
+  plan de cuentas (permiso `accounting.cuenta_administrar`), abrir/cerrar
+  periodo contable (`accounting.periodo_administrar`, RN-CTB-010), asiento
+  manual con cuadre obligatorio debe=haber (`accounting.asiento_manual`,
+  RN-CTB-001) y anulación por asiento inverso — nunca borra/edita
+  (RN-CTB-002). `regla_asiento` (nuevo): mapeo configurable evento→cuentas
+  por empresa, mismo criterio que `regla_aprobacion` (RN-CTB-011: sin regla
+  configurada, el asiento automático se omite y loguea, nunca bloquea el
+  proceso de origen). **Listener** (`application/listeners.py`) genera
+  asiento automático para los 3 eventos que sus módulos de origen ya
+  publican en código: `purchases.oc_emitida`, `purchases.compra_recibida`,
+  `sales.venta_confirmada` — se agregó `empresa_id` al payload de
+  `oc_emitida` y `total` al de `venta_confirmada` (campos aditivos,
+  `events.md` actualizado). Rol semilla `contador`. Tests en
+  `tests/test_accounting.py`. Deuda registrada en ROADMAP (resto de eventos
+  aún no publicados por sus módulos, pago a proveedor, conciliación
+  bancaria, arqueo backend, ciclo de caja sin conectar al libro contable,
+  activo fijo/ITAN).
 - **Persona CRUD + lock optimista + matriz de aprobaciones + contrato
   público de lectura** (2026-07-25): migración `af8a246e2c25`.
   - `feat(users)`: CRUD de `persona` sin Delete (`POST/GET/PATCH

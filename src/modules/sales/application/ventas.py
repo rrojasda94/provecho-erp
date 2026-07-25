@@ -117,6 +117,7 @@ def crear_venta(
             "venta_id": str(venta.id),
             "sucursal_id": str(sucursal_id),
             "items": detalle_evento,
+            "total": str(venta.total),
         },
     )
     return venta
