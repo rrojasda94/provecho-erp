@@ -7,6 +7,22 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Added
 
+- **Módulo `purchases` — slice core** (2026-07-25): migración `4ff85f833b29`
+  (proveedor, orden_compra, orden_compra_item, recepcion_compra,
+  recepcion_item) aplicada a la BD dev (Supabase). Endpoints
+  `/api/v1/purchases`: CRUD de proveedores (natural liga a `persona`,
+  mismo party model que `cliente`, RN-GEN-007; jurídico con razón
+  social/RUC propios), ciclo de OC tipo `insumo` (crear borrador →
+  emitir → recibir total/parcial → anular), todo con idempotencia.
+  Emitir exige `purchases.aprobar` si el total supera el umbral
+  configurable `purchases_umbral_aprobacion_oc` (semilla: 2000). Eventos
+  `purchases.oc_emitida` / `compra_recibida` / `oc_anulada`. **Listener
+  en inventory**: `compra_recibida` suma stock en el almacén destino y
+  recalcula `articulo.costo_promedio` (promedio ponderado). Rol semilla
+  `comprador`. Tests en `tests/test_purchases.py`. Deuda registrada en
+  ROADMAP (cotización, OC tipo `activo` + `requerimiento_activo`,
+  compra_directa + caja chica, evaluación de proveedor automática,
+  comprobante recibido, devolución a proveedor).
 - **Módulo `sales` — KDS** (2026-07-25): migración `7672566bf189` —
   `kds_pantalla` (pantallas por sucursal, tipo preparación/despacho, filtro
   por categorías de producto comercial), `venta_item.estado_preparacion`

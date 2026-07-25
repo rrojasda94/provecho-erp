@@ -46,6 +46,10 @@ PERMISOS = [
     ("inventory.registrar_movimiento", "Registrar movimiento de stock"),
     ("inventory.solicitar_ajuste", "Solicitar ajuste de inventario"),
     ("inventory.aprobar_ajuste", "Aprobar ajuste de inventario"),
+    ("purchases.crear", "CRUD de proveedores, crear y emitir OC bajo el umbral"),
+    ("purchases.leer", "Consultar proveedores y órdenes de compra"),
+    ("purchases.recepcionar", "Registrar recepción de una OC"),
+    ("purchases.anular", "Anular una OC sin recepción registrada"),
     ("purchases.aprobar", "Aprobar orden de compra"),
 ]
 
@@ -53,6 +57,7 @@ ROLES = {
     "admin": ["*"],
     "supervisor": [
         "purchases.aprobar",
+        "purchases.leer",
         "sales.leer",
         "sales.anular",
         "sales.gestionar_catalogo",
@@ -73,6 +78,12 @@ ROLES = {
         "inventory.solicitar_ajuste",
     ],
     "agente_ia": ["sales.crear_pedido"],
+    "comprador": [
+        "purchases.crear",
+        "purchases.leer",
+        "purchases.recepcionar",
+        "purchases.anular",
+    ],
 }
 
 

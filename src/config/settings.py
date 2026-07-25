@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -15,6 +17,9 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_minutes: int = 15
     refresh_token_days: int = 7
+    # Monto sobre el cual emitir una OC exige permiso purchases.aprobar
+    # (RN-CMP — umbral configurable, valor semilla a ajustar por el negocio).
+    purchases_umbral_aprobacion_oc: Decimal = Decimal("2000")
 
 
 settings = Settings()

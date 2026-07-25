@@ -18,7 +18,7 @@ Registro de lo construido y lo pendiente. Actualizar en cada cambio relevante.
 | Migraciones Alembic iniciales | 🔶 en curso 2026-07-25 | 6 migraciones aplicadas a la BD dev (head `be914c92a94b`): transversal+org, slice Venta, cobro/caja, cliente opcional, slice auth/RBAC, slice inventory core (stock/movimiento/ajuste). |
 | Seeders (admin / PIN 123456, org base) | ✅ 2026-07-25 | `src/seeders/seed.py` (idempotente, prohibido en prod): Grupo Majambo + empresa + marca, matriz de roles/permisos semilla, `admin`/PIN `123456`. Correr: `python -m src.seeders.seed`. |
 | Módulo `inventory` | 🔶 slice 1 ✅ 2026-07-25 | Catálogo (CRUD artículos/categorías/SKUs), stock por almacén (vía `movimiento_inventario` inmutable) y ajuste con segregación (`solicitar_ajuste` ≠ `aprobar_ajuste`, aprobador ≠ solicitante). Migración `be914c92a94b`. Diferido: lote/FEFO, reservas, conteo, transferencias, devolución, guía remisión, listeners de eventos. |
-| Módulo `purchases` | ⬜ | Proveedores, OC, recepción |
+| Módulo `purchases` | 🔶 slice core ✅ 2026-07-25 | CRUD de proveedores (natural liga a `persona`, jurídico con RUC propio) y ciclo de OC tipo `insumo` (crear → emitir → recibir → anular), con idempotencia y umbral de aprobación configurable. `purchases.compra_recibida` → inventory suma stock y recalcula `costo_promedio`. Migración `4ff85f833b29` aplicada. Diferido: ver Deuda técnica. |
 | Módulo `sales` (PDV) | 🔶 slices 1-2 ✅ 2026-07-25 | Venta con correlativo+idempotencia → `sales.venta_confirmada` → inventory descuenta por receta (+merma+empaque); cobro con pagos parciales → `pagada`; anulación pre-pago repone stock; CRUD productos/medios de pago. **KDS** (slice 2): pantallas configurables por sucursal y categorías (`kds_pantalla`, migración `7672566bf189`), avance por ítem en `venta_item.estado_preparacion` (fuente única → todas las pantallas ven el avance real), tipos preparación/despacho, comanda imprimible con contador de reimpresiones, evento `sales.pedido_listo`, rol `cocinero`. Kiosk/Central de Pedidos = clientes del mismo contrato, no módulos. Diferido: ver Deuda técnica. |
 | Módulo `accounting` | ⬜ | |
 | Producción (fabricación) | ⬜ | Módulo futuro `production` |
@@ -110,7 +110,10 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
 ### Módulo inventory (slices siguientes)
 - ✅ 2026-07-25 **Listener `sales.venta_confirmada`** → consumo por receta
   (+merma % + empaque por modalidad) y `sales.venta_anulada` → reposición.
-  Pendiente el de `purchases.compra_recibida` (slice Compras).
+- ✅ 2026-07-25 **Listener `purchases.compra_recibida`** → suma stock en el
+  almacén destino y recalcula `articulo.costo_promedio` (promedio
+  ponderado solo contra el stock del almacén que recibe — deuda si
+  `compra_directa` multi-almacén se vuelve frecuente, ver módulo purchases).
 - ⬜ **Consumo omitido por configuración**: si falta almacén/SKU o el stock
   teórico no alcanza, el listener loguea y omite (la venta nunca se
   bloquea) — falta superficie de alerta/reporte de esas omisiones.
@@ -161,6 +164,31 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   relación con el proceso "cumplimiento de pedido" (¿1 o 2 procesos?,
   pendiente de decisión arriba) puede agregar estados de despacho/entrega
   a domicilio cuando se defina.
+
+### Módulo purchases (slices siguientes)
+- ✅ 2026-07-25 **Migración Alembic** `4ff85f833b29` (proveedor,
+  orden_compra, orden_compra_item, recepcion_compra, recepcion_item)
+  aplicada a la BD dev (Supabase).
+- ⬜ **`cotizacion`**: hoy toda OC tipo `insumo` emite sin cotización
+  comparativa (el camino "simplificado" de proveedor preferente es el
+  único implementado). Falta el flujo normal (proveedor regular) con
+  cotización de respaldo.
+- ⬜ **OC tipo `activo` + `requerimiento_activo`**: doble aprobación
+  (área + gerencia) y mínimo 2 cotizaciones vinculadas antes de emitir.
+  Hoy el tipo está rechazado explícitamente en la capa de aplicación.
+- ⬜ **`compra_directa` + caja chica** (`caja_chica_compras`,
+  `caja_chica_movimiento`, `rendicion_caja_chica`): compra sin OC a
+  proveedor informal, con comprobante obligatorio y rendición semanal
+  conciliada por `accounting`.
+- ⬜ **`evaluacion_proveedor`** automática (cumplimiento de plazo,
+  conformidad, variación de precio) recalculada en cada recepción.
+- ⬜ **Comprobante recibido**: `recepcion_compra.comprobante_id` existe en
+  el esquema pero nada lo completa aún; falta el evento
+  `purchases.comprobante_conforme` → `accounting` ejecuta el pago según
+  la condición del proveedor (accounting sigue sin capas propias).
+- ⬜ **Listener `inventory.devolucion_a_proveedor`**: gestionar reclamo/
+  nota de crédito con el proveedor (bloqueado por `devolucion` en
+  inventory, ver arriba).
 
 ## Orden sugerido de desarrollo
 

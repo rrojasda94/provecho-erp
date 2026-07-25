@@ -19,6 +19,44 @@ cualitativo), `requerimiento_activo` (ficha de especificación + validación
 de área/gerencia, ligada a la OC de tipo `activo`). Detalle en
 `docs/architecture/data-model.md` §5.
 
+## Estado (slice core implementado 2026-07-25)
+
+Operativo en `/api/v1/purchases`: CRUD de proveedores (natural liga a
+`persona` — mismo party model que `cliente`, RN-GEN-007 — jurídico trae
+razón social/RUC propios) y ciclo de OC tipo `insumo`: crear (borrador,
+idempotente) → emitir (permiso `purchases.aprobar` exigido si el total
+supera el umbral configurable `purchases_umbral_aprobacion_oc`) → recibir
+(total o parcial, nunca más de lo ordenado) → anular (solo antes de
+cualquier recepción). Capas `domain/rules.py`,
+`infrastructure/repositories.py`, `application/` (`proveedores.py`,
+`ordenes.py`), `api/`. Migración `4ff85f833b29` aplicada.
+
+| Método | Ruta | Permiso |
+|--------|------|---------|
+| POST/GET/PATCH | `/proveedores[/{id}]` | `purchases.crear` / `leer` |
+| POST | `/ordenes-compra` | `purchases.crear` |
+| GET | `/ordenes-compra/{id}` | `purchases.leer` |
+| POST | `/ordenes-compra/{id}/emitir` | `purchases.crear` (+ `aprobar` sobre umbral) |
+| POST | `/ordenes-compra/{id}/recepciones` | `purchases.recepcionar` |
+| POST | `/ordenes-compra/{id}/anular` | `purchases.anular` |
+
+Eventos: publica `purchases.oc_emitida` y `purchases.compra_recibida`
+(inventory suma stock en el almacén destino y recalcula
+`articulo.costo_promedio` — promedio ponderado solo contra el stock del
+almacén que recibe, ver `ponytail:` en
+`inventory/application/listeners.py`) y `purchases.oc_anulada`. Rol
+semilla `comprador` (crear/leer/recepcionar/anular); `supervisor` y
+`admin` tienen `purchases.aprobar`.
+
+Deuda del slice (ver ROADMAP): `cotizacion` (camino no-preferente sin
+modelar — hoy toda OC insumo emite sin cotización comparativa),
+OC tipo `activo` + `requerimiento_activo` con doble aprobación,
+`compra_directa` + `caja_chica_compras`/`caja_chica_movimiento` +
+`rendicion_caja_chica` (compra a proveedor informal), `evaluacion_proveedor`
+automática por recepción, `comprobante` recibido y evento
+`purchases.comprobante_conforme` (accounting aún no lo consume), listener
+de `inventory.devolucion_a_proveedor`.
+
 ## Casos de uso
 
 - CRUD de proveedores, con alta condicionada a verificación de RUC

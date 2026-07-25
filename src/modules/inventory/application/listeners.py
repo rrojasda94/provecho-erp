@@ -18,7 +18,8 @@ from src.core.database import SessionLocal
 from src.core.events import event_bus
 from src.modules.inventory.application import stock as stock_uc
 from src.modules.inventory.application.errors import StockInsuficiente
-from src.modules.inventory.infrastructure.models import RecetaItem, Sku
+from src.modules.inventory.infrastructure.models import Articulo, RecetaItem, Sku
+from src.modules.inventory.infrastructure.repositories import StockRepo
 
 # Almacén/Sucursal son organización transversal (data-model §1); viven en
 # users/infrastructure por historia. Import de modelo (no dominio) permitido.
@@ -133,6 +134,60 @@ def on_venta_anulada(payload: dict) -> None:
         log.exception("fallo reponiendo stock de venta %s", payload.get("venta_id"))
 
 
+def _actualizar_costo_promedio(
+    session: Session,
+    almacen_id: uuid.UUID,
+    sku_id: uuid.UUID,
+    cantidad: Decimal,
+    costo_unitario: Decimal,
+) -> None:
+    # ponytail: promedio ponderado solo contra el stock del SKU en el
+    # almacén que recibe (no consolida todos los almacenes del artículo) —
+    # razonable mientras casi toda compra entra por almacén central;
+    # revisar si compra_directa multi-almacén se vuelve frecuente.
+    sku = session.get(Sku, sku_id)
+    articulo = session.get(Articulo, sku.articulo_id)
+    stock_previo = StockRepo(session).get(almacen_id, sku_id)
+    cantidad_previa = stock_previo.cantidad if stock_previo else Decimal(0)
+    total_nuevo = cantidad_previa + cantidad
+    if total_nuevo > 0:
+        articulo.costo_promedio = (
+            (cantidad_previa * articulo.costo_promedio) + (cantidad * costo_unitario)
+        ) / total_nuevo
+
+
+def on_compra_recibida(payload: dict) -> None:
+    try:
+        with session_factory() as session:
+            almacen_id = uuid.UUID(payload["almacen_destino_id"])
+            for it in payload["items"]:
+                sku_id = _sku_de_articulo(session, uuid.UUID(it["articulo_id"]))
+                if sku_id is None:
+                    log.warning(
+                        "OC %s: artículo %s sin SKU activo, ítem omitido",
+                        payload["orden_compra_id"], it["articulo_id"],
+                    )
+                    continue
+                cantidad = Decimal(it["cantidad"])
+                costo_unitario = Decimal(it["costo_unitario"])
+                _actualizar_costo_promedio(
+                    session, almacen_id, sku_id, cantidad, costo_unitario
+                )
+                stock_uc.registrar_movimiento(
+                    session,
+                    almacen_id=almacen_id,
+                    sku_id=sku_id,
+                    cantidad=cantidad,
+                    tipo="recepcion_compra",
+                    referencia=payload["orden_compra_id"],
+                )
+            session.commit()
+    except Exception:
+        log.exception(
+            "fallo ingresando stock de la OC %s", payload.get("orden_compra_id")
+        )
+
+
 _registrado = False
 
 
@@ -144,3 +199,4 @@ def register() -> None:
     _registrado = True
     event_bus.subscribe("sales.venta_confirmada", on_venta_confirmada)
     event_bus.subscribe("sales.venta_anulada", on_venta_anulada)
+    event_bus.subscribe("purchases.compra_recibida", on_compra_recibida)
