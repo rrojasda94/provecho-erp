@@ -70,6 +70,10 @@ def _consumos_de_items(session: Session, items: list[dict]) -> list[tuple[uuid.U
 
 
 def _mover(payload: dict, tipo: str, signo: int) -> None:
+    # Un solo exit con commit SIEMPRE: un return temprano cerraría la sesión
+    # con rollback, y con conexión compartida (SQLite en tests) ese rollback
+    # arrastraría la transacción del request que publicó el evento.
+    movio = False
     with session_factory() as session:
         almacen_id = _almacen_de_sucursal(
             session, uuid.UUID(payload["sucursal_id"])
@@ -79,32 +83,34 @@ def _mover(payload: dict, tipo: str, signo: int) -> None:
                 "venta %s: sucursal sin almacén, consumo omitido",
                 payload["venta_id"],
             )
-            return
-        for articulo_id, cantidad in _consumos_de_items(session, payload["items"]):
-            sku_id = _sku_de_articulo(session, articulo_id)
-            if sku_id is None:
-                log.warning(
-                    "venta %s: artículo %s sin SKU activo, ítem omitido",
-                    payload["venta_id"], articulo_id,
-                )
-                continue
-            try:
-                stock_uc.registrar_movimiento(
-                    session,
-                    almacen_id=almacen_id,
-                    sku_id=sku_id,
-                    cantidad=cantidad * signo,
-                    tipo=tipo,
-                    referencia=payload["venta_id"],
-                )
-            except StockInsuficiente:
-                # ponytail: la venta ya ocurrió — el stock teórico no la
-                # bloquea; queda la discrepancia para conteo/ajuste.
-                log.warning(
-                    "venta %s: stock insuficiente de sku %s, consumo omitido",
-                    payload["venta_id"], sku_id,
-                )
+        else:
+            for articulo_id, cantidad in _consumos_de_items(session, payload["items"]):
+                sku_id = _sku_de_articulo(session, articulo_id)
+                if sku_id is None:
+                    log.warning(
+                        "venta %s: artículo %s sin SKU activo, ítem omitido",
+                        payload["venta_id"], articulo_id,
+                    )
+                    continue
+                try:
+                    stock_uc.registrar_movimiento(
+                        session,
+                        almacen_id=almacen_id,
+                        sku_id=sku_id,
+                        cantidad=cantidad * signo,
+                        tipo=tipo,
+                        referencia=payload["venta_id"],
+                    )
+                    movio = True
+                except StockInsuficiente:
+                    # ponytail: la venta ya ocurrió — el stock teórico no la
+                    # bloquea; queda la discrepancia para conteo/ajuste.
+                    log.warning(
+                        "venta %s: stock insuficiente de sku %s, consumo omitido",
+                        payload["venta_id"], sku_id,
+                    )
         session.commit()
+    if movio:
         event_bus.publish(
             "inventory.stock_consumido"
             if signo < 0

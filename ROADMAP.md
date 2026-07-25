@@ -19,7 +19,7 @@ Registro de lo construido y lo pendiente. Actualizar en cada cambio relevante.
 | Seeders (admin / PIN 123456, org base) | ✅ 2026-07-25 | `src/seeders/seed.py` (idempotente, prohibido en prod): Grupo Majambo + empresa + marca, matriz de roles/permisos semilla, `admin`/PIN `123456`. Correr: `python -m src.seeders.seed`. |
 | Módulo `inventory` | 🔶 slice 1 ✅ 2026-07-25 | Catálogo (CRUD artículos/categorías/SKUs), stock por almacén (vía `movimiento_inventario` inmutable) y ajuste con segregación (`solicitar_ajuste` ≠ `aprobar_ajuste`, aprobador ≠ solicitante). Migración `be914c92a94b`. Diferido: lote/FEFO, reservas, conteo, transferencias, devolución, guía remisión, listeners de eventos. |
 | Módulo `purchases` | ⬜ | Proveedores, OC, recepción |
-| Módulo `sales` (PDV) | 🔶 slice 1 ✅ 2026-07-25 | Venta con correlativo+idempotencia → `sales.venta_confirmada` → inventory descuenta por receta (+merma+empaque); cobro con pagos parciales → `pagada`; anulación pre-pago repone stock; CRUD productos/medios de pago. Kiosk/Central de Pedidos = clientes del mismo contrato, no módulos. Sin migración (esquema ya existía). Diferido: ver Deuda técnica. |
+| Módulo `sales` (PDV) | 🔶 slices 1-2 ✅ 2026-07-25 | Venta con correlativo+idempotencia → `sales.venta_confirmada` → inventory descuenta por receta (+merma+empaque); cobro con pagos parciales → `pagada`; anulación pre-pago repone stock; CRUD productos/medios de pago. **KDS** (slice 2): pantallas configurables por sucursal y categorías (`kds_pantalla`, migración `7672566bf189`), avance por ítem en `venta_item.estado_preparacion` (fuente única → todas las pantallas ven el avance real), tipos preparación/despacho, comanda imprimible con contador de reimpresiones, evento `sales.pedido_listo`, rol `cocinero`. Kiosk/Central de Pedidos = clientes del mismo contrato, no módulos. Diferido: ver Deuda técnica. |
 | Módulo `accounting` | ⬜ | |
 | Producción (fabricación) | ⬜ | Módulo futuro `production` |
 | Solicitudes / picking / transporte | ⬜ | Módulos futuros `requests`, `logistics` |
@@ -147,6 +147,20 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   de receta; una receta cuyo ítem es `subreceta` no explota recursivo aún.
 - ⬜ Modificadores/variantes/combos, `central_pedidos` (pantalla y
   agregación), puntos/loyalty, kiosk UI.
+- ⬜ **KDS tiempo real**: hoy el frontend refresca por polling; push por
+  WebSocket/Redis pub-sub (Redis reservado para pantallas/colas/sesiones).
+- ⬜ **KDS aviso de anulación**: si anulan un pedido ya en preparación, la
+  tarjeta solo desaparece al refrescar — falta aviso explícito "ANULADO"
+  (llega natural con el push de tiempo real).
+- ⬜ **KDS impresión física**: la comanda sale como texto 32 cols; falta
+  puente a impresora térmica (ESC/POS por red o agente local) y comanda
+  automática al confirmar venta (hoy es bajo demanda).
+- ⬜ **KDS tiempos**: alertas por pedido demorado (umbral por pantalla) y
+  métricas de tiempo de preparación (base: `venta_item.updated_at`).
+- ⬜ **Cumplimiento de pedido**: `estado_preparacion` cubre cocina; la
+  relación con el proceso "cumplimiento de pedido" (¿1 o 2 procesos?,
+  pendiente de decisión arriba) puede agregar estados de despacho/entrega
+  a domicilio cuando se defina.
 
 ## Orden sugerido de desarrollo
 

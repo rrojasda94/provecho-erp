@@ -53,6 +53,7 @@ def crear_venta(
             idempotency_key=body.idempotency_key,
             items=[it.model_dump() for it in body.items],
             cliente_id=body.cliente_id,
+            referencia_atencion=body.referencia_atencion,
         )
     except (NoEncontrado, ReglaNegocio) as e:
         raise _http(e) from e

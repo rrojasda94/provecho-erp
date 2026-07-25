@@ -22,6 +22,8 @@ class VentaCreate(BaseModel):
     idempotency_key: str = Field(min_length=8, max_length=100)
     items: list[VentaItemIn] = Field(min_length=1)
     cliente_id: uuid.UUID | None = None
+    # "Mesa 5", "Carlos", "Rappi #1042" — visible en KDS y comanda.
+    referencia_atencion: str | None = Field(default=None, max_length=50)
 
 
 class VentaOut(BaseModel):
@@ -34,6 +36,7 @@ class VentaOut(BaseModel):
     modalidad: str
     estado: str
     total: Decimal
+    referencia_atencion: str | None
 
 
 class PagoCreate(BaseModel):

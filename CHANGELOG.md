@@ -7,6 +7,25 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Added
 
+- **Módulo `sales` — KDS** (2026-07-25): migración `7672566bf189` —
+  `kds_pantalla` (pantallas por sucursal, tipo preparación/despacho, filtro
+  por categorías de producto comercial), `venta_item.estado_preparacion`
+  (pendiente → en_preparacion → listo → entregado, sin retroceso; fuente
+  única del avance: todas las pantallas muestran el progreso real del
+  pedido), `producto_comercial.categoria_id` (ruteo a estaciones),
+  `venta.comanda_impresa_veces`, `venta.referencia_atencion` (migración
+  `617845c27651` — "Mesa 5"/"Carlos"/"Rappi #1042", texto libre visible en
+  tarjetas KDS y comanda sin exigir cliente registrado). Endpoints
+  `/api/v1/kds`: CRUD de pantallas,
+  cola por pantalla, bump de ítems, avance de pedido y comanda imprimible
+  (texto 32 cols para térmica 58 mm, reimpresión marcada). Evento
+  `sales.pedido_listo` al completarse todos los ítems. Permisos
+  `kds.configurar`/`kds.operar`; rol `cocinero` en el seeder. Fix en el
+  listener de inventory: cierre de sesión sin rollback en early-return
+  (rompía transacción compartida en tests SQLite). Tests en
+  `tests/test_kds.py`. Deuda: tiempo real (WebSocket/Redis), impresión
+  física ESC/POS, alertas de demora, estados de entrega según proceso de
+  cumplimiento.
 - **Módulo `sales` — slice PDV** (2026-07-25): sin migración (esquema del
   slice Venta/Cobro ya existía). Endpoints `/api/v1/sales`: crear venta
   (correlativo `numero_orden` por sucursal+día, idempotencia por

@@ -38,6 +38,7 @@ def crear_venta(
     idempotency_key: str,
     items: list[dict],  # [{producto_comercial_id, cantidad, precio_unitario, descuento}]
     cliente_id: uuid.UUID | None = None,
+    referencia_atencion: str | None = None,
 ) -> Venta:
     if canal not in rules.CANALES:
         raise ReglaNegocio(f"canal inválido: {canal}")
@@ -99,6 +100,7 @@ def crear_venta(
             [(f.cantidad, f.precio_unitario, f.descuento) for f in filas]
         ),
         idempotency_key=idempotency_key,
+        referencia_atencion=referencia_atencion,
     )
     # ponytail: correlativo max+1; el UNIQUE (sucursal, fecha, numero) corta
     # la carrera — si dos cajas chocan, el cliente reintenta con la misma

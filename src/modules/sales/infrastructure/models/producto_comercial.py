@@ -22,6 +22,11 @@ class ProductoComercial(Base, UuidPkMixin, TimestampMixin):
     id_interno: Mapped[str] = mapped_column(String(4), unique=True)
     marca_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("marca.id"))
     nombre: Mapped[str] = mapped_column(String(150))
+    # Agrupador para ruteo KDS (pizzas → horno, bebidas → barra). Reusa la
+    # tabla `categoria` (agrupador genérico por empresa).
+    categoria_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("categoria.id"), nullable=True
+    )
     receta_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("receta.id"))
     # Al descontinuarse pasa a False/archivado, nunca se elimina.
     activo: Mapped[bool] = mapped_column(Boolean, default=True)

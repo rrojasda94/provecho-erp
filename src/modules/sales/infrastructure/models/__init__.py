@@ -10,6 +10,7 @@ carta_disputa_pago.
 """
 
 from src.modules.sales.infrastructure.models.cliente import Cliente
+from src.modules.sales.infrastructure.models.kds_pantalla import KdsPantalla
 from src.modules.sales.infrastructure.models.medio_pago import MedioPago
 from src.modules.sales.infrastructure.models.pago import Pago
 from src.modules.sales.infrastructure.models.producto_comercial import (
@@ -21,6 +22,7 @@ from src.modules.sales.infrastructure.models.venta_item import VentaItem
 
 __all__ = [
     "Cliente",
+    "KdsPantalla",
     "MedioPago",
     "Pago",
     "ProductoComercial",

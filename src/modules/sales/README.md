@@ -66,6 +66,43 @@ Deuda del slice (ver ROADMAP): precio server-side vía `lista_precio`
 crédito post-pago, webhook de pasarela (pago nace `confirmado`),
 apertura/cierre de caja enlazados a la venta.
 
+## KDS (implementado 2026-07-25)
+
+Pantallas de cocina configurables por sucursal en `/api/v1/kds`. El
+avance vive en `venta_item.estado_preparacion`
+(`pendiente → en_preparacion → listo → entregado`, sin retroceso) —
+fuente única: toda pantalla lee el mismo estado, por eso el avance
+mostrado siempre es el real. El frontend refresca por polling; push en
+tiempo real (Redis/WebSocket) es deuda declarada.
+
+- **`kds_pantalla`**: sucursal + tipo (`preparacion` | `despacho`) +
+  `categoria_ids` (filtro por categorías de producto comercial; vacío =
+  todas). `producto_comercial.categoria_id` (nuevo, reusa `categoria`)
+  rutea cada ítem a su estación (pizzas → horno, bebidas → barra).
+- **Preparación**: ve ítems pendientes/en curso de sus categorías; bump
+  por ítem (`POST /kds/items/{id}/avanzar`).
+- **Despacho**: ve pedidos con ítems listos + `estado_pedido` agregado
+  (el ítem más atrasado manda); al estar todo listo se publica
+  `sales.pedido_listo`; marca entrega y el pedido sale de las colas.
+- **Comanda**: `POST /kds/ventas/{id}/comanda` → texto plano 32 cols
+  (térmica 58 mm) + contador `comanda_impresa_veces` (reimpresión
+  marcada y auditable).
+- **`venta.referencia_atencion`** ("Mesa 5", "Carlos", "Rappi #1042"):
+  texto libre que el PDV envía al crear la venta — visible en toda
+  tarjeta KDS y en la comanda, para aclarar de quién es el pedido sin
+  exigir cliente registrado (RN-PER-005 sigue: cliente anónimo válido).
+
+| Método | Ruta | Permiso |
+|--------|------|---------|
+| POST/PATCH | `/kds/pantallas[/{id}]` | `kds.configurar` |
+| GET | `/kds/pantallas` \| `/{id}/cola` | `kds.operar` |
+| POST | `/kds/items/{id}/avanzar` | `kds.operar` |
+| GET | `/kds/ventas/{id}/avance` | `kds.operar` |
+| POST | `/kds/ventas/{id}/comanda` | `kds.operar` |
+
+Roles seed: `cocinero` (kds.operar), cajero también opera; supervisor
+configura.
+
 ## Casos de uso
 
 - CRUD de productos comerciales y recetas (separados de artículos inventariables).

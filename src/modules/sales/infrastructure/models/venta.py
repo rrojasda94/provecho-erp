@@ -62,3 +62,11 @@ class Venta(Base, UuidPkMixin, TimestampMixin):
     repartidor_externo_plataforma: Mapped[str | None] = mapped_column(
         String(30), nullable=True
     )
+    # Contador de impresiones de comanda (>1 = reimpresión, auditable).
+    comanda_impresa_veces: Mapped[int] = mapped_column(Integer, default=0)
+    # Para quién es el pedido, como lo canta el mesero: "Mesa 5", "Carlos",
+    # "Rappi #1042". Texto libre — no exige cliente registrado. Visible en
+    # KDS y comanda para aclarar problemas en cocina.
+    referencia_atencion: Mapped[str | None] = mapped_column(
+        String(50), nullable=True
+    )
