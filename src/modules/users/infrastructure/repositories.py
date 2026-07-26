@@ -4,6 +4,8 @@ La sesión actúa como Unit of Work: la capa de aplicación decide cuándo hacer
 commit/rollback. Los repos solo encapsulan las queries.
 """
 
+from __future__ import annotations
+
 import uuid
 
 from sqlalchemy import select
