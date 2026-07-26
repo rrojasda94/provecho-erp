@@ -7,6 +7,13 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Added
 
+- **Spec de UX — dialog de personalización de producto en PDV/Kiosk**
+  (2026-07-26, `docs/product/ui-ux.md`): seleccionar un producto comercial
+  abre un dialog con sus modificadores admitidos (tamaño/combinación/
+  extras/restas) para producir una `variante_producto`; cruza con
+  RN-PRD-004/005 ya existentes. Solo especificado, implementación
+  pendiente (ver ROADMAP — deuda técnica módulo sales).
+
 - **Spec de theming multi-marca, accesibilidad y plataformas** (2026-07-25,
   `docs/product/ui-ux.md`, `docs/prompts/frontend.md`): PDV/Kiosk = mayor
   variación de skin (branding por marca de Grupo Majambo), resto de módulos

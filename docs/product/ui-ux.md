@@ -72,6 +72,27 @@
   touch (tablet): sin interacciones hover-only, touch targets de tamaño
   adecuado.
 
+## Flujos clave de UI
+
+### PDV — selección de producto → dialog de personalización
+
+- Al seleccionar un producto comercial en el PDV (y en Kiosk), se abre un
+  **dialog de personalización** con los modificadores admitidos por ese
+  producto (tamaño, combinación, extras, restas — entidad `modificador`,
+  `docs/architecture/data-model.md` §Operación comercial).
+- El dialog es la única forma de configurar el producto antes de agregarlo
+  al carrito; el resultado es una `variante_producto` (modificadores
+  aplicados + receta/precio resultante).
+- El orden de aplicación de los modificadores es siempre
+  tamaño → combinación → extras → restas (RN-PRD-004), sin importar el
+  orden en que el cajero/cliente los toca en el dialog.
+- RN-PRD-005: todo modificador admitido por el producto debe reflejarse en
+  el PDV de la sucursal — el dialog no puede ofrecer configuraciones que el
+  producto no admite, ni ocultar las que sí admite.
+- Pendiente definir con el negocio: diseño visual del dialog, si combos se
+  configuran en el mismo dialog o en uno propio (`combo_item`), y el
+  comportamiento en Kiosk (autoservicio, sin cajero) vs. PDV asistido.
+
 ## Reglas de implementación
 
 - Colores y fuentes SOLO vía tokens CSS (`frontend/app/globals.css`).

@@ -156,7 +156,13 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
 - ⬜ **Consumo de subrecetas anidadas**: el listener expande un solo nivel
   de receta; una receta cuyo ítem es `subreceta` no explota recursivo aún.
 - ⬜ Modificadores/variantes/combos, `central_pedidos` (pantalla y
-  agregación), puntos/loyalty, kiosk UI.
+  agregación), puntos/loyalty, kiosk UI. **UX definida** (2026-07-26,
+  `docs/product/ui-ux.md`): seleccionar un producto comercial en PDV/Kiosk
+  abre un dialog de personalización con sus modificadores admitidos
+  (tamaño/combinación/extras/restas), que produce una `variante_producto`;
+  orden fijo tamaño→combinación→extras→restas (RN-PRD-004). Falta definir
+  si combo se configura en el mismo dialog o en uno propio, y el
+  comportamiento en Kiosk (autoservicio) vs. PDV asistido.
 - ⬜ **KDS tiempo real**: hoy el frontend refresca por polling; push por
   WebSocket/Redis pub-sub (Redis reservado para pantallas/colas/sesiones).
 - ⬜ **KDS aviso de anulación**: si anulan un pedido ya en preparación, la
