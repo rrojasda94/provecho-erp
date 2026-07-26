@@ -168,13 +168,17 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
 - ⬜ **Buscador contextual de producto** (PDV/Kiosk/web): por nombre,
   por insumo/ingrediente (cruce `receta_item`) y por exclusión ("que no
   tenga X"); lista de resultados ordenada por relevancia cuando no hay
-  match único. UX especificada en `docs/product/ui-ux.md`, sin
-  implementar — full-text search (`pg_trgm`/`tsvector`) es la vía técnica
-  sugerida, sin necesitar IA.
+  match único. Ranking por **historial de uso/patrones detectados**
+  (decidido 2026-07-26, no solo similitud de texto) — objetivo explícito:
+  reducir fricción de búsqueda en versiones futuras a medida que aprende.
+  UX especificada en `docs/product/ui-ux.md`, sin implementar — full-text
+  search (`pg_trgm`/`tsvector`) como base, historial como señal encima.
 - ⬜ **Dialog de venta sugerida (upsell) al ir al carrito**: productos
   complementarios de adición rápida, descartable sin bloquear el flujo.
-  UX especificada en `docs/product/ui-ux.md`; falta definir el criterio de
-  qué sugerir (fijo por producto vs. reglas de venta cruzada).
+  Criterio de sugerencia decidido (2026-07-26): complementos del producto
+  elegido (ej. bebidas) + producto en promoción vigente. UX especificada
+  en `docs/product/ui-ux.md`; falta definir cómo se configura la relación
+  producto→complemento (fija vs. regla de venta cruzada).
 - ⬜ **KDS tiempo real**: hoy el frontend refresca por polling; push por
   WebSocket/Redis pub-sub (Redis reservado para pantallas/colas/sesiones).
 - ⬜ **KDS aviso de anulación**: si anulan un pedido ya en preparación, la

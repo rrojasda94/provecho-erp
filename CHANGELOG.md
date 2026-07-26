@@ -7,6 +7,14 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Added
 
+- **Decisiones de negocio — ranking del buscador y criterio de upsell**
+  (2026-07-26, `docs/product/ui-ux.md`): el ranking del buscador se basa
+  en historial de uso/patrones detectados (no solo similitud de texto),
+  con el objetivo explícito de reducir fricción en versiones futuras a
+  medida que el sistema aprende; el dialog de upsell del carrito sugiere
+  complementos del producto elegido (ej. bebidas) y/o producto en
+  promoción vigente. Solo especificado, implementación pendiente.
+
 - **Spec de UX — buscador contextual y upsell en carrito** (2026-07-26,
   `docs/product/ui-ux.md`): buscador de producto (PDV/Kiosk/web) por
   nombre, por insumo/ingrediente (cruce `receta_item`) y por exclusión

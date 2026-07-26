@@ -133,13 +133,19 @@
   resultado forzado ni una lista sin orden.
 - Aplica también a buscadores de otros módulos (reportes, ítems de
   inventario, etc.), no solo al de producto en el punto de venta.
-- Nota técnica (no bloquea la spec): full-text search con score de
-  relevancia (ej. `pg_trgm`/`tsvector` de Postgres) cubre esto sin
-  necesitar IA; el ranking puede afinarse después con historial de venta
-  como señal adicional.
+- **Ranking por historial de uso** (decidido con el negocio, 2026-07-26):
+  el orden por relevancia se basa en patrones de uso reales (qué
+  encuentra/selecciona cada usuario, qué se busca/vende más), no solo en
+  similitud de texto. El sistema debe poder detectar esos patrones para
+  mejorar resultados con el tiempo — el objetivo explícito es reducir la
+  fricción de búsqueda en versiones futuras a medida que aprende del uso.
+- Nota técnica (no bloquea la spec): arrancar con full-text search con
+  score de relevancia (ej. `pg_trgm`/`tsvector` de Postgres); el historial
+  de uso se suma como señal de ranking encima de eso — no reemplaza la
+  búsqueda estructurada por nombre/insumo/exclusión, la reordena.
 - Pendiente definir con el negocio: qué otros campos son buscables por
-  módulo, y si el ranking por historial de venta aplica desde el día 1 o
-  se agrega después.
+  módulo, y el diseño concreto de la señal de historial (por usuario, por
+  sucursal, global — y con qué ventana de tiempo).
 
 ### Carrito — dialog de venta sugerida (upsell) antes de continuar
 
@@ -150,11 +156,16 @@
 - Si el usuario no quiere agregar nada, puede **descartar el dialog** y
   seguir directo al carrito o a cobrar — nunca es un paso obligatorio.
 - Aplica en PDV, Kiosk y web.
-- Pendiente definir con el negocio: criterio para elegir qué productos
-  sugerir (¿combo/complemento fijo por producto, o basado en reglas de
-  venta cruzada?) y si el dialog aparece siempre o solo bajo ciertas
-  condiciones (ej. no repetir la sugerencia ya rechazada en el mismo
-  pedido).
+- **Criterio de sugerencia** (decidido con el negocio, 2026-07-26): dos
+  fuentes, no excluyentes entre sí — (1) **complementos** del producto
+  elegido (típicamente bebidas, pero también otros complementos definidos
+  por producto) y (2) **producto en promoción vigente** (`promocion`),
+  independiente de si complementa al elegido o no.
+- Pendiente definir con el negocio: cómo se configura la relación
+  producto → complemento sugerido (fija por producto vs. regla de venta
+  cruzada más general), y si el dialog aparece siempre o solo bajo
+  ciertas condiciones (ej. no repetir la sugerencia ya rechazada en el
+  mismo pedido).
 
 ## Reglas de implementación
 
