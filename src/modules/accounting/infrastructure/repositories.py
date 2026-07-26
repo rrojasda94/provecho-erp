@@ -1,6 +1,13 @@
 """Repositorios del módulo accounting: la sesión es la Unit of Work, el
 repositorio solo encapsula queries."""
 
+# `AsientoRepo` define un método `list`, que dentro del cuerpo de la clase
+# pisa el builtin `list` — sin esto, la anotación `-> list[AsientoLinea]` de
+# `lineas` (definida después) revienta con "'function' object is not
+# subscriptable" en Python <3.14 (evaluación eager de anotaciones). Con este
+# import las anotaciones quedan como string y nunca se evalúan así.
+from __future__ import annotations
+
 import uuid
 
 from sqlalchemy import select

@@ -4,6 +4,14 @@ La sesión actúa como Unit of Work: la capa de aplicación decide cuándo hacer
 commit/rollback. Los repos solo encapsulan las queries.
 """
 
+# `UsuarioRepo` define un método `list`, que dentro del cuerpo de la clase
+# pisa el builtin `list` — sin esto, anotaciones como `-> list[uuid.UUID]`
+# en métodos definidos después (`sucursal_ids`, `rol_nombres`) revientan con
+# "'function' object is not subscriptable" en Python <3.14 (evaluación eager
+# de anotaciones). Con este import las anotaciones quedan como string y
+# nunca se evalúan así.
+from __future__ import annotations
+
 import uuid
 
 from sqlalchemy import select, update
