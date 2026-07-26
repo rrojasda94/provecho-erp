@@ -1,11 +1,31 @@
-"""Modelos del módulo rrhh — alcance mínimo: `trabajador` (data-model §8b).
+"""Modelos del módulo rrhh: ciclo laboral completo (data-model.md §8b)."""
 
-Este módulo se abre parcialmente como dependencia del slice Venta (ranking
-de venta por trabajador). El resto de §8b (boleta_pago, memorandum,
-amonestacion, acta, contrato_laboral, etc.) se modela en el slice
-dedicado de RRHH.
-"""
-
+from src.modules.rrhh.infrastructure.models.acta import Acta
+from src.modules.rrhh.infrastructure.models.amonestacion import Amonestacion
+from src.modules.rrhh.infrastructure.models.asistencia import Asistencia
+from src.modules.rrhh.infrastructure.models.boleta_pago import BoletaPago
+from src.modules.rrhh.infrastructure.models.certificado_trabajo import CertificadoTrabajo
+from src.modules.rrhh.infrastructure.models.contrato_laboral import ContratoLaboral
+from src.modules.rrhh.infrastructure.models.liquidacion_bss import LiquidacionBss
+from src.modules.rrhh.infrastructure.models.memorandum import Memorandum
+from src.modules.rrhh.infrastructure.models.pacto_permanencia import PactoPermanencia
+from src.modules.rrhh.infrastructure.models.postulante import Postulante
+from src.modules.rrhh.infrastructure.models.socio import Socio
+from src.modules.rrhh.infrastructure.models.solicitud_permiso import SolicitudPermiso
 from src.modules.rrhh.infrastructure.models.trabajador import Trabajador
 
-__all__ = ["Trabajador"]
+__all__ = [
+    "Acta",
+    "Amonestacion",
+    "Asistencia",
+    "BoletaPago",
+    "CertificadoTrabajo",
+    "ContratoLaboral",
+    "LiquidacionBss",
+    "Memorandum",
+    "PactoPermanencia",
+    "Postulante",
+    "Socio",
+    "SolicitudPermiso",
+    "Trabajador",
+]

@@ -10,10 +10,15 @@ from sqlalchemy import Date, Enum, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
-from src.core.model_base import SoftDeleteMixin, TimestampMixin, UuidPkMixin
+from src.core.model_base import (
+    SoftDeleteMixin,
+    TimestampMixin,
+    UuidPkMixin,
+    VersionedMixin,
+)
 
 
-class Persona(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin):
+class Persona(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin, VersionedMixin):
     __tablename__ = "persona"
 
     nombres: Mapped[str] = mapped_column(String(100))

@@ -16,6 +16,11 @@ frontend/out/
 .env.*
 !.env.example
 
+# Backups de la base (nunca versionados: son datos reales del negocio).
+# Anclado a la raíz: sin la barra inicial también tapaba `src/backups/`,
+# que es el código del módulo y sí va al repositorio.
+/backups/
+
 # Guiones de capacitación (working files de producción de video, no versionados)
 docs/capacitacion/*-guion-video.md
 docs/capacitacion/*-ayudamemoria.md

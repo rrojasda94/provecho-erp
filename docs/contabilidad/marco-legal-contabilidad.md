@@ -30,7 +30,7 @@ diseñar el ERP y los SOPs.
 
 ## Comprobantes de pago
 
-- La empresa **emite** boleta/factura electrónica (vía Nubefact, ver
+- La empresa **emite** boleta/factura electrónica (vía Factiliza, ver
   [ADR-003 / integraciones](../../CLAUDE.md)); **acepta** factura, recibo por
   honorarios (RHE) y, excepcionalmente, boleta/ticket de compra.
 - Sin comprobante emitido no hay venta (regla comercial); sin comprobante

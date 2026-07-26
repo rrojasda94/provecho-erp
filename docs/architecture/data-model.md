@@ -49,7 +49,7 @@ erDiagram
 - **grupo**: nombre.
 - **empresa**: grupo_id, razón social, RUC, domicilio fiscal, contacto, tipo
   (`operativa` | `logistica` | `servicios` | `asesoria` | `transporte`),
-  config fiscal (Nubefact), zona_tributaria (`amazonia_ley27037` |
+  config fiscal (proveedor de facturación), zona_tributaria (`amazonia_ley27037` |
   `general` — determina exoneración de IGV y tasa reducida de IR,
   RN-IMP-001).
 - **marca**: grupo_id (dueño de la identidad, no la empresa), nombre, skins
@@ -137,11 +137,16 @@ erDiagram
 
 - **persona**: nombres, apellidos, tipo_documento (`dni` | `ce` |
   `pasaporte`), numero_documento (único), fecha_nacimiento, domicilio,
-  contacto (teléfono/email). **Fuente única de datos de personas
-  naturales** (party model): `trabajador`, `cliente` (natural) y `usuario`
-  (humano) la referencian por `persona_id`, para no duplicar nombres. Los
-  roles de un documento (emisor, destinatario, representante, aprobador)
-  no son tablas: se atan a un `trabajador`/`persona` al emitir.
+  contacto (teléfono/email), `version` (lock optimista — cada `UPDATE`
+  exige la `version` vigente; si no coincide, 409, en vez de pisar en
+  silencio el cambio de otro editor concurrente). **Fuente única de datos
+  de personas naturales** (party model): `trabajador`, `cliente` (natural)
+  y `usuario` (humano) la referencian por `persona_id`, para no duplicar
+  nombres. Los roles de un documento (emisor, destinatario, representante,
+  aprobador) no son tablas: se atan a un `trabajador`/`persona` al emitir.
+  CRUD propio en `/api/v1/personas` (Create/Read/Update — sin Delete: el
+  ciclo de vida real se maneja en la entidad que la referencia, ej.
+  `trabajador.estado=cesado`, no borrando la persona).
 - **usuario**: username, pin_hash (Argon2id), persona_id (nullable — NULL
   si `agente_ia`), nombre_display (fallback para agente_ia), email, tipo
   (`humano` | `agente_ia`), activo.
@@ -539,7 +544,8 @@ Solicitud.
   (único por empresa+serie — nunca se repite, RN-CPP-007), sustento
   (`efectivo` | `voucher_medio_pago` | `movimiento_bancario` |
   `contrato_credito`, RN-CPP-003), idempotency_key (anti-duplicado/
-  reemisión, RN-CPP-008), estado Nubefact, respuesta (JSONB).
+  reemisión, RN-CPP-008), estado de emisión, hash e intentos del
+  proveedor, respuesta (JSONB). Ver ADR-005 (Factiliza).
 - **cliente**: grupo_id (transversal al grupo, no a una empresa —
   RN-PTS-001), tipo (`natural` | `juridico` — ej. cliente corporativo:
   catering/eventos), persona_id (si `natural`) o razon_social + ruc (si
@@ -549,7 +555,11 @@ Solicitud.
   Central de Pedidos — esas ventas enrutan al mismo `cliente` por sus
   datos, sin login). Si natural, nombre y documento se leen de `persona`
   — no se duplican (RN-GEN-007). `cliente_id` es opcional en `venta` —
-  cliente anónimo es un caso válido (RN-PER-005).
+  cliente anónimo es un caso válido (RN-PER-005). Lectura para análisis
+  cross-módulo (marketing/comercial) vía el contrato público
+  `sales/application/queries_publicas.py::listar_clientes_para_analisis`
+  (`GET /api/v1/sales/clientes`, permiso `sales.leer_clientes_externos`) —
+  ver [events.md#eventos-vs-contratos-públicos-de-lectura](events.md).
 - **cuenta_puntos**: cliente_id, saldo. Un solo saldo válido en todas las
   marcas/empresas del grupo (RN-PTS-001).
 - **puntos_movimiento**: cuenta_puntos_id, tipo (`acumulacion` | `canje` |
@@ -620,13 +630,58 @@ sin operación real hoy. Ver [docs/produccion/README.md](../produccion/README.md
   al finalizar la jornada con los datos registrados durante esta — el
   jefe de cocina visa, no redacta (RN-DOC-010).
 
-## 8. Contabilidad (módulo accounting — spec inicial)
+## 8. Contabilidad (módulo accounting)
 
-- **cuenta_contable** (plan de cuentas), **asiento**, **asiento_linea**
-  (debe/haber), **periodo_contable**. Los módulos operativos publican eventos
-  que generan asientos. Detalle al implementar.
+Implementado (2026-07-25) — libro contable núcleo, además del ciclo de caja
+(`apertura_caja`, `cierre_caja`, `custodia_efectivo`, `arqueo`, ya existentes):
+
+- **cuenta_contable**: empresa_id, codigo (único por empresa), nombre, tipo
+  (`activo`\|`pasivo`\|`patrimonio`\|`ingreso`\|`gasto`), cuenta_padre_id
+  (árbol simple), activa.
+- **periodo_contable**: empresa_id, anio, mes (único por empresa), estado
+  (`abierto`\|`cerrado`), cerrado_por, fecha_cierre. Ningún asiento se
+  registra fuera de un periodo abierto (RN-CTB-001... RN-CTB-002).
+- **asiento**: empresa_id, periodo_contable_id, fecha, glosa, origen
+  (`manual`\|`automatico`), evento_origen (NULL si manual), referencia_origen
+  (NULL si manual), estado (`registrado`\|`anulado`), creado_por (NULL si
+  automático), asiento_reversa_de_id (autorreferencia — anular crea un
+  asiento inverso, nunca borra/edita, RN-CTB-002).
+- **asiento_linea**: asiento_id, cuenta_contable_id, tipo (`debe`\|`haber`),
+  monto. La suma de líneas `debe` = suma `haber` por asiento (RN-CTB-001).
+- **regla_asiento**: empresa_id, evento (ej. `purchases.oc_emitida`, único
+  por empresa), cuenta_debe_id, cuenta_haber_id, activa. Mapeo configurable
+  evento→contrapartida que alimenta la generación automática de asientos —
+  sin regla vigente, el evento no genera asiento (se omite y loguea, nunca
+  bloquea el proceso operativo de origen). Mismo criterio que
+  `regla_aprobacion` (RN-GER-003): la empresa configura su plan de cuentas,
+  el código no lo hardcodea.
+- **movimiento_dinero** (implementado 2026-07-25, tesorería/PROC-CTB-003):
+  empresa_id, tipo (`egreso`\|`ingreso`), concepto (hoy solo
+  `pago_proveedor`), comprobante_id (FK `comprobante`, único cuando no NULL
+  — guardián de RN-CTB-008, un mismo comprobante no se paga dos veces),
+  proveedor_id/orden_compra_id (UUID sin FK — dominio de `purchases`, mismo
+  criterio que `Comprobante.compra_id`), monto, monto_detraccion, medio_pago
+  (`transferencia`\|`cheque`\|`efectivo`, solo al ejecutar), estado
+  (`pendiente`\|`ejecutado`\|`rechazado`), solicitado_por, aprobado_por,
+  asiento_id (FK `asiento`, NULL si no había `regla_asiento` configurada),
+  fecha_ejecucion, constancia. `purchases.comprobante_conforme` lo encola
+  (`pendiente`); ejecutar exige permiso sobre el umbral (`regla_aprobacion`,
+  código `pago_umbral`, RN-CTB-005) y genera el asiento vía `regla_asiento`
+  (evento `accounting.pago_ejecutado`).
 - **declaracion_itan**: empresa_id, periodo, activos_netos, umbral_legal,
   base_imponible (excedente), monto, credito_ir_aplicado (RN-IMP-006).
+
+Pendiente (deuda técnica, ver ROADMAP): generación automática de asientos
+operativos solo cubre los 4 eventos que sus módulos de origen ya publican
+en código (`purchases.oc_emitida`, `purchases.compra_recibida`,
+`sales.venta_confirmada`, `purchases.comprobante_conforme`) — el resto de
+eventos documentados en `events.md` (pago de venta, comprobante emitido,
+transferencia, merma, ajuste, caja chica) no se generan aún porque esos
+módulos todavía no los publican. La detracción SPOT se calcula pero el
+asiento de pago no la desglosa en una cuenta propia (queda en el debe/haber
+único del total); `purchases.orden_compra` no queda marcada como pagada;
+conciliación bancaria y arqueo backend también quedan para un slice de
+tesorería dedicado.
 
 ## 8b. Recursos humanos (módulo rrhh — spec inicial)
 
@@ -707,11 +762,22 @@ tabla. Ver [docs/gerencia/README.md](../gerencia/README.md).
   fecha, archivo_id (opcional). Materializa el acta de decisión gerencial
   (RN-GER-002); toda aprobación de la matriz de aprobaciones (RN-GER-003)
   genera una fila.
-- **Matriz de aprobaciones**: es configuración/política, no una tabla de
-  transacciones — vive en
-  [gerencia/politica-gerencia.md](../gerencia/politica-gerencia.md#matriz-de-aprobaciones).
-  Los umbrales que consulta (ej. umbral de OC RN-CMP-008) son settings por
-  empresa, no se hardcodean en cada módulo.
+- **regla_aprobacion** (entidad transversal, vive en `shared` — mismo
+  criterio que `Comprobante`): empresa_id, modulo (ej. `purchases`), codigo
+  (ej. `oc_umbral`), umbral, permiso_requerido (informativo — la
+  verificación real del permiso la hace el módulo consumidor), vigente.
+  Reemplaza el umbral fijo en config para reglas cuantitativas (RN-GER-003:
+  fuente única, ninguna área fija su propio umbral por fuera de la matriz).
+  Si no hay fila para una empresa/módulo/código, el módulo consumidor usa
+  su valor semilla de config como fallback (no rompe lo ya sembrado).
+  Administrado vía `/api/v1/reglas-aprobacion` (permiso
+  `gerencia.gestionar_reglas_aprobacion`).
+- **Matriz de aprobaciones**: la narrativa de gobierno (qué requiere
+  visado, quién aprueba) vive en
+  [gerencia/politica-gerencia.md](../gerencia/politica-gerencia.md#matriz-de-aprobaciones);
+  los umbrales cuantitativos que esa narrativa referencia (ej. umbral de OC
+  RN-CMP-008) ahora son filas de `regla_aprobacion`, no texto
+  `[[COMPLETAR]]` ni config estático por módulo.
 
 ## 8d. Marketing (módulo futuro marketing)
 

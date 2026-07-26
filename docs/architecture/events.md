@@ -13,6 +13,29 @@ importando el dominio de otro módulo. Ver mapa:
   cambio incompatible (nueva versión del evento).
 - Idempotencia: los consumidores toleran recibir el mismo evento dos veces.
 
+## Eventos vs. contratos públicos de lectura
+
+El event bus (`src/core/events.py`) sirve para **notificar un hecho ya
+ocurrido** de forma asíncrona (el emisor no sabe quién escucha). Para una
+**consulta síncrona bajo demanda** ("dame los clientes de este grupo para
+analizarlos") un evento no encaja — ahí el módulo dueño expone un **contrato
+público de lectura**: un archivo `application/queries_publicas.py` con
+funciones que devuelven DTOs (nunca el modelo ORM ni tipos de `domain`),
+protegidas por su propio permiso RBAC. Otro módulo solo puede importar de
+ese archivo — nunca de `domain`/`infrastructure` del módulo dueño
+(CLAUDE.md: "nunca importar el dominio de otro módulo").
+
+Mientras el módulo consumidor no exista todavía como código (ej.
+`marketing`, hoy solo README), el contrato también se expone como endpoint
+HTTP — así cualquier rol autorizado lo usa ya (análisis manual, integración
+futura). Cuando el módulo consumidor exista, su capa de aplicación importa
+la función directamente (llamada Python en proceso, sin HTTP).
+
+| Contrato | Dueño | Consumidores | Función | Permiso |
+|---|---|---|---|---|
+| Lectura de clientes | `sales` | `marketing`/`comercial` (análisis, targeting de campañas) | `sales/application/queries_publicas.py::listar_clientes_para_analisis` (`GET /api/v1/sales/clientes`) | `sales.leer_clientes_externos` |
+| Solicitudes por usuario | `inventory` (`solicitud_insumos`) | `purchases` (qué usuarios/sucursales piden más — insumo para negociar con proveedores) | **bloqueado** — `solicitud_insumos` aún no existe en código (deuda de `inventory`, ver ROADMAP) | — |
+
 ## Cadena de referencia (venta → contabilidad)
 
 ```
@@ -31,7 +54,7 @@ accounting.asiento_generado
 |--------|--------|--------------|-----------------|--------|--------|
 | `sales.venta_confirmada` | sales | inventory, accounting | venta_id, sucursal_id, items[], total | Al confirmar la venta | RN-COM-001, RN-PRD-002 |
 | `sales.pago_registrado` | sales | accounting | venta_id, medio, monto, ref_externa | Al registrar pago | RN-COM-002 |
-| `sales.comprobante_emitido` | sales | accounting | venta_id, tipo, serie_numero | Respuesta OK de Nubefact | RN-COM-003 |
+| `sales.comprobante_emitido` | sales | accounting | venta_id, tipo, serie_numero | Comprobante aceptado por SUNAT (Factiliza) | RN-COM-003 |
 | `sales.venta_anulada` | sales | inventory, accounting | venta_id, motivo | Al anular | RN-GEN-002 |
 | `sales.carrito_abandonado` | sales | — (analítica) | carrito_id, canal, paso, motivo (opcional) | Al abandonar sin confirmar | RN-COM-013 |
 | `inventory.stock_consumido` | inventory | — (auditoría) | almacen_id, articulo_id, cantidad, ref | Tras descontar por venta/producción | RN-INV-003 |
@@ -41,9 +64,9 @@ accounting.asiento_generado
 | `inventory.devolucion_a_proveedor` | inventory | purchases | devolucion_id, proveedor_id, items[], motivo | Al registrar devolución a proveedor (purchases gestiona reclamo/nota de crédito) | RN-INV-020 |
 | `inventory.ajuste_fuera_margen` | inventory | accounting, users (alerta admin) | ajuste_id, almacen_id, sku_id, diferencia, margen | Ajuste excede el margen de error configurado | RN-INV-015 |
 | `inventory.lote_vencido_detectado` | inventory | users (notifica), rrhh* (memorándum al responsable) | lote_id, almacen_id, sku_id, fecha_vencimiento, responsable_id | Al hallar un lote vencido aún disponible en stock | RN-VNC-001..003 |
-| `purchases.oc_emitida` | purchases | accounting | oc_id, proveedor_id, total | Al emitir OC | RN-CMP-001 |
+| `purchases.oc_emitida` | purchases | accounting | oc_id, proveedor_id, empresa_id, total | Al emitir OC | RN-CMP-001 |
 | `purchases.compra_recibida` | purchases | inventory, accounting | oc_id, almacen_id, items[] | Al recibir mercadería | RN-CMP-003 |
-| `purchases.comprobante_conforme` | purchases | accounting | comprobante_id, oc_id, proveedor_id, condicion_pago | Compras da conformidad al comprobante; accounting decide y ejecuta el pago | RN-CMP-005 |
+| `purchases.comprobante_conforme` | purchases | accounting | comprobante_id, orden_compra_id, proveedor_id, empresa_id, condicion_pago, sujeto_spot, porcentaje_deteccion, monto | Compras da conformidad al comprobante; accounting encola el pago (`movimiento_dinero` pendiente) | RN-CMP-005, RN-CMP-014 |
 | `purchases.caja_chica_rendida` | purchases | accounting | rendicion_id, gasto_total, efectivo_restante, diferencia | Al cerrar la rendición semanal de caja chica | RN-CMP-017 |
 | `purchases.evaluacion_proveedor_actualizada` | purchases | — (informativo) | proveedor_id, indicador_automatico | En cada recepción (cumplimiento, conformidad, variación de precio) | — |
 | `production.orden_completada` | production* | inventory | orden_id, articulo_id, cantidad | Al terminar producción | RN-PRD-003 |
@@ -58,8 +81,8 @@ accounting.asiento_generado
 | `accounting.apertura_caja_registrada` | accounting | users (alerta si hay diferencia) | apertura_caja_id, punto_venta_id, diferencia_reportada | Al aperturar caja | RN-POS-003, RN-MDP-002 |
 | `accounting.cierre_caja_registrado` | accounting | — (auditoría/BI) | cierre_caja_id, apertura_caja_id, descuadre_monto | Al confirmar el cierre | PROC-CTB-001 |
 | `accounting.cierre_caja_irregular` | accounting | users (notifica gerencia/RRHH) | cierre_caja_id, descuadre_monto, descuadre_atribucion | Cierre con descuadre/irregularidad detectada | RN-MDP-005 |
-| `accounting.pago_ejecutado` | accounting | purchases (marca OC pagada), auditoría/BI | comprobante_id, oc_id, proveedor_id, monto, detraccion_monto, aprobado_por | Al ejecutar el pago a proveedor | RN-CMP-014, RN-CTB-005, RN-CTB-008 |
-| `accounting.pago_requiere_aprobacion` | accounting | users (notifica gerencia) | comprobante_id, proveedor_id, monto, umbral | Pago sobre umbral en espera de aprobación de Gerencia | RN-CTB-005 |
+| `accounting.pago_ejecutado` | accounting | purchases (marca OC pagada — sin consumidor todavía), auditoría/BI | movimiento_dinero_id, comprobante_id, orden_compra_id, proveedor_id, monto, detraccion_monto, aprobado_por | Al ejecutar el pago a proveedor | RN-CMP-014, RN-CTB-005, RN-CTB-008 |
+| `accounting.pago_requiere_aprobacion` | accounting | users (notifica gerencia — sin consumidor todavía) | movimiento_dinero_id, proveedor_id, monto, umbral | Pago sobre umbral en espera de aprobación de Gerencia | RN-CTB-005 |
 | `accounting.arqueo_registrado` | accounting | users (notifica gerencia/RRHH si hay diferencia) | arqueo_id, punto, diferencia_monto, diferencia_atribucion | Al registrar un arqueo (sorpresa) | RN-CTB-007 |
 
 `*` = módulo futuro. Reglas referenciadas en

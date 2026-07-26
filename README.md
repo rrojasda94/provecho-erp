@@ -15,6 +15,8 @@ y soporta agentes de IA y humanos para toma de pedidos.
 | Cache / Workers | Redis, Celery |
 | Auth | JWT + refresh token, PIN con Argon2id, RBAC |
 | Infra | Docker, GitHub Actions |
+| Observabilidad | Logs JSON correlacionados, Sentry/GlitchTip, chequeos de salud |
+| Integraciones | Factiliza (facturación electrónica PE) |
 
 ## Arranque local
 
@@ -23,8 +25,32 @@ cp .env.example .env
 docker compose up --build
 ```
 
+> `docker-compose.yml` es **solo desarrollo** (monta el código, `--reload`,
+> Postgres con contraseña de juguete). Para servidor:
+> `docker-compose.prod.yml` — ver
+> [devops.md](docs/engineering/devops.md#despliegue).
+
 - API: http://localhost:8000 — docs OpenAPI en http://localhost:8000/docs
+  (deshabilitadas en producción)
 - Web: http://localhost:3000
+
+### Salud
+
+| Endpoint | Qué responde |
+|----------|--------------|
+| `/health` | Liveness — el proceso responde |
+| `/health/ready` | Readiness — base de datos, Redis, cola (503 si cae una crítica) |
+| `/health/backups` | Horas desde el último backup (503 si venció) |
+
+### Backups
+
+```bash
+python -m src.backups.backup
+```
+
+Dump, verificación, restauración de prueba, copia externa y purga. Requiere
+`postgresql-client`. Programación por cron y runbook de restauración en
+[docs/engineering/devops.md](docs/engineering/devops.md#backups).
 
 ### Sin Docker (backend)
 

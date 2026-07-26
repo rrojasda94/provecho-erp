@@ -13,6 +13,7 @@ from src.modules.users.application.errors import (
 from src.modules.users.domain import rules
 from src.modules.users.infrastructure.models import (
     Permiso,
+    Persona,
     Rol,
     RolPermiso,
     Usuario,
@@ -22,6 +23,7 @@ from src.modules.users.infrastructure.models import (
 from src.modules.users.infrastructure.repositories import (
     AuditLogRepo,
     PermisoRepo,
+    PersonaRepo,
     RolRepo,
     UsuarioRepo,
 )
@@ -83,6 +85,62 @@ def cambiar_pin(session: Session, usuario_id: uuid.UUID, nuevo_pin: str) -> Usua
 
 def listar_usuarios(session: Session) -> list[Usuario]:
     return UsuarioRepo(session).list()
+
+
+# --- Persona (party model, RN-GEN-007) --------------------------------------
+def crear_persona(
+    session: Session,
+    *,
+    nombres: str,
+    apellidos: str,
+    tipo_documento: str,
+    numero_documento: str,
+    fecha_nacimiento=None,
+    domicilio: str | None = None,
+    telefono: str | None = None,
+    email: str | None = None,
+) -> Persona:
+    repo = PersonaRepo(session)
+    if repo.get_by_documento(numero_documento):
+        raise Conflicto(f"numero_documento '{numero_documento}' ya existe")
+    return repo.add(
+        Persona(
+            nombres=nombres,
+            apellidos=apellidos,
+            tipo_documento=tipo_documento,
+            numero_documento=numero_documento,
+            fecha_nacimiento=fecha_nacimiento,
+            domicilio=domicilio,
+            telefono=telefono,
+            email=email,
+        )
+    )
+
+
+def obtener_persona(session: Session, persona_id: uuid.UUID) -> Persona:
+    return _get(PersonaRepo(session).get(persona_id), "persona")
+
+
+def listar_personas(session: Session, q: str | None = None) -> list[Persona]:
+    return PersonaRepo(session).list(q)
+
+
+def editar_persona(
+    session: Session, persona_id: uuid.UUID, *, version: int, **campos
+) -> Persona:
+    repo = PersonaRepo(session)
+    actual = _get(repo.get(persona_id), "persona")
+    numero_nuevo = campos.get("numero_documento")
+    if numero_nuevo:
+        otra = repo.get_by_documento(numero_nuevo)
+        if otra is not None and otra.id != persona_id:
+            raise Conflicto(f"numero_documento '{numero_nuevo}' ya existe")
+    actualizada = repo.actualizar_con_lock(persona_id, version, **campos)
+    if actualizada is None:
+        raise Conflicto(
+            f"version {version} desactualizada (actual {actual.version})"
+        )
+    return actualizada
 
 
 # --- Roles ------------------------------------------------------------------

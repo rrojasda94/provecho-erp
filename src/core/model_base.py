@@ -7,7 +7,7 @@ Convenciones de docs/architecture/data-model.md: PK `id` (UUID),
 import uuid
 from datetime import datetime
 
-from sqlalchemy import JSON, DateTime, Uuid, func
+from sqlalchemy import JSON, DateTime, Integer, Uuid, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -37,3 +37,12 @@ class SoftDeleteMixin:
     deleted_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+
+
+class VersionedMixin:
+    """Lock optimista a nivel de aplicación (no `version_id_col` de SQLAlchemy,
+    que exige `__mapper_args__` por clase concreta). El repositorio hace un
+    UPDATE condicional `WHERE version = :esperada` — atómico, sin ventana de
+    carrera entre leer y escribir."""
+
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)

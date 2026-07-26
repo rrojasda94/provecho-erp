@@ -194,7 +194,7 @@ usuario aún no decide).
 flowchart LR
     PC[Producto comercial] --> RE[Receta] --> DES[Descuenta insumos del almacén del local]
     V[Venta confirmada] --> OP[Orden de Pedido enviada a cocina]
-    V --> PG[Pago: efectivo / Izipay] --> CO[Comprobante Nubefact]
+    V --> PG[Pago: efectivo / Izipay] --> CO[Comprobante electrónico]
     V -. evento sales.venta_confirmada .-> DES
 ```
 
