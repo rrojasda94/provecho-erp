@@ -120,6 +120,42 @@
 - Pendiente definir con el negocio: contenido exacto de cada tooltip (se
   redacta por campo al construir cada formulario, no de una vez).
 
+### Buscadores — contextuales, por nombre/insumo/exclusión, con ranking
+
+- El buscador debe llevar directo al reporte/ítem/información buscada por
+  **palabra clave contextual**, no solo por coincidencia exacta de nombre.
+- Búsquedas admitidas (mínimo, en PDV/Kiosk/web): por **nombre de
+  producto**, por **insumo/ingrediente** (cruce contra `receta_item` — un
+  producto aparece si su receta lo usa), y por **exclusión** ("que no
+  tenga XXXX" → productos cuya receta NO incluye ese insumo).
+- Cuando no hay una coincidencia única y clara, se muestra una **lista de
+  resultados posibles ordenada por probabilidad/relevancia** — no un único
+  resultado forzado ni una lista sin orden.
+- Aplica también a buscadores de otros módulos (reportes, ítems de
+  inventario, etc.), no solo al de producto en el punto de venta.
+- Nota técnica (no bloquea la spec): full-text search con score de
+  relevancia (ej. `pg_trgm`/`tsvector` de Postgres) cubre esto sin
+  necesitar IA; el ranking puede afinarse después con historial de venta
+  como señal adicional.
+- Pendiente definir con el negocio: qué otros campos son buscables por
+  módulo, y si el ranking por historial de venta aplica desde el día 1 o
+  se agrega después.
+
+### Carrito — dialog de venta sugerida (upsell) antes de continuar
+
+- Al elegir un producto o grupo de productos y avanzar hacia el carrito,
+  se abre un **dialog de productos sugeridos** que el usuario puede
+  agregar rápido con un toque/clic (sin repetir el flujo completo de
+  selección).
+- Si el usuario no quiere agregar nada, puede **descartar el dialog** y
+  seguir directo al carrito o a cobrar — nunca es un paso obligatorio.
+- Aplica en PDV, Kiosk y web.
+- Pendiente definir con el negocio: criterio para elegir qué productos
+  sugerir (¿combo/complemento fijo por producto, o basado en reglas de
+  venta cruzada?) y si el dialog aparece siempre o solo bajo ciertas
+  condiciones (ej. no repetir la sugerencia ya rechazada en el mismo
+  pedido).
+
 ## Reglas de implementación
 
 - Colores y fuentes SOLO vía tokens CSS (`frontend/app/globals.css`).

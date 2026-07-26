@@ -7,6 +7,15 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Added
 
+- **Spec de UX — buscador contextual y upsell en carrito** (2026-07-26,
+  `docs/product/ui-ux.md`): buscador de producto (PDV/Kiosk/web) por
+  nombre, por insumo/ingrediente (cruce `receta_item`) y por exclusión
+  ("que no tenga X"), con lista de resultados ordenada por relevancia
+  cuando no hay match único; vía técnica sugerida: full-text search
+  (`pg_trgm`/`tsvector`), sin necesitar IA. Al ir al carrito, dialog de
+  productos sugeridos de adición rápida, descartable sin bloquear el
+  flujo. Solo especificado, implementación pendiente.
+
 - **Spec de UX — breadcrumb por ruta de usuario y tooltips de formulario**
   (2026-07-26, `docs/product/ui-ux.md`): breadcrumb crece según la
   navegación del usuario (patrón Odoo), no según la jerarquía de la

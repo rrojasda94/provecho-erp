@@ -42,8 +42,9 @@ Registro de lo construido y lo pendiente. Actualizar en cada cambio relevante.
 | App Android (15+) | ⬜ | Evaluar PWA vs nativo (ADR pendiente) |
 | Backups automáticos | ⬜ | |
 | Observabilidad (métricas, trazas, logs centralizados) | ⬜ | |
-| UX: menús, buscadores, atajos, sidebars, dashboards | ⬜ | Definición pendiente con el usuario |
+| UX: menús, atajos, sidebars, dashboards | ⬜ | Definición pendiente con el usuario |
 | UX: breadcrumb por ruta de usuario (no jerárquico) + tooltip de ayuda por campo de formulario | ✅ spec 2026-07-26 | `docs/product/ui-ux.md` — breadcrumb crece con la navegación (patrón Odoo), navegación jerárquica va por menús desplegables; todo campo de formulario lleva hover explicando término/formato. Solo especificado |
+| UX: buscador contextual (nombre/insumo/exclusión, ranking por probabilidad) + dialog de venta sugerida (upsell) en carrito | ✅ spec 2026-07-26 | `docs/product/ui-ux.md` — buscador cruza `receta_item` para insumo/exclusión, lista ordenada por relevancia si no hay match único; al ir al carrito se sugieren productos de adición rápida, descartable. Solo especificado |
 | Branding (paleta, tipografías, tokens CSS) | ✅ 2026-07-04 | Brandboard aplicado — `docs/product/ui-ux.md` |
 | Skins multi-marca (PDV/Kiosk por marca vs Provecho/Majambo en el resto), accesibilidad (daltonismo, tamaño de fuente) y plataformas por módulo (táctil Android en PDV/Kiosk/KDS/Inventario, PC-first en el resto) | 🔶 spec 2026-07-25 | `docs/product/ui-ux.md` — solo especificado, falta implementar (resolver de tema por marca, preferencias de accesibilidad en perfil de usuario) |
 
@@ -164,6 +165,16 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   orden fijo tamaño→combinación→extras→restas (RN-PRD-004). Falta definir
   si combo se configura en el mismo dialog o en uno propio, y el
   comportamiento en Kiosk (autoservicio) vs. PDV asistido.
+- ⬜ **Buscador contextual de producto** (PDV/Kiosk/web): por nombre,
+  por insumo/ingrediente (cruce `receta_item`) y por exclusión ("que no
+  tenga X"); lista de resultados ordenada por relevancia cuando no hay
+  match único. UX especificada en `docs/product/ui-ux.md`, sin
+  implementar — full-text search (`pg_trgm`/`tsvector`) es la vía técnica
+  sugerida, sin necesitar IA.
+- ⬜ **Dialog de venta sugerida (upsell) al ir al carrito**: productos
+  complementarios de adición rápida, descartable sin bloquear el flujo.
+  UX especificada en `docs/product/ui-ux.md`; falta definir el criterio de
+  qué sugerir (fijo por producto vs. reglas de venta cruzada).
 - ⬜ **KDS tiempo real**: hoy el frontend refresca por polling; push por
   WebSocket/Redis pub-sub (Redis reservado para pantallas/colas/sesiones).
 - ⬜ **KDS aviso de anulación**: si anulan un pedido ya en preparación, la
