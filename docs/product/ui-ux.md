@@ -93,6 +93,33 @@
   configuran en el mismo dialog o en uno propio (`combo_item`), y el
   comportamiento en Kiosk (autoservicio, sin cajero) vs. PDV asistido.
 
+### Navegación — breadcrumbs por ruta de usuario, no por jerarquía
+
+- El breadcrumb sigue la **ruta que recorrió el usuario**, no la jerarquía
+  de dónde vive la funcionalidad (patrón Odoo): cada pantalla nueva a la
+  que se entra desde la actual agrega un eslabón; no se resetea al estilo
+  "Sección > Subsección > Pantalla".
+- Ejemplo: si desde un producto se abre su receta y desde la receta se abre
+  un insumo, el breadcrumb queda `Producto X > Receta > Insumo Y` — cada
+  eslabón es clicable para volver exactamente al punto de origen de esa
+  acción, sin perder el resto del recorrido intermedio.
+- La **navegación jerárquica** (ir directo a un módulo/pantalla sin haber
+  pasado por ahí) se hace por **menús desplegables**, no por el breadcrumb
+  — son dos mecanismos distintos y no se mezclan.
+- Pendiente definir con el negocio: límite de eslabones antes de colapsar
+  (ej. "... > Y > Z") y qué pasa con el breadcrumb al cambiar de módulo
+  desde el menú (¿se reinicia o se apila?).
+
+### Formularios — ayuda contextual por campo
+
+- Todo campo de formulario tiene **hover** (tooltip) que explica qué debe
+  llenarse: el término de negocio si no es obvio, y/o el formato esperado
+  (ej. `RUC: 11 dígitos`, `Fecha de vencimiento: no puede ser pasada`).
+- Aplica a todos los módulos, no solo PDV — es una regla transversal de
+  formularios.
+- Pendiente definir con el negocio: contenido exacto de cada tooltip (se
+  redacta por campo al construir cada formulario, no de una vez).
+
 ## Reglas de implementación
 
 - Colores y fuentes SOLO vía tokens CSS (`frontend/app/globals.css`).
@@ -107,8 +134,8 @@
 
 ## Pendiente de definición (con el negocio)
 
-- Menús, buscadores, breadcrumbs, atajos de teclado, sidebars, dashboards y
-  diseño visual de pantallas.
+- Menús, buscadores, atajos de teclado, sidebars, dashboards y diseño
+  visual de pantallas.
 - Catálogo exacto de paletas de accesibilidad y niveles de tamaño de fuente.
 - Si Grupo Majambo tiene tema propio distinto al de Provecho, o si Provecho
   es el tema por defecto también para Grupo Majambo.

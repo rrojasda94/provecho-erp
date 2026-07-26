@@ -42,7 +42,8 @@ Registro de lo construido y lo pendiente. Actualizar en cada cambio relevante.
 | App Android (15+) | ⬜ | Evaluar PWA vs nativo (ADR pendiente) |
 | Backups automáticos | ⬜ | |
 | Observabilidad (métricas, trazas, logs centralizados) | ⬜ | |
-| UX: menús, buscadores, breadcrumbs, atajos, sidebars, dashboards | ⬜ | Definición pendiente con el usuario |
+| UX: menús, buscadores, atajos, sidebars, dashboards | ⬜ | Definición pendiente con el usuario |
+| UX: breadcrumb por ruta de usuario (no jerárquico) + tooltip de ayuda por campo de formulario | ✅ spec 2026-07-26 | `docs/product/ui-ux.md` — breadcrumb crece con la navegación (patrón Odoo), navegación jerárquica va por menús desplegables; todo campo de formulario lleva hover explicando término/formato. Solo especificado |
 | Branding (paleta, tipografías, tokens CSS) | ✅ 2026-07-04 | Brandboard aplicado — `docs/product/ui-ux.md` |
 | Skins multi-marca (PDV/Kiosk por marca vs Provecho/Majambo en el resto), accesibilidad (daltonismo, tamaño de fuente) y plataformas por módulo (táctil Android en PDV/Kiosk/KDS/Inventario, PC-first en el resto) | 🔶 spec 2026-07-25 | `docs/product/ui-ux.md` — solo especificado, falta implementar (resolver de tema por marca, preferencias de accesibilidad en perfil de usuario) |
 

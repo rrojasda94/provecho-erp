@@ -7,6 +7,15 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Added
 
+- **Spec de UX — breadcrumb por ruta de usuario y tooltips de formulario**
+  (2026-07-26, `docs/product/ui-ux.md`): breadcrumb crece según la
+  navegación del usuario (patrón Odoo), no según la jerarquía de la
+  funcionalidad — cada eslabón es clicable para volver al punto exacto de
+  origen; la navegación jerárquica va por menús desplegables, mecanismo
+  separado del breadcrumb. Todo campo de formulario lleva hover explicando
+  el término o formato esperado. Solo especificado, implementación
+  pendiente.
+
 - **Spec de UX — dialog de personalización de producto en PDV/Kiosk**
   (2026-07-26, `docs/product/ui-ux.md`): seleccionar un producto comercial
   abre un dialog con sus modificadores admitidos (tamaño/combinación/
