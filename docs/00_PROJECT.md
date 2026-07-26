@@ -40,7 +40,7 @@ renumera nada). Este archivo define el orden de lectura recomendado.
 | | [tech-stack.md](architecture/tech-stack.md) | Stack y justificación |
 | | [data-model.md](architecture/data-model.md) | Modelo de datos (tablas, ERD) |
 | | [events.md](architecture/events.md) | Catálogo de eventos internos |
-| | [adr/](architecture/adr/) | Decisiones de arquitectura |
+| | [adr/](architecture/adr/) | Decisiones de arquitectura — 001 modular monolith, 002 stack, 003 Izipay, 004 tenant, 005 Factiliza, 006 observabilidad, 007 backups y salud, 008 entrega continua |
 | **engineering/** | [engineering-guide.md](engineering/engineering-guide.md) | Guía principal para constructores (humano + IA) |
 | | [coding-standards.md](engineering/coding-standards.md) | Convenciones, formato, linters |
 | | [api-guidelines.md](engineering/api-guidelines.md) | Convenciones de API REST |
@@ -84,3 +84,6 @@ docker compose up --build
 ```
 
 API: http://localhost:8000/docs — Web: http://localhost:3000
+
+Ese compose es **solo desarrollo**; el servidor usa `docker-compose.prod.yml`
+(ver [engineering/devops.md](engineering/devops.md#despliegue)).

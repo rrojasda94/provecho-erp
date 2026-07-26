@@ -104,3 +104,16 @@ class MedioPagoOut(BaseModel):
     tipo: str
     comision_pct: Decimal
     activo: bool
+
+
+class ComprobanteOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    venta_id: uuid.UUID | None
+    tipo: str
+    serie: str
+    correlativo: int
+    estado_emision: str
+    hash_proveedor: str | None
+    detalle_emision: str | None
+    intentos_emision: int

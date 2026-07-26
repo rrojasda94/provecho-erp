@@ -960,7 +960,8 @@ producción se hace en cocinas de sucursal. Ver
   receta (o política configurable de venta sin stock — por definir).
 - **RN-COM-002** `Idempotency-Key` obligatoria al confirmar venta y al registrar
   pago; reintentos no duplican efectos.
-- **RN-COM-003** El comprobante se encola a Nubefact; una caída del proveedor no
+- **RN-COM-003** El comprobante se encola al proveedor de facturación electrónica
+  (Factiliza, ADR-005); una caída del proveedor no
   bloquea la venta.
 - **RN-COM-004** Una venta de servicio, o generada por el área comercial,
   puede originarse en una cotización que el cliente acepta.
@@ -1002,7 +1003,7 @@ producción se hace en cocinas de sucursal. Ver
   correlativo, único por sucursal y día — es el número que ve el
   personal (cocina, mostrador, KDS); no se confunde con
   `idempotency_key` (técnico) ni con el correlativo del comprobante
-  (fiscal, vía Nubefact). Aplica tenga o no `cotizacion_id` — toda venta
+  (fiscal, vía Factiliza). Aplica tenga o no `cotizacion_id` — toda venta
   confirmada ya es una Orden de Pedido (glosario) por sí misma.
 - **RN-COM-015** La cuenta web de un cliente (`cliente.usuario_id`) es
   opcional y solo habilita autoservicio (ver historial, pedir online);

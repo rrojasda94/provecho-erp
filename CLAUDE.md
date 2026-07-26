@@ -66,7 +66,7 @@ el código no sea expresivo.
 
 ## Integraciones externas
 
-Nubefact (facturación PE), Google API, Meta API, Izipay (ADR-003).
+Factiliza (facturación electrónica PE), Google API, Meta API, Izipay (ADR-003).
 Siempre detrás de adaptadores en `src/shared/integrations/` — nunca llamar
 APIs externas desde el dominio.
 

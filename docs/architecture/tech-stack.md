@@ -9,7 +9,7 @@ Decisión formal en [adr/ADR-002-stack-tecnologico.md](adr/ADR-002-stack-tecnolo
 | Frontend | Next.js / React / TypeScript | Webapp responsive; base para PWA/Android |
 | Base de datos | PostgreSQL | Transaccional, JSONB para auditoría |
 | Cache | Redis | Cache y broker de Celery |
-| Workers | Celery | Colas: notificaciones, Nubefact, integraciones |
+| Workers | Celery | Colas: emisión de comprobantes (Factiliza), notificaciones, integraciones |
 | Storage | S3 (compatible) | Archivos, comprobantes, imágenes |
 | Auth | JWT + refresh, Argon2id | Estándar, stateless, PIN seguro |
 | Infra | Docker + GitHub Actions | Igual en local y servidor; CI/CD |

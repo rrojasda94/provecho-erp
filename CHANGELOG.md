@@ -7,6 +7,169 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Added
 
+- **Entrega continua — imagen en GHCR y CI endurecida** (2026-07-26):
+  `ci.yml` gana tres verificaciones que no existían. **Cabeza única de
+  Alembic**: dos ramas que crean migraciones en paralelo hacían fallar
+  `upgrade head` durante el despliegue, no en el merge que lo causó.
+  **Job `imagen`**: nadie comprobaba que el `Dockerfile` siquiera
+  construyera — ahora además se levanta el contenedor y se le pide `/health`,
+  lo que valida el `CMD`, el usuario sin privilegios y el `HEALTHCHECK`.
+  **`pip-audit`** informativo (no bloquea: un aviso en una dependencia
+  transitiva no puede frenar un arreglo urgente en caja). Se suman caché de
+  pip/npm y `npm ci` en vez de `npm install`. `release.yml` nuevo: cada push
+  a `main` publica la imagen en **GHCR**, y los tags `v*` publican además la
+  versión exacta — GHCR y no Docker Hub porque autentica con el
+  `GITHUB_TOKEN` del propio workflow, sin secreto que rotar.
+  **`docker-compose.prod.yml` nuevo**: el `docker-compose.yml` existente es
+  solo de desarrollo (monta el código, `uvicorn --reload`, Postgres con
+  contraseña de juguete) y desplegarlo habría publicado esa configuración; el
+  de producción no incluye base de datos (gestionada vía `DATABASE_URL`),
+  publica la API solo en `127.0.0.1` y no expone el puerto de Redis. El
+  `Dockerfile` pasa a correr como usuario sin privilegios (uid 10001) y trae
+  `HEALTHCHECK`. **El despliegue sigue siendo manual y documentado**
+  (ADR-008): automatizar por SSH contra un servidor que todavía no existe
+  daría automatización imposible de probar. `alembic upgrade head` queda como
+  paso explícito del despliegue y no al arrancar la aplicación — con varias
+  réplicas todas migrarían a la vez y una migración fallida dejaría el
+  contenedor en bucle de reinicio en lugar de fallar con un error legible.
+
+- **Chequeos de salud y alertas** (2026-07-26): `src/core/health.py` +
+  `health_router.py`. `/health` queda como **liveness** puro, sin tocar
+  dependencias — si fallara por la base de datos, el orquestador reiniciaría
+  en bucle un proceso sano. `/health/ready` es **readiness**: base de datos
+  (crítica → `caido` + 503), Redis y profundidad de la cola de tareas
+  (degradan a 200 con estado `degradado`, porque sin Redis el rate limit
+  falla abierto y los comprobantes esperan, pero la caja tiene que seguir
+  vendiendo). `/health/backups` va aparte a propósito: que falte un backup es
+  grave, pero devolver 503 en readiness sacaría la API de rotación y dejaría
+  al restaurante sin vender. Ese endpoint cubre el caso que el reporte de
+  errores **no puede** cubrir — un backup que falla avisa por Sentry, pero
+  uno que nunca corrió (cron desactivado, servidor reinstalado) no genera
+  ningún evento; solo se detecta preguntando por la frescura del archivo
+  (umbral 26 h, con margen sobre el cron diario). **El ERP no alerta por su
+  cuenta**: expone estado y un monitor externo avisa (ADR-007) — alertas que
+  viven en el servidor monitoreado dejan de avisar justo cuando ese servidor
+  cae. Los tres endpoints son públicos (un monitor no puede autenticarse) y
+  devuelven estados, nunca hostnames, DSN ni errores crudos. Los endpoints se
+  extrajeron a su propio router: `create_app` había superado el umbral de
+  complejidad de ruff. `tests/test_health.py` (20 casos).
+
+- **Observabilidad — logs estructurados y reporte de errores** (2026-07-26):
+  `src/core/logging_config.py` y `src/core/sentry.py`. Los logs salen en JSON
+  (una línea por evento) en producción y en texto legible en local, con los
+  **tres flujos** que `security.md` ya declaraba —`app`, `seguridad`,
+  `auditoria`— derivados del nombre del logger, sin parámetro extra en cada
+  llamada. **Correlación por `request_id`**: se genera por request (o se
+  respeta el `X-Request-ID` entrante, para seguir una traza que venía del
+  proxy), viaja en un `contextvar`, sale en la cabecera de toda respuesta y
+  se devuelve en el cuerpo del error 500 — sin él, un "me dio error" de un
+  cajero no se cruza con ningún log. **Redacción** de PIN, contraseñas,
+  tokens y cabeceras `Authorization`/`Cookie` antes de escribir el log y
+  antes de salir hacia Sentry (`send_default_pii=False`, Ley 29733). El
+  flujo `seguridad` estrena usuarios reales: login fallido, bloqueo de
+  cuenta, reuso de refresh token y rate limit superado. Reporte de errores
+  activo en los tres componentes que hasta ahora fallaban en silencio —
+  `api`, `worker` (señal `celeryd_init`: un comprobante que agotaba
+  reintentos contra Factiliza no avisaba a nadie) y `backups` (un fallo de
+  madrugada quedaba solo en el log del cron). Sirve igual para Sentry o
+  GlitchTip autoalojado; sin `SENTRY_DSN` no se envía un solo byte.
+  `sentry-sdk` va en dependencias base a propósito: como extra opcional, un
+  despliegue que lo olvidara se quedaría justo sin lo que avisa que algo
+  falla. `configurar_logging` etiqueta su handler y retira solo el propio,
+  para no desconectar a un colector externo (ni a pytest).
+  `tests/test_observabilidad.py` (33 casos).
+
+- **Backups automáticos con restauración probada** (2026-07-26):
+  `src/backups/backup.py` (`python -m src.backups.backup`) encadena dump →
+  verificación → restauración de prueba → copia externa → purga, y sale con
+  código 1 si algo falla para que el cron pueda alertar. `pg_dump
+  --format=custom` con la contraseña por `PGPASSWORD` (nunca en `argv`, que
+  `ps` expone). La verificación comprueba la firma del dump y que
+  `pg_restore --list` traiga las tablas críticas — detecta el dump truncado
+  por disco lleno, que a simple vista parece sano. Con
+  `BACKUP_VERIFY_DATABASE_URL` restaura de verdad contra una base desechable
+  y cuenta filas; se niega a restaurar sobre la base de origen, porque
+  `pg_restore --clean` borra el esquema destino. La purga por retención
+  **nunca borra el backup más reciente**, aunque esté vencido: si el cron
+  llevaba meses caído, borrarlo dejaría al ERP sin ninguna copia. Copia a S3
+  (o compatible) detrás de credenciales, con `boto3` como dependencia
+  opcional `[backups]` para no cargarla en la imagen de la API. **Frecuencia
+  revisada de mensual+incremental a diaria con retención de 30 días**
+  (`glossary.md`, `security.md`): un negocio que vende todos los días no
+  puede perder un mes de caja, y el dump completo pesa megas. Runbook de
+  restauración y línea de cron en `docs/engineering/devops.md`.
+  `tests/test_backups.py` (17 casos). Verificación pendiente: el camino feliz real (pg_dump contra Postgres) no se pudo ejecutar en la máquina de desarrollo — falta `postgresql-client`.
+
+- **Facturación electrónica — Factiliza (SUNAT)** (2026-07-26): migración
+  `b3d7f21ac094`. **Cambio de proveedor: Factiliza reemplaza a Nubefact**
+  (decisión del usuario); las columnas `comprobante.estado_nubefact`/
+  `respuesta_nubefact` se sustituyen por `estado_emision`
+  (`no_aplica|pendiente|aceptado|rechazado|error`), `hash_proveedor`,
+  `detalle_emision`, `intentos_emision` y `respuesta_proveedor`. Adaptador
+  nuevo en `src/shared/integrations/factiliza/`: `client.py` (`POST
+  /invoice/send`, Bearer) y `mapper.py` (traducción a catálogos SUNAT 01/
+  06/07/51/52 + leyenda 1000 en letras vía `num2words`). Cola nueva:
+  `src/core/celery_app.py` + tarea `sales.emitir_comprobante` con reintento
+  exponencial, y servicio `worker` en `docker-compose.yml`.
+  `sales.registrar_pago` crea el `comprobante` `pendiente` al cubrirse el
+  total y el router encola el envío **después del commit**; aceptado →
+  venta `facturada` + `sales.comprobante_emitido`; rechazo de SUNAT se
+  guarda como veredicto sin reintentar; fallo de transporte reintenta.
+  Boleta vs factura por `rules.tipo_comprobante` (factura solo con cliente
+  jurídico + RUC; anónimo → `CLIENTES VARIOS`). **IGV desglosado hacia
+  atrás** desde el precio de carta, y **exoneración automática** para
+  empresas de zona `amazonia_ley27037` (RN-IMP-001 — el caso real de
+  Majambo en Tarapoto). Sin `FACTILIZA_TOKEN` la emisión queda desactivada
+  y los comprobantes se acumulan pendientes: la caja nunca se bloquea
+  (RN-COM-003). Permiso `sales.emitir_comprobante` + endpoints
+  `GET /ventas/{id}/comprobante` y `POST /comprobantes/{id}/reintentar`.
+  Dependencias nuevas: `httpx` (pasa de dev a runtime), `num2words`.
+  `tests/test_facturacion_electronica.py` (23 casos).
+
+- **Endurecimiento de producción — rate limit, secretos y HTTPS**
+  (2026-07-26): `src/core/rate_limit.py` nuevo — límite por IP con contador
+  en Redis (ventana fija), aplicado a `/auth/login` y `/auth/refresh`
+  (10/min configurable); el lockout por cuenta no frenaba a quien rota
+  usernames desde una misma IP. Fail-open si Redis no responde: una caída de
+  Redis no puede dejar sin operar al restaurante. `settings` valida la
+  configuración al arrancar y **aborta** con `ENVIRONMENT=production` si
+  `JWT_SECRET` es el placeholder o mide menos de 32 caracteres, si
+  `DEBUG=true`, si `DATABASE_URL` conserva la contraseña por defecto o si
+  `ALLOWED_HOSTS`/`CORS_ORIGINS` quedaron en `*`. `create_app` suma
+  `TrustedHostMiddleware`, CORS con orígenes explícitos (antes no había CORS:
+  el frontend no podía llamar a la API), cabeceras `X-Content-Type-Options`/
+  `X-Frame-Options`/`Referrer-Policy` en toda respuesta, `HSTS` solo en
+  producción, y `/docs` + `/openapi.json` deshabilitados en producción.
+  Dockerfile arranca uvicorn con `--proxy-headers` (detrás de nginx la IP
+  real llega en `X-Forwarded-For`; sin esto el rate limit y el `audit_log`
+  registraban la IP del proxy). `docker-compose.yml` toma la contraseña de
+  Postgres de `POSTGRES_PASSWORD`. Runbook de rotación de credenciales y
+  custodia de `.env`, y guía de despliegue tras nginx/Caddy, en
+  `docs/engineering/devops.md`; `docs/security/security.md` actualizado.
+  `tests/test_security.py` (13 casos).
+
+- **`rrhh`: slice completo — ciclo laboral** (2026-07-25): migración
+  `9e1b6a4c7d23`, 12 tablas nuevas sobre `trabajador` (que solo tenía modelo,
+  sin capa de aplicación). `application/trabajadores.py` completa el ciclo
+  crear/actualizar/cesar (RN-PER-002: `locacion_servicios` fuerza
+  `registra_asistencia=false`). `contratos.py`: `contrato_laboral`
+  borrador→firmado→finalizado (RN-RRHH-012). `postulantes.py`: exige
+  `consentimiento_datos` antes de guardar CV (RN-PER-004). `socios.py`:
+  participación societaria. `nomina.py`: `boleta_pago`/`liquidacion_bss`
+  idempotentes por `idempotency_key` (RN-RRHH-001/003, flag
+  `dentro_de_plazo` de 48h). `disciplina.py`: `memorandum`/`amonestacion`/
+  `acta`/`certificado_trabajo` (RN-RRHH-002/004/007). `permisos.py`:
+  `solicitud_permiso` pendiente→aprobada/rechazada (RN-RRHH-005).
+  `capacitacion.py`: `pacto_permanencia` con reembolso proporcional al
+  tiempo no cumplido (RN-RRHH-006). `asistencia.py`: marcar entrada/salida,
+  bloqueado para trabajadores que no registran asistencia. 11 permisos
+  `rrhh.*` nuevos, rol `rrhh_admin`, `supervisor` gana lectura/aprobación de
+  permisos y marcado de asistencia. Constante `rrhh_rmv_vigente` en
+  settings (RN-PER-001). Endpoints bajo `/api/v1/rrhh`. `tests/test_rrhh.py`
+  (17 casos). Diferido: ver ROADMAP — eventos `rrhh.*` sin consumidor
+  todavía, `contrato`/`solicitud` transversales, cálculo automático de
+  PLAME.
+
 - **Pago a proveedor (PROC-CTB-003) — tesorería en `accounting`** (2026-07-25):
   migración `cbf904a9fc1b` (`movimiento_dinero`). `feat(purchases)`: nuevo
   `application/comprobantes.py::dar_conformidad_comprobante` (permiso
@@ -375,6 +538,26 @@ Versionado: [SemVer](https://semver.org/lang/es/).
   picking y despacho en almacén central, recepción y devoluciones en
   local — nueva área `Logistica-Almacen` en
   `docs/diagrams/Procesos/`.
+
+### Changed
+
+- **Documentación al día con lo construido** (2026-07-26): tres ADR nuevos
+  para decisiones que se habían tomado sin registrar —
+  **ADR-005** (Factiliza como proveedor de facturación electrónica; deja
+  constancia de que **Nubefact nunca fue un ADR**, era un supuesto heredado
+  del scaffold que arrastraron trece archivos), **ADR-006** (logs con la
+  biblioteca estándar en vez de `structlog`; Sentry/GlitchTip intercambiables
+  por DSN, así que elegir backend no es decisión de arquitectura) y
+  **ADR-007** (backups por `pg_dump` + cron y no Celery beat, porque el
+  backup debe correr justo cuando la aplicación está caída; salud expuesta a
+  un monitor externo). Barrido de las trece menciones obsoletas a Nubefact en
+  `data-model.md`, `overview.md`, `tech-stack.md`, `marco-legal-contabilidad.md`,
+  `diagrams/modules.md`, `business-rules.md`, `domain-model.md`,
+  `state-machines.md`, `workflows.md`, `glossary.md` y `vision.md`.
+  `overview.md` documenta ahora la infraestructura de operación de
+  `src/core/` (tabla archivo → responsabilidad) y `src/backups/`, más el
+  índice completo de ADR; `00_PROJECT.md` y el `README.md` raíz actualizados
+  con salud, backups y observabilidad.
 
 ### Fixed
 

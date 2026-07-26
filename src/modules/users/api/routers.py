@@ -5,6 +5,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
+from src.core.rate_limit import rate_limit_login
 from src.modules.users.api import schemas
 from src.modules.users.api.deps import (
     client_ip,
@@ -45,7 +46,12 @@ def _http(err: UsersError) -> HTTPException:
 
 
 # --- Auth -------------------------------------------------------------------
-@router.post("/auth/login", response_model=schemas.TokenPair, tags=["auth"])
+@router.post(
+    "/auth/login",
+    response_model=schemas.TokenPair,
+    tags=["auth"],
+    dependencies=[Depends(rate_limit_login)],
+)
 def login(body: schemas.LoginIn, request: Request, session: Session = Depends(get_db)):
     try:
         tokens = auth.login(session, body.username, body.pin, client_ip(request))
@@ -56,7 +62,12 @@ def login(body: schemas.LoginIn, request: Request, session: Session = Depends(ge
     return tokens
 
 
-@router.post("/auth/refresh", response_model=schemas.TokenPair, tags=["auth"])
+@router.post(
+    "/auth/refresh",
+    response_model=schemas.TokenPair,
+    tags=["auth"],
+    dependencies=[Depends(rate_limit_login)],
+)
 def refresh(body: schemas.RefreshIn, session: Session = Depends(get_db)):
     try:
         tokens = auth.refresh(session, body.refresh_token)

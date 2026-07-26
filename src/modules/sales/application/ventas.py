@@ -12,6 +12,7 @@ from decimal import Decimal
 from sqlalchemy.orm import Session
 
 from src.core.events import event_bus
+from src.modules.sales.application import comprobantes
 from src.modules.sales.application.errors import (
     Conflicto,
     NoEncontrado,
@@ -25,6 +26,7 @@ from src.modules.sales.infrastructure.repositories import (
     ProductoComercialRepo,
     VentaRepo,
 )
+from src.shared.models import Comprobante
 
 
 def crear_venta(
@@ -131,16 +133,21 @@ def registrar_pago(
     monto: Decimal,
     idempotency_key: str,
     referencia_externa: str | None = None,
-) -> tuple[Pago, Venta]:
+) -> tuple[Pago, Venta, Comprobante | None]:
     """El pago nace `confirmado` (PDV presencial). Pasarela con webhook de
-    confirmación async = slice Izipay posterior."""
+    confirmación async = slice Izipay posterior.
+
+    Al cubrirse el total se crea el `comprobante` en estado `pendiente`; el
+    envío a SUNAT lo hace la cola (el tercer valor devuelto es lo que el
+    router encola tras el commit).
+    """
     repo = PagoRepo(session)
     existente = repo.get_by_idempotency(idempotency_key)
     venta = VentaRepo(session).get(venta_id)
     if venta is None:
         raise NoEncontrado("venta no encontrada")
     if existente is not None:
-        return existente, venta
+        return existente, venta, None
 
     if venta.estado not in ("orden",):
         raise Conflicto(f"la venta está {venta.estado}; no admite pagos")
@@ -163,13 +170,15 @@ def registrar_pago(
             estado="confirmado",
         )
     )
+    comprobante = None
     if rules.pagos_cubren_total(confirmados + [monto], venta.total):
         venta.estado = "pagada"
         event_bus.publish(
             "sales.venta_pagada",
             {"venta_id": str(venta.id), "total": str(venta.total)},
         )
-    return pago, venta
+        comprobante = comprobantes.crear_comprobante_pendiente(session, venta)
+    return pago, venta, comprobante
 
 
 def anular_venta(session: Session, venta_id: uuid.UUID, usuario_id: uuid.UUID) -> Venta:

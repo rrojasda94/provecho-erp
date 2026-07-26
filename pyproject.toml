@@ -14,13 +14,26 @@ dependencies = [
     "celery>=5.4",
     "argon2-cffi>=23.1",
     "pyjwt>=2.9",
+    # No-op sin SENTRY_DSN. Va en las dependencias base a propósito: si fuera
+    # opcional, un despliegue que olvide el extra se queda justo sin lo que
+    # avisa que algo falla.
+    "sentry-sdk>=2.0",
+    "httpx>=0.27",
+    # Monto en letras de la leyenda 1000 del comprobante electrónico
+    # (SUNAT lo exige). Escribirlo a mano falla en los casos raros del
+    # español: veintiuno, quinientos, novecientos.
+    "num2words>=0.5",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",
-    "httpx>=0.27",
     "ruff>=0.6",
+]
+# Solo el servidor que corre el cron de backups necesita esto — la imagen
+# de la API no carga boto3.
+backups = [
+    "boto3>=1.34",
 ]
 
 [build-system]
@@ -38,8 +51,9 @@ target-version = "py312"
 select = ["E", "F", "I", "UP", "B", "C901"]
 
 [tool.ruff.lint.per-file-ignores]
-# Migraciones autogeneradas por Alembic: no se reformatean a mano.
-"alembic/versions/*" = ["E501"]
+# Migraciones autogeneradas por Alembic: no se reformatean a mano
+# (I001: el orden de imports lo fija la plantilla de Alembic, no nosotros).
+"alembic/versions/*" = ["E501", "I001"]
 # B008: FastAPI usa `Depends(...)` en valores por defecto (patrón idiomático).
 "src/modules/*/api/*" = ["B008"]
 

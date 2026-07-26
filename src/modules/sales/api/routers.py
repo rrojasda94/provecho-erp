@@ -6,15 +6,23 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from src.modules.sales.api import schemas
-from src.modules.sales.application import catalogo, queries_publicas, ventas
+from src.modules.sales.application import (
+    catalogo,
+    comprobantes,
+    queries_publicas,
+    tasks,
+    ventas,
+)
 from src.modules.sales.application.errors import (
     Conflicto,
     NoEncontrado,
     ReglaNegocio,
     SalesError,
 )
+from src.modules.sales.infrastructure.repositories import ComprobanteRepo
 from src.modules.users.api.deps import get_db, require_permission
 from src.modules.users.infrastructure.models import Usuario
+from src.shared.integrations.factiliza import FactilizaError
 
 router = APIRouter(prefix="/sales", tags=["sales"])
 
@@ -24,6 +32,7 @@ LEER = "sales.leer"
 ANULAR = "sales.anular"
 CATALOGO = "sales.gestionar_catalogo"
 LEER_CLIENTES_EXTERNOS = "sales.leer_clientes_externos"
+EMITIR = "sales.emitir_comprobante"
 
 _HTTP_STATUS: dict[type[SalesError], int] = {
     NoEncontrado: status.HTTP_404_NOT_FOUND,
@@ -84,7 +93,7 @@ def registrar_pago(
     session: Session = Depends(get_db),
 ):
     try:
-        pago, _venta = ventas.registrar_pago(
+        pago, _venta, comprobante = ventas.registrar_pago(
             session,
             venta_id=venta_id,
             medio_pago_id=body.medio_pago_id,
@@ -95,6 +104,10 @@ def registrar_pago(
     except (NoEncontrado, Conflicto, ReglaNegocio) as e:
         raise _http(e) from e
     session.commit()
+    # Después del commit: el worker corre en otro proceso y solo puede ver
+    # filas ya confirmadas.
+    if comprobante is not None:
+        tasks.encolar(comprobante.id)
     return pago
 
 
@@ -110,6 +123,41 @@ def anular_venta(
         raise _http(e) from e
     session.commit()
     return venta
+
+
+# --- Comprobante electrónico ------------------------------------------------
+@router.get("/ventas/{venta_id}/comprobante", response_model=schemas.ComprobanteOut)
+def ver_comprobante(
+    venta_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(LEER)),
+    session: Session = Depends(get_db),
+):
+    comprobante = ComprobanteRepo(session).por_venta(venta_id)
+    if comprobante is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "la venta no tiene comprobante")
+    return comprobante
+
+
+@router.post(
+    "/comprobantes/{comprobante_id}/reintentar",
+    response_model=schemas.ComprobanteOut,
+)
+def reintentar_emision(
+    comprobante_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(EMITIR)),
+    session: Session = Depends(get_db),
+):
+    """Reenvía a SUNAT un comprobante rechazado o con fallo de transporte.
+    Corre en línea (no en la cola) para devolver el veredicto al operador."""
+    try:
+        comprobante = comprobantes.emitir_comprobante(session, comprobante_id)
+    except (NoEncontrado, Conflicto) as e:
+        raise _http(e) from e
+    except FactilizaError as e:
+        session.commit()  # conserva el intento contado
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(e)) from e
+    session.commit()
+    return comprobante
 
 
 # --- Contrato público de lectura (marketing/comercial/análisis) -------------

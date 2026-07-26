@@ -13,9 +13,65 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install -e ".[dev]"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - run: pip install -e ".[dev,backups]"
       - run: ruff check .
       - run: pytest
+      # Dos cabezas de Alembic hacen fallar `upgrade head` en el despliegue,
+      # no en el merge que las creó. Se detecta acá, no en producción.
+      - name: Migraciones con una sola cabeza
+        run: |
+          cabezas=$(alembic heads | grep -c '(head)')
+          if [ "$cabezas" -ne 1 ]; then
+            echo "Se esperaba 1 cabeza de Alembic, hay $cabezas:"
+            alembic heads
+            exit 1
+          fi
+
+  # Nadie comprobaba que la imagen siquiera construyera: un Dockerfile roto
+  # se descubría al desplegar.
+  imagen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: provecho:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      # Arranca la imagen real y espera que responda: valida el CMD, el
+      # usuario sin privilegios y el HEALTHCHECK, no solo que compile.
+      - name: La imagen levanta y responde
+        run: |
+          docker run -d --name provecho-ci -p 8000:8000 \
+            -e ENVIRONMENT=testing \
+            -e DATABASE_URL=postgresql+psycopg://x:x@localhost/x \
+            provecho:ci
+          for intento in $(seq 1 20); do
+            if curl -fsS http://localhost:8000/health; then exit 0; fi
+            sleep 1
+          done
+          echo "La imagen no respondió en /health"
+          docker logs provecho-ci
+          exit 1
+
+  seguridad:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e "." pip-audit
+      # Informativo por ahora: un aviso en una dependencia transitiva no debe
+      # frenar un arreglo urgente en caja. Pasa a bloqueante cuando el equipo
+      # tenga rutina de revisión (ver ROADMAP → Deuda técnica → Seguridad).
+      - run: pip-audit --progress-spinner=off || true
 
   frontend:
     runs-on: ubuntu-latest
@@ -27,6 +83,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-      - run: npm install
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
       - run: npm run lint
       - run: npm run build

@@ -406,4 +406,4 @@ de anulación (5 minutos).
 - Pedidos por agente humano o **agente de IA** (mismo contrato, mismos permisos).
 - Trazabilidad total: todo movimiento auditado (quién, qué, cuándo, dónde).
 - Corre igual en Docker local y en servidor.
-- Integraciones: Nubefact (SUNAT), Izipay (pagos), Google API, Meta API.
+- Integraciones: Factiliza (facturación electrónica SUNAT), Izipay (pagos), Google API, Meta API.

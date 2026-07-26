@@ -49,7 +49,7 @@ erDiagram
 - **grupo**: nombre.
 - **empresa**: grupo_id, razón social, RUC, domicilio fiscal, contacto, tipo
   (`operativa` | `logistica` | `servicios` | `asesoria` | `transporte`),
-  config fiscal (Nubefact), zona_tributaria (`amazonia_ley27037` |
+  config fiscal (proveedor de facturación), zona_tributaria (`amazonia_ley27037` |
   `general` — determina exoneración de IGV y tasa reducida de IR,
   RN-IMP-001).
 - **marca**: grupo_id (dueño de la identidad, no la empresa), nombre, skins
@@ -544,7 +544,8 @@ Solicitud.
   (único por empresa+serie — nunca se repite, RN-CPP-007), sustento
   (`efectivo` | `voucher_medio_pago` | `movimiento_bancario` |
   `contrato_credito`, RN-CPP-003), idempotency_key (anti-duplicado/
-  reemisión, RN-CPP-008), estado Nubefact, respuesta (JSONB).
+  reemisión, RN-CPP-008), estado de emisión, hash e intentos del
+  proveedor, respuesta (JSONB). Ver ADR-005 (Factiliza).
 - **cliente**: grupo_id (transversal al grupo, no a una empresa —
   RN-PTS-001), tipo (`natural` | `juridico` — ej. cliente corporativo:
   catering/eventos), persona_id (si `natural`) o razon_social + ruc (si

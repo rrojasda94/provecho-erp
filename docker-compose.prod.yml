@@ -1,0 +1,51 @@
+# Despliegue en servidor. `docker-compose.yml` es SOLO desarrollo: monta el
+# código, corre uvicorn con --reload y trae un Postgres con contraseña de
+# juguete. Desplegar con ese archivo publicaría una configuración de
+# desarrollo.
+#
+# Uso:
+#   docker compose -f docker-compose.prod.yml up -d
+#
+# La base de datos NO está acá: en producción es gestionada (Supabase u otro
+# Postgres propio), apuntada por DATABASE_URL. Un Postgres en el mismo
+# compose no tendría backups ni failover.
+#
+# TLS lo termina nginx/Caddy delante; la API solo escucha en loopback.
+# Ver docs/engineering/devops.md.
+
+services:
+  api:
+    image: ${PROVECHO_IMAGE:-ghcr.io/majambo/provecho:latest}
+    restart: unless-stopped
+    env_file: .env
+    # Solo loopback: el proxy es la única puerta de entrada desde fuera.
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  worker:
+    image: ${PROVECHO_IMAGE:-ghcr.io/majambo/provecho:latest}
+    restart: unless-stopped
+    env_file: .env
+    command: celery -A src.core.celery_app worker --loglevel=info
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # Sin puertos publicados: solo lo alcanzan api y worker por la red interna.
+    command: redis-server --save 60 1 --appendonly no
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  redisdata:

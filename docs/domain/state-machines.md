@@ -61,7 +61,7 @@ marcados aparte, fuera de Venta.
 stateDiagram-v2
     [*] --> orden: confirmar (RN-COM-001, Orden de Pedido)
     orden --> pagada: pago adelantado (autoatención, RN-POS-005)
-    pagada --> facturada: comprobante Nubefact (RN-COM-003, recomendado)
+    pagada --> facturada: comprobante aceptado por SUNAT (RN-COM-003, recomendado)
     orden --> facturada: comprobante antes de pago (RN-COM-006, no recomendable)
     facturada --> anulada: nota de crédito
     pagada --> anulada

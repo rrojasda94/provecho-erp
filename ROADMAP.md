@@ -24,7 +24,8 @@ Registro de lo construido y lo pendiente. Actualizar en cada cambio relevante.
 | Módulo `accounting` | 🔶 slice core+tesorería ✅ 2026-07-25 | Libro contable núcleo: plan de cuentas (`cuenta_contable`), periodo (`periodo_contable`, abrir/cerrar), asiento manual (`asiento`/`asiento_linea`, cuadre RN-CTB-001, anulación por asiento inverso RN-CTB-002) y mapeo configurable evento→cuentas (`regla_asiento`) que alimenta la generación automática para 4 eventos operativos ya publicados en código (`purchases.oc_emitida`, `purchases.compra_recibida`, `sales.venta_confirmada`, `purchases.comprobante_conforme`). **Pago a proveedor** (PROC-CTB-003, `movimiento_dinero`): cola idempotente por comprobante (RN-CTB-008) → ejecutar con umbral configurable + permiso (RN-CTB-005) → asiento automático. Migraciones `5402d99333fa`+`cbf904a9fc1b` aplicadas. Diferido: ver Deuda técnica. |
 | Producción (fabricación) | 🔶 slice core ✅ 2026-07-25 | Orden de producción ad-hoc (crear → registrar consumo → completar con resultado de control de calidad) y costeo automático. Construido antes de tiempo a pedido del usuario — primera cocina real sigue planeada 2027. `receta.articulo_id` nuevo liga receta↔subreceta. Diferido: ver Deuda técnica. |
 | Solicitudes / picking / transporte | ⬜ | Módulos futuros `requests`, `logistics` |
-| RRHH: procesos y plantillas (reclutamiento, contratación, inducción) | ✅ 2026-07-19 | `docs/rrhh/`, 13 SOPs, 9 plantillas — ver detalle abajo. Módulo backend `rrhh` sigue pendiente |
+| Módulo `rrhh` | ✅ slice completo 2026-07-25 | Ciclo laboral completo: `trabajador` (con capa de aplicación que faltaba) + 12 entidades de §8b — `contrato_laboral` (borrador→firmado→finalizado), `postulante` (RN-PER-004), `socio`, `boleta_pago`/`liquidacion_bss` (idempotentes, RN-RRHH-001/003), `memorandum`/`amonestacion`/`acta`/`certificado_trabajo` (RN-RRHH-002/004/007), `solicitud_permiso` (RN-RRHH-005), `pacto_permanencia` (reembolso proporcional, RN-RRHH-006), `asistencia` (RN-RRHH-009, bloqueada para locación de servicios RN-PER-002). Migración `9e1b6a4c7d23`. Diferido: ver Deuda técnica. |
+| RRHH: procesos y plantillas (reclutamiento, contratación, inducción) | ✅ 2026-07-19 | `docs/rrhh/`, 13 SOPs, 9 plantillas — ver detalle abajo. |
 | Compras: procesos y plantillas (proveedores, cotización, OC, recepción, pago, caja chica, activos) | ✅ 2026-07-19 | `docs/compras/`, 11 SOPs, 6 plantillas — ver detalle abajo. Módulo backend `purchases` actualizado conforme al flujo |
 | Comercial: procesos y plantillas (precio/margen, promociones, mercado, metas, desempeño, capacitación) | ✅ 2026-07-19 | `docs/comercial/`, 9 SOPs, 5 plantillas — ver detalle abajo. Módulo backend `sales` ajustado (margen, vigencia de promoción) |
 | Almacén-Logística: procesos y plantillas (conteo, vencimientos/merma, transporte/transferencias) | ✅ 2026-07-19 | `docs/almacen-logistica/`, 8 SOPs, 6 plantillas — ver detalle abajo. Módulo backend `inventory` ajustado (lote, merma, ajuste solicitar/aprobar) |
@@ -33,16 +34,19 @@ Registro de lo construido y lo pendiente. Actualizar en cada cambio relevante.
 | Marketing: procesos y plantillas (marca/naming, contenido, campañas, material en sucursal, agencias) | ✅ 2026-07-22 | `docs/marketing/`, 6 SOPs, 4 plantillas — ver detalle abajo. Módulo backend `marketing` nuevo (spec técnica); PROC-MKT-001 registrado. Resuelve el pendiente "módulo marketing README/contrato propio" |
 | Contabilidad: procesos y plantillas | ✅ 2026-07-24 | `docs/contabilidad/` (política + marco legal + perfil contador/tesorero), 3 SOPs nuevos (pago a proveedor PROC-CTB-003, conciliación bancaria PROC-CTB-004, arqueo sorpresa PROC-CTB-005), 4 plantillas — ver detalle abajo. Área = tesorería + finanzas + registro + auditoría interna en un solo responsable, supervisada por Gerencia (RN-CTB-004..009; control en dos niveles: Contabilidad audita a las operativas, Gerencia audita a Contabilidad). Quedan propuestos PROC-CTB-006..013 |
 | Mantenimiento, Sistemas/TI como áreas propias | ⬜ | Definidas como áreas del negocio (posible tercerización); documentación pendiente, desactivadas por ahora |
-| RRHH backend, supervisión, CRM, tesorería, activos, proyectos, BI, reportes | ⬜ | Módulos futuros |
-| Integración Nubefact | ⬜ | Adaptador en `src/shared/integrations/` |
+| Supervisión, CRM, tesorería, activos, proyectos, BI, reportes | ⬜ | Módulos futuros |
+| Integración de facturación electrónica (**Factiliza**) | 🔶 boleta/factura ✅ 2026-07-26 | **Reemplaza a Nubefact** (decisión del usuario). Adaptador en `src/shared/integrations/factiliza/`; cola Celery + servicio `worker`; migración `b3d7f21ac094`. Emite boleta/factura con IGV desglosado y exoneración de Amazonía (RN-IMP-001). Diferido: nota de crédito, PDF/XML/CDR, guía de remisión — ver Deuda técnica → sales. |
 | Integración Izipay | ⬜ | Proveedor decidido (ADR-003) |
 | Integraciones Google / Meta | ⬜ | |
 | Agentes IA para pedidos | ⬜ | |
 | Notificaciones | ⬜ | Celery + canales por definir |
 | Auditoría (audit_log) | ⬜ | Especificada en data-model |
+| Endurecimiento de producción (rate limit, secretos, HTTPS, cabeceras) | 🔶 base ✅ 2026-07-26 | Rate limit por IP en login/refresh (Redis, fail-open), validación de config que aborta el arranque en `production` con valores de desarrollo, CORS + `TrustedHost` + cabeceras de seguridad + HSTS, `/docs` cerrado en producción, uvicorn `--proxy-headers`. Runbook de rotación de credenciales y custodia de `.env` en `docs/engineering/devops.md`. Pendiente: ver Deuda técnica → Seguridad. |
 | App Android (15+) | ⬜ | Evaluar PWA vs nativo (ADR pendiente) |
-| Backups automáticos | ⬜ | |
-| Observabilidad (métricas, trazas, logs centralizados) | ⬜ | |
+| Backups automáticos | ✅ 2026-07-26 | `python -m src.backups.backup`: dump `pg_dump --format=custom` → verificación del archivo (firma + tablas críticas) → restauración probada contra base desechable → copia a S3 (opcional) → purga con retención de 30 días que nunca borra la copia más reciente. **Diario** (antes se declaraba mensual e incremental). Cron del host, no Celery beat. Runbook en `docs/engineering/devops.md#backups`. Pendiente: alerta ante fallo, ver Deuda técnica. |
+| CI/CD | 🔶 CI + entrega ✅ 2026-07-26 | `ci.yml` gana tres verificaciones que no existían: cabeza única de Alembic (una doble falla en el despliegue, no en el merge que la crea), construcción de la imagen **y arranque real del contenedor** contra `/health`, y `pip-audit` informativo. `release.yml` publica la imagen en GHCR en cada push a `main` (tags `v*` → versión exacta). `docker-compose.prod.yml` nuevo: el compose existente es solo desarrollo y desplegarlo publicaría esa configuración. Dockerfile con usuario sin privilegios y `HEALTHCHECK`. El **despliegue sigue manual** y documentado hasta que exista el VPS (ADR-008). |
+| Chequeos de salud y alertas | ✅ 2026-07-26 | `src/core/health.py` + `health_router.py`: `/health` (liveness, sin dependencias), `/health/ready` (base de datos crítica → 503; Redis y cola degradan sin sacar de rotación) y `/health/backups` (503 pasadas 26 h — cubre el backup que nunca corrió, que no genera evento de error). El ERP expone estado; **un monitor externo alerta** (ADR-007): construir alertas dentro del servidor que se monitorea deja de avisar justo cuando ese servidor cae. Pendiente: contratar el monitor y dar de alta las sondas. |
+| Observabilidad (métricas, trazas, logs centralizados) | 🔶 logs + errores ✅ 2026-07-26 | `src/core/logging_config.py`: JSON en producción, tres flujos (`app`/`seguridad`/`auditoria`) derivados del nombre del logger, `request_id` por request (respeta `X-Request-ID` entrante, sale en la cabecera y en el cuerpo del error 500), redacción de PIN/tokens/`Authorization`. `src/core/sentry.py`: reporte de errores en `api`, `worker` (señal `celeryd_init`) y `backups`; sirve para Sentry o GlitchTip autoalojado, no-op sin DSN. Pendiente: métricas, trazas y colector de logs — ver Deuda técnica. |
 | UX: menús, buscadores, breadcrumbs, atajos, sidebars, dashboards | ⬜ | Definición pendiente con el usuario |
 | Branding (paleta, tipografías, tokens CSS) | ✅ 2026-07-04 | Brandboard aplicado — `docs/product/ui-ux.md` |
 
@@ -94,6 +98,16 @@ contiene, buscando su `[[ COMPLETAR ]]`):
   momento se registran los PROC en el registro maestro.
 - ⬜ BPMN pendientes ya declarados: contingencias de personal faltante
   (RN-RRHH-011) y tardanza/falta del encargado (RN-RRHH-010).
+- ⬜ **Pendiente del usuario para desplegar el endurecimiento de producción**
+  (2026-07-26, ver ROADMAP → Deuda técnica → Seguridad): no bloquea seguir
+  desarrollando, solo hace falta al desplegar de verdad.
+  1. Dominio real de producción → fijar `ALLOWED_HOSTS` y `CORS_ORIGINS` en
+     el `.env` del servidor.
+  2. Generar el `JWT_SECRET` real: `python -c "import secrets;
+     print(secrets.token_urlsafe(48))"` — nunca el placeholder `change-me`.
+  3. Cuando exista el VPS: Claude escribe el `nginx.conf` concreto (TLS,
+     `proxy_pass`, `X-Forwarded-For`/`X-Forwarded-Proto`,
+     `FORWARDED_ALLOW_IPS` con la IP real del proxy).
 
 ## Deuda técnica pendiente (backlog)
 
@@ -118,6 +132,86 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   El patrón de contrato público ya está establecido (`sales.cliente`, ver
   `docs/architecture/events.md`) — replicar cuando `solicitud_insumos`
   se implemente.
+
+### Seguridad (tras el endurecimiento base de 2026-07-26)
+- ⬜ **Rate limit global**, no solo en auth: el resto de la API sigue sin
+  límite. Se resuelve mejor en nginx/Caddy (`limit_req`) que en la
+  aplicación — decidir al configurar el servidor de producción.
+- ⬜ **Ventana deslizante en el rate limit**: hoy es ventana fija; un pico
+  justo en el borde deja pasar hasta el doble del límite. Solo vale la pena
+  si aparece abuso real.
+- ⬜ **Rate limit por usuario además de por IP**: una IP compartida (la
+  sucursal entera sale por la misma) puede agotar el límite de todos.
+  Evaluar cuando haya varias cajas por local.
+- ⬜ **Content-Security-Policy**: falta definirla junto con el frontend
+  (hoy solo hay cabeceras que no dependen del contenido).
+- ⬜ **Escaneo de dependencias** (`pip-audit`/Dependabot) en CI.
+- ⬜ **Verificación de firma en webhooks entrantes** (Izipay, Meta):
+  documentada en `security.md`, sin implementar — llega con las
+  integraciones.
+
+### CI/CD (tras la implementación de 2026-07-26)
+- ⬜ **Job de despliegue**: hoy el despliegue es manual y documentado. Se
+  escribe cuando exista el VPS — automatizar por SSH contra una máquina que
+  no existe da automatización no probada (ADR-008).
+- ⬜ **Imagen de producción del frontend**: su `Dockerfile` sigue siendo de
+  desarrollo (`npm run dev`), sin build de producción ni multi-stage. Por eso
+  `release.yml` publica solo la imagen del backend.
+- ⬜ **`pip-audit` bloqueante**: hoy es informativo (`|| true`) para que un
+  aviso en una dependencia transitiva no frene un arreglo urgente en caja.
+  Pasar a bloqueante cuando el equipo tenga rutina de revisión.
+- ⬜ **Escaneo de la imagen** (Trivy/Grype) y firma del artefacto: el
+  contenido de la imagen base no se audita todavía.
+- ⬜ **Entorno de staging**: hoy se saltaría de CI a producción directo.
+- ⬜ **Migraciones con vuelta atrás probada**: `alembic downgrade` existe por
+  archivo pero nunca se ejercita; un despliegue fallido no tiene camino de
+  regreso verificado.
+
+### Observabilidad y salud (tras las implementaciones de 2026-07-26)
+- ⬜ **Elegir proveedor y cargar `SENTRY_DSN`**: el código está listo pero
+  sin DSN no reporta nada. Decidir Sentry SaaS (plan gratis) vs GlitchTip
+  autoalojado en el mismo VPS — el código es el mismo para ambos (ADR-006).
+- ⬜ **Contratar el monitor externo** y darle de alta las tres sondas
+  (`/health` 1 min, `/health/ready` 5 min, `/health/backups` 1 h). Sin
+  monitor, los endpoints no alertan a nadie: el ERP expone, el monitor avisa
+  (ADR-007).
+- ⬜ **Colector de logs**: hoy el JSON sale a stdout y queda en `docker logs`
+  / journald. Falta enviarlo a algún lado consultable (Loki, o el propio
+  Sentry para el flujo de errores).
+- ⬜ **Métricas** (CPU, memoria, latencia, disponibilidad) y **trazas de
+  rendimiento**: `SENTRY_TRACES_SAMPLE_RATE` está en 0. Subirlo cuando haya
+  tráfico real que valga la pena perfilar.
+- ✅ 2026-07-26 **Health check profundo**: `/health/ready` comprueba base de
+  datos, Redis y profundidad de la cola; `/health/backups` comprueba
+  frescura. Liveness quedó separado y sin dependencias a propósito.
+- ⬜ **Salud del worker**: se infiere de la cola (si crece, el worker murió),
+  no se pregunta directo. Suficiente por ahora; un `celery inspect ping` es
+  caro para un endpoint que se sondea cada minuto.
+- ⬜ **Handler de listener que revienta**: `EventBus.publish` corre los
+  handlers en línea; si uno lanza, arrastra al publicador (una venta podría
+  fallar por un listener contable). Evaluar aislar cada handler y reportar
+  el fallo sin tumbar la operación.
+- ⬜ **Flujo `auditoria` sin usuarios**: el `audit_log` va a base de datos
+  pero no emite al log estructurado; el flujo está definido y vacío.
+
+### Backups (tras la implementación de 2026-07-26)
+- ✅ 2026-07-26 **Alerta ante fallo**: el comando reporta a Sentry
+  (`iniciar_sentry("backups")` + `reportar`) cuando falla, y
+  `GET /health/backups` devuelve 503 cuando el último backup pasó las 26 h —
+  que cubre el caso traicionero, el backup que **nunca corrió** y por eso no
+  genera ningún evento de error. Falta solo dar de alta la sonda en el
+  monitor externo (ver Observabilidad y salud).
+- ⬜ **Restauración probada sin base desechable**: hoy `BACKUP_VERIFY_DATABASE_URL`
+  es opcional y, si falta, solo se valida el archivo. Levantar la base de
+  verificación en el servidor de producción para que la prueba real corra
+  siempre (al menos semanal).
+- ⬜ **Copia on-premise**: `security.md` declara redundancia on-premise +
+  nube; hoy están el disco del servidor y S3 (ambos "nube" si el servidor es
+  un VPS). Falta definir dónde vive la copia dentro de la empresa.
+- ⬜ **Backup de archivos de S3** (`archivo`): solo se respalda Postgres.
+  Cuando el módulo de archivos exista, sus objetos también necesitan copia.
+- ⬜ **Cifrado del dump en reposo**: el archivo contiene datos personales de
+  trabajadores y clientes (Ley 29733). Hoy va en claro al disco y al bucket.
 
 ### Módulo inventory (slices siguientes)
 - ✅ 2026-07-25 **Listener `sales.venta_confirmada`** → consumo por receta
@@ -151,9 +245,25 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
 - ⬜ **Precio server-side** (`lista_precio`/`precio`/`promocion`): hoy el
   PDV manda `precio_unitario` en el request. RN-COM: el precio lo fija el
   sistema por sucursal/canal.
-- ⬜ **Comprobante** (boleta/factura vía Nubefact) — venta `pagada` →
-  `facturada`; series por `punto_venta`.
-- ⬜ **Nota de crédito** (anulación post-pago).
+- ✅ 2026-07-26 **Comprobante** (boleta/factura vía **Factiliza**) — venta
+  `pagada` → `facturada`; series por `punto_venta`; correlativo por
+  (empresa, serie); cola Celery con reintentos. Migración `b3d7f21ac094`.
+- ⬜ **Nota de crédito** (anulación post-pago): endpoint `/note/send` de
+  Factiliza ya relevado (requiere `afectado_Tipo_Doc`/`afectado_Num_Doc` +
+  `motivo_Cod` del catálogo 09). Bloqueado por la decisión de flujo de
+  anulación post-pago, no por la integración.
+- ⬜ **Descarga de PDF / XML / CDR** del comprobante emitido
+  (`/invoice/pdf|xml|cdr`): hoy se guarda el `hash` y la respuesta cruda,
+  pero el cliente no puede bajarse su representación impresa.
+- ⬜ **Guía de remisión electrónica** (`/despatch-*` de Factiliza) —
+  se cruza con `guia_remision`, deuda de `inventory`.
+- ⬜ **Comprobante sin correlativo reservado**: si Factiliza rechaza, el
+  correlativo queda consumido por una fila `rechazado`. SUNAT admite
+  huecos, pero conviene revisar si el negocio quiere reusarlo.
+- ⬜ **Barrido de comprobantes pendientes**: `ComprobanteRepo.pendientes`
+  ya existe pero nadie la llama — falta el periódico (Celery beat) que
+  recoja los que quedaron sin encolar (ej. emitidos cuando aún no había
+  `FACTILIZA_TOKEN`).
 - ⬜ **Webhook de pasarela** (Izipay): hoy el pago nace `confirmado`
   (PDV presencial); pago online requiere estado `pendiente` + confirmación.
 - ⬜ **Enlace con caja** (`apertura_caja`/`cierre_caja` de accounting):
@@ -297,6 +407,38 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   genera exactamente 2 líneas por evento (una cuenta debe, una haber) —
   suficiente para provisión/recepción/venta simples; un asiento con más de
   2 líneas (ej. IGV desglosado) requiere asiento manual o ampliar el mapeo.
+
+### Módulo rrhh (slice completo — deuda declarada)
+- ✅ 2026-07-25 **Ciclo laboral completo**: `trabajador` (capa de aplicación
+  que faltaba desde el slice de venta) + `contrato_laboral`, `postulante`,
+  `socio`, `boleta_pago`, `liquidacion_bss`, `memorandum`, `amonestacion`,
+  `acta`, `certificado_trabajo`, `solicitud_permiso`, `pacto_permanencia`,
+  `asistencia`. Migración `9e1b6a4c7d23`.
+- ⬜ **`contrato`/`solicitud` transversales**: `contrato_laboral` y
+  `solicitud_permiso` se modelaron directo en `rrhh` (sin precedente de
+  entidad genérica en código todavía) — mismo diferimiento que `purchases`
+  hizo con `cotizacion`. Si otro módulo necesita `contrato`/`solicitud`
+  genérico, extraer entidad transversal en `src/shared/` y migrar ambos.
+- ⬜ **Eventos `rrhh.*` sin consumidor**: `trabajador_cesado`,
+  `contrato_laboral_firmado`, `boleta_pago_emitida`, `liquidacion_bss_pagada`,
+  `solicitud_permiso_aprobada`, `amonestacion_emitida` se publican pero
+  nadie escucha todavía. Candidatos: `accounting` podría generar asiento al
+  escuchar `boleta_pago_emitida`/`liquidacion_bss_pagada` (mismo patrón que
+  `purchases.compra_recibida`); `users` podría desactivar el `usuario`
+  ligado al escuchar `trabajador_cesado`.
+- ⬜ **RN-RRHH-007 (visado de abogado) y RN-CTR-002 sin enforcement**: las
+  cartas/actas se generan desde plantilla + datos del ERP, pero no hay
+  entidad `plantilla` ni flag de "visado" — hoy es proceso manual fuera del
+  ERP.
+- ⬜ **Convocatoria/perfil de puesto sin modelar**: RN-RRHH-013 (no publicar
+  convocatoria sin perfil aprobado) es hoy proceso documental
+  (`docs/rrhh/perfiles/`), no hay tabla `convocatoria` — `postulante` nace
+  suelto, sin FK a una convocatoria.
+- ⬜ **Uniforme/EPP (RN-RRHH-014/015)** y **parentesco/relaciones
+  (RN-RRHH-016/017)**: sin modelo — hoy son controles manuales/SOP.
+- ⬜ **`boleta_pago`/`liquidacion_bss` sin cálculo automático de PLAME**: la
+  API recibe `ingresos`/`descuentos`/montos ya calculados (por el contador
+  externo) — no hay motor de cálculo de renta 5ta/ONP/AFP/EsSalud en el ERP.
 
 ## Orden sugerido de desarrollo
 

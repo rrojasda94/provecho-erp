@@ -854,7 +854,7 @@ contrato o lo solicitado según la cotización.
 El número de serie se asigna por punto de venta, con correlativo propio;
 cada empresa tiene sus propios comprobantes (serie/correlativo no se
 comparten entre empresas del grupo) y no puede repetir uno emitido dentro
-de sí misma. El ERP o el proveedor de facturación (Nubefact) debe
+de sí misma. El ERP o el proveedor de facturación (Factiliza) debe
 garantizar un mecanismo anti-duplicado y anti-reemisión.
 
 ### Guía de Remisión
