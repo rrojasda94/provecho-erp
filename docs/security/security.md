@@ -2,7 +2,9 @@
 
 Autenticación, endurecimiento, auditoría y backups. El control de acceso
 (roles, permisos, restricciones por tenant) vive aparte en
-[authorization.md](authorization.md).
+[authorization.md](authorization.md). Protección de datos personales
+(Ley 29733, derechos ARCO) vive aparte en
+[proteccion-datos-personales.md](proteccion-datos-personales.md).
 
 ## Autenticación
 

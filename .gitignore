@@ -15,6 +15,7 @@ frontend/out/
 .env
 .env.*
 !.env.example
+!.env.hub.example
 
 # Backups de la base (nunca versionados: son datos reales del negocio).
 # Anclado a la raíz: sin la barra inicial también tapaba `src/backups/`,

@@ -7,6 +7,7 @@ from fastapi import APIRouter, Response, status
 
 from src.config.settings import settings
 from src.core.health import CAIDO, revisar_backups, revisar_todo
+from src.core.sync import estado_conexion
 
 router = APIRouter(tags=["core"])
 
@@ -37,3 +38,20 @@ def health_backups(respuesta: Response) -> dict:
     if resultado["estado"] == CAIDO:
         respuesta.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
     return resultado
+
+
+@router.get("/health/sync")
+def health_sync() -> dict:
+    """Solo tiene sentido en un hub (ADR-009): si este proceso es la nube,
+    lo dice explícitamente en vez de fingir un estado que no aplica.
+
+    Siempre 200: a diferencia de `/health/ready`, "offline" acá NO significa
+    que el hub esté fallando — es justo su modo de diseño durante un corte
+    de internet, y sigue sirviendo perfecto a la LAN. Sacarlo de rotación
+    por esto sería exactamente lo contrario de lo que se necesita. Es
+    diagnóstico para que un monitor externo avise si lleva offline
+    demasiado tiempo, no una señal de "no sirvas tráfico".
+    """
+    if not settings.es_hub:
+        return {"aplica": False, "motivo": "deployment_mode=cloud"}
+    return {"aplica": True, **estado_conexion.verificar_conectividad()}

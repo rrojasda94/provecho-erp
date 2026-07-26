@@ -127,3 +127,115 @@ def test_editar_persona_version_desactualizada_409(client):
         json={"version": persona["version"], "telefono": "222222222"},
     )
     assert r2.status_code == 409
+
+
+# --- Derecho de cancelación: anonimización (Ley 29733, ADR-011) -------------
+def test_anonimizar_persona_borra_los_campos_identificables(client) -> None:
+    headers = _admin_auth(client)
+    persona = _crear_persona(client, headers).json()
+
+    r = client.post(
+        f"/api/v1/personas/{persona['id']}/anonimizar",
+        headers=headers,
+        json={"motivo": "solicitud ARCO del titular"},
+    )
+
+    assert r.status_code == 200
+    body = r.json()
+    assert body["nombres"] == "ANONIMIZADO"
+    assert body["apellidos"] == "ANONIMIZADO"
+    assert body["numero_documento"] != persona["numero_documento"]
+    assert body["numero_documento"].startswith("ANON")
+    assert body["domicilio"] is None
+    assert body["telefono"] is None
+    assert body["email"] is None
+    assert body["anonimizado_at"] is not None
+
+
+def test_anonimizar_persona_dos_veces_da_409(client) -> None:
+    headers = _admin_auth(client)
+    persona = _crear_persona(client, headers).json()
+    primera = client.post(
+        f"/api/v1/personas/{persona['id']}/anonimizar",
+        headers=headers,
+        json={"motivo": "solicitud ARCO"},
+    )
+    assert primera.status_code == 200
+
+    segunda = client.post(
+        f"/api/v1/personas/{persona['id']}/anonimizar",
+        headers=headers,
+        json={"motivo": "reintento"},
+    )
+    assert segunda.status_code == 409
+
+
+def test_anonimizar_persona_inexistente_da_404(client) -> None:
+    headers = _admin_auth(client)
+    r = client.post(
+        "/api/v1/personas/00000000-0000-0000-0000-000000000000/anonimizar",
+        headers=headers,
+        json={"motivo": "solicitud ARCO"},
+    )
+    assert r.status_code == 404
+
+
+def test_no_se_puede_rectificar_una_persona_ya_anonimizada(client) -> None:
+    """Anonimizar y luego "corregir" un dato ya borrado no tiene sentido —
+    RN-PER-007 lo bloquea con 409, no lo deja pisar en silencio."""
+    headers = _admin_auth(client)
+    persona = _crear_persona(client, headers).json()
+    client.post(
+        f"/api/v1/personas/{persona['id']}/anonimizar",
+        headers=headers,
+        json={"motivo": "solicitud ARCO"},
+    )
+
+    r = client.patch(
+        f"/api/v1/personas/{persona['id']}",
+        headers=headers,
+        json={"version": persona["version"], "telefono": "999888777"},
+    )
+    assert r.status_code == 409
+
+
+def test_anonimizar_no_permitido_sin_el_permiso_dedicado(client) -> None:
+    """`users.gestionar` alcanza para CRUD normal de persona pero no para
+    anonimizar — permiso separado a propósito, la acción es irreversible."""
+    headers = _admin_auth(client)
+    persona = _crear_persona(client, headers).json()
+
+    # Rol con users.gestionar (CRUD normal) pero SIN personas.anonimizar.
+    rol_id = client.post(
+        "/api/v1/roles", headers=headers, json={"nombre": "solo_crud_personas"}
+    ).json()["id"]
+    permiso_id = next(
+        p["id"]
+        for p in client.get("/api/v1/permisos", headers=headers).json()
+        if p["codigo"] == "users.gestionar"
+    )
+    client.post(
+        f"/api/v1/roles/{rol_id}/permisos",
+        headers=headers,
+        json={"permiso_id": permiso_id},
+    )
+    usuario_id = client.post(
+        "/api/v1/users",
+        headers=headers,
+        json={"username": "crud_only", "pin": "654321", "tipo": "humano"},
+    ).json()["id"]
+    client.post(
+        f"/api/v1/users/{usuario_id}/roles", headers=headers, json={"rol_id": rol_id}
+    )
+
+    token = client.post(
+        "/api/v1/auth/login", json={"username": "crud_only", "pin": "654321"}
+    ).json()["access_token"]
+    headers_limitado = {"Authorization": f"Bearer {token}"}
+
+    r = client.post(
+        f"/api/v1/personas/{persona['id']}/anonimizar",
+        headers=headers_limitado,
+        json={"motivo": "solicitud ARCO"},
+    )
+    assert r.status_code == 403

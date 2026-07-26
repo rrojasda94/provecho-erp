@@ -69,12 +69,26 @@ primero de este tipo en el repo — ver
 `listar_clientes_para_analisis` expone `cliente` (join con `persona` si es
 natural) para que `marketing`/`comercial` lo consuman sin importar el
 dominio de `sales` — hoy vía `GET /clientes`, mañana vía import directo de
-la función cuando `marketing` exista como módulo.
+la función cuando `marketing` exista como módulo. Ampliado 2026-07-26
+(ADR-012) con tres funciones más, consumidas por `core.dashboard_router` y
+por `accounting` (reconciliación de cierre de caja): `resumen_ventas_del_dia`
+(cantidad+total del día), `total_efectivo_cobrado` (pagos en efectivo
+confirmados de un punto de venta desde una fecha) y `puntos_venta_de_empresa`
+(IDs de `punto_venta` de una empresa — `accounting` no importa `PuntoVenta`
+directo, no es organización transversal como `Persona`/`Sucursal`).
 
 Deuda del slice (ver ROADMAP): precio server-side vía `lista_precio`
 (hoy el PDV manda `precio_unitario`), nota de crédito post-pago, webhook
 de pasarela (pago nace `confirmado`), apertura/cierre de caja enlazados a
 la venta.
+
+**Pendiente para el modo offline del PDV** (ADR-009, ver
+`docs/architecture/adr/ADR-009-modo-offline-pdv.md`): `crear_venta`/
+`registrar_pago` necesitan aceptar un `id: uuid.UUID | None` opcional para
+que el hub local de sucursal y la nube compartan el mismo UUID al
+sincronizar, sin tabla de mapeo. Ya es posible sin migración —
+`UuidPkMixin` genera el UUID en Python al construir el objeto, no en la
+base— falta solo el parámetro. No implementado todavía.
 
 ## Facturación electrónica (implementado 2026-07-26)
 

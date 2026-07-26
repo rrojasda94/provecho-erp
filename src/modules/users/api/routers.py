@@ -13,7 +13,7 @@ from src.modules.users.api.deps import (
     get_db,
     require_permission,
 )
-from src.modules.users.application import admin, auth, gerencia
+from src.modules.users.application import admin, auth, gerencia, privacidad
 from src.modules.users.application.errors import (
     Conflicto,
     CredencialesInvalidas,
@@ -30,6 +30,7 @@ router = APIRouter()
 
 GESTIONAR = "users.gestionar"  # permiso para el CRUD administrativo
 GESTIONAR_REGLAS = "gerencia.gestionar_reglas_aprobacion"
+ANONIMIZAR = "personas.anonimizar"  # derecho de cancelación (Ley 29733, ADR-011)
 
 _HTTP_STATUS: dict[type[UsersError], int] = {
     CredencialesInvalidas: status.HTTP_401_UNAUTHORIZED,
@@ -152,6 +153,34 @@ def editar_persona(
 ):
     try:
         persona = admin.editar_persona(session, persona_id, **body.model_dump())
+    except (NoEncontrado, Conflicto) as e:
+        raise _http(e) from e
+    session.commit()
+    return persona
+
+
+@router.post(
+    "/personas/{persona_id}/anonimizar",
+    response_model=schemas.PersonaOut,
+    tags=["personas"],
+)
+def anonimizar_persona(
+    persona_id: uuid.UUID,
+    body: schemas.AnonimizarPersonaIn,
+    usuario: Usuario = Depends(require_permission(ANONIMIZAR)),
+    session: Session = Depends(get_db),
+):
+    """Derecho de cancelación (Ley 29733, ADR-011): irreversible, no borra
+    la fila. Verificar antes de llamar que no exista una obligación de
+    retención vigente en otro módulo (trabajador activo, comprobante bajo
+    retención tributaria) — el sistema no lo bloquea automáticamente."""
+    try:
+        persona = privacidad.anonimizar_persona(
+            session,
+            persona_id,
+            motivo=body.motivo,
+            solicitado_por=usuario.id,
+        )
     except (NoEncontrado, Conflicto) as e:
         raise _http(e) from e
     session.commit()

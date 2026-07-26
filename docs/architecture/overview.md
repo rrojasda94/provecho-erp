@@ -74,3 +74,7 @@ Decisiones con alternativas viables se registran en [adr/](adr/). Vigentes:
 | [006](adr/ADR-006-observabilidad.md) | Logs con la biblioteca estándar; errores a Sentry/GlitchTip |
 | [007](adr/ADR-007-backups-y-salud.md) | Backups por `pg_dump` + cron; salud expuesta a monitor externo |
 | [008](adr/ADR-008-entrega-continua.md) | Imagen publicada en GHCR; despliegue manual hasta tener servidor |
+| [009](adr/ADR-009-modo-offline-pdv.md) | Modo offline del PDV: hub local por sucursal, sync vía la propia API REST |
+| [010](adr/ADR-010-contrato-openapi-exportado.md) | Contrato OpenAPI exportado a `docs/architecture/openapi.json`, verificado en CI |
+| [011](adr/ADR-011-derechos-arco-anonimizacion.md) | Derechos ARCO: cancelación de `persona` por anonimización, no borrado físico |
+| [012](adr/ADR-012-dashboard-gerencial-y-slice-minimo-de-caja.md) | Dashboard gerencial (agregador en `core`) + slice mínimo de caja con reconciliación real |

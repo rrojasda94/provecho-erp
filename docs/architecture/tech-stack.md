@@ -12,10 +12,12 @@ Decisión formal en [adr/ADR-002-stack-tecnologico.md](adr/ADR-002-stack-tecnolo
 | Workers | Celery | Colas: emisión de comprobantes (Factiliza), notificaciones, integraciones |
 | Storage | S3 (compatible) | Archivos, comprobantes, imágenes |
 | Auth | JWT + refresh, Argon2id | Estándar, stateless, PIN seguro |
-| Infra | Docker + GitHub Actions | Igual en local y servidor; CI/CD |
+| Infra | Docker + GitHub Actions | Tres topologías de compose (dev/prod/hub de sucursal, ver `docs/engineering/devops.md`), misma imagen; CI/CD |
 | Linters | Ruff (backend), ESLint (frontend) | Ver [../engineering/coding-standards.md](../engineering/coding-standards.md) |
 
 ## Pendientes (ADR futuro)
 
-- App Android 15+: PWA (TWA) vs nativa/React Native. La API REST sirve a ambas.
+- App Android 15+: PWA (TWA) vs nativa/React Native. Cualquiera de las dos
+  le habla siempre al hub local de sucursal, nunca directo a la nube —
+  ver [ADR-009](adr/ADR-009-modo-offline-pdv.md).
 - Broker/canales de notificaciones.

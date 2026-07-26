@@ -130,6 +130,8 @@ def editar_persona(
 ) -> Persona:
     repo = PersonaRepo(session)
     actual = _get(repo.get(persona_id), "persona")
+    if actual.anonimizado_at is not None:
+        raise Conflicto("persona anonimizada (Ley 29733): no admite rectificación")
     numero_nuevo = campos.get("numero_documento")
     if numero_nuevo:
         otra = repo.get_by_documento(numero_nuevo)

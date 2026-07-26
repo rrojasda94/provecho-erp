@@ -541,6 +541,15 @@ de su módulo y se prueban de forma aislada.
   tienda cuando la situación lo amerite, y vela por el correcto
   funcionamiento operativo y el cumplimiento de reglas en las sucursales a
   su cargo.
+- **RN-PER-007** El derecho de cancelación (Ley 29733) sobre `persona` se
+  ejerce por **anonimización**, nunca por borrado físico —`trabajador`/
+  `cliente`/`usuario` la referencian, y suele coexistir con una obligación
+  de retención tributaria/laboral vigente que prevalece mientras dure.
+  Antes de anonimizar, quien opera verifica manualmente que no haya
+  `trabajador` en estado `activo` ligado a esa persona, ni comprobante bajo
+  retención tributaria, ni litigio abierto — el sistema no lo bloquea
+  automáticamente (ADR-011). Una persona ya anonimizada no admite
+  rectificación (`PATCH` da 409).
 
 ## Transversales
 
@@ -958,8 +967,9 @@ producción se hace en cocinas de sucursal. Ver
 
 - **RN-COM-001** Confirmar una venta exige stock suficiente de los insumos de la
   receta (o política configurable de venta sin stock — por definir).
-- **RN-COM-002** `Idempotency-Key` obligatoria al confirmar venta y al registrar
-  pago; reintentos no duplican efectos.
+- **RN-COM-002** `idempotency_key` obligatoria (campo del body, no header —
+  corregido 2026-07-26) al confirmar venta y al registrar pago; reintentos
+  no duplican efectos.
 - **RN-COM-003** El comprobante se encola al proveedor de facturación electrónica
   (Factiliza, ADR-005); una caída del proveedor no
   bloquea la venta.

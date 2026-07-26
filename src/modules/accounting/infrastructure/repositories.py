@@ -14,8 +14,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.modules.accounting.infrastructure.models import (
+    AperturaCaja,
+    Arqueo,
     Asiento,
     AsientoLinea,
+    CierreCaja,
     CuentaContable,
     MovimientoDinero,
     PeriodoContable,
@@ -181,3 +184,74 @@ class MovimientoDineroRepo:
         self.s.add(movimiento)
         self.s.flush()
         return movimiento
+
+
+class AperturaCajaRepo:
+    def __init__(self, session: Session) -> None:
+        self.s = session
+
+    def get(self, apertura_id: uuid.UUID) -> AperturaCaja | None:
+        return self.s.get(AperturaCaja, apertura_id)
+
+    def abierta_en(self, punto_venta_id: uuid.UUID) -> AperturaCaja | None:
+        """La apertura vigente de ese punto de venta: la más reciente que
+        todavía no tiene `cierre_caja`."""
+        return self.s.scalar(
+            select(AperturaCaja)
+            .outerjoin(CierreCaja, CierreCaja.apertura_caja_id == AperturaCaja.id)
+            .where(AperturaCaja.punto_venta_id == punto_venta_id, CierreCaja.id.is_(None))
+            .order_by(AperturaCaja.created_at.desc())
+        )
+
+    def abiertas_de(self, punto_venta_ids: list[uuid.UUID]) -> list[AperturaCaja]:
+        if not punto_venta_ids:
+            return []
+        return list(
+            self.s.scalars(
+                select(AperturaCaja)
+                .outerjoin(CierreCaja, CierreCaja.apertura_caja_id == AperturaCaja.id)
+                .where(
+                    AperturaCaja.punto_venta_id.in_(punto_venta_ids),
+                    CierreCaja.id.is_(None),
+                )
+            )
+        )
+
+    def add(self, apertura: AperturaCaja) -> AperturaCaja:
+        self.s.add(apertura)
+        self.s.flush()
+        return apertura
+
+
+class CierreCajaRepo:
+    def __init__(self, session: Session) -> None:
+        self.s = session
+
+    def get_by_apertura(self, apertura_caja_id: uuid.UUID) -> CierreCaja | None:
+        return self.s.scalar(
+            select(CierreCaja).where(CierreCaja.apertura_caja_id == apertura_caja_id)
+        )
+
+    def add(self, cierre: CierreCaja) -> CierreCaja:
+        self.s.add(cierre)
+        self.s.flush()
+        return cierre
+
+
+class ArqueoRepo:
+    def __init__(self, session: Session) -> None:
+        self.s = session
+
+    def list(self, punto_venta_id: uuid.UUID) -> list[Arqueo]:
+        return list(
+            self.s.scalars(
+                select(Arqueo)
+                .where(Arqueo.punto_venta_id == punto_venta_id)
+                .order_by(Arqueo.created_at.desc())
+            )
+        )
+
+    def add(self, arqueo: Arqueo) -> Arqueo:
+        self.s.add(arqueo)
+        self.s.flush()
+        return arqueo

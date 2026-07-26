@@ -12,6 +12,14 @@ esta guía afirmaba lo contrario): `docker-compose.yml` es de desarrollo
 de juguete— y `docker-compose.prod.yml` es el de servidor. Ver
 [Despliegue](#despliegue).
 
+**Dos variables para la URL de la API en `web`, no una** (desde el
+dashboard de 2026-07-26, ADR-012): `NEXT_PUBLIC_API_URL` es la vista del
+**navegador** (fuera de los contenedores: `localhost`, puerto publicado);
+`API_INTERNAL_URL` es la vista del **proceso de Next.js** (Server Actions/
+Server Components, dentro del contenedor `web`) — usa el nombre del
+servicio (`http://api:8000`), porque `web` y `api` son contenedores
+distintos sin ningún `localhost` en común.
+
 ## Base de datos: Postgres en Supabase (desarrollo)
 
 Desde 2026-07-20 el `DATABASE_URL` de desarrollo apunta a un proyecto
@@ -305,3 +313,53 @@ pg_restore -h HOST -U provecho -d provecho --clean --if-exists --no-owner backup
 
 Pendiente: alerta cuando el backup falla o cuando no hubo uno en 48 h — hoy
 solo queda en el log. Ver ROADMAP → Deuda técnica → Backups.
+
+## Modo offline del PDV — hub local de sucursal
+
+Fase 1 implementada 2026-07-26 (diseño + plumbing base; el motor de sync
+real es fase 2). Arquitectura completa y alternativas descartadas:
+[ADR-009](architecture/adr/ADR-009-modo-offline-pdv.md).
+
+Un mini-PC o Raspberry Pi **dedicado, siempre encendido**, en la LAN de cada
+sucursal, corre **la misma imagen** del backend contra su **propio Postgres
+local**. Todos los dispositivos del local (PDV web, Android, PC, KDS) le
+hablan siempre al hub, nunca directo a internet — el hub decide si tiene
+camino a la nube; los clientes ni se enteran.
+
+### Desplegar un hub
+
+```bash
+cp .env.hub.example .env
+# completar JWT_SECRET (el mismo que la nube), HUB_EMPRESA_ID,
+# HUB_SUCURSAL_ID, CLOUD_SYNC_URL y la cuenta de servicio del hub.
+docker compose -f docker-compose.hub.yml up -d
+docker compose -f docker-compose.hub.yml exec api alembic upgrade head
+curl http://localhost:8000/health/sync
+```
+
+A diferencia de `docker-compose.prod.yml` (que solo escucha en loopback
+detrás de un proxy), el hub publica el puerto **a toda la LAN**: es
+justamente lo que los dispositivos del local necesitan alcanzar. Sin
+Celery/Redis/worker — la emisión de comprobantes a Factiliza ocurre solo en
+la nube, después de sincronizar, así que el hub no necesita cargar esa cola.
+
+### Detector de conectividad
+
+`src/core/sync/estado_conexion.py` pinguea el `/health` (liveness) de la
+nube. Una racha de `SYNC_FALLOS_PARA_OFFLINE` fallos seguidos (no uno solo —
+un timeout puntual de red no puede tumbar el estado) declara `offline`; un
+solo éxito vuelve a `en_linea` de inmediato. Expuesto en
+`GET /health/sync`, **siempre 200**: a diferencia de `/health/ready`, estar
+offline es el modo de diseño del hub durante un corte, no un fallo — sacarlo
+de rotación por eso sería exactamente lo contrario de lo necesario. Es
+diagnóstico para que un monitor externo avise si lleva offline demasiado
+tiempo, no una señal de "dejá de servir".
+
+### Pendiente (fase 2, ver ROADMAP → Deuda técnica)
+
+El motor de sync real (push de ventas/pagos/movimientos, pull de catálogo/
+stock/usuarios) requiere primero un cambio pequeño en `sales`/`inventory`:
+aceptar un `id` client-generado en la creación, para que el hub y la nube
+compartan el mismo UUID sin tabla de mapeo — ya es posible sin migración
+(`UuidPkMixin` genera el UUID en Python al construir el objeto, no en la
+base de datos). No incluido en esta fase.

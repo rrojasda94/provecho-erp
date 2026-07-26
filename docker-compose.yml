@@ -59,7 +59,12 @@ services:
     ports:
       - "3000:3000"
     environment:
+      # Vista del NAVEGADOR (fuera del contenedor): localhost, puerto publicado.
       NEXT_PUBLIC_API_URL: http://localhost:8000
+      # Vista del PROCESO de Next.js (dentro del contenedor, Server Actions/
+      # Server Components): nombre del servicio, no localhost — son
+      # contenedores distintos sin ese "localhost" en común.
+      API_INTERNAL_URL: http://api:8000
     depends_on:
       - api
 

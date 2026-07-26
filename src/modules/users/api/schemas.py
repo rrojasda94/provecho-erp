@@ -1,7 +1,7 @@
 """DTOs (pydantic) de entrada/salida del módulo users."""
 
 import uuid
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -69,6 +69,11 @@ class PersonaOut(BaseModel):
     telefono: str | None
     email: str | None
     version: int
+    anonimizado_at: datetime | None
+
+
+class AnonimizarPersonaIn(BaseModel):
+    motivo: str = Field(min_length=3, max_length=500)
 
 
 # --- Usuarios (admin) ---

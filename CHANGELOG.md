@@ -7,6 +7,130 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Added
 
+- **Dashboard gerencial mínimo + slice de caja (PROC-CTB-001/002)**
+  (2026-07-26): ADR-012. `GET /api/v1/dashboard/resumen`
+  (`src/core/dashboard_router.py`, permiso `dashboard.leer`): ventas del
+  día (cantidad+total), stock bajo mínimo, cajas abiertas — vive en `core`
+  y no en un módulo de negocio porque compone lecturas de `sales`,
+  `inventory` y `accounting` sin importar el dominio de ninguno directo
+  (mismo patrón que `sales.queries_publicas.listar_clientes_para_analisis`,
+  extendido con `resumen_ventas_del_dia` y `puntos_venta_de_empresa`;
+  `inventory.contar_bajo_minimo` nuevo). Construir esto expuso dos huecos
+  reales: `sales` no tenía ningún endpoint de listado de ventas, y
+  `accounting` tenía los modelos de caja (`apertura_caja`/`cierre_caja`/
+  `arqueo`, migrados desde 2026-07-20) sin ninguna capa de aplicación —
+  PROC-CTB-001/002 nunca se había construido. **Slice mínimo, no el
+  proceso completo**: `accounting.application.caja` abre, cierra y arquea
+  con **reconciliación real** — el cierre calcula
+  `monto_esperado = monto_apertura + efectivo cobrado desde la apertura`
+  (vía el contrato público de `sales`, `total_efectivo_cobrado` — primera
+  vez que un módulo consulta a otro en tiempo real para una escritura
+  propia, no solo para un reporte) y lo compara contra el conteo físico;
+  sin esa cuenta, un cierre sería un formulario sin ningún valor de
+  control. Deliberadamente fuera de esta fase: verificación de series de
+  POS y denominaciones (RN-POS-009..013), relevo autenticado por PIN propio,
+  `custodia_efectivo` como máquina de estados — ese es un slice de negocio
+  del tamaño de los ya construidos para `sales`/`purchases`/`production`,
+  no algo para colar bajo "hacer un dashboard". Permisos nuevos:
+  `dashboard.leer`, `accounting.caja_operar` (rol `cajero` — abre/cierra su
+  propia caja sin permisos de administración), `accounting.arqueo_registrar`
+  (`supervisor`/`contador`). **Primer frontend real**: login por PIN +
+  pantalla de dashboard en Next.js/React, reemplazando el scaffold por
+  defecto. `tests/test_dashboard_caja.py` (16 casos) — incluye un caso de
+  flakiness real detectado y corregido: SQLite guarda `created_at` sin
+  microsegundos pero SQLAlchemy los agrega al enlazar un `datetime` de
+  Python, así que dos eventos en el mismo segundo de reloj comparan mal
+  como texto (`"...25" < "...25.000000"`); Postgres (columna timestamp
+  real) no tiene este problema — se documentó y se resolvió a nivel de
+  prueba, no tocando la lógica de producción.
+
+- **Protección de datos personales — derechos ARCO (Ley 29733)**
+  (2026-07-26): ADR-011, migración `dad43729501d`. `docs/security/proteccion-datos-personales.md`
+  nuevo: qué datos personales trata el ERP y dónde viven (`persona` es la
+  fuente única — RN-GEN-007, casi todo ARCO se resuelve tocando una sola
+  entidad), derechos ARCO y su estado (Acceso/Rectificación ya existían;
+  Oposición queda como política sin contraparte técnica porque no hay
+  marketing automatizado todavía), plazos de conservación por tipo de dato,
+  medidas de seguridad ya vigentes (referenciadas a `security.md`/ADR-006/
+  ADR-007, no reconstruidas), proceso de brecha de seguridad, y una lista
+  separada de pendientes que son **acción del usuario, no de código**
+  (registro ante la ANPD, aviso de privacidad público, designación de
+  responsable, plazos de retención confirmados con contador/abogado).
+  **Cancelación implementada como anonimización irreversible**, no `DELETE`:
+  `persona` la referencian `trabajador`/`cliente`/`usuario`, un borrado
+  físico rompería esas FK o dejaría planillas/comprobantes sin sustento
+  legal (retención tributaria/laboral que prevalece mientras esté vigente).
+  `POST /api/v1/personas/{id}/anonimizar` (permiso dedicado
+  `personas.anonimizar`, distinto de `users.gestionar` — una acción
+  irreversible no hereda un permiso de CRUD normal) sobrescribe
+  `nombres`/`apellidos`/`numero_documento`/`fecha_nacimiento`/`domicilio`/
+  `telefono`/`email` (RN-PER-007); `numero_documento` es `UNIQUE`, se
+  reemplaza por un valor derivado del propio `id`, no un texto fijo. El
+  `audit_log` de la acción registra qué campos se anonimizaron y el motivo,
+  **nunca el valor real anterior** — guardarlo ahí habría dejado la PII
+  accesible para siempre, vaciando de sentido la anonimización.
+  `PATCH /personas/{id}` sobre una persona ya anonimizada ahora da 409: no
+  hay dato real que rectificar. Sin bloqueo automático cross-módulo (p. ej.
+  contra `trabajador.estado=activo`) a propósito — `users` es el módulo más
+  foundational del ERP y consultar hacia `rrhh` invertiría la dirección de
+  dependencia que todo el código ya asume; se documenta un checklist manual
+  en su lugar. `docs/domain/business-rules.md` (RN-PER-007),
+  `docs/architecture/data-model.md` y `docs/foundation/glossary.md`
+  (Derechos ARCO, Anonimización) actualizados. `tests/test_users_persona.py`
+  +5 casos.
+
+- **Contrato OpenAPI exportado y verificado en CI** (2026-07-26): ADR-010.
+  `src/core/openapi_export.py` (`python -m src.core.openapi_export`) escribe
+  `docs/architecture/openapi.json` desde la app real — determinista (claves
+  ordenadas, salto de línea final) para que el diff entre corridas refleje
+  solo cambios reales del contrato. `ci.yml` lo regenera y compara contra el
+  commiteado: un endpoint que cambió sin actualizar el contrato falla el PR
+  que lo causó, no cuando Android/PC/una integración se entera por las
+  malas. `TAGS_METADATA` nuevo en `src/core/app.py` describe los 13 tags de
+  la API (antes FastAPI solo agrupaba por nombre); un test falla si aparece
+  un tag sin su entrada. `app.version` ahora usa `settings.app_version` en
+  vez de un `"0.1.0"` hardcodeado aparte (duplicación encontrada de paso).
+  **Dos afirmaciones falsas corregidas en `api-guidelines.md`**, detectadas
+  al auditar la doc contra el código real: `idempotency_key` siempre viajó
+  como **campo del body**, la guía decía "header"; ningún endpoint de
+  listado pagina, la guía prometía `{items, total, page, page_size}` — se
+  documentó el formato real (array plano) y la paginación real queda en
+  deuda técnica en vez de fingirse implementada. `tests/test_openapi_export.py`
+  (7 casos).
+
+- **Modo offline del PDV — diseño y plumbing base (fase 1)** (2026-07-26):
+  ADR-009. Arquitectura de **hub local dedicado por sucursal** (mini-PC/
+  Raspberry Pi, siempre encendido): corre la **misma imagen** del backend
+  contra su **propio Postgres local** — no una versión recortada. Los tres
+  clientes de PDV (web, Android, PC) le hablan siempre al hub por LAN,
+  nunca directo a internet, resolviendo el requisito de "equipos en la
+  misma red local se ven entre sí durante un corte". Alcance offline:
+  catálogo, ventas/cobro/KDS y —por necesidad lógica, no solo lo pedido—
+  RBAC/usuarios (sin eso nadie se autentica en el hub) e inventory/stock (el
+  listener `sales.venta_confirmada` ya corre en el mismo proceso). El sync
+  hub↔nube **reusa la propia API REST** existente en vez de inventar un
+  protocolo de replicación: descendente por `updated_at` (ya presente vía
+  `TimestampMixin`), ascendente reintentando las mismas llamadas idempotentes
+  que el hub ya ejecutó offline (`idempotency_key` ya exigida en ventas/
+  pagos). Comprobantes se crean `pendiente` en el hub pero **la emisión a
+  Factiliza ocurre solo en la nube**, tras sincronizar — el hub no necesita
+  Celery/Redis/worker. `src/core/sync/estado_conexion.py`: detector de
+  conectividad con racha de fallos antes de declarar `offline` (un timeout
+  puntual no basta) y recuperación inmediata al primer éxito;
+  `GET /health/sync` — siempre 200 (a diferencia de `/health/ready`, estar
+  offline es el modo de diseño del hub, no un fallo: sacarlo de rotación por
+  eso sería contraproducente). `DEPLOYMENT_MODE=hub` con validación de
+  config que aborta el arranque si falta algo (sucursal, URL de sync,
+  credenciales de la cuenta de servicio). `docker-compose.hub.yml` +
+  `.env.hub.example` nuevos. **Fase 2 (motor de sync real) queda
+  explícitamente pendiente**: requiere primero extender `crear_venta`/
+  `registrar_pago`/movimientos para aceptar un `id` client-generado (ya
+  posible sin migración — `UuidPkMixin` genera el UUID en Python, no en la
+  base), evitando así una tabla de mapeo hub-id↔nube-id. Fix de paso en
+  `.gitignore`: `.env.hub.example` quedaba tapado por la regla `.env.*`, el
+  mismo tipo de trampa que `backups/` en el commit anterior.
+  `tests/test_offline_hub.py` (17 casos).
+
 - **Entrega continua — imagen en GHCR y CI endurecida** (2026-07-26):
   `ci.yml` gana tres verificaciones que no existían. **Cabeza única de
   Alembic**: dos ramas que crean migraciones en paralelo hacían fallar

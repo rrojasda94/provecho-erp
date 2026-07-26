@@ -90,6 +90,12 @@ deja stock negativo; ajuste `solicitar` ≠ `aprobar` y aprobador ≠ solicitant
 alerta `bajo_minimo` derivada en la consulta; evento
 `inventory.ajuste_fuera_margen` al aprobar fuera de margen.
 
+`application/stock.py::contar_bajo_minimo(session, empresa_id)` (nuevo
+2026-07-26, ADR-012): cuenta filas bajo mínimo escopadas por empresa (vía
+`Almacen.empresa_id` — mismo import de modelo permitido que ya usa
+`application/listeners.py`), consumido por `core.dashboard_router` para el
+dashboard gerencial.
+
 **Diferido (deuda del módulo):** `stock_lote`/FEFO, `reserva_stock`, conteo
 cíclico, transferencias/`solicitud_insumos`, devolución, guía de remisión,
 listeners de eventos (`sales.venta_confirmada` → consumo por receta),

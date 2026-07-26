@@ -146,7 +146,11 @@ erDiagram
   aprobador) no son tablas: se atan a un `trabajador`/`persona` al emitir.
   CRUD propio en `/api/v1/personas` (Create/Read/Update — sin Delete: el
   ciclo de vida real se maneja en la entidad que la referencia, ej.
-  `trabajador.estado=cesado`, no borrando la persona).
+  `trabajador.estado=cesado`, no borrando la persona). `anonimizado_at`
+  (nullable, 2026-07-26): derecho de cancelación (Ley 29733, RN-PER-007,
+  ADR-011) — `POST /api/v1/personas/{id}/anonimizar` sobrescribe los campos
+  identificables sin borrar la fila; distinto del soft-delete genérico
+  (`deleted_at`), que oculta sin destruir el dato.
 - **usuario**: username, pin_hash (Argon2id), persona_id (nullable — NULL
   si `agente_ia`), nombre_display (fallback para agente_ia), email, tipo
   (`humano` | `agente_ia`), activo.
