@@ -28,7 +28,7 @@ def escribir(destino: Path = DESTINO) -> Path:
     # Claves ordenadas + salto de línea final: el diff entre corridas refleja
     # solo cambios reales del contrato, no reordenamientos de FastAPI.
     contenido = json.dumps(esquema, indent=2, ensure_ascii=False, sort_keys=True) + "\n"
-    destino.write_text(contenido, encoding="utf-8")
+    destino.write_text(contenido, encoding="utf-8", newline="\n")
     return destino
 
 
