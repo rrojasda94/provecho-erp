@@ -24,6 +24,11 @@ Detalle en `docs/architecture/data-model.md` (§1, §2).
   se maneja en la entidad que la referencia). `PATCH` exige la `version`
   vigente (lock optimista): `version` desactualizada → 409, en vez de
   pisar en silencio el cambio de otro editor concurrente.
+- Derecho de cancelación (Ley 29733, ADR-011): `POST /personas/{id}/anonimizar`
+  sobrescribe los campos identificables de forma irreversible — no es un
+  Delete, la fila y sus referencias (`trabajador`/`cliente`/`usuario`)
+  permanecen. Permiso dedicado `personas.anonimizar`, distinto de
+  `users.gestionar`.
 - Administrar la matriz de aprobaciones (`regla_aprobacion`, entidad de
   `shared` — umbrales cuantitativos que otros módulos, ej. `purchases`,
   consultan en vez de hardcodear).
@@ -55,6 +60,7 @@ Claims del JWT: `sub` (usuario_id), `tipo`, `roles`, `sucursales`, `empresa_id`,
 | POST/DELETE | `/api/v1/roles/{id}/permisos[/{permiso_id}]` | Asignar / quitar permiso a rol |
 | POST/GET | `/api/v1/permisos` | Crear / listar permisos |
 | POST/GET/PATCH | `/api/v1/personas[/{id}]` | CRUD de persona (party model) — `PATCH` exige `version` |
+| POST | `/api/v1/personas/{id}/anonimizar` | Derecho de cancelación (Ley 29733) — permiso `personas.anonimizar` |
 | POST/GET/PATCH | `/api/v1/reglas-aprobacion[/{id}]` | CRUD de la matriz de aprobaciones (permiso `gerencia.gestionar_reglas_aprobacion`) |
 
 ## Estado (implementado 2026-07-25)

@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from src.config.settings import settings
 from src.modules.accounting.api import schemas
-from src.modules.accounting.application import asientos, cuentas, pagos, periodos, reglas
+from src.modules.accounting.application import asientos, caja, cuentas, pagos, periodos, reglas
 from src.modules.accounting.application.errors import (
     AccountingError,
     Conflicto,
@@ -29,6 +29,8 @@ ASIENTO_MANUAL = "accounting.asiento_manual"
 LEER = "accounting.leer"
 PAGO_GESTIONAR = "accounting.pago_gestionar"
 PAGO_APROBAR = "accounting.pago_aprobar"
+CAJA_OPERAR = "accounting.caja_operar"
+ARQUEO_REGISTRAR = "accounting.arqueo_registrar"
 
 _HTTP_STATUS: dict[type[AccountingError], int] = {
     NoEncontrado: status.HTTP_404_NOT_FOUND,
@@ -272,3 +274,60 @@ def rechazar_pago(
         raise _http(e) from e
     session.commit()
     return movimiento
+
+
+# --- Caja (PROC-CTB-001/002) — slice mínimo, ver módulo application/caja.py -----
+@router.post("/cajas/apertura", response_model=schemas.AperturaCajaOut, status_code=201)
+def abrir_caja(
+    body: schemas.AbrirCajaIn,
+    actor: Usuario = Depends(require_permission(CAJA_OPERAR)),
+    session: Session = Depends(get_db),
+):
+    try:
+        apertura = caja.abrir_caja(session, cajero_id=actor.id, **body.model_dump())
+    except Conflicto as e:
+        raise _http(e) from e
+    session.commit()
+    return apertura
+
+
+@router.post(
+    "/cajas/apertura/{apertura_caja_id}/cierre", response_model=schemas.CierreCajaOut
+)
+def cerrar_caja(
+    apertura_caja_id: uuid.UUID,
+    body: schemas.CerrarCajaIn,
+    actor: Usuario = Depends(require_permission(CAJA_OPERAR)),
+    session: Session = Depends(get_db),
+):
+    try:
+        cierre = caja.cerrar_caja(
+            session, apertura_caja_id, cajero_id=actor.id, **body.model_dump()
+        )
+    except (NoEncontrado, Conflicto) as e:
+        raise _http(e) from e
+    session.commit()
+    return cierre
+
+
+@router.get("/cajas/abiertas", response_model=list[schemas.CajaAbiertaOut])
+def listar_cajas_abiertas(
+    empresa_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(LEER)),
+    session: Session = Depends(get_db),
+):
+    return caja.cajas_abiertas(session, empresa_id)
+
+
+@router.post("/arqueos", response_model=schemas.ArqueoOut, status_code=201)
+def registrar_arqueo(
+    body: schemas.ArqueoIn,
+    actor: Usuario = Depends(require_permission(ARQUEO_REGISTRAR)),
+    session: Session = Depends(get_db),
+):
+    try:
+        arqueo = caja.registrar_arqueo(session, realizado_por=actor.id, **body.model_dump())
+    except NoEncontrado as e:
+        raise _http(e) from e
+    session.commit()
+    return arqueo

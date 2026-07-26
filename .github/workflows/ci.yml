@@ -28,6 +28,12 @@ jobs:
             alembic heads
             exit 1
           fi
+      # Un endpoint que cambió sin regenerar el contrato deja a Android/PC/
+      # integraciones construyendo contra una promesa vieja. Se atrapa acá.
+      - name: Contrato OpenAPI al día
+        run: |
+          python -m src.core.openapi_export
+          git diff --exit-code docs/architecture/openapi.json
 
   # Nadie comprobaba que la imagen siquiera construyera: un Dockerfile roto
   # se descubría al desplegar.

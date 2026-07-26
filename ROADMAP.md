@@ -42,8 +42,12 @@ Registro de lo construido y lo pendiente. Actualizar en cada cambio relevante.
 | Notificaciones | ⬜ | Celery + canales por definir |
 | Auditoría (audit_log) | ⬜ | Especificada en data-model |
 | Endurecimiento de producción (rate limit, secretos, HTTPS, cabeceras) | 🔶 base ✅ 2026-07-26 | Rate limit por IP en login/refresh (Redis, fail-open), validación de config que aborta el arranque en `production` con valores de desarrollo, CORS + `TrustedHost` + cabeceras de seguridad + HSTS, `/docs` cerrado en producción, uvicorn `--proxy-headers`. Runbook de rotación de credenciales y custodia de `.env` en `docs/engineering/devops.md`. Pendiente: ver Deuda técnica → Seguridad. |
-| App Android (15+) | ⬜ | Evaluar PWA vs nativo (ADR pendiente) |
+| App Android (15+) | ⬜ | Evaluar PWA vs nativo (ADR pendiente) — debe hablar con el hub local de sucursal igual que web y PC, ver ADR-009 |
+| Modo offline del PDV — diseño + plumbing base | 🔶 fase 1 ✅ 2026-07-26 | ADR-009: hub local dedicado por sucursal (misma imagen del backend, Postgres propio), los 3 clientes (web/Android/PC) le hablan siempre al hub por LAN. Sync hub↔nube reusando la propia API REST (sin protocolo nuevo): descendente por `updated_at`, ascendente reintentando las mismas llamadas idempotentes ya hechas offline. `DEPLOYMENT_MODE=hub` + validación de config, detector de conectividad (`src/core/sync/estado_conexion.py`, racha de fallos antes de declarar offline), `GET /health/sync`, `docker-compose.hub.yml` + `.env.hub.example`. **Fase 2 (motor de sync real) requiere primero** un cambio pequeño y acotado en `sales`/`inventory` (aceptar `id` client-generado en `crear_venta`/`registrar_pago`/movimientos — ya es posible sin migración, `UuidPkMixin` genera el UUID en Python, no en la base) — no incluido en esta fase, ver ADR. |
 | Backups automáticos | ✅ 2026-07-26 | `python -m src.backups.backup`: dump `pg_dump --format=custom` → verificación del archivo (firma + tablas críticas) → restauración probada contra base desechable → copia a S3 (opcional) → purga con retención de 30 días que nunca borra la copia más reciente. **Diario** (antes se declaraba mensual e incremental). Cron del host, no Celery beat. Runbook en `docs/engineering/devops.md#backups`. Pendiente: alerta ante fallo, ver Deuda técnica. |
+| Dashboard gerencial mínimo | ✅ 2026-07-26 | `GET /api/v1/dashboard/resumen` (`src/core/dashboard_router.py`, permiso `dashboard.leer`): ventas del día (cantidad+total), stock bajo mínimo, cajas abiertas — agregador en `core`, nunca importa dominio de otro módulo (ADR-012). Requirió construir dos huecos que no existían: `sales` no tenía ningún listado de ventas, `accounting` tenía los modelos de caja (`apertura_caja`/`cierre_caja`/`arqueo`, migrados desde 2026-07-20) sin capa de aplicación. **Slice mínimo de caja** (`accounting.application.caja`): abrir/cerrar/arquear con **reconciliación real** (el cierre calcula `monto_esperado` desde los pagos en efectivo reales, vía contrato público de `sales`, no un número tipeado sin verificar). Primer frontend real: login por PIN + pantalla de dashboard en Next.js. Fuera de esta fase, a propósito: RN-POS-009..013 completas, relevo autenticado por PIN, máquina de estados de `custodia_efectivo` — ver Deuda técnica. |
+| Protección de datos personales (Ley 29733) | 🔶 ARCO técnico ✅ 2026-07-26 | `docs/security/proteccion-datos-personales.md`: qué datos trata el ERP y dónde viven (casi todo en `persona`, fuente única — RN-GEN-007), derechos ARCO, plazos de conservación, medidas de seguridad ya vigentes (referenciadas, no reconstruidas), proceso de brecha. Cancelación implementada como **anonimización irreversible** de `persona`, no `DELETE` — `POST /api/v1/personas/{id}/anonimizar`, permiso dedicado `personas.anonimizar`, migración `dad43729501d` (RN-PER-007, ADR-011). Acceso/Rectificación ya existían (`GET`/`PATCH /personas/{id}`). Pendiente de **acción del usuario, no de código**: registro del banco de datos ante la ANPD, aviso de privacidad público, confirmar plazos de retención con el contador/abogado, jurisdicción de transferencia internacional. Pendiente técnico: ver Deuda técnica. |
+| Contrato OpenAPI de la API | ✅ 2026-07-26 | `docs/architecture/openapi.json` exportado (`python -m src.core.openapi_export`) y verificado en CI — un endpoint que cambia sin regenerar el contrato falla el PR (ADR-010). `TAGS_METADATA` en `src/core/app.py` describe los 13 tags de la API; un tag nuevo sin descripción falla un test. De paso, corregidas dos afirmaciones falsas en `api-guidelines.md`: `idempotency_key` es campo del body, no header; las colecciones devuelven array plano, no `{items,total,page,page_size}` (nunca se implementó paginación). |
 | CI/CD | 🔶 CI + entrega ✅ 2026-07-26 | `ci.yml` gana tres verificaciones que no existían: cabeza única de Alembic (una doble falla en el despliegue, no en el merge que la crea), construcción de la imagen **y arranque real del contenedor** contra `/health`, y `pip-audit` informativo. `release.yml` publica la imagen en GHCR en cada push a `main` (tags `v*` → versión exacta). `docker-compose.prod.yml` nuevo: el compose existente es solo desarrollo y desplegarlo publicaría esa configuración. Dockerfile con usuario sin privilegios y `HEALTHCHECK`. El **despliegue sigue manual** y documentado hasta que exista el VPS (ADR-008). |
 | Chequeos de salud y alertas | ✅ 2026-07-26 | `src/core/health.py` + `health_router.py`: `/health` (liveness, sin dependencias), `/health/ready` (base de datos crítica → 503; Redis y cola degradan sin sacar de rotación) y `/health/backups` (503 pasadas 26 h — cubre el backup que nunca corrió, que no genera evento de error). El ERP expone estado; **un monitor externo alerta** (ADR-007): construir alertas dentro del servidor que se monitorea deja de avisar justo cuando ese servidor cae. Pendiente: contratar el monitor y dar de alta las sondas. |
 | Observabilidad (métricas, trazas, logs centralizados) | 🔶 logs + errores ✅ 2026-07-26 | `src/core/logging_config.py`: JSON en producción, tres flujos (`app`/`seguridad`/`auditoria`) derivados del nombre del logger, `request_id` por request (respeta `X-Request-ID` entrante, sale en la cabecera y en el cuerpo del error 500), redacción de PIN/tokens/`Authorization`. `src/core/sentry.py`: reporte de errores en `api`, `worker` (señal `celeryd_init`) y `backups`; sirve para Sentry o GlitchTip autoalojado, no-op sin DSN. Pendiente: métricas, trazas y colector de logs — ver Deuda técnica. |
@@ -149,6 +153,105 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
 - ⬜ **Verificación de firma en webhooks entrantes** (Izipay, Meta):
   documentada en `security.md`, sin implementar — llega con las
   integraciones.
+
+### Dashboard y caja (tras la implementación de 2026-07-26 — ADR-012)
+- ⬜ **Hallazgo real de la verificación en navegador**: `src/seeders/seed.py`
+  no crea ninguna `Sucursal` ni asigna `admin` a una — `build_claims`
+  deriva `empresa_id` desde las sucursales del usuario, así que en una
+  instalación recién sembrada el dashboard (y cualquier otra pantalla que
+  dependa de `empresa_id` del JWT) falla con "sin empresa asignada" hasta
+  que alguien asigna una sucursal a mano. No es un bug de esta fase — ya
+  existía — pero recién se hizo visible al construir la primera pantalla
+  que de verdad depende de ese claim. Corregirlo en el seeder base (crear
+  al menos una sucursal semilla y asignar `admin`) queda pendiente.
+- ⬜ **Ciclo de caja completo**: RN-POS-009 a RN-POS-013 (verificación de
+  series de POS, denominaciones obligatorias por billete/moneda), relevo
+  autenticado por ambas partes con PIN propio (hoy solo se registra
+  `relevo_encargado_id`, sin exigir su sesión), `custodia_efectivo` como
+  máquina de estados real (cajero→supervisor→contabilidad).
+- ⬜ **Enlace caja↔venta**: no bloquea cobrar sin caja abierta — deuda ya
+  declarada en el slice de `sales`, sigue sin resolverse.
+- ⬜ **`rechazar_pago` / reapertura de cierre**: si un cierre queda
+  `con_irregularidad` no hay flujo de corrección, solo el registro.
+- ⬜ **`GET /ventas` genérico** (listado paginado con filtros): el
+  dashboard resuelve su propio agregado (`resumen_ventas_del_dia`); un
+  listado general de ventas para otros usos queda pendiente.
+- ⬜ **Caché/paginación del agregador**: cada llamada a
+  `/dashboard/resumen` recalcula todo en vivo — aceptable al volumen de hoy,
+  revisar si empieza a pesar.
+- ⬜ **Más indicadores**: el dashboard de hoy es mínimo (3 tarjetas). Serie
+  de ventas por hora, ranking de productos, alertas de KDS demorado, etc.
+  quedan para iteraciones futuras.
+- ⬜ **`empresa_id` seguirá viniendo por query param** en `/dashboard/resumen`
+  hasta que se resuelva ADR-004 (tenant desde el JWT).
+
+### Protección de datos personales (tras la implementación de 2026-07-26 — ADR-011)
+- ⬜ **Borrado del `archivo` (CV) en `postulante`**: anonimizar la persona
+  no toca el PDF en S3 — el módulo de archivos no tiene ni siquiera un
+  flujo de borrado propio hoy.
+- ⬜ **Purga de `audit_log`/logs por antigüedad**: sin retención automática
+  todavía.
+- ⬜ **Cifrado de backups en reposo**: el dump contiene PII en claro (ya
+  declarado en la deuda de Backups, repetido acá por relevancia).
+- ⬜ **Proceso y plantilla formal de notificación de brecha**: hoy es una
+  lista de pasos en prosa, sin plantilla ni plazo confirmado con asesoría
+  legal.
+- ⬜ **`usuario.email` no se anonimiza** junto con `persona.email` — son
+  campos independientes; si hace falta, es una acción aparte.
+- ⬜ **Oposición** (cuarto derecho ARCO): sin contraparte técnica porque no
+  existe procesamiento de marketing automatizado todavía. Construir cuando
+  `marketing` tenga código real.
+- ⬜ **Auto-servicio del titular**: hoy ARCO se ejerce a través del
+  administrador (permiso `personas.anonimizar`/`users.gestionar`), no por
+  un portal donde el propio titular pida su acceso/cancelación.
+
+### Contrato de API (tras la implementación de 2026-07-26 — ADR-010)
+- ⬜ **Paginación real** (`{items, total, page, page_size}`): ningún
+  endpoint de listado la implementa hoy — se documentó honestamente en vez
+  de fingir. Construir cuando una colección lo justifique por volumen
+  (candidatas: histórico de ventas si se expone, `audit_log`).
+- ⬜ **`responses={...}` por endpoint**: documentar en OpenAPI qué código de
+  error devuelve cada operación específica (hoy es una convención global en
+  `api-guidelines.md`, no anotada endpoint por endpoint). Mejora real pero
+  mecánica sobre ~100 rutas ya en producción — incremental, al tocar cada
+  router por otra razón.
+- ⬜ **Ejemplos de request/response** en los schemas Pydantic
+  (`json_schema_extra`): el contrato exportado no trae ejemplos, solo tipos.
+- ⬜ **Publicar el contrato fuera del repo** (portal de API) si aparece un
+  consumidor externo real que lo pida — descartado por ahora en ADR-010.
+
+### Modo offline del PDV (tras la fase 1 de 2026-07-26 — ADR-009)
+- ⬜ **Cambio previo a la fase 2**: extender `crear_venta`/`registrar_pago`
+  (sales) y la creación de `movimiento_inventario` (inventory) para aceptar
+  un `id: uuid.UUID | None` opcional. Ya es posible sin migración
+  (`UuidPkMixin.default=uuid.uuid4` corre en Python, no en la base) — falta
+  solo el parámetro. Sin esto, el hub y la nube generan UUIDs distintos
+  para la misma venta al reintentar el sync, y haría falta una tabla de
+  mapeo hub-id↔nube-id que el diseño evita. Revisar aparte, toca dominio de
+  dos módulos.
+- ⬜ **Motor de sync real** (push/pull): el detector de conectividad y la
+  config existen; falta el proceso que de verdad drena lo pendiente hacia
+  la nube y hace upsert del catálogo/stock/usuarios hacia el hub. Bloqueado
+  por el punto anterior para la dirección ascendente (ventas/pagos/
+  movimientos); la descendente (catálogo/stock/usuarios) no depende de eso
+  y podría construirse antes.
+- ⬜ **Cuenta de servicio por sucursal** (`usuario.tipo=agente_ia`): hoy el
+  seeder no crea este tipo de usuario para hubs; falta el flujo de alta +
+  permisos mínimos (lectura catálogo/stock/usuarios, escritura ventas/
+  movimientos).
+- ⬜ **Descubrimiento del hub en la LAN** (mDNS `sucursal.local` o IP fija
+  configurada por dispositivo): decisión de cliente, no resuelta en el
+  backend.
+- ⬜ **Redundancia del hub**: si el Raspberry Pi mismo se cae, la sucursal
+  pierde el PDV entero — no hay hub de respaldo. Aceptado como riesgo por
+  ahora (ADR-009); mitigación futura: imagen lista para flashear en un
+  repuesto.
+- ⬜ **Ningún frontend construido todavía**: web, Android y PC son proyectos
+  aparte, ahora con contrato de arquitectura para construir contra él.
+- ⬜ **Migraciones en cada hub**: un hub offline por días necesita
+  `alembic upgrade head` local antes de sincronizar contra un esquema de
+  nube ya migrado — mismo runbook que la nube (ADR-008), sin automatizar
+  todavía por sucursal.
 
 ### CI/CD (tras la implementación de 2026-07-26)
 - ⬜ **Job de despliegue**: hoy el despliegue es manual y documentado. Se
@@ -388,17 +491,22 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   para siempre; reintentar el pago del mismo comprobante requiere
   intervención manual (borrar/reabrir la fila) — evaluar si el negocio
   necesita un caso de uso de reapertura.
-- ⬜ **Conciliación bancaria (PROC-CTB-004)** y **arqueo backend
-  (PROC-CTB-005)**: `Arqueo` ya existe como modelo pero sin caso de
-  uso/endpoint; conciliación bancaria no tiene ni modelo. RN-CTB-006 (cierre
-  de periodo exige conciliación visada) no se valida todavía —
-  `cerrar_periodo` hoy no lo comprueba.
-  Bloquea implementar rigurosamente RN-CTB-006.
-- ⬜ **Ciclo de caja → libro contable**: `apertura_caja`/`cierre_caja`/`arqueo`
-  (PROC-CTB-001/002) no generan asiento ni publican los eventos
+- ✅ 2026-07-26 **Arqueo backend (PROC-CTB-005)**: `application/caja.py::registrar_arqueo`
+  + `POST /accounting/arqueos`, publica `accounting.arqueo_registrado`
+  (slice mínimo, ver ADR-012 — sin visado de Gerencia ni plantilla propia).
+- ⬜ **Conciliación bancaria (PROC-CTB-004)**: sin modelo ni caso de uso.
+  RN-CTB-006 (cierre de periodo exige conciliación visada) no se valida
+  todavía — `cerrar_periodo` hoy no lo comprueba. Bloquea implementar
+  rigurosamente RN-CTB-006.
+- ✅ 2026-07-26 **Ciclo de caja → eventos**: `apertura_caja`/`cierre_caja`/
+  `arqueo` (PROC-CTB-001/002/005) ya tienen capa de aplicación
+  (`accounting.application.caja`, ver ADR-012) y publican
   `accounting.apertura_caja_registrada`/`cierre_caja_registrado`/
-  `cierre_caja_irregular` que `events.md` documenta — están construidos
-  pero no conectados entre sí.
+  `cierre_caja_irregular`/`arqueo_registrado`. **No generan asiento
+  contable todavía** (sin listener que consuma esos eventos hacia
+  `regla_asiento`) — eso sigue pendiente. Tampoco incluye RN-POS-009..013
+  completas ni la máquina de estados de `custodia_efectivo` — ver Deuda
+  técnica → Dashboard y caja.
 - ⬜ **Activo fijo/depreciación y flujo de caja** (PROC-CTB-007/010,
   propuestos): sin modelar, dependen de que exista el módulo de activos.
 - ⬜ **`declaracion_itan`**: entidad documentada en data-model §8, sin

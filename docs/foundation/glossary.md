@@ -143,6 +143,8 @@ documentación. Prohibido usar sinónimos ambiguos.
 | **Cliente anónimo** | Cliente sin datos registrados (`cliente_id` nulo en la venta); caso válido, no error de captura. |
 | **Comunidad / vecindario** | Terceros no transaccionales relevantes para permisos municipales o quejas (ruido, olores); sin entidad propia en el ERP — se gestiona vía reclamos/actas si aplica. |
 | **Postulante** | Candidato en proceso de selección, aún no contratado. Rige Ley 29733 + D.S. 016-2024-JUS: exige consentimiento previo/informado/expreso para tratar y conservar su CV. Perú NO fija plazo legal de conservación (a diferencia del RGPD) — se declara en el aviso de privacidad y se respetan derechos ARCO. |
+| **Derechos ARCO** | Acceso, Rectificación, Cancelación, Oposición (Ley 29733) — lo que cualquier titular de datos personales puede ejercer sobre su información en el ERP. Acceso/Rectificación: `GET`/`PATCH /api/v1/personas/{id}`. Cancelación: ver Anonimización. Oposición: hoy solo política, sin contraparte técnica (no hay marketing automatizado al que oponerse). Ver `docs/security/proteccion-datos-personales.md`. |
+| **Anonimización** | Forma en que el ERP ejerce el derecho de cancelación sobre `persona` (RN-PER-007, ADR-011): sobrescribe los campos identificables (nombre, documento, contacto) de forma irreversible, sin borrar la fila — a diferencia de un `DELETE`, que rompería las referencias de `trabajador`/`cliente`/`usuario`. `POST /api/v1/personas/{id}/anonimizar`, permiso `personas.anonimizar`. | Soft-delete (`deleted_at`, oculta sin destruir el dato) |
 
 ## Recursos humanos
 

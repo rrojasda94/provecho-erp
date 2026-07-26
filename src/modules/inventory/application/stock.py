@@ -7,6 +7,7 @@ El stock nunca se edita directo — todo cambio pasa por
 import uuid
 from decimal import Decimal
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.modules.inventory.application.errors import ReglaNegocio, StockInsuficiente
@@ -16,6 +17,11 @@ from src.modules.inventory.infrastructure.repositories import (
     MovimientoRepo,
     StockRepo,
 )
+
+# Almacén es organización transversal (data-model §1); vive en
+# users/infrastructure por historia. Import de modelo (no dominio)
+# permitido — mismo precedente que `application/listeners.py`.
+from src.modules.users.infrastructure.models import Almacen
 
 
 def aplicar_a_stock(
@@ -83,3 +89,22 @@ def consultar_stock(
         }
         for s in filas
     ]
+
+
+def contar_bajo_minimo(session: Session, empresa_id: uuid.UUID) -> int:
+    """Cantidad de filas de stock bajo su mínimo, en almacenes de la
+    empresa — para el dashboard gerencial (`core.dashboard_router`)."""
+    almacen_ids = list(
+        session.scalars(
+            select(Almacen.id).where(
+                Almacen.empresa_id == empresa_id, Almacen.deleted_at.is_(None)
+            )
+        )
+    )
+    if not almacen_ids:
+        return 0
+    return sum(
+        1
+        for s in session.scalars(select(Stock).where(Stock.almacen_id.in_(almacen_ids)))
+        if rules.stock_bajo(s.cantidad, s.stock_minimo)
+    )

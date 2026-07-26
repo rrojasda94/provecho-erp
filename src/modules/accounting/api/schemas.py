@@ -113,6 +113,70 @@ class EjecutarPagoIn(BaseModel):
     constancia: str | None = Field(default=None, max_length=255)
 
 
+# --- Caja (PROC-CTB-001/002) -------------------------------------------------
+class AbrirCajaIn(BaseModel):
+    punto_venta_id: uuid.UUID
+    relevo_encargado_id: uuid.UUID
+    monto_apertura: Decimal = Field(ge=0)
+    detalle_denominaciones: dict | None = None
+    diferencia_reportada: Decimal | None = None
+
+
+class AperturaCajaOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    punto_venta_id: uuid.UUID
+    cajero_id: uuid.UUID
+    relevo_encargado_id: uuid.UUID
+    monto_apertura: Decimal
+    diferencia_reportada: Decimal | None
+    created_at: datetime
+
+
+class CerrarCajaIn(BaseModel):
+    monto_real: Decimal = Field(ge=0)
+    custodia: str
+    descuadre_atribucion: str | None = None
+
+
+class CierreCajaOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    apertura_caja_id: uuid.UUID
+    cajero_id: uuid.UUID
+    descuadre_monto: Decimal
+    descuadre_atribucion: str | None
+    custodia: str
+    estado: str
+    created_at: datetime
+
+
+class ArqueoIn(BaseModel):
+    punto_venta_id: uuid.UUID
+    tipo: str
+    monto_contado: Decimal = Field(ge=0)
+
+
+class ArqueoOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    punto_venta_id: uuid.UUID
+    tipo: str
+    realizado_por: uuid.UUID
+    monto_esperado: Decimal
+    monto_contado: Decimal
+    diferencia: Decimal
+    created_at: datetime
+
+
+class CajaAbiertaOut(BaseModel):
+    apertura_caja_id: uuid.UUID
+    punto_venta_id: uuid.UUID
+    cajero_id: uuid.UUID
+    monto_apertura: Decimal
+    abierta_desde: datetime
+
+
 class MovimientoDineroOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID

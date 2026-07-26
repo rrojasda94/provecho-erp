@@ -78,6 +78,24 @@ class Settings(BaseSettings):
     s3_access_key: str = ""
     s3_secret_key: str = ""
     s3_region: str = "us-east-1"
+    # --- Modo offline del PDV (ADR-009) --------------------------------------
+    # "cloud": la nube central. "hub": instancia local de sucursal — misma
+    # imagen, Postgres propio, sincroniza con la nube cuando hay internet.
+    deployment_mode: str = "cloud"
+    # Requeridos solo si deployment_mode="hub".
+    hub_empresa_id: str = ""
+    hub_sucursal_id: str = ""
+    # Base de la API en la nube contra la que este hub sincroniza.
+    cloud_sync_url: str = ""
+    # Credenciales de la cuenta de servicio (usuario.tipo=agente_ia) que el
+    # hub usa para autenticarse contra la nube — login normal, sin endpoint
+    # de auth nuevo.
+    cloud_sync_username: str = ""
+    cloud_sync_pin: str = ""
+    sync_intervalo_segundos: int = 60
+    # Fallos de heartbeat seguidos antes de declarar al hub "offline" — uno
+    # solo sería demasiado sensible a un timeout de red puntual.
+    sync_fallos_para_offline: int = 3
 
     @property
     def broker_url(self) -> str:
@@ -86,6 +104,10 @@ class Settings(BaseSettings):
     @property
     def es_produccion(self) -> bool:
         return self.environment.lower() in {"production", "produccion", "prod"}
+
+    @property
+    def es_hub(self) -> bool:
+        return self.deployment_mode == "hub"
 
     @field_validator("allowed_hosts", "cors_origins", mode="before")
     @classmethod
@@ -117,6 +139,32 @@ class Settings(BaseSettings):
         if fallas:
             raise ValueError(
                 "Configuración insegura para ENVIRONMENT=production: " + "; ".join(fallas)
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _exigir_config_de_hub(self) -> "Settings":
+        """Un hub sin saber a qué sucursal pertenece o contra qué nube
+        sincronizar arranca "bien" y falla en silencio recién al primer
+        ciclo de sync — mejor que no arranque (ADR-009)."""
+        if self.deployment_mode not in {"cloud", "hub"}:
+            raise ValueError("DEPLOYMENT_MODE debe ser 'cloud' o 'hub'")
+        if not self.es_hub:
+            return self
+        faltantes = [
+            nombre
+            for nombre, valor in (
+                ("HUB_EMPRESA_ID", self.hub_empresa_id),
+                ("HUB_SUCURSAL_ID", self.hub_sucursal_id),
+                ("CLOUD_SYNC_URL", self.cloud_sync_url),
+                ("CLOUD_SYNC_USERNAME", self.cloud_sync_username),
+                ("CLOUD_SYNC_PIN", self.cloud_sync_pin),
+            )
+            if not valor
+        ]
+        if faltantes:
+            raise ValueError(
+                "DEPLOYMENT_MODE=hub requiere: " + ", ".join(faltantes)
             )
         return self
 

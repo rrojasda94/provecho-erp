@@ -95,9 +95,29 @@ finanzas documentados en el área:
   pago con comprobante conforme (RN-CMP-014), umbral de aprobación de
   Gerencia (RN-CTB-005), detracción SPOT (calculada, sin desglose contable
   propio aún) e idempotencia contra doble pago (RN-CTB-008).
+- **Apertura/cierre de caja** (PROC-CTB-002/001, **slice mínimo**
+  implementado 2026-07-26, ver ADR-012): `abrir_caja`/`cerrar_caja`/
+  `registrar_arqueo` en `application/caja.py`. El cierre **reconcilia de
+  verdad**: `monto_esperado = monto_apertura + efectivo cobrado desde la
+  apertura`, este último vía el contrato público de `sales`
+  (`total_efectivo_cobrado` — `accounting` no importa el dominio de
+  `sales`). Permisos `accounting.caja_operar` (rol `cajero`, abre/cierra su
+  propia caja) y `accounting.arqueo_registrar` (`supervisor`/`contador`).
+  **Diferido a un slice dedicado** (no incluido): verificación de series de
+  POS y denominaciones obligatorias (RN-POS-009..013), relevo autenticado
+  por PIN propio de ambas partes (hoy solo se registra
+  `relevo_encargado_id`), `custodia_efectivo` como máquina de estados real,
+  enlace con `sales` para bloquear el cobro sin caja abierta.
 - **Conciliación bancaria** (PROC-CTB-004): cuadra movimientos vs. extracto;
   visada por Gerencia, requisito de cierre de periodo (RN-CTB-006).
-- **Arqueo sorpresa** (PROC-CTB-005): control de Gerencia sobre el efectivo
-  (RN-CTB-007).
 - **Flujo de caja** y **activo fijo/depreciación**: pendientes de slice
   dedicado (PROC-CTB-007/010, propuestos).
+
+## Contrato API — caja (slice mínimo)
+
+| Método | Ruta | Permiso |
+|--------|------|---------|
+| POST | `/accounting/cajas/apertura` | `accounting.caja_operar` |
+| POST | `/accounting/cajas/apertura/{id}/cierre` | `accounting.caja_operar` |
+| GET | `/accounting/cajas/abiertas?empresa_id=` | `accounting.leer` |
+| POST | `/accounting/arqueos` | `accounting.arqueo_registrar` |

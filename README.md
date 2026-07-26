@@ -32,7 +32,10 @@ docker compose up --build
 
 - API: http://localhost:8000 — docs OpenAPI en http://localhost:8000/docs
   (deshabilitadas en producción)
-- Web: http://localhost:3000
+- Web: http://localhost:3000 — login por PIN + dashboard gerencial
+  (ventas del día, stock bajo mínimo, cajas abiertas; ADR-012). Primera
+  pantalla real del frontend, corriendo servidor: el JWT vive en cookie
+  httpOnly, nunca en el navegador vía JS.
 
 ### Salud
 

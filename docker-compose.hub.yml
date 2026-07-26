@@ -1,0 +1,49 @@
+# Hub local de sucursal (ADR-009 — modo offline del PDV). Corre en un
+# mini-PC/Raspberry Pi dedicado, siempre encendido, en la LAN del local.
+#
+# Misma imagen que la nube (`provecho-erp:*`), apuntando a un Postgres
+# LOCAL propio de la sucursal — no una versión recortada del backend. Los
+# dispositivos del local (PDV web, Android, PC, KDS) le hablan siempre a
+# este hub por LAN, nunca directo a internet.
+#
+# Sin Celery/Redis/worker a propósito: la emisión de comprobantes a
+# Factiliza ocurre solo en la nube, después de sincronizar — reduce el
+# hub a lo mínimo que un Raspberry Pi necesita cargar.
+#
+# Uso:
+#   cp .env.hub.example .env
+#   docker compose -f docker-compose.hub.yml up -d
+#   docker compose -f docker-compose.hub.yml exec api alembic upgrade head
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      POSTGRES_USER: provecho
+      POSTGRES_DB: provecho
+    volumes:
+      - hubdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U provecho"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    image: ${PROVECHO_IMAGE:-ghcr.io/majambo/provecho:latest}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DEPLOYMENT_MODE: hub
+    # Expuesto a toda la LAN del local (no solo loopback, como en la nube):
+    # es justamente lo que los dispositivos de la sucursal necesitan alcanzar.
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  hubdata:

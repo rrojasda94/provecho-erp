@@ -8,6 +8,7 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from src.config.settings import settings
+from src.core.dashboard_router import router as dashboard_router
 from src.core.health_router import router as health_router
 from src.core.logging_config import configurar_logging, request_id_var
 from src.core.sentry import iniciar_sentry
@@ -27,6 +28,63 @@ log = logging.getLogger("provecho.app")
 # Ruido: el chequeo de salud lo golpea el monitor cada pocos segundos.
 RUTAS_SIN_LOG = frozenset({"/health"})
 
+# Descripción de cada tag en /docs y en el contrato OpenAPI exportado
+# (`src/core/openapi_export.py`). Sin esto FastAPI agrupa por nombre pero
+# sin explicar qué es cada grupo — un cliente externo generando SDK a
+# partir del JSON no tiene más contexto que el nombre.
+TAGS_METADATA = [
+    {
+        "name": "core",
+        "description": "Salud del proceso (liveness/readiness) y estado de sync del hub. Sin auth.",
+    },
+    {
+        "name": "auth",
+        "description": "Login por PIN, refresh rotativo, logout. Sin JWT previo.",
+    },
+    {"name": "users", "description": "Perfil del usuario autenticado (`/users/me`)."},
+    {
+        "name": "personas",
+        "description": "Party model transversal: base de trabajador/cliente/usuario natural.",
+    },
+    {
+        "name": "users-admin",
+        "description": "CRUD de usuarios, roles, permisos y asignaciones (`users.gestionar`).",
+    },
+    {
+        "name": "gerencia",
+        "description": "Matriz de aprobaciones por empresa, en vez de umbrales fijos por módulo.",
+    },
+    {
+        "name": "sales",
+        "description": "Ventas y PDV: venta, cobro, catálogo comercial, comprobante electrónico.",
+    },
+    {
+        "name": "kds",
+        "description": "Pantallas de cocina: avance de pedido, comanda, despacho.",
+    },
+    {
+        "name": "inventory",
+        "description": "Catálogo de artículos, stock por almacén, movimientos y ajustes.",
+    },
+    {"name": "purchases", "description": "Proveedores y ciclo de orden de compra."},
+    {
+        "name": "production",
+        "description": "Órdenes de producción (fabricación) y costeo.",
+    },
+    {
+        "name": "accounting",
+        "description": "Libro contable, pago a proveedor (tesorería).",
+    },
+    {
+        "name": "rrhh",
+        "description": "Ciclo laboral: contrato, nómina, disciplina, permisos, asistencia.",
+    },
+    {
+        "name": "dashboard",
+        "description": "Agregado gerencial de solo lectura: ventas del día, stock crítico, caja.",
+    },
+]
+
 
 def create_app() -> FastAPI:
     """Crea la aplicación y registra los routers de cada módulo activo."""
@@ -36,11 +94,15 @@ def create_app() -> FastAPI:
     docs_url = None if settings.es_produccion else "/docs"
     app = FastAPI(
         title="Provecho ERP",
-        version="0.1.0",
-        description="ERP modular para grupo de restaurantes multi-marca.",
+        version=settings.app_version,
+        description=(
+            "ERP modular para grupo de restaurantes multi-marca. "
+            "Convenciones de la API: docs/engineering/api-guidelines.md."
+        ),
         docs_url=docs_url,
         redoc_url=None,
         openapi_url=None if settings.es_produccion else "/openapi.json",
+        openapi_tags=TAGS_METADATA,
     )
 
     @app.exception_handler(Exception)
@@ -118,6 +180,7 @@ def create_app() -> FastAPI:
         return respuesta
 
     app.include_router(health_router)
+    app.include_router(dashboard_router, prefix="/api/v1")
     app.include_router(users_router, prefix="/api/v1")
     app.include_router(inventory_router, prefix="/api/v1")
     app.include_router(sales_router, prefix="/api/v1")
