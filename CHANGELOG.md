@@ -7,6 +7,20 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Added
 
+- **Arquitectura frontend — ADR-013** (2026-07-27): Tailwind CSS sobre los
+  tokens de marca ya definidos en `globals.css` (`tailwind.config.ts` mapea
+  `bg-primary` → `var(--color-primary)`, nunca hex fijo); **Base UI**
+  (`@base-ui-components/react`) en vez de Radix para overlays/combobox/dialog
+  con accesibilidad no trivial, sin kit ya estilizado (shadcn/ui) encima;
+  shell estilo Odoo — home de apps (grilla de módulos) + sidebar dentro de
+  cada módulo, ambos filtrados por `permisos` de `GET /users/me` (endpoint ya
+  existente, sin cambio de backend), con guard real server-side por módulo
+  (el filtro del grid es solo UX). Decide de paso el pendiente de ROADMAP
+  "App Android": PWA/responsive, no app nativa. Sin librería de estado
+  global (YAGNI); Playwright para e2e de flujos críticos. Solo
+  especificación — sin implementación de código. `docs/prompts/frontend.md`
+  actualizado con las reglas técnicas.
+
 - **Decisiones de negocio — ranking del buscador y criterio de upsell**
   (2026-07-26, `docs/product/ui-ux.md`): el ranking del buscador se basa
   en historial de uso/patrones detectados (no solo similitud de texto),

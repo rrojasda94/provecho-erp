@@ -6,7 +6,7 @@ Decisión formal en [adr/ADR-002-stack-tecnologico.md](adr/ADR-002-stack-tecnolo
 |------|----------|-----------------|
 | Backend | Python 3.12+ / FastAPI | Tipado con Pydantic, OpenAPI automático, ecosistema IA |
 | ORM / Migraciones | SQLAlchemy 2 / Alembic | Repository/UoW naturales, migraciones versionadas |
-| Frontend | Next.js / React / TypeScript | Webapp responsive; base para PWA/Android |
+| Frontend | Next.js / React / TypeScript / Tailwind / Base UI | Webapp responsive (PWA, no app nativa — ver [ADR-013](adr/ADR-013-arquitectura-frontend.md)) |
 | Base de datos | PostgreSQL | Transaccional, JSONB para auditoría |
 | Cache | Redis | Cache y broker de Celery |
 | Workers | Celery | Colas: emisión de comprobantes (Factiliza), notificaciones, integraciones |
@@ -17,7 +17,8 @@ Decisión formal en [adr/ADR-002-stack-tecnologico.md](adr/ADR-002-stack-tecnolo
 
 ## Pendientes (ADR futuro)
 
-- App Android 15+: PWA (TWA) vs nativa/React Native. Cualquiera de las dos
-  le habla siempre al hub local de sucursal, nunca directo a la nube —
-  ver [ADR-009](adr/ADR-009-modo-offline-pdv.md).
+- ~~App Android 15+: PWA (TWA) vs nativa/React Native~~: resuelto en
+  [ADR-013](adr/ADR-013-arquitectura-frontend.md) (PWA/responsive). Le habla
+  siempre al hub local de sucursal, nunca directo a la nube — ver
+  [ADR-009](adr/ADR-009-modo-offline-pdv.md).
 - Broker/canales de notificaciones.
