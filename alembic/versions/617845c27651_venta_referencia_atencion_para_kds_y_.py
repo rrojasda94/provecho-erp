@@ -8,6 +8,7 @@ Create Date: 2026-07-25 11:41:27.283690
 from collections.abc import Sequence
 
 import sqlalchemy as sa  # noqa: F401
+
 from alembic import op  # noqa: F401
 
 revision: str = '617845c27651'

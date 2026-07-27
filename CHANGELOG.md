@@ -7,6 +7,48 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Added
 
+- **Decisiones de negocio — ranking del buscador y criterio de upsell**
+  (2026-07-26, `docs/product/ui-ux.md`): el ranking del buscador se basa
+  en historial de uso/patrones detectados (no solo similitud de texto),
+  con el objetivo explícito de reducir fricción en versiones futuras a
+  medida que el sistema aprende; el dialog de upsell del carrito sugiere
+  complementos del producto elegido (ej. bebidas) y/o producto en
+  promoción vigente. Solo especificado, implementación pendiente.
+
+- **Spec de UX — buscador contextual y upsell en carrito** (2026-07-26,
+  `docs/product/ui-ux.md`): buscador de producto (PDV/Kiosk/web) por
+  nombre, por insumo/ingrediente (cruce `receta_item`) y por exclusión
+  ("que no tenga X"), con lista de resultados ordenada por relevancia
+  cuando no hay match único; vía técnica sugerida: full-text search
+  (`pg_trgm`/`tsvector`), sin necesitar IA. Al ir al carrito, dialog de
+  productos sugeridos de adición rápida, descartable sin bloquear el
+  flujo. Solo especificado, implementación pendiente.
+
+- **Spec de UX — breadcrumb por ruta de usuario y tooltips de formulario**
+  (2026-07-26, `docs/product/ui-ux.md`): breadcrumb crece según la
+  navegación del usuario (patrón Odoo), no según la jerarquía de la
+  funcionalidad — cada eslabón es clicable para volver al punto exacto de
+  origen; la navegación jerárquica va por menús desplegables, mecanismo
+  separado del breadcrumb. Todo campo de formulario lleva hover explicando
+  el término o formato esperado. Solo especificado, implementación
+  pendiente.
+
+- **Spec de UX — dialog de personalización de producto en PDV/Kiosk**
+  (2026-07-26, `docs/product/ui-ux.md`): seleccionar un producto comercial
+  abre un dialog con sus modificadores admitidos (tamaño/combinación/
+  extras/restas) para producir una `variante_producto`; cruza con
+  RN-PRD-004/005 ya existentes. Solo especificado, implementación
+  pendiente (ver ROADMAP — deuda técnica módulo sales).
+
+- **Spec de theming multi-marca, accesibilidad y plataformas** (2026-07-25,
+  `docs/product/ui-ux.md`, `docs/prompts/frontend.md`): PDV/Kiosk = mayor
+  variación de skin (branding por marca de Grupo Majambo), resto de módulos
+  usa Provecho/Majambo; modo daltonismo y tamaño de fuente ajustable como
+  preferencia por usuario; táctil obligatorio en Android para
+  PDV/Kiosk/KDS/Inventario, resto de módulos PC-first pero responsive. Solo
+  especificado, implementación pendiente (ver ROADMAP — Deuda técnica
+  transversal).
+
 - **Cumplimiento de pedido — PROC-OPE-002 v1.0** (2026-07-27): cierra el
   pendiente de decisión abierto el 2026-07-14 (qué pasa después de Venta).
   Es **un** proceso del área Operaciones con Preparación y Despacho/Entrega

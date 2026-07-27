@@ -52,7 +52,10 @@ Registro de lo construido y lo pendiente. Actualizar en cada cambio relevante.
 | Chequeos de salud y alertas | ✅ 2026-07-26 | `src/core/health.py` + `health_router.py`: `/health` (liveness, sin dependencias), `/health/ready` (base de datos crítica → 503; Redis y cola degradan sin sacar de rotación) y `/health/backups` (503 pasadas 26 h — cubre el backup que nunca corrió, que no genera evento de error). El ERP expone estado; **un monitor externo alerta** (ADR-007): construir alertas dentro del servidor que se monitorea deja de avisar justo cuando ese servidor cae. Pendiente: contratar el monitor y dar de alta las sondas. |
 | Observabilidad (métricas, trazas, logs centralizados) | 🔶 logs + errores ✅ 2026-07-26 | `src/core/logging_config.py`: JSON en producción, tres flujos (`app`/`seguridad`/`auditoria`) derivados del nombre del logger, `request_id` por request (respeta `X-Request-ID` entrante, sale en la cabecera y en el cuerpo del error 500), redacción de PIN/tokens/`Authorization`. `src/core/sentry.py`: reporte de errores en `api`, `worker` (señal `celeryd_init`) y `backups`; sirve para Sentry o GlitchTip autoalojado, no-op sin DSN. Pendiente: métricas, trazas y colector de logs — ver Deuda técnica. |
 | UX: menús, buscadores, breadcrumbs, atajos, sidebars, dashboards | ⬜ | Definición pendiente con el usuario |
+| UX: breadcrumb por ruta de usuario (no jerárquico) + tooltip de ayuda por campo de formulario | ✅ spec 2026-07-26 | `docs/product/ui-ux.md` — breadcrumb crece con la navegación (patrón Odoo), navegación jerárquica va por menús desplegables; todo campo de formulario lleva hover explicando término/formato. Solo especificado |
+| UX: buscador contextual (nombre/insumo/exclusión, ranking por probabilidad) + dialog de venta sugerida (upsell) en carrito | ✅ spec 2026-07-26 | `docs/product/ui-ux.md` — buscador cruza `receta_item` para insumo/exclusión, lista ordenada por relevancia si no hay match único; al ir al carrito se sugieren productos de adición rápida, descartable. Solo especificado |
 | Branding (paleta, tipografías, tokens CSS) | ✅ 2026-07-04 | Brandboard aplicado — `docs/product/ui-ux.md` |
+| Skins multi-marca (PDV/Kiosk por marca vs Provecho/Majambo en el resto), accesibilidad (daltonismo, tamaño de fuente) y plataformas por módulo (táctil Android en PDV/Kiosk/KDS/Inventario, PC-first en el resto) | 🔶 spec 2026-07-25 | `docs/product/ui-ux.md` — solo especificado, falta implementar (resolver de tema por marca, preferencias de accesibilidad en perfil de usuario) |
 
 ## Pendientes de decisión (registro vivo)
 
@@ -110,6 +113,11 @@ contiene, buscando su `[[ COMPLETAR ]]`):
   momento se registran los PROC en el registro maestro.
 - ⬜ BPMN pendientes ya declarados: contingencias de personal faltante
   (RN-RRHH-011) y tardanza/falta del encargado (RN-RRHH-010).
+- ⬜ Catálogo exacto de paletas de accesibilidad (daltonismo) y niveles de
+  tamaño de fuente (`docs/product/ui-ux.md`).
+- ⬜ Si Grupo Majambo tiene tema propio distinto al de Provecho, o si
+  Provecho es también el tema por defecto de Grupo Majambo
+  (`docs/product/ui-ux.md`).
 - ⬜ **Pendiente del usuario para desplegar el endurecimiento de producción**
   (2026-07-26, ver ROADMAP → Deuda técnica → Seguridad): no bloquea seguir
   desarrollando, solo hace falta al desplegar de verdad.
@@ -133,6 +141,10 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
 - ⬜ `users`: aplicar **restricciones JSONB** por permiso (hoy autoriza solo
   por código, no por condición monto/estado/horario).
 - ⬜ `users`: auth de **`agente_ia` por token** (hoy exige PIN como humano).
+- ⬜ **Theming multi-marca + accesibilidad** (frontend, spec en
+  `docs/product/ui-ux.md`): resolver de tema por marca/sucursal para
+  PDV/Kiosk, preferencias de accesibilidad (paleta daltonismo, tamaño de
+  fuente) persistidas en el perfil de `usuario`. Sin implementar.
 - ✅ 2026-07-25 **Lock optimista en `persona`** (`VersionedMixin`,
   `src/core/model_base.py`): `PATCH /api/v1/personas/{id}` exige `version`
   vigente, 409 si está desactualizada. Aplicado solo a `persona` por
@@ -397,7 +409,27 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
 - ⬜ **Consumo de subrecetas anidadas**: el listener expande un solo nivel
   de receta; una receta cuyo ítem es `subreceta` no explota recursivo aún.
 - ⬜ Modificadores/variantes/combos, `central_pedidos` (pantalla y
-  agregación), puntos/loyalty, kiosk UI.
+  agregación), puntos/loyalty, kiosk UI. **UX definida** (2026-07-26,
+  `docs/product/ui-ux.md`): seleccionar un producto comercial en PDV/Kiosk
+  abre un dialog de personalización con sus modificadores admitidos
+  (tamaño/combinación/extras/restas), que produce una `variante_producto`;
+  orden fijo tamaño→combinación→extras→restas (RN-PRD-004). Falta definir
+  si combo se configura en el mismo dialog o en uno propio, y el
+  comportamiento en Kiosk (autoservicio) vs. PDV asistido.
+- ⬜ **Buscador contextual de producto** (PDV/Kiosk/web): por nombre,
+  por insumo/ingrediente (cruce `receta_item`) y por exclusión ("que no
+  tenga X"); lista de resultados ordenada por relevancia cuando no hay
+  match único. Ranking por **historial de uso/patrones detectados**
+  (decidido 2026-07-26, no solo similitud de texto) — objetivo explícito:
+  reducir fricción de búsqueda en versiones futuras a medida que aprende.
+  UX especificada en `docs/product/ui-ux.md`, sin implementar — full-text
+  search (`pg_trgm`/`tsvector`) como base, historial como señal encima.
+- ⬜ **Dialog de venta sugerida (upsell) al ir al carrito**: productos
+  complementarios de adición rápida, descartable sin bloquear el flujo.
+  Criterio de sugerencia decidido (2026-07-26): complementos del producto
+  elegido (ej. bebidas) + producto en promoción vigente. UX especificada
+  en `docs/product/ui-ux.md`; falta definir cómo se configura la relación
+  producto→complemento (fija vs. regla de venta cruzada).
 - ⬜ **KDS tiempo real**: hoy el frontend refresca por polling; push por
   WebSocket/Redis pub-sub (Redis reservado para pantallas/colas/sesiones).
 - ⬜ **KDS aviso de anulación**: si anulan un pedido ya en preparación, la
