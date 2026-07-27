@@ -163,6 +163,7 @@ def registrar_movimiento(
             tipo=body.tipo,
             usuario_id=actor.id,
             referencia=body.referencia,
+            id=body.id,
         )
     except (ReglaNegocio, StockInsuficiente) as e:
         raise _http(e) from e

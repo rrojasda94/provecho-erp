@@ -2117,6 +2117,29 @@
         "title": "EntregaOut",
         "type": "object"
       },
+      "ErrorSyncOut": {
+        "properties": {
+          "detalle": {
+            "title": "Detalle",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "tipo": {
+            "title": "Tipo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tipo",
+          "id",
+          "detalle"
+        ],
+        "title": "ErrorSyncOut",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -2294,6 +2317,28 @@
           "pin"
         ],
         "title": "LoginIn",
+        "type": "object"
+      },
+      "LoteSyncIn": {
+        "properties": {
+          "pagos": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/PagoSyncIn"
+            },
+            "title": "Pagos",
+            "type": "array"
+          },
+          "ventas": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/VentaSyncIn"
+            },
+            "title": "Ventas",
+            "type": "array"
+          }
+        },
+        "title": "LoteSyncIn",
         "type": "object"
       },
       "MeOut": {
@@ -2553,6 +2598,18 @@
               }
             ],
             "title": "Cantidad"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
           },
           "referencia": {
             "anyOf": [
@@ -3134,6 +3191,18 @@
       },
       "PagoCreate": {
         "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
           "idempotency_key": {
             "maxLength": 100,
             "minLength": 8,
@@ -3293,6 +3362,64 @@
           "monto"
         ],
         "title": "PagoProveedorCreate",
+        "type": "object"
+      },
+      "PagoSyncIn": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "idempotency_key": {
+            "maxLength": 100,
+            "minLength": 8,
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "medio_pago_id": {
+            "format": "uuid",
+            "title": "Medio Pago Id",
+            "type": "string"
+          },
+          "monto": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Monto"
+          },
+          "referencia_externa": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referencia Externa"
+          },
+          "venta_id": {
+            "format": "uuid",
+            "title": "Venta Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "venta_id",
+          "medio_pago_id",
+          "monto",
+          "idempotency_key"
+        ],
+        "title": "PagoSyncIn",
         "type": "object"
       },
       "PantallaCreate": {
@@ -4478,6 +4605,77 @@
         "title": "ProveedorUpdate",
         "type": "object"
       },
+      "PullOut": {
+        "properties": {
+          "filas": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Filas",
+            "type": "array"
+          },
+          "hay_mas": {
+            "title": "Hay Mas",
+            "type": "boolean"
+          },
+          "recurso": {
+            "title": "Recurso",
+            "type": "string"
+          }
+        },
+        "required": [
+          "recurso",
+          "filas",
+          "hay_mas"
+        ],
+        "title": "PullOut",
+        "type": "object"
+      },
+      "PushIn": {
+        "properties": {
+          "sales": {
+            "$ref": "#/components/schemas/LoteSyncIn"
+          }
+        },
+        "required": [
+          "sales"
+        ],
+        "title": "PushIn",
+        "type": "object"
+      },
+      "PushOut": {
+        "properties": {
+          "anuladas": {
+            "title": "Anuladas",
+            "type": "integer"
+          },
+          "errores": {
+            "items": {
+              "$ref": "#/components/schemas/ErrorSyncOut"
+            },
+            "title": "Errores",
+            "type": "array"
+          },
+          "pagos": {
+            "title": "Pagos",
+            "type": "integer"
+          },
+          "ventas": {
+            "description": "Ventas creadas o ya existentes",
+            "title": "Ventas",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ventas",
+          "pagos",
+          "anuladas",
+          "errores"
+        ],
+        "title": "PushOut",
+        "type": "object"
+      },
       "RecepcionCreate": {
         "properties": {
           "idempotency_key": {
@@ -4570,6 +4768,37 @@
           "recibido_por"
         ],
         "title": "RecepcionOut",
+        "type": "object"
+      },
+      "RecursoOut": {
+        "properties": {
+          "campo_marca": {
+            "title": "Campo Marca",
+            "type": "string"
+          },
+          "campos": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Campos",
+            "type": "array"
+          },
+          "motivo": {
+            "title": "Motivo",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          }
+        },
+        "required": [
+          "nombre",
+          "campos",
+          "campo_marca",
+          "motivo"
+        ],
+        "title": "RecursoOut",
         "type": "object"
       },
       "RefreshIn": {
@@ -5823,6 +6052,18 @@
             ],
             "title": "Cliente Id"
           },
+          "id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
           "idempotency_key": {
             "maxLength": 100,
             "minLength": 8,
@@ -5992,6 +6233,106 @@
           "referencia_atencion"
         ],
         "title": "VentaOut",
+        "type": "object"
+      },
+      "VentaSyncIn": {
+        "description": "Una venta ya ocurrida en el hub, tal cual, para reproducirla en la\nnube. Trae lo que la nube no puede reconstruir: identificador, día y\nnúmero de orden que el cliente ya vio impresos, y quién la atendió.",
+        "properties": {
+          "canal": {
+            "title": "Canal",
+            "type": "string"
+          },
+          "cliente_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cliente Id"
+          },
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          },
+          "fecha_orden": {
+            "format": "date",
+            "title": "Fecha Orden",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "idempotency_key": {
+            "maxLength": 100,
+            "minLength": 8,
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/VentaItemIn"
+            },
+            "minItems": 1,
+            "title": "Items",
+            "type": "array"
+          },
+          "modalidad": {
+            "title": "Modalidad",
+            "type": "string"
+          },
+          "numero_orden": {
+            "minimum": 1.0,
+            "title": "Numero Orden",
+            "type": "integer"
+          },
+          "punto_venta_id": {
+            "format": "uuid",
+            "title": "Punto Venta Id",
+            "type": "string"
+          },
+          "referencia_atencion": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referencia Atencion"
+          },
+          "sucursal_id": {
+            "format": "uuid",
+            "title": "Sucursal Id",
+            "type": "string"
+          },
+          "usuario_id": {
+            "format": "uuid",
+            "title": "Usuario Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "sucursal_id",
+          "punto_venta_id",
+          "canal",
+          "modalidad",
+          "usuario_id",
+          "idempotency_key",
+          "fecha_orden",
+          "numero_orden",
+          "estado",
+          "items"
+        ],
+        "title": "VentaSyncIn",
         "type": "object"
       },
       "VentasHoyOut": {
@@ -11968,6 +12309,160 @@
         ]
       }
     },
+    "/api/v1/sync/pull": {
+      "get": {
+        "description": "Filas del recurso con `campo_marca >= desde`, acotadas a la sucursal\nde la cuenta. Sin `desde` es la carga inicial del hub.",
+        "operationId": "pull_api_v1_sync_pull_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "recurso",
+            "required": true,
+            "schema": {
+              "title": "Recurso",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "desde",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Desde"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limite",
+            "required": false,
+            "schema": {
+              "default": 500,
+              "maximum": 2000,
+              "minimum": 1,
+              "title": "Limite",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PullOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Pull",
+        "tags": [
+          "sync"
+        ]
+      }
+    },
+    "/api/v1/sync/push": {
+      "post": {
+        "description": "Reproduce en la nube el lote que el hub acumuló durante el corte.\n\nNo escribe filas crudas: cada ítem pasa por el caso de uso de `sales`,\ncon sus validaciones, su idempotencia y sus eventos (por eso la nube\ndescuenta su propio stock y prepara los comprobantes). Un ítem\nrechazado se informa y no arrastra al resto del lote.",
+        "operationId": "push_api_v1_sync_push_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Push",
+        "tags": [
+          "sync"
+        ]
+      }
+    },
+    "/api/v1/sync/recursos": {
+      "get": {
+        "description": "El contrato de replicación, tal como está declarado en el código:\nqué entidades baja un hub y por qué necesita cada una.",
+        "operationId": "listar_recursos_api_v1_sync_recursos_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RecursoOut"
+                  },
+                  "title": "Response Listar Recursos Api V1 Sync Recursos Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Recursos",
+        "tags": [
+          "sync"
+        ]
+      }
+    },
     "/api/v1/users": {
       "get": {
         "operationId": "listar_usuarios_api_v1_users_get",
@@ -12536,6 +13031,10 @@
     {
       "description": "Agregado gerencial de solo lectura: ventas del día, stock crítico, caja.",
       "name": "dashboard"
+    },
+    {
+      "description": "Replicación con el hub local de sucursal (ADR-009): catálogo y RBAC hacia el hub, ventas y cobros del corte hacia la nube.",
+      "name": "sync"
     }
   ]
 }

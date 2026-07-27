@@ -1,5 +1,6 @@
-"""Seeder de desarrollo: organización base, roles/permisos semilla y usuario
-`admin` (PIN 123456).
+"""Seeder de desarrollo: organización real del Grupo Majambo (empresa,
+marca licenciada, sucursales CH1/CH2 y almacén central WH1), roles/permisos
+semilla y usuario `admin` (PIN 123456).
 
 Idempotente: se puede correr varias veces. PROHIBIDO en producción.
 
@@ -15,16 +16,37 @@ from sqlalchemy.orm import Session
 from src.config.settings import settings
 from src.core.database import SessionLocal
 from src.modules.users.infrastructure.models import (
+    Almacen,
     Empresa,
     Grupo,
+    LicenciaMarca,
     Marca,
     Permiso,
     Rol,
     RolPermiso,
+    Sucursal,
     Usuario,
     UsuarioRol,
 )
 from src.modules.users.infrastructure.security import hash_pin
+
+# --- Organización real del Grupo Majambo ---
+GRUPO = "Grupo Majambo"
+MARCA = "Charlie's Pizzas"
+EMPRESA_RUC = "20450311520"
+EMPRESA_RAZON_SOCIAL = "Inversiones Turísticas y Alimentarias Majambo EIRL"
+SEDE_CASTILLA = "Jr. Ramón Castilla 248 - Tarapoto"
+
+# nombre → (dirección, tenencia). La tenencia decide predial/arbitrios
+# (RN-IMP-004); ambas sucursales operan en local alquilado.
+SUCURSALES = {
+    "CH1": (SEDE_CASTILLA, "alquilada"),
+    "CH2": ("Jr. Lamas 299 - Tarapoto", "alquilada"),
+}
+
+# Central: abastece a los almacenes de sucursal y a producción, y no cuelga
+# de ninguna sucursal (`sucursal_id` NULL).
+ALMACEN_CENTRAL = ("WH1", SEDE_CASTILLA)
 
 # Matriz semilla (authorization.md). "*" = todo (solo admin, entornos internos).
 PERMISOS = [
@@ -98,6 +120,8 @@ PERMISOS = [
     ("rrhh.permiso_aprobar", "Aprobar o rechazar solicitudes de permiso"),
     ("rrhh.asistencia_marcar", "Marcar entrada y salida de asistencia"),
     ("rrhh.capacitacion_gestionar", "Administrar pactos de permanencia por capacitación"),
+    ("sync.leer", "Descargar catálogo, stock y RBAC de la sucursal hacia su hub"),
+    ("sync.empujar", "Reproducir en la nube las ventas y cobros de un hub offline"),
 ]
 
 ROLES = {
@@ -143,6 +167,10 @@ ROLES = {
         "inventory.solicitar_ajuste",
     ],
     "agente_ia": ["sales.crear_pedido"],
+    # Cuenta de servicio del hub de sucursal (ADR-009): lo mínimo para
+    # replicar hacia abajo y reproducir hacia arriba. Nada de gestión de
+    # catálogo, RRHH ni contabilidad — un hub robado no es un admin.
+    "hub_sucursal": ["sync.leer", "sync.empujar"],
     "comprador": [
         "purchases.crear",
         "purchases.leer",
@@ -190,28 +218,61 @@ def _get_or_create(session: Session, model, defaults=None, **filtros):
     return inst, True
 
 
-def seed(session: Session) -> None:
-    # --- Organización base (Grupo Majambo) ---
-    grupo, _ = _get_or_create(session, Grupo, nombre="Grupo Majambo")
-    _get_or_create(
+def _seed_organizacion(session: Session) -> None:
+    """Grupo, empresa, marca licenciada, sucursales y almacén central."""
+    grupo, _ = _get_or_create(session, Grupo, nombre=GRUPO)
+    empresa, _ = _get_or_create(
         session,
         Empresa,
-        ruc="20450311520",
+        ruc=EMPRESA_RUC,
         defaults=dict(
             grupo_id=grupo.id,
-            razon_social="Inversiones Turísticas y Alimentarias Majambo EIRL",
-            domicilio_fiscal="Tarapoto, San Martín",
+            razon_social=EMPRESA_RAZON_SOCIAL,
+            domicilio_fiscal=SEDE_CASTILLA,
             tipo="operativa",
             zona_tributaria="amazonia_ley27037",
         ),
     )
-    _get_or_create(
+    # `_get_or_create` no toca lo ya creado: el domicilio fiscal se sincroniza
+    # aparte para que un seed viejo quede con la dirección vigente.
+    empresa.domicilio_fiscal = SEDE_CASTILLA
+
+    marca, _ = _get_or_create(
         session,
         Marca,
         grupo_id=grupo.id,
-        nombre="Charlie's Pizzas",
+        nombre=MARCA,
         defaults=dict(tipo="restaurante"),
     )
+    # La marca es del grupo; la empresa la opera vía licencia (data-model §1).
+    _get_or_create(session, LicenciaMarca, empresa_id=empresa.id, marca_id=marca.id)
+
+    for nombre, (direccion, tenencia) in SUCURSALES.items():
+        _get_or_create(
+            session,
+            Sucursal,
+            empresa_id=empresa.id,
+            nombre=nombre,
+            defaults=dict(
+                marca_id=marca.id,
+                direccion=direccion,
+                estado="activa",
+                tenencia=tenencia,
+            ),
+        )
+
+    nombre_almacen, direccion_almacen = ALMACEN_CENTRAL
+    _get_or_create(
+        session,
+        Almacen,
+        empresa_id=empresa.id,
+        nombre=nombre_almacen,
+        defaults=dict(tipo="central", sucursal_id=None, direccion=direccion_almacen),
+    )
+
+
+def seed(session: Session) -> None:
+    _seed_organizacion(session)
 
     # --- Permisos ---
     permisos = {}

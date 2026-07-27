@@ -184,6 +184,28 @@ tiempo real (Redis/WebSocket) es deuda declarada.
 Roles seed: `cocinero` (kds.operar, **no** entrega), `despachador`
 (kds.operar + entrega), cajero opera y entrega; supervisor configura.
 
+## Sincronización con el hub de sucursal (implementado 2026-07-27)
+
+`application/sincronizacion.py` declara el contrato de este módulo con el
+hub local de cada sucursal (ADR-009 fase 2). Es la única parte de `sales`
+que sabe del modo offline; el motor vive en `core/sync` y no conoce
+ninguna entidad de negocio.
+
+- **Hacia el hub** (`RECURSOS`): `producto_comercial`, `medio_pago`,
+  `punto_venta`, `kds_pantalla` — la carta del local, sus medios de cobro,
+  sus cajas y sus pantallas de cocina, filtrados por la marca/sucursal del
+  hub.
+- **Hacia la nube** (`pendientes` / `aplicar`): las ventas, cobros y
+  anulaciones que ocurrieron durante el corte se reproducen **por los
+  mismos casos de uso** (`crear_venta`, `registrar_pago`, `anular_venta`),
+  conservando `id`, `idempotency_key`, `fecha_orden`, `numero_orden` y
+  quién vendió. Un commit por ítem: una venta que la nube rechaza no
+  arrastra al resto del lote.
+- El hub **no** empuja movimientos de inventario: los genera el listener de
+  la nube al recibir la venta (empujarlos duplicaría el consumo).
+- `tasks.encolar` es no-op en un hub — la emisión a SUNAT es siempre de la
+  nube, después del sync.
+
 ## Casos de uso
 
 - CRUD de productos comerciales y recetas (separados de artículos inventariables).

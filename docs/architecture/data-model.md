@@ -68,6 +68,8 @@ erDiagram
 - **almacen**: empresa_id, sucursal_id (NULL si central o de activos), tipo
   (`central` | `produccion` | `sucursal` | `activos` | ... — enum
   extensible, ej. futuro `transporte` como hub físico, RN-TRP-003),
+  direccion (NULL en los virtuales y en los de sucursal, que heredan la de
+  su sucursal — el central no cuelga de ninguna y necesita la suya),
   almacen_abastecedor_id
   (el central del que se abastece un almacén de sucursal/producción).
   `activos` es virtual (sin ubicación física ni stock de SKUs). Equipamiento
@@ -833,6 +835,24 @@ módulo.
 La adquisición de material y la contratación de agencia **no** son
 entidades de marketing: usan el flujo de `purchases` (OC/caja chica) y
 `contrato` (transversal), RN-MKT-004/006.
+
+## 8e. Sincronización del hub de sucursal (core, ADR-009)
+
+Única tabla que agrega el motor de sync. **Solo la escribe un hub**; en la
+base de la nube queda vacía. No lleva tenant: una base de hub *es* de una
+sola sucursal.
+
+- **sync_watermark** (PK compuesta `direccion` + `recurso`): direccion
+  (`pull` | `push`), recurso (nombre declarado del recurso replicable, ej.
+  `producto_comercial`, o `sales` para el lote ascendente), marca (último
+  `updated_at` procesado; NULL = nunca sincronizó), ultimo_ok,
+  ultimo_error. Una fila por recurso y dirección — **no es un outbox**: no
+  hay una fila por escritura. Un recurso con `ultimo_error` no avanza su
+  marca y se reintenta entero cada ciclo; `GET /health/sync` lo expone.
+
+No hay tabla de mapeo hub-id↔nube-id: `venta`, `pago` y
+`movimiento_inventario` conservan el mismo UUID en ambos lados porque el
+`id` se genera en la aplicación (`UuidPkMixin`) y viaja en el lote.
 
 ## 9. Módulos futuros
 

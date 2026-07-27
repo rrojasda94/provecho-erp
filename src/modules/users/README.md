@@ -77,6 +77,26 @@ python -m src.seeders.seed
 Pendiente: aplicar las `restricciones` (JSONB) de cada permiso — hoy la
 autorización solo valida el código, no la condición (monto/estado/horario).
 
+## Sincronización con el hub de sucursal (implementado 2026-07-27)
+
+`application/sincronizacion.py` declara qué replica este módulo hacia el
+hub local (ADR-009 fase 2): la organización (grupo, empresa, marca,
+sucursal, almacén) y el RBAC completo de esa sucursal (persona, usuario,
+rol, permiso y sus asignaciones). Sin RBAC replicado nadie puede
+autenticarse en el hub durante un corte.
+
+- `usuario.pin_hash` **sí** viaja (Argon2id, nunca el PIN): es lo que
+  permite validar el PIN sin nube. Es la única salida de un hash de
+  credencial en toda la API, detrás del permiso `sync.leer` y acotada a
+  los usuarios de esa sucursal.
+- `intentos_fallidos`/`bloqueado_hasta` **no** viajan: el lockout es estado
+  vivo de cada lado; replicarlo bloquearía a un cajero en el local por
+  intentos hechos contra la nube.
+- `persona` viaja recortada (nombres, apellidos, documento) — el PDV
+  muestra un nombre, no una ficha.
+- Rol `hub_sucursal` (`sync.leer` + `sync.empujar`) y alta de la cuenta de
+  servicio: `python -m src.seeders.hub`.
+
 ## Reglas
 
 - PIN: exactamente 6 dígitos, hasheado con Argon2id. Nunca en logs.
@@ -84,6 +104,12 @@ autorización solo valida el código, no la condición (monto/estado/horario).
 - Refresh tokens rotativos: usar uno viejo revoca toda la cadena.
 - Agentes de IA son usuarios tipo `agente_ia` con permisos restringidos (ej. solo `sales.crear_pedido`).
 - Seeder de desarrollo: usuario `admin` / PIN `123456` con rol admin. Prohibido en producción.
+- El seeder deja montada la organización real del grupo: empresa
+  Majambo EIRL (RUC 20450311520, zona `amazonia_ley27037`), marca
+  Charlie's Pizzas licenciada a esa empresa, sucursales `CH1` y `CH2`
+  (alquiladas, activas) y almacén central `WH1`. Es idempotente: correrlo de
+  nuevo no duplica ni reescribe, salvo el domicilio fiscal, que se
+  sincroniza siempre.
 
 ## Flujo
 

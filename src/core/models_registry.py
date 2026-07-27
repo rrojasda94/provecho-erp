@@ -4,6 +4,7 @@ Lo usan Alembic (autogenerate) y los tests. Cada módulo nuevo agrega aquí
 su import de `infrastructure.models`.
 """
 
+import src.core.sync.models  # noqa: F401
 import src.modules.accounting.infrastructure.models  # noqa: F401
 import src.modules.inventory.infrastructure.models  # noqa: F401
 import src.modules.production.infrastructure.models  # noqa: F401

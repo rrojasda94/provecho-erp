@@ -66,8 +66,9 @@ def crear_venta(
             items=[it.model_dump() for it in body.items],
             cliente_id=body.cliente_id,
             referencia_atencion=body.referencia_atencion,
+            id=body.id,
         )
-    except (NoEncontrado, ReglaNegocio) as e:
+    except (NoEncontrado, ReglaNegocio, Conflicto) as e:
         raise _http(e) from e
     session.commit()
     return venta
@@ -102,6 +103,7 @@ def registrar_pago(
             monto=body.monto,
             idempotency_key=body.idempotency_key,
             referencia_externa=body.referencia_externa,
+            id=body.id,
         )
     except (NoEncontrado, Conflicto, ReglaNegocio) as e:
         raise _http(e) from e
