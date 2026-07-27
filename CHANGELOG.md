@@ -7,6 +7,33 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Added
 
+- **Organización real del Grupo Majambo en el seeder** (2026-07-27): el
+  seeder creaba grupo, empresa y marca, pero ninguna sucursal ni almacén —
+  el ERP arrancaba sin los locales sobre los que opera. Ahora siembra la
+  estructura completa y real: empresa **Inversiones Turísticas y
+  Alimentarias Majambo EIRL** (RUC 20450311520, domicilio fiscal Jr. Ramón
+  Castilla 248 - Tarapoto, zona `amazonia_ley27037`), la **licencia** de la
+  marca Charlie's Pizzas a esa empresa (`licencia_marca` nunca se había
+  sembrado, y `sucursal.empresa_id` existe justamente vía licencia), las
+  sucursales **CH1** (Jr. Ramón Castilla 248) y **CH2** (Jr. Lamas 299),
+  ambas `activa` y `alquilada` — tenencia confirmada con el usuario, decide
+  predial/arbitrios (RN-IMP-004) — y el almacén central **WH1** (Jr. Ramón
+  Castilla 248, `sucursal_id` NULL: el central no cuelga de ninguna
+  sucursal, las abastece). El domicilio fiscal se sincroniza en cada corrida
+  porque `_get_or_create` no toca lo ya creado y el valor sembrado antes era
+  el genérico "Tarapoto, San Martín". `tests/test_seed_organizacion.py`
+  (6 casos, incluida la idempotencia). Los almacenes de sucursal de CH1/CH2
+  no se siembran: no fueron pedidos y su stock mínimo/máximo depende de
+  datos de operación que aún no existen.
+
+### Changed
+
+- **`almacen.direccion`** (2026-07-27, migración `e5a1c93b7d40`): columna
+  nueva, nullable. El almacén central tiene `sucursal_id` NULL, así que no
+  había dónde registrar su ubicación física; los almacenes de sucursal
+  heredan la dirección de su sucursal y los virtuales (`activos`, futuro
+  `transporte`) no tienen ninguna — de ahí que sea nullable y no obligatoria.
+
 - **Dashboard gerencial mínimo + slice de caja (PROC-CTB-001/002)**
   (2026-07-26): ADR-012. `GET /api/v1/dashboard/resumen`
   (`src/core/dashboard_router.py`, permiso `dashboard.leer`): ventas del

@@ -21,6 +21,9 @@ class Almacen(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin):
     # Enum extensible (ej. futuro `transporte` como hub físico, RN-TRP-003)
     # — String a propósito. `activos` es virtual, sin stock de SKUs.
     tipo: Mapped[str] = mapped_column(String(30))
+    # NULL en los almacenes sin ubicación física (`activos`, `transporte`)
+    # y en los de sucursal, cuya dirección es la de su sucursal.
+    direccion: Mapped[str | None] = mapped_column(String(255), nullable=True)
     # El central del que se abastece un almacén de sucursal/producción.
     almacen_abastecedor_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("almacen.id"), nullable=True
