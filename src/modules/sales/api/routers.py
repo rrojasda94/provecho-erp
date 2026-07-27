@@ -9,6 +9,7 @@ from src.modules.sales.api import schemas
 from src.modules.sales.application import (
     catalogo,
     comprobantes,
+    cumplimiento,
     queries_publicas,
     tasks,
     ventas,
@@ -33,6 +34,7 @@ ANULAR = "sales.anular"
 CATALOGO = "sales.gestionar_catalogo"
 LEER_CLIENTES_EXTERNOS = "sales.leer_clientes_externos"
 EMITIR = "sales.emitir_comprobante"
+ENTREGAR = "sales.entregar_pedido"
 
 _HTTP_STATUS: dict[type[SalesError], int] = {
     NoEncontrado: status.HTTP_404_NOT_FOUND,
@@ -123,6 +125,26 @@ def anular_venta(
         raise _http(e) from e
     session.commit()
     return venta
+
+
+# --- Cumplimiento de pedido (PROC-OPE-002) ----------------------------------
+@router.post("/ventas/{venta_id}/entrega", response_model=schemas.EntregaOut)
+def registrar_entrega(
+    venta_id: uuid.UUID,
+    actor: Usuario = Depends(require_permission(ENTREGAR)),
+    session: Session = Depends(get_db),
+):
+    """Cierra el pedido: lo entrega al cliente y publica
+    `sales.venta_entregada`. Permiso propio, distinto del avance de cocina
+    (RN-CUP-006); repetirlo no reemite el evento (RN-CUP-005)."""
+    try:
+        resultado = cumplimiento.registrar_entrega(
+            session, venta_id, entregado_por=actor.id
+        )
+    except (NoEncontrado, Conflicto, ReglaNegocio) as e:
+        raise _http(e) from e
+    session.commit()
+    return resultado
 
 
 # --- Comprobante electrónico ------------------------------------------------

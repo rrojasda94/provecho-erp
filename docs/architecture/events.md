@@ -57,6 +57,9 @@ accounting.asiento_generado
 | `sales.comprobante_emitido` | sales | accounting | venta_id, tipo, serie_numero | Comprobante aceptado por SUNAT (Factiliza) | RN-COM-003 |
 | `sales.venta_anulada` | sales | inventory, accounting | venta_id, motivo | Al anular | RN-GEN-002 |
 | `sales.carrito_abandonado` | sales | — (analítica) | carrito_id, canal, paso, motivo (opcional) | Al abandonar sin confirmar | RN-COM-013 |
+| `sales.pedido_listo` | sales (PROC-OPE-002) | — (pantalla de despacho, analítica de tiempos) | venta_id | Todos los ítems del pedido alcanzan `listo` | RN-CUP-005 |
+| `sales.venta_entregada` | sales (PROC-OPE-002) | marketing* (habilita encuesta selectiva), accounting (habilita cobro al finalizar en mesa) | venta_id, sucursal_id, modalidad, cliente_id (opcional), repartidor_externo_plataforma (opcional), entregado_por | El pedido queda en manos del cliente | RN-CUP-005/006/007/009, RN-COM-007 |
+| `marketing.encuesta_enviada` | marketing* | — (analítica de experiencia) | encuesta_id, venta_id, cliente_id, canal (`pos`\|`whatsapp`\|`link`) | Marketing selecciona una venta entregada y envía la encuesta — nunca automático para toda venta | RN-COM-007 |
 | `inventory.stock_consumido` | inventory | — (auditoría) | almacen_id, articulo_id, cantidad, ref | Tras descontar por venta/producción | RN-INV-003 |
 | `inventory.stock_bajo_minimo` | inventory | users (notifica), production* (dispara orden por necesidad) | almacen_id, articulo_id, actual, minimo | Al cruzar el mínimo | RN-PRD-007 |
 | `inventory.transferencia_recibida` | inventory | accounting | transferencia_id, diferencias[] | Al recibir en local | RN-INV-002 |
@@ -88,10 +91,12 @@ accounting.asiento_generado
 `*` = módulo futuro. Reglas referenciadas en
 [../domain/business-rules.md](../domain/business-rules.md).
 
-> ⚠ **Pendiente, fuera de alcance de Venta (2026-07-14)**: `venta_entregada`
-> y `encuesta_enviada` se retiraron de la v1 — su disparador (entrega al
-> cliente) pertenece al proceso de cumplimiento de pedido, aún sin definir
-> (ni su nombre de módulo ni si es 1 o 2 procesos). Se retoman cuando ese
-> proceso se modele.
+> **Nota (2026-07-27)**: `sales.venta_entregada` y `marketing.encuesta_enviada`
+> vuelven a la tabla al definirse `PROC-OPE-002` (Cumplimiento de pedido)
+> como **un** proceso del área Operaciones. `venta_entregada` es del módulo
+> `sales` porque el estado de cumplimiento vive en `venta_item` — el área
+> dueña del proceso no obliga a crear un módulo de código nuevo. En la misma
+> fecha se regulariza `sales.pedido_listo`, que el KDS publicaba desde
+> 2026-07-25 sin fila en esta tabla.
 
 > Al agregar un evento: definir aquí su fila ANTES de publicarlo o consumirlo.

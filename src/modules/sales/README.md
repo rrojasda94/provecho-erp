@@ -135,7 +135,12 @@ credencial exista.
 Diferido: nota de crédito (`/note/send`), descarga de PDF/XML/CDR,
 guía de remisión (`/despatch-*`), consulta de estado en SUNAT.
 
-## KDS (implementado 2026-07-25)
+## Cumplimiento de pedido — KDS y entrega (implementado 2026-07-25/27)
+
+Implementa `PROC-OPE-002` ([workflows.md](../../../docs/domain/workflows.md#cumplimiento-de-pedido),
+RN-CUP-001..012). El área dueña del proceso es Operaciones; el código vive
+en `sales` porque el avance se persiste en `venta_item` — el área de
+negocio no obliga a crear un módulo nuevo.
 
 Pantallas de cocina configurables por sucursal en `/api/v1/kds`. El
 avance vive en `venta_item.estado_preparacion`
@@ -152,7 +157,13 @@ tiempo real (Redis/WebSocket) es deuda declarada.
   por ítem (`POST /kds/items/{id}/avanzar`).
 - **Despacho**: ve pedidos con ítems listos + `estado_pedido` agregado
   (el ítem más atrasado manda); al estar todo listo se publica
-  `sales.pedido_listo`; marca entrega y el pedido sale de las colas.
+  `sales.pedido_listo`.
+- **Entrega**: `POST /sales/ventas/{id}/entrega` cierra el pedido completo
+  y publica `sales.venta_entregada` (disparador de la encuesta de
+  marketing, RN-COM-007). Exige todos los ítems en `listo` (RN-CUP-005),
+  permiso propio distinto del de cocina (RN-CUP-006) y es idempotente:
+  repetirla no reemite el evento. Por eso el bump del KDS **no** llega a
+  `entregado` — devuelve 409 apuntando a este endpoint.
 - **Comanda**: `POST /kds/ventas/{id}/comanda` → texto plano 32 cols
   (térmica 58 mm) + contador `comanda_impresa_veces` (reimpresión
   marcada y auditable).
@@ -168,9 +179,10 @@ tiempo real (Redis/WebSocket) es deuda declarada.
 | POST | `/kds/items/{id}/avanzar` | `kds.operar` |
 | GET | `/kds/ventas/{id}/avance` | `kds.operar` |
 | POST | `/kds/ventas/{id}/comanda` | `kds.operar` |
+| POST | `/sales/ventas/{id}/entrega` | `sales.entregar_pedido` |
 
-Roles seed: `cocinero` (kds.operar), cajero también opera; supervisor
-configura.
+Roles seed: `cocinero` (kds.operar, **no** entrega), `despachador`
+(kds.operar + entrega), cajero opera y entrega; supervisor configura.
 
 ## Casos de uso
 

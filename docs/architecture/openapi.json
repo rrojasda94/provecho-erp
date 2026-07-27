@@ -2084,6 +2084,39 @@
         "title": "EjecutarPagoIn",
         "type": "object"
       },
+      "EntregaOut": {
+        "properties": {
+          "estado_pedido": {
+            "title": "Estado Pedido",
+            "type": "string"
+          },
+          "modalidad": {
+            "title": "Modalidad",
+            "type": "string"
+          },
+          "numero_orden": {
+            "title": "Numero Orden",
+            "type": "integer"
+          },
+          "venta_id": {
+            "title": "Venta Id",
+            "type": "string"
+          },
+          "ya_entregado": {
+            "title": "Ya Entregado",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "venta_id",
+          "numero_orden",
+          "modalidad",
+          "estado_pedido",
+          "ya_entregado"
+        ],
+        "title": "EntregaOut",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -11823,6 +11856,55 @@
           }
         ],
         "summary": "Ver Comprobante",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/ventas/{venta_id}/entrega": {
+      "post": {
+        "description": "Cierra el pedido: lo entrega al cliente y publica\n`sales.venta_entregada`. Permiso propio, distinto del avance de cocina\n(RN-CUP-006); repetirlo no reemite el evento (RN-CUP-005).",
+        "operationId": "registrar_entrega_api_v1_sales_ventas__venta_id__entrega_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "venta_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Venta Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntregaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Registrar Entrega",
         "tags": [
           "sales"
         ]

@@ -42,6 +42,10 @@ PERMISOS = [
     ("sales.emitir_comprobante", "Reintentar la emisión de un comprobante a SUNAT"),
     ("kds.configurar", "Crear y configurar pantallas KDS"),
     ("kds.operar", "Operar KDS: cola, avance de ítems, comanda"),
+    (
+        "sales.entregar_pedido",
+        "Registrar la entrega del pedido al cliente (PROC-OPE-002)",
+    ),
     ("sales.crear_pedido", "Crear pedido (canal agente IA)"),
     ("inventory.transferir", "Transferir stock"),
     ("inventory.recepcion", "Recepcionar mercadería"),
@@ -105,6 +109,7 @@ ROLES = {
         "sales.anular",
         "sales.gestionar_catalogo",
         "sales.emitir_comprobante",
+        "sales.entregar_pedido",
         "kds.configurar",
         "kds.operar",
         "inventory.leer",
@@ -122,10 +127,13 @@ ROLES = {
         "sales.crear",
         "sales.cobrar",
         "sales.leer",
+        "sales.entregar_pedido",
         "kds.operar",
         "accounting.caja_operar",
     ],
+    # Cocina avanza la preparación pero NO cierra la entrega (RN-CUP-006).
     "cocinero": ["kds.operar", "sales.leer"],
+    "despachador": ["kds.operar", "sales.leer", "sales.entregar_pedido"],
     "almacenero": [
         "inventory.transferir",
         "inventory.recepcion",

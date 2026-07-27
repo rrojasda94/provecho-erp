@@ -61,9 +61,9 @@ def tipo_comprobante(tipo_cliente: str | None, ruc: str | None) -> str:
     return "factura" if tipo_cliente == "juridico" and ruc else "boleta"
 
 
-# --- KDS: avance de preparación por ítem -------------------------------------
-# Secuencia estricta, sin retroceso: el avance mostrado en todas las
-# pantallas es la verdad única del ítem.
+# --- Cumplimiento de pedido (PROC-OPE-002) -----------------------------------
+# Secuencia estricta, sin retroceso (RN-CUP-002): el avance mostrado en
+# todas las pantallas es la verdad única del ítem (RN-CUP-003).
 ORDEN_PREPARACION = ["pendiente", "en_preparacion", "listo", "entregado"]
 
 
@@ -82,3 +82,17 @@ def estado_pedido(estados_items: list[str]) -> str:
     if not estados_items:
         return "pendiente"
     return min(estados_items, key=ORDEN_PREPARACION.index)
+
+
+def pedido_entregable(estados_items: list[str]) -> bool:
+    """Solo se entrega un pedido con todos sus ítems al menos `listo`
+    (RN-CUP-005). Un pedido sin ítems no es entregable."""
+    return bool(estados_items) and all(
+        estado in ("listo", "entregado") for estado in estados_items
+    )
+
+
+def pedido_entregado(estados_items: list[str]) -> bool:
+    return bool(estados_items) and all(
+        estado == "entregado" for estado in estados_items
+    )

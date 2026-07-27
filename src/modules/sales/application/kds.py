@@ -167,6 +167,12 @@ def avanzar_item(
     venta = session.get(Venta, item.venta_id)
     if venta.estado == "anulada":
         raise Conflicto("la venta está anulada")
+    if nuevo_estado == "entregado":
+        # La entrega cierra el pedido completo y exige su propio permiso
+        # (RN-CUP-005/006) — no se marca ítem por ítem desde cocina.
+        raise ReglaNegocio(
+            "la entrega se registra en POST /sales/ventas/{venta_id}/entrega"
+        )
     if not rules.transicion_preparacion_valida(item.estado_preparacion, nuevo_estado):
         raise ReglaNegocio(
             f"transición inválida: {item.estado_preparacion} → {nuevo_estado}"

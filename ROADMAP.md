@@ -19,7 +19,7 @@ Registro de lo construido y lo pendiente. Actualizar en cada cambio relevante.
 | Seeders (admin / PIN 123456, org base) | ✅ 2026-07-25 | `src/seeders/seed.py` (idempotente, prohibido en prod): Grupo Majambo + empresa + marca, matriz de roles/permisos semilla, `admin`/PIN `123456`. Correr: `python -m src.seeders.seed`. |
 | Módulo `inventory` | 🔶 slice 1 ✅ 2026-07-25 | Catálogo (CRUD artículos/categorías/SKUs), stock por almacén (vía `movimiento_inventario` inmutable) y ajuste con segregación (`solicitar_ajuste` ≠ `aprobar_ajuste`, aprobador ≠ solicitante). Migración `be914c92a94b`. Diferido: lote/FEFO, reservas, conteo, transferencias, devolución, guía remisión, listeners de eventos. |
 | Módulo `purchases` | 🔶 slice core ✅ 2026-07-25 | CRUD de proveedores (natural liga a `persona`, jurídico con RUC propio) y ciclo de OC tipo `insumo` (crear → emitir → recibir → anular), con idempotencia y umbral de aprobación configurable. `purchases.compra_recibida` → inventory suma stock y recalcula `costo_promedio`. Conformidad de comprobante (`purchases.dar_conformidad`) registra el `comprobante` recibido y dispara `purchases.comprobante_conforme` → cola de pago en `accounting`. Migración `4ff85f833b29` aplicada. Diferido: ver Deuda técnica. |
-| Módulo `sales` (PDV) | 🔶 slices 1-2 ✅ 2026-07-25 | Venta con correlativo+idempotencia → `sales.venta_confirmada` → inventory descuenta por receta (+merma+empaque); cobro con pagos parciales → `pagada`; anulación pre-pago repone stock; CRUD productos/medios de pago. **KDS** (slice 2): pantallas configurables por sucursal y categorías (`kds_pantalla`, migración `7672566bf189`), avance por ítem en `venta_item.estado_preparacion` (fuente única → todas las pantallas ven el avance real), tipos preparación/despacho, comanda imprimible con contador de reimpresiones, evento `sales.pedido_listo`, rol `cocinero`. Kiosk/Central de Pedidos = clientes del mismo contrato, no módulos. Diferido: ver Deuda técnica. |
+| Módulo `sales` (PDV) | 🔶 slices 1-3 ✅ 2026-07-27 | Venta con correlativo+idempotencia → `sales.venta_confirmada` → inventory descuenta por receta (+merma+empaque); cobro con pagos parciales → `pagada`; anulación pre-pago repone stock; CRUD productos/medios de pago. **KDS** (slice 2): pantallas configurables por sucursal y categorías (`kds_pantalla`, migración `7672566bf189`), avance por ítem en `venta_item.estado_preparacion` (fuente única → todas las pantallas ven el avance real), tipos preparación/despacho, comanda imprimible con contador de reimpresiones, evento `sales.pedido_listo`, rol `cocinero`. Kiosk/Central de Pedidos = clientes del mismo contrato, no módulos. **Cumplimiento de pedido** (slice 3, 2026-07-27): `PROC-OPE-002` definido como UN proceso (área Operaciones) y su etapa de entrega implementada — `POST /sales/ventas/{id}/entrega` con permiso propio `sales.entregar_pedido` y rol `despachador`, idempotente, publica `sales.venta_entregada` (disparador de la encuesta de marketing, RN-COM-007). Diferido: ver Deuda técnica. |
 | Persona CRUD + lock optimista + matriz de aprobaciones + contrato público | ✅ 2026-07-25 | `POST/GET/PATCH /api/v1/personas` (sin Delete); `persona.version` con lock optimista (409 si desactualizada); `regla_aprobacion` (nuevo, `src/shared/`) reemplaza el umbral fijo de `purchases` por empresa, admin en `/api/v1/reglas-aprobacion`; primer contrato público de lectura cross-módulo (`sales.cliente` para marketing/comercial, `GET /api/v1/sales/clientes`). Migración `af8a246e2c25`. Ver detalle abajo. |
 | Módulo `accounting` | 🔶 slice core+tesorería ✅ 2026-07-25 | Libro contable núcleo: plan de cuentas (`cuenta_contable`), periodo (`periodo_contable`, abrir/cerrar), asiento manual (`asiento`/`asiento_linea`, cuadre RN-CTB-001, anulación por asiento inverso RN-CTB-002) y mapeo configurable evento→cuentas (`regla_asiento`) que alimenta la generación automática para 4 eventos operativos ya publicados en código (`purchases.oc_emitida`, `purchases.compra_recibida`, `sales.venta_confirmada`, `purchases.comprobante_conforme`). **Pago a proveedor** (PROC-CTB-003, `movimiento_dinero`): cola idempotente por comprobante (RN-CTB-008) → ejecutar con umbral configurable + permiso (RN-CTB-005) → asiento automático. Migraciones `5402d99333fa`+`cbf904a9fc1b` aplicadas. Diferido: ver Deuda técnica. |
 | Producción (fabricación) | 🔶 slice core ✅ 2026-07-25 | Orden de producción ad-hoc (crear → registrar consumo → completar con resultado de control de calidad) y costeo automático. Construido antes de tiempo a pedido del usuario — primera cocina real sigue planeada 2027. `receta.articulo_id` nuevo liga receta↔subreceta. Diferido: ver Deuda técnica. |
@@ -77,8 +77,16 @@ contiene, buscando su `[[ COMPLETAR ]]`):
   atención al cliente → supervisor (redacta solución) → comercial/gerencia
   (acciones reportadas); se almacena para mejora continua
   (`data-model.md` §6).
-- ⬜ Cumplimiento de pedido: ¿1 proceso o 2 (Producción/Cocina +
-  Despacho/Entrega)? Bloquea `venta_entregada`/`encuesta_enviada`.
+- ✅ 2026-07-27 Cumplimiento de pedido: **UN** proceso — `PROC-OPE-002`
+  (área Operaciones), con Preparación y Despacho/Entrega como etapas
+  internas, no dos procesos. Razones: un solo resultado (entra Orden de
+  Pedido, sale pedido entregado) sin artefacto de traspaso; la máquina de
+  estados ya implementada (`venta_item.estado_preparacion`) es una sola y
+  las pantallas KDS `preparacion`/`despacho` son vistas de ella; "Producción"
+  ya nombra la cocina de producción central (`PROC-PRD-001`, 2027) y
+  reusarlo rompía la nomenclatura. Desbloquea `sales.venta_entregada` y
+  `marketing.encuesta_enviada`; se separa como v2.0 si el reparto llega a
+  tener ruteo/flota/liquidación propios.
 - ✅ 2026-07-22 Módulo `marketing`: README/contrato propio —
   `src/modules/marketing/README.md` + área documentada en `docs/marketing/`.
 - ✅ 2026-07-24 Área Contabilidad documentada — `docs/contabilidad/`
@@ -385,10 +393,15 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   automática al confirmar venta (hoy es bajo demanda).
 - ⬜ **KDS tiempos**: alertas por pedido demorado (umbral por pantalla) y
   métricas de tiempo de preparación (base: `venta_item.updated_at`).
-- ⬜ **Cumplimiento de pedido**: `estado_preparacion` cubre cocina; la
-  relación con el proceso "cumplimiento de pedido" (¿1 o 2 procesos?,
-  pendiente de decisión arriba) puede agregar estados de despacho/entrega
-  a domicilio cuando se defina.
+- 🔶 **Cumplimiento de pedido** (`PROC-OPE-002`, definido 2026-07-27):
+  preparación + entrega implementadas (`POST /sales/ventas/{id}/entrega`
+  → `sales.venta_entregada`). Falta la **rama delivery con trazabilidad**:
+  entidad `entrega` especificada en `data-model.md` §6 (repartidor propio
+  vs. plataforma externa, hora de salida, resultado `entregado`/`fallido`
+  con motivo — RN-CUP-007/008, evidencia). Hoy una entrega fallida no se
+  puede registrar: solo se marca el pedido entregado o no se marca nada.
+- ⬜ **Plazo de espera de takeout no recogido** (RN-CUP-011): la regla
+  existe, el plazo por sucursal no está configurado ni modelado.
 
 ### Módulo purchases (slices siguientes)
 - ✅ 2026-07-25 **Migración Alembic** `4ff85f833b29` (proveedor,
@@ -602,6 +615,8 @@ empaquetado, despacho y entrega al cliente NO son Venta — se retiraron de
 en esos mismos archivos (no se borró contenido, se reetiquetó). Pendiente
 del usuario: si eso es UN proceso ("Cumplimiento de pedido") o DOS
 (Producción/Cocina + Despacho/Entrega) — dijo "defino después".
+**Resuelto 2026-07-27**: UN proceso, `PROC-OPE-002` — ver la sección
+"Cumplimiento de pedido — PROC-OPE-002" abajo.
 
 **Relato detallado de los 3 canales (2026-07-14, mismo día)** — el usuario
 narró la experiencia real de venta en Web, Central de Pedidos y Sucursal,
@@ -1290,6 +1305,60 @@ Tras revisar el primer borrador de Marketing, el usuario corrigió 3 cosas:
    "umbral de presupuesto de campaña" por el marco de presupuesto anual
    (los montos/límites por área siguen `[[ COMPLETAR ]]`, se fijan en la
    reunión).
+
+### Cumplimiento de pedido — PROC-OPE-002 (2026-07-27)
+
+Cierra el pendiente de decisión abierto el 2026-07-14: lo que ocurre
+después de Venta es **un** proceso, no dos.
+
+**Decisión y por qué.** `PROC-OPE-002 Cumplimiento de pedido` v1.0
+Vigente, área **Operaciones** (cruza cocina de sucursal, atención al
+cliente y reparto sin pertenecer a ninguna). Preparación y
+Despacho/Entrega son etapas internas. Cuatro razones: (1) un solo
+resultado — entra Orden de Pedido, sale pedido entregado — y ningún
+artefacto de traspaso entre cocina y despacho; (2) el código ya lo modeló
+como continuo: `venta_item.estado_preparacion` es UNA máquina de estados
+y `kds_pantalla.tipo` (`preparacion`/`despacho`) es un filtro de vista
+sobre ella, partirlo obligaba a partir la máquina y duplicar el contrato
+del KDS; (3) "Producción" ya nombra la cocina de producción central
+(`PROC-PRD-001`, primera cocina 2027) — reusarlo para la cocina de
+sucursal rompe la regla de que la sigla nombra un área real; (4) mesa/
+takeout/delivery son variantes de un mismo flujo, no procesos distintos.
+No se pierde medición separada: `venta_item.updated_at` por transición ya
+da tiempo de preparación y de despacho. Si el reparto llega a tener
+ruteo, flota y liquidación propios, se separa entonces como v2.0.
+
+**Especificación.** `process-nomenclature.md` (registro maestro + nota que
+distingue `PRD` de la preparación en sucursal), `workflows.md` (sección
+propia con gateway por modalidad; el borrador "fuera de Venta" se
+reemplaza por un puntero), `use-cases.md` (CU-OPE-001/002/003 por
+modalidad, con excepciones: cliente ausente, pedido no recogido, producto
+rechazado), `business-rules.md` (**RN-CUP-001..012** nuevas; RN-COM-005
+apunta al proceso; **RN-COM-007 reactivada** — la encuesta recupera su
+disparador tras 13 días sin dueño), `state-machines.md` (la máquina pasa
+de borrador a oficial, y se declara qué NO es estado: entrega fallida,
+devolución y el pago al finalizar en mesa), `events.md` (filas de
+`sales.venta_entregada` y `marketing.encuesta_enviada`), `data-model.md`
+(entidad `entrega` especificada para el slice de delivery).
+
+**Deriva corregida.** `sales.pedido_listo` se publicaba desde el slice KDS
+(2026-07-25) sin fila en `events.md`, contra la propia regla del catálogo
+("definir la fila ANTES de publicarlo"). Queda registrado.
+
+**Código.** `sales/application/cumplimiento.py`: `registrar_entrega`
+exige todos los ítems en `listo` (RN-CUP-005), es idempotente (repetirla
+no reemite el evento) y publica `sales.venta_entregada` con modalidad,
+cliente y plataforma de reparto. `POST /sales/ventas/{id}/entrega` con
+permiso **propio** `sales.entregar_pedido` y rol nuevo `despachador`;
+`cocinero` deliberadamente NO lo tiene (RN-CUP-006). En consecuencia el
+bump del KDS ya **no** llega a `entregado`: devuelve 409 apuntando al
+endpoint de entrega — antes cualquiera con `kds.operar` cerraba el pedido
+ítem por ítem, lo que dejaba el permiso de entrega decorativo. Sin
+migración: el enum ya tenía `entregado`.
+
+**Fuera de esta fase, a propósito**: entidad `entrega` (trazabilidad del
+repartidor y de la entrega fallida), plazo de espera de takeout
+(RN-CUP-011) y BPMN del proceso — ver Deuda técnica → sales.
 
 ### Fase de procesos (tras el modelado de BD)
 

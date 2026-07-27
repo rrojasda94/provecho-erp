@@ -185,10 +185,10 @@ SOPs derivados de este proceso:
 
 **Alcance (2026-07-14, decisión del usuario): Venta termina con el envío
 del pedido a cocina y el cobro.** Preparación, emplatado/empaquetado,
-despacho y entrega al cliente NO son parte de Venta — son proceso(s)
-posterior(es) todavía sin definir (¿uno solo "Cumplimiento de pedido" o
-dos separados "Producción/Cocina" + "Despacho/Entrega"? — pendiente,
-usuario aún no decide).
+despacho y entrega al cliente NO son parte de Venta: desde 2026-07-27 son
+un proceso propio, [PROC-OPE-002 Cumplimiento de pedido](#cumplimiento-de-pedido),
+del área Operaciones. Venta lo dispara con `sales.venta_confirmada` y no
+espera su resultado.
 
 ```mermaid
 flowchart LR
@@ -227,25 +227,12 @@ técnicos/demoras del sistema. Desistimiento del cliente durante la toma
 del pedido SÍ está cubierto (con resolución) — ver RN-COM-010/011/012 y
 `sales.carrito_abandonado` (RN-COM-013).
 
-### Fuera de Venta — borrador sin confirmar (producción/despacho)
+### Qué pasa después de Venta
 
-Lo siguiente NO es parte del proceso Venta — queda como insumo para cuando
-se defina el/los proceso(s) de cumplimiento de pedido:
-
-```mermaid
-flowchart LR
-    OP[Orden de Pedido] --> KDS[Pantalla KDS]
-    KDS --> PR[Produce receta] --> EM[Emplata / Empaca] --> EN[Entrega al cliente]
-    EN -. evento venta_entregada .-> MK[Marketing puede elegir cliente]
-    MK --> ENC[Encuesta de satisfacción vía POS / WhatsApp / link]
-```
-
-- KDS muestra la Orden de Pedido ya enviada (no el Carrito); cocina prepara
-  siguiendo la receta y sus modificadores/variante resultante.
-- Emplatado (mesa) o empaquetado (takeout/delivery) consume el `empaque`
-  correspondiente según modalidad (glosario: Empaque).
-- La encuesta de satisfacción es opcional y selectiva (marketing decide a
-  qué cliente enviarla, no es automática para toda venta).
+Preparación, emplatado/empaquetado, despacho y entrega viven en
+[PROC-OPE-002 Cumplimiento de pedido](#cumplimiento-de-pedido). Ahí también
+se resuelven la encuesta de satisfacción (RN-COM-007) y el pago al
+finalizar en mesa (RN-POS-005).
 
 ## Cobro y Emisión de Comprobante de Pago
 
@@ -292,6 +279,77 @@ Garantía ante error de cobro con tarjeta/billetera digital: si el cliente
 detecta un doble cobro en las siguientes 48 horas, la empresa lo ayuda a
 reclamar ante el banco; si la empresa lo detecta primero, el monto se
 retorna al cliente.
+
+## Cumplimiento de pedido
+
+`PROC-OPE-002` · v1.0 · Vigente
+
+Toma el relevo exactamente donde termina Venta (RN-COM-005). Empieza
+cuando la Orden de Pedido confirmada llega al KDS de la sucursal
+(`sales.venta_confirmada`) y termina cuando el pedido está en manos del
+cliente (`sales.venta_entregada`). Área dueña: Operaciones — cruza cocina
+de sucursal, atención al cliente y reparto, sin pertenecer a una sola.
+Reglas: RN-CUP-001 a RN-CUP-012. Casos de uso por modalidad:
+[use-cases.md](use-cases.md) CU-OPE-001/002/003.
+
+**Es UN proceso con dos etapas, no dos procesos** (decisión 2026-07-27):
+entra una Orden de Pedido y sale un pedido entregado — un solo resultado,
+un solo registro (`venta_item.estado_preparacion`), sin artefacto de
+traspaso entre cocina y despacho. Las pantallas KDS de tipo `preparacion`
+y `despacho` son vistas distintas del mismo avance, no procesos distintos.
+Si el reparto a domicilio llega a tener ruteo, flota propia y liquidación
+de repartidores, se separa entonces como versión MAYOR.
+
+> **No confundir con `PROC-PRD-001` (Producción)**: ese es la cocina de
+> producción central (subrecetas y lotes, 2027). Acá se prepara el pedido
+> de un cliente en la cocina de una sucursal.
+
+```mermaid
+flowchart LR
+    OP[Orden de Pedido confirmada] --> KDS[Pantallas KDS por estacion]
+    KDS --> PR[Prepara segun receta y modificadores]
+    PR --> LI[Item listo] --> TODO{Todos los items listos?}
+    TODO -->|No| KDS
+    TODO -->|Si| VER[Verifica pedido completo contra comanda]
+    VER --> MOD{Modalidad}
+    MOD -->|Mesa| EMP[Emplata] --> LLE[Lleva a la mesa] --> ENT
+    MOD -->|Takeout| EPT[Empaca] --> LLA[Llama por numero de orden] --> ENT
+    MOD -->|Delivery| EPD[Empaca] --> ASI[Asigna repartidor propio o plataforma] --> RUT[Sale a ruta] --> ENT
+    ENT[Entrega al cliente] --> COB{Cobro pendiente?}
+    COB -->|Si| PC["Cobro post-entrega o al finalizar (PROC-COM-002)"] --> FIN
+    COB -->|No| FIN[Pedido entregado]
+```
+
+**Etapa 1 — Preparación.** El KDS muestra la Orden de Pedido ya enviada
+(no el Carrito); cada estación ve solo los ítems de las categorías que le
+tocan y los avanza `pendiente → en_preparacion → listo`, sin retroceso
+(RN-CUP-002). El avance es único y compartido: todas las pantallas leen el
+mismo estado. Cuando todos los ítems están listos se emite
+`sales.pedido_listo`.
+
+**Etapa 2 — Despacho y entrega.** Antes de entregar, quien despacha
+verifica el pedido completo contra la comanda (RN-CUP-004) — control de
+salida, último punto donde un error todavía es barato. Luego:
+
+- **Mesa**: emplatado y entrega en mesa. La entrega habilita el cierre del
+  servicio y, con él, el pago al finalizar el consumo (RN-POS-005,
+  RN-CUP-009).
+- **Takeout**: empaquetado y entrega en mostrador contra número de orden.
+- **Delivery**: empaquetado, asignación de repartidor —propio o de
+  plataforma externa (RN-PER-003)— y entrega en el domicilio. Si el cobro
+  es contra entrega, lo ejecuta quien entrega y responde por el monto ante
+  el cajero (PROC-COM-002, RN-MDP-005).
+
+Emplatado (mesa) o empaquetado (takeout/delivery) consumen el `empaque`
+que corresponda según modalidad (RN-EMP-003).
+
+**Excepciones** (detalle en los CU): cliente ausente o dirección errada en
+delivery, pedido no recogido en takeout, producto rechazado en la entrega
+(reproceso o devolución), y anulación posterior al envío a cocina.
+
+**Después de la entrega**: `sales.venta_entregada` habilita a Marketing a
+seleccionar al cliente para la encuesta de satisfacción — selectiva, nunca
+automática para toda venta (RN-COM-007) — que emite `marketing.encuesta_enviada`.
 
 ## Apertura de sucursal
 
@@ -452,3 +510,5 @@ hecho por un tercero según [PROC-COM-002](#cobro-y-emisión-de-comprobante-de-p
 - Transferencia: `en_transito → recibida` (diferencias registradas y auditadas)
 - OC: `borrador → emitida → recibida_parcial → recibida | anulada`
 - Venta: confirmación exige stock de receta; anulación genera contramovimientos.
+- Cumplimiento de pedido (por ítem): `pendiente → en_preparacion → listo → entregado`,
+  sin retroceso; el pedido hereda el estado de su ítem más atrasado.
