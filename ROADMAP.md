@@ -56,6 +56,7 @@ Registro de lo construido y lo pendiente. Actualizar en cada cambio relevante.
 | UX: buscador contextual (nombre/insumo/exclusión, ranking por probabilidad) + dialog de venta sugerida (upsell) en carrito | ✅ spec 2026-07-26 | `docs/product/ui-ux.md` — buscador cruza `receta_item` para insumo/exclusión, lista ordenada por relevancia si no hay match único; al ir al carrito se sugieren productos de adición rápida, descartable. Solo especificado |
 | Branding (paleta, tipografías, tokens CSS) | ✅ 2026-07-04 | Brandboard aplicado — `docs/product/ui-ux.md` |
 | Skins multi-marca (PDV/Kiosk por marca vs Provecho/Majambo en el resto), accesibilidad (daltonismo, tamaño de fuente) y plataformas por módulo (táctil Android en PDV/Kiosk/KDS/Inventario, PC-first en el resto) | 🔶 spec 2026-07-25 | `docs/product/ui-ux.md` — solo especificado, falta implementar (resolver de tema por marca, preferencias de accesibilidad en perfil de usuario) |
+| F2 — Arquitectura de frontend (documento maestro) | ✅ spec 2026-07-27 | `docs/product/frontend-architecture.md` — 31 secciones (tokens, componentes base/especializados, layout, navegación, estado, tablas, formularios, tiempo real, permisos visuales por rol, etc.) con estado por sección y los 6 puntos a cerrar antes de los diseños finales del alfa (layout general, componentes base, tablas, permisos visuales, arquitectura de carpetas, decisión de estado). Solo especificado — ver detalle en Deuda técnica → Frontend |
 
 ## Pendientes de decisión (registro vivo)
 
@@ -607,6 +608,43 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
 - ⬜ **`boleta_pago`/`liquidacion_bss` sin cálculo automático de PLAME**: la
   API recibe `ingresos`/`descuentos`/montos ya calculados (por el contador
   externo) — no hay motor de cálculo de renta 5ta/ONP/AFP/EsSalud en el ERP.
+
+### Frontend (F2 — arquitectura y UX, documento nuevo 2026-07-27)
+
+Detalle completo por sección en `docs/product/frontend-architecture.md`.
+Aquí solo el resumen accionable — los 6 puntos que bloquean empezar los
+diseños finales del alfa, en orden sugerido:
+
+- ⬜ **F2.6 Layout general**: shell de back-office (sidebar+topbar) vs.
+  shell de PDV/Kiosk (pantalla completa) — decidir si son layouts de Next.js
+  separados antes de construir POS, para no migrar rutas después.
+- ⬜ **F2.4 Componentes base**: catálogo mínimo v1 (Button, Input, Select,
+  Checkbox, Switch, Card, Modal, Tabs, Toast, Badge, Table base, Skeleton,
+  EmptyState, ErrorState). Hoy no existe ni un `Button` propio — el login
+  usa HTML plano con clases CSS directas.
+- ⬜ **F2.11 Tablas**: elegir librería (candidata: TanStack Table) y
+  alcance v1 (orden/filtro/búsqueda/paginación) vs. v2 (columnas
+  congelar/mover/ocultar, selección + acciones masivas, scroll virtual,
+  totales). Es el componente más usado de todo el ERP y ninguna tabla está
+  construida todavía.
+- ⬜ **F2.28 Permisos visuales por rol**: decidir si el JWT ya trae
+  permisos resueltos para que el frontend solo oculte/deshabilite, o si
+  el frontend llama a `/me` y cachea el set — afecta el diseño de cada
+  pantalla desde el principio, no se puede agregar después sin rehacer
+  componentes. El RBAC backend ya existe completo (`users`).
+- ⬜ **F2.2 Arquitectura de carpetas**: pasar de `app/` + `lib/` a
+  `components/{ui,erp,layout}` + `hooks/` + `store/` (si aparece) antes de
+  que la 3ª pantalla obligue a reordenar código ya escrito.
+- ⬜ **F2.8 Gestión de estado**: dejar explícito "Server Components +
+  estado local, sin Zustand/Redux todavía" hasta que el carrito POS lo
+  exija — evita que alguien lo decida a las apuradas a mitad de una
+  pantalla.
+
+Todo lo demás (theming multi-marca, accesibilidad, tiempo real de KDS,
+i18n, hardware, testing, observabilidad, printing, productividad,
+multitarea) tiene decisión tomada, está correctamente diferido, o depende
+de un módulo backend que todavía no llega a pantalla — no bloquea empezar
+a diseñar.
 
 ## Orden sugerido de desarrollo
 

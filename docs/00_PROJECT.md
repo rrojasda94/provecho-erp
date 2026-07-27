@@ -51,6 +51,7 @@ renumera nada). Este archivo define el orden de lectura recomendado.
 | | [proteccion-datos-personales.md](security/proteccion-datos-personales.md) | Ley 29733: qué datos, derechos ARCO, retención, brecha |
 | **product/** | [modules.md](product/modules.md) | Índice de módulos → specs en `src/modules/*/README.md` |
 | | [ui-ux.md](product/ui-ux.md) | Branding y reglas de UX |
+| | [frontend-architecture.md](product/frontend-architecture.md) | F2 — arquitectura de frontend (tokens, componentes, layout, estado, tablas, permisos visuales...), estado por sección y qué falta cerrar antes del alfa |
 | **templates/** | [templates/rrhh/](templates/rrhh/) | Plantillas rellenables de documentos (RRHH: memorándum, certificado, amonestación, acta, permiso, pacto de permanencia, contratos, convocatoria, entrevista, oferta, alta, uniforme) — requieren visado legal |
 | | [templates/compras/](templates/compras/) | Plantillas de Compras (ficha de proveedor, RFQ, orden de compra, evaluación) |
 | | [templates/comercial/](templates/comercial/) | Plantillas de Comercial (precio/margen, brief de promoción, nuevo producto, desempeño, capacitación) |
