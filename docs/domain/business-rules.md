@@ -978,16 +978,17 @@ producción se hace en cocinas de sucursal. Ver
 - **RN-COM-005** El flujo de una venta es: orden → envío del pedido a
   cocina → pago → emisión de comprobante. **Venta termina acá** (decisión
   2026-07-14) — preparación, emplatado/empaquetado, despacho y entrega al
-  cliente son proceso(s) posterior(es), aún sin definir.
+  cliente pertenecen a `PROC-OPE-002` (Cumplimiento de pedido), que Venta
+  dispara con `sales.venta_confirmada` sin esperar su resultado.
 - **RN-COM-006** El pago puede realizarse por adelantado; el comprobante
   puede emitirse antes del pago (no recomendable).
 
-> ⚠ **RN-COM-007 (pendiente, fuera de alcance de Venta)** — la regla de
-> encuesta de satisfacción (marketing selecciona cliente tras la entrega)
-> sigue siendo válida como intención de negocio, pero su disparador
-> (entrega al cliente) ya no ocurre dentro de Venta — depende del/los
-> proceso(s) de cumplimiento de pedido sin definir. No renumerar: se
-> retoma cuando ese proceso se modele.
+- **RN-COM-007** La encuesta de satisfacción es selectiva: Marketing
+  decide a qué cliente enviarla, nunca es automática para toda venta.
+  Su disparador es `sales.venta_entregada`, emitido por `PROC-OPE-002`
+  (Cumplimiento de pedido) — no ocurre dentro de Venta. Exige cliente
+  identificado (`cliente_id` no nulo). Regla reactivada 2026-07-27 al
+  definirse ese proceso; estuvo sin disparador desde 2026-07-14.
 
 - **RN-COM-008** Datos del cliente son opcionales por defecto (nombre
   completo, DNI), salvo: takeout y delivery exigen teléfono + nombre de
@@ -1024,6 +1025,53 @@ producción se hace en cocinas de sucursal. Ver
   (ej. mitad efectivo, mitad tarjeta) — confirmado 2026-07-20 como caso
   real del negocio. La suma de `pago.monto` de una venta debe igualar
   `venta.total` antes de que la venta pase a `estado=pagada`.
+
+## Cumplimiento de pedido
+
+Proceso `PROC-OPE-002` ([workflows.md](workflows.md#cumplimiento-de-pedido)),
+área dueña Operaciones. Empieza donde termina Venta (RN-COM-005) y cubre
+preparación, despacho y entrega en las tres modalidades.
+
+- **RN-CUP-001** El cumplimiento arranca con la venta ya confirmada: el
+  KDS muestra la Orden de Pedido, nunca el Carrito (RN-CAR-002 decide si
+  el pedido llega antes o después del pago, según el punto de venta).
+- **RN-CUP-002** El avance de un ítem es estrictamente secuencial y sin
+  retroceso: `pendiente → en_preparacion → listo → entregado`. No se
+  salta ni se revierte un estado; una corrección se registra como
+  incidencia, no reescribiendo el avance.
+- **RN-CUP-003** El estado de preparación es único por ítem de venta y es
+  la fuente de verdad del avance. Una pantalla KDS es un filtro sobre ese
+  estado, nunca una copia — dos pantallas jamás muestran avances distintos
+  del mismo ítem.
+- **RN-CUP-004** Ningún pedido se entrega sin verificar el pedido completo
+  contra la comanda: control de salida obligatorio, responsabilidad de
+  quien despacha.
+- **RN-CUP-005** Un pedido solo se entrega cuando todos sus ítems están
+  al menos `listo`. La entrega es un acto único por venta e idempotente:
+  repetirla no vuelve a emitir el evento ni duplica efectos.
+- **RN-CUP-006** La entrega la registra un trabajador con permiso de
+  entrega, distinto del avance de cocina, y queda auditada (quién, cuándo).
+- **RN-CUP-007** En delivery se registra siempre quién entrega:
+  repartidor propio o repartidor de plataforma externa — este último sin
+  vínculo laboral ni gestión como recurso propio (RN-PER-003).
+- **RN-CUP-008** Una entrega fallida (cliente ausente, dirección errada,
+  rechazo en la puerta) se registra con motivo y **no** marca el pedido
+  como entregado; el encargado de tienda decide devolución, nuevo intento
+  o merma. Un pedido no entregado nunca se cierra en silencio.
+- **RN-CUP-009** En mesa, el servicio se considera terminado con la
+  entrega del último pedido de esa atención; recién ahí queda habilitado
+  el cobro al finalizar el consumo (RN-POS-005).
+- **RN-CUP-010** Un producto rechazado por el cliente en la entrega se
+  reprocesa o se devuelve, con motivo registrado; si se desecha, genera
+  merma (RN-INV-017).
+- **RN-CUP-011** Un pedido de takeout no recogido espera el plazo que
+  defina la sucursal; vencido el plazo se escala al encargado, que decide
+  resguardo, merma o anulación con devolución del dinero al cliente.
+- **RN-CUP-012** Una venta ya entregada no se anula por la vía de
+  anulación de orden (reservada a la orden no pagada): requiere nota de
+  crédito y, si corresponde, devolución — RN-GEN-002. La anulación
+  temprana coordinada con la sucursal sigue el límite de la Central de
+  Pedidos (5 minutos desde la emisión del pedido).
 
 ## Comercial — estrategia
 

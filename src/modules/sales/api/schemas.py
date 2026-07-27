@@ -160,3 +160,11 @@ class ComprobanteOut(BaseModel):
     hash_proveedor: str | None
     detalle_emision: str | None
     intentos_emision: int
+
+
+class EntregaOut(BaseModel):
+    venta_id: str
+    numero_orden: int
+    modalidad: str
+    estado_pedido: str
+    ya_entregado: bool

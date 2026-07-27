@@ -469,14 +469,30 @@ Solicitud.
   `anulada` — alcance de Venta corregido 2026-07-14: termina en envío a
   cocina + cobro, RN-COM-005; pago y comprobante en orden flexible,
   RN-COM-006; ver [state-machines.md](../domain/state-machines.md#venta).
-  `preparacion`/`listo`/`entrega`/`entregado`/`devolucion` pertenecen al
-  futuro proceso "cumplimiento de pedido", aún sin definir — no son
-  estados de `venta`), total,
+  El avance de cumplimiento NO es estado de `venta`: vive por ítem en
+  `venta_item.estado_preparacion` — `PROC-OPE-002`, ver
+  [state-machines.md](../domain/state-machines.md#cumplimiento-de-pedido)),
+  total,
   idempotency_key, repartidor_externo_plataforma (nullable — `rappi` |
   `ubereats` | `pedidosya`... si el delivery lo hizo un rider de
   plataforma externa, sin vínculo laboral ni gestión como Vehículo/
   Mantenimiento propio, RN-PER-003).
-- **venta_item**: producto_comercial_id, cantidad, precio unitario, descuento.
+- **venta_item**: producto_comercial_id, cantidad, precio unitario,
+  descuento, estado_preparacion (`pendiente` | `en_preparacion` | `listo` |
+  `entregado` — avance de `PROC-OPE-002`, fuente única del progreso del
+  pedido; `updated_at` de cada transición es la base para medir tiempos de
+  preparación y de despacho, RN-CUP-002/003).
+- **entrega** (pendiente de slice — rama delivery de `PROC-OPE-002`):
+  venta_id (único: una entrega por venta, RN-CUP-005), entregado_por
+  (usuario_id de quien registra), fecha_entrega,
+  repartidor_trabajador_id (opcional, repartidor propio) |
+  repartidor_externo_plataforma (opcional, `rappi`|`ubereats`|... —
+  RN-PER-003; ambos nulos en mesa y takeout), hora_salida (opcional),
+  resultado (`entregado` | `fallido`), motivo_fallo (opcional, obligatorio
+  si `fallido` — RN-CUP-008), evidencia_id (opcional, foto/firma).
+  Mientras no exista esta tabla, la entrega se registra solo como avance
+  de los ítems a `entregado` + evento `sales.venta_entregada`, sin
+  trazabilidad del repartidor ni del intento fallido.
 - **medio_pago**: empresa_id (catálogo por empresa, no global del grupo —
   decisión 2026-07-20: cada empresa pacta su propia pasarela/comisión),
   nombre, direccion (`cobro` | `pago` | `ambos`), tipo
@@ -582,7 +598,10 @@ Evento `sales.venta_confirmada` → inventory descuenta insumos según receta.
   canal (`pos` | `whatsapp` | `link`), fecha_envio, fecha_respuesta
   (opcional), puntaje (opcional hasta responder), comentario (opcional),
   estado (`enviada` | `respondida` | `expirada`). Selectiva — no toda venta
-  genera una fila (RN-COM-007); requiere `cliente_id` no nulo.
+  genera una fila (RN-COM-007); requiere `cliente_id` no nulo. Su
+  disparador es `sales.venta_entregada` (`PROC-OPE-002`); Marketing elige
+  a qué venta entregada enviarle encuesta, y al enviarla emite
+  `marketing.encuesta_enviada`.
 
 ## 7. Producción (módulo futuro production)
 

@@ -33,6 +33,13 @@ recepcion de mercaderia, RRHH de apertura) sin encajar en una sola area de
 negocio existente. Tambien evalua y mejora continuamente los procesos del
 grupo (mejora continua).
 
+`PRD` (Producción) es la **cocina de producción central** — subrecetas y
+lotes, primera cocina planeada 2027 ([docs/produccion/](../produccion/README.md)).
+La preparación de un pedido de cliente en la cocina de una sucursal **no**
+es `PRD`: es la primera etapa de `PROC-OPE-002` (Cumplimiento de pedido).
+Distinción decidida el 2026-07-27 al cerrar ese proceso — usar `PRD` para
+ambas cosas rompía la regla de que la sigla nombra un área real.
+
 Nueva área sin sigla en la tabla: se propone una sigla de 3 letras sin
 choque, se agrega a esta tabla en el mismo cambio.
 
@@ -123,5 +130,6 @@ v1.1)`).
 | PROC-CTB-004 | Conciliación bancaria | v1.0 | Vigente | [SOP](../diagrams/Procesos/Contabilidad/Tesoreria/conciliacion-bancaria.md); cuadra ERP vs. extracto; visada por Gerencia, requisito de cierre de periodo (RN-CTB-006) |
 | PROC-CTB-005 | Arqueo sorpresa | v1.0 | Vigente | [SOP](../diagrams/Procesos/Contabilidad/Control/arqueo-sorpresa.md); control de Gerencia, conteo no anunciado por persona distinta del custodio (RN-CTB-007) |
 | PROC-OPE-001 | Apertura de sucursal | v1.0 | Vigente | [workflows.md](workflows.md#apertura-de-sucursal); área dueña Operaciones (nueva, ver tabla de áreas); referencia a PROC-CTB-002 (apertura de caja) y a los pasos 6-9 de PROC-INV-001 (recepción del pedido de almacén central); decisión de alcance 2026-07-16 |
+| PROC-OPE-002 | Cumplimiento de pedido | v1.0 | Vigente | [workflows.md](workflows.md#cumplimiento-de-pedido); área dueña Operaciones (cruza cocina de sucursal, atención al cliente y reparto); toma el relevo donde termina PROC-COM-001 (RN-COM-005) y habilita el cobro post-entrega de PROC-COM-002; decisión 2026-07-27 — **un** proceso con dos etapas internas (Preparación, Despacho y entrega), no dos procesos |
 
 Al crear o versionar un proceso: actualizar esta tabla en el mismo cambio.

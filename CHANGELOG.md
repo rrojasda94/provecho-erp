@@ -7,6 +7,27 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Added
 
+- **Cumplimiento de pedido — PROC-OPE-002 v1.0** (2026-07-27): cierra el
+  pendiente de decisión abierto el 2026-07-14 (qué pasa después de Venta).
+  Es **un** proceso del área Operaciones con Preparación y Despacho/Entrega
+  como etapas internas, **no** dos procesos: hay un solo resultado y ningún
+  artefacto de traspaso entre cocina y despacho; la máquina de estados ya
+  implementada (`venta_item.estado_preparacion`) es una sola y las
+  pantallas KDS `preparacion`/`despacho` son vistas de ella; y "Producción"
+  ya nombra la cocina de producción central (`PROC-PRD-001`), por lo que
+  reusar `PRD` para la cocina de sucursal rompía la nomenclatura.
+  Especificación completa: registro maestro en `process-nomenclature.md`,
+  proceso en `workflows.md`, `CU-OPE-001/002/003` por modalidad en
+  `use-cases.md`, **RN-CUP-001..012** en `business-rules.md`, máquina
+  oficial en `state-machines.md`, entidad `entrega` en `data-model.md`.
+  **Código**: `sales/application/cumplimiento.py::registrar_entrega` +
+  `POST /api/v1/sales/ventas/{id}/entrega` (permiso propio
+  `sales.entregar_pedido`, rol nuevo `despachador`) — exige todos los ítems
+  en `listo` (RN-CUP-005), idempotente, publica `sales.venta_entregada`.
+  Eventos nuevos en el catálogo: `sales.venta_entregada` y
+  `marketing.encuesta_enviada`; de paso se regulariza `sales.pedido_listo`,
+  que el KDS publicaba desde 2026-07-25 sin fila en `events.md`. Sin
+  migración: el enum ya tenía `entregado`. `tests/test_kds.py` +5 casos.
 - **Organización real del Grupo Majambo en el seeder** (2026-07-27): el
   seeder creaba grupo, empresa y marca, pero ninguna sucursal ni almacén —
   el ERP arrancaba sin los locales sobre los que opera. Ahora siembra la
@@ -762,6 +783,17 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Changed
 
+- **RN-COM-007 reactivada** (2026-07-27): la encuesta de satisfacción
+  vuelve a tener disparador (`sales.venta_entregada`) tras quedar sin él
+  desde el recorte de alcance de Venta del 2026-07-14. Desbloquea
+  `encuesta_satisfaccion` en el módulo `marketing`.
+- **El bump del KDS ya no marca `entregado`** (2026-07-27):
+  `POST /kds/items/{id}/avanzar` devuelve 409 apuntando al endpoint de
+  entrega. Antes cualquiera con `kds.operar` cerraba el pedido ítem por
+  ítem, lo que dejaba decorativo cualquier permiso de entrega; ahora la
+  entrega exige `sales.entregar_pedido` y cierra la venta completa de una
+  vez (RN-CUP-005/006). Cambio de contrato para clientes del KDS que
+  usaran ese estado.
 - **`almacen.direccion`** (2026-07-27, migración `e5a1c93b7d40`): columna
   nueva, nullable. El almacén central tiene `sucursal_id` NULL, así que no
   había dónde registrar su ubicación física; los almacenes de sucursal
