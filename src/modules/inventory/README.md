@@ -101,6 +101,22 @@ cíclico, transferencias/`solicitud_insumos`, devolución, guía de remisión,
 listeners de eventos (`sales.venta_confirmada` → consumo por receta),
 contexto de tenant desde el JWT (hoy `empresa_id` viene en el body).
 
+## Sincronización con el hub de sucursal (implementado 2026-07-27)
+
+`application/sincronizacion.py` declara qué replica este módulo hacia el
+hub local (ADR-009 fase 2): unidades de medida, categorías, artículos,
+SKU, recetas y el `stock` del almacén de esa sucursal. Sin stock local, la
+primera venta offline fallaría al descontar insumos — el listener
+`sales.venta_confirmada` corre también dentro del hub.
+
+`stock` es el único recurso que el hub además escribe por su cuenta. La
+nube gana en el pull, y eso es correcto porque el ciclo **empuja antes de
+jalar**: para cuando el hub lee el stock de la nube, la nube ya procesó
+las ventas del corte.
+
+`registrar_movimiento` acepta un `id` client-generado (mismo motivo que en
+`sales`), aunque hoy el sync no empuja movimientos.
+
 ## Flujo
 
 Solicitud (local) → aprobación (supervisor) → picking/packing (central) →

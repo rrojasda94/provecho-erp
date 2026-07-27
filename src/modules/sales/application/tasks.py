@@ -7,6 +7,7 @@ sin broker ni red.
 
 import uuid
 
+from src.config.settings import settings
 from src.core.celery_app import celery_app
 from src.core.database import SessionLocal
 from src.modules.sales.application import comprobantes
@@ -47,7 +48,13 @@ def emitir_comprobante(self, comprobante_id: str) -> str:
 
 def encolar(comprobante_id: uuid.UUID) -> None:
     """Encola el envío. Se llama DESPUÉS del commit de la venta: el worker
-    corre en otro proceso y solo ve filas ya confirmadas."""
-    if not comprobantes.emision_habilitada():
+    corre en otro proceso y solo ve filas ya confirmadas.
+
+    En un hub de sucursal no hace nada: no corre Celery ni Redis y la
+    emisión a SUNAT es siempre de la nube, después del sync (ADR-009). Sin
+    esta guarda, cobrar durante un corte intentaría hablarle a un broker
+    inexistente.
+    """
+    if settings.es_hub or not comprobantes.emision_habilitada():
         return
     emitir_comprobante.delay(str(comprobante_id))

@@ -3,11 +3,17 @@ puede loguearse—, por eso devuelven estados y nunca detalles de
 infraestructura: el detalle va al log.
 """
 
+import logging
+
 from fastapi import APIRouter, Response, status
+from sqlalchemy.exc import SQLAlchemyError
 
 from src.config.settings import settings
+from src.core.database import SessionLocal
 from src.core.health import CAIDO, revisar_backups, revisar_todo
-from src.core.sync import estado_conexion
+from src.core.sync import estado_conexion, watermark
+
+log = logging.getLogger("provecho.sync")
 
 router = APIRouter(tags=["core"])
 
@@ -54,4 +60,23 @@ def health_sync() -> dict:
     """
     if not settings.es_hub:
         return {"aplica": False, "motivo": "deployment_mode=cloud"}
-    return {"aplica": True, **estado_conexion.verificar_conectividad()}
+    return {
+        "aplica": True,
+        **estado_conexion.verificar_conectividad(),
+        # Hasta dónde llegó el motor, por recurso: el ping dice si hay
+        # internet, esto dice si el sync realmente está avanzando. Corre en
+        # el proceso de la API, así que se lee de la base y no de memoria —
+        # el runner es otro proceso.
+        "recursos": _watermarks(),
+    }
+
+
+def _watermarks() -> list[dict] | None:
+    """None (y no 503) si la base no responde: `/health/ready` ya cubre eso
+    y este endpoint no debe fallar por un diagnóstico."""
+    try:
+        with SessionLocal() as session:
+            return watermark.resumen(session)
+    except SQLAlchemyError:
+        log.warning("No se pudo leer el estado de sync", exc_info=True)
+        return None

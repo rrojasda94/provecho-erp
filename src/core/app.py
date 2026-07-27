@@ -12,6 +12,7 @@ from src.core.dashboard_router import router as dashboard_router
 from src.core.health_router import router as health_router
 from src.core.logging_config import configurar_logging, request_id_var
 from src.core.sentry import iniciar_sentry
+from src.core.sync.api.routers import router as sync_router
 from src.modules.accounting.api.routers import router as accounting_router
 from src.modules.accounting.application import listeners as accounting_listeners
 from src.modules.inventory.api.routers import router as inventory_router
@@ -82,6 +83,13 @@ TAGS_METADATA = [
     {
         "name": "dashboard",
         "description": "Agregado gerencial de solo lectura: ventas del día, stock crítico, caja.",
+    },
+    {
+        "name": "sync",
+        "description": (
+            "Replicación con el hub local de sucursal (ADR-009): catálogo y RBAC "
+            "hacia el hub, ventas y cobros del corte hacia la nube."
+        ),
     },
 ]
 
@@ -189,6 +197,7 @@ def create_app() -> FastAPI:
     app.include_router(production_router, prefix="/api/v1")
     app.include_router(accounting_router, prefix="/api/v1")
     app.include_router(rrhh_router, prefix="/api/v1")
+    app.include_router(sync_router, prefix="/api/v1")
     inventory_listeners.register()
     accounting_listeners.register()
     return app

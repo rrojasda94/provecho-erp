@@ -116,6 +116,8 @@ PERMISOS = [
     ("rrhh.permiso_aprobar", "Aprobar o rechazar solicitudes de permiso"),
     ("rrhh.asistencia_marcar", "Marcar entrada y salida de asistencia"),
     ("rrhh.capacitacion_gestionar", "Administrar pactos de permanencia por capacitación"),
+    ("sync.leer", "Descargar catálogo, stock y RBAC de la sucursal hacia su hub"),
+    ("sync.empujar", "Reproducir en la nube las ventas y cobros de un hub offline"),
 ]
 
 ROLES = {
@@ -157,6 +159,10 @@ ROLES = {
         "inventory.solicitar_ajuste",
     ],
     "agente_ia": ["sales.crear_pedido"],
+    # Cuenta de servicio del hub de sucursal (ADR-009): lo mínimo para
+    # replicar hacia abajo y reproducir hacia arriba. Nada de gestión de
+    # catálogo, RRHH ni contabilidad — un hub robado no es un admin.
+    "hub_sucursal": ["sync.leer", "sync.empujar"],
     "comprador": [
         "purchases.crear",
         "purchases.leer",

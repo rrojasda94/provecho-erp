@@ -43,11 +43,11 @@ Registro de lo construido y lo pendiente. Actualizar en cada cambio relevante.
 | Auditoría (audit_log) | ⬜ | Especificada en data-model |
 | Endurecimiento de producción (rate limit, secretos, HTTPS, cabeceras) | 🔶 base ✅ 2026-07-26 | Rate limit por IP en login/refresh (Redis, fail-open), validación de config que aborta el arranque en `production` con valores de desarrollo, CORS + `TrustedHost` + cabeceras de seguridad + HSTS, `/docs` cerrado en producción, uvicorn `--proxy-headers`. Runbook de rotación de credenciales y custodia de `.env` en `docs/engineering/devops.md`. Pendiente: ver Deuda técnica → Seguridad. |
 | App Android (15+) | ⬜ | Evaluar PWA vs nativo (ADR pendiente) — debe hablar con el hub local de sucursal igual que web y PC, ver ADR-009 |
-| Modo offline del PDV — diseño + plumbing base | 🔶 fase 1 ✅ 2026-07-26 | ADR-009: hub local dedicado por sucursal (misma imagen del backend, Postgres propio), los 3 clientes (web/Android/PC) le hablan siempre al hub por LAN. Sync hub↔nube reusando la propia API REST (sin protocolo nuevo): descendente por `updated_at`, ascendente reintentando las mismas llamadas idempotentes ya hechas offline. `DEPLOYMENT_MODE=hub` + validación de config, detector de conectividad (`src/core/sync/estado_conexion.py`, racha de fallos antes de declarar offline), `GET /health/sync`, `docker-compose.hub.yml` + `.env.hub.example`. **Fase 2 (motor de sync real) requiere primero** un cambio pequeño y acotado en `sales`/`inventory` (aceptar `id` client-generado en `crear_venta`/`registrar_pago`/movimientos — ya es posible sin migración, `UuidPkMixin` genera el UUID en Python, no en la base) — no incluido en esta fase, ver ADR. |
+| Modo offline del PDV — hub local de sucursal | ✅ fase 1 2026-07-26 · fase 2 2026-07-27 | ADR-009: hub local dedicado por sucursal (misma imagen del backend, Postgres propio), los 3 clientes (web/Android/PC) le hablan siempre al hub por LAN. **Fase 1**: `DEPLOYMENT_MODE=hub` + validación de config, detector de conectividad, `GET /health/sync`, `docker-compose.hub.yml`. **Fase 2 — motor de sync**: ciclo que **empuja y después jala** (`src/core/sync/motor.py`, proceso `python -m src.core.sync.runner`); `id` client-generado en `crear_venta`/`registrar_pago`/`registrar_movimiento` (el cambio previo que pedía la fase 1, sin migración); endpoints dedicados `GET /sync/pull` + `POST /sync/push` (permisos `sync.leer`/`sync.empujar`, rol `hub_sucursal`) porque los públicos no alcanzaban (no traen `pin_hash` ni los campos del catálogo, no son incrementales, y el push necesita conservar quién vendió y el número de orden); contrato declarativo por módulo (`application/sincronizacion.py`, 24 recursos) que el motor solo ensambla; tabla `sync_watermark` por recurso y dirección; `/health/sync` con avance y último error por recurso; alta de la cuenta de servicio con `python -m src.seeders.hub`. El hub NO empuja movimientos de inventario (el listener de la nube los regenera; duplicaría el consumo). 24 casos en `tests/test_sync_motor.py` sincronizando dos bases reales. Pendiente: ver Deuda técnica. |
 | Backups automáticos | ✅ 2026-07-26 | `python -m src.backups.backup`: dump `pg_dump --format=custom` → verificación del archivo (firma + tablas críticas) → restauración probada contra base desechable → copia a S3 (opcional) → purga con retención de 30 días que nunca borra la copia más reciente. **Diario** (antes se declaraba mensual e incremental). Cron del host, no Celery beat. Runbook en `docs/engineering/devops.md#backups`. Pendiente: alerta ante fallo, ver Deuda técnica. |
 | Dashboard gerencial mínimo | ✅ 2026-07-26 | `GET /api/v1/dashboard/resumen` (`src/core/dashboard_router.py`, permiso `dashboard.leer`): ventas del día (cantidad+total), stock bajo mínimo, cajas abiertas — agregador en `core`, nunca importa dominio de otro módulo (ADR-012). Requirió construir dos huecos que no existían: `sales` no tenía ningún listado de ventas, `accounting` tenía los modelos de caja (`apertura_caja`/`cierre_caja`/`arqueo`, migrados desde 2026-07-20) sin capa de aplicación. **Slice mínimo de caja** (`accounting.application.caja`): abrir/cerrar/arquear con **reconciliación real** (el cierre calcula `monto_esperado` desde los pagos en efectivo reales, vía contrato público de `sales`, no un número tipeado sin verificar). Primer frontend real: login por PIN + pantalla de dashboard en Next.js. Fuera de esta fase, a propósito: RN-POS-009..013 completas, relevo autenticado por PIN, máquina de estados de `custodia_efectivo` — ver Deuda técnica. |
 | Protección de datos personales (Ley 29733) | 🔶 ARCO técnico ✅ 2026-07-26 | `docs/security/proteccion-datos-personales.md`: qué datos trata el ERP y dónde viven (casi todo en `persona`, fuente única — RN-GEN-007), derechos ARCO, plazos de conservación, medidas de seguridad ya vigentes (referenciadas, no reconstruidas), proceso de brecha. Cancelación implementada como **anonimización irreversible** de `persona`, no `DELETE` — `POST /api/v1/personas/{id}/anonimizar`, permiso dedicado `personas.anonimizar`, migración `dad43729501d` (RN-PER-007, ADR-011). Acceso/Rectificación ya existían (`GET`/`PATCH /personas/{id}`). Pendiente de **acción del usuario, no de código**: registro del banco de datos ante la ANPD, aviso de privacidad público, confirmar plazos de retención con el contador/abogado, jurisdicción de transferencia internacional. Pendiente técnico: ver Deuda técnica. |
-| Contrato OpenAPI de la API | ✅ 2026-07-26 | `docs/architecture/openapi.json` exportado (`python -m src.core.openapi_export`) y verificado en CI — un endpoint que cambia sin regenerar el contrato falla el PR (ADR-010). `TAGS_METADATA` en `src/core/app.py` describe los 13 tags de la API; un tag nuevo sin descripción falla un test. De paso, corregidas dos afirmaciones falsas en `api-guidelines.md`: `idempotency_key` es campo del body, no header; las colecciones devuelven array plano, no `{items,total,page,page_size}` (nunca se implementó paginación). |
+| Contrato OpenAPI de la API | ✅ 2026-07-26 | `docs/architecture/openapi.json` exportado (`python -m src.core.openapi_export`) y verificado en CI — un endpoint que cambia sin regenerar el contrato falla el PR (ADR-010). `TAGS_METADATA` en `src/core/app.py` describe los 15 tags de la API; un tag nuevo sin descripción falla un test. De paso, corregidas dos afirmaciones falsas en `api-guidelines.md`: `idempotency_key` es campo del body, no header; las colecciones devuelven array plano, no `{items,total,page,page_size}` (nunca se implementó paginación). |
 | CI/CD | 🔶 CI + entrega ✅ 2026-07-26 | `ci.yml` gana tres verificaciones que no existían: cabeza única de Alembic (una doble falla en el despliegue, no en el merge que la crea), construcción de la imagen **y arranque real del contenedor** contra `/health`, y `pip-audit` informativo. `release.yml` publica la imagen en GHCR en cada push a `main` (tags `v*` → versión exacta). `docker-compose.prod.yml` nuevo: el compose existente es solo desarrollo y desplegarlo publicaría esa configuración. Dockerfile con usuario sin privilegios y `HEALTHCHECK`. El **despliegue sigue manual** y documentado hasta que exista el VPS (ADR-008). |
 | Chequeos de salud y alertas | ✅ 2026-07-26 | `src/core/health.py` + `health_router.py`: `/health` (liveness, sin dependencias), `/health/ready` (base de datos crítica → 503; Redis y cola degradan sin sacar de rotación) y `/health/backups` (503 pasadas 26 h — cubre el backup que nunca corrió, que no genera evento de error). El ERP expone estado; **un monitor externo alerta** (ADR-007): construir alertas dentro del servidor que se monitorea deja de avisar justo cuando ese servidor cae. Pendiente: contratar el monitor y dar de alta las sondas. |
 | Observabilidad (métricas, trazas, logs centralizados) | 🔶 logs + errores ✅ 2026-07-26 | `src/core/logging_config.py`: JSON en producción, tres flujos (`app`/`seguridad`/`auditoria`) derivados del nombre del logger, `request_id` por request (respeta `X-Request-ID` entrante, sale en la cabecera y en el cuerpo del error 500), redacción de PIN/tokens/`Authorization`. `src/core/sentry.py`: reporte de errores en `api`, `worker` (señal `celeryd_init`) y `backups`; sirve para Sentry o GlitchTip autoalojado, no-op sin DSN. Pendiente: métricas, trazas y colector de logs — ver Deuda técnica. |
@@ -220,25 +220,40 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
 - ⬜ **Publicar el contrato fuera del repo** (portal de API) si aparece un
   consumidor externo real que lo pida — descartado por ahora en ADR-010.
 
-### Modo offline del PDV (tras la fase 1 de 2026-07-26 — ADR-009)
-- ⬜ **Cambio previo a la fase 2**: extender `crear_venta`/`registrar_pago`
-  (sales) y la creación de `movimiento_inventario` (inventory) para aceptar
-  un `id: uuid.UUID | None` opcional. Ya es posible sin migración
-  (`UuidPkMixin.default=uuid.uuid4` corre en Python, no en la base) — falta
-  solo el parámetro. Sin esto, el hub y la nube generan UUIDs distintos
-  para la misma venta al reintentar el sync, y haría falta una tabla de
-  mapeo hub-id↔nube-id que el diseño evita. Revisar aparte, toca dominio de
-  dos módulos.
-- ⬜ **Motor de sync real** (push/pull): el detector de conectividad y la
-  config existen; falta el proceso que de verdad drena lo pendiente hacia
-  la nube y hace upsert del catálogo/stock/usuarios hacia el hub. Bloqueado
-  por el punto anterior para la dirección ascendente (ventas/pagos/
-  movimientos); la descendente (catálogo/stock/usuarios) no depende de eso
-  y podría construirse antes.
-- ⬜ **Cuenta de servicio por sucursal** (`usuario.tipo=agente_ia`): hoy el
-  seeder no crea este tipo de usuario para hubs; falta el flujo de alta +
-  permisos mínimos (lectura catálogo/stock/usuarios, escritura ventas/
-  movimientos).
+### Modo offline del PDV (tras la fase 2 de 2026-07-27 — ADR-009)
+- ✅ **Cambio previo a la fase 2** (2026-07-27): `crear_venta`,
+  `registrar_pago` y `registrar_movimiento` aceptan `id` opcional
+  client-generado; sin migración, como estaba previsto.
+- ✅ **Motor de sync real** (2026-07-27): push→pull por ciclo, contrato
+  declarativo por módulo, watermark por recurso, runner en su propio
+  contenedor.
+- ✅ **Cuenta de servicio por sucursal** (2026-07-27): rol `hub_sucursal`
+  en el seeder y alta con `python -m src.seeders.hub`.
+- ⬜ **Un ítem que la nube rechaza frena su recurso hasta que alguien lo
+  mire**: es la política elegida (perder una venta en silencio es peor),
+  pero hoy el único aviso es `ultimo_error` en `/health/sync`. Falta que el
+  monitor externo alerte sobre eso, o una bandeja de ítems en conflicto.
+- ⬜ **El borde del watermark se vuelve a bajar en cada ciclo**: el pull
+  usa `campo_marca >= desde` para no perder nunca una fila escrita en el
+  mismo instante que la marca, y `now()` en Postgres es el reloj de la
+  transacción — así que un catálogo sembrado de una sola vez y nunca
+  tocado viaja entero en cada ciclo. Con el tamaño de un catálogo de
+  restaurante son cientos de KB por minuto; si el enlace de algún local lo
+  siente, la salida es paginar por cursor compuesto `(marca, pk)`.
+- ⬜ **Nada alerta si un hub deja de sincronizar**: `/health/sync` expone
+  `ultimo_ok` por recurso, pero no hay nadie mirándolo. Mismo pendiente que
+  la alerta de backups.
+- ⬜ **`venta_item.estado_preparacion` no viaja a la nube**: el avance de
+  KDS es local al local (y sus ítems no conservan `id` entre lados). Si
+  alguna vez se quieren tiempos de cocina consolidados por grupo, hay que
+  resolverlo aparte.
+- ⬜ **`cliente` no se replica**: una venta offline es anónima o con datos
+  escritos a mano; vender a cliente registrado exige estar en línea.
+- ⬜ **`receta`/`receta_item` viajan sin filtro de tenant**: no tienen
+  columna de empresa y acotarlas exigiría cruzar `producto_comercial`
+  (dominio de `sales`) desde `inventory`. Aceptable mientras el grupo opere
+  empresas que pueden verse entre sí; si eso cambia, `receta` necesita su
+  columna de tenant antes que este sync.
 - ⬜ **Descubrimiento del hub en la LAN** (mDNS `sucursal.local` o IP fija
   configurada por dispositivo): decisión de cliente, no resuelta en el
   backend.

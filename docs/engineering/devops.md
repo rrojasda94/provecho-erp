@@ -316,9 +316,9 @@ solo queda en el log. Ver ROADMAP → Deuda técnica → Backups.
 
 ## Modo offline del PDV — hub local de sucursal
 
-Fase 1 implementada 2026-07-26 (diseño + plumbing base; el motor de sync
-real es fase 2). Arquitectura completa y alternativas descartadas:
-[ADR-009](architecture/adr/ADR-009-modo-offline-pdv.md).
+Fase 1 (diseño + plumbing) 2026-07-26; fase 2 (motor de sync) 2026-07-27.
+Arquitectura completa y alternativas descartadas:
+[ADR-009](../architecture/adr/ADR-009-modo-offline-pdv.md).
 
 Un mini-PC o Raspberry Pi **dedicado, siempre encendido**, en la LAN de cada
 sucursal, corre **la misma imagen** del backend contra su **propio Postgres
@@ -355,11 +355,76 @@ de rotación por eso sería exactamente lo contrario de lo necesario. Es
 diagnóstico para que un monitor externo avise si lleva offline demasiado
 tiempo, no una señal de "dejá de servir".
 
-### Pendiente (fase 2, ver ROADMAP → Deuda técnica)
+### Alta de la cuenta de servicio del hub
 
-El motor de sync real (push de ventas/pagos/movimientos, pull de catálogo/
-stock/usuarios) requiere primero un cambio pequeño en `sales`/`inventory`:
-aceptar un `id` client-generado en la creación, para que el hub y la nube
-compartan el mismo UUID sin tabla de mapeo — ya es posible sin migración
-(`UuidPkMixin` genera el UUID en Python al construir el objeto, no en la
-base de datos). No incluido en esta fase.
+Antes de levantar el hub hay que crearle su cuenta **en la nube**: una por
+sucursal, con el rol `hub_sucursal` (solo `sync.leer` y `sync.empujar`) y
+alcance a esa única sucursal — de ahí sale el tenant que la API de sync
+aplica a todo lo que el hub pide.
+
+```bash
+# en el servidor de la nube
+python -m src.seeders.hub --sucursal <HUB_SUCURSAL_ID> --username hub_tarapoto
+# el PIN se pide por consola; va a CLOUD_SYNC_PIN en el .env del hub
+```
+
+Idempotente: repetirlo no duplica nada. `--rotar-pin` cambia el PIN de una
+cuenta ya existente.
+
+### Motor de sync
+
+El hub corre **dos procesos** (servicios `api` y `sync` del compose):
+
+| Proceso | Qué hace |
+|---------|----------|
+| `api` | Atiende a los dispositivos de la LAN. Nunca depende de internet. |
+| `sync` | `python -m src.core.sync.runner`: cada `SYNC_INTERVALO_SEGUNDOS`, un ciclo. |
+
+Separados a propósito: si el sync se traba, el PDV del local sigue
+vendiendo. Un ciclo es **empujar y después jalar**, en ese orden (el porqué,
+en el ADR):
+
+1. **Push** — las ventas, cobros y anulaciones del corte se reproducen en la
+   nube por `POST /sync/push`, con su mismo `id`, `idempotency_key`,
+   `fecha_orden` y `numero_orden`. La nube las procesa con los mismos casos
+   de uso de siempre: descuenta su propio stock y prepara los comprobantes.
+   El hub **no** empuja movimientos de inventario (los genera el listener de
+   la nube; empujarlos duplicaría el consumo).
+2. **Pull** — `GET /sync/pull` por recurso, incremental por `updated_at`.
+   Baja organización, RBAC (incluido `pin_hash`, sin el cual nadie se
+   autentica offline), catálogo de inventario, stock y catálogo comercial.
+
+`GET /sync/recursos` lista el contrato vigente: qué baja un hub y por qué
+necesita cada tabla.
+
+### Diagnóstico del sync
+
+`GET /health/sync` (sin auth, siempre 200) muestra el estado de conexión y
+**el avance por recurso**, leído de la tabla `sync_watermark`:
+
+```json
+{"aplica": true, "estado": "en_linea", "recursos": [
+  {"direccion": "pull", "recurso": "producto_comercial",
+   "marca": "2026-07-27T10:00:00+00:00", "ultimo_ok": "2026-07-27T10:01:00+00:00",
+   "ultimo_error": null}]}
+```
+
+Qué mirar cuando algo no cuadra:
+
+- `ultimo_error` con texto → ese recurso **no avanza** y se reintenta cada
+  ciclo. Es a propósito: perder una venta en silencio es peor. Los demás
+  recursos siguen sincronizando.
+- `ultimo_ok` viejo en todos los recursos → el runner está caído o la nube
+  no responde; revisar `docker compose -f docker-compose.hub.yml logs sync`.
+- `estado: offline` → no hay internet. El local sigue vendiendo; no hay nada
+  que hacer más que esperar (o revisar el enlace).
+
+### Después de una migración de esquema
+
+Un hub que estuvo días sin conexión necesita su propio `alembic upgrade
+head` antes de sincronizar contra una nube ya migrada — mismo runbook que la
+nube (ADR-008), repetido por sucursal:
+
+```bash
+docker compose -f docker-compose.hub.yml exec api alembic upgrade head
+```

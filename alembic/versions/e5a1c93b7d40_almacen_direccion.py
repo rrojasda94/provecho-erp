@@ -6,7 +6,7 @@ virtuales (`activos`, futuro `transporte`) no tienen direccion, y los de
 sucursal heredan la de su sucursal.
 
 Revision ID: e5a1c93b7d40
-Revises: dad43729501d
+Revises: e5c47b90f118
 Create Date: 2026-07-27
 
 """
@@ -16,7 +16,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = 'e5a1c93b7d40'
-down_revision: str | None = 'dad43729501d'
+down_revision: str | None = 'e5c47b90f118'
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
