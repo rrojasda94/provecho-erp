@@ -104,6 +104,12 @@ autenticarse en el hub durante un corte.
 - Refresh tokens rotativos: usar uno viejo revoca toda la cadena.
 - Agentes de IA son usuarios tipo `agente_ia` con permisos restringidos (ej. solo `sales.crear_pedido`).
 - Seeder de desarrollo: usuario `admin` / PIN `123456` con rol admin. Prohibido en producción.
+- El seeder deja montada la organización real del grupo: empresa
+  Majambo EIRL (RUC 20450311520, zona `amazonia_ley27037`), marca
+  Charlie's Pizzas licenciada a esa empresa, sucursales `CH1` y `CH2`
+  (alquiladas, activas) y almacén central `WH1`. Es idempotente: correrlo de
+  nuevo no duplica ni reescribe, salvo el domicilio fiscal, que se
+  sincroniza siempre.
 
 ## Flujo
 

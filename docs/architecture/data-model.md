@@ -68,6 +68,8 @@ erDiagram
 - **almacen**: empresa_id, sucursal_id (NULL si central o de activos), tipo
   (`central` | `produccion` | `sucursal` | `activos` | ... — enum
   extensible, ej. futuro `transporte` como hub físico, RN-TRP-003),
+  direccion (NULL en los virtuales y en los de sucursal, que heredan la de
+  su sucursal — el central no cuelga de ninguna y necesita la suya),
   almacen_abastecedor_id
   (el central del que se abastece un almacén de sucursal/producción).
   `activos` es virtual (sin ubicación física ni stock de SKUs). Equipamiento
