@@ -54,14 +54,15 @@ exactamente con la guía de remisión (RN-TRP-001/002).
 ## Venta
 
 **Alcance (2026-07-14): Venta termina en el envío del pedido a cocina y el
-cobro** — RN-COM-005. Los estados de preparación/entrega quedan abajo,
-marcados aparte, fuera de Venta.
+cobro** — RN-COM-005. Los estados de preparación/entrega no son de
+`venta`: viven en [Cumplimiento de pedido](#cumplimiento-de-pedido)
+(`PROC-OPE-002`), abajo.
 
 ```mermaid
 stateDiagram-v2
     [*] --> orden: confirmar (RN-COM-001, Orden de Pedido)
     orden --> pagada: pago adelantado (autoatención, RN-POS-005)
-    pagada --> facturada: comprobante Nubefact (RN-COM-003, recomendado)
+    pagada --> facturada: comprobante aceptado por SUNAT (RN-COM-003, recomendado)
     orden --> facturada: comprobante antes de pago (RN-COM-006, no recomendable)
     facturada --> anulada: nota de crédito
     pagada --> anulada
@@ -74,22 +75,38 @@ y el comprobante puede emitirse antes del pago aunque no es recomendable
 Eventos: `sales.venta_confirmada`, `sales.pago_registrado`,
 `sales.comprobante_emitido`, `sales.venta_anulada`.
 
-### Fuera de Venta — borrador sin confirmar (cumplimiento de pedido)
+## Cumplimiento de pedido
 
-⚠ No es parte de Venta. Incluye el caso "pago al finalizar" (atención en
-mesa), que depende de un estado ("servicio terminado") que hoy no tiene
-dueño claro — pendiente junto con la definición de 1 o 2 procesos
-(Producción/Cocina, Despacho/Entrega).
+`PROC-OPE-002` — no es parte de Venta. **La máquina corre por ítem de
+venta**, no por venta: cada ítem lo prepara la estación que le toca, y el
+pedido hereda el estado de su ítem más atrasado (RN-CUP-003). Persistida
+en `venta_item.estado_preparacion`.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> preparacion: cocina inicia preparación
-    preparacion --> listo
-    listo --> entrega: KDS/produce/emplata
-    entrega --> entregado: entrega
-    entregado --> pagada_al_finalizar: pago al finalizar (mesa, RN-POS-005)
-    entregado --> devolucion: si aplica
+    [*] --> pendiente: venta confirmada (sales.venta_confirmada)
+    pendiente --> en_preparacion: la estación toma el ítem
+    en_preparacion --> listo: ítem terminado
+    listo --> entregado: entrega al cliente (RN-CUP-005)
 ```
+
+Secuencial y sin retroceso (RN-CUP-002): no se salta ni se revierte un
+estado. Estado del pedido completo = estado del ítem más atrasado; cuando
+todos llegan a `listo` se emite `sales.pedido_listo`, y cuando la entrega
+se registra, `sales.venta_entregada`.
+
+Lo que **no** es un estado de esta máquina, a propósito:
+
+- **Entrega fallida** (cliente ausente, rechazo) no es un estado del ítem:
+  el ítem sigue `listo` y el intento se registra aparte con su motivo
+  (RN-CUP-008). Un pedido no entregado no puede quedar indistinguible de
+  uno entregado.
+- **Devolución** ocurre después de la entrega y se resuelve por nota de
+  crédito y merma, no retrocediendo el avance (RN-CUP-010/012).
+- **Pago al finalizar** (mesa, RN-POS-005) es una transición de *Venta*
+  (`orden → pagada`), habilitada por la entrega del último pedido de la
+  atención (RN-CUP-009) — el "servicio terminado" que antes no tenía dueño
+  es hoy la salida de este proceso.
 
 ## Custodia de efectivo
 

@@ -3,7 +3,9 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: provecho
-      POSTGRES_PASSWORD: provecho
+      # Solo desarrollo. Producción exige POSTGRES_PASSWORD real en .env:
+      # el arranque falla si DATABASE_URL conserva la contraseña por defecto.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-provecho}
       POSTGRES_DB: provecho
     ports:
       # Host 5433: el 5432 local lo ocupa la plataforma de Charlie's Pizzas.
@@ -37,12 +39,32 @@ services:
       redis:
         condition: service_started
 
+  worker:
+    build: .
+    # Envío de comprobantes a SUNAT vía Factiliza. Sin worker, los
+    # comprobantes se acumulan en estado `pendiente` — la venta y el cobro
+    # siguen funcionando.
+    command: celery -A src.core.celery_app worker --loglevel=info
+    env_file: .env
+    volumes:
+      - ./src:/app/src
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
   web:
     build: ./frontend
     ports:
       - "3000:3000"
     environment:
+      # Vista del NAVEGADOR (fuera del contenedor): localhost, puerto publicado.
       NEXT_PUBLIC_API_URL: http://localhost:8000
+      # Vista del PROCESO de Next.js (dentro del contenedor, Server Actions/
+      # Server Components): nombre del servicio, no localhost — son
+      # contenedores distintos sin ese "localhost" en común.
+      API_INTERNAL_URL: http://api:8000
     depends_on:
       - api
 

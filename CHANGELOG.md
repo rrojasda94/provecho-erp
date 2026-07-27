@@ -49,6 +49,517 @@ Versionado: [SemVer](https://semver.org/lang/es/).
   especificado, implementación pendiente (ver ROADMAP — Deuda técnica
   transversal).
 
+- **Cumplimiento de pedido — PROC-OPE-002 v1.0** (2026-07-27): cierra el
+  pendiente de decisión abierto el 2026-07-14 (qué pasa después de Venta).
+  Es **un** proceso del área Operaciones con Preparación y Despacho/Entrega
+  como etapas internas, **no** dos procesos: hay un solo resultado y ningún
+  artefacto de traspaso entre cocina y despacho; la máquina de estados ya
+  implementada (`venta_item.estado_preparacion`) es una sola y las
+  pantallas KDS `preparacion`/`despacho` son vistas de ella; y "Producción"
+  ya nombra la cocina de producción central (`PROC-PRD-001`), por lo que
+  reusar `PRD` para la cocina de sucursal rompía la nomenclatura.
+  Especificación completa: registro maestro en `process-nomenclature.md`,
+  proceso en `workflows.md`, `CU-OPE-001/002/003` por modalidad en
+  `use-cases.md`, **RN-CUP-001..012** en `business-rules.md`, máquina
+  oficial en `state-machines.md`, entidad `entrega` en `data-model.md`.
+  **Código**: `sales/application/cumplimiento.py::registrar_entrega` +
+  `POST /api/v1/sales/ventas/{id}/entrega` (permiso propio
+  `sales.entregar_pedido`, rol nuevo `despachador`) — exige todos los ítems
+  en `listo` (RN-CUP-005), idempotente, publica `sales.venta_entregada`.
+  Eventos nuevos en el catálogo: `sales.venta_entregada` y
+  `marketing.encuesta_enviada`; de paso se regulariza `sales.pedido_listo`,
+  que el KDS publicaba desde 2026-07-25 sin fila en `events.md`. Sin
+  migración: el enum ya tenía `entregado`. `tests/test_kds.py` +5 casos.
+- **Organización real del Grupo Majambo en el seeder** (2026-07-27): el
+  seeder creaba grupo, empresa y marca, pero ninguna sucursal ni almacén —
+  el ERP arrancaba sin los locales sobre los que opera. Ahora siembra la
+  estructura completa y real: empresa **Inversiones Turísticas y
+  Alimentarias Majambo EIRL** (RUC 20450311520, domicilio fiscal Jr. Ramón
+  Castilla 248 - Tarapoto, zona `amazonia_ley27037`), la **licencia** de la
+  marca Charlie's Pizzas a esa empresa (`licencia_marca` nunca se había
+  sembrado, y `sucursal.empresa_id` existe justamente vía licencia), las
+  sucursales **CH1** (Jr. Ramón Castilla 248) y **CH2** (Jr. Lamas 299),
+  ambas `activa` y `alquilada` — tenencia confirmada con el usuario, decide
+  predial/arbitrios (RN-IMP-004) — y el almacén central **WH1** (Jr. Ramón
+  Castilla 248, `sucursal_id` NULL: el central no cuelga de ninguna
+  sucursal, las abastece). El domicilio fiscal se sincroniza en cada corrida
+  porque `_get_or_create` no toca lo ya creado y el valor sembrado antes era
+  el genérico "Tarapoto, San Martín". `tests/test_seed_organizacion.py`
+  (6 casos, incluida la idempotencia). Los almacenes de sucursal de CH1/CH2
+  no se siembran: no fueron pedidos y su stock mínimo/máximo depende de
+  datos de operación que aún no existen.
+
+- **Modo offline del PDV — fase 2: motor de sync del hub** (2026-07-27):
+  ADR-009 (sección "Fase 2"), migración `e5c47b90f118`. El hub de sucursal
+  ya no solo sabe *si* tiene internet: ahora sincroniza de verdad. Un ciclo
+  (`src/core/sync/motor.py`, proceso aparte `python -m src.core.sync.runner`,
+  servicio `sync` del `docker-compose.hub.yml`) **empuja y después jala**,
+  en ese orden y no al revés: si jalara primero, el hub sobreescribiría su
+  stock con el de una nube que todavía no sabe nada de las ventas del
+  corte. Corolario que evita un bug caro: **el hub no empuja movimientos de
+  inventario** — el listener de la nube los genera al recibir la venta, y
+  empujarlos además contaría el consumo dos veces.
+  - **Cambio previo que pedía la fase 1, hecho**: `crear_venta`,
+    `registrar_pago` y `registrar_movimiento` aceptan un `id` opcional
+    generado por el cliente (sin migración: `UuidPkMixin` genera el UUID en
+    Python). Así una venta conserva su identidad entre hub y nube, sin
+    tabla de mapeo. Expuesto también en `POST /sales/ventas` y
+    `/pagos`, que es lo que permitirá a las tres apps (web/Android/PC)
+    crear la venta sin depender del servidor para tener su id.
+  - **`GET /sync/pull` + `POST /sync/push`** (permisos `sync.leer` /
+    `sync.empujar`, rol `hub_sucursal`) en vez de reusar los endpoints
+    públicos como preveía la fase 1. Al implementarlo no alcanzaban: no
+    exponen los campos que el hub necesita (`empaque_id`,
+    `modalidades_empaque`, y directamente no hay endpoint de `receta`,
+    `sku` ni `punto_venta`), ninguno es incremental por `updated_at`, y el
+    `pin_hash` —sin el cual nadie se autentica offline— no puede vivir en
+    `UsuarioOut`. Del lado ascendente, `POST /sales/ventas` toma el
+    `usuario_id` del JWT (todas las ventas quedarían a nombre del hub) y
+    recalcula `fecha_orden`/`numero_orden`, con lo que el número que el
+    cliente vio impreso no coincidiría. **El push no escribe filas crudas**:
+    ejecuta los mismos casos de uso de `sales`, con sus validaciones,
+    idempotencia y eventos — la objeción que hundió a la replicación lógica
+    de Postgres en el ADR sigue respetada. El tenant sale de la cuenta de
+    servicio (exactamente una sucursal), nunca de un parámetro.
+  - **Contrato declarativo por módulo**: cada módulo declara sus
+    `RecursoSync` en `application/sincronizacion.py` (modelo, campos que
+    viajan, filtro de tenant y por qué el hub lo necesita) y
+    `core/sync/registro.py` los ensambla en orden de dependencia — igual
+    que `core/app.py` ensambla routers. El motor no conoce ninguna entidad
+    de negocio. 24 recursos: organización, RBAC, catálogo de inventario,
+    stock y catálogo comercial. `campos` es explícito: agregar una columna
+    al modelo no la manda al hub sin que alguien lo decida.
+  - **`usuario.pin_hash` viaja; el lockout no.** El hash Argon2id es
+    indispensable para validar el PIN durante un corte (es la única salida
+    de un hash de credencial en la API, acotada a los usuarios de esa
+    sucursal); `intentos_fallidos`/`bloqueado_hasta` son estado vivo de
+    cada lado y replicarlos bloquearía a un cajero en el local por intentos
+    hechos contra la nube. `persona` viaja recortada (nombre y documento,
+    sin domicilio/teléfono/email) — minimización de datos sobre hardware
+    que vive en un local.
+  - **Tabla `sync_watermark`** (una fila por recurso y dirección, no un
+    outbox): la fase 1 suponía que bastaba `max(updated_at)` local, y no
+    basta — el hub *escribe* localmente algunas de las tablas que replica
+    (cada venta mueve `stock`), y la dirección ascendente necesita memoria
+    durable de qué se empujó. Guarda también el último error. Un recurso
+    que falla no avanza su marca y se reintenta entero; los demás siguen.
+  - **`/health/sync` ahora muestra el avance por recurso** (marca, último
+    OK, último error), leído de la base porque el runner es otro proceso.
+    `GET /sync/recursos` documenta el contrato vigente.
+  - **`sales.tasks.encolar` es no-op en un hub**: sin esa guarda, cobrar
+    durante un corte intentaría hablarle a un broker que en el Raspberry Pi
+    no existe (el hub corre sin Celery/Redis por diseño).
+  - **Alta de la cuenta de servicio**: `python -m src.seeders.hub
+    --sucursal <uuid> --username hub_<local>`, idempotente y apto para
+    producción (a diferencia del seeder de desarrollo).
+  - `tests/test_sync_motor.py` (24 casos) monta **las dos bases** —nube y
+    hub— y sincroniza entre ellas por la API real vía `TestClient`
+    autenticado: carga inicial, login offline contra el hash replicado,
+    pull incremental, aislamiento entre sucursales, venta/cobro/anulación
+    reproducidos con su identidad, convergencia de stock, ítem rechazado
+    que no arrastra al lote, y recurso caído que no cancela a los demás.
+    En el camino apareció otra vez el desfase de microsegundos de SQLite
+    (`CURRENT_TIMESTAMP` sin ellos vs. el bind de Python con ellos, ya
+    documentado en el dashboard de caja): acá **sí** se resolvió en el
+    código (`core/sync/tiempo.para_dialecto` ensancha el borde un segundo
+    solo en SQLite) porque el `>=` afectado es una consulta de producción,
+    no una aserción de test; en Postgres —la base real de hub y nube— no
+    aplica, y como todo el sync es idempotente, reprocesar el borde no
+    cuesta nada mientras que perderlo sería perder una venta.
+
+- **Dashboard gerencial mínimo + slice de caja (PROC-CTB-001/002)**
+  (2026-07-26): ADR-012. `GET /api/v1/dashboard/resumen`
+  (`src/core/dashboard_router.py`, permiso `dashboard.leer`): ventas del
+  día (cantidad+total), stock bajo mínimo, cajas abiertas — vive en `core`
+  y no en un módulo de negocio porque compone lecturas de `sales`,
+  `inventory` y `accounting` sin importar el dominio de ninguno directo
+  (mismo patrón que `sales.queries_publicas.listar_clientes_para_analisis`,
+  extendido con `resumen_ventas_del_dia` y `puntos_venta_de_empresa`;
+  `inventory.contar_bajo_minimo` nuevo). Construir esto expuso dos huecos
+  reales: `sales` no tenía ningún endpoint de listado de ventas, y
+  `accounting` tenía los modelos de caja (`apertura_caja`/`cierre_caja`/
+  `arqueo`, migrados desde 2026-07-20) sin ninguna capa de aplicación —
+  PROC-CTB-001/002 nunca se había construido. **Slice mínimo, no el
+  proceso completo**: `accounting.application.caja` abre, cierra y arquea
+  con **reconciliación real** — el cierre calcula
+  `monto_esperado = monto_apertura + efectivo cobrado desde la apertura`
+  (vía el contrato público de `sales`, `total_efectivo_cobrado` — primera
+  vez que un módulo consulta a otro en tiempo real para una escritura
+  propia, no solo para un reporte) y lo compara contra el conteo físico;
+  sin esa cuenta, un cierre sería un formulario sin ningún valor de
+  control. Deliberadamente fuera de esta fase: verificación de series de
+  POS y denominaciones (RN-POS-009..013), relevo autenticado por PIN propio,
+  `custodia_efectivo` como máquina de estados — ese es un slice de negocio
+  del tamaño de los ya construidos para `sales`/`purchases`/`production`,
+  no algo para colar bajo "hacer un dashboard". Permisos nuevos:
+  `dashboard.leer`, `accounting.caja_operar` (rol `cajero` — abre/cierra su
+  propia caja sin permisos de administración), `accounting.arqueo_registrar`
+  (`supervisor`/`contador`). **Primer frontend real**: login por PIN +
+  pantalla de dashboard en Next.js/React, reemplazando el scaffold por
+  defecto. `tests/test_dashboard_caja.py` (16 casos) — incluye un caso de
+  flakiness real detectado y corregido: SQLite guarda `created_at` sin
+  microsegundos pero SQLAlchemy los agrega al enlazar un `datetime` de
+  Python, así que dos eventos en el mismo segundo de reloj comparan mal
+  como texto (`"...25" < "...25.000000"`); Postgres (columna timestamp
+  real) no tiene este problema — se documentó y se resolvió a nivel de
+  prueba, no tocando la lógica de producción.
+
+- **Protección de datos personales — derechos ARCO (Ley 29733)**
+  (2026-07-26): ADR-011, migración `dad43729501d`. `docs/security/proteccion-datos-personales.md`
+  nuevo: qué datos personales trata el ERP y dónde viven (`persona` es la
+  fuente única — RN-GEN-007, casi todo ARCO se resuelve tocando una sola
+  entidad), derechos ARCO y su estado (Acceso/Rectificación ya existían;
+  Oposición queda como política sin contraparte técnica porque no hay
+  marketing automatizado todavía), plazos de conservación por tipo de dato,
+  medidas de seguridad ya vigentes (referenciadas a `security.md`/ADR-006/
+  ADR-007, no reconstruidas), proceso de brecha de seguridad, y una lista
+  separada de pendientes que son **acción del usuario, no de código**
+  (registro ante la ANPD, aviso de privacidad público, designación de
+  responsable, plazos de retención confirmados con contador/abogado).
+  **Cancelación implementada como anonimización irreversible**, no `DELETE`:
+  `persona` la referencian `trabajador`/`cliente`/`usuario`, un borrado
+  físico rompería esas FK o dejaría planillas/comprobantes sin sustento
+  legal (retención tributaria/laboral que prevalece mientras esté vigente).
+  `POST /api/v1/personas/{id}/anonimizar` (permiso dedicado
+  `personas.anonimizar`, distinto de `users.gestionar` — una acción
+  irreversible no hereda un permiso de CRUD normal) sobrescribe
+  `nombres`/`apellidos`/`numero_documento`/`fecha_nacimiento`/`domicilio`/
+  `telefono`/`email` (RN-PER-007); `numero_documento` es `UNIQUE`, se
+  reemplaza por un valor derivado del propio `id`, no un texto fijo. El
+  `audit_log` de la acción registra qué campos se anonimizaron y el motivo,
+  **nunca el valor real anterior** — guardarlo ahí habría dejado la PII
+  accesible para siempre, vaciando de sentido la anonimización.
+  `PATCH /personas/{id}` sobre una persona ya anonimizada ahora da 409: no
+  hay dato real que rectificar. Sin bloqueo automático cross-módulo (p. ej.
+  contra `trabajador.estado=activo`) a propósito — `users` es el módulo más
+  foundational del ERP y consultar hacia `rrhh` invertiría la dirección de
+  dependencia que todo el código ya asume; se documenta un checklist manual
+  en su lugar. `docs/domain/business-rules.md` (RN-PER-007),
+  `docs/architecture/data-model.md` y `docs/foundation/glossary.md`
+  (Derechos ARCO, Anonimización) actualizados. `tests/test_users_persona.py`
+  +5 casos.
+
+- **Contrato OpenAPI exportado y verificado en CI** (2026-07-26): ADR-010.
+  `src/core/openapi_export.py` (`python -m src.core.openapi_export`) escribe
+  `docs/architecture/openapi.json` desde la app real — determinista (claves
+  ordenadas, salto de línea final) para que el diff entre corridas refleje
+  solo cambios reales del contrato. `ci.yml` lo regenera y compara contra el
+  commiteado: un endpoint que cambió sin actualizar el contrato falla el PR
+  que lo causó, no cuando Android/PC/una integración se entera por las
+  malas. `TAGS_METADATA` nuevo en `src/core/app.py` describe los 13 tags de
+  la API (antes FastAPI solo agrupaba por nombre); un test falla si aparece
+  un tag sin su entrada. `app.version` ahora usa `settings.app_version` en
+  vez de un `"0.1.0"` hardcodeado aparte (duplicación encontrada de paso).
+  **Dos afirmaciones falsas corregidas en `api-guidelines.md`**, detectadas
+  al auditar la doc contra el código real: `idempotency_key` siempre viajó
+  como **campo del body**, la guía decía "header"; ningún endpoint de
+  listado pagina, la guía prometía `{items, total, page, page_size}` — se
+  documentó el formato real (array plano) y la paginación real queda en
+  deuda técnica en vez de fingirse implementada. `tests/test_openapi_export.py`
+  (7 casos).
+
+- **Modo offline del PDV — diseño y plumbing base (fase 1)** (2026-07-26):
+  ADR-009. Arquitectura de **hub local dedicado por sucursal** (mini-PC/
+  Raspberry Pi, siempre encendido): corre la **misma imagen** del backend
+  contra su **propio Postgres local** — no una versión recortada. Los tres
+  clientes de PDV (web, Android, PC) le hablan siempre al hub por LAN,
+  nunca directo a internet, resolviendo el requisito de "equipos en la
+  misma red local se ven entre sí durante un corte". Alcance offline:
+  catálogo, ventas/cobro/KDS y —por necesidad lógica, no solo lo pedido—
+  RBAC/usuarios (sin eso nadie se autentica en el hub) e inventory/stock (el
+  listener `sales.venta_confirmada` ya corre en el mismo proceso). El sync
+  hub↔nube **reusa la propia API REST** existente en vez de inventar un
+  protocolo de replicación: descendente por `updated_at` (ya presente vía
+  `TimestampMixin`), ascendente reintentando las mismas llamadas idempotentes
+  que el hub ya ejecutó offline (`idempotency_key` ya exigida en ventas/
+  pagos). Comprobantes se crean `pendiente` en el hub pero **la emisión a
+  Factiliza ocurre solo en la nube**, tras sincronizar — el hub no necesita
+  Celery/Redis/worker. `src/core/sync/estado_conexion.py`: detector de
+  conectividad con racha de fallos antes de declarar `offline` (un timeout
+  puntual no basta) y recuperación inmediata al primer éxito;
+  `GET /health/sync` — siempre 200 (a diferencia de `/health/ready`, estar
+  offline es el modo de diseño del hub, no un fallo: sacarlo de rotación por
+  eso sería contraproducente). `DEPLOYMENT_MODE=hub` con validación de
+  config que aborta el arranque si falta algo (sucursal, URL de sync,
+  credenciales de la cuenta de servicio). `docker-compose.hub.yml` +
+  `.env.hub.example` nuevos. **Fase 2 (motor de sync real) queda
+  explícitamente pendiente**: requiere primero extender `crear_venta`/
+  `registrar_pago`/movimientos para aceptar un `id` client-generado (ya
+  posible sin migración — `UuidPkMixin` genera el UUID en Python, no en la
+  base), evitando así una tabla de mapeo hub-id↔nube-id. Fix de paso en
+  `.gitignore`: `.env.hub.example` quedaba tapado por la regla `.env.*`, el
+  mismo tipo de trampa que `backups/` en el commit anterior.
+  `tests/test_offline_hub.py` (17 casos).
+
+- **Entrega continua — imagen en GHCR y CI endurecida** (2026-07-26):
+  `ci.yml` gana tres verificaciones que no existían. **Cabeza única de
+  Alembic**: dos ramas que crean migraciones en paralelo hacían fallar
+  `upgrade head` durante el despliegue, no en el merge que lo causó.
+  **Job `imagen`**: nadie comprobaba que el `Dockerfile` siquiera
+  construyera — ahora además se levanta el contenedor y se le pide `/health`,
+  lo que valida el `CMD`, el usuario sin privilegios y el `HEALTHCHECK`.
+  **`pip-audit`** informativo (no bloquea: un aviso en una dependencia
+  transitiva no puede frenar un arreglo urgente en caja). Se suman caché de
+  pip/npm y `npm ci` en vez de `npm install`. `release.yml` nuevo: cada push
+  a `main` publica la imagen en **GHCR**, y los tags `v*` publican además la
+  versión exacta — GHCR y no Docker Hub porque autentica con el
+  `GITHUB_TOKEN` del propio workflow, sin secreto que rotar.
+  **`docker-compose.prod.yml` nuevo**: el `docker-compose.yml` existente es
+  solo de desarrollo (monta el código, `uvicorn --reload`, Postgres con
+  contraseña de juguete) y desplegarlo habría publicado esa configuración; el
+  de producción no incluye base de datos (gestionada vía `DATABASE_URL`),
+  publica la API solo en `127.0.0.1` y no expone el puerto de Redis. El
+  `Dockerfile` pasa a correr como usuario sin privilegios (uid 10001) y trae
+  `HEALTHCHECK`. **El despliegue sigue siendo manual y documentado**
+  (ADR-008): automatizar por SSH contra un servidor que todavía no existe
+  daría automatización imposible de probar. `alembic upgrade head` queda como
+  paso explícito del despliegue y no al arrancar la aplicación — con varias
+  réplicas todas migrarían a la vez y una migración fallida dejaría el
+  contenedor en bucle de reinicio en lugar de fallar con un error legible.
+
+- **Chequeos de salud y alertas** (2026-07-26): `src/core/health.py` +
+  `health_router.py`. `/health` queda como **liveness** puro, sin tocar
+  dependencias — si fallara por la base de datos, el orquestador reiniciaría
+  en bucle un proceso sano. `/health/ready` es **readiness**: base de datos
+  (crítica → `caido` + 503), Redis y profundidad de la cola de tareas
+  (degradan a 200 con estado `degradado`, porque sin Redis el rate limit
+  falla abierto y los comprobantes esperan, pero la caja tiene que seguir
+  vendiendo). `/health/backups` va aparte a propósito: que falte un backup es
+  grave, pero devolver 503 en readiness sacaría la API de rotación y dejaría
+  al restaurante sin vender. Ese endpoint cubre el caso que el reporte de
+  errores **no puede** cubrir — un backup que falla avisa por Sentry, pero
+  uno que nunca corrió (cron desactivado, servidor reinstalado) no genera
+  ningún evento; solo se detecta preguntando por la frescura del archivo
+  (umbral 26 h, con margen sobre el cron diario). **El ERP no alerta por su
+  cuenta**: expone estado y un monitor externo avisa (ADR-007) — alertas que
+  viven en el servidor monitoreado dejan de avisar justo cuando ese servidor
+  cae. Los tres endpoints son públicos (un monitor no puede autenticarse) y
+  devuelven estados, nunca hostnames, DSN ni errores crudos. Los endpoints se
+  extrajeron a su propio router: `create_app` había superado el umbral de
+  complejidad de ruff. `tests/test_health.py` (20 casos).
+
+- **Observabilidad — logs estructurados y reporte de errores** (2026-07-26):
+  `src/core/logging_config.py` y `src/core/sentry.py`. Los logs salen en JSON
+  (una línea por evento) en producción y en texto legible en local, con los
+  **tres flujos** que `security.md` ya declaraba —`app`, `seguridad`,
+  `auditoria`— derivados del nombre del logger, sin parámetro extra en cada
+  llamada. **Correlación por `request_id`**: se genera por request (o se
+  respeta el `X-Request-ID` entrante, para seguir una traza que venía del
+  proxy), viaja en un `contextvar`, sale en la cabecera de toda respuesta y
+  se devuelve en el cuerpo del error 500 — sin él, un "me dio error" de un
+  cajero no se cruza con ningún log. **Redacción** de PIN, contraseñas,
+  tokens y cabeceras `Authorization`/`Cookie` antes de escribir el log y
+  antes de salir hacia Sentry (`send_default_pii=False`, Ley 29733). El
+  flujo `seguridad` estrena usuarios reales: login fallido, bloqueo de
+  cuenta, reuso de refresh token y rate limit superado. Reporte de errores
+  activo en los tres componentes que hasta ahora fallaban en silencio —
+  `api`, `worker` (señal `celeryd_init`: un comprobante que agotaba
+  reintentos contra Factiliza no avisaba a nadie) y `backups` (un fallo de
+  madrugada quedaba solo en el log del cron). Sirve igual para Sentry o
+  GlitchTip autoalojado; sin `SENTRY_DSN` no se envía un solo byte.
+  `sentry-sdk` va en dependencias base a propósito: como extra opcional, un
+  despliegue que lo olvidara se quedaría justo sin lo que avisa que algo
+  falla. `configurar_logging` etiqueta su handler y retira solo el propio,
+  para no desconectar a un colector externo (ni a pytest).
+  `tests/test_observabilidad.py` (33 casos).
+
+- **Backups automáticos con restauración probada** (2026-07-26):
+  `src/backups/backup.py` (`python -m src.backups.backup`) encadena dump →
+  verificación → restauración de prueba → copia externa → purga, y sale con
+  código 1 si algo falla para que el cron pueda alertar. `pg_dump
+  --format=custom` con la contraseña por `PGPASSWORD` (nunca en `argv`, que
+  `ps` expone). La verificación comprueba la firma del dump y que
+  `pg_restore --list` traiga las tablas críticas — detecta el dump truncado
+  por disco lleno, que a simple vista parece sano. Con
+  `BACKUP_VERIFY_DATABASE_URL` restaura de verdad contra una base desechable
+  y cuenta filas; se niega a restaurar sobre la base de origen, porque
+  `pg_restore --clean` borra el esquema destino. La purga por retención
+  **nunca borra el backup más reciente**, aunque esté vencido: si el cron
+  llevaba meses caído, borrarlo dejaría al ERP sin ninguna copia. Copia a S3
+  (o compatible) detrás de credenciales, con `boto3` como dependencia
+  opcional `[backups]` para no cargarla en la imagen de la API. **Frecuencia
+  revisada de mensual+incremental a diaria con retención de 30 días**
+  (`glossary.md`, `security.md`): un negocio que vende todos los días no
+  puede perder un mes de caja, y el dump completo pesa megas. Runbook de
+  restauración y línea de cron en `docs/engineering/devops.md`.
+  `tests/test_backups.py` (17 casos). Verificación pendiente: el camino feliz real (pg_dump contra Postgres) no se pudo ejecutar en la máquina de desarrollo — falta `postgresql-client`.
+
+- **Facturación electrónica — Factiliza (SUNAT)** (2026-07-26): migración
+  `b3d7f21ac094`. **Cambio de proveedor: Factiliza reemplaza a Nubefact**
+  (decisión del usuario); las columnas `comprobante.estado_nubefact`/
+  `respuesta_nubefact` se sustituyen por `estado_emision`
+  (`no_aplica|pendiente|aceptado|rechazado|error`), `hash_proveedor`,
+  `detalle_emision`, `intentos_emision` y `respuesta_proveedor`. Adaptador
+  nuevo en `src/shared/integrations/factiliza/`: `client.py` (`POST
+  /invoice/send`, Bearer) y `mapper.py` (traducción a catálogos SUNAT 01/
+  06/07/51/52 + leyenda 1000 en letras vía `num2words`). Cola nueva:
+  `src/core/celery_app.py` + tarea `sales.emitir_comprobante` con reintento
+  exponencial, y servicio `worker` en `docker-compose.yml`.
+  `sales.registrar_pago` crea el `comprobante` `pendiente` al cubrirse el
+  total y el router encola el envío **después del commit**; aceptado →
+  venta `facturada` + `sales.comprobante_emitido`; rechazo de SUNAT se
+  guarda como veredicto sin reintentar; fallo de transporte reintenta.
+  Boleta vs factura por `rules.tipo_comprobante` (factura solo con cliente
+  jurídico + RUC; anónimo → `CLIENTES VARIOS`). **IGV desglosado hacia
+  atrás** desde el precio de carta, y **exoneración automática** para
+  empresas de zona `amazonia_ley27037` (RN-IMP-001 — el caso real de
+  Majambo en Tarapoto). Sin `FACTILIZA_TOKEN` la emisión queda desactivada
+  y los comprobantes se acumulan pendientes: la caja nunca se bloquea
+  (RN-COM-003). Permiso `sales.emitir_comprobante` + endpoints
+  `GET /ventas/{id}/comprobante` y `POST /comprobantes/{id}/reintentar`.
+  Dependencias nuevas: `httpx` (pasa de dev a runtime), `num2words`.
+  `tests/test_facturacion_electronica.py` (23 casos).
+
+- **Endurecimiento de producción — rate limit, secretos y HTTPS**
+  (2026-07-26): `src/core/rate_limit.py` nuevo — límite por IP con contador
+  en Redis (ventana fija), aplicado a `/auth/login` y `/auth/refresh`
+  (10/min configurable); el lockout por cuenta no frenaba a quien rota
+  usernames desde una misma IP. Fail-open si Redis no responde: una caída de
+  Redis no puede dejar sin operar al restaurante. `settings` valida la
+  configuración al arrancar y **aborta** con `ENVIRONMENT=production` si
+  `JWT_SECRET` es el placeholder o mide menos de 32 caracteres, si
+  `DEBUG=true`, si `DATABASE_URL` conserva la contraseña por defecto o si
+  `ALLOWED_HOSTS`/`CORS_ORIGINS` quedaron en `*`. `create_app` suma
+  `TrustedHostMiddleware`, CORS con orígenes explícitos (antes no había CORS:
+  el frontend no podía llamar a la API), cabeceras `X-Content-Type-Options`/
+  `X-Frame-Options`/`Referrer-Policy` en toda respuesta, `HSTS` solo en
+  producción, y `/docs` + `/openapi.json` deshabilitados en producción.
+  Dockerfile arranca uvicorn con `--proxy-headers` (detrás de nginx la IP
+  real llega en `X-Forwarded-For`; sin esto el rate limit y el `audit_log`
+  registraban la IP del proxy). `docker-compose.yml` toma la contraseña de
+  Postgres de `POSTGRES_PASSWORD`. Runbook de rotación de credenciales y
+  custodia de `.env`, y guía de despliegue tras nginx/Caddy, en
+  `docs/engineering/devops.md`; `docs/security/security.md` actualizado.
+  `tests/test_security.py` (13 casos).
+
+- **`rrhh`: slice completo — ciclo laboral** (2026-07-25): migración
+  `9e1b6a4c7d23`, 12 tablas nuevas sobre `trabajador` (que solo tenía modelo,
+  sin capa de aplicación). `application/trabajadores.py` completa el ciclo
+  crear/actualizar/cesar (RN-PER-002: `locacion_servicios` fuerza
+  `registra_asistencia=false`). `contratos.py`: `contrato_laboral`
+  borrador→firmado→finalizado (RN-RRHH-012). `postulantes.py`: exige
+  `consentimiento_datos` antes de guardar CV (RN-PER-004). `socios.py`:
+  participación societaria. `nomina.py`: `boleta_pago`/`liquidacion_bss`
+  idempotentes por `idempotency_key` (RN-RRHH-001/003, flag
+  `dentro_de_plazo` de 48h). `disciplina.py`: `memorandum`/`amonestacion`/
+  `acta`/`certificado_trabajo` (RN-RRHH-002/004/007). `permisos.py`:
+  `solicitud_permiso` pendiente→aprobada/rechazada (RN-RRHH-005).
+  `capacitacion.py`: `pacto_permanencia` con reembolso proporcional al
+  tiempo no cumplido (RN-RRHH-006). `asistencia.py`: marcar entrada/salida,
+  bloqueado para trabajadores que no registran asistencia. 11 permisos
+  `rrhh.*` nuevos, rol `rrhh_admin`, `supervisor` gana lectura/aprobación de
+  permisos y marcado de asistencia. Constante `rrhh_rmv_vigente` en
+  settings (RN-PER-001). Endpoints bajo `/api/v1/rrhh`. `tests/test_rrhh.py`
+  (17 casos). Diferido: ver ROADMAP — eventos `rrhh.*` sin consumidor
+  todavía, `contrato`/`solicitud` transversales, cálculo automático de
+  PLAME.
+
+- **Pago a proveedor (PROC-CTB-003) — tesorería en `accounting`** (2026-07-25):
+  migración `cbf904a9fc1b` (`movimiento_dinero`). `feat(purchases)`: nuevo
+  `application/comprobantes.py::dar_conformidad_comprobante` (permiso
+  `purchases.dar_conformidad`) registra el `comprobante` recibido
+  (transversal, `shared`), lo liga a la última `recepcion_compra` de la OC
+  y publica `purchases.comprobante_conforme` (empresa_id, condición de
+  pago, `sujeto_spot`/`porcentaje_deteccion`, monto). `feat(accounting)`:
+  `application/pagos.py` — `registrar_pago` encola un `movimiento_dinero`
+  `pendiente` (idempotente por `comprobante_id`, RN-CTB-008), `ejecutar_pago`
+  exige permiso `accounting.pago_gestionar` y revisa el umbral configurable
+  (`regla_aprobacion`, código `pago_umbral`, RN-CTB-005 — sobre el umbral
+  exige además `accounting.pago_aprobar`) antes de generar el asiento vía
+  `regla_asiento` (evento `accounting.pago_ejecutado`; sin mapeo
+  configurado, el pago igual se ejecuta y el asiento se omite),
+  `rechazar_pago` cierra la cola sin ejecutar. Nuevo helper compartido
+  `asientos.crear_asiento_automatico_si_hay_regla` (usado también por
+  `application/listeners.py`, dedup de la búsqueda de `regla_asiento`).
+  Endpoints `/api/v1/accounting/pagos-proveedor` (registrar, listar,
+  ejecutar, rechazar) y `/api/v1/purchases/ordenes-compra/{id}/conformidad-comprobante`.
+  Roles: `comprador` gana `purchases.dar_conformidad`; `contador` gana
+  `accounting.pago_gestionar`; `supervisor` gana `accounting.pago_aprobar`.
+  Tests en `tests/test_accounting.py`. Deuda: detracción SPOT se calcula
+  pero el asiento no la desglosa en cuenta propia; `purchases` no marca la
+  OC como pagada; `rechazar_pago` no libera el comprobante para reintentar
+  — ver ROADMAP.
+- **Módulo `accounting` — slice core (libro contable)** (2026-07-25): migración
+  `5402d99333fa` (`cuenta_contable`, `periodo_contable`, `asiento`,
+  `asiento_linea`, `regla_asiento`) aplicada. Endpoints `/api/v1/accounting`:
+  plan de cuentas (permiso `accounting.cuenta_administrar`), abrir/cerrar
+  periodo contable (`accounting.periodo_administrar`, RN-CTB-010), asiento
+  manual con cuadre obligatorio debe=haber (`accounting.asiento_manual`,
+  RN-CTB-001) y anulación por asiento inverso — nunca borra/edita
+  (RN-CTB-002). `regla_asiento` (nuevo): mapeo configurable evento→cuentas
+  por empresa, mismo criterio que `regla_aprobacion` (RN-CTB-011: sin regla
+  configurada, el asiento automático se omite y loguea, nunca bloquea el
+  proceso de origen). **Listener** (`application/listeners.py`) genera
+  asiento automático para los 3 eventos que sus módulos de origen ya
+  publican en código: `purchases.oc_emitida`, `purchases.compra_recibida`,
+  `sales.venta_confirmada` — se agregó `empresa_id` al payload de
+  `oc_emitida` y `total` al de `venta_confirmada` (campos aditivos,
+  `events.md` actualizado). Rol semilla `contador`. Tests en
+  `tests/test_accounting.py`. Deuda registrada en ROADMAP (resto de eventos
+  aún no publicados por sus módulos, pago a proveedor, conciliación
+  bancaria, arqueo backend, ciclo de caja sin conectar al libro contable,
+  activo fijo/ITAN).
+- **Persona CRUD + lock optimista + matriz de aprobaciones + contrato
+  público de lectura** (2026-07-25): migración `af8a246e2c25`.
+  - `feat(users)`: CRUD de `persona` sin Delete (`POST/GET/PATCH
+    /api/v1/personas`, permiso `users.gestionar`) — antes solo se creaba
+    de rebote vía trabajador/cliente/proveedor. `PATCH` exige `version`
+    vigente (lock optimista, `VersionedMixin` nuevo en
+    `src/core/model_base.py`): dos ediciones concurrentes ya no se pisan
+    en silencio, la segunda recibe 409.
+  - `feat(shared)`: `regla_aprobacion` (nuevo, `src/shared/`) — la matriz
+    de aprobaciones deja de ser solo un documento con `[[COMPLETAR]]`;
+    umbral de OC de `purchases` migrado a leerla (con fallback al valor
+    semilla de config si la empresa no configuró ninguna fila). Admin en
+    `/api/v1/reglas-aprobacion`, permiso
+    `gerencia.gestionar_reglas_aprobacion`.
+  - `feat(sales)`: primer contrato público de lectura cross-módulo del
+    repo (`application/queries_publicas.py`) — `GET /api/v1/sales/clientes`
+    expone `cliente` (join con `persona` si es natural) para que
+    `marketing`/`comercial` lo consuman sin importar el dominio de
+    `sales`, permiso `sales.leer_clientes_externos`. Patrón documentado en
+    `docs/architecture/events.md` para replicar cuando `inventory`
+    implemente `solicitud_insumos` (caso `purchases` ↔ `inventory`, hoy
+    bloqueado).
+  - Tests: `tests/test_users_persona.py` (CRUD + lock optimista),
+    `tests/test_sales_clientes_publico.py`, nuevo caso en
+    `tests/test_purchases.py` (override de umbral por empresa).
+- **Módulo `production` — slice core** (2026-07-25): migración
+  `f78501175fba` (orden_produccion, consumo_produccion_item,
+  receta.articulo_id) aplicada. Construido antes de tiempo (primera
+  cocina real planeada 2027) a pedido explícito del usuario, mismo
+  patrón slice-por-slice. `receta.articulo_id` nuevo (nullable) liga una
+  receta a la subreceta que produce — separado del uso existente de
+  `producto_comercial.receta_id`. Endpoints
+  `/api/v1/production`: crear orden ad-hoc (sin plan/cronograma),
+  registrar consumo real de insumos, completar con resultado de control
+  de calidad (`conforme`/`no_conforme_reprocesado`/`no_conforme_desechado`)
+  y costeo automático (`costo_insumos` + `costo_mano_obra` vía tarifa
+  configurable `production_costo_hora_mano_obra` → `costo_real_unitario`).
+  Desecho exige merma + motivo + evidencia (RN-PRD-015). **Listeners en
+  inventory**: `consumo_registrado` descuenta insumos,
+  `orden_completada` suma el producto terminado y recalcula su
+  `costo_promedio` (mismo patrón que `purchases.compra_recibida`). Rol
+  semilla `jefe_cocina`. Sin migración generada aún. Tests en
+  `tests/test_production.py`. Deuda registrada en ROADMAP (cronograma,
+  checklist de inocuidad, reporte consolidado, reporte de escalamiento
+  real, merma→accounting, lote/trazabilidad, subrecetas anidadas).
+- **Módulo `purchases` — slice core** (2026-07-25): migración `4ff85f833b29`
+  (proveedor, orden_compra, orden_compra_item, recepcion_compra,
+  recepcion_item) aplicada a la BD dev (Supabase). Endpoints
+  `/api/v1/purchases`: CRUD de proveedores (natural liga a `persona`,
+  mismo party model que `cliente`, RN-GEN-007; jurídico con razón
+  social/RUC propios), ciclo de OC tipo `insumo` (crear borrador →
+  emitir → recibir total/parcial → anular), todo con idempotencia.
+  Emitir exige `purchases.aprobar` si el total supera el umbral
+  configurable `purchases_umbral_aprobacion_oc` (semilla: 2000). Eventos
+  `purchases.oc_emitida` / `compra_recibida` / `oc_anulada`. **Listener
+  en inventory**: `compra_recibida` suma stock en el almacén destino y
+  recalcula `articulo.costo_promedio` (promedio ponderado). Rol semilla
+  `comprador`. Tests en `tests/test_purchases.py`. Deuda registrada en
+  ROADMAP (cotización, OC tipo `activo` + `requerimiento_activo`,
+  compra_directa + caja chica, evaluación de proveedor automática,
+  comprobante recibido, devolución a proveedor).
 - **Módulo `sales` — KDS** (2026-07-25): migración `7672566bf189` —
   `kds_pantalla` (pantallas por sucursal, tipo preparación/despacho, filtro
   por categorías de producto comercial), `venta_item.estado_preparacion`
@@ -311,6 +822,45 @@ Versionado: [SemVer](https://semver.org/lang/es/).
   picking y despacho en almacén central, recepción y devoluciones en
   local — nueva área `Logistica-Almacen` en
   `docs/diagrams/Procesos/`.
+
+### Changed
+
+- **RN-COM-007 reactivada** (2026-07-27): la encuesta de satisfacción
+  vuelve a tener disparador (`sales.venta_entregada`) tras quedar sin él
+  desde el recorte de alcance de Venta del 2026-07-14. Desbloquea
+  `encuesta_satisfaccion` en el módulo `marketing`.
+- **El bump del KDS ya no marca `entregado`** (2026-07-27):
+  `POST /kds/items/{id}/avanzar` devuelve 409 apuntando al endpoint de
+  entrega. Antes cualquiera con `kds.operar` cerraba el pedido ítem por
+  ítem, lo que dejaba decorativo cualquier permiso de entrega; ahora la
+  entrega exige `sales.entregar_pedido` y cierra la venta completa de una
+  vez (RN-CUP-005/006). Cambio de contrato para clientes del KDS que
+  usaran ese estado.
+- **`almacen.direccion`** (2026-07-27, migración `e5a1c93b7d40`): columna
+  nueva, nullable. El almacén central tiene `sucursal_id` NULL, así que no
+  había dónde registrar su ubicación física; los almacenes de sucursal
+  heredan la dirección de su sucursal y los virtuales (`activos`, futuro
+  `transporte`) no tienen ninguna — de ahí que sea nullable y no obligatoria.
+
+### Changed
+
+- **Documentación al día con lo construido** (2026-07-26): tres ADR nuevos
+  para decisiones que se habían tomado sin registrar —
+  **ADR-005** (Factiliza como proveedor de facturación electrónica; deja
+  constancia de que **Nubefact nunca fue un ADR**, era un supuesto heredado
+  del scaffold que arrastraron trece archivos), **ADR-006** (logs con la
+  biblioteca estándar en vez de `structlog`; Sentry/GlitchTip intercambiables
+  por DSN, así que elegir backend no es decisión de arquitectura) y
+  **ADR-007** (backups por `pg_dump` + cron y no Celery beat, porque el
+  backup debe correr justo cuando la aplicación está caída; salud expuesta a
+  un monitor externo). Barrido de las trece menciones obsoletas a Nubefact en
+  `data-model.md`, `overview.md`, `tech-stack.md`, `marco-legal-contabilidad.md`,
+  `diagrams/modules.md`, `business-rules.md`, `domain-model.md`,
+  `state-machines.md`, `workflows.md`, `glossary.md` y `vision.md`.
+  `overview.md` documenta ahora la infraestructura de operación de
+  `src/core/` (tabla archivo → responsabilidad) y `src/backups/`, más el
+  índice completo de ADR; `00_PROJECT.md` y el `README.md` raíz actualizados
+  con salud, backups y observabilidad.
 
 ### Fixed
 

@@ -32,3 +32,179 @@ h4 {
     font-style: italic;
     text-transform: uppercase;
 }
+
+button {
+    font-family: inherit;
+    cursor: pointer;
+    border: none;
+    border-radius: 8px;
+}
+
+button:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+input {
+    font-family: inherit;
+    font-size: 1rem;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--color-gray);
+    border-radius: 8px;
+    background: #fff;
+    color: var(--color-dark);
+}
+
+input:focus {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 1px;
+}
+
+/* --- Login --- */
+.login-page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+}
+
+.login-card {
+    width: 100%;
+    max-width: 360px;
+    background: #fff;
+    border-radius: 16px;
+    padding: 2rem;
+    box-shadow: 0 8px 24px rgba(22, 22, 22, 0.12);
+}
+
+.login-card h1 {
+    color: var(--color-primary);
+    font-size: 2rem;
+}
+
+.login-tagline {
+    color: var(--color-gray);
+    margin-top: 0.25rem;
+    margin-bottom: 1.5rem;
+}
+
+.login-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.login-form label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.login-form button {
+    margin-top: 0.5rem;
+    padding: 0.75rem;
+    background: var(--color-primary);
+    color: #fff;
+    font-weight: 700;
+    font-size: 1rem;
+}
+
+.login-form button:not(:disabled):hover {
+    background: var(--color-secondary);
+}
+
+.login-error {
+    color: var(--color-secondary);
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+/* --- Dashboard --- */
+.dashboard-page {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+}
+
+.dashboard-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 2rem;
+    border-bottom: 2px solid var(--color-dark);
+    padding-bottom: 1rem;
+}
+
+.dashboard-header h1 {
+    color: var(--color-primary);
+    font-size: 1.75rem;
+}
+
+.logout-button {
+    background: transparent;
+    border: 1px solid var(--color-gray);
+    color: var(--color-dark);
+    padding: 0.5rem 1rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.logout-button:hover {
+    border-color: var(--color-dark);
+}
+
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1.25rem;
+}
+
+.dashboard-card {
+    background: #fff;
+    border-radius: 16px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 16px rgba(22, 22, 22, 0.08);
+}
+
+.dashboard-card h2 {
+    font-size: 1rem;
+    color: var(--color-gray);
+    margin-bottom: 0.75rem;
+}
+
+.dashboard-metric {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--color-dark);
+    line-height: 1;
+}
+
+.dashboard-metric--alerta {
+    color: var(--color-secondary);
+}
+
+.dashboard-submetric {
+    margin-top: 0.35rem;
+    color: var(--color-gray);
+    font-weight: 600;
+}
+
+.dashboard-list {
+    list-style: none;
+    margin-top: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    font-size: 0.85rem;
+    color: var(--color-gray);
+}
+
+.dashboard-error {
+    color: var(--color-secondary);
+    font-weight: 600;
+    text-align: center;
+    margin-top: 2rem;
+}

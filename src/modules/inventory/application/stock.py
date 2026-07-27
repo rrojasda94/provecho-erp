@@ -7,6 +7,7 @@ El stock nunca se edita directo — todo cambio pasa por
 import uuid
 from decimal import Decimal
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.modules.inventory.application.errors import ReglaNegocio, StockInsuficiente
@@ -16,6 +17,11 @@ from src.modules.inventory.infrastructure.repositories import (
     MovimientoRepo,
     StockRepo,
 )
+
+# Almacén es organización transversal (data-model §1); vive en
+# users/infrastructure por historia. Import de modelo (no dominio)
+# permitido — mismo precedente que `application/listeners.py`.
+from src.modules.users.infrastructure.models import Almacen
 
 
 def aplicar_a_stock(
@@ -46,8 +52,17 @@ def registrar_movimiento(
     usuario_id: uuid.UUID | None = None,
     referencia: str | None = None,
     motivo_ajuste: str | None = None,
+    id: uuid.UUID | None = None,
 ) -> tuple[MovimientoInventario, Stock]:
-    """`cantidad` con signo: + ingreso, − salida."""
+    """`cantidad` con signo: + ingreso, − salida.
+
+    `id` explícito lo usa el cliente que ya generó el identificador del
+    movimiento antes de que existiera la fila (ADR-009): así un movimiento
+    registrado sin conexión conserva su identidad si más tarde se
+    reproduce. Los movimientos que derivan de una venta NO se sincronizan
+    —el listener de la nube los genera al recibirla, empujarlos además
+    duplicaría el consumo—, ver `sales/application/sincronizacion.py`.
+    """
     if tipo not in rules.TIPOS_MOVIMIENTO:
         raise ReglaNegocio(f"tipo de movimiento inválido: {tipo}")
     if not rules.signo_movimiento_valido(tipo, cantidad):
@@ -57,6 +72,7 @@ def registrar_movimiento(
     stock = aplicar_a_stock(session, almacen_id, sku_id, cantidad)
     mov = MovimientoRepo(session).add(
         MovimientoInventario(
+            id=id or uuid.uuid4(),
             almacen_id=almacen_id,
             sku_id=sku_id,
             cantidad=cantidad,
@@ -83,3 +99,22 @@ def consultar_stock(
         }
         for s in filas
     ]
+
+
+def contar_bajo_minimo(session: Session, empresa_id: uuid.UUID) -> int:
+    """Cantidad de filas de stock bajo su mínimo, en almacenes de la
+    empresa — para el dashboard gerencial (`core.dashboard_router`)."""
+    almacen_ids = list(
+        session.scalars(
+            select(Almacen.id).where(
+                Almacen.empresa_id == empresa_id, Almacen.deleted_at.is_(None)
+            )
+        )
+    )
+    if not almacen_ids:
+        return 0
+    return sum(
+        1
+        for s in session.scalars(select(Stock).where(Stock.almacen_id.in_(almacen_ids)))
+        if rules.stock_bajo(s.cantidad, s.stock_minimo)
+    )

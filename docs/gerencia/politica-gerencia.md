@@ -30,13 +30,17 @@ está definido, se marca `[[ COMPLETAR ]]`.
 Fuente **única** de qué requiere visado gerencial, su umbral y el
 aprobador (RN-GER-003). Ninguna área fija un umbral propio por fuera de
 esta tabla; los SOPs de cada área la referencian en vez de redefinirla.
+Los umbrales cuantitativos (montos) viven como filas de la tabla
+`regla_aprobacion` (editable por empresa vía
+`gerencia.gestionar_reglas_aprobacion`, ver `data-model.md` §8c) — esta
+tabla es la narrativa de gobierno (qué, quién, por qué), no el valor exacto.
 
 | Qué se aprueba | Umbral / condición | Aprobador | Regla / fuente |
 |---|---|---|---|
 | Presupuesto anual de cada área | Una vez al año, en la reunión de presupuesto | Gerencia sobre propuesta del área e informe de Contabilidad | RN-GER-007 |
 | Gasto de un área durante el año | Fuera de lo presupuestado, o sobre el límite de gasto autónomo del área `[[ COMPLETAR: límite por área ]]` | Gerencia (puntual) | RN-GER-007 |
 | Contratación de agencia (servicio) | Marketing evalúa; excede el presupuesto/límite o requiere validación | Marketing evalúa + Gerencia valida | RN-MKT-006 |
-| Orden de compra sobre umbral | Monto ≥ `[[ COMPLETAR: umbral en soles ]]`; prohibido fraccionar para evadirlo | Administrador/Gerencia | RN-CMP-008 |
+| Orden de compra sobre umbral | Monto ≥ el configurado en `regla_aprobacion` (`purchases`/`oc_umbral`) por empresa — valor semilla S/2000 si nadie lo configuró aún; prohibido fraccionar para evadirlo | Administrador/Gerencia | RN-CMP-008 |
 | Compra de activo / equipamiento | Siempre (cotización comparativa de ≥2 proveedores) | Área solicitante + Gerencia | RN-CMP-015 |
 | Préstamo de una empresa | Siempre, con estudio de viabilidad previo | Gerencia sobre informe de Contabilidad | RN-EMP-006 |
 | Esquema de incentivo/comisión de metas de venta | Al crearse o cambiar; nunca retroactivo | Comercial + RRHH + Gerencia | RN-CML-003 |

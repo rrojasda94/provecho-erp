@@ -19,6 +19,50 @@ cualitativo), `requerimiento_activo` (ficha de especificación + validación
 de área/gerencia, ligada a la OC de tipo `activo`). Detalle en
 `docs/architecture/data-model.md` §5.
 
+## Estado (slice core implementado 2026-07-25)
+
+Operativo en `/api/v1/purchases`: CRUD de proveedores (natural liga a
+`persona` — mismo party model que `cliente`, RN-GEN-007 — jurídico trae
+razón social/RUC propios) y ciclo de OC tipo `insumo`: crear (borrador,
+idempotente) → emitir (permiso `purchases.aprobar` exigido si el total
+supera el umbral vigente en `regla_aprobacion` — `shared`, módulo
+`purchases`, código `oc_umbral`; sin fila configurada cae al valor semilla
+`purchases_umbral_aprobacion_oc`) → recibir
+(total o parcial, nunca más de lo ordenado) → anular (solo antes de
+cualquier recepción). Capas `domain/rules.py`,
+`infrastructure/repositories.py`, `application/` (`proveedores.py`,
+`ordenes.py`), `api/`. Migración `4ff85f833b29` aplicada.
+
+| Método | Ruta | Permiso |
+|--------|------|---------|
+| POST/GET/PATCH | `/proveedores[/{id}]` | `purchases.crear` / `leer` |
+| POST | `/ordenes-compra` | `purchases.crear` |
+| GET | `/ordenes-compra/{id}` | `purchases.leer` |
+| POST | `/ordenes-compra/{id}/emitir` | `purchases.crear` (+ `aprobar` sobre umbral) |
+| POST | `/ordenes-compra/{id}/recepciones` | `purchases.recepcionar` |
+| POST | `/ordenes-compra/{id}/anular` | `purchases.anular` |
+| POST | `/ordenes-compra/{id}/conformidad-comprobante` | `purchases.dar_conformidad` |
+
+Eventos: publica `purchases.oc_emitida` y `purchases.compra_recibida`
+(inventory suma stock en el almacén destino y recalcula
+`articulo.costo_promedio` — promedio ponderado solo contra el stock del
+almacén que recibe, ver `ponytail:` en
+`inventory/application/listeners.py`), `purchases.oc_anulada` y
+`purchases.comprobante_conforme` (2026-07-25 — registra `comprobante`
+recibido, transversal en `src/shared/models/`, y dispara en `accounting`
+la cola de pago a proveedor, `application/pagos.registrar_pago`). Rol
+semilla `comprador` (crear/leer/recepcionar/anular/dar_conformidad);
+`supervisor` y `admin` tienen `purchases.aprobar`.
+
+Deuda del slice (ver ROADMAP): `cotizacion` (camino no-preferente sin
+modelar — hoy toda OC insumo emite sin cotización comparativa),
+OC tipo `activo` + `requerimiento_activo` con doble aprobación,
+`compra_directa` + `caja_chica_compras`/`caja_chica_movimiento` +
+`rendicion_caja_chica` (compra a proveedor informal), `evaluacion_proveedor`
+automática por recepción, listener de `inventory.devolucion_a_proveedor`.
+La OC no queda marcada como "pagada" tras el pago (RN-CMP-014 vive del
+lado de `accounting`, `orden_compra.estado` no tiene ese valor todavía).
+
 ## Casos de uso
 
 - CRUD de proveedores, con alta condicionada a verificación de RUC
@@ -54,15 +98,18 @@ de área/gerencia, ligada a la OC de tipo `activo`). Detalle en
   permiso especial.
 - `idempotency_key` en emisión de OC, recepción y `compra_directa`.
 - Aprobación de OC sobre monto umbral requiere permiso `purchases.aprobar`
-  (umbral configurable).
+  (umbral por empresa en `regla_aprobacion`, con fallback al valor semilla
+  de config — ver `docs/architecture/data-model.md` §8c).
 - OC tipo `activo` requiere `requerimiento_activo.aprobado_area = true` y
   `requerimiento_activo.aprobado_gerencia = true` antes de permitir emisión
   — bloqueo a nivel de dominio, no solo de UI.
 - `compra_directa` exige comprobante adjunto antes de guardarse; sin
   comprobante no se persiste.
-- `purchases` **no ejecuta pagos** — solo marca el comprobante como
-  `conforme` y lo entrega (evento) a `accounting`, que decide y ejecuta el
-  pago según la condición de la ficha del proveedor.
+- `purchases` **no ejecuta pagos** — solo registra el `comprobante`
+  recibido como conforme (`purchases.dar_conformidad`, exige OC con
+  recepción registrada) y lo entrega (evento `purchases.comprobante_conforme`)
+  a `accounting`, que decide y ejecuta el pago según la condición de la
+  ficha del proveedor (RN-CMP-014).
 - Cierre de `caja_chica_compras` (rendición) requiere que
   `gasto_total + efectivo_restante == fondo_fijo`; si no cuadra, el cierre
   queda `con_diferencia` y no repone el fondo hasta resolverse.

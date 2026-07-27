@@ -9,7 +9,7 @@ flowchart TB
     subgraph core[core / shared]
         BUS[Event Bus]
         AUTH[Auth JWT + tenant]
-        INT[Integraciones: Nubefact, Izipay, Google, Meta]
+        INT[Integraciones: Factiliza, Izipay, Google, Meta]
     end
 
     USERS[users\nauth, RBAC, auditoría]

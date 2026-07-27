@@ -17,7 +17,12 @@ aprobación gerencial si sobre umbral), `pieza_contenido` (calendario,
 pertinencia y uso de marca validados), `lead` (canal, atribución a
 `venta_id`), `implementacion_material_sucursal` (verificación en sitio).
 `encuesta_satisfaccion` pertenece a este módulo (spec en
-`docs/architecture/data-model.md` §6 y §8d).
+`docs/architecture/data-model.md` §6 y §8d). Su disparador es
+`sales.venta_entregada`, que emite `PROC-OPE-002` (Cumplimiento de
+pedido) desde 2026-07-27 — el hecho que faltaba para que la encuesta
+pudiera construirse. Marketing elige a qué venta entregada enviarle
+encuesta (selectiva, RN-COM-007) y al enviarla emite
+`marketing.encuesta_enviada`.
 
 `contrato` (transversal) y las compras de material/agencia (`purchases`)
 no se duplican aquí — Marketing las usa.

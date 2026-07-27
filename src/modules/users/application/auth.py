@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.core.events import event_bus
+from src.core.logging_config import logger_seguridad
 from src.modules.users.application.errors import (
     CredencialesInvalidas,
     TokenInvalido,
@@ -27,6 +28,8 @@ from src.modules.users.infrastructure.security import (
     refresh_expira_en,
     verify_pin,
 )
+
+log_seguridad = logger_seguridad()
 
 
 def _aware(dt: datetime | None) -> datetime | None:
@@ -100,6 +103,18 @@ def login(session: Session, username: str, pin: str, ip: str | None = None) -> d
             usuario_id=usuario.id, entidad="usuario", entidad_id=usuario.id,
             accion="login_fallido", ip=ip,
         )
+        # El `audit_log` deja el rastro legal; el log de seguridad es lo que
+        # dispara una alerta cuando alguien está probando credenciales.
+        log_seguridad.warning(
+            "Login fallido%s",
+            " — usuario bloqueado" if recien_bloqueado else "",
+            extra={
+                "usuario_id": str(usuario.id),
+                "ip": ip,
+                "intentos": usuario.intentos_fallidos,
+                "bloqueado": recien_bloqueado,
+            },
+        )
         if recien_bloqueado:
             raise UsuarioBloqueado("Usuario bloqueado por intentos fallidos")
         raise CredencialesInvalidas("Credenciales inválidas")
@@ -125,6 +140,11 @@ def refresh(session: Session, raw_token: str) -> dict:
     # Reuso de un token ya rotado/revocado: revoca toda la cadena.
     if rec.revocado:
         repo.revocar_sesion(rec.sesion_id)
+        # Señal fuerte de token robado: alguien usó una copia ya rotada.
+        log_seguridad.error(
+            "Reuso de refresh token; sesión revocada",
+            extra={"usuario_id": str(rec.usuario_id), "sesion_id": str(rec.sesion_id)},
+        )
         raise TokenInvalido("Refresh token reutilizado; sesión revocada")
 
     if _aware(rec.expira_en) <= datetime.now(UTC):

@@ -16,33 +16,42 @@ Registro de lo construido y lo pendiente. Actualizar en cada cambio relevante.
 | Modelado de base de datos completo (SQLAlchemy + Alembic) | 🔶 en curso 2026-07-25 | Bloque transversal + organización (11) + slice Venta núcleo (11) + slice Cobro/Comprobante/Caja (8) + slice auth/RBAC (7) + slice inventory core (3) — 40 tablas en total. BD de desarrollo corre en **Supabase** (Postgres gestionado, solo BD — sin su Auth/RLS, ver `docs/engineering/devops.md`); Docker local sigue disponible como alternativa. Resto por slice vertical. |
 | Módulo `users` (auth JWT + PIN + RBAC) | ✅ 2026-07-25 | Slice auth+CRUD implementado: 7 tablas RBAC (`rol`, `permiso`, `usuario_rol`, `rol_permiso`, `usuario_sucursal`, `refresh_token`, `audit_log`) + lockout en `usuario`. Login/refresh(rotativo+detección de reuso)/logout/me + CRUD admin de usuarios/roles/permisos/asignaciones. Argon2id, JWT, `require_permission` deny por defecto. `docs/security/authorization.md`. Restricciones JSONB por permiso: pendientes de aplicar (hoy solo chequeo por código). |
 | Migraciones Alembic iniciales | 🔶 en curso 2026-07-25 | 6 migraciones aplicadas a la BD dev (head `be914c92a94b`): transversal+org, slice Venta, cobro/caja, cliente opcional, slice auth/RBAC, slice inventory core (stock/movimiento/ajuste). |
-| Seeders (admin / PIN 123456, org base) | ✅ 2026-07-25 | `src/seeders/seed.py` (idempotente, prohibido en prod): Grupo Majambo + empresa + marca, matriz de roles/permisos semilla, `admin`/PIN `123456`. Correr: `python -m src.seeders.seed`. |
+| Seeders (admin / PIN 123456, org base) | ✅ 2026-07-27 | `src/seeders/seed.py` (idempotente, prohibido en prod): matriz de roles/permisos semilla, `admin`/PIN `123456` y la **organización real** del grupo — empresa Majambo EIRL (RUC 20450311520, Jr. Ramón Castilla 248 - Tarapoto, zona `amazonia_ley27037`), marca Charlie's Pizzas **licenciada** a la empresa (`licencia_marca`), sucursales `CH1` (Jr. Ramón Castilla 248) y `CH2` (Jr. Lamas 299) activas y alquiladas (RN-IMP-004), almacén central `WH1` (`sucursal_id` NULL). Requirió `almacen.direccion` (migración `e5a1c93b7d40`): el central no cuelga de ninguna sucursal y no había dónde guardar su ubicación. Correr: `python -m src.seeders.seed`. Diferido: almacenes de sucursal de CH1/CH2 (no pedidos; su mín./máx. por SKU depende de datos de operación inexistentes) y CRUD de organización por API — hoy empresa/sucursal/almacén solo se crean por seeder. |
 | Módulo `inventory` | 🔶 slice 1 ✅ 2026-07-25 | Catálogo (CRUD artículos/categorías/SKUs), stock por almacén (vía `movimiento_inventario` inmutable) y ajuste con segregación (`solicitar_ajuste` ≠ `aprobar_ajuste`, aprobador ≠ solicitante). Migración `be914c92a94b`. Diferido: lote/FEFO, reservas, conteo, transferencias, devolución, guía remisión, listeners de eventos. |
-| Módulo `purchases` | ⬜ | Proveedores, OC, recepción |
-| Módulo `sales` (PDV) | 🔶 slices 1-2 ✅ 2026-07-25 | Venta con correlativo+idempotencia → `sales.venta_confirmada` → inventory descuenta por receta (+merma+empaque); cobro con pagos parciales → `pagada`; anulación pre-pago repone stock; CRUD productos/medios de pago. **KDS** (slice 2): pantallas configurables por sucursal y categorías (`kds_pantalla`, migración `7672566bf189`), avance por ítem en `venta_item.estado_preparacion` (fuente única → todas las pantallas ven el avance real), tipos preparación/despacho, comanda imprimible con contador de reimpresiones, evento `sales.pedido_listo`, rol `cocinero`. Kiosk/Central de Pedidos = clientes del mismo contrato, no módulos. Diferido: ver Deuda técnica. |
-| Módulo `accounting` | ⬜ | |
-| Producción (fabricación) | ⬜ | Módulo futuro `production` |
+| Módulo `purchases` | 🔶 slice core ✅ 2026-07-25 | CRUD de proveedores (natural liga a `persona`, jurídico con RUC propio) y ciclo de OC tipo `insumo` (crear → emitir → recibir → anular), con idempotencia y umbral de aprobación configurable. `purchases.compra_recibida` → inventory suma stock y recalcula `costo_promedio`. Conformidad de comprobante (`purchases.dar_conformidad`) registra el `comprobante` recibido y dispara `purchases.comprobante_conforme` → cola de pago en `accounting`. Migración `4ff85f833b29` aplicada. Diferido: ver Deuda técnica. |
+| Módulo `sales` (PDV) | 🔶 slices 1-3 ✅ 2026-07-27 | Venta con correlativo+idempotencia → `sales.venta_confirmada` → inventory descuenta por receta (+merma+empaque); cobro con pagos parciales → `pagada`; anulación pre-pago repone stock; CRUD productos/medios de pago. **KDS** (slice 2): pantallas configurables por sucursal y categorías (`kds_pantalla`, migración `7672566bf189`), avance por ítem en `venta_item.estado_preparacion` (fuente única → todas las pantallas ven el avance real), tipos preparación/despacho, comanda imprimible con contador de reimpresiones, evento `sales.pedido_listo`, rol `cocinero`. Kiosk/Central de Pedidos = clientes del mismo contrato, no módulos. **Cumplimiento de pedido** (slice 3, 2026-07-27): `PROC-OPE-002` definido como UN proceso (área Operaciones) y su etapa de entrega implementada — `POST /sales/ventas/{id}/entrega` con permiso propio `sales.entregar_pedido` y rol `despachador`, idempotente, publica `sales.venta_entregada` (disparador de la encuesta de marketing, RN-COM-007). Diferido: ver Deuda técnica. |
+| Persona CRUD + lock optimista + matriz de aprobaciones + contrato público | ✅ 2026-07-25 | `POST/GET/PATCH /api/v1/personas` (sin Delete); `persona.version` con lock optimista (409 si desactualizada); `regla_aprobacion` (nuevo, `src/shared/`) reemplaza el umbral fijo de `purchases` por empresa, admin en `/api/v1/reglas-aprobacion`; primer contrato público de lectura cross-módulo (`sales.cliente` para marketing/comercial, `GET /api/v1/sales/clientes`). Migración `af8a246e2c25`. Ver detalle abajo. |
+| Módulo `accounting` | 🔶 slice core+tesorería ✅ 2026-07-25 | Libro contable núcleo: plan de cuentas (`cuenta_contable`), periodo (`periodo_contable`, abrir/cerrar), asiento manual (`asiento`/`asiento_linea`, cuadre RN-CTB-001, anulación por asiento inverso RN-CTB-002) y mapeo configurable evento→cuentas (`regla_asiento`) que alimenta la generación automática para 4 eventos operativos ya publicados en código (`purchases.oc_emitida`, `purchases.compra_recibida`, `sales.venta_confirmada`, `purchases.comprobante_conforme`). **Pago a proveedor** (PROC-CTB-003, `movimiento_dinero`): cola idempotente por comprobante (RN-CTB-008) → ejecutar con umbral configurable + permiso (RN-CTB-005) → asiento automático. Migraciones `5402d99333fa`+`cbf904a9fc1b` aplicadas. Diferido: ver Deuda técnica. |
+| Producción (fabricación) | 🔶 slice core ✅ 2026-07-25 | Orden de producción ad-hoc (crear → registrar consumo → completar con resultado de control de calidad) y costeo automático. Construido antes de tiempo a pedido del usuario — primera cocina real sigue planeada 2027. `receta.articulo_id` nuevo liga receta↔subreceta. Diferido: ver Deuda técnica. |
 | Solicitudes / picking / transporte | ⬜ | Módulos futuros `requests`, `logistics` |
-| RRHH: procesos y plantillas (reclutamiento, contratación, inducción) | ✅ 2026-07-19 | `docs/rrhh/`, 13 SOPs, 9 plantillas — ver detalle abajo. Módulo backend `rrhh` sigue pendiente |
+| Módulo `rrhh` | ✅ slice completo 2026-07-25 | Ciclo laboral completo: `trabajador` (con capa de aplicación que faltaba) + 12 entidades de §8b — `contrato_laboral` (borrador→firmado→finalizado), `postulante` (RN-PER-004), `socio`, `boleta_pago`/`liquidacion_bss` (idempotentes, RN-RRHH-001/003), `memorandum`/`amonestacion`/`acta`/`certificado_trabajo` (RN-RRHH-002/004/007), `solicitud_permiso` (RN-RRHH-005), `pacto_permanencia` (reembolso proporcional, RN-RRHH-006), `asistencia` (RN-RRHH-009, bloqueada para locación de servicios RN-PER-002). Migración `9e1b6a4c7d23`. Diferido: ver Deuda técnica. |
+| RRHH: procesos y plantillas (reclutamiento, contratación, inducción) | ✅ 2026-07-19 | `docs/rrhh/`, 13 SOPs, 9 plantillas — ver detalle abajo. |
 | Compras: procesos y plantillas (proveedores, cotización, OC, recepción, pago, caja chica, activos) | ✅ 2026-07-19 | `docs/compras/`, 11 SOPs, 6 plantillas — ver detalle abajo. Módulo backend `purchases` actualizado conforme al flujo |
 | Comercial: procesos y plantillas (precio/margen, promociones, mercado, metas, desempeño, capacitación) | ✅ 2026-07-19 | `docs/comercial/`, 9 SOPs, 5 plantillas — ver detalle abajo. Módulo backend `sales` ajustado (margen, vigencia de promoción) |
 | Almacén-Logística: procesos y plantillas (conteo, vencimientos/merma, transporte/transferencias) | ✅ 2026-07-19 | `docs/almacen-logistica/`, 8 SOPs, 6 plantillas — ver detalle abajo. Módulo backend `inventory` ajustado (lote, merma, ajuste solicitar/aprobar) |
-| Producción: procesos y plantillas (cronograma, calidad/no conformidad, inocuidad, inventario de cocina, soporte a I+D+i) | ✅ 2026-07-20 | `docs/produccion/`, 4 SOPs, 5 plantillas — ver detalle abajo. Spec a futuro: primera cocina de producción planeada 2027, hoy sin operación real. Módulo backend `production` nuevo (spec técnica, sin implementar) |
+| Producción: procesos y plantillas (cronograma, calidad/no conformidad, inocuidad, inventario de cocina, soporte a I+D+i) | ✅ 2026-07-20 | `docs/produccion/`, 4 SOPs, 5 plantillas — ver detalle abajo. Spec a futuro: primera cocina de producción planeada 2027, hoy sin operación real. Módulo backend `production` — slice core implementado 2026-07-25 |
 | Gerencia: gobierno + matriz de aprobaciones + presupuesto anual | ✅ 2026-07-22 | `docs/gerencia/`, política + perfil + 3 plantillas + 1 SOP (definición de presupuesto anual, PROC-GER-001) — ver detalle abajo. Área de autoridad/estrategia/control; sin módulo backend (RBAC + documentos) |
 | Marketing: procesos y plantillas (marca/naming, contenido, campañas, material en sucursal, agencias) | ✅ 2026-07-22 | `docs/marketing/`, 6 SOPs, 4 plantillas — ver detalle abajo. Módulo backend `marketing` nuevo (spec técnica); PROC-MKT-001 registrado. Resuelve el pendiente "módulo marketing README/contrato propio" |
 | Contabilidad: procesos y plantillas | ✅ 2026-07-24 | `docs/contabilidad/` (política + marco legal + perfil contador/tesorero), 3 SOPs nuevos (pago a proveedor PROC-CTB-003, conciliación bancaria PROC-CTB-004, arqueo sorpresa PROC-CTB-005), 4 plantillas — ver detalle abajo. Área = tesorería + finanzas + registro + auditoría interna en un solo responsable, supervisada por Gerencia (RN-CTB-004..009; control en dos niveles: Contabilidad audita a las operativas, Gerencia audita a Contabilidad). Quedan propuestos PROC-CTB-006..013 |
 | Mantenimiento, Sistemas/TI como áreas propias | ⬜ | Definidas como áreas del negocio (posible tercerización); documentación pendiente, desactivadas por ahora |
-| RRHH backend, supervisión, CRM, tesorería, activos, proyectos, BI, reportes | ⬜ | Módulos futuros |
-| Integración Nubefact | ⬜ | Adaptador en `src/shared/integrations/` |
+| Supervisión, CRM, tesorería, activos, proyectos, BI, reportes | ⬜ | Módulos futuros |
+| Integración de facturación electrónica (**Factiliza**) | 🔶 boleta/factura ✅ 2026-07-26 | **Reemplaza a Nubefact** (decisión del usuario). Adaptador en `src/shared/integrations/factiliza/`; cola Celery + servicio `worker`; migración `b3d7f21ac094`. Emite boleta/factura con IGV desglosado y exoneración de Amazonía (RN-IMP-001). Diferido: nota de crédito, PDF/XML/CDR, guía de remisión — ver Deuda técnica → sales. |
 | Integración Izipay | ⬜ | Proveedor decidido (ADR-003) |
 | Integraciones Google / Meta | ⬜ | |
 | Agentes IA para pedidos | ⬜ | |
 | Notificaciones | ⬜ | Celery + canales por definir |
 | Auditoría (audit_log) | ⬜ | Especificada en data-model |
-| App Android (15+) | ⬜ | Evaluar PWA vs nativo (ADR pendiente) |
-| Backups automáticos | ⬜ | |
-| Observabilidad (métricas, trazas, logs centralizados) | ⬜ | |
-| UX: menús, atajos, sidebars, dashboards | ⬜ | Definición pendiente con el usuario |
+| Endurecimiento de producción (rate limit, secretos, HTTPS, cabeceras) | 🔶 base ✅ 2026-07-26 | Rate limit por IP en login/refresh (Redis, fail-open), validación de config que aborta el arranque en `production` con valores de desarrollo, CORS + `TrustedHost` + cabeceras de seguridad + HSTS, `/docs` cerrado en producción, uvicorn `--proxy-headers`. Runbook de rotación de credenciales y custodia de `.env` en `docs/engineering/devops.md`. Pendiente: ver Deuda técnica → Seguridad. |
+| App Android (15+) | ⬜ | Evaluar PWA vs nativo (ADR pendiente) — debe hablar con el hub local de sucursal igual que web y PC, ver ADR-009 |
+| Modo offline del PDV — hub local de sucursal | ✅ fase 1 2026-07-26 · fase 2 2026-07-27 | ADR-009: hub local dedicado por sucursal (misma imagen del backend, Postgres propio), los 3 clientes (web/Android/PC) le hablan siempre al hub por LAN. **Fase 1**: `DEPLOYMENT_MODE=hub` + validación de config, detector de conectividad, `GET /health/sync`, `docker-compose.hub.yml`. **Fase 2 — motor de sync**: ciclo que **empuja y después jala** (`src/core/sync/motor.py`, proceso `python -m src.core.sync.runner`); `id` client-generado en `crear_venta`/`registrar_pago`/`registrar_movimiento` (el cambio previo que pedía la fase 1, sin migración); endpoints dedicados `GET /sync/pull` + `POST /sync/push` (permisos `sync.leer`/`sync.empujar`, rol `hub_sucursal`) porque los públicos no alcanzaban (no traen `pin_hash` ni los campos del catálogo, no son incrementales, y el push necesita conservar quién vendió y el número de orden); contrato declarativo por módulo (`application/sincronizacion.py`, 24 recursos) que el motor solo ensambla; tabla `sync_watermark` por recurso y dirección; `/health/sync` con avance y último error por recurso; alta de la cuenta de servicio con `python -m src.seeders.hub`. El hub NO empuja movimientos de inventario (el listener de la nube los regenera; duplicaría el consumo). 24 casos en `tests/test_sync_motor.py` sincronizando dos bases reales. Pendiente: ver Deuda técnica. |
+| Backups automáticos | ✅ 2026-07-26 | `python -m src.backups.backup`: dump `pg_dump --format=custom` → verificación del archivo (firma + tablas críticas) → restauración probada contra base desechable → copia a S3 (opcional) → purga con retención de 30 días que nunca borra la copia más reciente. **Diario** (antes se declaraba mensual e incremental). Cron del host, no Celery beat. Runbook en `docs/engineering/devops.md#backups`. Pendiente: alerta ante fallo, ver Deuda técnica. |
+| Dashboard gerencial mínimo | ✅ 2026-07-26 | `GET /api/v1/dashboard/resumen` (`src/core/dashboard_router.py`, permiso `dashboard.leer`): ventas del día (cantidad+total), stock bajo mínimo, cajas abiertas — agregador en `core`, nunca importa dominio de otro módulo (ADR-012). Requirió construir dos huecos que no existían: `sales` no tenía ningún listado de ventas, `accounting` tenía los modelos de caja (`apertura_caja`/`cierre_caja`/`arqueo`, migrados desde 2026-07-20) sin capa de aplicación. **Slice mínimo de caja** (`accounting.application.caja`): abrir/cerrar/arquear con **reconciliación real** (el cierre calcula `monto_esperado` desde los pagos en efectivo reales, vía contrato público de `sales`, no un número tipeado sin verificar). Primer frontend real: login por PIN + pantalla de dashboard en Next.js. Fuera de esta fase, a propósito: RN-POS-009..013 completas, relevo autenticado por PIN, máquina de estados de `custodia_efectivo` — ver Deuda técnica. |
+| Protección de datos personales (Ley 29733) | 🔶 ARCO técnico ✅ 2026-07-26 | `docs/security/proteccion-datos-personales.md`: qué datos trata el ERP y dónde viven (casi todo en `persona`, fuente única — RN-GEN-007), derechos ARCO, plazos de conservación, medidas de seguridad ya vigentes (referenciadas, no reconstruidas), proceso de brecha. Cancelación implementada como **anonimización irreversible** de `persona`, no `DELETE` — `POST /api/v1/personas/{id}/anonimizar`, permiso dedicado `personas.anonimizar`, migración `dad43729501d` (RN-PER-007, ADR-011). Acceso/Rectificación ya existían (`GET`/`PATCH /personas/{id}`). Pendiente de **acción del usuario, no de código**: registro del banco de datos ante la ANPD, aviso de privacidad público, confirmar plazos de retención con el contador/abogado, jurisdicción de transferencia internacional. Pendiente técnico: ver Deuda técnica. |
+| Contrato OpenAPI de la API | ✅ 2026-07-26 | `docs/architecture/openapi.json` exportado (`python -m src.core.openapi_export`) y verificado en CI — un endpoint que cambia sin regenerar el contrato falla el PR (ADR-010). `TAGS_METADATA` en `src/core/app.py` describe los 15 tags de la API; un tag nuevo sin descripción falla un test. De paso, corregidas dos afirmaciones falsas en `api-guidelines.md`: `idempotency_key` es campo del body, no header; las colecciones devuelven array plano, no `{items,total,page,page_size}` (nunca se implementó paginación). |
+| CI/CD | 🔶 CI + entrega ✅ 2026-07-26 | `ci.yml` gana tres verificaciones que no existían: cabeza única de Alembic (una doble falla en el despliegue, no en el merge que la crea), construcción de la imagen **y arranque real del contenedor** contra `/health`, y `pip-audit` informativo. `release.yml` publica la imagen en GHCR en cada push a `main` (tags `v*` → versión exacta). `docker-compose.prod.yml` nuevo: el compose existente es solo desarrollo y desplegarlo publicaría esa configuración. Dockerfile con usuario sin privilegios y `HEALTHCHECK`. El **despliegue sigue manual** y documentado hasta que exista el VPS (ADR-008). |
+| Chequeos de salud y alertas | ✅ 2026-07-26 | `src/core/health.py` + `health_router.py`: `/health` (liveness, sin dependencias), `/health/ready` (base de datos crítica → 503; Redis y cola degradan sin sacar de rotación) y `/health/backups` (503 pasadas 26 h — cubre el backup que nunca corrió, que no genera evento de error). El ERP expone estado; **un monitor externo alerta** (ADR-007): construir alertas dentro del servidor que se monitorea deja de avisar justo cuando ese servidor cae. Pendiente: contratar el monitor y dar de alta las sondas. |
+| Observabilidad (métricas, trazas, logs centralizados) | 🔶 logs + errores ✅ 2026-07-26 | `src/core/logging_config.py`: JSON en producción, tres flujos (`app`/`seguridad`/`auditoria`) derivados del nombre del logger, `request_id` por request (respeta `X-Request-ID` entrante, sale en la cabecera y en el cuerpo del error 500), redacción de PIN/tokens/`Authorization`. `src/core/sentry.py`: reporte de errores en `api`, `worker` (señal `celeryd_init`) y `backups`; sirve para Sentry o GlitchTip autoalojado, no-op sin DSN. Pendiente: métricas, trazas y colector de logs — ver Deuda técnica. |
+| UX: menús, buscadores, breadcrumbs, atajos, sidebars, dashboards | ⬜ | Definición pendiente con el usuario |
 | UX: breadcrumb por ruta de usuario (no jerárquico) + tooltip de ayuda por campo de formulario | ✅ spec 2026-07-26 | `docs/product/ui-ux.md` — breadcrumb crece con la navegación (patrón Odoo), navegación jerárquica va por menús desplegables; todo campo de formulario lleva hover explicando término/formato. Solo especificado |
 | UX: buscador contextual (nombre/insumo/exclusión, ranking por probabilidad) + dialog de venta sugerida (upsell) en carrito | ✅ spec 2026-07-26 | `docs/product/ui-ux.md` — buscador cruza `receta_item` para insumo/exclusión, lista ordenada por relevancia si no hay match único; al ir al carrito se sugieren productos de adición rápida, descartable. Solo especificado |
 | Branding (paleta, tipografías, tokens CSS) | ✅ 2026-07-04 | Brandboard aplicado — `docs/product/ui-ux.md` |
@@ -71,8 +80,16 @@ contiene, buscando su `[[ COMPLETAR ]]`):
   atención al cliente → supervisor (redacta solución) → comercial/gerencia
   (acciones reportadas); se almacena para mejora continua
   (`data-model.md` §6).
-- ⬜ Cumplimiento de pedido: ¿1 proceso o 2 (Producción/Cocina +
-  Despacho/Entrega)? Bloquea `venta_entregada`/`encuesta_enviada`.
+- ✅ 2026-07-27 Cumplimiento de pedido: **UN** proceso — `PROC-OPE-002`
+  (área Operaciones), con Preparación y Despacho/Entrega como etapas
+  internas, no dos procesos. Razones: un solo resultado (entra Orden de
+  Pedido, sale pedido entregado) sin artefacto de traspaso; la máquina de
+  estados ya implementada (`venta_item.estado_preparacion`) es una sola y
+  las pantallas KDS `preparacion`/`despacho` son vistas de ella; "Producción"
+  ya nombra la cocina de producción central (`PROC-PRD-001`, 2027) y
+  reusarlo rompía la nomenclatura. Desbloquea `sales.venta_entregada` y
+  `marketing.encuesta_enviada`; se separa como v2.0 si el reparto llega a
+  tener ruteo/flota/liquidación propios.
 - ✅ 2026-07-22 Módulo `marketing`: README/contrato propio —
   `src/modules/marketing/README.md` + área documentada en `docs/marketing/`.
 - ✅ 2026-07-24 Área Contabilidad documentada — `docs/contabilidad/`
@@ -101,6 +118,16 @@ contiene, buscando su `[[ COMPLETAR ]]`):
 - ⬜ Si Grupo Majambo tiene tema propio distinto al de Provecho, o si
   Provecho es también el tema por defecto de Grupo Majambo
   (`docs/product/ui-ux.md`).
+- ⬜ **Pendiente del usuario para desplegar el endurecimiento de producción**
+  (2026-07-26, ver ROADMAP → Deuda técnica → Seguridad): no bloquea seguir
+  desarrollando, solo hace falta al desplegar de verdad.
+  1. Dominio real de producción → fijar `ALLOWED_HOSTS` y `CORS_ORIGINS` en
+     el `.env` del servidor.
+  2. Generar el `JWT_SECRET` real: `python -c "import secrets;
+     print(secrets.token_urlsafe(48))"` — nunca el placeholder `change-me`.
+  3. Cuando exista el VPS: Claude escribe el `nginx.conf` concreto (TLS,
+     `proxy_pass`, `X-Forwarded-For`/`X-Forwarded-Proto`,
+     `FORWARDED_ALLOW_IPS` con la IP real del proxy).
 
 ## Deuda técnica pendiente (backlog)
 
@@ -118,11 +145,219 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   `docs/product/ui-ux.md`): resolver de tema por marca/sucursal para
   PDV/Kiosk, preferencias de accesibilidad (paleta daltonismo, tamaño de
   fuente) persistidas en el perfil de `usuario`. Sin implementar.
+- ✅ 2026-07-25 **Lock optimista en `persona`** (`VersionedMixin`,
+  `src/core/model_base.py`): `PATCH /api/v1/personas/{id}` exige `version`
+  vigente, 409 si está desactualizada. Aplicado solo a `persona` por
+  ahora — extender a otras entidades compartidas si aparecen más choques
+  reales de edición concurrente.
+- ⬜ **Contrato de lectura `purchases` ↔ `inventory.solicitud_insumos`**
+  ("qué usuarios/sucursales piden más productos"): bloqueado hasta que
+  `solicitud_insumos` exista en código (deuda de `inventory`, ver abajo).
+  El patrón de contrato público ya está establecido (`sales.cliente`, ver
+  `docs/architecture/events.md`) — replicar cuando `solicitud_insumos`
+  se implemente.
+
+### Seguridad (tras el endurecimiento base de 2026-07-26)
+- ⬜ **Rate limit global**, no solo en auth: el resto de la API sigue sin
+  límite. Se resuelve mejor en nginx/Caddy (`limit_req`) que en la
+  aplicación — decidir al configurar el servidor de producción.
+- ⬜ **Ventana deslizante en el rate limit**: hoy es ventana fija; un pico
+  justo en el borde deja pasar hasta el doble del límite. Solo vale la pena
+  si aparece abuso real.
+- ⬜ **Rate limit por usuario además de por IP**: una IP compartida (la
+  sucursal entera sale por la misma) puede agotar el límite de todos.
+  Evaluar cuando haya varias cajas por local.
+- ⬜ **Content-Security-Policy**: falta definirla junto con el frontend
+  (hoy solo hay cabeceras que no dependen del contenido).
+- ⬜ **Escaneo de dependencias** (`pip-audit`/Dependabot) en CI.
+- ⬜ **Verificación de firma en webhooks entrantes** (Izipay, Meta):
+  documentada en `security.md`, sin implementar — llega con las
+  integraciones.
+
+### Dashboard y caja (tras la implementación de 2026-07-26 — ADR-012)
+- ⬜ **Hallazgo real de la verificación en navegador**: `src/seeders/seed.py`
+  no crea ninguna `Sucursal` ni asigna `admin` a una — `build_claims`
+  deriva `empresa_id` desde las sucursales del usuario, así que en una
+  instalación recién sembrada el dashboard (y cualquier otra pantalla que
+  dependa de `empresa_id` del JWT) falla con "sin empresa asignada" hasta
+  que alguien asigna una sucursal a mano. No es un bug de esta fase — ya
+  existía — pero recién se hizo visible al construir la primera pantalla
+  que de verdad depende de ese claim. Corregirlo en el seeder base (crear
+  al menos una sucursal semilla y asignar `admin`) queda pendiente.
+- ⬜ **Ciclo de caja completo**: RN-POS-009 a RN-POS-013 (verificación de
+  series de POS, denominaciones obligatorias por billete/moneda), relevo
+  autenticado por ambas partes con PIN propio (hoy solo se registra
+  `relevo_encargado_id`, sin exigir su sesión), `custodia_efectivo` como
+  máquina de estados real (cajero→supervisor→contabilidad).
+- ⬜ **Enlace caja↔venta**: no bloquea cobrar sin caja abierta — deuda ya
+  declarada en el slice de `sales`, sigue sin resolverse.
+- ⬜ **`rechazar_pago` / reapertura de cierre**: si un cierre queda
+  `con_irregularidad` no hay flujo de corrección, solo el registro.
+- ⬜ **`GET /ventas` genérico** (listado paginado con filtros): el
+  dashboard resuelve su propio agregado (`resumen_ventas_del_dia`); un
+  listado general de ventas para otros usos queda pendiente.
+- ⬜ **Caché/paginación del agregador**: cada llamada a
+  `/dashboard/resumen` recalcula todo en vivo — aceptable al volumen de hoy,
+  revisar si empieza a pesar.
+- ⬜ **Más indicadores**: el dashboard de hoy es mínimo (3 tarjetas). Serie
+  de ventas por hora, ranking de productos, alertas de KDS demorado, etc.
+  quedan para iteraciones futuras.
+- ⬜ **`empresa_id` seguirá viniendo por query param** en `/dashboard/resumen`
+  hasta que se resuelva ADR-004 (tenant desde el JWT).
+
+### Protección de datos personales (tras la implementación de 2026-07-26 — ADR-011)
+- ⬜ **Borrado del `archivo` (CV) en `postulante`**: anonimizar la persona
+  no toca el PDF en S3 — el módulo de archivos no tiene ni siquiera un
+  flujo de borrado propio hoy.
+- ⬜ **Purga de `audit_log`/logs por antigüedad**: sin retención automática
+  todavía.
+- ⬜ **Cifrado de backups en reposo**: el dump contiene PII en claro (ya
+  declarado en la deuda de Backups, repetido acá por relevancia).
+- ⬜ **Proceso y plantilla formal de notificación de brecha**: hoy es una
+  lista de pasos en prosa, sin plantilla ni plazo confirmado con asesoría
+  legal.
+- ⬜ **`usuario.email` no se anonimiza** junto con `persona.email` — son
+  campos independientes; si hace falta, es una acción aparte.
+- ⬜ **Oposición** (cuarto derecho ARCO): sin contraparte técnica porque no
+  existe procesamiento de marketing automatizado todavía. Construir cuando
+  `marketing` tenga código real.
+- ⬜ **Auto-servicio del titular**: hoy ARCO se ejerce a través del
+  administrador (permiso `personas.anonimizar`/`users.gestionar`), no por
+  un portal donde el propio titular pida su acceso/cancelación.
+
+### Contrato de API (tras la implementación de 2026-07-26 — ADR-010)
+- ⬜ **Paginación real** (`{items, total, page, page_size}`): ningún
+  endpoint de listado la implementa hoy — se documentó honestamente en vez
+  de fingir. Construir cuando una colección lo justifique por volumen
+  (candidatas: histórico de ventas si se expone, `audit_log`).
+- ⬜ **`responses={...}` por endpoint**: documentar en OpenAPI qué código de
+  error devuelve cada operación específica (hoy es una convención global en
+  `api-guidelines.md`, no anotada endpoint por endpoint). Mejora real pero
+  mecánica sobre ~100 rutas ya en producción — incremental, al tocar cada
+  router por otra razón.
+- ⬜ **Ejemplos de request/response** en los schemas Pydantic
+  (`json_schema_extra`): el contrato exportado no trae ejemplos, solo tipos.
+- ⬜ **Publicar el contrato fuera del repo** (portal de API) si aparece un
+  consumidor externo real que lo pida — descartado por ahora en ADR-010.
+
+### Modo offline del PDV (tras la fase 2 de 2026-07-27 — ADR-009)
+- ✅ **Cambio previo a la fase 2** (2026-07-27): `crear_venta`,
+  `registrar_pago` y `registrar_movimiento` aceptan `id` opcional
+  client-generado; sin migración, como estaba previsto.
+- ✅ **Motor de sync real** (2026-07-27): push→pull por ciclo, contrato
+  declarativo por módulo, watermark por recurso, runner en su propio
+  contenedor.
+- ✅ **Cuenta de servicio por sucursal** (2026-07-27): rol `hub_sucursal`
+  en el seeder y alta con `python -m src.seeders.hub`.
+- ⬜ **Un ítem que la nube rechaza frena su recurso hasta que alguien lo
+  mire**: es la política elegida (perder una venta en silencio es peor),
+  pero hoy el único aviso es `ultimo_error` en `/health/sync`. Falta que el
+  monitor externo alerte sobre eso, o una bandeja de ítems en conflicto.
+- ⬜ **El borde del watermark se vuelve a bajar en cada ciclo**: el pull
+  usa `campo_marca >= desde` para no perder nunca una fila escrita en el
+  mismo instante que la marca, y `now()` en Postgres es el reloj de la
+  transacción — así que un catálogo sembrado de una sola vez y nunca
+  tocado viaja entero en cada ciclo. Con el tamaño de un catálogo de
+  restaurante son cientos de KB por minuto; si el enlace de algún local lo
+  siente, la salida es paginar por cursor compuesto `(marca, pk)`.
+- ⬜ **Nada alerta si un hub deja de sincronizar**: `/health/sync` expone
+  `ultimo_ok` por recurso, pero no hay nadie mirándolo. Mismo pendiente que
+  la alerta de backups.
+- ⬜ **`venta_item.estado_preparacion` no viaja a la nube**: el avance de
+  KDS es local al local (y sus ítems no conservan `id` entre lados). Si
+  alguna vez se quieren tiempos de cocina consolidados por grupo, hay que
+  resolverlo aparte.
+- ⬜ **`cliente` no se replica**: una venta offline es anónima o con datos
+  escritos a mano; vender a cliente registrado exige estar en línea.
+- ⬜ **`receta`/`receta_item` viajan sin filtro de tenant**: no tienen
+  columna de empresa y acotarlas exigiría cruzar `producto_comercial`
+  (dominio de `sales`) desde `inventory`. Aceptable mientras el grupo opere
+  empresas que pueden verse entre sí; si eso cambia, `receta` necesita su
+  columna de tenant antes que este sync.
+- ⬜ **Descubrimiento del hub en la LAN** (mDNS `sucursal.local` o IP fija
+  configurada por dispositivo): decisión de cliente, no resuelta en el
+  backend.
+- ⬜ **Redundancia del hub**: si el Raspberry Pi mismo se cae, la sucursal
+  pierde el PDV entero — no hay hub de respaldo. Aceptado como riesgo por
+  ahora (ADR-009); mitigación futura: imagen lista para flashear en un
+  repuesto.
+- ⬜ **Ningún frontend construido todavía**: web, Android y PC son proyectos
+  aparte, ahora con contrato de arquitectura para construir contra él.
+- ⬜ **Migraciones en cada hub**: un hub offline por días necesita
+  `alembic upgrade head` local antes de sincronizar contra un esquema de
+  nube ya migrado — mismo runbook que la nube (ADR-008), sin automatizar
+  todavía por sucursal.
+
+### CI/CD (tras la implementación de 2026-07-26)
+- ⬜ **Job de despliegue**: hoy el despliegue es manual y documentado. Se
+  escribe cuando exista el VPS — automatizar por SSH contra una máquina que
+  no existe da automatización no probada (ADR-008).
+- ⬜ **Imagen de producción del frontend**: su `Dockerfile` sigue siendo de
+  desarrollo (`npm run dev`), sin build de producción ni multi-stage. Por eso
+  `release.yml` publica solo la imagen del backend.
+- ⬜ **`pip-audit` bloqueante**: hoy es informativo (`|| true`) para que un
+  aviso en una dependencia transitiva no frene un arreglo urgente en caja.
+  Pasar a bloqueante cuando el equipo tenga rutina de revisión.
+- ⬜ **Escaneo de la imagen** (Trivy/Grype) y firma del artefacto: el
+  contenido de la imagen base no se audita todavía.
+- ⬜ **Entorno de staging**: hoy se saltaría de CI a producción directo.
+- ⬜ **Migraciones con vuelta atrás probada**: `alembic downgrade` existe por
+  archivo pero nunca se ejercita; un despliegue fallido no tiene camino de
+  regreso verificado.
+
+### Observabilidad y salud (tras las implementaciones de 2026-07-26)
+- ⬜ **Elegir proveedor y cargar `SENTRY_DSN`**: el código está listo pero
+  sin DSN no reporta nada. Decidir Sentry SaaS (plan gratis) vs GlitchTip
+  autoalojado en el mismo VPS — el código es el mismo para ambos (ADR-006).
+- ⬜ **Contratar el monitor externo** y darle de alta las tres sondas
+  (`/health` 1 min, `/health/ready` 5 min, `/health/backups` 1 h). Sin
+  monitor, los endpoints no alertan a nadie: el ERP expone, el monitor avisa
+  (ADR-007).
+- ⬜ **Colector de logs**: hoy el JSON sale a stdout y queda en `docker logs`
+  / journald. Falta enviarlo a algún lado consultable (Loki, o el propio
+  Sentry para el flujo de errores).
+- ⬜ **Métricas** (CPU, memoria, latencia, disponibilidad) y **trazas de
+  rendimiento**: `SENTRY_TRACES_SAMPLE_RATE` está en 0. Subirlo cuando haya
+  tráfico real que valga la pena perfilar.
+- ✅ 2026-07-26 **Health check profundo**: `/health/ready` comprueba base de
+  datos, Redis y profundidad de la cola; `/health/backups` comprueba
+  frescura. Liveness quedó separado y sin dependencias a propósito.
+- ⬜ **Salud del worker**: se infiere de la cola (si crece, el worker murió),
+  no se pregunta directo. Suficiente por ahora; un `celery inspect ping` es
+  caro para un endpoint que se sondea cada minuto.
+- ⬜ **Handler de listener que revienta**: `EventBus.publish` corre los
+  handlers en línea; si uno lanza, arrastra al publicador (una venta podría
+  fallar por un listener contable). Evaluar aislar cada handler y reportar
+  el fallo sin tumbar la operación.
+- ⬜ **Flujo `auditoria` sin usuarios**: el `audit_log` va a base de datos
+  pero no emite al log estructurado; el flujo está definido y vacío.
+
+### Backups (tras la implementación de 2026-07-26)
+- ✅ 2026-07-26 **Alerta ante fallo**: el comando reporta a Sentry
+  (`iniciar_sentry("backups")` + `reportar`) cuando falla, y
+  `GET /health/backups` devuelve 503 cuando el último backup pasó las 26 h —
+  que cubre el caso traicionero, el backup que **nunca corrió** y por eso no
+  genera ningún evento de error. Falta solo dar de alta la sonda en el
+  monitor externo (ver Observabilidad y salud).
+- ⬜ **Restauración probada sin base desechable**: hoy `BACKUP_VERIFY_DATABASE_URL`
+  es opcional y, si falta, solo se valida el archivo. Levantar la base de
+  verificación en el servidor de producción para que la prueba real corra
+  siempre (al menos semanal).
+- ⬜ **Copia on-premise**: `security.md` declara redundancia on-premise +
+  nube; hoy están el disco del servidor y S3 (ambos "nube" si el servidor es
+  un VPS). Falta definir dónde vive la copia dentro de la empresa.
+- ⬜ **Backup de archivos de S3** (`archivo`): solo se respalda Postgres.
+  Cuando el módulo de archivos exista, sus objetos también necesitan copia.
+- ⬜ **Cifrado del dump en reposo**: el archivo contiene datos personales de
+  trabajadores y clientes (Ley 29733). Hoy va en claro al disco y al bucket.
 
 ### Módulo inventory (slices siguientes)
 - ✅ 2026-07-25 **Listener `sales.venta_confirmada`** → consumo por receta
   (+merma % + empaque por modalidad) y `sales.venta_anulada` → reposición.
-  Pendiente el de `purchases.compra_recibida` (slice Compras).
+- ✅ 2026-07-25 **Listener `purchases.compra_recibida`** → suma stock en el
+  almacén destino y recalcula `articulo.costo_promedio` (promedio
+  ponderado solo contra el stock del almacén que recibe — deuda si
+  `compra_directa` multi-almacén se vuelve frecuente, ver módulo purchases).
 - ⬜ **Consumo omitido por configuración**: si falta almacén/SKU o el stock
   teórico no alcanza, el listener loguea y omite (la venta nunca se
   bloquea) — falta superficie de alerta/reporte de esas omisiones.
@@ -148,9 +383,25 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
 - ⬜ **Precio server-side** (`lista_precio`/`precio`/`promocion`): hoy el
   PDV manda `precio_unitario` en el request. RN-COM: el precio lo fija el
   sistema por sucursal/canal.
-- ⬜ **Comprobante** (boleta/factura vía Nubefact) — venta `pagada` →
-  `facturada`; series por `punto_venta`.
-- ⬜ **Nota de crédito** (anulación post-pago).
+- ✅ 2026-07-26 **Comprobante** (boleta/factura vía **Factiliza**) — venta
+  `pagada` → `facturada`; series por `punto_venta`; correlativo por
+  (empresa, serie); cola Celery con reintentos. Migración `b3d7f21ac094`.
+- ⬜ **Nota de crédito** (anulación post-pago): endpoint `/note/send` de
+  Factiliza ya relevado (requiere `afectado_Tipo_Doc`/`afectado_Num_Doc` +
+  `motivo_Cod` del catálogo 09). Bloqueado por la decisión de flujo de
+  anulación post-pago, no por la integración.
+- ⬜ **Descarga de PDF / XML / CDR** del comprobante emitido
+  (`/invoice/pdf|xml|cdr`): hoy se guarda el `hash` y la respuesta cruda,
+  pero el cliente no puede bajarse su representación impresa.
+- ⬜ **Guía de remisión electrónica** (`/despatch-*` de Factiliza) —
+  se cruza con `guia_remision`, deuda de `inventory`.
+- ⬜ **Comprobante sin correlativo reservado**: si Factiliza rechaza, el
+  correlativo queda consumido por una fila `rechazado`. SUNAT admite
+  huecos, pero conviene revisar si el negocio quiere reusarlo.
+- ⬜ **Barrido de comprobantes pendientes**: `ComprobanteRepo.pendientes`
+  ya existe pero nadie la llama — falta el periódico (Celery beat) que
+  recoja los que quedaron sin encolar (ej. emitidos cuando aún no había
+  `FACTILIZA_TOKEN`).
 - ⬜ **Webhook de pasarela** (Izipay): hoy el pago nace `confirmado`
   (PDV presencial); pago online requiere estado `pendiente` + confirmación.
 - ⬜ **Enlace con caja** (`apertura_caja`/`cierre_caja` de accounting):
@@ -189,10 +440,173 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   automática al confirmar venta (hoy es bajo demanda).
 - ⬜ **KDS tiempos**: alertas por pedido demorado (umbral por pantalla) y
   métricas de tiempo de preparación (base: `venta_item.updated_at`).
-- ⬜ **Cumplimiento de pedido**: `estado_preparacion` cubre cocina; la
-  relación con el proceso "cumplimiento de pedido" (¿1 o 2 procesos?,
-  pendiente de decisión arriba) puede agregar estados de despacho/entrega
-  a domicilio cuando se defina.
+- 🔶 **Cumplimiento de pedido** (`PROC-OPE-002`, definido 2026-07-27):
+  preparación + entrega implementadas (`POST /sales/ventas/{id}/entrega`
+  → `sales.venta_entregada`). Falta la **rama delivery con trazabilidad**:
+  entidad `entrega` especificada en `data-model.md` §6 (repartidor propio
+  vs. plataforma externa, hora de salida, resultado `entregado`/`fallido`
+  con motivo — RN-CUP-007/008, evidencia). Hoy una entrega fallida no se
+  puede registrar: solo se marca el pedido entregado o no se marca nada.
+- ⬜ **Plazo de espera de takeout no recogido** (RN-CUP-011): la regla
+  existe, el plazo por sucursal no está configurado ni modelado.
+
+### Módulo purchases (slices siguientes)
+- ✅ 2026-07-25 **Migración Alembic** `4ff85f833b29` (proveedor,
+  orden_compra, orden_compra_item, recepcion_compra, recepcion_item)
+  aplicada a la BD dev (Supabase).
+- ✅ 2026-07-25 **Conformidad de comprobante** (`application/comprobantes.py`,
+  permiso `purchases.dar_conformidad`): crea el `comprobante` recibido
+  (transversal, `shared`), lo liga a la última `recepcion_compra` de la OC
+  y publica `purchases.comprobante_conforme` — `accounting` encola el pago
+  (ver slice pago a proveedor abajo).
+- ⬜ **`cotizacion`**: hoy toda OC tipo `insumo` emite sin cotización
+  comparativa (el camino "simplificado" de proveedor preferente es el
+  único implementado). Falta el flujo normal (proveedor regular) con
+  cotización de respaldo.
+- ⬜ **OC tipo `activo` + `requerimiento_activo`**: doble aprobación
+  (área + gerencia) y mínimo 2 cotizaciones vinculadas antes de emitir.
+  Hoy el tipo está rechazado explícitamente en la capa de aplicación.
+- ⬜ **`compra_directa` + caja chica** (`caja_chica_compras`,
+  `caja_chica_movimiento`, `rendicion_caja_chica`): compra sin OC a
+  proveedor informal, con comprobante obligatorio y rendición semanal
+  conciliada por `accounting`.
+- ⬜ **`evaluacion_proveedor`** automática (cumplimiento de plazo,
+  conformidad, variación de precio) recalculada en cada recepción.
+- ⬜ **`orden_compra` no queda marcada como pagada**: `accounting.pago_ejecutado`
+  se publica pero `purchases` no lo escucha; `orden_compra.estado` no tiene
+  un valor para "pagada" todavía (RN-CMP-014 vive hoy solo del lado de
+  `accounting`).
+- ⬜ **Listener `inventory.devolucion_a_proveedor`**: gestionar reclamo/
+  nota de crédito con el proveedor (bloqueado por `devolucion` en
+  inventory, ver arriba).
+
+### Módulo production (slices siguientes)
+- ✅ 2026-07-25 **Migración Alembic** `f78501175fba` (orden_produccion,
+  consumo_produccion_item, receta.articulo_id) aplicada a la BD dev
+  (Supabase).
+- ⬜ **`plan_produccion`** (cronograma fijo por tipo de receta/turno,
+  evita contaminación cruzada): hoy toda orden se crea ad-hoc, sin plan.
+- ⬜ **`checklist_inocuidad_turno`**: bioseguridad, superficies, equipos
+  de frío (JSONB), indicio de plaga — bloquea la cocina si algo falla
+  (RN-CDP-005), igual criterio que falla de frío en apertura de sucursal.
+- ⬜ **`reporte_produccion`** consolidado automático al cierre de jornada
+  (RN-DOC-010), visado por el jefe de cocina, no redactado a mano.
+- ⬜ **`reporte_escalamiento` real**: hoy `production.no_conformidad_detectada`
+  se publica pero nadie lo consume — falta la entidad (vive en `shared`)
+  y quién la genera/resuelve.
+- ⬜ **Merma → `accounting`**: `no_conforme_desechado` registra
+  `merma_cantidad`/`merma_motivo` en la orden pero no dispara
+  `inventory.merma_registrada` (bloqueado por `stock_merma`, deuda de
+  inventory) — sin ese evento, el asiento contable de la merma no llega.
+  Mismo bloqueo para el costeo por lote (ver siguiente punto).
+  Reproceso (`no_conforme_reprocesado`) correctamente no genera merma ni
+  asiento (RN-PRD — solo detalle en el reporte de escalamiento).
+- ⬜ **Lote/trazabilidad del producto terminado**: el ingreso a stock por
+  `orden_completada` no genera `lote` (bloqueado por lote/FEFO, deuda de
+  inventory) — sin eso no hay manipulador/envasador/variables de proceso
+  trazables por lote (RN-PRD).
+- ⬜ **Subrecetas anidadas**: una orden que consume otra subreceta (con su
+  propia orden de producción) no está resuelta — hoy `registrar_consumo`
+  espera insumos ya disponibles en stock.
+- ⬜ **Conteo cíclico del almacén de producción**: mismo esquema que
+  `inventory` en Almacén Central (bloqueado por conteo, deuda de
+  inventory).
+- ⬜ **Segregación quien crea vs. quien completa la orden**: hoy
+  `production.crear`/`production.completar` son permisos distintos pero
+  nada impide que el mismo usuario tenga ambos y haga las dos acciones
+  (a diferencia de `inventory.ajuste`, que sí exige aprobador≠solicitante) —
+  evaluar si el negocio lo requiere para producción.
+
+### Módulo accounting (slices siguientes)
+- ✅ 2026-07-25 **Pago a proveedor (PROC-CTB-003)**: migración `cbf904a9fc1b`
+  (`movimiento_dinero`). `purchases.comprobante_conforme` encola
+  (`registrar_pago`, idempotente por `comprobante_id` RN-CTB-008);
+  `ejecutar_pago` exige `accounting.pago_gestionar` + umbral vía
+  `regla_aprobacion` (código `pago_umbral`, RN-CTB-005, `accounting.pago_aprobar`
+  sobre el umbral) y genera asiento vía `regla_asiento`
+  (`accounting.pago_ejecutado`); `rechazar_pago` cierra sin ejecutar.
+  Eventos `accounting.pago_ejecutado`/`pago_requiere_aprobacion` ya se
+  publican, pero sin consumidor todavía (ver pendiente de `purchases`
+  arriba y de `users`/alertas abajo).
+- ⬜ **Resto de eventos → asiento automático**: `sales.pago_registrado`,
+  `sales.comprobante_emitido`, `purchases.caja_chica_rendida`,
+  `inventory.transferencia_recibida`, `inventory.merma_registrada`,
+  `inventory.ajuste_fuera_margen` están documentados en `events.md` pero
+  sus módulos de origen aún no los publican en código (o, en el caso de
+  `sales`, el evento real ya publicado se llama `sales.venta_pagada`, no
+  `sales.pago_registrado` — desalineación de nombre entre spec y código,
+  revisar). Cuando existan, agregar su extractor de monto/empresa en
+  `accounting/application/listeners.py`.
+- ⬜ **Detracción SPOT sin cuenta propia**: `movimiento_dinero.monto_detraccion`
+  se calcula (RN-IMP-003) pero el asiento de `pago_ejecutado` no la
+  desglosa — el debe/haber usa el monto total, no separa la cuenta de
+  detracciones del banco/caja. Requiere ampliar `regla_asiento` a N líneas
+  (hoy es siempre 1 debe/1 haber).
+- ⬜ **`accounting.pago_ejecutado`/`pago_requiere_aprobacion` sin
+  consumidor real**: `events.md` documenta que `purchases` marca la OC
+  pagada y que `users` alerta a Gerencia — ninguno de los dos escucha
+  todavía.
+- ⬜ **`rechazar_pago` no libera el comprobante**: el único
+  `movimiento_dinero` por `comprobante_id` (unique) queda en `rechazado`
+  para siempre; reintentar el pago del mismo comprobante requiere
+  intervención manual (borrar/reabrir la fila) — evaluar si el negocio
+  necesita un caso de uso de reapertura.
+- ✅ 2026-07-26 **Arqueo backend (PROC-CTB-005)**: `application/caja.py::registrar_arqueo`
+  + `POST /accounting/arqueos`, publica `accounting.arqueo_registrado`
+  (slice mínimo, ver ADR-012 — sin visado de Gerencia ni plantilla propia).
+- ⬜ **Conciliación bancaria (PROC-CTB-004)**: sin modelo ni caso de uso.
+  RN-CTB-006 (cierre de periodo exige conciliación visada) no se valida
+  todavía — `cerrar_periodo` hoy no lo comprueba. Bloquea implementar
+  rigurosamente RN-CTB-006.
+- ✅ 2026-07-26 **Ciclo de caja → eventos**: `apertura_caja`/`cierre_caja`/
+  `arqueo` (PROC-CTB-001/002/005) ya tienen capa de aplicación
+  (`accounting.application.caja`, ver ADR-012) y publican
+  `accounting.apertura_caja_registrada`/`cierre_caja_registrado`/
+  `cierre_caja_irregular`/`arqueo_registrado`. **No generan asiento
+  contable todavía** (sin listener que consuma esos eventos hacia
+  `regla_asiento`) — eso sigue pendiente. Tampoco incluye RN-POS-009..013
+  completas ni la máquina de estados de `custodia_efectivo` — ver Deuda
+  técnica → Dashboard y caja.
+- ⬜ **Activo fijo/depreciación y flujo de caja** (PROC-CTB-007/010,
+  propuestos): sin modelar, dependen de que exista el módulo de activos.
+- ⬜ **`declaracion_itan`**: entidad documentada en data-model §8, sin
+  slice propio (depende del ciclo tributario anual, RN-IMP-006).
+- ⬜ **`regla_asiento` de una sola línea debe/haber**: el mapeo actual
+  genera exactamente 2 líneas por evento (una cuenta debe, una haber) —
+  suficiente para provisión/recepción/venta simples; un asiento con más de
+  2 líneas (ej. IGV desglosado) requiere asiento manual o ampliar el mapeo.
+
+### Módulo rrhh (slice completo — deuda declarada)
+- ✅ 2026-07-25 **Ciclo laboral completo**: `trabajador` (capa de aplicación
+  que faltaba desde el slice de venta) + `contrato_laboral`, `postulante`,
+  `socio`, `boleta_pago`, `liquidacion_bss`, `memorandum`, `amonestacion`,
+  `acta`, `certificado_trabajo`, `solicitud_permiso`, `pacto_permanencia`,
+  `asistencia`. Migración `9e1b6a4c7d23`.
+- ⬜ **`contrato`/`solicitud` transversales**: `contrato_laboral` y
+  `solicitud_permiso` se modelaron directo en `rrhh` (sin precedente de
+  entidad genérica en código todavía) — mismo diferimiento que `purchases`
+  hizo con `cotizacion`. Si otro módulo necesita `contrato`/`solicitud`
+  genérico, extraer entidad transversal en `src/shared/` y migrar ambos.
+- ⬜ **Eventos `rrhh.*` sin consumidor**: `trabajador_cesado`,
+  `contrato_laboral_firmado`, `boleta_pago_emitida`, `liquidacion_bss_pagada`,
+  `solicitud_permiso_aprobada`, `amonestacion_emitida` se publican pero
+  nadie escucha todavía. Candidatos: `accounting` podría generar asiento al
+  escuchar `boleta_pago_emitida`/`liquidacion_bss_pagada` (mismo patrón que
+  `purchases.compra_recibida`); `users` podría desactivar el `usuario`
+  ligado al escuchar `trabajador_cesado`.
+- ⬜ **RN-RRHH-007 (visado de abogado) y RN-CTR-002 sin enforcement**: las
+  cartas/actas se generan desde plantilla + datos del ERP, pero no hay
+  entidad `plantilla` ni flag de "visado" — hoy es proceso manual fuera del
+  ERP.
+- ⬜ **Convocatoria/perfil de puesto sin modelar**: RN-RRHH-013 (no publicar
+  convocatoria sin perfil aprobado) es hoy proceso documental
+  (`docs/rrhh/perfiles/`), no hay tabla `convocatoria` — `postulante` nace
+  suelto, sin FK a una convocatoria.
+- ⬜ **Uniforme/EPP (RN-RRHH-014/015)** y **parentesco/relaciones
+  (RN-RRHH-016/017)**: sin modelo — hoy son controles manuales/SOP.
+- ⬜ **`boleta_pago`/`liquidacion_bss` sin cálculo automático de PLAME**: la
+  API recibe `ingresos`/`descuentos`/montos ya calculados (por el contador
+  externo) — no hay motor de cálculo de renta 5ta/ONP/AFP/EsSalud en el ERP.
 
 ## Orden sugerido de desarrollo
 
@@ -248,6 +662,8 @@ empaquetado, despacho y entrega al cliente NO son Venta — se retiraron de
 en esos mismos archivos (no se borró contenido, se reetiquetó). Pendiente
 del usuario: si eso es UN proceso ("Cumplimiento de pedido") o DOS
 (Producción/Cocina + Despacho/Entrega) — dijo "defino después".
+**Resuelto 2026-07-27**: UN proceso, `PROC-OPE-002` — ver la sección
+"Cumplimiento de pedido — PROC-OPE-002" abajo.
 
 **Relato detallado de los 3 canales (2026-07-14, mismo día)** — el usuario
 narró la experiencia real de venta en Web, Central de Pedidos y Sucursal,
@@ -936,6 +1352,60 @@ Tras revisar el primer borrador de Marketing, el usuario corrigió 3 cosas:
    "umbral de presupuesto de campaña" por el marco de presupuesto anual
    (los montos/límites por área siguen `[[ COMPLETAR ]]`, se fijan en la
    reunión).
+
+### Cumplimiento de pedido — PROC-OPE-002 (2026-07-27)
+
+Cierra el pendiente de decisión abierto el 2026-07-14: lo que ocurre
+después de Venta es **un** proceso, no dos.
+
+**Decisión y por qué.** `PROC-OPE-002 Cumplimiento de pedido` v1.0
+Vigente, área **Operaciones** (cruza cocina de sucursal, atención al
+cliente y reparto sin pertenecer a ninguna). Preparación y
+Despacho/Entrega son etapas internas. Cuatro razones: (1) un solo
+resultado — entra Orden de Pedido, sale pedido entregado — y ningún
+artefacto de traspaso entre cocina y despacho; (2) el código ya lo modeló
+como continuo: `venta_item.estado_preparacion` es UNA máquina de estados
+y `kds_pantalla.tipo` (`preparacion`/`despacho`) es un filtro de vista
+sobre ella, partirlo obligaba a partir la máquina y duplicar el contrato
+del KDS; (3) "Producción" ya nombra la cocina de producción central
+(`PROC-PRD-001`, primera cocina 2027) — reusarlo para la cocina de
+sucursal rompe la regla de que la sigla nombra un área real; (4) mesa/
+takeout/delivery son variantes de un mismo flujo, no procesos distintos.
+No se pierde medición separada: `venta_item.updated_at` por transición ya
+da tiempo de preparación y de despacho. Si el reparto llega a tener
+ruteo, flota y liquidación propios, se separa entonces como v2.0.
+
+**Especificación.** `process-nomenclature.md` (registro maestro + nota que
+distingue `PRD` de la preparación en sucursal), `workflows.md` (sección
+propia con gateway por modalidad; el borrador "fuera de Venta" se
+reemplaza por un puntero), `use-cases.md` (CU-OPE-001/002/003 por
+modalidad, con excepciones: cliente ausente, pedido no recogido, producto
+rechazado), `business-rules.md` (**RN-CUP-001..012** nuevas; RN-COM-005
+apunta al proceso; **RN-COM-007 reactivada** — la encuesta recupera su
+disparador tras 13 días sin dueño), `state-machines.md` (la máquina pasa
+de borrador a oficial, y se declara qué NO es estado: entrega fallida,
+devolución y el pago al finalizar en mesa), `events.md` (filas de
+`sales.venta_entregada` y `marketing.encuesta_enviada`), `data-model.md`
+(entidad `entrega` especificada para el slice de delivery).
+
+**Deriva corregida.** `sales.pedido_listo` se publicaba desde el slice KDS
+(2026-07-25) sin fila en `events.md`, contra la propia regla del catálogo
+("definir la fila ANTES de publicarlo"). Queda registrado.
+
+**Código.** `sales/application/cumplimiento.py`: `registrar_entrega`
+exige todos los ítems en `listo` (RN-CUP-005), es idempotente (repetirla
+no reemite el evento) y publica `sales.venta_entregada` con modalidad,
+cliente y plataforma de reparto. `POST /sales/ventas/{id}/entrega` con
+permiso **propio** `sales.entregar_pedido` y rol nuevo `despachador`;
+`cocinero` deliberadamente NO lo tiene (RN-CUP-006). En consecuencia el
+bump del KDS ya **no** llega a `entregado`: devuelve 409 apuntando al
+endpoint de entrega — antes cualquiera con `kds.operar` cerraba el pedido
+ítem por ítem, lo que dejaba el permiso de entrega decorativo. Sin
+migración: el enum ya tenía `entregado`.
+
+**Fuera de esta fase, a propósito**: entidad `entrega` (trazabilidad del
+repartidor y de la entrega fallida), plazo de espera de takeout
+(RN-CUP-011) y BPMN del proceso — ver Deuda técnica → sales.
 
 ### Fase de procesos (tras el modelado de BD)
 

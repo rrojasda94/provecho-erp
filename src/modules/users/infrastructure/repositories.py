@@ -4,16 +4,23 @@ La sesión actúa como Unit of Work: la capa de aplicación decide cuándo hacer
 commit/rollback. Los repos solo encapsulan las queries.
 """
 
+# `UsuarioRepo` define un método `list`, que dentro del cuerpo de la clase
+# pisa el builtin `list` — sin esto, anotaciones como `-> list[uuid.UUID]`
+# en métodos definidos después (`sucursal_ids`, `rol_nombres`) revientan con
+# "'function' object is not subscriptable" en Python <3.14 (evaluación eager
+# de anotaciones). Con este import las anotaciones quedan como string y
+# nunca se evalúan así.
 from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from src.modules.users.infrastructure.models import (
     AuditLog,
     Permiso,
+    Persona,
     RefreshToken,
     Rol,
     RolPermiso,
@@ -137,6 +144,60 @@ class RefreshTokenRepo:
             select(RefreshToken).where(RefreshToken.sesion_id == sesion_id)
         ):
             tok.revocado = True
+
+
+class PersonaRepo:
+    def __init__(self, session: Session) -> None:
+        self.s = session
+
+    def get(self, persona_id: uuid.UUID) -> Persona | None:
+        return self.s.scalar(
+            select(Persona).where(
+                Persona.id == persona_id, Persona.deleted_at.is_(None)
+            )
+        )
+
+    def get_by_documento(self, numero_documento: str) -> Persona | None:
+        return self.s.scalar(
+            select(Persona).where(
+                Persona.numero_documento == numero_documento,
+                Persona.deleted_at.is_(None),
+            )
+        )
+
+    def list(self, q: str | None = None) -> list[Persona]:
+        stmt = select(Persona).where(Persona.deleted_at.is_(None))
+        if q:
+            patron = f"%{q}%"
+            stmt = stmt.where(
+                (Persona.nombres.ilike(patron))
+                | (Persona.apellidos.ilike(patron))
+                | (Persona.numero_documento.ilike(patron))
+            )
+        return list(self.s.scalars(stmt.order_by(Persona.apellidos, Persona.nombres)))
+
+    def add(self, persona: Persona) -> Persona:
+        self.s.add(persona)
+        self.s.flush()
+        return persona
+
+    def actualizar_con_lock(
+        self, persona_id: uuid.UUID, expected_version: int, **campos
+    ) -> Persona | None:
+        """UPDATE condicional atómico. Devuelve None si no hay fila afectada
+        (version desactualizada — la capa de aplicación distingue el 404 de
+        la existencia previa del 409 de conflicto de version)."""
+        campos = {k: v for k, v in campos.items() if v is not None}
+        campos["version"] = Persona.version + 1
+        resultado = self.s.execute(
+            update(Persona)
+            .where(Persona.id == persona_id, Persona.version == expected_version)
+            .values(**campos)
+        )
+        if resultado.rowcount == 0:
+            return None
+        self.s.flush()
+        return self.get(persona_id)
 
 
 class AuditLogRepo:

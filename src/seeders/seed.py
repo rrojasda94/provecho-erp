@@ -1,5 +1,6 @@
-"""Seeder de desarrollo: organización base, roles/permisos semilla y usuario
-`admin` (PIN 123456).
+"""Seeder de desarrollo: organización real del Grupo Majambo (empresa,
+marca licenciada, sucursales CH1/CH2 y almacén central WH1), roles/permisos
+semilla y usuario `admin` (PIN 123456).
 
 Idempotente: se puede correr varias veces. PROHIBIDO en producción.
 
@@ -15,28 +16,58 @@ from sqlalchemy.orm import Session
 from src.config.settings import settings
 from src.core.database import SessionLocal
 from src.modules.users.infrastructure.models import (
+    Almacen,
     Empresa,
     Grupo,
+    LicenciaMarca,
     Marca,
     Permiso,
     Rol,
     RolPermiso,
+    Sucursal,
     Usuario,
     UsuarioRol,
 )
 from src.modules.users.infrastructure.security import hash_pin
 
+# --- Organización real del Grupo Majambo ---
+GRUPO = "Grupo Majambo"
+MARCA = "Charlie's Pizzas"
+EMPRESA_RUC = "20450311520"
+EMPRESA_RAZON_SOCIAL = "Inversiones Turísticas y Alimentarias Majambo EIRL"
+SEDE_CASTILLA = "Jr. Ramón Castilla 248 - Tarapoto"
+
+# nombre → (dirección, tenencia). La tenencia decide predial/arbitrios
+# (RN-IMP-004); ambas sucursales operan en local alquilado.
+SUCURSALES = {
+    "CH1": (SEDE_CASTILLA, "alquilada"),
+    "CH2": ("Jr. Lamas 299 - Tarapoto", "alquilada"),
+}
+
+# Central: abastece a los almacenes de sucursal y a producción, y no cuelga
+# de ninguna sucursal (`sucursal_id` NULL).
+ALMACEN_CENTRAL = ("WH1", SEDE_CASTILLA)
+
 # Matriz semilla (authorization.md). "*" = todo (solo admin, entornos internos).
 PERMISOS = [
     ("*", "Acceso total (solo entornos internos)"),
     ("users.gestionar", "Administrar usuarios, roles y permisos"),
+    (
+        "personas.anonimizar",
+        "Anonimizar datos de una persona — derecho de cancelación (Ley 29733)",
+    ),
     ("sales.crear", "Crear venta"),
     ("sales.cobrar", "Cobrar venta"),
     ("sales.leer", "Consultar ventas"),
     ("sales.anular", "Anular orden no pagada"),
     ("sales.gestionar_catalogo", "CRUD de productos comerciales y medios de pago"),
+    ("sales.emitir_comprobante", "Reintentar la emisión de un comprobante a SUNAT"),
     ("kds.configurar", "Crear y configurar pantallas KDS"),
     ("kds.operar", "Operar KDS: cola, avance de ítems, comanda"),
+    (
+        "sales.entregar_pedido",
+        "Registrar la entrega del pedido al cliente (PROC-OPE-002)",
+    ),
     ("sales.crear_pedido", "Crear pedido (canal agente IA)"),
     ("inventory.transferir", "Transferir stock"),
     ("inventory.recepcion", "Recepcionar mercadería"),
@@ -46,24 +77,87 @@ PERMISOS = [
     ("inventory.registrar_movimiento", "Registrar movimiento de stock"),
     ("inventory.solicitar_ajuste", "Solicitar ajuste de inventario"),
     ("inventory.aprobar_ajuste", "Aprobar ajuste de inventario"),
+    ("purchases.crear", "CRUD de proveedores, crear y emitir OC bajo el umbral"),
+    ("purchases.leer", "Consultar proveedores y órdenes de compra"),
+    ("purchases.recepcionar", "Registrar recepción de una OC"),
+    ("purchases.anular", "Anular una OC sin recepción registrada"),
     ("purchases.aprobar", "Aprobar orden de compra"),
+    (
+        "purchases.dar_conformidad",
+        "Dar conformidad al comprobante recibido (dispara el pago)",
+    ),
+    ("production.crear", "Crear orden de producción y registrar consumo"),
+    ("production.leer", "Consultar órdenes de producción"),
+    ("production.completar", "Registrar control de calidad y completar la orden"),
+    (
+        "accounting.cuenta_administrar",
+        "Administrar plan de cuentas y mapeo de asientos automáticos",
+    ),
+    ("accounting.periodo_administrar", "Abrir y cerrar periodos contables"),
+    ("accounting.asiento_manual", "Registrar y anular asientos manuales"),
+    ("accounting.leer", "Consultar plan de cuentas, asientos y periodos"),
+    (
+        "accounting.pago_gestionar",
+        "Registrar, ejecutar y rechazar pagos a proveedor bajo el umbral",
+    ),
+    ("accounting.pago_aprobar", "Aprobar pagos a proveedor sobre el umbral"),
+    ("accounting.caja_operar", "Abrir y cerrar caja (PROC-CTB-001/002)"),
+    ("accounting.arqueo_registrar", "Registrar arqueo de caja (sorpresa o programado)"),
+    ("dashboard.leer", "Consultar el dashboard gerencial (ventas, stock, caja)"),
+    ("gerencia.gestionar_reglas_aprobacion", "Administrar la matriz de aprobaciones"),
+    ("sales.leer_clientes_externos", "Consultar clientes para análisis fuera de sales"),
+    ("rrhh.leer", "Consultar trabajadores, contratos, nómina y documentos de RRHH"),
+    ("rrhh.trabajador_gestionar", "Crear, actualizar y cesar trabajadores"),
+    ("rrhh.contrato_gestionar", "Crear, firmar y finalizar contratos laborales"),
+    ("rrhh.postulante_gestionar", "Gestionar postulantes y su estado de selección"),
+    ("rrhh.socio_gestionar", "Administrar socios y participación societaria"),
+    ("rrhh.nomina_gestionar", "Emitir boletas de pago y liquidaciones de beneficios sociales"),
+    (
+        "rrhh.disciplina_gestionar",
+        "Emitir memorándums, amonestaciones, actas y certificados de trabajo",
+    ),
+    ("rrhh.permiso_solicitar", "Solicitar vacaciones, licencias y permisos"),
+    ("rrhh.permiso_aprobar", "Aprobar o rechazar solicitudes de permiso"),
+    ("rrhh.asistencia_marcar", "Marcar entrada y salida de asistencia"),
+    ("rrhh.capacitacion_gestionar", "Administrar pactos de permanencia por capacitación"),
+    ("sync.leer", "Descargar catálogo, stock y RBAC de la sucursal hacia su hub"),
+    ("sync.empujar", "Reproducir en la nube las ventas y cobros de un hub offline"),
 ]
 
 ROLES = {
     "admin": ["*"],
     "supervisor": [
         "purchases.aprobar",
+        "purchases.leer",
         "sales.leer",
         "sales.anular",
         "sales.gestionar_catalogo",
+        "sales.emitir_comprobante",
+        "sales.entregar_pedido",
         "kds.configurar",
         "kds.operar",
         "inventory.leer",
         "inventory.gestionar_catalogo",
         "inventory.aprobar_ajuste",
+        "sales.leer_clientes_externos",
+        "accounting.pago_aprobar",
+        "accounting.arqueo_registrar",
+        "dashboard.leer",
+        "rrhh.leer",
+        "rrhh.permiso_aprobar",
+        "rrhh.asistencia_marcar",
     ],
-    "cajero": ["sales.crear", "sales.cobrar", "sales.leer", "kds.operar"],
+    "cajero": [
+        "sales.crear",
+        "sales.cobrar",
+        "sales.leer",
+        "sales.entregar_pedido",
+        "kds.operar",
+        "accounting.caja_operar",
+    ],
+    # Cocina avanza la preparación pero NO cierra la entrega (RN-CUP-006).
     "cocinero": ["kds.operar", "sales.leer"],
+    "despachador": ["kds.operar", "sales.leer", "sales.entregar_pedido"],
     "almacenero": [
         "inventory.transferir",
         "inventory.recepcion",
@@ -73,6 +167,44 @@ ROLES = {
         "inventory.solicitar_ajuste",
     ],
     "agente_ia": ["sales.crear_pedido"],
+    # Cuenta de servicio del hub de sucursal (ADR-009): lo mínimo para
+    # replicar hacia abajo y reproducir hacia arriba. Nada de gestión de
+    # catálogo, RRHH ni contabilidad — un hub robado no es un admin.
+    "hub_sucursal": ["sync.leer", "sync.empujar"],
+    "comprador": [
+        "purchases.crear",
+        "purchases.leer",
+        "purchases.recepcionar",
+        "purchases.anular",
+        "purchases.dar_conformidad",
+    ],
+    "jefe_cocina": [
+        "production.crear",
+        "production.leer",
+        "production.completar",
+    ],
+    "contador": [
+        "accounting.cuenta_administrar",
+        "accounting.periodo_administrar",
+        "accounting.asiento_manual",
+        "accounting.leer",
+        "accounting.pago_gestionar",
+        "accounting.arqueo_registrar",
+        "dashboard.leer",
+    ],
+    "rrhh_admin": [
+        "rrhh.leer",
+        "rrhh.trabajador_gestionar",
+        "rrhh.contrato_gestionar",
+        "rrhh.postulante_gestionar",
+        "rrhh.socio_gestionar",
+        "rrhh.nomina_gestionar",
+        "rrhh.disciplina_gestionar",
+        "rrhh.permiso_solicitar",
+        "rrhh.permiso_aprobar",
+        "rrhh.asistencia_marcar",
+        "rrhh.capacitacion_gestionar",
+    ],
 }
 
 
@@ -86,28 +218,61 @@ def _get_or_create(session: Session, model, defaults=None, **filtros):
     return inst, True
 
 
-def seed(session: Session) -> None:
-    # --- Organización base (Grupo Majambo) ---
-    grupo, _ = _get_or_create(session, Grupo, nombre="Grupo Majambo")
-    _get_or_create(
+def _seed_organizacion(session: Session) -> None:
+    """Grupo, empresa, marca licenciada, sucursales y almacén central."""
+    grupo, _ = _get_or_create(session, Grupo, nombre=GRUPO)
+    empresa, _ = _get_or_create(
         session,
         Empresa,
-        ruc="20450311520",
+        ruc=EMPRESA_RUC,
         defaults=dict(
             grupo_id=grupo.id,
-            razon_social="Inversiones Turísticas y Alimentarias Majambo EIRL",
-            domicilio_fiscal="Tarapoto, San Martín",
+            razon_social=EMPRESA_RAZON_SOCIAL,
+            domicilio_fiscal=SEDE_CASTILLA,
             tipo="operativa",
             zona_tributaria="amazonia_ley27037",
         ),
     )
-    _get_or_create(
+    # `_get_or_create` no toca lo ya creado: el domicilio fiscal se sincroniza
+    # aparte para que un seed viejo quede con la dirección vigente.
+    empresa.domicilio_fiscal = SEDE_CASTILLA
+
+    marca, _ = _get_or_create(
         session,
         Marca,
         grupo_id=grupo.id,
-        nombre="Charlie's Pizzas",
+        nombre=MARCA,
         defaults=dict(tipo="restaurante"),
     )
+    # La marca es del grupo; la empresa la opera vía licencia (data-model §1).
+    _get_or_create(session, LicenciaMarca, empresa_id=empresa.id, marca_id=marca.id)
+
+    for nombre, (direccion, tenencia) in SUCURSALES.items():
+        _get_or_create(
+            session,
+            Sucursal,
+            empresa_id=empresa.id,
+            nombre=nombre,
+            defaults=dict(
+                marca_id=marca.id,
+                direccion=direccion,
+                estado="activa",
+                tenencia=tenencia,
+            ),
+        )
+
+    nombre_almacen, direccion_almacen = ALMACEN_CENTRAL
+    _get_or_create(
+        session,
+        Almacen,
+        empresa_id=empresa.id,
+        nombre=nombre_almacen,
+        defaults=dict(tipo="central", sucursal_id=None, direccion=direccion_almacen),
+    )
+
+
+def seed(session: Session) -> None:
+    _seed_organizacion(session)
 
     # --- Permisos ---
     permisos = {}

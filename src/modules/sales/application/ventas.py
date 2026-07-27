@@ -12,6 +12,7 @@ from decimal import Decimal
 from sqlalchemy.orm import Session
 
 from src.core.events import event_bus
+from src.modules.sales.application import comprobantes
 from src.modules.sales.application.errors import (
     Conflicto,
     NoEncontrado,
@@ -25,6 +26,7 @@ from src.modules.sales.infrastructure.repositories import (
     ProductoComercialRepo,
     VentaRepo,
 )
+from src.shared.models import Comprobante
 
 
 def crear_venta(
@@ -39,7 +41,17 @@ def crear_venta(
     items: list[dict],  # [{producto_comercial_id, cantidad, precio_unitario, descuento}]
     cliente_id: uuid.UUID | None = None,
     referencia_atencion: str | None = None,
+    id: uuid.UUID | None = None,
+    fecha_orden: date | None = None,
+    numero_orden: int | None = None,
 ) -> Venta:
+    """`id`, `fecha_orden` y `numero_orden` los fija el cliente solo cuando
+    la venta ya ocurrió en otro lado y se está reproduciendo acá: es el
+    caso del hub de sucursal sincronizando lo que vendió durante un corte
+    (ADR-009). Sin ellos la nube y el hub generarían identificadores
+    distintos para la misma venta, y el número de orden que vio el cliente
+    en su comanda no sería el de la nube.
+    """
     if canal not in rules.CANALES:
         raise ReglaNegocio(f"canal inválido: {canal}")
     if modalidad not in rules.MODALIDADES:
@@ -52,6 +64,8 @@ def crear_venta(
     existente = repo.get_by_idempotency(idempotency_key)
     if existente is not None:
         return existente
+    if id is not None and repo.get(id) is not None:
+        raise Conflicto(f"ya existe una venta con id {id} y otra idempotency_key")
 
     productos = ProductoComercialRepo(session)
     detalle_evento = []
@@ -85,11 +99,12 @@ def crear_venta(
             }
         )
 
-    hoy = date.today()
+    dia = fecha_orden or date.today()
     venta = Venta(
+        id=id or uuid.uuid4(),
         sucursal_id=sucursal_id,
-        fecha_orden=hoy,
-        numero_orden=repo.siguiente_numero_orden(sucursal_id, hoy),
+        fecha_orden=dia,
+        numero_orden=numero_orden or repo.siguiente_numero_orden(sucursal_id, dia),
         punto_venta_id=punto_venta_id,
         canal=canal,
         modalidad=modalidad,
@@ -117,6 +132,7 @@ def crear_venta(
             "venta_id": str(venta.id),
             "sucursal_id": str(sucursal_id),
             "items": detalle_evento,
+            "total": str(venta.total),
         },
     )
     return venta
@@ -130,16 +146,27 @@ def registrar_pago(
     monto: Decimal,
     idempotency_key: str,
     referencia_externa: str | None = None,
-) -> tuple[Pago, Venta]:
+    id: uuid.UUID | None = None,
+) -> tuple[Pago, Venta, Comprobante | None]:
     """El pago nace `confirmado` (PDV presencial). Pasarela con webhook de
-    confirmación async = slice Izipay posterior."""
+    confirmación async = slice Izipay posterior.
+
+    Al cubrirse el total se crea el `comprobante` en estado `pendiente`; el
+    envío a SUNAT lo hace la cola (el tercer valor devuelto es lo que el
+    router encola tras el commit).
+
+    `id` explícito: mismo motivo que en `crear_venta` — un cobro hecho
+    offline conserva su identificador al reproducirse en la nube (ADR-009).
+    """
     repo = PagoRepo(session)
     existente = repo.get_by_idempotency(idempotency_key)
     venta = VentaRepo(session).get(venta_id)
     if venta is None:
         raise NoEncontrado("venta no encontrada")
     if existente is not None:
-        return existente, venta
+        return existente, venta, None
+    if id is not None and repo.get(id) is not None:
+        raise Conflicto(f"ya existe un pago con id {id} y otra idempotency_key")
 
     if venta.estado not in ("orden",):
         raise Conflicto(f"la venta está {venta.estado}; no admite pagos")
@@ -154,6 +181,7 @@ def registrar_pago(
 
     pago = repo.add(
         Pago(
+            id=id or uuid.uuid4(),
             venta_id=venta_id,
             medio_pago_id=medio_pago_id,
             monto=monto,
@@ -162,13 +190,15 @@ def registrar_pago(
             estado="confirmado",
         )
     )
+    comprobante = None
     if rules.pagos_cubren_total(confirmados + [monto], venta.total):
         venta.estado = "pagada"
         event_bus.publish(
             "sales.venta_pagada",
             {"venta_id": str(venta.id), "total": str(venta.total)},
         )
-    return pago, venta
+        comprobante = comprobantes.crear_comprobante_pendiente(session, venta)
+    return pago, venta, comprobante
 
 
 def anular_venta(session: Session, venta_id: uuid.UUID, usuario_id: uuid.UUID) -> Venta:

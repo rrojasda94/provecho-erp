@@ -90,10 +90,32 @@ deja stock negativo; ajuste `solicitar` ≠ `aprobar` y aprobador ≠ solicitant
 alerta `bajo_minimo` derivada en la consulta; evento
 `inventory.ajuste_fuera_margen` al aprobar fuera de margen.
 
+`application/stock.py::contar_bajo_minimo(session, empresa_id)` (nuevo
+2026-07-26, ADR-012): cuenta filas bajo mínimo escopadas por empresa (vía
+`Almacen.empresa_id` — mismo import de modelo permitido que ya usa
+`application/listeners.py`), consumido por `core.dashboard_router` para el
+dashboard gerencial.
+
 **Diferido (deuda del módulo):** `stock_lote`/FEFO, `reserva_stock`, conteo
 cíclico, transferencias/`solicitud_insumos`, devolución, guía de remisión,
 listeners de eventos (`sales.venta_confirmada` → consumo por receta),
 contexto de tenant desde el JWT (hoy `empresa_id` viene en el body).
+
+## Sincronización con el hub de sucursal (implementado 2026-07-27)
+
+`application/sincronizacion.py` declara qué replica este módulo hacia el
+hub local (ADR-009 fase 2): unidades de medida, categorías, artículos,
+SKU, recetas y el `stock` del almacén de esa sucursal. Sin stock local, la
+primera venta offline fallaría al descontar insumos — el listener
+`sales.venta_confirmada` corre también dentro del hub.
+
+`stock` es el único recurso que el hub además escribe por su cuenta. La
+nube gana en el pull, y eso es correcto porque el ciclo **empuja antes de
+jalar**: para cuando el hub lee el stock de la nube, la nube ya procesó
+las ventas del corte.
+
+`registrar_movimiento` acepta un `id` client-generado (mismo motivo que en
+`sales`), aunque hoy el sync no empuja movimientos.
 
 ## Flujo
 

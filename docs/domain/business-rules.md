@@ -541,6 +541,15 @@ de su módulo y se prueban de forma aislada.
   tienda cuando la situación lo amerite, y vela por el correcto
   funcionamiento operativo y el cumplimiento de reglas en las sucursales a
   su cargo.
+- **RN-PER-007** El derecho de cancelación (Ley 29733) sobre `persona` se
+  ejerce por **anonimización**, nunca por borrado físico —`trabajador`/
+  `cliente`/`usuario` la referencian, y suele coexistir con una obligación
+  de retención tributaria/laboral vigente que prevalece mientras dure.
+  Antes de anonimizar, quien opera verifica manualmente que no haya
+  `trabajador` en estado `activo` ligado a esa persona, ni comprobante bajo
+  retención tributaria, ni litigio abierto — el sistema no lo bloquea
+  automáticamente (ADR-011). Una persona ya anonimizada no admite
+  rectificación (`PATCH` da 409).
 
 ## Transversales
 
@@ -958,25 +967,28 @@ producción se hace en cocinas de sucursal. Ver
 
 - **RN-COM-001** Confirmar una venta exige stock suficiente de los insumos de la
   receta (o política configurable de venta sin stock — por definir).
-- **RN-COM-002** `Idempotency-Key` obligatoria al confirmar venta y al registrar
-  pago; reintentos no duplican efectos.
-- **RN-COM-003** El comprobante se encola a Nubefact; una caída del proveedor no
+- **RN-COM-002** `idempotency_key` obligatoria (campo del body, no header —
+  corregido 2026-07-26) al confirmar venta y al registrar pago; reintentos
+  no duplican efectos.
+- **RN-COM-003** El comprobante se encola al proveedor de facturación electrónica
+  (Factiliza, ADR-005); una caída del proveedor no
   bloquea la venta.
 - **RN-COM-004** Una venta de servicio, o generada por el área comercial,
   puede originarse en una cotización que el cliente acepta.
 - **RN-COM-005** El flujo de una venta es: orden → envío del pedido a
   cocina → pago → emisión de comprobante. **Venta termina acá** (decisión
   2026-07-14) — preparación, emplatado/empaquetado, despacho y entrega al
-  cliente son proceso(s) posterior(es), aún sin definir.
+  cliente pertenecen a `PROC-OPE-002` (Cumplimiento de pedido), que Venta
+  dispara con `sales.venta_confirmada` sin esperar su resultado.
 - **RN-COM-006** El pago puede realizarse por adelantado; el comprobante
   puede emitirse antes del pago (no recomendable).
 
-> ⚠ **RN-COM-007 (pendiente, fuera de alcance de Venta)** — la regla de
-> encuesta de satisfacción (marketing selecciona cliente tras la entrega)
-> sigue siendo válida como intención de negocio, pero su disparador
-> (entrega al cliente) ya no ocurre dentro de Venta — depende del/los
-> proceso(s) de cumplimiento de pedido sin definir. No renumerar: se
-> retoma cuando ese proceso se modele.
+- **RN-COM-007** La encuesta de satisfacción es selectiva: Marketing
+  decide a qué cliente enviarla, nunca es automática para toda venta.
+  Su disparador es `sales.venta_entregada`, emitido por `PROC-OPE-002`
+  (Cumplimiento de pedido) — no ocurre dentro de Venta. Exige cliente
+  identificado (`cliente_id` no nulo). Regla reactivada 2026-07-27 al
+  definirse ese proceso; estuvo sin disparador desde 2026-07-14.
 
 - **RN-COM-008** Datos del cliente son opcionales por defecto (nombre
   completo, DNI), salvo: takeout y delivery exigen teléfono + nombre de
@@ -1002,7 +1014,7 @@ producción se hace en cocinas de sucursal. Ver
   correlativo, único por sucursal y día — es el número que ve el
   personal (cocina, mostrador, KDS); no se confunde con
   `idempotency_key` (técnico) ni con el correlativo del comprobante
-  (fiscal, vía Nubefact). Aplica tenga o no `cotizacion_id` — toda venta
+  (fiscal, vía Factiliza). Aplica tenga o no `cotizacion_id` — toda venta
   confirmada ya es una Orden de Pedido (glosario) por sí misma.
 - **RN-COM-015** La cuenta web de un cliente (`cliente.usuario_id`) es
   opcional y solo habilita autoservicio (ver historial, pedir online);
@@ -1013,6 +1025,53 @@ producción se hace en cocinas de sucursal. Ver
   (ej. mitad efectivo, mitad tarjeta) — confirmado 2026-07-20 como caso
   real del negocio. La suma de `pago.monto` de una venta debe igualar
   `venta.total` antes de que la venta pase a `estado=pagada`.
+
+## Cumplimiento de pedido
+
+Proceso `PROC-OPE-002` ([workflows.md](workflows.md#cumplimiento-de-pedido)),
+área dueña Operaciones. Empieza donde termina Venta (RN-COM-005) y cubre
+preparación, despacho y entrega en las tres modalidades.
+
+- **RN-CUP-001** El cumplimiento arranca con la venta ya confirmada: el
+  KDS muestra la Orden de Pedido, nunca el Carrito (RN-CAR-002 decide si
+  el pedido llega antes o después del pago, según el punto de venta).
+- **RN-CUP-002** El avance de un ítem es estrictamente secuencial y sin
+  retroceso: `pendiente → en_preparacion → listo → entregado`. No se
+  salta ni se revierte un estado; una corrección se registra como
+  incidencia, no reescribiendo el avance.
+- **RN-CUP-003** El estado de preparación es único por ítem de venta y es
+  la fuente de verdad del avance. Una pantalla KDS es un filtro sobre ese
+  estado, nunca una copia — dos pantallas jamás muestran avances distintos
+  del mismo ítem.
+- **RN-CUP-004** Ningún pedido se entrega sin verificar el pedido completo
+  contra la comanda: control de salida obligatorio, responsabilidad de
+  quien despacha.
+- **RN-CUP-005** Un pedido solo se entrega cuando todos sus ítems están
+  al menos `listo`. La entrega es un acto único por venta e idempotente:
+  repetirla no vuelve a emitir el evento ni duplica efectos.
+- **RN-CUP-006** La entrega la registra un trabajador con permiso de
+  entrega, distinto del avance de cocina, y queda auditada (quién, cuándo).
+- **RN-CUP-007** En delivery se registra siempre quién entrega:
+  repartidor propio o repartidor de plataforma externa — este último sin
+  vínculo laboral ni gestión como recurso propio (RN-PER-003).
+- **RN-CUP-008** Una entrega fallida (cliente ausente, dirección errada,
+  rechazo en la puerta) se registra con motivo y **no** marca el pedido
+  como entregado; el encargado de tienda decide devolución, nuevo intento
+  o merma. Un pedido no entregado nunca se cierra en silencio.
+- **RN-CUP-009** En mesa, el servicio se considera terminado con la
+  entrega del último pedido de esa atención; recién ahí queda habilitado
+  el cobro al finalizar el consumo (RN-POS-005).
+- **RN-CUP-010** Un producto rechazado por el cliente en la entrega se
+  reprocesa o se devuelve, con motivo registrado; si se desecha, genera
+  merma (RN-INV-017).
+- **RN-CUP-011** Un pedido de takeout no recogido espera el plazo que
+  defina la sucursal; vencido el plazo se escala al encargado, que decide
+  resguardo, merma o anulación con devolución del dinero al cliente.
+- **RN-CUP-012** Una venta ya entregada no se anula por la vía de
+  anulación de orden (reservada a la orden no pagada): requiere nota de
+  crédito y, si corresponde, devolución — RN-GEN-002. La anulación
+  temprana coordinada con la sucursal sigue el límite de la Central de
+  Pedidos (5 minutos desde la emisión del pedido).
 
 ## Comercial — estrategia
 
@@ -1103,6 +1162,14 @@ producción se hace en cocinas de sucursal. Ver
   la audita Gerencia. Toda auditoría/arqueo la ejecuta quien **no custodia** el
   fondo o dato revisado; el custodio está presente como testigo, no cuenta por
   el auditor.
+- **RN-CTB-010** Ningún asiento se registra fuera de un periodo contable
+  abierto; un asiento manual sobre un periodo sin abrir o ya cerrado se
+  rechaza (409).
+- **RN-CTB-011** La generación automática de asientos usa el mapeo
+  configurable evento→cuentas (`regla_asiento`) por empresa; si la empresa no
+  configuró mapeo para un evento, el asiento se omite (se audita en el log)
+  — nunca bloquea el proceso operativo que lo originó (mismo criterio de
+  módulos operativos con dependencias sin configurar, ej. inventory).
 
 > Nota: esta lista crece con cada módulo. Al implementar un módulo se agregan
 > aquí sus reglas antes de codificarlas.

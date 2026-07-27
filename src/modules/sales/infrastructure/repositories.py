@@ -8,12 +8,16 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from src.modules.sales.infrastructure.models import (
+    Cliente,
     MedioPago,
     Pago,
     ProductoComercial,
+    PuntoVenta,
     Venta,
     VentaItem,
 )
+from src.modules.users.infrastructure.models import Empresa, Persona, Sucursal
+from src.shared.models import Comprobante
 
 
 class VentaRepo:
@@ -48,6 +52,9 @@ class VentaRepo:
 class PagoRepo:
     def __init__(self, session: Session) -> None:
         self.s = session
+
+    def get(self, pago_id: uuid.UUID) -> Pago | None:
+        return self.s.get(Pago, pago_id)
 
     def get_by_idempotency(self, key: str) -> Pago | None:
         return self.s.scalar(select(Pago).where(Pago.idempotency_key == key))
@@ -91,6 +98,66 @@ class ProductoComercialRepo:
         self.s.add(producto)
         self.s.flush()
         return producto
+
+
+class ClienteRepo:
+    def __init__(self, session: Session) -> None:
+        self.s = session
+
+    def get(self, cliente_id: uuid.UUID) -> Cliente | None:
+        return self.s.get(Cliente, cliente_id)
+
+
+class PuntoVentaRepo:
+    def __init__(self, session: Session) -> None:
+        self.s = session
+
+    def get(self, punto_venta_id: uuid.UUID) -> PuntoVenta | None:
+        return self.s.get(PuntoVenta, punto_venta_id)
+
+
+class ComprobanteRepo:
+    def __init__(self, session: Session) -> None:
+        self.s = session
+
+    def get(self, comprobante_id: uuid.UUID) -> Comprobante | None:
+        return self.s.get(Comprobante, comprobante_id)
+
+    def por_venta(self, venta_id: uuid.UUID) -> Comprobante | None:
+        return self.s.scalar(
+            select(Comprobante).where(Comprobante.venta_id == venta_id)
+        )
+
+    def siguiente_correlativo(self, empresa_id: uuid.UUID, serie: str) -> int:
+        """El UNIQUE (empresa, serie, correlativo) corta la carrera: dos
+        cajas que choquen fallan y el PDV reintenta con la misma
+        idempotency_key. Serie SUNAT por punto de venta si el volumen lo pide."""
+        actual = self.s.scalar(
+            select(func.max(Comprobante.correlativo)).where(
+                Comprobante.empresa_id == empresa_id, Comprobante.serie == serie
+            )
+        )
+        return (actual or 0) + 1
+
+    def pendientes(self, limite: int = 100) -> list[Comprobante]:
+        return list(
+            self.s.scalars(
+                select(Comprobante)
+                .where(Comprobante.estado_emision.in_(("pendiente", "error")))
+                .order_by(Comprobante.created_at)
+                .limit(limite)
+            )
+        )
+
+    def empresa(self, empresa_id: uuid.UUID) -> Empresa | None:
+        return self.s.get(Empresa, empresa_id)
+
+    def empresa_de_sucursal(self, sucursal_id: uuid.UUID) -> Empresa | None:
+        sucursal = self.s.get(Sucursal, sucursal_id)
+        return self.s.get(Empresa, sucursal.empresa_id) if sucursal else None
+
+    def persona(self, persona_id: uuid.UUID | None) -> Persona | None:
+        return self.s.get(Persona, persona_id) if persona_id else None
 
 
 class MedioPagoRepo:

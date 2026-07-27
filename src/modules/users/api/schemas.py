@@ -1,6 +1,8 @@
 """DTOs (pydantic) de entrada/salida del módulo users."""
 
 import uuid
+from datetime import date, datetime
+from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -29,6 +31,49 @@ class MeOut(BaseModel):
     sucursales: list[uuid.UUID]
     empresa_id: uuid.UUID | None
     permisos: list[str]
+
+
+# --- Persona (party model) ---
+class PersonaCreate(BaseModel):
+    nombres: str = Field(max_length=100)
+    apellidos: str = Field(max_length=100)
+    tipo_documento: str
+    numero_documento: str = Field(max_length=20)
+    fecha_nacimiento: date | None = None
+    domicilio: str | None = None
+    telefono: str | None = None
+    email: str | None = None
+
+
+class PersonaUpdate(BaseModel):
+    version: int
+    nombres: str | None = None
+    apellidos: str | None = None
+    tipo_documento: str | None = None
+    numero_documento: str | None = None
+    fecha_nacimiento: date | None = None
+    domicilio: str | None = None
+    telefono: str | None = None
+    email: str | None = None
+
+
+class PersonaOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    nombres: str
+    apellidos: str
+    tipo_documento: str
+    numero_documento: str
+    fecha_nacimiento: date | None
+    domicilio: str | None
+    telefono: str | None
+    email: str | None
+    version: int
+    anonimizado_at: datetime | None
+
+
+class AnonimizarPersonaIn(BaseModel):
+    motivo: str = Field(min_length=3, max_length=500)
 
 
 # --- Usuarios (admin) ---
@@ -100,3 +145,29 @@ class PermisoIdIn(BaseModel):
 
 class SucursalIdIn(BaseModel):
     sucursal_id: uuid.UUID
+
+
+# --- Regla de aprobación (matriz de aprobaciones, RN-GER-003) ---
+class ReglaAprobacionCreate(BaseModel):
+    empresa_id: uuid.UUID
+    modulo: str = Field(max_length=50)
+    codigo: str = Field(max_length=50)
+    umbral: Decimal
+    permiso_requerido: str = Field(max_length=100)
+
+
+class ReglaAprobacionUpdate(BaseModel):
+    umbral: Decimal | None = None
+    permiso_requerido: str | None = None
+    vigente: bool | None = None
+
+
+class ReglaAprobacionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    empresa_id: uuid.UUID
+    modulo: str
+    codigo: str
+    umbral: Decimal
+    permiso_requerido: str
+    vigente: bool

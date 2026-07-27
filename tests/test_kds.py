@@ -1,5 +1,9 @@
-"""Tests del KDS: pantallas por categoría, bump, avance real compartido
-entre pantallas, comanda y RBAC."""
+"""Tests de Cumplimiento de pedido (PROC-OPE-002).
+
+Etapa 1 — preparación en el KDS: pantallas por categoría, bump, avance
+real compartido entre pantallas, comanda y RBAC.
+Etapa 2 — entrega: cierre del pedido, idempotencia y permiso propio.
+"""
 
 from decimal import Decimal
 
@@ -12,6 +16,7 @@ from sqlalchemy.pool import StaticPool
 import src.core.models_registry  # noqa: F401
 from src.core.app import create_app
 from src.core.database import Base
+from src.core.events import event_bus
 from src.modules.inventory.application import listeners
 from src.modules.inventory.infrastructure.models import (
     Categoria,
@@ -89,10 +94,14 @@ def env(monkeypatch):
                           direccion="cobro", tipo="efectivo")
         cocinero = Usuario(username="cocinero1", pin_hash=hash_pin("111222"),
                            tipo="humano")
-        s.add_all([pizza, bebida, medio, cocinero])
+        despachador = Usuario(username="despacho1", pin_hash=hash_pin("333444"),
+                              tipo="humano")
+        s.add_all([pizza, bebida, medio, cocinero, despachador])
         s.flush()
-        rol = s.scalar(select(Rol).where(Rol.nombre == "cocinero"))
-        s.add(UsuarioRol(usuario_id=cocinero.id, rol_id=rol.id))
+        for usuario, nombre_rol in ((cocinero, "cocinero"),
+                                    (despachador, "despachador")):
+            rol = s.scalar(select(Rol).where(Rol.nombre == nombre_rol))
+            s.add(UsuarioRol(usuario_id=usuario.id, rol_id=rol.id))
         ids.update(
             sucursal_id=str(sucursal.id), pv_id=str(pv.id),
             cat_pizzas=str(cat_pizzas.id), cat_bebidas=str(cat_bebidas.id),
@@ -194,11 +203,8 @@ def test_avance_real_compartido_entre_pantallas(env):
     avance = client.get(f"/api/v1/kds/ventas/{venta['id']}/avance", headers=h).json()
     assert avance["estado_pedido"] == "listo"
 
-    # Entrega ambos → pedido sale de todas las colas.
-    client.post(f"/api/v1/kds/items/{item_pizza}/avanzar", headers=h,
-                json={"estado": "entregado"})
-    client.post(f"/api/v1/kds/items/{item_bebida}/avanzar", headers=h,
-                json={"estado": "entregado"})
+    # La entrega cierra el pedido completo → sale de todas las colas.
+    client.post(f"/api/v1/sales/ventas/{venta['id']}/entrega", headers=h)
     assert _cola(client, h, despacho["id"]) == []
 
 
@@ -207,11 +213,12 @@ def test_no_retroceso(env):
     h = _token(client)
     horno, _, _, venta = _setup_pantallas_y_venta(client, ids, h)
     item = _cola(client, h, horno["id"])[0]["items"][0]["venta_item_id"]
+    # Saltarse un estado → 409.
+    assert client.post(f"/api/v1/kds/items/{item}/avanzar", headers=h,
+                       json={"estado": "listo"}).status_code == 409
     client.post(f"/api/v1/kds/items/{item}/avanzar", headers=h,
                 json={"estado": "en_preparacion"})
-    # Saltarse un estado o retroceder → 409.
-    assert client.post(f"/api/v1/kds/items/{item}/avanzar", headers=h,
-                       json={"estado": "entregado"}).status_code == 409
+    # Retroceder → 409.
     assert client.post(f"/api/v1/kds/items/{item}/avanzar", headers=h,
                        json={"estado": "pendiente"}).status_code == 409
 
@@ -245,6 +252,107 @@ def test_rbac_cocinero_opera_pero_no_configura(env):
         "sucursal_id": ids["sucursal_id"], "nombre": "Pirata",
         "tipo": "preparacion",
     }).status_code == 403
+
+
+def _dejar_pedido_listo(client, h, horno, barra):
+    for pantalla in (horno, barra):
+        item = _cola(client, h, pantalla["id"])[0]["items"][0]["venta_item_id"]
+        for estado in ("en_preparacion", "listo"):
+            client.post(f"/api/v1/kds/items/{item}/avanzar", headers=h,
+                        json={"estado": estado})
+
+
+def test_entrega_exige_pedido_listo(env):
+    client, ids = env
+    h = _token(client)
+    horno, _, _, venta = _setup_pantallas_y_venta(client, ids, h)
+    # Nada preparado todavía → no se entrega (RN-CUP-005).
+    assert client.post(
+        f"/api/v1/sales/ventas/{venta['id']}/entrega", headers=h
+    ).status_code == 409
+
+    # Solo la pizza lista: la bebida sigue pendiente → sigue sin entregarse.
+    item_pizza = _cola(client, h, horno["id"])[0]["items"][0]["venta_item_id"]
+    for estado in ("en_preparacion", "listo"):
+        client.post(f"/api/v1/kds/items/{item_pizza}/avanzar", headers=h,
+                    json={"estado": estado})
+    assert client.post(
+        f"/api/v1/sales/ventas/{venta['id']}/entrega", headers=h
+    ).status_code == 409
+
+
+def test_entrega_cierra_el_pedido_y_es_idempotente(env):
+    client, ids = env
+    h = _token(client)
+    horno, barra, despacho, venta = _setup_pantallas_y_venta(client, ids, h)
+    _dejar_pedido_listo(client, h, horno, barra)
+
+    eventos = []
+    event_bus.subscribe("sales.venta_entregada", eventos.append)
+
+    r = client.post(f"/api/v1/sales/ventas/{venta['id']}/entrega", headers=h)
+    assert r.status_code == 200
+    assert r.json()["estado_pedido"] == "entregado"
+    assert r.json()["ya_entregado"] is False
+    assert len(eventos) == 1
+    assert eventos[0]["venta_id"] == venta["id"]
+    assert eventos[0]["modalidad"] == "mesa"
+
+    avance = client.get(f"/api/v1/kds/ventas/{venta['id']}/avance", headers=h).json()
+    assert [i["estado"] for i in avance["items"]] == ["entregado", "entregado"]
+    assert _cola(client, h, despacho["id"]) == []
+
+    # Repetir la entrega no reemite el evento (RN-CUP-005).
+    r2 = client.post(f"/api/v1/sales/ventas/{venta['id']}/entrega", headers=h)
+    assert r2.status_code == 200 and r2.json()["ya_entregado"] is True
+    assert len(eventos) == 1
+
+
+def test_cocina_no_entrega_pero_despacho_si(env):
+    client, ids = env
+    h = _token(client)
+    horno, barra, _, venta = _setup_pantallas_y_venta(client, ids, h)
+    _dejar_pedido_listo(client, h, horno, barra)
+
+    # El cocinero opera el KDS pero no cierra la entrega (RN-CUP-006).
+    h_coc = _token(client, "cocinero1", "111222")
+    assert client.post(
+        f"/api/v1/sales/ventas/{venta['id']}/entrega", headers=h_coc
+    ).status_code == 403
+    # Tampoco por la puerta de atrás: el bump no llega a `entregado`.
+    item = _cola(client, h, horno["id"])
+    assert item == []  # ya está listo, fuera de la cola del horno
+
+    h_desp = _token(client, "despacho1", "333444")
+    assert client.post(
+        f"/api/v1/sales/ventas/{venta['id']}/entrega", headers=h_desp
+    ).status_code == 200
+
+
+def test_bump_no_marca_entregado(env):
+    client, ids = env
+    h = _token(client)
+    horno, _, _, _ = _setup_pantallas_y_venta(client, ids, h)
+    item = _cola(client, h, horno["id"])[0]["items"][0]["venta_item_id"]
+    for estado in ("en_preparacion", "listo"):
+        client.post(f"/api/v1/kds/items/{item}/avanzar", headers=h,
+                    json={"estado": estado})
+    # `entregado` no se marca ítem por ítem desde cocina (RN-CUP-005/006).
+    r = client.post(f"/api/v1/kds/items/{item}/avanzar", headers=h,
+                    json={"estado": "entregado"})
+    assert r.status_code == 409
+    assert "entrega" in r.json()["detail"]
+
+
+def test_venta_anulada_no_se_entrega(env):
+    client, ids = env
+    h = _token(client)
+    horno, barra, _, venta = _setup_pantallas_y_venta(client, ids, h)
+    _dejar_pedido_listo(client, h, horno, barra)
+    client.post(f"/api/v1/sales/ventas/{venta['id']}/anular", headers=h)
+    assert client.post(
+        f"/api/v1/sales/ventas/{venta['id']}/entrega", headers=h
+    ).status_code == 409
 
 
 def test_pantalla_sin_categorias_ve_todo(env):
