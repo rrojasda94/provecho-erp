@@ -45,5 +45,19 @@ services:
       db:
         condition: service_healthy
 
+  # Motor de sync (ADR-009 fase 2): empuja las ventas del corte y baja
+  # catálogo/stock/RBAC. Proceso aparte del que atiende a la LAN — si el
+  # sync se traba, el PDV del local sigue vendiendo igual.
+  sync:
+    image: ${PROVECHO_IMAGE:-ghcr.io/majambo/provecho:latest}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DEPLOYMENT_MODE: hub
+    command: python -m src.core.sync.runner
+    depends_on:
+      db:
+        condition: service_healthy
+
 volumes:
   hubdata:

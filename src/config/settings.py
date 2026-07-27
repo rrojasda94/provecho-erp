@@ -93,6 +93,10 @@ class Settings(BaseSettings):
     cloud_sync_username: str = ""
     cloud_sync_pin: str = ""
     sync_intervalo_segundos: int = 60
+    # Filas por página de sync. Holgado a propósito: un bloque de filas con
+    # el MISMO `updated_at` más grande que el lote obliga al motor a
+    # ensanchar la página para no atascarse (`motor.FACTOR_DESEMPATE`).
+    sync_lote_maximo: int = 500
     # Fallos de heartbeat seguidos antes de declarar al hub "offline" — uno
     # solo sería demasiado sensible a un timeout de red puntual.
     sync_fallos_para_offline: int = 3

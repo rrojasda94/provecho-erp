@@ -53,6 +53,9 @@ class PagoRepo:
     def __init__(self, session: Session) -> None:
         self.s = session
 
+    def get(self, pago_id: uuid.UUID) -> Pago | None:
+        return self.s.get(Pago, pago_id)
+
     def get_by_idempotency(self, key: str) -> Pago | None:
         return self.s.scalar(select(Pago).where(Pago.idempotency_key == key))
 

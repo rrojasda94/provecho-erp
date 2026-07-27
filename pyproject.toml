@@ -57,6 +57,7 @@ select = ["E", "F", "I", "UP", "B", "C901"]
 # B008: FastAPI usa `Depends(...)` en valores por defecto (patrón idiomático).
 "src/modules/*/api/*" = ["B008"]
 "src/core/*_router.py" = ["B008"]
+"src/core/sync/api/*" = ["B008"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 10

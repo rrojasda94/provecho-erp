@@ -1,8 +1,8 @@
 # ADR-009 — Modo offline del PDV: hub local por sucursal
 
-- Estado: aceptado (fase 1 — diseño y plumbing base); **fase 2 (motor de
-  sync) requiere una decisión adicional, ver Consecuencias**
-- Fecha: 2026-07-26
+- Estado: aceptado. Fase 1 (diseño y plumbing base) 2026-07-26; **fase 2
+  (motor de sync) 2026-07-27, ver "Fase 2" al final**
+- Fecha: 2026-07-26 (fase 1) / 2026-07-27 (fase 2)
 
 ## Contexto
 
@@ -90,7 +90,7 @@ tarde, sin tener que reautenticar.
 
 ## Consecuencias
 
-- **Requiere un cambio previo, no incluido en esta fase**: hoy
+- **Requiere un cambio previo** (hecho en la fase 2): hoy
   `Venta`/`Pago`/`MovimientoInventario` usan `UuidPkMixin` con
   `default=uuid.uuid4` — el UUID se genera en la capa ORM de Python al
   construir el objeto, no en la base de datos. Esto significa que **ya es
@@ -100,8 +100,7 @@ tarde, sin tener que reautenticar.
   pasarlo al modelo. Sin esto, el hub y la nube generarían UUIDs distintos
   para la misma venta al reintentar el POST, y haría falta una tabla de
   mapeo hub-id↔nube-id que el diseño actual evita. Cambio pequeño,
-  retrocompatible (parámetro opcional), pero toca `sales`/`inventory` y
-  debe revisarse aparte — **no se implementa en este ADR**.
+  retrocompatible (parámetro opcional), pero toca `sales`/`inventory`.
 - El hub corre **sin Celery/Redis/worker**: la emisión de comprobantes queda
   exclusivamente del lado nube. Reduce el footprint del Raspberry Pi a
   Postgres + la API, nada más.
@@ -148,3 +147,161 @@ tarde, sin tener que reautenticar.
   sincroniza por lotes con watermark de `updated_at`, que ya cubre el caso
   sin tabla nueva. Se reconsiderará si aparece necesidad real de sync
   cuasi-instantáneo entre hub y nube.
+
+---
+
+## Fase 2 — Motor de sync (2026-07-27)
+
+La fase 1 dejó la config del hub, el detector de conectividad y
+`/health/sync`. Esta fase construye el motor que de verdad sincroniza, y
+en el camino corrige tres supuestos de la fase 1 que no sobrevivieron al
+contacto con el código.
+
+### Lo que se mantuvo
+
+Todo lo estructural: hub por sucursal con la misma imagen, sync por la
+propia API REST (no replicación de base), autenticación con cuenta de
+servicio por `/auth/login`, JWT compartido, emisión de comprobantes solo
+en la nube, y el hub sin Celery/Redis.
+
+### Decisión 1 — El ciclo empuja primero y jala después
+
+Un ciclo es **push y después pull**, nunca al revés. Si el hub jalara
+primero, sobreescribiría su `stock` local con el de una nube que todavía
+no sabe nada de las ventas del corte. Empujando primero, la nube procesa
+esas ventas —su propio listener descuenta su propio stock— y lo que vuelve
+en el pull ya es el estado correcto. Los dos lados convergen dentro del
+mismo ciclo.
+
+Corolario: **el hub NO empuja movimientos de inventario**. El listener
+`sales.venta_confirmada` corre también en la nube al recibir la venta; si
+además viajaran los movimientos del hub, el consumo se contaría dos veces.
+El `id` client-generado de `movimiento_inventario` (el cambio previo que
+pedía la fase 1) queda igual disponible en `registrar_movimiento`, pero no
+lo usa el sync.
+
+### Decisión 2 — Endpoints `/sync/pull` y `/sync/push` en vez de reusar los públicos
+
+La fase 1 preveía que el hub llamara a los endpoints de lectura que ya
+existen (`GET /sales/productos`, `/inventory/stock`, `/users/users`). Al
+implementarlo no alcanzan, por tres razones concretas:
+
+1. **No traen lo que el hub necesita.** `ProductoOut` no expone
+   `empaque_id` ni `modalidades_empaque` (sin eso el descuento de empaque
+   por modalidad no funciona offline), y no hay endpoint alguno de
+   `receta`, `receta_item`, `sku`, `unidad_medida` ni `punto_venta`.
+2. **Nada de eso es incremental.** Ninguno filtra por `updated_at`: un hub
+   que sincroniza cada minuto bajaría el catálogo entero cada vez.
+3. **El PIN.** Autenticarse en el hub durante un corte exige el
+   `pin_hash` del usuario, y ese campo no puede aparecer en `UsuarioOut`
+   —el endpoint de administración de usuarios lo consumen humanos—, pero
+   sí tiene que llegar al hub.
+
+Por el lado ascendente pasaba lo mismo: `POST /sales/ventas` toma el
+`usuario_id` del JWT (todas las ventas sincronizadas quedarían a nombre de
+la cuenta del hub, perdiendo quién vendió) y calcula `fecha_orden` y
+`numero_orden` con el reloj y el correlativo de la nube — el número de
+orden que el cliente ya vio impreso en su comanda no coincidiría.
+Agregarle cuatro campos "solo para sync" al contrato público del PDV es
+peor que darle a la replicación su propia puerta.
+
+Entonces: **dos endpoints dedicados**, cada uno con su permiso
+(`sync.leer`, `sync.empujar`), y el rol `hub_sucursal` que solo tiene esos
+dos. Lo importante es que **`/sync/push` no escribe filas crudas**: ejecuta
+los mismos casos de uso de `sales` que atiende un PDV en línea, con sus
+validaciones, su idempotencia y sus eventos. La objeción que hundió a la
+replicación lógica de Postgres —"una fila replicada cruda no pasa por
+`require_permission` ni por las validaciones de dominio"— sigue en pie y
+este diseño la respeta.
+
+El tenant **no es un parámetro**: sale de las asignaciones de la cuenta de
+servicio, que debe tener exactamente una sucursal. Un hub no puede pedir
+el catálogo de otro local ni empujarle ventas aunque arme el request a
+mano.
+
+### Decisión 3 — Tabla `sync_watermark` (una fila por recurso y dirección)
+
+La fase 1 decía "watermark por `updated_at`, no hace falta tabla de
+control aparte". No alcanza, por dos motivos:
+
+- El hub **escribe localmente** algunas de las tablas que replica: cada
+  venta offline mueve `stock`. Su propio `max(updated_at)` refleja su
+  última venta, no hasta dónde leyó de la nube.
+- La dirección ascendente necesita memoria durable de qué se empujó, y eso
+  no lo dice ningún dato local.
+
+Sigue **sin ser un outbox** (la alternativa descartada más abajo): es una
+fila por recurso —24 filas en total—, no una por escritura. Guarda además
+el último error, que es lo que `/health/sync` muestra por recurso.
+
+Política ante fallas: un recurso que falla **no avanza su marca** y se
+reintenta entero al ciclo siguiente; los demás recursos siguen su curso.
+Si la nube rechaza un ítem del push, el lote no avanza tampoco — perder
+una venta en silencio es peor que reintentarla para siempre, y el error
+queda visible en `/health/sync`. El costo asumido: un ítem que la nube
+rechaza siempre frena su recurso hasta que alguien lo mire.
+
+### Decisión 4 — El contrato de replicación es declarativo y vive en cada módulo
+
+`core/sync` no conoce ninguna entidad de negocio. Cada módulo declara sus
+`RecursoSync` en `application/sincronizacion.py` (qué modelo, qué campos
+viajan, cómo se filtra por tenant y por qué el hub lo necesita) y
+`core/sync/registro.py` los ensambla en orden de dependencia, igual que
+`core/app.py` ensambla los routers. Un módulo nuevo se vuelve replicable
+declarando su tupla; el motor no se toca. `campos` es contrato explícito:
+agregar una columna al modelo **no** la manda al hub sin que alguien lo
+decida.
+
+### Lo que viaja y lo que no
+
+Se replican 24 recursos: organización (grupo, empresa, marca, sucursal,
+almacén), RBAC completo (persona, usuario, rol, permiso y sus
+asignaciones), catálogo de inventario (unidades, categorías, artículos,
+SKU, recetas, stock) y catálogo comercial (producto, medio de pago, punto
+de venta, pantallas KDS). Decisiones finas dentro de eso:
+
+- **`usuario.pin_hash` sí; `intentos_fallidos`/`bloqueado_hasta` no.** El
+  hash es indispensable para autenticar offline. El lockout, en cambio, es
+  estado vivo de cada lado: replicarlo bloquearía a un cajero en el local
+  por intentos hechos contra la nube.
+- **`persona` viaja recortada**: nombres, apellidos y documento; sin
+  domicilio, teléfono, email ni fecha de nacimiento. El PDV muestra un
+  nombre, no una ficha — minimización de datos (Ley 29733) sobre hardware
+  que vive en un local, no en un datacenter.
+- **Solo el almacén de la sucursal**, no el central de la empresa.
+- **`receta` y `receta_item` viajan completas, sin filtro de tenant**:
+  `receta` no tiene columna de empresa en el modelo de datos y acotarla
+  exigiría cruzar `producto_comercial` (dominio de `sales`) desde
+  `inventory`. Son recetas del propio grupo sobre hardware del propio
+  grupo. Si alguna vez el grupo opera empresas que no deban verse entre
+  sí, `receta` necesita su columna de tenant antes que este sync.
+- **`cliente` no viaja**: una venta offline es anónima o con datos
+  escritos a mano. Venta a cliente registrado exige estar en línea.
+- **`venta_item.id` no se conserva** entre hub y nube (sí el de la venta):
+  nada fuera del hub referencia un ítem, y el avance de KDS es local al
+  local.
+
+### Consecuencias de la fase 2
+
+- El hub corre **dos procesos**: la API que atiende a la LAN y el runner
+  de sync (`python -m src.core.sync.runner`, servicio `sync` del
+  `docker-compose.hub.yml`). Separados a propósito: si el sync se traba,
+  el PDV sigue vendiendo.
+- `sales.tasks.encolar` no hace nada en un hub. Sin esta guarda, cobrar
+  durante un corte intentaría hablarle a un broker que en el Raspberry Pi
+  no existe.
+- Un `POST /sales/ventas` ahora acepta `id` del cliente. Es lo que permite
+  que las tres apps (web/Android/PC) generen el identificador al crear la
+  venta y no dependan del servidor para tenerlo.
+- El alta de un hub es un comando: `python -m src.seeders.hub --sucursal
+  <uuid> --username hub_<local>`, contra la nube.
+- Queda pendiente **el frontend**: sigue sin existir un PDV que use nada
+  de esto. El contrato ya está y es verificable (`GET /sync/recursos`
+  documenta qué baja un hub y por qué).
+
+### Alternativa descartada en esta fase
+
+- **Un solo watermark global en vez de uno por recurso** — descartada: un
+  error puntual en una tabla (una FK que todavía no bajó) frenaría el sync
+  de todas las demás. Por recurso, el catálogo llega fresco aunque el
+  stock esté fallando.
