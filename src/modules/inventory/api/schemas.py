@@ -75,6 +75,9 @@ class MovimientoCreate(BaseModel):
     cantidad: Decimal  # con signo: + ingreso, − salida
     tipo: str
     referencia: str | None = None
+    # Identificador generado por el cliente: permite que un dispositivo que
+    # ya creó el movimiento sin conexión conserve su id (ADR-009).
+    id: uuid.UUID | None = None
 
 
 class MovimientoOut(BaseModel):

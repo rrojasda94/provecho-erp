@@ -50,6 +50,30 @@ alcance del usuario.
 | almacenero | `inventory.transferir`, `inventory.recepcion`, `inventory.ajustar` |
 | cajero | `sales.crear`, `sales.cobrar`, `sales.leer` (su sucursal) |
 | agente_ia | `sales.crear_pedido` (canal agente_ia, su marca) |
+| hub_sucursal | `sync.leer`, `sync.empujar` (una sola sucursal, ADR-009) |
 
 > La matriz completa por módulo se define al implementar cada módulo y su
 > conjunto de acciones.
+
+### Cuenta de servicio del hub de sucursal
+
+`hub_sucursal` es el rol de una máquina, no de una persona: lo usa el hub
+local de cada sucursal para sincronizar (ADR-009). Tres cosas lo hacen
+distinto y valen la pena tenerlas presentes:
+
+- **Alcance de exactamente una sucursal.** La API de sync deriva el tenant
+  de las asignaciones de la cuenta y **rechaza (403)** una cuenta con cero
+  o con más de una: un hub es de un local, y una cuenta más amplia
+  convertiría el sync en una fuga entre locales. El parámetro de sucursal
+  no existe en la API — no hay forma de pedir datos de otro local.
+- **`sync.leer` es el único permiso del ERP que devuelve `pin_hash`.** Sin
+  el hash replicado nadie puede autenticarse en el hub durante un corte, y
+  un PDV donde nadie puede loguearse no vende. Viaja el hash Argon2id,
+  nunca el PIN, y solo el de los usuarios de esa sucursal. No lo expone
+  ningún otro endpoint.
+- **`sync.empujar` no escribe filas crudas**: reproduce las ventas del
+  corte por los mismos casos de uso que atiende un PDV en línea, con sus
+  validaciones y su idempotencia.
+
+Alta: `python -m src.seeders.hub --sucursal <uuid> --username hub_<local>`
+(ver `docs/engineering/devops.md`).

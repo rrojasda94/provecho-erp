@@ -7,6 +7,84 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Added
 
+- **Modo offline del PDV — fase 2: motor de sync del hub** (2026-07-27):
+  ADR-009 (sección "Fase 2"), migración `e5c47b90f118`. El hub de sucursal
+  ya no solo sabe *si* tiene internet: ahora sincroniza de verdad. Un ciclo
+  (`src/core/sync/motor.py`, proceso aparte `python -m src.core.sync.runner`,
+  servicio `sync` del `docker-compose.hub.yml`) **empuja y después jala**,
+  en ese orden y no al revés: si jalara primero, el hub sobreescribiría su
+  stock con el de una nube que todavía no sabe nada de las ventas del
+  corte. Corolario que evita un bug caro: **el hub no empuja movimientos de
+  inventario** — el listener de la nube los genera al recibir la venta, y
+  empujarlos además contaría el consumo dos veces.
+  - **Cambio previo que pedía la fase 1, hecho**: `crear_venta`,
+    `registrar_pago` y `registrar_movimiento` aceptan un `id` opcional
+    generado por el cliente (sin migración: `UuidPkMixin` genera el UUID en
+    Python). Así una venta conserva su identidad entre hub y nube, sin
+    tabla de mapeo. Expuesto también en `POST /sales/ventas` y
+    `/pagos`, que es lo que permitirá a las tres apps (web/Android/PC)
+    crear la venta sin depender del servidor para tener su id.
+  - **`GET /sync/pull` + `POST /sync/push`** (permisos `sync.leer` /
+    `sync.empujar`, rol `hub_sucursal`) en vez de reusar los endpoints
+    públicos como preveía la fase 1. Al implementarlo no alcanzaban: no
+    exponen los campos que el hub necesita (`empaque_id`,
+    `modalidades_empaque`, y directamente no hay endpoint de `receta`,
+    `sku` ni `punto_venta`), ninguno es incremental por `updated_at`, y el
+    `pin_hash` —sin el cual nadie se autentica offline— no puede vivir en
+    `UsuarioOut`. Del lado ascendente, `POST /sales/ventas` toma el
+    `usuario_id` del JWT (todas las ventas quedarían a nombre del hub) y
+    recalcula `fecha_orden`/`numero_orden`, con lo que el número que el
+    cliente vio impreso no coincidiría. **El push no escribe filas crudas**:
+    ejecuta los mismos casos de uso de `sales`, con sus validaciones,
+    idempotencia y eventos — la objeción que hundió a la replicación lógica
+    de Postgres en el ADR sigue respetada. El tenant sale de la cuenta de
+    servicio (exactamente una sucursal), nunca de un parámetro.
+  - **Contrato declarativo por módulo**: cada módulo declara sus
+    `RecursoSync` en `application/sincronizacion.py` (modelo, campos que
+    viajan, filtro de tenant y por qué el hub lo necesita) y
+    `core/sync/registro.py` los ensambla en orden de dependencia — igual
+    que `core/app.py` ensambla routers. El motor no conoce ninguna entidad
+    de negocio. 24 recursos: organización, RBAC, catálogo de inventario,
+    stock y catálogo comercial. `campos` es explícito: agregar una columna
+    al modelo no la manda al hub sin que alguien lo decida.
+  - **`usuario.pin_hash` viaja; el lockout no.** El hash Argon2id es
+    indispensable para validar el PIN durante un corte (es la única salida
+    de un hash de credencial en la API, acotada a los usuarios de esa
+    sucursal); `intentos_fallidos`/`bloqueado_hasta` son estado vivo de
+    cada lado y replicarlos bloquearía a un cajero en el local por intentos
+    hechos contra la nube. `persona` viaja recortada (nombre y documento,
+    sin domicilio/teléfono/email) — minimización de datos sobre hardware
+    que vive en un local.
+  - **Tabla `sync_watermark`** (una fila por recurso y dirección, no un
+    outbox): la fase 1 suponía que bastaba `max(updated_at)` local, y no
+    basta — el hub *escribe* localmente algunas de las tablas que replica
+    (cada venta mueve `stock`), y la dirección ascendente necesita memoria
+    durable de qué se empujó. Guarda también el último error. Un recurso
+    que falla no avanza su marca y se reintenta entero; los demás siguen.
+  - **`/health/sync` ahora muestra el avance por recurso** (marca, último
+    OK, último error), leído de la base porque el runner es otro proceso.
+    `GET /sync/recursos` documenta el contrato vigente.
+  - **`sales.tasks.encolar` es no-op en un hub**: sin esa guarda, cobrar
+    durante un corte intentaría hablarle a un broker que en el Raspberry Pi
+    no existe (el hub corre sin Celery/Redis por diseño).
+  - **Alta de la cuenta de servicio**: `python -m src.seeders.hub
+    --sucursal <uuid> --username hub_<local>`, idempotente y apto para
+    producción (a diferencia del seeder de desarrollo).
+  - `tests/test_sync_motor.py` (24 casos) monta **las dos bases** —nube y
+    hub— y sincroniza entre ellas por la API real vía `TestClient`
+    autenticado: carga inicial, login offline contra el hash replicado,
+    pull incremental, aislamiento entre sucursales, venta/cobro/anulación
+    reproducidos con su identidad, convergencia de stock, ítem rechazado
+    que no arrastra al lote, y recurso caído que no cancela a los demás.
+    En el camino apareció otra vez el desfase de microsegundos de SQLite
+    (`CURRENT_TIMESTAMP` sin ellos vs. el bind de Python con ellos, ya
+    documentado en el dashboard de caja): acá **sí** se resolvió en el
+    código (`core/sync/tiempo.para_dialecto` ensancha el borde un segundo
+    solo en SQLite) porque el `>=` afectado es una consulta de producción,
+    no una aserción de test; en Postgres —la base real de hub y nube— no
+    aplica, y como todo el sync es idempotente, reprocesar el borde no
+    cuesta nada mientras que perderlo sería perder una venta.
+
 - **Dashboard gerencial mínimo + slice de caja (PROC-CTB-001/002)**
   (2026-07-26): ADR-012. `GET /api/v1/dashboard/resumen`
   (`src/core/dashboard_router.py`, permiso `dashboard.leer`): ventas del
