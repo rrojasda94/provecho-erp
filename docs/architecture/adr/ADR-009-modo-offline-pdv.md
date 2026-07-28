@@ -254,11 +254,12 @@ decida.
 
 ### Lo que viaja y lo que no
 
-Se replican 26 recursos: organización (grupo, empresa, marca, sucursal,
+Se replican 28 recursos: organización (grupo, empresa, marca, sucursal,
 almacén), RBAC completo (persona, usuario, rol, permiso y sus
 asignaciones), catálogo de inventario (unidades, categorías, artículos,
-SKU, recetas, stock) y catálogo comercial (producto, medio de pago, punto
-de venta, pantallas KDS). Decisiones finas dentro de eso:
+SKU, recetas, stock, lote y stock por lote) y catálogo comercial
+(producto, medio de pago, punto de venta, pantallas KDS). Decisiones finas
+dentro de eso:
 
 - **`usuario.pin_hash` sí; `intentos_fallidos`/`bloqueado_hasta` no.** El
   hash es indispensable para autenticar offline. El lockout, en cambio, es
@@ -269,6 +270,11 @@ de venta, pantallas KDS). Decisiones finas dentro de eso:
   nombre, no una ficha — minimización de datos (Ley 29733) sobre hardware
   que vive en un local, no en un datacenter.
 - **Solo el almacén de la sucursal**, no el central de la empresa.
+- **`lote` y `stock_lote` viajan** (agregados 2026-07-27 con FEFO,
+  ADR-015): sin la fecha de vencimiento en el hub, la venta offline
+  descontaría cualquier lote y la nube, al reprocesar el evento, elegiría
+  otro. `stock_lote` lo escriben ambos lados y gana la nube en el pull,
+  igual que `stock` y por la misma razón: el ciclo empuja antes de jalar.
 - **`receta` y `receta_item` viajan completas, sin filtro de tenant**:
   `receta` no tiene columna de empresa en el modelo de datos y acotarla
   exigiría cruzar `producto_comercial` (dominio de `sales`) desde
@@ -290,8 +296,9 @@ de venta, pantallas KDS). Decisiones finas dentro de eso:
   nube quedaría discrepando del comprobante que el cliente se llevó.
   Mismo criterio que `id`/`fecha_orden`/`numero_orden`: el replay
   reproduce un hecho, no lo vuelve a decidir. En sentido descendente el
-  hub recibe `lista_precio` y `precio` (2 recursos nuevos, 26 en total):
-  sin ellos no podría cotizar durante el corte.
+  hub recibe `lista_precio` y `precio` (2 recursos nuevos entonces; 28 en
+  total tras sumar `lote`/`stock_lote`): sin ellos no podría cotizar
+  durante el corte.
 
 ### Consecuencias de la fase 2
 

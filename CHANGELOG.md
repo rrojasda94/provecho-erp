@@ -7,6 +7,25 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Added
 
+- **Lote y FEFO en `inventory` — ADR-015** (2026-07-27, RN-VNC-001..003,
+  RN-LOT-001): nuevas entidades `lote` (código, vencimiento, origen,
+  condición de almacenamiento) y `stock_lote` (saldo y estado por lote),
+  con control **opcional por artículo** (`articulo.controla_lote`) — los
+  perecibles lo llevan, las servilletas no. Toda salida de un artículo con
+  control se reparte por FEFO (vence antes, sale antes; el lote sin
+  vencimiento va al final y cae en FIFO) y genera **un movimiento por lote
+  tomado**, cada uno con su `lote_id`; un `lote_id` explícito es el
+  override del lote sugerido. El lote vencido se bloquea en el momento en
+  que el picking lo toca y publica `inventory.lote_vencido_detectado`, más
+  un barrido a demanda `POST /inventory/lotes/bloquear-vencidos`. Nuevos
+  endpoints `POST /inventory/lotes` y
+  `GET /inventory/lotes?almacen_id&sku_id&por_vencer_dias`. La recepción de
+  compra transporta `lote_codigo` y `fecha_vencimiento` declarados por el
+  proveedor (RN-VNC-002) y producción crea su lote con `origen=produccion`.
+  El hub de sucursal replica `lote` y `stock_lote` (ADR-009, 28 recursos):
+  sin ellos la venta offline no podría aplicar FEFO. Migración
+  `c9a2f4e18b60`. Tests: `tests/test_lotes.py`.
+
 - **Arquitectura frontend — ADR-013** (2026-07-27): Tailwind CSS sobre los
   tokens de marca ya definidos en `globals.css` (`tailwind.config.ts` mapea
   `bg-primary` → `var(--color-primary)`, nunca hex fijo); **Base UI**
@@ -48,6 +67,12 @@ Versionado: [SemVer](https://semver.org/lang/es/).
   Tests: `tests/test_tenant_aislamiento.py`.
 
 ### Changed
+
+- `POST /api/v1/inventory/movimientos` devuelve una **lista** de
+  movimientos en vez de uno solo: una salida FEFO puede repartirse entre
+  varios lotes y cada lote es un movimiento propio (ADR-015). El body
+  acepta además `lote_id` opcional. Cambio incompatible del contrato,
+  todavía sin consumidores (el frontend hoy es login + dashboard).
 
 - `VentaItemIn` (API pública de venta) ya no acepta `precio_unitario` ni
   `descuento`. El lote de sincronización del hub usa un tipo propio,

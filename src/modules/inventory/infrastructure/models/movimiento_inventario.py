@@ -46,6 +46,12 @@ class MovimientoInventario(Base, UuidPkMixin):
     tipo: Mapped[str] = mapped_column(TIPO_MOVIMIENTO)
     # Solo si tipo=ajuste.
     motivo_ajuste: Mapped[str | None] = mapped_column(MOTIVO_AJUSTE, nullable=True)
+    # NULL si el artículo no controla lote. Una salida que abarca varios
+    # lotes genera un movimiento por lote — la traza queda por lote, no
+    # agregada (ADR-015).
+    lote_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("lote.id"), nullable=True
+    )
     # Documento origen (id de compra, venta, ajuste, transferencia...).
     referencia: Mapped[str | None] = mapped_column(String(100), nullable=True)
     usuario_id: Mapped[uuid.UUID | None] = mapped_column(

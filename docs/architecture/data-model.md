@@ -228,7 +228,8 @@ erDiagram
   I+D; toda modificación genera reporte, recalcula costos, solicita
   actualizar manuales y notifica a los involucrados en fabricación
   (RN-PRD-008/009).
-- **lote**: código (asignado por el ERP, nomenclatura de Producción),
+- **lote** (implementada 2026-07-27, migración `c9a2f4e18b60`, ADR-015):
+  código (asignado por el ERP, nomenclatura de Producción),
   articulo_id, orden_produccion_id, fecha_elaboracion, manipulador_id,
   envasador_id, lugar_elaboracion, linea_produccion, variables_proceso
   (JSONB — ej. insumos ajustados en receta flexible), fecha_vencimiento
@@ -238,6 +239,14 @@ erDiagram
   imprime en la etiqueta de cada artículo producido (cantidad, UdM, código
   de barras/QR, lote, fecha de vencimiento, condiciones de almacenamiento/
   transporte — RN-LOT-002).
+  Alcance implementado: `articulo_id`, `codigo` (único por artículo; si el
+  origen no lo trae, se deriva del vencimiento), `fecha_vencimiento`,
+  `fecha_elaboracion`, `origen` (`compra`|`produccion`|`carga_inicial`|
+  `ajuste`), `referencia` (OC u orden de producción) y
+  `condicion_almacenamiento`. Diferido al slice de `production`, que es
+  quien los produce: `manipulador_id`, `envasador_id`, `lugar_elaboracion`,
+  `linea_produccion`, `variables_proceso`, `qr_payload` y la FK directa a
+  `orden_produccion` (hoy va como `referencia`).
 - **receta_item**: receta_id, articulo_id, cantidad, merma_pct (desperdicio
   esperado del insumo, ej. cáscara/semilla del tomate — base del costeo
   real de producción, RN-PRD-018), tipo_desperdicio (texto descriptivo,
@@ -319,7 +328,8 @@ descuenta stock vía la receta (ver [../domain/domain-model.md](../domain/domain
   fecha_apertura, condicion_almacenamiento (`refrigerado` | `congelado` |
   `ambiente`) — nullable, para calcular vida útil tras apertura
   (RN-VNC-003).
-- **stock_lote**: almacen_id, sku_id, lote_id, cantidad, estado
+- **stock_lote** (implementada 2026-07-27, ADR-015): almacen_id, sku_id,
+  lote_id, cantidad, estado
   (`disponible` | `bloqueado` | `agotado`). Detalle del stock por lote —
   la suma de sus cantidades por almacén/SKU cuadra con `stock.cantidad`.
   Es lo que hace implementable FEFO/FIFO: el picking sugiere el lote
@@ -329,6 +339,11 @@ descuenta stock vía la receta (ver [../domain/domain-model.md](../domain/domain
   `inventory.lote_vencido_detectado` → notificación + memorándum al
   responsable del almacén (vía RRHH), para que no se repita — apoya la
   rotación de inventarios (RN-VNC-001..003).
+  El control es **opcional por artículo** (`articulo.controla_lote`, nuevo):
+  un artículo sin control mueve solo `stock`, como antes. La ventana de
+  alerta de vencimiento se pasa hoy por consulta (`por_vencer_dias`) y no
+  está configurada por artículo todavía. El evento se publica sin
+  `responsable_id`: `almacen` no tiene responsable modelado.
 - **reserva_stock**: almacen_id, sku_id, cantidad, tipo (`solicitud` |
   `produccion` | `merma` | `carrito`), referencia_id (solicitud_id/
   orden_produccion_id/carrito_id; o motivo `devolucion`|`rechazo_sucursal`|

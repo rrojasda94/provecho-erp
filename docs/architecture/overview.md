@@ -79,3 +79,5 @@ Decisiones con alternativas viables se registran en [adr/](adr/). Vigentes:
 | [010](adr/ADR-010-contrato-openapi-exportado.md) | Contrato OpenAPI exportado a `docs/architecture/openapi.json`, verificado en CI |
 | [011](adr/ADR-011-derechos-arco-anonimizacion.md) | Derechos ARCO: cancelación de `persona` por anonimización, no borrado físico |
 | [012](adr/ADR-012-dashboard-gerencial-y-slice-minimo-de-caja.md) | Dashboard gerencial (agregador en `core`) + slice mínimo de caja con reconciliación real |
+| [013](adr/ADR-013-arquitectura-frontend.md) | Frontend: Tailwind + Base UI, shell estilo Odoo, rutas filtradas por permiso; PWA en vez de app nativa |
+| [015](adr/ADR-015-lote-y-fefo.md) | Lote y FEFO: `stock_lote` como detalle de `stock`, control opcional por artículo, un movimiento por lote |

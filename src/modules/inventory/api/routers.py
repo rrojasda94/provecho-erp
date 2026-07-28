@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from src.core.tenant import Tenant
 from src.modules.inventory.api import schemas
 from src.modules.inventory.application import ajustes, catalogo
+from src.modules.inventory.application import lotes as lotes_uc
 from src.modules.inventory.application import stock as stock_uc
 from src.modules.inventory.application.errors import (
     Conflicto,
@@ -23,6 +24,7 @@ from src.modules.inventory.application.scope import (
     exigir_ajuste,
     exigir_almacen,
     exigir_articulo,
+    exigir_lote,
 )
 from src.modules.users.api.deps import get_db, get_tenant, require_permission
 from src.modules.users.infrastructure.models import Usuario
@@ -96,6 +98,7 @@ def crear_articulo(
             tipo=body.tipo,
             categoria_id=body.categoria_id,
             costo_promedio=body.costo_promedio,
+            controla_lote=body.controla_lote,
         )
     except (Conflicto, NoEncontrado) as e:
         raise _http(e) from e
@@ -168,29 +171,117 @@ def consultar_stock(
     return stock_uc.consultar_stock(session, almacen_id, tenant.filtro_empresa())
 
 
-@router.post("/movimientos", response_model=schemas.MovimientoOut, status_code=201)
+@router.post("/movimientos", response_model=list[schemas.MovimientoOut], status_code=201)
 def registrar_movimiento(
     body: schemas.MovimientoCreate,
     actor: Usuario = Depends(require_permission(MOVIMIENTO)),
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
+    """Devuelve una lista porque una salida FEFO puede repartirse entre
+    varios lotes, y cada lote es un movimiento propio (ADR-015)."""
     try:
         exigir_almacen(session, body.almacen_id, tenant)
-        mov, _ = stock_uc.registrar_movimiento(
-            session,
-            almacen_id=body.almacen_id,
-            sku_id=body.sku_id,
-            cantidad=body.cantidad,
-            tipo=body.tipo,
-            usuario_id=actor.id,
-            referencia=body.referencia,
-            id=body.id,
-        )
+        if body.lote_id is not None:
+            exigir_lote(session, body.lote_id, tenant)
+        if body.cantidad < 0:
+            movs = stock_uc.registrar_salida(
+                session,
+                almacen_id=body.almacen_id,
+                sku_id=body.sku_id,
+                cantidad=-body.cantidad,
+                tipo=body.tipo,
+                usuario_id=actor.id,
+                referencia=body.referencia,
+                lote_id=body.lote_id,
+            )
+        else:
+            mov, _ = stock_uc.registrar_movimiento(
+                session,
+                almacen_id=body.almacen_id,
+                sku_id=body.sku_id,
+                cantidad=body.cantidad,
+                tipo=body.tipo,
+                usuario_id=actor.id,
+                referencia=body.referencia,
+                lote_id=body.lote_id,
+                id=body.id,
+            )
+            movs = [mov]
     except (NoEncontrado, ReglaNegocio, StockInsuficiente) as e:
         raise _http(e) from e
     session.commit()
-    return mov
+    return movs
+
+
+# --- Lotes / FEFO -----------------------------------------------------------
+@router.post("/lotes", response_model=schemas.LoteOut, status_code=201)
+def crear_lote(
+    body: schemas.LoteCreate,
+    _: Usuario = Depends(require_permission(MOVIMIENTO)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    try:
+        exigir_articulo(session, body.articulo_id, tenant)
+        lote = lotes_uc.crear_lote(session, **body.model_dump())
+    except (NoEncontrado, ReglaNegocio) as e:
+        raise _http(e) from e
+    session.commit()
+    return lote
+
+
+@router.get("/lotes", response_model=list[schemas.StockLoteOut])
+def listar_lotes(
+    almacen_id: uuid.UUID | None = None,
+    sku_id: uuid.UUID | None = None,
+    por_vencer_dias: int | None = None,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Saldo por lote en orden de vencimiento. `por_vencer_dias` acota a los
+    que vencen dentro de esa ventana (incluye los ya vencidos)."""
+    try:
+        if almacen_id is not None:
+            exigir_almacen(session, almacen_id, tenant)
+    except NoEncontrado as e:
+        raise _http(e) from e
+    return lotes_uc.listar(
+        session,
+        almacen_id=almacen_id,
+        sku_id=sku_id,
+        empresa_id=tenant.filtro_empresa(),
+        por_vencer_dias=por_vencer_dias,
+    )
+
+
+@router.post("/lotes/bloquear-vencidos", response_model=list[schemas.StockLoteOut])
+def bloquear_vencidos(
+    almacen_id: uuid.UUID | None = None,
+    _: Usuario = Depends(require_permission(MOVIMIENTO)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Barrido de vencidos: bloquea y publica `inventory.lote_vencido_detectado`.
+    El picking ya lo hace al tocar cada lote; esto lo adelanta a demanda."""
+    try:
+        if almacen_id is not None:
+            exigir_almacen(session, almacen_id, tenant)
+    except NoEncontrado as e:
+        raise _http(e) from e
+    bloqueados = lotes_uc.bloquear_vencidos(
+        session, almacen_id, tenant.filtro_empresa()
+    )
+    ids = [b.lote_id for b in bloqueados]
+    session.commit()
+    return [
+        fila
+        for fila in lotes_uc.listar(
+            session, almacen_id=almacen_id, empresa_id=tenant.filtro_empresa()
+        )
+        if fila["lote_id"] in ids
+    ]
 
 
 # --- Ajustes (segregación solicitar/aprobar) --------------------------------

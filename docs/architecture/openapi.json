@@ -527,6 +527,11 @@
             ],
             "title": "Categoria Id"
           },
+          "controla_lote": {
+            "default": false,
+            "title": "Controla Lote",
+            "type": "boolean"
+          },
           "costo_promedio": {
             "anyOf": [
               {
@@ -602,6 +607,10 @@
             ],
             "title": "Categoria Id"
           },
+          "controla_lote": {
+            "title": "Controla Lote",
+            "type": "boolean"
+          },
           "costo_promedio": {
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Costo Promedio",
@@ -644,7 +653,8 @@
           "tipo",
           "categoria_id",
           "costo_promedio",
-          "archivado"
+          "archivado",
+          "controla_lote"
         ],
         "title": "ArticuloOut",
         "type": "object"
@@ -673,6 +683,17 @@
               }
             ],
             "title": "Categoria Id"
+          },
+          "controla_lote": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Controla Lote"
           },
           "costo_promedio": {
             "anyOf": [
@@ -2543,6 +2564,163 @@
         "title": "LoginIn",
         "type": "object"
       },
+      "LoteCreate": {
+        "properties": {
+          "articulo_id": {
+            "format": "uuid",
+            "title": "Articulo Id",
+            "type": "string"
+          },
+          "codigo": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Codigo"
+          },
+          "condicion_almacenamiento": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Condicion Almacenamiento"
+          },
+          "fecha_elaboracion": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Elaboracion"
+          },
+          "fecha_vencimiento": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Vencimiento"
+          },
+          "origen": {
+            "default": "carga_inicial",
+            "title": "Origen",
+            "type": "string"
+          },
+          "referencia": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referencia"
+          }
+        },
+        "required": [
+          "articulo_id"
+        ],
+        "title": "LoteCreate",
+        "type": "object"
+      },
+      "LoteOut": {
+        "properties": {
+          "articulo_id": {
+            "format": "uuid",
+            "title": "Articulo Id",
+            "type": "string"
+          },
+          "codigo": {
+            "title": "Codigo",
+            "type": "string"
+          },
+          "condicion_almacenamiento": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Condicion Almacenamiento"
+          },
+          "fecha_elaboracion": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Elaboracion"
+          },
+          "fecha_vencimiento": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Vencimiento"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "origen": {
+            "title": "Origen",
+            "type": "string"
+          },
+          "referencia": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referencia"
+          }
+        },
+        "required": [
+          "id",
+          "articulo_id",
+          "codigo",
+          "fecha_vencimiento",
+          "fecha_elaboracion",
+          "origen",
+          "referencia",
+          "condicion_almacenamiento"
+        ],
+        "title": "LoteOut",
+        "type": "object"
+      },
       "LoteSyncIn": {
         "properties": {
           "pagos": {
@@ -2841,6 +3019,18 @@
             ],
             "title": "Id"
           },
+          "lote_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lote Id"
+          },
           "referencia": {
             "anyOf": [
               {
@@ -3031,6 +3221,18 @@
             "title": "Id",
             "type": "string"
           },
+          "lote_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lote Id"
+          },
           "sku_id": {
             "format": "uuid",
             "title": "Sku Id",
@@ -3046,7 +3248,8 @@
           "almacen_id",
           "sku_id",
           "cantidad",
-          "tipo"
+          "tipo",
+          "lote_id"
         ],
         "title": "MovimientoOut",
         "type": "object"
@@ -5021,6 +5224,30 @@
             ],
             "title": "Costo Unitario"
           },
+          "fecha_vencimiento": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Vencimiento"
+          },
+          "lote_codigo": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lote Codigo"
+          },
           "orden_compra_item_id": {
             "format": "uuid",
             "title": "Orden Compra Item Id",
@@ -5746,6 +5973,73 @@
           "aprobador_id"
         ],
         "title": "SolicitudPermisoOut",
+        "type": "object"
+      },
+      "StockLoteOut": {
+        "description": "Saldo por lote — el listado que el picking lee en orden FEFO.",
+        "properties": {
+          "almacen_id": {
+            "format": "uuid",
+            "title": "Almacen Id",
+            "type": "string"
+          },
+          "articulo_id": {
+            "format": "uuid",
+            "title": "Articulo Id",
+            "type": "string"
+          },
+          "cantidad": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Cantidad",
+            "type": "string"
+          },
+          "codigo": {
+            "title": "Codigo",
+            "type": "string"
+          },
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          },
+          "fecha_vencimiento": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Vencimiento"
+          },
+          "lote_id": {
+            "format": "uuid",
+            "title": "Lote Id",
+            "type": "string"
+          },
+          "sku_id": {
+            "format": "uuid",
+            "title": "Sku Id",
+            "type": "string"
+          },
+          "vencido": {
+            "title": "Vencido",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "lote_id",
+          "codigo",
+          "articulo_id",
+          "almacen_id",
+          "sku_id",
+          "cantidad",
+          "estado",
+          "fecha_vencimiento",
+          "vencido"
+        ],
+        "title": "StockLoteOut",
         "type": "object"
       },
       "StockOut": {
@@ -8440,8 +8734,206 @@
         ]
       }
     },
+    "/api/v1/inventory/lotes": {
+      "get": {
+        "description": "Saldo por lote en orden de vencimiento. `por_vencer_dias` acota a los\nque vencen dentro de esa ventana (incluye los ya vencidos).",
+        "operationId": "listar_lotes_api_v1_inventory_lotes_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "almacen_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Almacen Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sku_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sku Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "por_vencer_dias",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Por Vencer Dias"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/StockLoteOut"
+                  },
+                  "title": "Response Listar Lotes Api V1 Inventory Lotes Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Lotes",
+        "tags": [
+          "inventory"
+        ]
+      },
+      "post": {
+        "operationId": "crear_lote_api_v1_inventory_lotes_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoteCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoteOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Lote",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/lotes/bloquear-vencidos": {
+      "post": {
+        "description": "Barrido de vencidos: bloquea y publica `inventory.lote_vencido_detectado`.\nEl picking ya lo hace al tocar cada lote; esto lo adelanta a demanda.",
+        "operationId": "bloquear_vencidos_api_v1_inventory_lotes_bloquear_vencidos_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "almacen_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Almacen Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/StockLoteOut"
+                  },
+                  "title": "Response Bloquear Vencidos Api V1 Inventory Lotes Bloquear Vencidos Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Bloquear Vencidos",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
     "/api/v1/inventory/movimientos": {
       "post": {
+        "description": "Devuelve una lista porque una salida FEFO puede repartirse entre\nvarios lotes, y cada lote es un movimiento propio (ADR-015).",
         "operationId": "registrar_movimiento_api_v1_inventory_movimientos_post",
         "requestBody": {
           "content": {
@@ -8458,7 +8950,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MovimientoOut"
+                  "items": {
+                    "$ref": "#/components/schemas/MovimientoOut"
+                  },
+                  "title": "Response Registrar Movimiento Api V1 Inventory Movimientos Post",
+                  "type": "array"
                 }
               }
             },

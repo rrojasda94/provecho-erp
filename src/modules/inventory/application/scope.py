@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from src.core.tenant import Tenant
 from src.modules.inventory.application.errors import NoEncontrado
-from src.modules.inventory.infrastructure.models import Ajuste, Articulo
+from src.modules.inventory.infrastructure.models import Ajuste, Articulo, Lote
 from src.modules.users.infrastructure.models import Almacen
 
 
@@ -30,6 +30,14 @@ def exigir_articulo(
         raise NoEncontrado("artículo no encontrado")
     tenant.exigir_empresa(articulo.empresa_id)
     return articulo
+
+
+def exigir_lote(session: Session, lote_id: uuid.UUID, tenant: Tenant) -> Lote:
+    lote = session.get(Lote, lote_id)
+    if lote is None:
+        raise NoEncontrado("lote no encontrado")
+    exigir_articulo(session, lote.articulo_id, tenant)
+    return lote
 
 
 def exigir_ajuste(session: Session, ajuste_id: uuid.UUID, tenant: Tenant) -> Ajuste:

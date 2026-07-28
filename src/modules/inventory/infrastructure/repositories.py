@@ -9,9 +9,11 @@ from src.modules.inventory.infrastructure.models import (
     Ajuste,
     Articulo,
     Categoria,
+    Lote,
     MovimientoInventario,
     Sku,
     Stock,
+    StockLote,
 )
 from src.modules.users.infrastructure.models import Almacen
 
@@ -137,6 +139,95 @@ class MovimientoRepo:
                 .order_by(MovimientoInventario.ts)
             )
         )
+
+
+class LoteRepo:
+    def __init__(self, session: Session) -> None:
+        self.s = session
+
+    def get(self, lote_id: uuid.UUID) -> Lote | None:
+        return self.s.get(Lote, lote_id)
+
+    def get_by_codigo(self, articulo_id: uuid.UUID, codigo: str) -> Lote | None:
+        return self.s.scalar(
+            select(Lote).where(Lote.articulo_id == articulo_id, Lote.codigo == codigo)
+        )
+
+    def add(self, lote: Lote) -> Lote:
+        self.s.add(lote)
+        self.s.flush()
+        return lote
+
+
+class StockLoteRepo:
+    def __init__(self, session: Session) -> None:
+        self.s = session
+
+    def get(
+        self,
+        almacen_id: uuid.UUID,
+        sku_id: uuid.UUID,
+        lote_id: uuid.UUID,
+        for_update: bool = False,
+    ) -> StockLote | None:
+        q = select(StockLote).where(
+            StockLote.almacen_id == almacen_id,
+            StockLote.sku_id == sku_id,
+            StockLote.lote_id == lote_id,
+        )
+        if for_update:
+            q = q.with_for_update()
+        return self.s.scalar(q)
+
+    def fefo(self, almacen_id: uuid.UUID, sku_id: uuid.UUID) -> list[StockLote]:
+        """Lotes con saldo, ordenados por vencimiento más próximo; los que no
+        vencen van al final y entre ellos manda el más antiguo (FIFO)."""
+        return list(
+            self.s.scalars(
+                select(StockLote)
+                .join(Lote, Lote.id == StockLote.lote_id)
+                .where(
+                    StockLote.almacen_id == almacen_id,
+                    StockLote.sku_id == sku_id,
+                    StockLote.cantidad > 0,
+                )
+                .order_by(
+                    Lote.fecha_vencimiento.is_(None),
+                    Lote.fecha_vencimiento,
+                    Lote.created_at,
+                )
+            )
+        )
+
+    def list(
+        self,
+        almacen_id: uuid.UUID | None = None,
+        sku_id: uuid.UUID | None = None,
+        empresa_id: uuid.UUID | None = None,
+    ) -> list[tuple[StockLote, Lote]]:
+        q = select(StockLote, Lote).join(Lote, Lote.id == StockLote.lote_id)
+        if almacen_id is not None:
+            q = q.where(StockLote.almacen_id == almacen_id)
+        if sku_id is not None:
+            q = q.where(StockLote.sku_id == sku_id)
+        if empresa_id is not None:
+            # El stock no lleva empresa: la hereda del almacén (ADR-004).
+            q = q.join(Almacen, Almacen.id == StockLote.almacen_id).where(
+                Almacen.empresa_id == empresa_id
+            )
+        return [
+            (sl, lote)
+            for sl, lote in self.s.execute(
+                q.order_by(
+                    Lote.fecha_vencimiento.is_(None), Lote.fecha_vencimiento
+                )
+            )
+        ]
+
+    def add(self, stock_lote: StockLote) -> StockLote:
+        self.s.add(stock_lote)
+        self.s.flush()
+        return stock_lote
 
 
 class AjusteRepo:

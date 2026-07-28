@@ -1,6 +1,7 @@
 """DTOs (pydantic) del módulo inventory."""
 
 import uuid
+from datetime import date
 from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -32,6 +33,8 @@ class ArticuloCreate(BaseModel):
     tipo: str = Field(max_length=30)
     categoria_id: uuid.UUID | None = None
     costo_promedio: Decimal = Decimal(0)
+    # Perecible o trazable → su stock se mueve por lote y respeta FEFO.
+    controla_lote: bool = False
 
 
 class ArticuloUpdate(BaseModel):
@@ -40,6 +43,7 @@ class ArticuloUpdate(BaseModel):
     tipo: str | None = None
     costo_promedio: Decimal | None = None
     archivado: bool | None = None
+    controla_lote: bool | None = None
 
 
 class ArticuloOut(BaseModel):
@@ -53,6 +57,7 @@ class ArticuloOut(BaseModel):
     categoria_id: uuid.UUID | None
     costo_promedio: Decimal
     archivado: bool
+    controla_lote: bool
 
 
 # --- SKU ---
@@ -78,6 +83,8 @@ class MovimientoCreate(BaseModel):
     cantidad: Decimal  # con signo: + ingreso, − salida
     tipo: str
     referencia: str | None = None
+    # Override del lote sugerido por FEFO; NULL deja que el ERP lo elija.
+    lote_id: uuid.UUID | None = None
     # Identificador generado por el cliente: permite que un dispositivo que
     # ya creó el movimiento sin conexión conserve su id (ADR-009).
     id: uuid.UUID | None = None
@@ -90,6 +97,7 @@ class MovimientoOut(BaseModel):
     sku_id: uuid.UUID
     cantidad: Decimal
     tipo: str
+    lote_id: uuid.UUID | None
 
 
 class StockOut(BaseModel):
@@ -98,6 +106,43 @@ class StockOut(BaseModel):
     cantidad: Decimal
     stock_minimo: Decimal | None
     bajo_minimo: bool
+
+
+# --- Lotes ---
+class LoteCreate(BaseModel):
+    articulo_id: uuid.UUID
+    # Sin código, el ERP lo deriva del vencimiento (RN-LOT-001).
+    codigo: str | None = Field(default=None, max_length=50)
+    fecha_vencimiento: date | None = None
+    fecha_elaboracion: date | None = None
+    origen: str = "carga_inicial"
+    referencia: str | None = None
+    condicion_almacenamiento: str | None = None
+
+
+class LoteOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    articulo_id: uuid.UUID
+    codigo: str
+    fecha_vencimiento: date | None
+    fecha_elaboracion: date | None
+    origen: str
+    referencia: str | None
+    condicion_almacenamiento: str | None
+
+
+class StockLoteOut(BaseModel):
+    """Saldo por lote — el listado que el picking lee en orden FEFO."""
+    lote_id: uuid.UUID
+    codigo: str
+    articulo_id: uuid.UUID
+    almacen_id: uuid.UUID
+    sku_id: uuid.UUID
+    cantidad: Decimal
+    estado: str
+    fecha_vencimiento: date | None
+    vencido: bool
 
 
 # --- Ajustes ---
