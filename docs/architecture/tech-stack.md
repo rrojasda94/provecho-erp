@@ -6,7 +6,7 @@ Decisión formal en [adr/ADR-002-stack-tecnologico.md](adr/ADR-002-stack-tecnolo
 |------|----------|-----------------|
 | Backend | Python 3.12+ / FastAPI | Tipado con Pydantic, OpenAPI automático, ecosistema IA |
 | ORM / Migraciones | SQLAlchemy 2 / Alembic | Repository/UoW naturales, migraciones versionadas |
-| Frontend | Next.js / React / TypeScript / Tailwind / Base UI | Webapp responsive (PWA, no app nativa — ver [ADR-013](adr/ADR-013-arquitectura-frontend.md)) |
+| Frontend | Next.js / React / TypeScript / Tailwind / shadcn/ui (sobre Base UI) | Webapp responsive (PWA, no app nativa — ver [ADR-013](adr/ADR-013-arquitectura-frontend.md)) |
 | Base de datos | PostgreSQL | Transaccional, JSONB para auditoría |
 | Cache | Redis | Cache y broker de Celery |
 | Workers | Celery | Colas: emisión de comprobantes (Factiliza), notificaciones, integraciones |

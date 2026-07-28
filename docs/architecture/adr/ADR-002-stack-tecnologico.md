@@ -20,6 +20,6 @@
 
 - ~~Pasarela de pago~~: resuelto en ADR-003 (Izipay).
 - ~~App Android 15+: PWA (TWA) vs app nativa/React Native~~: resuelto en
-  ADR-013 (PWA/responsive — Next.js + Tailwind + Base UI es 100% web, sin
+  ADR-013 (PWA/responsive — Next.js + Tailwind + shadcn/ui es 100% web, sin
   base de código separada).
 - Broker de notificaciones y canales.

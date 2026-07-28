@@ -9,10 +9,13 @@ Leer antes: `/CLAUDE.md`, [product/ui-ux.md](../product/ui-ux.md) y
   mapeados en `tailwind.config.ts` (`bg-primary` → `var(--color-primary)`) —
   nunca hex ni tamaño mágico, ni en CSS ni en className (PDV/Kiosk re-tematizan
   por marca pisando las variables; el resto de módulos usa Provecho/Majambo).
-- **Base UI** (`@base-ui-components/react`) para overlays/interacción con
-  reglas de accesibilidad no triviales (dialog, combobox, popover, tooltip,
-  tabs/menu) — nunca Radix, nunca un kit ya estilizado (shadcn/ui, MUI). Lo
-  demás (tarjetas, grillas, botones simples) es HTML + Tailwind sin librería.
+- **shadcn/ui** (componentes copiados a `components/ui/`, no una librería
+  instalada) para overlays/interacción con reglas de accesibilidad no
+  triviales (dialog, combobox, popover, tooltip, tabs/menu) y el catálogo
+  base (Button, Input, Select, Card, Badge...) — corre sobre **Base UI**
+  (nunca Radix). Podar el catálogo por defecto a lo que el ERP usa, nunca
+  copiar el registro completo. Tarjetas/grillas simples sin comportamiento
+  interactivo siguen siendo HTML + Tailwind sin componente.
 - **Shell estilo Odoo**: home de apps (grilla de módulos, `app/(app)/apps.config.ts`)
   + navegación con sidebar dentro de cada módulo. Un módulo solo aparece en
   el grid, y solo es accesible por URL directa, si `permisos` (de

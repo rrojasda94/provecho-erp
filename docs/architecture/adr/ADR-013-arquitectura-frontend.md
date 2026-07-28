@@ -1,7 +1,15 @@
-# ADR-013 — Arquitectura frontend: Tailwind + Base UI, shell estilo Odoo, gate por permiso
+# ADR-013 — Arquitectura frontend: Tailwind + shadcn/ui, shell estilo Odoo, gate por permiso
 
 - Estado: aceptado
-- Fecha: 2026-07-27
+- Fecha: 2026-07-27 (actualizado 2026-07-27, misma fecha — ver nota abajo)
+
+**Actualización (misma fecha, sesión distinta)**: la sección 2 (primitivas de
+interacción) cambió de Base UI directo a **shadcn/ui** — decisión revisada a
+pedido del negocio para priorizar velocidad y facilidad de editar
+color/forma por marca (ver razón completa en la sección 2). El resto del
+ADR (Tailwind, shell estilo Odoo, gate por permiso, sin Radix, sin app
+nativa) no cambia. `docs/product/frontend-architecture.md` (F2.4) y
+`docs/prompts/frontend.md` se actualizan en el mismo cambio.
 
 ## Contexto
 
@@ -65,31 +73,82 @@ export default {
 Así `bg-primary` compila a `background-color: var(--color-primary)`: el
 theming multi-marca de PDV/Kiosk (ADR pendiente en `ui-ux.md`) sigue
 resolviéndose en runtime pisando las variables CSS en `<html data-theme>`
-—Tailwind no necesita recompilar nada al cambiar de marca. Mismo patrón que
-usa shadcn/ui, no es una invención de este ADR.
+—Tailwind no necesita recompilar nada al cambiar de marca.
+
+Con shadcn/ui (sección 2) el set de tokens se amplía a roles semánticos
+(convención shadcn) mapeados a los MISMOS 6 tokens de marca — no se
+inventa una paleta paralela, se remapea:
+
+```css
+/* globals.css — bloque por marca, ej. [data-brand="charlies"] */
+--background: var(--color-cream);
+--foreground: var(--color-dark);
+--primary: var(--color-primary);
+--primary-foreground: #fff;
+--secondary: var(--color-secondary);
+--muted: var(--color-gray);
+--accent: var(--color-accent);
+--radius: 0.5rem; /* forma — un solo valor controla todos los componentes */
+```
+
+Esto es lo que responde directo al objetivo de negocio (perfiles de marca
+editables rápido): un bloque de variables por marca (`[data-brand="..."]`)
+controla color Y forma de cada componente shadcn a la vez, sin tocar
+componentes.
 
 **Regla dura que reemplaza a la de `docs/prompts/frontend.md`**: ningún hex
 ni tamaño mágico ni en CSS ni en className — todo vía `tailwind.config.ts`
 apuntando a los tokens, o clases utilitarias existentes de la escala de
 Tailwind.
 
-### 2. Primitivas de interacción: Base UI
+### 2. Primitivas de interacción: shadcn/ui (sobre Base UI)
 
-[Base UI](https://base-ui.com) (`@base-ui-components/react`) — librería
-headless mantenida por el equipo de MUI, sucesora directa del linaje que
-incluye a Radix (mismo espacio: overlays/combobox/dialog accesibles, cero
-estilos propios, se pinta 100% con Tailwind). Es la base de facto de
-shadcn/ui hoy. Se usa **solo para lo que de verdad necesita comportamiento
-accesible no trivial** — dialog (personalización de producto, upsell),
-combobox (buscador), popover, tooltip (ayuda contextual por campo),
-tabs/menu (navegación dentro de módulo). Todo lo demás (tarjetas, grillas,
-botones simples) sigue siendo HTML + Tailwind sin librería, como hoy.
+**Revisado 2026-07-27** (ver nota de actualización arriba). Decisión
+original: Base UI directo, construyendo cada componente a mano. Se cambia a
+**shadcn/ui** por el objetivo real del negocio — editar color y forma por
+marca rápido, con el mínimo trabajo de mantenimiento — al que shadcn le pega
+mejor que construir a mano:
 
-No se adopta un kit de componentes ya estilizado (shadcn/ui, MUI completo,
-etc.) — el pedido es una identidad visual propia parecida a Odoo, no la
-estética de un kit de terceros; adoptar uno completo obligaría a
-sobre-escribir su tema entero, que es más trabajo que partir de primitivas
-sin estilo.
+- **shadcn/ui no es una dependencia instalada, es un generador**: el CLI
+  copia el código fuente de cada componente a `components/ui/` — queda en
+  el repo, se edita directo, no hay versión de librería que actualizar ni
+  API de terceros que aprender. Sigue siendo "nuestro" código, no un kit
+  cerrado.
+- **[Base UI](https://base-ui.com) sigue siendo la base** — shadcn/ui corre
+  sobre Base UI (no Radix; el equipo de MUI mantiene ambos), así que la
+  decisión "sin Radix" del negocio no cambia, solo cómo se llega a Base UI:
+  a mano vs. vía shadcn.
+- **Token set semántico ya cableado**: shadcn viene con roles
+  (`--primary`, `--secondary`, `--background`, `--foreground`, `--muted`,
+  `--accent`, `--destructive`, `--radius`) en vez de los 6 tokens crudos
+  actuales — cambiar de marca es reemplazar un bloque de variables, los
+  componentes leen el rol, no el color literal. `--radius` en particular
+  controla la forma (esquinas) de **todos** los componentes con una sola
+  variable — exactamente lo que se pidió ("más sencillo editar los colores
+  y formas en el futuro").
+- **Se ahorra construir el catálogo base a mano**: el plan original exigía
+  levantar Button/Input/Select/Dialog/Tabs/Toast/etc. sobre Base UI uno por
+  uno para llegar al mismo resultado de theming. shadcn ya los trae
+  pre-armados sobre el mismo Base UI — se editan, no se construyen desde
+  cero.
+
+Se usa igual que se planeaba usar Base UI: solo donde hace falta
+comportamiento accesible real (dialog, combobox, popover, tooltip,
+tabs/menu) más el catálogo base (Button, Input, Select, Checkbox, Switch,
+Card, Badge, Skeleton). Tarjetas/grillas simples sin comportamiento
+interactivo siguen siendo HTML + Tailwind sin componente.
+
+**Con qué cuidado**: el catálogo que trae `shadcn init` es más grande que lo
+que este ERP necesita día uno — revisar y podar, no copiar todo el
+registro. Si se usa un `--preset` de un registro externo (ej. tweakcn), es
+punto de partida de **forma/espaciado únicamente** — los colores finales
+siempre son los de `docs/product/ui-ux.md`, nunca los del preset tal cual.
+
+**Alternativas evaluadas y descartadas para este mismo objetivo** (además
+de las de la sección "Alternativas descartadas" original): Panda CSS /
+vanilla-extract — no aportan nada extra para theming en runtime (las
+variables CSS ya resuelven el cambio de marca en runtime, sin importar el
+motor de estilos) y suman una herramienta de build sin beneficio real.
 
 ### 3. Shell general — home de apps + navegación dentro de módulo (patrón Odoo)
 
@@ -158,7 +217,7 @@ frontend/app/
       page.tsx
     ...
 frontend/components/
-  ui/                    # wrappers propios sobre Base UI (Dialog, Combobox, Tooltip...)
+  ui/                    # componentes shadcn/ui (copiados por el CLI, editables) sobre Base UI
   shell/                 # AppGrid, Sidebar, Breadcrumb — layout, no de un módulo
 frontend/lib/
 ```
@@ -187,7 +246,7 @@ flujos de plata sobre cobertura unitaria de componentes sueltos.
 
 ### 7. Android: webapp responsive, no nativo
 
-Esta pila (Next.js + Tailwind + Base UI) es 100% web. Elegirla **resuelve**
+Esta pila (Next.js + Tailwind + shadcn/ui) es 100% web. Elegirla **resuelve**
 el pendiente abierto en ROADMAP ("App Android (15+) — evaluar PWA vs
 nativo"): queda decidido **PWA/responsive**, no una app nativa separada —
 construir una app React Native/Kotlin en paralelo duplicaría toda esta
@@ -215,8 +274,15 @@ en variedad de color de fondo.
 - Cada módulo nuevo de frontend agrega una fila a `APPS` en
   `apps.config.ts` y un `layout.tsx` propio con su guard de permiso — no hay
   paso manual adicional en el backend, `permisos` ya viaja en `/users/me`.
-- Nuevas dependencias: `tailwindcss`, `@base-ui-components/react`,
-  `@playwright/test` (dev). Ninguna toca el backend.
+- Nuevas dependencias: `tailwindcss`, componentes de shadcn/ui (código
+  copiado a `components/ui/`, no una librería instalada — trae consigo
+  `@base-ui-components/react`, `class-variance-authority`, `tailwind-merge`
+  como dependencias reales), `@playwright/test` (dev). Ninguna toca el
+  backend.
+- `npx shadcn@latest init` genera `components.json` (config del CLI) y
+  escribe sobre `tailwind.config.ts`/`globals.css` — al correrlo, remapear
+  sus tokens genéricos a los 6 tokens de marca de Provecho (ver ejemplo de
+  la sección 1) antes de aceptar el resultado por defecto.
 - El mecanismo de theming multi-marca de PDV/Kiosk (variables CSS en
   `data-theme`) queda fijado como parte de este ADR aunque el catálogo
   exacto de temas por marca sigue pendiente de negocio (ya declarado en
@@ -226,11 +292,20 @@ en variedad de color de fondo.
 
 - **Radix UI** — descartado explícitamente (pedido del negocio); Base UI
   cubre el mismo rol (headless, accesible, sin estilos) con el mismo modelo
-  mental, así que no hay costo real de cambiarlo.
-- **shadcn/ui u otro kit ya estilizado** — descartado: la interfaz debe
-  parecerse a Odoo con la identidad Provecho, no a la estética por defecto
-  de un kit; partir de primitivas sin estilo (Base UI) da control total sin
-  pelear contra un tema ajeno.
+  mental, así que no hay costo real de cambiarlo. shadcn/ui corre sobre Base
+  UI, así que adoptarlo (sección 2) no reabre esta decisión.
+- **Base UI directo, sin shadcn** (plan original de este ADR) — descartado
+  tras revisar el objetivo real: construir el catálogo de componentes a
+  mano llega al mismo mecanismo de theming (variables CSS) con más trabajo
+  propio y un token set más pobre (6 tokens crudos vs. los roles semánticos
+  + `--radius` que trae shadcn) — peor ajuste al pedido de negocio de poder
+  editar color y forma por marca rápido. Ver sección 2 para el detalle
+  completo de esta revisión.
+- **MUI completo u otro kit con estética propia fuerte** — descartado: la
+  interfaz debe parecerse a Odoo con la identidad Provecho, no a la
+  estética por defecto de un kit; shadcn no cuenta como este caso porque no
+  es un kit cerrado (el código se copia y se edita, no se hereda un tema
+  ajeno que sobrescribir).
 - **CSS vanilla sin Tailwind** (seguir como hoy) — descartado: con 9 módulos
   de negocio por construir, la velocidad de utilidades de Tailwind sobre los
   mismos tokens vale más que el costo de la dependencia; no se pierde nada

@@ -5,6 +5,21 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
+### Changed
+
+- **ADR-013 revisado — shadcn/ui en vez de Base UI directo** (2026-07-27):
+  las primitivas de interacción del frontend pasan de "Base UI construido a
+  mano" a **shadcn/ui** (que corre sobre Base UI — sigue sin Radix). Motivo:
+  el objetivo real de negocio es poder editar color y forma por marca
+  rápido; shadcn trae un token set semántico (`--primary`, `--muted`,
+  `--radius`...) ya cableado a todo su catálogo de componentes, en vez de
+  construir ese mismo mecanismo de theming a mano componente por
+  componente. shadcn/ui no es una dependencia instalada — el CLI copia el
+  código fuente a `components/ui/`, se edita directo. `docs/architecture/adr/ADR-013-arquitectura-frontend.md`,
+  `docs/product/frontend-architecture.md`, `docs/prompts/frontend.md`,
+  `docs/architecture/tech-stack.md` y `docs/architecture/overview.md`
+  actualizados. Sin implementación de código todavía.
+
 ### Added
 
 - **Permiso `gerencia.gestionar_parametros_empresa`** (2026-07-27,
