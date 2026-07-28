@@ -7,8 +7,11 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 # --- Categorías ---
+# `empresa_id` sale del JWT (ADR-004). Solo un superusuario sin empresa
+# asignada puede indicarla; a cualquier otro usuario, una empresa distinta
+# a la suya le responde 403.
 class CategoriaCreate(BaseModel):
-    empresa_id: uuid.UUID
+    empresa_id: uuid.UUID | None = None
     nombre: str = Field(min_length=1, max_length=100)
     asiento_contable_config: dict | None = None
 
@@ -22,7 +25,7 @@ class CategoriaOut(BaseModel):
 
 # --- Artículos ---
 class ArticuloCreate(BaseModel):
-    empresa_id: uuid.UUID
+    empresa_id: uuid.UUID | None = None
     id_interno: str = Field(min_length=1, max_length=4)
     nombre: str = Field(min_length=1, max_length=150)
     unidad_medida_id: uuid.UUID

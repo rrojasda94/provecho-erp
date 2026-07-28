@@ -6,6 +6,28 @@ CANALES = {"pdv", "agente_ia", "delivery"}
 MODALIDADES = {"mesa", "takeout", "delivery"}
 
 
+def especificidad_lista(sucursal_id, canal: str | None, modalidad: str | None) -> int:
+    """Cuántas dimensiones de ámbito acota una lista de precios. Una lista de
+    sucursal+canal (2) gana a una de solo canal (1)."""
+    return sum(1 for campo in (sucursal_id, canal, modalidad) if campo is not None)
+
+
+def elegir_lista_precio(candidatas: list) -> object | None:
+    """De las listas ya filtradas por vigencia y ámbito compatible, gana la
+    promocional; a igualdad, la más específica; luego la de vigencia más
+    reciente (RN-PRC-003/005). Al vencer la promoción el precio regular
+    vuelve solo: nada que revertir a mano."""
+    return max(
+        candidatas,
+        key=lambda lp: (
+            lp.es_promocional,
+            especificidad_lista(lp.sucursal_id, lp.canal, lp.modalidad),
+            lp.vigente_desde,
+        ),
+        default=None,
+    )
+
+
 def total_venta(items: list[tuple[Decimal, Decimal, Decimal]]) -> Decimal:
     """items = [(cantidad, precio_unitario, descuento)]."""
     return sum(

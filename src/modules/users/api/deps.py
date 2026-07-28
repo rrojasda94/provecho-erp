@@ -1,5 +1,5 @@
-"""Dependencias FastAPI: sesión (Unit of Work por request), usuario actual
-y verificación de permisos (deny por defecto)."""
+"""Dependencias FastAPI: sesión (Unit of Work por request), usuario actual,
+contexto de tenant (ADR-004) y verificación de permisos (deny por defecto)."""
 
 import uuid
 from collections.abc import Iterator
@@ -10,6 +10,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from src.core.database import SessionLocal
+from src.core.tenant import Tenant
 from src.modules.users.domain import rules
 from src.modules.users.infrastructure.models import Usuario
 from src.modules.users.infrastructure.repositories import UsuarioRepo
@@ -31,20 +32,31 @@ def get_db() -> Iterator[Session]:
         session.close()
 
 
-def get_current_user(
-    creds: HTTPAuthorizationCredentials = Depends(_bearer),
-    session: Session = Depends(get_db),
-) -> Usuario:
+def get_claims(creds: HTTPAuthorizationCredentials = Depends(_bearer)) -> dict:
+    """Claims validados del access token. FastAPI cachea la dependencia, así
+    que el token se decodifica una sola vez por request."""
     try:
-        payload = decode_access_token(creds.credentials)
+        return decode_access_token(creds.credentials)
     except jwt.PyJWTError:
         raise HTTPException(
             status.HTTP_401_UNAUTHORIZED, "Token inválido o expirado"
         ) from None
-    usuario = UsuarioRepo(session).get(uuid.UUID(payload["sub"]))
+
+
+def get_current_user(
+    claims: dict = Depends(get_claims),
+    session: Session = Depends(get_db),
+) -> Usuario:
+    usuario = UsuarioRepo(session).get(uuid.UUID(claims["sub"]))
     if usuario is None or not usuario.activo:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Usuario inválido")
     return usuario
+
+
+def get_tenant(claims: dict = Depends(get_claims)) -> Tenant:
+    """Contexto de tenant del request (ADR-004). Único origen válido del
+    `empresa_id`/`sucursal_id` de una operación — el body no manda."""
+    return Tenant.from_claims(claims)
 
 
 def require_permission(codigo: str):

@@ -271,19 +271,35 @@ erDiagram
 Separación clave: producto comercial ≠ artículo inventariable. La venta
 descuenta stock vía la receta (ver [../domain/domain-model.md](../domain/domain-model.md)).
 
-- **lista_precio**: nombre, marca_id o grupo_id (quién la define), ámbito
+- **lista_precio** (implementada 2026-07-27, migración `d4b1f0a7c3e9`):
+  nombre, marca_id o grupo_id (quién la define), ámbito
   (sucursal/canal/modalidad de consumo), segmento_consumidor (opcional),
   es_promocional (bool), precio_minimo, precio_maximo, moneda (fija, PEN —
   RN-PRC-004), vigente_desde, vigente_hasta. Creada por el área comercial
   con asesoría contable (RN-PRC-005).
+  Alcance implementado: `marca_id`, `nombre`, `sucursal_id`/`canal`/
+  `modalidad` (NULL = aplica a todas), `es_promocional`, `vigente_desde`/
+  `vigente_hasta`, `activa`. **Resolución**: entre las vigentes de ámbito
+  compatible gana la promocional; a igualdad, la más específica (más
+  dimensiones acotadas); luego la de vigencia más reciente. Al vencer la
+  promoción el precio regular se restaura solo.
+  Diferido: `grupo_id` como emisor alternativo, `segmento_consumidor`,
+  `precio_minimo`/`precio_maximo` (la moneda no se modela: es PEN única
+  por RN-PRC-004).
 - **promocion**: nombre, objetivo (`lanzamiento` | `fidelizacion` |
   `rotacion_inventario` | `ticket_promedio`), lista_precio_id (opcional),
   material_promocional (URL/JSONB), guion_atencion (texto, RN-PRM-002),
   canales (array), horarios/fechas de vigencia, capacitacion_requerida
   (bool).
-- **precio**: producto_comercial_id, lista_precio_id, monto. Fijo e
-  innegociable en POS (RN-PRC-003); fuera de POS (ej. cotización) admite
-  rango_negociacion_min/max definido por el área comercial.
+- **precio** (implementada 2026-07-27): producto_comercial_id,
+  lista_precio_id, monto. Fijo e innegociable en POS (RN-PRC-003); fuera
+  de POS (ej. cotización) admite rango_negociacion_min/max definido por el
+  área comercial (diferido — hoy solo el monto).
+  Único por (lista_precio_id, producto_comercial_id) y **sin edición**:
+  corregir un precio es una lista nueva, para que el histórico quede
+  auditable (RN-PRC-005), igual que una OC en `purchases`.
+  `venta_item.precio_unitario` sigue siendo el snapshot de lo cobrado: una
+  venta ya confirmada no cambia si la lista cambia después.
 
 - **servicio** (vendible, intangible): id_interno (4 alfanuméricos,
   autogenerado, inmutable, único), marca_id, nombre, tipo (`delivery` |

@@ -136,9 +136,17 @@ Registro vivo de deuda técnica declarada al cerrar cada slice — para que no
 se olvide. Marcar ✅ al resolverse en el slice indicado.
 
 ### Transversal
-- ⬜ **Contexto de tenant desde el JWT** (ADR-004): hoy varios endpoints
-  reciben `empresa_id` en el body (ej. catálogo de inventory). Derivarlo de
-  los claims + validar alcance en cada query. Afecta a todo módulo nuevo.
+- 🔶 **Contexto de tenant desde el JWT** (ADR-004): resuelto 2026-07-27 en
+  `users`, `inventory`, `sales` y `kds` — `src/core/tenant.py` +
+  dependencia `get_tenant`; el `empresa_id`/`sucursal_id` sale de los
+  claims, no del body, y un recurso ajeno responde 403 vía el handler de
+  `FueraDeAlcance` del app factory. Tests en
+  `tests/test_tenant_aislamiento.py`. **Falta** aplicarlo a `purchases`,
+  `production`, `accounting`, `rrhh` y el dashboard gerencial, que siguen
+  recibiendo `empresa_id` del cliente (`sync` ya lo derivaba de la cuenta
+  de servicio). Escape explícito documentado: superusuario (`*`) sin
+  sucursal asignada puede indicar la empresa — sin eso el bootstrap del
+  sistema sería imposible.
 - ⬜ `users`: aplicar **restricciones JSONB** por permiso (hoy autoriza solo
   por código, no por condición monto/estado/horario).
 - ⬜ `users`: auth de **`agente_ia` por token** (hoy exige PIN como humano).
@@ -381,9 +389,18 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   `bajo_minimo` derivado en la consulta de stock).
 
 ### Módulo sales (slices siguientes)
-- ⬜ **Precio server-side** (`lista_precio`/`precio`/`promocion`): hoy el
-  PDV manda `precio_unitario` en el request. RN-COM: el precio lo fija el
-  sistema por sucursal/canal.
+- ✅ 2026-07-27 **Precio server-side** (`lista_precio`/`precio`): el PDV
+  ya no manda `precio_unitario` — `crear_venta` lo resuelve por
+  marca+sucursal+canal+modalidad+fecha (RN-PRC-003/RN-MDC-003). Gana la
+  lista promocional, luego la más específica, luego la de vigencia más
+  reciente; al vencer la promoción el precio regular vuelve solo. Sin
+  precio vigente la venta es 409 y el producto no sale en `GET /carta`.
+  `precio` no tiene endpoint de edición: corregir = lista nueva
+  (RN-PRC-005). Migración `d4b1f0a7c3e9` (cierra además la FK pendiente
+  `medio_pago.lista_precio_credito_id`). El replay offline del hub
+  conserva el precio cobrado (`VentaItemSyncIn`, ADR-009). Pendiente:
+  `promocion` como entidad propia (material, guion, capacitación) y el
+  cálculo de margen de contribución expuesto a Comercial (RN-CML-001).
 - ✅ 2026-07-26 **Comprobante** (boleta/factura vía **Factiliza**) — venta
   `pagada` → `facturada`; series por `punto_venta`; correlativo por
   (empresa, serie); cola Celery con reintentos. Migración `b3d7f21ac094`.

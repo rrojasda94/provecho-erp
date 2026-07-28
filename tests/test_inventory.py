@@ -20,7 +20,16 @@ from src.modules.inventory.infrastructure.models import (
     UnidadMedida,
 )
 from src.modules.users.api.deps import get_db
-from src.modules.users.infrastructure.models import Almacen, Empresa, Rol, Usuario, UsuarioRol
+from src.modules.users.infrastructure.models import (
+    Almacen,
+    Empresa,
+    Marca,
+    Rol,
+    Sucursal,
+    Usuario,
+    UsuarioRol,
+    UsuarioSucursal,
+)
 from src.modules.users.infrastructure.security import hash_pin
 
 
@@ -56,13 +65,23 @@ def env():
         s.add(sku)
         s.flush()
         # Segundo usuario con rol almacenero (permiso inventory.solicitar_ajuste).
+        # Va asignado a una sucursal: sin ella el JWT no lleva empresa y el
+        # contexto de tenant (ADR-004) le niega todo.
+        marca = s.scalar(select(Marca))
+        sucursal = Sucursal(
+            marca_id=marca.id, empresa_id=empresa.id, nombre="Tarapoto Centro",
+            direccion="Jr. X 123", tenencia="alquilada",
+        )
         almacenero = Usuario(
             username="almacenero1", pin_hash=hash_pin("654321"), tipo="humano",
         )
-        s.add(almacenero)
+        s.add_all([sucursal, almacenero])
         s.flush()
         rol_alm = s.scalar(select(Rol).where(Rol.nombre == "almacenero"))
-        s.add(UsuarioRol(usuario_id=almacenero.id, rol_id=rol_alm.id))
+        s.add_all([
+            UsuarioRol(usuario_id=almacenero.id, rol_id=rol_alm.id),
+            UsuarioSucursal(usuario_id=almacenero.id, sucursal_id=sucursal.id),
+        ])
         ids.update(
             empresa_id=str(empresa.id), udm_id=str(udm.id),
             almacen_id=str(almacen.id), articulo_id=str(art.id), sku_id=str(sku.id),

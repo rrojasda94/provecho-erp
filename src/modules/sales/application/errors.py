@@ -15,3 +15,8 @@ class Conflicto(SalesError):
 
 class ReglaNegocio(SalesError):
     """Violación de regla (canal/modalidad inválida, sobrepago, etc.)."""
+
+
+class PrecioNoDefinido(ReglaNegocio):
+    """Ninguna `lista_precio` vigente cubre el producto en ese ámbito. La
+    venta no se confirma: el precio nunca lo pone el cliente (RN-PRC-003)."""

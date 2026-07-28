@@ -86,9 +86,11 @@ def registrar_movimiento(
 
 
 def consultar_stock(
-    session: Session, almacen_id: uuid.UUID | None = None
+    session: Session,
+    almacen_id: uuid.UUID | None = None,
+    empresa_id: uuid.UUID | None = None,
 ) -> list[dict]:
-    filas = StockRepo(session).list(almacen_id)
+    filas = StockRepo(session).list(almacen_id, empresa_id)
     return [
         {
             "almacen_id": s.almacen_id,

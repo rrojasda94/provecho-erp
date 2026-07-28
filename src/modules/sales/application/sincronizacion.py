@@ -31,8 +31,10 @@ from src.modules.sales.application import ventas as ventas_uc
 from src.modules.sales.application.errors import SalesError
 from src.modules.sales.infrastructure.models import (
     KdsPantalla,
+    ListaPrecio,
     MedioPago,
     Pago,
+    Precio,
     ProductoComercial,
     PuntoVenta,
     Venta,
@@ -73,6 +75,42 @@ RECURSOS = (
             ProductoComercial.marca_id.in_(_marca_de_la_sucursal(a))
         ),
         motivo="La carta del local: sin esto no hay nada que vender offline.",
+    ),
+    RecursoSync(
+        nombre="lista_precio",
+        modelo=ListaPrecio,
+        campos=(
+            "id",
+            "marca_id",
+            "nombre",
+            "sucursal_id",
+            "canal",
+            "modalidad",
+            "es_promocional",
+            "vigente_desde",
+            "vigente_hasta",
+            "activa",
+            "deleted_at",
+            "updated_at",
+        ),
+        filtro=lambda q, a: q.where(ListaPrecio.marca_id.in_(_marca_de_la_sucursal(a))),
+        motivo=(
+            "El precio lo fija el servidor (RN-PRC-003): sin las listas, el hub "
+            "no puede cotizar una venta durante el corte."
+        ),
+    ),
+    RecursoSync(
+        nombre="precio",
+        modelo=Precio,
+        campos=("id", "lista_precio_id", "producto_comercial_id", "monto", "updated_at"),
+        filtro=lambda q, a: q.where(
+            Precio.lista_precio_id.in_(
+                select(ListaPrecio.id).where(
+                    ListaPrecio.marca_id.in_(_marca_de_la_sucursal(a))
+                )
+            )
+        ),
+        motivo="El monto de cada producto dentro de esas listas.",
     ),
     RecursoSync(
         nombre="medio_pago",

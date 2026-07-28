@@ -31,10 +31,12 @@ purchases/accounting, no en este módulo). `punto_venta.serie_boleta`/
 `serie_factura` (series SUNAT separadas) alimentan el `comprobante.serie`
 al emitir.
 
+**Precio server-side (2026-07-27):** `lista_precio` + `precio` (migración
+`d4b1f0a7c3e9`). El PDV ya no manda el monto — ver sección propia abajo.
+
 Diferido a un slice posterior: `modificador`, `variante_producto`,
-`combo`, `lista_precio`, `precio`, `promocion`, `carrito`,
-`central_pedidos`, `cuenta_puntos`/`puntos_movimiento`,
-`carta_disputa_pago`.
+`combo`, `promocion`, `carrito`, `central_pedidos`,
+`cuenta_puntos`/`puntos_movimiento`, `carta_disputa_pago`.
 
 ## Estado (slice PDV implementado 2026-07-25)
 
@@ -77,10 +79,49 @@ confirmados de un punto de venta desde una fecha) y `puntos_venta_de_empresa`
 (IDs de `punto_venta` de una empresa — `accounting` no importa `PuntoVenta`
 directo, no es organización transversal como `Persona`/`Sucursal`).
 
-Deuda del slice (ver ROADMAP): precio server-side vía `lista_precio`
-(hoy el PDV manda `precio_unitario`), nota de crédito post-pago, webhook
-de pasarela (pago nace `confirmado`), apertura/cierre de caja enlazados a
-la venta.
+Deuda del slice (ver ROADMAP): nota de crédito post-pago, webhook de
+pasarela (pago nace `confirmado`), apertura/cierre de caja enlazados a la
+venta.
+
+## Precio server-side (implementado 2026-07-27)
+
+RN-PRC-003: en PDV, kiosko y web el precio es fijo e innegociable. Antes
+el request traía `precio_unitario` y el servidor lo aceptaba: cualquier
+cliente podía fijar el monto a cobrar. Ahora `VentaItemIn` solo lleva
+producto y cantidad, y `crear_venta` resuelve el precio contra
+`lista_precio`.
+
+- **`lista_precio`**: marca + ámbito opcional (`sucursal_id`, `canal`,
+  `modalidad` — NULL = aplica a todas, RN-MDC-003), `es_promocional`,
+  `vigente_desde`/`vigente_hasta`, `activa`.
+- **`precio`**: monto de un producto dentro de una lista. Único por
+  (lista, producto) y **sin endpoint de edición**: corregir un precio es
+  una lista nueva, para que el histórico quede auditable (RN-PRC-005),
+  igual que una OC en `purchases`.
+- **Resolución** (`domain/rules.elegir_lista_precio`, función pura): de
+  las listas vigentes y de ámbito compatible gana la promocional; a
+  igualdad, la más específica; luego la de vigencia más reciente. Al
+  vencer la promoción el precio regular vuelve solo — no hay nada que
+  revertir a mano.
+- **Sin precio vigente no hay venta**: `PrecioNoDefinido` → 409. Un
+  producto sin precio tampoco aparece en la carta.
+- **Descuentos**: salen de listas promocionales, no del cliente; hoy el
+  ítem nace en 0.
+
+| Método | Ruta | Permiso |
+|--------|------|---------|
+| POST/GET | `/listas-precio` | `gestionar_catalogo` / `leer` |
+| POST | `/listas-precio/{id}/precios` | `gestionar_catalogo` |
+| GET | `/carta?sucursal_id&canal&modalidad` | `sales.leer` |
+
+`GET /carta` es lo que el PDV/kiosko renderiza: catálogo vendible con el
+precio ya resuelto, en vez de que el cliente traiga uno propio.
+
+**Excepción del replay offline (ADR-009)**: el lote que empuja el hub usa
+`VentaItemSyncIn`, que **sí** lleva `precio_unitario`. Una venta ya
+cobrada conserva el precio al que se cobró; recotizarla en la nube
+cambiaría el monto si la promoción venció entre el corte y la
+sincronización.
 
 **Pendiente para el modo offline del PDV** (ADR-009, ver
 `docs/architecture/adr/ADR-009-modo-offline-pdv.md`): `crear_venta`/

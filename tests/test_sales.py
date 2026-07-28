@@ -1,6 +1,7 @@
 """Tests del slice Sales/PDV: venta → consumo de stock, cobro → pagada,
 idempotencia, anulación → reposición, RBAC."""
 
+from datetime import date
 from decimal import Decimal
 
 import pytest
@@ -22,7 +23,13 @@ from src.modules.inventory.infrastructure.models import (
     Stock,
     UnidadMedida,
 )
-from src.modules.sales.infrastructure.models import MedioPago, ProductoComercial, PuntoVenta
+from src.modules.sales.infrastructure.models import (
+    ListaPrecio,
+    MedioPago,
+    Precio,
+    ProductoComercial,
+    PuntoVenta,
+)
 from src.modules.users.api.deps import get_db
 from src.modules.users.infrastructure.models import (
     Almacen,
@@ -95,6 +102,13 @@ def env(monkeypatch):
         )
         s.add_all([producto, medio])
         s.flush()
+        # Precio server-side (RN-PRC-003): sin lista vigente no hay venta.
+        lista = ListaPrecio(marca_id=marca.id, nombre="Regular",
+                            vigente_desde=date(2020, 1, 1))
+        s.add(lista)
+        s.flush()
+        s.add(Precio(lista_precio_id=lista.id,
+                     producto_comercial_id=producto.id, monto=Decimal("25.00")))
         # Stock inicial: 10 kg de harina.
         s.add(Stock(almacen_id=almacen.id, sku_id=sku.id, cantidad=Decimal(10)))
         ids.update(
@@ -128,8 +142,7 @@ def _venta_body(ids, key="test-venta-0001", cantidad="2"):
         "sucursal_id": ids["sucursal_id"], "punto_venta_id": ids["pv_id"],
         "canal": "pdv", "modalidad": "takeout", "idempotency_key": key,
         "items": [{
-            "producto_comercial_id": ids["producto_id"],
-            "cantidad": cantidad, "precio_unitario": "25.00",
+            "producto_comercial_id": ids["producto_id"], "cantidad": cantidad,
         }],
     }
 

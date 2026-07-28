@@ -8,6 +8,8 @@ mismas reglas de negocio que en producción.
 """
 
 import time
+import uuid
+from datetime import date
 from decimal import Decimal
 
 import pytest
@@ -30,7 +32,13 @@ from src.modules.inventory.infrastructure.models import (
     Stock,
     UnidadMedida,
 )
-from src.modules.sales.infrastructure.models import MedioPago, ProductoComercial, PuntoVenta
+from src.modules.sales.infrastructure.models import (
+    ListaPrecio,
+    MedioPago,
+    Precio,
+    ProductoComercial,
+    PuntoVenta,
+)
 from src.modules.users.api.deps import get_db
 from src.modules.users.infrastructure.models import (
     Almacen,
@@ -104,6 +112,13 @@ def env(monkeypatch):
         )
         s.add_all([producto, medio])
         s.flush()
+        # Precio server-side (RN-PRC-003): sin lista vigente no hay venta.
+        lista = ListaPrecio(marca_id=marca.id, nombre="Regular",
+                            vigente_desde=date(2020, 1, 1))
+        s.add(lista)
+        s.flush()
+        s.add(Precio(lista_precio_id=lista.id,
+                     producto_comercial_id=producto.id, monto=Decimal("50.00")))
         # Stock bajo mínimo a propósito: 1 unidad, mínimo 5 (bandera para el dashboard).
         s.add(
             Stock(
@@ -121,6 +136,7 @@ def env(monkeypatch):
         ids.update(
             empresa_id=str(empresa.id), sucursal_id=str(sucursal.id), pv_id=str(pv.id),
             producto_id=str(producto.id), medio_id=str(medio.id), cajero_id=str(cajero.id),
+            marca_id=str(marca.id), lista_id=str(lista.id), receta_id=str(receta.id),
         )
         s.commit()
 
@@ -169,17 +185,43 @@ def _abrir_caja(client, headers, ids, monto="100.00"):
     )
 
 
-def _vender_y_cobrar(client, headers, ids, key, precio="50.00"):
+def _producto_a(TestSession, ids, precio):
+    """Producto comercial cuyo precio de lista es `precio`.
+
+    El precio ya no viaja en el request (RN-PRC-003), así que un monto
+    distinto exige un producto distinto, no un campo distinto.
+    """
+    if precio == "50.00":
+        return ids["producto_id"]
+    with TestSession() as s:
+        producto = ProductoComercial(
+            id_interno=f"P{int(Decimal(precio)):03d}"[:4],
+            marca_id=uuid.UUID(ids["marca_id"]),
+            nombre=f"Pizza {precio}",
+            receta_id=uuid.UUID(ids["receta_id"]),
+        )
+        s.add(producto)
+        s.flush()
+        s.add(Precio(
+            lista_precio_id=uuid.UUID(ids["lista_id"]),
+            producto_comercial_id=producto.id, monto=Decimal(precio),
+        ))
+        s.commit()
+        return str(producto.id)
+
+
+def _vender_y_cobrar(client, headers, ids, key, precio="50.00",
+                     TestSession=None):
+    producto_id = (
+        _producto_a(TestSession, ids, precio) if TestSession else ids["producto_id"]
+    )
     venta = client.post(
         "/api/v1/sales/ventas",
         headers=headers,
         json={
             "sucursal_id": ids["sucursal_id"], "punto_venta_id": ids["pv_id"],
             "canal": "pdv", "modalidad": "takeout", "idempotency_key": f"venta-{key}",
-            "items": [{
-                "producto_comercial_id": ids["producto_id"],
-                "cantidad": "1", "precio_unitario": precio,
-            }],
+            "items": [{"producto_comercial_id": producto_id, "cantidad": "1"}],
         },
     ).json()
     client.post(
@@ -223,12 +265,12 @@ def test_cerrar_caja_sin_ventas_cuadra_exacto(env):
 def test_cerrar_caja_reconcilia_ventas_en_efectivo(env):
     """El monto esperado del cierre no es un número tipeado: se calcula
     desde los pagos en efectivo reales de ese punto de venta."""
-    client, ids, _ = env
+    client, ids, TestSession = env
     h = _token(client)
     apertura = _abrir_caja(client, h, ids, monto="100.00").json()
     _cruzar_segundo()
     _vender_y_cobrar(client, h, ids, key="0001", precio="50.00")
-    _vender_y_cobrar(client, h, ids, key="0002", precio="30.00")
+    _vender_y_cobrar(client, h, ids, key="0002", precio="30.00", TestSession=TestSession)
 
     r = client.post(
         f"/api/v1/accounting/cajas/apertura/{apertura['id']}/cierre",
@@ -371,8 +413,7 @@ def test_dashboard_venta_anulada_no_cuenta(env):
             "sucursal_id": ids["sucursal_id"], "punto_venta_id": ids["pv_id"],
             "canal": "pdv", "modalidad": "takeout", "idempotency_key": "venta-sin-pagar",
             "items": [{
-                "producto_comercial_id": ids["producto_id"],
-                "cantidad": "1", "precio_unitario": "50.00",
+                "producto_comercial_id": ids["producto_id"], "cantidad": "1",
             }],
         },
     )
@@ -419,7 +460,7 @@ def test_total_efectivo_cobrado_usa_hora_de_apertura_no_desde_siempre(env):
     client, ids, TestSession = env
     h = _token(client)
     ahora = datetime.now(UTC).replace(tzinfo=None)
-    _vender_y_cobrar(client, h, ids, key="antes0001", precio="999.00")
+    _vender_y_cobrar(client, h, ids, key="antes0001", precio="999.00", TestSession=TestSession)
     apertura = _abrir_caja(client, h, ids, monto="0.00").json()
     with TestSession() as s:
         s.execute(
@@ -433,7 +474,7 @@ def test_total_efectivo_cobrado_usa_hora_de_apertura_no_desde_siempre(env):
             .values(created_at=ahora - timedelta(minutes=30))
         )
         s.commit()
-    _vender_y_cobrar(client, h, ids, key="despues01", precio="10.00")
+    _vender_y_cobrar(client, h, ids, key="despues01", precio="10.00", TestSession=TestSession)
 
     with TestSession() as s:
         corte = AperturaCajaRepo(s).get(UUID(apertura["id"])).created_at

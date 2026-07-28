@@ -21,6 +21,43 @@ Versionado: [SemVer](https://semver.org/lang/es/).
   especificación — sin implementación de código. `docs/prompts/frontend.md`
   actualizado con las reglas técnicas.
 
+- **Precio server-side — `lista_precio` + `precio`** (2026-07-27,
+  RN-PRC-003/004/005, RN-MDC-003): el PDV deja de enviar
+  `precio_unitario`; `crear_venta` lo resuelve por
+  marca+sucursal+canal+modalidad+fecha. Entre listas vigentes gana la
+  promocional, luego la más específica, luego la de vigencia más reciente
+  — al vencer la promoción el precio regular se restaura solo. Sin precio
+  vigente la venta responde 409 y el producto no aparece en la carta.
+  Nuevos endpoints `POST/GET /sales/listas-precio`,
+  `POST /sales/listas-precio/{id}/precios` y `GET /sales/carta`
+  (catálogo con precio ya resuelto, lo que renderiza el PDV). `precio` no
+  tiene edición: corregir un precio es una lista nueva, auditable.
+  Migración `d4b1f0a7c3e9`, que además cierra la FK pendiente
+  `medio_pago.lista_precio_credito_id` (RN-MDP-001).
+  Tests: `tests/test_precios.py`.
+
+- **Contexto de tenant desde el JWT** (2026-07-27, ADR-004):
+  `src/core/tenant.py` + dependencia `get_tenant`. El `empresa_id` y el
+  `sucursal_id` de una operación se derivan de los claims del token, no
+  del body ni del query string; un recurso de otro tenant responde 403 vía
+  un handler único de `FueraDeAlcance` en el app factory. Aplicado a
+  `users`, `inventory`, `sales` y `kds`, con helpers de alcance por módulo
+  (`*/application/scope.py`). Escape explícito y documentado: un
+  superusuario (permiso `*`) sin sucursal asignada puede indicar la
+  empresa, necesario para el bootstrap del sistema.
+  Tests: `tests/test_tenant_aislamiento.py`.
+
+### Changed
+
+- `VentaItemIn` (API pública de venta) ya no acepta `precio_unitario` ni
+  `descuento`. El lote de sincronización del hub usa un tipo propio,
+  `VentaItemSyncIn`, que sí los lleva: una venta ya cobrada offline
+  conserva el precio al que se cobró, porque recotizarla en la nube
+  cambiaría el monto si la promoción venció entre el corte y el push
+  (ADR-009).
+- `CategoriaCreate`, `ArticuloCreate` y `MedioPagoCreate` pasan a tener
+  `empresa_id` opcional: se toma del JWT, y una empresa ajena da 403.
+
 - **Decisiones de negocio — ranking del buscador y criterio de upsell**
   (2026-07-26, `docs/product/ui-ux.md`): el ranking del buscador se basa
   en historial de uso/patrones detectados (no solo similitud de texto),

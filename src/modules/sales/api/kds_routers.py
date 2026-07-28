@@ -10,6 +10,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from src.core.tenant import Tenant
 from src.modules.sales.api import kds_schemas as schemas
 from src.modules.sales.application import kds
 from src.modules.sales.application.errors import (
@@ -18,7 +19,12 @@ from src.modules.sales.application.errors import (
     ReglaNegocio,
     SalesError,
 )
-from src.modules.users.api.deps import get_db, require_permission
+from src.modules.sales.application.scope import (
+    exigir_pantalla,
+    exigir_venta,
+    exigir_venta_item,
+)
+from src.modules.users.api.deps import get_db, get_tenant, require_permission
 from src.modules.users.infrastructure.models import Usuario
 
 router = APIRouter(prefix="/kds", tags=["kds"])
@@ -34,7 +40,12 @@ _HTTP_STATUS: dict[type[SalesError], int] = {
 
 
 def _http(err: SalesError) -> HTTPException:
-    return HTTPException(_HTTP_STATUS.get(type(err), 400), str(err))
+    # Por isinstance y no por `type`: un error derivado (PrecioNoDefinido de
+    # ReglaNegocio) debe heredar el estado de su base, no caer al 400 genérico.
+    for tipo, codigo in _HTTP_STATUS.items():
+        if isinstance(err, tipo):
+            return HTTPException(codigo, str(err))
+    return HTTPException(400, str(err))
 
 
 # --- Configuración ------------------------------------------------------------
@@ -42,8 +53,10 @@ def _http(err: SalesError) -> HTTPException:
 def crear_pantalla(
     body: schemas.PantallaCreate,
     _: Usuario = Depends(require_permission(CONFIGURAR)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
+    tenant.exigir_sucursal(body.sucursal_id)
     try:
         pantalla = kds.crear_pantalla(session, **body.model_dump())
     except (Conflicto, ReglaNegocio) as e:
@@ -56,9 +69,15 @@ def crear_pantalla(
 def listar_pantallas(
     sucursal_id: uuid.UUID | None = None,
     _: Usuario = Depends(require_permission(OPERAR)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    return kds.listar_pantallas(session, sucursal_id)
+    if sucursal_id is not None:
+        tenant.exigir_sucursal(sucursal_id)
+    pantallas = kds.listar_pantallas(session, sucursal_id)
+    if tenant.superusuario:
+        return pantallas
+    return [p for p in pantallas if p.sucursal_id in tenant.sucursal_ids]
 
 
 @router.patch("/pantallas/{pantalla_id}", response_model=schemas.PantallaOut)
@@ -66,9 +85,11 @@ def editar_pantalla(
     pantalla_id: uuid.UUID,
     body: schemas.PantallaUpdate,
     _: Usuario = Depends(require_permission(CONFIGURAR)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
     try:
+        exigir_pantalla(session, pantalla_id, tenant)
         pantalla = kds.editar_pantalla(session, pantalla_id, **body.model_dump())
     except (NoEncontrado, ReglaNegocio) as e:
         raise _http(e) from e
@@ -81,9 +102,11 @@ def editar_pantalla(
 def cola(
     pantalla_id: uuid.UUID,
     _: Usuario = Depends(require_permission(OPERAR)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
     try:
+        exigir_pantalla(session, pantalla_id, tenant)
         return kds.cola_pantalla(session, pantalla_id)
     except NoEncontrado as e:
         raise _http(e) from e
@@ -94,9 +117,11 @@ def avanzar(
     venta_item_id: uuid.UUID,
     body: schemas.AvanzarIn,
     _: Usuario = Depends(require_permission(OPERAR)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
     try:
+        exigir_venta_item(session, venta_item_id, tenant)
         item = kds.avanzar_item(session, venta_item_id, body.estado)
     except (NoEncontrado, Conflicto, ReglaNegocio) as e:
         raise _http(e) from e
@@ -111,9 +136,11 @@ def avanzar(
 def avance(
     venta_id: uuid.UUID,
     _: Usuario = Depends(require_permission(OPERAR)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
     try:
+        exigir_venta(session, venta_id, tenant)
         return kds.avance_venta(session, venta_id)
     except NoEncontrado as e:
         raise _http(e) from e
@@ -123,9 +150,11 @@ def avance(
 def imprimir_comanda(
     venta_id: uuid.UUID,
     _: Usuario = Depends(require_permission(OPERAR)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
     try:
+        exigir_venta(session, venta_id, tenant)
         resultado = kds.comanda(session, venta_id)
     except NoEncontrado as e:
         raise _http(e) from e

@@ -254,7 +254,7 @@ decida.
 
 ### Lo que viaja y lo que no
 
-Se replican 24 recursos: organización (grupo, empresa, marca, sucursal,
+Se replican 26 recursos: organización (grupo, empresa, marca, sucursal,
 almacén), RBAC completo (persona, usuario, rol, permiso y sus
 asignaciones), catálogo de inventario (unidades, categorías, artículos,
 SKU, recetas, stock) y catálogo comercial (producto, medio de pago, punto
@@ -280,6 +280,18 @@ de venta, pantallas KDS). Decisiones finas dentro de eso:
 - **`venta_item.id` no se conserva** entre hub y nube (sí el de la venta):
   nada fuera del hub referencia un ítem, y el avance de KDS es local al
   local.
+- **El precio cobrado sí viaja** (agregado 2026-07-27, con el precio
+  server-side): el lote ascendente usa `VentaItemSyncIn`, que lleva
+  `precio_unitario` y `descuento`, mientras el PDV en línea
+  (`VentaItemIn`) ya no los manda — ahí el precio lo resuelve el servidor
+  contra `lista_precio` (RN-PRC-003). Es deliberado: una venta ya cobrada
+  conserva el precio al que se cobró. Recotizarla al reproducirla
+  cambiaría el monto si la promoción venció entre el corte y el push, y la
+  nube quedaría discrepando del comprobante que el cliente se llevó.
+  Mismo criterio que `id`/`fecha_orden`/`numero_orden`: el replay
+  reproduce un hecho, no lo vuelve a decidir. En sentido descendente el
+  hub recibe `lista_precio` y `precio` (2 recursos nuevos, 26 en total):
+  sin ellos no podría cotizar durante el corte.
 
 ### Consecuencias de la fase 2
 

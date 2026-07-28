@@ -13,6 +13,7 @@ from src.modules.inventory.infrastructure.models import (
     Sku,
     Stock,
 )
+from src.modules.users.infrastructure.models import Almacen
 
 
 class ArticuloRepo:
@@ -95,10 +96,19 @@ class StockRepo:
             q = q.with_for_update()
         return self.s.scalar(q)
 
-    def list(self, almacen_id: uuid.UUID | None = None) -> list[Stock]:
+    def list(
+        self,
+        almacen_id: uuid.UUID | None = None,
+        empresa_id: uuid.UUID | None = None,
+    ) -> list[Stock]:
         q = select(Stock)
         if almacen_id is not None:
             q = q.where(Stock.almacen_id == almacen_id)
+        if empresa_id is not None:
+            # El stock no lleva empresa: la hereda del almacén (ADR-004).
+            q = q.join(Almacen, Almacen.id == Stock.almacen_id).where(
+                Almacen.empresa_id == empresa_id
+            )
         return list(self.s.scalars(q))
 
     def add(self, stock: Stock) -> Stock:
