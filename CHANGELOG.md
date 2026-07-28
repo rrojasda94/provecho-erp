@@ -7,6 +7,31 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Added
 
+- **Permiso `gerencia.gestionar_parametros_empresa`** (2026-07-27,
+  ADR-014): sembrado en `src/seeders/seed.py`, mismo patrón que
+  `gestionar_reglas_aprobacion`. Adelantado a la entidad `parametro_empresa`
+  en sí, que sigue siendo spec — sin modelo, migración ni endpoints
+  todavía (`ROADMAP.md` → Deuda técnica → Transversal).
+
+- **Lote y FEFO en `inventory` — ADR-015** (2026-07-27, RN-VNC-001..003,
+  RN-LOT-001): nuevas entidades `lote` (código, vencimiento, origen,
+  condición de almacenamiento) y `stock_lote` (saldo y estado por lote),
+  con control **opcional por artículo** (`articulo.controla_lote`) — los
+  perecibles lo llevan, las servilletas no. Toda salida de un artículo con
+  control se reparte por FEFO (vence antes, sale antes; el lote sin
+  vencimiento va al final y cae en FIFO) y genera **un movimiento por lote
+  tomado**, cada uno con su `lote_id`; un `lote_id` explícito es el
+  override del lote sugerido. El lote vencido se bloquea en el momento en
+  que el picking lo toca y publica `inventory.lote_vencido_detectado`, más
+  un barrido a demanda `POST /inventory/lotes/bloquear-vencidos`. Nuevos
+  endpoints `POST /inventory/lotes` y
+  `GET /inventory/lotes?almacen_id&sku_id&por_vencer_dias`. La recepción de
+  compra transporta `lote_codigo` y `fecha_vencimiento` declarados por el
+  proveedor (RN-VNC-002) y producción crea su lote con `origen=produccion`.
+  El hub de sucursal replica `lote` y `stock_lote` (ADR-009, 28 recursos):
+  sin ellos la venta offline no podría aplicar FEFO. Migración
+  `c9a2f4e18b60`. Tests: `tests/test_lotes.py`.
+
 - **Arquitectura frontend — ADR-013** (2026-07-27): Tailwind CSS sobre los
   tokens de marca ya definidos en `globals.css` (`tailwind.config.ts` mapea
   `bg-primary` → `var(--color-primary)`, nunca hex fijo); **Base UI**
@@ -20,6 +45,49 @@ Versionado: [SemVer](https://semver.org/lang/es/).
   global (YAGNI); Playwright para e2e de flujos críticos. Solo
   especificación — sin implementación de código. `docs/prompts/frontend.md`
   actualizado con las reglas técnicas.
+
+- **Precio server-side — `lista_precio` + `precio`** (2026-07-27,
+  RN-PRC-003/004/005, RN-MDC-003): el PDV deja de enviar
+  `precio_unitario`; `crear_venta` lo resuelve por
+  marca+sucursal+canal+modalidad+fecha. Entre listas vigentes gana la
+  promocional, luego la más específica, luego la de vigencia más reciente
+  — al vencer la promoción el precio regular se restaura solo. Sin precio
+  vigente la venta responde 409 y el producto no aparece en la carta.
+  Nuevos endpoints `POST/GET /sales/listas-precio`,
+  `POST /sales/listas-precio/{id}/precios` y `GET /sales/carta`
+  (catálogo con precio ya resuelto, lo que renderiza el PDV). `precio` no
+  tiene edición: corregir un precio es una lista nueva, auditable.
+  Migración `d4b1f0a7c3e9`, que además cierra la FK pendiente
+  `medio_pago.lista_precio_credito_id` (RN-MDP-001).
+  Tests: `tests/test_precios.py`.
+
+- **Contexto de tenant desde el JWT** (2026-07-27, ADR-004):
+  `src/core/tenant.py` + dependencia `get_tenant`. El `empresa_id` y el
+  `sucursal_id` de una operación se derivan de los claims del token, no
+  del body ni del query string; un recurso de otro tenant responde 403 vía
+  un handler único de `FueraDeAlcance` en el app factory. Aplicado a
+  `users`, `inventory`, `sales` y `kds`, con helpers de alcance por módulo
+  (`*/application/scope.py`). Escape explícito y documentado: un
+  superusuario (permiso `*`) sin sucursal asignada puede indicar la
+  empresa, necesario para el bootstrap del sistema.
+  Tests: `tests/test_tenant_aislamiento.py`.
+
+### Changed
+
+- `POST /api/v1/inventory/movimientos` devuelve una **lista** de
+  movimientos en vez de uno solo: una salida FEFO puede repartirse entre
+  varios lotes y cada lote es un movimiento propio (ADR-015). El body
+  acepta además `lote_id` opcional. Cambio incompatible del contrato,
+  todavía sin consumidores (el frontend hoy es login + dashboard).
+
+- `VentaItemIn` (API pública de venta) ya no acepta `precio_unitario` ni
+  `descuento`. El lote de sincronización del hub usa un tipo propio,
+  `VentaItemSyncIn`, que sí los lleva: una venta ya cobrada offline
+  conserva el precio al que se cobró, porque recotizarla en la nube
+  cambiaría el monto si la promoción venció entre el corte y el push
+  (ADR-009).
+- `CategoriaCreate`, `ArticuloCreate` y `MedioPagoCreate` pasan a tener
+  `empresa_id` opcional: se toma del JWT, y una empresa ajena da 403.
 
 - **Decisiones de negocio — ranking del buscador y criterio de upsell**
   (2026-07-26, `docs/product/ui-ux.md`): el ranking del buscador se basa

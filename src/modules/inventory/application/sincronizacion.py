@@ -17,10 +17,12 @@ from src.modules.inventory.infrastructure.models import (
     Articulo,
     Categoria,
     CategoriaUdm,
+    Lote,
     Receta,
     RecetaItem,
     Sku,
     Stock,
+    StockLote,
     UnidadMedida,
 )
 
@@ -80,6 +82,7 @@ RECURSOS = (
             "tipo",
             "costo_promedio",
             "archivado",
+            "controla_lote",
             "deleted_at",
             "updated_at",
         ),
@@ -144,5 +147,43 @@ RECURSOS = (
         ),
         filtro=lambda q, a: q.where(Stock.almacen_id.in_(_almacenes_de_la_sucursal(a))),
         motivo="Cantidad disponible en el local; la venta la descuenta offline.",
+    ),
+    RecursoSync(
+        nombre="lote",
+        modelo=Lote,
+        campos=(
+            "id",
+            "articulo_id",
+            "codigo",
+            "fecha_vencimiento",
+            "fecha_elaboracion",
+            "origen",
+            "referencia",
+            "condicion_almacenamiento",
+            "updated_at",
+        ),
+        filtro=lambda q, a: q.where(Lote.articulo_id.in_(_articulos_de_la_empresa(a))),
+        motivo="Sin la fecha de vencimiento, la venta offline no puede aplicar FEFO.",
+    ),
+    RecursoSync(
+        nombre="stock_lote",
+        modelo=StockLote,
+        campos=(
+            "id",
+            "almacen_id",
+            "sku_id",
+            "lote_id",
+            "cantidad",
+            "estado",
+            "updated_at",
+        ),
+        filtro=lambda q, a: q.where(
+            StockLote.almacen_id.in_(_almacenes_de_la_sucursal(a))
+        ),
+        motivo=(
+            "Detalle por lote del stock local: el hub elige el lote igual que "
+            "la nube. Mismo criterio que `stock` — el hub lo escribe, la nube "
+            "gana en el pull porque el ciclo empuja antes de jalar."
+        ),
     ),
 )

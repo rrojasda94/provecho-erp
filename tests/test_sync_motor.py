@@ -39,8 +39,10 @@ from src.modules.inventory.infrastructure.models import (
 from src.modules.sales.application import sincronizacion as sales_sync
 from src.modules.sales.application import ventas as ventas_uc
 from src.modules.sales.infrastructure.models import (
+    ListaPrecio,
     MedioPago,
     Pago,
+    Precio,
     ProductoComercial,
     PuntoVenta,
     Venta,
@@ -128,6 +130,14 @@ def _poblar_nube(Session) -> dict:
         )
         s.add_all([producto, medio])
         s.flush()
+        # El precio lo fija el servidor (RN-PRC-003): el hub necesita la
+        # lista replicada para poder cotizar durante el corte.
+        lista = ListaPrecio(marca_id=marca.id, nombre="Regular",
+                            vigente_desde=date(2020, 1, 1))
+        s.add(lista)
+        s.flush()
+        s.add(Precio(lista_precio_id=lista.id, producto_comercial_id=producto.id,
+                     monto=Decimal("25.00")))
         s.add(Stock(almacen_id=almacen.id, sku_id=sku.id, cantidad=Decimal(10)))
 
         cajero = Usuario(
@@ -290,6 +300,9 @@ def test_carga_inicial_replica_catalogo_stock_y_rbac(entorno):
         assert s.scalar(select(func.count()).select_from(MedioPago)) == 1
         assert s.scalar(select(func.count()).select_from(PuntoVenta)) == 1
         assert s.scalar(select(func.count()).select_from(RecetaItem)) == 1
+        # Sin lista de precios el hub no puede cotizar una venta offline.
+        assert s.scalar(select(func.count()).select_from(ListaPrecio)) == 1
+        assert s.scalar(select(Precio)).monto == Decimal("25.00")
         assert s.scalar(select(Stock)).cantidad == Decimal(10)
         # RBAC completo: sin esto nadie se autentica durante el corte.
         assert s.scalar(select(func.count()).select_from(Permiso)) > 0

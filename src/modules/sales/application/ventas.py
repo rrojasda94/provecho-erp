@@ -12,7 +12,7 @@ from decimal import Decimal
 from sqlalchemy.orm import Session
 
 from src.core.events import event_bus
-from src.modules.sales.application import comprobantes
+from src.modules.sales.application import comprobantes, precios
 from src.modules.sales.application.errors import (
     Conflicto,
     NoEncontrado,
@@ -29,6 +29,56 @@ from src.modules.sales.infrastructure.repositories import (
 from src.shared.models import Comprobante
 
 
+def _armar_item(
+    session: Session,
+    it: dict,
+    *,
+    productos: ProductoComercialRepo,
+    sucursal_id: uuid.UUID,
+    canal: str,
+    modalidad: str,
+    dia: date,
+) -> tuple[VentaItem, dict]:
+    """Valida un ítem del request y le resuelve el precio. Devuelve la fila y
+    el detalle que viaja en `sales.venta_confirmada` para que inventory
+    descuente."""
+    prod = productos.get(it["producto_comercial_id"])
+    if prod is None or not prod.activo:
+        raise NoEncontrado(
+            f"producto comercial {it['producto_comercial_id']} no encontrado"
+        )
+    cantidad = Decimal(str(it["cantidad"]))
+    if cantidad <= 0:
+        raise ReglaNegocio("cantidad de ítem debe ser > 0")
+    if it.get("precio_unitario") is None:
+        precio_unitario = precios.resolver_precio(
+            session,
+            producto=prod,
+            sucursal_id=sucursal_id,
+            canal=canal,
+            modalidad=modalidad,
+            fecha=dia,
+        )
+    else:
+        precio_unitario = Decimal(str(it["precio_unitario"]))
+    fila = VentaItem(
+        producto_comercial_id=prod.id,
+        cantidad=cantidad,
+        precio_unitario=precio_unitario,
+        # Los descuentos salen de listas promocionales, no del cliente
+        # (RN-PRC-003); en replay viaja el que ya se aplicó.
+        descuento=Decimal(str(it.get("descuento") or 0)),
+    )
+    # Empaque se descuenta solo en las modalidades configuradas (RN-EMP-003).
+    con_empaque = bool(prod.empaque_id and modalidad in (prod.modalidades_empaque or []))
+    detalle = {
+        "receta_id": str(prod.receta_id),
+        "cantidad": str(cantidad),
+        "empaque_articulo_id": str(prod.empaque_id) if con_empaque else None,
+    }
+    return fila, detalle
+
+
 def crear_venta(
     session: Session,
     *,
@@ -38,7 +88,7 @@ def crear_venta(
     modalidad: str,
     usuario_id: uuid.UUID,
     idempotency_key: str,
-    items: list[dict],  # [{producto_comercial_id, cantidad, precio_unitario, descuento}]
+    items: list[dict],  # [{producto_comercial_id, cantidad}]
     cliente_id: uuid.UUID | None = None,
     referencia_atencion: str | None = None,
     id: uuid.UUID | None = None,
@@ -51,6 +101,12 @@ def crear_venta(
     (ADR-009). Sin ellos la nube y el hub generarían identificadores
     distintos para la misma venta, y el número de orden que vio el cliente
     en su comanda no sería el de la nube.
+
+    El **precio lo fija el servidor** contra `lista_precio` (RN-PRC-003): el
+    PDV manda producto y cantidad, nunca el monto. `precio_unitario` en un
+    ítem solo lo acepta ese mismo camino de replay — una venta que ya se
+    cobró conserva el precio al que se cobró, aunque la promoción haya
+    vencido entre el corte y la sincronización.
     """
     if canal not in rules.CANALES:
         raise ReglaNegocio(f"canal inválido: {canal}")
@@ -67,39 +123,18 @@ def crear_venta(
     if id is not None and repo.get(id) is not None:
         raise Conflicto(f"ya existe una venta con id {id} y otra idempotency_key")
 
-    productos = ProductoComercialRepo(session)
-    detalle_evento = []
-    filas = []
-    for it in items:
-        prod = productos.get(it["producto_comercial_id"])
-        if prod is None or not prod.activo:
-            raise NoEncontrado(
-                f"producto comercial {it['producto_comercial_id']} no encontrado"
-            )
-        cantidad = Decimal(str(it["cantidad"]))
-        if cantidad <= 0:
-            raise ReglaNegocio("cantidad de ítem debe ser > 0")
-        filas.append(
-            VentaItem(
-                producto_comercial_id=prod.id,
-                cantidad=cantidad,
-                precio_unitario=Decimal(str(it["precio_unitario"])),
-                descuento=Decimal(str(it.get("descuento", 0))),
-            )
-        )
-        # Empaque se descuenta solo en las modalidades configuradas (RN-EMP-003).
-        con_empaque = bool(
-            prod.empaque_id and modalidad in (prod.modalidades_empaque or [])
-        )
-        detalle_evento.append(
-            {
-                "receta_id": str(prod.receta_id),
-                "cantidad": str(cantidad),
-                "empaque_articulo_id": str(prod.empaque_id) if con_empaque else None,
-            }
-        )
-
     dia = fecha_orden or date.today()
+    productos = ProductoComercialRepo(session)
+    armados = [
+        _armar_item(
+            session, it, productos=productos, sucursal_id=sucursal_id,
+            canal=canal, modalidad=modalidad, dia=dia,
+        )
+        for it in items
+    ]
+    filas = [fila for fila, _ in armados]
+    detalle_evento = [detalle for _, detalle in armados]
+
     venta = Venta(
         id=id or uuid.uuid4(),
         sucursal_id=sucursal_id,

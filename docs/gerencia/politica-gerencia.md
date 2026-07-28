@@ -47,12 +47,41 @@ tabla es la narrativa de gobierno (qué, quién, por qué), no el valor exacto.
 | Lanzamiento de nuevo producto (impacto/inversión mayor) | Cuando supera el criterio comercial normal `[[ COMPLETAR: definir cuándo escala a Gerencia ]]` | Gerencia sobre evaluación de Producción/I+D+i y Comercial | RN-PRD-017, RN-CML-005 |
 | Entrada a nuevo mercado / marca / línea de negocio | Siempre | Gerencia (o socios si implica nueva empresa/marca) | RN-GER-006, RN-GER-001 |
 | Acción correctiva/disciplinaria a un trabajador | Cuando la situación lo amerita | Gerencia decide; RRHH ejecuta | RN-GER-005, RN-RRHH-004 |
-| Ajuste de inventario fuera de margen | Diferencia excede el margen acordado | Escala a administrador/Gerencia | RN-INV-015 |
-| Rango salarial de un perfil de puesto | Al crear/actualizar el perfil | Administración/Gerencia | perfiles `[[ COMPLETAR ]]` |
+| Ajuste de inventario fuera de margen | Diferencia excede el margen acordado (valor en `parametro_empresa`, `inventory/margen_error_ajuste`) | Escala a administrador/Gerencia | RN-INV-015 |
+| Rango salarial de un perfil de puesto | Al crear/actualizar el perfil | Administración/Gerencia | `parametro_empresa`, `rrhh/rango_salarial_<perfil>` (RN-GER-008) |
 
 > Al agregar un nuevo punto de aprobación en cualquier área, se agrega
 > aquí en el mismo cambio — no se documenta el umbral solo en el SOP del
 > área.
+
+## Parámetros operativos configurables
+
+Distinto de la matriz de aprobaciones (arriba): esto no es "qué requiere
+visado", es cualquier valor operativo que varía por empresa o en el
+tiempo y que antes se documentaba como `[[ COMPLETAR ]]` fijo. Se
+configura en `parametro_empresa` (RN-GER-008, `data-model.md` §8c,
+ADR-014) — lo gestiona Gerencia, no cada área por su cuenta. Un cambio
+puede sustentarse en un acta (`decision_gerencial`) cuando el ajuste lo
+amerite — por ejemplo, tras una reunión con las cabezas de área — pero no
+es obligatorio para un ajuste rutinario.
+
+Primeros candidatos a configurar (mecanismo ya decidido; **valor real
+pendiente de que Gerencia lo cargue**, no bloquea código):
+
+| Parámetro | Módulo/código | Notas |
+|---|---|---|
+| Rango salarial por perfil de puesto (7 perfiles) | `rrhh/rango_salarial_<perfil>` | `{"minimo":..., "maximo":...}` |
+| Frecuencia de conteo cíclico y de conteo general | `inventory/frecuencia_conteo_<categoria>` | `{"frecuencia":"diario"\|"semanal"\|"mensual"\|"anual"\|"fecha_especifica"}`, puede variar por categoría de insumo y por almacén |
+| Margen de error de ajuste de inventario | `inventory/margen_error_ajuste` | `{"porcentaje":...}`, puede variar por tipo de producto |
+| Monto del fondo de caja chica de compras | `purchases/monto_caja_chica` | `{"monto":...}`; el mecanismo de reposición ante faltante sigue siendo una decisión de proceso aparte, no solo de valor |
+| Plazo interno de envío de comprobantes al contador | `contabilidad/plazo_envio_comprobante` | `{"dias":...}` |
+| Margen de contribución mínimo objetivo | `comercial/margen_minimo` | `{"porcentaje":...}` |
+
+Quedan **fuera** de `parametro_empresa` por ser decisiones de rol, no de
+valor: quién autoriza ajustes de inventario (¿admin o un rol de
+"supervisor de logística" que hoy no existe formalmente?) y el aprobador
+suplente de OC en ausencia del administrador — ambos siguen pendientes en
+"Pendientes de decisión" (`ROADMAP.md`).
 
 ## Dirección estratégica
 

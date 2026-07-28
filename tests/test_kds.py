@@ -5,6 +5,7 @@ real compartido entre pantallas, comanda y RBAC.
 Etapa 2 — entrega: cierre del pedido, idempotencia y permiso propio.
 """
 
+from datetime import date
 from decimal import Decimal
 
 import pytest
@@ -25,7 +26,9 @@ from src.modules.inventory.infrastructure.models import (
     UnidadMedida,
 )
 from src.modules.sales.infrastructure.models import (
+    ListaPrecio,
     MedioPago,
+    Precio,
     ProductoComercial,
     PuntoVenta,
 )
@@ -38,6 +41,7 @@ from src.modules.users.infrastructure.models import (
     Sucursal,
     Usuario,
     UsuarioRol,
+    UsuarioSucursal,
 )
 from src.modules.users.infrastructure.security import hash_pin
 
@@ -102,6 +106,20 @@ def env(monkeypatch):
                                     (despachador, "despachador")):
             rol = s.scalar(select(Rol).where(Rol.nombre == nombre_rol))
             s.add(UsuarioRol(usuario_id=usuario.id, rol_id=rol.id))
+            # Sin sucursal asignada el JWT no lleva empresa y el contexto de
+            # tenant (ADR-004) le niega todo.
+            s.add(UsuarioSucursal(usuario_id=usuario.id, sucursal_id=sucursal.id))
+        # Precio server-side (RN-PRC-003): sin lista vigente no hay venta.
+        lista = ListaPrecio(marca_id=marca.id, nombre="Regular",
+                            vigente_desde=date(2020, 1, 1))
+        s.add(lista)
+        s.flush()
+        s.add_all([
+            Precio(lista_precio_id=lista.id, producto_comercial_id=pizza.id,
+                   monto=Decimal("25.00")),
+            Precio(lista_precio_id=lista.id, producto_comercial_id=bebida.id,
+                   monto=Decimal("5.00")),
+        ])
         ids.update(
             sucursal_id=str(sucursal.id), pv_id=str(pv.id),
             cat_pizzas=str(cat_pizzas.id), cat_bebidas=str(cat_bebidas.id),
@@ -146,10 +164,8 @@ def _setup_pantallas_y_venta(client, ids, h):
         "canal": "pdv", "modalidad": "mesa", "idempotency_key": "kds-venta-1",
         "referencia_atencion": "Mesa 5",
         "items": [
-            {"producto_comercial_id": ids["pizza_id"], "cantidad": "1",
-             "precio_unitario": "25.00"},
-            {"producto_comercial_id": ids["bebida_id"], "cantidad": "2",
-             "precio_unitario": "5.00"},
+            {"producto_comercial_id": ids["pizza_id"], "cantidad": "1"},
+            {"producto_comercial_id": ids["bebida_id"], "cantidad": "2"},
         ],
     }).json()
     return horno, barra, despacho, venta
@@ -366,10 +382,8 @@ def test_pantalla_sin_categorias_ve_todo(env):
         "sucursal_id": ids["sucursal_id"], "punto_venta_id": ids["pv_id"],
         "canal": "pdv", "modalidad": "mesa", "idempotency_key": "kds-venta-2",
         "items": [
-            {"producto_comercial_id": ids["pizza_id"], "cantidad": "1",
-             "precio_unitario": "25.00"},
-            {"producto_comercial_id": ids["bebida_id"], "cantidad": "1",
-             "precio_unitario": "5.00"},
+            {"producto_comercial_id": ids["pizza_id"], "cantidad": "1"},
+            {"producto_comercial_id": ids["bebida_id"], "cantidad": "1"},
         ],
     })
     cola = _cola(client, h, todo["id"])

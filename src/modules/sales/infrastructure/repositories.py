@@ -4,13 +4,15 @@ import uuid
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from src.modules.sales.infrastructure.models import (
     Cliente,
+    ListaPrecio,
     MedioPago,
     Pago,
+    Precio,
     ProductoComercial,
     PuntoVenta,
     Venta,
@@ -158,6 +160,88 @@ class ComprobanteRepo:
 
     def persona(self, persona_id: uuid.UUID | None) -> Persona | None:
         return self.s.get(Persona, persona_id) if persona_id else None
+
+
+class ListaPrecioRepo:
+    def __init__(self, session: Session) -> None:
+        self.s = session
+
+    def get(self, lista_id: uuid.UUID) -> ListaPrecio | None:
+        return self.s.get(ListaPrecio, lista_id)
+
+    def add(self, lista: ListaPrecio) -> ListaPrecio:
+        self.s.add(lista)
+        self.s.flush()
+        return lista
+
+    def vigentes(
+        self,
+        *,
+        marca_id: uuid.UUID,
+        sucursal_id: uuid.UUID,
+        canal: str,
+        modalidad: str,
+        fecha: date,
+    ) -> list[ListaPrecio]:
+        """Listas de la marca cuyo ámbito es compatible con la venta y que
+        están vigentes a `fecha`. NULL en una dimensión = aplica a todas."""
+        return list(
+            self.s.scalars(
+                select(ListaPrecio).where(
+                    ListaPrecio.deleted_at.is_(None),
+                    ListaPrecio.activa.is_(True),
+                    ListaPrecio.marca_id == marca_id,
+                    ListaPrecio.vigente_desde <= fecha,
+                    or_(
+                        ListaPrecio.vigente_hasta.is_(None),
+                        ListaPrecio.vigente_hasta >= fecha,
+                    ),
+                    or_(
+                        ListaPrecio.sucursal_id.is_(None),
+                        ListaPrecio.sucursal_id == sucursal_id,
+                    ),
+                    or_(ListaPrecio.canal.is_(None), ListaPrecio.canal == canal),
+                    or_(
+                        ListaPrecio.modalidad.is_(None),
+                        ListaPrecio.modalidad == modalidad,
+                    ),
+                )
+            )
+        )
+
+    def list(self, marca_id: uuid.UUID | None = None) -> list[ListaPrecio]:
+        q = select(ListaPrecio).where(ListaPrecio.deleted_at.is_(None))
+        if marca_id is not None:
+            q = q.where(ListaPrecio.marca_id == marca_id)
+        return list(self.s.scalars(q.order_by(ListaPrecio.vigente_desde.desc())))
+
+
+class PrecioRepo:
+    def __init__(self, session: Session) -> None:
+        self.s = session
+
+    def add(self, precio: Precio) -> Precio:
+        self.s.add(precio)
+        self.s.flush()
+        return precio
+
+    def por_producto(
+        self, producto_id: uuid.UUID, lista_ids: list[uuid.UUID]
+    ) -> dict[uuid.UUID, Decimal]:
+        if not lista_ids:
+            return {}
+        filas = self.s.execute(
+            select(Precio.lista_precio_id, Precio.monto).where(
+                Precio.producto_comercial_id == producto_id,
+                Precio.lista_precio_id.in_(lista_ids),
+            )
+        )
+        return {lista_id: monto for lista_id, monto in filas}
+
+    def de_lista(self, lista_id: uuid.UUID) -> list[Precio]:
+        return list(
+            self.s.scalars(select(Precio).where(Precio.lista_precio_id == lista_id))
+        )
 
 
 class MedioPagoRepo:

@@ -17,7 +17,7 @@ Registro de lo construido y lo pendiente. Actualizar en cada cambio relevante.
 | Módulo `users` (auth JWT + PIN + RBAC) | ✅ 2026-07-25 | Slice auth+CRUD implementado: 7 tablas RBAC (`rol`, `permiso`, `usuario_rol`, `rol_permiso`, `usuario_sucursal`, `refresh_token`, `audit_log`) + lockout en `usuario`. Login/refresh(rotativo+detección de reuso)/logout/me + CRUD admin de usuarios/roles/permisos/asignaciones. Argon2id, JWT, `require_permission` deny por defecto. `docs/security/authorization.md`. Restricciones JSONB por permiso: pendientes de aplicar (hoy solo chequeo por código). |
 | Migraciones Alembic iniciales | 🔶 en curso 2026-07-25 | 6 migraciones aplicadas a la BD dev (head `be914c92a94b`): transversal+org, slice Venta, cobro/caja, cliente opcional, slice auth/RBAC, slice inventory core (stock/movimiento/ajuste). |
 | Seeders (admin / PIN 123456, org base) | ✅ 2026-07-27 | `src/seeders/seed.py` (idempotente, prohibido en prod): matriz de roles/permisos semilla, `admin`/PIN `123456` y la **organización real** del grupo — empresa Majambo EIRL (RUC 20450311520, Jr. Ramón Castilla 248 - Tarapoto, zona `amazonia_ley27037`), marca Charlie's Pizzas **licenciada** a la empresa (`licencia_marca`), sucursales `CH1` (Jr. Ramón Castilla 248) y `CH2` (Jr. Lamas 299) activas y alquiladas (RN-IMP-004), almacén central `WH1` (`sucursal_id` NULL). Requirió `almacen.direccion` (migración `e5a1c93b7d40`): el central no cuelga de ninguna sucursal y no había dónde guardar su ubicación. Correr: `python -m src.seeders.seed`. Diferido: almacenes de sucursal de CH1/CH2 (no pedidos; su mín./máx. por SKU depende de datos de operación inexistentes) y CRUD de organización por API — hoy empresa/sucursal/almacén solo se crean por seeder. |
-| Módulo `inventory` | 🔶 slice 1 ✅ 2026-07-25 | Catálogo (CRUD artículos/categorías/SKUs), stock por almacén (vía `movimiento_inventario` inmutable) y ajuste con segregación (`solicitar_ajuste` ≠ `aprobar_ajuste`, aprobador ≠ solicitante). Migración `be914c92a94b`. Diferido: lote/FEFO, reservas, conteo, transferencias, devolución, guía remisión, listeners de eventos. |
+| Módulo `inventory` | 🔶 slices 1-2 ✅ 2026-07-27 | **Slice 1**: catálogo (CRUD artículos/categorías/SKUs), stock por almacén (vía `movimiento_inventario` inmutable) y ajuste con segregación (`solicitar_ajuste` ≠ `aprobar_ajuste`, aprobador ≠ solicitante). Migración `be914c92a94b`. **Slice 2 — lote/FEFO** (2026-07-27, ADR-015): `lote` + `stock_lote`, control **opcional por artículo** (`articulo.controla_lote` — el queso sí, las servilletas no). La salida reparte por FEFO (vence antes, sale antes; sin vencimiento va al final → FIFO) y genera **un movimiento por lote tomado**, con `lote_id` explícito como override. El lote vencido se bloquea cuando el picking lo toca y publica `inventory.lote_vencido_detectado`; `POST /lotes/bloquear-vencidos` hace el barrido a demanda. La recepción de compra transporta el lote y vencimiento del proveedor (RN-VNC-002) y producción crea el suyo. Nada entra sin lote si el artículo lo controla: un ingreso sin lote cae en el lote del día. `POST /movimientos` pasa a devolver **lista** de movimientos. El hub replica `lote`/`stock_lote` (ADR-009, 28 recursos). Migración `c9a2f4e18b60`. Tests: `tests/test_lotes.py`. Diferido: reservas, conteo, transferencias, devolución, guía remisión, `stock_merma`. |
 | Módulo `purchases` | 🔶 slice core ✅ 2026-07-25 | CRUD de proveedores (natural liga a `persona`, jurídico con RUC propio) y ciclo de OC tipo `insumo` (crear → emitir → recibir → anular), con idempotencia y umbral de aprobación configurable. `purchases.compra_recibida` → inventory suma stock y recalcula `costo_promedio`. Conformidad de comprobante (`purchases.dar_conformidad`) registra el `comprobante` recibido y dispara `purchases.comprobante_conforme` → cola de pago en `accounting`. Migración `4ff85f833b29` aplicada. Diferido: ver Deuda técnica. |
 | Módulo `sales` (PDV) | 🔶 slices 1-3 ✅ 2026-07-27 | Venta con correlativo+idempotencia → `sales.venta_confirmada` → inventory descuenta por receta (+merma+empaque); cobro con pagos parciales → `pagada`; anulación pre-pago repone stock; CRUD productos/medios de pago. **KDS** (slice 2): pantallas configurables por sucursal y categorías (`kds_pantalla`, migración `7672566bf189`), avance por ítem en `venta_item.estado_preparacion` (fuente única → todas las pantallas ven el avance real), tipos preparación/despacho, comanda imprimible con contador de reimpresiones, evento `sales.pedido_listo`, rol `cocinero`. Kiosk/Central de Pedidos = clientes del mismo contrato, no módulos. **Cumplimiento de pedido** (slice 3, 2026-07-27): `PROC-OPE-002` definido como UN proceso (área Operaciones) y su etapa de entrega implementada — `POST /sales/ventas/{id}/entrega` con permiso propio `sales.entregar_pedido` y rol `despachador`, idempotente, publica `sales.venta_entregada` (disparador de la encuesta de marketing, RN-COM-007). Diferido: ver Deuda técnica. |
 | Persona CRUD + lock optimista + matriz de aprobaciones + contrato público | ✅ 2026-07-25 | `POST/GET/PATCH /api/v1/personas` (sin Delete); `persona.version` con lock optimista (409 si desactualizada); `regla_aprobacion` (nuevo, `src/shared/`) reemplaza el umbral fijo de `purchases` por empresa, admin en `/api/v1/reglas-aprobacion`; primer contrato público de lectura cross-módulo (`sales.cliente` para marketing/comercial, `GET /api/v1/sales/clientes`). Migración `af8a246e2c25`. Ver detalle abajo. |
@@ -44,7 +44,8 @@ Registro de lo construido y lo pendiente. Actualizar en cada cambio relevante.
 | Endurecimiento de producción (rate limit, secretos, HTTPS, cabeceras) | 🔶 base ✅ 2026-07-26 | Rate limit por IP en login/refresh (Redis, fail-open), validación de config que aborta el arranque en `production` con valores de desarrollo, CORS + `TrustedHost` + cabeceras de seguridad + HSTS, `/docs` cerrado en producción, uvicorn `--proxy-headers`. Runbook de rotación de credenciales y custodia de `.env` en `docs/engineering/devops.md`. Pendiente: ver Deuda técnica → Seguridad. |
 | App Android (15+) | ⬜ | **Decidido (ADR-013): PWA/responsive, no app nativa** — Next.js + Tailwind + Base UI es 100% web, sin base de código separada; debe hablar con el hub local de sucursal igual que web y PC, ver ADR-009 |
 | Arquitectura frontend (Tailwind, Base UI, shell estilo Odoo) | ✅ spec 2026-07-27 | ADR-013: Tailwind sobre los tokens de marca existentes (`tailwind.config.ts` → `var(--color-*)`, sin hex mágico); Base UI (no Radix, no kit estilizado) para overlays/combobox/dialog; home de apps + sidebar por módulo estilo Odoo; grid y rutas filtrados por `permisos` de `GET /users/me` (ya existente, sin cambio de backend), guard real server-side en cada `layout.tsx` de módulo — el filtro del grid es solo UX. Sin librería de estado global (YAGNI). Playwright para e2e de flujos críticos, hoy en cero. `docs/prompts/frontend.md` actualizado con las reglas técnicas. Sin implementación de código todavía. |
-| Modo offline del PDV — hub local de sucursal | ✅ fase 1 2026-07-26 · fase 2 2026-07-27 | ADR-009: hub local dedicado por sucursal (misma imagen del backend, Postgres propio), los 3 clientes (web/Android/PC) le hablan siempre al hub por LAN. **Fase 1**: `DEPLOYMENT_MODE=hub` + validación de config, detector de conectividad, `GET /health/sync`, `docker-compose.hub.yml`. **Fase 2 — motor de sync**: ciclo que **empuja y después jala** (`src/core/sync/motor.py`, proceso `python -m src.core.sync.runner`); `id` client-generado en `crear_venta`/`registrar_pago`/`registrar_movimiento` (el cambio previo que pedía la fase 1, sin migración); endpoints dedicados `GET /sync/pull` + `POST /sync/push` (permisos `sync.leer`/`sync.empujar`, rol `hub_sucursal`) porque los públicos no alcanzaban (no traen `pin_hash` ni los campos del catálogo, no son incrementales, y el push necesita conservar quién vendió y el número de orden); contrato declarativo por módulo (`application/sincronizacion.py`, 24 recursos) que el motor solo ensambla; tabla `sync_watermark` por recurso y dirección; `/health/sync` con avance y último error por recurso; alta de la cuenta de servicio con `python -m src.seeders.hub`. El hub NO empuja movimientos de inventario (el listener de la nube los regenera; duplicaría el consumo). 24 casos en `tests/test_sync_motor.py` sincronizando dos bases reales. Pendiente: ver Deuda técnica. |
+| Modo offline del PDV — hub local de sucursal | ✅ fase 1 2026-07-26 · fase 2 2026-07-27 | ADR-009: hub local dedicado por sucursal (misma imagen del backend, Postgres propio), los 3 clientes (web/Android/PC) le hablan siempre al hub por LAN. **Fase 1**: `DEPLOYMENT_MODE=hub` + validación de config, detector de conectividad, `GET /health/sync`, `docker-compose.hub.yml`. **Fase 2 — motor de sync**: ciclo que **empuja y después jala** (`src/core/sync/motor.py`, proceso `python -m src.core.sync.runner`); `id` client-generado en `crear_venta`/`registrar_pago`/`registrar_movimiento` (el cambio previo que pedía la fase 1, sin migración); endpoints dedicados `GET /sync/pull` + `POST /sync/push` (permisos `sync.leer`/`sync.empujar`, rol `hub_sucursal`) porque los públicos no alcanzaban (no traen `pin_hash` ni los campos del catálogo, no son incrementales, y el push necesita conservar quién vendió y el número de orden); contrato declarativo por módulo (`application/sincronizacion.py`, 28 recursos
+tras sumar precios y lote/FEFO) que el motor solo ensambla; tabla `sync_watermark` por recurso y dirección; `/health/sync` con avance y último error por recurso; alta de la cuenta de servicio con `python -m src.seeders.hub`. El hub NO empuja movimientos de inventario (el listener de la nube los regenera; duplicaría el consumo). 24 casos en `tests/test_sync_motor.py` sincronizando dos bases reales. Pendiente: ver Deuda técnica. |
 | Backups automáticos | ✅ 2026-07-26 | `python -m src.backups.backup`: dump `pg_dump --format=custom` → verificación del archivo (firma + tablas críticas) → restauración probada contra base desechable → copia a S3 (opcional) → purga con retención de 30 días que nunca borra la copia más reciente. **Diario** (antes se declaraba mensual e incremental). Cron del host, no Celery beat. Runbook en `docs/engineering/devops.md#backups`. Pendiente: alerta ante fallo, ver Deuda técnica. |
 | Dashboard gerencial mínimo | ✅ 2026-07-26 | `GET /api/v1/dashboard/resumen` (`src/core/dashboard_router.py`, permiso `dashboard.leer`): ventas del día (cantidad+total), stock bajo mínimo, cajas abiertas — agregador en `core`, nunca importa dominio de otro módulo (ADR-012). Requirió construir dos huecos que no existían: `sales` no tenía ningún listado de ventas, `accounting` tenía los modelos de caja (`apertura_caja`/`cierre_caja`/`arqueo`, migrados desde 2026-07-20) sin capa de aplicación. **Slice mínimo de caja** (`accounting.application.caja`): abrir/cerrar/arquear con **reconciliación real** (el cierre calcula `monto_esperado` desde los pagos en efectivo reales, vía contrato público de `sales`, no un número tipeado sin verificar). Primer frontend real: login por PIN + pantalla de dashboard en Next.js. Fuera de esta fase, a propósito: RN-POS-009..013 completas, relevo autenticado por PIN, máquina de estados de `custodia_efectivo` — ver Deuda técnica. |
 | Protección de datos personales (Ley 29733) | 🔶 ARCO técnico ✅ 2026-07-26 | `docs/security/proteccion-datos-personales.md`: qué datos trata el ERP y dónde viven (casi todo en `persona`, fuente única — RN-GEN-007), derechos ARCO, plazos de conservación, medidas de seguridad ya vigentes (referenciadas, no reconstruidas), proceso de brecha. Cancelación implementada como **anonimización irreversible** de `persona`, no `DELETE` — `POST /api/v1/personas/{id}/anonimizar`, permiso dedicado `personas.anonimizar`, migración `dad43729501d` (RN-PER-007, ADR-011). Acceso/Rectificación ya existían (`GET`/`PATCH /personas/{id}`). Pendiente de **acción del usuario, no de código**: registro del banco de datos ante la ANPD, aviso de privacidad público, confirmar plazos de retención con el contador/abogado, jurisdicción de transferencia internacional. Pendiente técnico: ver Deuda técnica. |
@@ -56,7 +57,7 @@ Registro de lo construido y lo pendiente. Actualizar en cada cambio relevante.
 | UX: breadcrumb por ruta de usuario (no jerárquico) + tooltip de ayuda por campo de formulario | ✅ spec 2026-07-26 | `docs/product/ui-ux.md` — breadcrumb crece con la navegación (patrón Odoo), navegación jerárquica va por menús desplegables; todo campo de formulario lleva hover explicando término/formato. Solo especificado |
 | UX: buscador contextual (nombre/insumo/exclusión, ranking por probabilidad) + dialog de venta sugerida (upsell) en carrito | ✅ spec 2026-07-26 | `docs/product/ui-ux.md` — buscador cruza `receta_item` para insumo/exclusión, lista ordenada por relevancia si no hay match único; al ir al carrito se sugieren productos de adición rápida, descartable. Solo especificado |
 | Branding (paleta, tipografías, tokens CSS) | ✅ 2026-07-04 | Brandboard aplicado — `docs/product/ui-ux.md` |
-| Skins multi-marca (PDV/Kiosk por marca vs Provecho/Majambo en el resto), accesibilidad (daltonismo, tamaño de fuente) y plataformas por módulo (táctil Android en PDV/Kiosk/KDS/Inventario, PC-first en el resto) | 🔶 spec 2026-07-25 | `docs/product/ui-ux.md` — solo especificado, falta implementar (resolver de tema por marca, preferencias de accesibilidad en perfil de usuario) |
+| Skins multi-marca (PDV/Kiosk por marca vs **Provecho** en el resto — Majambo no tiene tema propio, decidido 2026-07-27), accesibilidad (2 paletas + 4 niveles de tamaño de fuente, catálogo definido 2026-07-27) y plataformas por módulo (táctil Android en PDV/Kiosk/KDS/Inventario, PC-first en el resto) | 🔶 spec 2026-07-27 | `docs/product/ui-ux.md` — solo especificado, falta implementar (resolver de tema por marca, preferencias de accesibilidad en perfil de usuario) |
 | F2 — Arquitectura de frontend (documento maestro) | ✅ spec 2026-07-27 | `docs/product/frontend-architecture.md` — 31 secciones (tokens, componentes base/especializados, layout, navegación, estado, tablas, formularios, tiempo real, permisos visuales por rol, etc.) con estado por sección y los 6 puntos a cerrar antes de los diseños finales del alfa (layout general, componentes base, tablas, permisos visuales, arquitectura de carpetas, decisión de estado). Solo especificado — ver detalle en Deuda técnica → Frontend |
 
 ## Pendientes de decisión (registro vivo)
@@ -64,20 +65,43 @@ Registro de lo construido y lo pendiente. Actualizar en cada cambio relevante.
 Marcar aquí cuando cada uno se resuelva (y actualizar el doc que lo
 contiene, buscando su `[[ COMPLETAR ]]`):
 
-- ⬜ Umbral de aprobación de OC en soles (`marco-legal-compras.md`,
-  plantilla de OC, SOP de aprobación; ¿umbral separado para activos?).
-- ⬜ Aprobador suplente de OC en ausencia del administrador.
-- ⬜ Margen de contribución mínimo objetivo (con contabilidad).
-- ⬜ Esquema de incentivo/comisión de metas de venta (Comercial + RRHH +
-  Gerencia, nunca retroactivo).
-- ⬜ Frecuencia de conteo cíclico y de conteo general de Almacén Central.
-- ⬜ Margen de error de ajuste de inventario (con Contabilidad).
-- ⬜ Quién autoriza ajustes de inventario (admin vs. supervisor de
-  logística — rol aún no existe formalmente).
-- ⬜ Monto del fondo de caja chica de compras + mecanismo de reposición
-  cuando hay faltante en descuento (con contador).
-- ⬜ Plazo interno de envío de comprobantes al contador.
-- ⬜ Rangos salariales de los 7 perfiles de puesto (con administración).
+- ✅ 2026-07-27 **Mecanismo para los valores operativos configurables**
+  (umbral de OC, margen de contribución mínimo, frecuencia de conteo,
+  margen de error de ajuste, monto de caja chica, plazo de envío de
+  comprobantes, rangos salariales): decidido con el usuario que **no son
+  valores fijos** — se configuran en `parametro_empresa` por empresa, los
+  gestiona Gerencia, y un cambio puede sustentarse en un acta
+  (`decision_gerencial`) cuando amerite (no obligatorio para un ajuste
+  rutinario). Ver ADR-014, `data-model.md` §8c, RN-GER-008 y
+  `docs/gerencia/politica-gerencia.md#parámetros-operativos-configurables`.
+  Lo que queda abierto por cada uno de los puntos de abajo ya **no es el
+  mecanismo** (resuelto) sino que **Gerencia cargue el valor real** —
+  trabajo de configuración/negocio, no bloquea código:
+  - ⬜ Umbral de aprobación de OC en soles (`purchases/oc_umbral`, ya vive
+    en `regla_aprobacion` — solo falta que Gerencia lo configure por
+    empresa; valor semilla S/2000 mientras tanto). ¿Umbral separado para
+    activos?
+  - ⬜ Margen de contribución mínimo objetivo (`comercial/margen_minimo`).
+  - ⬜ Esquema de incentivo/comisión de metas de venta (Comercial + RRHH +
+    Gerencia, nunca retroactivo) — el valor numérico va en
+    `parametro_empresa`; el diseño del esquema en sí sigue siendo decisión
+    de negocio a definir con esas tres áreas.
+  - ⬜ Frecuencia de conteo cíclico y de conteo general de Almacén Central
+    (`inventory/frecuencia_conteo_<categoria>`).
+  - ⬜ Margen de error de ajuste de inventario
+    (`inventory/margen_error_ajuste`).
+  - ⬜ Monto del fondo de caja chica de compras
+    (`purchases/monto_caja_chica`) — el mecanismo de reposición ante
+    faltante sigue siendo decisión de proceso aparte, no solo de valor.
+  - ⬜ Plazo interno de envío de comprobantes al contador
+    (`contabilidad/plazo_envio_comprobante`).
+  - ⬜ Rangos salariales de los 7 perfiles de puesto
+    (`rrhh/rango_salarial_<perfil>`).
+  Quedan **fuera** de este mecanismo por ser decisión de rol, no de valor
+  (siguen abiertas tal cual):
+  - ⬜ Aprobador suplente de OC en ausencia del administrador.
+  - ⬜ Quién autoriza ajustes de inventario (admin vs. supervisor de
+    logística — rol aún no existe formalmente).
 - ✅ 2026-07-20 `reporte_escalamiento`: definido con el usuario — cadena
   atención al cliente → supervisor (redacta solución) → comercial/gerencia
   (acciones reportadas); se almacena para mejora continua
@@ -115,11 +139,15 @@ contiene, buscando su `[[ COMPLETAR ]]`):
   momento se registran los PROC en el registro maestro.
 - ⬜ BPMN pendientes ya declarados: contingencias de personal faltante
   (RN-RRHH-011) y tardanza/falta del encargado (RN-RRHH-010).
-- ⬜ Catálogo exacto de paletas de accesibilidad (daltonismo) y niveles de
-  tamaño de fuente (`docs/product/ui-ux.md`).
-- ⬜ Si Grupo Majambo tiene tema propio distinto al de Provecho, o si
-  Provecho es también el tema por defecto de Grupo Majambo
-  (`docs/product/ui-ux.md`).
+- ✅ 2026-07-27 Catálogo de paletas de accesibilidad y niveles de tamaño de
+  fuente — propuesta técnica definida (dos paletas: Provecho estándar y
+  un modo alto contraste/daltonismo inspirado en Okabe-Ito que cubre
+  protanopía+deuteranopía; 4 niveles de tamaño de fuente vía
+  `--font-scale`). `docs/product/ui-ux.md#catálogo-de-paletas-y-tamaños-de-fuente-propuesta-técnica-2026-07-27`.
+  Sujeta a ajuste si aparece validación real con usuarios daltónicos/baja
+  visión. Sin implementar todavía.
+- ✅ 2026-07-27 Grupo Majambo **no tiene tema propio** — Provecho es el
+  único tema fuera de PDV/Kiosk (`docs/product/ui-ux.md`).
 - ⬜ **Pendiente del usuario para desplegar el endurecimiento de producción**
   (2026-07-26, ver ROADMAP → Deuda técnica → Seguridad): no bloquea seguir
   desarrollando, solo hace falta al desplegar de verdad.
@@ -137,16 +165,41 @@ Registro vivo de deuda técnica declarada al cerrar cada slice — para que no
 se olvide. Marcar ✅ al resolverse en el slice indicado.
 
 ### Transversal
-- ⬜ **Contexto de tenant desde el JWT** (ADR-004): hoy varios endpoints
-  reciben `empresa_id` en el body (ej. catálogo de inventory). Derivarlo de
-  los claims + validar alcance en cada query. Afecta a todo módulo nuevo.
+- 🔶 **Contexto de tenant desde el JWT** (ADR-004): resuelto 2026-07-27 en
+  `users`, `inventory`, `sales` y `kds` — `src/core/tenant.py` +
+  dependencia `get_tenant`; el `empresa_id`/`sucursal_id` sale de los
+  claims, no del body, y un recurso ajeno responde 403 vía el handler de
+  `FueraDeAlcance` del app factory. Tests en
+  `tests/test_tenant_aislamiento.py`. **Falta** aplicarlo a `purchases`,
+  `production`, `accounting`, `rrhh` y el dashboard gerencial, que siguen
+  recibiendo `empresa_id` del cliente (`sync` ya lo derivaba de la cuenta
+  de servicio). Escape explícito documentado: superusuario (`*`) sin
+  sucursal asignada puede indicar la empresa — sin eso el bootstrap del
+  sistema sería imposible.
 - ⬜ `users`: aplicar **restricciones JSONB** por permiso (hoy autoriza solo
   por código, no por condición monto/estado/horario).
 - ⬜ `users`: auth de **`agente_ia` por token** (hoy exige PIN como humano).
 - ⬜ **Theming multi-marca + accesibilidad** (frontend, spec en
   `docs/product/ui-ux.md`): resolver de tema por marca/sucursal para
   PDV/Kiosk, preferencias de accesibilidad (paleta daltonismo, tamaño de
-  fuente) persistidas en el perfil de `usuario`. Sin implementar.
+  fuente) persistidas en el perfil de `usuario`. Catálogo de paletas y
+  niveles ya definido (2026-07-27) — sin implementar.
+- ⬜ **`parametro_empresa`** (ADR-014, `data-model.md` §8c, RN-GER-008):
+  entidad transversal para valores operativos configurables por empresa
+  (rango salarial, frecuencia de conteo, margen de error de ajuste, monto
+  de caja chica, plazos internos) con `valor` JSONB y
+  `decision_gerencial_id` opcional como sustento. **Sin modelo, migración
+  ni endpoints todavía** — candidato natural para el primer uso real:
+  rango salarial de RRHH. El permiso `gerencia.gestionar_parametros_empresa`
+  ya está sembrado en `src/seeders/seed.py` (2026-07-27, mismo patrón que
+  `gestionar_reglas_aprobacion`) para no bloquear el RBAC del primer slice
+  que lo implemente — hoy solo lo tiene `admin` vía `*`, no hay rol
+  `gerente` explícito (mismo hueco que `gestionar_reglas_aprobacion`).
+- ⬜ **`decision_gerencial`** (materializa el acta de decisión gerencial,
+  RN-GER-002, `data-model.md` §8c): documentado desde el slice de Gerencia
+  (2026-07-22) pero **sin modelo ni migración en código todavía** —
+  `parametro_empresa.decision_gerencial_id` depende de que esta entidad
+  exista primero.
 - ✅ 2026-07-25 **Lock optimista en `persona`** (`VersionedMixin`,
   `src/core/model_base.py`): `PATCH /api/v1/personas/{id}` exige `version`
   vigente, 409 si está desactualizada. Aplicado solo a `persona` por
@@ -365,11 +418,30 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   bloquea) — falta superficie de alerta/reporte de esas omisiones.
 - ⬜ **`reserva_stock`**: disponible = físico − reservas activas
   (carrito / solicitud / producción / merma), RN-INV-009.
-- ⬜ **Lote / FEFO**: `lote` + `stock_lote`; picking sugiere lote por
-  `fecha_vencimiento`; bloqueo de vencidos + evento
-  `inventory.lote_vencido_detectado`. **El lote lo genera tanto la recepción
-  de compra como la producción**: un SKU producido recibe su lote al
-  fabricarse — coordinar con el módulo `production`.
+- ✅ 2026-07-27 **Lote / FEFO** (ADR-015): `lote` + `stock_lote`, control
+  opcional por artículo, reparto FEFO al registrar la salida, bloqueo de
+  vencidos + `inventory.lote_vencido_detectado`, lote generado por
+  recepción de compra y por producción. Deuda que deja abierta:
+  - ⬜ **La reposición por venta anulada entra al lote del día**, no al
+    lote del que salió: `sales.venta_anulada` no transporta los
+    movimientos originales. Con volumen bajo la diferencia es contable,
+    no física; si importa, el evento tiene que llevar el detalle.
+  - ⬜ **Ventana de alerta de vencimiento por artículo**: hoy
+    `por_vencer_dias` se pasa en cada consulta; el modelo de datos la
+    quiere configurable por artículo.
+  - ⬜ **`inventory.lote_vencido_detectado` sin consumidor y sin
+    `responsable_id`**: `almacen` no tiene responsable modelado, así que
+    el memorándum a RRHH (RN-VNC) no puede dirigirse a nadie.
+  - ⬜ **Motivo del override de lote**: el README del módulo exige motivo
+    al no tomar el lote sugerido; hoy el override es solo el `lote_id`
+    explícito, sin motivo registrado.
+  - ⬜ **`recepcion_item` no guarda el lote recibido**: el dato viaja en
+    el evento hacia `inventory` pero el documento de recepción no lo
+    conserva; si el listener falla, se pierde.
+  - ⬜ **Salida sin lote que lo respalde**: si el total alcanza pero
+    ningún lote cubre (stock previo al control de lote, o resto
+    bloqueado), se registra un movimiento sin lote. Es deliberado
+    (ADR-015) pero nadie revisa esos movimientos — falta reporte.
 - ⬜ **Conteo cíclico**: `conteo` + `conteo_item`; la diferencia genera un
   `ajuste`.
 - ⬜ **Transferencias + `solicitud_insumos`**: solicitud → aprobación →
@@ -382,9 +454,18 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   `bajo_minimo` derivado en la consulta de stock).
 
 ### Módulo sales (slices siguientes)
-- ⬜ **Precio server-side** (`lista_precio`/`precio`/`promocion`): hoy el
-  PDV manda `precio_unitario` en el request. RN-COM: el precio lo fija el
-  sistema por sucursal/canal.
+- ✅ 2026-07-27 **Precio server-side** (`lista_precio`/`precio`): el PDV
+  ya no manda `precio_unitario` — `crear_venta` lo resuelve por
+  marca+sucursal+canal+modalidad+fecha (RN-PRC-003/RN-MDC-003). Gana la
+  lista promocional, luego la más específica, luego la de vigencia más
+  reciente; al vencer la promoción el precio regular vuelve solo. Sin
+  precio vigente la venta es 409 y el producto no sale en `GET /carta`.
+  `precio` no tiene endpoint de edición: corregir = lista nueva
+  (RN-PRC-005). Migración `d4b1f0a7c3e9` (cierra además la FK pendiente
+  `medio_pago.lista_precio_credito_id`). El replay offline del hub
+  conserva el precio cobrado (`VentaItemSyncIn`, ADR-009). Pendiente:
+  `promocion` como entidad propia (material, guion, capacitación) y el
+  cálculo de margen de contribución expuesto a Comercial (RN-CML-001).
 - ✅ 2026-07-26 **Comprobante** (boleta/factura vía **Factiliza**) — venta
   `pagada` → `facturada`; series por `punto_venta`; correlativo por
   (empresa, serie); cola Celery con reintentos. Migración `b3d7f21ac094`.
@@ -503,10 +584,13 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   Mismo bloqueo para el costeo por lote (ver siguiente punto).
   Reproceso (`no_conforme_reprocesado`) correctamente no genera merma ni
   asiento (RN-PRD — solo detalle en el reporte de escalamiento).
-- ⬜ **Lote/trazabilidad del producto terminado**: el ingreso a stock por
-  `orden_completada` no genera `lote` (bloqueado por lote/FEFO, deuda de
-  inventory) — sin eso no hay manipulador/envasador/variables de proceso
-  trazables por lote (RN-PRD).
+- 🔶 **Lote/trazabilidad del producto terminado**: desde 2026-07-27
+  (ADR-015) el ingreso por `orden_completada` **sí** genera `lote`
+  (`origen=produccion`, referencia a la orden) cuando el artículo controla
+  lote. Falta la trazabilidad fina de fabricación —manipulador, envasador,
+  línea, variables de proceso, QR (RN-PRD, RN-LOT-002/003)—: son campos
+  del slice de `production`, que además debe mandar la fecha de
+  vencimiento (hoy el lote producido nace sin ella, RN-VNC-001).
 - ⬜ **Subrecetas anidadas**: una orden que consume otra subreceta (con su
   propia orden de producción) no está resuelta — hoy `registrar_consumo`
   espera insumos ya disponibles en stock.
@@ -610,42 +694,42 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   API recibe `ingresos`/`descuentos`/montos ya calculados (por el contador
   externo) — no hay motor de cálculo de renta 5ta/ONP/AFP/EsSalud en el ERP.
 
-### Frontend (F2 — arquitectura y UX, documento nuevo 2026-07-27)
+### Frontend (F2 — arquitectura y UX, documento 2026-07-27, actualizado tras ADR-013)
 
 Detalle completo por sección en `docs/product/frontend-architecture.md`.
-Aquí solo el resumen accionable — los 6 puntos que bloquean empezar los
-diseños finales del alfa, en orden sugerido:
+De las 6 prioridades que este documento marcaba como bloqueantes del
+alfa, **ADR-013** (misma fecha, sesión distinta — arquitectura frontend:
+Tailwind + Base UI, shell estilo Odoo, gate por permiso) resolvió 5:
 
-- ⬜ **F2.6 Layout general**: shell de back-office (sidebar+topbar) vs.
-  shell de PDV/Kiosk (pantalla completa) — decidir si son layouts de Next.js
-  separados antes de construir POS, para no migrar rutas después.
-- ⬜ **F2.4 Componentes base**: catálogo mínimo v1 (Button, Input, Select,
-  Checkbox, Switch, Card, Modal, Tabs, Toast, Badge, Table base, Skeleton,
-  EmptyState, ErrorState). Hoy no existe ni un `Button` propio — el login
-  usa HTML plano con clases CSS directas.
+- ✅ **F2.6 Layout general**: home de apps + sidebar por módulo (patrón
+  Odoo), filtrado por permiso.
+- ✅ **F2.4 Componentes base**: Tailwind CSS sobre los tokens existentes +
+  Base UI (no Radix, no kit estilizado) para overlays/combobox/dialog.
+- ✅ **F2.28 Permisos visuales por rol**: `GET /users/me` ya devuelve
+  `permisos: string[]`; el home filtra módulos visibles, cada
+  `layout.tsx` de módulo repite el check server-side.
+- ✅ **F2.2 Arquitectura de carpetas**: convención por módulo definida
+  (`app/(app)/[modulo]/layout.tsx` + `components/{ui,shell}`).
+- ✅ **F2.8 Gestión de estado**: confirmado sin Zustand/Redux hasta que el
+  carrito POS lo justifique.
+
+Ninguna de las 5 está implementada en código todavía — son decisiones de
+arquitectura, no trabajo hecho.
+
+Queda **una sola prioridad abierta**:
+
 - ⬜ **F2.11 Tablas**: elegir librería (candidata: TanStack Table) y
   alcance v1 (orden/filtro/búsqueda/paginación) vs. v2 (columnas
   congelar/mover/ocultar, selección + acciones masivas, scroll virtual,
   totales). Es el componente más usado de todo el ERP y ninguna tabla está
-  construida todavía.
-- ⬜ **F2.28 Permisos visuales por rol**: decidir si el JWT ya trae
-  permisos resueltos para que el frontend solo oculte/deshabilite, o si
-  el frontend llama a `/me` y cachea el set — afecta el diseño de cada
-  pantalla desde el principio, no se puede agregar después sin rehacer
-  componentes. El RBAC backend ya existe completo (`users`).
-- ⬜ **F2.2 Arquitectura de carpetas**: pasar de `app/` + `lib/` a
-  `components/{ui,erp,layout}` + `hooks/` + `store/` (si aparece) antes de
-  que la 3ª pantalla obligue a reordenar código ya escrito.
-- ⬜ **F2.8 Gestión de estado**: dejar explícito "Server Components +
-  estado local, sin Zustand/Redux todavía" hasta que el carrito POS lo
-  exija — evita que alguien lo decida a las apuradas a mitad de una
-  pantalla.
+  construida todavía — ADR-013 resuelve overlays/interacción, no grillas
+  de datos.
 
-Todo lo demás (theming multi-marca, accesibilidad, tiempo real de KDS,
-i18n, hardware, testing, observabilidad, printing, productividad,
-multitarea) tiene decisión tomada, está correctamente diferido, o depende
-de un módulo backend que todavía no llega a pantalla — no bloquea empezar
-a diseñar.
+Todo lo demás (theming multi-marca, accesibilidad — catálogo ya definido,
+tiempo real de KDS, i18n, hardware, testing — Playwright ya decidido por
+ADR-013, observabilidad, printing, productividad, multitarea) tiene
+decisión tomada, está correctamente diferido, o depende de un módulo
+backend que todavía no llega a pantalla — no bloquea empezar a diseñar.
 
 ## Orden sugerido de desarrollo
 

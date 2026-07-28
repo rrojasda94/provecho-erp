@@ -59,6 +59,7 @@ def crear_articulo(
     tipo: str,
     categoria_id: uuid.UUID | None = None,
     costo_promedio: Decimal = Decimal(0),
+    controla_lote: bool = False,
 ) -> Articulo:
     _existe(session, UnidadMedida, unidad_medida_id, "unidad de medida")
     _existe(session, Categoria, categoria_id, "categoría")
@@ -74,6 +75,7 @@ def crear_articulo(
             tipo=tipo,
             categoria_id=categoria_id,
             costo_promedio=costo_promedio,
+            controla_lote=controla_lote,
         )
     )
 
@@ -82,7 +84,9 @@ def editar_articulo(session: Session, articulo_id: uuid.UUID, **campos) -> Artic
     articulo = ArticuloRepo(session).get(articulo_id)
     if articulo is None:
         raise NoEncontrado("artículo no encontrado")
-    for campo in ("nombre", "categoria_id", "tipo", "costo_promedio", "archivado"):
+    for campo in (
+        "nombre", "categoria_id", "tipo", "costo_promedio", "archivado", "controla_lote",
+    ):
         if campo in campos and campos[campo] is not None:
             setattr(articulo, campo, campos[campo])
     return articulo

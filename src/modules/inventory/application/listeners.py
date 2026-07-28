@@ -9,6 +9,7 @@ Un fallo de inventario NUNCA rompe la venta: el handler atrapa y loguea.
 
 import logging
 import uuid
+from datetime import date
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -16,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from src.core.database import SessionLocal
 from src.core.events import event_bus
+from src.modules.inventory.application import lotes as lotes_uc
 from src.modules.inventory.application import stock as stock_uc
 from src.modules.inventory.application.errors import StockInsuficiente
 from src.modules.inventory.infrastructure.models import Articulo, RecetaItem, Sku
@@ -94,14 +96,28 @@ def _mover(payload: dict, tipo: str, signo: int) -> None:
                     )
                     continue
                 try:
-                    stock_uc.registrar_movimiento(
-                        session,
-                        almacen_id=almacen_id,
-                        sku_id=sku_id,
-                        cantidad=cantidad * signo,
-                        tipo=tipo,
-                        referencia=payload["venta_id"],
-                    )
+                    if signo < 0:
+                        # FEFO: la venta se lleva primero lo que vence antes.
+                        stock_uc.registrar_salida(
+                            session,
+                            almacen_id=almacen_id,
+                            sku_id=sku_id,
+                            cantidad=cantidad,
+                            tipo=tipo,
+                            referencia=payload["venta_id"],
+                        )
+                    else:
+                        # ponytail: la reposición por anulación entra al lote
+                        # del día, no al lote del que salió — el movimiento
+                        # original no viaja en el evento. Ver deuda del módulo.
+                        stock_uc.registrar_movimiento(
+                            session,
+                            almacen_id=almacen_id,
+                            sku_id=sku_id,
+                            cantidad=cantidad,
+                            tipo=tipo,
+                            referencia=payload["venta_id"],
+                        )
                     movio = True
                 except StockInsuficiente:
                     # ponytail: la venta ya ocurrió — el stock teórico no la
@@ -156,12 +172,41 @@ def _actualizar_costo_promedio(
         ) / total_nuevo
 
 
+def _lote_del_ingreso(
+    session: Session,
+    articulo_id: uuid.UUID,
+    origen: str,
+    referencia: str,
+    datos: dict,
+) -> uuid.UUID | None:
+    """Crea (o reusa) el lote del ingreso si el artículo lo controla.
+
+    La fecha de vencimiento la declara el proveedor en la recepción
+    (RN-VNC-002) o la normativa/laboratorio en producción (RN-VNC-001);
+    si el evento no la trae, el lote nace sin vencimiento y FEFO lo trata
+    como FIFO.
+    """
+    articulo = session.get(Articulo, articulo_id)
+    if articulo is None or not articulo.controla_lote:
+        return None
+    vence = datos.get("fecha_vencimiento")
+    return lotes_uc.crear_lote(
+        session,
+        articulo_id=articulo_id,
+        codigo=datos.get("lote_codigo"),
+        fecha_vencimiento=date.fromisoformat(vence) if vence else None,
+        origen=origen,
+        referencia=referencia,
+    ).id
+
+
 def on_compra_recibida(payload: dict) -> None:
     try:
         with session_factory() as session:
             almacen_id = uuid.UUID(payload["almacen_destino_id"])
             for it in payload["items"]:
-                sku_id = _sku_de_articulo(session, uuid.UUID(it["articulo_id"]))
+                articulo_id = uuid.UUID(it["articulo_id"])
+                sku_id = _sku_de_articulo(session, articulo_id)
                 if sku_id is None:
                     log.warning(
                         "OC %s: artículo %s sin SKU activo, ítem omitido",
@@ -180,6 +225,10 @@ def on_compra_recibida(payload: dict) -> None:
                     cantidad=cantidad,
                     tipo="recepcion_compra",
                     referencia=payload["orden_compra_id"],
+                    lote_id=_lote_del_ingreso(
+                        session, articulo_id, "compra",
+                        payload["orden_compra_id"], it,
+                    ),
                 )
             session.commit()
     except Exception:
@@ -201,11 +250,11 @@ def on_consumo_registrado(payload: dict) -> None:
                     )
                     continue
                 try:
-                    stock_uc.registrar_movimiento(
+                    stock_uc.registrar_salida(
                         session,
                         almacen_id=almacen_id,
                         sku_id=sku_id,
-                        cantidad=-Decimal(it["cantidad"]),
+                        cantidad=Decimal(it["cantidad"]),
                         tipo="consumo_produccion",
                         referencia=payload["orden_produccion_id"],
                     )
@@ -245,6 +294,13 @@ def on_orden_completada(payload: dict) -> None:
                 cantidad=cantidad,
                 tipo="produccion_entrada",
                 referencia=payload["orden_produccion_id"],
+                lote_id=_lote_del_ingreso(
+                    session,
+                    uuid.UUID(payload["articulo_id"]),
+                    "produccion",
+                    payload["orden_produccion_id"],
+                    payload,
+                ),
             )
             session.commit()
     except Exception:

@@ -36,6 +36,7 @@ class MedioPago(Base, UuidPkMixin, TimestampMixin):
     comision_pct: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=Decimal(0))
     activo: Mapped[bool] = mapped_column(Boolean, default=True)
     activa_promocion: Mapped[bool] = mapped_column(Boolean, default=False)
-    # Si a crédito aplica otra lista de precios (RN-MDP-001) — lista_precio
-    # se modela en un slice posterior, sin FK todavía.
-    lista_precio_credito_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
+    # Si a crédito aplica otra lista de precios (RN-MDP-001).
+    lista_precio_credito_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("lista_precio.id"), nullable=True
+    )

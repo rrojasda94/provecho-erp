@@ -527,6 +527,11 @@
             ],
             "title": "Categoria Id"
           },
+          "controla_lote": {
+            "default": false,
+            "title": "Controla Lote",
+            "type": "boolean"
+          },
           "costo_promedio": {
             "anyOf": [
               {
@@ -541,9 +546,16 @@
             "title": "Costo Promedio"
           },
           "empresa_id": {
-            "format": "uuid",
-            "title": "Empresa Id",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Empresa Id"
           },
           "id_interno": {
             "maxLength": 4,
@@ -569,7 +581,6 @@
           }
         },
         "required": [
-          "empresa_id",
           "id_interno",
           "nombre",
           "unidad_medida_id",
@@ -595,6 +606,10 @@
               }
             ],
             "title": "Categoria Id"
+          },
+          "controla_lote": {
+            "title": "Controla Lote",
+            "type": "boolean"
           },
           "costo_promedio": {
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
@@ -638,7 +653,8 @@
           "tipo",
           "categoria_id",
           "costo_promedio",
-          "archivado"
+          "archivado",
+          "controla_lote"
         ],
         "title": "ArticuloOut",
         "type": "object"
@@ -667,6 +683,17 @@
               }
             ],
             "title": "Categoria Id"
+          },
+          "controla_lote": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Controla Lote"
           },
           "costo_promedio": {
             "anyOf": [
@@ -1252,6 +1279,49 @@
         "title": "CajaAbiertaOut",
         "type": "object"
       },
+      "CartaItemOut": {
+        "properties": {
+          "categoria_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Categoria Id"
+          },
+          "id_interno": {
+            "title": "Id Interno",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "precio_unitario": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Precio Unitario",
+            "type": "string"
+          },
+          "producto_comercial_id": {
+            "format": "uuid",
+            "title": "Producto Comercial Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "producto_comercial_id",
+          "id_interno",
+          "nombre",
+          "categoria_id",
+          "precio_unitario"
+        ],
+        "title": "CartaItemOut",
+        "type": "object"
+      },
       "CategoriaCreate": {
         "properties": {
           "asiento_contable_config": {
@@ -1267,9 +1337,16 @@
             "title": "Asiento Contable Config"
           },
           "empresa_id": {
-            "format": "uuid",
-            "title": "Empresa Id",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Empresa Id"
           },
           "nombre": {
             "maxLength": 100,
@@ -1279,7 +1356,6 @@
           }
         },
         "required": [
-          "empresa_id",
           "nombre"
         ],
         "title": "CategoriaCreate",
@@ -2301,6 +2377,175 @@
         "title": "LiquidacionBssOut",
         "type": "object"
       },
+      "ListaPrecioCreate": {
+        "properties": {
+          "canal": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canal"
+          },
+          "es_promocional": {
+            "default": false,
+            "title": "Es Promocional",
+            "type": "boolean"
+          },
+          "marca_id": {
+            "format": "uuid",
+            "title": "Marca Id",
+            "type": "string"
+          },
+          "modalidad": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modalidad"
+          },
+          "nombre": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Nombre",
+            "type": "string"
+          },
+          "sucursal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sucursal Id"
+          },
+          "vigente_desde": {
+            "format": "date",
+            "title": "Vigente Desde",
+            "type": "string"
+          },
+          "vigente_hasta": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vigente Hasta"
+          }
+        },
+        "required": [
+          "marca_id",
+          "nombre",
+          "vigente_desde"
+        ],
+        "title": "ListaPrecioCreate",
+        "type": "object"
+      },
+      "ListaPrecioOut": {
+        "properties": {
+          "activa": {
+            "title": "Activa",
+            "type": "boolean"
+          },
+          "canal": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canal"
+          },
+          "es_promocional": {
+            "title": "Es Promocional",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "marca_id": {
+            "format": "uuid",
+            "title": "Marca Id",
+            "type": "string"
+          },
+          "modalidad": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modalidad"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "sucursal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sucursal Id"
+          },
+          "vigente_desde": {
+            "format": "date",
+            "title": "Vigente Desde",
+            "type": "string"
+          },
+          "vigente_hasta": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vigente Hasta"
+          }
+        },
+        "required": [
+          "id",
+          "marca_id",
+          "nombre",
+          "sucursal_id",
+          "canal",
+          "modalidad",
+          "es_promocional",
+          "vigente_desde",
+          "vigente_hasta",
+          "activa"
+        ],
+        "title": "ListaPrecioOut",
+        "type": "object"
+      },
       "LoginIn": {
         "properties": {
           "pin": {
@@ -2317,6 +2562,163 @@
           "pin"
         ],
         "title": "LoginIn",
+        "type": "object"
+      },
+      "LoteCreate": {
+        "properties": {
+          "articulo_id": {
+            "format": "uuid",
+            "title": "Articulo Id",
+            "type": "string"
+          },
+          "codigo": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Codigo"
+          },
+          "condicion_almacenamiento": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Condicion Almacenamiento"
+          },
+          "fecha_elaboracion": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Elaboracion"
+          },
+          "fecha_vencimiento": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Vencimiento"
+          },
+          "origen": {
+            "default": "carga_inicial",
+            "title": "Origen",
+            "type": "string"
+          },
+          "referencia": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referencia"
+          }
+        },
+        "required": [
+          "articulo_id"
+        ],
+        "title": "LoteCreate",
+        "type": "object"
+      },
+      "LoteOut": {
+        "properties": {
+          "articulo_id": {
+            "format": "uuid",
+            "title": "Articulo Id",
+            "type": "string"
+          },
+          "codigo": {
+            "title": "Codigo",
+            "type": "string"
+          },
+          "condicion_almacenamiento": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Condicion Almacenamiento"
+          },
+          "fecha_elaboracion": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Elaboracion"
+          },
+          "fecha_vencimiento": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Vencimiento"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "origen": {
+            "title": "Origen",
+            "type": "string"
+          },
+          "referencia": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referencia"
+          }
+        },
+        "required": [
+          "id",
+          "articulo_id",
+          "codigo",
+          "fecha_vencimiento",
+          "fecha_elaboracion",
+          "origen",
+          "referencia",
+          "condicion_almacenamiento"
+        ],
+        "title": "LoteOut",
         "type": "object"
       },
       "LoteSyncIn": {
@@ -2424,9 +2826,16 @@
             "type": "string"
           },
           "empresa_id": {
-            "format": "uuid",
-            "title": "Empresa Id",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Empresa Id"
           },
           "nombre": {
             "maxLength": 50,
@@ -2440,7 +2849,6 @@
           }
         },
         "required": [
-          "empresa_id",
           "nombre",
           "tipo"
         ],
@@ -2610,6 +3018,18 @@
               }
             ],
             "title": "Id"
+          },
+          "lote_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lote Id"
           },
           "referencia": {
             "anyOf": [
@@ -2801,6 +3221,18 @@
             "title": "Id",
             "type": "string"
           },
+          "lote_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lote Id"
+          },
           "sku_id": {
             "format": "uuid",
             "title": "Sku Id",
@@ -2816,7 +3248,8 @@
           "almacen_id",
           "sku_id",
           "cantidad",
-          "tipo"
+          "tipo",
+          "lote_id"
         ],
         "title": "MovimientoOut",
         "type": "object"
@@ -4201,6 +4634,66 @@
         "title": "PostulanteOut",
         "type": "object"
       },
+      "PrecioCreate": {
+        "properties": {
+          "monto": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Monto"
+          },
+          "producto_comercial_id": {
+            "format": "uuid",
+            "title": "Producto Comercial Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "producto_comercial_id",
+          "monto"
+        ],
+        "title": "PrecioCreate",
+        "type": "object"
+      },
+      "PrecioOut": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "lista_precio_id": {
+            "format": "uuid",
+            "title": "Lista Precio Id",
+            "type": "string"
+          },
+          "monto": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Monto",
+            "type": "string"
+          },
+          "producto_comercial_id": {
+            "format": "uuid",
+            "title": "Producto Comercial Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "lista_precio_id",
+          "producto_comercial_id",
+          "monto"
+        ],
+        "title": "PrecioOut",
+        "type": "object"
+      },
       "ProductoCreate": {
         "properties": {
           "empaque_id": {
@@ -4730,6 +5223,30 @@
               }
             ],
             "title": "Costo Unitario"
+          },
+          "fecha_vencimiento": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Vencimiento"
+          },
+          "lote_codigo": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lote Codigo"
           },
           "orden_compra_item_id": {
             "format": "uuid",
@@ -5458,6 +5975,73 @@
         "title": "SolicitudPermisoOut",
         "type": "object"
       },
+      "StockLoteOut": {
+        "description": "Saldo por lote — el listado que el picking lee en orden FEFO.",
+        "properties": {
+          "almacen_id": {
+            "format": "uuid",
+            "title": "Almacen Id",
+            "type": "string"
+          },
+          "articulo_id": {
+            "format": "uuid",
+            "title": "Articulo Id",
+            "type": "string"
+          },
+          "cantidad": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Cantidad",
+            "type": "string"
+          },
+          "codigo": {
+            "title": "Codigo",
+            "type": "string"
+          },
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          },
+          "fecha_vencimiento": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Vencimiento"
+          },
+          "lote_id": {
+            "format": "uuid",
+            "title": "Lote Id",
+            "type": "string"
+          },
+          "sku_id": {
+            "format": "uuid",
+            "title": "Sku Id",
+            "type": "string"
+          },
+          "vencido": {
+            "title": "Vencido",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "lote_id",
+          "codigo",
+          "articulo_id",
+          "almacen_id",
+          "sku_id",
+          "cantidad",
+          "estado",
+          "fecha_vencimiento",
+          "vencido"
+        ],
+        "title": "StockLoteOut",
+        "type": "object"
+      },
       "StockOut": {
         "properties": {
           "almacen_id": {
@@ -6131,6 +6715,35 @@
             ],
             "title": "Cantidad"
           },
+          "producto_comercial_id": {
+            "format": "uuid",
+            "title": "Producto Comercial Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "producto_comercial_id",
+          "cantidad"
+        ],
+        "title": "VentaItemIn",
+        "type": "object"
+      },
+      "VentaItemSyncIn": {
+        "description": "Ítem de una venta que YA se cobró en el hub. A diferencia del PDV en\nlínea, acá el precio sí viaja: es el que el cliente pagó. Resolverlo de\nnuevo en la nube cambiaría el monto si la promoción venció entre el\ncorte y la sincronización (RN-PRC-003 no admite recotizar lo cobrado).",
+        "properties": {
+          "cantidad": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Cantidad"
+          },
           "descuento": {
             "anyOf": [
               {
@@ -6168,7 +6781,7 @@
           "cantidad",
           "precio_unitario"
         ],
-        "title": "VentaItemIn",
+        "title": "VentaItemSyncIn",
         "type": "object"
       },
       "VentaOut": {
@@ -6276,7 +6889,7 @@
           },
           "items": {
             "items": {
-              "$ref": "#/components/schemas/VentaItemIn"
+              "$ref": "#/components/schemas/VentaItemSyncIn"
             },
             "minItems": 1,
             "title": "Items",
@@ -8121,8 +8734,206 @@
         ]
       }
     },
+    "/api/v1/inventory/lotes": {
+      "get": {
+        "description": "Saldo por lote en orden de vencimiento. `por_vencer_dias` acota a los\nque vencen dentro de esa ventana (incluye los ya vencidos).",
+        "operationId": "listar_lotes_api_v1_inventory_lotes_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "almacen_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Almacen Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sku_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sku Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "por_vencer_dias",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Por Vencer Dias"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/StockLoteOut"
+                  },
+                  "title": "Response Listar Lotes Api V1 Inventory Lotes Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Lotes",
+        "tags": [
+          "inventory"
+        ]
+      },
+      "post": {
+        "operationId": "crear_lote_api_v1_inventory_lotes_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoteCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoteOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Lote",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/lotes/bloquear-vencidos": {
+      "post": {
+        "description": "Barrido de vencidos: bloquea y publica `inventory.lote_vencido_detectado`.\nEl picking ya lo hace al tocar cada lote; esto lo adelanta a demanda.",
+        "operationId": "bloquear_vencidos_api_v1_inventory_lotes_bloquear_vencidos_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "almacen_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Almacen Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/StockLoteOut"
+                  },
+                  "title": "Response Bloquear Vencidos Api V1 Inventory Lotes Bloquear Vencidos Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Bloquear Vencidos",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
     "/api/v1/inventory/movimientos": {
       "post": {
+        "description": "Devuelve una lista porque una salida FEFO puede repartirse entre\nvarios lotes, y cada lote es un movimiento propio (ADR-015).",
         "operationId": "registrar_movimiento_api_v1_inventory_movimientos_post",
         "requestBody": {
           "content": {
@@ -8139,7 +8950,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MovimientoOut"
+                  "items": {
+                    "$ref": "#/components/schemas/MovimientoOut"
+                  },
+                  "title": "Response Registrar Movimiento Api V1 Inventory Movimientos Post",
+                  "type": "array"
                 }
               }
             },
@@ -11631,6 +12446,94 @@
         ]
       }
     },
+    "/api/v1/sales/carta": {
+      "get": {
+        "description": "Catálogo vendible con el precio ya resuelto — lo que el PDV renderiza\nen vez de traer un precio propio.",
+        "operationId": "carta_api_v1_sales_carta_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "sucursal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sucursal Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "canal",
+            "required": true,
+            "schema": {
+              "title": "Canal",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "modalidad",
+            "required": true,
+            "schema": {
+              "title": "Modalidad",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "marca_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Marca Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CartaItemOut"
+                  },
+                  "title": "Response Carta Api V1 Sales Carta Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Carta",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
     "/api/v1/sales/clientes": {
       "get": {
         "operationId": "listar_clientes_publico_api_v1_sales_clientes_get",
@@ -11743,6 +12646,168 @@
           }
         ],
         "summary": "Reintentar Emision",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/listas-precio": {
+      "get": {
+        "operationId": "listar_listas_precio_api_v1_sales_listas_precio_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "marca_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Marca Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ListaPrecioOut"
+                  },
+                  "title": "Response Listar Listas Precio Api V1 Sales Listas Precio Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Listas Precio",
+        "tags": [
+          "sales"
+        ]
+      },
+      "post": {
+        "operationId": "crear_lista_precio_api_v1_sales_listas_precio_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ListaPrecioCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListaPrecioOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Lista Precio",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/listas-precio/{lista_id}/precios": {
+      "post": {
+        "description": "Alta de precio en una lista. No hay PATCH: corregir un precio es una\nlista nueva, para que el histórico quede auditable (RN-PRC-005).",
+        "operationId": "fijar_precio_api_v1_sales_listas_precio__lista_id__precios_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lista_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Lista Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrecioCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrecioOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Fijar Precio",
         "tags": [
           "sales"
         ]

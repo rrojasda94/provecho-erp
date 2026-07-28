@@ -29,6 +29,19 @@ Principios de negocio en [../foundation/business-philosophy.md](../foundation/bu
 - Toda consulta respeta contexto de tenant y RBAC
   ([../security/authorization.md](../security/authorization.md)).
 
+## Entorno local
+
+**El `.venv` corre Python 3.12**, la misma versión que CI y que la imagen
+Docker. No es un detalle de gusto: en 3.14 las anotaciones dejaron de
+evaluarse de forma eager (PEP 649), así que un error de anotación que
+revienta al importar en 3.12 pasa desapercibido en 3.14 — ya ocurrió una vez
+(`ListaPrecioRepo`, un método `list` que pisaba el builtin dentro del cuerpo
+de la clase), y se descubrió recién en CI con la suite entera caída.
+
+```bash
+py -3.12 -m venv .venv && .venv/Scripts/python -m pip install -e ".[dev,backups]"
+```
+
 ## Reglas para generar código
 
 - `snake_case`, 4 espacios, UTF-8, LF, ≤100 chars, una clase por archivo.

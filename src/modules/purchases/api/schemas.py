@@ -1,6 +1,7 @@
 """DTOs (pydantic) del módulo purchases."""
 
 import uuid
+from datetime import date
 from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -71,6 +72,10 @@ class RecepcionItemIn(BaseModel):
     orden_compra_item_id: uuid.UUID
     cantidad_recibida: Decimal = Field(gt=0)
     costo_unitario: Decimal | None = Field(default=None, ge=0)
+    # Lote del proveedor: solo lo usa inventory si el artículo controla lote
+    # (RN-VNC-002). Sin código, el ERP lo deriva del vencimiento.
+    lote_codigo: str | None = Field(default=None, max_length=50)
+    fecha_vencimiento: date | None = None
 
 
 class RecepcionCreate(BaseModel):

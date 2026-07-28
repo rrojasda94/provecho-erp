@@ -16,6 +16,9 @@ from src.modules.users.infrastructure.models import (
     Grupo,
     LicenciaMarca,
     Marca,
+    Permiso,
+    Rol,
+    RolPermiso,
     Sucursal,
 )
 from src.seeders.seed import seed
@@ -87,6 +90,36 @@ def test_almacen_central_sin_sucursal(sembrado):
     assert almacen.sucursal_id is None
     assert almacen.almacen_abastecedor_id is None
     assert almacen.empresa_id == sembrado.scalar(select(Empresa.id))
+
+
+def test_permiso_gestionar_parametros_empresa_sembrado_y_solo_admin(sembrado):
+    """El permiso (ADR-014) va adelantado a `parametro_empresa`, que sigue
+    sin código — pero debe existir en el catálogo y no colgar de ningún rol
+    operativo, solo de `admin` vía `*` (no hay rol `gerente` explícito,
+    mismo hueco que `gestionar_reglas_aprobacion`)."""
+    permiso = sembrado.scalar(
+        select(Permiso).where(Permiso.codigo == "gerencia.gestionar_parametros_empresa")
+    )
+    assert permiso is not None
+
+    roles_con_el_permiso = set(
+        sembrado.scalars(
+            select(Rol.nombre)
+            .join(RolPermiso, RolPermiso.rol_id == Rol.id)
+            .where(RolPermiso.permiso_id == permiso.id)
+        )
+    )
+    assert roles_con_el_permiso == set()
+
+    admin = sembrado.scalar(select(Rol).where(Rol.nombre == "admin"))
+    admin_permisos = set(
+        sembrado.scalars(
+            select(Permiso.codigo)
+            .join(RolPermiso, RolPermiso.permiso_id == Permiso.id)
+            .where(RolPermiso.rol_id == admin.id)
+        )
+    )
+    assert admin_permisos == {"*"}  # admin autoriza todo por wildcard, no fila por fila
 
 
 def test_seed_es_idempotente(sembrado):
