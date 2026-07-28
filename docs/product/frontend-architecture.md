@@ -200,9 +200,11 @@ alfa no debería diseñar pantallas de PDV sin releer esas tres secciones.
 🔶 **Decidido, sin implementar** (`ui-ux.md`): paleta alternativa
 (daltonismo) + tamaño de fuente ajustable, ambos guardados en el **perfil
 del usuario** (no en el dispositivo), combinables con el tema de marca
-activo. ⬜ Pendiente con el negocio: catálogo exacto de paletas alternativas
-y cuántos niveles de tamaño de fuente (bloquea implementar, no bloquea
-diseñar el mecanismo).
+activo. Catálogo ya definido (2026-07-27): dos paletas (Provecho estándar
++ un modo alto contraste/daltonismo inspirado en Okabe-Ito, tokens
+`--status-success/danger/warning/info`) y 4 niveles de tamaño de fuente
+vía `--font-scale` (1.0/1.15/1.3/1.5) — ver `ui-ux.md#accesibilidad`. Ya
+no bloquea implementar; sigue sin construirse.
 
 ## F2.15 Internacionalización
 

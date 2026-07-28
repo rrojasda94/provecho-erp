@@ -803,6 +803,26 @@ tabla. Ver [docs/gerencia/README.md](../gerencia/README.md).
   los umbrales cuantitativos que esa narrativa referencia (ej. umbral de OC
   RN-CMP-008) ahora son filas de `regla_aprobacion`, no texto
   `[[COMPLETAR]]` ni config estático por módulo.
+- **parametro_empresa** (entidad transversal, vive en `shared` — mismo
+  criterio que `regla_aprobacion`, ADR-014): empresa_id, modulo (ej.
+  `rrhh`, `inventory`, `purchases`, `contabilidad`), codigo (ej.
+  `rango_salarial_cocinero`, `frecuencia_conteo_insumo`,
+  `margen_error_ajuste`, `monto_caja_chica`, `plazo_envio_comprobante`),
+  valor (JSONB — forma libre por código: `{"minimo":1500,"maximo":2200}`
+  para un rango, `{"frecuencia":"mensual"}` para una periodicidad,
+  `{"dias":5}` para un plazo, `{"monto":500}` o `{"porcentaje":2.5}` para
+  un valor simple), decision_gerencial_id (FK opcional a
+  `decision_gerencial` — sustento cuando el cambio lo amerita, no
+  obligatorio para un ajuste rutinario), vigente, vigente_desde.
+  Generaliza `regla_aprobacion` (RN-GER-008): esa sigue siendo la vía
+  específica para umbrales que gatillan una aprobación (con
+  `permiso_requerido`); `parametro_empresa` es cualquier otro valor
+  operativo configurable por empresa, requiera o no aprobación. Si no hay
+  fila para una empresa/módulo/código, el módulo consumidor usa su valor
+  semilla de config como fallback (mismo patrón que `regla_aprobacion`).
+  Administrado vía `/api/v1/parametros-empresa` (permiso
+  `gerencia.gestionar_parametros_empresa`). Sin implementar todavía — ver
+  `ROADMAP.md` → Deuda técnica → Transversal.
 
 ## 8d. Marketing (módulo futuro marketing)
 

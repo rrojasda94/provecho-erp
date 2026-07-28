@@ -40,7 +40,7 @@ renumera nada). Este archivo define el orden de lectura recomendado.
 | | [tech-stack.md](architecture/tech-stack.md) | Stack y justificación |
 | | [data-model.md](architecture/data-model.md) | Modelo de datos (tablas, ERD) |
 | | [events.md](architecture/events.md) | Catálogo de eventos internos |
-| | [adr/](architecture/adr/) | Decisiones de arquitectura — 001 modular monolith, 002 stack, 003 Izipay, 004 tenant, 005 Factiliza, 006 observabilidad, 007 backups y salud, 008 entrega continua, 009 modo offline del PDV, 010 contrato OpenAPI, 011 derechos ARCO, 012 dashboard + caja |
+| | [adr/](architecture/adr/) | Decisiones de arquitectura — 001 modular monolith, 002 stack, 003 Izipay, 004 tenant, 005 Factiliza, 006 observabilidad, 007 backups y salud, 008 entrega continua, 009 modo offline del PDV, 010 contrato OpenAPI, 011 derechos ARCO, 012 dashboard + caja, 013 arquitectura frontend, 014 parámetros configurables por empresa |
 | **engineering/** | [engineering-guide.md](engineering/engineering-guide.md) | Guía principal para constructores (humano + IA) |
 | | [coding-standards.md](engineering/coding-standards.md) | Convenciones, formato, linters |
 | | [api-guidelines.md](engineering/api-guidelines.md) | Convenciones de API REST |

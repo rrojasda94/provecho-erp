@@ -55,7 +55,7 @@ Registro de lo construido y lo pendiente. Actualizar en cada cambio relevante.
 | UX: breadcrumb por ruta de usuario (no jerárquico) + tooltip de ayuda por campo de formulario | ✅ spec 2026-07-26 | `docs/product/ui-ux.md` — breadcrumb crece con la navegación (patrón Odoo), navegación jerárquica va por menús desplegables; todo campo de formulario lleva hover explicando término/formato. Solo especificado |
 | UX: buscador contextual (nombre/insumo/exclusión, ranking por probabilidad) + dialog de venta sugerida (upsell) en carrito | ✅ spec 2026-07-26 | `docs/product/ui-ux.md` — buscador cruza `receta_item` para insumo/exclusión, lista ordenada por relevancia si no hay match único; al ir al carrito se sugieren productos de adición rápida, descartable. Solo especificado |
 | Branding (paleta, tipografías, tokens CSS) | ✅ 2026-07-04 | Brandboard aplicado — `docs/product/ui-ux.md` |
-| Skins multi-marca (PDV/Kiosk por marca vs Provecho/Majambo en el resto), accesibilidad (daltonismo, tamaño de fuente) y plataformas por módulo (táctil Android en PDV/Kiosk/KDS/Inventario, PC-first en el resto) | 🔶 spec 2026-07-25 | `docs/product/ui-ux.md` — solo especificado, falta implementar (resolver de tema por marca, preferencias de accesibilidad en perfil de usuario) |
+| Skins multi-marca (PDV/Kiosk por marca vs **Provecho** en el resto — Majambo no tiene tema propio, decidido 2026-07-27), accesibilidad (2 paletas + 4 niveles de tamaño de fuente, catálogo definido 2026-07-27) y plataformas por módulo (táctil Android en PDV/Kiosk/KDS/Inventario, PC-first en el resto) | 🔶 spec 2026-07-27 | `docs/product/ui-ux.md` — solo especificado, falta implementar (resolver de tema por marca, preferencias de accesibilidad en perfil de usuario) |
 | F2 — Arquitectura de frontend (documento maestro) | ✅ spec 2026-07-27 | `docs/product/frontend-architecture.md` — 31 secciones (tokens, componentes base/especializados, layout, navegación, estado, tablas, formularios, tiempo real, permisos visuales por rol, etc.) con estado por sección y los 6 puntos a cerrar antes de los diseños finales del alfa (layout general, componentes base, tablas, permisos visuales, arquitectura de carpetas, decisión de estado). Solo especificado — ver detalle en Deuda técnica → Frontend |
 
 ## Pendientes de decisión (registro vivo)
@@ -63,20 +63,43 @@ Registro de lo construido y lo pendiente. Actualizar en cada cambio relevante.
 Marcar aquí cuando cada uno se resuelva (y actualizar el doc que lo
 contiene, buscando su `[[ COMPLETAR ]]`):
 
-- ⬜ Umbral de aprobación de OC en soles (`marco-legal-compras.md`,
-  plantilla de OC, SOP de aprobación; ¿umbral separado para activos?).
-- ⬜ Aprobador suplente de OC en ausencia del administrador.
-- ⬜ Margen de contribución mínimo objetivo (con contabilidad).
-- ⬜ Esquema de incentivo/comisión de metas de venta (Comercial + RRHH +
-  Gerencia, nunca retroactivo).
-- ⬜ Frecuencia de conteo cíclico y de conteo general de Almacén Central.
-- ⬜ Margen de error de ajuste de inventario (con Contabilidad).
-- ⬜ Quién autoriza ajustes de inventario (admin vs. supervisor de
-  logística — rol aún no existe formalmente).
-- ⬜ Monto del fondo de caja chica de compras + mecanismo de reposición
-  cuando hay faltante en descuento (con contador).
-- ⬜ Plazo interno de envío de comprobantes al contador.
-- ⬜ Rangos salariales de los 7 perfiles de puesto (con administración).
+- ✅ 2026-07-27 **Mecanismo para los valores operativos configurables**
+  (umbral de OC, margen de contribución mínimo, frecuencia de conteo,
+  margen de error de ajuste, monto de caja chica, plazo de envío de
+  comprobantes, rangos salariales): decidido con el usuario que **no son
+  valores fijos** — se configuran en `parametro_empresa` por empresa, los
+  gestiona Gerencia, y un cambio puede sustentarse en un acta
+  (`decision_gerencial`) cuando amerite (no obligatorio para un ajuste
+  rutinario). Ver ADR-014, `data-model.md` §8c, RN-GER-008 y
+  `docs/gerencia/politica-gerencia.md#parámetros-operativos-configurables`.
+  Lo que queda abierto por cada uno de los puntos de abajo ya **no es el
+  mecanismo** (resuelto) sino que **Gerencia cargue el valor real** —
+  trabajo de configuración/negocio, no bloquea código:
+  - ⬜ Umbral de aprobación de OC en soles (`purchases/oc_umbral`, ya vive
+    en `regla_aprobacion` — solo falta que Gerencia lo configure por
+    empresa; valor semilla S/2000 mientras tanto). ¿Umbral separado para
+    activos?
+  - ⬜ Margen de contribución mínimo objetivo (`comercial/margen_minimo`).
+  - ⬜ Esquema de incentivo/comisión de metas de venta (Comercial + RRHH +
+    Gerencia, nunca retroactivo) — el valor numérico va en
+    `parametro_empresa`; el diseño del esquema en sí sigue siendo decisión
+    de negocio a definir con esas tres áreas.
+  - ⬜ Frecuencia de conteo cíclico y de conteo general de Almacén Central
+    (`inventory/frecuencia_conteo_<categoria>`).
+  - ⬜ Margen de error de ajuste de inventario
+    (`inventory/margen_error_ajuste`).
+  - ⬜ Monto del fondo de caja chica de compras
+    (`purchases/monto_caja_chica`) — el mecanismo de reposición ante
+    faltante sigue siendo decisión de proceso aparte, no solo de valor.
+  - ⬜ Plazo interno de envío de comprobantes al contador
+    (`contabilidad/plazo_envio_comprobante`).
+  - ⬜ Rangos salariales de los 7 perfiles de puesto
+    (`rrhh/rango_salarial_<perfil>`).
+  Quedan **fuera** de este mecanismo por ser decisión de rol, no de valor
+  (siguen abiertas tal cual):
+  - ⬜ Aprobador suplente de OC en ausencia del administrador.
+  - ⬜ Quién autoriza ajustes de inventario (admin vs. supervisor de
+    logística — rol aún no existe formalmente).
 - ✅ 2026-07-20 `reporte_escalamiento`: definido con el usuario — cadena
   atención al cliente → supervisor (redacta solución) → comercial/gerencia
   (acciones reportadas); se almacena para mejora continua
@@ -114,11 +137,15 @@ contiene, buscando su `[[ COMPLETAR ]]`):
   momento se registran los PROC en el registro maestro.
 - ⬜ BPMN pendientes ya declarados: contingencias de personal faltante
   (RN-RRHH-011) y tardanza/falta del encargado (RN-RRHH-010).
-- ⬜ Catálogo exacto de paletas de accesibilidad (daltonismo) y niveles de
-  tamaño de fuente (`docs/product/ui-ux.md`).
-- ⬜ Si Grupo Majambo tiene tema propio distinto al de Provecho, o si
-  Provecho es también el tema por defecto de Grupo Majambo
-  (`docs/product/ui-ux.md`).
+- ✅ 2026-07-27 Catálogo de paletas de accesibilidad y niveles de tamaño de
+  fuente — propuesta técnica definida (dos paletas: Provecho estándar y
+  un modo alto contraste/daltonismo inspirado en Okabe-Ito que cubre
+  protanopía+deuteranopía; 4 niveles de tamaño de fuente vía
+  `--font-scale`). `docs/product/ui-ux.md#catálogo-de-paletas-y-tamaños-de-fuente-propuesta-técnica-2026-07-27`.
+  Sujeta a ajuste si aparece validación real con usuarios daltónicos/baja
+  visión. Sin implementar todavía.
+- ✅ 2026-07-27 Grupo Majambo **no tiene tema propio** — Provecho es el
+  único tema fuera de PDV/Kiosk (`docs/product/ui-ux.md`).
 - ⬜ **Pendiente del usuario para desplegar el endurecimiento de producción**
   (2026-07-26, ver ROADMAP → Deuda técnica → Seguridad): no bloquea seguir
   desarrollando, solo hace falta al desplegar de verdad.
@@ -145,7 +172,20 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
 - ⬜ **Theming multi-marca + accesibilidad** (frontend, spec en
   `docs/product/ui-ux.md`): resolver de tema por marca/sucursal para
   PDV/Kiosk, preferencias de accesibilidad (paleta daltonismo, tamaño de
-  fuente) persistidas en el perfil de `usuario`. Sin implementar.
+  fuente) persistidas en el perfil de `usuario`. Catálogo de paletas y
+  niveles ya definido (2026-07-27) — sin implementar.
+- ⬜ **`parametro_empresa`** (ADR-014, `data-model.md` §8c, RN-GER-008):
+  entidad transversal para valores operativos configurables por empresa
+  (rango salarial, frecuencia de conteo, margen de error de ajuste, monto
+  de caja chica, plazos internos) con `valor` JSONB y
+  `decision_gerencial_id` opcional como sustento. Sin modelo ni migración
+  todavía — candidato natural para el primer uso real: rango salarial de
+  RRHH. Permiso nuevo `gerencia.gestionar_parametros_empresa`.
+- ⬜ **`decision_gerencial`** (materializa el acta de decisión gerencial,
+  RN-GER-002, `data-model.md` §8c): documentado desde el slice de Gerencia
+  (2026-07-22) pero **sin modelo ni migración en código todavía** —
+  `parametro_empresa.decision_gerencial_id` depende de que esta entidad
+  exista primero.
 - ✅ 2026-07-25 **Lock optimista en `persona`** (`VersionedMixin`,
   `src/core/model_base.py`): `PATCH /api/v1/personas/{id}` exige `version`
   vigente, 409 si está desactualizada. Aplicado solo a `persona` por

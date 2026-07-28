@@ -30,16 +30,17 @@
 ## Sistema de skins y temas (multi-marca)
 
 - **Provecho** (branding de esta sección) es el tema por defecto de TODO el
-  ERP.
-- **Grupo Majambo** puede tener su propio tema corporativo para los módulos
-  de back-office (paleta/tipografía propias, distintas de Provecho) —
-  pendiente definir con el negocio si sustituye o convive con Provecho.
+  ERP. **Decidido (2026-07-27): Grupo Majambo no tiene tema propio** — no
+  hay un branding corporativo distinto para back-office; Provecho es el
+  único tema fuera de PDV/Kiosk. Si el grupo alguna vez lo necesita, es un
+  tema nuevo a definir en ese momento, no una variante de Majambo que ya
+  exista.
 - **PDV y Kiosk son las pantallas con MÁS variación de skin**: son el "front"
   de cada marca del grupo (Charlie's, Ariana, La Avenida, ...) y cada una
   puede sobreescribir su propio tema completo (paleta, tipografía, logo),
   configurable por marca/sucursal en el módulo de ajustes.
 - El resto de módulos (inventario, KDS, compras, contabilidad, comercial,
-  RRHH, gerencia, marketing) usan el tema de Provecho o de Grupo Majambo —
+  RRHH, gerencia, marketing) usan **siempre** el tema de Provecho —
   **nunca** el tema de una marca de PDV.
 - Mecanismo técnico: capa de resolución de tema (marca/sucursal activa →
   set de tokens CSS) separada del componente — nunca hex hardcodeado.
@@ -56,8 +57,51 @@
 - La capa de accesibilidad (paleta/tamaño) es independiente de la capa de
   tema por marca — deben poder combinarse sin conflicto (ej. tema Charlie's
   + modo daltonismo + fuente grande, a la vez).
-- Pendiente definir con el negocio: catálogo exacto de paletas alternativas
-  y cuántos niveles de tamaño de fuente.
+
+### Catálogo de paletas y tamaños de fuente (propuesta técnica, 2026-07-27)
+
+Resuelve el pendiente de catálogo exacto. Es una propuesta de partida —
+válida para empezar a construir; se ajusta si una validación real con
+usuarios daltónicos o de baja visión pide un cambio puntual, sin que eso
+rehaga el mecanismo.
+
+**Paletas — dos, no una por tipo de daltonismo.** Especializar una paleta
+por cada tipo (protanopía, deuteranopía, tritanopía...) multiplica el
+costo de mantener el sistema de diseño para un beneficio marginal, ya que
+la regla ya vigente arriba (ícono/patrón, nunca solo color) cubre la mayor
+parte del riesgo. En su lugar, un único modo alternativo que cubre
+protanopía + deuteranopía (~95% de los casos de daltonismo, el par
+rojo-verde) y sube el contraste general:
+
+| Token semántico | Provecho (estándar) | Alto contraste / daltonismo |
+|---|---|---|
+| `--status-success` | `--color-accent` `#AEEA00` (verde lima) | `#0072B2` (azul) |
+| `--status-danger` | `--color-secondary` `#B71C1C` (rojo) | `#D55E00` (naranja vermellón) |
+| `--status-warning` *(nuevo, no existe hoy)* | `#FFB300` (ámbar) | `#E69F00` (ocre) |
+| `--status-info` *(nuevo, no existe hoy)* | `#1976D2` (azul) | `#56B4E9` (celeste) |
+
+Paleta alternativa inspirada en Okabe-Ito (paleta categórica validada para
+visión de color deficiente). `--color-primary`/`--color-secondary`
+(marca, botones) no cambian entre modos — el riesgo de accesibilidad está
+en los **estados semánticos** (badges de stock/venta), no en la identidad
+de marca. Objetivo de contraste: WCAG AA (4.5:1 texto normal, 3:1 texto
+grande/UI) como mínimo en ambos modos; AAA donde no cueste layout extra.
+
+**Tamaño de fuente — 4 niveles**, como multiplicador (`--font-scale`) sobre
+el tamaño base (`1rem` = 16px), aplicado en la raíz para que todo lo
+dimensionado en `rem` escale junto:
+
+| Nivel | `--font-scale` | Base efectiva |
+|---|---|---|
+| Estándar | `1.0` | 16px |
+| Grande | `1.15` | ~18.4px |
+| Muy grande | `1.3` | ~20.8px |
+| Máximo | `1.5` | 24px |
+
+Ambas preferencias viven en `usuario` (ej.
+`preferencia_paleta: estandar\|alto_contraste`,
+`preferencia_tamano_fuente: estandar\|grande\|muy_grande\|maximo`) — sin
+implementar todavía, ver `docs/product/frontend-architecture.md` F2.14.
 
 ## Responsive y plataformas
 
@@ -183,6 +227,3 @@
 
 - Menús, buscadores, atajos de teclado, sidebars, dashboards y diseño
   visual de pantallas.
-- Catálogo exacto de paletas de accesibilidad y niveles de tamaño de fuente.
-- Si Grupo Majambo tiene tema propio distinto al de Provecho, o si Provecho
-  es el tema por defecto también para Grupo Majambo.

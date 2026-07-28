@@ -277,6 +277,19 @@ de su módulo y se prueban de forma aislada.
   presupuestado**, requiere aprobación puntual de Gerencia (matriz de
   aprobaciones, RN-GER-003). Los límites por área se definen en esa
   reunión (`[[ COMPLETAR ]]`).
+- **RN-GER-008** Todo valor operativo que varía por empresa o en el tiempo
+  —rango salarial de un perfil de puesto, frecuencia de conteo cíclico,
+  margen de error de ajuste de inventario, monto del fondo de caja chica,
+  plazos internos, y cualquier otro que hoy aparezca como
+  `[[ COMPLETAR ]]` en un documento— se configura en `parametro_empresa`
+  (entidad transversal, `data-model.md` §8c), **nunca hardcodeado en
+  código ni fijado una sola vez en un documento de política**. Lo
+  gestiona Gerencia; un cambio puede sustentarse en un `decision_gerencial`
+  (acta) cuando amerite dejar constancia de por qué se cambió, pero el
+  acta no es requisito para el ajuste rutinario de un valor ya
+  configurado. Distinto de `regla_aprobacion` (RN-GER-003): esa es
+  específicamente el umbral que gatilla una aprobación; `parametro_empresa`
+  es cualquier valor operativo, requiera o no aprobación.
 
 ## Sucursal
 
