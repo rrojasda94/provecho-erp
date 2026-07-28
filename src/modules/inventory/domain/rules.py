@@ -1,6 +1,9 @@
 """Reglas de negocio de inventario. Puras, sin infraestructura."""
 
+from collections.abc import Sequence
+from datetime import date
 from decimal import Decimal
+from typing import Any
 
 TIPOS_MOVIMIENTO = {
     "recepcion_compra",
@@ -52,3 +55,45 @@ def puede_aprobar(solicitante_id, aprobador_id) -> bool:
 
 def stock_bajo(cantidad: Decimal, stock_minimo: Decimal | None) -> bool:
     return stock_minimo is not None and cantidad <= stock_minimo
+
+
+def lote_vencido(fecha_vencimiento: date | None, hoy: date) -> bool:
+    """Un lote sin fecha de vencimiento nunca vence (RN-VNC-001/002)."""
+    return fecha_vencimiento is not None and fecha_vencimiento < hoy
+
+
+def por_vencer(fecha_vencimiento: date | None, hoy: date, dias: int) -> bool:
+    """Dentro de la ventana de alerta (incluye los ya vencidos)."""
+    if fecha_vencimiento is None:
+        return False
+    return (fecha_vencimiento - hoy).days <= dias
+
+
+def repartir_fefo(
+    disponibles: Sequence[tuple[Any, Decimal]], requerido: Decimal
+) -> tuple[list[tuple[Any, Decimal]], Decimal]:
+    """Reparte `requerido` (positivo) entre lotes YA ordenados por FEFO.
+
+    Devuelve las asignaciones `(clave, cantidad)` y el faltante que ningún
+    lote pudo cubrir — el llamador decide qué hacer con él (la venta ya
+    ocurrió: se descuenta igual sin lote; un ajuste sí puede rechazarse).
+    """
+    asignaciones: list[tuple[Any, Decimal]] = []
+    pendiente = requerido
+    for clave, cantidad in disponibles:
+        if pendiente <= 0:
+            break
+        toma = min(cantidad, pendiente)
+        if toma > 0:
+            asignaciones.append((clave, toma))
+            pendiente -= toma
+    return asignaciones, pendiente
+
+
+def codigo_lote_auto(fecha: date) -> str:
+    """Código por defecto cuando el origen no trae uno (RN-LOT-001).
+
+    Dos recepciones del mismo artículo con el mismo vencimiento comparten
+    lote — es lo que hace el almacén en la práctica.
+    """
+    return f"L{fecha:%y%m%d}"

@@ -202,11 +202,20 @@ def recibir_orden_compra(
                 costo_unitario=costo_unitario,
             )
         )
+        vencimiento = it.get("fecha_vencimiento")
         evento_items.append(
             {
                 "articulo_id": str(oc_item.articulo_id),
                 "cantidad": str(cantidad_recibida),
                 "costo_unitario": str(costo_unitario),
+                # Datos del lote recibido; inventory los ignora si el
+                # artículo no controla lote (RN-VNC-002).
+                "lote_codigo": it.get("lote_codigo"),
+                "fecha_vencimiento": (
+                    vencimiento.isoformat()
+                    if hasattr(vencimiento, "isoformat")
+                    else vencimiento
+                ),
             }
         )
 

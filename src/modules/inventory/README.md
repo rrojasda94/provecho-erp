@@ -7,12 +7,12 @@ y gestionar el flujo solicitud → aprobación → picking → transferencia →
 
 ## Entidades
 
-**Estado de implementación (2026-07-20):** modeladas las entidades base de
-productos como dependencia del slice Venta — `articulo`, `sku`, `receta`,
-`receta_item` (`src/modules/inventory/infrastructure/models/`), además
-del bloque transversal ya existente (`categoria`, `categoria_udm`,
-`unidad_medida`). `stock`, movimientos, transferencias, `lote` y demás
-del flujo de almacén siguen pendientes del slice de Inventario.
+**Estado de implementación (2026-07-27):** implementados el bloque
+transversal (`categoria`, `categoria_udm`, `unidad_medida`), la base de
+productos (`articulo`, `sku`, `receta`, `receta_item`), `stock`,
+`movimiento_inventario`, `ajuste` y ahora `lote` + `stock_lote` (FEFO).
+Transferencias, `solicitud_insumos`, `conteo`, `reserva_stock`,
+`stock_merma` y `devolucion` siguen pendientes de sus slices.
 
 `articulo` (tipos `insumo` | `subreceta` | `mercaderia` | `empaque` |
 `repuesto` | `suministro` — enum extensible), `categoria`, `stock`,
@@ -65,6 +65,38 @@ almacenamiento), `conteo`, `ajuste` (motivo, solicitante, aprobador),
 - Movimiento de salida siempre respeta FEFO/FIFO — el picking no permite
   tomar un lote distinto al sugerido sin override explícito y motivo.
 
+## Estado (slice 2 — lote/FEFO, 2026-07-27)
+
+`lote` (código, vencimiento, origen, condición de almacenamiento) y
+`stock_lote` (saldo por lote y estado `disponible`/`bloqueado`/`agotado`)
+implementados según ADR-015. El control es **opcional por artículo**
+(`articulo.controla_lote`): solo los perecibles/trazables mueven stock por
+lote.
+
+- **FEFO al salir**: `application/stock.py::registrar_salida` reparte la
+  cantidad entre los lotes con saldo, del vencimiento más próximo al más
+  lejano (sin vencimiento va al final → FIFO por fecha de ingreso), y
+  genera **un movimiento por lote tomado**. Un `lote_id` explícito es el
+  override del lote sugerido.
+- **Vencidos**: el picking bloquea el lote vencido que encuentra todavía
+  disponible y publica `inventory.lote_vencido_detectado`;
+  `POST /lotes/bloquear-vencidos` hace el mismo barrido a demanda.
+- **Ingresos**: la recepción de compra crea el lote con el código y
+  vencimiento declarados por el proveedor (RN-VNC-002) y producción con
+  `origen=produccion`. Un ingreso sin lote de un artículo que lo controla
+  entra al lote del día — nada queda fuera de la trazabilidad.
+
+| Método | Ruta | Permiso |
+|--------|------|---------|
+| POST | `/lotes` | `registrar_movimiento` |
+| GET | `/lotes?almacen_id&sku_id&por_vencer_dias` | `leer` |
+| POST | `/lotes/bloquear-vencidos` | `registrar_movimiento` |
+
+`POST /movimientos` devuelve ahora una **lista** de movimientos (una salida
+FEFO puede repartirse entre varios lotes) y acepta `lote_id` opcional.
+
+Tests: `tests/test_lotes.py`. Migración `c9a2f4e18b60`.
+
 ## Estado (slice 1 implementado 2026-07-25)
 
 Operativo: catálogo (CRUD artículos/categorías/SKUs), stock por almacén y
@@ -96,20 +128,25 @@ alerta `bajo_minimo` derivada en la consulta; evento
 `application/listeners.py`), consumido por `core.dashboard_router` para el
 dashboard gerencial.
 
-**Diferido (deuda del módulo):** `stock_lote`/FEFO, `reserva_stock`, conteo
-cíclico, transferencias/`solicitud_insumos`, devolución, guía de remisión,
-listeners de eventos (`sales.venta_confirmada` → consumo por receta),
-contexto de tenant desde el JWT (hoy `empresa_id` viene en el body).
+**Diferido (deuda del módulo):** `reserva_stock`, conteo cíclico,
+transferencias/`solicitud_insumos`, devolución, guía de remisión,
+`stock_merma`. Del slice de lote: la reposición por venta anulada entra al
+lote del día y no al lote del que salió, y la ventana de alerta de
+vencimiento se pasa por request (`por_vencer_dias`) en vez de configurarse
+por artículo. Ver ROADMAP → Deuda técnica → Módulo inventory.
 
 ## Sincronización con el hub de sucursal (implementado 2026-07-27)
 
 `application/sincronizacion.py` declara qué replica este módulo hacia el
 hub local (ADR-009 fase 2): unidades de medida, categorías, artículos,
-SKU, recetas y el `stock` del almacén de esa sucursal. Sin stock local, la
-primera venta offline fallaría al descontar insumos — el listener
-`sales.venta_confirmada` corre también dentro del hub.
+SKU, recetas, el `stock` del almacén de esa sucursal y —desde el slice de
+lote— `lote` y `stock_lote`. Sin stock local, la primera venta offline
+fallaría al descontar insumos — el listener `sales.venta_confirmada` corre
+también dentro del hub; sin los lotes, ese descuento no podría aplicar
+FEFO y elegiría un lote distinto al que elige la nube.
 
-`stock` es el único recurso que el hub además escribe por su cuenta. La
+`stock` y `stock_lote` son los recursos que el hub además escribe por su
+cuenta. La
 nube gana en el pull, y eso es correcto porque el ciclo **empuja antes de
 jalar**: para cuando el hub lee el stock de la nube, la nube ya procesó
 las ventas del corte.

@@ -59,6 +59,13 @@ def build_claims(session: Session, usuario: Usuario) -> dict:
         "roles": repo.rol_nombres(usuario.id),
         "sucursales": [str(s) for s in sucursales],
         "empresa_id": str(_empresa_id(session, sucursales) or "") or None,
+        # Superusuario (permiso `*`): puede operar sobre una empresa que
+        # indique explícitamente cuando no tiene sucursales asignadas — es la
+        # cuenta de administración, que existe antes que cualquier sucursal.
+        # Se resuelve al emitir el token; revocar `*` surte efecto al vencer
+        # el access token (minutos). El permiso concreto de cada endpoint sí
+        # se valida contra BD en cada request.
+        "su": rules.permite(repo.permiso_codigos(usuario.id), "*"),
     }
 
 

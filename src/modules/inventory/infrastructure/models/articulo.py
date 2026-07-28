@@ -27,3 +27,6 @@ class Articulo(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin):
     tipo: Mapped[str] = mapped_column(String(30))
     costo_promedio: Mapped[Decimal] = mapped_column(Numeric(12, 4), default=Decimal(0))
     archivado: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Solo los artículos que lo declaran mueven stock por lote y respetan
+    # FEFO (ADR-015). Perecibles y trazables sí; servilletas no.
+    controla_lote: Mapped[bool] = mapped_column(Boolean, default=False)

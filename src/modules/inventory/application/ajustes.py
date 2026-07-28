@@ -57,19 +57,28 @@ def aprobar_ajuste(
     if not rules.puede_aprobar(ajuste.solicitado_por, aprobado_por):
         raise ReglaNegocio("el aprobador no puede ser el solicitante del ajuste")
 
-    mov, _ = stock_uc.registrar_movimiento(
-        session,
-        almacen_id=ajuste.almacen_id,
-        sku_id=ajuste.sku_id,
-        cantidad=ajuste.cantidad,
-        tipo="ajuste",
-        usuario_id=aprobado_por,
-        referencia=str(ajuste.id),
-        motivo_ajuste=ajuste.motivo,
-    )
+    comun = {
+        "almacen_id": ajuste.almacen_id,
+        "sku_id": ajuste.sku_id,
+        "tipo": "ajuste",
+        "usuario_id": aprobado_por,
+        "referencia": str(ajuste.id),
+        "motivo_ajuste": ajuste.motivo,
+    }
+    if ajuste.cantidad < 0:
+        # Un ajuste negativo de un artículo con lote puede repartirse entre
+        # varios lotes (FEFO): `movimiento_id` guarda el primero y todos
+        # comparten `referencia`, así la traza completa sigue siendo una
+        # consulta por referencia.
+        movs = stock_uc.registrar_salida(session, cantidad=-ajuste.cantidad, **comun)
+    else:
+        mov, _ = stock_uc.registrar_movimiento(
+            session, cantidad=ajuste.cantidad, **comun
+        )
+        movs = [mov]
     ajuste.aprobado_por = aprobado_por
     ajuste.estado = "aprobado"
-    ajuste.movimiento_id = mov.id
+    ajuste.movimiento_id = movs[0].id
 
     if not ajuste.dentro_margen:
         event_bus.publish(

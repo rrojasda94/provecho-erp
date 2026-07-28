@@ -8,8 +8,10 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from src.core.tenant import Tenant
 from src.modules.inventory.api import schemas
 from src.modules.inventory.application import ajustes, catalogo
+from src.modules.inventory.application import lotes as lotes_uc
 from src.modules.inventory.application import stock as stock_uc
 from src.modules.inventory.application.errors import (
     Conflicto,
@@ -18,7 +20,13 @@ from src.modules.inventory.application.errors import (
     ReglaNegocio,
     StockInsuficiente,
 )
-from src.modules.users.api.deps import get_db, require_permission
+from src.modules.inventory.application.scope import (
+    exigir_ajuste,
+    exigir_almacen,
+    exigir_articulo,
+    exigir_lote,
+)
+from src.modules.users.api.deps import get_db, get_tenant, require_permission
 from src.modules.users.infrastructure.models import Usuario
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])
@@ -46,12 +54,13 @@ def _http(err: InventoryError) -> HTTPException:
 def crear_categoria(
     body: schemas.CategoriaCreate,
     _: Usuario = Depends(require_permission(CATALOGO)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
     try:
         cat = catalogo.crear_categoria(
             session,
-            empresa_id=body.empresa_id,
+            empresa_id=tenant.empresa(body.empresa_id),
             nombre=body.nombre,
             asiento_contable_config=body.asiento_contable_config,
         )
@@ -65,9 +74,10 @@ def crear_categoria(
 def listar_categorias(
     empresa_id: uuid.UUID | None = None,
     _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    return catalogo.listar_categorias(session, empresa_id)
+    return catalogo.listar_categorias(session, tenant.filtro_empresa(empresa_id))
 
 
 # --- Artículos --------------------------------------------------------------
@@ -75,18 +85,20 @@ def listar_categorias(
 def crear_articulo(
     body: schemas.ArticuloCreate,
     _: Usuario = Depends(require_permission(CATALOGO)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
     try:
         art = catalogo.crear_articulo(
             session,
-            empresa_id=body.empresa_id,
+            empresa_id=tenant.empresa(body.empresa_id),
             id_interno=body.id_interno,
             nombre=body.nombre,
             unidad_medida_id=body.unidad_medida_id,
             tipo=body.tipo,
             categoria_id=body.categoria_id,
             costo_promedio=body.costo_promedio,
+            controla_lote=body.controla_lote,
         )
     except (Conflicto, NoEncontrado) as e:
         raise _http(e) from e
@@ -98,9 +110,10 @@ def crear_articulo(
 def listar_articulos(
     empresa_id: uuid.UUID | None = None,
     _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    return catalogo.listar_articulos(session, empresa_id)
+    return catalogo.listar_articulos(session, tenant.filtro_empresa(empresa_id))
 
 
 @router.patch("/articulos/{articulo_id}", response_model=schemas.ArticuloOut)
@@ -108,9 +121,11 @@ def editar_articulo(
     articulo_id: uuid.UUID,
     body: schemas.ArticuloUpdate,
     _: Usuario = Depends(require_permission(CATALOGO)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
     try:
+        exigir_articulo(session, articulo_id, tenant)
         art = catalogo.editar_articulo(session, articulo_id, **body.model_dump())
     except NoEncontrado as e:
         raise _http(e) from e
@@ -123,9 +138,11 @@ def editar_articulo(
 def crear_sku(
     body: schemas.SkuCreate,
     _: Usuario = Depends(require_permission(CATALOGO)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
     try:
+        exigir_articulo(session, body.articulo_id, tenant)
         sku = catalogo.crear_sku(
             session,
             articulo_id=body.articulo_id,
@@ -143,32 +160,128 @@ def crear_sku(
 def consultar_stock(
     almacen_id: uuid.UUID | None = None,
     _: Usuario = Depends(require_permission(LEER)),
-    session: Session = Depends(get_db),
-):
-    return stock_uc.consultar_stock(session, almacen_id)
-
-
-@router.post("/movimientos", response_model=schemas.MovimientoOut, status_code=201)
-def registrar_movimiento(
-    body: schemas.MovimientoCreate,
-    actor: Usuario = Depends(require_permission(MOVIMIENTO)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
     try:
-        mov, _ = stock_uc.registrar_movimiento(
-            session,
-            almacen_id=body.almacen_id,
-            sku_id=body.sku_id,
-            cantidad=body.cantidad,
-            tipo=body.tipo,
-            usuario_id=actor.id,
-            referencia=body.referencia,
-            id=body.id,
-        )
-    except (ReglaNegocio, StockInsuficiente) as e:
+        if almacen_id is not None:
+            exigir_almacen(session, almacen_id, tenant)
+    except NoEncontrado as e:
+        raise _http(e) from e
+    return stock_uc.consultar_stock(session, almacen_id, tenant.filtro_empresa())
+
+
+@router.post("/movimientos", response_model=list[schemas.MovimientoOut], status_code=201)
+def registrar_movimiento(
+    body: schemas.MovimientoCreate,
+    actor: Usuario = Depends(require_permission(MOVIMIENTO)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Devuelve una lista porque una salida FEFO puede repartirse entre
+    varios lotes, y cada lote es un movimiento propio (ADR-015)."""
+    try:
+        exigir_almacen(session, body.almacen_id, tenant)
+        if body.lote_id is not None:
+            exigir_lote(session, body.lote_id, tenant)
+        if body.cantidad < 0:
+            movs = stock_uc.registrar_salida(
+                session,
+                almacen_id=body.almacen_id,
+                sku_id=body.sku_id,
+                cantidad=-body.cantidad,
+                tipo=body.tipo,
+                usuario_id=actor.id,
+                referencia=body.referencia,
+                lote_id=body.lote_id,
+            )
+        else:
+            mov, _ = stock_uc.registrar_movimiento(
+                session,
+                almacen_id=body.almacen_id,
+                sku_id=body.sku_id,
+                cantidad=body.cantidad,
+                tipo=body.tipo,
+                usuario_id=actor.id,
+                referencia=body.referencia,
+                lote_id=body.lote_id,
+                id=body.id,
+            )
+            movs = [mov]
+    except (NoEncontrado, ReglaNegocio, StockInsuficiente) as e:
         raise _http(e) from e
     session.commit()
-    return mov
+    return movs
+
+
+# --- Lotes / FEFO -----------------------------------------------------------
+@router.post("/lotes", response_model=schemas.LoteOut, status_code=201)
+def crear_lote(
+    body: schemas.LoteCreate,
+    _: Usuario = Depends(require_permission(MOVIMIENTO)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    try:
+        exigir_articulo(session, body.articulo_id, tenant)
+        lote = lotes_uc.crear_lote(session, **body.model_dump())
+    except (NoEncontrado, ReglaNegocio) as e:
+        raise _http(e) from e
+    session.commit()
+    return lote
+
+
+@router.get("/lotes", response_model=list[schemas.StockLoteOut])
+def listar_lotes(
+    almacen_id: uuid.UUID | None = None,
+    sku_id: uuid.UUID | None = None,
+    por_vencer_dias: int | None = None,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Saldo por lote en orden de vencimiento. `por_vencer_dias` acota a los
+    que vencen dentro de esa ventana (incluye los ya vencidos)."""
+    try:
+        if almacen_id is not None:
+            exigir_almacen(session, almacen_id, tenant)
+    except NoEncontrado as e:
+        raise _http(e) from e
+    return lotes_uc.listar(
+        session,
+        almacen_id=almacen_id,
+        sku_id=sku_id,
+        empresa_id=tenant.filtro_empresa(),
+        por_vencer_dias=por_vencer_dias,
+    )
+
+
+@router.post("/lotes/bloquear-vencidos", response_model=list[schemas.StockLoteOut])
+def bloquear_vencidos(
+    almacen_id: uuid.UUID | None = None,
+    _: Usuario = Depends(require_permission(MOVIMIENTO)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Barrido de vencidos: bloquea y publica `inventory.lote_vencido_detectado`.
+    El picking ya lo hace al tocar cada lote; esto lo adelanta a demanda."""
+    try:
+        if almacen_id is not None:
+            exigir_almacen(session, almacen_id, tenant)
+    except NoEncontrado as e:
+        raise _http(e) from e
+    bloqueados = lotes_uc.bloquear_vencidos(
+        session, almacen_id, tenant.filtro_empresa()
+    )
+    ids = [b.lote_id for b in bloqueados]
+    session.commit()
+    return [
+        fila
+        for fila in lotes_uc.listar(
+            session, almacen_id=almacen_id, empresa_id=tenant.filtro_empresa()
+        )
+        if fila["lote_id"] in ids
+    ]
 
 
 # --- Ajustes (segregación solicitar/aprobar) --------------------------------
@@ -176,9 +289,11 @@ def registrar_movimiento(
 def solicitar_ajuste(
     body: schemas.AjusteCreate,
     actor: Usuario = Depends(require_permission(SOLICITAR)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
     try:
+        exigir_almacen(session, body.almacen_id, tenant)
         aj = ajustes.solicitar_ajuste(
             session,
             almacen_id=body.almacen_id,
@@ -188,7 +303,7 @@ def solicitar_ajuste(
             solicitado_por=actor.id,
             dentro_margen=body.dentro_margen,
         )
-    except ReglaNegocio as e:
+    except (NoEncontrado, ReglaNegocio) as e:
         raise _http(e) from e
     session.commit()
     return aj
@@ -198,9 +313,11 @@ def solicitar_ajuste(
 def aprobar_ajuste(
     ajuste_id: uuid.UUID,
     actor: Usuario = Depends(require_permission(APROBAR)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
     try:
+        exigir_ajuste(session, ajuste_id, tenant)
         aj = ajustes.aprobar_ajuste(session, ajuste_id, actor.id)
     except (NoEncontrado, ReglaNegocio, StockInsuficiente) as e:
         raise _http(e) from e
@@ -212,9 +329,11 @@ def aprobar_ajuste(
 def rechazar_ajuste(
     ajuste_id: uuid.UUID,
     actor: Usuario = Depends(require_permission(APROBAR)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
     try:
+        exigir_ajuste(session, ajuste_id, tenant)
         aj = ajustes.rechazar_ajuste(session, ajuste_id, actor.id)
     except (NoEncontrado, ReglaNegocio) as e:
         raise _http(e) from e

@@ -13,6 +13,7 @@ from src.core.health_router import router as health_router
 from src.core.logging_config import configurar_logging, request_id_var
 from src.core.sentry import iniciar_sentry
 from src.core.sync.api.routers import router as sync_router
+from src.core.tenant import FueraDeAlcance
 from src.modules.accounting.api.routers import router as accounting_router
 from src.modules.accounting.application import listeners as accounting_listeners
 from src.modules.inventory.api.routers import router as inventory_router
@@ -112,6 +113,13 @@ def create_app() -> FastAPI:
         openapi_url=None if settings.es_produccion else "/openapi.json",
         openapi_tags=TAGS_METADATA,
     )
+
+    @app.exception_handler(FueraDeAlcance)
+    async def fuera_de_alcance(request: Request, exc: FueraDeAlcance):
+        """ADR-004: pedir datos de otro tenant es 403, en cualquier módulo.
+        Se resuelve acá y no en cada router para que agregar un endpoint no
+        pueda olvidarse de mapearlo."""
+        return JSONResponse(status_code=403, content={"detail": str(exc)})
 
     @app.exception_handler(Exception)
     async def error_no_controlado(request: Request, exc: Exception):

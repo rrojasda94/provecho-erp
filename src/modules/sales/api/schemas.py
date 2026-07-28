@@ -7,11 +7,12 @@ from decimal import Decimal
 from pydantic import BaseModel, ConfigDict, Field
 
 
+# El precio NO viaja en el request: lo fija el servidor contra
+# `lista_precio` (RN-PRC-003). `venta_item.precio_unitario` guarda el
+# snapshot de lo resuelto.
 class VentaItemIn(BaseModel):
     producto_comercial_id: uuid.UUID
     cantidad: Decimal = Field(gt=0)
-    precio_unitario: Decimal = Field(ge=0)
-    descuento: Decimal = Decimal(0)
 
 
 class VentaCreate(BaseModel):
@@ -64,6 +65,19 @@ class PagoOut(BaseModel):
 # Lo consume `core/sync` en `POST /sync/push`. Vive acá y no en `core`
 # porque el contenido es dominio de sales: quien define qué es una venta
 # válida es el módulo que la implementa.
+class VentaItemSyncIn(BaseModel):
+    """Ítem de una venta que YA se cobró en el hub. A diferencia del PDV en
+    línea, acá el precio sí viaja: es el que el cliente pagó. Resolverlo de
+    nuevo en la nube cambiaría el monto si la promoción venció entre el
+    corte y la sincronización (RN-PRC-003 no admite recotizar lo cobrado).
+    """
+
+    producto_comercial_id: uuid.UUID
+    cantidad: Decimal = Field(gt=0)
+    precio_unitario: Decimal = Field(ge=0)
+    descuento: Decimal = Decimal(0)
+
+
 class VentaSyncIn(BaseModel):
     """Una venta ya ocurrida en el hub, tal cual, para reproducirla en la
     nube. Trae lo que la nube no puede reconstruir: identificador, día y
@@ -79,7 +93,7 @@ class VentaSyncIn(BaseModel):
     fecha_orden: date
     numero_orden: int = Field(ge=1)
     estado: str
-    items: list[VentaItemIn] = Field(min_length=1)
+    items: list[VentaItemSyncIn] = Field(min_length=1)
     cliente_id: uuid.UUID | None = None
     referencia_atencion: str | None = Field(default=None, max_length=50)
 
@@ -125,11 +139,60 @@ class ProductoOut(BaseModel):
 
 
 class MedioPagoCreate(BaseModel):
-    empresa_id: uuid.UUID
+    # Derivado del JWT (ADR-004); solo un superusuario sin empresa asignada
+    # puede indicarlo.
+    empresa_id: uuid.UUID | None = None
     nombre: str = Field(min_length=1, max_length=50)
     direccion: str = "cobro"
     tipo: str
     comision_pct: Decimal = Decimal(0)
+
+
+# --- Precios (server-side, RN-PRC-003) ---
+class ListaPrecioCreate(BaseModel):
+    marca_id: uuid.UUID
+    nombre: str = Field(min_length=1, max_length=100)
+    vigente_desde: date
+    vigente_hasta: date | None = None
+    sucursal_id: uuid.UUID | None = None
+    canal: str | None = None
+    modalidad: str | None = None
+    es_promocional: bool = False
+
+
+class ListaPrecioOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    marca_id: uuid.UUID
+    nombre: str
+    sucursal_id: uuid.UUID | None
+    canal: str | None
+    modalidad: str | None
+    es_promocional: bool
+    vigente_desde: date
+    vigente_hasta: date | None
+    activa: bool
+
+
+class PrecioCreate(BaseModel):
+    producto_comercial_id: uuid.UUID
+    monto: Decimal = Field(ge=0)
+
+
+class PrecioOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    lista_precio_id: uuid.UUID
+    producto_comercial_id: uuid.UUID
+    monto: Decimal
+
+
+class CartaItemOut(BaseModel):
+    producto_comercial_id: uuid.UUID
+    id_interno: str
+    nombre: str
+    categoria_id: uuid.UUID | None
+    precio_unitario: Decimal
 
 
 class ClientePublicoOut(BaseModel):
