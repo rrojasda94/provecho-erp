@@ -7,6 +7,12 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Added
 
+- **Permiso `gerencia.gestionar_parametros_empresa`** (2026-07-27,
+  ADR-014): sembrado en `src/seeders/seed.py`, mismo patrón que
+  `gestionar_reglas_aprobacion`. Adelantado a la entidad `parametro_empresa`
+  en sí, que sigue siendo spec — sin modelo, migración ni endpoints
+  todavía (`ROADMAP.md` → Deuda técnica → Transversal).
+
 - **Lote y FEFO en `inventory` — ADR-015** (2026-07-27, RN-VNC-001..003,
   RN-LOT-001): nuevas entidades `lote` (código, vencimiento, origen,
   condición de almacenamiento) y `stock_lote` (saldo y estado por lote),

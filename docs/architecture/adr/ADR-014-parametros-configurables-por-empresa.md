@@ -80,10 +80,16 @@ fuente única que RN-GER-003 aplica a la matriz de aprobaciones).
   necesita más de un campo numérico (ej. un umbral con rango), se
   reevalúa fusionarlas.
 - `parametro_empresa` **no está implementada todavía** — es spec (esta
-  ADR + `data-model.md` §8c + RN-GER-008). Implementación queda en
-  `ROADMAP.md` → Deuda técnica → Transversal, para cuando el primer
-  parámetro real (candidato: rango salarial de RRHH) lo necesite en
-  código.
+  ADR + `data-model.md` §8c + RN-GER-008): sin modelo, migración ni
+  endpoints. Implementación queda en `ROADMAP.md` → Deuda técnica →
+  Transversal, para cuando el primer parámetro real (candidato: rango
+  salarial de RRHH) lo necesite en código. El permiso
+  `gerencia.gestionar_parametros_empresa` sí quedó sembrado en
+  `src/seeders/seed.py` (2026-07-27) adelantado a la entidad — mismo
+  patrón que ya sigue `gestionar_reglas_aprobacion`: el catálogo RBAC no
+  espera a que exista el caso de uso que lo consume, así el primer slice
+  que implemente `parametro_empresa` no necesita tocar el seeder para
+  autorizar su propio endpoint.
 - Sigue sin resolverse **quién autoriza** ciertas acciones (ej. ajuste de
   inventario fuera de margen: admin vs. un rol de "supervisor de
   logística" que hoy no existe formalmente) — eso es una decisión de rol

@@ -188,9 +188,13 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   entidad transversal para valores operativos configurables por empresa
   (rango salarial, frecuencia de conteo, margen de error de ajuste, monto
   de caja chica, plazos internos) con `valor` JSONB y
-  `decision_gerencial_id` opcional como sustento. Sin modelo ni migración
-  todavía — candidato natural para el primer uso real: rango salarial de
-  RRHH. Permiso nuevo `gerencia.gestionar_parametros_empresa`.
+  `decision_gerencial_id` opcional como sustento. **Sin modelo, migración
+  ni endpoints todavía** — candidato natural para el primer uso real:
+  rango salarial de RRHH. El permiso `gerencia.gestionar_parametros_empresa`
+  ya está sembrado en `src/seeders/seed.py` (2026-07-27, mismo patrón que
+  `gestionar_reglas_aprobacion`) para no bloquear el RBAC del primer slice
+  que lo implemente — hoy solo lo tiene `admin` vía `*`, no hay rol
+  `gerente` explícito (mismo hueco que `gestionar_reglas_aprobacion`).
 - ⬜ **`decision_gerencial`** (materializa el acta de decisión gerencial,
   RN-GER-002, `data-model.md` §8c): documentado desde el slice de Gerencia
   (2026-07-22) pero **sin modelo ni migración en código todavía** —

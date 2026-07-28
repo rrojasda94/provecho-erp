@@ -105,6 +105,10 @@ PERMISOS = [
     ("accounting.arqueo_registrar", "Registrar arqueo de caja (sorpresa o programado)"),
     ("dashboard.leer", "Consultar el dashboard gerencial (ventas, stock, caja)"),
     ("gerencia.gestionar_reglas_aprobacion", "Administrar la matriz de aprobaciones"),
+    (
+        "gerencia.gestionar_parametros_empresa",
+        "Administrar parámetros operativos configurables por empresa (ADR-014)",
+    ),
     ("sales.leer_clientes_externos", "Consultar clientes para análisis fuera de sales"),
     ("rrhh.leer", "Consultar trabajadores, contratos, nómina y documentos de RRHH"),
     ("rrhh.trabajador_gestionar", "Crear, actualizar y cesar trabajadores"),
