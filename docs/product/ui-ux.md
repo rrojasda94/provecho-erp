@@ -225,5 +225,7 @@ implementar todavía, ver `docs/product/frontend-architecture.md` F2.14.
 
 ## Pendiente de definición (con el negocio)
 
-- Menús, buscadores, atajos de teclado, sidebars, dashboards y diseño
-  visual de pantallas.
+- Menús, buscadores, atajos de teclado, dashboards y diseño visual de
+  pantallas. **Mecanismo de navegación ya decidido** (ADR-013: home de apps
+  + sidebar por módulo estilo Odoo) — pendiente es el contenido de cada
+  menú, no la estructura.

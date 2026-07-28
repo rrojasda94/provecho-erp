@@ -42,7 +42,8 @@ Registro de lo construido y lo pendiente. Actualizar en cada cambio relevante.
 | Notificaciones | ⬜ | Celery + canales por definir |
 | Auditoría (audit_log) | ⬜ | Especificada en data-model |
 | Endurecimiento de producción (rate limit, secretos, HTTPS, cabeceras) | 🔶 base ✅ 2026-07-26 | Rate limit por IP en login/refresh (Redis, fail-open), validación de config que aborta el arranque en `production` con valores de desarrollo, CORS + `TrustedHost` + cabeceras de seguridad + HSTS, `/docs` cerrado en producción, uvicorn `--proxy-headers`. Runbook de rotación de credenciales y custodia de `.env` en `docs/engineering/devops.md`. Pendiente: ver Deuda técnica → Seguridad. |
-| App Android (15+) | ⬜ | Evaluar PWA vs nativo (ADR pendiente) — debe hablar con el hub local de sucursal igual que web y PC, ver ADR-009 |
+| App Android (15+) | ⬜ | **Decidido (ADR-013): PWA/responsive, no app nativa** — Next.js + Tailwind + Base UI es 100% web, sin base de código separada; debe hablar con el hub local de sucursal igual que web y PC, ver ADR-009 |
+| Arquitectura frontend (Tailwind, Base UI, shell estilo Odoo) | ✅ spec 2026-07-27 | ADR-013: Tailwind sobre los tokens de marca existentes (`tailwind.config.ts` → `var(--color-*)`, sin hex mágico); Base UI (no Radix, no kit estilizado) para overlays/combobox/dialog; home de apps + sidebar por módulo estilo Odoo; grid y rutas filtrados por `permisos` de `GET /users/me` (ya existente, sin cambio de backend), guard real server-side en cada `layout.tsx` de módulo — el filtro del grid es solo UX. Sin librería de estado global (YAGNI). Playwright para e2e de flujos críticos, hoy en cero. `docs/prompts/frontend.md` actualizado con las reglas técnicas. Sin implementación de código todavía. |
 | Modo offline del PDV — hub local de sucursal | ✅ fase 1 2026-07-26 · fase 2 2026-07-27 | ADR-009: hub local dedicado por sucursal (misma imagen del backend, Postgres propio), los 3 clientes (web/Android/PC) le hablan siempre al hub por LAN. **Fase 1**: `DEPLOYMENT_MODE=hub` + validación de config, detector de conectividad, `GET /health/sync`, `docker-compose.hub.yml`. **Fase 2 — motor de sync**: ciclo que **empuja y después jala** (`src/core/sync/motor.py`, proceso `python -m src.core.sync.runner`); `id` client-generado en `crear_venta`/`registrar_pago`/`registrar_movimiento` (el cambio previo que pedía la fase 1, sin migración); endpoints dedicados `GET /sync/pull` + `POST /sync/push` (permisos `sync.leer`/`sync.empujar`, rol `hub_sucursal`) porque los públicos no alcanzaban (no traen `pin_hash` ni los campos del catálogo, no son incrementales, y el push necesita conservar quién vendió y el número de orden); contrato declarativo por módulo (`application/sincronizacion.py`, 24 recursos) que el motor solo ensambla; tabla `sync_watermark` por recurso y dirección; `/health/sync` con avance y último error por recurso; alta de la cuenta de servicio con `python -m src.seeders.hub`. El hub NO empuja movimientos de inventario (el listener de la nube los regenera; duplicaría el consumo). 24 casos en `tests/test_sync_motor.py` sincronizando dos bases reales. Pendiente: ver Deuda técnica. |
 | Backups automáticos | ✅ 2026-07-26 | `python -m src.backups.backup`: dump `pg_dump --format=custom` → verificación del archivo (firma + tablas críticas) → restauración probada contra base desechable → copia a S3 (opcional) → purga con retención de 30 días que nunca borra la copia más reciente. **Diario** (antes se declaraba mensual e incremental). Cron del host, no Celery beat. Runbook en `docs/engineering/devops.md#backups`. Pendiente: alerta ante fallo, ver Deuda técnica. |
 | Dashboard gerencial mínimo | ✅ 2026-07-26 | `GET /api/v1/dashboard/resumen` (`src/core/dashboard_router.py`, permiso `dashboard.leer`): ventas del día (cantidad+total), stock bajo mínimo, cajas abiertas — agregador en `core`, nunca importa dominio de otro módulo (ADR-012). Requirió construir dos huecos que no existían: `sales` no tenía ningún listado de ventas, `accounting` tenía los modelos de caja (`apertura_caja`/`cierre_caja`/`arqueo`, migrados desde 2026-07-20) sin capa de aplicación. **Slice mínimo de caja** (`accounting.application.caja`): abrir/cerrar/arquear con **reconciliación real** (el cierre calcula `monto_esperado` desde los pagos en efectivo reales, vía contrato público de `sales`, no un número tipeado sin verificar). Primer frontend real: login por PIN + pantalla de dashboard en Next.js. Fuera de esta fase, a propósito: RN-POS-009..013 completas, relevo autenticado por PIN, máquina de estados de `custodia_efectivo` — ver Deuda técnica. |
@@ -649,42 +650,42 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   API recibe `ingresos`/`descuentos`/montos ya calculados (por el contador
   externo) — no hay motor de cálculo de renta 5ta/ONP/AFP/EsSalud en el ERP.
 
-### Frontend (F2 — arquitectura y UX, documento nuevo 2026-07-27)
+### Frontend (F2 — arquitectura y UX, documento 2026-07-27, actualizado tras ADR-013)
 
 Detalle completo por sección en `docs/product/frontend-architecture.md`.
-Aquí solo el resumen accionable — los 6 puntos que bloquean empezar los
-diseños finales del alfa, en orden sugerido:
+De las 6 prioridades que este documento marcaba como bloqueantes del
+alfa, **ADR-013** (misma fecha, sesión distinta — arquitectura frontend:
+Tailwind + Base UI, shell estilo Odoo, gate por permiso) resolvió 5:
 
-- ⬜ **F2.6 Layout general**: shell de back-office (sidebar+topbar) vs.
-  shell de PDV/Kiosk (pantalla completa) — decidir si son layouts de Next.js
-  separados antes de construir POS, para no migrar rutas después.
-- ⬜ **F2.4 Componentes base**: catálogo mínimo v1 (Button, Input, Select,
-  Checkbox, Switch, Card, Modal, Tabs, Toast, Badge, Table base, Skeleton,
-  EmptyState, ErrorState). Hoy no existe ni un `Button` propio — el login
-  usa HTML plano con clases CSS directas.
+- ✅ **F2.6 Layout general**: home de apps + sidebar por módulo (patrón
+  Odoo), filtrado por permiso.
+- ✅ **F2.4 Componentes base**: Tailwind CSS sobre los tokens existentes +
+  Base UI (no Radix, no kit estilizado) para overlays/combobox/dialog.
+- ✅ **F2.28 Permisos visuales por rol**: `GET /users/me` ya devuelve
+  `permisos: string[]`; el home filtra módulos visibles, cada
+  `layout.tsx` de módulo repite el check server-side.
+- ✅ **F2.2 Arquitectura de carpetas**: convención por módulo definida
+  (`app/(app)/[modulo]/layout.tsx` + `components/{ui,shell}`).
+- ✅ **F2.8 Gestión de estado**: confirmado sin Zustand/Redux hasta que el
+  carrito POS lo justifique.
+
+Ninguna de las 5 está implementada en código todavía — son decisiones de
+arquitectura, no trabajo hecho.
+
+Queda **una sola prioridad abierta**:
+
 - ⬜ **F2.11 Tablas**: elegir librería (candidata: TanStack Table) y
   alcance v1 (orden/filtro/búsqueda/paginación) vs. v2 (columnas
   congelar/mover/ocultar, selección + acciones masivas, scroll virtual,
   totales). Es el componente más usado de todo el ERP y ninguna tabla está
-  construida todavía.
-- ⬜ **F2.28 Permisos visuales por rol**: decidir si el JWT ya trae
-  permisos resueltos para que el frontend solo oculte/deshabilite, o si
-  el frontend llama a `/me` y cachea el set — afecta el diseño de cada
-  pantalla desde el principio, no se puede agregar después sin rehacer
-  componentes. El RBAC backend ya existe completo (`users`).
-- ⬜ **F2.2 Arquitectura de carpetas**: pasar de `app/` + `lib/` a
-  `components/{ui,erp,layout}` + `hooks/` + `store/` (si aparece) antes de
-  que la 3ª pantalla obligue a reordenar código ya escrito.
-- ⬜ **F2.8 Gestión de estado**: dejar explícito "Server Components +
-  estado local, sin Zustand/Redux todavía" hasta que el carrito POS lo
-  exija — evita que alguien lo decida a las apuradas a mitad de una
-  pantalla.
+  construida todavía — ADR-013 resuelve overlays/interacción, no grillas
+  de datos.
 
-Todo lo demás (theming multi-marca, accesibilidad, tiempo real de KDS,
-i18n, hardware, testing, observabilidad, printing, productividad,
-multitarea) tiene decisión tomada, está correctamente diferido, o depende
-de un módulo backend que todavía no llega a pantalla — no bloquea empezar
-a diseñar.
+Todo lo demás (theming multi-marca, accesibilidad — catálogo ya definido,
+tiempo real de KDS, i18n, hardware, testing — Playwright ya decidido por
+ADR-013, observabilidad, printing, productividad, multitarea) tiene
+decisión tomada, está correctamente diferido, o depende de un módulo
+backend que todavía no llega a pantalla — no bloquea empezar a diseñar.
 
 ## Orden sugerido de desarrollo
 

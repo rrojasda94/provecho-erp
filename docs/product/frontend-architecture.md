@@ -20,6 +20,18 @@ React 19 / TypeScript, App Router. Existen dos rutas (`/login`, `/dashboard`),
 Sin librería de componentes, sin gestor de estado, sin capa de theming, sin
 tests de frontend.
 
+**Actualización 2026-07-27 (misma fecha, sesión distinta): ADR-013**
+(`docs/architecture/adr/ADR-013-arquitectura-frontend.md`) resolvió 5 de
+las 6 prioridades que este documento marcaba como bloqueantes del alfa:
+Tailwind CSS sobre los tokens existentes, Base UI (no Radix, no kit
+estilizado) como primitivas de interacción, shell de home de apps +
+sidebar por módulo (patrón Odoo), permisos visuales vía `permisos` de
+`GET /users/me` con guard server-side por `layout.tsx`, arquitectura de
+carpetas por módulo, sin librería de estado global (confirmado), Android
+como PWA/responsive (no nativo), y Playwright para e2e. Las secciones de
+abajo ya reflejan esas decisiones — la única prioridad que seguía abierta
+es **F2.11 Tablas** (elegir librería). Ver el resumen final actualizado.
+
 ## F2.1 Filosofía del frontend
 
 **Decidido** (`product/ui-ux.md`): Desktop-first para back-office
@@ -34,39 +46,43 @@ por LAN, nunca directo a la nube ni a un cache local propio. El frontend no
 necesita lógica de offline propia; necesita saber hablarle al hub (mismo
 contrato REST que la nube).
 
-⬜ **Pendiente**: PWA vs. app nativa/React Native para Android 15+
-(`tech-stack.md` lo deja abierto). Cualquiera de las dos opciones habla con
-el hub, así que no bloquea el resto de la arquitectura — pero sí decide si
-hay un segundo proyecto (nativo) o un solo Next.js con manifest+service
-worker de instalación (PWA).
+✅ **Resuelto (ADR-013)**: PWA/responsive, no app nativa. Una sola base de
+código (Next.js) para web y Android — descartado React Native/Kotlin
+porque el requisito real es táctil en tablet, no acceso a hardware nativo.
 
 ⬜ Usuarios simultáneos / pestañas abiertas por sucursal: sin definir
 formalmente (relevante para F2.18 tiempo real y F2.30).
 
 ## F2.2 Arquitectura del proyecto
 
-🔶 **Parcial**. Hoy: `frontend/app/` (rutas) + `frontend/lib/` (fetch +
-auth). Sin `components/`, `hooks/`, `store/`, `types/`, `constants/`.
-
-**Propuesta para el plan** (a validar al construir la primera pantalla
-nueva, no antes):
+✅ **Resuelto (ADR-013)**. Convención de carpetas por módulo, replicando
+la modularidad que el backend ya tiene por Clean Architecture:
 
 ```
-frontend/
-  app/            # rutas (App Router) — solo composición de página
-  components/
-    ui/           # componentes base (F2.4) — sin lógica de negocio
-    erp/          # componentes especializados (F2.5)
-    layout/       # sidebar, topbar, breadcrumb (F2.6)
-  hooks/          # hooks compartidos (useTablero, useAtajos, etc.)
-  lib/            # api.ts, auth.ts — infraestructura de datos, ya existe
-  store/          # estado global cliente, si aparece (F2.8)
-  styles/         # tokens si crecen más allá de globals.css
-  types/          # tipos compartidos entre rutas (hoy inline por página)
+frontend/app/
+  (auth)/login/
+  (app)/
+    layout.tsx          # lee /users/me una vez, guarda sesión+permisos en contexto
+    page.tsx            # home de apps (grilla filtrada por permiso)
+    apps.config.ts
+    sales/
+      layout.tsx         # guard de permiso + sidebar del módulo
+      page.tsx
+      [venta]/page.tsx
+    inventory/
+      layout.tsx
+      page.tsx
+    ...
+frontend/components/
+  ui/                    # wrappers propios sobre Base UI (Dialog, Combobox, Tooltip...)
+  shell/                 # AppGrid, Sidebar, Breadcrumb — layout, no de un módulo
+frontend/lib/
 ```
 
-No se crea carpeta hasta que la necesidad sea real (regla KISS de
-`/CLAUDE.md`) — esto es el destino, no algo a scaffoldear todo de una vez.
+Un módulo de frontend no importa componentes internos de otro, solo lo
+compartido en `components/` — mismo principio de bajo acoplamiento que
+`src/modules/` en el backend. Sin implementar todavía (hoy sigue siendo
+solo `app/` + `lib/`).
 
 ## F2.3 Sistema de diseño (tokens)
 
@@ -84,16 +100,18 @@ tokens nombrados).
 
 ## F2.4 Componentes base
 
-⬜ **Sin empezar.** No existe ni un `Button`/`Input` propio — el login usa
-`<button>`/`<input>` con clases CSS directas. Es el hueco más urgente antes
-de construir cualquier pantalla nueva: cada pantalla que se agregue sin
-esto reinventa estilos y duplica CSS (contradice DRY de `/CLAUDE.md`).
-
-**Viable para el plan**: catálogo mínimo antes del alfa — Button, Input,
-Select, Checkbox, Switch, Card, Modal/Dialog, Tabs, Toast, Badge, Table
-(base), Skeleton, EmptyState, ErrorState. El resto de la lista larga
-(Command Palette, DatePicker/Calendar propios, etc.) se agrega bajo demanda
-cuando una pantalla real lo pida — no antes (YAGNI).
+✅ **Resuelto (ADR-013)**: Tailwind CSS (consumiendo los tokens de
+`globals.css` vía `tailwind.config.ts`, nunca hex fijo) + **Base UI**
+(`@base-ui-components/react`, no Radix, no kit estilizado como shadcn/ui)
+para lo que necesita comportamiento accesible no trivial — dialog,
+combobox, popover, tooltip, tabs/menu. Todo lo demás (tarjetas, grillas,
+botones simples) es HTML + Tailwind sin librería. Sin implementación de
+código todavía — sigue sin existir ni un `Button` propio (el login usa
+HTML plano con CSS directa); el catálogo mínimo v1 (Button, Input, Select,
+Checkbox, Switch, Card, Modal/Dialog, Tabs, Toast, Badge, Skeleton,
+EmptyState, ErrorState) se construye sobre esta base ahora que está
+decidida. Tabla (F2.11) sigue como decisión aparte — ninguna librería de
+tablas resuelve accesibilidad de overlays, es un problema distinto.
 
 ## F2.5 Componentes especializados del ERP
 
@@ -106,13 +124,18 @@ guía, merma) se construye cuando su módulo backend tenga pantalla asignada.
 
 ## F2.6 Layout general
 
-⬜ **Sin empezar.** El dashboard actual es standalone (sin sidebar/topbar).
-Antes de agregar una segunda pantalla de back-office hace falta decidir el
-shell: sidebar de navegación + topbar (usuario, sucursal activa, logout) +
-área de trabajo. PDV/Kiosk probablemente necesitan su propio shell
-(pantalla completa, sin sidebar) — **decidir si es un layout de Next.js
-distinto (`app/(pdv)/layout.tsx` vs `app/(backoffice)/layout.tsx`) antes de
-construir POS**, para no migrar rutas después.
+✅ **Resuelto (ADR-013)**: patrón Odoo en dos niveles. **(a) Home de apps**
+(`/` tras login): grilla de íconos por módulo de negocio, filtrada por
+`permisos` de `GET /users/me` (Server Component, sin llamada extra al
+backend — el endpoint ya existe). **(b) Dentro de un módulo**: sidebar
+vertical con el submenú del módulo activo + breadcrumb arriba (el
+breadcrumb sigue siendo ruta de navegación del usuario, no árbol de menú —
+`ui-ux.md`). Dirección visual: superficies neutras por defecto,
+`--color-primary`/`--color-accent` reservados para acción primaria/ítem
+activo — no un color de marca distinto por tarjeta. PDV/Kiosk no está
+resuelto explícitamente por este ADR (su shell de pantalla completa queda
+para cuando se construya esa pantalla). Sin implementar todavía — el
+dashboard actual sigue siendo standalone.
 
 ## F2.7 Navegación
 
@@ -120,28 +143,27 @@ construir POS**, para no migrar rutas después.
 recorrida** (patrón Odoo), no por jerarquía; navegación jerárquica va por
 menú desplegable, son mecanismos separados que no se mezclan.
 
-⬜ **Pendiente**: rutas protegidas por permiso (hoy solo hay redirect por
-falta de cookie, no hay chequeo de `permiso` en frontend — ver F2.28),
-deep links, historial, favoritos, pantallas recientes, búsqueda global (esta
-última ya tiene spec de negocio en `ui-ux.md` — contextual, por
-nombre/insumo/exclusión — falta decidir su implementación de UI).
-Límite de eslabones del breadcrumb antes de colapsar: sin definir con el
-negocio (pendiente ya registrado en `ui-ux.md`).
+✅ **Rutas protegidas por permiso — resuelto (ADR-013)**: cada
+`layout.tsx` de módulo (`app/(app)/[modulo]/layout.tsx`) repite el chequeo
+de permiso que ya filtra el home — el filtro del grid es solo UX, el
+guard real es server-side, igual que el backend ya deniega por defecto
+(`require_permission`). Ver F2.28.
+
+⬜ **Sigue pendiente**: deep links, historial, favoritos, pantallas
+recientes, búsqueda global (ya tiene spec de negocio en `ui-ux.md` —
+contextual, por nombre/insumo/exclusión — falta decidir su implementación
+de UI). Límite de eslabones del breadcrumb antes de colapsar: sin definir
+con el negocio (pendiente ya registrado en `ui-ux.md`).
 
 ## F2.8 Gestión del estado
 
-⬜ **Sin decidir formalmente.** Hoy todo es Server Components + Server
-Actions (login, logout) — cero estado de cliente. Esto alcanza mientras las
-pantallas sean de solo lectura/formularios simples. Se vuelve una decisión
-real en cuanto exista el carrito POS (estado que sobrevive varias
-interacciones antes de un submit) o filtros/estado de tabla que no deben
-perderse al navegar.
-
-**Recomendación a validar con el usuario**: no traer Redux/Zustand hasta
-que el carrito POS lo exija — mientras tanto, `useState`/`useReducer` local
-por componente alcanza (YAGNI). Cuando el carrito exista, evaluar Zustand
-(simple, sin boilerplate) frente a seguir con Context — decisión puntual,
-no ahora.
+✅ **Resuelto (ADR-013)**: sin librería de estado global (Zustand/Redux)
+mientras no aparezca un caso real que lo justifique (candidato futuro:
+carrito de PDV compartido entre listado y dialog de cobro, si crece
+mucho) — YAGNI explícito, ya no una recomendación a validar. Server
+Components para todo lo de solo lectura (dashboard, listados de
+back-office); Client Components (`"use client"`) solo donde hay
+interacción real (PDV, Kiosk, KDS), con `useState`/`useReducer` de React.
 
 ## F2.9 Comunicación con backend
 
@@ -221,10 +243,13 @@ autenticación ya existe (redirect a `/login` sin cookie).
 
 ⬜ **Falta**: Content-Security-Policy (deuda ya declarada en
 `ROADMAP.md` → Seguridad — "falta definirla junto con el frontend"),
-ocultar acciones por permiso en UI (F2.28), expiración de sesión visible al
-usuario (hoy silenciosa hasta el próximo request fallido), sanitización
-explícita de inputs que se rendericen como HTML (ninguno hoy, revisar
-cuando aparezca contenido enriquecido — ej. notas, comentarios).
+expiración de sesión visible al usuario (hoy silenciosa hasta el próximo
+request fallido), sanitización explícita de inputs que se rendericen
+como HTML (ninguno hoy, revisar cuando aparezca contenido enriquecido —
+ej. notas, comentarios). Ocultar módulo/ruta completa por permiso ya está
+resuelto a nivel de layout (ADR-013, ver F2.28) — lo que falta es el nivel
+más fino: ocultar/deshabilitar un botón o acción puntual dentro de una
+pantalla ya visible.
 
 ## F2.17 Rendimiento
 
@@ -295,12 +320,13 @@ diseñar hardware para un flujo que aún no tiene pantalla).
 
 ## F2.25 Testing
 
-⬜ **Sin empezar.** Cero tests de frontend hoy (ni unitarios ni E2E). Se
-propone: Vitest + Testing Library para componentes/hooks desde que exista
-F2.4 (probar el sistema de diseño primero, no las pantallas), Playwright
-para E2E cuando exista un flujo crítico completo (login → dashboard, luego
-venta completa). No bloquea el alfa si el alfa es una demo guiada, pero sí
-antes de producción real con dinero de por medio (POS).
+🔶 **Parcial (ADR-013)**: Playwright adoptado para e2e de flujos críticos
+(login, filtrado del home de apps por permiso, crear venta, cobrar) —
+prioriza flujos de plata sobre cobertura unitaria de componentes sueltos.
+⬜ Sin implementar todavía (cero tests de frontend hoy) y sin decidir
+testing unitario de componentes/hooks (candidato: Vitest + Testing
+Library cuando exista F2.4). No bloquea el alfa si es una demo guiada,
+pero sí antes de producción real con dinero de por medio (POS).
 
 ## F2.26 Observabilidad
 
@@ -314,22 +340,22 @@ es reusar la de `ADR-006`.
 
 🔶 **Parcial**. ESLint ya configurado (`frontend/.eslintrc.json`) y exigido
 antes de commit (`/CLAUDE.md`). TypeScript estricto y PascalCase para
-componentes ya son regla (`prompts/frontend.md`). ⬜ Sin Storybook, sin
-convención de nombres de archivo documentada más allá de componentes,
-sin checklist de PR específico de frontend (existe el general de
-`/CLAUDE.md`).
+componentes ya son regla (`prompts/frontend.md`, actualizado con las
+reglas técnicas de ADR-013). Convención de carpetas por módulo ya decidida
+(F2.2). ⬜ Sin Storybook, sin checklist de PR específico de frontend
+(existe el general de `/CLAUDE.md`).
 
 ## F2.28 Permisos visuales por rol *(agregado local)*
 
-⬜ **Sin empezar, pero desbloqueado.** El RBAC completo ya existe en
-backend (`users`: rol/permiso/usuario_rol/rol_permiso, `require_permission`
-deny-by-default, `docs/security/authorization.md`). Falta decidir el
-mapeo a UI: ¿los claims del JWT ya traen permisos resueltos para que el
-frontend solo oculte/deshabilite, o el frontend debe llamar a `/me` y
-cachear el set de permisos? **Viable cerrar esta spec antes del alfa** —
-afecta cómo se diseña cada pantalla desde el principio (qué botón/acción
-se oculta a qué rol), no algo que se pueda agregar después sin rehacer
-componentes.
+✅ **Resuelto (ADR-013)**. `GET /users/me` ya devuelve `permisos: string[]`
+(lista plana de códigos, sin cambio de backend necesario). El home de apps
+filtra qué módulos se muestran (`appsVisibles(permisos)` contra un
+registro estático módulo→prefijo de permiso); cada `layout.tsx` de módulo
+repite el check server-side — el filtro del grid es UX, no el único gate
+(descartado explícitamente "permisos resueltos solo en el cliente").
+Pendiente más fino: ocultar/deshabilitar una acción puntual dentro de una
+pantalla ya visible (ver F2.16) — el patrón de módulo/ruta está resuelto,
+el de botón/acción no.
 
 ## F2.29 Sistema de productividad *(agregado local)*
 
@@ -354,16 +380,23 @@ que requiera su propia decisión previa.
 
 ## Resumen — qué cerrar antes de los diseños finales del alfa
 
-Orden sugerido (bloquean diseño visual, no son opcionales antes de dibujar
-pantallas):
+**Actualizado 2026-07-27 tras ADR-013**: de las 6 prioridades originales,
+5 ya están resueltas (layout, componentes base, permisos visuales,
+arquitectura de carpetas, estado). Queda una sola bloqueante real:
 
-1. **F2.6 Layout general** — shell de back-office vs. shell de PDV/Kiosk.
-2. **F2.4 Componentes base** — catálogo mínimo v1.
-3. **F2.11 Tablas** — librería + alcance v1.
-4. **F2.28 Permisos visuales** — mecanismo de mapeo rol→UI.
-5. **F2.2 Arquitectura de carpetas** — antes de que la 3ª pantalla obligue
-   a reordenar código ya escrito.
-6. **F2.8 Estado** — al menos la decisión de "no Redux todavía", explícita.
+1. **F2.11 Tablas** — elegir librería (candidata: TanStack Table) y
+   alcance v1 (orden/filtro/búsqueda/paginación) vs. v2 (columnas
+   congelar/mover/ocultar, selección + acciones masivas, scroll virtual,
+   totales). Es el componente más usado de todo el ERP y ninguna tabla
+   está construida todavía — el único hueco de arquitectura que ADR-013
+   no cubrió (resuelve overlays/interacción, no grillas de datos).
+
+Resueltas por ADR-013 (`docs/architecture/adr/ADR-013-arquitectura-frontend.md`),
+sin implementar todavía en código: F2.6 (home de apps + sidebar estilo
+Odoo), F2.4 (Tailwind + Base UI), F2.28 (permisos vía `/users/me` +
+guard por `layout.tsx`), F2.2 (carpetas por módulo), F2.8 (sin
+Zustand/Redux, confirmado), más F2.1 (Android = PWA/responsive) y F2.25
+(Playwright para e2e).
 
 El resto de las 31 secciones tiene decisión tomada, está correctamente
 diferido, o depende de un módulo backend que todavía no llega a pantalla —
