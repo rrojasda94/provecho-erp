@@ -174,12 +174,6 @@ class ListaPrecioRepo:
         self.s.flush()
         return lista
 
-    def list(self, marca_id: uuid.UUID | None = None) -> list[ListaPrecio]:
-        q = select(ListaPrecio).where(ListaPrecio.deleted_at.is_(None))
-        if marca_id is not None:
-            q = q.where(ListaPrecio.marca_id == marca_id)
-        return list(self.s.scalars(q.order_by(ListaPrecio.vigente_desde.desc())))
-
     def vigentes(
         self,
         *,
@@ -214,6 +208,12 @@ class ListaPrecioRepo:
                 )
             )
         )
+
+    def list(self, marca_id: uuid.UUID | None = None) -> list[ListaPrecio]:
+        q = select(ListaPrecio).where(ListaPrecio.deleted_at.is_(None))
+        if marca_id is not None:
+            q = q.where(ListaPrecio.marca_id == marca_id)
+        return list(self.s.scalars(q.order_by(ListaPrecio.vigente_desde.desc())))
 
 
 class PrecioRepo:
