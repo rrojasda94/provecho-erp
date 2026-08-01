@@ -82,7 +82,9 @@ def crear_asiento_manual(
         session.add(fila)
     session.flush()
     event_bus.publish(
-        "accounting.asiento_generado", {"asiento_id": str(asiento.id), "evento_origen": "manual"}
+        "accounting.asiento_generado",
+        {"asiento_id": str(asiento.id), "evento_origen": "manual"},
+        session=session,
     )
     return asiento
 
@@ -126,6 +128,7 @@ def anular_asiento(session: Session, asiento_id: uuid.UUID, *, actor_id: uuid.UU
     event_bus.publish(
         "accounting.asiento_generado",
         {"asiento_id": str(reversa.id), "evento_origen": "reversion"},
+        session=session,
     )
     return reversa
 
@@ -175,7 +178,9 @@ def crear_asiento_automatico(
     )
     session.flush()
     event_bus.publish(
-        "accounting.asiento_generado", {"asiento_id": str(asiento.id), "evento_origen": evento}
+        "accounting.asiento_generado",
+        {"asiento_id": str(asiento.id), "evento_origen": evento},
+        session=session,
     )
     return asiento
 

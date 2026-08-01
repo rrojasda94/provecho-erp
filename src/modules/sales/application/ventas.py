@@ -169,6 +169,7 @@ def crear_venta(
             "items": detalle_evento,
             "total": str(venta.total),
         },
+        session=session,
     )
     return venta
 
@@ -231,6 +232,7 @@ def registrar_pago(
         event_bus.publish(
             "sales.venta_pagada",
             {"venta_id": str(venta.id), "total": str(venta.total)},
+            session=session,
         )
         comprobante = comprobantes.crear_comprobante_pendiente(session, venta)
     return pago, venta, comprobante
@@ -258,5 +260,6 @@ def anular_venta(session: Session, venta_id: uuid.UUID, usuario_id: uuid.UUID) -
             "usuario_id": str(usuario_id),
             "items": items,
         },
+        session=session,
     )
     return venta

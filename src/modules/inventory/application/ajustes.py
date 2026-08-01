@@ -84,6 +84,7 @@ def aprobar_ajuste(
         event_bus.publish(
             "inventory.ajuste_fuera_margen",
             {"ajuste_id": str(ajuste.id), "almacen_id": str(ajuste.almacen_id)},
+            session=session,
         )
     return ajuste
 

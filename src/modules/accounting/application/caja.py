@@ -67,6 +67,7 @@ def abrir_caja(
             "punto_venta_id": str(punto_venta_id),
             "diferencia_reportada": str(diferencia_reportada) if diferencia_reportada else None,
         },
+        session=session,
     )
     return apertura
 
@@ -112,6 +113,7 @@ def cerrar_caja(
             "apertura_caja_id": str(apertura_caja_id),
             "descuadre_monto": str(descuadre),
         },
+        session=session,
     )
     if estado == "con_irregularidad":
         event_bus.publish(
@@ -121,6 +123,7 @@ def cerrar_caja(
                 "descuadre_monto": str(descuadre),
                 "descuadre_atribucion": descuadre_atribucion,
             },
+            session=session,
         )
     return cierre
 
@@ -158,6 +161,7 @@ def registrar_arqueo(
             "punto_venta_id": str(punto_venta_id),
             "diferencia_monto": str(diferencia),
         },
+        session=session,
     )
     return arqueo
 

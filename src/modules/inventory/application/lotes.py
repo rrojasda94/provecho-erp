@@ -119,6 +119,7 @@ def _bloquear(session: Session, fila: StockLote, lote: Lote) -> None:
             "fecha_vencimiento": lote.fecha_vencimiento.isoformat(),
             "cantidad": str(fila.cantidad),
         },
+        session=session,
     )
 
 

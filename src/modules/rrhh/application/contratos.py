@@ -61,6 +61,7 @@ def firmar_contrato_laboral(
             "trabajador_id": str(contrato.trabajador_id),
             "fecha_firma": fecha_firma.isoformat(),
         },
+        session=session,
     )
     return contrato
 

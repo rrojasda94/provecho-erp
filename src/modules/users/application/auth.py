@@ -134,7 +134,7 @@ def login(session: Session, username: str, pin: str, ip: str | None = None) -> d
         usuario_id=usuario.id, entidad="usuario", entidad_id=usuario.id,
         accion="login", ip=ip,
     )
-    event_bus.publish("users.sesion_iniciada", {"usuario_id": str(usuario.id)})
+    event_bus.publish("users.sesion_iniciada", {"usuario_id": str(usuario.id)}, session=session)
     return tokens
 
 

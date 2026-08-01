@@ -69,6 +69,7 @@ def _resolver(
                 "trabajador_id": str(solicitud.trabajador_id),
                 "tipo": solicitud.tipo,
             },
+            session=session,
         )
     return solicitud
 
