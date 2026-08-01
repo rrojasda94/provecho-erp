@@ -1,0 +1,843 @@
+/* Punto de venta.
+   Pantalla táctil de mostrador: objetivos grandes, jerarquía por tamaño
+   (el total manda sobre todo lo demás) y las acciones destructivas lejos
+   del recorrido natural del pulgar. Reusa los tokens de marca de
+   globals.css; el PDV los sobreescribe por marca más adelante. */
+
+.pdv {
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    user-select: none;
+}
+
+.pdv-vacio {
+    padding: 3rem;
+    max-width: 44rem;
+    margin: 0 auto;
+    display: grid;
+    gap: 0.75rem;
+}
+
+.pdv-top {
+    flex: none;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    gap: 0.875rem;
+    padding: 0 1rem;
+    background: #fff;
+    border-bottom: 1px solid rgba(22, 22, 22, 0.1);
+}
+
+.pdv-marca strong {
+    display: block;
+    font-size: 0.9375rem;
+}
+
+.pdv-marca small {
+    color: var(--color-gray);
+    font-size: 0.75rem;
+}
+
+.pdv-spacer {
+    flex: 1;
+}
+
+.pdv-meta {
+    font-size: 0.8125rem;
+    color: var(--color-gray);
+    font-variant-numeric: tabular-nums;
+}
+
+.pdv-pill {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.3125rem 0.625rem;
+    border-radius: 999px;
+}
+
+.pdv-pill.ok {
+    background: #e4f1e2;
+    color: #1e5a2b;
+}
+
+.pdv-pill.off {
+    background: #fbeae7;
+    color: var(--color-secondary);
+}
+
+.pdv-shell {
+    flex: 1;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 24.5rem;
+    min-height: 0;
+}
+
+/* --- Panel izquierdo: qué se vende --- */
+.pdv-izq {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    border-right: 1px solid rgba(22, 22, 22, 0.1);
+}
+
+.pdv-barra {
+    flex: none;
+    display: flex;
+    gap: 0.625rem;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid rgba(22, 22, 22, 0.1);
+}
+
+.pdv-buscar {
+    flex: 1;
+    height: 40px;
+    padding: 0 0.75rem;
+    border: 1px solid rgba(22, 22, 22, 0.15);
+    border-radius: 8px;
+    background: #fff;
+    font: inherit;
+}
+
+.pdv-seg {
+    display: flex;
+    gap: 2px;
+    background: rgba(22, 22, 22, 0.06);
+    padding: 3px;
+    border-radius: 8px;
+}
+
+.pdv-seg button {
+    padding: 0.4375rem 0.875rem;
+    border-radius: 6px;
+    background: none;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--color-gray);
+}
+
+.pdv-seg button[aria-pressed="true"] {
+    background: #fff;
+    color: var(--color-foreground);
+}
+
+.pdv-grid {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(9.25rem, 1fr));
+    gap: 0.625rem;
+    align-content: start;
+}
+
+.pdv-producto {
+    background: #fff;
+    border: 1px solid rgba(22, 22, 22, 0.1);
+    border-radius: 12px;
+    padding: 0.75rem;
+    min-height: 5.75rem;
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.pdv-producto:active {
+    transform: scale(0.975);
+}
+
+.pdv-producto-nombre {
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+.pdv-producto-precio {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--color-primary);
+    font-variant-numeric: tabular-nums;
+}
+
+.pdv-producto-extras {
+    display: block;
+    font-size: 0.6875rem;
+    color: var(--color-gray);
+}
+
+.pdv-nada,
+.pdv-vacio-ticket {
+    padding: 2rem 1.5rem;
+    text-align: center;
+    color: var(--color-gray);
+    font-size: 0.875rem;
+    line-height: 1.6;
+}
+
+/* --- Mesas y cobrados --- */
+.pdv-mesas,
+.pdv-cobrados {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1rem;
+}
+
+.pdv-mesas-resumen {
+    font-size: 0.8125rem;
+    color: var(--color-gray);
+    margin-bottom: 0.75rem;
+}
+
+.pdv-mesas-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
+    gap: 0.625rem;
+}
+
+.pdv-mesa {
+    background: #fff;
+    border: 1px solid rgba(22, 22, 22, 0.1);
+    border-radius: 12px;
+    padding: 0.75rem;
+    min-height: 6rem;
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+}
+
+.pdv-mesa.ocupada {
+    background: #e4f1e2;
+    border-color: transparent;
+}
+
+.pdv-mesa-num {
+    font-size: 1.375rem;
+    font-weight: 700;
+}
+
+.pdv-mesa-total {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.pdv-mesa-info {
+    margin-top: auto;
+    font-size: 0.75rem;
+    color: var(--color-gray);
+}
+
+.pdv-cobrados-cab {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    background: #fff;
+    border-radius: 12px;
+    margin-bottom: 0.75rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.pdv-cobrados ul {
+    list-style: none;
+    display: grid;
+    gap: 0.375rem;
+}
+
+.pdv-cobrados li {
+    display: grid;
+    grid-template-columns: 4rem 1fr auto auto;
+    gap: 0.75rem;
+    align-items: center;
+    background: #fff;
+    border: 1px solid rgba(22, 22, 22, 0.08);
+    border-radius: 8px;
+    padding: 0.75rem;
+    font-size: 0.875rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.pdv-cobrado-modalidad,
+.pdv-cobrado-estado {
+    color: var(--color-gray);
+    font-size: 0.75rem;
+}
+
+/* --- Panel derecho: el pedido --- */
+.pdv-der {
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    min-height: 0;
+}
+
+.pdv-tabs {
+    flex: none;
+    display: flex;
+    gap: 0.3125rem;
+    padding: 0.5625rem 0.75rem;
+    overflow-x: auto;
+    border-bottom: 1px solid rgba(22, 22, 22, 0.1);
+}
+
+.pdv-tab {
+    padding: 0.4375rem 0.75rem;
+    border-radius: 999px;
+    border: 1px solid rgba(22, 22, 22, 0.15);
+    background: #fff;
+    font-size: 0.78125rem;
+    font-weight: 600;
+    white-space: nowrap;
+    color: var(--color-gray);
+}
+
+.pdv-tab[aria-pressed="true"] {
+    background: var(--color-dark);
+    border-color: var(--color-dark);
+    color: var(--color-cream);
+}
+
+.pdv-tab-monto {
+    margin-left: 0.3125rem;
+    opacity: 0.7;
+    font-weight: 500;
+}
+
+.pdv-tab-add {
+    width: 2rem;
+    height: 2rem;
+    flex: none;
+    border-radius: 999px;
+    border: 1px dashed rgba(22, 22, 22, 0.25);
+    background: none;
+    font-size: 1.125rem;
+    line-height: 1;
+}
+
+.pdv-ticket-cab {
+    flex: none;
+    padding: 0.875rem 1rem 0.75rem;
+    border-bottom: 1px solid rgba(22, 22, 22, 0.1);
+}
+
+.pdv-ticket-cab h2 {
+    font-size: 1.0625rem;
+}
+
+.pdv-ticket-cab p {
+    font-size: 0.78125rem;
+    color: var(--color-gray);
+    margin-top: 0.1875rem;
+}
+
+.pdv-lineas {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.625rem 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    min-height: 0;
+}
+
+.pdv-linea {
+    display: grid;
+    grid-template-columns: 2.125rem minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 0.625rem 0.75rem;
+    border: 1px solid rgba(22, 22, 22, 0.1);
+    border-radius: 8px;
+    background: #fff;
+    text-align: left;
+    width: 100%;
+}
+
+.pdv-linea.sel {
+    border-color: var(--color-primary);
+    background: #fff5f1;
+}
+
+.pdv-linea-cant {
+    width: 1.875rem;
+    height: 1.875rem;
+    border-radius: 8px;
+    background: rgba(22, 22, 22, 0.06);
+    display: grid;
+    place-items: center;
+    font-weight: 700;
+    font-size: 0.84375rem;
+}
+
+.pdv-linea.sel .pdv-linea-cant {
+    background: var(--color-primary);
+    color: #fff;
+}
+
+.pdv-linea-nombre {
+    font-size: 0.84375rem;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+.pdv-linea-nombre em {
+    display: block;
+    font-size: 0.71875rem;
+    color: var(--color-gray);
+    font-weight: 400;
+    font-style: normal;
+    margin-top: 0.125rem;
+}
+
+.pdv-linea-monto {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.pdv-selbar {
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.625rem;
+    padding: 0.5625rem 0.875rem;
+    background: #fff5f1;
+    color: var(--color-secondary);
+    font-size: 0.78125rem;
+    font-weight: 600;
+}
+
+.pdv-selbar button {
+    background: none;
+    text-decoration: underline;
+    font-weight: 700;
+    color: inherit;
+}
+
+.pdv-totales {
+    flex: none;
+    padding: 0.75rem 1rem 0.625rem;
+    border-top: 1px solid rgba(22, 22, 22, 0.1);
+}
+
+.pdv-total-fila {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8125rem;
+    color: var(--color-gray);
+    padding: 0.125rem 0;
+    font-variant-numeric: tabular-nums;
+}
+
+.pdv-total-fila.fuerte {
+    font-weight: 700;
+    color: var(--color-foreground);
+}
+
+.pdv-total-fila.grande {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--color-foreground);
+    align-items: baseline;
+    padding-top: 0.375rem;
+}
+
+.pdv-total-fila.grande span:first-child {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--color-gray);
+}
+
+.rojo {
+    color: var(--color-secondary);
+}
+
+.verde {
+    color: #1e5a2b;
+}
+
+.pdv-acciones {
+    flex: none;
+    padding: 0 0.75rem;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.375rem;
+}
+
+.pdv-acciones button {
+    border: 1px solid rgba(22, 22, 22, 0.15);
+    border-radius: 8px;
+    padding: 0.625rem 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    background: #fff;
+    line-height: 1.25;
+}
+
+.pdv-acciones button.puesto {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+    background: #fff5f1;
+}
+
+.pdv-pago {
+    flex: none;
+    padding: 0.625rem 0.75rem 0.875rem;
+    display: grid;
+    grid-template-columns: 1fr 1.25fr;
+    gap: 0.5rem;
+}
+
+.pdv-boton-pri,
+.pdv-boton-sec,
+.pdv-boton-riesgo {
+    border-radius: 8px;
+    padding: 0.9375rem 0.625rem;
+    font-size: 0.90625rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+.pdv-boton-pri {
+    background: var(--color-primary);
+    color: #fff;
+}
+
+.pdv-boton-sec {
+    border: 1px solid rgba(22, 22, 22, 0.2);
+    background: #fff;
+}
+
+.pdv-boton-sec.ancho {
+    width: 100%;
+    margin-top: 0.625rem;
+}
+
+.pdv-boton-riesgo {
+    border: 1px solid var(--color-secondary);
+    background: #fff;
+    color: var(--color-secondary);
+}
+
+.pdv-boton-pri:disabled,
+.pdv-boton-sec:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+/* --- Diálogos --- */
+.pdv-dialogo {
+    border: none;
+    border-radius: 16px;
+    padding: 0;
+    max-width: min(94vw, 34rem);
+    width: 100%;
+    background: var(--color-cream);
+    color: var(--color-foreground);
+}
+
+.pdv-dialogo.ancho {
+    max-width: min(94vw, 50rem);
+}
+
+.pdv-dialogo::backdrop {
+    background: rgba(16, 17, 12, 0.45);
+}
+
+.pdv-dialogo header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.125rem 1.25rem 0.875rem;
+}
+
+.pdv-dialogo header h3 {
+    font-size: 0.875rem;
+    letter-spacing: 0.06em;
+}
+
+.pdv-dialogo header button {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 8px;
+    background: rgba(22, 22, 22, 0.06);
+    font-size: 1.0625rem;
+    line-height: 1;
+}
+
+.pdv-dialogo-cuerpo {
+    padding: 0 1.25rem 1.25rem;
+    max-height: min(70vh, 38rem);
+    overflow-y: auto;
+}
+
+.pdv-dialogo-pie {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    padding-top: 0.875rem;
+    border-top: 1px solid rgba(22, 22, 22, 0.1);
+}
+
+.pdv-etiqueta {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--color-gray);
+    margin: 0.875rem 0 0.4375rem;
+}
+
+.pdv-nota {
+    font-size: 0.75rem;
+    color: var(--color-gray);
+    line-height: 1.55;
+    margin-top: 0.5rem;
+}
+
+.pdv-campo {
+    width: 100%;
+    height: 2.75rem;
+    padding: 0 0.8125rem;
+    border: 1px solid rgba(22, 22, 22, 0.15);
+    border-radius: 8px;
+    background: #fff;
+    font: inherit;
+}
+
+.pdv-dos {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+}
+
+.pdv-lista {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.pdv-opcion {
+    width: 100%;
+    text-align: left;
+    border: 1px solid rgba(22, 22, 22, 0.1);
+    border-radius: 8px;
+    padding: 0.8125rem 0.875rem;
+    background: #fff;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.pdv-opcion.on {
+    border-color: var(--color-primary);
+    background: #fff5f1;
+}
+
+.pdv-opcion strong {
+    display: block;
+    font-size: 0.90625rem;
+}
+
+.pdv-opcion em {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--color-gray);
+    font-style: normal;
+    margin-top: 0.125rem;
+}
+
+.pdv-badge {
+    font-size: 0.6875rem;
+    background: rgba(22, 22, 22, 0.08);
+    color: var(--color-gray);
+    padding: 0.125rem 0.375rem;
+    border-radius: 5px;
+}
+
+.pdv-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+}
+
+.pdv-chip {
+    border: 1px solid rgba(22, 22, 22, 0.15);
+    border-radius: 999px;
+    padding: 0.5rem 0.875rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    background: #fff;
+}
+
+.pdv-chip.on {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: #fff;
+}
+
+.pdv-chip:disabled {
+    opacity: 0.35;
+}
+
+.pdv-stepper {
+    display: flex;
+    align-items: center;
+    border: 1px solid rgba(22, 22, 22, 0.15);
+    border-radius: 8px;
+    overflow: hidden;
+    width: fit-content;
+    background: #fff;
+}
+
+.pdv-stepper button {
+    width: 2.875rem;
+    height: 2.875rem;
+    font-size: 1.3125rem;
+    background: rgba(22, 22, 22, 0.04);
+    border-radius: 0;
+}
+
+.pdv-stepper span {
+    width: 4rem;
+    text-align: center;
+    font-size: 1.1875rem;
+    font-weight: 700;
+}
+
+.pdv-stepper.chico button {
+    width: 2.25rem;
+    height: 2.25rem;
+    font-size: 1.0625rem;
+}
+
+.pdv-stepper.chico span {
+    width: 2.5rem;
+    font-size: 1rem;
+}
+
+.pdv-extra {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+    border: 1px solid rgba(22, 22, 22, 0.1);
+    border-radius: 8px;
+    padding: 0.5rem 0.75rem;
+    background: #fff;
+    font-size: 0.875rem;
+}
+
+.pdv-extra em {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--color-gray);
+    font-style: normal;
+}
+
+.pdv-denoms {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+}
+
+.pdv-denom {
+    display: grid;
+    grid-template-columns: 4rem 1fr 4.5rem;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.84375rem;
+}
+
+.pdv-denom input {
+    height: 2.375rem;
+    text-align: center;
+    border: 1px solid rgba(22, 22, 22, 0.15);
+    border-radius: 8px;
+    background: #fff;
+    font: inherit;
+}
+
+.pdv-denom-sub {
+    text-align: right;
+    color: var(--color-gray);
+    font-variant-numeric: tabular-nums;
+}
+
+.pdv-monto-grande {
+    font-size: 1.5rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.pdv-cobro {
+    display: grid;
+    grid-template-columns: minmax(0, 16rem) minmax(0, 1fr);
+    gap: 1.125rem;
+}
+
+.pdv-cobro-resumen {
+    background: rgba(22, 22, 22, 0.04);
+    border-radius: 12px;
+    padding: 0.875rem;
+}
+
+.pdv-cobro-monto {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.625rem;
+}
+
+.pdv-pago-fila {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.84375rem;
+    padding: 0.375rem 0;
+    border-bottom: 1px dashed rgba(22, 22, 22, 0.15);
+    font-variant-numeric: tabular-nums;
+}
+
+.pdv-pago-fila button {
+    background: none;
+    color: var(--color-secondary);
+    font-size: 0.75rem;
+    margin-left: 0.5rem;
+}
+
+.pdv-aviso {
+    position: fixed;
+    left: 50%;
+    bottom: 1.625rem;
+    transform: translateX(-50%);
+    background: var(--color-dark);
+    color: var(--color-cream);
+    padding: 0.75rem 1.25rem;
+    border-radius: 999px;
+    font-size: 0.84375rem;
+    font-weight: 600;
+    z-index: 99;
+}
+
+/* En pantallas angostas el ticket no cabe al lado del catálogo. El PDV es
+   una pantalla de mostrador, no de teléfono: se avisa en vez de fingir que
+   funciona. */
+@media (max-width: 60rem) {
+    .pdv-shell {
+        grid-template-columns: 1fr;
+    }
+
+    .pdv-der {
+        display: none;
+    }
+
+    .pdv-cobro {
+        grid-template-columns: 1fr;
+    }
+}

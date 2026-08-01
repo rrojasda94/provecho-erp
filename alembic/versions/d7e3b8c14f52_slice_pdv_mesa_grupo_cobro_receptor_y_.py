@@ -40,8 +40,18 @@ def upgrade() -> None:
         sa.Column("zona", sa.String(length=50), nullable=True),
         sa.Column("capacidad", sa.Integer(), nullable=True),
         sa.Column("activa", sa.Boolean(), nullable=False, server_default=sa.true()),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
         sa.UniqueConstraint("sucursal_id", "numero", name="uq_mesa_sucursal_numero"),
     )

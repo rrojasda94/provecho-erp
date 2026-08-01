@@ -491,8 +491,18 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
     pestaña de cobrados: falta el adaptador de notificaciones.
   - ⬜ `grupo_cobro` es un entero sin entidad detrás: nada impide un grupo 7
     sin grupos 1-6. Se valida en el caso de uso, no en el esquema.
-  - ⬜ Frontend: portar el prototipo del PDV a `frontend/app/pdv/` contra
-    estos endpoints (hoy el frontend real solo tiene login y dashboard).
+  - ✅ 2026-07-28 **Frontend del PDV** en `frontend/app/pdv/`, contra los
+    endpoints reales: apertura de caja con firma del encargado, catálogo con
+    extras, ticket multi-borrador con selección por pulsación larga, mapa de
+    mesas, cobrados del día y cobro con split de medios. Proxy
+    `/api/proxy/[...ruta]` para que el token httpOnly no llegue al navegador.
+    Verificado de punta a punta contra la API: venta con extras (94.00
+    correcto), cobro dividido en dos cuentas con dos boletas y receptores
+    distintos, y factura por RUC. **Pendiente de esta pantalla:** el botón
+    "Más opciones" (descuento, anular líneas, precuenta, movimiento de
+    efectivo) está cableado en backend pero no en la UI; y agregar productos
+    a una orden ya enviada exige abrir una orden nueva — falta un endpoint
+    que sume ítems a una `venta` existente.
 - ✅ 2026-07-28 **Cierre del PDV para alfa** (ADR-016 §5-7, migraciones
   `f2a8c15e94d7` + `a3f0d29b6c81` + `b6d41e07af92`):
   - **Extras** (RN-COM-021): un extra es un `producto_comercial` con

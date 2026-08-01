@@ -55,8 +55,18 @@ def upgrade() -> None:
         sa.Column(
             "idempotency_key", sa.String(length=100), nullable=False, unique=True
         ),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
     )
     op.create_index(
         "ix_movimiento_caja_apertura_caja_id", "movimiento_caja", ["apertura_caja_id"]

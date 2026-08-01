@@ -114,14 +114,22 @@ def _armar_extras(
             raise ReglaNegocio(
                 f"{padre_prod.nombre} no admite el extra {extra_id}"
             )
-        cantidad = Decimal(str(ex.get("cantidad") or 1))
-        if vinculo.maximo is not None and cantidad > vinculo.maximo:
+        # `cantidad` es POR PLATO: "extra queso" en 2 pizzas son 2 porciones.
+        # Se multiplica una sola vez, acá, para que el cobro y el consumo
+        # salgan del mismo número — si se cobrara 1 y se descontaran 2, la
+        # merma aparecería como faltante de inventario todos los días.
+        por_plato = Decimal(str(ex.get("cantidad") or 1))
+        if vinculo.maximo is not None and por_plato > vinculo.maximo:
             raise ReglaNegocio(
                 f"el extra admite hasta {vinculo.maximo} por línea"
             )
         fila, detalle, prod = _armar_item(
             session,
-            {**ex, "cantidad": cantidad, "grupo_cobro": padre.grupo_cobro},
+            {
+                **ex,
+                "cantidad": por_plato * padre.cantidad,
+                "grupo_cobro": padre.grupo_cobro,
+            },
             productos=productos,
             sucursal_id=sucursal_id,
             canal=canal,
@@ -130,9 +138,6 @@ def _armar_extras(
         )
         if not prod.es_extra:
             raise ReglaNegocio(f"{prod.nombre} no está marcado como extra")
-        # El extra se consume tantas veces como el plato que lo lleva: dos
-        # pizzas con extra queso llevan dos porciones de queso.
-        detalle["cantidad"] = str(cantidad * padre.cantidad)
         filas.append(fila)
         detalles.append(detalle)
     return filas, detalles

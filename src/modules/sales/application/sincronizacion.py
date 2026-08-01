@@ -239,10 +239,17 @@ def _items_a_dict(filas: list) -> list[dict]:
             continue
         fila = basico(it)
         if it.id in hijos:
-            # La cantidad del extra se guardó ya multiplicada por el padre;
-            # el replay la vuelve a multiplicar, así que se divide acá.
+            # El extra se guarda con la cantidad TOTAL (por plato × platos),
+            # pero el request la espera POR PLATO y la vuelve a multiplicar.
+            # Sin dividir acá, cada sincronización duplicaría los extras.
             fila["extras"] = [
-                {**basico(h), "cantidad": str(h.cantidad)} for h in hijos[it.id]
+                {
+                    **basico(h),
+                    "cantidad": str(
+                        h.cantidad / it.cantidad if it.cantidad else h.cantidad
+                    ),
+                }
+                for h in hijos[it.id]
             ]
         salida.append(fila)
     return salida

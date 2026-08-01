@@ -261,6 +261,13 @@ class PuntoVentaRepo:
     def get(self, punto_venta_id: uuid.UUID) -> PuntoVenta | None:
         return self.s.get(PuntoVenta, punto_venta_id)
 
+    def de_sucursal(self, sucursal_id: uuid.UUID) -> list[PuntoVenta]:
+        return list(
+            self.s.scalars(
+                select(PuntoVenta).where(PuntoVenta.sucursal_id == sucursal_id)
+            )
+        )
+
 
 class ComprobanteRepo:
     def __init__(self, session: Session) -> None:

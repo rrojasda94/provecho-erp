@@ -5924,6 +5924,59 @@
         "title": "PullOut",
         "type": "object"
       },
+      "PuntoVentaOut": {
+        "properties": {
+          "canal": {
+            "title": "Canal",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "modalidades_habilitadas": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modalidades Habilitadas"
+          },
+          "politica_pago": {
+            "title": "Politica Pago",
+            "type": "string"
+          },
+          "serie_boleta": {
+            "title": "Serie Boleta",
+            "type": "string"
+          },
+          "serie_factura": {
+            "title": "Serie Factura",
+            "type": "string"
+          },
+          "sucursal_id": {
+            "format": "uuid",
+            "title": "Sucursal Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "sucursal_id",
+          "canal",
+          "serie_boleta",
+          "serie_factura",
+          "modalidades_habilitadas",
+          "politica_pago"
+        ],
+        "title": "PuntoVentaOut",
+        "type": "object"
+      },
       "PushIn": {
         "properties": {
           "sales": {
@@ -8060,6 +8113,10 @@
             "title": "Estado Emision",
             "type": "string"
           },
+          "grupo_cobro": {
+            "title": "Grupo Cobro",
+            "type": "integer"
+          },
           "hash_proveedor": {
             "anyOf": [
               {
@@ -8079,6 +8136,28 @@
           "intentos_emision": {
             "title": "Intentos Emision",
             "type": "integer"
+          },
+          "receptor_nombre": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receptor Nombre"
+          },
+          "receptor_num_doc": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receptor Num Doc"
           },
           "serie": {
             "title": "Serie",
@@ -8107,6 +8186,9 @@
           "tipo",
           "serie",
           "correlativo",
+          "grupo_cobro",
+          "receptor_num_doc",
+          "receptor_nombre",
           "estado_emision",
           "hash_proveedor",
           "detalle_emision",
@@ -14658,6 +14740,59 @@
           }
         ],
         "summary": "Vincular Extra",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/puntos-venta": {
+      "get": {
+        "description": "Las cajas de la sucursal. El PDV lo necesita al arrancar: sin saber\nqué punto de venta es, no puede abrir caja ni emitir con la serie\ncorrecta.",
+        "operationId": "listar_puntos_venta_api_v1_sales_puntos_venta_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "sucursal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sucursal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PuntoVentaOut"
+                  },
+                  "title": "Response Listar Puntos Venta Api V1 Sales Puntos Venta Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Puntos Venta",
         "tags": [
           "sales"
         ]

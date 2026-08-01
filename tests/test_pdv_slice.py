@@ -792,8 +792,11 @@ def test_extra_se_vende_como_linea_colgada_de_su_padre(session, base):
     # El extra hereda el grupo de cobro: dividir la cuenta no puede dejar
     # la pizza en una cuenta y su extra en otra.
     assert hijos[0].grupo_cobro == padres[0].grupo_cobro
-    # 2 pizzas a 40 + 1 extra a 5 = 85.
-    assert venta.total == Decimal("85.00")
+    # El extra se pide POR PLATO: 2 pizzas con extra queso son 2 porciones.
+    # 2×40 + 2×5 = 90. Cobrar una sola porción dejaría la segunda como
+    # faltante de inventario.
+    assert hijos[0].cantidad == Decimal(2)
+    assert venta.total == Decimal("90.00")
 
 
 def test_no_se_agrega_un_extra_que_el_producto_no_admite(session, base):
@@ -886,3 +889,40 @@ def test_el_consumo_del_extra_se_multiplica_por_el_plato(session, base):
     items = publicados[-1]["items"]
     assert len(items) == 2, "el extra viaja como consumo propio a inventory"
     assert items[1]["cantidad"] == "3"
+
+
+def test_el_extra_sobrevive_al_ida_y_vuelta_de_sincronizacion(session, base):
+    """El extra se guarda con la cantidad total pero el request la espera
+    por plato. Sin dividir al exportar, cada sincronización duplicaría los
+    extras del local (ADR-009)."""
+    from src.modules.sales.application.sincronizacion import _items_a_dict
+
+    extra = _crear_extra(session, base, "Extra queso", "E007")
+    catalogo_uc.vincular_extra(
+        session, producto_id=base["productos"][0].id, extra_id=extra.id
+    )
+    venta = _crear(
+        session,
+        base,
+        [
+            {
+                **_item(base["productos"][0], cantidad=3, precio="40.00"),
+                "extras": [
+                    {
+                        "producto_comercial_id": extra.id,
+                        "cantidad": Decimal(2),
+                        "precio_unitario": Decimal("5.00"),
+                    }
+                ],
+            }
+        ],
+    )
+    filas = VentaRepo(session).items(venta.id)
+    hijo = next(f for f in filas if f.padre_venta_item_id)
+    assert hijo.cantidad == Decimal(6), "2 porciones × 3 platos"
+
+    exportado = _items_a_dict(filas)
+    assert len(exportado) == 1, "el extra viaja anidado, no como línea suelta"
+    assert Decimal(exportado[0]["extras"][0]["cantidad"]) == Decimal(2), (
+        "se exporta POR PLATO para que el replay no vuelva a multiplicar"
+    )

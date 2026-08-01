@@ -28,7 +28,11 @@ from src.modules.sales.application.errors import (
 )
 from src.modules.sales.application.scope import exigir_venta
 from src.modules.sales.domain import rules
-from src.modules.sales.infrastructure.repositories import ComprobanteRepo, VentaRepo
+from src.modules.sales.infrastructure.repositories import (
+    ComprobanteRepo,
+    PuntoVentaRepo,
+    VentaRepo,
+)
 from src.modules.users.api.deps import get_db, get_tenant, require_permission
 from src.modules.users.application import autorizacion
 from src.modules.users.application.errors import TokenInvalido
@@ -488,6 +492,20 @@ def carta(
         modalidad=modalidad,
         marca_id=marca_id,
     )
+
+
+@router.get("/puntos-venta", response_model=list[schemas.PuntoVentaOut])
+def listar_puntos_venta(
+    sucursal_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Las cajas de la sucursal. El PDV lo necesita al arrancar: sin saber
+    qué punto de venta es, no puede abrir caja ni emitir con la serie
+    correcta."""
+    tenant.exigir_sucursal(sucursal_id)
+    return PuntoVentaRepo(session).de_sucursal(sucursal_id)
 
 
 # --- Mesas del salón --------------------------------------------------------

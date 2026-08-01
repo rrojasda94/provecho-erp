@@ -24,6 +24,23 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Fixed
 
+- **El extra cobraba una porción y descontaba varias** (2026-07-28). La
+  cantidad del extra es **por plato**: dos pizzas con extra queso son dos
+  porciones. El consumo enviado a inventory ya se multiplicaba por el plato,
+  pero la línea cobrada no, así que dos pizzas con extra cobraban S/ 5 y
+  descontaban dos porciones de queso — la diferencia habría aparecido como
+  faltante de inventario todos los días. Ahora se multiplica una sola vez, al
+  armar la línea, y el cobro y el consumo salen del mismo número. El lote de
+  sincronización exporta la cantidad **por plato** para que el replay no la
+  vuelva a multiplicar (ADR-009). Detectado al operar el PDV real contra la
+  API, no por los tests.
+- **`created_at`/`updated_at` sin `server_default` en las tablas nuevas**
+  (2026-07-28): `mesa`, `producto_comercial_extra` y `movimiento_caja` se
+  crearon con las columnas `NOT NULL` pero sin default, mientras el modelo
+  las declara con `server_default=now()`. Los tests no lo veían porque usan
+  `create_all` (que sí aplica el default del modelo); insertar contra la base
+  migrada fallaba con `NotNullViolation`. Es justo el hueco que `alembic
+  check` no cubre: compara tipos y nulabilidad, no defaults.
 - **`json` → `jsonb` en cuatro columnas** (2026-07-28, migración
   `b6d41e07af92`). `acta.participantes`, `boleta_pago.ingresos`,
   `boleta_pago.descuentos` y `comprobante.respuesta_proveedor` se habían creado
@@ -131,6 +148,31 @@ Versionado: [SemVer](https://semver.org/lang/es/).
   puede exceder el efectivo disponible; ingresar no la exige. El cierre suma
   el neto al monto esperado — sin esto, pagarle a un repartidor dejaba el
   cierre descuadrado y la diferencia se le atribuía al cajero (RN-MDP-005).
+- **Frontend del punto de venta** (2026-07-28, `frontend/app/pdv/`). Primera
+  pantalla operativa del PDV contra los endpoints reales: apertura de caja
+  por denominación con firma del encargado, catálogo con extras por producto,
+  ticket con varios pedidos abiertos en paralelo, selección de líneas por
+  pulsación larga, mapa de mesas, cobrados de la jornada, y los diálogos de
+  cliente, tipo de orden y cobro con split de medios.
+  - El pedido **vive en el navegador** hasta enviarlo o cobrarlo: recién ahí
+    nace la `venta` (RN-COM-005). Por eso se pueden tener varios borradores
+    abiertos sin ensuciar la base.
+  - **Proxy `/api/proxy/[...ruta]`**: el navegador llama sin credenciales y
+    Next adjunta el `Authorization` desde la cookie httpOnly. El token nunca
+    llega al JavaScript del cliente. No filtra rutas a propósito — la
+    autorización real la hace la API en cada request (ADR-004), y duplicar
+    esa lista solo crearía un segundo lugar donde olvidarse de actualizarla.
+  - Nuevo `GET /sales/puntos-venta?sucursal_id=`: sin saber qué caja es, el
+    PDV no puede abrir turno ni emitir con la serie correcta.
+  - Nuevo seeder de desarrollo `python -m src.seeders.pdv_demo`: caja, carta
+    con un extra, medios de pago y 12 mesas. `seed.py` deja la organización
+    pero nada que vender.
+  - `comprobante` expone `grupo_cobro`, `receptor_num_doc` y
+    `receptor_nombre`: la pestaña de cobrados los necesita para reimprimir el
+    comprobante correcto de una venta dividida.
+  - La regla `no-unused-vars` de ESLint pasa a la variante de
+    `@typescript-eslint`: la del core no entiende TypeScript y marcaba como
+    no usados los nombres de parámetro en las firmas de tipo.
 - **CI: las migraciones se ejecutan de verdad** (2026-07-28). Los tests corren
   sobre SQLite con `create_all` y nunca ejecutaban una sola migración; un
   `alembic upgrade head` roto se descubría al desplegar. Nuevo job

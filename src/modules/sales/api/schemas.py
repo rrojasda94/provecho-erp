@@ -119,6 +119,17 @@ class PagoOut(BaseModel):
     estado: str
 
 
+class PuntoVentaOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    sucursal_id: uuid.UUID
+    canal: str
+    serie_boleta: str
+    serie_factura: str
+    modalidades_habilitadas: list | None
+    politica_pago: str
+
+
 # --- Mesas del salón --------------------------------------------------------
 class MesaCreate(BaseModel):
     sucursal_id: uuid.UUID
@@ -395,6 +406,11 @@ class ComprobanteOut(BaseModel):
     tipo: str
     serie: str
     correlativo: int
+    # Cuenta que documenta y a quién se emitió: la pestaña de cobrados los
+    # necesita para reimprimir el comprobante correcto de una venta dividida.
+    grupo_cobro: int
+    receptor_num_doc: str | None
+    receptor_nombre: str | None
     estado_emision: str
     hash_proveedor: str | None
     detalle_emision: str | None
