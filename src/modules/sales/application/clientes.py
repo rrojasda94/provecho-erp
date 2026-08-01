@@ -19,6 +19,7 @@ programa. El nombre y los datos siguen viviendo en `persona`, fuente única
 """
 
 import uuid
+from datetime import date
 
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
@@ -60,6 +61,22 @@ def _persona_por_documento(session: Session, numero_documento: str) -> Persona |
     )
 
 
+def _completar_persona(
+    persona: Persona,
+    telefono: str | None,
+    direccion: str | None,
+    fecha_nacimiento: date | None,
+) -> None:
+    """Rellena solo lo que falte: la persona ya existía por otro motivo
+    (trabajador, otro registro) y no se pisa lo que ya dio."""
+    if telefono and not persona.telefono:
+        persona.telefono = telefono
+    if direccion and not persona.domicilio:
+        persona.domicilio = direccion
+    if fecha_nacimiento and not persona.fecha_nacimiento:
+        persona.fecha_nacimiento = fecha_nacimiento
+
+
 def crear_cliente(
     session: Session,
     *,
@@ -69,6 +86,7 @@ def crear_cliente(
     numero_documento: str | None = None,
     email: str | None = None,
     direccion: str | None = None,
+    fecha_nacimiento: date | None = None,
     tipo_documento: str = "dni",
 ) -> Cliente:
     """RUC de 11 dígitos crea un cliente jurídico; el resto, uno natural con
@@ -111,6 +129,7 @@ def crear_cliente(
             telefono=telefono,
             email=email,
             domicilio=direccion,
+            fecha_nacimiento=fecha_nacimiento,
         )
         session.add(persona)
         session.flush()
@@ -118,10 +137,7 @@ def crear_cliente(
         # `persona` es única por documento y la comparten users/rrhh: si ya
         # existe (un trabajador que compra, por ejemplo) se reutiliza en vez
         # de duplicarla, y se completa lo que le falte.
-        if telefono and not persona.telefono:
-            persona.telefono = telefono
-        if direccion and not persona.domicilio:
-            persona.domicilio = direccion
+        _completar_persona(persona, telefono, direccion, fecha_nacimiento)
         existente = repo.por_persona(grupo_id, persona.id)
         if existente is not None:
             raise Conflicto("esa persona ya está registrada como cliente")

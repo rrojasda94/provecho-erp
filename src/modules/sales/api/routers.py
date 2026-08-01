@@ -166,6 +166,22 @@ def ver_venta(
         raise _http(e) from e
 
 
+@router.get("/ventas/{venta_id}/items", response_model=list[schemas.VentaItemOut])
+def ver_items_venta(
+    venta_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Líneas de una venta ya confirmada: reabrir una mesa en curso en el
+    PDV, o elegir qué anular, necesitan verlas con su id real (RN-COM-020)."""
+    try:
+        exigir_venta(session, venta_id, tenant)
+        return ventas.listar_items(session, venta_id)
+    except NoEncontrado as e:
+        raise _http(e) from e
+
+
 @router.post("/ventas/{venta_id}/pagos", response_model=schemas.PagoOut, status_code=201)
 def registrar_pago(
     venta_id: uuid.UUID,
@@ -603,6 +619,7 @@ def crear_cliente(
             telefono=body.telefono,
             email=body.email,
             direccion=body.direccion,
+            fecha_nacimiento=body.fecha_nacimiento,
             tipo_documento=body.tipo_documento,
         )
     except (NoEncontrado, Conflicto, ReglaNegocio) as e:

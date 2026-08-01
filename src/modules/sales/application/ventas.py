@@ -499,6 +499,43 @@ def _cerrar_cuenta(
     return comprobante
 
 
+def listar_items(session: Session, venta_id: uuid.UUID) -> list[dict]:
+    """Líneas de una venta con su nombre resuelto, extras anidados bajo su
+    línea padre — como el cajero las ve, no como se guardan en la tabla."""
+    filas = VentaRepo(session).items(venta_id)
+    productos = ProductoComercialRepo(session)
+    nombre_de = {
+        f.producto_comercial_id: productos.get(f.producto_comercial_id).nombre
+        for f in filas
+    }
+    hijos_de: dict[uuid.UUID, list[VentaItem]] = {}
+    for f in filas:
+        if f.padre_venta_item_id is not None:
+            hijos_de.setdefault(f.padre_venta_item_id, []).append(f)
+    return [
+        {
+            "id": f.id,
+            "producto_comercial_id": f.producto_comercial_id,
+            "nombre": nombre_de[f.producto_comercial_id],
+            "cantidad": f.cantidad,
+            "precio_unitario": f.precio_unitario,
+            "grupo_cobro": f.grupo_cobro,
+            "extras": [
+                {
+                    "id": e.id,
+                    "producto_comercial_id": e.producto_comercial_id,
+                    "nombre": nombre_de[e.producto_comercial_id],
+                    "cantidad": e.cantidad,
+                    "precio_unitario": e.precio_unitario,
+                }
+                for e in hijos_de.get(f.id, [])
+            ],
+        }
+        for f in filas
+        if f.padre_venta_item_id is None
+    ]
+
+
 def anular_lineas(
     session: Session,
     *,

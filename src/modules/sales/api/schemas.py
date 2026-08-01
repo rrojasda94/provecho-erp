@@ -177,6 +177,7 @@ class ClienteCreate(BaseModel):
     numero_documento: str | None = Field(default=None, max_length=11)
     email: str | None = Field(default=None, max_length=255)
     direccion: str | None = Field(default=None, max_length=255)
+    fecha_nacimiento: date | None = None
     tipo_documento: str = "dni"
 
 
@@ -378,8 +379,30 @@ class CartaItemOut(BaseModel):
     id_interno: str
     nombre: str
     categoria_id: uuid.UUID | None
+    categoria_nombre: str | None = None
     precio_unitario: Decimal
     extras: list[ExtraDeCartaOut] = []
+
+
+class VentaItemExtraOut(BaseModel):
+    id: uuid.UUID
+    producto_comercial_id: uuid.UUID
+    nombre: str
+    cantidad: Decimal
+    precio_unitario: Decimal
+
+
+class VentaItemOut(BaseModel):
+    """Línea de una venta ya confirmada, para reabrirla en el PDV (mesa en
+    curso) o para elegir qué anular (RN-COM-020)."""
+
+    id: uuid.UUID
+    producto_comercial_id: uuid.UUID
+    nombre: str
+    cantidad: Decimal
+    precio_unitario: Decimal
+    grupo_cobro: int
+    extras: list[VentaItemExtraOut] = []
 
 
 class ClientePublicoOut(BaseModel):

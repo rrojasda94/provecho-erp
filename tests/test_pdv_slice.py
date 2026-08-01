@@ -519,6 +519,36 @@ def test_dni_crea_cliente_natural_y_reutiliza_la_persona_existente(session, base
     assert otro.persona_id == base["usuario"].persona_id
 
 
+def test_fecha_nacimiento_se_guarda_y_no_se_pisa(session, base):
+    """Cumpleaños del cliente: se guarda al registrar y, si la persona ya
+    existía sin ese dato, se completa sin pisar uno que ya tuviera."""
+    cliente = clientes_uc.crear_cliente(
+        session,
+        grupo_id=base["grupo"].id,
+        nombre="Rosa Delgado",
+        telefono="965478123",
+        fecha_nacimiento=date(1990, 5, 12),
+    )
+    persona = session.get(Persona, cliente.persona_id)
+    assert persona.fecha_nacimiento == date(1990, 5, 12)
+
+    # La cajera de la fixture ya es persona (documento "10000001") y ya
+    # tiene su fecha registrada por otro motivo (p. ej. RRHH): registrarla
+    # como cliente con otra fecha no debe corregirle la que ya tenía.
+    cajera_persona = session.get(Persona, base["usuario"].persona_id)
+    cajera_persona.fecha_nacimiento = date(1985, 3, 20)
+    session.flush()
+    clientes_uc.crear_cliente(
+        session,
+        grupo_id=base["grupo"].id,
+        nombre="Ana Cajera",
+        telefono="988777666",
+        numero_documento="10000001",
+        fecha_nacimiento=date(2000, 1, 1),
+    )
+    assert cajera_persona.fecha_nacimiento == date(1985, 3, 20)
+
+
 def test_solo_con_telefono_se_registra_un_cliente_natural(session, base):
     """El caso que más pasa en mostrador: el cliente no quiere dar su DNI."""
     cliente = clientes_uc.crear_cliente(
@@ -797,6 +827,43 @@ def test_extra_se_vende_como_linea_colgada_de_su_padre(session, base):
     # faltante de inventario.
     assert hijos[0].cantidad == Decimal(2)
     assert venta.total == Decimal("90.00")
+
+
+def test_listar_items_anida_extras_bajo_su_linea(session, base):
+    """Reabrir una mesa en curso o elegir qué anular (RN-COM-020) necesita
+    ver la línea con su nombre y sus extras colgados, no la tabla plana."""
+    extra = _crear_extra(session, base, "Extra queso", "E003")
+    catalogo_uc.vincular_extra(
+        session, producto_id=base["productos"][0].id, extra_id=extra.id, maximo=3
+    )
+    venta = _crear(
+        session,
+        base,
+        [
+            {
+                **_item(base["productos"][0], cantidad=2, precio="40.00"),
+                "extras": [
+                    {
+                        "producto_comercial_id": extra.id,
+                        "cantidad": Decimal(1),
+                        "precio_unitario": Decimal("5.00"),
+                    }
+                ],
+            },
+            _item(base["productos"][1], cantidad=1, precio="15.00"),
+        ],
+    )
+    items = ventas_uc.listar_items(session, venta.id)
+
+    assert len(items) == 2
+    con_extra = next(i for i in items if i["nombre"] == base["productos"][0].nombre)
+    assert con_extra["cantidad"] == Decimal(2)
+    assert len(con_extra["extras"]) == 1
+    assert con_extra["extras"][0]["nombre"] == "Extra queso"
+    assert con_extra["extras"][0]["cantidad"] == Decimal(2)
+
+    sin_extra = next(i for i in items if i["nombre"] == base["productos"][1].nombre)
+    assert sin_extra["extras"] == []
 
 
 def test_no_se_agrega_un_extra_que_el_producto_no_admite(session, base):

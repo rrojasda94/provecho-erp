@@ -9,8 +9,14 @@ import uuid
 from datetime import date
 from decimal import Decimal
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+# `categoria` es la misma tabla a la que `producto_comercial.categoria_id`
+# ya apunta por FK (ver ese modelo): un agrupador genérico por empresa, sin
+# lógica de dominio propia. Leer su nombre acá no es cruzar el dominio de
+# inventory, es seguir la referencia que sales ya tiene.
+from src.modules.inventory.infrastructure.models.categoria import Categoria
 from src.modules.sales.application.errors import (
     Conflicto,
     NoEncontrado,
@@ -160,6 +166,13 @@ def carta(
             continue
 
     por_id = {p.id: p for p in productos}
+    categoria_ids = {p.categoria_id for p in productos if p.categoria_id}
+    nombre_categoria = {
+        c.id: c.nombre
+        for c in session.scalars(
+            select(Categoria).where(Categoria.id.in_(categoria_ids))
+        )
+    }
     items = []
     for producto in productos:
         # Los extras no se listan sueltos: salen dentro del producto que
@@ -187,6 +200,7 @@ def carta(
                 "id_interno": producto.id_interno,
                 "nombre": producto.nombre,
                 "categoria_id": producto.categoria_id,
+                "categoria_nombre": nombre_categoria.get(producto.categoria_id),
                 "precio_unitario": precio_de[producto.id],
                 "extras": extras,
             }

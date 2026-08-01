@@ -205,6 +205,18 @@
             "title": "Cantidad",
             "type": "string"
           },
+          "conteo_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conteo Id"
+          },
           "dentro_margen": {
             "title": "Dentro Margen",
             "type": "boolean"
@@ -240,6 +252,7 @@
           "cantidad",
           "motivo",
           "estado",
+          "conteo_id",
           "solicitado_por",
           "aprobado_por",
           "dentro_margen"
@@ -1372,6 +1385,17 @@
             ],
             "title": "Categoria Id"
           },
+          "categoria_nombre": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Categoria Nombre"
+          },
           "extras": {
             "default": [],
             "items": {
@@ -1435,6 +1459,17 @@
             ],
             "title": "Empresa Id"
           },
+          "frecuencia_conteo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frecuencia Conteo"
+          },
           "nombre": {
             "maxLength": 100,
             "minLength": 1,
@@ -1455,6 +1490,17 @@
             "title": "Empresa Id",
             "type": "string"
           },
+          "frecuencia_conteo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frecuencia Conteo"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
@@ -1468,9 +1514,57 @@
         "required": [
           "id",
           "empresa_id",
-          "nombre"
+          "nombre",
+          "frecuencia_conteo"
         ],
         "title": "CategoriaOut",
+        "type": "object"
+      },
+      "CategoriaUpdate": {
+        "properties": {
+          "asiento_contable_config": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asiento Contable Config"
+          },
+          "frecuencia_conteo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frecuencia Conteo"
+          },
+          "nombre": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nombre"
+          },
+          "quitar_frecuencia": {
+            "default": false,
+            "title": "Quitar Frecuencia",
+            "type": "boolean"
+          }
+        },
+        "title": "CategoriaUpdate",
         "type": "object"
       },
       "CerrarCajaIn": {
@@ -1736,6 +1830,18 @@
               }
             ],
             "title": "Email"
+          },
+          "fecha_nacimiento": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Nacimiento"
           },
           "nombre": {
             "maxLength": 255,
@@ -2134,6 +2240,347 @@
           "costo_unitario"
         ],
         "title": "ConsumoItemIn",
+        "type": "object"
+      },
+      "ConteoCantidad": {
+        "properties": {
+          "cantidad": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Cantidad"
+          },
+          "sku_id": {
+            "format": "uuid",
+            "title": "Sku Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sku_id",
+          "cantidad"
+        ],
+        "title": "ConteoCantidad",
+        "type": "object"
+      },
+      "ConteoCantidades": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ConteoCantidad"
+            },
+            "minItems": 1,
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "ConteoCantidades",
+        "type": "object"
+      },
+      "ConteoCierreOut": {
+        "properties": {
+          "ajustes": {
+            "items": {
+              "$ref": "#/components/schemas/AjusteOut"
+            },
+            "title": "Ajustes",
+            "type": "array"
+          },
+          "conteo": {
+            "$ref": "#/components/schemas/ConteoOut"
+          }
+        },
+        "required": [
+          "conteo",
+          "ajustes"
+        ],
+        "title": "ConteoCierreOut",
+        "type": "object"
+      },
+      "ConteoCreate": {
+        "properties": {
+          "almacen_id": {
+            "format": "uuid",
+            "title": "Almacen Id",
+            "type": "string"
+          },
+          "categoria_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Categoria Id"
+          },
+          "observacion": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observacion"
+          },
+          "tipo": {
+            "default": "rutina",
+            "title": "Tipo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "almacen_id"
+        ],
+        "title": "ConteoCreate",
+        "type": "object"
+      },
+      "ConteoDetalleOut": {
+        "properties": {
+          "abierto_por": {
+            "format": "uuid",
+            "title": "Abierto Por",
+            "type": "string"
+          },
+          "almacen_id": {
+            "format": "uuid",
+            "title": "Almacen Id",
+            "type": "string"
+          },
+          "categoria_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Categoria Id"
+          },
+          "cerrado_por": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cerrado Por"
+          },
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          },
+          "fecha_programada": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Programada"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ConteoItemOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "observacion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observacion"
+          },
+          "tipo": {
+            "title": "Tipo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "almacen_id",
+          "categoria_id",
+          "tipo",
+          "estado",
+          "fecha_programada",
+          "abierto_por",
+          "cerrado_por",
+          "observacion",
+          "items"
+        ],
+        "title": "ConteoDetalleOut",
+        "type": "object"
+      },
+      "ConteoItemOut": {
+        "properties": {
+          "cantidad_contada": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cantidad Contada"
+          },
+          "cantidad_sistema": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cantidad Sistema"
+          },
+          "diferencia": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diferencia"
+          },
+          "sku_id": {
+            "format": "uuid",
+            "title": "Sku Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sku_id",
+          "cantidad_contada"
+        ],
+        "title": "ConteoItemOut",
+        "type": "object"
+      },
+      "ConteoOut": {
+        "properties": {
+          "abierto_por": {
+            "format": "uuid",
+            "title": "Abierto Por",
+            "type": "string"
+          },
+          "almacen_id": {
+            "format": "uuid",
+            "title": "Almacen Id",
+            "type": "string"
+          },
+          "categoria_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Categoria Id"
+          },
+          "cerrado_por": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cerrado Por"
+          },
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          },
+          "fecha_programada": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Programada"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "observacion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observacion"
+          },
+          "tipo": {
+            "title": "Tipo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "almacen_id",
+          "categoria_id",
+          "tipo",
+          "estado",
+          "fecha_programada",
+          "abierto_por",
+          "cerrado_por",
+          "observacion"
+        ],
+        "title": "ConteoOut",
         "type": "object"
       },
       "ContratoLaboralCreate": {
@@ -5648,6 +6095,65 @@
         "title": "ProductoUpdate",
         "type": "object"
       },
+      "ProgramaConteoOut": {
+        "properties": {
+          "almacen_id": {
+            "format": "uuid",
+            "title": "Almacen Id",
+            "type": "string"
+          },
+          "categoria": {
+            "title": "Categoria",
+            "type": "string"
+          },
+          "categoria_id": {
+            "format": "uuid",
+            "title": "Categoria Id",
+            "type": "string"
+          },
+          "dias_atraso": {
+            "title": "Dias Atraso",
+            "type": "integer"
+          },
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          },
+          "frecuencia": {
+            "title": "Frecuencia",
+            "type": "string"
+          },
+          "proxima_fecha": {
+            "format": "date",
+            "title": "Proxima Fecha",
+            "type": "string"
+          },
+          "ultimo_conteo": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ultimo Conteo"
+          }
+        },
+        "required": [
+          "almacen_id",
+          "categoria_id",
+          "categoria",
+          "frecuencia",
+          "ultimo_conteo",
+          "proxima_fecha",
+          "estado",
+          "dias_atraso"
+        ],
+        "title": "ProgramaConteoOut",
+        "type": "object"
+      },
       "ProveedorCreate": {
         "properties": {
           "afecto_igv": {
@@ -7576,6 +8082,43 @@
         "title": "VentaCreate",
         "type": "object"
       },
+      "VentaItemExtraOut": {
+        "properties": {
+          "cantidad": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Cantidad",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "precio_unitario": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Precio Unitario",
+            "type": "string"
+          },
+          "producto_comercial_id": {
+            "format": "uuid",
+            "title": "Producto Comercial Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "producto_comercial_id",
+          "nombre",
+          "cantidad",
+          "precio_unitario"
+        ],
+        "title": "VentaItemExtraOut",
+        "type": "object"
+      },
       "VentaItemIn": {
         "properties": {
           "cantidad": {
@@ -7616,6 +8159,57 @@
           "cantidad"
         ],
         "title": "VentaItemIn",
+        "type": "object"
+      },
+      "VentaItemOut": {
+        "description": "Línea de una venta ya confirmada, para reabrirla en el PDV (mesa en\ncurso) o para elegir qué anular (RN-COM-020).",
+        "properties": {
+          "cantidad": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Cantidad",
+            "type": "string"
+          },
+          "extras": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/VentaItemExtraOut"
+            },
+            "title": "Extras",
+            "type": "array"
+          },
+          "grupo_cobro": {
+            "title": "Grupo Cobro",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "precio_unitario": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Precio Unitario",
+            "type": "string"
+          },
+          "producto_comercial_id": {
+            "format": "uuid",
+            "title": "Producto Comercial Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "producto_comercial_id",
+          "nombre",
+          "cantidad",
+          "precio_unitario",
+          "grupo_cobro"
+        ],
+        "title": "VentaItemOut",
         "type": "object"
       },
       "VentaItemSyncIn": {
@@ -9970,6 +10564,387 @@
           }
         ],
         "summary": "Crear Categoria",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/categorias/{categoria_id}": {
+      "patch": {
+        "description": "Acá se configura cada cuánto se cuenta la categoría (RN-INV-007).",
+        "operationId": "editar_categoria_api_v1_inventory_categorias__categoria_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "categoria_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Categoria Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CategoriaUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoriaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Editar Categoria",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/conteos": {
+      "post": {
+        "operationId": "abrir_conteo_api_v1_inventory_conteos_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConteoCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConteoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Abrir Conteo",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/conteos/programa": {
+      "get": {
+        "description": "Calendario derivado del último conteo cerrado + la frecuencia de cada\ncategoría (RN-INV-007). Los vencidos salen primero.",
+        "operationId": "programa_conteos_api_v1_inventory_conteos_programa_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "almacen_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Almacen Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ProgramaConteoOut"
+                  },
+                  "title": "Response Programa Conteos Api V1 Inventory Conteos Programa Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Programa Conteos",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/conteos/verificar-vencidos": {
+      "post": {
+        "description": "Reporta a almacén y gerencia lo que no se contó en su fecha\n(RN-INV-021): publica `inventory.conteo_vencido` por cada uno.",
+        "operationId": "verificar_conteos_vencidos_api_v1_inventory_conteos_verificar_vencidos_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "almacen_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Almacen Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ProgramaConteoOut"
+                  },
+                  "title": "Response Verificar Conteos Vencidos Api V1 Inventory Conteos Verificar Vencidos Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Verificar Conteos Vencidos",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/conteos/{conteo_id}": {
+      "get": {
+        "description": "Conteo \"a ciegas\" por defecto: el stock esperado y la diferencia solo\nviajan a quien tiene `inventory.ver_stock_esperado` (RN-INV-005).",
+        "operationId": "ver_conteo_api_v1_inventory_conteos__conteo_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conteo_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Conteo Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConteoDetalleOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Ver Conteo",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/conteos/{conteo_id}/cantidades": {
+      "post": {
+        "operationId": "registrar_cantidades_api_v1_inventory_conteos__conteo_id__cantidades_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conteo_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Conteo Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConteoCantidades"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConteoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Registrar Cantidades",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/conteos/{conteo_id}/cerrar": {
+      "post": {
+        "description": "Cierra y solicita un ajuste por cada diferencia. No mueve stock: los\najustes nacen `pendiente` y los aprueba otro usuario (RN-INV-006).",
+        "operationId": "cerrar_conteo_api_v1_inventory_conteos__conteo_id__cerrar_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conteo_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Conteo Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConteoCierreOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Cerrar Conteo",
         "tags": [
           "inventory"
         ]
@@ -15234,6 +16209,59 @@
           }
         ],
         "summary": "Registrar Entrega",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/ventas/{venta_id}/items": {
+      "get": {
+        "description": "Líneas de una venta ya confirmada: reabrir una mesa en curso en el\nPDV, o elegir qué anular, necesitan verlas con su id real (RN-COM-020).",
+        "operationId": "ver_items_venta_api_v1_sales_ventas__venta_id__items_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "venta_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Venta Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/VentaItemOut"
+                  },
+                  "title": "Response Ver Items Venta Api V1 Sales Ventas  Venta Id  Items Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Ver Items Venta",
         "tags": [
           "sales"
         ]
