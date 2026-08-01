@@ -29,10 +29,20 @@ class Persona(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin, VersionedMixin
 
     nombres: Mapped[str] = mapped_column(String(100))
     apellidos: Mapped[str] = mapped_column(String(100))
-    tipo_documento: Mapped[str] = mapped_column(
-        Enum("dni", "ce", "pasaporte", name="tipo_documento", native_enum=False)
+    # Documento OPCIONAL desde 2026-07-28 (ADR-016): un cliente de mostrador
+    # o delivery no siempre quiere darlo, y el teléfono alcanza para
+    # identificarlo y volverle a vender. Se completa después sin problema.
+    # Trabajador y usuario SÍ lo exigen — esa validación vive en sus casos
+    # de uso (`users.application.admin`), no en el esquema, porque `persona`
+    # es compartida y no todos sus roles tienen la misma exigencia.
+    # El UNIQUE se conserva: un índice único admite varios NULL.
+    tipo_documento: Mapped[str | None] = mapped_column(
+        Enum("dni", "ce", "pasaporte", name="tipo_documento", native_enum=False),
+        nullable=True,
     )
-    numero_documento: Mapped[str] = mapped_column(String(20), unique=True)
+    numero_documento: Mapped[str | None] = mapped_column(
+        String(20), unique=True, nullable=True
+    )
     fecha_nacimiento: Mapped[date | None] = mapped_column(Date, nullable=True)
     domicilio: Mapped[str | None] = mapped_column(String(255), nullable=True)
     telefono: Mapped[str | None] = mapped_column(String(20), nullable=True)

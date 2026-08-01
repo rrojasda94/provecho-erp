@@ -368,6 +368,37 @@
         "title": "AnonimizarPersonaIn",
         "type": "object"
       },
+      "AnularLineasCreate": {
+        "description": "Quitar líneas de una orden ya enviada a cocina. `autorizacion` es el\ntoken de `POST /auth/autorizar`: es inventario que se repone, lo\nautoriza un supervisor (RN-COM-020).",
+        "properties": {
+          "autorizacion": {
+            "title": "Autorizacion",
+            "type": "string"
+          },
+          "motivo": {
+            "maxLength": 120,
+            "minLength": 3,
+            "title": "Motivo",
+            "type": "string"
+          },
+          "venta_item_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Venta Item Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "venta_item_ids",
+          "motivo",
+          "autorizacion"
+        ],
+        "title": "AnularLineasCreate",
+        "type": "object"
+      },
       "AperturaCajaOut": {
         "properties": {
           "cajero_id": {
@@ -1053,6 +1084,54 @@
         "title": "AsistenciaOut",
         "type": "object"
       },
+      "AutorizacionIn": {
+        "description": "El supervisor se identifica en el terminal del cajero para autorizar\nUNA acción (RN-AUD-005). No abre sesión: no sirve para llamar a\ncualquier endpoint ni se refresca.",
+        "properties": {
+          "permiso": {
+            "title": "Permiso",
+            "type": "string"
+          },
+          "pin": {
+            "title": "Pin",
+            "type": "string"
+          },
+          "username": {
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "username",
+          "pin",
+          "permiso"
+        ],
+        "title": "AutorizacionIn",
+        "type": "object"
+      },
+      "AutorizacionOut": {
+        "properties": {
+          "autorizacion": {
+            "title": "Autorizacion",
+            "type": "string"
+          },
+          "autorizado_por": {
+            "format": "uuid",
+            "title": "Autorizado Por",
+            "type": "string"
+          },
+          "expira_en_minutos": {
+            "title": "Expira En Minutos",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "autorizacion",
+          "autorizado_por",
+          "expira_en_minutos"
+        ],
+        "title": "AutorizacionOut",
+        "type": "object"
+      },
       "AvanceOut": {
         "properties": {
           "estado_pedido": {
@@ -1292,6 +1371,14 @@
               }
             ],
             "title": "Categoria Id"
+          },
+          "extras": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ExtraDeCartaOut"
+            },
+            "title": "Extras",
+            "type": "array"
           },
           "id_interno": {
             "title": "Id Interno",
@@ -1555,6 +1642,218 @@
           "created_at"
         ],
         "title": "CierreCajaOut",
+        "type": "object"
+      },
+      "ClienteBuscadoOut": {
+        "description": "Lo que el PDV necesita para pintar un resultado de búsqueda.",
+        "properties": {
+          "direccion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direccion"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "identificado": {
+            "title": "Identificado",
+            "type": "boolean"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "numero_documento": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Numero Documento"
+          },
+          "telefono": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Telefono"
+          },
+          "tipo": {
+            "title": "Tipo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "tipo",
+          "nombre",
+          "telefono",
+          "numero_documento",
+          "direccion",
+          "identificado"
+        ],
+        "title": "ClienteBuscadoOut",
+        "type": "object"
+      },
+      "ClienteCreate": {
+        "description": "El tipo lo decide el documento: 11 dígitos crea cliente jurídico con\nRUC; el resto, uno natural con su persona.\n\nEl documento es **opcional** para una persona natural — mucha gente no\nlo da en el mostrador — pero entonces el **teléfono es obligatorio**,\nporque algo tiene que servir para encontrarla después (RN-PTS-002). Para\nfacturar a una empresa el RUC sí es obligatorio.",
+        "properties": {
+          "direccion": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direccion"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "nombre": {
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Nombre",
+            "type": "string"
+          },
+          "numero_documento": {
+            "anyOf": [
+              {
+                "maxLength": 11,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Numero Documento"
+          },
+          "telefono": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Telefono"
+          },
+          "tipo_documento": {
+            "default": "dni",
+            "title": "Tipo Documento",
+            "type": "string"
+          }
+        },
+        "required": [
+          "nombre"
+        ],
+        "title": "ClienteCreate",
+        "type": "object"
+      },
+      "ClienteDocumentoUpdate": {
+        "description": "Completar el documento de un cliente registrado solo por teléfono.",
+        "properties": {
+          "numero_documento": {
+            "maxLength": 11,
+            "minLength": 8,
+            "title": "Numero Documento",
+            "type": "string"
+          },
+          "tipo_documento": {
+            "default": "dni",
+            "title": "Tipo Documento",
+            "type": "string"
+          }
+        },
+        "required": [
+          "numero_documento"
+        ],
+        "title": "ClienteDocumentoUpdate",
+        "type": "object"
+      },
+      "ClienteOut": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "persona_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Persona Id"
+          },
+          "razon_social": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Razon Social"
+          },
+          "ruc": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ruc"
+          },
+          "tipo": {
+            "title": "Tipo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "tipo",
+          "razon_social",
+          "ruc",
+          "persona_id"
+        ],
+        "title": "ClienteOut",
         "type": "object"
       },
       "ClientePublicoOut": {
@@ -2135,6 +2434,58 @@
         "title": "DashboardResumenOut",
         "type": "object"
       },
+      "DescuentoCreate": {
+        "description": "`modo=None` quita el descuento. Motivo y autorizador son obligatorios\nal aplicarlo: el reporte de descuentos necesita saber por qué y quién.\n\n`autorizacion` es el token que devuelve `POST /auth/autorizar` cuando el\nsupervisor teclea su PIN en el terminal del cajero. **Quién autorizó sale\nde ahí, nunca del cuerpo**: un id suelto en el request sería una firma\nfalsificable y el reporte de descuentos dejaría de valer (RN-AUD-005).",
+        "properties": {
+          "autorizacion": {
+            "title": "Autorizacion",
+            "type": "string"
+          },
+          "modo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modo"
+          },
+          "motivo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Motivo"
+          },
+          "valor": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valor"
+          }
+        },
+        "required": [
+          "autorizacion"
+        ],
+        "title": "DescuentoCreate",
+        "type": "object"
+      },
       "EjecutarPagoIn": {
         "properties": {
           "constancia": {
@@ -2214,6 +2565,72 @@
           "detalle"
         ],
         "title": "ErrorSyncOut",
+        "type": "object"
+      },
+      "ExtraDeCartaOut": {
+        "description": "Extra ofrecible sobre un producto, con su precio ya resuelto para\neste ámbito (RN-COM-021).",
+        "properties": {
+          "maximo": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maximo"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "precio_unitario": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Precio Unitario",
+            "type": "string"
+          },
+          "producto_comercial_id": {
+            "format": "uuid",
+            "title": "Producto Comercial Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "producto_comercial_id",
+          "nombre",
+          "precio_unitario",
+          "maximo"
+        ],
+        "title": "ExtraDeCartaOut",
+        "type": "object"
+      },
+      "ExtraIn": {
+        "properties": {
+          "cantidad": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "default": "1",
+            "title": "Cantidad"
+          },
+          "producto_comercial_id": {
+            "format": "uuid",
+            "title": "Producto Comercial Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "producto_comercial_id"
+        ],
+        "title": "ExtraIn",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -2988,6 +3405,300 @@
         "title": "MemorandumOut",
         "type": "object"
       },
+      "MesaCreate": {
+        "properties": {
+          "capacidad": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capacidad"
+          },
+          "numero": {
+            "minimum": 1.0,
+            "title": "Numero",
+            "type": "integer"
+          },
+          "sucursal_id": {
+            "format": "uuid",
+            "title": "Sucursal Id",
+            "type": "string"
+          },
+          "zona": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zona"
+          }
+        },
+        "required": [
+          "sucursal_id",
+          "numero"
+        ],
+        "title": "MesaCreate",
+        "type": "object"
+      },
+      "MesaEnMapaOut": {
+        "description": "Una mesa y la orden abierta que tenga. `venta_id=None` = libre.",
+        "properties": {
+          "capacidad": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capacidad"
+          },
+          "comensales": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comensales"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "numero": {
+            "title": "Numero",
+            "type": "integer"
+          },
+          "numero_orden": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Numero Orden"
+          },
+          "total": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total",
+            "type": "string"
+          },
+          "venta_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Venta Id"
+          },
+          "zona": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zona"
+          }
+        },
+        "required": [
+          "id",
+          "numero",
+          "zona",
+          "capacidad",
+          "venta_id",
+          "numero_orden",
+          "comensales",
+          "total"
+        ],
+        "title": "MesaEnMapaOut",
+        "type": "object"
+      },
+      "MesaOut": {
+        "properties": {
+          "activa": {
+            "title": "Activa",
+            "type": "boolean"
+          },
+          "capacidad": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capacidad"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "numero": {
+            "title": "Numero",
+            "type": "integer"
+          },
+          "sucursal_id": {
+            "format": "uuid",
+            "title": "Sucursal Id",
+            "type": "string"
+          },
+          "zona": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zona"
+          }
+        },
+        "required": [
+          "id",
+          "sucursal_id",
+          "numero",
+          "zona",
+          "capacidad",
+          "activa"
+        ],
+        "title": "MesaOut",
+        "type": "object"
+      },
+      "MovimientoCajaIn": {
+        "description": "Ingreso o retiro de efectivo del cajón durante el turno (RN-MDP-007).\n\n`autorizacion` es el token de `POST /auth/autorizar` y solo hace falta\npara retirar: meter plata al cajón no es la operación de la que hay que\ndesconfiar.",
+        "properties": {
+          "autorizacion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Autorizacion"
+          },
+          "idempotency_key": {
+            "maxLength": 100,
+            "minLength": 8,
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "monto": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Monto"
+          },
+          "motivo": {
+            "maxLength": 120,
+            "minLength": 3,
+            "title": "Motivo",
+            "type": "string"
+          },
+          "tipo": {
+            "pattern": "^(ingreso|retiro)$",
+            "title": "Tipo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tipo",
+          "monto",
+          "motivo",
+          "idempotency_key"
+        ],
+        "title": "MovimientoCajaIn",
+        "type": "object"
+      },
+      "MovimientoCajaOut": {
+        "properties": {
+          "apertura_caja_id": {
+            "format": "uuid",
+            "title": "Apertura Caja Id",
+            "type": "string"
+          },
+          "autorizado_por": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Autorizado Por"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "monto": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Monto",
+            "type": "string"
+          },
+          "motivo": {
+            "title": "Motivo",
+            "type": "string"
+          },
+          "registrado_por": {
+            "format": "uuid",
+            "title": "Registrado Por",
+            "type": "string"
+          },
+          "tipo": {
+            "title": "Tipo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "apertura_caja_id",
+          "tipo",
+          "monto",
+          "motivo",
+          "registrado_por",
+          "autorizado_por"
+        ],
+        "title": "MovimientoCajaOut",
+        "type": "object"
+      },
       "MovimientoCreate": {
         "properties": {
           "almacen_id": {
@@ -3624,6 +4335,12 @@
       },
       "PagoCreate": {
         "properties": {
+          "grupo_cobro": {
+            "default": 1,
+            "minimum": 1.0,
+            "title": "Grupo Cobro",
+            "type": "integer"
+          },
           "id": {
             "anyOf": [
               {
@@ -3660,6 +4377,30 @@
             ],
             "title": "Monto"
           },
+          "receptor_nombre": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receptor Nombre"
+          },
+          "receptor_num_doc": {
+            "anyOf": [
+              {
+                "maxLength": 11,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receptor Num Doc"
+          },
           "referencia_externa": {
             "anyOf": [
               {
@@ -3685,6 +4426,10 @@
           "estado": {
             "title": "Estado",
             "type": "string"
+          },
+          "grupo_cobro": {
+            "title": "Grupo Cobro",
+            "type": "integer"
           },
           "id": {
             "format": "uuid",
@@ -3712,6 +4457,7 @@
           "venta_id",
           "medio_pago_id",
           "monto",
+          "grupo_cobro",
           "estado"
         ],
         "title": "PagoOut",
@@ -3799,6 +4545,12 @@
       },
       "PagoSyncIn": {
         "properties": {
+          "grupo_cobro": {
+            "default": 1,
+            "minimum": 1.0,
+            "title": "Grupo Cobro",
+            "type": "integer"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
@@ -4694,6 +5446,43 @@
         "title": "PrecioOut",
         "type": "object"
       },
+      "PrecuentaOut": {
+        "properties": {
+          "grupo_cobro": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grupo Cobro"
+          },
+          "texto": {
+            "title": "Texto",
+            "type": "string"
+          },
+          "total": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total",
+            "type": "string"
+          },
+          "venta_id": {
+            "format": "uuid",
+            "title": "Venta Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "venta_id",
+          "grupo_cobro",
+          "total",
+          "texto"
+        ],
+        "title": "PrecuentaOut",
+        "type": "object"
+      },
       "ProductoCreate": {
         "properties": {
           "empaque_id": {
@@ -4707,6 +5496,11 @@
               }
             ],
             "title": "Empaque Id"
+          },
+          "es_extra": {
+            "default": false,
+            "title": "Es Extra",
+            "type": "boolean"
           },
           "id_interno": {
             "maxLength": 4,
@@ -4758,6 +5552,11 @@
         "properties": {
           "activo": {
             "title": "Activo",
+            "type": "boolean"
+          },
+          "es_extra": {
+            "default": false,
+            "title": "Es Extra",
             "type": "boolean"
           },
           "id": {
@@ -6636,6 +7435,18 @@
             ],
             "title": "Cliente Id"
           },
+          "comensales": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comensales"
+          },
           "id": {
             "anyOf": [
               {
@@ -6661,6 +7472,18 @@
             "minItems": 1,
             "title": "Items",
             "type": "array"
+          },
+          "mesa_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mesa Id"
           },
           "modalidad": {
             "title": "Modalidad",
@@ -6715,6 +7538,20 @@
             ],
             "title": "Cantidad"
           },
+          "extras": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ExtraIn"
+            },
+            "title": "Extras",
+            "type": "array"
+          },
+          "grupo_cobro": {
+            "default": 1,
+            "minimum": 1.0,
+            "title": "Grupo Cobro",
+            "type": "integer"
+          },
           "producto_comercial_id": {
             "format": "uuid",
             "title": "Producto Comercial Id",
@@ -6757,6 +7594,20 @@
             "default": "0",
             "title": "Descuento"
           },
+          "extras": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/VentaItemSyncIn"
+            },
+            "title": "Extras",
+            "type": "array"
+          },
+          "grupo_cobro": {
+            "default": 1,
+            "minimum": 1.0,
+            "title": "Grupo Cobro",
+            "type": "integer"
+          },
           "precio_unitario": {
             "anyOf": [
               {
@@ -6790,6 +7641,51 @@
             "title": "Canal",
             "type": "string"
           },
+          "comensales": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comensales"
+          },
+          "descuento_modo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descuento Modo"
+          },
+          "descuento_motivo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descuento Motivo"
+          },
+          "descuento_valor": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descuento Valor"
+          },
           "estado": {
             "title": "Estado",
             "type": "string"
@@ -6803,6 +7699,18 @@
             "format": "uuid",
             "title": "Id",
             "type": "string"
+          },
+          "mesa_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mesa Id"
           },
           "modalidad": {
             "title": "Modalidad",
@@ -6867,6 +7775,67 @@
             ],
             "title": "Cliente Id"
           },
+          "comensales": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comensales"
+          },
+          "descuento_autorizado_por": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descuento Autorizado Por"
+          },
+          "descuento_modo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descuento Modo"
+          },
+          "descuento_motivo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descuento Motivo"
+          },
+          "descuento_valor": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descuento Valor"
+          },
           "estado": {
             "title": "Estado",
             "type": "string"
@@ -6894,6 +7863,18 @@
             "minItems": 1,
             "title": "Items",
             "type": "array"
+          },
+          "mesa_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mesa Id"
           },
           "modalidad": {
             "title": "Modalidad",
@@ -6971,6 +7952,33 @@
           "total"
         ],
         "title": "VentasHoyOut",
+        "type": "object"
+      },
+      "VincularExtraCreate": {
+        "description": "Habilita un extra sobre un producto. `maximo` es el tope de unidades\ndel extra en una misma línea; NULL = sin tope.",
+        "properties": {
+          "extra_id": {
+            "format": "uuid",
+            "title": "Extra Id",
+            "type": "string"
+          },
+          "maximo": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maximo"
+          }
+        },
+        "required": [
+          "extra_id"
+        ],
+        "title": "VincularExtraCreate",
         "type": "object"
       },
       "src__modules__purchases__api__schemas__ComprobanteOut": {
@@ -7563,6 +8571,115 @@
           }
         ],
         "summary": "Cerrar Caja",
+        "tags": [
+          "accounting"
+        ]
+      }
+    },
+    "/api/v1/accounting/cajas/apertura/{apertura_caja_id}/movimientos": {
+      "get": {
+        "operationId": "listar_movimientos_caja_api_v1_accounting_cajas_apertura__apertura_caja_id__movimientos_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "apertura_caja_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Apertura Caja Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MovimientoCajaOut"
+                  },
+                  "title": "Response Listar Movimientos Caja Api V1 Accounting Cajas Apertura  Apertura Caja Id  Movimientos Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Movimientos Caja",
+        "tags": [
+          "accounting"
+        ]
+      },
+      "post": {
+        "description": "Ingreso o retiro de efectivo del cajón durante el turno (RN-MDP-007).\n\n**Retirar exige autorización de supervisor** con su PIN (el token de\n`POST /auth/autorizar`); ingresar no, porque meter plata al cajón no es\nla operación de la que hay que desconfiar.",
+        "operationId": "registrar_movimiento_caja_api_v1_accounting_cajas_apertura__apertura_caja_id__movimientos_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "apertura_caja_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Apertura Caja Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MovimientoCajaIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MovimientoCajaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Registrar Movimiento Caja",
         "tags": [
           "accounting"
         ]
@@ -8161,6 +9278,48 @@
         "summary": "Crear Regla Asiento",
         "tags": [
           "accounting"
+        ]
+      }
+    },
+    "/api/v1/auth/autorizar": {
+      "post": {
+        "description": "Elevación puntual de supervisor sobre el terminal de otro: verifica\nsu PIN **y** que tenga el permiso, y devuelve un token de corta vida\nacotado a esa acción (RN-AUD-005).\n\nVa detrás del mismo rate limit que el login: es un endpoint que recibe\nPINes y sin freno sería el camino cómodo para probarlos.",
+        "operationId": "autorizar_api_v1_auth_autorizar_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AutorizacionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutorizacionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Autorizar",
+        "tags": [
+          "auth"
         ]
       }
     },
@@ -12600,6 +13759,162 @@
         "tags": [
           "sales"
         ]
+      },
+      "post": {
+        "description": "Alta rápida desde el PDV. Registrar es opcional: vender a cliente\nanónimo sigue siendo válido (RN-PER-005). Para una persona natural basta\nel teléfono; para facturar a una empresa el RUC es obligatorio\n(RN-PTS-002).",
+        "operationId": "crear_cliente_api_v1_sales_clientes_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClienteCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClienteOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Cliente",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/clientes/buscar": {
+      "get": {
+        "description": "Búsqueda de caja: por teléfono, documento o nombre — lo que el\ncliente recuerde. Distinta de `GET /clientes`, que es el listado para\nanálisis externo y usa otro permiso.",
+        "operationId": "buscar_clientes_api_v1_sales_clientes_buscar_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "title": "Q",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ClienteBuscadoOut"
+                  },
+                  "title": "Response Buscar Clientes Api V1 Sales Clientes Buscar Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Buscar Clientes",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/clientes/{cliente_id}/documento": {
+      "patch": {
+        "description": "Completa el documento de un cliente que se registró solo por\nteléfono. Desde ese momento cuenta como identificado para promociones\n(RN-PTS-002).",
+        "operationId": "actualizar_documento_cliente_api_v1_sales_clientes__cliente_id__documento_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "cliente_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Cliente Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClienteDocumentoUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClienteOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Actualizar Documento Cliente",
+        "tags": [
+          "sales"
+        ]
       }
     },
     "/api/v1/sales/comprobantes/{comprobante_id}/reintentar": {
@@ -12916,6 +14231,220 @@
         ]
       }
     },
+    "/api/v1/sales/mesas": {
+      "get": {
+        "operationId": "listar_mesas_api_v1_sales_mesas_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "sucursal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sucursal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MesaOut"
+                  },
+                  "title": "Response Listar Mesas Api V1 Sales Mesas Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Mesas",
+        "tags": [
+          "sales"
+        ]
+      },
+      "post": {
+        "operationId": "crear_mesa_api_v1_sales_mesas_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MesaCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MesaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Mesa",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/mesas/mapa": {
+      "get": {
+        "description": "Estado del salón: qué mesa está ocupada, con qué orden y por cuánto.\nDerivado de las ventas en `orden` — la mesa no guarda estado propio.",
+        "operationId": "mapa_de_mesas_api_v1_sales_mesas_mapa_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "sucursal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sucursal Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "fecha",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Fecha"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MesaEnMapaOut"
+                  },
+                  "title": "Response Mapa De Mesas Api V1 Sales Mesas Mapa Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Mapa De Mesas",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/mesas/{mesa_id}/desactivar": {
+      "post": {
+        "operationId": "desactivar_mesa_api_v1_sales_mesas__mesa_id__desactivar_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "mesa_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Mesa Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MesaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Desactivar Mesa",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
     "/api/v1/sales/productos": {
       "get": {
         "operationId": "listar_productos_api_v1_sales_productos_get",
@@ -13077,7 +14606,148 @@
         ]
       }
     },
+    "/api/v1/sales/productos/{producto_id}/extras": {
+      "post": {
+        "description": "Habilita un extra sobre un producto. Ambas puntas son\n`producto_comercial`: el extra es uno con `es_extra=True` y su propia\nreceta, que se suma a la del producto al agregarse (RN-COM-021).",
+        "operationId": "vincular_extra_api_v1_sales_productos__producto_id__extras_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "producto_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Producto Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VincularExtraCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Vincular Extra",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
     "/api/v1/sales/ventas": {
+      "get": {
+        "description": "Jornada de una sucursal. Alimenta la pestaña de cobrados del PDV:\nverificar lo vendido y reimprimir un comprobante que el cliente perdió.",
+        "operationId": "listar_ventas_del_dia_api_v1_sales_ventas_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "sucursal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sucursal Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "fecha",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Fecha"
+            }
+          },
+          {
+            "in": "query",
+            "name": "estado",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Estado"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/VentaOut"
+                  },
+                  "title": "Response Listar Ventas Del Dia Api V1 Sales Ventas Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Ventas Del Dia",
+        "tags": [
+          "sales"
+        ]
+      },
       "post": {
         "operationId": "crear_venta_api_v1_sales_ventas_post",
         "requestBody": {
@@ -13219,6 +14889,65 @@
         ]
       }
     },
+    "/api/v1/sales/ventas/{venta_id}/anular-lineas": {
+      "post": {
+        "description": "Quita líneas de una orden ya enviada a cocina y repone su insumo.\nLo pide el cajero, lo autoriza un supervisor con su PIN (RN-COM-020).\nAntes de enviar, el pedido vive en el PDV y no pasa por acá.",
+        "operationId": "anular_lineas_api_v1_sales_ventas__venta_id__anular_lineas_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "venta_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Venta Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnularLineasCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VentaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Anular Lineas",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
     "/api/v1/sales/ventas/{venta_id}/comprobante": {
       "get": {
         "operationId": "ver_comprobante_api_v1_sales_ventas__venta_id__comprobante_get",
@@ -13262,6 +14991,65 @@
           }
         ],
         "summary": "Ver Comprobante",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/ventas/{venta_id}/descuento": {
+      "post": {
+        "description": "Lo **pide** el cajero (permiso `sales.cobrar`) y lo **autoriza** un\nsupervisor con su PIN en el mismo terminal: la elevación de\n`POST /auth/autorizar` viaja en `autorizacion` y de ahí sale\n`autorizado_por` (RN-COM-017, RN-AUD-005).",
+        "operationId": "aplicar_descuento_api_v1_sales_ventas__venta_id__descuento_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "venta_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Venta Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DescuentoCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VentaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Aplicar Descuento",
         "tags": [
           "sales"
         ]
@@ -13369,6 +15157,71 @@
           }
         ],
         "summary": "Registrar Pago",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/ventas/{venta_id}/precuenta": {
+      "get": {
+        "description": "Documento **no fiscal** para que el cliente revise su consumo antes\nde pagar (RN-COM-019). No cambia el estado de la venta ni se audita:\npedirla dos veces es normal.",
+        "operationId": "ver_precuenta_api_v1_sales_ventas__venta_id__precuenta_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "venta_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Venta Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "grupo_cobro",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Grupo Cobro"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrecuentaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Ver Precuenta",
         "tags": [
           "sales"
         ]

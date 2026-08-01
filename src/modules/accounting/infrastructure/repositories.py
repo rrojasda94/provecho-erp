@@ -9,6 +9,7 @@ repositorio solo encapsula queries."""
 from __future__ import annotations
 
 import uuid
+from decimal import Decimal
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -20,6 +21,7 @@ from src.modules.accounting.infrastructure.models import (
     AsientoLinea,
     CierreCaja,
     CuentaContable,
+    MovimientoCaja,
     MovimientoDinero,
     PeriodoContable,
     ReglaAsiento,
@@ -221,6 +223,38 @@ class AperturaCajaRepo:
         self.s.add(apertura)
         self.s.flush()
         return apertura
+
+
+class MovimientoCajaRepo:
+    def __init__(self, session: Session) -> None:
+        self.s = session
+
+    def get_by_idempotency(self, key: str) -> MovimientoCaja | None:
+        return self.s.scalar(
+            select(MovimientoCaja).where(MovimientoCaja.idempotency_key == key)
+        )
+
+    def de_apertura(self, apertura_caja_id: uuid.UUID) -> list[MovimientoCaja]:
+        return list(
+            self.s.scalars(
+                select(MovimientoCaja)
+                .where(MovimientoCaja.apertura_caja_id == apertura_caja_id)
+                .order_by(MovimientoCaja.created_at)
+            )
+        )
+
+    def neto(self, apertura_caja_id: uuid.UUID) -> Decimal:
+        """Ingresos menos retiros. Es lo que hay que sumarle al esperado del
+        cierre para que cuadre contra el cajón real."""
+        total = Decimal(0)
+        for mov in self.de_apertura(apertura_caja_id):
+            total += mov.monto if mov.tipo == "ingreso" else -mov.monto
+        return total
+
+    def add(self, movimiento: MovimientoCaja) -> MovimientoCaja:
+        self.s.add(movimiento)
+        self.s.flush()
+        return movimiento
 
 
 class CierreCajaRepo:

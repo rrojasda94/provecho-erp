@@ -5,6 +5,139 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
+### Security
+
+- **Autorización de supervisor por PIN** (2026-07-28, RN-AUD-005, ADR-016 §6).
+  Corrige un defecto introducido el mismo día: `POST /sales/ventas/{id}/descuento`
+  recibía `autorizado_por` como UUID **en el cuerpo del request, sin validar**,
+  mientras el permiso se comprobaba contra el token de quien llamaba — el cajero
+  no podía ejecutarlo y el campo de auditoría era falsificable.
+  Nuevo `POST /api/v1/auth/autorizar`: verifica usuario + PIN **y** que tenga el
+  permiso, y devuelve un JWT de 3 minutos con `typ=autorizacion` acotado a esa
+  acción. Un access token normal no sirve como autorización (si sirviera, el
+  cajero se autorizaría con su propia sesión); una elevación obtenida para
+  descontar no vale para anular. Va detrás del mismo rate limit que el login y
+  devuelve el mismo error tenga o no el permiso, para no revelar qué PIN es
+  válido ni quién es supervisor. Deja rastro en `audit_log` y en el log de
+  seguridad. Lo exigen descuento de orden, anulación de líneas enviadas y
+  retiro de efectivo.
+
+### Fixed
+
+- **`json` → `jsonb` en cuatro columnas** (2026-07-28, migración
+  `b6d41e07af92`). `acta.participantes`, `boleta_pago.ingresos`,
+  `boleta_pago.descuentos` y `comprobante.respuesta_proveedor` se habían creado
+  con `sa.JSON()` genérico en vez del `JsonB` que declaran los modelos, y en
+  Postgres quedaron como `json` mientras las otras 19 columnas JSON del esquema
+  son `jsonb`. `json` guarda el texto literal y **no admite los operadores ni
+  los índices GIN de `jsonb`**. Detectado al agregar `alembic check` al CI.
+- **Índices y constraints declarados solo en la migración** (2026-07-28): los
+  índices de `mesa`, `movimiento_caja`, `venta_item.padre_venta_item_id` y
+  `comprobante(venta_id, grupo_cobro)`, y los nombres de las constraints únicas
+  de `mesa` y `producto_comercial_extra`, existían en la migración pero no en
+  los modelos. Un `create_all` (tests) no los creaba. Ahora coinciden y
+  `alembic check` pasa limpio.
+
+### Added
+
+- **Slice PDV: mesa tipada, cobro dividido, receptor en caja y descuento de
+  orden** (2026-07-28, ADR-016, migración `d7e3b8c14f52`). Cierra los cuatro
+  huecos que el diseño del punto de venta destapó y el modelo no daba:
+  - **`mesa`** (`sucursal_id`, `numero` único por sucursal, `zona`,
+    `capacidad`, `activa`) + `venta.mesa_id` / `venta.comensales`. El salón
+    deja de vivir en el texto libre de `venta.referencia_atencion`, que se
+    conserva para takeout/delivery. `GET /sales/mesas/mapa` devuelve la
+    ocupación **derivada** de las ventas en `orden` — la mesa no guarda
+    estado propio. Permiso `sales.gestionar_mesas`.
+  - **`grupo_cobro`** (entero, default 1) en `venta_item`, `pago` y
+    `comprobante` (RN-COM-018): una orden se divide en cuentas, cada una con
+    sus pagos, su receptor y **su propio comprobante**. La venta pasa a
+    `pagada` recién cuando ninguna cuenta queda con saldo. `venta_id` deja
+    de identificar un único comprobante: usar `por_venta_y_grupo` /
+    `todos_de_venta`.
+  - **`comprobante.receptor_num_doc` / `receptor_nombre`** (RN-CPP-003): el
+    DNI o RUC que el cajero teclea al cobrar, sin exigir cliente registrado.
+    11 dígitos → factura; 8, `00000000` o vacío → boleta. Un documento a
+    medio teclear se rechaza en el dominio, no en SUNAT.
+  - **Descuento manual de orden** en `venta` (`descuento_modo`,
+    `descuento_valor`, `descuento_motivo`, `descuento_autorizado_por`,
+    RN-COM-017), `POST /sales/ventas/{id}/descuento`, permiso
+    `sales.aplicar_descuento` separado de `sales.cobrar` para que el cajero
+    no se autorice a sí mismo. Se prorratea entre grupos de cobro y baja a
+    las líneas al emitir. Publica `sales.descuento_aplicado`.
+  - **Cliente identificado por teléfono** (migración `e1c4a9d6b038`):
+    `persona.numero_documento` y `tipo_documento` pasan a **nullable** — el
+    UNIQUE se conserva porque admite varios NULL. Registrar a una persona
+    natural exige **teléfono, no DNI** (RN-PTS-004): mucha gente no lo da en
+    el mostrador y negarse a registrarla perdía la venta y su historial. El
+    documento se completa después con
+    `PATCH /sales/clientes/{id}/documento`. Para **facturar a una empresa el
+    RUC sigue siendo obligatorio**. Un cliente sin documento o con el
+    genérico `00000000` **no cuenta como identificado** y queda fuera de las
+    promociones para clientes registrados (RN-PTS-005) — regla derivada
+    `rules.cliente_identificado`, no una columna. `00000000` se persiste como
+    `NULL`: es "sin documento", no un documento, y guardarlo literal haría
+    chocar al segundo anónimo contra el UNIQUE. **Trabajador y usuario
+    siguen exigiendo documento** — esa validación vive en
+    `users.application.admin`, no en el esquema.
+  - **`POST /sales/clientes`**: alta desde caja. El documento decide el tipo
+    (RUC → jurídico; el resto → natural con su `persona`, reutilizándola si
+    ya existe). Antes solo había `GET /sales/clientes`.
+  - **`GET /sales/clientes/buscar?q=`**: búsqueda de caja por teléfono,
+    documento o nombre (RN-PTS-006), separada del listado de análisis
+    externo, que usa otro permiso.
+  - **`GET /sales/ventas`**: jornada por sucursal, base de la pestaña de
+    cobrados del PDV.
+  - Replay del hub (ADR-009) transporta los campos nuevos; los lotes viejos
+    siguen entrando (`grupo_cobro` asume 1, el resto es opcional).
+  - Migración sin backfill: todo lo agregado es nullable o con
+    `server_default`. La clave de idempotencia del grupo 1 sigue siendo
+    `venta:{id}`. 24 casos nuevos en `tests/test_pdv_slice.py`, incluidos
+    los de compatibilidad hacia atrás. `docs/architecture/openapi.json`
+    regenerado.
+
+  **No incluye promociones.** El descuento manual es un acto humano
+  autorizado; las promociones condicionales por marca/sucursal necesitan un
+  motor de reglas que sigue pendiente (ver ADR-016 → «Frontera explícita» y
+  `ROADMAP.md`).
+
+- **Extras de producto** (2026-07-28, RN-COM-021, migración `f2a8c15e94d7`).
+  Un extra (extra queso, doble carne) **es un `producto_comercial`** con
+  `es_extra=True` y su propia receta, que se ejecuta en la sucursal y se suma
+  a la del producto al agregarse. Modelarlo así en vez de como entidad aparte
+  le da gratis precio server-side por lista, aparición en la carta y descuento
+  de insumos por el mismo `sales.venta_confirmada`. Lo propio son
+  `producto_comercial_extra` (qué producto admite qué extra, con tope por
+  línea) y `venta_item.padre_venta_item_id` (de qué línea cuelga). El extra
+  **hereda el grupo de cobro del padre** — dividir la cuenta no puede dejar la
+  pizza en una cuenta y su extra en otra — y su consumo se multiplica por el
+  plato: tres pizzas con extra queso descuentan tres porciones. `GET /carta`
+  devuelve los extras dentro de cada producto; los extras no salen sueltos.
+  Nuevo `POST /sales/productos/{id}/extras`.
+- **Anular líneas de una orden ya enviada** (2026-07-28, RN-COM-020):
+  `POST /sales/ventas/{id}/anular-lineas` con autorización de supervisor y
+  motivo obligatorio. Publica `sales.lineas_anuladas` → inventory repone lo
+  que ya no se prepara (mismo listener que `venta_anulada`). Quitar todas
+  anula la orden. Antes de enviar a cocina el pedido vive en el PDV y no toca
+  el servidor.
+- **Precuenta** (2026-07-28, RN-COM-019): `GET /sales/ventas/{id}/precuenta`,
+  documento **no fiscal** para que el cliente revise su consumo antes de
+  pagar, opcionalmente por cuenta. Sin serie ni correlativo, no cambia el
+  estado de la venta y no se audita: pedirla dos veces es normal.
+- **Movimiento de efectivo en caja** (2026-07-28, RN-MDP-007, migración
+  `a3f0d29b6c81`): `movimiento_caja` por apertura, con motivo obligatorio.
+  `POST` y `GET /accounting/cajas/apertura/{id}/movimientos`. **Retirar exige
+  autorización de supervisor** (permiso nuevo `accounting.caja_retirar`) y no
+  puede exceder el efectivo disponible; ingresar no la exige. El cierre suma
+  el neto al monto esperado — sin esto, pagarle a un repartidor dejaba el
+  cierre descuadrado y la diferencia se le atribuía al cajero (RN-MDP-005).
+- **CI: las migraciones se ejecutan de verdad** (2026-07-28). Los tests corren
+  sobre SQLite con `create_all` y nunca ejecutaban una sola migración; un
+  `alembic upgrade head` roto se descubría al desplegar. Nuevo job
+  `migraciones` con un Postgres real: `upgrade head` sobre base vacía,
+  `downgrade base`, volver a subir, y `alembic check` para que un modelo sin
+  migración no pase. Verificado localmente contra Postgres 16.
+
 ### Changed
 
 - **ADR-013 revisado — shadcn/ui en vez de Base UI directo** (2026-07-27):

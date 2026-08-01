@@ -62,6 +62,11 @@ PERMISOS = [
     ("sales.anular", "Anular orden no pagada"),
     ("sales.gestionar_catalogo", "CRUD de productos comerciales y medios de pago"),
     ("sales.emitir_comprobante", "Reintentar la emisión de un comprobante a SUNAT"),
+    (
+        "sales.aplicar_descuento",
+        "Autorizar un descuento manual sobre una orden (RN-COM-017)",
+    ),
+    ("sales.gestionar_mesas", "Configurar las mesas del salón de una sucursal"),
     ("kds.configurar", "Crear y configurar pantallas KDS"),
     ("kds.operar", "Operar KDS: cola, avance de ítems, comanda"),
     (
@@ -103,6 +108,10 @@ PERMISOS = [
     ("accounting.pago_aprobar", "Aprobar pagos a proveedor sobre el umbral"),
     ("accounting.caja_operar", "Abrir y cerrar caja (PROC-CTB-001/002)"),
     ("accounting.arqueo_registrar", "Registrar arqueo de caja (sorpresa o programado)"),
+    (
+        "accounting.caja_retirar",
+        "Autorizar el retiro de efectivo del cajón durante el turno (RN-MDP-007)",
+    ),
     ("dashboard.leer", "Consultar el dashboard gerencial (ventas, stock, caja)"),
     ("gerencia.gestionar_reglas_aprobacion", "Administrar la matriz de aprobaciones"),
     (
@@ -138,6 +147,10 @@ ROLES = {
         "sales.gestionar_catalogo",
         "sales.emitir_comprobante",
         "sales.entregar_pedido",
+        # El descuento y el salón los autoriza el supervisor, nunca el
+        # cajero que lo pide (RN-COM-017).
+        "sales.aplicar_descuento",
+        "sales.gestionar_mesas",
         "kds.configurar",
         "kds.operar",
         "inventory.leer",
@@ -146,6 +159,7 @@ ROLES = {
         "sales.leer_clientes_externos",
         "accounting.pago_aprobar",
         "accounting.arqueo_registrar",
+        "accounting.caja_retirar",
         "dashboard.leer",
         "rrhh.leer",
         "rrhh.permiso_aprobar",

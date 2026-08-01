@@ -138,7 +138,14 @@ erDiagram
 ```
 
 - **persona**: nombres, apellidos, tipo_documento (`dni` | `ce` |
-  `pasaporte`), numero_documento (único), fecha_nacimiento, domicilio,
+  `pasaporte`, **nullable** desde 2026-07-28), numero_documento (único,
+  **nullable** desde 2026-07-28 — migración `e1c4a9d6b038`, ADR-016: para
+  registrar a un cliente de mostrador basta el teléfono, RN-PTS-004; el
+  UNIQUE se conserva porque un índice único admite varios NULL. **Trabajador
+  y usuario siguen exigiéndolo** — esa validación vive en
+  `users.application.admin`, no en el esquema, porque `persona` es
+  compartida y no todos sus roles tienen la misma exigencia),
+  fecha_nacimiento, domicilio,
   contacto (teléfono/email), `version` (lock optimista — cada `UPDATE`
   exige la `version` vigente; si no coincide, 409, en vez de pisar en
   silencio el cambio de otro editor concurrente). **Fuente única de datos
@@ -503,16 +510,45 @@ Solicitud.
   El avance de cumplimiento NO es estado de `venta`: vive por ítem en
   `venta_item.estado_preparacion` — `PROC-OPE-002`, ver
   [state-machines.md](../domain/state-machines.md#cumplimiento-de-pedido)),
-  total,
+  total (lo que el cliente debe pagar: ya lleva descontado el descuento
+  manual de la orden),
   idempotency_key, repartidor_externo_plataforma (nullable — `rappi` |
   `ubereats` | `pedidosya`... si el delivery lo hizo un rider de
   plataforma externa, sin vínculo laboral ni gestión como Vehículo/
-  Mantenimiento propio, RN-PER-003).
+  Mantenimiento propio, RN-PER-003), referencia_atencion (texto libre para
+  takeout/delivery: "Carlos", "Rappi #1042" — para `modalidad=mesa` el dato
+  tipado es `mesa_id`), **mesa_id** (nullable, solo si modalidad=mesa),
+  **comensales** (nullable), y el descuento manual de la orden (ADR-016):
+  **descuento_modo** (`porcentaje` | `monto`), **descuento_valor**,
+  **descuento_motivo** (`cortesia` | `reclamo` | `colaborador` |
+  `promocion` | `convenio`), **descuento_autorizado_por** (usuario_id del
+  supervisor — RN-COM-017; el permiso `sales.aplicar_descuento` está
+  separado de `sales.cobrar` para que el cajero no se autorice a sí mismo).
+- **mesa** (ADR-016): sucursal_id, numero (único por sucursal), zona
+  (`Salón`, `Terraza`, `Barra`... libre), capacidad (nullable), activa.
+  Vive en `sales` y no en `users` porque quien le da sentido es la toma de
+  pedido. **No guarda estado de ocupación**: una mesa está ocupada si tiene
+  una venta en `orden`; el mapa del salón es una lectura derivada, nunca un
+  campo. Dos fuentes de verdad para el mismo hecho se desincronizan apenas
+  alguien cobre desde otra caja.
+- **producto_comercial_extra** (ADR-016): producto_comercial_id, extra_id
+  (también un `producto_comercial`, con `es_extra=True`), maximo (tope de
+  unidades del extra en una línea, NULL = sin tope). Define qué extra admite
+  cada producto (RN-COM-021). Sin esta tabla nada impediría agregarle
+  "extra queso" a una gaseosa.
 - **venta_item**: producto_comercial_id, cantidad, precio unitario,
-  descuento, estado_preparacion (`pendiente` | `en_preparacion` | `listo` |
-  `entregado` — avance de `PROC-OPE-002`, fuente única del progreso del
-  pedido; `updated_at` de cada transición es la base para medir tiempos de
-  preparación y de despacho, RN-CUP-002/003).
+  descuento (monto por línea que sale de listas promocionales — distinto
+  del descuento manual de `venta`), **padre_venta_item_id** (nullable,
+  auto-FK — línea de la que cuelga un extra; NULL en una línea normal.
+  El extra es línea propia y no columna del padre porque tiene su propia
+  receta, su propio precio de lista y su propio avance en cocina; aplanarlo
+  perdería las tres cosas), **grupo_cobro** (entero, default 1 —
+  cuenta a la que pertenece la línea cuando el pedido se divide entre
+  varios pagadores, RN-COM-018/ADR-016), estado_preparacion (`pendiente` |
+  `en_preparacion` | `listo` | `entregado` — avance de `PROC-OPE-002`,
+  fuente única del progreso del pedido; `updated_at` de cada transición es
+  la base para medir tiempos de preparación y de despacho,
+  RN-CUP-002/003).
 - **entrega** (pendiente de slice — rama delivery de `PROC-OPE-002`):
   venta_id (único: una entrega por venta, RN-CUP-005), entregado_por
   (usuario_id de quien registra), fecha_entrega,
@@ -535,7 +571,10 @@ Solicitud.
 - **pago**: venta_id, medio_pago_id, monto (obligatorio — una venta puede
   cobrarse con varios `pago`, confirmado 2026-07-20 como caso real del
   negocio, no solo capacidad técnica; suma de `pago.monto` debe igualar
-  `venta.total` antes de `estado=pagada`, RN-COM-016), pasarela (izipay),
+  `venta.total` antes de `estado=pagada`, RN-COM-016), **grupo_cobro**
+  (entero, default 1 — los pagos de un grupo suman contra el total de ESE
+  grupo, no de la venta entera; la venta pasa a `pagada` recién cuando
+  ningún grupo queda con saldo, RN-COM-018/ADR-016), pasarela (izipay),
   referencia externa, idempotency_key (obligatoria al registrar pago,
   RN-COM-002), estado.
 - **custodia_efectivo**: apertura_caja_id, monto, responsable_actual_id,
@@ -558,6 +597,16 @@ Solicitud.
   → contabilidad, cada uno autenticado con usuario+PIN, timestamps),
   custodia (`local_caja_fuerte` | `traslado_contabilidad`, RN-MDP-006),
   estado. Irregularidades notifican a contabilidad, gerencia y RRHH.
+- **movimiento_caja** (ADR-016): apertura_caja_id, tipo (`ingreso` |
+  `retiro`), monto (siempre positivo — el signo lo da `tipo`; guardar
+  negativos invita a sumar mal), motivo (obligatorio: un movimiento sin
+  motivo es indistinguible de un faltante), registrado_por, autorizado_por
+  (NULL en ingresos; **retirar exige supervisor**, RN-MDP-007),
+  idempotency_key. Ingreso o retiro de efectivo del cajón **durante el
+  turno** (pagar al repartidor, comprar hielo). Su neto entra al
+  `monto_esperado` del cierre; sin él, todo descuadre se le atribuye al
+  cajero. Distinto de `movimiento_dinero`, que es tesorería (pagos a
+  proveedor desde banco): esto es el efectivo físico de UNA apertura.
 - **arqueo**: punto_venta_id, tipo (`sorpresa` | `programado`),
   realizado_por, monto_esperado, monto_contado, diferencia, acta_id.
   Verificación puntual de caja fuera del ciclo apertura/cierre.
@@ -599,6 +648,16 @@ Solicitud.
   `contrato_credito`, RN-CPP-003), idempotency_key (anti-duplicado/
   reemisión, RN-CPP-008), estado de emisión, hash e intentos del
   proveedor, respuesta (JSONB). Ver ADR-005 (Factiliza).
+  **grupo_cobro** (entero, default 1) y **receptor_num_doc** /
+  **receptor_nombre** (ADR-016): `venta_id` dejó de identificar un único
+  comprobante — una venta dividida emite uno por grupo. El código que
+  asumía «un comprobante por venta» debe usar `por_venta_y_grupo` o
+  `todos_de_venta`; `por_venta` devuelve el primero. El receptor es el
+  DNI/RUC que el cajero teclea al cobrar: cuando viene informado gana sobre
+  `venta.cliente_id` al armar el envío a SUNAT, y su largo decide el tipo
+  (11 dígitos = factura; 8, `00000000` o vacío = boleta, RN-CPP-003). La
+  clave de idempotencia del grupo 1 sigue siendo `venta:{id}`, para que los
+  comprobantes anteriores a este cambio resuelvan igual.
 - **cliente**: grupo_id (transversal al grupo, no a una empresa —
   RN-PTS-001), tipo (`natural` | `juridico` — ej. cliente corporativo:
   catering/eventos), persona_id (si `natural`) o razon_social + ruc (si
@@ -608,7 +667,17 @@ Solicitud.
   Central de Pedidos — esas ventas enrutan al mismo `cliente` por sus
   datos, sin login). Si natural, nombre y documento se leen de `persona`
   — no se duplican (RN-GEN-007). `cliente_id` es opcional en `venta` —
-  cliente anónimo es un caso válido (RN-PER-005). Lectura para análisis
+  cliente anónimo es un caso válido (RN-PER-005).
+  **Alta desde caja** (`POST /sales/clientes`, 2026-07-28): para una
+  persona natural basta el **teléfono**, el documento se completa después
+  (`PATCH /sales/clientes/{id}/documento`); para facturar a una empresa el
+  **RUC es obligatorio** (RN-PTS-004). Un cliente sin documento o con el
+  genérico `00000000` **no cuenta como identificado** y queda fuera de las
+  promociones para clientes registrados (RN-PTS-005) — condición derivada
+  (`rules.cliente_identificado`), no una columna. Búsqueda de caja por
+  teléfono, documento o nombre: `GET /sales/clientes/buscar?q=`
+  (RN-PTS-006), distinta del listado de análisis externo. Una persona es
+  cliente a lo más una vez por grupo. Lectura para análisis
   cross-módulo (marketing/comercial) vía el contrato público
   `sales/application/queries_publicas.py::listar_clientes_para_analisis`
   (`GET /api/v1/sales/clientes`, permiso `sales.leer_clientes_externos`) —

@@ -19,7 +19,7 @@ Registro de lo construido y lo pendiente. Actualizar en cada cambio relevante.
 | Seeders (admin / PIN 123456, org base) | ✅ 2026-07-27 | `src/seeders/seed.py` (idempotente, prohibido en prod): matriz de roles/permisos semilla, `admin`/PIN `123456` y la **organización real** del grupo — empresa Majambo EIRL (RUC 20450311520, Jr. Ramón Castilla 248 - Tarapoto, zona `amazonia_ley27037`), marca Charlie's Pizzas **licenciada** a la empresa (`licencia_marca`), sucursales `CH1` (Jr. Ramón Castilla 248) y `CH2` (Jr. Lamas 299) activas y alquiladas (RN-IMP-004), almacén central `WH1` (`sucursal_id` NULL). Requirió `almacen.direccion` (migración `e5a1c93b7d40`): el central no cuelga de ninguna sucursal y no había dónde guardar su ubicación. Correr: `python -m src.seeders.seed`. Diferido: almacenes de sucursal de CH1/CH2 (no pedidos; su mín./máx. por SKU depende de datos de operación inexistentes) y CRUD de organización por API — hoy empresa/sucursal/almacén solo se crean por seeder. |
 | Módulo `inventory` | 🔶 slices 1-2 ✅ 2026-07-27 | **Slice 1**: catálogo (CRUD artículos/categorías/SKUs), stock por almacén (vía `movimiento_inventario` inmutable) y ajuste con segregación (`solicitar_ajuste` ≠ `aprobar_ajuste`, aprobador ≠ solicitante). Migración `be914c92a94b`. **Slice 2 — lote/FEFO** (2026-07-27, ADR-015): `lote` + `stock_lote`, control **opcional por artículo** (`articulo.controla_lote` — el queso sí, las servilletas no). La salida reparte por FEFO (vence antes, sale antes; sin vencimiento va al final → FIFO) y genera **un movimiento por lote tomado**, con `lote_id` explícito como override. El lote vencido se bloquea cuando el picking lo toca y publica `inventory.lote_vencido_detectado`; `POST /lotes/bloquear-vencidos` hace el barrido a demanda. La recepción de compra transporta el lote y vencimiento del proveedor (RN-VNC-002) y producción crea el suyo. Nada entra sin lote si el artículo lo controla: un ingreso sin lote cae en el lote del día. `POST /movimientos` pasa a devolver **lista** de movimientos. El hub replica `lote`/`stock_lote` (ADR-009, 28 recursos). Migración `c9a2f4e18b60`. Tests: `tests/test_lotes.py`. Diferido: reservas, conteo, transferencias, devolución, guía remisión, `stock_merma`. |
 | Módulo `purchases` | 🔶 slice core ✅ 2026-07-25 | CRUD de proveedores (natural liga a `persona`, jurídico con RUC propio) y ciclo de OC tipo `insumo` (crear → emitir → recibir → anular), con idempotencia y umbral de aprobación configurable. `purchases.compra_recibida` → inventory suma stock y recalcula `costo_promedio`. Conformidad de comprobante (`purchases.dar_conformidad`) registra el `comprobante` recibido y dispara `purchases.comprobante_conforme` → cola de pago en `accounting`. Migración `4ff85f833b29` aplicada. Diferido: ver Deuda técnica. |
-| Módulo `sales` (PDV) | 🔶 slices 1-3 ✅ 2026-07-27 | Venta con correlativo+idempotencia → `sales.venta_confirmada` → inventory descuenta por receta (+merma+empaque); cobro con pagos parciales → `pagada`; anulación pre-pago repone stock; CRUD productos/medios de pago. **KDS** (slice 2): pantallas configurables por sucursal y categorías (`kds_pantalla`, migración `7672566bf189`), avance por ítem en `venta_item.estado_preparacion` (fuente única → todas las pantallas ven el avance real), tipos preparación/despacho, comanda imprimible con contador de reimpresiones, evento `sales.pedido_listo`, rol `cocinero`. Kiosk/Central de Pedidos = clientes del mismo contrato, no módulos. **Cumplimiento de pedido** (slice 3, 2026-07-27): `PROC-OPE-002` definido como UN proceso (área Operaciones) y su etapa de entrega implementada — `POST /sales/ventas/{id}/entrega` con permiso propio `sales.entregar_pedido` y rol `despachador`, idempotente, publica `sales.venta_entregada` (disparador de la encuesta de marketing, RN-COM-007). Diferido: ver Deuda técnica. |
+| Módulo `sales` (PDV) | 🔶 slices 1-3 ✅ 2026-07-27 | Venta con correlativo+idempotencia → `sales.venta_confirmada` → inventory descuenta por receta (+merma+empaque); cobro con pagos parciales → `pagada`; anulación pre-pago repone stock; CRUD productos/medios de pago. **KDS** (slice 2): pantallas configurables por sucursal y categorías (`kds_pantalla`, migración `7672566bf189`), avance por ítem en `venta_item.estado_preparacion` (fuente única → todas las pantallas ven el avance real), tipos preparación/despacho, comanda imprimible con contador de reimpresiones, evento `sales.pedido_listo`, rol `cocinero`. Kiosk/Central de Pedidos = clientes del mismo contrato, no módulos. **Cumplimiento de pedido** (slice 3, 2026-07-27): `PROC-OPE-002` definido como UN proceso (área Operaciones) y su etapa de entrega implementada — `POST /sales/ventas/{id}/entrega` con permiso propio `sales.entregar_pedido` y rol `despachador`, idempotente, publica `sales.venta_entregada` (disparador de la encuesta de marketing, RN-COM-007). **Slice PDV** (slice 4, 2026-07-28, ADR-016, migración `d7e3b8c14f52`): `mesa` tipada por sucursal + mapa de salón derivado; `grupo_cobro` para dividir la cuenta y emitir un comprobante por pagador (RN-COM-018); receptor tecleado en caja que decide boleta/factura sin cliente registrado (RN-CPP-003); descuento manual de orden con motivo y autorizador (RN-COM-017, permiso propio). Suma `POST /sales/clientes` y `GET /sales/ventas`. Diferido: ver Deuda técnica. |
 | Persona CRUD + lock optimista + matriz de aprobaciones + contrato público | ✅ 2026-07-25 | `POST/GET/PATCH /api/v1/personas` (sin Delete); `persona.version` con lock optimista (409 si desactualizada); `regla_aprobacion` (nuevo, `src/shared/`) reemplaza el umbral fijo de `purchases` por empresa, admin en `/api/v1/reglas-aprobacion`; primer contrato público de lectura cross-módulo (`sales.cliente` para marketing/comercial, `GET /api/v1/sales/clientes`). Migración `af8a246e2c25`. Ver detalle abajo. |
 | Módulo `accounting` | 🔶 slice core+tesorería ✅ 2026-07-25 | Libro contable núcleo: plan de cuentas (`cuenta_contable`), periodo (`periodo_contable`, abrir/cerrar), asiento manual (`asiento`/`asiento_linea`, cuadre RN-CTB-001, anulación por asiento inverso RN-CTB-002) y mapeo configurable evento→cuentas (`regla_asiento`) que alimenta la generación automática para 4 eventos operativos ya publicados en código (`purchases.oc_emitida`, `purchases.compra_recibida`, `sales.venta_confirmada`, `purchases.comprobante_conforme`). **Pago a proveedor** (PROC-CTB-003, `movimiento_dinero`): cola idempotente por comprobante (RN-CTB-008) → ejecutar con umbral configurable + permiso (RN-CTB-005) → asiento automático. Migraciones `5402d99333fa`+`cbf904a9fc1b` aplicadas. Diferido: ver Deuda técnica. |
 | Producción (fabricación) | 🔶 slice core ✅ 2026-07-25 | Orden de producción ad-hoc (crear → registrar consumo → completar con resultado de control de calidad) y costeo automático. Construido antes de tiempo a pedido del usuario — primera cocina real sigue planeada 2027. `receta.articulo_id` nuevo liga receta↔subreceta. Diferido: ver Deuda técnica. |
@@ -454,6 +454,64 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   `bajo_minimo` derivado en la consulta de stock).
 
 ### Módulo sales (slices siguientes)
+- ✅ 2026-07-28 **Slice PDV** (ADR-016, migración `d7e3b8c14f52`): cierra
+  los cuatro huecos que destapó el diseño del punto de venta —
+  `mesa` tipada por sucursal + `venta.mesa_id`/`comensales` con mapa de
+  salón derivado (`GET /sales/mesas/mapa`, permiso `sales.gestionar_mesas`);
+  `grupo_cobro` en `venta_item`/`pago`/`comprobante` para dividir la cuenta
+  y emitir un comprobante por pagador (RN-COM-018);
+  `comprobante.receptor_num_doc`/`receptor_nombre` para el DNI/RUC tecleado
+  en caja, que decide boleta o factura sin exigir cliente registrado
+  (RN-CPP-003); descuento manual de orden con motivo y autorizador
+  (RN-COM-017, permiso `sales.aplicar_descuento` separado de
+  `sales.cobrar`). Suma `POST /sales/clientes` (alta desde caja) y
+  `GET /sales/ventas` (jornada por sucursal). Migración sin backfill y
+  clave de idempotencia del grupo 1 intacta; 24 casos en
+  `tests/test_pdv_slice.py`. **Pendiente derivado:**
+  - ⬜ **Motor de promociones condicionales** por marca/sucursal — se
+    activan solas si el pedido cumple reglas (ej. segunda pizza a mitad de
+    precio si pide dos del mismo tamaño, en días vigentes, sobre el precio
+    base de la más barata, sin incluir extras). Requiere entidad
+    `promocion` con vigencia, condiciones de activación y base de cálculo.
+    **No debe reutilizar `venta.descuento_*`**: esos campos son de un acto
+    humano autorizado, con motivo y responsable; mezclarlos haría imposible
+    auditar cuál descuento fue manual y cuál automático (ADR-016 →
+    «Frontera explícita»).
+  - ✅ 2026-07-28 **Cliente identificado por teléfono** (migración
+    `e1c4a9d6b038`): `persona.numero_documento`/`tipo_documento` pasan a
+    nullable, conservando el UNIQUE. Registrar a una persona natural exige
+    teléfono, no DNI (RN-PTS-004); el documento se completa después
+    (`PATCH /sales/clientes/{id}/documento`). RUC obligatorio solo para
+    facturar a empresas. Sin documento o con `00000000` el cliente no
+    cuenta como identificado y queda fuera de las promociones para
+    clientes registrados (RN-PTS-005). Búsqueda por teléfono, documento o
+    nombre (`GET /sales/clientes/buscar`, RN-PTS-006). Trabajador y usuario
+    siguen exigiendo documento — validación en `users.application.admin`.
+  - ⬜ **Reenvío del comprobante al cliente** (WhatsApp/correo) desde la
+    pestaña de cobrados: falta el adaptador de notificaciones.
+  - ⬜ `grupo_cobro` es un entero sin entidad detrás: nada impide un grupo 7
+    sin grupos 1-6. Se valida en el caso de uso, no en el esquema.
+  - ⬜ Frontend: portar el prototipo del PDV a `frontend/app/pdv/` contra
+    estos endpoints (hoy el frontend real solo tiene login y dashboard).
+- ✅ 2026-07-28 **Cierre del PDV para alfa** (ADR-016 §5-7, migraciones
+  `f2a8c15e94d7` + `a3f0d29b6c81` + `b6d41e07af92`):
+  - **Extras** (RN-COM-021): un extra es un `producto_comercial` con
+    `es_extra=True` y receta propia; `producto_comercial_extra` define qué
+    producto admite cuál y `venta_item.padre_venta_item_id` de qué línea
+    cuelga. Hereda el grupo de cobro del padre y su consumo se multiplica
+    por el plato. Reusa precio server-side, carta y descuento de inventario
+    sin duplicar nada.
+  - **Anular líneas enviadas** (RN-COM-020) y **precuenta** (RN-COM-019).
+  - **Autorización de supervisor por PIN** (RN-AUD-005): cierra un hueco de
+    seguridad — `autorizado_por` ya no viene del cuerpo del request.
+  - **Movimiento de efectivo en caja** (RN-MDP-007) sumado al esperado del
+    cierre.
+  - **CI ejecuta las migraciones** contra Postgres real, ida y vuelta, más
+    `alembic check`. Destapó y corrigió cuatro columnas `json` que debían
+    ser `jsonb` y cinco índices/constraints declarados solo en la migración.
+  - **Pendiente para después del alfa:** `variante_producto` (tamaños como
+    variantes en vez de productos separados), mitad-y-mitad de pizza,
+    `cuenta_puntos`/`puntos_movimiento` (canje real de puntos).
 - ✅ 2026-07-27 **Precio server-side** (`lista_precio`/`precio`): el PDV
   ya no manda `precio_unitario` — `crear_venta` lo resuelve por
   marca+sucursal+canal+modalidad+fecha (RN-PRC-003/RN-MDC-003). Gana la

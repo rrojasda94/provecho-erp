@@ -23,6 +23,22 @@ class RefreshIn(BaseModel):
     refresh_token: str
 
 
+class AutorizacionIn(BaseModel):
+    """El supervisor se identifica en el terminal del cajero para autorizar
+    UNA acción (RN-AUD-005). No abre sesión: no sirve para llamar a
+    cualquier endpoint ni se refresca."""
+
+    username: str
+    pin: str
+    permiso: str
+
+
+class AutorizacionOut(BaseModel):
+    autorizacion: str
+    autorizado_por: uuid.UUID
+    expira_en_minutos: int
+
+
 class MeOut(BaseModel):
     id: uuid.UUID
     username: str

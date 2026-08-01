@@ -15,8 +15,13 @@ from src.modules.accounting.application.errors import (
     NoEncontrado,
     ReglaNegocio,
 )
-from src.modules.accounting.infrastructure.repositories import AsientoRepo
+from src.modules.accounting.infrastructure.repositories import (
+    AsientoRepo,
+    MovimientoCajaRepo,
+)
 from src.modules.users.api.deps import get_db, require_permission
+from src.modules.users.application import autorizacion
+from src.modules.users.application.errors import TokenInvalido
 from src.modules.users.domain.rules import permite
 from src.modules.users.infrastructure.models import Usuario
 from src.modules.users.infrastructure.repositories import UsuarioRepo
@@ -31,6 +36,9 @@ PAGO_GESTIONAR = "accounting.pago_gestionar"
 PAGO_APROBAR = "accounting.pago_aprobar"
 CAJA_OPERAR = "accounting.caja_operar"
 ARQUEO_REGISTRAR = "accounting.arqueo_registrar"
+# Retirar efectivo del cajón lo autoriza un supervisor, no el cajero solo
+# (RN-MDP-007).
+CAJA_RETIRAR = "accounting.caja_retirar"
 
 _HTTP_STATUS: dict[type[AccountingError], int] = {
     NoEncontrado: status.HTTP_404_NOT_FOUND,
@@ -308,6 +316,62 @@ def cerrar_caja(
         raise _http(e) from e
     session.commit()
     return cierre
+
+
+@router.post(
+    "/cajas/apertura/{apertura_caja_id}/movimientos",
+    response_model=schemas.MovimientoCajaOut,
+    status_code=201,
+)
+def registrar_movimiento_caja(
+    apertura_caja_id: uuid.UUID,
+    body: schemas.MovimientoCajaIn,
+    actor: Usuario = Depends(require_permission(CAJA_OPERAR)),
+    session: Session = Depends(get_db),
+):
+    """Ingreso o retiro de efectivo del cajón durante el turno (RN-MDP-007).
+
+    **Retirar exige autorización de supervisor** con su PIN (el token de
+    `POST /auth/autorizar`); ingresar no, porque meter plata al cajón no es
+    la operación de la que hay que desconfiar.
+    """
+    autorizado_por = None
+    try:
+        if body.tipo == "retiro":
+            if not body.autorizacion:
+                raise HTTPException(
+                    status.HTTP_403_FORBIDDEN,
+                    "retirar efectivo requiere autorización de supervisor",
+                )
+            autorizado_por = autorizacion.verificar(body.autorizacion, CAJA_RETIRAR)
+        movimiento = caja.registrar_movimiento_caja(
+            session,
+            apertura_caja_id,
+            tipo=body.tipo,
+            monto=body.monto,
+            motivo=body.motivo,
+            registrado_por=actor.id,
+            idempotency_key=body.idempotency_key,
+            autorizado_por=autorizado_por,
+        )
+    except TokenInvalido as e:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, str(e)) from e
+    except (NoEncontrado, Conflicto) as e:
+        raise _http(e) from e
+    session.commit()
+    return movimiento
+
+
+@router.get(
+    "/cajas/apertura/{apertura_caja_id}/movimientos",
+    response_model=list[schemas.MovimientoCajaOut],
+)
+def listar_movimientos_caja(
+    apertura_caja_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(LEER)),
+    session: Session = Depends(get_db),
+):
+    return MovimientoCajaRepo(session).de_apertura(apertura_caja_id)
 
 
 @router.get("/cajas/abiertas", response_model=list[schemas.CajaAbiertaOut])

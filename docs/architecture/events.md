@@ -56,6 +56,9 @@ accounting.asiento_generado
 | `sales.pago_registrado` | sales | accounting | venta_id, medio, monto, ref_externa | Al registrar pago | RN-COM-002 |
 | `sales.comprobante_emitido` | sales | accounting | venta_id, tipo, serie_numero | Comprobante aceptado por SUNAT (Factiliza) | RN-COM-003 |
 | `sales.venta_anulada` | sales | inventory, accounting | venta_id, motivo | Al anular | RN-GEN-002 |
+| `sales.descuento_aplicado` | sales | accounting, gerencia (reporte de descuentos) | venta_id, sucursal_id, modo, valor, motivo, autorizado_por | Un supervisor autoriza un descuento manual sobre el total de una orden | RN-COM-017 |
+| `sales.lineas_anuladas` | sales | inventory (repone stock), accounting | venta_id, sucursal_id, autorizado_por, motivo, items[] | Se quitan líneas de una orden YA enviada a cocina. Mismo payload que `venta_anulada` pero solo con lo quitado; inventory usa el mismo listener | RN-COM-020 |
+| `accounting.movimiento_caja_registrado` | accounting | — (auditoría, arqueo) | movimiento_caja_id, apertura_caja_id, tipo, monto, motivo | Ingreso o retiro de efectivo del cajón durante el turno | RN-MDP-007 |
 | `sales.carrito_abandonado` | sales | — (analítica) | carrito_id, canal, paso, motivo (opcional) | Al abandonar sin confirmar | RN-COM-013 |
 | `sales.pedido_listo` | sales (PROC-OPE-002) | — (pantalla de despacho, analítica de tiempos) | venta_id | Todos los ítems del pedido alcanzan `listo` | RN-CUP-005 |
 | `sales.venta_entregada` | sales (PROC-OPE-002) | marketing* (habilita encuesta selectiva), accounting (habilita cobro al finalizar en mesa) | venta_id, sucursal_id, modalidad, cliente_id (opcional), repartidor_externo_plataforma (opcional), entregado_por | El pedido queda en manos del cliente | RN-CUP-005/006/007/009, RN-COM-007 |

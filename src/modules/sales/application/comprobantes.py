@@ -14,7 +14,11 @@ from sqlalchemy.orm import Session
 
 from src.config.settings import settings
 from src.core.events import event_bus
-from src.modules.sales.application.errors import Conflicto, NoEncontrado
+from src.modules.sales.application.errors import (
+    Conflicto,
+    NoEncontrado,
+    ReglaNegocio,
+)
 from src.modules.sales.domain import rules
 from src.modules.sales.infrastructure.models import Venta
 from src.modules.sales.infrastructure.repositories import (
@@ -36,10 +40,27 @@ def emision_habilitada() -> bool:
     return bool(settings.factiliza_token)
 
 
-def crear_comprobante_pendiente(session: Session, venta: Venta) -> Comprobante | None:
-    """Idempotente por venta: cobrar dos veces no duplica el comprobante."""
+def clave_idempotencia(venta_id, grupo_cobro: int) -> str:
+    """El grupo 1 conserva la clave histórica `venta:{id}`: los comprobantes
+    emitidos antes del cobro dividido siguen resolviendo idempotentes."""
+    if grupo_cobro == rules.GRUPO_COBRO_UNICO:
+        return f"venta:{venta_id}"
+    return f"venta:{venta_id}:g{grupo_cobro}"
+
+
+def crear_comprobante_pendiente(
+    session: Session,
+    venta: Venta,
+    *,
+    grupo_cobro: int = rules.GRUPO_COBRO_UNICO,
+    receptor_num_doc: str | None = None,
+    receptor_nombre: str | None = None,
+) -> Comprobante | None:
+    """Idempotente por venta y grupo de cobro: cobrar dos veces la misma
+    cuenta no duplica el comprobante, pero dos cuentas distintas de la misma
+    venta sí emiten dos documentos (RN-COM-018)."""
     repo = ComprobanteRepo(session)
-    existente = repo.por_venta(venta.id)
+    existente = repo.por_venta_y_grupo(venta.id, grupo_cobro)
     if existente is not None:
         return existente
 
@@ -50,22 +71,36 @@ def crear_comprobante_pendiente(session: Session, venta: Venta) -> Comprobante |
     if empresa is None:
         raise NoEncontrado("empresa de la sucursal no encontrada")
 
-    cliente = ClienteRepo(session).get(venta.cliente_id) if venta.cliente_id else None
-    tipo = rules.tipo_comprobante(cliente.tipo if cliente else None,
-                                  cliente.ruc if cliente else None)
+    if receptor_num_doc:
+        # El documento tecleado en caja manda: es el que el cliente pidió.
+        if not rules.documento_receptor_valido(receptor_num_doc):
+            raise ReglaNegocio(
+                "el documento del receptor debe tener 8 dígitos (DNI) u 11 (RUC)"
+            )
+        tipo = rules.tipo_comprobante_por_documento(receptor_num_doc)
+    else:
+        cliente = (
+            ClienteRepo(session).get(venta.cliente_id) if venta.cliente_id else None
+        )
+        tipo = rules.tipo_comprobante(
+            cliente.tipo if cliente else None, cliente.ruc if cliente else None
+        )
     serie = punto_venta.serie_factura if tipo == "factura" else punto_venta.serie_boleta
 
     comprobante = Comprobante(
         empresa_id=empresa.id,
         venta_id=venta.id,
+        grupo_cobro=grupo_cobro,
         punto_venta_id=punto_venta.id,
         direccion="emitido",
         tipo=tipo,
         serie=serie,
         correlativo=repo.siguiente_correlativo(empresa.id, serie),
         sustento="voucher_medio_pago",
-        idempotency_key=f"venta:{venta.id}",
+        idempotency_key=clave_idempotencia(venta.id, grupo_cobro),
         estado_emision="pendiente",
+        receptor_num_doc=receptor_num_doc or None,
+        receptor_nombre=receptor_nombre or None,
     )
     session.add(comprobante)
     session.flush()
@@ -75,16 +110,35 @@ def crear_comprobante_pendiente(session: Session, venta: Venta) -> Comprobante |
 def _documento(session: Session, comprobante: Comprobante) -> factiliza.Documento:
     repo = ComprobanteRepo(session)
     empresa = repo.empresa(comprobante.empresa_id)
-    venta = VentaRepo(session).get(comprobante.venta_id)
-    cliente = ClienteRepo(session).get(venta.cliente_id) if venta.cliente_id else None
+    venta_repo = VentaRepo(session)
+    venta = venta_repo.get(comprobante.venta_id)
     productos = ProductoComercialRepo(session)
 
+    # Solo las líneas de la cuenta que este comprobante documenta.
+    filas = venta_repo.items(venta.id, grupo_cobro=comprobante.grupo_cobro)
+    subtotales = [f.cantidad * f.precio_unitario - f.descuento for f in filas]
+    # El descuento manual de la orden se prorratea entre TODAS sus líneas;
+    # a este comprobante le toca la parte de su grupo.
+    todos = venta_repo.items(venta.id)
+    base_venta = sum(
+        (f.cantidad * f.precio_unitario - f.descuento for f in todos), Decimal(0)
+    )
+    del_grupo = rules.descuento_prorrateado(
+        venta.descuento_modo,
+        venta.descuento_valor,
+        base_venta,
+        sum(subtotales, Decimal(0)),
+    )
+    por_linea = rules.repartir_descuento(del_grupo, subtotales)
+
     items = []
-    for it in VentaRepo(session).items(venta.id):
+    for it, extra in zip(filas, por_linea, strict=True):
         prod = productos.get(it.producto_comercial_id)
         # El descuento se reparte en el precio unitario: el endpoint de
         # Factiliza no recibe descuento por línea.
-        neto = rules.precio_unitario_neto(it.cantidad, it.precio_unitario, it.descuento)
+        neto = rules.precio_unitario_neto(
+            it.cantidad, it.precio_unitario, it.descuento + extra
+        )
         items.append(
             factiliza.Item(
                 codigo=str(prod.id) if prod else str(it.producto_comercial_id),
@@ -104,13 +158,33 @@ def _documento(session: Session, comprobante: Comprobante) -> factiliza.Document
         serie=comprobante.serie,
         correlativo=comprobante.correlativo,
         fecha_emision=datetime.now(UTC),
-        cliente=_cliente_para_sunat(session, cliente),
+        cliente=_receptor_para_sunat(session, comprobante, venta),
         items=items,
         # Ley 27037: las empresas de Amazonía venden exoneradas de IGV
         # (RN-IMP-001). El régimen lo declara la empresa, no la venta.
         exonerado_igv=empresa.zona_tributaria == "amazonia_ley27037",
         igv_porcentaje=settings.igv_porcentaje,
     )
+
+
+def _receptor_para_sunat(
+    session: Session, comprobante: Comprobante, venta: Venta
+) -> factiliza.Cliente:
+    """El documento tecleado en caja gana sobre el cliente de la venta: es
+    el que el cliente pidió en el momento del cobro (RN-CPP-003). Sin él,
+    se resuelve como siempre desde `venta.cliente_id`.
+    """
+    if comprobante.receptor_num_doc:
+        num = comprobante.receptor_num_doc
+        es_ruc = len(num) == rules.LARGO_RUC
+        return factiliza.Cliente(
+            tipo_doc=rules.DOC_SUNAT_RUC if es_ruc else rules.DOC_SUNAT_DNI,
+            num_doc=num,
+            razon_social=comprobante.receptor_nombre or "CLIENTES VARIOS",
+            direccion="-",
+        )
+    cliente = ClienteRepo(session).get(venta.cliente_id) if venta.cliente_id else None
+    return _cliente_para_sunat(session, cliente)
 
 
 def _cliente_para_sunat(session: Session, cliente) -> factiliza.Cliente:
@@ -132,8 +206,18 @@ def _cliente_para_sunat(session: Session, cliente) -> factiliza.Cliente:
     if persona is None:
         return factiliza.Cliente(
             tipo_doc=rules.DOC_SUNAT_SIN_DOCUMENTO,
-            num_doc="00000000",
+            num_doc=rules.SIN_DOCUMENTO,
             razon_social="CLIENTES VARIOS",
+        )
+    # Un cliente registrado solo por teléfono no tiene documento: la boleta
+    # sale igual, a su nombre, con el documento genérico (RN-PER-005).
+    if not rules.cliente_identificado(persona.numero_documento):
+        return factiliza.Cliente(
+            tipo_doc=rules.DOC_SUNAT_SIN_DOCUMENTO,
+            num_doc=rules.SIN_DOCUMENTO,
+            razon_social=f"{persona.nombres} {persona.apellidos}".strip()
+            or "CLIENTES VARIOS",
+            direccion=persona.domicilio or "-",
         )
     return factiliza.Cliente(
         tipo_doc=rules.doc_sunat_de_persona(persona.tipo_documento),

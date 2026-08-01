@@ -148,6 +148,14 @@ de su módulo y se prueban de forma aislada.
   necesidad de cambiar denominaciones) el encargado de tienda/supervisor
   traslada el efectivo a las oficinas del área contable y lo recoge para
   la siguiente apertura.
+- **RN-MDP-007** Todo **ingreso o retiro de efectivo del cajón durante el
+  turno** (pagar a un repartidor, comprar hielo, reponer un vuelto) se
+  registra con **motivo obligatorio** y entra al cálculo del monto esperado
+  del cierre. Sin registrarlo, el cierre cuadra contra un esperado irreal y
+  el descuadre se le atribuye al cajero (RN-MDP-005). **Retirar exige
+  autorización de supervisor**; ingresar no, porque meter plata al cajón no
+  es la operación de la que hay que desconfiar. Un retiro nunca puede
+  exceder el efectivo disponible: el cajón no da crédito.
 
 ## Impuestos
 
@@ -199,6 +207,24 @@ de su módulo y se prueban de forma aislada.
   consumido; el valor por producto o por monto lo determinan las áreas
   comercial y de marketing.
 - **RN-PTS-003** Los puntos tienen una vigencia; al vencer, expiran.
+- **RN-PTS-004** Para registrar a una **persona natural** basta el
+  **teléfono**: no todo cliente quiere dar su DNI en el mostrador, y
+  negarse a registrarlo por eso pierde la venta y su historial. El
+  documento se completa después sin trámite
+  (`PATCH /sales/clientes/{id}/documento`). Para **facturar a una empresa
+  el RUC sí es obligatorio** — sin él no hay factura.
+- **RN-PTS-005** Un cliente **sin documento**, o con el genérico
+  `00000000`, **no cuenta como cliente registrado con documento**: compra,
+  recibe su boleta a su nombre y figura en el historial, pero queda **fuera
+  de las promociones y beneficios reservados a clientes identificados**. Sin
+  esta distinción cualquier boleta anónima entraría al programa de puntos.
+  La condición es derivada (`rules.cliente_identificado`), no una columna:
+  guardar el mismo hecho dos veces solo crea la ocasión de que se
+  contradigan.
+- **RN-PTS-006** En caja el cliente se busca por **teléfono, documento o
+  nombre** — lo que recuerde en el momento
+  (`GET /sales/clientes/buscar?q=`). Una misma persona es cliente a lo más
+  una vez por grupo: registrarla dos veces partiría su historial.
 
 ## Grupo empresarial
 
@@ -378,7 +404,12 @@ de su módulo y se prueban de forma aislada.
   RHE, y excepcionalmente boleta o ticket de compra.
 - **RN-CPP-003** Todo comprobante de pago se sustenta con un ingreso en
   efectivo, un voucher del proveedor de medios de pago, movimientos
-  bancarios, o un contrato que autoriza un crédito.
+  bancarios, o un contrato que autoriza un crédito. El **tipo** lo decide
+  el documento que el cliente da en caja: **11 dígitos (RUC) obliga
+  factura**; 8 dígitos (DNI), `00000000` o sin documento van a **boleta**.
+  No hace falta que el cliente esté registrado — el receptor tecleado se
+  guarda en el propio comprobante (ADR-016). Un documento con otro largo
+  se rechaza antes de enviarse a SUNAT.
 - **RN-CPP-004** No puede realizarse una venta sin la emisión de un
   comprobante de pago.
 - **RN-CPP-005** Todos los comprobantes de pago son recepcionados y
@@ -492,6 +523,17 @@ de su módulo y se prueban de forma aislada.
 - **RN-AUD-004** Una auditoría se dispara por reportes de alarma de
   inconsistencias de inventario, alertas de malas prácticas, reclamos, o
   sanciones de entidades regulatorias.
+- **RN-AUD-005** Hay acciones que un operario **pide** pero no puede
+  **autorizar**: descontar sobre el total, quitar líneas ya enviadas a
+  cocina, retirar efectivo del cajón, cerrar caja con diferencia. En esos
+  casos el supervisor se identifica **en el mismo terminal, con su PIN**, y
+  el sistema verifica su clave *y* que realmente tenga el permiso antes de
+  habilitar la acción. Quién autorizó se deriva de esa verificación, nunca
+  de un dato que el operario pueda escribir: un identificador suelto en el
+  pedido es una firma falsificable, y el registro de quién autorizó
+  —que es la razón de ser del control— dejaría de valer nada. La
+  autorización es puntual: cubre una acción, no abre sesión, no se renueva
+  y caduca en minutos.
 
 ## Dato
 
@@ -1038,6 +1080,44 @@ producción se hace en cocinas de sucursal. Ver
   (ej. mitad efectivo, mitad tarjeta) — confirmado 2026-07-20 como caso
   real del negocio. La suma de `pago.monto` de una venta debe igualar
   `venta.total` antes de que la venta pase a `estado=pagada`.
+- **RN-COM-017** Un descuento manual sobre el total de una orden lo
+  **autoriza un supervisor o encargado**, nunca el cajero que lo pide, y
+  se registra con **motivo** (`cortesia`, `reclamo`, `colaborador`,
+  `promocion`, `convenio`) y **quién lo autorizó**, porque debe poder
+  explicarse en los reportes de descuentos. Solo se aplica a una venta en
+  estado `orden`. No confundir con las **promociones**, que se definen a
+  nivel de marca y sucursal, se activan solas cuando el pedido cumple sus
+  condiciones (ej. segunda pizza a mitad de precio si el cliente pide dos
+  del mismo tamaño, en los días en que la promoción está vigente,
+  aplicando el descuento sobre el precio base de la más barata y sin
+  incluir extras), y viven en un motor de reglas aparte (ver ADR-016 y
+  `ROADMAP.md`).
+- **RN-COM-018** Una orden puede **dividirse en varias cuentas**: el
+  cajero selecciona qué productos cobra en ese momento y los no
+  seleccionados quedan pendientes en la misma orden. Cada cuenta acumula
+  sus propios pagos, puede tener un receptor distinto y **emite su propio
+  comprobante**. La venta pasa a `estado=pagada` recién cuando ninguna
+  cuenta queda con saldo. Si no se selecciona nada, se cobra la orden
+  completa como una sola cuenta.
+
+- **RN-COM-019** La **precuenta** es un documento **no fiscal**: no tiene
+  serie ni correlativo, no se envía a SUNAT y no cambia el estado de la
+  venta. Es el papel que el cliente pide para revisar su consumo antes de
+  pagar. Se imprime tantas veces como haga falta y no se audita; el
+  comprobante fiscal nace recién al cobrar.
+- **RN-COM-020** Antes de enviar a cocina, corregir el pedido no toca el
+  servidor: vive en el punto de venta. Después de enviarlo, **quitar líneas
+  requiere autorización de supervisor y motivo**, porque la comanda ya salió
+  y el insumo ya se descontó — anularlas repone stock. Una línea ya cobrada
+  no se quita por esta vía: eso es nota de crédito. Quitar todas equivale a
+  anular la orden.
+- **RN-COM-021** Un **extra** (extra queso, doble carne) es un producto
+  comercial con **su propia receta**, que se ejecuta en la sucursal y se
+  suma a la del producto al que se agrega. Solo se ofrece dentro de un
+  producto que lo admita, nunca suelto en la carta. Al venderse es una línea
+  propia colgada de la del plato, y **hereda su cuenta**: dividir la cuenta
+  no puede dejar la pizza en una y su extra en otra. Su consumo se
+  multiplica por el plato — dos pizzas con extra queso llevan dos porciones.
 
 ## Cumplimiento de pedido
 

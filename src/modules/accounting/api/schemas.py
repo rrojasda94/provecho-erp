@@ -151,6 +151,32 @@ class CierreCajaOut(BaseModel):
     created_at: datetime
 
 
+class MovimientoCajaIn(BaseModel):
+    """Ingreso o retiro de efectivo del cajón durante el turno (RN-MDP-007).
+
+    `autorizacion` es el token de `POST /auth/autorizar` y solo hace falta
+    para retirar: meter plata al cajón no es la operación de la que hay que
+    desconfiar.
+    """
+
+    tipo: str = Field(pattern="^(ingreso|retiro)$")
+    monto: Decimal = Field(gt=0)
+    motivo: str = Field(min_length=3, max_length=120)
+    idempotency_key: str = Field(min_length=8, max_length=100)
+    autorizacion: str | None = None
+
+
+class MovimientoCajaOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    apertura_caja_id: uuid.UUID
+    tipo: str
+    monto: Decimal
+    motivo: str
+    registrado_por: uuid.UUID
+    autorizado_por: uuid.UUID | None
+
+
 class ArqueoIn(BaseModel):
     punto_venta_id: uuid.UUID
     tipo: str
