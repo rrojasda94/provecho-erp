@@ -13,6 +13,27 @@ importando el dominio de otro módulo. Ver mapa:
   cambio incompatible (nueva versión del evento).
 - Idempotencia: los consumidores toleran recibir el mismo evento dos veces.
 
+## Momento de despacho (ADR-016)
+
+El evento se publica en medio del caso de uso, pero **no se entrega hasta
+que commitea la sesión que lo publicó**. Si la transacción del emisor hace
+rollback, el evento se descarta y ningún consumidor lo ve.
+
+Consecuencias para quien emite y quien consume:
+
+- Emitir es `event_bus.publish(nombre, payload, session=session)`. Sin
+  `session=` el despacho es inmediato, y eso solo tiene sentido fuera de
+  una transacción.
+- El consumidor **puede leer de la base lo que el emisor escribió**: para
+  cuando corre, esos datos ya están commiteados. El payload no necesita
+  arrastrar todo por adelantado.
+- Un handler que lanza una excepción no rompe al emisor ni impide que
+  corran los demás: el bus lo loguea (`log.exception` → Sentry). Un
+  consumidor que falla nunca cancela la operación de origen.
+- La entrega es best-effort en proceso, no at-least-once: si el commit del
+  *consumidor* falla, el del emisor ya ocurrió. La garantía completa
+  requiere la tabla outbox descrita en ADR-016.
+
 ## Eventos vs. contratos públicos de lectura
 
 El event bus (`src/core/events.py`) sirve para **notificar un hecho ya

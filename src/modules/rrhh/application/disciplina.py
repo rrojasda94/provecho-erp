@@ -91,6 +91,7 @@ def emitir_amonestacion(
             "trabajador_id": str(trabajador_id),
             "tipo": tipo,
         },
+        session=session,
     )
     return amonestacion
 

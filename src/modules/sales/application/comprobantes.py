@@ -190,5 +190,6 @@ def emitir_comprobante(
             "serie_numero": f"{comprobante.serie}-{comprobante.correlativo:08d}",
             "total": str(venta.total if venta else Decimal(0)),
         },
+        session=session,
     )
     return comprobante

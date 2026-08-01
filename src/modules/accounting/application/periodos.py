@@ -44,6 +44,7 @@ def cerrar_periodo(
     event_bus.publish(
         "accounting.periodo_cerrado",
         {"periodo_id": str(periodo.id), "fecha_cierre": periodo.fecha_cierre.isoformat()},
+        session=session,
     )
     return periodo
 

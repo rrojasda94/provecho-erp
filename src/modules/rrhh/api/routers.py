@@ -2,7 +2,7 @@
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from src.modules.rrhh.api import schemas
@@ -19,7 +19,6 @@ from src.modules.rrhh.application import (
     socios,
     trabajadores,
 )
-from src.modules.rrhh.application.errors import Conflicto, NoEncontrado, ReglaNegocio, RrhhError
 from src.modules.rrhh.infrastructure.repositories import (
     ActaRepo,
     AmonestacionRepo,
@@ -49,16 +48,6 @@ PERMISO_APROBAR = "rrhh.permiso_aprobar"
 ASISTENCIA_MARCAR = "rrhh.asistencia_marcar"
 CAPACITACION_GESTIONAR = "rrhh.capacitacion_gestionar"
 
-_HTTP_STATUS: dict[type[RrhhError], int] = {
-    NoEncontrado: status.HTTP_404_NOT_FOUND,
-    Conflicto: status.HTTP_409_CONFLICT,
-    ReglaNegocio: status.HTTP_409_CONFLICT,
-}
-
-
-def _http(err: RrhhError) -> HTTPException:
-    return HTTPException(_HTTP_STATUS.get(type(err), 400), str(err))
-
 
 # --- Trabajador ----------------------------------------------------------------
 @router.post("/trabajadores", response_model=schemas.TrabajadorOut, status_code=201)
@@ -67,10 +56,7 @@ def crear_trabajador(
     _: Usuario = Depends(require_permission(TRABAJADOR_GESTIONAR)),
     session: Session = Depends(get_db),
 ):
-    try:
-        trabajador = trabajadores.crear_trabajador(session, **body.model_dump())
-    except (NoEncontrado, ReglaNegocio) as e:
-        raise _http(e) from e
+    trabajador = trabajadores.crear_trabajador(session, **body.model_dump())
     session.commit()
     return trabajador
 
@@ -103,10 +89,7 @@ def actualizar_trabajador(
     _: Usuario = Depends(require_permission(TRABAJADOR_GESTIONAR)),
     session: Session = Depends(get_db),
 ):
-    try:
-        trabajador = trabajadores.actualizar_trabajador(session, trabajador_id, **body.model_dump())
-    except NoEncontrado as e:
-        raise _http(e) from e
+    trabajador = trabajadores.actualizar_trabajador(session, trabajador_id, **body.model_dump())
     session.commit()
     return trabajador
 
@@ -118,12 +101,9 @@ def cesar_trabajador(
     _: Usuario = Depends(require_permission(TRABAJADOR_GESTIONAR)),
     session: Session = Depends(get_db),
 ):
-    try:
-        trabajador = trabajadores.cesar_trabajador(
-            session, trabajador_id, fecha_cese=body.fecha_cese
-        )
-    except (NoEncontrado, Conflicto) as e:
-        raise _http(e) from e
+    trabajador = trabajadores.cesar_trabajador(
+        session, trabajador_id, fecha_cese=body.fecha_cese
+    )
     session.commit()
     return trabajador
 
@@ -135,10 +115,7 @@ def crear_contrato_laboral(
     _: Usuario = Depends(require_permission(CONTRATO_GESTIONAR)),
     session: Session = Depends(get_db),
 ):
-    try:
-        contrato = contratos.crear_contrato_laboral(session, **body.model_dump())
-    except (NoEncontrado, ReglaNegocio) as e:
-        raise _http(e) from e
+    contrato = contratos.crear_contrato_laboral(session, **body.model_dump())
     session.commit()
     return contrato
 
@@ -158,18 +135,17 @@ def ver_contrato_laboral(
 @router.post(
     "/contratos-laborales/{contrato_id}/firmar", response_model=schemas.ContratoLaboralOut
 )
+
+
 def firmar_contrato_laboral(
     contrato_id: uuid.UUID,
     body: schemas.ContratoLaboralFirmar,
     _: Usuario = Depends(require_permission(CONTRATO_GESTIONAR)),
     session: Session = Depends(get_db),
 ):
-    try:
-        contrato = contratos.firmar_contrato_laboral(
-            session, contrato_id, fecha_firma=body.fecha_firma
-        )
-    except (NoEncontrado, Conflicto) as e:
-        raise _http(e) from e
+    contrato = contratos.firmar_contrato_laboral(
+        session, contrato_id, fecha_firma=body.fecha_firma
+    )
     session.commit()
     return contrato
 
@@ -177,15 +153,14 @@ def firmar_contrato_laboral(
 @router.post(
     "/contratos-laborales/{contrato_id}/finalizar", response_model=schemas.ContratoLaboralOut
 )
+
+
 def finalizar_contrato_laboral(
     contrato_id: uuid.UUID,
     _: Usuario = Depends(require_permission(CONTRATO_GESTIONAR)),
     session: Session = Depends(get_db),
 ):
-    try:
-        contrato = contratos.finalizar_contrato_laboral(session, contrato_id)
-    except (NoEncontrado, Conflicto) as e:
-        raise _http(e) from e
+    contrato = contratos.finalizar_contrato_laboral(session, contrato_id)
     session.commit()
     return contrato
 
@@ -197,10 +172,7 @@ def crear_postulante(
     _: Usuario = Depends(require_permission(POSTULANTE_GESTIONAR)),
     session: Session = Depends(get_db),
 ):
-    try:
-        postulante = postulantes.crear_postulante(session, **body.model_dump())
-    except (NoEncontrado, ReglaNegocio) as e:
-        raise _http(e) from e
+    postulante = postulantes.crear_postulante(session, **body.model_dump())
     session.commit()
     return postulante
 
@@ -221,12 +193,9 @@ def cambiar_estado_postulante(
     _: Usuario = Depends(require_permission(POSTULANTE_GESTIONAR)),
     session: Session = Depends(get_db),
 ):
-    try:
-        postulante = postulantes.cambiar_estado_postulante(
-            session, postulante_id, estado=body.estado
-        )
-    except (NoEncontrado, ReglaNegocio) as e:
-        raise _http(e) from e
+    postulante = postulantes.cambiar_estado_postulante(
+        session, postulante_id, estado=body.estado
+    )
     session.commit()
     return postulante
 
@@ -238,10 +207,7 @@ def crear_socio(
     _: Usuario = Depends(require_permission(SOCIO_GESTIONAR)),
     session: Session = Depends(get_db),
 ):
-    try:
-        socio = socios.crear_socio(session, **body.model_dump())
-    except (NoEncontrado, ReglaNegocio) as e:
-        raise _http(e) from e
+    socio = socios.crear_socio(session, **body.model_dump())
     session.commit()
     return socio
 
@@ -261,10 +227,7 @@ def emitir_boleta_pago(
     _: Usuario = Depends(require_permission(NOMINA_GESTIONAR)),
     session: Session = Depends(get_db),
 ):
-    try:
-        boleta = nomina.emitir_boleta_pago(session, **body.model_dump())
-    except NoEncontrado as e:
-        raise _http(e) from e
+    boleta = nomina.emitir_boleta_pago(session, **body.model_dump())
     session.commit()
     return boleta
 
@@ -287,10 +250,7 @@ def liquidar_cese(
     _: Usuario = Depends(require_permission(NOMINA_GESTIONAR)),
     session: Session = Depends(get_db),
 ):
-    try:
-        liquidacion = nomina.liquidar_cese(session, **body.model_dump())
-    except NoEncontrado as e:
-        raise _http(e) from e
+    liquidacion = nomina.liquidar_cese(session, **body.model_dump())
     session.commit()
     return liquidacion
 
@@ -314,10 +274,7 @@ def emitir_memorandum(
     _: Usuario = Depends(require_permission(DISCIPLINA_GESTIONAR)),
     session: Session = Depends(get_db),
 ):
-    try:
-        memorandum = disciplina.emitir_memorandum(session, **body.model_dump())
-    except (NoEncontrado, ReglaNegocio) as e:
-        raise _http(e) from e
+    memorandum = disciplina.emitir_memorandum(session, **body.model_dump())
     session.commit()
     return memorandum
 
@@ -340,10 +297,7 @@ def emitir_amonestacion(
     _: Usuario = Depends(require_permission(DISCIPLINA_GESTIONAR)),
     session: Session = Depends(get_db),
 ):
-    try:
-        amonestacion = disciplina.emitir_amonestacion(session, **body.model_dump())
-    except (NoEncontrado, ReglaNegocio) as e:
-        raise _http(e) from e
+    amonestacion = disciplina.emitir_amonestacion(session, **body.model_dump())
     session.commit()
     return amonestacion
 
@@ -366,10 +320,7 @@ def emitir_acta(
     _: Usuario = Depends(require_permission(DISCIPLINA_GESTIONAR)),
     session: Session = Depends(get_db),
 ):
-    try:
-        acta = disciplina.emitir_acta(session, **body.model_dump())
-    except NoEncontrado as e:
-        raise _http(e) from e
+    acta = disciplina.emitir_acta(session, **body.model_dump())
     session.commit()
     return acta
 
@@ -389,15 +340,14 @@ def ver_acta(
 @router.post(
     "/certificados-trabajo", response_model=schemas.CertificadoTrabajoOut, status_code=201
 )
+
+
 def emitir_certificado_trabajo(
     body: schemas.CertificadoTrabajoCreate,
     _: Usuario = Depends(require_permission(DISCIPLINA_GESTIONAR)),
     session: Session = Depends(get_db),
 ):
-    try:
-        certificado = disciplina.emitir_certificado_trabajo(session, **body.model_dump())
-    except NoEncontrado as e:
-        raise _http(e) from e
+    certificado = disciplina.emitir_certificado_trabajo(session, **body.model_dump())
     session.commit()
     return certificado
 
@@ -405,6 +355,8 @@ def emitir_certificado_trabajo(
 @router.get(
     "/certificados-trabajo/{certificado_id}", response_model=schemas.CertificadoTrabajoOut
 )
+
+
 def ver_certificado_trabajo(
     certificado_id: uuid.UUID,
     _: Usuario = Depends(require_permission(LEER)),
@@ -423,10 +375,7 @@ def crear_solicitud_permiso(
     _: Usuario = Depends(require_permission(PERMISO_SOLICITAR)),
     session: Session = Depends(get_db),
 ):
-    try:
-        solicitud = permisos.crear_solicitud_permiso(session, **body.model_dump())
-    except (NoEncontrado, ReglaNegocio) as e:
-        raise _http(e) from e
+    solicitud = permisos.crear_solicitud_permiso(session, **body.model_dump())
     session.commit()
     return solicitud
 
@@ -446,15 +395,14 @@ def ver_solicitud_permiso(
 @router.post(
     "/solicitudes-permiso/{solicitud_id}/aprobar", response_model=schemas.SolicitudPermisoOut
 )
+
+
 def aprobar_solicitud_permiso(
     solicitud_id: uuid.UUID,
     actor: Usuario = Depends(require_permission(PERMISO_APROBAR)),
     session: Session = Depends(get_db),
 ):
-    try:
-        solicitud = permisos.aprobar_solicitud_permiso(session, solicitud_id, aprobador_id=actor.id)
-    except (NoEncontrado, Conflicto) as e:
-        raise _http(e) from e
+    solicitud = permisos.aprobar_solicitud_permiso(session, solicitud_id, aprobador_id=actor.id)
     session.commit()
     return solicitud
 
@@ -462,17 +410,16 @@ def aprobar_solicitud_permiso(
 @router.post(
     "/solicitudes-permiso/{solicitud_id}/rechazar", response_model=schemas.SolicitudPermisoOut
 )
+
+
 def rechazar_solicitud_permiso(
     solicitud_id: uuid.UUID,
     actor: Usuario = Depends(require_permission(PERMISO_APROBAR)),
     session: Session = Depends(get_db),
 ):
-    try:
-        solicitud = permisos.rechazar_solicitud_permiso(
-            session, solicitud_id, aprobador_id=actor.id
-        )
-    except (NoEncontrado, Conflicto) as e:
-        raise _http(e) from e
+    solicitud = permisos.rechazar_solicitud_permiso(
+        session, solicitud_id, aprobador_id=actor.id
+    )
     session.commit()
     return solicitud
 
@@ -481,15 +428,14 @@ def rechazar_solicitud_permiso(
 @router.post(
     "/pactos-permanencia", response_model=schemas.PactoPermanenciaOut, status_code=201
 )
+
+
 def crear_pacto_permanencia(
     body: schemas.PactoPermanenciaCreate,
     _: Usuario = Depends(require_permission(CAPACITACION_GESTIONAR)),
     session: Session = Depends(get_db),
 ):
-    try:
-        pacto = capacitacion.crear_pacto_permanencia(session, **body.model_dump())
-    except (NoEncontrado, ReglaNegocio) as e:
-        raise _http(e) from e
+    pacto = capacitacion.crear_pacto_permanencia(session, **body.model_dump())
     session.commit()
     return pacto
 
@@ -513,10 +459,7 @@ def marcar_entrada(
     _: Usuario = Depends(require_permission(ASISTENCIA_MARCAR)),
     session: Session = Depends(get_db),
 ):
-    try:
-        asistencia = asistencia_uc.marcar_entrada(session, **body.model_dump())
-    except (NoEncontrado, ReglaNegocio) as e:
-        raise _http(e) from e
+    asistencia = asistencia_uc.marcar_entrada(session, **body.model_dump())
     session.commit()
     return asistencia
 
@@ -527,9 +470,6 @@ def marcar_salida(
     _: Usuario = Depends(require_permission(ASISTENCIA_MARCAR)),
     session: Session = Depends(get_db),
 ):
-    try:
-        asistencia = asistencia_uc.marcar_salida(session, **body.model_dump())
-    except (NoEncontrado, ReglaNegocio) as e:
-        raise _http(e) from e
+    asistencia = asistencia_uc.marcar_salida(session, **body.model_dump())
     session.commit()
     return asistencia

@@ -8,6 +8,7 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from src.config.settings import settings
+from src.core import error_handlers
 from src.core.dashboard_router import router as dashboard_router
 from src.core.health_router import router as health_router
 from src.core.logging_config import configurar_logging, request_id_var
@@ -23,6 +24,7 @@ from src.modules.purchases.api.routers import router as purchases_router
 from src.modules.rrhh.api.routers import router as rrhh_router
 from src.modules.sales.api.kds_routers import router as kds_router
 from src.modules.sales.api.routers import router as sales_router
+from src.modules.users.api import error_handlers as users_error_handlers
 from src.modules.users.api.routers import router as users_router
 
 log = logging.getLogger("provecho.app")
@@ -113,6 +115,12 @@ def create_app() -> FastAPI:
         openapi_url=None if settings.es_produccion else "/openapi.json",
         openapi_tags=TAGS_METADATA,
     )
+
+    # Errores de negocio → 4xx, en un solo lugar. Primero el genérico y
+    # después el de users: da igual el orden de registro (Starlette resuelve
+    # por MRO), pero se lee mejor de lo general a lo particular.
+    error_handlers.registrar(app)
+    users_error_handlers.registrar(app)
 
     @app.exception_handler(FueraDeAlcance)
     async def fuera_de_alcance(request: Request, exc: FueraDeAlcance):
