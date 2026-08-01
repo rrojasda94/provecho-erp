@@ -5,7 +5,59 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Los eventos internos se despachan después del commit** (2026-08-01,
+  ADR-016). El bus entregaba el evento en el acto, en medio de la
+  transacción del emisor: cuando esa transacción hacía rollback —el
+  `UNIQUE (sucursal, fecha, numero_orden)` de dos cajas simultáneas, un
+  ítem rechazado en el replay del hub, la rama de error de la tarea del
+  comprobante— `inventory` ya había descontado y commiteado stock de una
+  venta que no llegó a existir. Ahora `publish(..., session=session)`
+  acumula el evento en la sesión y un listener de `after_commit` lo vacía;
+  el rollback lo descarta. Efecto lateral: el consumidor puede leer lo que
+  escribió el emisor, y un handler que falla se loguea sin romper al
+  emisor ni a los demás suscriptores.
+
+### Changed
+
+- **Una sola jerarquía de errores y un solo mapeo a HTTP** (2026-08-01,
+  ADR-017). `NoEncontrado`/`Conflicto`/`ReglaNegocio` pasan a
+  `src/shared/errors.py` sobre una base `AppError`; la traducción a HTTP
+  vive en `src/core/error_handlers.py` y `users` registra desde su capa
+  `api` sus estados propios (401/423/422). Se eliminan las 7 bases por
+  módulo, las 8 copias de `_HTTP_STATUS`/`_http()` y 86 `try/except`
+  cuyo cuerpo completo era `raise _http(e)` — 251 líneas netas menos en los
+  routers. Cierra un bug latente: seis de las ocho copias resolvían por
+  `type(err)` exacto, así que una subclase como `PrecioNoDefinido` habría
+  devuelto 400 en vez de 409. Conservan su `try/except` los tres endpoints
+  que commitean en el camino de error (login fallido, reuso de refresh
+  token, intento contado de Factiliza).
+
+- **`purchases` y `accounting` dejan de importar `users.domain`**
+  (2026-08-01): la consulta "¿este actor puede aprobar sobre el umbral?"
+  pasa por el contrato público
+  `users/application/queries_publicas.py::tiene_permiso`, en vez de
+  `users.domain.rules` + `UsuarioRepo`. Era la única violación literal de
+  "nunca importar el dominio de otro módulo".
+
 ### Added
+
+- **Auditoría arquitectónica** (2026-08-01):
+  `docs/architecture/audit-2026-08-01.md` — riesgos priorizados con
+  severidad, beneficio, costo y recomendación, incluido el detalle de lo
+  **descartado** (dividir `rules.py`, dividir `repositories.py`, eventos
+  tipados, separar eventos síncronos de asíncronos) y por qué.
+
+- **`tests/test_arquitectura.py`** (2026-08-01, 98 casos): las reglas de
+  CLAUDE.md como test. Pureza de `domain` (sin ORM, framework ni `core`),
+  `application` sin FastAPI, ningún módulo entrando a otro fuera de su
+  contrato público, `core` sin dominio ajeno y `shared` sin mirar hacia
+  arriba. Los acoplamientos que la auditoría difiere quedan como
+  excepciones nominales: la lista puede encogerse, no crecer en silencio.
+
+- **`tests/test_errores_http.py`** (2026-08-01, 13 casos): fija el mapeo
+  unificado, incluidas las subclases que antes caían al 400.
 
 - **Permiso `gerencia.gestionar_parametros_empresa`** (2026-07-27,
   ADR-014): sembrado en `src/seeders/seed.py`, mismo patrón que
