@@ -2,22 +2,15 @@
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from src.config.settings import settings
 from src.modules.purchases.api import schemas
 from src.modules.purchases.application import comprobantes, ordenes, proveedores
-from src.modules.purchases.application.errors import (
-    Conflicto,
-    NoEncontrado,
-    PurchasesError,
-    ReglaNegocio,
-)
 from src.modules.users.api.deps import get_db, require_permission
-from src.modules.users.domain.rules import permite
+from src.modules.users.application.queries_publicas import tiene_permiso
 from src.modules.users.infrastructure.models import Usuario
-from src.modules.users.infrastructure.repositories import UsuarioRepo
 
 router = APIRouter(prefix="/purchases", tags=["purchases"])
 
@@ -28,16 +21,6 @@ ANULAR = "purchases.anular"
 APROBAR = "purchases.aprobar"
 DAR_CONFORMIDAD = "purchases.dar_conformidad"
 
-_HTTP_STATUS: dict[type[PurchasesError], int] = {
-    NoEncontrado: status.HTTP_404_NOT_FOUND,
-    Conflicto: status.HTTP_409_CONFLICT,
-    ReglaNegocio: status.HTTP_409_CONFLICT,
-}
-
-
-def _http(err: PurchasesError) -> HTTPException:
-    return HTTPException(_HTTP_STATUS.get(type(err), 400), str(err))
-
 
 # --- Proveedores -------------------------------------------------------------
 @router.post("/proveedores", response_model=schemas.ProveedorOut, status_code=201)
@@ -46,10 +29,7 @@ def crear_proveedor(
     _: Usuario = Depends(require_permission(CREAR)),
     session: Session = Depends(get_db),
 ):
-    try:
-        proveedor = proveedores.crear_proveedor(session, **body.model_dump())
-    except (NoEncontrado, ReglaNegocio) as e:
-        raise _http(e) from e
+    proveedor = proveedores.crear_proveedor(session, **body.model_dump())
     session.commit()
     return proveedor
 
@@ -70,10 +50,7 @@ def editar_proveedor(
     _: Usuario = Depends(require_permission(CREAR)),
     session: Session = Depends(get_db),
 ):
-    try:
-        proveedor = proveedores.editar_proveedor(session, proveedor_id, **body.model_dump())
-    except NoEncontrado as e:
-        raise _http(e) from e
+    proveedor = proveedores.editar_proveedor(session, proveedor_id, **body.model_dump())
     session.commit()
     return proveedor
 
@@ -85,18 +62,15 @@ def crear_orden_compra(
     actor: Usuario = Depends(require_permission(CREAR)),
     session: Session = Depends(get_db),
 ):
-    try:
-        orden = ordenes.crear_orden_compra(
-            session,
-            proveedor_id=body.proveedor_id,
-            almacen_destino_id=body.almacen_destino_id,
-            creado_por=actor.id,
-            idempotency_key=body.idempotency_key,
-            items=[it.model_dump() for it in body.items],
-            tipo=body.tipo,
-        )
-    except (NoEncontrado, ReglaNegocio) as e:
-        raise _http(e) from e
+    orden = ordenes.crear_orden_compra(
+        session,
+        proveedor_id=body.proveedor_id,
+        almacen_destino_id=body.almacen_destino_id,
+        creado_por=actor.id,
+        idempotency_key=body.idempotency_key,
+        items=[it.model_dump() for it in body.items],
+        tipo=body.tipo,
+    )
     session.commit()
     return orden
 
@@ -121,17 +95,14 @@ def emitir_orden_compra(
     actor: Usuario = Depends(require_permission(CREAR)),
     session: Session = Depends(get_db),
 ):
-    puede_aprobar = permite(UsuarioRepo(session).permiso_codigos(actor.id), APROBAR)
-    try:
-        orden = ordenes.emitir_orden_compra(
-            session,
-            orden_compra_id,
-            actor_id=actor.id,
-            puede_aprobar_monto=puede_aprobar,
-            umbral_aprobacion=settings.purchases_umbral_aprobacion_oc,
-        )
-    except (NoEncontrado, Conflicto, ReglaNegocio) as e:
-        raise _http(e) from e
+    puede_aprobar = tiene_permiso(session, actor.id, APROBAR)
+    orden = ordenes.emitir_orden_compra(
+        session,
+        orden_compra_id,
+        actor_id=actor.id,
+        puede_aprobar_monto=puede_aprobar,
+        umbral_aprobacion=settings.purchases_umbral_aprobacion_oc,
+    )
     session.commit()
     return orden
 
@@ -141,22 +112,21 @@ def emitir_orden_compra(
     response_model=schemas.RecepcionOut,
     status_code=201,
 )
+
+
 def recibir_orden_compra(
     orden_compra_id: uuid.UUID,
     body: schemas.RecepcionCreate,
     actor: Usuario = Depends(require_permission(RECEPCIONAR)),
     session: Session = Depends(get_db),
 ):
-    try:
-        recepcion = ordenes.recibir_orden_compra(
-            session,
-            orden_compra_id,
-            recibido_por=actor.id,
-            idempotency_key=body.idempotency_key,
-            items=[it.model_dump() for it in body.items],
-        )
-    except (NoEncontrado, Conflicto, ReglaNegocio) as e:
-        raise _http(e) from e
+    recepcion = ordenes.recibir_orden_compra(
+        session,
+        orden_compra_id,
+        recibido_por=actor.id,
+        idempotency_key=body.idempotency_key,
+        items=[it.model_dump() for it in body.items],
+    )
     session.commit()
     return recepcion
 
@@ -167,10 +137,7 @@ def anular_orden_compra(
     actor: Usuario = Depends(require_permission(ANULAR)),
     session: Session = Depends(get_db),
 ):
-    try:
-        orden = ordenes.anular_orden_compra(session, orden_compra_id, actor.id)
-    except (NoEncontrado, Conflicto) as e:
-        raise _http(e) from e
+    orden = ordenes.anular_orden_compra(session, orden_compra_id, actor.id)
     session.commit()
     return orden
 
@@ -180,17 +147,16 @@ def anular_orden_compra(
     response_model=schemas.ComprobanteOut,
     status_code=201,
 )
+
+
 def dar_conformidad_comprobante(
     orden_compra_id: uuid.UUID,
     body: schemas.ConformidadComprobanteCreate,
     _: Usuario = Depends(require_permission(DAR_CONFORMIDAD)),
     session: Session = Depends(get_db),
 ):
-    try:
-        comprobante = comprobantes.dar_conformidad_comprobante(
-            session, orden_compra_id, **body.model_dump()
-        )
-    except (NoEncontrado, Conflicto) as e:
-        raise _http(e) from e
+    comprobante = comprobantes.dar_conformidad_comprobante(
+        session, orden_compra_id, **body.model_dump()
+    )
     session.commit()
     return comprobante

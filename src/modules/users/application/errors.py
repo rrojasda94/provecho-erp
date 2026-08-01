@@ -1,32 +1,32 @@
-"""Errores de la capa de aplicación de users.
+"""Errores propios de users. La tripleta común y su mapeo a HTTP viven en
+`src/shared/errors.py`; los de autenticación son específicos del módulo y
+su estado HTTP lo registra `src/modules/users/api/error_handlers.py`."""
 
-La capa API los mapea a códigos HTTP (401/403/404/409/422).
-"""
+from src.shared.errors import AppError, Conflicto, NoEncontrado, ReglaNegocio
 
-
-class UsersError(Exception):
-    """Base."""
-
-
-class CredencialesInvalidas(UsersError):
-    """Username o PIN incorrectos, o usuario inactivo."""
-
-
-class UsuarioBloqueado(UsersError):
-    """Login bloqueado por intentos fallidos."""
-
-
-class TokenInvalido(UsersError):
-    """Refresh token ausente, expirado o revocado."""
+__all__ = [
+    "AppError",
+    "Conflicto",
+    "CredencialesInvalidas",
+    "NoEncontrado",
+    "PinInvalido",
+    "ReglaNegocio",
+    "TokenInvalido",
+    "UsuarioBloqueado",
+]
 
 
-class NoEncontrado(UsersError):
-    """Entidad inexistente."""
+class CredencialesInvalidas(AppError):
+    """Usuario o PIN incorrectos."""
 
 
-class Conflicto(UsersError):
-    """Violación de unicidad (username/código/nombre duplicado)."""
+class UsuarioBloqueado(AppError):
+    """Lockout por intentos fallidos."""
 
 
-class PinInvalido(UsersError):
-    """El PIN no cumple el formato (6 dígitos)."""
+class TokenInvalido(AppError):
+    """Refresh token inválido, expirado o reutilizado."""
+
+
+class PinInvalido(AppError):
+    """El PIN no cumple el formato exigido."""

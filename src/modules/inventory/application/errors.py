@@ -1,21 +1,10 @@
-"""Errores de la capa de aplicación de inventory (la API los mapea a HTTP)."""
+"""Errores propios de inventory. La tripleta común y su mapeo a HTTP viven
+en `src/shared/errors.py`."""
+
+from src.shared.errors import AppError, Conflicto, NoEncontrado, ReglaNegocio
+
+__all__ = ["AppError", "Conflicto", "NoEncontrado", "ReglaNegocio", "StockInsuficiente"]
 
 
-class InventoryError(Exception):
-    """Base."""
-
-
-class NoEncontrado(InventoryError):
-    """Entidad inexistente."""
-
-
-class Conflicto(InventoryError):
-    """Violación de unicidad (id_interno / código / nombre duplicado)."""
-
-
-class ReglaNegocio(InventoryError):
-    """Violación de una regla (segregación, estado inválido, tipo inválido)."""
-
-
-class StockInsuficiente(InventoryError):
+class StockInsuficiente(ReglaNegocio):
     """Una salida dejaría el stock en negativo."""

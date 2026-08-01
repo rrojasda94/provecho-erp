@@ -1,20 +1,10 @@
-"""Errores de la capa de aplicación de sales (la API los mapea a HTTP)."""
+"""Errores propios de sales. La tripleta común (`NoEncontrado`, `Conflicto`,
+`ReglaNegocio`) y su mapeo a HTTP viven en `src/shared/errors.py`; acá solo
+lo que sales especializa."""
 
+from src.shared.errors import AppError, Conflicto, NoEncontrado, ReglaNegocio
 
-class SalesError(Exception):
-    """Base."""
-
-
-class NoEncontrado(SalesError):
-    """Entidad inexistente."""
-
-
-class Conflicto(SalesError):
-    """Duplicado (id_interno) o estado que no admite la operación."""
-
-
-class ReglaNegocio(SalesError):
-    """Violación de regla (canal/modalidad inválida, sobrepago, etc.)."""
+__all__ = ["AppError", "Conflicto", "NoEncontrado", "PrecioNoDefinido", "ReglaNegocio"]
 
 
 class PrecioNoDefinido(ReglaNegocio):

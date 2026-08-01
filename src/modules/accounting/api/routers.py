@@ -3,23 +3,16 @@ y mapeo de asientos automáticos."""
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from src.config.settings import settings
 from src.modules.accounting.api import schemas
 from src.modules.accounting.application import asientos, caja, cuentas, pagos, periodos, reglas
-from src.modules.accounting.application.errors import (
-    AccountingError,
-    Conflicto,
-    NoEncontrado,
-    ReglaNegocio,
-)
 from src.modules.accounting.infrastructure.repositories import AsientoRepo
 from src.modules.users.api.deps import get_db, require_permission
-from src.modules.users.domain.rules import permite
+from src.modules.users.application.queries_publicas import tiene_permiso
 from src.modules.users.infrastructure.models import Usuario
-from src.modules.users.infrastructure.repositories import UsuarioRepo
 
 router = APIRouter(prefix="/accounting", tags=["accounting"])
 
@@ -32,16 +25,6 @@ PAGO_APROBAR = "accounting.pago_aprobar"
 CAJA_OPERAR = "accounting.caja_operar"
 ARQUEO_REGISTRAR = "accounting.arqueo_registrar"
 
-_HTTP_STATUS: dict[type[AccountingError], int] = {
-    NoEncontrado: status.HTTP_404_NOT_FOUND,
-    Conflicto: status.HTTP_409_CONFLICT,
-    ReglaNegocio: status.HTTP_409_CONFLICT,
-}
-
-
-def _http(err: AccountingError) -> HTTPException:
-    return HTTPException(_HTTP_STATUS.get(type(err), 400), str(err))
-
 
 # --- Plan de cuentas ----------------------------------------------------------
 @router.post("/cuentas-contables", response_model=schemas.CuentaContableOut, status_code=201)
@@ -50,10 +33,7 @@ def crear_cuenta(
     _: Usuario = Depends(require_permission(CUENTA_ADMINISTRAR)),
     session: Session = Depends(get_db),
 ):
-    try:
-        cuenta = cuentas.crear_cuenta(session, **body.model_dump())
-    except (NoEncontrado, Conflicto, ReglaNegocio) as e:
-        raise _http(e) from e
+    cuenta = cuentas.crear_cuenta(session, **body.model_dump())
     session.commit()
     return cuenta
 
@@ -74,10 +54,7 @@ def editar_cuenta(
     _: Usuario = Depends(require_permission(CUENTA_ADMINISTRAR)),
     session: Session = Depends(get_db),
 ):
-    try:
-        cuenta = cuentas.editar_cuenta(session, cuenta_id, **body.model_dump())
-    except NoEncontrado as e:
-        raise _http(e) from e
+    cuenta = cuentas.editar_cuenta(session, cuenta_id, **body.model_dump())
     session.commit()
     return cuenta
 
@@ -89,10 +66,7 @@ def abrir_periodo(
     _: Usuario = Depends(require_permission(PERIODO_ADMINISTRAR)),
     session: Session = Depends(get_db),
 ):
-    try:
-        periodo = periodos.abrir_periodo(session, **body.model_dump())
-    except ReglaNegocio as e:
-        raise _http(e) from e
+    periodo = periodos.abrir_periodo(session, **body.model_dump())
     session.commit()
     return periodo
 
@@ -112,10 +86,7 @@ def cerrar_periodo(
     actor: Usuario = Depends(require_permission(PERIODO_ADMINISTRAR)),
     session: Session = Depends(get_db),
 ):
-    try:
-        periodo = periodos.cerrar_periodo(session, periodo_id, cerrado_por=actor.id)
-    except (NoEncontrado, Conflicto) as e:
-        raise _http(e) from e
+    periodo = periodos.cerrar_periodo(session, periodo_id, cerrado_por=actor.id)
     session.commit()
     return periodo
 
@@ -127,17 +98,14 @@ def crear_asiento_manual(
     actor: Usuario = Depends(require_permission(ASIENTO_MANUAL)),
     session: Session = Depends(get_db),
 ):
-    try:
-        asiento = asientos.crear_asiento_manual(
-            session,
-            empresa_id=body.empresa_id,
-            fecha=body.fecha,
-            glosa=body.glosa,
-            lineas=[li.model_dump() for li in body.lineas],
-            creado_por=actor.id,
-        )
-    except (NoEncontrado, Conflicto, ReglaNegocio) as e:
-        raise _http(e) from e
+    asiento = asientos.crear_asiento_manual(
+        session,
+        empresa_id=body.empresa_id,
+        fecha=body.fecha,
+        glosa=body.glosa,
+        lineas=[li.model_dump() for li in body.lineas],
+        creado_por=actor.id,
+    )
     session.commit()
     return asiento
 
@@ -178,10 +146,7 @@ def anular_asiento(
     actor: Usuario = Depends(require_permission(ASIENTO_MANUAL)),
     session: Session = Depends(get_db),
 ):
-    try:
-        reversa = asientos.anular_asiento(session, asiento_id, actor_id=actor.id)
-    except (NoEncontrado, Conflicto) as e:
-        raise _http(e) from e
+    reversa = asientos.anular_asiento(session, asiento_id, actor_id=actor.id)
     session.commit()
     return reversa
 
@@ -193,10 +158,7 @@ def crear_regla_asiento(
     _: Usuario = Depends(require_permission(CUENTA_ADMINISTRAR)),
     session: Session = Depends(get_db),
 ):
-    try:
-        regla = reglas.crear_regla_asiento(session, **body.model_dump())
-    except (NoEncontrado, Conflicto) as e:
-        raise _http(e) from e
+    regla = reglas.crear_regla_asiento(session, **body.model_dump())
     session.commit()
     return regla
 
@@ -217,10 +179,7 @@ def registrar_pago(
     actor: Usuario = Depends(require_permission(PAGO_GESTIONAR)),
     session: Session = Depends(get_db),
 ):
-    try:
-        movimiento = pagos.registrar_pago(session, solicitado_por=actor.id, **body.model_dump())
-    except ReglaNegocio as e:
-        raise _http(e) from e
+    movimiento = pagos.registrar_pago(session, solicitado_por=actor.id, **body.model_dump())
     session.commit()
     return movimiento
 
@@ -237,25 +196,24 @@ def listar_pagos(
 @router.post(
     "/pagos-proveedor/{movimiento_id}/ejecutar", response_model=schemas.MovimientoDineroOut
 )
+
+
 def ejecutar_pago(
     movimiento_id: uuid.UUID,
     body: schemas.EjecutarPagoIn,
     actor: Usuario = Depends(require_permission(PAGO_GESTIONAR)),
     session: Session = Depends(get_db),
 ):
-    puede_aprobar = permite(UsuarioRepo(session).permiso_codigos(actor.id), PAGO_APROBAR)
-    try:
-        movimiento = pagos.ejecutar_pago(
-            session,
-            movimiento_id,
-            actor_id=actor.id,
-            puede_aprobar_monto=puede_aprobar,
-            umbral=settings.accounting_umbral_aprobacion_pago,
-            medio_pago=body.medio_pago,
-            constancia=body.constancia,
-        )
-    except (NoEncontrado, Conflicto, ReglaNegocio) as e:
-        raise _http(e) from e
+    puede_aprobar = tiene_permiso(session, actor.id, PAGO_APROBAR)
+    movimiento = pagos.ejecutar_pago(
+        session,
+        movimiento_id,
+        actor_id=actor.id,
+        puede_aprobar_monto=puede_aprobar,
+        umbral=settings.accounting_umbral_aprobacion_pago,
+        medio_pago=body.medio_pago,
+        constancia=body.constancia,
+    )
     session.commit()
     return movimiento
 
@@ -263,15 +221,14 @@ def ejecutar_pago(
 @router.post(
     "/pagos-proveedor/{movimiento_id}/rechazar", response_model=schemas.MovimientoDineroOut
 )
+
+
 def rechazar_pago(
     movimiento_id: uuid.UUID,
     actor: Usuario = Depends(require_permission(PAGO_GESTIONAR)),
     session: Session = Depends(get_db),
 ):
-    try:
-        movimiento = pagos.rechazar_pago(session, movimiento_id, actor_id=actor.id)
-    except (NoEncontrado, Conflicto) as e:
-        raise _http(e) from e
+    movimiento = pagos.rechazar_pago(session, movimiento_id, actor_id=actor.id)
     session.commit()
     return movimiento
 
@@ -283,10 +240,7 @@ def abrir_caja(
     actor: Usuario = Depends(require_permission(CAJA_OPERAR)),
     session: Session = Depends(get_db),
 ):
-    try:
-        apertura = caja.abrir_caja(session, cajero_id=actor.id, **body.model_dump())
-    except Conflicto as e:
-        raise _http(e) from e
+    apertura = caja.abrir_caja(session, cajero_id=actor.id, **body.model_dump())
     session.commit()
     return apertura
 
@@ -294,18 +248,17 @@ def abrir_caja(
 @router.post(
     "/cajas/apertura/{apertura_caja_id}/cierre", response_model=schemas.CierreCajaOut
 )
+
+
 def cerrar_caja(
     apertura_caja_id: uuid.UUID,
     body: schemas.CerrarCajaIn,
     actor: Usuario = Depends(require_permission(CAJA_OPERAR)),
     session: Session = Depends(get_db),
 ):
-    try:
-        cierre = caja.cerrar_caja(
-            session, apertura_caja_id, cajero_id=actor.id, **body.model_dump()
-        )
-    except (NoEncontrado, Conflicto) as e:
-        raise _http(e) from e
+    cierre = caja.cerrar_caja(
+        session, apertura_caja_id, cajero_id=actor.id, **body.model_dump()
+    )
     session.commit()
     return cierre
 
@@ -325,9 +278,6 @@ def registrar_arqueo(
     actor: Usuario = Depends(require_permission(ARQUEO_REGISTRAR)),
     session: Session = Depends(get_db),
 ):
-    try:
-        arqueo = caja.registrar_arqueo(session, realizado_por=actor.id, **body.model_dump())
-    except NoEncontrado as e:
-        raise _http(e) from e
+    arqueo = caja.registrar_arqueo(session, realizado_por=actor.id, **body.model_dump())
     session.commit()
     return arqueo
