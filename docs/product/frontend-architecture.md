@@ -23,14 +23,21 @@ tests de frontend.
 **Actualización 2026-07-27 (misma fecha, sesión distinta): ADR-013**
 (`docs/architecture/adr/ADR-013-arquitectura-frontend.md`) resolvió 5 de
 las 6 prioridades que este documento marcaba como bloqueantes del alfa:
-Tailwind CSS sobre los tokens existentes, Base UI (no Radix, no kit
-estilizado) como primitivas de interacción, shell de home de apps +
-sidebar por módulo (patrón Odoo), permisos visuales vía `permisos` de
-`GET /users/me` con guard server-side por `layout.tsx`, arquitectura de
+Tailwind CSS sobre los tokens existentes, shadcn/ui (sobre Base UI, no
+Radix) como primitivas de interacción y catálogo base, shell de home de
+apps + sidebar por módulo (patrón Odoo), permisos visuales vía `permisos`
+de `GET /users/me` con guard server-side por `layout.tsx`, arquitectura de
 carpetas por módulo, sin librería de estado global (confirmado), Android
 como PWA/responsive (no nativo), y Playwright para e2e. Las secciones de
 abajo ya reflejan esas decisiones — la única prioridad que seguía abierta
 es **F2.11 Tablas** (elegir librería). Ver el resumen final actualizado.
+
+**Actualización 2026-07-27 (segunda revisión, misma fecha)**: dentro de
+ADR-013, la sección de primitivas de interacción cambió de Base UI directo
+a **shadcn/ui** (sigue corriendo sobre Base UI, sigue sin Radix) — mejor
+ajuste al objetivo de negocio de poder editar color y forma por marca
+rápido (token set semántico + `--radius` único, en vez de construir el
+catálogo de componentes a mano). Ver ADR-013 sección 2 para el detalle.
 
 ## F2.1 Filosofía del frontend
 
@@ -74,7 +81,7 @@ frontend/app/
       page.tsx
     ...
 frontend/components/
-  ui/                    # wrappers propios sobre Base UI (Dialog, Combobox, Tooltip...)
+  ui/                    # componentes shadcn/ui (copiados, editables) sobre Base UI
   shell/                 # AppGrid, Sidebar, Breadcrumb — layout, no de un módulo
 frontend/lib/
 ```
@@ -100,18 +107,24 @@ tokens nombrados).
 
 ## F2.4 Componentes base
 
-✅ **Resuelto (ADR-013)**: Tailwind CSS (consumiendo los tokens de
-`globals.css` vía `tailwind.config.ts`, nunca hex fijo) + **Base UI**
-(`@base-ui-components/react`, no Radix, no kit estilizado como shadcn/ui)
-para lo que necesita comportamiento accesible no trivial — dialog,
-combobox, popover, tooltip, tabs/menu. Todo lo demás (tarjetas, grillas,
-botones simples) es HTML + Tailwind sin librería. Sin implementación de
-código todavía — sigue sin existir ni un `Button` propio (el login usa
-HTML plano con CSS directa); el catálogo mínimo v1 (Button, Input, Select,
-Checkbox, Switch, Card, Modal/Dialog, Tabs, Toast, Badge, Skeleton,
-EmptyState, ErrorState) se construye sobre esta base ahora que está
-decidida. Tabla (F2.11) sigue como decisión aparte — ninguna librería de
-tablas resuelve accesibilidad de overlays, es un problema distinto.
+✅ **Resuelto (ADR-013, revisado)**: Tailwind CSS (consumiendo los tokens
+de `globals.css` vía `tailwind.config.ts`, nunca hex fijo) + **shadcn/ui**
+sobre **Base UI** (no Radix) para lo que necesita comportamiento accesible
+no trivial — dialog, combobox, popover, tooltip, tabs/menu — y el catálogo
+base (Button, Input, Select, Checkbox, Switch, Card, Badge, Skeleton).
+shadcn/ui no es una dependencia instalada: el CLI copia el código fuente a
+`components/ui/`, queda en el repo y se edita directo. Se eligió sobre
+construir a mano porque el token set semántico (`--primary`, `--muted`,
+`--radius`...) que trae de fábrica es justo lo que hace fácil editar color
+y forma por marca — objetivo real de negocio, no solo estética. Tarjetas/
+grillas simples sin comportamiento interactivo siguen siendo HTML +
+Tailwind sin componente. Sin implementación de código todavía — sigue sin
+existir ni un `Button` propio (el login usa HTML plano con CSS directa).
+Al correr `shadcn init`, podar el catálogo a lo que el ERP usa (no copiar
+el registro completo) y remapear sus tokens genéricos a los 6 tokens de
+marca de Provecho antes de aceptar el resultado por defecto — ver ADR-013
+sección 1 y 2. Tabla (F2.11) sigue como decisión aparte — ninguna librería
+de tablas resuelve accesibilidad de overlays, es un problema distinto.
 
 ## F2.5 Componentes especializados del ERP
 
@@ -393,10 +406,10 @@ arquitectura de carpetas, estado). Queda una sola bloqueante real:
 
 Resueltas por ADR-013 (`docs/architecture/adr/ADR-013-arquitectura-frontend.md`),
 sin implementar todavía en código: F2.6 (home de apps + sidebar estilo
-Odoo), F2.4 (Tailwind + Base UI), F2.28 (permisos vía `/users/me` +
-guard por `layout.tsx`), F2.2 (carpetas por módulo), F2.8 (sin
-Zustand/Redux, confirmado), más F2.1 (Android = PWA/responsive) y F2.25
-(Playwright para e2e).
+Odoo), F2.4 (Tailwind + shadcn/ui sobre Base UI), F2.28 (permisos vía
+`/users/me` + guard por `layout.tsx`), F2.2 (carpetas por módulo), F2.8
+(sin Zustand/Redux, confirmado), más F2.1 (Android = PWA/responsive) y
+F2.25 (Playwright para e2e).
 
 El resto de las 31 secciones tiene decisión tomada, está correctamente
 diferido, o depende de un módulo backend que todavía no llega a pantalla —
