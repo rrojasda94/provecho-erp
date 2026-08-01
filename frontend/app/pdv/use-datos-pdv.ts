@@ -32,6 +32,7 @@ export function useDatosPdv(empresaId: string | null, puntoVentaId: string, sucu
   const [medios, setMedios] = useState<MedioPago[]>([]);
   const [mesas, setMesas] = useState<MesaEnMapa[]>([]);
   const [cobrados, setCobrados] = useState<Venta[]>([]);
+  const [abiertas, setAbiertas] = useState<Venta[]>([]);
   const [modalidad, setModalidad] = useState("mesa");
 
   useEffect(() => {
@@ -59,6 +60,16 @@ export function useDatosPdv(empresaId: string | null, puntoVentaId: string, sucu
       .catch(() => setCobrados([]));
   }, [sucursalId]);
 
+  // Pedidos ya enviados a cocina pero sin cobrar: para llevar/delivery no
+  // se ven en el mapa de mesas, y sin esto se pierden si se recarga la
+  // página antes de cobrarlos.
+  const recargarAbiertas = useCallback(() => {
+    api
+      .ventasDelDia(sucursalId, "orden")
+      .then((vs) => setAbiertas(vs.filter((v) => !v.mesa_id)))
+      .catch(() => setAbiertas([]));
+  }, [sucursalId]);
+
   useEffect(() => {
     if (!caja) return;
     // El precio depende de la modalidad (RN-PRC-003): la carta se vuelve a
@@ -71,7 +82,8 @@ export function useDatosPdv(empresaId: string | null, puntoVentaId: string, sucu
     api.mediosPago().then(setMedios).catch(() => setMedios([]));
     recargarMesas();
     recargarCobrados();
-  }, [caja, recargarMesas, recargarCobrados]);
+    recargarAbiertas();
+  }, [caja, recargarMesas, recargarCobrados, recargarAbiertas]);
 
   return {
     caja,
@@ -81,8 +93,10 @@ export function useDatosPdv(empresaId: string | null, puntoVentaId: string, sucu
     medios,
     mesas,
     cobrados,
+    abiertas,
     setModalidad,
     recargarMesas,
     recargarCobrados,
+    recargarAbiertas,
   };
 }

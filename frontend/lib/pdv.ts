@@ -65,8 +65,29 @@ export type ItemDeCarta = {
   id_interno: string;
   nombre: string;
   categoria_id: string | null;
+  categoria_nombre: string | null;
   precio_unitario: string;
   extras: ExtraDeCarta[];
+};
+
+export type ExtraDeVentaItem = {
+  id: string;
+  producto_comercial_id: string;
+  nombre: string;
+  cantidad: string;
+  precio_unitario: string;
+};
+
+/** Línea de una venta ya confirmada, tal como la devuelve
+ * `GET /ventas/{id}/items` — id real, no el uuid local del borrador. */
+export type VentaItem = {
+  id: string;
+  producto_comercial_id: string;
+  nombre: string;
+  cantidad: string;
+  precio_unitario: string;
+  grupo_cobro: number;
+  extras: ExtraDeVentaItem[];
 };
 
 export type MesaEnMapa = {
@@ -88,6 +109,14 @@ export type ClienteBuscado = {
   numero_documento: string | null;
   direccion: string | null;
   identificado: boolean;
+};
+
+export type ClienteNuevo = {
+  nombre: string;
+  telefono?: string | null;
+  numero_documento?: string | null;
+  direccion?: string | null;
+  fecha_nacimiento?: string | null;
 };
 
 export type MedioPago = {
@@ -122,6 +151,21 @@ export type Autorizacion = {
   expira_en_minutos: number;
 };
 
+export type CierreCaja = {
+  id: string;
+  apertura_caja_id: string;
+  descuadre_monto: string;
+  estado: string;
+};
+
+export type MovimientoCaja = {
+  id: string;
+  apertura_caja_id: string;
+  tipo: string;
+  monto: string;
+  motivo: string;
+};
+
 // --- Operaciones ------------------------------------------------------------
 export const api = {
   carta: (sucursalId: string, modalidad: string) =>
@@ -135,12 +179,8 @@ export const api = {
   buscarClientes: (q: string) =>
     pedir<ClienteBuscado[]>(`/sales/clientes/buscar?q=${encodeURIComponent(q)}`),
 
-  crearCliente: (cuerpo: {
-    nombre: string;
-    telefono?: string | null;
-    numero_documento?: string | null;
-    direccion?: string | null;
-  }) => pedir<{ id: string }>("/sales/clientes", { metodo: "POST", cuerpo }),
+  crearCliente: (cuerpo: ClienteNuevo) =>
+    pedir<{ id: string }>("/sales/clientes", { metodo: "POST", cuerpo }),
 
   mediosPago: () => pedir<MedioPago[]>("/sales/medios-pago"),
 
@@ -151,6 +191,23 @@ export const api = {
 
   crearVenta: (cuerpo: Record<string, unknown>) =>
     pedir<Venta>("/sales/ventas", { metodo: "POST", cuerpo }),
+
+  itemsDeVenta: (ventaId: string) =>
+    pedir<VentaItem[]>(`/sales/ventas/${ventaId}/items`),
+
+  /** Quitar líneas de un pedido ya enviado a cocina exige PIN de supervisor
+   * (RN-COM-020): el insumo ya se descontó, hay que reponerlo. */
+  anularLineas: (
+    ventaId: string,
+    cuerpo: { venta_item_ids: string[]; motivo: string; autorizacion: string },
+  ) =>
+    pedir<Venta>(`/sales/ventas/${ventaId}/anular-lineas`, {
+      metodo: "POST",
+      cuerpo,
+    }),
+
+  anularVenta: (ventaId: string) =>
+    pedir<Venta>(`/sales/ventas/${ventaId}/anular`, { metodo: "POST" }),
 
   registrarPago: (ventaId: string, cuerpo: Record<string, unknown>) =>
     pedir<{ id: string }>(`/sales/ventas/${ventaId}/pagos`, {
@@ -167,8 +224,45 @@ export const api = {
   cajasAbiertas: (empresaId: string) =>
     pedir<CajaAbierta[]>(`/accounting/cajas/abiertas?empresa_id=${empresaId}`),
 
-  abrirCaja: (cuerpo: Record<string, unknown>) =>
-    pedir<CajaAbierta>("/accounting/cajas/apertura", { metodo: "POST", cuerpo }),
+  /** `POST /cajas/apertura` devuelve el registro completo de la apertura
+   * (`id`, `relevo_encargado_id`, `diferencia_reportada`...); `GET
+   * /cajas/abiertas` devuelve la vista liviana de la lista, con
+   * `apertura_caja_id`. Se normaliza acá para que el resto del PDV — que
+   * después necesita ese id para cerrar la caja o registrar propinas — no
+   * tenga que saber de cuál de los dos endpoints vino el objeto. */
+  abrirCaja: async (cuerpo: Record<string, unknown>): Promise<CajaAbierta> => {
+    const apertura = await pedir<{
+      id: string;
+      punto_venta_id: string;
+      cajero_id: string;
+      monto_apertura: string;
+      created_at: string;
+    }>("/accounting/cajas/apertura", { metodo: "POST", cuerpo });
+    return {
+      apertura_caja_id: apertura.id,
+      punto_venta_id: apertura.punto_venta_id,
+      cajero_id: apertura.cajero_id,
+      monto_apertura: apertura.monto_apertura,
+      abierta_desde: apertura.created_at,
+    };
+  },
+
+  cerrarCaja: (aperturaCajaId: string, cuerpo: Record<string, unknown>) =>
+    pedir<CierreCaja>(`/accounting/cajas/apertura/${aperturaCajaId}/cierre`, {
+      metodo: "POST",
+      cuerpo,
+    }),
+
+  /** Propina en efectivo: ingreso de caja aparte, no toca la venta ni el
+   * comprobante (decisión del usuario, 2026-08-01). */
+  registrarMovimientoCaja: (
+    aperturaCajaId: string,
+    cuerpo: Record<string, unknown>,
+  ) =>
+    pedir<MovimientoCaja>(
+      `/accounting/cajas/apertura/${aperturaCajaId}/movimientos`,
+      { metodo: "POST", cuerpo },
+    ),
 
   /** El supervisor teclea su PIN en el terminal del cajero (RN-AUD-005).
    * Devuelve una elevación de minutos acotada a ese permiso. */

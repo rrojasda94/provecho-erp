@@ -7,16 +7,21 @@ import {
   claveIdempotencia,
   ErrorApi,
   soles,
+  type CajaAbierta,
   type ClienteBuscado,
   type ItemDeCarta,
   type MesaEnMapa,
+  type Venta,
+  type VentaItem,
 } from "@/lib/pdv";
 
 import Catalogo from "./catalogo";
 import {
   DialogoApertura,
+  DialogoCierre,
   DialogoCliente,
   DialogoCobro,
+  Dialogo,
   DialogoProducto,
   DialogoTipo,
 } from "./dialogos";
@@ -60,14 +65,41 @@ function nuevoBorrador(mesa?: MesaEnMapa): Borrador {
   };
 }
 
+function EstadoCaja({
+  caja,
+  onClick,
+}: {
+  caja: CajaAbierta | null;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={`pdv-pill ${caja ? "ok" : "off"}`}
+      disabled={!caja}
+      onClick={onClick}
+    >
+      {caja ? "Caja abierta · cerrar" : "Caja cerrada"}
+    </button>
+  );
+}
+
+function tituloComprobante(venta: Venta | null): string {
+  return venta ? `Orden #${venta.numero_orden}` : "Comprobante";
+}
+
 export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props) {
   const datos = useDatosPdv(empresaId, puntoVenta.id, sucursalId);
   const [borradores, setBorradores] = useState<Borrador[]>([nuevoBorrador()]);
   const [activoId, setActivoId] = useState<string | null>(null);
   const [seleccion, setSeleccion] = useState<Set<string>>(new Set());
   const [vista, setVista] = useState<"catalogo" | "mesas" | "cobrados">("catalogo");
-  const [dialogo, setDialogo] = useState<"cliente" | "tipo" | "cobro" | null>(null);
+  const [dialogo, setDialogo] = useState<
+    "cliente" | "tipo" | "cobro" | "cierre" | null
+  >(null);
   const [lineaEnEdicion, setLineaEnEdicion] = useState<LineaBorrador | null>(null);
+  const [cobradoAVer, setCobradoAVer] = useState<Venta | null>(null);
+  const [precuentaAVer, setPrecuentaAVer] = useState("");
   const [aviso, setAviso] = useState("");
   const [ocupado, setOcupado] = useState(false);
 
@@ -115,23 +147,16 @@ export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props)
     setSeleccion(new Set());
   };
 
+  /** Cada toque abre el diálogo de personalización (cantidad, nota, extras)
+   * antes de que la línea exista: agregar a ciegas fuerza a corregir
+   * después tocando la línea, que es el mismo trabajo pero en dos pasos. */
   const agregarProducto = (item: ItemDeCarta) => {
     if (!activo) return;
     if (activo.ventaId) {
       notificar("Este pedido ya se envió. Usa + para abrir uno nuevo.");
       return;
     }
-    const existente = activo.lineas.find(
-      (l) =>
-        l.productoId === item.producto_comercial_id && !l.nota && !l.extras.length,
-    );
-    parchar({
-      lineas: existente
-        ? activo.lineas.map((l) =>
-            l.id === existente.id ? { ...l, cantidad: l.cantidad + 1 } : l,
-          )
-        : [...activo.lineas, lineaDesde(item)],
-    });
+    setLineaEnEdicion(lineaDesde(item));
   };
 
   const cuerpoVenta = (b: Borrador) => ({
@@ -185,12 +210,14 @@ export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props)
     pagos: Array<{ medioId: string; monto: number }>,
     doc: string,
     nombre: string,
+    propina: number,
   ) => {
     if (!activo) return;
     setOcupado(true);
     try {
       const { ventaId, numero } = await asegurarVenta(activo);
       await registrarPagos(ventaId, pagos, doc, nombre);
+      if (propina > 0) await registrarPropina(numero, propina);
       notificar(
         `Orden #${numero} cobrada · ${soles(totalBorrador(activo))} · ${
           doc.length === 11 ? "factura" : "boleta"
@@ -200,10 +227,28 @@ export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props)
       cerrarPedido(activo.id);
       datos.recargarMesas();
       datos.recargarCobrados();
+      datos.recargarAbiertas();
     } catch (e) {
       notificar(mensajeDe(e, "No se pudo completar el cobro"));
     } finally {
       setOcupado(false);
+    }
+  };
+
+  /** Ingreso de caja aparte, no toca la venta ni el comprobante (decisión
+   * del usuario, 2026-08-01): un problema al registrarla no debe deshacer
+   * un cobro que ya se completó. */
+  const registrarPropina = async (numeroOrden: number | null, propina: number) => {
+    if (!datos.caja) return;
+    try {
+      await api.registrarMovimientoCaja(datos.caja.apertura_caja_id, {
+        tipo: "ingreso",
+        monto: String(propina),
+        motivo: `Propina orden #${numeroOrden ?? "?"}`,
+        idempotency_key: claveIdempotencia("propina"),
+      });
+    } catch (e) {
+      notificar(mensajeDe(e, "El cobro se hizo, pero la propina no se registró"));
     }
   };
 
@@ -245,21 +290,80 @@ export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props)
     }
   };
 
+  /** Reabre una orden ya confirmada (mesa en curso, o para llevar/delivery
+   * enviado a cocina) en una pestaña editable — con sus líneas reales, no
+   * las que el navegador todavía recordara de antes de recargar. */
+  const reabrirOrden = async (info: {
+    ventaId: string;
+    numeroOrden: number | null;
+    tipo: Borrador["tipo"];
+    mesaId: string | null;
+    mesaNumero: number | null;
+    comensales: number | null;
+  }) => {
+    const yaAbierto = borradores.find((b) => b.ventaId === info.ventaId);
+    if (yaAbierto) {
+      setActivoId(yaAbierto.id);
+      return;
+    }
+    setOcupado(true);
+    try {
+      const items = await api.itemsDeVenta(info.ventaId);
+      const b: Borrador = {
+        id: crypto.randomUUID(),
+        tipo: info.tipo,
+        mesaId: info.mesaId,
+        mesaNumero: info.mesaNumero,
+        comensales: info.comensales,
+        direccion: null,
+        cliente: null,
+        lineas: items.map(lineaDesdeVentaItem),
+        ventaId: info.ventaId,
+        numeroOrden: info.numeroOrden,
+        hora: hora(),
+      };
+      setBorradores((bs) => [...bs, b]);
+      setActivoId(b.id);
+    } catch (e) {
+      notificar(mensajeDe(e, "No se pudo abrir el pedido"));
+    } finally {
+      setOcupado(false);
+    }
+  };
+
   const elegirMesa = (mesa: MesaEnMapa) => {
     if (mesa.venta_id) {
-      notificar(
-        `Mesa ${mesa.numero} tiene la orden #${mesa.numero_orden} abierta por ${soles(mesa.total)}`,
-      );
+      reabrirOrden({
+        ventaId: mesa.venta_id,
+        numeroOrden: mesa.numero_orden,
+        tipo: "mesa",
+        mesaId: mesa.id,
+        mesaNumero: mesa.numero,
+        comensales: mesa.comensales,
+      });
+      setVista("catalogo");
       return;
     }
     abrirNuevo(mesa);
     setVista("catalogo");
   };
 
-  const crearCliente = async (nombre: string, telefono: string) => {
+  const crearCliente = async (entrada: {
+    nombre: string;
+    telefono: string;
+    numero_documento: string;
+    direccion: string;
+    fecha_nacimiento: string;
+  }) => {
     try {
-      await api.crearCliente({ nombre, telefono });
-      const [encontrado] = await api.buscarClientes(telefono);
+      await api.crearCliente({
+        nombre: entrada.nombre,
+        telefono: entrada.telefono,
+        numero_documento: entrada.numero_documento || null,
+        direccion: entrada.direccion || null,
+        fecha_nacimiento: entrada.fecha_nacimiento || null,
+      });
+      const [encontrado] = await api.buscarClientes(entrada.telefono);
       if (encontrado) {
         parchar({ cliente: encontrado, direccion: encontrado.direccion });
         notificar(`${encontrado.nombre} guardado y asignado`);
@@ -267,6 +371,113 @@ export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props)
       setDialogo(null);
     } catch (e) {
       notificar(mensajeDe(e, "No se pudo crear el cliente"));
+    }
+  };
+
+  /** Sin línea alguna es un pedido vacío: no hay nada que anular en el
+   * servidor, así que descartar la pestaña alcanza. */
+  const anularPedido = async () => {
+    if (!activo || activo.lineas.length === 0) return;
+    if (!activo.ventaId) {
+      cerrarPedido(activo.id);
+      notificar("Pedido descartado");
+      return;
+    }
+    setOcupado(true);
+    try {
+      await api.anularVenta(activo.ventaId);
+      cerrarPedido(activo.id);
+      notificar(`Orden #${activo.numeroOrden} anulada`);
+      datos.recargarMesas();
+      datos.recargarAbiertas();
+    } catch (e) {
+      notificar(mensajeDe(e, "No se pudo anular el pedido"));
+    } finally {
+      setOcupado(false);
+    }
+  };
+
+  /** Quitar una línea ya enviada a cocina repone insumo (RN-COM-020): el
+   * PIN que teclea el supervisor es el mismo token de `POST /auth/autorizar`
+   * que verifica `anular-lineas`. */
+  const anularLineaEnviada = async (
+    lineaId: string,
+    encargado: { username: string; pin: string },
+  ) => {
+    if (!activo?.ventaId) return;
+    setOcupado(true);
+    try {
+      const elevacion = await api.autorizar(
+        encargado.username,
+        encargado.pin,
+        "sales.anular",
+      );
+      const venta = await api.anularLineas(activo.ventaId, {
+        venta_item_ids: [lineaId],
+        motivo: "Anulado desde PDV",
+        autorizacion: elevacion.autorizacion,
+      });
+      setLineaEnEdicion(null);
+      if (venta.estado === "anulada") {
+        cerrarPedido(activo.id);
+        notificar(`Orden #${activo.numeroOrden} anulada: no quedaron líneas`);
+      } else {
+        parchar({ lineas: activo.lineas.filter((l) => l.id !== lineaId) });
+        notificar("Línea anulada");
+      }
+      datos.recargarMesas();
+    } catch (e) {
+      notificar(mensajeDe(e, "No se pudo anular la línea"));
+    } finally {
+      setOcupado(false);
+    }
+  };
+
+  const cerrarCaja = async (
+    montoReal: number,
+    _detalle: Record<string, number>,
+    custodia: string,
+  ) => {
+    if (!datos.caja) return;
+    setOcupado(true);
+    try {
+      const cierre = await api.cerrarCaja(datos.caja.apertura_caja_id, {
+        monto_real: String(montoReal),
+        custodia,
+      });
+      datos.setCaja(null);
+      setDialogo(null);
+      notificar(
+        cierre.estado === "conforme"
+          ? "Caja cerrada: conforme"
+          : `Caja cerrada con descuadre de ${soles(cierre.descuadre_monto)}`,
+      );
+    } catch (e) {
+      notificar(mensajeDe(e, "No se pudo cerrar la caja"));
+    } finally {
+      setOcupado(false);
+    }
+  };
+
+  const verOrdenAbierta = (venta: Venta) => {
+    reabrirOrden({
+      ventaId: venta.id,
+      numeroOrden: venta.numero_orden,
+      tipo: (venta.modalidad as Borrador["tipo"]) ?? "takeout",
+      mesaId: venta.mesa_id,
+      mesaNumero: null,
+      comensales: venta.comensales,
+    });
+    setVista("catalogo");
+  };
+
+  const verCobrado = async (venta: Venta) => {
+    setCobradoAVer(venta);
+    try {
+      const p = await api.precuenta(venta.id);
+      setPrecuentaAVer(p.texto);
+    } catch (e) {
+      setPrecuentaAVer(mensajeDe(e, "No se pudo cargar el comprobante"));
     }
   };
 
@@ -281,9 +492,7 @@ export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props)
           <strong>Punto de venta</strong>
           <small>Serie {puntoVenta.serieBoleta}</small>
         </div>
-        <span className={`pdv-pill ${datos.caja ? "ok" : "off"}`}>
-          {datos.caja ? "Caja abierta" : "Caja cerrada"}
-        </span>
+        <EstadoCaja caja={datos.caja} onClick={() => setDialogo("cierre")} />
         <span className="pdv-spacer" />
         <span className="pdv-meta">{hora()}</span>
       </header>
@@ -293,10 +502,13 @@ export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props)
           carta={datos.carta}
           mesas={datos.mesas}
           cobrados={datos.cobrados}
+          abiertas={datos.abiertas}
           vista={vista}
           onVista={setVista}
           onProducto={agregarProducto}
           onMesa={elegirMesa}
+          onOrdenAbierta={verOrdenAbierta}
+          onVerCobrado={verCobrado}
         />
         <Ticket
           borradores={borradores}
@@ -310,7 +522,7 @@ export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props)
           onLimpiarSeleccion={() => setSeleccion(new Set())}
           onCliente={() => setDialogo("cliente")}
           onTipo={() => setDialogo("tipo")}
-          onMas={() => notificar("Más opciones: pendiente en esta versión")}
+          onAnular={anularPedido}
           onEnviar={enviar}
           onCobrar={() => {
             if (activo && revisarAntesDeSalir(activo, "cobrar")) setDialogo("cobro");
@@ -325,6 +537,12 @@ export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props)
         onAbrir={abrirCaja}
         ocupado={ocupado}
       />
+      <DialogoCierre
+        abierto={dialogo === "cierre"}
+        onCerrar={() => setDialogo(null)}
+        onCerrarCaja={cerrarCaja}
+        ocupado={ocupado}
+      />
       <DialogoProducto
         linea={lineaEnEdicion}
         item={
@@ -332,10 +550,14 @@ export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props)
             (c) => c.producto_comercial_id === lineaEnEdicion?.productoId,
           ) ?? null
         }
+        enviado={Boolean(activo?.ventaId)}
         onCerrar={() => setLineaEnEdicion(null)}
         onGuardar={(l) => {
+          const yaExiste = activo?.lineas.some((x) => x.id === l.id);
           parchar({
-            lineas: activo?.lineas.map((x) => (x.id === l.id ? l : x)) ?? [],
+            lineas: yaExiste
+              ? (activo?.lineas.map((x) => (x.id === l.id ? l : x)) ?? [])
+              : [...(activo?.lineas ?? []), l],
           });
           setLineaEnEdicion(null);
         }}
@@ -343,6 +565,7 @@ export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props)
           parchar({ lineas: activo?.lineas.filter((x) => x.id !== id) ?? [] });
           setLineaEnEdicion(null);
         }}
+        onAnularLinea={anularLineaEnviada}
       />
       <DialogoTipo
         abierto={dialogo === "tipo"}
@@ -372,6 +595,13 @@ export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props)
         onCerrar={() => setDialogo(null)}
         onConfirmar={confirmarCobro}
       />
+      <Dialogo
+        titulo={tituloComprobante(cobradoAVer)}
+        abierto={cobradoAVer !== null}
+        onCerrar={() => setCobradoAVer(null)}
+      >
+        <pre className="pdv-precuenta">{precuentaAVer || "Cargando…"}</pre>
+      </Dialogo>
     </main>
   );
 }
@@ -407,6 +637,27 @@ function lineaDesde(item: ItemDeCarta): LineaBorrador {
     nota: "",
     extras: [],
     grupoCobro: 1,
+  };
+}
+
+/** El id de la línea es el del `venta_item` real: si el cajero la quita
+ * después, `anular-lineas` necesita ese id, no uno inventado en el
+ * navegador (RN-COM-020). */
+function lineaDesdeVentaItem(item: VentaItem): LineaBorrador {
+  return {
+    id: item.id,
+    productoId: item.producto_comercial_id,
+    nombre: item.nombre,
+    precio: Number(item.precio_unitario),
+    cantidad: Number(item.cantidad),
+    nota: "",
+    extras: item.extras.map((e) => ({
+      productoId: e.producto_comercial_id,
+      nombre: e.nombre,
+      precio: Number(e.precio_unitario),
+      cantidad: Number(e.cantidad),
+    })),
+    grupoCobro: item.grupo_cobro,
   };
 }
 

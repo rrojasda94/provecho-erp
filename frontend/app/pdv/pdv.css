@@ -1,8 +1,29 @@
 /* Punto de venta.
    Pantalla táctil de mostrador: objetivos grandes, jerarquía por tamaño
    (el total manda sobre todo lo demás) y las acciones destructivas lejos
-   del recorrido natural del pulgar. Reusa los tokens de marca de
-   globals.css; el PDV los sobreescribe por marca más adelante. */
+   del recorrido natural del pulgar.
+
+   Paleta propia, oscura, calcada del prototipo aprobado (2026-08-01): el
+   PDV se opera con luz de cocina y de calle, no en una oficina — el
+   contraste alto importa más que heredar los tokens claros del dashboard. */
+
+.pdv,
+.pdv-vacio {
+    --pdv-bg: #0d0d0f;
+    --pdv-surface: #18181b;
+    --pdv-surface-alta: #202024;
+    --pdv-borde: rgba(255, 255, 255, 0.1);
+    --pdv-borde-fuerte: rgba(255, 255, 255, 0.2);
+    --pdv-texto: #f4f4f2;
+    --pdv-muted: #9a9a9f;
+    --pdv-verde: #22c55e;
+    --pdv-verde-tenue: rgba(34, 197, 94, 0.14);
+    --pdv-rojo: #f87171;
+    --pdv-rojo-tenue: rgba(248, 113, 113, 0.14);
+
+    background: var(--pdv-bg);
+    color: var(--pdv-texto);
+}
 
 .pdv {
     height: 100dvh;
@@ -18,6 +39,13 @@
     margin: 0 auto;
     display: grid;
     gap: 0.75rem;
+    height: 100dvh;
+    align-content: center;
+}
+
+.pdv-vacio h1 {
+    font-style: normal;
+    letter-spacing: 0.02em;
 }
 
 .pdv-top {
@@ -27,8 +55,8 @@
     align-items: center;
     gap: 0.875rem;
     padding: 0 1rem;
-    background: #fff;
-    border-bottom: 1px solid rgba(22, 22, 22, 0.1);
+    background: var(--pdv-surface);
+    border-bottom: 1px solid var(--pdv-borde);
 }
 
 .pdv-marca strong {
@@ -37,7 +65,7 @@
 }
 
 .pdv-marca small {
-    color: var(--color-gray);
+    color: var(--pdv-muted);
     font-size: 0.75rem;
 }
 
@@ -47,7 +75,7 @@
 
 .pdv-meta {
     font-size: 0.8125rem;
-    color: var(--color-gray);
+    color: var(--pdv-muted);
     font-variant-numeric: tabular-nums;
 }
 
@@ -56,16 +84,21 @@
     font-weight: 600;
     padding: 0.3125rem 0.625rem;
     border-radius: 999px;
+    background: none;
 }
 
 .pdv-pill.ok {
-    background: #e4f1e2;
-    color: #1e5a2b;
+    background: var(--pdv-verde-tenue);
+    color: var(--pdv-verde);
 }
 
 .pdv-pill.off {
-    background: #fbeae7;
-    color: var(--color-secondary);
+    background: var(--pdv-rojo-tenue);
+    color: var(--pdv-rojo);
+}
+
+.pdv-pill:disabled {
+    opacity: 1;
 }
 
 .pdv-shell {
@@ -80,7 +113,7 @@
     display: flex;
     flex-direction: column;
     min-width: 0;
-    border-right: 1px solid rgba(22, 22, 22, 0.1);
+    border-right: 1px solid var(--pdv-borde);
 }
 
 .pdv-barra {
@@ -88,23 +121,24 @@
     display: flex;
     gap: 0.625rem;
     padding: 0.75rem 1rem;
-    border-bottom: 1px solid rgba(22, 22, 22, 0.1);
+    border-bottom: 1px solid var(--pdv-borde);
 }
 
 .pdv-buscar {
     flex: 1;
     height: 40px;
     padding: 0 0.75rem;
-    border: 1px solid rgba(22, 22, 22, 0.15);
+    border: 1px solid var(--pdv-borde);
     border-radius: 8px;
-    background: #fff;
+    background: var(--pdv-surface);
+    color: var(--pdv-texto);
     font: inherit;
 }
 
 .pdv-seg {
     display: flex;
     gap: 2px;
-    background: rgba(22, 22, 22, 0.06);
+    background: var(--pdv-surface);
     padding: 3px;
     border-radius: 8px;
 }
@@ -115,12 +149,37 @@
     background: none;
     font-size: 0.8125rem;
     font-weight: 600;
-    color: var(--color-gray);
+    color: var(--pdv-muted);
 }
 
 .pdv-seg button[aria-pressed="true"] {
-    background: #fff;
-    color: var(--color-foreground);
+    background: var(--pdv-surface-alta);
+    color: var(--pdv-texto);
+}
+
+.pdv-categorias {
+    flex: none;
+    display: flex;
+    gap: 1.25rem;
+    padding: 0 1rem;
+    border-bottom: 1px solid var(--pdv-borde);
+    overflow-x: auto;
+}
+
+.pdv-categorias button {
+    background: none;
+    padding: 0.75rem 0.125rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--pdv-muted);
+    white-space: nowrap;
+    border-radius: 0;
+    border-bottom: 2px solid transparent;
+}
+
+.pdv-categorias button.on {
+    color: var(--pdv-texto);
+    border-bottom-color: var(--pdv-verde);
 }
 
 .pdv-grid {
@@ -134,8 +193,8 @@
 }
 
 .pdv-producto {
-    background: #fff;
-    border: 1px solid rgba(22, 22, 22, 0.1);
+    background: var(--pdv-surface);
+    border: 1px solid var(--pdv-borde);
     border-radius: 12px;
     padding: 0.75rem;
     min-height: 5.75rem;
@@ -144,6 +203,7 @@
     flex-direction: column;
     justify-content: space-between;
     gap: 0.5rem;
+    color: var(--pdv-texto);
 }
 
 .pdv-producto:active {
@@ -159,26 +219,26 @@
 .pdv-producto-precio {
     font-size: 1rem;
     font-weight: 700;
-    color: var(--color-primary);
+    color: var(--pdv-verde);
     font-variant-numeric: tabular-nums;
 }
 
 .pdv-producto-extras {
     display: block;
     font-size: 0.6875rem;
-    color: var(--color-gray);
+    color: var(--pdv-muted);
 }
 
 .pdv-nada,
 .pdv-vacio-ticket {
     padding: 2rem 1.5rem;
     text-align: center;
-    color: var(--color-gray);
+    color: var(--pdv-muted);
     font-size: 0.875rem;
     line-height: 1.6;
 }
 
-/* --- Mesas y cobrados --- */
+/* --- Mesas, órdenes abiertas y cobrados --- */
 .pdv-mesas,
 .pdv-cobrados {
     flex: 1;
@@ -188,8 +248,12 @@
 
 .pdv-mesas-resumen {
     font-size: 0.8125rem;
-    color: var(--color-gray);
-    margin-bottom: 0.75rem;
+    color: var(--pdv-muted);
+    margin: 0.75rem 0;
+}
+
+.pdv-mesas-resumen:first-child {
+    margin-top: 0;
 }
 
 .pdv-mesas-grid {
@@ -199,8 +263,8 @@
 }
 
 .pdv-mesa {
-    background: #fff;
-    border: 1px solid rgba(22, 22, 22, 0.1);
+    background: var(--pdv-surface);
+    border: 1px solid var(--pdv-borde);
     border-radius: 12px;
     padding: 0.75rem;
     min-height: 6rem;
@@ -208,10 +272,11 @@
     display: flex;
     flex-direction: column;
     gap: 0.125rem;
+    color: var(--pdv-texto);
 }
 
 .pdv-mesa.ocupada {
-    background: #e4f1e2;
+    background: var(--pdv-verde-tenue);
     border-color: transparent;
 }
 
@@ -228,14 +293,36 @@
 .pdv-mesa-info {
     margin-top: auto;
     font-size: 0.75rem;
-    color: var(--color-gray);
+    color: var(--pdv-muted);
+}
+
+.pdv-abiertas {
+    list-style: none;
+    display: grid;
+    gap: 0.375rem;
+}
+
+.pdv-abiertas button {
+    display: grid;
+    grid-template-columns: 4rem 1fr auto;
+    gap: 0.75rem;
+    align-items: center;
+    width: 100%;
+    background: var(--pdv-surface);
+    border: 1px solid var(--pdv-borde);
+    border-radius: 8px;
+    padding: 0.75rem;
+    font-size: 0.875rem;
+    color: var(--pdv-texto);
+    text-align: left;
+    font-variant-numeric: tabular-nums;
 }
 
 .pdv-cobrados-cab {
     display: flex;
     justify-content: space-between;
     padding: 0.75rem 1rem;
-    background: #fff;
+    background: var(--pdv-surface);
     border-radius: 12px;
     margin-bottom: 0.75rem;
     font-variant-numeric: tabular-nums;
@@ -247,22 +334,25 @@
     gap: 0.375rem;
 }
 
-.pdv-cobrados li {
+.pdv-cobrados li button {
     display: grid;
     grid-template-columns: 4rem 1fr auto auto;
     gap: 0.75rem;
     align-items: center;
-    background: #fff;
-    border: 1px solid rgba(22, 22, 22, 0.08);
+    width: 100%;
+    background: var(--pdv-surface);
+    border: 1px solid var(--pdv-borde);
     border-radius: 8px;
     padding: 0.75rem;
     font-size: 0.875rem;
+    color: var(--pdv-texto);
+    text-align: left;
     font-variant-numeric: tabular-nums;
 }
 
 .pdv-cobrado-modalidad,
 .pdv-cobrado-estado {
-    color: var(--color-gray);
+    color: var(--pdv-muted);
     font-size: 0.75rem;
 }
 
@@ -270,7 +360,7 @@
 .pdv-der {
     display: flex;
     flex-direction: column;
-    background: #fff;
+    background: var(--pdv-surface);
     min-height: 0;
 }
 
@@ -280,24 +370,24 @@
     gap: 0.3125rem;
     padding: 0.5625rem 0.75rem;
     overflow-x: auto;
-    border-bottom: 1px solid rgba(22, 22, 22, 0.1);
+    border-bottom: 1px solid var(--pdv-borde);
 }
 
 .pdv-tab {
     padding: 0.4375rem 0.75rem;
     border-radius: 999px;
-    border: 1px solid rgba(22, 22, 22, 0.15);
-    background: #fff;
+    border: 1px solid var(--pdv-borde);
+    background: none;
     font-size: 0.78125rem;
     font-weight: 600;
     white-space: nowrap;
-    color: var(--color-gray);
+    color: var(--pdv-muted);
 }
 
 .pdv-tab[aria-pressed="true"] {
-    background: var(--color-dark);
-    border-color: var(--color-dark);
-    color: var(--color-cream);
+    background: var(--pdv-surface-alta);
+    border-color: var(--pdv-borde-fuerte);
+    color: var(--pdv-texto);
 }
 
 .pdv-tab-monto {
@@ -311,8 +401,9 @@
     height: 2rem;
     flex: none;
     border-radius: 999px;
-    border: 1px dashed rgba(22, 22, 22, 0.25);
+    border: 1px dashed var(--pdv-borde-fuerte);
     background: none;
+    color: var(--pdv-texto);
     font-size: 1.125rem;
     line-height: 1;
 }
@@ -320,16 +411,18 @@
 .pdv-ticket-cab {
     flex: none;
     padding: 0.875rem 1rem 0.75rem;
-    border-bottom: 1px solid rgba(22, 22, 22, 0.1);
+    border-bottom: 1px solid var(--pdv-borde);
 }
 
 .pdv-ticket-cab h2 {
     font-size: 1.0625rem;
+    font-style: normal;
+    text-transform: none;
 }
 
 .pdv-ticket-cab p {
     font-size: 0.78125rem;
-    color: var(--color-gray);
+    color: var(--pdv-muted);
     margin-top: 0.1875rem;
 }
 
@@ -349,23 +442,24 @@
     align-items: center;
     gap: 0.625rem;
     padding: 0.625rem 0.75rem;
-    border: 1px solid rgba(22, 22, 22, 0.1);
+    border: 1px solid var(--pdv-borde);
     border-radius: 8px;
-    background: #fff;
+    background: var(--pdv-surface-alta);
+    color: var(--pdv-texto);
     text-align: left;
     width: 100%;
 }
 
 .pdv-linea.sel {
-    border-color: var(--color-primary);
-    background: #fff5f1;
+    border-color: var(--pdv-verde);
+    background: var(--pdv-verde-tenue);
 }
 
 .pdv-linea-cant {
     width: 1.875rem;
     height: 1.875rem;
     border-radius: 8px;
-    background: rgba(22, 22, 22, 0.06);
+    background: rgba(255, 255, 255, 0.08);
     display: grid;
     place-items: center;
     font-weight: 700;
@@ -373,8 +467,8 @@
 }
 
 .pdv-linea.sel .pdv-linea-cant {
-    background: var(--color-primary);
-    color: #fff;
+    background: var(--pdv-verde);
+    color: #06210f;
 }
 
 .pdv-linea-nombre {
@@ -386,7 +480,7 @@
 .pdv-linea-nombre em {
     display: block;
     font-size: 0.71875rem;
-    color: var(--color-gray);
+    color: var(--pdv-muted);
     font-weight: 400;
     font-style: normal;
     margin-top: 0.125rem;
@@ -404,8 +498,8 @@
     justify-content: space-between;
     gap: 0.625rem;
     padding: 0.5625rem 0.875rem;
-    background: #fff5f1;
-    color: var(--color-secondary);
+    background: var(--pdv-verde-tenue);
+    color: var(--pdv-verde);
     font-size: 0.78125rem;
     font-weight: 600;
 }
@@ -420,27 +514,27 @@
 .pdv-totales {
     flex: none;
     padding: 0.75rem 1rem 0.625rem;
-    border-top: 1px solid rgba(22, 22, 22, 0.1);
+    border-top: 1px solid var(--pdv-borde);
 }
 
 .pdv-total-fila {
     display: flex;
     justify-content: space-between;
     font-size: 0.8125rem;
-    color: var(--color-gray);
+    color: var(--pdv-muted);
     padding: 0.125rem 0;
     font-variant-numeric: tabular-nums;
 }
 
 .pdv-total-fila.fuerte {
     font-weight: 700;
-    color: var(--color-foreground);
+    color: var(--pdv-texto);
 }
 
 .pdv-total-fila.grande {
     font-size: 1.5rem;
     font-weight: 700;
-    color: var(--color-foreground);
+    color: var(--pdv-texto);
     align-items: baseline;
     padding-top: 0.375rem;
 }
@@ -449,15 +543,15 @@
     font-size: 0.75rem;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    color: var(--color-gray);
+    color: var(--pdv-muted);
 }
 
 .rojo {
-    color: var(--color-secondary);
+    color: var(--pdv-rojo);
 }
 
 .verde {
-    color: #1e5a2b;
+    color: var(--pdv-verde);
 }
 
 .pdv-acciones {
@@ -469,19 +563,29 @@
 }
 
 .pdv-acciones button {
-    border: 1px solid rgba(22, 22, 22, 0.15);
+    border: 1px solid var(--pdv-borde);
     border-radius: 8px;
     padding: 0.625rem 0.25rem;
     font-size: 0.75rem;
     font-weight: 600;
-    background: #fff;
+    background: none;
+    color: var(--pdv-texto);
     line-height: 1.25;
 }
 
 .pdv-acciones button.puesto {
-    border-color: var(--color-primary);
-    color: var(--color-primary);
-    background: #fff5f1;
+    border-color: var(--pdv-verde);
+    color: var(--pdv-verde);
+    background: var(--pdv-verde-tenue);
+}
+
+.pdv-acciones button.riesgo {
+    border-color: var(--pdv-rojo);
+    color: var(--pdv-rojo);
+}
+
+.pdv-acciones button:disabled {
+    opacity: 0.35;
 }
 
 .pdv-pago {
@@ -504,13 +608,14 @@
 }
 
 .pdv-boton-pri {
-    background: var(--color-primary);
-    color: #fff;
+    background: var(--pdv-verde);
+    color: #06210f;
 }
 
 .pdv-boton-sec {
-    border: 1px solid rgba(22, 22, 22, 0.2);
-    background: #fff;
+    border: 1px solid var(--pdv-borde-fuerte);
+    background: none;
+    color: var(--pdv-texto);
 }
 
 .pdv-boton-sec.ancho {
@@ -519,9 +624,9 @@
 }
 
 .pdv-boton-riesgo {
-    border: 1px solid var(--color-secondary);
-    background: #fff;
-    color: var(--color-secondary);
+    border: 1px solid var(--pdv-rojo);
+    background: none;
+    color: var(--pdv-rojo);
 }
 
 .pdv-boton-pri:disabled,
@@ -537,8 +642,8 @@
     padding: 0;
     max-width: min(94vw, 34rem);
     width: 100%;
-    background: var(--color-cream);
-    color: var(--color-foreground);
+    background: var(--pdv-surface, #18181b);
+    color: var(--pdv-texto, #f4f4f2);
 }
 
 .pdv-dialogo.ancho {
@@ -546,7 +651,7 @@
 }
 
 .pdv-dialogo::backdrop {
-    background: rgba(16, 17, 12, 0.45);
+    background: rgba(0, 0, 0, 0.6);
 }
 
 .pdv-dialogo header {
@@ -557,15 +662,19 @@
 }
 
 .pdv-dialogo header h3 {
-    font-size: 0.875rem;
+    font-size: 0.9375rem;
+    font-style: normal;
+    text-transform: uppercase;
     letter-spacing: 0.06em;
+    font-weight: 700;
 }
 
 .pdv-dialogo header button {
     width: 2rem;
     height: 2rem;
     border-radius: 8px;
-    background: rgba(22, 22, 22, 0.06);
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--pdv-texto);
     font-size: 1.0625rem;
     line-height: 1;
 }
@@ -583,7 +692,7 @@
     gap: 0.5rem;
     margin-top: 1rem;
     padding-top: 0.875rem;
-    border-top: 1px solid rgba(22, 22, 22, 0.1);
+    border-top: 1px solid var(--pdv-borde);
 }
 
 .pdv-etiqueta {
@@ -591,24 +700,35 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.07em;
-    color: var(--color-gray);
+    color: var(--pdv-muted);
     margin: 0.875rem 0 0.4375rem;
 }
 
 .pdv-nota {
     font-size: 0.75rem;
-    color: var(--color-gray);
+    color: var(--pdv-muted);
     line-height: 1.55;
     margin-top: 0.5rem;
+}
+
+.pdv-precuenta {
+    font: inherit;
+    font-size: 0.8125rem;
+    white-space: pre-wrap;
+    color: var(--pdv-texto);
+    background: var(--pdv-surface-alta);
+    border-radius: 8px;
+    padding: 0.875rem;
 }
 
 .pdv-campo {
     width: 100%;
     height: 2.75rem;
     padding: 0 0.8125rem;
-    border: 1px solid rgba(22, 22, 22, 0.15);
+    border: 1px solid var(--pdv-borde-fuerte);
     border-radius: 8px;
-    background: #fff;
+    background: var(--pdv-surface-alta);
+    color: var(--pdv-texto);
     font: inherit;
 }
 
@@ -627,10 +747,11 @@
 .pdv-opcion {
     width: 100%;
     text-align: left;
-    border: 1px solid rgba(22, 22, 22, 0.1);
+    border: 1px solid var(--pdv-borde);
     border-radius: 8px;
     padding: 0.8125rem 0.875rem;
-    background: #fff;
+    background: var(--pdv-surface-alta);
+    color: var(--pdv-texto);
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -638,8 +759,8 @@
 }
 
 .pdv-opcion.on {
-    border-color: var(--color-primary);
-    background: #fff5f1;
+    border-color: var(--pdv-verde);
+    background: var(--pdv-verde-tenue);
 }
 
 .pdv-opcion strong {
@@ -650,15 +771,15 @@
 .pdv-opcion em {
     display: block;
     font-size: 0.75rem;
-    color: var(--color-gray);
+    color: var(--pdv-muted);
     font-style: normal;
     margin-top: 0.125rem;
 }
 
 .pdv-badge {
     font-size: 0.6875rem;
-    background: rgba(22, 22, 22, 0.08);
-    color: var(--color-gray);
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--pdv-muted);
     padding: 0.125rem 0.375rem;
     border-radius: 5px;
 }
@@ -670,18 +791,19 @@
 }
 
 .pdv-chip {
-    border: 1px solid rgba(22, 22, 22, 0.15);
+    border: 1px solid var(--pdv-borde-fuerte);
     border-radius: 999px;
     padding: 0.5rem 0.875rem;
     font-size: 0.8125rem;
     font-weight: 600;
-    background: #fff;
+    background: none;
+    color: var(--pdv-texto);
 }
 
 .pdv-chip.on {
-    background: var(--color-primary);
-    border-color: var(--color-primary);
-    color: #fff;
+    background: var(--pdv-verde);
+    border-color: var(--pdv-verde);
+    color: #06210f;
 }
 
 .pdv-chip:disabled {
@@ -691,18 +813,19 @@
 .pdv-stepper {
     display: flex;
     align-items: center;
-    border: 1px solid rgba(22, 22, 22, 0.15);
+    border: 1px solid var(--pdv-borde-fuerte);
     border-radius: 8px;
     overflow: hidden;
     width: fit-content;
-    background: #fff;
+    background: var(--pdv-surface-alta);
 }
 
 .pdv-stepper button {
     width: 2.875rem;
     height: 2.875rem;
     font-size: 1.3125rem;
-    background: rgba(22, 22, 22, 0.04);
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--pdv-texto);
     border-radius: 0;
 }
 
@@ -729,17 +852,17 @@
     justify-content: space-between;
     align-items: center;
     gap: 0.75rem;
-    border: 1px solid rgba(22, 22, 22, 0.1);
+    border: 1px solid var(--pdv-borde);
     border-radius: 8px;
     padding: 0.5rem 0.75rem;
-    background: #fff;
+    background: var(--pdv-surface-alta);
     font-size: 0.875rem;
 }
 
 .pdv-extra em {
     display: block;
     font-size: 0.75rem;
-    color: var(--color-gray);
+    color: var(--pdv-muted);
     font-style: normal;
 }
 
@@ -760,15 +883,16 @@
 .pdv-denom input {
     height: 2.375rem;
     text-align: center;
-    border: 1px solid rgba(22, 22, 22, 0.15);
+    border: 1px solid var(--pdv-borde-fuerte);
     border-radius: 8px;
-    background: #fff;
+    background: var(--pdv-surface-alta);
+    color: var(--pdv-texto);
     font: inherit;
 }
 
 .pdv-denom-sub {
     text-align: right;
-    color: var(--color-gray);
+    color: var(--pdv-muted);
     font-variant-numeric: tabular-nums;
 }
 
@@ -784,7 +908,7 @@
 }
 
 .pdv-cobro-resumen {
-    background: rgba(22, 22, 22, 0.04);
+    background: var(--pdv-surface-alta);
     border-radius: 12px;
     padding: 0.875rem;
 }
@@ -800,13 +924,13 @@
     justify-content: space-between;
     font-size: 0.84375rem;
     padding: 0.375rem 0;
-    border-bottom: 1px dashed rgba(22, 22, 22, 0.15);
+    border-bottom: 1px dashed var(--pdv-borde);
     font-variant-numeric: tabular-nums;
 }
 
 .pdv-pago-fila button {
     background: none;
-    color: var(--color-secondary);
+    color: var(--pdv-rojo);
     font-size: 0.75rem;
     margin-left: 0.5rem;
 }
@@ -816,8 +940,9 @@
     left: 50%;
     bottom: 1.625rem;
     transform: translateX(-50%);
-    background: var(--color-dark);
-    color: var(--color-cream);
+    background: var(--pdv-surface-alta, #202024);
+    color: var(--pdv-texto, #f4f4f2);
+    border: 1px solid var(--pdv-borde-fuerte, rgba(255, 255, 255, 0.2));
     padding: 0.75rem 1.25rem;
     border-radius: 999px;
     font-size: 0.84375rem;

@@ -1,5 +1,7 @@
 "use client";
 
+import { useRef } from "react";
+
 import { soles } from "@/lib/pdv";
 
 import {
@@ -22,7 +24,7 @@ type Props = {
   onLimpiarSeleccion: () => void;
   onCliente: () => void;
   onTipo: () => void;
-  onMas: () => void;
+  onAnular: () => void;
   onEnviar: () => void;
   onCobrar: () => void;
 };
@@ -62,7 +64,7 @@ export default function Ticket(props: Props) {
             borrador={activo}
             onCliente={props.onCliente}
             onTipo={props.onTipo}
-            onMas={props.onMas}
+            onAnular={props.onAnular}
           />
           <Pago {...props} activo={activo} />
         </>
@@ -218,12 +220,12 @@ function Acciones({
   borrador,
   onCliente,
   onTipo,
-  onMas,
+  onAnular,
 }: {
   borrador: Borrador;
   onCliente: () => void;
   onTipo: () => void;
-  onMas: () => void;
+  onAnular: () => void;
 }) {
   return (
     <div className="pdv-acciones">
@@ -241,8 +243,13 @@ function Acciones({
       >
         {borrador.tipo ? etiquetaTipo(borrador) : "Tipo de orden"}
       </button>
-      <button type="button" onClick={onMas}>
-        Más opciones
+      <button
+        type="button"
+        className="riesgo"
+        disabled={borrador.lineas.length === 0}
+        onClick={onAnular}
+      >
+        Anular pedido
       </button>
     </div>
   );
@@ -295,28 +302,32 @@ function Linea({
   onClick: () => void;
   onLargo: () => void;
 }) {
-  let temporizador: ReturnType<typeof setTimeout> | null = null;
-  let disparado = false;
+  // Refs, no state local: seleccionar dispara un re-render del padre a
+  // mitad de la pulsación (cambia `seleccion`), y una variable de closure
+  // se reiniciaría con ese render — el click que sigue al soltar volvería
+  // a alternar la selección que el propio largo acaba de fijar.
+  const temporizador = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const disparado = useRef(false);
 
   return (
     <button
       type="button"
       className={`pdv-linea ${seleccionada ? "sel" : ""}`}
       onPointerDown={() => {
-        disparado = false;
-        temporizador = setTimeout(() => {
-          disparado = true;
+        disparado.current = false;
+        temporizador.current = setTimeout(() => {
+          disparado.current = true;
           onLargo();
         }, 420);
       }}
-      onPointerUp={() => temporizador && clearTimeout(temporizador)}
-      onPointerLeave={() => temporizador && clearTimeout(temporizador)}
+      onPointerUp={() => temporizador.current && clearTimeout(temporizador.current)}
+      onPointerLeave={() => temporizador.current && clearTimeout(temporizador.current)}
       onContextMenu={(e) => {
         e.preventDefault();
         onLargo();
       }}
       onClick={() => {
-        if (!disparado) onClick();
+        if (!disparado.current) onClick();
       }}
       aria-pressed={modoSeleccion ? seleccionada : undefined}
     >
