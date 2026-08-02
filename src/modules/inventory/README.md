@@ -172,3 +172,8 @@ salida → transferencia en tránsito → recepción (local) → stock actualiza
   administrador reciben alerta de auditoría),
   `inventory.lote_vencido_detectado` (notifica y dispara memorándum al
   responsable si el lote vencido seguía disponible).
+- Contrato público de lectura: `application/queries_publicas.py` — hoy
+  `unidad_medida_para_magnitud` (nombre y `decimales` de una UdM, para que
+  otro módulo exprese una cantidad con su unidad, RN-GER-010). Mismo criterio
+  que `sales.queries_publicas`: devuelve dicts, nunca el ORM, y nadie importa
+  `inventory.infrastructure` desde afuera.

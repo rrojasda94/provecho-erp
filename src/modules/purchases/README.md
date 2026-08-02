@@ -25,7 +25,7 @@ Operativo en `/api/v1/purchases`: CRUD de proveedores (natural liga a
 `persona` — mismo party model que `cliente`, RN-GEN-007 — jurídico trae
 razón social/RUC propios) y ciclo de OC tipo `insumo`: crear (borrador,
 idempotente) → emitir (permiso `purchases.aprobar` exigido si el total
-supera el umbral vigente en `regla_aprobacion` — `shared`, módulo
+supera el umbral vigente en `parametro_empresa` — `shared`, módulo
 `purchases`, código `oc_umbral`; sin fila configurada cae al valor semilla
 `purchases_umbral_aprobacion_oc`) → recibir
 (total o parcial, nunca más de lo ordenado) → anular (solo antes de
@@ -98,7 +98,7 @@ lado de `accounting`, `orden_compra.estado` no tiene ese valor todavía).
   permiso especial.
 - `idempotency_key` en emisión de OC, recepción y `compra_directa`.
 - Aprobación de OC sobre monto umbral requiere permiso `purchases.aprobar`
-  (umbral por empresa en `regla_aprobacion`, con fallback al valor semilla
+  (umbral por empresa en `parametro_empresa`, con fallback al valor semilla
   de config — ver `docs/architecture/data-model.md` §8c).
 - OC tipo `activo` requiere `requerimiento_activo.aprobado_area = true` y
   `requerimiento_activo.aprobado_gerencia = true` antes de permitir emisión

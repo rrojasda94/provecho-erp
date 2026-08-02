@@ -80,5 +80,5 @@ Decisiones con alternativas viables se registran en [adr/](adr/). Vigentes:
 | [011](adr/ADR-011-derechos-arco-anonimizacion.md) | Derechos ARCO: cancelación de `persona` por anonimización, no borrado físico |
 | [012](adr/ADR-012-dashboard-gerencial-y-slice-minimo-de-caja.md) | Dashboard gerencial (agregador en `core`) + slice mínimo de caja con reconciliación real |
 | [013](adr/ADR-013-arquitectura-frontend.md) | Arquitectura frontend: Tailwind + Base UI, shell estilo Odoo, gate por permiso |
-| [014](adr/ADR-014-parametros-configurables-por-empresa.md) | Parámetros operativos configurables por empresa (`parametro_empresa`), distinta de `regla_aprobacion` |
+| [014](adr/ADR-014-parametros-configurables-por-empresa.md) | Parámetros operativos configurables por empresa (`parametro_empresa`); el área propone, Gerencia aprueba (Addendum 2026-08-02) |
 | [015](adr/ADR-015-lote-y-fefo.md) | Lote y FEFO: `stock_lote` como detalle de `stock`, control opcional por artículo, un movimiento por lote |

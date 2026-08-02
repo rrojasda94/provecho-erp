@@ -2,9 +2,11 @@
 
 import uuid
 from datetime import date, datetime
-from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from src.shared.parametros import MODULOS
 
 
 # --- Auth ---
@@ -147,27 +149,40 @@ class SucursalIdIn(BaseModel):
     sucursal_id: uuid.UUID
 
 
-# --- Regla de aprobación (matriz de aprobaciones, RN-GER-003) ---
-class ReglaAprobacionCreate(BaseModel):
+# --- Parámetros operativos por empresa (ADR-014, RN-GER-008/009) ---
+class ParametroPropuesta(BaseModel):
     empresa_id: uuid.UUID
-    modulo: str = Field(max_length=50)
+    # `Literal` sobre el catálogo real: un módulo inventado no mapea a ningún
+    # permiso `<modulo>.proponer_parametro` y debe morir en el borde (422).
+    modulo: Literal[MODULOS]
     codigo: str = Field(max_length=50)
-    umbral: Decimal
-    permiso_requerido: str = Field(max_length=100)
+    valor: dict
+    motivo: str | None = None
 
 
-class ReglaAprobacionUpdate(BaseModel):
-    umbral: Decimal | None = None
-    permiso_requerido: str | None = None
-    vigente: bool | None = None
+class ParametroAprobacion(BaseModel):
+    # `valor` no nulo = Gerencia modifica el valor propuesto antes de aprobar.
+    valor: dict | None = None
 
 
-class ReglaAprobacionOut(BaseModel):
+class ParametroRechazo(BaseModel):
+    motivo_rechazo: str = Field(min_length=1, max_length=500)
+
+
+class ParametroEmpresaOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     empresa_id: uuid.UUID
     modulo: str
     codigo: str
-    umbral: Decimal
-    permiso_requerido: str
-    vigente: bool
+    valor: dict
+    # Magnitud con su unidad tal como se le mostró a Gerencia ("S/ 2000.00").
+    valor_display: str | None
+    estado: str
+    propuesto_por_id: uuid.UUID
+    motivo: str | None
+    resuelto_por_id: uuid.UUID | None
+    resuelto_en: datetime | None
+    motivo_rechazo: str | None
+
+

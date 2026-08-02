@@ -287,9 +287,30 @@ de su módulo y se prueban de forma aislada.
   gestiona Gerencia; un cambio puede sustentarse en un `decision_gerencial`
   (acta) cuando amerite dejar constancia de por qué se cambió, pero el
   acta no es requisito para el ajuste rutinario de un valor ya
-  configurado. Distinto de `regla_aprobacion` (RN-GER-003): esa es
-  específicamente el umbral que gatilla una aprobación; `parametro_empresa`
-  es cualquier valor operativo, requiera o no aprobación.
+  configurado. Es **la única** tabla de configuración por empresa: los
+  umbrales que gatillan una aprobación (RN-GER-003, ej. `purchases/oc_umbral`)
+  también son filas suyas, con `valor={"monto": ...}` — `regla_aprobacion`
+  se retiró el 2026-08-02.
+- **RN-GER-010** Toda magnitud se expresa **con su unidad**: un monto lleva
+  su **divisa** y una cantidad lleva su **unidad de medida**. Un número
+  suelto (2000, 5) es ambiguo —¿soles o dólares? ¿kilos o unidades?— y en un
+  valor que Gerencia aprueba esa ambigüedad se vuelve una decisión mal
+  tomada. Los **decimales** con los que se redondea salen de esa unidad
+  (`divisa.decimales`, `unidad_medida.decimales`), nunca de una constante en
+  el código: hay monedas de 0 y de 3 decimales, y no es lo mismo pesar
+  harina (gramos importan) que contar botellas (media botella no existe). La
+  decisión gerencial registra la magnitud ya formateada con su unidad
+  (`parametro_empresa.valor_display`, ej. "S/ 2000.00"), congelada al
+  momento de decidir. En dinero el medio centavo **sube** (ROUND_HALF_UP).
+
+- **RN-GER-009** Un cambio de parámetro operativo (RN-GER-008) lo **propone
+  el área desde su propio módulo**, pero **no surte efecto hasta que
+  Gerencia lo aprueba** en su sección de aprobaciones, donde puede
+  aceptarlo, rechazarlo con motivo, o modificar el valor antes de aprobar.
+  Mientras la propuesta está pendiente, el módulo consumidor sigue
+  operando con el valor anterior. Aprobar deja constancia de quién propuso,
+  quién resolvió, cuándo, y cuál era el valor anterior (`data-model.md`
+  §8c, ADR-014).
 
 ## Sucursal
 

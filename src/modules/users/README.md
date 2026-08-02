@@ -29,9 +29,14 @@ Detalle en `docs/architecture/data-model.md` (§1, §2).
   Delete, la fila y sus referencias (`trabajador`/`cliente`/`usuario`)
   permanecen. Permiso dedicado `personas.anonimizar`, distinto de
   `users.gestionar`.
-- Administrar la matriz de aprobaciones (`regla_aprobacion`, entidad de
-  `shared` — umbrales cuantitativos que otros módulos, ej. `purchases`,
-  consultan en vez de hardcodear).
+- Alojar el flujo de **parámetros operativos por empresa**
+  (`parametro_empresa`, entidad de `shared`, ADR-014 + Addendum): el área
+  propone desde su módulo, Gerencia acepta / rechaza / modifica, y recién
+  ahí el valor llega al módulo consumidor. Incluye los umbrales
+  cuantitativos que otros módulos consultan en vez de hardcodear
+  (`purchases/oc_umbral`, `accounting/pago_umbral`). Vive aquí porque
+  `users` es el hogar de lo administrativo transversal, no porque el
+  parámetro sea de `users`.
 - Asignar usuario a sucursales (alcance).
 - Consultar permisos efectivos de un usuario.
 - Registrar entrada en `audit_log` (consumido por todos los módulos).
@@ -61,7 +66,29 @@ Claims del JWT: `sub` (usuario_id), `tipo`, `roles`, `sucursales`, `empresa_id`,
 | POST/GET | `/api/v1/permisos` | Crear / listar permisos |
 | POST/GET/PATCH | `/api/v1/personas[/{id}]` | CRUD de persona (party model) — `PATCH` exige `version` |
 | POST | `/api/v1/personas/{id}/anonimizar` | Derecho de cancelación (Ley 29733) — permiso `personas.anonimizar` |
-| POST/GET/PATCH | `/api/v1/reglas-aprobacion[/{id}]` | CRUD de la matriz de aprobaciones (permiso `gerencia.gestionar_reglas_aprobacion`) |
+
+### Parámetros operativos por empresa (ADR-014, RN-GER-009)
+
+| Método | Ruta | Acción |
+|--------|------|--------|
+| POST | `/api/v1/parametros` | El área propone un cambio desde su módulo (permiso `<modulo>.proponer_parametro`); nace en estado `propuesto` y **no afecta al módulo todavía** |
+| GET | `/api/v1/parametros` | Lista con `?empresa_id&estado&modulo`; `?estado=propuesto` es la bandeja de Gerencia. Sin `?modulo` exige el permiso de Gerencia (los rangos salariales de RRHH no son de lectura general) |
+| POST | `/api/v1/parametros/{id}/aprobar` | Gerencia aprueba (permiso `gerencia.gestionar_parametros_empresa`); `{"valor": ...}` opcional = modificar antes de aprobar |
+| POST | `/api/v1/parametros/{id}/rechazar` | Gerencia rechaza con `{"motivo_rechazo": ...}`; queda el valor anterior |
+
+**Toda magnitud lleva su unidad** (RN-GER-010): un valor monetario declara
+`divisa` (`{"monto":"2000.00","divisa":"PEN"}`) y uno físico
+`unidad_medida_id` (`{"cantidad":"5.000","unidad_medida_id":"..."}`); un
+número suelto es 422. El redondeo usa los decimales de esa unidad
+(`divisa.decimales`, `unidad_medida.decimales`), y `valor_display` guarda la
+magnitud formateada que leyó Gerencia al decidir. Lo adimensional
+(`{"porcentaje":2.5}`, `{"dias":5}`) va sin unidad.
+
+Los módulos **no consultan la tabla**: leen con
+`src.shared.parametros.valor_vigente(session, empresa_id, modulo, codigo, default)`,
+o con `src.shared.aprobaciones.umbral_vigente(...)` si el valor es un monto
+que se compara como `Decimal`. Ambos devuelven solo el valor aprobado.
+Catálogo de módulos válidos: `src.shared.parametros.MODULOS`.
 
 ## Estado (implementado 2026-07-25)
 
