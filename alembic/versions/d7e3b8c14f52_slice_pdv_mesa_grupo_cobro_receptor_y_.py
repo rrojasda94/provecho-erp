@@ -1,7 +1,7 @@
 """slice pdv: mesa, grupo de cobro, receptor de comprobante y descuento de orden
 
 Cierra los huecos que el punto de venta necesitaba y el modelo no daba
-(ADR-016):
+(ADR-018):
 
 - `mesa`: el salón deja de vivir en el texto libre de
   `venta.referencia_atencion` y pasa a ser un dato tipado por sucursal.

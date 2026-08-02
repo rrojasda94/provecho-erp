@@ -1,4 +1,4 @@
-# ADR-018 — Abastecimiento interno: reserva, solicitud y transferencia
+# ADR-020 — Abastecimiento interno: reserva, solicitud y transferencia
 
 - Estado: aceptado
 - Fecha: 2026-08-01

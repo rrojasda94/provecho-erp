@@ -1,4 +1,4 @@
-"""Tests del ciclo de abastecimiento interno (ADR-018): reserva de stock,
+"""Tests del ciclo de abastecimiento interno (ADR-020): reserva de stock,
 solicitud de insumos y transferencia con recepción. SQLite en memoria +
 override de get_db, igual que `test_inventory.py`.
 """

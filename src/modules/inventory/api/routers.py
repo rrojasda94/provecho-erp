@@ -5,7 +5,7 @@ Reusa las dependencias de auth/RBAC del módulo users (mecanismo transversal).
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from src.core.tenant import Tenant
@@ -17,13 +17,6 @@ from src.modules.inventory.application import reservas as reservas_uc
 from src.modules.inventory.application import solicitudes as solicitudes_uc
 from src.modules.inventory.application import stock as stock_uc
 from src.modules.inventory.application import transferencias as transferencias_uc
-from src.modules.inventory.application.errors import (
-    Conflicto,
-    InventoryError,
-    NoEncontrado,
-    ReglaNegocio,
-    StockInsuficiente,
-)
 from src.modules.inventory.application.scope import (
     exigir_ajuste,
     exigir_almacen,
@@ -59,17 +52,6 @@ LIBERAR_RESERVA = "inventory.liberar_reserva"
 TRANSFERIR = "inventory.transferir"
 RECEPCION = "inventory.recepcion"
 
-_HTTP_STATUS: dict[type[InventoryError], int] = {
-    NoEncontrado: status.HTTP_404_NOT_FOUND,
-    Conflicto: status.HTTP_409_CONFLICT,
-    ReglaNegocio: status.HTTP_409_CONFLICT,
-    StockInsuficiente: status.HTTP_409_CONFLICT,
-}
-
-
-def _http(err: InventoryError) -> HTTPException:
-    return HTTPException(_HTTP_STATUS.get(type(err), 400), str(err))
-
 
 # --- Categorías -------------------------------------------------------------
 @router.post("/categorias", response_model=schemas.CategoriaOut, status_code=201)
@@ -79,16 +61,13 @@ def crear_categoria(
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        cat = catalogo.crear_categoria(
-            session,
-            empresa_id=tenant.empresa(body.empresa_id),
-            nombre=body.nombre,
-            asiento_contable_config=body.asiento_contable_config,
-            frecuencia_conteo=body.frecuencia_conteo,
-        )
-    except (Conflicto, ReglaNegocio) as e:
-        raise _http(e) from e
+    cat = catalogo.crear_categoria(
+        session,
+        empresa_id=tenant.empresa(body.empresa_id),
+        nombre=body.nombre,
+        asiento_contable_config=body.asiento_contable_config,
+        frecuencia_conteo=body.frecuencia_conteo,
+    )
     session.commit()
     return cat
 
@@ -102,11 +81,8 @@ def editar_categoria(
     session: Session = Depends(get_db),
 ):
     """Acá se configura cada cuánto se cuenta la categoría (RN-INV-007)."""
-    try:
-        exigir_categoria(session, categoria_id, tenant)
-        cat = catalogo.editar_categoria(session, categoria_id, **body.model_dump())
-    except (NoEncontrado, ReglaNegocio) as e:
-        raise _http(e) from e
+    exigir_categoria(session, categoria_id, tenant)
+    cat = catalogo.editar_categoria(session, categoria_id, **body.model_dump())
     session.commit()
     return cat
 
@@ -129,20 +105,17 @@ def crear_articulo(
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        art = catalogo.crear_articulo(
-            session,
-            empresa_id=tenant.empresa(body.empresa_id),
-            id_interno=body.id_interno,
-            nombre=body.nombre,
-            unidad_medida_id=body.unidad_medida_id,
-            tipo=body.tipo,
-            categoria_id=body.categoria_id,
-            costo_promedio=body.costo_promedio,
-            controla_lote=body.controla_lote,
-        )
-    except (Conflicto, NoEncontrado) as e:
-        raise _http(e) from e
+    art = catalogo.crear_articulo(
+        session,
+        empresa_id=tenant.empresa(body.empresa_id),
+        id_interno=body.id_interno,
+        nombre=body.nombre,
+        unidad_medida_id=body.unidad_medida_id,
+        tipo=body.tipo,
+        categoria_id=body.categoria_id,
+        costo_promedio=body.costo_promedio,
+        controla_lote=body.controla_lote,
+    )
     session.commit()
     return art
 
@@ -165,11 +138,8 @@ def editar_articulo(
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        exigir_articulo(session, articulo_id, tenant)
-        art = catalogo.editar_articulo(session, articulo_id, **body.model_dump())
-    except NoEncontrado as e:
-        raise _http(e) from e
+    exigir_articulo(session, articulo_id, tenant)
+    art = catalogo.editar_articulo(session, articulo_id, **body.model_dump())
     session.commit()
     return art
 
@@ -182,16 +152,13 @@ def crear_sku(
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        exigir_articulo(session, body.articulo_id, tenant)
-        sku = catalogo.crear_sku(
-            session,
-            articulo_id=body.articulo_id,
-            codigo=body.codigo,
-            codigo_barras=body.codigo_barras,
-        )
-    except (NoEncontrado, Conflicto) as e:
-        raise _http(e) from e
+    exigir_articulo(session, body.articulo_id, tenant)
+    sku = catalogo.crear_sku(
+        session,
+        articulo_id=body.articulo_id,
+        codigo=body.codigo,
+        codigo_barras=body.codigo_barras,
+    )
     session.commit()
     return sku
 
@@ -204,11 +171,8 @@ def consultar_stock(
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        if almacen_id is not None:
-            exigir_almacen(session, almacen_id, tenant)
-    except NoEncontrado as e:
-        raise _http(e) from e
+    if almacen_id is not None:
+        exigir_almacen(session, almacen_id, tenant)
     return stock_uc.consultar_stock(session, almacen_id, tenant.filtro_empresa())
 
 
@@ -221,36 +185,33 @@ def registrar_movimiento(
 ):
     """Devuelve una lista porque una salida FEFO puede repartirse entre
     varios lotes, y cada lote es un movimiento propio (ADR-015)."""
-    try:
-        exigir_almacen(session, body.almacen_id, tenant)
-        if body.lote_id is not None:
-            exigir_lote(session, body.lote_id, tenant)
-        if body.cantidad < 0:
-            movs = stock_uc.registrar_salida(
-                session,
-                almacen_id=body.almacen_id,
-                sku_id=body.sku_id,
-                cantidad=-body.cantidad,
-                tipo=body.tipo,
-                usuario_id=actor.id,
-                referencia=body.referencia,
-                lote_id=body.lote_id,
-            )
-        else:
-            mov, _ = stock_uc.registrar_movimiento(
-                session,
-                almacen_id=body.almacen_id,
-                sku_id=body.sku_id,
-                cantidad=body.cantidad,
-                tipo=body.tipo,
-                usuario_id=actor.id,
-                referencia=body.referencia,
-                lote_id=body.lote_id,
-                id=body.id,
-            )
-            movs = [mov]
-    except (NoEncontrado, ReglaNegocio, StockInsuficiente) as e:
-        raise _http(e) from e
+    exigir_almacen(session, body.almacen_id, tenant)
+    if body.lote_id is not None:
+        exigir_lote(session, body.lote_id, tenant)
+    if body.cantidad < 0:
+        movs = stock_uc.registrar_salida(
+            session,
+            almacen_id=body.almacen_id,
+            sku_id=body.sku_id,
+            cantidad=-body.cantidad,
+            tipo=body.tipo,
+            usuario_id=actor.id,
+            referencia=body.referencia,
+            lote_id=body.lote_id,
+        )
+    else:
+        mov, _ = stock_uc.registrar_movimiento(
+            session,
+            almacen_id=body.almacen_id,
+            sku_id=body.sku_id,
+            cantidad=body.cantidad,
+            tipo=body.tipo,
+            usuario_id=actor.id,
+            referencia=body.referencia,
+            lote_id=body.lote_id,
+            id=body.id,
+        )
+        movs = [mov]
     session.commit()
     return movs
 
@@ -263,11 +224,8 @@ def crear_lote(
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        exigir_articulo(session, body.articulo_id, tenant)
-        lote = lotes_uc.crear_lote(session, **body.model_dump())
-    except (NoEncontrado, ReglaNegocio) as e:
-        raise _http(e) from e
+    exigir_articulo(session, body.articulo_id, tenant)
+    lote = lotes_uc.crear_lote(session, **body.model_dump())
     session.commit()
     return lote
 
@@ -283,11 +241,8 @@ def listar_lotes(
 ):
     """Saldo por lote en orden de vencimiento. `por_vencer_dias` acota a los
     que vencen dentro de esa ventana (incluye los ya vencidos)."""
-    try:
-        if almacen_id is not None:
-            exigir_almacen(session, almacen_id, tenant)
-    except NoEncontrado as e:
-        raise _http(e) from e
+    if almacen_id is not None:
+        exigir_almacen(session, almacen_id, tenant)
     return lotes_uc.listar(
         session,
         almacen_id=almacen_id,
@@ -306,11 +261,8 @@ def bloquear_vencidos(
 ):
     """Barrido de vencidos: bloquea y publica `inventory.lote_vencido_detectado`.
     El picking ya lo hace al tocar cada lote; esto lo adelanta a demanda."""
-    try:
-        if almacen_id is not None:
-            exigir_almacen(session, almacen_id, tenant)
-    except NoEncontrado as e:
-        raise _http(e) from e
+    if almacen_id is not None:
+        exigir_almacen(session, almacen_id, tenant)
     bloqueados = lotes_uc.bloquear_vencidos(
         session, almacen_id, tenant.filtro_empresa()
     )
@@ -336,11 +288,8 @@ def listar_reservas(
 ):
     """Reservas activas — lo que ya está prometido y por eso no figura en
     el `disponible` de `GET /stock` (RN-INV-009)."""
-    try:
-        if almacen_id is not None:
-            exigir_almacen(session, almacen_id, tenant)
-    except NoEncontrado as e:
-        raise _http(e) from e
+    if almacen_id is not None:
+        exigir_almacen(session, almacen_id, tenant)
     return reservas_uc.listar(
         session,
         almacen_id=almacen_id,
@@ -358,11 +307,8 @@ def liberar_reserva(
 ):
     """Liberación manual ante desabastecimiento o sobredemanda: el central
     suelta lo prometido a uno para redistribuirlo (RN-INV-011)."""
-    try:
-        exigir_reserva(session, reserva_id, tenant)
-        reserva = reservas_uc.liberar(session, reserva_id, actor.id)
-    except (NoEncontrado, ReglaNegocio) as e:
-        raise _http(e) from e
+    exigir_reserva(session, reserva_id, tenant)
+    reserva = reservas_uc.liberar(session, reserva_id, actor.id)
     session.commit()
     return reserva
 
@@ -375,20 +321,17 @@ def crear_solicitud(
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        exigir_almacen(session, body.almacen_solicitante_id, tenant)
-        if body.almacen_abastecedor_id is not None:
-            exigir_almacen(session, body.almacen_abastecedor_id, tenant)
-        solicitud = solicitudes_uc.crear_solicitud(
-            session,
-            almacen_solicitante_id=body.almacen_solicitante_id,
-            almacen_abastecedor_id=body.almacen_abastecedor_id,
-            items=[(i.sku_id, i.cantidad) for i in body.items],
-            solicitado_por=actor.id,
-            observacion=body.observacion,
-        )
-    except (NoEncontrado, ReglaNegocio) as e:
-        raise _http(e) from e
+    exigir_almacen(session, body.almacen_solicitante_id, tenant)
+    if body.almacen_abastecedor_id is not None:
+        exigir_almacen(session, body.almacen_abastecedor_id, tenant)
+    solicitud = solicitudes_uc.crear_solicitud(
+        session,
+        almacen_solicitante_id=body.almacen_solicitante_id,
+        almacen_abastecedor_id=body.almacen_abastecedor_id,
+        items=[(i.sku_id, i.cantidad) for i in body.items],
+        solicitado_por=actor.id,
+        observacion=body.observacion,
+    )
     session.commit()
     return solicitud
 
@@ -401,11 +344,8 @@ def listar_solicitudes(
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        if almacen_solicitante_id is not None:
-            exigir_almacen(session, almacen_solicitante_id, tenant)
-    except NoEncontrado as e:
-        raise _http(e) from e
+    if almacen_solicitante_id is not None:
+        exigir_almacen(session, almacen_solicitante_id, tenant)
     return solicitudes_uc.listar(
         session,
         almacen_solicitante_id=almacen_solicitante_id,
@@ -423,11 +363,8 @@ def ver_solicitud(
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        exigir_solicitud(session, solicitud_id, tenant)
-        solicitud, items = solicitudes_uc.detalle(session, solicitud_id)
-    except NoEncontrado as e:
-        raise _http(e) from e
+    exigir_solicitud(session, solicitud_id, tenant)
+    solicitud, items = solicitudes_uc.detalle(session, solicitud_id)
     return schemas.SolicitudDetalleOut(
         **schemas.SolicitudOut.model_validate(solicitud).model_dump(),
         items=[schemas.SolicitudItemOut.model_validate(i) for i in items],
@@ -446,16 +383,13 @@ def aprobar_solicitud(
 ):
     """Aprobar reserva el stock en el abastecedor: entre la aprobación y el
     picking pasan horas y sin reserva otra sucursal se lleva lo mismo."""
-    try:
-        exigir_solicitud(session, solicitud_id, tenant)
-        solicitud = solicitudes_uc.aprobar_solicitud(
-            session,
-            solicitud_id,
-            actor.id,
-            {a.sku_id: a.cantidad for a in body.aprobadas},
-        )
-    except (NoEncontrado, ReglaNegocio, StockInsuficiente) as e:
-        raise _http(e) from e
+    exigir_solicitud(session, solicitud_id, tenant)
+    solicitud = solicitudes_uc.aprobar_solicitud(
+        session,
+        solicitud_id,
+        actor.id,
+        {a.sku_id: a.cantidad for a in body.aprobadas},
+    )
     session.commit()
     return solicitud
 
@@ -469,11 +403,8 @@ def rechazar_solicitud(
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        exigir_solicitud(session, solicitud_id, tenant)
-        solicitud = solicitudes_uc.rechazar_solicitud(session, solicitud_id, actor.id)
-    except (NoEncontrado, ReglaNegocio) as e:
-        raise _http(e) from e
+    exigir_solicitud(session, solicitud_id, tenant)
+    solicitud = solicitudes_uc.rechazar_solicitud(session, solicitud_id, actor.id)
     session.commit()
     return solicitud
 
@@ -489,11 +420,8 @@ def cancelar_solicitud(
 ):
     """Cancelar libera las reservas que la aprobación había tomado
     (RN-INV-010)."""
-    try:
-        exigir_solicitud(session, solicitud_id, tenant)
-        solicitud = solicitudes_uc.cancelar_solicitud(session, solicitud_id, actor.id)
-    except (NoEncontrado, ReglaNegocio) as e:
-        raise _http(e) from e
+    exigir_solicitud(session, solicitud_id, tenant)
+    solicitud = solicitudes_uc.cancelar_solicitud(session, solicitud_id, actor.id)
     session.commit()
     return solicitud
 
@@ -511,23 +439,20 @@ def despachar_transferencia(
     """Descuenta el origen y deja el stock `en_transito` (RN-INV-003). Con
     `solicitud_id` despacha lo aprobado; sin él es transferencia lateral y
     los ítems son obligatorios."""
-    try:
-        exigir_almacen(session, body.origen_almacen_id, tenant)
-        exigir_almacen(session, body.destino_almacen_id, tenant)
-        if body.solicitud_id is not None:
-            exigir_solicitud(session, body.solicitud_id, tenant)
-        transferencia = transferencias_uc.despachar(
-            session,
-            origen_almacen_id=body.origen_almacen_id,
-            destino_almacen_id=body.destino_almacen_id,
-            despachado_por=actor.id,
-            solicitud_id=body.solicitud_id,
-            items=[(i.sku_id, i.cantidad) for i in body.items] or None,
-            transportista_id=body.transportista_id,
-            observacion=body.observacion,
-        )
-    except (NoEncontrado, ReglaNegocio, StockInsuficiente) as e:
-        raise _http(e) from e
+    exigir_almacen(session, body.origen_almacen_id, tenant)
+    exigir_almacen(session, body.destino_almacen_id, tenant)
+    if body.solicitud_id is not None:
+        exigir_solicitud(session, body.solicitud_id, tenant)
+    transferencia = transferencias_uc.despachar(
+        session,
+        origen_almacen_id=body.origen_almacen_id,
+        destino_almacen_id=body.destino_almacen_id,
+        despachado_por=actor.id,
+        solicitud_id=body.solicitud_id,
+        items=[(i.sku_id, i.cantidad) for i in body.items] or None,
+        transportista_id=body.transportista_id,
+        observacion=body.observacion,
+    )
     session.commit()
     return transferencia
 
@@ -541,11 +466,8 @@ def listar_transferencias(
     session: Session = Depends(get_db),
 ):
     """`almacen_id` matchea origen o destino: lo que sale y lo que llega."""
-    try:
-        if almacen_id is not None:
-            exigir_almacen(session, almacen_id, tenant)
-    except NoEncontrado as e:
-        raise _http(e) from e
+    if almacen_id is not None:
+        exigir_almacen(session, almacen_id, tenant)
     return transferencias_uc.listar(
         session,
         almacen_id=almacen_id,
@@ -564,11 +486,8 @@ def ver_transferencia(
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        exigir_transferencia(session, transferencia_id, tenant)
-        transferencia, items = transferencias_uc.detalle(session, transferencia_id)
-    except NoEncontrado as e:
-        raise _http(e) from e
+    exigir_transferencia(session, transferencia_id, tenant)
+    transferencia, items = transferencias_uc.detalle(session, transferencia_id)
     return schemas.TransferenciaDetalleOut(
         **schemas.TransferenciaOut.model_validate(transferencia).model_dump(),
         items=[schemas.TransferenciaItemOut.model_validate(i) for i in items],
@@ -588,17 +507,14 @@ def recibir_transferencia(
 ):
     """Ingresa al destino lo que llegó, lote por lote. Una diferencia
     contra lo enviado no se corrige sola: queda auditable (RN-INV-002)."""
-    try:
-        exigir_transferencia(session, transferencia_id, tenant)
-        transferencias_uc.recibir(
-            session,
-            transferencia_id,
-            actor.id,
-            {i.item_id: i.cantidad for i in body.items},
-        )
-        transferencia, items = transferencias_uc.detalle(session, transferencia_id)
-    except (NoEncontrado, ReglaNegocio, StockInsuficiente) as e:
-        raise _http(e) from e
+    exigir_transferencia(session, transferencia_id, tenant)
+    transferencias_uc.recibir(
+        session,
+        transferencia_id,
+        actor.id,
+        {i.item_id: i.cantidad for i in body.items},
+    )
+    transferencia, items = transferencias_uc.detalle(session, transferencia_id)
     session.commit()
     return schemas.TransferenciaDetalleOut(
         **schemas.TransferenciaOut.model_validate(transferencia).model_dump(),
@@ -618,11 +534,8 @@ def programa_conteos(
 ):
     """Calendario derivado del último conteo cerrado + la frecuencia de cada
     categoría (RN-INV-007). Los vencidos salen primero."""
-    try:
-        if almacen_id is not None:
-            exigir_almacen(session, almacen_id, tenant)
-    except NoEncontrado as e:
-        raise _http(e) from e
+    if almacen_id is not None:
+        exigir_almacen(session, almacen_id, tenant)
     return conteos_uc.programa(
         session, almacen_id=almacen_id, empresa_id=tenant.filtro_empresa()
     )
@@ -639,11 +552,8 @@ def verificar_conteos_vencidos(
 ):
     """Reporta a almacén y gerencia lo que no se contó en su fecha
     (RN-INV-021): publica `inventory.conteo_vencido` por cada uno."""
-    try:
-        if almacen_id is not None:
-            exigir_almacen(session, almacen_id, tenant)
-    except NoEncontrado as e:
-        raise _http(e) from e
+    if almacen_id is not None:
+        exigir_almacen(session, almacen_id, tenant)
     return conteos_uc.reportar_vencidos(
         session, almacen_id=almacen_id, empresa_id=tenant.filtro_empresa()
     )
@@ -656,20 +566,17 @@ def abrir_conteo(
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        exigir_almacen(session, body.almacen_id, tenant)
-        if body.categoria_id is not None:
-            exigir_categoria(session, body.categoria_id, tenant)
-        conteo = conteos_uc.abrir_conteo(
-            session,
-            almacen_id=body.almacen_id,
-            categoria_id=body.categoria_id,
-            tipo=body.tipo,
-            abierto_por=actor.id,
-            observacion=body.observacion,
-        )
-    except (NoEncontrado, ReglaNegocio, Conflicto) as e:
-        raise _http(e) from e
+    exigir_almacen(session, body.almacen_id, tenant)
+    if body.categoria_id is not None:
+        exigir_categoria(session, body.categoria_id, tenant)
+    conteo = conteos_uc.abrir_conteo(
+        session,
+        almacen_id=body.almacen_id,
+        categoria_id=body.categoria_id,
+        tipo=body.tipo,
+        abierto_por=actor.id,
+        observacion=body.observacion,
+    )
     session.commit()
     return conteo
 
@@ -683,11 +590,8 @@ def ver_conteo(
 ):
     """Conteo "a ciegas" por defecto: el stock esperado y la diferencia solo
     viajan a quien tiene `inventory.ver_stock_esperado` (RN-INV-005)."""
-    try:
-        exigir_conteo(session, conteo_id, tenant)
-        conteo, items = conteos_uc.detalle(session, conteo_id)
-    except NoEncontrado as e:
-        raise _http(e) from e
+    exigir_conteo(session, conteo_id, tenant)
+    conteo, items = conteos_uc.detalle(session, conteo_id)
     ve_esperado = tiene_permiso(session, actor, VER_ESPERADO)
     return schemas.ConteoDetalleOut(
         **schemas.ConteoOut.model_validate(conteo).model_dump(),
@@ -711,13 +615,10 @@ def registrar_cantidades(
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        exigir_conteo(session, conteo_id, tenant)
-        conteo = conteos_uc.registrar_cantidades(
-            session, conteo_id, [(i.sku_id, i.cantidad) for i in body.items]
-        )
-    except (NoEncontrado, ReglaNegocio) as e:
-        raise _http(e) from e
+    exigir_conteo(session, conteo_id, tenant)
+    conteo = conteos_uc.registrar_cantidades(
+        session, conteo_id, [(i.sku_id, i.cantidad) for i in body.items]
+    )
     session.commit()
     return conteo
 
@@ -731,11 +632,8 @@ def cerrar_conteo(
 ):
     """Cierra y solicita un ajuste por cada diferencia. No mueve stock: los
     ajustes nacen `pendiente` y los aprueba otro usuario (RN-INV-006)."""
-    try:
-        exigir_conteo(session, conteo_id, tenant)
-        conteo, generados = conteos_uc.cerrar_conteo(session, conteo_id, actor.id)
-    except (NoEncontrado, ReglaNegocio) as e:
-        raise _http(e) from e
+    exigir_conteo(session, conteo_id, tenant)
+    conteo, generados = conteos_uc.cerrar_conteo(session, conteo_id, actor.id)
     session.commit()
     return schemas.ConteoCierreOut(conteo=conteo, ajustes=generados)
 
@@ -748,19 +646,16 @@ def solicitar_ajuste(
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        exigir_almacen(session, body.almacen_id, tenant)
-        aj = ajustes.solicitar_ajuste(
-            session,
-            almacen_id=body.almacen_id,
-            sku_id=body.sku_id,
-            cantidad=body.cantidad,
-            motivo=body.motivo,
-            solicitado_por=actor.id,
-            dentro_margen=body.dentro_margen,
-        )
-    except (NoEncontrado, ReglaNegocio) as e:
-        raise _http(e) from e
+    exigir_almacen(session, body.almacen_id, tenant)
+    aj = ajustes.solicitar_ajuste(
+        session,
+        almacen_id=body.almacen_id,
+        sku_id=body.sku_id,
+        cantidad=body.cantidad,
+        motivo=body.motivo,
+        solicitado_por=actor.id,
+        dentro_margen=body.dentro_margen,
+    )
     session.commit()
     return aj
 
@@ -772,11 +667,8 @@ def aprobar_ajuste(
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        exigir_ajuste(session, ajuste_id, tenant)
-        aj = ajustes.aprobar_ajuste(session, ajuste_id, actor.id)
-    except (NoEncontrado, ReglaNegocio, StockInsuficiente) as e:
-        raise _http(e) from e
+    exigir_ajuste(session, ajuste_id, tenant)
+    aj = ajustes.aprobar_ajuste(session, ajuste_id, actor.id)
     session.commit()
     return aj
 
@@ -788,10 +680,7 @@ def rechazar_ajuste(
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        exigir_ajuste(session, ajuste_id, tenant)
-        aj = ajustes.rechazar_ajuste(session, ajuste_id, actor.id)
-    except (NoEncontrado, ReglaNegocio) as e:
-        raise _http(e) from e
+    exigir_ajuste(session, ajuste_id, tenant)
+    aj = ajustes.rechazar_ajuste(session, ajuste_id, actor.id)
     session.commit()
     return aj

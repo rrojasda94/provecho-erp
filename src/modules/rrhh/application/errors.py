@@ -1,17 +1,7 @@
-"""Errores de la capa de aplicación de rrhh (la API los mapea a HTTP)."""
+"""Errores de aplicación de rrhh. La tripleta común (`NoEncontrado`,
+`Conflicto`, `ReglaNegocio`) y su mapeo a HTTP viven en
+`src/shared/errors.py`; el módulo no especializa ninguno todavía."""
 
+from src.shared.errors import AppError, Conflicto, NoEncontrado, ReglaNegocio
 
-class RrhhError(Exception):
-    """Base."""
-
-
-class NoEncontrado(RrhhError):
-    """Entidad inexistente."""
-
-
-class Conflicto(RrhhError):
-    """Estado que no admite la operación."""
-
-
-class ReglaNegocio(RrhhError):
-    """Violación de una regla de negocio."""
+__all__ = ["AppError", "Conflicto", "NoEncontrado", "ReglaNegocio"]

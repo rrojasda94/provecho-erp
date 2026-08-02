@@ -2,19 +2,13 @@
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from src.config.settings import settings
 from src.core.tenant import Tenant
 from src.modules.production.api import schemas
 from src.modules.production.application import ordenes
-from src.modules.production.application.errors import (
-    Conflicto,
-    NoEncontrado,
-    ProductionError,
-    ReglaNegocio,
-)
 from src.modules.production.application.scope import exigir_almacen, exigir_orden
 from src.modules.users.api.deps import get_db, get_tenant, require_permission
 from src.modules.users.infrastructure.models import Usuario
@@ -25,16 +19,6 @@ CREAR = "production.crear"
 LEER = "production.leer"
 COMPLETAR = "production.completar"
 
-_HTTP_STATUS: dict[type[ProductionError], int] = {
-    NoEncontrado: status.HTTP_404_NOT_FOUND,
-    Conflicto: status.HTTP_409_CONFLICT,
-    ReglaNegocio: status.HTTP_409_CONFLICT,
-}
-
-
-def _http(err: ProductionError) -> HTTPException:
-    return HTTPException(_HTTP_STATUS.get(type(err), 400), str(err))
-
 
 @router.post("/ordenes", response_model=schemas.OrdenProduccionOut, status_code=201)
 def crear_orden(
@@ -43,18 +27,15 @@ def crear_orden(
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        exigir_almacen(session, body.almacen_id, tenant)
-        orden = ordenes.crear_orden_produccion(
-            session,
-            articulo_id=body.articulo_id,
-            almacen_id=body.almacen_id,
-            cantidad_planeada=body.cantidad_planeada,
-            creado_por=actor.id,
-            idempotency_key=body.idempotency_key,
-        )
-    except (NoEncontrado, ReglaNegocio) as e:
-        raise _http(e) from e
+    exigir_almacen(session, body.almacen_id, tenant)
+    orden = ordenes.crear_orden_produccion(
+        session,
+        articulo_id=body.articulo_id,
+        almacen_id=body.almacen_id,
+        cantidad_planeada=body.cantidad_planeada,
+        creado_por=actor.id,
+        idempotency_key=body.idempotency_key,
+    )
     session.commit()
     return orden
 
@@ -66,10 +47,7 @@ def ver_orden(
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        return exigir_orden(session, orden_id, tenant)
-    except NoEncontrado as e:
-        raise _http(e) from e
+    return exigir_orden(session, orden_id, tenant)
 
 
 @router.post("/ordenes/{orden_id}/consumo", response_model=schemas.OrdenProduccionOut)
@@ -80,13 +58,10 @@ def registrar_consumo(
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        exigir_orden(session, orden_id, tenant)
-        orden = ordenes.registrar_consumo(
-            session, orden_id, items=[it.model_dump() for it in body.items]
-        )
-    except (NoEncontrado, Conflicto, ReglaNegocio) as e:
-        raise _http(e) from e
+    exigir_orden(session, orden_id, tenant)
+    orden = ordenes.registrar_consumo(
+        session, orden_id, items=[it.model_dump() for it in body.items]
+    )
     session.commit()
     return orden
 
@@ -99,20 +74,17 @@ def completar_orden(
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        exigir_orden(session, orden_id, tenant)
-        orden = ordenes.completar_orden_produccion(
-            session,
-            orden_id,
-            resultado=body.resultado,
-            costo_hora_mano_obra=settings.production_costo_hora_mano_obra,
-            cantidad_producida=body.cantidad_producida,
-            horas_hombre=body.horas_hombre,
-            merma_cantidad=body.merma_cantidad,
-            merma_motivo=body.merma_motivo,
-            evidencia_destruccion_url=body.evidencia_destruccion_url,
-        )
-    except (NoEncontrado, Conflicto, ReglaNegocio) as e:
-        raise _http(e) from e
+    exigir_orden(session, orden_id, tenant)
+    orden = ordenes.completar_orden_produccion(
+        session,
+        orden_id,
+        resultado=body.resultado,
+        costo_hora_mano_obra=settings.production_costo_hora_mano_obra,
+        cantidad_producida=body.cantidad_producida,
+        horas_hombre=body.horas_hombre,
+        merma_cantidad=body.merma_cantidad,
+        merma_motivo=body.merma_motivo,
+        evidencia_destruccion_url=body.evidencia_destruccion_url,
+    )
     session.commit()
     return orden

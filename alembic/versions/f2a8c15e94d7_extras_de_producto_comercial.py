@@ -2,7 +2,7 @@
 
 Un extra es un `producto_comercial` con `es_extra=True` y su propia receta,
 que se ejecuta en la sucursal y se suma a la del producto al que se agrega
-(RN-COM-021, ADR-016). Modelarlo así en vez de como entidad aparte hace que
+(RN-COM-021, ADR-018). Modelarlo así en vez de como entidad aparte hace que
 herede precio server-side por lista, aparición en la carta y descuento de
 insumos por el mismo evento `sales.venta_confirmada`.
 

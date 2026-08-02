@@ -16,7 +16,7 @@ código habría significado tocar código o un documento cada vez que el
 negocio los ajuste — y el usuario confirmó que sí van a variar: "no son
 cosas fijas siempre".
 
-> **Corrección (2026-08-01, ADR-017):** esta lista incluía además "frecuencia
+> **Corrección (2026-08-01, ADR-019):** esta lista incluía además "frecuencia
 > de conteo cíclico por categoría de insumo". No corresponde a
 > `parametro_empresa`: el negocio precisó que la frecuencia la fija **cada
 > categoría** y no hay un valor único por empresa, así que vive como columna

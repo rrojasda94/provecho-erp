@@ -34,7 +34,7 @@ al emitir.
 **Precio server-side (2026-07-27):** `lista_precio` + `precio` (migración
 `d4b1f0a7c3e9`). El PDV ya no manda el monto — ver sección propia abajo.
 
-**Slice PDV (2026-07-28, migración `d7e3b8c14f52`, ADR-016):** cierra los
+**Slice PDV (2026-07-28, migración `d7e3b8c14f52`, ADR-018):** cierra los
 cuatro huecos que el punto de venta necesitaba y el modelo no daba.
 
 - `mesa` (`sucursal_id`, `numero` único por sucursal, `zona`, `capacidad`,
@@ -100,7 +100,7 @@ Diferido a un slice posterior: `variante_producto`, `combo`, `promocion`,
 > vigentes, sobre el precio base de la más barata y sin extras) y exigen un
 > motor de reglas que **todavía no existe**. Quien lo construya no debe
 > reutilizar estos campos: mezclarlos haría imposible auditar cuál
-> descuento fue humano y cuál automático. Ver ADR-016 y `ROADMAP.md`.
+> descuento fue humano y cuál automático. Ver ADR-018 y `ROADMAP.md`.
 
 ## Estado (slice PDV implementado 2026-07-25)
 

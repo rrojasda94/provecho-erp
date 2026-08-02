@@ -1,17 +1,7 @@
-"""Errores de la capa de aplicación de accounting (la API los mapea a HTTP)."""
+"""Errores de aplicación de accounting. La tripleta común (`NoEncontrado`,
+`Conflicto`, `ReglaNegocio`) y su mapeo a HTTP viven en
+`src/shared/errors.py`; el módulo no especializa ninguno todavía."""
 
+from src.shared.errors import AppError, Conflicto, NoEncontrado, ReglaNegocio
 
-class AccountingError(Exception):
-    """Base."""
-
-
-class NoEncontrado(AccountingError):
-    """Entidad inexistente."""
-
-
-class Conflicto(AccountingError):
-    """Estado que no admite la operación."""
-
-
-class ReglaNegocio(AccountingError):
-    """Violación de una regla (descuadre, periodo cerrado, cuenta inactiva)."""
+__all__ = ["AppError", "Conflicto", "NoEncontrado", "ReglaNegocio"]

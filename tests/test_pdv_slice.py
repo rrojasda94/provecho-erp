@@ -1,4 +1,4 @@
-"""Slice PDV (ADR-016): mesa tipada, cobro dividido por grupos, receptor
+"""Slice PDV (ADR-018): mesa tipada, cobro dividido por grupos, receptor
 tecleado en caja y descuento manual de la orden.
 
 Cada prueba cubre un hueco que el punto de venta necesitaba y el modelo no
@@ -953,6 +953,7 @@ def test_el_consumo_del_extra_se_multiplica_por_el_plato(session, base):
             }
         ],
     )
+    session.commit()
     items = publicados[-1]["items"]
     assert len(items) == 2, "el extra viaja como consumo propio a inventory"
     assert items[1]["cantidad"] == "3"

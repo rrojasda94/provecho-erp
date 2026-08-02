@@ -1,4 +1,4 @@
-"""Tests del conteo cíclico (ADR-017): programa derivado por frecuencia de
+"""Tests del conteo cíclico (ADR-019): programa derivado por frecuencia de
 categoría, conteo a ciegas, ajustes generados al cerrar y reporte de lo
 que no se contó en su fecha. SQLite en memoria + override de get_db, igual
 que `test_inventory.py`.

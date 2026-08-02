@@ -113,7 +113,7 @@ erDiagram
   `activo` (ambos con categoria_id opcional); libremente
   editable/eliminable, a diferencia del SKU.
   `frecuencia_conteo` es lo que hace implementable el conteo cíclico
-  (RN-INV-007, ADR-017): la periodicidad no es única por empresa ni por
+  (RN-INV-007, ADR-019): la periodicidad no es única por empresa ni por
   almacén, la fija la categoría del SKU. NULL = fuera del ciclo.
 
 ## 1b. Geografía (transversal)
@@ -144,7 +144,7 @@ erDiagram
 
 - **persona**: nombres, apellidos, tipo_documento (`dni` | `ce` |
   `pasaporte`, **nullable** desde 2026-07-28), numero_documento (único,
-  **nullable** desde 2026-07-28 — migración `e1c4a9d6b038`, ADR-016: para
+  **nullable** desde 2026-07-28 — migración `e1c4a9d6b038`, ADR-018: para
   registrar a un cliente de mostrador basta el teléfono, RN-PTS-004; el
   UNIQUE se conserva porque un índice único admite varios NULL. **Trabajador
   y usuario siguen exigiéndolo** — esa validación vive en
@@ -365,7 +365,7 @@ descuenta stock vía la receta (ver [../domain/domain-model.md](../domain/domain
   creado_por, liberado_por (nullable), timestamp. Stock disponible = stock
   físico − Σ reservas activas (RN-INV-009).
   **No mueve `stock` ni genera movimiento**: es una promesa sobre stock que
-  sigue físicamente en el almacén (ADR-018). Reservar exige disponible
+  sigue físicamente en el almacén (ADR-020). Reservar exige disponible
   suficiente; consumir **no** se bloquea nunca por una reserva —una venta
   ya ocurrida no se niega—, así que el disponible puede quedar negativo, y
   eso es la señal de una promesa sin respaldo, no un error. De los cuatro
@@ -385,7 +385,7 @@ descuenta stock vía la receta (ver [../domain/domain-model.md](../domain/domain
   diferencia distinta de cero genera un `ajuste` pendiente; los ítems sin
   contar se ignoran. Sin categoría configurada con `frecuencia_conteo` no
   hay programa: el calendario se deriva del último conteo cerrado más la
-  frecuencia, no existe tabla `programa_conteo` (ADR-017).
+  frecuencia, no existe tabla `programa_conteo` (ADR-019).
 - **ajuste**: almacen_id, conteo_id (opcional — origen), motivo
   (`sobrante` | `faltante` | `merma` | `error_registro`), solicitado_por,
   aprobado_por (permisos separados `inventory.solicitar_ajuste` /
@@ -412,7 +412,7 @@ descuenta stock vía la receta (ver [../domain/domain-model.md](../domain/domain
   Ítems en **solicitud_item** (sku_id, cantidad_solicitada,
   cantidad_aprobada, cantidad_despachada; único por solicitud+sku). Caso
   concreto (ámbito inventario) del concepto marco Solicitud (RN-DOC-005).
-  Va **por almacén y no por sucursal** (ADR-018): producción también
+  Va **por almacén y no por sucursal** (ADR-020): producción también
   solicita y la transferencia opera sobre almacenes; la sucursal se deriva
   de `almacen.sucursal_id`. El abastecedor se copia del
   `almacen.almacen_abastecedor_id` al crearla, para que cambiarlo después
@@ -563,20 +563,20 @@ Solicitud.
   Mantenimiento propio, RN-PER-003), referencia_atencion (texto libre para
   takeout/delivery: "Carlos", "Rappi #1042" — para `modalidad=mesa` el dato
   tipado es `mesa_id`), **mesa_id** (nullable, solo si modalidad=mesa),
-  **comensales** (nullable), y el descuento manual de la orden (ADR-016):
+  **comensales** (nullable), y el descuento manual de la orden (ADR-018):
   **descuento_modo** (`porcentaje` | `monto`), **descuento_valor**,
   **descuento_motivo** (`cortesia` | `reclamo` | `colaborador` |
   `promocion` | `convenio`), **descuento_autorizado_por** (usuario_id del
   supervisor — RN-COM-017; el permiso `sales.aplicar_descuento` está
   separado de `sales.cobrar` para que el cajero no se autorice a sí mismo).
-- **mesa** (ADR-016): sucursal_id, numero (único por sucursal), zona
+- **mesa** (ADR-018): sucursal_id, numero (único por sucursal), zona
   (`Salón`, `Terraza`, `Barra`... libre), capacidad (nullable), activa.
   Vive en `sales` y no en `users` porque quien le da sentido es la toma de
   pedido. **No guarda estado de ocupación**: una mesa está ocupada si tiene
   una venta en `orden`; el mapa del salón es una lectura derivada, nunca un
   campo. Dos fuentes de verdad para el mismo hecho se desincronizan apenas
   alguien cobre desde otra caja.
-- **producto_comercial_extra** (ADR-016): producto_comercial_id, extra_id
+- **producto_comercial_extra** (ADR-018): producto_comercial_id, extra_id
   (también un `producto_comercial`, con `es_extra=True`), maximo (tope de
   unidades del extra en una línea, NULL = sin tope). Define qué extra admite
   cada producto (RN-COM-021). Sin esta tabla nada impediría agregarle
@@ -589,7 +589,7 @@ Solicitud.
   receta, su propio precio de lista y su propio avance en cocina; aplanarlo
   perdería las tres cosas), **grupo_cobro** (entero, default 1 —
   cuenta a la que pertenece la línea cuando el pedido se divide entre
-  varios pagadores, RN-COM-018/ADR-016), estado_preparacion (`pendiente` |
+  varios pagadores, RN-COM-018/ADR-018), estado_preparacion (`pendiente` |
   `en_preparacion` | `listo` | `entregado` — avance de `PROC-OPE-002`,
   fuente única del progreso del pedido; `updated_at` de cada transición es
   la base para medir tiempos de preparación y de despacho,
@@ -619,7 +619,7 @@ Solicitud.
   `venta.total` antes de `estado=pagada`, RN-COM-016), **grupo_cobro**
   (entero, default 1 — los pagos de un grupo suman contra el total de ESE
   grupo, no de la venta entera; la venta pasa a `pagada` recién cuando
-  ningún grupo queda con saldo, RN-COM-018/ADR-016), pasarela (izipay),
+  ningún grupo queda con saldo, RN-COM-018/ADR-018), pasarela (izipay),
   referencia externa, idempotency_key (obligatoria al registrar pago,
   RN-COM-002), estado.
 - **custodia_efectivo**: apertura_caja_id, monto, responsable_actual_id,
@@ -642,7 +642,7 @@ Solicitud.
   → contabilidad, cada uno autenticado con usuario+PIN, timestamps),
   custodia (`local_caja_fuerte` | `traslado_contabilidad`, RN-MDP-006),
   estado. Irregularidades notifican a contabilidad, gerencia y RRHH.
-- **movimiento_caja** (ADR-016): apertura_caja_id, tipo (`ingreso` |
+- **movimiento_caja** (ADR-018): apertura_caja_id, tipo (`ingreso` |
   `retiro`), monto (siempre positivo — el signo lo da `tipo`; guardar
   negativos invita a sumar mal), motivo (obligatorio: un movimiento sin
   motivo es indistinguible de un faltante), registrado_por, autorizado_por
@@ -694,7 +694,7 @@ Solicitud.
   reemisión, RN-CPP-008), estado de emisión, hash e intentos del
   proveedor, respuesta (JSONB). Ver ADR-005 (Factiliza).
   **grupo_cobro** (entero, default 1) y **receptor_num_doc** /
-  **receptor_nombre** (ADR-016): `venta_id` dejó de identificar un único
+  **receptor_nombre** (ADR-018): `venta_id` dejó de identificar un único
   comprobante — una venta dividida emite uno por grupo. El código que
   asumía «un comprobante por venta» debe usar `por_venta_y_grupo` o
   `todos_de_venta`; `por_venta` devuelve el primero. El receptor es el

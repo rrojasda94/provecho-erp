@@ -20,12 +20,6 @@ from src.modules.sales.application import (
     tasks,
     ventas,
 )
-from src.modules.sales.application.errors import (
-    Conflicto,
-    NoEncontrado,
-    ReglaNegocio,
-    SalesError,
-)
 from src.modules.sales.application.scope import exigir_venta
 from src.modules.sales.domain import rules
 from src.modules.sales.infrastructure.repositories import (
@@ -54,21 +48,6 @@ LEER_CLIENTES_EXTERNOS = "sales.leer_clientes_externos"
 EMITIR = "sales.emitir_comprobante"
 ENTREGAR = "sales.entregar_pedido"
 
-_HTTP_STATUS: dict[type[SalesError], int] = {
-    NoEncontrado: status.HTTP_404_NOT_FOUND,
-    Conflicto: status.HTTP_409_CONFLICT,
-    ReglaNegocio: status.HTTP_409_CONFLICT,
-}
-
-
-def _http(err: SalesError) -> HTTPException:
-    # Por isinstance y no por `type`: un error derivado (PrecioNoDefinido de
-    # ReglaNegocio) debe heredar el estado de su base, no caer al 400 genérico.
-    for tipo, codigo in _HTTP_STATUS.items():
-        if isinstance(err, tipo):
-            return HTTPException(codigo, str(err))
-    return HTTPException(400, str(err))
-
 
 # --- Venta ------------------------------------------------------------------
 @router.post("/ventas", response_model=schemas.VentaOut, status_code=201)
@@ -79,24 +58,21 @@ def crear_venta(
     session: Session = Depends(get_db),
 ):
     tenant.exigir_sucursal(body.sucursal_id)
-    try:
-        venta = ventas.crear_venta(
-            session,
-            sucursal_id=body.sucursal_id,
-            punto_venta_id=body.punto_venta_id,
-            canal=body.canal,
-            modalidad=body.modalidad,
-            usuario_id=actor.id,
-            idempotency_key=body.idempotency_key,
-            items=[it.model_dump() for it in body.items],
-            cliente_id=body.cliente_id,
-            referencia_atencion=body.referencia_atencion,
-            mesa_id=body.mesa_id,
-            comensales=body.comensales,
-            id=body.id,
-        )
-    except (NoEncontrado, ReglaNegocio, Conflicto) as e:
-        raise _http(e) from e
+    venta = ventas.crear_venta(
+        session,
+        sucursal_id=body.sucursal_id,
+        punto_venta_id=body.punto_venta_id,
+        canal=body.canal,
+        modalidad=body.modalidad,
+        usuario_id=actor.id,
+        idempotency_key=body.idempotency_key,
+        items=[it.model_dump() for it in body.items],
+        cliente_id=body.cliente_id,
+        referencia_atencion=body.referencia_atencion,
+        mesa_id=body.mesa_id,
+        comensales=body.comensales,
+        id=body.id,
+    )
     session.commit()
     return venta
 
@@ -136,19 +112,17 @@ def aplicar_descuento(
     """
     try:
         autorizado_por = autorizacion.verificar(body.autorizacion, DESCONTAR)
-        exigir_venta(session, venta_id, tenant)
-        venta = ventas.aplicar_descuento(
-            session,
-            venta_id=venta_id,
-            modo=body.modo,
-            valor=body.valor,
-            motivo=body.motivo,
-            autorizado_por=autorizado_por,
-        )
     except TokenInvalido as e:
         raise HTTPException(status.HTTP_403_FORBIDDEN, str(e)) from e
-    except (NoEncontrado, ReglaNegocio, Conflicto) as e:
-        raise _http(e) from e
+    exigir_venta(session, venta_id, tenant)
+    venta = ventas.aplicar_descuento(
+        session,
+        venta_id=venta_id,
+        modo=body.modo,
+        valor=body.valor,
+        motivo=body.motivo,
+        autorizado_por=autorizado_por,
+    )
     session.commit()
     return venta
 
@@ -160,10 +134,7 @@ def ver_venta(
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        return exigir_venta(session, venta_id, tenant)
-    except NoEncontrado as e:
-        raise _http(e) from e
+    return exigir_venta(session, venta_id, tenant)
 
 
 @router.get("/ventas/{venta_id}/items", response_model=list[schemas.VentaItemOut])
@@ -175,11 +146,8 @@ def ver_items_venta(
 ):
     """Líneas de una venta ya confirmada: reabrir una mesa en curso en el
     PDV, o elegir qué anular, necesitan verlas con su id real (RN-COM-020)."""
-    try:
-        exigir_venta(session, venta_id, tenant)
-        return ventas.listar_items(session, venta_id)
-    except NoEncontrado as e:
-        raise _http(e) from e
+    exigir_venta(session, venta_id, tenant)
+    return ventas.listar_items(session, venta_id)
 
 
 @router.post("/ventas/{venta_id}/pagos", response_model=schemas.PagoOut, status_code=201)
@@ -190,22 +158,19 @@ def registrar_pago(
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        exigir_venta(session, venta_id, tenant)
-        pago, _venta, comprobante = ventas.registrar_pago(
-            session,
-            venta_id=venta_id,
-            medio_pago_id=body.medio_pago_id,
-            monto=body.monto,
-            idempotency_key=body.idempotency_key,
-            referencia_externa=body.referencia_externa,
-            grupo_cobro=body.grupo_cobro,
-            receptor_num_doc=body.receptor_num_doc,
-            receptor_nombre=body.receptor_nombre,
-            id=body.id,
-        )
-    except (NoEncontrado, Conflicto, ReglaNegocio) as e:
-        raise _http(e) from e
+    exigir_venta(session, venta_id, tenant)
+    pago, _venta, comprobante = ventas.registrar_pago(
+        session,
+        venta_id=venta_id,
+        medio_pago_id=body.medio_pago_id,
+        monto=body.monto,
+        idempotency_key=body.idempotency_key,
+        referencia_externa=body.referencia_externa,
+        grupo_cobro=body.grupo_cobro,
+        receptor_num_doc=body.receptor_num_doc,
+        receptor_nombre=body.receptor_nombre,
+        id=body.id,
+    )
     session.commit()
     # Después del commit: el worker corre en otro proceso y solo puede ver
     # filas ya confirmadas.
@@ -227,18 +192,16 @@ def anular_lineas(
     Antes de enviar, el pedido vive en el PDV y no pasa por acá."""
     try:
         autorizado_por = autorizacion.verificar(body.autorizacion, ANULAR)
-        exigir_venta(session, venta_id, tenant)
-        venta = ventas.anular_lineas(
-            session,
-            venta_id=venta_id,
-            venta_item_ids=body.venta_item_ids,
-            autorizado_por=autorizado_por,
-            motivo=body.motivo,
-        )
     except TokenInvalido as e:
         raise HTTPException(status.HTTP_403_FORBIDDEN, str(e)) from e
-    except (NoEncontrado, Conflicto, ReglaNegocio) as e:
-        raise _http(e) from e
+    exigir_venta(session, venta_id, tenant)
+    venta = ventas.anular_lineas(
+        session,
+        venta_id=venta_id,
+        venta_item_ids=body.venta_item_ids,
+        autorizado_por=autorizado_por,
+        motivo=body.motivo,
+    )
     session.commit()
     return venta
 
@@ -254,11 +217,8 @@ def ver_precuenta(
     """Documento **no fiscal** para que el cliente revise su consumo antes
     de pagar (RN-COM-019). No cambia el estado de la venta ni se audita:
     pedirla dos veces es normal."""
-    try:
-        exigir_venta(session, venta_id, tenant)
-        return precuenta.generar(session, venta_id, grupo_cobro)
-    except NoEncontrado as e:
-        raise _http(e) from e
+    exigir_venta(session, venta_id, tenant)
+    return precuenta.generar(session, venta_id, grupo_cobro)
 
 
 @router.post("/ventas/{venta_id}/anular", response_model=schemas.VentaOut)
@@ -268,11 +228,8 @@ def anular_venta(
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        exigir_venta(session, venta_id, tenant)
-        venta = ventas.anular_venta(session, venta_id, actor.id)
-    except (NoEncontrado, Conflicto) as e:
-        raise _http(e) from e
+    exigir_venta(session, venta_id, tenant)
+    venta = ventas.anular_venta(session, venta_id, actor.id)
     session.commit()
     return venta
 
@@ -288,13 +245,10 @@ def registrar_entrega(
     """Cierra el pedido: lo entrega al cliente y publica
     `sales.venta_entregada`. Permiso propio, distinto del avance de cocina
     (RN-CUP-006); repetirlo no reemite el evento (RN-CUP-005)."""
-    try:
-        exigir_venta(session, venta_id, tenant)
-        resultado = cumplimiento.registrar_entrega(
-            session, venta_id, entregado_por=actor.id
-        )
-    except (NoEncontrado, Conflicto, ReglaNegocio) as e:
-        raise _http(e) from e
+    exigir_venta(session, venta_id, tenant)
+    resultado = cumplimiento.registrar_entrega(
+        session, venta_id, entregado_por=actor.id
+    )
     session.commit()
     return resultado
 
@@ -316,6 +270,8 @@ def ver_comprobante(
     "/comprobantes/{comprobante_id}/reintentar",
     response_model=schemas.ComprobanteOut,
 )
+
+
 def reintentar_emision(
     comprobante_id: uuid.UUID,
     _: Usuario = Depends(require_permission(EMITIR)),
@@ -325,10 +281,11 @@ def reintentar_emision(
     Corre en línea (no en la cola) para devolver el veredicto al operador."""
     try:
         comprobante = comprobantes.emitir_comprobante(session, comprobante_id)
-    except (NoEncontrado, Conflicto) as e:
-        raise _http(e) from e
     except FactilizaError as e:
-        session.commit()  # conserva el intento contado
+        # Commit en el camino de error: el intento ya quedó contado en la
+        # fila y hay que persistirlo. Por eso este `except` sobrevive al
+        # handler global — no solo traduce, decide sobre la transacción.
+        session.commit()
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(e)) from e
     session.commit()
     return comprobante
@@ -352,10 +309,7 @@ def crear_producto(
     _: Usuario = Depends(require_permission(CATALOGO)),
     session: Session = Depends(get_db),
 ):
-    try:
-        prod = catalogo.crear_producto(session, **body.model_dump())
-    except Conflicto as e:
-        raise _http(e) from e
+    prod = catalogo.crear_producto(session, **body.model_dump())
     session.commit()
     return prod
 
@@ -370,15 +324,12 @@ def vincular_extra(
     """Habilita un extra sobre un producto. Ambas puntas son
     `producto_comercial`: el extra es uno con `es_extra=True` y su propia
     receta, que se suma a la del producto al agregarse (RN-COM-021)."""
-    try:
-        vinculo = catalogo.vincular_extra(
-            session,
-            producto_id=producto_id,
-            extra_id=body.extra_id,
-            maximo=body.maximo,
-        )
-    except (NoEncontrado, Conflicto) as e:
-        raise _http(e) from e
+    vinculo = catalogo.vincular_extra(
+        session,
+        producto_id=producto_id,
+        extra_id=body.extra_id,
+        maximo=body.maximo,
+    )
     session.commit()
     return {
         "producto_comercial_id": str(vinculo.producto_comercial_id),
@@ -403,10 +354,7 @@ def editar_producto(
     _: Usuario = Depends(require_permission(CATALOGO)),
     session: Session = Depends(get_db),
 ):
-    try:
-        prod = catalogo.editar_producto(session, producto_id, **body.model_dump())
-    except NoEncontrado as e:
-        raise _http(e) from e
+    prod = catalogo.editar_producto(session, producto_id, **body.model_dump())
     session.commit()
     return prod
 
@@ -445,10 +393,7 @@ def crear_lista_precio(
 ):
     if body.sucursal_id is not None:
         tenant.exigir_sucursal(body.sucursal_id)
-    try:
-        lista = precios.crear_lista(session, **body.model_dump())
-    except Conflicto as e:
-        raise _http(e) from e
+    lista = precios.crear_lista(session, **body.model_dump())
     session.commit()
     return lista
 
@@ -467,6 +412,8 @@ def listar_listas_precio(
     response_model=schemas.PrecioOut,
     status_code=201,
 )
+
+
 def fijar_precio(
     lista_id: uuid.UUID,
     body: schemas.PrecioCreate,
@@ -475,15 +422,12 @@ def fijar_precio(
 ):
     """Alta de precio en una lista. No hay PATCH: corregir un precio es una
     lista nueva, para que el histórico quede auditable (RN-PRC-005)."""
-    try:
-        precio = precios.fijar_precio(
-            session,
-            lista_precio_id=lista_id,
-            producto_comercial_id=body.producto_comercial_id,
-            monto=body.monto,
-        )
-    except (NoEncontrado, Conflicto) as e:
-        raise _http(e) from e
+    precio = precios.fijar_precio(
+        session,
+        lista_precio_id=lista_id,
+        producto_comercial_id=body.producto_comercial_id,
+        monto=body.monto,
+    )
     session.commit()
     return precio
 
@@ -533,16 +477,13 @@ def crear_mesa(
     session: Session = Depends(get_db),
 ):
     tenant.exigir_sucursal(body.sucursal_id)
-    try:
-        mesa = mesas.crear_mesa(
-            session,
-            sucursal_id=body.sucursal_id,
-            numero=body.numero,
-            zona=body.zona,
-            capacidad=body.capacidad,
-        )
-    except (Conflicto, ReglaNegocio) as e:
-        raise _http(e) from e
+    mesa = mesas.crear_mesa(
+        session,
+        sucursal_id=body.sucursal_id,
+        numero=body.numero,
+        zona=body.zona,
+        capacidad=body.capacidad,
+    )
     session.commit()
     return mesa
 
@@ -590,10 +531,7 @@ def desactivar_mesa(
     _: Usuario = Depends(require_permission(GESTIONAR_MESAS)),
     session: Session = Depends(get_db),
 ):
-    try:
-        mesa = mesas.desactivar_mesa(session, mesa_id)
-    except (NoEncontrado, Conflicto) as e:
-        raise _http(e) from e
+    mesa = mesas.desactivar_mesa(session, mesa_id)
     session.commit()
     return mesa
 
@@ -610,20 +548,17 @@ def crear_cliente(
     anónimo sigue siendo válido (RN-PER-005). Para una persona natural basta
     el teléfono; para facturar a una empresa el RUC es obligatorio
     (RN-PTS-002)."""
-    try:
-        cliente = clientes.crear_cliente(
-            session,
-            grupo_id=clientes.grupo_de_empresa(session, tenant.empresa()),
-            nombre=body.nombre,
-            numero_documento=body.numero_documento,
-            telefono=body.telefono,
-            email=body.email,
-            direccion=body.direccion,
-            fecha_nacimiento=body.fecha_nacimiento,
-            tipo_documento=body.tipo_documento,
-        )
-    except (NoEncontrado, Conflicto, ReglaNegocio) as e:
-        raise _http(e) from e
+    cliente = clientes.crear_cliente(
+        session,
+        grupo_id=clientes.grupo_de_empresa(session, tenant.empresa()),
+        nombre=body.nombre,
+        numero_documento=body.numero_documento,
+        telefono=body.telefono,
+        email=body.email,
+        direccion=body.direccion,
+        fecha_nacimiento=body.fecha_nacimiento,
+        tipo_documento=body.tipo_documento,
+    )
     session.commit()
     return cliente
 
@@ -638,10 +573,7 @@ def buscar_clientes(
     """Búsqueda de caja: por teléfono, documento o nombre — lo que el
     cliente recuerde. Distinta de `GET /clientes`, que es el listado para
     análisis externo y usa otro permiso."""
-    try:
-        grupo_id = clientes.grupo_de_empresa(session, tenant.empresa())
-    except NoEncontrado as e:
-        raise _http(e) from e
+    grupo_id = clientes.grupo_de_empresa(session, tenant.empresa())
     salida = []
     for cliente, persona in clientes.buscar(session, grupo_id=grupo_id, q=q):
         es_juridico = cliente.tipo == "juridico"
@@ -680,14 +612,11 @@ def actualizar_documento_cliente(
     """Completa el documento de un cliente que se registró solo por
     teléfono. Desde ese momento cuenta como identificado para promociones
     (RN-PTS-002)."""
-    try:
-        cliente = clientes.actualizar_documento(
-            session,
-            cliente_id=cliente_id,
-            numero_documento=body.numero_documento,
-            tipo_documento=body.tipo_documento,
-        )
-    except (NoEncontrado, Conflicto, ReglaNegocio) as e:
-        raise _http(e) from e
+    cliente = clientes.actualizar_documento(
+        session,
+        cliente_id=cliente_id,
+        numero_documento=body.numero_documento,
+        tipo_documento=body.tipo_documento,
+    )
     session.commit()
     return cliente

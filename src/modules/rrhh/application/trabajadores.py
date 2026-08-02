@@ -113,5 +113,6 @@ def cesar_trabajador(
             "usuario_id": str(trabajador.usuario_id) if trabajador.usuario_id else None,
             "fecha_cese": fecha_cese.isoformat(),
         },
+        session=session,
     )
     return trabajador

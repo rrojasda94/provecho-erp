@@ -1,6 +1,6 @@
 """conteo ciclico: conteo, conteo_item y frecuencia por categoria
 
-Cierra el conteo cíclico de `inventory` (ADR-017, RN-INV-007/014/021).
+Cierra el conteo cíclico de `inventory` (ADR-019, RN-INV-007/014/021).
 
 `categoria.frecuencia_conteo` es la pieza que define el calendario: la
 periodicidad no es universal ni por empresa, la fija cada categoría — el

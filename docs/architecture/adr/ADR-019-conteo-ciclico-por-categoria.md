@@ -1,4 +1,4 @@
-# ADR-017 — Conteo cíclico: frecuencia por categoría y programa derivado
+# ADR-019 — Conteo cíclico: frecuencia por categoría y programa derivado
 
 - Estado: aceptado
 - Fecha: 2026-08-01

@@ -28,7 +28,7 @@ from sqlalchemy.orm import Session
 from src.core.sync.contratos import AlcanceHub, RecursoSync
 from src.core.sync.tiempo import a_utc, para_dialecto
 from src.modules.sales.application import ventas as ventas_uc
-from src.modules.sales.application.errors import SalesError
+from src.modules.sales.application.errors import AppError
 from src.modules.sales.infrastructure.models import (
     KdsPantalla,
     ListaPrecio,
@@ -327,7 +327,7 @@ def _intentar(session: Session, resumen: dict, tipo: str, ident: str, funcion, d
         resultado = funcion(session, datos)
         session.commit()
         return resultado
-    except (SalesError, ValueError, SQLAlchemyError) as e:
+    except (AppError, ValueError, SQLAlchemyError) as e:
         session.rollback()
         resumen["errores"].append({"tipo": tipo, "id": ident, "detalle": str(e)})
         return _FALLO

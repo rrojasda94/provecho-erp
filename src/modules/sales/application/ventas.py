@@ -300,6 +300,7 @@ def crear_venta(
             "items": detalle_evento,
             "total": str(venta.total),
         },
+        session=session,
     )
     return venta
 
@@ -386,6 +387,7 @@ def aplicar_descuento(
             "motivo": motivo,
             "autorizado_por": str(autorizado_por),
         },
+        session=session,
     )
     return venta
 
@@ -496,6 +498,7 @@ def _cerrar_cuenta(
         event_bus.publish(
             "sales.venta_pagada",
             {"venta_id": str(venta.id), "total": str(total_a_cobrar(session, venta))},
+            session=session,
         )
     return comprobante
 
@@ -597,6 +600,7 @@ def anular_lineas(
             "motivo": motivo,
             "items": devueltos,
         },
+        session=session,
     )
     return venta
 
@@ -623,5 +627,6 @@ def anular_venta(session: Session, venta_id: uuid.UUID, usuario_id: uuid.UUID) -
             "usuario_id": str(usuario_id),
             "items": items,
         },
+        session=session,
     )
     return venta

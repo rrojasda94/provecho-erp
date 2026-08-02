@@ -10,12 +10,6 @@ from src.config.settings import settings
 from src.core.tenant import Tenant
 from src.modules.accounting.api import schemas
 from src.modules.accounting.application import asientos, caja, cuentas, pagos, periodos, reglas
-from src.modules.accounting.application.errors import (
-    AccountingError,
-    Conflicto,
-    NoEncontrado,
-    ReglaNegocio,
-)
 from src.modules.accounting.application.scope import (
     exigir_apertura_caja,
     exigir_asiento,
@@ -31,9 +25,8 @@ from src.modules.accounting.infrastructure.repositories import (
 from src.modules.users.api.deps import get_db, get_tenant, require_permission
 from src.modules.users.application import autorizacion
 from src.modules.users.application.errors import TokenInvalido
-from src.modules.users.domain.rules import permite
+from src.modules.users.application.queries_publicas import tiene_permiso
 from src.modules.users.infrastructure.models import Usuario
-from src.modules.users.infrastructure.repositories import UsuarioRepo
 
 router = APIRouter(prefix="/accounting", tags=["accounting"])
 
@@ -49,16 +42,6 @@ ARQUEO_REGISTRAR = "accounting.arqueo_registrar"
 # (RN-MDP-007).
 CAJA_RETIRAR = "accounting.caja_retirar"
 
-_HTTP_STATUS: dict[type[AccountingError], int] = {
-    NoEncontrado: status.HTTP_404_NOT_FOUND,
-    Conflicto: status.HTTP_409_CONFLICT,
-    ReglaNegocio: status.HTTP_409_CONFLICT,
-}
-
-
-def _http(err: AccountingError) -> HTTPException:
-    return HTTPException(_HTTP_STATUS.get(type(err), 400), str(err))
-
 
 # --- Plan de cuentas ----------------------------------------------------------
 @router.post("/cuentas-contables", response_model=schemas.CuentaContableOut, status_code=201)
@@ -70,12 +53,9 @@ def crear_cuenta(
 ):
     campos = body.model_dump()
     campos["empresa_id"] = tenant.empresa(campos["empresa_id"])
-    try:
-        if campos["cuenta_padre_id"] is not None:
-            exigir_cuenta(session, campos["cuenta_padre_id"], tenant)
-        cuenta = cuentas.crear_cuenta(session, **campos)
-    except (NoEncontrado, Conflicto, ReglaNegocio) as e:
-        raise _http(e) from e
+    if campos["cuenta_padre_id"] is not None:
+        exigir_cuenta(session, campos["cuenta_padre_id"], tenant)
+    cuenta = cuentas.crear_cuenta(session, **campos)
     session.commit()
     return cuenta
 
@@ -98,11 +78,8 @@ def editar_cuenta(
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        exigir_cuenta(session, cuenta_id, tenant)
-        cuenta = cuentas.editar_cuenta(session, cuenta_id, **body.model_dump())
-    except NoEncontrado as e:
-        raise _http(e) from e
+    exigir_cuenta(session, cuenta_id, tenant)
+    cuenta = cuentas.editar_cuenta(session, cuenta_id, **body.model_dump())
     session.commit()
     return cuenta
 
@@ -117,10 +94,7 @@ def abrir_periodo(
 ):
     campos = body.model_dump()
     campos["empresa_id"] = tenant.empresa(campos["empresa_id"])
-    try:
-        periodo = periodos.abrir_periodo(session, **campos)
-    except ReglaNegocio as e:
-        raise _http(e) from e
+    periodo = periodos.abrir_periodo(session, **campos)
     session.commit()
     return periodo
 
@@ -142,11 +116,8 @@ def cerrar_periodo(
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        exigir_periodo(session, periodo_id, tenant)
-        periodo = periodos.cerrar_periodo(session, periodo_id, cerrado_por=actor.id)
-    except (NoEncontrado, Conflicto) as e:
-        raise _http(e) from e
+    exigir_periodo(session, periodo_id, tenant)
+    periodo = periodos.cerrar_periodo(session, periodo_id, cerrado_por=actor.id)
     session.commit()
     return periodo
 
@@ -160,19 +131,16 @@ def crear_asiento_manual(
     session: Session = Depends(get_db),
 ):
     empresa_id = tenant.empresa(body.empresa_id)
-    try:
-        for linea in body.lineas:
-            exigir_cuenta(session, linea.cuenta_contable_id, tenant)
-        asiento = asientos.crear_asiento_manual(
-            session,
-            empresa_id=empresa_id,
-            fecha=body.fecha,
-            glosa=body.glosa,
-            lineas=[li.model_dump() for li in body.lineas],
-            creado_por=actor.id,
-        )
-    except (NoEncontrado, Conflicto, ReglaNegocio) as e:
-        raise _http(e) from e
+    for linea in body.lineas:
+        exigir_cuenta(session, linea.cuenta_contable_id, tenant)
+    asiento = asientos.crear_asiento_manual(
+        session,
+        empresa_id=empresa_id,
+        fecha=body.fecha,
+        glosa=body.glosa,
+        lineas=[li.model_dump() for li in body.lineas],
+        creado_por=actor.id,
+    )
     session.commit()
     return asiento
 
@@ -194,10 +162,7 @@ def ver_asiento(
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        return exigir_asiento(session, asiento_id, tenant)
-    except NoEncontrado as e:
-        raise _http(e) from e
+    return exigir_asiento(session, asiento_id, tenant)
 
 
 @router.get("/asientos/{asiento_id}/lineas", response_model=list[schemas.AsientoLineaOut])
@@ -207,10 +172,7 @@ def ver_lineas_asiento(
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        exigir_asiento(session, asiento_id, tenant)
-    except NoEncontrado as e:
-        raise _http(e) from e
+    exigir_asiento(session, asiento_id, tenant)
     return AsientoRepo(session).lineas(asiento_id)
 
 
@@ -221,11 +183,8 @@ def anular_asiento(
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        exigir_asiento(session, asiento_id, tenant)
-        reversa = asientos.anular_asiento(session, asiento_id, actor_id=actor.id)
-    except (NoEncontrado, Conflicto) as e:
-        raise _http(e) from e
+    exigir_asiento(session, asiento_id, tenant)
+    reversa = asientos.anular_asiento(session, asiento_id, actor_id=actor.id)
     session.commit()
     return reversa
 
@@ -240,12 +199,9 @@ def crear_regla_asiento(
 ):
     campos = body.model_dump()
     campos["empresa_id"] = tenant.empresa(campos["empresa_id"])
-    try:
-        exigir_cuenta(session, campos["cuenta_debe_id"], tenant)
-        exigir_cuenta(session, campos["cuenta_haber_id"], tenant)
-        regla = reglas.crear_regla_asiento(session, **campos)
-    except (NoEncontrado, Conflicto) as e:
-        raise _http(e) from e
+    exigir_cuenta(session, campos["cuenta_debe_id"], tenant)
+    exigir_cuenta(session, campos["cuenta_haber_id"], tenant)
+    regla = reglas.crear_regla_asiento(session, **campos)
     session.commit()
     return regla
 
@@ -270,10 +226,7 @@ def registrar_pago(
 ):
     campos = body.model_dump()
     campos["empresa_id"] = tenant.empresa(campos["empresa_id"])
-    try:
-        movimiento = pagos.registrar_pago(session, solicitado_por=actor.id, **campos)
-    except ReglaNegocio as e:
-        raise _http(e) from e
+    movimiento = pagos.registrar_pago(session, solicitado_por=actor.id, **campos)
     session.commit()
     return movimiento
 
@@ -298,20 +251,17 @@ def ejecutar_pago(
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    puede_aprobar = permite(UsuarioRepo(session).permiso_codigos(actor.id), PAGO_APROBAR)
-    try:
-        exigir_pago(session, movimiento_id, tenant)
-        movimiento = pagos.ejecutar_pago(
-            session,
-            movimiento_id,
-            actor_id=actor.id,
-            puede_aprobar_monto=puede_aprobar,
-            umbral=settings.accounting_umbral_aprobacion_pago,
-            medio_pago=body.medio_pago,
-            constancia=body.constancia,
-        )
-    except (NoEncontrado, Conflicto, ReglaNegocio) as e:
-        raise _http(e) from e
+    exigir_pago(session, movimiento_id, tenant)
+    puede_aprobar = tiene_permiso(session, actor.id, PAGO_APROBAR)
+    movimiento = pagos.ejecutar_pago(
+        session,
+        movimiento_id,
+        actor_id=actor.id,
+        puede_aprobar_monto=puede_aprobar,
+        umbral=settings.accounting_umbral_aprobacion_pago,
+        medio_pago=body.medio_pago,
+        constancia=body.constancia,
+    )
     session.commit()
     return movimiento
 
@@ -325,11 +275,8 @@ def rechazar_pago(
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        exigir_pago(session, movimiento_id, tenant)
-        movimiento = pagos.rechazar_pago(session, movimiento_id, actor_id=actor.id)
-    except (NoEncontrado, Conflicto) as e:
-        raise _http(e) from e
+    exigir_pago(session, movimiento_id, tenant)
+    movimiento = pagos.rechazar_pago(session, movimiento_id, actor_id=actor.id)
     session.commit()
     return movimiento
 
@@ -342,11 +289,8 @@ def abrir_caja(
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        exigir_punto_venta(session, body.punto_venta_id, tenant)
-        apertura = caja.abrir_caja(session, cajero_id=actor.id, **body.model_dump())
-    except Conflicto as e:
-        raise _http(e) from e
+    exigir_punto_venta(session, body.punto_venta_id, tenant)
+    apertura = caja.abrir_caja(session, cajero_id=actor.id, **body.model_dump())
     session.commit()
     return apertura
 
@@ -361,13 +305,10 @@ def cerrar_caja(
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        exigir_apertura_caja(session, apertura_caja_id, tenant)
-        cierre = caja.cerrar_caja(
-            session, apertura_caja_id, cajero_id=actor.id, **body.model_dump()
-        )
-    except (NoEncontrado, Conflicto) as e:
-        raise _http(e) from e
+    exigir_apertura_caja(session, apertura_caja_id, tenant)
+    cierre = caja.cerrar_caja(
+        session, apertura_caja_id, cajero_id=actor.id, **body.model_dump()
+    )
     session.commit()
     return cierre
 
@@ -390,30 +331,28 @@ def registrar_movimiento_caja(
     `POST /auth/autorizar`); ingresar no, porque meter plata al cajón no es
     la operación de la que hay que desconfiar.
     """
+    exigir_apertura_caja(session, apertura_caja_id, tenant)
     autorizado_por = None
-    try:
-        exigir_apertura_caja(session, apertura_caja_id, tenant)
-        if body.tipo == "retiro":
-            if not body.autorizacion:
-                raise HTTPException(
-                    status.HTTP_403_FORBIDDEN,
-                    "retirar efectivo requiere autorización de supervisor",
-                )
+    if body.tipo == "retiro":
+        if not body.autorizacion:
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                "retirar efectivo requiere autorización de supervisor",
+            )
+        try:
             autorizado_por = autorizacion.verificar(body.autorizacion, CAJA_RETIRAR)
-        movimiento = caja.registrar_movimiento_caja(
-            session,
-            apertura_caja_id,
-            tipo=body.tipo,
-            monto=body.monto,
-            motivo=body.motivo,
-            registrado_por=actor.id,
-            idempotency_key=body.idempotency_key,
-            autorizado_por=autorizado_por,
-        )
-    except TokenInvalido as e:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, str(e)) from e
-    except (NoEncontrado, Conflicto) as e:
-        raise _http(e) from e
+        except TokenInvalido as e:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, str(e)) from e
+    movimiento = caja.registrar_movimiento_caja(
+        session,
+        apertura_caja_id,
+        tipo=body.tipo,
+        monto=body.monto,
+        motivo=body.motivo,
+        registrado_por=actor.id,
+        idempotency_key=body.idempotency_key,
+        autorizado_por=autorizado_por,
+    )
     session.commit()
     return movimiento
 
@@ -428,10 +367,7 @@ def listar_movimientos_caja(
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        exigir_apertura_caja(session, apertura_caja_id, tenant)
-    except NoEncontrado as e:
-        raise _http(e) from e
+    exigir_apertura_caja(session, apertura_caja_id, tenant)
     return MovimientoCajaRepo(session).de_apertura(apertura_caja_id)
 
 
@@ -452,10 +388,7 @@ def registrar_arqueo(
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        exigir_punto_venta(session, body.punto_venta_id, tenant)
-        arqueo = caja.registrar_arqueo(session, realizado_por=actor.id, **body.model_dump())
-    except NoEncontrado as e:
-        raise _http(e) from e
+    exigir_punto_venta(session, body.punto_venta_id, tenant)
+    arqueo = caja.registrar_arqueo(session, realizado_por=actor.id, **body.model_dump())
     session.commit()
     return arqueo

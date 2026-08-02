@@ -1,6 +1,6 @@
 """reserva de stock, solicitud de insumos y transferencias
 
-Cierra el ciclo de abastecimiento interno (ADR-018, RN-INV-001..003,
+Cierra el ciclo de abastecimiento interno (ADR-020, RN-INV-001..003,
 RN-INV-009..011): el local pide, el supervisor aprueba y reserva, el
 central despacha, el local recibe.
 

@@ -1,4 +1,4 @@
-# ADR-016 — Cobro dividido, mesa tipada y descuento de orden
+# ADR-018 — Cobro dividido, mesa tipada y descuento de orden
 
 - **Estado:** aceptado
 - **Fecha:** 2026-07-28

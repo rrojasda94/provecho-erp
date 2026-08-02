@@ -14,7 +14,7 @@ almacén "por conveniencia de acceso" si eso rompe el orden de salida.
 ## 2. Conteo y ajuste
 
 - La periodicidad de conteo se configura **en cada categoría**, no como un
-  número único de almacén (RN-INV-007, ADR-017): `diario`, `semanal`,
+  número único de almacén (RN-INV-007, ADR-019): `diario`, `semanal`,
   `quincenal`, `mensual`, `semestral` o `anual`. Una categoría sin
   frecuencia queda fuera del ciclo. Cargarlas es tarea de Gerencia
   (`PATCH /inventory/categorias/{id}`); el criterio operativo es que la

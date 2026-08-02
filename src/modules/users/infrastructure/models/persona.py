@@ -29,7 +29,7 @@ class Persona(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin, VersionedMixin
 
     nombres: Mapped[str] = mapped_column(String(100))
     apellidos: Mapped[str] = mapped_column(String(100))
-    # Documento OPCIONAL desde 2026-07-28 (ADR-016): un cliente de mostrador
+    # Documento OPCIONAL desde 2026-07-28 (ADR-018): un cliente de mostrador
     # o delivery no siempre quiere darlo, y el teléfono alcanza para
     # identificarlo y volverle a vender. Se completa después sin problema.
     # Trabajador y usuario SÍ lo exigen — esa validación vive en sus casos

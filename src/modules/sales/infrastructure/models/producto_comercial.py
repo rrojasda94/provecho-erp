@@ -5,7 +5,7 @@ contribución. Variantes y combos se modelan en un slice posterior — no son
 dependencia dura de venta_item, que guarda su propio precio_unitario al
 momento de la venta.
 
-**Los extras son productos comerciales** (`es_extra=True`, ADR-016): un
+**Los extras son productos comerciales** (`es_extra=True`, ADR-018): un
 "extra queso" tiene su propia receta, que se ejecuta en la sucursal y se
 suma a la del producto al que se agrega. Modelarlo así, y no como una
 entidad aparte, hace que el extra herede sin escribir una línea: precio

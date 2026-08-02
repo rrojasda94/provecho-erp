@@ -71,7 +71,7 @@ almacenamiento), `conteo`, `ajuste` (motivo, solicitante, aprobador),
 
 ## Estado (slice 4 — reserva, solicitud y transferencia, 2026-08-01)
 
-Ciclo completo de abastecimiento interno según ADR-018: el local pide, el
+Ciclo completo de abastecimiento interno según ADR-020: el local pide, el
 supervisor aprueba y reserva, el central despacha, el local recibe.
 
 - **`reserva_stock` es una promesa, no un movimiento**: no toca `stock` ni
@@ -119,7 +119,7 @@ Tests: `tests/test_transferencias.py` (23 casos). Migración `d8b35f1ca207`.
 
 ## Estado (slice 3 — conteo cíclico, 2026-08-01)
 
-`conteo` + `conteo_item` según ADR-017. La periodicidad **la fija la
+`conteo` + `conteo_item` según ADR-019. La periodicidad **la fija la
 categoría** (`categoria.frecuencia_conteo`: diario / semanal / quincenal /
 mensual / semestral / anual, RN-INV-007) — no hay un número universal.
 NULL deja la categoría fuera del ciclo.
@@ -267,7 +267,7 @@ Solicitud (local) → aprobación + reserva (supervisor) → picking/packing
 actualizado.
 
 El picking/packing es una etapa operativa del SOP, no un estado del ERP:
-entre `aprobada` y `despachada` no cambia qué se puede hacer (ADR-018).
+entre `aprobada` y `despachada` no cambia qué se puede hacer (ADR-020).
 
 ## Relaciones
 

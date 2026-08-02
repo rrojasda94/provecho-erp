@@ -1,4 +1,4 @@
-# ADR-019 — Atribución lead→venta y dueño de la encuesta de satisfacción
+# ADR-021 — Atribución lead→venta y dueño de la encuesta de satisfacción
 
 - Estado: aceptado
 - Fecha: 2026-08-01

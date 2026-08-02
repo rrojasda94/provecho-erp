@@ -408,7 +408,7 @@ de su módulo y se prueban de forma aislada.
   el documento que el cliente da en caja: **11 dígitos (RUC) obliga
   factura**; 8 dígitos (DNI), `00000000` o sin documento van a **boleta**.
   No hace falta que el cliente esté registrado — el receptor tecleado se
-  guarda en el propio comprobante (ADR-016). Un documento con otro largo
+  guarda en el propio comprobante (ADR-018). Un documento con otro largo
   se rechaza antes de enviarse a SUNAT.
 - **RN-CPP-004** No puede realizarse una venta sin la emisión de un
   comprobante de pago.
@@ -936,7 +936,7 @@ producción se hace en cocinas de sucursal. Ver
   la determina **la categoría** a la que pertenece cada SKU, no un valor
   único de empresa ni de almacén: `diario`, `semanal`, `quincenal`,
   `mensual`, `semestral` o `anual` (`categoria.frecuencia_conteo`,
-  ADR-017). Una categoría sin frecuencia queda fuera del conteo cíclico.
+  ADR-019). Una categoría sin frecuencia queda fuera del conteo cíclico.
   La próxima fecha se cuenta desde el último conteo cerrado que cubrió esa
   categoría en ese almacén; un conteo general cubre a todas.
 - **RN-INV-008** El stock mínimo (cubre un período de tiempo determinado)
@@ -981,7 +981,7 @@ producción se hace en cocinas de sucursal. Ver
   (aprobar una solicitud) exige disponible suficiente; **consumir no se
   bloquea nunca por una reserva** — una venta o un consumo de producción
   ya ocurrieron y el ERP los registra igual, aunque el disponible quede
-  negativo (ADR-018). Un disponible negativo es una promesa sin respaldo:
+  negativo (ADR-020). Un disponible negativo es una promesa sin respaldo:
   hay que liberarla o reponer.
 - **RN-INV-010** Al cancelarse o modificarse la solicitud/pedido que
   originó una reserva, el stock reservado vuelve a disponible
@@ -1117,7 +1117,7 @@ producción se hace en cocinas de sucursal. Ver
   condiciones (ej. segunda pizza a mitad de precio si el cliente pide dos
   del mismo tamaño, en los días en que la promoción está vigente,
   aplicando el descuento sobre el precio base de la más barata y sin
-  incluir extras), y viven en un motor de reglas aparte (ver ADR-016 y
+  incluir extras), y viven en un motor de reglas aparte (ver ADR-018 y
   `ROADMAP.md`).
 - **RN-COM-018** Una orden puede **dividirse en varias cuentas**: el
   cajero selecciona qué productos cobra en ese momento y los no
