@@ -954,23 +954,37 @@ Tailwind + Base UI, shell estilo Odoo, gate por permiso) resolvió 5:
 - ✅ **F2.8 Gestión de estado**: confirmado sin Zustand/Redux hasta que el
   carrito POS lo justifique.
 
-Ninguna de las 5 está implementada en código todavía — son decisiones de
-arquitectura, no trabajo hecho.
+- ✅ 2026-08-02 **F2.11 Tablas**: TanStack Table (headless, sin atar a un
+  design system). v1 implementado (orden, búsqueda, filtro, paginación);
+  v2 (congelar/mover columnas, selección masiva, scroll virtual, totales)
+  diferido hasta que una pantalla real lo pida — mismas APIs, no es
+  migración de librería. Componente reusable en
+  `frontend/components/tabla/tabla-datos.tsx`.
 
-Queda **una sola prioridad abierta**:
+**Primera implementación en código** (2026-08-02, no solo spec): shell Odoo
+completo (`frontend/app/(app)/`) — home de apps con grid filtrado por
+`permisos` de `/users/me`, sidebar + guard real server-side por
+`[modulo]/layout.tsx` (no solo UX: entrar por URL sin el permiso cae en
+"Sin permiso", no en datos). Tailwind CSS instalado, mapeado a los tokens
+ya existentes (`globals.css`), sin hex nuevo. El dashboard existente se
+relocalizó como primera app del shell y de paso dejó de leer `empresa_id`
+del JWT sin verificar — ahora sale de `/users/me`.
 
-- ⬜ **F2.11 Tablas**: elegir librería (candidata: TanStack Table) y
-  alcance v1 (orden/filtro/búsqueda/paginación) vs. v2 (columnas
-  congelar/mover/ocultar, selección + acciones masivas, scroll virtual,
-  totales). Es el componente más usado de todo el ERP y ninguna tabla está
-  construida todavía — ADR-013 resuelve overlays/interacción, no grillas
-  de datos.
+**Primera pantalla real de un módulo**: Compras → Proveedores (listado
+TanStack + alta con `<dialog>` nativo, sin shadcn/ui todavía — ningún
+formulario construido necesitó overlay complejo). v1 solo proveedor
+jurídico; el natural espera un selector de `persona_id` que el frontend no
+tiene. Verificado end-to-end en Docker (migrar + seed contra el Postgres
+del compose, login → home → crear proveedor → tabla se actualiza), sin
+errores de consola. Resto de módulos (inventario, ventas, producción,
+contabilidad, rrhh, marketing, gerencia, usuarios) solo tienen tile en el
+home — sus rutas dan 404 limpio, no hay pantalla construida todavía.
 
 Todo lo demás (theming multi-marca, accesibilidad — catálogo ya definido,
 tiempo real de KDS, i18n, hardware, testing — Playwright ya decidido por
 ADR-013, observabilidad, printing, productividad, multitarea) tiene
 decisión tomada, está correctamente diferido, o depende de un módulo
-backend que todavía no llega a pantalla — no bloquea empezar a diseñar.
+backend que todavía no llega a pantalla.
 
 ## Orden sugerido de desarrollo
 
