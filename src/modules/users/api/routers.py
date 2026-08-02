@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from src.core.rate_limit import rate_limit_login
 from src.modules.users.api import schemas
 from src.modules.users.api.deps import (
+    check_permission,
     client_ip,
     get_current_user,
     get_db,
@@ -28,11 +29,12 @@ from src.modules.users.application.errors import (
 )
 from src.modules.users.infrastructure.models import Usuario
 from src.modules.users.infrastructure.repositories import UsuarioRepo
+from src.shared import parametros
 
 router = APIRouter()
 
 GESTIONAR = "users.gestionar"  # permiso para el CRUD administrativo
-GESTIONAR_REGLAS = "gerencia.gestionar_reglas_aprobacion"
+GESTIONAR_PARAMETROS = "gerencia.gestionar_parametros_empresa"  # aprobar/rechazar
 ANONIMIZAR = "personas.anonimizar"  # derecho de cancelación (Ley 29733, ADR-011)
 
 
@@ -441,51 +443,85 @@ def listar_permisos(
     return admin.listar_permisos(session)
 
 
-# --- Reglas de aprobación (matriz de aprobaciones) --------------------------
+# --- Parámetros operativos por empresa (ADR-014) ----------------------------
+# Proponer: el área, desde su módulo (permiso `<modulo>.proponer_parametro`).
+# Aprobar/rechazar/modificar: solo Gerencia. El valor propuesto no llega al
+# módulo hasta que Gerencia lo aprueba.
 @router.post(
-    "/reglas-aprobacion",
-    response_model=schemas.ReglaAprobacionOut,
+    "/parametros",
+    response_model=schemas.ParametroEmpresaOut,
     status_code=status.HTTP_201_CREATED,
     tags=["gerencia"],
 )
-
-
-def crear_regla_aprobacion(
-    body: schemas.ReglaAprobacionCreate,
-    _: Usuario = Depends(require_permission(GESTIONAR_REGLAS)),
+def proponer_parametro(
+    body: schemas.ParametroPropuesta,
+    usuario: Usuario = Depends(get_current_user),
     session: Session = Depends(get_db),
 ):
-    regla = gerencia.crear_regla(session, **body.model_dump())
+    # El permiso depende del `modulo` del body, así que no puede resolverse en
+    # un `Depends` — Compras no propone parámetros de RRHH.
+    check_permission(session, usuario, parametros.permiso_proponer(body.modulo))
+    parametro = gerencia.proponer_parametro(
+        session, propuesto_por_id=usuario.id, **body.model_dump()
+    )
     session.commit()
-    return regla
+    return parametro
 
 
 @router.get(
-    "/reglas-aprobacion", response_model=list[schemas.ReglaAprobacionOut], tags=["gerencia"]
+    "/parametros", response_model=list[schemas.ParametroEmpresaOut], tags=["gerencia"]
 )
-
-
-def listar_reglas_aprobacion(
+def listar_parametros(
     empresa_id: uuid.UUID | None = None,
-    _: Usuario = Depends(require_permission(GESTIONAR_REGLAS)),
+    estado: str | None = None,
+    modulo: str | None = None,
+    usuario: Usuario = Depends(get_current_user),
     session: Session = Depends(get_db),
 ):
-    return gerencia.listar_reglas(session, empresa_id)
+    """`?estado=propuesto` = bandeja de aprobaciones de Gerencia. Sin filtro de
+    `modulo` hace falta el permiso de Gerencia: hay parámetros sensibles (los
+    rangos salariales de RRHH) que no son de lectura general."""
+    exigidos = [GESTIONAR_PARAMETROS]
+    if modulo in parametros.MODULOS:
+        exigidos.append(parametros.permiso_proponer(modulo))
+    check_permission(session, usuario, *exigidos)
+    return gerencia.listar_parametros(session, empresa_id, estado, modulo)
 
 
-@router.patch(
-    "/reglas-aprobacion/{regla_id}",
-    response_model=schemas.ReglaAprobacionOut,
+@router.post(
+    "/parametros/{parametro_id}/aprobar",
+    response_model=schemas.ParametroEmpresaOut,
     tags=["gerencia"],
 )
-
-
-def editar_regla_aprobacion(
-    regla_id: uuid.UUID,
-    body: schemas.ReglaAprobacionUpdate,
-    _: Usuario = Depends(require_permission(GESTIONAR_REGLAS)),
+def aprobar_parametro(
+    parametro_id: uuid.UUID,
+    body: schemas.ParametroAprobacion,
+    usuario: Usuario = Depends(require_permission(GESTIONAR_PARAMETROS)),
     session: Session = Depends(get_db),
 ):
-    regla = gerencia.editar_regla(session, regla_id, **body.model_dump())
+    parametro = gerencia.aprobar_parametro(
+        session, parametro_id, resuelto_por_id=usuario.id, valor=body.valor
+    )
     session.commit()
-    return regla
+    return parametro
+
+
+@router.post(
+    "/parametros/{parametro_id}/rechazar",
+    response_model=schemas.ParametroEmpresaOut,
+    tags=["gerencia"],
+)
+def rechazar_parametro(
+    parametro_id: uuid.UUID,
+    body: schemas.ParametroRechazo,
+    usuario: Usuario = Depends(require_permission(GESTIONAR_PARAMETROS)),
+    session: Session = Depends(get_db),
+):
+    parametro = gerencia.rechazar_parametro(
+        session,
+        parametro_id,
+        resuelto_por_id=usuario.id,
+        motivo_rechazo=body.motivo_rechazo,
+    )
+    session.commit()
+    return parametro

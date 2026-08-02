@@ -1,7 +1,7 @@
 """Mapeo configurable evento operativo → cuentas de contrapartida. Sin una
 regla vigente para `empresa_id`+`evento`, el asiento automático se omite
 (se loguea, nunca bloquea el proceso de origen) — mismo criterio que
-`regla_aprobacion` para umbrales (RN-GER-003): la empresa configura, el
+`parametro_empresa` para umbrales (RN-GER-003/008): la empresa configura, el
 código no hardcodea su propio plan de cuentas."""
 
 import uuid

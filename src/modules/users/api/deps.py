@@ -81,5 +81,15 @@ def tiene_permiso(session: Session, usuario: Usuario, codigo: str) -> bool:
     return rules.permite(UsuarioRepo(session).permiso_codigos(usuario.id), codigo)
 
 
+def check_permission(session: Session, usuario: Usuario, *codigos: str) -> None:
+    """Igual que `require_permission` pero dentro del handler: para cuando el
+    permiso exigido depende del body y no puede resolverse en un `Depends`.
+    Basta con tener uno de `codigos`. Una sola consulta, a diferencia de
+    llamar `tiene_permiso` en bucle."""
+    concedidos = UsuarioRepo(session).permiso_codigos(usuario.id)
+    if not any(rules.permite(concedidos, codigo) for codigo in codigos):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Permiso denegado")
+
+
 def client_ip(request: Request) -> str | None:
     return request.client.host if request.client else None

@@ -6174,6 +6174,200 @@
         "title": "PantallaUpdate",
         "type": "object"
       },
+      "ParametroAprobacion": {
+        "properties": {
+          "valor": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valor"
+          }
+        },
+        "title": "ParametroAprobacion",
+        "type": "object"
+      },
+      "ParametroEmpresaOut": {
+        "properties": {
+          "codigo": {
+            "title": "Codigo",
+            "type": "string"
+          },
+          "empresa_id": {
+            "format": "uuid",
+            "title": "Empresa Id",
+            "type": "string"
+          },
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "modulo": {
+            "title": "Modulo",
+            "type": "string"
+          },
+          "motivo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Motivo"
+          },
+          "motivo_rechazo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Motivo Rechazo"
+          },
+          "propuesto_por_id": {
+            "format": "uuid",
+            "title": "Propuesto Por Id",
+            "type": "string"
+          },
+          "resuelto_en": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resuelto En"
+          },
+          "resuelto_por_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resuelto Por Id"
+          },
+          "valor": {
+            "additionalProperties": true,
+            "title": "Valor",
+            "type": "object"
+          },
+          "valor_display": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valor Display"
+          }
+        },
+        "required": [
+          "id",
+          "empresa_id",
+          "modulo",
+          "codigo",
+          "valor",
+          "valor_display",
+          "estado",
+          "propuesto_por_id",
+          "motivo",
+          "resuelto_por_id",
+          "resuelto_en",
+          "motivo_rechazo"
+        ],
+        "title": "ParametroEmpresaOut",
+        "type": "object"
+      },
+      "ParametroPropuesta": {
+        "properties": {
+          "codigo": {
+            "maxLength": 50,
+            "title": "Codigo",
+            "type": "string"
+          },
+          "empresa_id": {
+            "format": "uuid",
+            "title": "Empresa Id",
+            "type": "string"
+          },
+          "modulo": {
+            "enum": [
+              "accounting",
+              "inventory",
+              "marketing",
+              "production",
+              "purchases",
+              "rrhh",
+              "sales",
+              "users"
+            ],
+            "title": "Modulo",
+            "type": "string"
+          },
+          "motivo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Motivo"
+          },
+          "valor": {
+            "additionalProperties": true,
+            "title": "Valor",
+            "type": "object"
+          }
+        },
+        "required": [
+          "empresa_id",
+          "modulo",
+          "codigo",
+          "valor"
+        ],
+        "title": "ParametroPropuesta",
+        "type": "object"
+      },
+      "ParametroRechazo": {
+        "properties": {
+          "motivo_rechazo": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Motivo Rechazo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "motivo_rechazo"
+        ],
+        "title": "ParametroRechazo",
+        "type": "object"
+      },
       "PedidoColaOut": {
         "properties": {
           "canal": {
@@ -8372,140 +8566,6 @@
           "refresh_token"
         ],
         "title": "RefreshIn",
-        "type": "object"
-      },
-      "ReglaAprobacionCreate": {
-        "properties": {
-          "codigo": {
-            "maxLength": 50,
-            "title": "Codigo",
-            "type": "string"
-          },
-          "empresa_id": {
-            "format": "uuid",
-            "title": "Empresa Id",
-            "type": "string"
-          },
-          "modulo": {
-            "maxLength": 50,
-            "title": "Modulo",
-            "type": "string"
-          },
-          "permiso_requerido": {
-            "maxLength": 100,
-            "title": "Permiso Requerido",
-            "type": "string"
-          },
-          "umbral": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-                "type": "string"
-              }
-            ],
-            "title": "Umbral"
-          }
-        },
-        "required": [
-          "empresa_id",
-          "modulo",
-          "codigo",
-          "umbral",
-          "permiso_requerido"
-        ],
-        "title": "ReglaAprobacionCreate",
-        "type": "object"
-      },
-      "ReglaAprobacionOut": {
-        "properties": {
-          "codigo": {
-            "title": "Codigo",
-            "type": "string"
-          },
-          "empresa_id": {
-            "format": "uuid",
-            "title": "Empresa Id",
-            "type": "string"
-          },
-          "id": {
-            "format": "uuid",
-            "title": "Id",
-            "type": "string"
-          },
-          "modulo": {
-            "title": "Modulo",
-            "type": "string"
-          },
-          "permiso_requerido": {
-            "title": "Permiso Requerido",
-            "type": "string"
-          },
-          "umbral": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-            "title": "Umbral",
-            "type": "string"
-          },
-          "vigente": {
-            "title": "Vigente",
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "id",
-          "empresa_id",
-          "modulo",
-          "codigo",
-          "umbral",
-          "permiso_requerido",
-          "vigente"
-        ],
-        "title": "ReglaAprobacionOut",
-        "type": "object"
-      },
-      "ReglaAprobacionUpdate": {
-        "properties": {
-          "permiso_requerido": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Permiso Requerido"
-          },
-          "umbral": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Umbral"
-          },
-          "vigente": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Vigente"
-          }
-        },
-        "title": "ReglaAprobacionUpdate",
         "type": "object"
       },
       "ReglaAsientoCreate": {
@@ -15773,6 +15833,258 @@
         ]
       }
     },
+    "/api/v1/parametros": {
+      "get": {
+        "description": "`?estado=propuesto` = bandeja de aprobaciones de Gerencia. Sin filtro de\n`modulo` hace falta el permiso de Gerencia: hay parámetros sensibles (los\nrangos salariales de RRHH) que no son de lectura general.",
+        "operationId": "listar_parametros_api_v1_parametros_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "empresa_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Empresa Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "estado",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Estado"
+            }
+          },
+          {
+            "in": "query",
+            "name": "modulo",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Modulo"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ParametroEmpresaOut"
+                  },
+                  "title": "Response Listar Parametros Api V1 Parametros Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Parametros",
+        "tags": [
+          "gerencia"
+        ]
+      },
+      "post": {
+        "operationId": "proponer_parametro_api_v1_parametros_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ParametroPropuesta"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParametroEmpresaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Proponer Parametro",
+        "tags": [
+          "gerencia"
+        ]
+      }
+    },
+    "/api/v1/parametros/{parametro_id}/aprobar": {
+      "post": {
+        "operationId": "aprobar_parametro_api_v1_parametros__parametro_id__aprobar_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "parametro_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Parametro Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ParametroAprobacion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParametroEmpresaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Aprobar Parametro",
+        "tags": [
+          "gerencia"
+        ]
+      }
+    },
+    "/api/v1/parametros/{parametro_id}/rechazar": {
+      "post": {
+        "operationId": "rechazar_parametro_api_v1_parametros__parametro_id__rechazar_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "parametro_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Parametro Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ParametroRechazo"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParametroEmpresaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Rechazar Parametro",
+        "tags": [
+          "gerencia"
+        ]
+      }
+    },
     "/api/v1/permisos": {
       "get": {
         "operationId": "listar_permisos_api_v1_permisos_get",
@@ -16786,167 +17098,6 @@
         "summary": "Editar Proveedor",
         "tags": [
           "purchases"
-        ]
-      }
-    },
-    "/api/v1/reglas-aprobacion": {
-      "get": {
-        "operationId": "listar_reglas_aprobacion_api_v1_reglas_aprobacion_get",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "empresa_id",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "format": "uuid",
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Empresa Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/ReglaAprobacionOut"
-                  },
-                  "title": "Response Listar Reglas Aprobacion Api V1 Reglas Aprobacion Get",
-                  "type": "array"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Listar Reglas Aprobacion",
-        "tags": [
-          "gerencia"
-        ]
-      },
-      "post": {
-        "operationId": "crear_regla_aprobacion_api_v1_reglas_aprobacion_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ReglaAprobacionCreate"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "201": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ReglaAprobacionOut"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Crear Regla Aprobacion",
-        "tags": [
-          "gerencia"
-        ]
-      }
-    },
-    "/api/v1/reglas-aprobacion/{regla_id}": {
-      "patch": {
-        "operationId": "editar_regla_aprobacion_api_v1_reglas_aprobacion__regla_id__patch",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "regla_id",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "title": "Regla Id",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ReglaAprobacionUpdate"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ReglaAprobacionOut"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Editar Regla Aprobacion",
-        "tags": [
-          "gerencia"
         ]
       }
     },

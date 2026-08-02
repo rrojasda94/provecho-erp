@@ -207,9 +207,12 @@ erDiagram
   referencia).
 - **unidad_medida**: categoria_udm_id, nombre (Kilo, Doypack 2kg, Litro,
   Botella 500ml...), ratio (conversión respecto a la unidad base de su
-  categoría — ej. Doypack 2kg = 2:1 sobre Kilo). Un artículo/receta/
-  producto comercial solo admite UdM de su propia categoría (RN-UDM-001).
-  Default: categoría "Unidades" con UdM base "Unidad".
+  categoría — ej. Doypack 2kg = 2:1 sobre Kilo), decimales (con cuánta
+  precisión se expresa una cantidad en esta unidad: 3 para Kilo porque los
+  gramos importan, 0 para Unidad porque media botella no existe;
+  configurable por unidad, no una constante del código — RN-GER-010). Un
+  artículo/receta/producto comercial solo admite UdM de su propia categoría
+  (RN-UDM-001). Default: categoría "Unidades" con UdM base "Unidad".
 - **articulo** (inventariable): empresa_id (tenant directo — `categoria_id`
   es opcional, no sirve de puente de tenant por sí solo), id_interno (4
   alfanuméricos, autogenerado, inmutable, único — RN-GEN-005), nombre,
@@ -826,7 +829,7 @@ Implementado (2026-07-25) — libro contable núcleo, además del ciclo de caja
   evento→contrapartida que alimenta la generación automática de asientos —
   sin regla vigente, el evento no genera asiento (se omite y loguea, nunca
   bloquea el proceso operativo de origen). Mismo criterio que
-  `regla_aprobacion` (RN-GER-003): la empresa configura su plan de cuentas,
+  `parametro_empresa` (RN-GER-003/008): la empresa configura su plan de cuentas,
   el código no lo hardcodea.
 - **movimiento_dinero** (implementado 2026-07-25, tesorería/PROC-CTB-003):
   empresa_id, tipo (`egreso`\|`ingreso`), concepto (hoy solo
@@ -838,7 +841,7 @@ Implementado (2026-07-25) — libro contable núcleo, además del ciclo de caja
   (`pendiente`\|`ejecutado`\|`rechazado`), solicitado_por, aprobado_por,
   asiento_id (FK `asiento`, NULL si no había `regla_asiento` configurada),
   fecha_ejecucion, constancia. `purchases.comprobante_conforme` lo encola
-  (`pendiente`); ejecutar exige permiso sobre el umbral (`regla_aprobacion`,
+  (`pendiente`); ejecutar exige permiso sobre el umbral (`parametro_empresa`,
   código `pago_umbral`, RN-CTB-005) y genera el asiento vía `regla_asiento`
   (evento `accounting.pago_ejecutado`).
 - **declaracion_itan**: empresa_id, periodo, activos_netos, umbral_legal,
@@ -961,42 +964,87 @@ tabla. Ver [docs/gerencia/README.md](../gerencia/README.md).
   fecha, archivo_id (opcional). Materializa el acta de decisión gerencial
   (RN-GER-002); toda aprobación de la matriz de aprobaciones (RN-GER-003)
   genera una fila.
-- **regla_aprobacion** (entidad transversal, vive en `shared` — mismo
-  criterio que `Comprobante`): empresa_id, modulo (ej. `purchases`), codigo
-  (ej. `oc_umbral`), umbral, permiso_requerido (informativo — la
-  verificación real del permiso la hace el módulo consumidor), vigente.
-  Reemplaza el umbral fijo en config para reglas cuantitativas (RN-GER-003:
-  fuente única, ninguna área fija su propio umbral por fuera de la matriz).
-  Si no hay fila para una empresa/módulo/código, el módulo consumidor usa
-  su valor semilla de config como fallback (no rompe lo ya sembrado).
-  Administrado vía `/api/v1/reglas-aprobacion` (permiso
-  `gerencia.gestionar_reglas_aprobacion`).
+- **divisa** (entidad transversal, vive en `shared` — el dinero no es de
+  ningún módulo): codigo (ISO 4217: PEN, USD), nombre, simbolo, decimales,
+  activa. Existe porque los decimales de una moneda no son 2 por decreto y
+  porque toda magnitud monetaria debe poder nombrar su unidad (RN-GER-010).
+  Sembrada con PEN (S/, 2 decimales). **No** cambia que la operación sea PEN
+  única (RN-PRC-004): `precio` sigue sin columna de divisa.
+- ~~**regla_aprobacion**~~ — **retirada el 2026-08-02** (migración
+  `b82d4c1f7a35`). Sus umbrales (`purchases/oc_umbral`,
+  `accounting/pago_umbral`) son filas de `parametro_empresa` con
+  `valor={"monto": ...}`, y pasan por el mismo flujo de aprobación de
+  Gerencia que el resto (RN-GER-009). `permiso_requerido` se descartó: era
+  informativo, la verificación real siempre la hizo el módulo consumidor.
+  Los módulos siguen leyendo el umbral tipado con
+  `src.shared.aprobaciones.umbral_vigente(...)`, que hoy resuelve sobre
+  `parametro_empresa`.
 - **Matriz de aprobaciones**: la narrativa de gobierno (qué requiere
   visado, quién aprueba) vive en
   [gerencia/politica-gerencia.md](../gerencia/politica-gerencia.md#matriz-de-aprobaciones);
   los umbrales cuantitativos que esa narrativa referencia (ej. umbral de OC
-  RN-CMP-008) ahora son filas de `regla_aprobacion`, no texto
-  `[[COMPLETAR]]` ni config estático por módulo.
+  RN-CMP-008) son filas de `parametro_empresa`, no texto `[[COMPLETAR]]` ni
+  config estático por módulo.
 - **parametro_empresa** (entidad transversal, vive en `shared` — mismo
-  criterio que `regla_aprobacion`, ADR-014): empresa_id, modulo (ej.
-  `rrhh`, `inventory`, `purchases`, `contabilidad`), codigo (ej.
-  `rango_salarial_cocinero`, `frecuencia_conteo_insumo`,
+  criterio que `Comprobante`, ADR-014): empresa_id, modulo (nombre del
+  módulo de código — `rrhh`, `inventory`, `purchases`, `accounting`,
+  `sales`, `production`, `marketing`, `users`; **no** el nombre del área,
+  ver `process-nomenclature.md`), codigo (ej.
+  `rango_salarial_cocinero`,
   `margen_error_ajuste`, `monto_caja_chica`, `plazo_envio_comprobante`),
-  valor (JSONB — forma libre por código: `{"minimo":1500,"maximo":2200}`
-  para un rango, `{"frecuencia":"mensual"}` para una periodicidad,
-  `{"dias":5}` para un plazo, `{"monto":500}` o `{"porcentaje":2.5}` para
-  un valor simple), decision_gerencial_id (FK opcional a
-  `decision_gerencial` — sustento cuando el cambio lo amerita, no
-  obligatorio para un ajuste rutinario), vigente, vigente_desde.
-  Generaliza `regla_aprobacion` (RN-GER-008): esa sigue siendo la vía
-  específica para umbrales que gatillan una aprobación (con
-  `permiso_requerido`); `parametro_empresa` es cualquier otro valor
-  operativo configurable por empresa, requiera o no aprobación. Si no hay
-  fila para una empresa/módulo/código, el módulo consumidor usa su valor
-  semilla de config como fallback (mismo patrón que `regla_aprobacion`).
-  Administrado vía `/api/v1/parametros-empresa` (permiso
-  `gerencia.gestionar_parametros_empresa`). Sin implementar todavía — ver
-  `ROADMAP.md` → Deuda técnica → Transversal.
+  valor (JSONB — forma libre por código, pero **toda magnitud declara su
+  unidad**, RN-GER-010: `{"monto":"500.00","divisa":"PEN"}`,
+  `{"minimo":"1500.00","maximo":"2200.00","divisa":"PEN"}`,
+  `{"cantidad":"5.000","unidad_medida_id":"..."}`; los adimensionales van
+  sueltos: `{"frecuencia":"mensual"}`, `{"dias":5}`, `{"porcentaje":2.5}`),
+  valor_display (la magnitud ya formateada con su unidad —"S/ 2000.00",
+  "5.000 Kilo"— tal como se le mostró a Gerencia; se congela con la fila,
+  renombrar la UdM después no reescribe lo aprobado; NULL si es
+  adimensional), estado (`propuesto` → `vigente` | `rechazado`, y
+  `reemplazado` cuando otra propuesta aprobada lo sucede),
+  propuesto_por_id, motivo, resuelto_por_id, resuelto_en, motivo_rechazo.
+  **Tabla única de configuración por empresa** (RN-GER-008): cubre tanto los
+  umbrales que gatillan una aprobación (`purchases/oc_umbral`,
+  `accounting/pago_umbral`) como cualquier otro valor operativo.
+
+  **Flujo de aprobación (RN-GER-009)**: el área propone el cambio desde su
+  propio módulo (permiso `<modulo>.proponer_parametro` — Compras no propone
+  parámetros de RRHH) y la propuesta nace en estado `propuesto` — **el
+  módulo consumidor sigue leyendo el valor anterior**. Gerencia la ve en su
+  bandeja (`GET /api/v1/parametros?estado=propuesto`) y puede aceptarla,
+  rechazarla con motivo, o modificar el valor al aprobar (permiso
+  `gerencia.gestionar_parametros_empresa`). Solo al aprobar el valor pasa
+  a `vigente` y el módulo lo lee. Cada propuesta es una fila: el historial
+  (quién propuso, quién resolvió, cuándo, valor anterior y nuevo) queda en
+  la propia tabla, sin `audit_log` aparte. Un índice único parcial sobre
+  (empresa_id, modulo, codigo) `WHERE estado='vigente'` garantiza un solo
+  valor vigente. Si no hay fila vigente, el módulo consumidor usa su valor
+  semilla de config como fallback.
+
+  Endpoints: `POST /api/v1/parametros` (proponer), `GET /api/v1/parametros`
+  (`?empresa_id&estado&modulo`; sin `modulo` exige el permiso de Gerencia —
+  los rangos salariales de RRHH no son de lectura general),
+  `POST /api/v1/parametros/{id}/aprobar` (`{"valor": ...}` opcional =
+  modificar al aprobar), `POST /api/v1/parametros/{id}/rechazar`. Lectura
+  desde un módulo: `src.shared.parametros.valor_vigente(...)`, o
+  `src.shared.aprobaciones.umbral_vigente(...)` si el valor es un monto que
+  se compara como `Decimal` — nunca consultar la tabla directo.
+
+  **Unidades (RN-GER-010)**: `src/shared/magnitudes.py` decide qué unidad
+  exige cada valor y lo redondea con los decimales de ESA unidad. La divisa
+  se resuelve contra `divisa`; la UdM contra el contrato público
+  `inventory.application.queries_publicas.unidad_medida_para_magnitud` —
+  `shared` no consulta el catálogo de otro módulo. Un monto sin divisa o una
+  cantidad sin UdM responden 409 (`MagnitudInvalida` es una `ReglaNegocio`,
+  traducida por el handler global de `core/error_handlers.py`), tanto al
+  proponer como al modificar-y-aprobar. El `modulo` inventado sí es 422:
+  lo ataja pydantic antes de llegar al caso de uso.
+
+  **Sin `decision_gerencial_id`** (descartado 2026-08-02, previsto en
+  ADR-014): el par propuesta/aprobación ya registra quién, qué, cuándo y
+  con qué sustento (`motivo`) — la FK duplicaba ese rastro. `decision_gerencial`
+  sigue pendiente para **su** caso propio (aprobación de OC escalada,
+  campaña sobre presupuesto, sanción), no para parámetros.
 
 ## 8d. Marketing (módulo marketing)
 

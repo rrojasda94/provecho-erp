@@ -7,35 +7,61 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from src.shared.models import ReglaAprobacion
+from src.shared.models import Divisa, ParametroEmpresa
 
 
-class ReglaAprobacionRepo:
+class DivisaRepo:
     def __init__(self, session: Session) -> None:
         self.s = session
 
-    def get(self, regla_id: uuid.UUID) -> ReglaAprobacion | None:
-        return self.s.get(ReglaAprobacion, regla_id)
+    def get_por_codigo(self, codigo: str) -> Divisa | None:
+        return self.s.scalar(
+            select(Divisa).where(Divisa.codigo == codigo, Divisa.activa.is_(True))
+        )
+
+    def list(self) -> list[Divisa]:
+        return list(self.s.scalars(select(Divisa).order_by(Divisa.codigo)))
+
+
+class ParametroEmpresaRepo:
+    def __init__(self, session: Session) -> None:
+        self.s = session
+
+    def get(self, parametro_id: uuid.UUID) -> ParametroEmpresa | None:
+        return self.s.get(ParametroEmpresa, parametro_id)
 
     def get_vigente(
         self, empresa_id: uuid.UUID, modulo: str, codigo: str
-    ) -> ReglaAprobacion | None:
+    ) -> ParametroEmpresa | None:
         return self.s.scalar(
-            select(ReglaAprobacion).where(
-                ReglaAprobacion.empresa_id == empresa_id,
-                ReglaAprobacion.modulo == modulo,
-                ReglaAprobacion.codigo == codigo,
-                ReglaAprobacion.vigente.is_(True),
+            select(ParametroEmpresa).where(
+                ParametroEmpresa.empresa_id == empresa_id,
+                ParametroEmpresa.modulo == modulo,
+                ParametroEmpresa.codigo == codigo,
+                ParametroEmpresa.estado == "vigente",
             )
         )
 
-    def list(self, empresa_id: uuid.UUID | None = None) -> list[ReglaAprobacion]:
-        stmt = select(ReglaAprobacion)
+    def list(
+        self,
+        empresa_id: uuid.UUID | None = None,
+        estado: str | None = None,
+        modulo: str | None = None,
+    ) -> list[ParametroEmpresa]:
+        stmt = select(ParametroEmpresa)
         if empresa_id is not None:
-            stmt = stmt.where(ReglaAprobacion.empresa_id == empresa_id)
-        return list(self.s.scalars(stmt.order_by(ReglaAprobacion.modulo, ReglaAprobacion.codigo)))
+            stmt = stmt.where(ParametroEmpresa.empresa_id == empresa_id)
+        if estado is not None:
+            stmt = stmt.where(ParametroEmpresa.estado == estado)
+        if modulo is not None:
+            stmt = stmt.where(ParametroEmpresa.modulo == modulo)
+        return list(
+            self.s.scalars(
+                stmt.order_by(ParametroEmpresa.modulo, ParametroEmpresa.codigo)
+            )
+        )
 
-    def add(self, regla: ReglaAprobacion) -> ReglaAprobacion:
-        self.s.add(regla)
+    def add(self, parametro: ParametroEmpresa) -> ParametroEmpresa:
+        self.s.add(parametro)
         self.s.flush()
-        return regla
+        return parametro

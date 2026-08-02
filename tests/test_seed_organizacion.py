@@ -22,6 +22,7 @@ from src.modules.users.infrastructure.models import (
     Sucursal,
 )
 from src.seeders.seed import seed
+from src.shared.parametros import MODULOS
 
 SEDE_CASTILLA = "Jr. Ramón Castilla 248 - Tarapoto"
 
@@ -93,10 +94,8 @@ def test_almacen_central_sin_sucursal(sembrado):
 
 
 def test_permiso_gestionar_parametros_empresa_sembrado_y_solo_admin(sembrado):
-    """El permiso (ADR-014) va adelantado a `parametro_empresa`, que sigue
-    sin código — pero debe existir en el catálogo y no colgar de ningún rol
-    operativo, solo de `admin` vía `*` (no hay rol `gerente` explícito,
-    mismo hueco que `gestionar_reglas_aprobacion`)."""
+    """Aprobar parámetros (ADR-014) no cuelga de ningún rol operativo: solo
+    de `admin` vía `*` — no hay rol `gerente` explícito todavía."""
     permiso = sembrado.scalar(
         select(Permiso).where(Permiso.codigo == "gerencia.gestionar_parametros_empresa")
     )
@@ -110,6 +109,17 @@ def test_permiso_gestionar_parametros_empresa_sembrado_y_solo_admin(sembrado):
         )
     )
     assert roles_con_el_permiso == set()
+
+
+def test_permiso_proponer_parametro_sembrado_por_modulo(sembrado):
+    """Un permiso por módulo (ADR-014 Addendum): Compras no puede proponer
+    parámetros de RRHH. Ninguno cuelga aún de un rol operativo."""
+    codigos = set(
+        sembrado.scalars(
+            select(Permiso.codigo).where(Permiso.codigo.like("%.proponer_parametro"))
+        )
+    )
+    assert codigos == {f"{modulo}.proponer_parametro" for modulo in MODULOS}
 
     admin = sembrado.scalar(select(Rol).where(Rol.nombre == "admin"))
     admin_permisos = set(

@@ -265,26 +265,30 @@ def test_emitir_oc_sobre_umbral_sin_permiso_aprobar_409(env):
     assert r2.status_code == 200
 
 
-def test_regla_aprobacion_override_por_empresa_permite_sin_umbral_semilla(env):
-    """Con una fila `regla_aprobacion` que sube el umbral para esta empresa,
-    una OC que antes exigía `purchases.aprobar` (sobre el umbral semilla
-    S/2000) ya no lo exige."""
+def test_parametro_aprobado_sube_el_umbral_de_oc_de_la_empresa(env):
+    """Con un `parametro_empresa` aprobado que sube el umbral para esta
+    empresa, una OC que antes exigía `purchases.aprobar` (sobre el umbral
+    semilla S/2000) ya no lo exige. Proponer no basta: hace falta que
+    Gerencia apruebe (RN-GER-009)."""
     client, ids, _ = env
     h_admin = _token(client)
     h_comprador = _token(client, "comprador1", "111111")
 
     r = client.post(
-        "/api/v1/reglas-aprobacion",
+        "/api/v1/parametros",
         headers=h_admin,
         json={
             "empresa_id": ids["empresa_id"],
             "modulo": "purchases",
             "codigo": "oc_umbral",
-            "umbral": "10000",
-            "permiso_requerido": "purchases.aprobar",
+            "valor": {"monto": "10000", "divisa": "PEN"},
         },
     )
     assert r.status_code == 201
+    aprobacion = client.post(
+        f"/api/v1/parametros/{r.json()['id']}/aprobar", headers=h_admin, json={}
+    )
+    assert aprobacion.status_code == 200
 
     proveedor_id = _crear_proveedor(client, h_admin, ids).json()["id"]
     # 100 * 50 = 5000: bajo el umbral semilla (2000) hubiera exigido aprobar,

@@ -30,6 +30,11 @@ from src.modules.users.infrastructure.models import (
     UsuarioSucursal,
 )
 from src.modules.users.infrastructure.security import hash_pin
+from src.shared.models import Divisa
+from src.shared.parametros import MODULOS
+
+# Moneda de la operación (RN-PRC-004). `decimales` es configurable por divisa.
+DIVISAS = [("PEN", "Sol peruano", "S/", 2)]
 
 # --- Organización real del Grupo Majambo ---
 GRUPO = "Grupo Majambo"
@@ -137,10 +142,9 @@ PERMISOS = [
         "Enviar la encuesta de satisfacción y registrar su respuesta (RN-COM-007)",
     ),
     ("dashboard.leer", "Consultar el dashboard gerencial (ventas, stock, caja)"),
-    ("gerencia.gestionar_reglas_aprobacion", "Administrar la matriz de aprobaciones"),
     (
         "gerencia.gestionar_parametros_empresa",
-        "Administrar parámetros operativos configurables por empresa (ADR-014)",
+        "Aprobar, rechazar o modificar parámetros operativos por empresa (ADR-014)",
     ),
     ("sales.leer_clientes_externos", "Consultar clientes para análisis fuera de sales"),
     ("rrhh.leer", "Consultar trabajadores, contratos, nómina y documentos de RRHH"),
@@ -163,6 +167,11 @@ PERMISOS = [
     ("rrhh.capacitacion_gestionar", "Administrar pactos de permanencia por capacitación"),
     ("sync.leer", "Descargar catálogo, stock y RBAC de la sucursal hacia su hub"),
     ("sync.empujar", "Reproducir en la nube las ventas y cobros de un hub offline"),
+] + [
+    # Un permiso por módulo: cada área propone parámetros de lo suyo y de nada
+    # más (ADR-014 Addendum). Gerencia sigue siendo quien aprueba.
+    (f"{modulo}.proponer_parametro", f"Proponer un cambio de parámetro de {modulo}")
+    for modulo in MODULOS
 ]
 
 ROLES = {
@@ -341,6 +350,15 @@ def _seed_organizacion(session: Session) -> None:
 
 def seed(session: Session) -> None:
     _seed_organizacion(session)
+
+    # --- Divisas (RN-GER-010: sin divisa, ningún monto puede declarar unidad) ---
+    for codigo, nombre, simbolo, decimales in DIVISAS:
+        _get_or_create(
+            session,
+            Divisa,
+            codigo=codigo,
+            defaults=dict(nombre=nombre, simbolo=simbolo, decimales=decimales),
+        )
 
     # --- Permisos ---
     permisos = {}

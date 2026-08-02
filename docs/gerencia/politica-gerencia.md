@@ -30,17 +30,17 @@ está definido, se marca `[[ COMPLETAR ]]`.
 Fuente **única** de qué requiere visado gerencial, su umbral y el
 aprobador (RN-GER-003). Ninguna área fija un umbral propio por fuera de
 esta tabla; los SOPs de cada área la referencian en vez de redefinirla.
-Los umbrales cuantitativos (montos) viven como filas de la tabla
-`regla_aprobacion` (editable por empresa vía
-`gerencia.gestionar_reglas_aprobacion`, ver `data-model.md` §8c) — esta
-tabla es la narrativa de gobierno (qué, quién, por qué), no el valor exacto.
+Los umbrales cuantitativos (montos) viven como filas de
+`parametro_empresa` (el área los propone, Gerencia los aprueba —
+RN-GER-009, ver `data-model.md` §8c) — esta tabla es la narrativa de
+gobierno (qué, quién, por qué), no el valor exacto.
 
 | Qué se aprueba | Umbral / condición | Aprobador | Regla / fuente |
 |---|---|---|---|
 | Presupuesto anual de cada área | Una vez al año, en la reunión de presupuesto | Gerencia sobre propuesta del área e informe de Contabilidad | RN-GER-007 |
 | Gasto de un área durante el año | Fuera de lo presupuestado, o sobre el límite de gasto autónomo del área `[[ COMPLETAR: límite por área ]]` | Gerencia (puntual) | RN-GER-007 |
 | Contratación de agencia (servicio) | Marketing evalúa; excede el presupuesto/límite o requiere validación | Marketing evalúa + Gerencia valida | RN-MKT-006 |
-| Orden de compra sobre umbral | Monto ≥ el configurado en `regla_aprobacion` (`purchases`/`oc_umbral`) por empresa — valor semilla S/2000 si nadie lo configuró aún; prohibido fraccionar para evadirlo | Administrador/Gerencia | RN-CMP-008 |
+| Orden de compra sobre umbral | Monto ≥ el configurado en `parametro_empresa` (`purchases`/`oc_umbral`) por empresa — valor semilla S/2000 si nadie lo configuró aún; prohibido fraccionar para evadirlo | Administrador/Gerencia | RN-CMP-008 |
 | Compra de activo / equipamiento | Siempre (cotización comparativa de ≥2 proveedores) | Área solicitante + Gerencia | RN-CMP-015 |
 | Préstamo de una empresa | Siempre, con estudio de viabilidad previo | Gerencia sobre informe de Contabilidad | RN-EMP-006 |
 | Esquema de incentivo/comisión de metas de venta | Al crearse o cambiar; nunca retroactivo | Comercial + RRHH + Gerencia | RN-CML-003 |
@@ -60,22 +60,37 @@ Distinto de la matriz de aprobaciones (arriba): esto no es "qué requiere
 visado", es cualquier valor operativo que varía por empresa o en el
 tiempo y que antes se documentaba como `[[ COMPLETAR ]]` fijo. Se
 configura en `parametro_empresa` (RN-GER-008, `data-model.md` §8c,
-ADR-014) — lo gestiona Gerencia, no cada área por su cuenta. Un cambio
-puede sustentarse en un acta (`decision_gerencial`) cuando el ajuste lo
-amerite — por ejemplo, tras una reunión con las cabezas de área — pero no
-es obligatorio para un ajuste rutinario.
+ADR-014). Un cambio puede sustentarse en un acta (`decision_gerencial`)
+cuando el ajuste lo amerite — por ejemplo, tras una reunión con las
+cabezas de área — pero no es obligatorio para un ajuste rutinario.
 
-Primeros candidatos a configurar (mecanismo ya decidido; **valor real
-pendiente de que Gerencia lo cargue**, no bloquea código):
+**Quién propone y quién decide** (RN-GER-009): **el área propone el
+cambio desde su propio módulo** — Compras su umbral de OC, Almacén su
+margen de error de ajuste, RRHH sus rangos salariales — y la propuesta queda
+pendiente. **El valor no cambia hasta que Gerencia lo aprueba** en su
+sección de aprobaciones, donde puede:
+
+| Acción | Efecto |
+|---|---|
+| Aceptar | El valor propuesto pasa a vigente y el módulo empieza a usarlo |
+| Rechazar (con motivo) | Queda el valor anterior; el motivo vuelve al área |
+| Modificar y aprobar | Gerencia corrige el valor y ese corregido queda vigente |
+
+Mientras la propuesta esté pendiente, el módulo sigue operando con el
+valor anterior. Gerencia gobierna el parámetro; no lo digita por las
+áreas.
+
+Primeros candidatos a configurar (mecanismo ya implementado; **valor real
+pendiente de que el área lo proponga y Gerencia lo apruebe**, no bloquea
+código):
 
 | Parámetro | Módulo/código | Notas |
 |---|---|---|
 | Rango salarial por perfil de puesto (7 perfiles) | `rrhh/rango_salarial_<perfil>` | `{"minimo":..., "maximo":...}` |
-| Frecuencia de conteo cíclico y de conteo general | `inventory/frecuencia_conteo_<categoria>` | `{"frecuencia":"diario"\|"semanal"\|"mensual"\|"anual"\|"fecha_especifica"}`, puede variar por categoría de insumo y por almacén |
 | Margen de error de ajuste de inventario | `inventory/margen_error_ajuste` | `{"porcentaje":...}`, puede variar por tipo de producto |
 | Monto del fondo de caja chica de compras | `purchases/monto_caja_chica` | `{"monto":...}`; el mecanismo de reposición ante faltante sigue siendo una decisión de proceso aparte, no solo de valor |
-| Plazo interno de envío de comprobantes al contador | `contabilidad/plazo_envio_comprobante` | `{"dias":...}` |
-| Margen de contribución mínimo objetivo | `comercial/margen_minimo` | `{"porcentaje":...}` |
+| Plazo interno de envío de comprobantes al contador | `accounting/plazo_envio_comprobante` | `{"dias":...}` |
+| Margen de contribución mínimo objetivo | `sales/margen_minimo` | `{"porcentaje":...}` |
 
 Quedan **fuera** de `parametro_empresa` por ser decisiones de rol, no de
 valor: quién autoriza ajustes de inventario (¿admin o un rol de

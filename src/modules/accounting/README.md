@@ -37,7 +37,7 @@ eventos listados abajo quedan pendientes de que esos módulos los publiquen
 encola un pago `pendiente` (`application/pagos.registrar_pago`, idempotente
 por `comprobante_id`, RN-CTB-008); `application/pagos.ejecutar_pago` exige
 permiso `accounting.pago_gestionar`, revisa el umbral configurable
-(`regla_aprobacion`, código `pago_umbral`, RN-CTB-005 — sobre el umbral
+(`parametro_empresa`, código `pago_umbral`, RN-CTB-005 — sobre el umbral
 exige además `accounting.pago_aprobar`) y genera el asiento vía
 `regla_asiento` (evento `accounting.pago_ejecutado`; sin mapeo configurado,
 el pago igual se ejecuta y el asiento se omite). `rechazar_pago` cierra la
