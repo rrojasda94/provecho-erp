@@ -1,7 +1,7 @@
 """Reglas de negocio de inventario. Puras, sin infraestructura."""
 
 from collections.abc import Sequence
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -17,6 +17,31 @@ TIPOS_MOVIMIENTO = {
 }
 
 MOTIVOS_AJUSTE = {"sobrante", "faltante", "merma", "error_registro"}
+
+TIPOS_CONTEO = {"rutina", "ajuste", "auditoria"}
+
+TIPOS_RESERVA = {"solicitud", "produccion", "merma", "carrito"}
+MOTIVOS_RESERVA_MERMA = {"devolucion", "rechazo_sucursal", "auditoria"}
+
+# Estados desde los que todavía se puede cancelar una solicitud y soltar
+# sus reservas (RN-INV-010). Despachada ya movió stock: eso se corrige
+# recibiendo o con una transferencia de vuelta, no cancelando.
+ESTADOS_SOLICITUD_CANCELABLES = {"pendiente", "aprobada"}
+
+# Cada cuánto toca contar una categoría, en días (RN-INV-007). El período
+# es en días y no en meses de calendario a propósito: el almacén cuenta
+# "cada 15 días" / "cada mes", no "el mismo día de cada mes", y así el
+# programa no depende de qué día tenga febrero.
+# ponytail: si el negocio pide anclar al día del mes, esto pasa a
+# `dateutil.relativedelta` — el resto del cálculo no cambia.
+FRECUENCIAS_CONTEO: dict[str, int] = {
+    "diario": 1,
+    "semanal": 7,
+    "quincenal": 15,
+    "mensual": 30,
+    "semestral": 182,
+    "anual": 365,
+}
 
 # Dirección esperada del signo de la cantidad según el tipo de movimiento.
 TIPOS_INGRESO = {"recepcion_compra", "transferencia_entrada", "produccion_entrada"}
@@ -57,6 +82,23 @@ def stock_bajo(cantidad: Decimal, stock_minimo: Decimal | None) -> bool:
     return stock_minimo is not None and cantidad <= stock_minimo
 
 
+def disponible(fisico: Decimal, reservado: Decimal) -> Decimal:
+    """Stock que se puede comprometer: el físico menos lo ya prometido
+    (RN-INV-009). Puede dar negativo si se reservó y después se consumió
+    por otra vía —una venta nunca se bloquea por una reserva—, y eso es
+    información, no un error: significa que hay una promesa sin respaldo.
+    """
+    return fisico - reservado
+
+
+def puede_despachar(aprobada: Decimal | None, a_despachar: Decimal) -> bool:
+    """Nunca más de lo aprobado (RN-INV-001). Menos sí: si el central no
+    tiene todo, despacha lo que hay y la diferencia queda a la vista."""
+    if aprobada is None:
+        return False
+    return 0 < a_despachar <= aprobada
+
+
 def lote_vencido(fecha_vencimiento: date | None, hoy: date) -> bool:
     """Un lote sin fecha de vencimiento nunca vence (RN-VNC-001/002)."""
     return fecha_vencimiento is not None and fecha_vencimiento < hoy
@@ -88,6 +130,48 @@ def repartir_fefo(
             asignaciones.append((clave, toma))
             pendiente -= toma
     return asignaciones, pendiente
+
+
+def proxima_fecha_conteo(ultima: date, frecuencia: str) -> date:
+    """Cuándo vuelve a tocar contar, a partir del último conteo cerrado."""
+    return ultima + timedelta(days=FRECUENCIAS_CONTEO[frecuencia])
+
+
+def estado_programa_conteo(proxima: date, hoy: date) -> tuple[str, int]:
+    """Estado del conteo programado y días de atraso.
+
+    Atraso 0 es el día en que vence: todavía se puede contar, no es una
+    falta. Recién al día siguiente el conteo está vencido y se reporta
+    (RN-INV-021).
+    """
+    atraso = (hoy - proxima).days
+    if atraso > 0:
+        return "vencido", atraso
+    if atraso == 0:
+        return "vence_hoy", 0
+    return "al_dia", atraso
+
+
+def diferencia_dentro_margen(
+    cantidad_sistema: Decimal, diferencia: Decimal, margen_pct: Decimal
+) -> bool:
+    """Margen de error tolerado al ajustar por conteo (RN-INV-015).
+
+    Con stock de sistema en 0 no hay base contra la cual medir un
+    porcentaje: cualquier diferencia queda fuera de margen y exige
+    investigación.
+    """
+    if diferencia == 0:
+        return True
+    if cantidad_sistema == 0:
+        return False
+    return abs(diferencia) <= abs(cantidad_sistema) * margen_pct / Decimal(100)
+
+
+def motivo_por_diferencia(diferencia: Decimal) -> str:
+    """Un conteo solo produce sobrante o faltante; merma y error de
+    registro los declara una persona, no la diferencia (RN-INV-016)."""
+    return "sobrante" if diferencia > 0 else "faltante"
 
 
 def codigo_lote_auto(fecha: date) -> str:

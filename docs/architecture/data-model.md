@@ -108,8 +108,13 @@ erDiagram
   licenciado_a_trabajador_id (nullable — beneficio laboral, RN-VEH-003).
 - **categoria**: empresa_id, nombre, asiento_contable_config (JSONB —
   cuenta contable por tipo de movimiento: compra, consumo, merma, etc.;
-  opcional). Se asigna a `articulo` o `activo` (ambos con categoria_id
-  opcional); libremente editable/eliminable, a diferencia del SKU.
+  opcional), frecuencia_conteo (`diario` | `semanal` | `quincenal` |
+  `mensual` | `semestral` | `anual`; nullable). Se asigna a `articulo` o
+  `activo` (ambos con categoria_id opcional); libremente
+  editable/eliminable, a diferencia del SKU.
+  `frecuencia_conteo` es lo que hace implementable el conteo cíclico
+  (RN-INV-007, ADR-017): la periodicidad no es única por empresa ni por
+  almacén, la fija la categoría del SKU. NULL = fuera del ciclo.
 
 ## 1b. Geografía (transversal)
 
@@ -353,14 +358,34 @@ descuenta stock vía la receta (ver [../domain/domain-model.md](../domain/domain
   `responsable_id`: `almacen` no tiene responsable modelado.
 - **reserva_stock**: almacen_id, sku_id, cantidad, tipo (`solicitud` |
   `produccion` | `merma` | `carrito`), referencia_id (solicitud_id/
-  orden_produccion_id/carrito_id; o motivo `devolucion`|`rechazo_sucursal`|
-  `auditoria` si tipo=`merma`),
+  orden_produccion_id/carrito_id; sin FK porque apunta a tablas distintas
+  según el tipo), motivo (`devolucion`|`rechazo_sucursal`|`auditoria`,
+  solo si tipo=`merma`),
   estado (`activa` | `liberada` | `consumida` | `pendiente_desecho`),
   creado_por, liberado_por (nullable), timestamp. Stock disponible = stock
   físico − Σ reservas activas (RN-INV-009).
-- **conteo**: almacen_id, tipo (`rutina` | `ajuste` | `auditoria`), fecha,
-  usuario_id. Ítems en **conteo_item** (sku_id, cantidad_contada,
-  cantidad_sistema, diferencia). Una diferencia genera un `ajuste`.
+  **No mueve `stock` ni genera movimiento**: es una promesa sobre stock que
+  sigue físicamente en el almacén (ADR-018). Reservar exige disponible
+  suficiente; consumir **no** se bloquea nunca por una reserva —una venta
+  ya ocurrida no se niega—, así que el disponible puede quedar negativo, y
+  eso es la señal de una promesa sin respaldo, no un error. De los cuatro
+  tipos solo `solicitud` tiene productor hoy: `produccion` y `carrito`
+  esperan a sus módulos y `merma` a `stock_merma` (RN-INV-012).
+- **conteo**: almacen_id, categoria_id (nullable — NULL es conteo general
+  de todo el almacén), tipo (`rutina` | `ajuste` | `auditoria`), estado
+  (`abierto` | `cerrado` | `anulado`), fecha_programada (nullable — la que
+  el ciclo exigía, para saber si llegó a tiempo), abierto_por,
+  cerrado_por, cerrado_at, observacion. Ítems en **conteo_item**
+  (conteo_id, sku_id, cantidad_sistema, cantidad_contada nullable; único
+  por conteo+sku). `diferencia` = cantidad_contada − cantidad_sistema es
+  **derivada, no almacenada**.
+  `cantidad_sistema` se congela **al abrir** el conteo: el almacén sigue
+  operando mientras se cuenta, y medir contra un stock que se movió
+  durante el recuento inventa diferencias inexistentes. Al cerrar, cada
+  diferencia distinta de cero genera un `ajuste` pendiente; los ítems sin
+  contar se ignoran. Sin categoría configurada con `frecuencia_conteo` no
+  hay programa: el calendario se deriva del último conteo cerrado más la
+  frecuencia, no existe tabla `programa_conteo` (ADR-017).
 - **ajuste**: almacen_id, conteo_id (opcional — origen), motivo
   (`sobrante` | `faltante` | `merma` | `error_registro`), solicitado_por,
   aprobado_por (permisos separados `inventory.solicitar_ajuste` /
@@ -381,17 +406,37 @@ descuenta stock vía la receta (ver [../domain/domain-model.md](../domain/domain
   `duplicidad`), destino (`desecho` | `auditoria` | `reintegro`), items
   (sku, cantidad), reporte_dirigido_a (`almacen` | `comercial`, RN-INV-020).
   Genera el `movimiento_inventario` tipo `devolucion` correspondiente.
-- **solicitud_insumos**: sucursal_id, estado (`pendiente` | `aprobada` |
-  `rechazada` | `en_picking` | `despachada` | `recibida`), aprobador_id.
-  Ítems en **solicitud_item**. Caso concreto (ámbito inventario) del
-  concepto marco Solicitud (RN-DOC-005) — comparte fecha_elaboracion/
-  responsable_id/proposito de Documento (ver convenciones arriba).
-- **transferencia**: origen_almacen_id, destino_almacen_id, solicitud_id,
-  estado (`en_transito` | `recibida`), ítems con cantidad enviada/recibida
-  (diferencias auditables). Mientras `en_transito` ("almacén de transporte"
-  — no es ubicación física, es el estado del inventario ya descontado de
-  origen y aún no ingresado a destino): transportista_id, vehiculo_id,
-  tracking GPS, tiempos de ruta y de entrega.
+- **solicitud_insumos**: almacen_solicitante_id, almacen_abastecedor_id,
+  estado (`pendiente` | `aprobada` | `rechazada` | `cancelada` |
+  `despachada` | `recibida`), solicitado_por, aprobado_por, observacion.
+  Ítems en **solicitud_item** (sku_id, cantidad_solicitada,
+  cantidad_aprobada, cantidad_despachada; único por solicitud+sku). Caso
+  concreto (ámbito inventario) del concepto marco Solicitud (RN-DOC-005).
+  Va **por almacén y no por sucursal** (ADR-018): producción también
+  solicita y la transferencia opera sobre almacenes; la sucursal se deriva
+  de `almacen.sucursal_id`. El abastecedor se copia del
+  `almacen.almacen_abastecedor_id` al crearla, para que cambiarlo después
+  no reescriba la historia de lo ya pedido. Las tres cantidades son tres
+  momentos: lo pedido, lo aprobado (nunca se despacha más, RN-INV-001) y
+  lo que el central llegó a despachar. `en_picking` **no se implementó**:
+  no gobierna ninguna regla entre `aprobada` y `despachada`.
+  Aprobar reserva el stock en el abastecedor; cancelar o rechazar lo
+  suelta (RN-INV-010).
+- **transferencia**: origen_almacen_id, destino_almacen_id, solicitud_id
+  (NULL en la transferencia lateral sucursal↔sucursal), estado
+  (`en_transito` | `recibida`), despachado_por, recibido_por,
+  transportista_id, recibida_at, observacion. Mientras `en_transito`
+  ("almacén de transporte" — no es ubicación física, es el estado del
+  inventario ya descontado de origen y aún no ingresado a destino).
+  `vehiculo_id`, tracking GPS y tiempos de ruta **pendientes**: `vehiculo`
+  no existe todavía como entidad.
+  Ítems en **transferencia_item** (sku_id, **lote_id** nullable,
+  cantidad_enviada, cantidad_recibida nullable; `diferencia` derivada). Va
+  por SKU **y lote** porque el despacho reparte por FEFO: sacar 10 kg puede
+  tomar tres lotes y el destino recibe esos mismos tres (ADR-015) — una
+  fila por movimiento de salida. Al recibir entra al stock lo que de verdad
+  llegó; la diferencia contra lo enviado queda registrada y viaja en
+  `inventory.transferencia_recibida` (RN-INV-002), no se corrige sola.
 - **guia_remision**: empresa_id, transferencia_id (opcional — traslado
   entre almacenes), fecha_inicio_traslado, items (articulo/sku, cantidad),
   ruc_emisor, ruc_receptor, lugar_origen, lugar_destino, motivo_traslado,
@@ -694,14 +739,17 @@ Solicitud.
 
 Evento `sales.venta_confirmada` → inventory descuenta insumos según receta.
 
-- **encuesta_satisfaccion** (módulo futuro marketing): venta_id, cliente_id,
-  canal (`pos` | `whatsapp` | `link`), fecha_envio, fecha_respuesta
-  (opcional), puntaje (opcional hasta responder), comentario (opcional),
-  estado (`enviada` | `respondida` | `expirada`). Selectiva — no toda venta
-  genera una fila (RN-COM-007); requiere `cliente_id` no nulo. Su
-  disparador es `sales.venta_entregada` (`PROC-OPE-002`); Marketing elige
-  a qué venta entregada enviarle encuesta, y al enviarla emite
-  `marketing.encuesta_enviada`.
+- **encuesta_satisfaccion** (módulo marketing, ver §8d): venta_id (único),
+  cliente_id, canal (`pos` | `whatsapp` | `link`), fecha_envio,
+  fecha_respuesta (opcional), puntaje 1-5 (opcional hasta responder),
+  comentario (opcional), estado (`enviada` | `respondida` | `expirada`),
+  enviada_por. Selectiva — no toda venta genera una fila (RN-COM-007);
+  requiere `cliente_id` no nulo y el pedido ya entregado. Su disparador es
+  `sales.venta_entregada` (`PROC-OPE-002`); Marketing elige a qué venta
+  entregada enviarle encuesta, y al enviarla emite
+  `marketing.encuesta_enviada`. El estado de entrega lo lee del contrato
+  público `sales/application/queries_publicas.py::venta_para_encuesta` —
+  marketing no importa `Venta`.
 
 ## 7. Producción (módulo futuro production)
 
@@ -825,10 +873,36 @@ un trabajador puede o no tener usuario, y no todo usuario es trabajador
   `locacion_servicios`**, RN-PER-002), estado (`activo` | `cesado` |
   `suspendido`). Los nombres/documento NO viven aquí, viven en `persona`
   (RN-GEN-007).
-- **postulante**: persona_id, puesto_postulado, fecha_postulacion,
+- **convocatoria** (implementada 2026-08-01, migración `a7f2c81e4b95`):
+  empresa_id, sucursal_id (opcional — dónde se necesita cubrir), puesto,
+  perfil_puesto (slug del perfil aprobado en `docs/rrhh/perfiles/`; **sin él
+  no se publica**, RN-RRHH-013), motivo (`reemplazo` | `refuerzo` |
+  `puesto_nuevo`), vacantes, jornada_horas_semana, remuneracion_min/max (el
+  rango aprobado en la requisición: la oferta no sale de ahí), fecha_objetivo,
+  fecha_limite, fecha_publicacion, token_publico (único, se genera al publicar
+  y se retira al cerrar), estado (`borrador` | `publicada` | `cerrada`).
+  Es el expediente de la búsqueda; los postulantes cuelgan de ella.
+- **postulante** (ampliada 2026-08-01, misma migración): empresa_id,
+  convocatoria_id (nulo si es espontánea o referido), **nombres, apellidos,
+  telefono, email propios** — el candidato NO entra a `persona` mientras es
+  candidato: el pool es gente ajena a la empresa y la mayoría nunca se
+  contrata; puesto_postulado, fecha_postulacion, canal_origen (para medir qué
+  canal trae a los que sí se contratan), respuestas (JSONB — el formulario de
+  cada convocatoria pregunta lo suyo, no hay esquema fijo que mantener),
   consentimiento_datos (bool + fecha, RN-PER-004), plazo_conservacion_declarado
-  (fecha, según aviso de privacidad), cv_archivo_id (FK `archivo`), estado
-  (`en_proceso` | `rechazado` | `contratado`).
+  (fecha, según aviso de privacidad), cv_archivo_id (FK `archivo`),
+  persona_id + trabajador_id (**nulos hasta contratar**), motivo_descarte
+  (obligatorio al descartar: sustenta la decisión ante un reclamo de
+  discriminación, Ley 26772 — **sobrevive a la anonimización**, así que lleva
+  el criterio y nunca datos personales), anonimizado_at (cancelación ARCO
+  sobre la ficha, ADR-011: se conserva la fila sin datos identificables),
+  estado.
+  El `estado` es el tablero de contratación completo, una columna por paso:
+  `recibido` → `preseleccionado` → `entrevistado` → `verificado` →
+  `oferta_enviada` → `contratado` → `inducido` → `confirmado`, más
+  `descartado`. Un solo tablero para los 13 pasos de `docs/rrhh/README.md`:
+  la ficha cierra cuando la persona pasa el periodo de prueba, no cuando
+  firma.
 - **socio**: grupo_id o empresa_id, persona_id o razon_social+ruc,
   porcentaje_participacion. Referenciado en aprobaciones (RN-GRP-006,
   RN-MAR-004); no implica `trabajador` ni `usuario`.
@@ -924,33 +998,46 @@ tabla. Ver [docs/gerencia/README.md](../gerencia/README.md).
   `gerencia.gestionar_parametros_empresa`). Sin implementar todavía — ver
   `ROADMAP.md` → Deuda técnica → Transversal.
 
-## 8d. Marketing (módulo futuro marketing)
+## 8d. Marketing (módulo marketing)
 
 Marketing atrae demanda y cuida la marca; **Comercial** cierra la venta.
-Ver [docs/marketing/README.md](../marketing/README.md). `encuesta_satisfaccion`
-(hoy descrita en §6 como "módulo futuro marketing") pertenece a este
-módulo.
+Ver [docs/marketing/README.md](../marketing/README.md) y
+[src/modules/marketing/README.md](../../src/modules/marketing/README.md).
+`encuesta_satisfaccion` (descrita también en §6, donde nace su disparador)
+pertenece a este módulo.
+
+Implementado 2026-08-01 (migración `e9c3b7412a68`): las 5 entidades de
+abajo existen como tablas.
 
 - **campana**: empresa_id, marca_id, nombre (naming, RN-MKT-007), tipo
   (`notoriedad` | `impulso_venta` | `lanzamiento` | `medios` | `evento`),
   objetivo, publico_objetivo, canal, presupuesto, kpi, estado
-  (`brief` | `aprobada` | `en_curso` | `cerrada`), aprobada_por (referencia
-  a `decision_gerencial` solo si el gasto sale del presupuesto anual o
-  supera el límite, RN-GER-007), objetivo_comercial_id (opcional — enlaza
-  con Comercial si es impulso de venta). Sin brief aprobado no pasa de
-  `brief` (RN-MKT-003).
-- **pieza_contenido**: campana_id (opcional), marca_id, canal, fecha_publicacion,
-  pertinente_marca (bool — filtro RN-MKT-002), uso_marca_validado (bool,
-  RN-MKT-001), metricas (JSONB — alcance/interacción). Se planifica en un
-  calendario; solo se publica si `pertinente_marca` y `uso_marca_validado`.
+  (`brief` | `aprobada` | `en_curso` | `cerrada`), aprobada_por, creado_por,
+  idempotency_key. Único por `(empresa_id, nombre)`. Sin los cuatro campos
+  del brief —objetivo, público, presupuesto y KPI— no se aprueba, y sin
+  aprobación no sale a canal (RN-MKT-003). `aprobada_por` apunta hoy a
+  `usuario`: la referencia a `decision_gerencial` (obligatoria solo si el
+  gasto sale del presupuesto anual o supera el límite, RN-GER-007) y
+  `objetivo_comercial_id` quedan diferidas porque ninguna de esas dos
+  tablas existe todavía — ver ROADMAP → Deuda técnica → marketing.
+- **pieza_contenido**: campana_id (opcional), marca_id, titulo, canal,
+  fecha_publicacion, pertinente_marca (bool — filtro RN-MKT-002),
+  uso_marca_validado (bool, RN-MKT-001), estado
+  (`planificada` | `publicada` | `descartada`), metricas (JSONB —
+  alcance/interacción), creado_por. Se planifica en un calendario; solo se
+  publica si `pertinente_marca` y `uso_marca_validado`.
 - **lead**: campana_id, canal, tipo (`contacto` | `visita` | `cupon` |
-  `registro`), cliente_id (opcional), venta_id (opcional — atribución a la
-  venta real cuando Comercial cierra, RN-MKT-003). El valor de la campaña
-  se mide por leads con `venta_id` no nulo, no por volumen bruto.
+  `registro`), contacto (texto libre), cliente_id (opcional), venta_id
+  (opcional — atribución a la venta real cuando Comercial cierra,
+  RN-MKT-003), idempotency_key. El valor de la campaña se mide por leads
+  con `venta_id` no nulo, no por volumen bruto. Solo una campaña `en_curso`
+  admite leads nuevos.
 - **implementacion_material_sucursal**: campana_id, sucursal_id, fecha,
   verificado_por, completa (bool — producto nuevo y clásico, RN-MKT-005),
-  incidencia (opcional). Registra la verificación en sitio, no solo el
-  envío.
+  incidencia (opcional, obligatoria si `completa` es falso). Registra la
+  verificación en sitio, no solo el envío. Única por
+  `(campana_id, sucursal_id, fecha)`: reverificar el mismo día corrige la
+  fila, no acumula otra.
 
 La adquisición de material y la contratación de agencia **no** son
 entidades de marketing: usan el flujo de `purchases` (OC/caja chica) y

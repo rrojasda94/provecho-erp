@@ -8,7 +8,9 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class CuentaContableCreate(BaseModel):
-    empresa_id: uuid.UUID
+    # `empresa_id` sale del JWT (ADR-004). Solo un superusuario sin empresa
+    # asignada puede indicarla.
+    empresa_id: uuid.UUID | None = None
     codigo: str = Field(min_length=1, max_length=20)
     nombre: str = Field(min_length=1, max_length=150)
     tipo: str
@@ -32,7 +34,9 @@ class CuentaContableOut(BaseModel):
 
 
 class PeriodoContableCreate(BaseModel):
-    empresa_id: uuid.UUID
+    # `empresa_id` sale del JWT (ADR-004). Solo un superusuario sin empresa
+    # asignada puede indicarla.
+    empresa_id: uuid.UUID | None = None
     anio: int = Field(ge=2000, le=2100)
     mes: int = Field(ge=1, le=12)
 
@@ -62,7 +66,9 @@ class AsientoLineaOut(BaseModel):
 
 
 class AsientoManualCreate(BaseModel):
-    empresa_id: uuid.UUID
+    # `empresa_id` sale del JWT (ADR-004). Solo un superusuario sin empresa
+    # asignada puede indicarla.
+    empresa_id: uuid.UUID | None = None
     fecha: date
     glosa: str = Field(min_length=1, max_length=255)
     lineas: list[AsientoLineaIn] = Field(min_length=2)
@@ -83,7 +89,9 @@ class AsientoOut(BaseModel):
 
 
 class ReglaAsientoCreate(BaseModel):
-    empresa_id: uuid.UUID
+    # `empresa_id` sale del JWT (ADR-004). Solo un superusuario sin empresa
+    # asignada puede indicarla.
+    empresa_id: uuid.UUID | None = None
     evento: str = Field(min_length=1, max_length=100)
     cuenta_debe_id: uuid.UUID
     cuenta_haber_id: uuid.UUID
@@ -100,7 +108,9 @@ class ReglaAsientoOut(BaseModel):
 
 
 class PagoProveedorCreate(BaseModel):
-    empresa_id: uuid.UUID
+    # `empresa_id` sale del JWT (ADR-004). Solo un superusuario sin empresa
+    # asignada puede indicarla.
+    empresa_id: uuid.UUID | None = None
     comprobante_id: uuid.UUID | None = None
     proveedor_id: uuid.UUID | None = None
     orden_compra_id: uuid.UUID | None = None

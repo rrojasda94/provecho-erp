@@ -65,9 +65,16 @@
       "ActaCreate": {
         "properties": {
           "empresa_id": {
-            "format": "uuid",
-            "title": "Empresa Id",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Empresa Id"
           },
           "fecha": {
             "format": "date",
@@ -97,7 +104,6 @@
           }
         },
         "required": [
-          "empresa_id",
           "tipo",
           "fecha",
           "lugar",
@@ -847,9 +853,16 @@
       "AsientoManualCreate": {
         "properties": {
           "empresa_id": {
-            "format": "uuid",
-            "title": "Empresa Id",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Empresa Id"
           },
           "fecha": {
             "format": "date",
@@ -872,7 +885,6 @@
           }
         },
         "required": [
-          "empresa_id",
           "fecha",
           "glosa",
           "lineas"
@@ -1333,6 +1345,64 @@
         "title": "BoletaPagoOut",
         "type": "object"
       },
+      "BriefUpdate": {
+        "properties": {
+          "kpi": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kpi"
+          },
+          "objetivo": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Objetivo"
+          },
+          "presupuesto": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Presupuesto"
+          },
+          "publico_objetivo": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Publico Objetivo"
+          }
+        },
+        "title": "BriefUpdate",
+        "type": "object"
+      },
       "CajaAbiertaOut": {
         "properties": {
           "abierta_desde": {
@@ -1369,6 +1439,225 @@
           "abierta_desde"
         ],
         "title": "CajaAbiertaOut",
+        "type": "object"
+      },
+      "CampanaCreate": {
+        "properties": {
+          "canal": {
+            "maxLength": 50,
+            "minLength": 2,
+            "title": "Canal",
+            "type": "string"
+          },
+          "empresa_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Empresa Id"
+          },
+          "idempotency_key": {
+            "maxLength": 100,
+            "minLength": 8,
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "kpi": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kpi"
+          },
+          "marca_id": {
+            "format": "uuid",
+            "title": "Marca Id",
+            "type": "string"
+          },
+          "nombre": {
+            "maxLength": 120,
+            "minLength": 3,
+            "title": "Nombre",
+            "type": "string"
+          },
+          "objetivo": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Objetivo"
+          },
+          "presupuesto": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Presupuesto"
+          },
+          "publico_objetivo": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Publico Objetivo"
+          },
+          "tipo": {
+            "enum": [
+              "notoriedad",
+              "impulso_venta",
+              "lanzamiento",
+              "medios",
+              "evento"
+            ],
+            "title": "Tipo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "marca_id",
+          "nombre",
+          "tipo",
+          "canal",
+          "idempotency_key"
+        ],
+        "title": "CampanaCreate",
+        "type": "object"
+      },
+      "CampanaOut": {
+        "properties": {
+          "aprobada_por": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Aprobada Por"
+          },
+          "canal": {
+            "title": "Canal",
+            "type": "string"
+          },
+          "empresa_id": {
+            "format": "uuid",
+            "title": "Empresa Id",
+            "type": "string"
+          },
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kpi": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kpi"
+          },
+          "marca_id": {
+            "format": "uuid",
+            "title": "Marca Id",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "objetivo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Objetivo"
+          },
+          "presupuesto": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Presupuesto"
+          },
+          "publico_objetivo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Publico Objetivo"
+          },
+          "tipo": {
+            "title": "Tipo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "empresa_id",
+          "marca_id",
+          "nombre",
+          "tipo",
+          "canal",
+          "objetivo",
+          "publico_objetivo",
+          "presupuesto",
+          "kpi",
+          "estado",
+          "aprobada_por"
+        ],
+        "title": "CampanaOut",
         "type": "object"
       },
       "CartaItemOut": {
@@ -2730,6 +3019,309 @@
         "title": "ContratoLaboralOut",
         "type": "object"
       },
+      "ConvocatoriaCreate": {
+        "properties": {
+          "empresa_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Empresa Id"
+          },
+          "fecha_limite": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Limite"
+          },
+          "fecha_objetivo": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Objetivo"
+          },
+          "jornada_horas_semana": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 48.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jornada Horas Semana"
+          },
+          "motivo": {
+            "title": "Motivo",
+            "type": "string"
+          },
+          "perfil_puesto": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Perfil Puesto"
+          },
+          "puesto": {
+            "maxLength": 150,
+            "title": "Puesto",
+            "type": "string"
+          },
+          "remuneracion_max": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remuneracion Max"
+          },
+          "remuneracion_min": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remuneracion Min"
+          },
+          "sucursal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sucursal Id"
+          },
+          "vacantes": {
+            "default": 1,
+            "maximum": 99.0,
+            "minimum": 1.0,
+            "title": "Vacantes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "puesto",
+          "motivo"
+        ],
+        "title": "ConvocatoriaCreate",
+        "type": "object"
+      },
+      "ConvocatoriaOut": {
+        "properties": {
+          "empresa_id": {
+            "format": "uuid",
+            "title": "Empresa Id",
+            "type": "string"
+          },
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          },
+          "fecha_limite": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Limite"
+          },
+          "fecha_objetivo": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Objetivo"
+          },
+          "fecha_publicacion": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Publicacion"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "motivo": {
+            "title": "Motivo",
+            "type": "string"
+          },
+          "perfil_puesto": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Perfil Puesto"
+          },
+          "puesto": {
+            "title": "Puesto",
+            "type": "string"
+          },
+          "remuneracion_max": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remuneracion Max"
+          },
+          "remuneracion_min": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remuneracion Min"
+          },
+          "sucursal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sucursal Id"
+          },
+          "token_publico": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Token Publico"
+          },
+          "vacantes": {
+            "title": "Vacantes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "empresa_id",
+          "sucursal_id",
+          "puesto",
+          "motivo",
+          "perfil_puesto",
+          "vacantes",
+          "remuneracion_min",
+          "remuneracion_max",
+          "fecha_objetivo",
+          "fecha_limite",
+          "fecha_publicacion",
+          "token_publico",
+          "estado"
+        ],
+        "title": "ConvocatoriaOut",
+        "type": "object"
+      },
+      "ConvocatoriaPublicar": {
+        "properties": {
+          "fecha_publicacion": {
+            "format": "date",
+            "title": "Fecha Publicacion",
+            "type": "string"
+          },
+          "perfil_puesto": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Perfil Puesto"
+          }
+        },
+        "required": [
+          "fecha_publicacion"
+        ],
+        "title": "ConvocatoriaPublicar",
+        "type": "object"
+      },
       "CuentaContableCreate": {
         "properties": {
           "codigo": {
@@ -2751,9 +3343,16 @@
             "title": "Cuenta Padre Id"
           },
           "empresa_id": {
-            "format": "uuid",
-            "title": "Empresa Id",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Empresa Id"
           },
           "nombre": {
             "maxLength": 150,
@@ -2767,7 +3366,6 @@
           }
         },
         "required": [
-          "empresa_id",
           "codigo",
           "nombre",
           "tipo"
@@ -2958,6 +3556,136 @@
         "title": "EjecutarPagoIn",
         "type": "object"
       },
+      "EncuestaCreate": {
+        "properties": {
+          "canal": {
+            "enum": [
+              "pos",
+              "whatsapp",
+              "link"
+            ],
+            "title": "Canal",
+            "type": "string"
+          },
+          "venta_id": {
+            "format": "uuid",
+            "title": "Venta Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "venta_id",
+          "canal"
+        ],
+        "title": "EncuestaCreate",
+        "type": "object"
+      },
+      "EncuestaOut": {
+        "properties": {
+          "canal": {
+            "title": "Canal",
+            "type": "string"
+          },
+          "cliente_id": {
+            "format": "uuid",
+            "title": "Cliente Id",
+            "type": "string"
+          },
+          "comentario": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comentario"
+          },
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          },
+          "fecha_envio": {
+            "format": "date-time",
+            "title": "Fecha Envio",
+            "type": "string"
+          },
+          "fecha_respuesta": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Respuesta"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "puntaje": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Puntaje"
+          },
+          "venta_id": {
+            "format": "uuid",
+            "title": "Venta Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "venta_id",
+          "cliente_id",
+          "canal",
+          "fecha_envio",
+          "fecha_respuesta",
+          "puntaje",
+          "comentario",
+          "estado"
+        ],
+        "title": "EncuestaOut",
+        "type": "object"
+      },
+      "EncuestaRespuesta": {
+        "properties": {
+          "comentario": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comentario"
+          },
+          "puntaje": {
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Puntaje",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "puntaje"
+        ],
+        "title": "EncuestaRespuesta",
+        "type": "object"
+      },
       "EntregaOut": {
         "properties": {
           "estado_pedido": {
@@ -3093,6 +3821,98 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "ImplementacionCreate": {
+        "properties": {
+          "completa": {
+            "title": "Completa",
+            "type": "boolean"
+          },
+          "fecha": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha"
+          },
+          "incidencia": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Incidencia"
+          },
+          "sucursal_id": {
+            "format": "uuid",
+            "title": "Sucursal Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sucursal_id",
+          "completa"
+        ],
+        "title": "ImplementacionCreate",
+        "type": "object"
+      },
+      "ImplementacionOut": {
+        "properties": {
+          "campana_id": {
+            "format": "uuid",
+            "title": "Campana Id",
+            "type": "string"
+          },
+          "completa": {
+            "title": "Completa",
+            "type": "boolean"
+          },
+          "fecha": {
+            "format": "date",
+            "title": "Fecha",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "incidencia": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Incidencia"
+          },
+          "sucursal_id": {
+            "format": "uuid",
+            "title": "Sucursal Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "campana_id",
+          "sucursal_id",
+          "fecha",
+          "completa",
+          "incidencia"
+        ],
+        "title": "ImplementacionOut",
+        "type": "object"
+      },
       "ItemColaOut": {
         "properties": {
           "cantidad": {
@@ -3119,6 +3939,151 @@
           "estado"
         ],
         "title": "ItemColaOut",
+        "type": "object"
+      },
+      "LeadAtribuir": {
+        "properties": {
+          "venta_id": {
+            "format": "uuid",
+            "title": "Venta Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "venta_id"
+        ],
+        "title": "LeadAtribuir",
+        "type": "object"
+      },
+      "LeadCreate": {
+        "properties": {
+          "campana_id": {
+            "format": "uuid",
+            "title": "Campana Id",
+            "type": "string"
+          },
+          "canal": {
+            "maxLength": 50,
+            "minLength": 2,
+            "title": "Canal",
+            "type": "string"
+          },
+          "cliente_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cliente Id"
+          },
+          "contacto": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contacto"
+          },
+          "idempotency_key": {
+            "maxLength": 100,
+            "minLength": 8,
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "tipo": {
+            "enum": [
+              "contacto",
+              "visita",
+              "cupon",
+              "registro"
+            ],
+            "title": "Tipo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "campana_id",
+          "canal",
+          "tipo",
+          "idempotency_key"
+        ],
+        "title": "LeadCreate",
+        "type": "object"
+      },
+      "LeadOut": {
+        "properties": {
+          "campana_id": {
+            "format": "uuid",
+            "title": "Campana Id",
+            "type": "string"
+          },
+          "canal": {
+            "title": "Canal",
+            "type": "string"
+          },
+          "cliente_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cliente Id"
+          },
+          "contacto": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contacto"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "tipo": {
+            "title": "Tipo",
+            "type": "string"
+          },
+          "venta_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Venta Id"
+          }
+        },
+        "required": [
+          "id",
+          "campana_id",
+          "canal",
+          "tipo",
+          "contacto",
+          "cliente_id",
+          "venta_id"
+        ],
+        "title": "LeadOut",
         "type": "object"
       },
       "LiquidacionBssCreate": {
@@ -3801,9 +4766,16 @@
             "type": "string"
           },
           "empresa_id": {
-            "format": "uuid",
-            "title": "Empresa Id",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Empresa Id"
           },
           "fecha": {
             "format": "date",
@@ -3812,7 +4784,6 @@
           }
         },
         "required": [
-          "empresa_id",
           "emisor_id",
           "asunto",
           "cuerpo",
@@ -4925,9 +5896,16 @@
             "title": "Comprobante Id"
           },
           "empresa_id": {
-            "format": "uuid",
-            "title": "Empresa Id",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Empresa Id"
           },
           "monto": {
             "anyOf": [
@@ -4984,7 +5962,6 @@
           }
         },
         "required": [
-          "empresa_id",
           "monto"
         ],
         "title": "PagoProveedorCreate",
@@ -5259,9 +6236,16 @@
             "type": "integer"
           },
           "empresa_id": {
-            "format": "uuid",
-            "title": "Empresa Id",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Empresa Id"
           },
           "mes": {
             "maximum": 12.0,
@@ -5271,7 +6255,6 @@
           }
         },
         "required": [
-          "empresa_id",
           "anio",
           "mes"
         ],
@@ -5699,6 +6682,185 @@
         "title": "PersonaUpdate",
         "type": "object"
       },
+      "PiezaCreate": {
+        "properties": {
+          "campana_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Campana Id"
+          },
+          "canal": {
+            "maxLength": 50,
+            "minLength": 2,
+            "title": "Canal",
+            "type": "string"
+          },
+          "fecha_publicacion": {
+            "format": "date",
+            "title": "Fecha Publicacion",
+            "type": "string"
+          },
+          "marca_id": {
+            "format": "uuid",
+            "title": "Marca Id",
+            "type": "string"
+          },
+          "pertinente_marca": {
+            "default": false,
+            "title": "Pertinente Marca",
+            "type": "boolean"
+          },
+          "titulo": {
+            "maxLength": 150,
+            "minLength": 3,
+            "title": "Titulo",
+            "type": "string"
+          },
+          "uso_marca_validado": {
+            "default": false,
+            "title": "Uso Marca Validado",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "marca_id",
+          "titulo",
+          "canal",
+          "fecha_publicacion"
+        ],
+        "title": "PiezaCreate",
+        "type": "object"
+      },
+      "PiezaOut": {
+        "properties": {
+          "campana_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Campana Id"
+          },
+          "canal": {
+            "title": "Canal",
+            "type": "string"
+          },
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          },
+          "fecha_publicacion": {
+            "format": "date",
+            "title": "Fecha Publicacion",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "marca_id": {
+            "format": "uuid",
+            "title": "Marca Id",
+            "type": "string"
+          },
+          "metricas": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metricas"
+          },
+          "pertinente_marca": {
+            "title": "Pertinente Marca",
+            "type": "boolean"
+          },
+          "titulo": {
+            "title": "Titulo",
+            "type": "string"
+          },
+          "uso_marca_validado": {
+            "title": "Uso Marca Validado",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "campana_id",
+          "marca_id",
+          "titulo",
+          "canal",
+          "fecha_publicacion",
+          "pertinente_marca",
+          "uso_marca_validado",
+          "estado",
+          "metricas"
+        ],
+        "title": "PiezaOut",
+        "type": "object"
+      },
+      "PiezaPublicar": {
+        "properties": {
+          "metricas": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metricas"
+          }
+        },
+        "title": "PiezaPublicar",
+        "type": "object"
+      },
+      "PiezaValidar": {
+        "properties": {
+          "pertinente_marca": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pertinente Marca"
+          },
+          "uso_marca_validado": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uso Marca Validado"
+          }
+        },
+        "title": "PiezaValidar",
+        "type": "object"
+      },
       "PinChange": {
         "properties": {
           "pin": {
@@ -5712,8 +6874,266 @@
         "title": "PinChange",
         "type": "object"
       },
+      "PostulacionPublica": {
+        "description": "Cuerpo del formulario público. Sin `fecha_postulacion`: la pone el\nservidor, si no el cliente podría postular fuera de la fecha límite.",
+        "properties": {
+          "apellidos": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Apellidos",
+            "type": "string"
+          },
+          "canal_origen": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canal Origen"
+          },
+          "consentimiento_datos": {
+            "title": "Consentimiento Datos",
+            "type": "boolean"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "maxLength": 150,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "nombres": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Nombres",
+            "type": "string"
+          },
+          "respuestas": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Respuestas"
+          },
+          "telefono": {
+            "anyOf": [
+              {
+                "maxLength": 30,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Telefono"
+          }
+        },
+        "required": [
+          "nombres",
+          "apellidos",
+          "consentimiento_datos"
+        ],
+        "title": "PostulacionPublica",
+        "type": "object"
+      },
+      "PostulanteAnonimizar": {
+        "properties": {
+          "motivo": {
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Motivo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "motivo"
+        ],
+        "title": "PostulanteAnonimizar",
+        "type": "object"
+      },
+      "PostulanteAvanzar": {
+        "properties": {
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          }
+        },
+        "required": [
+          "estado"
+        ],
+        "title": "PostulanteAvanzar",
+        "type": "object"
+      },
+      "PostulanteContratar": {
+        "properties": {
+          "afp_nombre": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Afp Nombre"
+          },
+          "area": {
+            "maxLength": 100,
+            "title": "Area",
+            "type": "string"
+          },
+          "cargo": {
+            "maxLength": 100,
+            "title": "Cargo",
+            "type": "string"
+          },
+          "fecha_ingreso": {
+            "format": "date",
+            "title": "Fecha Ingreso",
+            "type": "string"
+          },
+          "jornada_horas_semana": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jornada Horas Semana"
+          },
+          "numero_documento": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Numero Documento"
+          },
+          "persona_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Persona Id"
+          },
+          "regimen_laboral": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Regimen Laboral"
+          },
+          "registra_asistencia": {
+            "default": true,
+            "title": "Registra Asistencia",
+            "type": "boolean"
+          },
+          "remuneracion_base": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remuneracion Base"
+          },
+          "sistema_pensiones": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sistema Pensiones"
+          },
+          "tipo_documento": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tipo Documento"
+          },
+          "tipo_vinculo": {
+            "title": "Tipo Vinculo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "cargo",
+          "area",
+          "tipo_vinculo",
+          "fecha_ingreso"
+        ],
+        "title": "PostulanteContratar",
+        "type": "object"
+      },
       "PostulanteCreate": {
         "properties": {
+          "apellidos": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Apellidos",
+            "type": "string"
+          },
+          "canal_origen": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canal Origen"
+          },
           "consentimiento_datos": {
             "title": "Consentimiento Datos",
             "type": "boolean"
@@ -5730,6 +7150,18 @@
             ],
             "title": "Consentimiento Fecha"
           },
+          "convocatoria_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Convocatoria Id"
+          },
           "cv_archivo_id": {
             "anyOf": [
               {
@@ -5742,14 +7174,39 @@
             ],
             "title": "Cv Archivo Id"
           },
+          "email": {
+            "anyOf": [
+              {
+                "maxLength": 150,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "empresa_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Empresa Id"
+          },
           "fecha_postulacion": {
             "format": "date",
             "title": "Fecha Postulacion",
             "type": "string"
           },
-          "persona_id": {
-            "format": "uuid",
-            "title": "Persona Id",
+          "nombres": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Nombres",
             "type": "string"
           },
           "plazo_conservacion_declarado": {
@@ -5768,10 +7225,37 @@
             "maxLength": 150,
             "title": "Puesto Postulado",
             "type": "string"
+          },
+          "respuestas": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Respuestas"
+          },
+          "telefono": {
+            "anyOf": [
+              {
+                "maxLength": 30,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Telefono"
           }
         },
         "required": [
-          "persona_id",
+          "nombres",
+          "apellidos",
           "puesto_postulado",
           "fecha_postulacion",
           "consentimiento_datos"
@@ -5779,24 +7263,81 @@
         "title": "PostulanteCreate",
         "type": "object"
       },
-      "PostulanteEstado": {
+      "PostulanteDescartar": {
         "properties": {
-          "estado": {
-            "title": "Estado",
+          "motivo": {
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Motivo",
             "type": "string"
           }
         },
         "required": [
-          "estado"
+          "motivo"
         ],
-        "title": "PostulanteEstado",
+        "title": "PostulanteDescartar",
         "type": "object"
       },
       "PostulanteOut": {
         "properties": {
+          "anonimizado_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anonimizado At"
+          },
+          "apellidos": {
+            "title": "Apellidos",
+            "type": "string"
+          },
+          "canal_origen": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canal Origen"
+          },
           "consentimiento_datos": {
             "title": "Consentimiento Datos",
             "type": "boolean"
+          },
+          "convocatoria_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Convocatoria Id"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "empresa_id": {
+            "format": "uuid",
+            "title": "Empresa Id",
+            "type": "string"
           },
           "estado": {
             "title": "Estado",
@@ -5812,25 +7353,163 @@
             "title": "Id",
             "type": "string"
           },
-          "persona_id": {
-            "format": "uuid",
-            "title": "Persona Id",
+          "motivo_descarte": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Motivo Descarte"
+          },
+          "nombres": {
+            "title": "Nombres",
             "type": "string"
+          },
+          "persona_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Persona Id"
+          },
+          "plazo_conservacion_declarado": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plazo Conservacion Declarado"
           },
           "puesto_postulado": {
             "title": "Puesto Postulado",
             "type": "string"
+          },
+          "respuestas": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Respuestas"
+          },
+          "telefono": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Telefono"
+          },
+          "trabajador_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trabajador Id"
           }
         },
         "required": [
           "id",
-          "persona_id",
+          "empresa_id",
+          "convocatoria_id",
+          "nombres",
+          "apellidos",
+          "telefono",
+          "email",
           "puesto_postulado",
           "fecha_postulacion",
+          "canal_origen",
+          "respuestas",
           "consentimiento_datos",
+          "persona_id",
+          "trabajador_id",
+          "motivo_descarte",
+          "plazo_conservacion_declarado",
+          "anonimizado_at",
           "estado"
         ],
         "title": "PostulanteOut",
+        "type": "object"
+      },
+      "PostulanteUpdate": {
+        "description": "Rectificación (ARCO): solo datos de contacto. El puesto, el estado y\nel motivo de descarte no son 'datos del titular' que él pueda corregir.",
+        "properties": {
+          "apellidos": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Apellidos"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "maxLength": 150,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "nombres": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nombres"
+          },
+          "telefono": {
+            "anyOf": [
+              {
+                "maxLength": 30,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Telefono"
+          }
+        },
+        "title": "PostulanteUpdate",
         "type": "object"
       },
       "PrecioCreate": {
@@ -6183,9 +7862,16 @@
             "title": "Contacto"
           },
           "empresa_id": {
-            "format": "uuid",
-            "title": "Empresa Id",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Empresa Id"
           },
           "formal": {
             "default": true,
@@ -6266,7 +7952,6 @@
           }
         },
         "required": [
-          "empresa_id",
           "tipo",
           "condicion_pago"
         ],
@@ -6836,9 +8521,16 @@
             "type": "string"
           },
           "empresa_id": {
-            "format": "uuid",
-            "title": "Empresa Id",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Empresa Id"
           },
           "evento": {
             "maxLength": 100,
@@ -6848,7 +8540,6 @@
           }
         },
         "required": [
-          "empresa_id",
           "evento",
           "cuenta_debe_id",
           "cuenta_haber_id"
@@ -6896,6 +8587,73 @@
           "activa"
         ],
         "title": "ReglaAsientoOut",
+        "type": "object"
+      },
+      "ReservaOut": {
+        "properties": {
+          "almacen_id": {
+            "format": "uuid",
+            "title": "Almacen Id",
+            "type": "string"
+          },
+          "cantidad": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Cantidad",
+            "type": "string"
+          },
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "motivo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Motivo"
+          },
+          "referencia_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referencia Id"
+          },
+          "sku_id": {
+            "format": "uuid",
+            "title": "Sku Id",
+            "type": "string"
+          },
+          "tipo": {
+            "title": "Tipo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "almacen_id",
+          "sku_id",
+          "cantidad",
+          "tipo",
+          "referencia_id",
+          "motivo",
+          "estado"
+        ],
+        "title": "ReservaOut",
         "type": "object"
       },
       "RolCreate": {
@@ -7208,6 +8966,302 @@
         "title": "SocioOut",
         "type": "object"
       },
+      "SolicitudAprobar": {
+        "description": "Recorte por SKU; lo que no se menciona se aprueba tal cual se pidió.\nAprobar 0 deja el ítem fuera y no reserva nada.",
+        "properties": {
+          "aprobadas": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/SolicitudItemCantidad"
+            },
+            "title": "Aprobadas",
+            "type": "array"
+          }
+        },
+        "title": "SolicitudAprobar",
+        "type": "object"
+      },
+      "SolicitudCreate": {
+        "properties": {
+          "almacen_abastecedor_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Almacen Abastecedor Id"
+          },
+          "almacen_solicitante_id": {
+            "format": "uuid",
+            "title": "Almacen Solicitante Id",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SolicitudItemIn"
+            },
+            "minItems": 1,
+            "title": "Items",
+            "type": "array"
+          },
+          "observacion": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observacion"
+          }
+        },
+        "required": [
+          "almacen_solicitante_id",
+          "items"
+        ],
+        "title": "SolicitudCreate",
+        "type": "object"
+      },
+      "SolicitudDetalleOut": {
+        "properties": {
+          "almacen_abastecedor_id": {
+            "format": "uuid",
+            "title": "Almacen Abastecedor Id",
+            "type": "string"
+          },
+          "almacen_solicitante_id": {
+            "format": "uuid",
+            "title": "Almacen Solicitante Id",
+            "type": "string"
+          },
+          "aprobado_por": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Aprobado Por"
+          },
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SolicitudItemOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "observacion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observacion"
+          },
+          "solicitado_por": {
+            "format": "uuid",
+            "title": "Solicitado Por",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "almacen_solicitante_id",
+          "almacen_abastecedor_id",
+          "estado",
+          "solicitado_por",
+          "aprobado_por",
+          "observacion",
+          "items"
+        ],
+        "title": "SolicitudDetalleOut",
+        "type": "object"
+      },
+      "SolicitudItemCantidad": {
+        "properties": {
+          "cantidad": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Cantidad"
+          },
+          "sku_id": {
+            "format": "uuid",
+            "title": "Sku Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sku_id",
+          "cantidad"
+        ],
+        "title": "SolicitudItemCantidad",
+        "type": "object"
+      },
+      "SolicitudItemIn": {
+        "properties": {
+          "cantidad": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Cantidad"
+          },
+          "sku_id": {
+            "format": "uuid",
+            "title": "Sku Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sku_id",
+          "cantidad"
+        ],
+        "title": "SolicitudItemIn",
+        "type": "object"
+      },
+      "SolicitudItemOut": {
+        "properties": {
+          "cantidad_aprobada": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cantidad Aprobada"
+          },
+          "cantidad_despachada": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cantidad Despachada"
+          },
+          "cantidad_solicitada": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Cantidad Solicitada",
+            "type": "string"
+          },
+          "sku_id": {
+            "format": "uuid",
+            "title": "Sku Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sku_id",
+          "cantidad_solicitada",
+          "cantidad_aprobada",
+          "cantidad_despachada"
+        ],
+        "title": "SolicitudItemOut",
+        "type": "object"
+      },
+      "SolicitudOut": {
+        "properties": {
+          "almacen_abastecedor_id": {
+            "format": "uuid",
+            "title": "Almacen Abastecedor Id",
+            "type": "string"
+          },
+          "almacen_solicitante_id": {
+            "format": "uuid",
+            "title": "Almacen Solicitante Id",
+            "type": "string"
+          },
+          "aprobado_por": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Aprobado Por"
+          },
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "observacion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observacion"
+          },
+          "solicitado_por": {
+            "format": "uuid",
+            "title": "Solicitado Por",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "almacen_solicitante_id",
+          "almacen_abastecedor_id",
+          "estado",
+          "solicitado_por",
+          "aprobado_por",
+          "observacion"
+        ],
+        "title": "SolicitudOut",
+        "type": "object"
+      },
       "SolicitudPermisoCreate": {
         "properties": {
           "fecha_desde": {
@@ -7416,6 +9470,16 @@
             "title": "Cantidad",
             "type": "string"
           },
+          "disponible": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Disponible",
+            "type": "string"
+          },
+          "reservado": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Reservado",
+            "type": "string"
+          },
           "sku_id": {
             "format": "uuid",
             "title": "Sku Id",
@@ -7438,6 +9502,8 @@
           "almacen_id",
           "sku_id",
           "cantidad",
+          "reservado",
+          "disponible",
           "stock_minimo",
           "bajo_minimo"
         ],
@@ -7456,6 +9522,27 @@
           "sucursal_id"
         ],
         "title": "SucursalIdIn",
+        "type": "object"
+      },
+      "TableroColumna": {
+        "properties": {
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          },
+          "postulantes": {
+            "items": {
+              "$ref": "#/components/schemas/PostulanteOut"
+            },
+            "title": "Postulantes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "estado",
+          "postulantes"
+        ],
+        "title": "TableroColumna",
         "type": "object"
       },
       "TokenPair": {
@@ -7519,9 +9606,16 @@
             "type": "string"
           },
           "empresa_id": {
-            "format": "uuid",
-            "title": "Empresa Id",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Empresa Id"
           },
           "fecha_ingreso": {
             "format": "date",
@@ -7613,7 +9707,6 @@
           }
         },
         "required": [
-          "empresa_id",
           "persona_id",
           "cargo",
           "area",
@@ -7758,6 +9851,362 @@
           }
         },
         "title": "TrabajadorUpdate",
+        "type": "object"
+      },
+      "TransferenciaCreate": {
+        "properties": {
+          "destino_almacen_id": {
+            "format": "uuid",
+            "title": "Destino Almacen Id",
+            "type": "string"
+          },
+          "items": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/SolicitudItemIn"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "observacion": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observacion"
+          },
+          "origen_almacen_id": {
+            "format": "uuid",
+            "title": "Origen Almacen Id",
+            "type": "string"
+          },
+          "solicitud_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Solicitud Id"
+          },
+          "transportista_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transportista Id"
+          }
+        },
+        "required": [
+          "origen_almacen_id",
+          "destino_almacen_id"
+        ],
+        "title": "TransferenciaCreate",
+        "type": "object"
+      },
+      "TransferenciaDetalleOut": {
+        "properties": {
+          "despachado_por": {
+            "format": "uuid",
+            "title": "Despachado Por",
+            "type": "string"
+          },
+          "destino_almacen_id": {
+            "format": "uuid",
+            "title": "Destino Almacen Id",
+            "type": "string"
+          },
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TransferenciaItemOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "observacion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observacion"
+          },
+          "origen_almacen_id": {
+            "format": "uuid",
+            "title": "Origen Almacen Id",
+            "type": "string"
+          },
+          "recibido_por": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recibido Por"
+          },
+          "solicitud_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Solicitud Id"
+          },
+          "transportista_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transportista Id"
+          }
+        },
+        "required": [
+          "id",
+          "origen_almacen_id",
+          "destino_almacen_id",
+          "solicitud_id",
+          "estado",
+          "despachado_por",
+          "recibido_por",
+          "transportista_id",
+          "observacion",
+          "items"
+        ],
+        "title": "TransferenciaDetalleOut",
+        "type": "object"
+      },
+      "TransferenciaItemOut": {
+        "properties": {
+          "cantidad_enviada": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Cantidad Enviada",
+            "type": "string"
+          },
+          "cantidad_recibida": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cantidad Recibida"
+          },
+          "diferencia": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diferencia"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "lote_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lote Id"
+          },
+          "sku_id": {
+            "format": "uuid",
+            "title": "Sku Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "sku_id",
+          "lote_id",
+          "cantidad_enviada",
+          "cantidad_recibida",
+          "diferencia"
+        ],
+        "title": "TransferenciaItemOut",
+        "type": "object"
+      },
+      "TransferenciaOut": {
+        "properties": {
+          "despachado_por": {
+            "format": "uuid",
+            "title": "Despachado Por",
+            "type": "string"
+          },
+          "destino_almacen_id": {
+            "format": "uuid",
+            "title": "Destino Almacen Id",
+            "type": "string"
+          },
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "observacion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observacion"
+          },
+          "origen_almacen_id": {
+            "format": "uuid",
+            "title": "Origen Almacen Id",
+            "type": "string"
+          },
+          "recibido_por": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recibido Por"
+          },
+          "solicitud_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Solicitud Id"
+          },
+          "transportista_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transportista Id"
+          }
+        },
+        "required": [
+          "id",
+          "origen_almacen_id",
+          "destino_almacen_id",
+          "solicitud_id",
+          "estado",
+          "despachado_por",
+          "recibido_por",
+          "transportista_id",
+          "observacion"
+        ],
+        "title": "TransferenciaOut",
+        "type": "object"
+      },
+      "TransferenciaRecibir": {
+        "description": "Lo que no se menciona se recibe completo.",
+        "properties": {
+          "items": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/TransferenciaRecibirItem"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "title": "TransferenciaRecibir",
+        "type": "object"
+      },
+      "TransferenciaRecibirItem": {
+        "properties": {
+          "cantidad": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Cantidad"
+          },
+          "item_id": {
+            "format": "uuid",
+            "title": "Item Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "item_id",
+          "cantidad"
+        ],
+        "title": "TransferenciaRecibirItem",
         "type": "object"
       },
       "UsuarioCreate": {
@@ -8859,11 +11308,18 @@
           {
             "in": "query",
             "name": "empresa_id",
-            "required": true,
+            "required": false,
             "schema": {
-              "format": "uuid",
-              "title": "Empresa Id",
-              "type": "string"
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Empresa Id"
             }
           }
         ],
@@ -9103,11 +11559,18 @@
           {
             "in": "query",
             "name": "empresa_id",
-            "required": true,
+            "required": false,
             "schema": {
-              "format": "uuid",
-              "title": "Empresa Id",
-              "type": "string"
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Empresa Id"
             }
           }
         ],
@@ -9368,11 +11831,18 @@
           {
             "in": "query",
             "name": "empresa_id",
-            "required": true,
+            "required": false,
             "schema": {
-              "format": "uuid",
-              "title": "Empresa Id",
-              "type": "string"
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Empresa Id"
             }
           }
         ],
@@ -9522,11 +11992,18 @@
           {
             "in": "query",
             "name": "empresa_id",
-            "required": true,
+            "required": false,
             "schema": {
-              "format": "uuid",
-              "title": "Empresa Id",
-              "type": "string"
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Empresa Id"
             }
           }
         ],
@@ -9724,11 +12201,18 @@
           {
             "in": "query",
             "name": "empresa_id",
-            "required": true,
+            "required": false,
             "schema": {
-              "format": "uuid",
-              "title": "Empresa Id",
-              "type": "string"
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Empresa Id"
             }
           }
         ],
@@ -9868,11 +12352,18 @@
           {
             "in": "query",
             "name": "empresa_id",
-            "required": true,
+            "required": false,
             "schema": {
-              "format": "uuid",
-              "title": "Empresa Id",
-              "type": "string"
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Empresa Id"
             }
           }
         ],
@@ -10122,11 +12613,18 @@
           {
             "in": "query",
             "name": "empresa_id",
-            "required": true,
+            "required": false,
             "schema": {
-              "format": "uuid",
-              "title": "Empresa Id",
-              "type": "string"
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Empresa Id"
             }
           }
         ],
@@ -11198,6 +13696,132 @@
         ]
       }
     },
+    "/api/v1/inventory/reservas": {
+      "get": {
+        "description": "Reservas activas — lo que ya está prometido y por eso no figura en\nel `disponible` de `GET /stock` (RN-INV-009).",
+        "operationId": "listar_reservas_api_v1_inventory_reservas_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "almacen_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Almacen Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sku_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sku Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ReservaOut"
+                  },
+                  "title": "Response Listar Reservas Api V1 Inventory Reservas Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Reservas",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/reservas/{reserva_id}/liberar": {
+      "post": {
+        "description": "Liberación manual ante desabastecimiento o sobredemanda: el central\nsuelta lo prometido a uno para redistribuirlo (RN-INV-011).",
+        "operationId": "liberar_reserva_api_v1_inventory_reservas__reserva_id__liberar_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "reserva_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Reserva Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Liberar Reserva",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
     "/api/v1/inventory/skus": {
       "post": {
         "operationId": "crear_sku_api_v1_inventory_skus_post",
@@ -11239,6 +13863,329 @@
           }
         ],
         "summary": "Crear Sku",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/solicitudes": {
+      "get": {
+        "operationId": "listar_solicitudes_api_v1_inventory_solicitudes_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "almacen_solicitante_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Almacen Solicitante Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "estado",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Estado"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SolicitudOut"
+                  },
+                  "title": "Response Listar Solicitudes Api V1 Inventory Solicitudes Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Solicitudes",
+        "tags": [
+          "inventory"
+        ]
+      },
+      "post": {
+        "operationId": "crear_solicitud_api_v1_inventory_solicitudes_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SolicitudCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SolicitudOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Solicitud",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/solicitudes/{solicitud_id}": {
+      "get": {
+        "operationId": "ver_solicitud_api_v1_inventory_solicitudes__solicitud_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "solicitud_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Solicitud Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SolicitudDetalleOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Ver Solicitud",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/solicitudes/{solicitud_id}/aprobar": {
+      "post": {
+        "description": "Aprobar reserva el stock en el abastecedor: entre la aprobación y el\npicking pasan horas y sin reserva otra sucursal se lleva lo mismo.",
+        "operationId": "aprobar_solicitud_api_v1_inventory_solicitudes__solicitud_id__aprobar_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "solicitud_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Solicitud Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SolicitudAprobar"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SolicitudOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Aprobar Solicitud",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/solicitudes/{solicitud_id}/cancelar": {
+      "post": {
+        "description": "Cancelar libera las reservas que la aprobación había tomado\n(RN-INV-010).",
+        "operationId": "cancelar_solicitud_api_v1_inventory_solicitudes__solicitud_id__cancelar_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "solicitud_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Solicitud Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SolicitudOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Cancelar Solicitud",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/solicitudes/{solicitud_id}/rechazar": {
+      "post": {
+        "operationId": "rechazar_solicitud_api_v1_inventory_solicitudes__solicitud_id__rechazar_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "solicitud_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Solicitud Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SolicitudOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Rechazar Solicitud",
         "tags": [
           "inventory"
         ]
@@ -11298,6 +14245,234 @@
           }
         ],
         "summary": "Consultar Stock",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/transferencias": {
+      "get": {
+        "description": "`almacen_id` matchea origen o destino: lo que sale y lo que llega.",
+        "operationId": "listar_transferencias_api_v1_inventory_transferencias_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "almacen_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Almacen Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "estado",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Estado"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TransferenciaOut"
+                  },
+                  "title": "Response Listar Transferencias Api V1 Inventory Transferencias Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Transferencias",
+        "tags": [
+          "inventory"
+        ]
+      },
+      "post": {
+        "description": "Descuenta el origen y deja el stock `en_transito` (RN-INV-003). Con\n`solicitud_id` despacha lo aprobado; sin él es transferencia lateral y\nlos ítems son obligatorios.",
+        "operationId": "despachar_transferencia_api_v1_inventory_transferencias_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransferenciaCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferenciaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Despachar Transferencia",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/transferencias/{transferencia_id}": {
+      "get": {
+        "operationId": "ver_transferencia_api_v1_inventory_transferencias__transferencia_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "transferencia_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Transferencia Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferenciaDetalleOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Ver Transferencia",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/transferencias/{transferencia_id}/recibir": {
+      "post": {
+        "description": "Ingresa al destino lo que llegó, lote por lote. Una diferencia\ncontra lo enviado no se corrige sola: queda auditable (RN-INV-002).",
+        "operationId": "recibir_transferencia_api_v1_inventory_transferencias__transferencia_id__recibir_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "transferencia_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Transferencia Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransferenciaRecibir"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferenciaDetalleOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Recibir Transferencia",
         "tags": [
           "inventory"
         ]
@@ -11667,6 +14842,934 @@
         "summary": "Imprimir Comanda",
         "tags": [
           "kds"
+        ]
+      }
+    },
+    "/api/v1/marketing/campanas": {
+      "get": {
+        "operationId": "listar_campanas_api_v1_marketing_campanas_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "estado",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Estado"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CampanaOut"
+                  },
+                  "title": "Response Listar Campanas Api V1 Marketing Campanas Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Campanas",
+        "tags": [
+          "marketing"
+        ]
+      },
+      "post": {
+        "operationId": "crear_campana_api_v1_marketing_campanas_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CampanaCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampanaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Campana",
+        "tags": [
+          "marketing"
+        ]
+      }
+    },
+    "/api/v1/marketing/campanas/{campana_id}": {
+      "get": {
+        "operationId": "ver_campana_api_v1_marketing_campanas__campana_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "campana_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Campana Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampanaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Ver Campana",
+        "tags": [
+          "marketing"
+        ]
+      }
+    },
+    "/api/v1/marketing/campanas/{campana_id}/aprobacion": {
+      "post": {
+        "operationId": "aprobar_campana_api_v1_marketing_campanas__campana_id__aprobacion_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "campana_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Campana Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampanaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Aprobar Campana",
+        "tags": [
+          "marketing"
+        ]
+      }
+    },
+    "/api/v1/marketing/campanas/{campana_id}/brief": {
+      "patch": {
+        "operationId": "completar_brief_api_v1_marketing_campanas__campana_id__brief_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "campana_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Campana Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BriefUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampanaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Completar Brief",
+        "tags": [
+          "marketing"
+        ]
+      }
+    },
+    "/api/v1/marketing/campanas/{campana_id}/cierre": {
+      "post": {
+        "operationId": "cerrar_campana_api_v1_marketing_campanas__campana_id__cierre_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "campana_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Campana Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampanaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Cerrar Campana",
+        "tags": [
+          "marketing"
+        ]
+      }
+    },
+    "/api/v1/marketing/campanas/{campana_id}/implementaciones": {
+      "post": {
+        "operationId": "registrar_implementacion_api_v1_marketing_campanas__campana_id__implementaciones_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "campana_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Campana Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImplementacionCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImplementacionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Registrar Implementacion",
+        "tags": [
+          "marketing"
+        ]
+      }
+    },
+    "/api/v1/marketing/campanas/{campana_id}/lanzamiento": {
+      "post": {
+        "operationId": "lanzar_campana_api_v1_marketing_campanas__campana_id__lanzamiento_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "campana_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Campana Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampanaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Lanzar Campana",
+        "tags": [
+          "marketing"
+        ]
+      }
+    },
+    "/api/v1/marketing/campanas/{campana_id}/leads": {
+      "get": {
+        "operationId": "listar_leads_api_v1_marketing_campanas__campana_id__leads_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "campana_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Campana Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LeadOut"
+                  },
+                  "title": "Response Listar Leads Api V1 Marketing Campanas  Campana Id  Leads Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Leads",
+        "tags": [
+          "marketing"
+        ]
+      }
+    },
+    "/api/v1/marketing/encuestas": {
+      "post": {
+        "operationId": "enviar_encuesta_api_v1_marketing_encuestas_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EncuestaCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EncuestaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Enviar Encuesta",
+        "tags": [
+          "marketing"
+        ]
+      }
+    },
+    "/api/v1/marketing/encuestas/{encuesta_id}/expiracion": {
+      "post": {
+        "operationId": "expirar_encuesta_api_v1_marketing_encuestas__encuesta_id__expiracion_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "encuesta_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Encuesta Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EncuestaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Expirar Encuesta",
+        "tags": [
+          "marketing"
+        ]
+      }
+    },
+    "/api/v1/marketing/encuestas/{encuesta_id}/respuesta": {
+      "post": {
+        "operationId": "responder_encuesta_api_v1_marketing_encuestas__encuesta_id__respuesta_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "encuesta_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Encuesta Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EncuestaRespuesta"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EncuestaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Responder Encuesta",
+        "tags": [
+          "marketing"
+        ]
+      }
+    },
+    "/api/v1/marketing/leads": {
+      "post": {
+        "operationId": "registrar_lead_api_v1_marketing_leads_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LeadCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LeadOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Registrar Lead",
+        "tags": [
+          "marketing"
+        ]
+      }
+    },
+    "/api/v1/marketing/leads/{lead_id}/atribucion": {
+      "post": {
+        "operationId": "atribuir_lead_api_v1_marketing_leads__lead_id__atribucion_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lead_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Lead Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LeadAtribuir"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LeadOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Atribuir Lead",
+        "tags": [
+          "marketing"
+        ]
+      }
+    },
+    "/api/v1/marketing/piezas": {
+      "post": {
+        "operationId": "planificar_pieza_api_v1_marketing_piezas_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PiezaCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PiezaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Planificar Pieza",
+        "tags": [
+          "marketing"
+        ]
+      }
+    },
+    "/api/v1/marketing/piezas/{pieza_id}/descarte": {
+      "post": {
+        "operationId": "descartar_pieza_api_v1_marketing_piezas__pieza_id__descarte_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pieza_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Pieza Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PiezaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Descartar Pieza",
+        "tags": [
+          "marketing"
+        ]
+      }
+    },
+    "/api/v1/marketing/piezas/{pieza_id}/publicacion": {
+      "post": {
+        "operationId": "publicar_pieza_api_v1_marketing_piezas__pieza_id__publicacion_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pieza_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Pieza Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PiezaPublicar"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PiezaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Publicar Pieza",
+        "tags": [
+          "marketing"
+        ]
+      }
+    },
+    "/api/v1/marketing/piezas/{pieza_id}/validacion": {
+      "patch": {
+        "operationId": "validar_pieza_api_v1_marketing_piezas__pieza_id__validacion_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pieza_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Pieza Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PiezaValidar"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PiezaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Validar Pieza",
+        "tags": [
+          "marketing"
         ]
       }
     },
@@ -13691,6 +17794,332 @@
         ]
       }
     },
+    "/api/v1/rrhh/convocatorias": {
+      "get": {
+        "operationId": "listar_convocatorias_api_v1_rrhh_convocatorias_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "estado",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Estado"
+            }
+          },
+          {
+            "in": "query",
+            "name": "empresa_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Empresa Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ConvocatoriaOut"
+                  },
+                  "title": "Response Listar Convocatorias Api V1 Rrhh Convocatorias Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Convocatorias",
+        "tags": [
+          "rrhh"
+        ]
+      },
+      "post": {
+        "operationId": "crear_convocatoria_api_v1_rrhh_convocatorias_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConvocatoriaCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConvocatoriaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Convocatoria",
+        "tags": [
+          "rrhh"
+        ]
+      }
+    },
+    "/api/v1/rrhh/convocatorias/{convocatoria_id}": {
+      "get": {
+        "operationId": "ver_convocatoria_api_v1_rrhh_convocatorias__convocatoria_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "convocatoria_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Convocatoria Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConvocatoriaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Ver Convocatoria",
+        "tags": [
+          "rrhh"
+        ]
+      }
+    },
+    "/api/v1/rrhh/convocatorias/{convocatoria_id}/cerrar": {
+      "post": {
+        "operationId": "cerrar_convocatoria_api_v1_rrhh_convocatorias__convocatoria_id__cerrar_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "convocatoria_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Convocatoria Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConvocatoriaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Cerrar Convocatoria",
+        "tags": [
+          "rrhh"
+        ]
+      }
+    },
+    "/api/v1/rrhh/convocatorias/{convocatoria_id}/publicar": {
+      "post": {
+        "operationId": "publicar_convocatoria_api_v1_rrhh_convocatorias__convocatoria_id__publicar_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "convocatoria_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Convocatoria Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConvocatoriaPublicar"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConvocatoriaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Publicar Convocatoria",
+        "tags": [
+          "rrhh"
+        ]
+      }
+    },
+    "/api/v1/rrhh/convocatorias/{convocatoria_id}/tablero": {
+      "get": {
+        "description": "Columnas del proceso de contratación en orden, con sus fichas.",
+        "operationId": "ver_tablero_api_v1_rrhh_convocatorias__convocatoria_id__tablero_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "convocatoria_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Convocatoria Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TableroColumna"
+                  },
+                  "title": "Response Ver Tablero Api V1 Rrhh Convocatorias  Convocatoria Id  Tablero Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Ver Tablero",
+        "tags": [
+          "rrhh"
+        ]
+      }
+    },
     "/api/v1/rrhh/liquidaciones-bss": {
       "post": {
         "operationId": "liquidar_cese_api_v1_rrhh_liquidaciones_bss_post",
@@ -13973,6 +18402,59 @@
         ]
       }
     },
+    "/api/v1/rrhh/postulaciones/{token}": {
+      "post": {
+        "description": "Endpoint público del formulario de postulación (Google Forms vía Apps\nScript, o cualquier formulario propio). Sin JWT: el token de la\nconvocatoria publicada es lo único que autoriza a escribir, y solo puede\ncrear un postulante.",
+        "operationId": "recibir_postulacion_api_v1_rrhh_postulaciones__token__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostulacionPublica"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostulanteOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Recibir Postulacion",
+        "tags": [
+          "rrhh"
+        ]
+      }
+    },
     "/api/v1/rrhh/postulantes": {
       "get": {
         "operationId": "listar_postulantes_api_v1_rrhh_postulantes_get",
@@ -13991,6 +18473,23 @@
                 }
               ],
               "title": "Estado"
+            }
+          },
+          {
+            "in": "query",
+            "name": "convocatoria_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Convocatoria Id"
             }
           }
         ],
@@ -14075,9 +18574,57 @@
         ]
       }
     },
-    "/api/v1/rrhh/postulantes/{postulante_id}/estado": {
+    "/api/v1/rrhh/postulantes/{postulante_id}": {
+      "get": {
+        "description": "Acceso (ARCO): el titular lo ejerce a través de quien administra el\nERP, igual que en `personas` (ADR-011).",
+        "operationId": "ver_postulante_api_v1_rrhh_postulantes__postulante_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "postulante_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Postulante Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostulanteOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Ver Postulante",
+        "tags": [
+          "rrhh"
+        ]
+      },
       "patch": {
-        "operationId": "cambiar_estado_postulante_api_v1_rrhh_postulantes__postulante_id__estado_patch",
+        "description": "Rectificación (ARCO).",
+        "operationId": "actualizar_postulante_api_v1_rrhh_postulantes__postulante_id__patch",
         "parameters": [
           {
             "in": "path",
@@ -14094,7 +18641,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/PostulanteEstado"
+                "$ref": "#/components/schemas/PostulanteUpdate"
               }
             }
           },
@@ -14127,7 +18674,241 @@
             "HTTPBearer": []
           }
         ],
-        "summary": "Cambiar Estado Postulante",
+        "summary": "Actualizar Postulante",
+        "tags": [
+          "rrhh"
+        ]
+      }
+    },
+    "/api/v1/rrhh/postulantes/{postulante_id}/anonimizar": {
+      "post": {
+        "description": "Cancelación (ARCO, Ley 29733). Irreversible. Reusa el permiso\n`personas.anonimizar`: es la misma capacidad legal y el mismo custodio,\naunque la tabla sea otra.",
+        "operationId": "anonimizar_postulante_api_v1_rrhh_postulantes__postulante_id__anonimizar_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "postulante_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Postulante Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostulanteAnonimizar"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostulanteOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Anonimizar Postulante",
+        "tags": [
+          "rrhh"
+        ]
+      }
+    },
+    "/api/v1/rrhh/postulantes/{postulante_id}/avanzar": {
+      "post": {
+        "operationId": "avanzar_postulante_api_v1_rrhh_postulantes__postulante_id__avanzar_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "postulante_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Postulante Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostulanteAvanzar"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostulanteOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Avanzar Postulante",
+        "tags": [
+          "rrhh"
+        ]
+      }
+    },
+    "/api/v1/rrhh/postulantes/{postulante_id}/contratar": {
+      "post": {
+        "description": "Cierra la selección creando `persona` + `trabajador`. Exige el permiso\nde trabajador, no el de postulante: acá nace la planilla.",
+        "operationId": "contratar_postulante_api_v1_rrhh_postulantes__postulante_id__contratar_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "postulante_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Postulante Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostulanteContratar"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostulanteOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Contratar Postulante",
+        "tags": [
+          "rrhh"
+        ]
+      }
+    },
+    "/api/v1/rrhh/postulantes/{postulante_id}/descartar": {
+      "post": {
+        "operationId": "descartar_postulante_api_v1_rrhh_postulantes__postulante_id__descartar_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "postulante_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Postulante Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostulanteDescartar"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostulanteOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Descartar Postulante",
         "tags": [
           "rrhh"
         ]
@@ -14136,6 +18917,25 @@
     "/api/v1/rrhh/socios": {
       "get": {
         "operationId": "listar_socios_api_v1_rrhh_socios_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "empresa_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Empresa Id"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -14150,6 +18950,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "security": [
@@ -17108,6 +21918,10 @@
     {
       "description": "Ciclo laboral: contrato, nómina, disciplina, permisos, asistencia.",
       "name": "rrhh"
+    },
+    {
+      "description": "Campañas, calendario de contenido, leads con atribución a la venta y encuesta de satisfacción.",
+      "name": "marketing"
     },
     {
       "description": "Agregado gerencial de solo lectura: ventas del día, stock crítico, caja.",

@@ -6,6 +6,7 @@ from src.modules.rrhh.infrastructure.models.asistencia import Asistencia
 from src.modules.rrhh.infrastructure.models.boleta_pago import BoletaPago
 from src.modules.rrhh.infrastructure.models.certificado_trabajo import CertificadoTrabajo
 from src.modules.rrhh.infrastructure.models.contrato_laboral import ContratoLaboral
+from src.modules.rrhh.infrastructure.models.convocatoria import Convocatoria
 from src.modules.rrhh.infrastructure.models.liquidacion_bss import LiquidacionBss
 from src.modules.rrhh.infrastructure.models.memorandum import Memorandum
 from src.modules.rrhh.infrastructure.models.pacto_permanencia import PactoPermanencia
@@ -21,6 +22,7 @@ __all__ = [
     "BoletaPago",
     "CertificadoTrabajo",
     "ContratoLaboral",
+    "Convocatoria",
     "LiquidacionBss",
     "Memorandum",
     "PactoPermanencia",

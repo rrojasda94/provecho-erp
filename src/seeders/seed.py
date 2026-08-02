@@ -27,6 +27,7 @@ from src.modules.users.infrastructure.models import (
     Sucursal,
     Usuario,
     UsuarioRol,
+    UsuarioSucursal,
 )
 from src.modules.users.infrastructure.security import hash_pin
 
@@ -74,14 +75,22 @@ PERMISOS = [
         "Registrar la entrega del pedido al cliente (PROC-OPE-002)",
     ),
     ("sales.crear_pedido", "Crear pedido (canal agente IA)"),
-    ("inventory.transferir", "Transferir stock"),
-    ("inventory.recepcion", "Recepcionar mercadería"),
+    ("inventory.transferir", "Despachar una transferencia entre almacenes"),
+    ("inventory.recepcion", "Recepcionar mercadería y transferencias"),
+    ("inventory.solicitar_insumos", "Crear y cancelar solicitudes de insumos"),
+    ("inventory.aprobar_solicitud", "Aprobar o rechazar solicitudes de insumos"),
+    ("inventory.liberar_reserva", "Liberar a mano una reserva de stock"),
     ("inventory.ajustar", "Ajustar inventario"),
     ("inventory.leer", "Consultar stock y catálogo"),
     ("inventory.gestionar_catalogo", "CRUD de artículos, categorías y SKUs"),
     ("inventory.registrar_movimiento", "Registrar movimiento de stock"),
     ("inventory.solicitar_ajuste", "Solicitar ajuste de inventario"),
     ("inventory.aprobar_ajuste", "Aprobar ajuste de inventario"),
+    ("inventory.contar", "Abrir, registrar y cerrar conteos de inventario"),
+    (
+        "inventory.ver_stock_esperado",
+        "Ver el stock esperado durante un conteo (sin esto el conteo es a ciegas)",
+    ),
     ("purchases.crear", "CRUD de proveedores, crear y emitir OC bajo el umbral"),
     ("purchases.leer", "Consultar proveedores y órdenes de compra"),
     ("purchases.recepcionar", "Registrar recepción de una OC"),
@@ -112,6 +121,21 @@ PERMISOS = [
         "accounting.caja_retirar",
         "Autorizar el retiro de efectivo del cajón durante el turno (RN-MDP-007)",
     ),
+    ("marketing.leer", "Consultar campañas, contenido, leads y encuestas"),
+    ("marketing.campana_gestionar", "Crear, editar el brief, lanzar y cerrar campañas"),
+    (
+        "marketing.campana_aprobar",
+        "Aprobar el brief de una campaña para que salga a canal (RN-MKT-003)",
+    ),
+    (
+        "marketing.contenido_gestionar",
+        "Planificar, validar y publicar piezas de contenido (RN-MKT-001/002)",
+    ),
+    ("marketing.lead_gestionar", "Registrar leads y atribuirlos a la venta real"),
+    (
+        "marketing.encuesta_gestionar",
+        "Enviar la encuesta de satisfacción y registrar su respuesta (RN-COM-007)",
+    ),
     ("dashboard.leer", "Consultar el dashboard gerencial (ventas, stock, caja)"),
     ("gerencia.gestionar_reglas_aprobacion", "Administrar la matriz de aprobaciones"),
     (
@@ -122,7 +146,11 @@ PERMISOS = [
     ("rrhh.leer", "Consultar trabajadores, contratos, nómina y documentos de RRHH"),
     ("rrhh.trabajador_gestionar", "Crear, actualizar y cesar trabajadores"),
     ("rrhh.contrato_gestionar", "Crear, firmar y finalizar contratos laborales"),
-    ("rrhh.postulante_gestionar", "Gestionar postulantes y su estado de selección"),
+    ("rrhh.postulante_gestionar", "Gestionar postulantes y su avance en el tablero"),
+    (
+        "rrhh.convocatoria_gestionar",
+        "Crear, publicar y cerrar convocatorias de personal (RN-RRHH-013)",
+    ),
     ("rrhh.socio_gestionar", "Administrar socios y participación societaria"),
     ("rrhh.nomina_gestionar", "Emitir boletas de pago y liquidaciones de beneficios sociales"),
     (
@@ -156,10 +184,17 @@ ROLES = {
         "inventory.leer",
         "inventory.gestionar_catalogo",
         "inventory.aprobar_ajuste",
+        "inventory.ver_stock_esperado",
+        # El encargado aprueba lo que pide su gente, no lo pide él.
+        "inventory.aprobar_solicitud",
+        "inventory.liberar_reserva",
         "sales.leer_clientes_externos",
         "accounting.pago_aprobar",
         "accounting.arqueo_registrar",
         "accounting.caja_retirar",
+        # Marketing arma el brief; quien lo aprueba nunca es quien lo escribe.
+        "marketing.leer",
+        "marketing.campana_aprobar",
         "dashboard.leer",
         "rrhh.leer",
         "rrhh.permiso_aprobar",
@@ -176,6 +211,8 @@ ROLES = {
     # Cocina avanza la preparación pero NO cierra la entrega (RN-CUP-006).
     "cocinero": ["kds.operar", "sales.leer"],
     "despachador": ["kds.operar", "sales.leer", "sales.entregar_pedido"],
+    # Cuenta y solicita el ajuste, pero no lo aprueba ni ve el stock
+    # esperado mientras cuenta: el conteo es a ciegas (RN-INV-005/006).
     "almacenero": [
         "inventory.transferir",
         "inventory.recepcion",
@@ -183,6 +220,8 @@ ROLES = {
         "inventory.leer",
         "inventory.registrar_movimiento",
         "inventory.solicitar_ajuste",
+        "inventory.contar",
+        "inventory.solicitar_insumos",
     ],
     "agente_ia": ["sales.crear_pedido"],
     # Cuenta de servicio del hub de sucursal (ADR-009): lo mínimo para
@@ -215,6 +254,7 @@ ROLES = {
         "rrhh.trabajador_gestionar",
         "rrhh.contrato_gestionar",
         "rrhh.postulante_gestionar",
+        "rrhh.convocatoria_gestionar",
         "rrhh.socio_gestionar",
         "rrhh.nomina_gestionar",
         "rrhh.disciplina_gestionar",
@@ -222,6 +262,16 @@ ROLES = {
         "rrhh.permiso_aprobar",
         "rrhh.asistencia_marcar",
         "rrhh.capacitacion_gestionar",
+    ],
+    # Marketing atrae demanda y cuida la marca; no se aprueba su propio
+    # brief — eso lo valida Gerencia (RN-MKT-003, RN-GER-007).
+    "marketing": [
+        "marketing.leer",
+        "marketing.campana_gestionar",
+        "marketing.contenido_gestionar",
+        "marketing.lead_gestionar",
+        "marketing.encuesta_gestionar",
+        "sales.leer_clientes_externos",
     ],
 }
 
@@ -320,6 +370,13 @@ def seed(session: Session) -> None:
     )
     if session.get(UsuarioRol, (admin.id, roles["admin"].id)) is None:
         session.add(UsuarioRol(usuario_id=admin.id, rol_id=roles["admin"].id))
+
+    # Sin `usuario_sucursal` el JWT sale sin `empresa_id` y toda operación
+    # escopada responde 403 "usuario sin empresa asignada" (ADR-004): una
+    # instalación nueva quedaba inutilizable hasta asignar sucursales a mano.
+    for sucursal in session.scalars(select(Sucursal)):
+        if session.get(UsuarioSucursal, (admin.id, sucursal.id)) is None:
+            session.add(UsuarioSucursal(usuario_id=admin.id, sucursal_id=sucursal.id))
 
     session.commit()
     print("Seed OK. admin/123456 con rol admin. Usuario nuevo:" if creado else

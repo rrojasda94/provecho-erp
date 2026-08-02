@@ -45,5 +45,5 @@ def crear_socio(
     )
 
 
-def listar_socios(session: Session) -> list[Socio]:
-    return SocioRepo(session).list()
+def listar_socios(session: Session, empresa_id: uuid.UUID | None = None) -> list[Socio]:
+    return SocioRepo(session).list(empresa_id)

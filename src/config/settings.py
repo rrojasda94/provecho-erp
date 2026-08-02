@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     # Monto sobre el cual emitir una OC exige permiso purchases.aprobar
     # (RN-CMP — umbral configurable, valor semilla a ajustar por el negocio).
     purchases_umbral_aprobacion_oc: Decimal = Decimal("2000")
+    # Margen de error tolerado en el ajuste que sale de un conteo, en % del
+    # stock esperado (RN-INV-015). Fuera de margen no bloquea el ajuste:
+    # lo marca para investigación y dispara la alerta de auditoría.
+    inventory_margen_ajuste_pct: Decimal = Decimal("2")
     # Tarifa única de mano de obra para costeo de producción (RN-PRD-018)
     # — valor semilla, ajustar cuando el negocio defina la tarifa real.
     production_costo_hora_mano_obra: Decimal = Decimal("15.00")
@@ -42,6 +46,10 @@ class Settings(BaseSettings):
     # RMV vigente (RN-PER-001: subvención de practicante no menor a 1 RMV
     # con jornada máxima) — valor semilla, ajustar según MTPE.
     rrhh_rmv_vigente: Decimal = Decimal("1130")
+    # Meses que se conservan los datos de un postulante no contratado
+    # (RN-PER-004: no hay plazo legal fijo en Perú, lo declara el aviso de
+    # privacidad). Se aplica al crear la ficha y lo barre la purga.
+    rrhh_plazo_conservacion_postulante_meses: int = 12
     # Facturación electrónica (Factiliza → SUNAT). Por defecto apunta al
     # entorno QA: emitir contra producción exige cambiar la URL a conciencia.
     factiliza_base_url: str = "https://apife-qa.factiliza.com/api/v1"

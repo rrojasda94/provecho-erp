@@ -253,7 +253,7 @@ def registrar_arqueo(
     return arqueo
 
 
-def cajas_abiertas(session: Session, empresa_id: uuid.UUID) -> list[dict]:
+def cajas_abiertas(session: Session, empresa_id: uuid.UUID | None = None) -> list[dict]:
     """Estado actual de caja por punto de venta de la empresa — para el
     dashboard gerencial (`core.dashboard_router`)."""
     punto_venta_ids = puntos_venta_de_empresa(session, empresa_id)

@@ -296,6 +296,7 @@ def crear_venta(
         {
             "venta_id": str(venta.id),
             "sucursal_id": str(sucursal_id),
+            "cliente_id": str(venta.cliente_id) if venta.cliente_id else None,
             "items": detalle_evento,
             "total": str(venta.total),
         },

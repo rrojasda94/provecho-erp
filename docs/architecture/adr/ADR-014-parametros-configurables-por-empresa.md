@@ -8,13 +8,23 @@
 `ROADMAP.md` acumulaba una lista de "Pendientes de decisión" que en
 realidad no eran preguntas de negocio sin resolver, sino valores que
 **nunca deben fijarse una sola vez**: rango salarial de cada perfil de
-puesto, frecuencia de conteo cíclico por categoría de insumo, margen de
-error de ajuste de inventario, monto del fondo de caja chica de compras,
-plazo interno de envío de comprobantes al contador. Redactarlos como texto
+puesto, margen de error de ajuste de inventario, monto del fondo de caja
+chica de compras, plazo interno de envío de comprobantes al contador.
+Redactarlos como texto
 fijo en un documento de política (`[[ COMPLETAR ]]`) o hardcodearlos en
 código habría significado tocar código o un documento cada vez que el
 negocio los ajuste — y el usuario confirmó que sí van a variar: "no son
 cosas fijas siempre".
+
+> **Corrección (2026-08-01, ADR-017):** esta lista incluía además "frecuencia
+> de conteo cíclico por categoría de insumo". No corresponde a
+> `parametro_empresa`: el negocio precisó que la frecuencia la fija **cada
+> categoría** y no hay un valor único por empresa, así que vive como columna
+> `categoria.frecuencia_conteo`. `parametro_empresa` indexa por
+> `(empresa_id, modulo, codigo)` — un valor por categoría obligaría a
+> codificar el `categoria_id` dentro del `codigo` y perder la FK. El margen
+> de error de ajuste de inventario, que sí es único por empresa, sigue en
+> esta lista.
 
 Ya existe precedente para esto: `regla_aprobacion` (`ADR` implícito en su
 propio docstring, ver `data-model.md` §8c) generaliza el umbral de
@@ -66,7 +76,7 @@ fuente única que RN-GER-003 aplica a la matriz de aprobaciones).
 ## Consecuencias
 
 - Los "Pendientes de decisión" de `ROADMAP.md` referidos a valores
-  operativos (rangos salariales, frecuencia de conteo, margen de error de
+  operativos (rangos salariales, margen de error de
   ajuste, monto de caja chica, plazo de envío de comprobantes) dejan de
   ser preguntas abiertas de arquitectura: el mecanismo está decidido. Lo
   que queda pendiente es que Gerencia cargue el valor real de cada uno

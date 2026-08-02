@@ -15,11 +15,13 @@ Administrador/gerente.
 
 ## Materiales y equipo
 - Perfil de puesto (criterios de filtro salen de ahí)
-- Postulaciones recibidas por el canal único
-- Lista simple de seguimiento (nombre, teléfono, cumple/no cumple, estado)
+- ERP: tablero de la convocatoria (las postulaciones del formulario entran
+  solas a la columna **recibido**)
 
 ## Pasos
-1. Volcar cada postulación a la lista de seguimiento el día que llega.
+1. Revisar la columna `recibido` del tablero cada 1-2 días. Las postulaciones
+   que llegaron por fuera del formulario (referido, CV en mano) se cargan a
+   mano en el mismo tablero.
 2. Filtro duro — descartar si no cumple: mayoría de edad, disponibilidad para
    los turnos del puesto, requisito legal del puesto (disposición a tramitar
    carné de sanidad si no lo tiene vigente).

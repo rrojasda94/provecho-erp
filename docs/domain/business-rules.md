@@ -483,7 +483,10 @@ de su módulo y se prueban de forma aislada.
   además se comunica al MTPE dentro de 15 días de firmado.
 - **RN-RRHH-013** Ninguna convocatoria se publica sin perfil de puesto
   aprobado ni con requisitos discriminatorios (edad, sexo, apariencia,
-  estado civil, religión — Ley 26772).
+  estado civil, religión — Ley 26772). *Aplicada en código desde 2026-08-01
+  en su mitad verificable: `publicar_convocatoria` rechaza la convocatoria
+  sin `perfil_puesto`. Que el aviso no discrimine lo revisa una persona
+  antes de publicar (SOP de publicación de convocatoria).*
 - **RN-RRHH-014** El uniforme y EPP son condición de trabajo: se entregan y
   devuelven con acta firmada, y su movimiento se registra en el ERP como
   artículo de almacén.
@@ -914,9 +917,12 @@ producción se hace en cocinas de sucursal. Ver
 
 ## Inventario
 
-- **RN-INV-001** No se despacha más de lo aprobado en la solicitud.
+- **RN-INV-001** No se despacha más de lo aprobado en la solicitud. Menos
+  sí: si el abastecedor no tiene todo, despacha lo que hay y la diferencia
+  queda en `solicitud_item.cantidad_despachada`.
 - **RN-INV-002** No se recibe más de lo enviado sin registrar la diferencia
-  (auditada).
+  (auditada). Al destino entra **lo que de verdad llegó**, no lo que decía
+  la guía; la diferencia viaja en `inventory.transferencia_recibida`.
 - **RN-INV-003** Una transferencia descuenta el origen al salir y suma el
   destino al recibirse; entre ambos momentos el stock está en tránsito.
 - **RN-INV-004** Todo ajuste exige permiso `inventory.ajustar` y motivo.
@@ -926,7 +932,13 @@ producción se hace en cocinas de sucursal. Ver
   conteo, conteo + requerimiento, solicitar ajuste, autorizar ajuste).
 - **RN-INV-006** Solicitar un ajuste y autorizarlo son permisos distintos;
   no se auto-autoriza.
-- **RN-INV-007** La periodicidad de conteos es configurable por el ERP.
+- **RN-INV-007** La periodicidad de conteos es configurable por el ERP y
+  la determina **la categoría** a la que pertenece cada SKU, no un valor
+  único de empresa ni de almacén: `diario`, `semanal`, `quincenal`,
+  `mensual`, `semestral` o `anual` (`categoria.frecuencia_conteo`,
+  ADR-017). Una categoría sin frecuencia queda fuera del conteo cíclico.
+  La próxima fecha se cuenta desde el último conteo cerrado que cubrió esa
+  categoría en ese almacén; un conteo general cubre a todas.
 - **RN-INV-008** El stock mínimo (cubre un período de tiempo determinado)
   y el stock máximo (evita desborde de almacenamiento o pérdidas por
   rotación/vencimiento) de cada artículo los determinan las áreas de
@@ -936,7 +948,16 @@ producción se hace en cocinas de sucursal. Ver
   seguridad = demanda diaria. Al alcanzarse, genera alerta de
   reabastecimiento (sucursal, central o producción).
 - **RN-INV-014** Un conteo puede ser de rutina (programado) o parte de un
-  proceso de ajuste/auditoría puntual.
+  proceso de ajuste/auditoría puntual. El conteo no corrige el stock: al
+  cerrarse, cada diferencia genera un `ajuste` pendiente ligado a él
+  (`ajuste.conteo_id`), que aprueba otro usuario (RN-INV-006). El stock
+  esperado se congela al abrir el conteo, no al cerrarlo. Los ítems que
+  nadie contó no generan ajuste — un conteo parcial no declara faltante lo
+  que no se miró.
+- **RN-INV-021** Si un conteo no se realiza en la fecha que su frecuencia
+  exigía, se genera un reporte dirigido al área de almacén y a gerencia
+  (evento `inventory.conteo_vencido`). El día en que vence todavía no es
+  atraso; el reporte sale a partir del día siguiente.
 - **RN-INV-015** Un ajuste es válido, sin generar alarma, solo si está
   dentro de un margen de error definido por las áreas de almacén y
   contabilidad; fuera de ese margen dispara alarma/auditoría.
@@ -956,10 +977,16 @@ producción se hace en cocinas de sucursal. Ver
   almacén (empresa→proveedor o sucursal→central) o al área comercial (si
   devuelve un cliente).
 - **RN-INV-009** El stock disponible de un SKU en un almacén es su stock
-  físico menos la suma de sus reservas activas.
+  físico menos la suma de sus reservas activas. Comprometer stock nuevo
+  (aprobar una solicitud) exige disponible suficiente; **consumir no se
+  bloquea nunca por una reserva** — una venta o un consumo de producción
+  ya ocurrieron y el ERP los registra igual, aunque el disponible quede
+  negativo (ADR-018). Un disponible negativo es una promesa sin respaldo:
+  hay que liberarla o reponer.
 - **RN-INV-010** Al cancelarse o modificarse la solicitud/pedido que
   originó una reserva, el stock reservado vuelve a disponible
-  automáticamente.
+  automáticamente. Una solicitud ya despachada no se cancela: eso movió
+  stock y se corrige recibiendo o devolviendo.
 - **RN-INV-011** En el almacén central, un usuario autorizado puede
   liberar manualmente una reserva y redistribuirla entre otros
   solicitantes, ante desabastecimiento o sobredemanda del SKU.

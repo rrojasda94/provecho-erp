@@ -5,7 +5,123 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
+### Added
+
+- **Slice core del módulo `marketing`** (2026-08-01, migración
+  `e9c3b7412a68`). El módulo existía solo como README de spec desde el
+  2026-07-22; ahora tiene código. Las 5 entidades de data-model §8d y 17
+  endpoints bajo `/api/v1/marketing`:
+  - **`campana`** con brief obligatorio: sin objetivo, público, presupuesto
+    y KPI no se aprueba, y sin aprobación no sale a canal (RN-MKT-003). El
+    rol semilla `marketing` **no** lleva `marketing.campana_aprobar` — ese
+    permiso vive en `supervisor`: quien redacta el brief no lo aprueba.
+  - **`pieza_contenido`**: solo se publica si es pertinente a la marca y su
+    uso de marca está validado (RN-MKT-001/002). Contenido viral pero ajeno
+    a la marca queda bloqueado por el propio endpoint, no por criterio.
+  - **`lead` con atribución a la venta real** (RN-MKT-003). La automática la
+    hace `marketing` escuchando `sales.venta_confirmada`, y **solo cuando no
+    hay ambigüedad**: un único lead abierto del cliente en campaña en curso.
+    Con dos o más no atribuye nada y queda
+    `POST /leads/{id}/atribucion` — adivinar qué campaña convirtió falsearía
+    justo la métrica por la que la campaña existe. `sales.venta_confirmada`
+    suma `cliente_id` al payload para hacerlo posible.
+  - **`implementacion_material_sucursal`**: enviar el material no cierra la
+    tarea, se verifica en sitio (RN-MKT-005); una implementación incompleta
+    exige incidencia.
+  - **`encuesta_satisfaccion`** (RN-COM-007): selectiva y solo sobre venta
+    ya entregada y con cliente registrado. Estaba descrita en data-model §6
+    (ventas) porque su disparador es `sales.venta_entregada`; la tabla es de
+    marketing, que es quien elige a qué venta encuestar.
+  - `marketing` no importa `Venta`: lee sucursal, cliente y estado de
+    entrega por el contrato público nuevo
+    `sales::venta_para_encuesta`. Alcance de tenant por `campana.empresa_id`
+    y, para la encuesta, por la sucursal de su venta (ADR-004).
+  - 13 tests en `tests/test_marketing.py`. Diferido: aprobación contra
+    presupuesto anual (`decision_gerencial`), envío real de la encuesta y
+    expiración programada — ver `ROADMAP.md` → Deuda técnica → marketing.
+- **Convocatoria y tablero de contratación en `rrhh`** (2026-08-01, migración
+  `a7f2c81e4b95`). El reclutamiento tenía SOPs y plantillas pero en código
+  `postulante` nacía suelto, sin búsqueda a la que pertenecer y sin más
+  estados que `en_proceso`/`rechazado`/`contratado`. Ahora:
+  - **`convocatoria`** es el expediente de la búsqueda (empresa, sucursal,
+    puesto, motivo, vacantes, rango salarial aprobado, fecha límite):
+    borrador → publicada → cerrada. **RN-RRHH-013 pasa a estar aplicada en
+    código**: sin `perfil_puesto` registrado el sistema no deja publicar.
+  - **Formulario público de postulación** — `POST /rrhh/postulaciones/{token}`
+    sin JWT. El token nace al publicar y desaparece al cerrar: es lo único
+    que autoriza a escribir y solo crea un postulante de esa convocatoria.
+    Rate limit de 20/hora por IP, campos y `respuestas` acotados,
+    consentimiento obligatorio (RN-PER-004) y **fecha puesta por el
+    servidor** — si la mandara el cliente, podría postular vencida la fecha
+    límite. El formulario es Google Forms con un Apps Script de 12 líneas
+    (SOP de publicación de convocatoria); no se construyó un formulario
+    propio ni se integró la API de Google.
+  - **El candidato ya no entra a `persona`**: `postulante` lleva sus propios
+    nombres/apellidos/teléfono/email y `respuestas` JSONB. El pool es gente
+    ajena a la empresa y la mayoría nunca se contrata; `persona` y
+    `trabajador` se crean recién en `POST /postulantes/{id}/contratar` (o se
+    reusa la `persona` del ex-trabajador recontratado, RN-GEN-007).
+  - **Un solo tablero** para los 13 pasos de incorporación: `recibido` →
+    `preseleccionado` → `entrevistado` → `verificado` → `oferta_enviada` →
+    `contratado` → `inducido` → `confirmado`, más `descartado`.
+    `GET /convocatorias/{id}/tablero` devuelve las columnas en orden (el
+    cliente no replica ese orden). Se avanza de a una columna, sin saltos ni
+    retrocesos, y descartar exige motivo: el historial del proceso es la
+    defensa ante un reclamo de discriminación (Ley 26772).
+  - `postulante` gana `empresa_id` y queda escopado por tenant — cierra la
+    excepción declarada en el cambio de tenant del mismo día. Permiso nuevo
+    `rrhh.convocatoria_gestionar` (publicar/cerrar lo aprueba el
+    administrador, no quien pide el puesto); contratar exige
+    `rrhh.trabajador_gestionar`, que es donde nace la planilla.
+
+  Diferido a propósito: entidad `requisicion` aparte (la convocatoria en
+  borrador ya lo es), checklist de inducción paso por paso (las columnas del
+  tablero alcanzan), cálculo de PLAME y modelado de uniforme/EPP.
+
+- **Derechos ARCO sobre `postulante`** (2026-08-01, migración
+  `b1d09e574c23`, ADR-011). Sacar al candidato de `persona` dejó sus datos
+  fuera del alcance de `POST /personas/{id}/anonimizar`; ahora tiene los
+  suyos: `GET /rrhh/postulantes/{id}` (acceso),
+  `PATCH /rrhh/postulantes/{id}` (rectificación de contacto, 409 sobre una
+  ficha ya anonimizada) y `POST /rrhh/postulantes/{id}/anonimizar`
+  (cancelación irreversible). Reusa el permiso `personas.anonimizar` — misma
+  capacidad legal, mismo custodio, otra tabla — y deja rastro en `audit_log`
+  registrando **qué** se borró, nunca el valor.
+  - Se anonimiza en vez de borrar aunque, a diferencia de `persona`, **nada
+    referencie la fila**: el borrado se llevaría `motivo_descarte` y
+    `canal_origen`, o sea la evidencia de por qué se descartó a alguien
+    (Ley 26772) y la constancia de que la solicitud existió. Corolario que
+    quedó documentado en el modelo: el motivo de descarte se escribe como
+    criterio, nunca con datos personales, porque sobrevive.
+  - Contratado → 409: sus datos ya pasaron a `persona` y están bajo
+    retención laboral; su ARCO se ejerce allá.
+  - **El plazo de conservación pasa de declarado a aplicado**: cada ficha
+    nace con `plazo_conservacion_declarado`
+    (`RRHH_PLAZO_CONSERVACION_POSTULANTE_MESES`, 12 por defecto) — antes
+    quedaba en NULL, lo que volvía la ficha inpurgable y el aviso de
+    privacidad una promesa vacía — y `python -m src.modules.rrhh.purga`
+    anonimiza lo vencido desde el cron del host (mismo criterio que
+    backups), sin tocar nunca al contratado. Falta darlo de alta en el
+    servidor.
+
 ### Security
+
+- **Contexto de tenant desde el JWT en toda la API** (2026-08-01, ADR-004).
+  `purchases`, `production`, `accounting`, `rrhh` y el dashboard gerencial
+  todavía recibían `empresa_id` del cliente: cualquier usuario autenticado con
+  el permiso correspondiente podía leer y escribir datos de otra empresa
+  mandando el UUID ajeno en el body o el query string. Ahora el alcance sale
+  de los claims (`tenant.empresa` / `tenant.filtro_empresa`) y cada recurso se
+  valida contra su fila real mediante un `application/scope.py` por módulo —
+  proveedor y OC por su empresa, orden de producción por su almacén, cuenta /
+  periodo / asiento / pago por `empresa_id`, caja y arqueo por la sucursal de
+  su punto de venta, y todo `rrhh` por el trabajador o la empresa del
+  documento. `empresa_id` en el body pasa a ser opcional y solo lo usa un
+  superusuario sin empresa asignada. `accounting` resuelve la sucursal de un
+  punto de venta con un contrato público nuevo de `sales`
+  (`sucursal_de_punto_venta`), sin importar su dominio. Excepción declarada:
+  `rrhh.postulante` no tenía `empresa_id` y quedó sin escopar — **cerrada el
+  mismo día** por el slice de convocatoria (ver Added).
 
 - **Autorización de supervisor por PIN** (2026-07-28, RN-AUD-005, ADR-016 §6).
   Corrige un defecto introducido el mismo día: `POST /sales/ventas/{id}/descuento`
@@ -24,6 +140,12 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Fixed
 
+- **Instalación nueva inutilizable: el seeder no asignaba sucursales al
+  `admin`** (2026-08-01). Sin filas en `usuario_sucursal` el JWT sale sin
+  `empresa_id`, así que toda operación escopada respondía 403 "usuario sin
+  empresa asignada" (ADR-004) apenas se levantaba el sistema. El seeder ahora
+  asigna al `admin` todas las sucursales que crea, de forma idempotente.
+  Cubierto por `test_seed_deja_al_admin_con_empresa`.
 - **El extra cobraba una porción y descontaba varias** (2026-07-28). La
   cantidad del extra es **por plato**: dos pizzas con extra queso son dos
   porciones. El consumo enviado a inventory ya se multiplicaba por el plato,
@@ -57,6 +179,100 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Added
 
+- **Abastecimiento interno: reserva de stock, solicitud de insumos y
+  transferencias** (2026-08-01, ADR-018, migración `d8b35f1ca207`,
+  RN-INV-001/002/003/009/010/011). El ERP ya sabía cuánto stock hay en cada
+  almacén; ahora sabe moverlo entre ellos. Cierra el ciclo que los SOP de
+  Almacén describen desde el modelado y que no tenía una línea de código.
+  - **`reserva_stock` es una promesa, no un movimiento**: no toca `stock`
+    ni genera `movimiento_inventario`. `GET /inventory/stock` devuelve
+    ahora `cantidad` (físico), `reservado` y `disponible` = físico − Σ
+    reservas activas (RN-INV-009). Sin esto, entre que un supervisor
+    aprueba un requerimiento y el central arma el picking pasan horas
+    durante las cuales dos sucursales se prometen el mismo saco de harina.
+  - **Reservar bloquea, consumir no**: aprobar una solicitud exige
+    disponible suficiente (409 si no alcanza), pero una venta o un consumo
+    de producción **nunca** se frenan por una reserva — esa operación ya
+    ocurrió en el mundo real y negarla en el ERP solo desincroniza los
+    libros. La consecuencia aceptada es que el disponible puede quedar
+    negativo: es la señal de una promesa sin respaldo, no un error.
+  - **Ciclo completo**: `POST /solicitudes` (el local pide) →
+    `/aprobar` (recorta por SKU si hace falta y reserva en el abastecedor)
+    → `POST /transferencias` (descuenta el origen, deja el stock
+    `en_transito`) → `/recibir` (suma el destino). `/rechazar` y
+    `/cancelar` sueltan las reservas (RN-INV-010); `/reservas/{id}/liberar`
+    es la liberación manual ante desabastecimiento (RN-INV-011).
+  - **La solicitud va por almacén, no por sucursal** como decía el
+    borrador del modelo: producción también solicita y la transferencia
+    opera sobre almacenes. El abastecedor sale de
+    `almacen.almacen_abastecedor_id` y se copia a la fila, para que
+    cambiarlo después no reescriba la historia de lo ya pedido.
+  - **`transferencia_item` va por SKU y lote**: el despacho reparte por
+    FEFO, así que sacar 10 kg puede tomar tres lotes y el destino recibe
+    esos mismos tres. Por SKU a secas, el destino elegiría un lote
+    distinto al que salió y la trazabilidad de ADR-015 se cortaría justo
+    en el traslado.
+  - **Las diferencias se registran, no se corrigen**: no se despacha más de
+    lo aprobado ni se recibe más de lo enviado (RN-INV-001/002) — menos sí,
+    en ambos casos. Si llegaron 28 de 30, al stock entra 28 y la diferencia
+    viaja en `inventory.transferencia_recibida`. Cuadrar el papel a la
+    fuerza es lo que despega el inventario teórico del real.
+  - **Transferencia lateral** sucursal↔sucursal: misma entidad, sin
+    solicitud detrás e ítems explícitos.
+  - Permisos nuevos `inventory.solicitar_insumos`,
+    `inventory.aprobar_solicitud` y `inventory.liberar_reserva`; el slice
+    estrena además `inventory.transferir` e `inventory.recepcion`,
+    sembrados desde el slice 1 y sin uso hasta hoy. Aprobar y solicitar son
+    permisos distintos y el aprobador no puede ser quien pidió (RN-INV-006).
+  - Desbloquea el contrato de lectura `purchases` ↔ `solicitud_insumos`
+    ("qué sucursales piden más"), que esperaba a que la entidad existiera.
+  - 23 casos en `tests/test_transferencias.py`; migración verificada ida y
+    vuelta contra Postgres real más `alembic check`.
+- **Conteo cíclico de inventario, con la frecuencia en la categoría**
+  (2026-08-01, ADR-017, migración `c4e70a91d5b8`, RN-INV-007/014/021).
+  `conteo` + `conteo_item` cierran el pendiente más viejo de `inventory`:
+  hasta ahora el ERP sabía qué stock debía haber, pero no tenía cómo
+  contrastarlo contra lo que hay en el estante.
+  - **La periodicidad la fija la categoría**, no un número universal:
+    `categoria.frecuencia_conteo` (diario / semanal / quincenal / mensual /
+    semestral / anual; NULL = fuera del ciclo). Un perecible se cuenta a
+    diario y un abarrote al mes en el mismo almacén. Se configura en
+    `PATCH /inventory/categorias/{id}` — endpoint nuevo. Esto **corrige a
+    ADR-014**, que había anticipado la frecuencia como `parametro_empresa`:
+    esa tabla guarda un valor por empresa y aquí hace falta uno por
+    categoría, con FK de verdad.
+  - **El calendario se deriva, no se guarda**: la próxima fecha es el
+    último conteo cerrado más los días de la frecuencia. Sin tabla
+    `programa_conteo` que mantener sincronizada con cuatro caminos de
+    escritura. `GET /inventory/conteos/programa` muestra estado (`al_dia` |
+    `vence_hoy` | `vencido`) y días de atraso, lo vencido primero. Un
+    conteo general (sin categoría) pone al día a todas las del almacén.
+  - **Lo no contado en su fecha se reporta a almacén y gerencia**
+    (RN-INV-021): `POST /inventory/conteos/verificar-vencidos` publica
+    `inventory.conteo_vencido`. El día en que vence todavía no es falta.
+  - **Stock esperado congelado al abrir**, no al cerrar: el almacén sigue
+    operando mientras se cuenta, y medir contra un stock que se movió
+    durante el recuento inventa diferencias que nadie provocó. Mismo
+    criterio de "congelar el fondo" del arqueo de caja.
+  - **A ciegas por defecto** (RN-INV-005): el detalle del conteo oculta
+    `cantidad_sistema` y `diferencia` salvo permiso
+    `inventory.ver_stock_esperado`. El rol `almacenero` cuenta sin verlo —
+    conocer el número esperado convierte la auditoría en una confirmación.
+    Permisos nuevos `inventory.contar` y `inventory.ver_stock_esperado`.
+  - **Cerrar solicita, no corrige**: cada diferencia genera un `ajuste`
+    `pendiente` con `ajuste.conteo_id` (columna nueva), que sigue exigiendo
+    un aprobador distinto de quien contó (RN-INV-006). Los ítems que nadie
+    contó se ignoran: un conteo parcial no puede declarar faltante lo que
+    no se miró. `dentro_margen` sale de `INVENTORY_MARGEN_AJUSTE_PCT` (2%,
+    RN-INV-015); con stock esperado en 0 no hay porcentaje posible y la
+    diferencia queda fuera de margen.
+  - Un SKU contado que no estaba en el snapshot entra con sistema en 0 —
+    encontrar en el estante algo que el ERP no registra es justo el
+    sobrante que el conteo existe para detectar.
+  - Resuelve los `[[ COMPLETAR ]]` de periodicidad y margen en
+    `docs/almacen-logistica/politica-almacen-logistica.md`. 22 casos en
+    `tests/test_conteos.py`; migración verificada ida y vuelta contra
+    Postgres real más `alembic check`.
 - **Slice PDV: mesa tipada, cobro dividido, receptor en caja y descuento de
   orden** (2026-07-28, ADR-016, migración `d7e3b8c14f52`). Cierra los cuatro
   huecos que el diseño del punto de venta destapó y el modelo no daba:

@@ -25,15 +25,16 @@ protegidas por su propio permiso RBAC. Otro módulo solo puede importar de
 ese archivo — nunca de `domain`/`infrastructure` del módulo dueño
 (CLAUDE.md: "nunca importar el dominio de otro módulo").
 
-Mientras el módulo consumidor no exista todavía como código (ej.
-`marketing`, hoy solo README), el contrato también se expone como endpoint
-HTTP — así cualquier rol autorizado lo usa ya (análisis manual, integración
-futura). Cuando el módulo consumidor exista, su capa de aplicación importa
-la función directamente (llamada Python en proceso, sin HTTP).
+Mientras el módulo consumidor no exista todavía como código, el contrato
+también se expone como endpoint HTTP — así cualquier rol autorizado lo usa
+ya (análisis manual, integración futura). Cuando el módulo consumidor
+existe, su capa de aplicación importa la función directamente (llamada
+Python en proceso, sin HTTP) — es lo que hace `marketing` desde 2026-08-01.
 
 | Contrato | Dueño | Consumidores | Función | Permiso |
 |---|---|---|---|---|
 | Lectura de clientes | `sales` | `marketing`/`comercial` (análisis, targeting de campañas) | `sales/application/queries_publicas.py::listar_clientes_para_analisis` (`GET /api/v1/sales/clientes`) | `sales.leer_clientes_externos` |
+| Venta para encuesta | `sales` | `marketing` (decide a qué venta entregada encuestar, RN-COM-007) | `sales/application/queries_publicas.py::venta_para_encuesta` — devuelve sucursal, cliente y si el pedido ya se entregó | interno (llamada en proceso; el endpoint que lo usa exige `marketing.encuesta_gestionar`) |
 | Solicitudes por usuario | `inventory` (`solicitud_insumos`) | `purchases` (qué usuarios/sucursales piden más — insumo para negociar con proveedores) | **bloqueado** — `solicitud_insumos` aún no existe en código (deuda de `inventory`, ver ROADMAP) | — |
 
 ## Cadena de referencia (venta → contabilidad)
@@ -52,7 +53,7 @@ accounting.asiento_generado
 
 | Evento | Emisor | Consumidores | Payload (clave) | Cuándo | Reglas |
 |--------|--------|--------------|-----------------|--------|--------|
-| `sales.venta_confirmada` | sales | inventory, accounting | venta_id, sucursal_id, items[], total | Al confirmar la venta | RN-COM-001, RN-PRD-002 |
+| `sales.venta_confirmada` | sales | inventory, accounting, marketing (atribución lead→venta) | venta_id, sucursal_id, cliente_id (opcional), items[], total | Al confirmar la venta. `cliente_id` se agregó 2026-08-01 para la atribución de marketing | RN-COM-001, RN-PRD-002, RN-MKT-003 |
 | `sales.pago_registrado` | sales | accounting | venta_id, medio, monto, ref_externa | Al registrar pago | RN-COM-002 |
 | `sales.comprobante_emitido` | sales | accounting | venta_id, tipo, serie_numero | Comprobante aceptado por SUNAT (Factiliza) | RN-COM-003 |
 | `sales.venta_anulada` | sales | inventory, accounting | venta_id, motivo | Al anular | RN-GEN-002 |
@@ -61,15 +62,16 @@ accounting.asiento_generado
 | `accounting.movimiento_caja_registrado` | accounting | — (auditoría, arqueo) | movimiento_caja_id, apertura_caja_id, tipo, monto, motivo | Ingreso o retiro de efectivo del cajón durante el turno | RN-MDP-007 |
 | `sales.carrito_abandonado` | sales | — (analítica) | carrito_id, canal, paso, motivo (opcional) | Al abandonar sin confirmar | RN-COM-013 |
 | `sales.pedido_listo` | sales (PROC-OPE-002) | — (pantalla de despacho, analítica de tiempos) | venta_id | Todos los ítems del pedido alcanzan `listo` | RN-CUP-005 |
-| `sales.venta_entregada` | sales (PROC-OPE-002) | marketing* (habilita encuesta selectiva), accounting (habilita cobro al finalizar en mesa) | venta_id, sucursal_id, modalidad, cliente_id (opcional), repartidor_externo_plataforma (opcional), entregado_por | El pedido queda en manos del cliente | RN-CUP-005/006/007/009, RN-COM-007 |
-| `marketing.encuesta_enviada` | marketing* | — (analítica de experiencia) | encuesta_id, venta_id, cliente_id, canal (`pos`\|`whatsapp`\|`link`) | Marketing selecciona una venta entregada y envía la encuesta — nunca automático para toda venta | RN-COM-007 |
+| `sales.venta_entregada` | sales (PROC-OPE-002) | marketing (habilita encuesta selectiva), accounting (habilita cobro al finalizar en mesa) | venta_id, sucursal_id, modalidad, cliente_id (opcional), repartidor_externo_plataforma (opcional), entregado_por | El pedido queda en manos del cliente | RN-CUP-005/006/007/009, RN-COM-007 |
+| `marketing.encuesta_enviada` | marketing | — (analítica de experiencia) | encuesta_id, venta_id, cliente_id, canal (`pos`\|`whatsapp`\|`link`) | Marketing selecciona una venta entregada y envía la encuesta — nunca automático para toda venta | RN-COM-007 |
 | `inventory.stock_consumido` | inventory | — (auditoría) | almacen_id, articulo_id, cantidad, ref | Tras descontar por venta/producción | RN-INV-003 |
 | `inventory.stock_bajo_minimo` | inventory | users (notifica), production* (dispara orden por necesidad) | almacen_id, articulo_id, actual, minimo | Al cruzar el mínimo | RN-PRD-007 |
-| `inventory.transferencia_recibida` | inventory | accounting | transferencia_id, diferencias[] | Al recibir en local | RN-INV-002 |
+| `inventory.transferencia_recibida` | inventory | accounting | transferencia_id, origen_almacen_id, destino_almacen_id, solicitud_id (nullable), diferencias[] (sku_id, lote_id, enviada, recibida) | Al recibir en destino (ADR-018). `diferencias` solo trae las líneas donde lo recibido no coincide con lo enviado — al destino entró lo que de verdad llegó. Sin consumidor todavía en `accounting` | RN-INV-002 |
 | `inventory.merma_registrada` | inventory | accounting | almacen_id, sku_id, lote_id (opcional), cantidad, motivo | Al registrar merma/desperdicio | RN-INV-017 |
 | `inventory.devolucion_a_proveedor` | inventory | purchases | devolucion_id, proveedor_id, items[], motivo | Al registrar devolución a proveedor (purchases gestiona reclamo/nota de crédito) | RN-INV-020 |
 | `inventory.ajuste_fuera_margen` | inventory | accounting, users (alerta admin) | ajuste_id, almacen_id, sku_id, diferencia, margen | Ajuste excede el margen de error configurado | RN-INV-015 |
 | `inventory.lote_vencido_detectado` | inventory | users (notifica), rrhh* (memorándum al responsable) | lote_id, almacen_id, sku_id, fecha_vencimiento, cantidad | Al hallar un lote vencido aún disponible en stock — lo publica tanto el picking FEFO al toparse con él como el barrido `POST /inventory/lotes/bloquear-vencidos` (ADR-015). Sin `responsable_id`: `almacen` no lo tiene modelado; el memorándum a RRHH queda bloqueado por eso | RN-VNC-001..003 |
+| `inventory.conteo_vencido` | inventory | users (reporte a almacén y gerencia) | almacen_id, categoria_id, categoria, frecuencia, fecha_programada, dias_atraso, dirigido_a (`["almacen","gerencia"]`) | Una categoría no se contó en la fecha que su frecuencia exigía — lo publica el barrido `POST /inventory/conteos/verificar-vencidos` (ADR-017). Sin consumidor todavía; hoy el reporte se lee en `GET /inventory/conteos/programa` | RN-INV-007, RN-INV-021 |
 | `purchases.oc_emitida` | purchases | accounting | oc_id, proveedor_id, empresa_id, total | Al emitir OC | RN-CMP-001 |
 | `purchases.compra_recibida` | purchases | inventory, accounting | oc_id, almacen_id, items[] (articulo_id, cantidad, costo_unitario, lote_codigo, fecha_vencimiento) | Al recibir mercadería; los dos últimos campos solo los usa inventory si el artículo controla lote (RN-VNC-002) | RN-CMP-003 |
 | `purchases.comprobante_conforme` | purchases | accounting | comprobante_id, orden_compra_id, proveedor_id, empresa_id, condicion_pago, sujeto_spot, porcentaje_deteccion, monto | Compras da conformidad al comprobante; accounting encola el pago (`movimiento_dinero` pendiente) | RN-CMP-005, RN-CMP-014 |
@@ -78,8 +80,8 @@ accounting.asiento_generado
 | `production.orden_completada` | production* | inventory | orden_id, articulo_id, cantidad | Al terminar producción | RN-PRD-003 |
 | `production.no_conformidad_detectada` | production* | users (alerta Comercial/Gerencia si reincidencia) | orden_id, resultado (`no_conforme_reprocesado`\|`no_conforme_desechado`), reporte_escalamiento_id | Al registrar control de calidad no conforme — un solo asiento contable posible por lote, y solo si `resultado=no_conforme_desechado`: ese caso también dispara `inventory.merma_registrada` (vía merma_cantidad/merma_motivo de la orden). `no_conforme_reprocesado` no genera merma ni asiento, solo el detalle de la corrección en el reporte de escalamiento | RN-PRD-013/014/015 |
 | `production.equipo_frio_fuera_rango` | production* | users (alerta inmediata a Gerencia) | cocina_produccion_id, equipo_id, temperatura_c, rango_esperado | Checklist de turno detecta equipo de frío fuera de rango — bloquea nuevas órdenes en ese equipo (`checklist_inocuidad_turno.estado=bloqueado`) | RN-CDP-005 |
-| `marketing.campana_lanzada` | marketing* | — (informativo/BI) | campana_id, marca_id, tipo, presupuesto | Al lanzar una campaña con brief aprobado | RN-MKT-003 |
-| `marketing.lead_generado` | marketing* | sales (atribución lead→venta) | lead_id, campana_id, canal, cliente_id | Al registrar un lead de campaña; sales lo enlaza a la venta cuando Comercial cierra | RN-MKT-003 |
+| `marketing.campana_lanzada` | marketing | — (informativo/BI) | campana_id, marca_id, tipo, presupuesto | Al lanzar una campaña con brief aprobado | RN-MKT-003 |
+| `marketing.lead_generado` | marketing | — (informativo/BI) | lead_id, campana_id, canal, cliente_id | Al registrar un lead en una campaña en curso. La atribución lead→venta la hace **marketing** escuchando `sales.venta_confirmada`, no `sales` escuchando este evento: el dueño del dato `lead.venta_id` es marketing (ADR-019) | RN-MKT-003 |
 | `users.usuario_creado` | users | — | usuario_id, tipo | Al crear usuario | — |
 | `users.sesion_iniciada` | users | — (auditoría) | usuario_id, ip | Login exitoso | — |
 | `accounting.asiento_generado` | accounting | — (auditoría/BI) | asiento_id, evento_origen | Al generar asiento desde un evento operativo | — |
