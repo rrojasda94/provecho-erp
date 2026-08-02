@@ -1,10 +1,13 @@
 """Routers FastAPI del módulo rrhh: ciclo laboral completo."""
 
 import uuid
+from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
+from src.core.rate_limit import rate_limit
+from src.core.tenant import Tenant
 from src.modules.rrhh.api import schemas
 from src.modules.rrhh.application import (
     asistencia as asistencia_uc,
@@ -12,27 +15,30 @@ from src.modules.rrhh.application import (
 from src.modules.rrhh.application import (
     capacitacion,
     contratos,
+    convocatorias,
     disciplina,
     nomina,
     permisos,
     postulantes,
+    privacidad,
     socios,
     trabajadores,
 )
-from src.modules.rrhh.application.errors import Conflicto, NoEncontrado, ReglaNegocio, RrhhError
-from src.modules.rrhh.infrastructure.repositories import (
-    ActaRepo,
-    AmonestacionRepo,
-    BoletaPagoRepo,
-    CertificadoTrabajoRepo,
-    ContratoLaboralRepo,
-    LiquidacionBssRepo,
-    MemorandumRepo,
-    PactoPermanenciaRepo,
-    SolicitudPermisoRepo,
-    TrabajadorRepo,
+from src.modules.rrhh.application.scope import (
+    exigir_acta,
+    exigir_amonestacion,
+    exigir_boleta,
+    exigir_certificado,
+    exigir_contrato,
+    exigir_convocatoria,
+    exigir_liquidacion,
+    exigir_memorandum,
+    exigir_pacto,
+    exigir_postulante,
+    exigir_solicitud_permiso,
+    exigir_trabajador,
 )
-from src.modules.users.api.deps import get_db, require_permission
+from src.modules.users.api.deps import get_db, get_tenant, require_permission
 from src.modules.users.infrastructure.models import Usuario
 
 router = APIRouter(prefix="/rrhh", tags=["rrhh"])
@@ -41,6 +47,7 @@ LEER = "rrhh.leer"
 TRABAJADOR_GESTIONAR = "rrhh.trabajador_gestionar"
 CONTRATO_GESTIONAR = "rrhh.contrato_gestionar"
 POSTULANTE_GESTIONAR = "rrhh.postulante_gestionar"
+CONVOCATORIA_GESTIONAR = "rrhh.convocatoria_gestionar"
 SOCIO_GESTIONAR = "rrhh.socio_gestionar"
 NOMINA_GESTIONAR = "rrhh.nomina_gestionar"
 DISCIPLINA_GESTIONAR = "rrhh.disciplina_gestionar"
@@ -48,16 +55,15 @@ PERMISO_SOLICITAR = "rrhh.permiso_solicitar"
 PERMISO_APROBAR = "rrhh.permiso_aprobar"
 ASISTENCIA_MARCAR = "rrhh.asistencia_marcar"
 CAPACITACION_GESTIONAR = "rrhh.capacitacion_gestionar"
-
-_HTTP_STATUS: dict[type[RrhhError], int] = {
-    NoEncontrado: status.HTTP_404_NOT_FOUND,
-    Conflicto: status.HTTP_409_CONFLICT,
-    ReglaNegocio: status.HTTP_409_CONFLICT,
-}
+# Misma capacidad legal que sobre `persona` (Ley 29733): un permiso nuevo
+# solo agregaría matriz que mantener.
+ANONIMIZAR = "personas.anonimizar"
 
 
-def _http(err: RrhhError) -> HTTPException:
-    return HTTPException(_HTTP_STATUS.get(type(err), 400), str(err))
+# El formulario de postulación es público: sin límite, cualquiera llena la
+# base de candidatos con basura. 20 por hora y por IP alcanza de sobra para
+# una familia postulando desde la misma casa o cabina.
+_rate_limit_postulacion = rate_limit("postulacion", 20, 3600)
 
 
 # --- Trabajador ----------------------------------------------------------------
@@ -65,12 +71,12 @@ def _http(err: RrhhError) -> HTTPException:
 def crear_trabajador(
     body: schemas.TrabajadorCreate,
     _: Usuario = Depends(require_permission(TRABAJADOR_GESTIONAR)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        trabajador = trabajadores.crear_trabajador(session, **body.model_dump())
-    except (NoEncontrado, ReglaNegocio) as e:
-        raise _http(e) from e
+    campos = body.model_dump()
+    campos["empresa_id"] = tenant.empresa(campos["empresa_id"])
+    trabajador = trabajadores.crear_trabajador(session, **campos)
     session.commit()
     return trabajador
 
@@ -79,21 +85,20 @@ def crear_trabajador(
 def listar_trabajadores(
     empresa_id: uuid.UUID | None = None,
     _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    return trabajadores.listar_trabajadores(session, empresa_id)
+    return trabajadores.listar_trabajadores(session, tenant.filtro_empresa(empresa_id))
 
 
 @router.get("/trabajadores/{trabajador_id}", response_model=schemas.TrabajadorOut)
 def ver_trabajador(
     trabajador_id: uuid.UUID,
     _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    trabajador = TrabajadorRepo(session).get(trabajador_id)
-    if trabajador is None:
-        raise HTTPException(404, "trabajador no encontrado")
-    return trabajador
+    return exigir_trabajador(session, trabajador_id, tenant)
 
 
 @router.patch("/trabajadores/{trabajador_id}", response_model=schemas.TrabajadorOut)
@@ -101,12 +106,11 @@ def actualizar_trabajador(
     trabajador_id: uuid.UUID,
     body: schemas.TrabajadorUpdate,
     _: Usuario = Depends(require_permission(TRABAJADOR_GESTIONAR)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        trabajador = trabajadores.actualizar_trabajador(session, trabajador_id, **body.model_dump())
-    except NoEncontrado as e:
-        raise _http(e) from e
+    exigir_trabajador(session, trabajador_id, tenant)
+    trabajador = trabajadores.actualizar_trabajador(session, trabajador_id, **body.model_dump())
     session.commit()
     return trabajador
 
@@ -116,14 +120,13 @@ def cesar_trabajador(
     trabajador_id: uuid.UUID,
     body: schemas.TrabajadorCese,
     _: Usuario = Depends(require_permission(TRABAJADOR_GESTIONAR)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        trabajador = trabajadores.cesar_trabajador(
-            session, trabajador_id, fecha_cese=body.fecha_cese
-        )
-    except (NoEncontrado, Conflicto) as e:
-        raise _http(e) from e
+    exigir_trabajador(session, trabajador_id, tenant)
+    trabajador = trabajadores.cesar_trabajador(
+        session, trabajador_id, fecha_cese=body.fecha_cese
+    )
     session.commit()
     return trabajador
 
@@ -133,12 +136,11 @@ def cesar_trabajador(
 def crear_contrato_laboral(
     body: schemas.ContratoLaboralCreate,
     _: Usuario = Depends(require_permission(CONTRATO_GESTIONAR)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        contrato = contratos.crear_contrato_laboral(session, **body.model_dump())
-    except (NoEncontrado, ReglaNegocio) as e:
-        raise _http(e) from e
+    exigir_trabajador(session, body.trabajador_id, tenant)
+    contrato = contratos.crear_contrato_laboral(session, **body.model_dump())
     session.commit()
     return contrato
 
@@ -147,12 +149,10 @@ def crear_contrato_laboral(
 def ver_contrato_laboral(
     contrato_id: uuid.UUID,
     _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    contrato = ContratoLaboralRepo(session).get(contrato_id)
-    if contrato is None:
-        raise HTTPException(404, "contrato no encontrado")
-    return contrato
+    return exigir_contrato(session, contrato_id, tenant)
 
 
 @router.post(
@@ -162,14 +162,13 @@ def firmar_contrato_laboral(
     contrato_id: uuid.UUID,
     body: schemas.ContratoLaboralFirmar,
     _: Usuario = Depends(require_permission(CONTRATO_GESTIONAR)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        contrato = contratos.firmar_contrato_laboral(
-            session, contrato_id, fecha_firma=body.fecha_firma
-        )
-    except (NoEncontrado, Conflicto) as e:
-        raise _http(e) from e
+    exigir_contrato(session, contrato_id, tenant)
+    contrato = contratos.firmar_contrato_laboral(
+        session, contrato_id, fecha_firma=body.fecha_firma
+    )
     session.commit()
     return contrato
 
@@ -180,27 +179,135 @@ def firmar_contrato_laboral(
 def finalizar_contrato_laboral(
     contrato_id: uuid.UUID,
     _: Usuario = Depends(require_permission(CONTRATO_GESTIONAR)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        contrato = contratos.finalizar_contrato_laboral(session, contrato_id)
-    except (NoEncontrado, Conflicto) as e:
-        raise _http(e) from e
+    exigir_contrato(session, contrato_id, tenant)
+    contrato = contratos.finalizar_contrato_laboral(session, contrato_id)
     session.commit()
     return contrato
 
 
+# --- Convocatoria ---------------------------------------------------------------
+@router.post("/convocatorias", response_model=schemas.ConvocatoriaOut, status_code=201)
+def crear_convocatoria(
+    body: schemas.ConvocatoriaCreate,
+    _: Usuario = Depends(require_permission(CONVOCATORIA_GESTIONAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    campos = body.model_dump()
+    campos["empresa_id"] = tenant.empresa(campos["empresa_id"])
+    if campos["sucursal_id"] is not None:
+        tenant.exigir_sucursal(campos["sucursal_id"])
+    convocatoria = convocatorias.crear_convocatoria(session, **campos)
+    session.commit()
+    return convocatoria
+
+
+@router.get("/convocatorias", response_model=list[schemas.ConvocatoriaOut])
+def listar_convocatorias(
+    estado: str | None = None,
+    empresa_id: uuid.UUID | None = None,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    return convocatorias.listar_convocatorias(
+        session, tenant.filtro_empresa(empresa_id), estado
+    )
+
+
+@router.get("/convocatorias/{convocatoria_id}", response_model=schemas.ConvocatoriaOut)
+def ver_convocatoria(
+    convocatoria_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    return exigir_convocatoria(session, convocatoria_id, tenant)
+
+
+@router.post(
+    "/convocatorias/{convocatoria_id}/publicar", response_model=schemas.ConvocatoriaOut
+)
+def publicar_convocatoria(
+    convocatoria_id: uuid.UUID,
+    body: schemas.ConvocatoriaPublicar,
+    _: Usuario = Depends(require_permission(CONVOCATORIA_GESTIONAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    exigir_convocatoria(session, convocatoria_id, tenant)
+    convocatoria = convocatorias.publicar_convocatoria(
+        session, convocatoria_id, **body.model_dump()
+    )
+    session.commit()
+    return convocatoria
+
+
+@router.post(
+    "/convocatorias/{convocatoria_id}/cerrar", response_model=schemas.ConvocatoriaOut
+)
+def cerrar_convocatoria(
+    convocatoria_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(CONVOCATORIA_GESTIONAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    exigir_convocatoria(session, convocatoria_id, tenant)
+    convocatoria = convocatorias.cerrar_convocatoria(session, convocatoria_id)
+    session.commit()
+    return convocatoria
+
+
+@router.get(
+    "/convocatorias/{convocatoria_id}/tablero", response_model=list[schemas.TableroColumna]
+)
+def ver_tablero(
+    convocatoria_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Columnas del proceso de contratación en orden, con sus fichas."""
+    exigir_convocatoria(session, convocatoria_id, tenant)
+    return convocatorias.tablero(session, convocatoria_id)
+
+
 # --- Postulante --------------------------------------------------------------
+@router.post(
+    "/postulaciones/{token}",
+    response_model=schemas.PostulanteOut,
+    status_code=201,
+    dependencies=[Depends(_rate_limit_postulacion)],
+)
+def recibir_postulacion(
+    token: str,
+    body: schemas.PostulacionPublica,
+    session: Session = Depends(get_db),
+):
+    """Endpoint público del formulario de postulación (Google Forms vía Apps
+    Script, o cualquier formulario propio). Sin JWT: el token de la
+    convocatoria publicada es lo único que autoriza a escribir, y solo puede
+    crear un postulante."""
+    postulante = postulantes.recibir_postulacion(
+        session, token=token, fecha_postulacion=date.today(), **body.model_dump()
+    )
+    session.commit()
+    return postulante
+
+
 @router.post("/postulantes", response_model=schemas.PostulanteOut, status_code=201)
 def crear_postulante(
     body: schemas.PostulanteCreate,
     _: Usuario = Depends(require_permission(POSTULANTE_GESTIONAR)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        postulante = postulantes.crear_postulante(session, **body.model_dump())
-    except (NoEncontrado, ReglaNegocio) as e:
-        raise _http(e) from e
+    campos = body.model_dump()
+    campos["empresa_id"] = tenant.empresa(campos["empresa_id"])
+    postulante = postulantes.crear_postulante(session, **campos)
     session.commit()
     return postulante
 
@@ -208,25 +315,108 @@ def crear_postulante(
 @router.get("/postulantes", response_model=list[schemas.PostulanteOut])
 def listar_postulantes(
     estado: str | None = None,
+    convocatoria_id: uuid.UUID | None = None,
     _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    return postulantes.listar_postulantes(session, estado)
+    return postulantes.listar_postulantes(
+        session, estado, tenant.filtro_empresa(), convocatoria_id
+    )
 
 
-@router.patch("/postulantes/{postulante_id}/estado", response_model=schemas.PostulanteOut)
-def cambiar_estado_postulante(
+@router.get("/postulantes/{postulante_id}", response_model=schemas.PostulanteOut)
+def ver_postulante(
     postulante_id: uuid.UUID,
-    body: schemas.PostulanteEstado,
-    _: Usuario = Depends(require_permission(POSTULANTE_GESTIONAR)),
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        postulante = postulantes.cambiar_estado_postulante(
-            session, postulante_id, estado=body.estado
-        )
-    except (NoEncontrado, ReglaNegocio) as e:
-        raise _http(e) from e
+    """Acceso (ARCO): el titular lo ejerce a través de quien administra el
+    ERP, igual que en `personas` (ADR-011)."""
+    return exigir_postulante(session, postulante_id, tenant)
+
+
+@router.patch("/postulantes/{postulante_id}", response_model=schemas.PostulanteOut)
+def actualizar_postulante(
+    postulante_id: uuid.UUID,
+    body: schemas.PostulanteUpdate,
+    _: Usuario = Depends(require_permission(POSTULANTE_GESTIONAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Rectificación (ARCO)."""
+    exigir_postulante(session, postulante_id, tenant)
+    postulante = postulantes.actualizar_postulante(
+        session, postulante_id, **body.model_dump()
+    )
+    session.commit()
+    return postulante
+
+
+@router.post("/postulantes/{postulante_id}/anonimizar", response_model=schemas.PostulanteOut)
+def anonimizar_postulante(
+    postulante_id: uuid.UUID,
+    body: schemas.PostulanteAnonimizar,
+    actor: Usuario = Depends(require_permission(ANONIMIZAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Cancelación (ARCO, Ley 29733). Irreversible. Reusa el permiso
+    `personas.anonimizar`: es la misma capacidad legal y el mismo custodio,
+    aunque la tabla sea otra."""
+    exigir_postulante(session, postulante_id, tenant)
+    postulante = privacidad.anonimizar_postulante(
+        session, postulante_id, motivo=body.motivo, solicitado_por=actor.id
+    )
+    session.commit()
+    return postulante
+
+
+@router.post("/postulantes/{postulante_id}/avanzar", response_model=schemas.PostulanteOut)
+def avanzar_postulante(
+    postulante_id: uuid.UUID,
+    body: schemas.PostulanteAvanzar,
+    _: Usuario = Depends(require_permission(POSTULANTE_GESTIONAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    exigir_postulante(session, postulante_id, tenant)
+    postulante = postulantes.avanzar_postulante(session, postulante_id, estado=body.estado)
+    session.commit()
+    return postulante
+
+
+@router.post("/postulantes/{postulante_id}/descartar", response_model=schemas.PostulanteOut)
+def descartar_postulante(
+    postulante_id: uuid.UUID,
+    body: schemas.PostulanteDescartar,
+    _: Usuario = Depends(require_permission(POSTULANTE_GESTIONAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    exigir_postulante(session, postulante_id, tenant)
+    postulante = postulantes.descartar_postulante(
+        session, postulante_id, motivo=body.motivo
+    )
+    session.commit()
+    return postulante
+
+
+@router.post("/postulantes/{postulante_id}/contratar", response_model=schemas.PostulanteOut)
+def contratar_postulante(
+    postulante_id: uuid.UUID,
+    body: schemas.PostulanteContratar,
+    _: Usuario = Depends(require_permission(TRABAJADOR_GESTIONAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Cierra la selección creando `persona` + `trabajador`. Exige el permiso
+    de trabajador, no el de postulante: acá nace la planilla."""
+    exigir_postulante(session, postulante_id, tenant)
+    postulante = postulantes.contratar_postulante(
+        session, postulante_id, **body.model_dump()
+    )
     session.commit()
     return postulante
 
@@ -236,22 +426,26 @@ def cambiar_estado_postulante(
 def crear_socio(
     body: schemas.SocioCreate,
     _: Usuario = Depends(require_permission(SOCIO_GESTIONAR)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        socio = socios.crear_socio(session, **body.model_dump())
-    except (NoEncontrado, ReglaNegocio) as e:
-        raise _http(e) from e
+    # Un socio puede serlo del grupo (`empresa_id` nulo); si se indica
+    # empresa, tiene que ser la del usuario.
+    if body.empresa_id is not None:
+        tenant.exigir_empresa(body.empresa_id)
+    socio = socios.crear_socio(session, **body.model_dump())
     session.commit()
     return socio
 
 
 @router.get("/socios", response_model=list[schemas.SocioOut])
 def listar_socios(
+    empresa_id: uuid.UUID | None = None,
     _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    return socios.listar_socios(session)
+    return socios.listar_socios(session, tenant.filtro_empresa(empresa_id))
 
 
 # --- Nómina --------------------------------------------------------------------
@@ -259,12 +453,11 @@ def listar_socios(
 def emitir_boleta_pago(
     body: schemas.BoletaPagoCreate,
     _: Usuario = Depends(require_permission(NOMINA_GESTIONAR)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        boleta = nomina.emitir_boleta_pago(session, **body.model_dump())
-    except NoEncontrado as e:
-        raise _http(e) from e
+    exigir_trabajador(session, body.trabajador_id, tenant)
+    boleta = nomina.emitir_boleta_pago(session, **body.model_dump())
     session.commit()
     return boleta
 
@@ -273,24 +466,21 @@ def emitir_boleta_pago(
 def ver_boleta_pago(
     boleta_id: uuid.UUID,
     _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    boleta = BoletaPagoRepo(session).get(boleta_id)
-    if boleta is None:
-        raise HTTPException(404, "boleta de pago no encontrada")
-    return boleta
+    return exigir_boleta(session, boleta_id, tenant)
 
 
 @router.post("/liquidaciones-bss", response_model=schemas.LiquidacionBssOut, status_code=201)
 def liquidar_cese(
     body: schemas.LiquidacionBssCreate,
     _: Usuario = Depends(require_permission(NOMINA_GESTIONAR)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        liquidacion = nomina.liquidar_cese(session, **body.model_dump())
-    except NoEncontrado as e:
-        raise _http(e) from e
+    exigir_trabajador(session, body.trabajador_id, tenant)
+    liquidacion = nomina.liquidar_cese(session, **body.model_dump())
     session.commit()
     return liquidacion
 
@@ -299,12 +489,10 @@ def liquidar_cese(
 def ver_liquidacion_bss(
     liquidacion_id: uuid.UUID,
     _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    liquidacion = LiquidacionBssRepo(session).get(liquidacion_id)
-    if liquidacion is None:
-        raise HTTPException(404, "liquidación no encontrada")
-    return liquidacion
+    return exigir_liquidacion(session, liquidacion_id, tenant)
 
 
 # --- Disciplina y documentos -----------------------------------------------------
@@ -312,12 +500,14 @@ def ver_liquidacion_bss(
 def emitir_memorandum(
     body: schemas.MemorandumCreate,
     _: Usuario = Depends(require_permission(DISCIPLINA_GESTIONAR)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        memorandum = disciplina.emitir_memorandum(session, **body.model_dump())
-    except (NoEncontrado, ReglaNegocio) as e:
-        raise _http(e) from e
+    campos = body.model_dump()
+    campos["empresa_id"] = tenant.empresa(campos["empresa_id"])
+    if campos["destinatario_trabajador_id"] is not None:
+        exigir_trabajador(session, campos["destinatario_trabajador_id"], tenant)
+    memorandum = disciplina.emitir_memorandum(session, **campos)
     session.commit()
     return memorandum
 
@@ -326,24 +516,21 @@ def emitir_memorandum(
 def ver_memorandum(
     memorandum_id: uuid.UUID,
     _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    memorandum = MemorandumRepo(session).get(memorandum_id)
-    if memorandum is None:
-        raise HTTPException(404, "memorándum no encontrado")
-    return memorandum
+    return exigir_memorandum(session, memorandum_id, tenant)
 
 
 @router.post("/amonestaciones", response_model=schemas.AmonestacionOut, status_code=201)
 def emitir_amonestacion(
     body: schemas.AmonestacionCreate,
     _: Usuario = Depends(require_permission(DISCIPLINA_GESTIONAR)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        amonestacion = disciplina.emitir_amonestacion(session, **body.model_dump())
-    except (NoEncontrado, ReglaNegocio) as e:
-        raise _http(e) from e
+    exigir_trabajador(session, body.trabajador_id, tenant)
+    amonestacion = disciplina.emitir_amonestacion(session, **body.model_dump())
     session.commit()
     return amonestacion
 
@@ -352,24 +539,22 @@ def emitir_amonestacion(
 def ver_amonestacion(
     amonestacion_id: uuid.UUID,
     _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    amonestacion = AmonestacionRepo(session).get(amonestacion_id)
-    if amonestacion is None:
-        raise HTTPException(404, "amonestación no encontrada")
-    return amonestacion
+    return exigir_amonestacion(session, amonestacion_id, tenant)
 
 
 @router.post("/actas", response_model=schemas.ActaOut, status_code=201)
 def emitir_acta(
     body: schemas.ActaCreate,
     _: Usuario = Depends(require_permission(DISCIPLINA_GESTIONAR)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        acta = disciplina.emitir_acta(session, **body.model_dump())
-    except NoEncontrado as e:
-        raise _http(e) from e
+    campos = body.model_dump()
+    campos["empresa_id"] = tenant.empresa(campos["empresa_id"])
+    acta = disciplina.emitir_acta(session, **campos)
     session.commit()
     return acta
 
@@ -378,12 +563,10 @@ def emitir_acta(
 def ver_acta(
     acta_id: uuid.UUID,
     _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    acta = ActaRepo(session).get(acta_id)
-    if acta is None:
-        raise HTTPException(404, "acta no encontrada")
-    return acta
+    return exigir_acta(session, acta_id, tenant)
 
 
 @router.post(
@@ -392,12 +575,11 @@ def ver_acta(
 def emitir_certificado_trabajo(
     body: schemas.CertificadoTrabajoCreate,
     _: Usuario = Depends(require_permission(DISCIPLINA_GESTIONAR)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        certificado = disciplina.emitir_certificado_trabajo(session, **body.model_dump())
-    except NoEncontrado as e:
-        raise _http(e) from e
+    exigir_trabajador(session, body.trabajador_id, tenant)
+    certificado = disciplina.emitir_certificado_trabajo(session, **body.model_dump())
     session.commit()
     return certificado
 
@@ -408,12 +590,10 @@ def emitir_certificado_trabajo(
 def ver_certificado_trabajo(
     certificado_id: uuid.UUID,
     _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    certificado = CertificadoTrabajoRepo(session).get(certificado_id)
-    if certificado is None:
-        raise HTTPException(404, "certificado no encontrado")
-    return certificado
+    return exigir_certificado(session, certificado_id, tenant)
 
 
 # --- Permisos --------------------------------------------------------------------
@@ -421,12 +601,11 @@ def ver_certificado_trabajo(
 def crear_solicitud_permiso(
     body: schemas.SolicitudPermisoCreate,
     _: Usuario = Depends(require_permission(PERMISO_SOLICITAR)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        solicitud = permisos.crear_solicitud_permiso(session, **body.model_dump())
-    except (NoEncontrado, ReglaNegocio) as e:
-        raise _http(e) from e
+    exigir_trabajador(session, body.trabajador_id, tenant)
+    solicitud = permisos.crear_solicitud_permiso(session, **body.model_dump())
     session.commit()
     return solicitud
 
@@ -435,12 +614,10 @@ def crear_solicitud_permiso(
 def ver_solicitud_permiso(
     solicitud_id: uuid.UUID,
     _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    solicitud = SolicitudPermisoRepo(session).get(solicitud_id)
-    if solicitud is None:
-        raise HTTPException(404, "solicitud no encontrada")
-    return solicitud
+    return exigir_solicitud_permiso(session, solicitud_id, tenant)
 
 
 @router.post(
@@ -449,12 +626,11 @@ def ver_solicitud_permiso(
 def aprobar_solicitud_permiso(
     solicitud_id: uuid.UUID,
     actor: Usuario = Depends(require_permission(PERMISO_APROBAR)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        solicitud = permisos.aprobar_solicitud_permiso(session, solicitud_id, aprobador_id=actor.id)
-    except (NoEncontrado, Conflicto) as e:
-        raise _http(e) from e
+    exigir_solicitud_permiso(session, solicitud_id, tenant)
+    solicitud = permisos.aprobar_solicitud_permiso(session, solicitud_id, aprobador_id=actor.id)
     session.commit()
     return solicitud
 
@@ -465,14 +641,13 @@ def aprobar_solicitud_permiso(
 def rechazar_solicitud_permiso(
     solicitud_id: uuid.UUID,
     actor: Usuario = Depends(require_permission(PERMISO_APROBAR)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        solicitud = permisos.rechazar_solicitud_permiso(
-            session, solicitud_id, aprobador_id=actor.id
-        )
-    except (NoEncontrado, Conflicto) as e:
-        raise _http(e) from e
+    exigir_solicitud_permiso(session, solicitud_id, tenant)
+    solicitud = permisos.rechazar_solicitud_permiso(
+        session, solicitud_id, aprobador_id=actor.id
+    )
     session.commit()
     return solicitud
 
@@ -484,12 +659,11 @@ def rechazar_solicitud_permiso(
 def crear_pacto_permanencia(
     body: schemas.PactoPermanenciaCreate,
     _: Usuario = Depends(require_permission(CAPACITACION_GESTIONAR)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        pacto = capacitacion.crear_pacto_permanencia(session, **body.model_dump())
-    except (NoEncontrado, ReglaNegocio) as e:
-        raise _http(e) from e
+    exigir_trabajador(session, body.trabajador_id, tenant)
+    pacto = capacitacion.crear_pacto_permanencia(session, **body.model_dump())
     session.commit()
     return pacto
 
@@ -498,12 +672,10 @@ def crear_pacto_permanencia(
 def ver_pacto_permanencia(
     pacto_id: uuid.UUID,
     _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    pacto = PactoPermanenciaRepo(session).get(pacto_id)
-    if pacto is None:
-        raise HTTPException(404, "pacto de permanencia no encontrado")
-    return pacto
+    return exigir_pacto(session, pacto_id, tenant)
 
 
 # --- Asistencia --------------------------------------------------------------------
@@ -511,12 +683,11 @@ def ver_pacto_permanencia(
 def marcar_entrada(
     body: schemas.AsistenciaMarcarEntrada,
     _: Usuario = Depends(require_permission(ASISTENCIA_MARCAR)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        asistencia = asistencia_uc.marcar_entrada(session, **body.model_dump())
-    except (NoEncontrado, ReglaNegocio) as e:
-        raise _http(e) from e
+    exigir_trabajador(session, body.trabajador_id, tenant)
+    asistencia = asistencia_uc.marcar_entrada(session, **body.model_dump())
     session.commit()
     return asistencia
 
@@ -525,11 +696,10 @@ def marcar_entrada(
 def marcar_salida(
     body: schemas.AsistenciaMarcarSalida,
     _: Usuario = Depends(require_permission(ASISTENCIA_MARCAR)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        asistencia = asistencia_uc.marcar_salida(session, **body.model_dump())
-    except (NoEncontrado, ReglaNegocio) as e:
-        raise _http(e) from e
+    exigir_trabajador(session, body.trabajador_id, tenant)
+    asistencia = asistencia_uc.marcar_salida(session, **body.model_dump())
     session.commit()
     return asistencia

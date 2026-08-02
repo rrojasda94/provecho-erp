@@ -63,6 +63,7 @@ def registrar_entrega(
             "repartidor_externo_plataforma": venta.repartidor_externo_plataforma,
             "entregado_por": str(entregado_por),
         },
+        session=session,
     )
     return _resultado(venta, ["entregado"] * len(items), ya_entregado=False)
 

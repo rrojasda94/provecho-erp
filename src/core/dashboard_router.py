@@ -7,8 +7,8 @@ router ensambla sus lecturas públicas. Nunca importa el dominio de ninguno
 directo, solo sus funciones `application`/`queries_publicas` ya pensadas
 para consumo externo.
 
-`empresa_id` como query param, no derivado del JWT — mismo patrón (y misma
-deuda declarada, ADR-004) que el resto de la API hoy.
+`empresa_id` se deriva del JWT (ADR-004); el query param solo lo puede usar
+un superusuario sin empresa asignada, para elegir sobre cuál mira.
 """
 
 import uuid
@@ -19,10 +19,11 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from src.core.tenant import Tenant
 from src.modules.accounting.application import caja
 from src.modules.inventory.application.stock import contar_bajo_minimo
 from src.modules.sales.application.queries_publicas import resumen_ventas_del_dia
-from src.modules.users.api.deps import get_db, require_permission
+from src.modules.users.api.deps import get_db, get_tenant, require_permission
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -54,10 +55,14 @@ class DashboardResumenOut(BaseModel):
 
 @router.get("/resumen", response_model=DashboardResumenOut)
 def resumen(
-    empresa_id: uuid.UUID,
+    empresa_id: uuid.UUID | None = None,
     _=Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
+    # El resumen es de *una* empresa: no tiene sentido sumar ventas de dos
+    # empresas distintas, así que acá se exige una (no `filtro_empresa`).
+    empresa_id = tenant.empresa(empresa_id)
     return {
         "ventas_hoy": resumen_ventas_del_dia(session, empresa_id),
         "stock_bajo_minimo": contar_bajo_minimo(session, empresa_id),

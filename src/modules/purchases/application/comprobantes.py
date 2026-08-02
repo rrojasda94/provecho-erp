@@ -78,5 +78,6 @@ def dar_conformidad_comprobante(
             ),
             "monto": str(orden.total),
         },
+        session=session,
     )
     return comprobante

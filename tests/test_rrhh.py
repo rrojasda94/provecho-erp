@@ -163,37 +163,35 @@ def test_contrato_plazo_fijo_sin_fecha_fin_409(env):
     assert r.status_code == 409
 
 
+def _postulante_manual(client, headers, ids, **overrides):
+    """Carga manual (referido o CV en mano), sin pasar por el formulario."""
+    body = {
+        "empresa_id": ids["empresa_id"],
+        "nombres": "Ana",
+        "apellidos": "Torres",
+        "puesto_postulado": "Cajero",
+        "fecha_postulacion": "2026-07-01",
+        "consentimiento_datos": True,
+    }
+    body.update(overrides)
+    return client.post("/api/v1/rrhh/postulantes", headers=headers, json=body)
+
+
 def test_postulante_sin_consentimiento_409(env):
     client, ids, _ = env
     h = _token(client)
-    r = client.post(
-        "/api/v1/rrhh/postulantes",
-        headers=h,
-        json={
-            "persona_id": ids["persona_id"],
-            "puesto_postulado": "Cajero",
-            "fecha_postulacion": "2026-07-01",
-            "consentimiento_datos": False,
-        },
-    )
+    r = _postulante_manual(client, h, ids, consentimiento_datos=False)
     assert r.status_code == 409
 
 
 def test_postulante_con_consentimiento_201(env):
     client, ids, _ = env
     h = _token(client)
-    r = client.post(
-        "/api/v1/rrhh/postulantes",
-        headers=h,
-        json={
-            "persona_id": ids["persona_id"],
-            "puesto_postulado": "Cajero",
-            "fecha_postulacion": "2026-07-01",
-            "consentimiento_datos": True,
-        },
-    )
+    r = _postulante_manual(client, h, ids)
     assert r.status_code == 201
-    assert r.json()["estado"] == "en_proceso"
+    assert r.json()["estado"] == "recibido"
+    # El candidato no entra a `persona` por postular.
+    assert r.json()["persona_id"] is None
 
 
 def test_flujo_solicitud_permiso_crear_aprobar(env):

@@ -9,8 +9,14 @@ import uuid
 from datetime import date
 from decimal import Decimal
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+# `categoria` es la misma tabla a la que `producto_comercial.categoria_id`
+# ya apunta por FK (ver ese modelo): un agrupador genérico por empresa, sin
+# lógica de dominio propia. Leer su nombre acá no es cruzar el dominio de
+# inventory, es seguir la referencia que sales ya tiene.
+from src.modules.inventory.infrastructure.models.categoria import Categoria
 from src.modules.sales.application.errors import (
     Conflicto,
     NoEncontrado,
@@ -141,12 +147,14 @@ def carta(
     fecha: date | None = None,
 ) -> list[dict]:
     """Lo que el PDV/kiosko renderiza: productos activos con su precio ya
-    resuelto. Los que no tienen precio vigente no se muestran (no se pueden
-    vender)."""
-    items = []
-    for producto in ProductoComercialRepo(session).list(marca_id):
+    resuelto y los extras que admite cada uno. Los que no tienen precio
+    vigente no se muestran (no se pueden vender)."""
+    repo = ProductoComercialRepo(session)
+    precio_de = {}
+    productos = repo.list(marca_id)
+    for producto in productos:
         try:
-            monto = resolver_precio(
+            precio_de[producto.id] = resolver_precio(
                 session,
                 producto=producto,
                 sucursal_id=sucursal_id,
@@ -156,13 +164,45 @@ def carta(
             )
         except PrecioNoDefinido:
             continue
+
+    por_id = {p.id: p for p in productos}
+    categoria_ids = {p.categoria_id for p in productos if p.categoria_id}
+    nombre_categoria = {
+        c.id: c.nombre
+        for c in session.scalars(
+            select(Categoria).where(Categoria.id.in_(categoria_ids))
+        )
+    }
+    items = []
+    for producto in productos:
+        # Los extras no se listan sueltos: salen dentro del producto que
+        # los admite (RN-COM-021).
+        if producto.es_extra or producto.id not in precio_de:
+            continue
+        extras = []
+        for vinculo in repo.extras_de(producto.id):
+            extra = por_id.get(vinculo.extra_id)
+            # Un extra sin precio vigente en este ámbito no se ofrece,
+            # mismo criterio que un producto sin precio.
+            if extra is None or vinculo.extra_id not in precio_de:
+                continue
+            extras.append(
+                {
+                    "producto_comercial_id": extra.id,
+                    "nombre": extra.nombre,
+                    "precio_unitario": precio_de[extra.id],
+                    "maximo": vinculo.maximo,
+                }
+            )
         items.append(
             {
                 "producto_comercial_id": producto.id,
                 "id_interno": producto.id_interno,
                 "nombre": producto.nombre,
                 "categoria_id": producto.categoria_id,
-                "precio_unitario": monto,
+                "categoria_nombre": nombre_categoria.get(producto.categoria_id),
+                "precio_unitario": precio_de[producto.id],
+                "extras": extras,
             }
         )
     return items

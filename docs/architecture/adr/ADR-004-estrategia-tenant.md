@@ -51,9 +51,17 @@ repetir el suyo, y uno ajeno responde 403.
   recurso ya cargado; lanzan `FueraDeAlcance`, que el app factory mapea a
   403 en un solo lugar para que ningún endpoint nuevo olvide hacerlo.
 
-Helpers por módulo: `inventory/application/scope.py` (almacén, artículo,
-ajuste) y `sales/application/scope.py` (venta, ítem, pantalla KDS), que
-resuelven el tenant del recurso a partir de su fila real.
+Helpers por módulo (`<módulo>/application/scope.py`), que resuelven el
+tenant de un recurso a partir de su fila real:
+
+| Módulo | Recursos y cómo se resuelve su tenant |
+|---|---|
+| `inventory` | almacén, artículo, categoría, lote, conteo, solicitud, transferencia, reserva, ajuste — `empresa_id` propio o del almacén |
+| `sales` | venta, ítem de venta, pantalla KDS — por `sucursal_id` |
+| `purchases` | proveedor (`empresa_id` propio), orden de compra (por su proveedor), almacén de destino |
+| `production` | orden de producción — por su almacén |
+| `accounting` | cuenta, periodo, asiento, regla, pago (`empresa_id` propio); caja y arqueo por la sucursal del punto de venta |
+| `rrhh` | trabajador (`empresa_id` propio) y todo lo que cuelga de él; memorándum y acta por `empresa_id` propio |
 
 **Escape explícito — superusuario**: un usuario con permiso `*` y sin
 `usuario_sucursal` (la cuenta de administración, que existe antes que
@@ -61,9 +69,24 @@ cualquier sucursal) puede indicar `empresa_id` explícitamente. Sin esto el
 bootstrap del sistema sería imposible. Se resuelve al emitir el token
 (claim `su`), no por request.
 
-Cobertura actual: `users`, `inventory`, `sales` y `kds`. **Pendiente**:
-`purchases`, `production`, `accounting`, `rrhh` y el dashboard gerencial
-siguen recibiendo `empresa_id` del cliente — ver Deuda técnica en
-`ROADMAP.md`. `sync` ya derivaba el tenant de la cuenta de servicio.
+### Cobertura (2026-08-01)
+
+Toda la API deriva el tenant del JWT: `users`, `inventory`, `sales`, `kds`,
+`purchases`, `production`, `accounting`, `rrhh` y el dashboard gerencial.
+`sync` ya derivaba el tenant de la cuenta de servicio.
+
+- `accounting` resuelve la sucursal de un punto de venta vía el contrato
+  público `sales.application.queries_publicas.sucursal_de_punto_venta`; no
+  importa el dominio de `sales` (CLAUDE.md).
+- El dashboard exige *una* empresa (`tenant.empresa`), no `filtro_empresa`:
+  sumar ventas de dos empresas distintas no significa nada.
+- ~~**Excepción**: `rrhh.postulante` no se escopa~~ — **resuelto 2026-08-01**:
+  se decidió con el usuario que la contratación es de la empresa, no del
+  grupo (el grupo no tiene planilla). `postulante.empresa_id` es obligatorio
+  y lo hereda de su `convocatoria` cuando entra por el formulario público.
+
+El seeder asigna al usuario `admin` todas las sucursales que crea: sin
+`usuario_sucursal` el JWT sale sin `empresa_id` y una instalación nueva
+respondía 403 "usuario sin empresa asignada" en toda operación escopada.
 
 Tests de aislamiento: `tests/test_tenant_aislamiento.py`.

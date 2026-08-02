@@ -74,10 +74,18 @@ def require_permission(codigo: str):
     return _dep
 
 
+def tiene_permiso(session: Session, usuario: Usuario, codigo: str) -> bool:
+    """Chequeo sin bloquear, para respuestas que muestran más o menos según
+    el rol (ej. el conteo "a ciegas" oculta el stock esperado, RN-INV-005).
+    `require_permission` sigue siendo la vía para negar el acceso."""
+    return rules.permite(UsuarioRepo(session).permiso_codigos(usuario.id), codigo)
+
+
 def check_permission(session: Session, usuario: Usuario, *codigos: str) -> None:
     """Igual que `require_permission` pero dentro del handler: para cuando el
     permiso exigido depende del body y no puede resolverse en un `Depends`.
-    Basta con tener uno de `codigos`."""
+    Basta con tener uno de `codigos`. Una sola consulta, a diferencia de
+    llamar `tiene_permiso` en bucle."""
     concedidos = UsuarioRepo(session).permiso_codigos(usuario.id)
     if not any(rules.permite(concedidos, codigo) for codigo in codigos):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Permiso denegado")

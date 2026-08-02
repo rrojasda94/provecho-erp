@@ -138,6 +138,7 @@ def emitir_orden_compra(
             "empresa_id": str(proveedor.empresa_id),
             "total": str(orden.total),
         },
+        session=session,
     )
     return orden
 
@@ -232,6 +233,7 @@ def recibir_orden_compra(
             "almacen_destino_id": str(orden.almacen_destino_id),
             "items": evento_items,
         },
+        session=session,
     )
     return recepcion
 
@@ -250,5 +252,6 @@ def anular_orden_compra(
     event_bus.publish(
         "purchases.oc_anulada",
         {"orden_compra_id": str(orden.id), "usuario_id": str(actor_id)},
+        session=session,
     )
     return orden

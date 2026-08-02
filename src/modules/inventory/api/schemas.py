@@ -15,6 +15,18 @@ class CategoriaCreate(BaseModel):
     empresa_id: uuid.UUID | None = None
     nombre: str = Field(min_length=1, max_length=100)
     asiento_contable_config: dict | None = None
+    # Cada cuánto se cuenta esta categoría (RN-INV-007). NULL = fuera del
+    # conteo cíclico.
+    frecuencia_conteo: str | None = None
+
+
+class CategoriaUpdate(BaseModel):
+    nombre: str | None = Field(default=None, min_length=1, max_length=100)
+    asiento_contable_config: dict | None = None
+    frecuencia_conteo: str | None = None
+    # Único modo de volver a NULL: sin esto, `frecuencia_conteo=None` es
+    # indistinguible de "no la mandaron".
+    quitar_frecuencia: bool = False
 
 
 class CategoriaOut(BaseModel):
@@ -22,6 +34,7 @@ class CategoriaOut(BaseModel):
     id: uuid.UUID
     empresa_id: uuid.UUID
     nombre: str
+    frecuencia_conteo: str | None
 
 
 # --- Artículos ---
@@ -103,9 +116,125 @@ class MovimientoOut(BaseModel):
 class StockOut(BaseModel):
     almacen_id: uuid.UUID
     sku_id: uuid.UUID
+    # `cantidad` es el stock físico; `disponible` = físico − reservas
+    # activas (RN-INV-009), y es contra ese que se compromete stock nuevo.
     cantidad: Decimal
+    reservado: Decimal
+    disponible: Decimal
     stock_minimo: Decimal | None
     bajo_minimo: bool
+
+
+# --- Reservas ---
+class ReservaOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    almacen_id: uuid.UUID
+    sku_id: uuid.UUID
+    cantidad: Decimal
+    tipo: str
+    referencia_id: uuid.UUID | None
+    motivo: str | None
+    estado: str
+
+
+# --- Solicitud de insumos ---
+class SolicitudItemIn(BaseModel):
+    sku_id: uuid.UUID
+    cantidad: Decimal = Field(gt=0)
+
+
+class SolicitudCreate(BaseModel):
+    almacen_solicitante_id: uuid.UUID
+    # Sin esto se usa el `almacen_abastecedor_id` configurado en el almacén.
+    almacen_abastecedor_id: uuid.UUID | None = None
+    items: list[SolicitudItemIn] = Field(min_length=1)
+    observacion: str | None = Field(default=None, max_length=500)
+
+
+class SolicitudItemCantidad(BaseModel):
+    sku_id: uuid.UUID
+    cantidad: Decimal = Field(ge=0)
+
+
+class SolicitudAprobar(BaseModel):
+    """Recorte por SKU; lo que no se menciona se aprueba tal cual se pidió.
+    Aprobar 0 deja el ítem fuera y no reserva nada."""
+    aprobadas: list[SolicitudItemCantidad] = []
+
+
+class SolicitudItemOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    sku_id: uuid.UUID
+    cantidad_solicitada: Decimal
+    cantidad_aprobada: Decimal | None
+    cantidad_despachada: Decimal | None
+
+
+class SolicitudOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    almacen_solicitante_id: uuid.UUID
+    almacen_abastecedor_id: uuid.UUID
+    estado: str
+    solicitado_por: uuid.UUID
+    aprobado_por: uuid.UUID | None
+    observacion: str | None
+
+
+class SolicitudDetalleOut(SolicitudOut):
+    items: list[SolicitudItemOut]
+
+
+# --- Transferencias ---
+class TransferenciaCreate(BaseModel):
+    origen_almacen_id: uuid.UUID
+    destino_almacen_id: uuid.UUID
+    # Con solicitud, los ítems son opcionales: por defecto se despacha lo
+    # aprobado. Sin solicitud (transferencia lateral) son obligatorios.
+    solicitud_id: uuid.UUID | None = None
+    items: list[SolicitudItemIn] = []
+    transportista_id: uuid.UUID | None = None
+    observacion: str | None = Field(default=None, max_length=500)
+
+
+class TransferenciaRecibirItem(BaseModel):
+    # Es el id del `transferencia_item`, no del SKU: una salida FEFO puede
+    # repartir un mismo SKU entre varios lotes y cada lote se recibe aparte.
+    item_id: uuid.UUID
+    cantidad: Decimal = Field(ge=0)
+
+
+class TransferenciaRecibir(BaseModel):
+    """Lo que no se menciona se recibe completo."""
+    items: list[TransferenciaRecibirItem] = []
+
+
+class TransferenciaItemOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    sku_id: uuid.UUID
+    lote_id: uuid.UUID | None
+    cantidad_enviada: Decimal
+    cantidad_recibida: Decimal | None
+    diferencia: Decimal | None
+
+
+class TransferenciaOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    origen_almacen_id: uuid.UUID
+    destino_almacen_id: uuid.UUID
+    solicitud_id: uuid.UUID | None
+    estado: str
+    despachado_por: uuid.UUID
+    recibido_por: uuid.UUID | None
+    transportista_id: uuid.UUID | None
+    observacion: str | None
+
+
+class TransferenciaDetalleOut(TransferenciaOut):
+    items: list[TransferenciaItemOut]
 
 
 # --- Lotes ---
@@ -162,6 +291,69 @@ class AjusteOut(BaseModel):
     cantidad: Decimal
     motivo: str
     estado: str
+    conteo_id: uuid.UUID | None
     solicitado_por: uuid.UUID
     aprobado_por: uuid.UUID | None
     dentro_margen: bool
+
+
+# --- Conteo cíclico ---
+class ConteoCreate(BaseModel):
+    almacen_id: uuid.UUID
+    # NULL = conteo general de todo el almacén.
+    categoria_id: uuid.UUID | None = None
+    tipo: str = "rutina"
+    observacion: str | None = Field(default=None, max_length=500)
+
+
+class ConteoCantidad(BaseModel):
+    sku_id: uuid.UUID
+    cantidad: Decimal = Field(ge=0)
+
+
+class ConteoCantidades(BaseModel):
+    items: list[ConteoCantidad] = Field(min_length=1)
+
+
+class ConteoItemOut(BaseModel):
+    sku_id: uuid.UUID
+    cantidad_contada: Decimal | None
+    # Ocultos al contador "a ciegas" (RN-INV-005): sin el permiso
+    # `inventory.ver_stock_esperado` viajan en NULL.
+    cantidad_sistema: Decimal | None = None
+    diferencia: Decimal | None = None
+
+
+class ConteoOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    almacen_id: uuid.UUID
+    categoria_id: uuid.UUID | None
+    tipo: str
+    estado: str
+    fecha_programada: date | None
+    abierto_por: uuid.UUID
+    cerrado_por: uuid.UUID | None
+    observacion: str | None
+
+
+class ConteoDetalleOut(ConteoOut):
+    items: list[ConteoItemOut]
+
+
+class ConteoCierreOut(BaseModel):
+    conteo: ConteoOut
+    # Ajustes solicitados por las diferencias — nacen `pendiente` y los
+    # aprueba alguien distinto de quien contó (RN-INV-006).
+    ajustes: list[AjusteOut]
+
+
+class ProgramaConteoOut(BaseModel):
+    almacen_id: uuid.UUID
+    categoria_id: uuid.UUID
+    categoria: str
+    frecuencia: str
+    ultimo_conteo: date | None
+    proxima_fecha: date
+    estado: str  # al_dia | vence_hoy | vencido
+    dias_atraso: int

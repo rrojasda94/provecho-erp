@@ -50,8 +50,8 @@ checklist manual en vez de un bloqueo automático:
 - [ ] Sin comprobantes/documentos tributarios bajo plazo de retención SUNAT
   (Ley del IR: 5 años; Código Tributario puede exigir más).
 - [ ] Sin litigio o reclamo abierto que dependa de estos datos.
-- [ ] Si es `postulante`: su `cv_archivo_id` (S3) no se elimina con este
-  endpoint — ver Consecuencias.
+- [ ] Si la persona fue `postulante`: su ficha de postulante y su
+  `cv_archivo_id` (S3) **no** se tocan con este endpoint — ver Consecuencias.
 
 **Auditoría sin re-almacenar la PII**: `audit_log.datos_despues` registra
 `{"campos_anonimizados": [...], "motivo": ...}` — deliberadamente **nunca**
@@ -70,10 +70,21 @@ rectificar.
   cláusula de política (`docs/security/proteccion-datos-personales.md`) sin
   contraparte técnica porque no existe todavía procesamiento de marketing
   automatizado al que oponerse.
+- **`postulante` tiene su propio endpoint** (desde 2026-08-01): sus datos no
+  viven en `persona` —postular no debe meter a nadie en la fuente única de la
+  empresa— así que anonimizar la persona no limpia la ficha del candidato.
+  `POST /rrhh/postulantes/{id}/anonimizar` aplica la misma decisión de este
+  ADR (anonimizar, no borrar) por una razón distinta: allá el borrado rompía
+  FK, acá nada referencia la fila pero se llevaría la evidencia del descarte
+  (Ley 26772) y la constancia de la solicitud. Reusa el permiso
+  `personas.anonimizar`: misma capacidad legal, mismo custodio, otra tabla.
+  Se suma una purga por plazo de conservación
+  (`python -m src.modules.rrhh.purga`), que `persona` no tiene ni necesita —
+  sus datos están bajo retención tributaria/laboral, no bajo un plazo
+  declarado en el aviso de privacidad.
 - **`archivo` (CV de `postulante`, S3) no se borra** con este endpoint — el
   módulo de archivos no tiene ni siquiera un flujo de borrado propio hoy.
-  Anonimizar la `persona` de un postulante limpia su nombre/contacto pero el
-  PDF del CV sigue en S3. Deuda técnica declarada, no resuelta acá.
+  El PDF del CV sigue en S3. Deuda técnica declarada, no resuelta acá.
 - `usuario.email` (campo propio, fallback de `agente_ia`) no se toca por
   este endpoint — solo `persona.email`. Si el usuario asociado necesita
   también anonimizarse, es una acción separada, no incluida hoy.

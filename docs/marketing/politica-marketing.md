@@ -89,4 +89,4 @@ Donde una cifra no está definida, se marca `[[ COMPLETAR ]]`.
 - Reglas de negocio: RN-MKT-*, RN-MAR-003/004, RN-CML-002/003/005, RN-CMP-*, RN-CTR-002/003, RN-GER-003 en [business-rules.md](../domain/business-rules.md)
 - Glosario: Marketing, Lead, Campaña, Naming, Marca en [glossary.md](../foundation/glossary.md)
 - SOPs del área: [docs/diagrams/Procesos/Marketing/](../diagrams/Procesos/Marketing/)
-- Spec técnica del módulo: [src/modules/marketing/README.md](../../src/modules/marketing/README.md)
+- Módulo backend (slice core desde 2026-08-01): [src/modules/marketing/README.md](../../src/modules/marketing/README.md)

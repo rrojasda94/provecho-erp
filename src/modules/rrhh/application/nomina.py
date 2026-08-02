@@ -61,6 +61,7 @@ def emitir_boleta_pago(
             "periodo": periodo,
             "neto_pagar": str(neto_pagar),
         },
+        session=session,
     )
     return boleta
 
@@ -112,5 +113,6 @@ def liquidar_cese(
             "total": str(total),
             "dentro_de_plazo": dentro_de_plazo,
         },
+        session=session,
     )
     return liquidacion

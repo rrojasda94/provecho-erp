@@ -13,16 +13,31 @@ almacén "por conveniencia de acceso" si eso rompe el orden de salida.
 
 ## 2. Conteo y ajuste
 
-- La periodicidad de conteo de Almacén Central es configurable en el ERP
-  (RN-INV-007); mínimo un conteo cíclico [[ COMPLETAR: definir frecuencia,
-  sugerido semanal por categoría rotativa ]] además de un conteo general
-  [[ COMPLETAR: sugerido mensual o trimestral ]].
+- La periodicidad de conteo se configura **en cada categoría**, no como un
+  número único de almacén (RN-INV-007, ADR-019): `diario`, `semanal`,
+  `quincenal`, `mensual`, `semestral` o `anual`. Una categoría sin
+  frecuencia queda fuera del ciclo. Cargarlas es tarea de Gerencia
+  (`PATCH /inventory/categorias/{id}`); el criterio operativo es que la
+  rotación y el riesgo de pérdida mandan — perecible a diario, abarrote al
+  mes, activos y repuestos al semestre o al año.
+- El ERP calcula solo la próxima fecha de cada categoría y muestra su
+  estado en el programa de conteos. **Si un conteo no se hace en su
+  fecha, se reporta a Almacén y a Gerencia** (RN-INV-021).
 - Un conteo es de rutina (programado) o parte de un proceso de
-  ajuste/auditoría puntual (RN-INV-014).
+  ajuste/auditoría puntual (RN-INV-014). Un conteo general (sin categoría)
+  cubre todo el almacén y pone al día a todas sus categorías.
+- El conteo es **a ciegas**: quien cuenta no ve el stock esperado
+  (RN-INV-005). Verlo lo convierte en una confirmación del sistema en vez
+  de una auditoría.
 - Un ajuste es válido sin generar alarma solo dentro del margen de error
   definido entre Almacén y Contabilidad (RN-INV-015); fuera de margen
-  dispara auditoría. Margen vigente: [[ COMPLETAR: definir con
-  Contabilidad ]].
+  dispara auditoría. Margen vigente: **2% del stock esperado del ítem**
+  (valor semilla en `INVENTORY_MARGEN_AJUSTE_PCT`, a confirmar con
+  Contabilidad). Con stock esperado en cero no hay porcentaje posible:
+  cualquier diferencia queda fuera de margen.
+- El conteo nunca corrige el stock por su cuenta. Cada diferencia genera
+  un ajuste pendiente que aprueba alguien distinto de quien contó
+  (RN-INV-006).
 - Un ajuste se origina por sobrante, faltante, merma/daño o error de
   registro (RN-INV-016) — el motivo siempre se declara, nunca "ajuste
   genérico".

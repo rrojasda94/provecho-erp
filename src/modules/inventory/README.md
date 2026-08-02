@@ -7,12 +7,14 @@ y gestionar el flujo solicitud → aprobación → picking → transferencia →
 
 ## Entidades
 
-**Estado de implementación (2026-07-27):** implementados el bloque
+**Estado de implementación (2026-08-01):** implementados el bloque
 transversal (`categoria`, `categoria_udm`, `unidad_medida`), la base de
 productos (`articulo`, `sku`, `receta`, `receta_item`), `stock`,
-`movimiento_inventario`, `ajuste` y ahora `lote` + `stock_lote` (FEFO).
-Transferencias, `solicitud_insumos`, `conteo`, `reserva_stock`,
-`stock_merma` y `devolucion` siguen pendientes de sus slices.
+`movimiento_inventario`, `ajuste`, `lote` + `stock_lote` (FEFO),
+`conteo` + `conteo_item` (conteo cíclico) y el ciclo de abastecimiento
+interno (`reserva_stock`, `solicitud_insumos` + `solicitud_item`,
+`transferencia` + `transferencia_item`). `stock_merma`, `devolucion` y
+`guia_remision` siguen pendientes de sus slices.
 
 `articulo` (tipos `insumo` | `subreceta` | `mercaderia` | `empaque` |
 `repuesto` | `suministro` — enum extensible), `categoria`, `stock`,
@@ -34,9 +36,11 @@ almacenamiento), `conteo`, `ajuste` (motivo, solicitante, aprobador),
 - Ajustes de inventario (con motivo, auditados): solicitar y autorizar son
   permisos distintos (`inventory.solicitar_ajuste` /
   `inventory.aprobar_ajuste`), nunca el mismo usuario.
-- Conteo cíclico: registro de conteo físico (opcionalmente "a ciegas", sin
-  mostrar el stock esperado según permiso del rol) vs. stock del sistema,
-  con diferencia calculada automáticamente.
+- Conteo cíclico: registro de conteo físico (a ciegas por defecto — el
+  stock esperado solo lo ve quien tenga `inventory.ver_stock_esperado`)
+  vs. stock del sistema, con diferencia calculada automáticamente. La
+  periodicidad la fija la categoría del SKU, y lo no contado en su fecha
+  se reporta a almacén y gerencia.
 - Local crea solicitud de insumos → supervisor aprueba/rechaza.
 - Almacén central: picking → packing → salida (transferencia en tránsito).
 - Local recibe transferencia → stock local sube; diferencias quedan registradas.
@@ -64,6 +68,102 @@ almacenamiento), `conteo`, `ajuste` (motivo, solicitante, aprobador),
   antes de aprobar.
 - Movimiento de salida siempre respeta FEFO/FIFO — el picking no permite
   tomar un lote distinto al sugerido sin override explícito y motivo.
+
+## Estado (slice 4 — reserva, solicitud y transferencia, 2026-08-01)
+
+Ciclo completo de abastecimiento interno según ADR-020: el local pide, el
+supervisor aprueba y reserva, el central despacha, el local recibe.
+
+- **`reserva_stock` es una promesa, no un movimiento**: no toca `stock` ni
+  genera `movimiento_inventario`. `GET /stock` devuelve ahora `cantidad`
+  (físico), `reservado` y `disponible` = físico − reservas activas
+  (RN-INV-009).
+- **Reservar bloquea, consumir no**: aprobar una solicitud exige
+  disponible suficiente (409 si no alcanza), pero una venta o un consumo
+  de producción **nunca** se frenan por una reserva — ya ocurrieron. El
+  disponible puede quedar negativo y eso es la señal de una promesa sin
+  respaldo, no un error.
+- **La solicitud va por almacén**, no por sucursal: producción también
+  solicita. El abastecedor sale de `almacen.almacen_abastecedor_id` y se
+  copia a la fila.
+- **Estados**: `pendiente` → `aprobada` | `rechazada` | `cancelada`, y el
+  despacho la lleva a `despachada` → `recibida`. Cancelar libera las
+  reservas (RN-INV-010). `en_picking` no se implementó: no gobierna
+  ninguna regla.
+- **`transferencia_item` va por SKU y lote**: el despacho reparte por FEFO
+  y el destino recibe los mismos lotes que salieron (ADR-015).
+- **Las diferencias se registran, no se corrigen**: no se despacha más de
+  lo aprobado (RN-INV-001) ni se recibe más de lo enviado (RN-INV-002);
+  menos sí en ambos casos. Al destino entra lo que de verdad llegó y la
+  diferencia viaja en `inventory.transferencia_recibida`.
+- **Transferencia lateral** sucursal↔sucursal: misma entidad con
+  `solicitud_id` en NULL e ítems explícitos.
+
+| Método | Ruta | Permiso |
+|--------|------|---------|
+| GET | `/reservas?almacen_id&sku_id` | `leer` |
+| POST | `/reservas/{id}/liberar` | `liberar_reserva` |
+| POST/GET | `/solicitudes` | `solicitar_insumos` / `leer` |
+| GET | `/solicitudes/{id}` | `leer` |
+| POST | `/solicitudes/{id}/aprobar` \| `/rechazar` | `aprobar_solicitud` |
+| POST | `/solicitudes/{id}/cancelar` | `solicitar_insumos` |
+| POST/GET | `/transferencias` | `transferir` / `leer` |
+| GET | `/transferencias/{id}` | `leer` |
+| POST | `/transferencias/{id}/recibir` | `recepcion` |
+
+Solicitar y aprobar son permisos distintos y el aprobador no puede ser
+quien pidió (RN-INV-006). `transferir` y `recepcion` ya estaban sembrados
+desde el slice 1 sin uso: este slice los estrena.
+
+Tests: `tests/test_transferencias.py` (23 casos). Migración `d8b35f1ca207`.
+
+## Estado (slice 3 — conteo cíclico, 2026-08-01)
+
+`conteo` + `conteo_item` según ADR-019. La periodicidad **la fija la
+categoría** (`categoria.frecuencia_conteo`: diario / semanal / quincenal /
+mensual / semestral / anual, RN-INV-007) — no hay un número universal.
+NULL deja la categoría fuera del ciclo.
+
+- **Programa derivado, sin tabla de calendario**: la próxima fecha de una
+  categoría en un almacén es el último conteo **cerrado** que la cubrió
+  más los días de su frecuencia; si nunca se contó, cuenta desde el alta
+  de la categoría. Un conteo general (`categoria_id` NULL) pone al día a
+  todas las categorías de ese almacén.
+- **Snapshot al abrir**: `cantidad_sistema` se congela al abrir el conteo,
+  no al cerrarlo. Un SKU contado que no estaba en el snapshot entra con
+  sistema en 0 — es justo el sobrante que el conteo busca.
+- **A ciegas por defecto** (RN-INV-005): el detalle omite
+  `cantidad_sistema`/`diferencia` salvo permiso
+  `inventory.ver_stock_esperado`. `almacenero` cuenta sin verlo.
+- **Cerrar solicita, no corrige**: cada diferencia genera un `ajuste`
+  `pendiente` con `ajuste.conteo_id`, que aprueba otro usuario
+  (RN-INV-006). Los ítems no contados se ignoran: un conteo parcial no
+  declara faltante lo que nadie miró. `dentro_margen` sale de
+  `INVENTORY_MARGEN_AJUSTE_PCT` (2% por defecto, RN-INV-015); con sistema
+  en 0 cualquier diferencia queda fuera de margen.
+- **Lo no contado en su fecha se reporta a almacén y gerencia**
+  (RN-INV-021): `inventory.conteo_vencido`. El día de vencimiento aún no
+  es atraso.
+
+| Método | Ruta | Permiso |
+|--------|------|---------|
+| PATCH | `/categorias/{id}` | `gestionar_catalogo` |
+| GET | `/conteos/programa?almacen_id` | `leer` |
+| POST | `/conteos/verificar-vencidos?almacen_id` | `contar` |
+| POST | `/conteos` | `contar` |
+| GET | `/conteos/{id}` | `contar` (+ `ver_stock_esperado` para el esperado) |
+| POST | `/conteos/{id}/cantidades` | `contar` |
+| POST | `/conteos/{id}/cerrar` | `contar` |
+
+Cerrar un conteo crea los ajustes con `inventory.contar`, sin exigir
+además `solicitar_ajuste`: cerrar el conteo **es** solicitar esos ajustes,
+y ninguno mueve stock sin la firma de un aprobador distinto.
+
+`PATCH /categorias/{id}` acepta `quitar_frecuencia: true` para sacar una
+categoría del ciclo — mandar `frecuencia_conteo: null` significa "no la
+toques", no "bórrala".
+
+Tests: `tests/test_conteos.py` (22 casos). Migración `c4e70a91d5b8`.
 
 ## Estado (slice 2 — lote/FEFO, 2026-07-27)
 
@@ -128,12 +228,18 @@ alerta `bajo_minimo` derivada en la consulta; evento
 `application/listeners.py`), consumido por `core.dashboard_router` para el
 dashboard gerencial.
 
-**Diferido (deuda del módulo):** `reserva_stock`, conteo cíclico,
-transferencias/`solicitud_insumos`, devolución, guía de remisión,
-`stock_merma`. Del slice de lote: la reposición por venta anulada entra al
+**Diferido (deuda del módulo):** devolución, guía de remisión,
+`stock_merma`. Del slice de abastecimiento: el disponible negativo no
+tiene alerta, `reserva_stock` nace con tres tipos sin productor
+(`produccion`, `carrito`, `merma`), la transferencia no lleva vehículo ni
+tracking (`vehiculo` no existe), la recepción es de una sola pasada (sin
+parcial) y el ciclo no se replica al hub. Del slice de lote: la reposición por venta anulada entra al
 lote del día y no al lote del que salió, y la ventana de alerta de
 vencimiento se pasa por request (`por_vencer_dias`) en vez de configurarse
-por artículo. Ver ROADMAP → Deuda técnica → Módulo inventory.
+por artículo. Del slice de conteo: el barrido de vencidos es a demanda
+(no hay periódico), `inventory.conteo_vencido` no tiene consumidor,
+`conteo` no se replica al hub y el margen de ajuste vive en `settings` y
+no en `parametro_empresa`. Ver ROADMAP → Deuda técnica → Módulo inventory.
 
 ## Sincronización con el hub de sucursal (implementado 2026-07-27)
 
@@ -156,8 +262,12 @@ las ventas del corte.
 
 ## Flujo
 
-Solicitud (local) → aprobación (supervisor) → picking/packing (central) →
-salida → transferencia en tránsito → recepción (local) → stock actualizado.
+Solicitud (local) → aprobación + reserva (supervisor) → picking/packing
+(central) → salida → transferencia en tránsito → recepción (local) → stock
+actualizado.
+
+El picking/packing es una etapa operativa del SOP, no un estado del ERP:
+entre `aprobada` y `despachada` no cambia qué se puede hacer (ADR-020).
 
 ## Relaciones
 
@@ -171,7 +281,9 @@ salida → transferencia en tránsito → recepción (local) → stock actualiza
   reclamo/nota de crédito), `inventory.ajuste_fuera_margen` (accounting/
   administrador reciben alerta de auditoría),
   `inventory.lote_vencido_detectado` (notifica y dispara memorándum al
-  responsable si el lote vencido seguía disponible).
+  responsable si el lote vencido seguía disponible),
+  `inventory.conteo_vencido` (reporte a almacén y gerencia de la categoría
+  que no se contó en su fecha, RN-INV-021).
 - Contrato público de lectura: `application/queries_publicas.py` — hoy
   `unidad_medida_para_magnitud` (nombre y `decimales` de una UdM, para que
   otro módulo exprese una cantidad con su unidad, RN-GER-010). Mismo criterio

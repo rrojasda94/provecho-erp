@@ -34,6 +34,11 @@ class Ajuste(Base, UuidPkMixin, TimestampMixin):
     # Delta con signo: + sobrante, − faltante/merma.
     cantidad: Mapped[Decimal] = mapped_column(Numeric(12, 4))
     motivo: Mapped[str] = mapped_column(MOTIVO_AJUSTE)
+    # Conteo que lo originó, si vino de uno (RN-INV-014). NULL = ajuste
+    # solicitado a mano.
+    conteo_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("conteo.id"), nullable=True
+    )
     solicitado_por: Mapped[uuid.UUID] = mapped_column(ForeignKey("usuario.id"))
     aprobado_por: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("usuario.id"), nullable=True

@@ -29,9 +29,11 @@ from src.modules.users.infrastructure.models import Almacen
 
 log = logging.getLogger(__name__)
 
-# Inyectable (tests la reemplazan). ponytail: el listener commitea su propia
-# sesión — si el commit de la venta fallara post-flush, la discrepancia la
-# detecta el conteo; patrón outbox cuando llegue Celery.
+# Inyectable (tests la reemplazan). El listener commitea su propia sesión;
+# el bus solo lo despierta después de que la venta commiteó (`core/events`),
+# así que lo que mueve acá corresponde a una venta que ya existe. Sigue sin
+# ser atómico con ella: si este commit falla, la venta queda igual y la
+# discrepancia la detecta el conteo — outbox real cuando llegue Celery.
 session_factory = SessionLocal
 
 
@@ -75,7 +77,7 @@ def _consumos_de_items(session: Session, items: list[dict]) -> list[tuple[uuid.U
 def _mover(payload: dict, tipo: str, signo: int) -> None:
     # Un solo exit con commit SIEMPRE: un return temprano cerraría la sesión
     # con rollback, y con conexión compartida (SQLite en tests) ese rollback
-    # arrastraría la transacción del request que publicó el evento.
+    # se llevaría también lo ya movido en esta misma sesión.
     movio = False
     with session_factory() as session:
         almacen_id = _almacen_de_sucursal(
@@ -126,14 +128,15 @@ def _mover(payload: dict, tipo: str, signo: int) -> None:
                         "venta %s: stock insuficiente de sku %s, consumo omitido",
                         payload["venta_id"], sku_id,
                     )
+        if movio:
+            event_bus.publish(
+                "inventory.stock_consumido"
+                if signo < 0
+                else "inventory.stock_repuesto",
+                {"venta_id": payload["venta_id"]},
+                session=session,
+            )
         session.commit()
-    if movio:
-        event_bus.publish(
-            "inventory.stock_consumido"
-            if signo < 0
-            else "inventory.stock_repuesto",
-            {"venta_id": payload["venta_id"]},
-        )
 
 
 def on_venta_confirmada(payload: dict) -> None:
@@ -320,6 +323,9 @@ def register() -> None:
     _registrado = True
     event_bus.subscribe("sales.venta_confirmada", on_venta_confirmada)
     event_bus.subscribe("sales.venta_anulada", on_venta_anulada)
+    # Anular líneas sueltas repone igual que anular la venta entera: el
+    # payload trae solo las líneas quitadas.
+    event_bus.subscribe("sales.lineas_anuladas", on_venta_anulada)
     event_bus.subscribe("purchases.compra_recibida", on_compra_recibida)
     event_bus.subscribe("production.consumo_registrado", on_consumo_registrado)
     event_bus.subscribe("production.orden_completada", on_orden_completada)

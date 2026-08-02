@@ -12,7 +12,9 @@ from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
-from src.modules.inventory.application import queries_publicas as inventory_publicas
+from src.modules.inventory.application.queries_publicas import (
+    unidad_medida_para_magnitud,
+)
 from src.modules.users.application.errors import Conflicto, NoEncontrado
 from src.shared import magnitudes
 from src.shared.magnitudes import MagnitudInvalida, Unidad
@@ -71,7 +73,7 @@ def _resolver_unidad(session: Session, valor: dict) -> Unidad | None:
         raise MagnitudInvalida(
             f"unidad_medida_id no es un UUID: {valor['unidad_medida_id']!r}"
         ) from e
-    udm = inventory_publicas.unidad_medida_para_magnitud(session, udm_id)
+    udm = unidad_medida_para_magnitud(session, udm_id)
     if udm is None:
         raise MagnitudInvalida(f"unidad de medida desconocida: {udm_id}")
     return Unidad(udm["decimales"], udm["nombre"], prefija=False)

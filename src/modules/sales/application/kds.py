@@ -185,7 +185,9 @@ def avanzar_item(
     ]
     if all(e in ("listo", "entregado") for e in estados):
         event_bus.publish(
-            "sales.pedido_listo", {"venta_id": str(item.venta_id)}
+            "sales.pedido_listo",
+            {"venta_id": str(item.venta_id)},
+            session=session,
         )
     return item
 

@@ -39,7 +39,9 @@ def crear_cuenta(
     )
 
 
-def listar_cuentas(session: Session, empresa_id: uuid.UUID) -> list[CuentaContable]:
+def listar_cuentas(
+    session: Session, empresa_id: uuid.UUID | None = None
+) -> list[CuentaContable]:
     return CuentaContableRepo(session).list(empresa_id)
 
 

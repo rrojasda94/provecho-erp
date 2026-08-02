@@ -1,17 +1,7 @@
-"""Errores de la capa de aplicación de purchases (la API los mapea a HTTP)."""
+"""Errores de aplicación de purchases. La tripleta común (`NoEncontrado`,
+`Conflicto`, `ReglaNegocio`) y su mapeo a HTTP viven en
+`src/shared/errors.py`; el módulo no especializa ninguno todavía."""
 
+from src.shared.errors import AppError, Conflicto, NoEncontrado, ReglaNegocio
 
-class PurchasesError(Exception):
-    """Base."""
-
-
-class NoEncontrado(PurchasesError):
-    """Entidad inexistente."""
-
-
-class Conflicto(PurchasesError):
-    """Estado que no admite la operación."""
-
-
-class ReglaNegocio(PurchasesError):
-    """Violación de una regla (tipo/condición inválida, umbral, exceso de recepción)."""
+__all__ = ["AppError", "Conflicto", "NoEncontrado", "ReglaNegocio"]

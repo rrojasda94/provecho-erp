@@ -1,17 +1,7 @@
-"""Errores de la capa de aplicación de production (la API los mapea a HTTP)."""
+"""Errores de aplicación de production. La tripleta común (`NoEncontrado`,
+`Conflicto`, `ReglaNegocio`) y su mapeo a HTTP viven en
+`src/shared/errors.py`; el módulo no especializa ninguno todavía."""
 
+from src.shared.errors import AppError, Conflicto, NoEncontrado, ReglaNegocio
 
-class ProductionError(Exception):
-    """Base."""
-
-
-class NoEncontrado(ProductionError):
-    """Entidad inexistente."""
-
-
-class Conflicto(ProductionError):
-    """Estado que no admite la operación."""
-
-
-class ReglaNegocio(ProductionError):
-    """Violación de una regla (receta inexistente, resultado inválido, etc.)."""
+__all__ = ["AppError", "Conflicto", "NoEncontrado", "ReglaNegocio"]

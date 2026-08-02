@@ -35,6 +35,47 @@ jobs:
           python -m src.core.openapi_export
           git diff --exit-code docs/architecture/openapi.json
 
+  # Los tests corren sobre SQLite con `create_all`: nunca ejecutan una sola
+  # migración. Un `alembic upgrade head` roto se descubría al desplegar.
+  # Acá se corre de verdad contra Postgres, ida y vuelta.
+  migraciones:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: provecho
+          POSTGRES_PASSWORD: provecho
+          POSTGRES_DB: provecho_migraciones
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U provecho"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://provecho:provecho@localhost:5432/provecho_migraciones
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - run: pip install -e ".[dev]"
+      - name: upgrade head sobre base vacía
+        run: alembic upgrade head
+      # Un `downgrade` roto se nota solo cuando hay que revertir un
+      # despliegue en caliente, que es el peor momento para descubrirlo.
+      - name: downgrade base y volver a subir
+        run: |
+          alembic downgrade base
+          alembic upgrade head
+      # El modelo y las migraciones tienen que contar la misma historia: si
+      # alguien agrega una columna al modelo y olvida la migración, esto lo
+      # delata en vez de que aparezca como un 500 en producción.
+      - name: El modelo no difiere del esquema migrado
+        run: |
+          alembic check
+
   # Nadie comprobaba que la imagen siquiera construyera: un Dockerfile roto
   # se descubría al desplegar.
   imagen:

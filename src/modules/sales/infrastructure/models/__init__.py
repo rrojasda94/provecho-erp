@@ -13,10 +13,14 @@ from src.modules.sales.infrastructure.models.cliente import Cliente
 from src.modules.sales.infrastructure.models.kds_pantalla import KdsPantalla
 from src.modules.sales.infrastructure.models.lista_precio import ListaPrecio
 from src.modules.sales.infrastructure.models.medio_pago import MedioPago
+from src.modules.sales.infrastructure.models.mesa import Mesa
 from src.modules.sales.infrastructure.models.pago import Pago
 from src.modules.sales.infrastructure.models.precio import Precio
 from src.modules.sales.infrastructure.models.producto_comercial import (
     ProductoComercial,
+)
+from src.modules.sales.infrastructure.models.producto_comercial_extra import (
+    ProductoComercialExtra,
 )
 from src.modules.sales.infrastructure.models.punto_venta import PuntoVenta
 from src.modules.sales.infrastructure.models.venta import Venta
@@ -27,9 +31,11 @@ __all__ = [
     "KdsPantalla",
     "ListaPrecio",
     "MedioPago",
+    "Mesa",
     "Pago",
     "Precio",
     "ProductoComercial",
+    "ProductoComercialExtra",
     "PuntoVenta",
     "Venta",
     "VentaItem",

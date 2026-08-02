@@ -9,13 +9,23 @@
 `ROADMAP.md` acumulaba una lista de "Pendientes de decisión" que en
 realidad no eran preguntas de negocio sin resolver, sino valores que
 **nunca deben fijarse una sola vez**: rango salarial de cada perfil de
-puesto, frecuencia de conteo cíclico por categoría de insumo, margen de
-error de ajuste de inventario, monto del fondo de caja chica de compras,
-plazo interno de envío de comprobantes al contador. Redactarlos como texto
+puesto, margen de error de ajuste de inventario, monto del fondo de caja
+chica de compras, plazo interno de envío de comprobantes al contador.
+Redactarlos como texto
 fijo en un documento de política (`[[ COMPLETAR ]]`) o hardcodearlos en
 código habría significado tocar código o un documento cada vez que el
 negocio los ajuste — y el usuario confirmó que sí van a variar: "no son
 cosas fijas siempre".
+
+> **Corrección (2026-08-01, ADR-019):** esta lista incluía además "frecuencia
+> de conteo cíclico por categoría de insumo". No corresponde a
+> `parametro_empresa`: el negocio precisó que la frecuencia la fija **cada
+> categoría** y no hay un valor único por empresa, así que vive como columna
+> `categoria.frecuencia_conteo`. `parametro_empresa` indexa por
+> `(empresa_id, modulo, codigo)` — un valor por categoría obligaría a
+> codificar el `categoria_id` dentro del `codigo` y perder la FK. El margen
+> de error de ajuste de inventario, que sí es único por empresa, sigue en
+> esta lista.
 
 Ya existe precedente para esto: `regla_aprobacion` (`ADR` implícito en su
 propio docstring, ver `data-model.md` §8c) generaliza el umbral de
@@ -71,7 +81,7 @@ fuente única que RN-GER-003 aplica a la matriz de aprobaciones).
 ## Consecuencias
 
 - Los "Pendientes de decisión" de `ROADMAP.md` referidos a valores
-  operativos (rangos salariales, frecuencia de conteo, margen de error de
+  operativos (rangos salariales, margen de error de
   ajuste, monto de caja chica, plazo de envío de comprobantes) dejan de
   ser preguntas abiertas de arquitectura: el mecanismo está decidido. Lo
   que queda pendiente es que Gerencia cargue el valor real de cada uno
@@ -122,7 +132,7 @@ fuente única que RN-GER-003 aplica a la matriz de aprobaciones).
 
 El usuario precisó el modelo de gestión: **cada parámetro se configura
 desde el módulo al que pertenece** (Compras propone su umbral de OC,
-Almacén su frecuencia de conteo, RRHH sus rangos salariales), pero el
+Almacén su margen de error de ajuste, RRHH sus rangos salariales), pero el
 valor **no se modifica de verdad hasta que Gerencia lo aprueba** en su
 sección de aprobaciones, donde puede **aceptar, rechazar o modificar**.
 Recién aprobado, el cambio se refleja en los datos que el módulo consume.
@@ -198,7 +208,9 @@ de decimales sea configurable**, en la unidad de medida y en la divisa.
   gramos, Unidad necesita 0.
 - **`src/shared/magnitudes.py`**: contrato de forma del valor. Las claves
   `monto`/`minimo`/`maximo` exigen `divisa`; `cantidad` exige
-  `unidad_medida_id`; declarar una unidad sin su magnitud (o mezclar dinero
+  `unidad_medida_id`; incumplirlo es 409 —`MagnitudInvalida` hereda de
+  `ReglaNegocio`, así que la traduce el handler global de
+  `core/error_handlers.py` sin `try/except` por endpoint—; declarar una unidad sin su magnitud (o mezclar dinero
   con magnitud física) también falla. Lo adimensional (`porcentaje`, `dias`,
   `frecuencia`) pasa intacto y sin unidad.
 - Nueva columna **`parametro_empresa.valor_display`** con la magnitud ya

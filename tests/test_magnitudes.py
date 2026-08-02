@@ -141,11 +141,13 @@ def test_seeder_deja_pen_con_dos_decimales(env):
     assert (pen.simbolo, pen.decimales, pen.activa) == ("S/", 2, True)
 
 
-def test_monto_sin_divisa_es_422_y_con_divisa_se_formatea(env):
+def test_monto_sin_divisa_es_409_y_con_divisa_se_formatea(env):
     client, datos, _ = env
     h = _token(client)
 
-    assert _proponer(client, h, datos, {"monto": "2000"}).status_code == 422
+    # 409: `MagnitudInvalida` es una `ReglaNegocio` (RN-GER-010) y la traduce
+    # el handler global de `core/error_handlers.py`.
+    assert _proponer(client, h, datos, {"monto": "2000"}).status_code == 409
 
     r = _proponer(client, h, datos, {"monto": "2000", "divisa": "PEN"})
     assert r.status_code == 201
@@ -165,15 +167,15 @@ def test_cantidad_usa_los_decimales_de_su_udm(env):
     assert r.json()["valor_display"] == "5.500 Kilo"
 
 
-def test_divisa_o_udm_inexistente_es_422(env):
+def test_divisa_o_udm_inexistente_es_409(env):
     client, datos, _ = env
     h = _token(client)
-    assert _proponer(client, h, datos, {"monto": "1", "divisa": "XYZ"}).status_code == 422
+    assert _proponer(client, h, datos, {"monto": "1", "divisa": "XYZ"}).status_code == 409
     assert (
         _proponer(
             client, h, datos, {"cantidad": "1", "unidad_medida_id": str(uuid.uuid4())}
         ).status_code
-        == 422
+        == 409
     )
 
 
@@ -189,7 +191,7 @@ def test_gerencia_no_puede_aprobar_un_monto_sin_divisa(env):
         headers=h,
         json={"valor": {"monto": "3000"}},
     )
-    assert malo.status_code == 422
+    assert malo.status_code == 409
 
     bueno = client.post(
         f"/api/v1/parametros/{propuesta_id}/aprobar",

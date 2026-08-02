@@ -2,7 +2,7 @@
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, Request, Response, status
 from sqlalchemy.orm import Session
 
 from src.core.rate_limit import rate_limit_login
@@ -14,39 +14,28 @@ from src.modules.users.api.deps import (
     get_db,
     require_permission,
 )
-from src.modules.users.application import admin, auth, gerencia, privacidad
+from src.modules.users.api.error_handlers import http_exception
+from src.modules.users.application import (
+    admin,
+    auth,
+    autorizacion,
+    gerencia,
+    privacidad,
+)
 from src.modules.users.application.errors import (
-    Conflicto,
     CredencialesInvalidas,
-    NoEncontrado,
-    PinInvalido,
     TokenInvalido,
-    UsersError,
     UsuarioBloqueado,
 )
 from src.modules.users.infrastructure.models import Usuario
 from src.modules.users.infrastructure.repositories import UsuarioRepo
 from src.shared import parametros
-from src.shared.magnitudes import MagnitudInvalida
 
 router = APIRouter()
 
 GESTIONAR = "users.gestionar"  # permiso para el CRUD administrativo
 GESTIONAR_PARAMETROS = "gerencia.gestionar_parametros_empresa"  # aprobar/rechazar
 ANONIMIZAR = "personas.anonimizar"  # derecho de cancelación (Ley 29733, ADR-011)
-
-_HTTP_STATUS: dict[type[UsersError], int] = {
-    CredencialesInvalidas: status.HTTP_401_UNAUTHORIZED,
-    TokenInvalido: status.HTTP_401_UNAUTHORIZED,
-    UsuarioBloqueado: status.HTTP_423_LOCKED,
-    NoEncontrado: status.HTTP_404_NOT_FOUND,
-    Conflicto: status.HTTP_409_CONFLICT,
-    PinInvalido: 422,
-}
-
-
-def _http(err: UsersError) -> HTTPException:
-    return HTTPException(_HTTP_STATUS.get(type(err), 400), str(err))
 
 
 # --- Auth -------------------------------------------------------------------
@@ -56,14 +45,47 @@ def _http(err: UsersError) -> HTTPException:
     tags=["auth"],
     dependencies=[Depends(rate_limit_login)],
 )
+
+
 def login(body: schemas.LoginIn, request: Request, session: Session = Depends(get_db)):
     try:
         tokens = auth.login(session, body.username, body.pin, client_ip(request))
     except (CredencialesInvalidas, UsuarioBloqueado) as e:
         session.commit()  # persistir intento fallido / lockout
-        raise _http(e) from e
+        raise http_exception(e) from e
     session.commit()
     return tokens
+
+
+@router.post(
+    "/auth/autorizar",
+    response_model=schemas.AutorizacionOut,
+    tags=["auth"],
+    dependencies=[Depends(rate_limit_login)],
+)
+def autorizar(
+    body: schemas.AutorizacionIn, request: Request, session: Session = Depends(get_db)
+):
+    """Elevación puntual de supervisor sobre el terminal de otro: verifica
+    su PIN **y** que tenga el permiso, y devuelve un token de corta vida
+    acotado a esa acción (RN-AUD-005).
+
+    Va detrás del mismo rate limit que el login: es un endpoint que recibe
+    PINes y sin freno sería el camino cómodo para probarlos.
+    """
+    try:
+        resultado = autorizacion.emitir(
+            session,
+            username=body.username,
+            pin=body.pin,
+            permiso=body.permiso,
+            ip=client_ip(request),
+        )
+    except CredencialesInvalidas as e:
+        session.commit()  # persistir el rastro del intento
+        raise http_exception(e) from e
+    session.commit()
+    return resultado
 
 
 @router.post(
@@ -72,12 +94,14 @@ def login(body: schemas.LoginIn, request: Request, session: Session = Depends(ge
     tags=["auth"],
     dependencies=[Depends(rate_limit_login)],
 )
+
+
 def refresh(body: schemas.RefreshIn, session: Session = Depends(get_db)):
     try:
         tokens = auth.refresh(session, body.refresh_token)
     except TokenInvalido as e:
         session.commit()  # persistir revocación de cadena ante reuso
-        raise _http(e) from e
+        raise http_exception(e) from e
     session.commit()
     return tokens
 
@@ -113,15 +137,14 @@ def me(
     status_code=status.HTTP_201_CREATED,
     tags=["personas"],
 )
+
+
 def crear_persona(
     body: schemas.PersonaCreate,
     _: Usuario = Depends(require_permission(GESTIONAR)),
     session: Session = Depends(get_db),
 ):
-    try:
-        persona = admin.crear_persona(session, **body.model_dump())
-    except Conflicto as e:
-        raise _http(e) from e
+    persona = admin.crear_persona(session, **body.model_dump())
     session.commit()
     return persona
 
@@ -141,10 +164,7 @@ def obtener_persona(
     _: Usuario = Depends(require_permission(GESTIONAR)),
     session: Session = Depends(get_db),
 ):
-    try:
-        return admin.obtener_persona(session, persona_id)
-    except NoEncontrado as e:
-        raise _http(e) from e
+    return admin.obtener_persona(session, persona_id)
 
 
 @router.patch("/personas/{persona_id}", response_model=schemas.PersonaOut, tags=["personas"])
@@ -154,10 +174,7 @@ def editar_persona(
     _: Usuario = Depends(require_permission(GESTIONAR)),
     session: Session = Depends(get_db),
 ):
-    try:
-        persona = admin.editar_persona(session, persona_id, **body.model_dump())
-    except (NoEncontrado, Conflicto) as e:
-        raise _http(e) from e
+    persona = admin.editar_persona(session, persona_id, **body.model_dump())
     session.commit()
     return persona
 
@@ -167,6 +184,8 @@ def editar_persona(
     response_model=schemas.PersonaOut,
     tags=["personas"],
 )
+
+
 def anonimizar_persona(
     persona_id: uuid.UUID,
     body: schemas.AnonimizarPersonaIn,
@@ -177,15 +196,12 @@ def anonimizar_persona(
     la fila. Verificar antes de llamar que no exista una obligación de
     retención vigente en otro módulo (trabajador activo, comprobante bajo
     retención tributaria) — el sistema no lo bloquea automáticamente."""
-    try:
-        persona = privacidad.anonimizar_persona(
-            session,
-            persona_id,
-            motivo=body.motivo,
-            solicitado_por=usuario.id,
-        )
-    except (NoEncontrado, Conflicto) as e:
-        raise _http(e) from e
+    persona = privacidad.anonimizar_persona(
+        session,
+        persona_id,
+        motivo=body.motivo,
+        solicitado_por=usuario.id,
+    )
     session.commit()
     return persona
 
@@ -197,24 +213,23 @@ def anonimizar_persona(
     status_code=status.HTTP_201_CREATED,
     tags=["users-admin"],
 )
+
+
 def crear_usuario(
     body: schemas.UsuarioCreate,
     actor: Usuario = Depends(require_permission(GESTIONAR)),
     session: Session = Depends(get_db),
 ):
-    try:
-        usuario = admin.crear_usuario(
-            session,
-            username=body.username,
-            pin=body.pin,
-            tipo=body.tipo,
-            persona_id=body.persona_id,
-            nombre_display=body.nombre_display,
-            email=body.email,
-            actor_id=actor.id,
-        )
-    except (Conflicto, PinInvalido) as e:
-        raise _http(e) from e
+    usuario = admin.crear_usuario(
+        session,
+        username=body.username,
+        pin=body.pin,
+        tipo=body.tipo,
+        persona_id=body.persona_id,
+        nombre_display=body.nombre_display,
+        email=body.email,
+        actor_id=actor.id,
+    )
     session.commit()
     return usuario
 
@@ -230,16 +245,15 @@ def listar_usuarios(
 @router.patch(
     "/users/{usuario_id}", response_model=schemas.UsuarioOut, tags=["users-admin"]
 )
+
+
 def editar_usuario(
     usuario_id: uuid.UUID,
     body: schemas.UsuarioUpdate,
     _: Usuario = Depends(require_permission(GESTIONAR)),
     session: Session = Depends(get_db),
 ):
-    try:
-        usuario = admin.editar_usuario(session, usuario_id, **body.model_dump())
-    except NoEncontrado as e:
-        raise _http(e) from e
+    usuario = admin.editar_usuario(session, usuario_id, **body.model_dump())
     session.commit()
     return usuario
 
@@ -249,16 +263,15 @@ def editar_usuario(
     status_code=status.HTTP_204_NO_CONTENT,
     tags=["users-admin"],
 )
+
+
 def cambiar_pin(
     usuario_id: uuid.UUID,
     body: schemas.PinChange,
     _: Usuario = Depends(require_permission(GESTIONAR)),
     session: Session = Depends(get_db),
 ):
-    try:
-        admin.cambiar_pin(session, usuario_id, body.pin)
-    except (NoEncontrado, PinInvalido) as e:
-        raise _http(e) from e
+    admin.cambiar_pin(session, usuario_id, body.pin)
     session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -268,16 +281,15 @@ def cambiar_pin(
     status_code=status.HTTP_204_NO_CONTENT,
     tags=["users-admin"],
 )
+
+
 def asignar_rol(
     usuario_id: uuid.UUID,
     body: schemas.RolIdIn,
     actor: Usuario = Depends(require_permission(GESTIONAR)),
     session: Session = Depends(get_db),
 ):
-    try:
-        admin.asignar_rol(session, usuario_id, body.rol_id, actor_id=actor.id)
-    except NoEncontrado as e:
-        raise _http(e) from e
+    admin.asignar_rol(session, usuario_id, body.rol_id, actor_id=actor.id)
     session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -287,6 +299,8 @@ def asignar_rol(
     status_code=status.HTTP_204_NO_CONTENT,
     tags=["users-admin"],
 )
+
+
 def quitar_rol(
     usuario_id: uuid.UUID,
     rol_id: uuid.UUID,
@@ -303,16 +317,15 @@ def quitar_rol(
     status_code=status.HTTP_204_NO_CONTENT,
     tags=["users-admin"],
 )
+
+
 def asignar_sucursal(
     usuario_id: uuid.UUID,
     body: schemas.SucursalIdIn,
     _: Usuario = Depends(require_permission(GESTIONAR)),
     session: Session = Depends(get_db),
 ):
-    try:
-        admin.asignar_sucursal(session, usuario_id, body.sucursal_id)
-    except NoEncontrado as e:
-        raise _http(e) from e
+    admin.asignar_sucursal(session, usuario_id, body.sucursal_id)
     session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -322,6 +335,8 @@ def asignar_sucursal(
     status_code=status.HTTP_204_NO_CONTENT,
     tags=["users-admin"],
 )
+
+
 def quitar_sucursal(
     usuario_id: uuid.UUID,
     sucursal_id: uuid.UUID,
@@ -340,15 +355,14 @@ def quitar_sucursal(
     status_code=status.HTTP_201_CREATED,
     tags=["users-admin"],
 )
+
+
 def crear_rol(
     body: schemas.RolCreate,
     _: Usuario = Depends(require_permission(GESTIONAR)),
     session: Session = Depends(get_db),
 ):
-    try:
-        rol = admin.crear_rol(session, nombre=body.nombre, descripcion=body.descripcion)
-    except Conflicto as e:
-        raise _http(e) from e
+    rol = admin.crear_rol(session, nombre=body.nombre, descripcion=body.descripcion)
     session.commit()
     return rol
 
@@ -366,16 +380,15 @@ def listar_roles(
     status_code=status.HTTP_204_NO_CONTENT,
     tags=["users-admin"],
 )
+
+
 def asignar_permiso(
     rol_id: uuid.UUID,
     body: schemas.PermisoIdIn,
     actor: Usuario = Depends(require_permission(GESTIONAR)),
     session: Session = Depends(get_db),
 ):
-    try:
-        admin.asignar_permiso(session, rol_id, body.permiso_id, actor_id=actor.id)
-    except NoEncontrado as e:
-        raise _http(e) from e
+    admin.asignar_permiso(session, rol_id, body.permiso_id, actor_id=actor.id)
     session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -385,6 +398,8 @@ def asignar_permiso(
     status_code=status.HTTP_204_NO_CONTENT,
     tags=["users-admin"],
 )
+
+
 def quitar_permiso(
     rol_id: uuid.UUID,
     permiso_id: uuid.UUID,
@@ -403,20 +418,19 @@ def quitar_permiso(
     status_code=status.HTTP_201_CREATED,
     tags=["users-admin"],
 )
+
+
 def crear_permiso(
     body: schemas.PermisoCreate,
     _: Usuario = Depends(require_permission(GESTIONAR)),
     session: Session = Depends(get_db),
 ):
-    try:
-        permiso = admin.crear_permiso(
-            session,
-            codigo=body.codigo,
-            descripcion=body.descripcion,
-            restricciones=body.restricciones,
-        )
-    except Conflicto as e:
-        raise _http(e) from e
+    permiso = admin.crear_permiso(
+        session,
+        codigo=body.codigo,
+        descripcion=body.descripcion,
+        restricciones=body.restricciones,
+    )
     session.commit()
     return permiso
 
@@ -447,12 +461,9 @@ def proponer_parametro(
     # El permiso depende del `modulo` del body, así que no puede resolverse en
     # un `Depends` — Compras no propone parámetros de RRHH.
     check_permission(session, usuario, parametros.permiso_proponer(body.modulo))
-    try:
-        parametro = gerencia.proponer_parametro(
-            session, propuesto_por_id=usuario.id, **body.model_dump()
-        )
-    except MagnitudInvalida as e:
-        raise HTTPException(422, str(e)) from e
+    parametro = gerencia.proponer_parametro(
+        session, propuesto_por_id=usuario.id, **body.model_dump()
+    )
     session.commit()
     return parametro
 
@@ -488,14 +499,9 @@ def aprobar_parametro(
     usuario: Usuario = Depends(require_permission(GESTIONAR_PARAMETROS)),
     session: Session = Depends(get_db),
 ):
-    try:
-        parametro = gerencia.aprobar_parametro(
-            session, parametro_id, resuelto_por_id=usuario.id, valor=body.valor
-        )
-    except MagnitudInvalida as e:
-        raise HTTPException(422, str(e)) from e
-    except (NoEncontrado, Conflicto) as e:
-        raise _http(e) from e
+    parametro = gerencia.aprobar_parametro(
+        session, parametro_id, resuelto_por_id=usuario.id, valor=body.valor
+    )
     session.commit()
     return parametro
 
@@ -511,14 +517,11 @@ def rechazar_parametro(
     usuario: Usuario = Depends(require_permission(GESTIONAR_PARAMETROS)),
     session: Session = Depends(get_db),
 ):
-    try:
-        parametro = gerencia.rechazar_parametro(
-            session,
-            parametro_id,
-            resuelto_por_id=usuario.id,
-            motivo_rechazo=body.motivo_rechazo,
-        )
-    except (NoEncontrado, Conflicto) as e:
-        raise _http(e) from e
+    parametro = gerencia.rechazar_parametro(
+        session,
+        parametro_id,
+        resuelto_por_id=usuario.id,
+        motivo_rechazo=body.motivo_rechazo,
+    )
     session.commit()
     return parametro

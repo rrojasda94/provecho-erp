@@ -24,11 +24,17 @@ from sqlalchemy.orm import Session
 
 from src.core.events import event_bus
 from src.modules.accounting.application.errors import Conflicto, NoEncontrado
-from src.modules.accounting.infrastructure.models import AperturaCaja, Arqueo, CierreCaja
+from src.modules.accounting.infrastructure.models import (
+    AperturaCaja,
+    Arqueo,
+    CierreCaja,
+    MovimientoCaja,
+)
 from src.modules.accounting.infrastructure.repositories import (
     AperturaCajaRepo,
     ArqueoRepo,
     CierreCajaRepo,
+    MovimientoCajaRepo,
 )
 from src.modules.sales.application.queries_publicas import (
     puntos_venta_de_empresa,
@@ -67,8 +73,86 @@ def abrir_caja(
             "punto_venta_id": str(punto_venta_id),
             "diferencia_reportada": str(diferencia_reportada) if diferencia_reportada else None,
         },
+        session=session,
     )
     return apertura
+
+
+def registrar_movimiento_caja(
+    session: Session,
+    apertura_caja_id: uuid.UUID,
+    *,
+    tipo: str,
+    monto: Decimal,
+    motivo: str,
+    registrado_por: uuid.UUID,
+    idempotency_key: str,
+    autorizado_por: uuid.UUID | None = None,
+) -> MovimientoCaja:
+    """Ingreso o retiro de efectivo del cajón durante el turno (RN-MDP-007).
+
+    El turno real no es solo vender: se le paga al repartidor, se compra
+    hielo, entra el vuelto que faltaba. Sin registrarlo, el cierre cuadra
+    contra un esperado irreal y el descuadre se le atribuye al cajero.
+
+    **Retirar exige autorización de supervisor**; ingresar no: meter plata
+    al cajón no es la operación de la que hay que desconfiar.
+    """
+    repo = MovimientoCajaRepo(session)
+    existente = repo.get_by_idempotency(idempotency_key)
+    if existente is not None:
+        return existente
+
+    apertura = AperturaCajaRepo(session).get(apertura_caja_id)
+    if apertura is None:
+        raise NoEncontrado("apertura de caja no encontrada")
+    if CierreCajaRepo(session).get_by_apertura(apertura_caja_id) is not None:
+        raise Conflicto("la caja ya está cerrada; no admite movimientos")
+    if tipo not in ("ingreso", "retiro"):
+        raise Conflicto(f"tipo de movimiento inválido: {tipo}")
+    if monto <= 0:
+        raise Conflicto("el monto debe ser > 0")
+    if not (motivo or "").strip():
+        raise Conflicto("el movimiento de efectivo requiere motivo")
+    if tipo == "retiro" and autorizado_por is None:
+        raise Conflicto("retirar efectivo requiere autorización de supervisor")
+
+    if tipo == "retiro":
+        # No se puede sacar más de lo que hay: el cajón no da crédito.
+        disponible = (
+            apertura.monto_apertura
+            + total_efectivo_cobrado(
+                session, apertura.punto_venta_id, apertura.created_at
+            )
+            + repo.neto(apertura_caja_id)
+        )
+        if monto > disponible:
+            raise Conflicto(
+                f"el retiro excede el efectivo en caja ({disponible})"
+            )
+
+    movimiento = repo.add(
+        MovimientoCaja(
+            apertura_caja_id=apertura_caja_id,
+            tipo=tipo,
+            monto=monto,
+            motivo=motivo.strip(),
+            registrado_por=registrado_por,
+            autorizado_por=autorizado_por,
+            idempotency_key=idempotency_key,
+        )
+    )
+    event_bus.publish(
+        "accounting.movimiento_caja_registrado",
+        {
+            "movimiento_caja_id": str(movimiento.id),
+            "apertura_caja_id": str(apertura_caja_id),
+            "tipo": tipo,
+            "monto": str(monto),
+            "motivo": movimiento.motivo,
+        },
+    )
+    return movimiento
 
 
 def cerrar_caja(
@@ -89,7 +173,10 @@ def cerrar_caja(
     efectivo_cobrado = total_efectivo_cobrado(
         session, apertura.punto_venta_id, apertura.created_at
     )
-    monto_esperado = apertura.monto_apertura + efectivo_cobrado
+    # Ingresos y retiros del turno: sin ellos el esperado es irreal y todo
+    # descuadre se le carga al cajero (RN-MDP-007).
+    movimientos = MovimientoCajaRepo(session).neto(apertura_caja_id)
+    monto_esperado = apertura.monto_apertura + efectivo_cobrado + movimientos
     descuadre = monto_real - monto_esperado
     estado = "conforme" if descuadre == 0 else "con_irregularidad"
 
@@ -97,7 +184,12 @@ def cerrar_caja(
         CierreCaja(
             apertura_caja_id=apertura_caja_id,
             cajero_id=cajero_id,
-            montos_esperados={"efectivo": str(monto_esperado)},
+            montos_esperados={
+            "efectivo": str(monto_esperado),
+            "apertura": str(apertura.monto_apertura),
+            "cobrado": str(efectivo_cobrado),
+            "movimientos": str(movimientos),
+        },
             montos_reales={"efectivo": str(monto_real)},
             descuadre_monto=descuadre,
             descuadre_atribucion=descuadre_atribucion if descuadre != 0 else None,
@@ -112,6 +204,7 @@ def cerrar_caja(
             "apertura_caja_id": str(apertura_caja_id),
             "descuadre_monto": str(descuadre),
         },
+        session=session,
     )
     if estado == "con_irregularidad":
         event_bus.publish(
@@ -121,6 +214,7 @@ def cerrar_caja(
                 "descuadre_monto": str(descuadre),
                 "descuadre_atribucion": descuadre_atribucion,
             },
+            session=session,
         )
     return cierre
 
@@ -158,11 +252,12 @@ def registrar_arqueo(
             "punto_venta_id": str(punto_venta_id),
             "diferencia_monto": str(diferencia),
         },
+        session=session,
     )
     return arqueo
 
 
-def cajas_abiertas(session: Session, empresa_id: uuid.UUID) -> list[dict]:
+def cajas_abiertas(session: Session, empresa_id: uuid.UUID | None = None) -> list[dict]:
     """Estado actual de caja por punto de venta de la empresa — para el
     dashboard gerencial (`core.dashboard_router`)."""
     punto_venta_ids = puntos_venta_de_empresa(session, empresa_id)

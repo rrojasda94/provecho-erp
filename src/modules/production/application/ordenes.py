@@ -109,6 +109,7 @@ def registrar_consumo(
             "almacen_id": str(orden.almacen_id),
             "items": evento_items,
         },
+        session=session,
     )
     return orden
 
@@ -161,6 +162,7 @@ def completar_orden_produccion(
                 "cantidad_producida": str(cantidad_producida),
                 "costo_unitario": str(orden.costo_real_unitario),
             },
+            session=session,
         )
     else:
         if resultado == "no_conforme_desechado":
@@ -177,5 +179,6 @@ def completar_orden_produccion(
         event_bus.publish(
             "production.no_conformidad_detectada",
             {"orden_produccion_id": str(orden.id), "resultado": resultado},
+            session=session,
         )
     return orden

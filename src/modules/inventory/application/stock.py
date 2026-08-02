@@ -18,6 +18,7 @@ from src.modules.inventory.infrastructure.models import MovimientoInventario, St
 from src.modules.inventory.infrastructure.repositories import (
     LoteRepo,
     MovimientoRepo,
+    ReservaRepo,
     StockRepo,
 )
 
@@ -210,12 +211,22 @@ def consultar_stock(
     almacen_id: uuid.UUID | None = None,
     empresa_id: uuid.UUID | None = None,
 ) -> list[dict]:
+    """`cantidad` es el físico; `disponible` descuenta las reservas activas
+    (RN-INV-009) — es el número contra el que se compromete stock nuevo."""
     filas = StockRepo(session).list(almacen_id, empresa_id)
+    reservado: dict[tuple[uuid.UUID, uuid.UUID], Decimal] = {}
+    for r in ReservaRepo(session).activas(almacen_id, None, empresa_id):
+        clave = (r.almacen_id, r.sku_id)
+        reservado[clave] = reservado.get(clave, Decimal(0)) + r.cantidad
     return [
         {
             "almacen_id": s.almacen_id,
             "sku_id": s.sku_id,
             "cantidad": s.cantidad,
+            "reservado": reservado.get((s.almacen_id, s.sku_id), Decimal(0)),
+            "disponible": rules.disponible(
+                s.cantidad, reservado.get((s.almacen_id, s.sku_id), Decimal(0))
+            ),
             "stock_minimo": s.stock_minimo,
             "bajo_minimo": rules.stock_bajo(s.cantidad, s.stock_minimo),
         }

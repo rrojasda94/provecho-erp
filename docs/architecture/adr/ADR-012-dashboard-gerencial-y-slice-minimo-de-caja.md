@@ -53,9 +53,11 @@ ninguna capa de aplicación ni endpoint — el ciclo de caja completo
   módulo usa el contrato de lectura de otro de forma síncrona para una
   operación de escritura propia (cerrar caja), no solo para un reporte —
   precedente a tener en cuenta si aparece otro caso similar.
-- El dashboard usa `empresa_id` como query param, no derivado del JWT —
-  mismo patrón (y misma deuda ya declarada en ADR-004) que el resto de la
-  API. No se resolvió acá a propósito: no es alcance de este cambio.
+- El dashboard usaba `empresa_id` como query param, no derivado del JWT —
+  deuda declarada en ADR-004 y **saldada el 2026-08-01**: hoy exige la
+  empresa del JWT (`tenant.empresa`), y el query param solo lo puede usar un
+  superusuario sin empresa asignada. Se exige *una* empresa, no
+  `filtro_empresa`: sumar ventas de dos empresas distintas no significa nada.
 - Sin `sync_outbox` ni caché: cada llamada al dashboard recalcula todo en
   vivo. Aceptable al volumen de un grupo de restaurantes chico; revisar si
   el agregado empieza a pesar.

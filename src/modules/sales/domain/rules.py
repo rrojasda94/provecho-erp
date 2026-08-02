@@ -41,6 +41,74 @@ def pagos_cubren_total(pagos_confirmados: list[Decimal], total: Decimal) -> bool
     return sum(pagos_confirmados, Decimal(0)) == total
 
 
+# --- Descuento manual de la orden (RN-COM-017) -------------------------------
+MODOS_DESCUENTO = {"porcentaje", "monto"}
+# Un descuento sin motivo no es auditable: el reporte necesita saber por qué
+# se regaló margen, no solo cuánto.
+MOTIVOS_DESCUENTO = {"cortesia", "reclamo", "colaborador", "promocion", "convenio"}
+
+
+def monto_descuento(
+    modo: str | None, valor: Decimal | None, base: Decimal
+) -> Decimal:
+    """Cuánto descuenta la orden sobre `base`. Nunca supera la base: un
+    descuento del 120% no deja la venta en negativo."""
+    if modo is None or valor is None or base <= 0:
+        return Decimal(0)
+    bruto = base * valor / Decimal(100) if modo == "porcentaje" else valor
+    return min(max(bruto, Decimal(0)), base).quantize(Decimal("0.01"))
+
+
+def repartir_descuento(
+    descuento: Decimal, subtotales: list[Decimal]
+) -> list[Decimal]:
+    """Baja el descuento de la orden a las líneas, a prorrata de cada una.
+
+    El comprobante electrónico no acepta un descuento global: hay que
+    llevarlo al precio unitario. El residuo de redondeo va a la línea más
+    grande para que la suma cuadre al céntimo con el total cobrado.
+    """
+    base = sum(subtotales, Decimal(0))
+    if descuento <= 0 or base <= 0:
+        return [Decimal(0) for _ in subtotales]
+    partes = [
+        (descuento * sub / base).quantize(Decimal("0.01")) for sub in subtotales
+    ]
+    residuo = descuento - sum(partes, Decimal(0))
+    if residuo:
+        mayor = subtotales.index(max(subtotales))
+        partes[mayor] += residuo
+    return partes
+
+
+def descuento_prorrateado(
+    modo: str | None, valor: Decimal | None, base: Decimal, parcial: Decimal
+) -> Decimal:
+    """Reparte el descuento de la orden entre los grupos de cobro según lo
+    que pesa cada uno: cobrar media cuenta descuenta la mitad. Sin prorrateo,
+    el primer grupo en cobrarse se llevaría todo el beneficio."""
+    if base <= 0:
+        return Decimal(0)
+    total = monto_descuento(modo, valor, base)
+    return (total * parcial / base).quantize(Decimal("0.01"))
+
+
+# --- Cobro por grupos (RN-COM-018) -------------------------------------------
+GRUPO_COBRO_UNICO = 1
+
+
+def grupos_de_cobro(grupos_items: list[int]) -> list[int]:
+    """Los grupos realmente presentes en la venta, en orden. Una venta sin
+    dividir devuelve `[1]`."""
+    return sorted(set(grupos_items)) or [GRUPO_COBRO_UNICO]
+
+
+def venta_totalmente_pagada(saldos_por_grupo: list[Decimal]) -> bool:
+    """La venta pasa a `pagada` recién cuando NINGÚN grupo queda con saldo.
+    Cobrar una cuenta de tres no cierra la venta."""
+    return bool(saldos_por_grupo) and all(s <= 0 for s in saldos_por_grupo)
+
+
 def puede_anular(estado: str) -> bool:
     """Solo una orden aún no pagada se anula por esta vía; anulación
     post-pago = nota de crédito (slice posterior)."""
@@ -81,6 +149,41 @@ def tipo_comprobante(tipo_cliente: str | None, ruc: str | None) -> str:
     """Factura solo si el cliente es jurídico y tiene RUC; en todo otro
     caso boleta, incluido el cliente anónimo (RN-PER-005)."""
     return "factura" if tipo_cliente == "juridico" and ruc else "boleta"
+
+
+LARGO_RUC = 11
+LARGO_DNI = 8
+SIN_DOCUMENTO = "00000000"
+
+
+def cliente_identificado(numero_documento: str | None) -> bool:
+    """Un cliente cuenta como *identificado* solo si dio un documento real.
+
+    Vacío o el genérico `00000000` no cuentan (RN-PTS-002): el cliente
+    existe, se le vende y se le entrega, pero queda fuera de las promociones
+    y beneficios reservados a clientes registrados con documento. Sin esto,
+    cualquier boleta anónima entraría al programa de puntos.
+    """
+    return bool(numero_documento) and numero_documento != SIN_DOCUMENTO
+
+
+def documento_receptor_valido(num_doc: str | None) -> bool:
+    """Vacío es válido (boleta a clientes varios). Con algo escrito, solo
+    se aceptan 8 dígitos (DNI) u 11 (RUC): un documento a medio teclear
+    haría rebotar el comprobante recién en SUNAT."""
+    if not num_doc:
+        return True
+    return num_doc.isdigit() and len(num_doc) in (LARGO_DNI, LARGO_RUC)
+
+
+def tipo_comprobante_por_documento(num_doc: str | None) -> str:
+    """Lo que el cajero teclea decide el tipo: 11 dígitos es RUC y obliga
+    factura; DNI, `00000000` o vacío van a boleta (RN-CPP-003).
+
+    Convive con `tipo_comprobante`: esta gana cuando el PDV informó un
+    documento, aquella cuando la venta trae `cliente_id` registrado.
+    """
+    return "factura" if num_doc and len(num_doc) == LARGO_RUC else "boleta"
 
 
 # --- Cumplimiento de pedido (PROC-OPE-002) -----------------------------------

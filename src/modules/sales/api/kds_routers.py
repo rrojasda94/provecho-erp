@@ -7,18 +7,12 @@ operar o leer ventas.
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from src.core.tenant import Tenant
 from src.modules.sales.api import kds_schemas as schemas
 from src.modules.sales.application import kds
-from src.modules.sales.application.errors import (
-    Conflicto,
-    NoEncontrado,
-    ReglaNegocio,
-    SalesError,
-)
 from src.modules.sales.application.scope import (
     exigir_pantalla,
     exigir_venta,
@@ -32,21 +26,6 @@ router = APIRouter(prefix="/kds", tags=["kds"])
 CONFIGURAR = "kds.configurar"
 OPERAR = "kds.operar"
 
-_HTTP_STATUS: dict[type[SalesError], int] = {
-    NoEncontrado: status.HTTP_404_NOT_FOUND,
-    Conflicto: status.HTTP_409_CONFLICT,
-    ReglaNegocio: status.HTTP_409_CONFLICT,
-}
-
-
-def _http(err: SalesError) -> HTTPException:
-    # Por isinstance y no por `type`: un error derivado (PrecioNoDefinido de
-    # ReglaNegocio) debe heredar el estado de su base, no caer al 400 genérico.
-    for tipo, codigo in _HTTP_STATUS.items():
-        if isinstance(err, tipo):
-            return HTTPException(codigo, str(err))
-    return HTTPException(400, str(err))
-
 
 # --- Configuración ------------------------------------------------------------
 @router.post("/pantallas", response_model=schemas.PantallaOut, status_code=201)
@@ -57,10 +36,7 @@ def crear_pantalla(
     session: Session = Depends(get_db),
 ):
     tenant.exigir_sucursal(body.sucursal_id)
-    try:
-        pantalla = kds.crear_pantalla(session, **body.model_dump())
-    except (Conflicto, ReglaNegocio) as e:
-        raise _http(e) from e
+    pantalla = kds.crear_pantalla(session, **body.model_dump())
     session.commit()
     return pantalla
 
@@ -88,11 +64,8 @@ def editar_pantalla(
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        exigir_pantalla(session, pantalla_id, tenant)
-        pantalla = kds.editar_pantalla(session, pantalla_id, **body.model_dump())
-    except (NoEncontrado, ReglaNegocio) as e:
-        raise _http(e) from e
+    exigir_pantalla(session, pantalla_id, tenant)
+    pantalla = kds.editar_pantalla(session, pantalla_id, **body.model_dump())
     session.commit()
     return pantalla
 
@@ -105,11 +78,8 @@ def cola(
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        exigir_pantalla(session, pantalla_id, tenant)
-        return kds.cola_pantalla(session, pantalla_id)
-    except NoEncontrado as e:
-        raise _http(e) from e
+    exigir_pantalla(session, pantalla_id, tenant)
+    return kds.cola_pantalla(session, pantalla_id)
 
 
 @router.post("/items/{venta_item_id}/avanzar", response_model=schemas.ItemColaOut)
@@ -120,11 +90,8 @@ def avanzar(
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        exigir_venta_item(session, venta_item_id, tenant)
-        item = kds.avanzar_item(session, venta_item_id, body.estado)
-    except (NoEncontrado, Conflicto, ReglaNegocio) as e:
-        raise _http(e) from e
+    exigir_venta_item(session, venta_item_id, tenant)
+    item = kds.avanzar_item(session, venta_item_id, body.estado)
     session.commit()
     return schemas.ItemColaOut(
         venta_item_id=str(item.id), producto="", cantidad=str(item.cantidad),
@@ -139,11 +106,8 @@ def avance(
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        exigir_venta(session, venta_id, tenant)
-        return kds.avance_venta(session, venta_id)
-    except NoEncontrado as e:
-        raise _http(e) from e
+    exigir_venta(session, venta_id, tenant)
+    return kds.avance_venta(session, venta_id)
 
 
 @router.post("/ventas/{venta_id}/comanda", response_model=schemas.ComandaOut)
@@ -153,10 +117,7 @@ def imprimir_comanda(
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    try:
-        exigir_venta(session, venta_id, tenant)
-        resultado = kds.comanda(session, venta_id)
-    except NoEncontrado as e:
-        raise _http(e) from e
+    exigir_venta(session, venta_id, tenant)
+    resultado = kds.comanda(session, venta_id)
     session.commit()
     return resultado

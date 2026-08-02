@@ -26,7 +26,9 @@ def abrir_periodo(
     return repo.add(PeriodoContable(empresa_id=empresa_id, anio=anio, mes=mes, estado="abierto"))
 
 
-def listar_periodos(session: Session, empresa_id: uuid.UUID) -> list[PeriodoContable]:
+def listar_periodos(
+    session: Session, empresa_id: uuid.UUID | None = None
+) -> list[PeriodoContable]:
     return PeriodoContableRepo(session).list(empresa_id)
 
 
@@ -44,6 +46,7 @@ def cerrar_periodo(
     event_bus.publish(
         "accounting.periodo_cerrado",
         {"periodo_id": str(periodo.id), "fecha_cierre": periodo.fecha_cierre.isoformat()},
+        session=session,
     )
     return periodo
 

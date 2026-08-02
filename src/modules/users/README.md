@@ -79,7 +79,7 @@ Claims del JWT: `sub` (usuario_id), `tipo`, `roles`, `sucursales`, `empresa_id`,
 **Toda magnitud lleva su unidad** (RN-GER-010): un valor monetario declara
 `divisa` (`{"monto":"2000.00","divisa":"PEN"}`) y uno físico
 `unidad_medida_id` (`{"cantidad":"5.000","unidad_medida_id":"..."}`); un
-número suelto es 422. El redondeo usa los decimales de esa unidad
+número suelto es 409. El redondeo usa los decimales de esa unidad
 (`divisa.decimales`, `unidad_medida.decimales`), y `valor_display` guarda la
 magnitud formateada que leyó Gerencia al decidir. Lo adimensional
 (`{"porcentaje":2.5}`, `{"dias":5}`) va sin unidad.

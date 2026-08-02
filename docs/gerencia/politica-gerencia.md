@@ -66,7 +66,7 @@ cabezas de área — pero no es obligatorio para un ajuste rutinario.
 
 **Quién propone y quién decide** (RN-GER-009): **el área propone el
 cambio desde su propio módulo** — Compras su umbral de OC, Almacén su
-frecuencia de conteo, RRHH sus rangos salariales — y la propuesta queda
+margen de error de ajuste, RRHH sus rangos salariales — y la propuesta queda
 pendiente. **El valor no cambia hasta que Gerencia lo aprueba** en su
 sección de aprobaciones, donde puede:
 
@@ -87,7 +87,6 @@ código):
 | Parámetro | Módulo/código | Notas |
 |---|---|---|
 | Rango salarial por perfil de puesto (7 perfiles) | `rrhh/rango_salarial_<perfil>` | `{"minimo":..., "maximo":...}` |
-| Frecuencia de conteo cíclico y de conteo general | `inventory/frecuencia_conteo_<categoria>` | `{"frecuencia":"diario"\|"semanal"\|"mensual"\|"anual"\|"fecha_especifica"}`, puede variar por categoría de insumo y por almacén |
 | Margen de error de ajuste de inventario | `inventory/margen_error_ajuste` | `{"porcentaje":...}`, puede variar por tipo de producto |
 | Monto del fondo de caja chica de compras | `purchases/monto_caja_chica` | `{"monto":...}`; el mecanismo de reposición ante faltante sigue siendo una decisión de proceso aparte, no solo de valor |
 | Plazo interno de envío de comprobantes al contador | `accounting/plazo_envio_comprobante` | `{"dias":...}` |

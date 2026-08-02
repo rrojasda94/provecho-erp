@@ -5,7 +5,12 @@ from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
-from src.modules.inventory.application.errors import Conflicto, NoEncontrado
+from src.modules.inventory.application.errors import (
+    Conflicto,
+    NoEncontrado,
+    ReglaNegocio,
+)
+from src.modules.inventory.domain import rules
 from src.modules.inventory.infrastructure.models import (
     Articulo,
     Categoria,
@@ -30,7 +35,9 @@ def crear_categoria(
     empresa_id: uuid.UUID,
     nombre: str,
     asiento_contable_config: dict | None = None,
+    frecuencia_conteo: str | None = None,
 ) -> Categoria:
+    _validar_frecuencia(frecuencia_conteo)
     repo = CategoriaRepo(session)
     if repo.get_by_nombre(empresa_id, nombre):
         raise Conflicto(f"categoría '{nombre}' ya existe en la empresa")
@@ -39,8 +46,41 @@ def crear_categoria(
             empresa_id=empresa_id,
             nombre=nombre,
             asiento_contable_config=asiento_contable_config,
+            frecuencia_conteo=frecuencia_conteo,
         )
     )
+
+
+def _validar_frecuencia(frecuencia: str | None) -> None:
+    if frecuencia is not None and frecuencia not in rules.FRECUENCIAS_CONTEO:
+        raise ReglaNegocio(f"frecuencia de conteo inválida: {frecuencia}")
+
+
+def editar_categoria(
+    session: Session,
+    categoria_id: uuid.UUID,
+    *,
+    nombre: str | None = None,
+    asiento_contable_config: dict | None = None,
+    frecuencia_conteo: str | None = None,
+    quitar_frecuencia: bool = False,
+) -> Categoria:
+    """`quitar_frecuencia` saca la categoría del conteo cíclico: sin ese
+    flag explícito, `frecuencia_conteo=None` significa "no la toques" y no
+    habría forma de volver a NULL."""
+    _validar_frecuencia(frecuencia_conteo)
+    categoria = CategoriaRepo(session).get(categoria_id)
+    if categoria is None:
+        raise NoEncontrado("categoría no encontrada")
+    if nombre is not None:
+        categoria.nombre = nombre
+    if asiento_contable_config is not None:
+        categoria.asiento_contable_config = asiento_contable_config
+    if quitar_frecuencia:
+        categoria.frecuencia_conteo = None
+    elif frecuencia_conteo is not None:
+        categoria.frecuencia_conteo = frecuencia_conteo
+    return categoria
 
 
 def listar_categorias(

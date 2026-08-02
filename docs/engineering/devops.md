@@ -314,6 +314,23 @@ pg_restore -h HOST -U provecho -d provecho --clean --if-exists --no-owner backup
 Pendiente: alerta cuando el backup falla o cuando no hubo uno en 48 h — hoy
 solo queda en el log. Ver ROADMAP → Deuda técnica → Backups.
 
+## Purga de datos de postulantes (Ley 29733)
+
+Anonimiza las fichas de candidatos no contratados cuyo plazo de conservación
+declarado ya venció (RN-PER-004). Sin esto el aviso de privacidad promete un
+plazo que el sistema no cumple. Mismo criterio que los backups —cron del
+host, no Celery beat— y semanal alcanza: el plazo se mide en meses.
+
+```cron
+30 3 * * 0 cd /srv/provecho && .venv/bin/python -m src.modules.rrhh.purga >> /var/log/provecho-purga.log 2>&1
+```
+
+El plazo por ficha se fija al crearla con
+`RRHH_PLAZO_CONSERVACION_POSTULANTE_MESES` (12 por defecto); el comando nunca
+toca a un postulante contratado, cuya retención es laboral y no la del aviso
+de privacidad. **Pendiente: darlo de alta en el servidor** — hasta entonces
+el plazo no se aplica en la práctica.
+
 ## Modo offline del PDV — hub local de sucursal
 
 Fase 1 (diseño + plumbing) 2026-07-26; fase 2 (motor de sync) 2026-07-27.

@@ -1,16 +1,18 @@
 """DTOs (pydantic) del módulo rrhh."""
 
 import uuid
-from datetime import date, time
+from datetime import date, datetime, time
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 # --- Trabajador ---------------------------------------------------------------
 
 
 class TrabajadorCreate(BaseModel):
-    empresa_id: uuid.UUID
+    # `empresa_id` sale del JWT (ADR-004). Solo un superusuario sin empresa
+    # asignada puede indicarla.
+    empresa_id: uuid.UUID | None = None
     persona_id: uuid.UUID
     cargo: str = Field(max_length=100)
     area: str = Field(max_length=100)
@@ -80,31 +82,169 @@ class ContratoLaboralOut(BaseModel):
     fecha_firma: date | None
 
 
+# --- Convocatoria ----------------------------------------------------------------
+
+
+class ConvocatoriaCreate(BaseModel):
+    # `empresa_id` sale del JWT (ADR-004). Solo un superusuario sin empresa
+    # asignada puede indicarla.
+    empresa_id: uuid.UUID | None = None
+    sucursal_id: uuid.UUID | None = None
+    puesto: str = Field(max_length=150)
+    motivo: str
+    perfil_puesto: str | None = Field(default=None, max_length=100)
+    vacantes: int = Field(default=1, ge=1, le=99)
+    jornada_horas_semana: Decimal | None = Field(default=None, gt=0, le=48)
+    remuneracion_min: Decimal | None = Field(default=None, ge=0)
+    remuneracion_max: Decimal | None = Field(default=None, ge=0)
+    fecha_objetivo: date | None = None
+    fecha_limite: date | None = None
+
+
+class ConvocatoriaPublicar(BaseModel):
+    fecha_publicacion: date
+    # Permite adjuntar el perfil aprobado en el mismo paso de publicar.
+    perfil_puesto: str | None = Field(default=None, max_length=100)
+
+
+class ConvocatoriaOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    empresa_id: uuid.UUID
+    sucursal_id: uuid.UUID | None
+    puesto: str
+    motivo: str
+    perfil_puesto: str | None
+    vacantes: int
+    remuneracion_min: Decimal | None
+    remuneracion_max: Decimal | None
+    fecha_objetivo: date | None
+    fecha_limite: date | None
+    fecha_publicacion: date | None
+    # Lo necesita quien arma la URL del formulario público.
+    token_publico: str | None
+    estado: str
+
+
 # --- Postulante -----------------------------------------------------------------
+
+_MAX_RESPUESTAS = 40
+_MAX_LARGO_RESPUESTA = 2000
+
+
+def _valida_respuestas(v: dict[str, str] | None) -> dict[str, str] | None:
+    """El formulario es de terceros y el endpoint que lo recibe es público:
+    lo que entra se acota acá o no se acota en ninguna parte."""
+    if v is None:
+        return v
+    if len(v) > _MAX_RESPUESTAS:
+        raise ValueError(f"máximo {_MAX_RESPUESTAS} respuestas")
+    for pregunta, respuesta in v.items():
+        if len(pregunta) > 200 or len(respuesta) > _MAX_LARGO_RESPUESTA:
+            raise ValueError("pregunta o respuesta demasiado larga")
+    return v
 
 
 class PostulanteCreate(BaseModel):
-    persona_id: uuid.UUID
+    # `empresa_id` sale del JWT (ADR-004). Solo un superusuario sin empresa
+    # asignada puede indicarla.
+    empresa_id: uuid.UUID | None = None
+    nombres: str = Field(min_length=1, max_length=100)
+    apellidos: str = Field(min_length=1, max_length=100)
     puesto_postulado: str = Field(max_length=150)
     fecha_postulacion: date
     consentimiento_datos: bool
+    convocatoria_id: uuid.UUID | None = None
+    telefono: str | None = Field(default=None, max_length=30)
+    email: str | None = Field(default=None, max_length=150)
+    canal_origen: str | None = Field(default=None, max_length=50)
+    respuestas: dict[str, str] | None = None
     consentimiento_fecha: date | None = None
     plazo_conservacion_declarado: date | None = None
     cv_archivo_id: uuid.UUID | None = None
 
+    _respuestas_acotadas = field_validator("respuestas")(_valida_respuestas)
 
-class PostulanteEstado(BaseModel):
+
+class PostulacionPublica(BaseModel):
+    """Cuerpo del formulario público. Sin `fecha_postulacion`: la pone el
+    servidor, si no el cliente podría postular fuera de la fecha límite."""
+
+    nombres: str = Field(min_length=1, max_length=100)
+    apellidos: str = Field(min_length=1, max_length=100)
+    consentimiento_datos: bool
+    telefono: str | None = Field(default=None, max_length=30)
+    email: str | None = Field(default=None, max_length=150)
+    canal_origen: str | None = Field(default=None, max_length=50)
+    respuestas: dict[str, str] | None = None
+
+    _respuestas_acotadas = field_validator("respuestas")(_valida_respuestas)
+
+
+class PostulanteUpdate(BaseModel):
+    """Rectificación (ARCO): solo datos de contacto. El puesto, el estado y
+    el motivo de descarte no son 'datos del titular' que él pueda corregir."""
+
+    nombres: str | None = Field(default=None, min_length=1, max_length=100)
+    apellidos: str | None = Field(default=None, min_length=1, max_length=100)
+    telefono: str | None = Field(default=None, max_length=30)
+    email: str | None = Field(default=None, max_length=150)
+
+
+class PostulanteAnonimizar(BaseModel):
+    motivo: str = Field(min_length=1, max_length=255)
+
+
+class PostulanteAvanzar(BaseModel):
     estado: str
+
+
+class PostulanteDescartar(BaseModel):
+    motivo: str = Field(min_length=1, max_length=255)
+
+
+class PostulanteContratar(BaseModel):
+    cargo: str = Field(max_length=100)
+    area: str = Field(max_length=100)
+    tipo_vinculo: str
+    fecha_ingreso: date
+    tipo_documento: str | None = None
+    numero_documento: str | None = Field(default=None, max_length=20)
+    # Ex-trabajador recontratado: se reusa su `persona`, no se duplica.
+    persona_id: uuid.UUID | None = None
+    regimen_laboral: str | None = None
+    remuneracion_base: Decimal | None = None
+    sistema_pensiones: str | None = None
+    afp_nombre: str | None = None
+    registra_asistencia: bool = True
+    jornada_horas_semana: Decimal | None = None
 
 
 class PostulanteOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
-    persona_id: uuid.UUID
+    empresa_id: uuid.UUID
+    convocatoria_id: uuid.UUID | None
+    nombres: str
+    apellidos: str
+    telefono: str | None
+    email: str | None
     puesto_postulado: str
     fecha_postulacion: date
+    canal_origen: str | None
+    respuestas: dict | None
     consentimiento_datos: bool
+    persona_id: uuid.UUID | None
+    trabajador_id: uuid.UUID | None
+    motivo_descarte: str | None
+    plazo_conservacion_declarado: date | None
+    anonimizado_at: datetime | None
     estado: str
+
+
+class TableroColumna(BaseModel):
+    estado: str
+    postulantes: list[PostulanteOut]
 
 
 # --- Socio -----------------------------------------------------------------------
@@ -178,7 +318,9 @@ class LiquidacionBssOut(BaseModel):
 
 
 class MemorandumCreate(BaseModel):
-    empresa_id: uuid.UUID
+    # `empresa_id` sale del JWT (ADR-004). Solo un superusuario sin empresa
+    # asignada puede indicarla.
+    empresa_id: uuid.UUID | None = None
     emisor_id: uuid.UUID
     asunto: str = Field(max_length=200)
     cuerpo: str
@@ -216,7 +358,9 @@ class AmonestacionOut(BaseModel):
 
 
 class ActaCreate(BaseModel):
-    empresa_id: uuid.UUID
+    # `empresa_id` sale del JWT (ADR-004). Solo un superusuario sin empresa
+    # asignada puede indicarla.
+    empresa_id: uuid.UUID | None = None
     tipo: str
     fecha: date
     lugar: str = Field(max_length=200)

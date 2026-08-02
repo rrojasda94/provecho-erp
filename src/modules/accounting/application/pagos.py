@@ -63,7 +63,9 @@ def registrar_pago(
     )
 
 
-def listar_pagos(session: Session, empresa_id: uuid.UUID) -> list[MovimientoDinero]:
+def listar_pagos(
+    session: Session, empresa_id: uuid.UUID | None = None
+) -> list[MovimientoDinero]:
     return MovimientoDineroRepo(session).list(empresa_id)
 
 
@@ -95,6 +97,7 @@ def ejecutar_pago(
                 "monto": str(movimiento.monto),
                 "umbral": str(umbral_efectivo),
             },
+            session=session,
         )
         raise ReglaNegocio(
             f"monto {movimiento.monto} supera el umbral {umbral_efectivo}; "
@@ -140,6 +143,7 @@ def ejecutar_pago(
             "detraccion_monto": str(monto_detraccion) if monto_detraccion else None,
             "aprobado_por": str(actor_id),
         },
+        session=session,
     )
     return movimiento
 
