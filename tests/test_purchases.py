@@ -150,6 +150,9 @@ def test_crear_proveedor_natural_requiere_persona(env):
     })
     assert r.status_code == 201
     assert r.json()["tipo"] == "natural"
+    # Antes no viajaba: un proveedor natural no tenía forma de mostrarse
+    # por nombre en un listado (se resuelve contra `persona`, RN-GEN-007).
+    assert r.json()["persona_id"] == ids["persona_id"]
 
 
 def test_crear_proveedor_natural_sin_persona_id_409(env):

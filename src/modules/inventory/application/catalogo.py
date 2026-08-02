@@ -14,12 +14,14 @@ from src.modules.inventory.domain import rules
 from src.modules.inventory.infrastructure.models import (
     Articulo,
     Categoria,
+    CategoriaUdm,
     Sku,
     UnidadMedida,
 )
 from src.modules.inventory.infrastructure.repositories import (
     ArticuloRepo,
     CategoriaRepo,
+    CategoriaUdmRepo,
     SkuRepo,
     UnidadMedidaRepo,
 )
@@ -92,6 +94,49 @@ def listar_categorias(
 
 def listar_unidades_medida(session: Session) -> list[UnidadMedida]:
     return UnidadMedidaRepo(session).list()
+
+
+def crear_categoria_udm(session: Session, *, nombre: str) -> CategoriaUdm:
+    repo = CategoriaUdmRepo(session)
+    if repo.get_by_nombre(nombre) is not None:
+        raise Conflicto(f"la categoría de unidad de medida '{nombre}' ya existe")
+    return repo.add(CategoriaUdm(nombre=nombre))
+
+
+def listar_categorias_udm(session: Session) -> list[CategoriaUdm]:
+    return CategoriaUdmRepo(session).list()
+
+
+def crear_unidad_medida(
+    session: Session,
+    *,
+    categoria_udm_id: uuid.UUID,
+    nombre: str,
+    ratio: Decimal,
+    decimales: int,
+) -> UnidadMedida:
+    _existe(session, CategoriaUdm, categoria_udm_id, "categoría de unidad de medida")
+    repo = UnidadMedidaRepo(session)
+    if repo.get_by_nombre(categoria_udm_id, nombre) is not None:
+        raise Conflicto(f"'{nombre}' ya existe en esa categoría de UdM")
+    return repo.add(
+        UnidadMedida(
+            categoria_udm_id=categoria_udm_id,
+            nombre=nombre,
+            ratio=ratio,
+            decimales=decimales,
+        )
+    )
+
+
+def editar_unidad_medida(session: Session, unidad_medida_id: uuid.UUID, **campos) -> UnidadMedida:
+    unidad = UnidadMedidaRepo(session).get(unidad_medida_id)
+    if unidad is None:
+        raise NoEncontrado("unidad de medida no encontrada")
+    for campo in ("nombre", "ratio", "decimales"):
+        if campo in campos and campos[campo] is not None:
+            setattr(unidad, campo, campos[campo])
+    return unidad
 
 
 def crear_articulo(

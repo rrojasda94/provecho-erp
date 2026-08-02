@@ -14,6 +14,9 @@ class DivisaRepo:
     def __init__(self, session: Session) -> None:
         self.s = session
 
+    def get(self, divisa_id: uuid.UUID) -> Divisa | None:
+        return self.s.get(Divisa, divisa_id)
+
     def get_por_codigo(self, codigo: str) -> Divisa | None:
         return self.s.scalar(
             select(Divisa).where(Divisa.codigo == codigo, Divisa.activa.is_(True))
@@ -21,6 +24,11 @@ class DivisaRepo:
 
     def list(self) -> list[Divisa]:
         return list(self.s.scalars(select(Divisa).order_by(Divisa.codigo)))
+
+    def add(self, divisa: Divisa) -> Divisa:
+        self.s.add(divisa)
+        self.s.flush()
+        return divisa
 
 
 class ParametroEmpresaRepo:

@@ -9,6 +9,7 @@ from src.modules.inventory.infrastructure.models import (
     Ajuste,
     Articulo,
     Categoria,
+    CategoriaUdm,
     Conteo,
     ConteoItem,
     Lote,
@@ -74,13 +75,50 @@ class CategoriaRepo:
         return categoria
 
 
+class CategoriaUdmRepo:
+    def __init__(self, session: Session) -> None:
+        self.s = session
+
+    def get(self, categoria_udm_id: uuid.UUID) -> CategoriaUdm | None:
+        return self.s.get(CategoriaUdm, categoria_udm_id)
+
+    def get_by_nombre(self, nombre: str) -> CategoriaUdm | None:
+        return self.s.scalar(select(CategoriaUdm).where(CategoriaUdm.nombre == nombre))
+
+    def list(self) -> list[CategoriaUdm]:
+        return list(self.s.scalars(select(CategoriaUdm).order_by(CategoriaUdm.nombre)))
+
+    def add(self, categoria: CategoriaUdm) -> CategoriaUdm:
+        self.s.add(categoria)
+        self.s.flush()
+        return categoria
+
+
 class UnidadMedidaRepo:
     def __init__(self, session: Session) -> None:
         self.s = session
 
+    def get(self, unidad_medida_id: uuid.UUID) -> UnidadMedida | None:
+        return self.s.get(UnidadMedida, unidad_medida_id)
+
+    def get_by_nombre(
+        self, categoria_udm_id: uuid.UUID, nombre: str
+    ) -> UnidadMedida | None:
+        return self.s.scalar(
+            select(UnidadMedida).where(
+                UnidadMedida.categoria_udm_id == categoria_udm_id,
+                UnidadMedida.nombre == nombre,
+            )
+        )
+
     def list(self) -> list[UnidadMedida]:
         # Global: sin filtro de empresa (RN-GER-010, docstring del modelo).
         return list(self.s.scalars(select(UnidadMedida).order_by(UnidadMedida.nombre)))
+
+    def add(self, unidad: UnidadMedida) -> UnidadMedida:
+        self.s.add(unidad)
+        self.s.flush()
+        return unidad
 
 
 class SkuRepo:

@@ -90,6 +90,19 @@ class PersonaOut(BaseModel):
     anonimizado_at: datetime | None
 
 
+class PersonaBusquedaOut(BaseModel):
+    """Para el selector de "elegir persona existente" de otro módulo
+    (trabajador, proveedor natural) — nunca domicilio/teléfono/email/fecha
+    de nacimiento. Mismo principio de minimización que `sales.cliente`: el
+    lookup no es la ficha completa."""
+
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    nombres: str
+    apellidos: str
+    numero_documento: str | None
+
+
 class AlmacenOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
@@ -193,6 +206,30 @@ class ParametroAprobacion(BaseModel):
 
 class ParametroRechazo(BaseModel):
     motivo_rechazo: str = Field(min_length=1, max_length=500)
+
+
+class DivisaCreate(BaseModel):
+    codigo: str = Field(min_length=3, max_length=3)  # ISO 4217: PEN, USD
+    nombre: str = Field(min_length=1, max_length=50)
+    simbolo: str = Field(min_length=1, max_length=5)
+    decimales: int = Field(ge=0, le=6, default=2)
+
+
+class DivisaUpdate(BaseModel):
+    nombre: str | None = None
+    simbolo: str | None = None
+    decimales: int | None = Field(default=None, ge=0, le=6)
+    activa: bool | None = None
+
+
+class DivisaOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    codigo: str
+    nombre: str
+    simbolo: str
+    decimales: int
+    activa: bool
 
 
 class ParametroEmpresaOut(BaseModel):

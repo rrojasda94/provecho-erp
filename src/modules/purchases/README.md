@@ -23,7 +23,9 @@ de área/gerencia, ligada a la OC de tipo `activo`). Detalle en
 
 Operativo en `/api/v1/purchases`: CRUD de proveedores (natural liga a
 `persona` — mismo party model que `cliente`, RN-GEN-007 — jurídico trae
-razón social/RUC propios) y ciclo de OC tipo `insumo`: crear (borrador,
+razón social/RUC propios; `ProveedorOut.persona_id` viaja desde 2026-08-02,
+antes un proveedor natural no tenía forma de mostrarse por nombre en un
+listado) y ciclo de OC tipo `insumo`: crear (borrador,
 idempotente) → emitir (permiso `purchases.aprobar` exigido si el total
 supera el umbral vigente en `parametro_empresa` — `shared`, módulo
 `purchases`, código `oc_umbral`; sin fila configurada cae al valor semilla

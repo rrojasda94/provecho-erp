@@ -164,7 +164,14 @@ erDiagram
   (nullable, 2026-07-26): derecho de cancelación (Ley 29733, RN-PER-007,
   ADR-011) — `POST /api/v1/personas/{id}/anonimizar` sobrescribe los campos
   identificables sin borrar la fila; distinto del soft-delete genérico
-  (`deleted_at`), que oculta sin destruir el dato.
+  (`deleted_at`), que oculta sin destruir el dato. **Lookup minimizado**
+  (`GET /api/v1/personas/buscar?q=`, permiso `personas.leer`,
+  implementado 2026-08-02): responde solo id/nombres/apellidos/
+  numero_documento, nunca domicilio/teléfono/email/fecha de nacimiento —
+  el CRUD completo sigue exigiendo `users.gestionar`. Lo consumen los
+  selectores de "elegir persona existente" de otro módulo (RRHH al
+  contratar un `trabajador`, Compras al dar de alta un proveedor
+  `natural`) sin exigirles el permiso de administración completo.
 - **usuario**: username, pin_hash (Argon2id), persona_id (nullable — NULL
   si `agente_ia`), nombre_display (fallback para agente_ia), email, tipo
   (`humano` | `agente_ia`), activo.
@@ -212,7 +219,10 @@ erDiagram
   gramos importan, 0 para Unidad porque media botella no existe;
   configurable por unidad, no una constante del código — RN-GER-010). Un
   artículo/receta/producto comercial solo admite UdM de su propia categoría
-  (RN-UDM-001). Default: categoría "Unidades" con UdM base "Unidad".
+  (RN-UDM-001). Default: categoría "Unidades" con UdM base "Unidad". CRUD
+  (`POST/PATCH /api/v1/inventory/unidades-medida[/{id}]`,
+  `POST /api/v1/inventory/categorias-udm`, permiso `gestionar_catalogo`,
+  implementado 2026-08-02) — antes solo se editaba por seeder/migración.
 - **articulo** (inventariable): empresa_id (tenant directo — `categoria_id`
   es opcional, no sirve de puente de tenant por sí solo), id_interno (4
   alfanuméricos, autogenerado, inmutable, único — RN-GEN-005), nombre,
@@ -969,7 +979,12 @@ tabla. Ver [docs/gerencia/README.md](../gerencia/README.md).
   activa. Existe porque los decimales de una moneda no son 2 por decreto y
   porque toda magnitud monetaria debe poder nombrar su unidad (RN-GER-010).
   Sembrada con PEN (S/, 2 decimales). **No** cambia que la operación sea PEN
-  única (RN-PRC-004): `precio` sigue sin columna de divisa.
+  única (RN-PRC-004): `precio` sigue sin columna de divisa. CRUD
+  (`POST/PATCH /api/v1/divisas[/{id}]`, permiso
+  `gerencia.gestionar_parametros_empresa`, implementado 2026-08-02):
+  lectura abierta a cualquier autenticado (`GET /divisas`), escritura
+  gobernada por Gerencia — así `decimales` se corrige con un `PATCH`, no
+  con una migración.
 - ~~**regla_aprobacion**~~ — **retirada el 2026-08-02** (migración
   `b82d4c1f7a35`). Sus umbrales (`purchases/oc_umbral`,
   `accounting/pago_umbral`) son filas de `parametro_empresa` con

@@ -18,7 +18,7 @@ from src.modules.inventory.application.queries_publicas import (
 from src.modules.users.application.errors import Conflicto, NoEncontrado
 from src.shared import magnitudes
 from src.shared.magnitudes import MagnitudInvalida, Unidad
-from src.shared.models import ParametroEmpresa
+from src.shared.models import Divisa, ParametroEmpresa
 from src.shared.repositories import DivisaRepo, ParametroEmpresaRepo
 
 
@@ -135,3 +135,31 @@ def _propuesta(repo: ParametroEmpresaRepo, parametro_id: uuid.UUID) -> Parametro
     if parametro.estado != "propuesto":
         raise Conflicto(f"el parámetro ya fue resuelto ({parametro.estado})")
     return parametro
+
+
+# --- Divisas (RN-GER-010: decimales configurables por moneda, no una
+# constante del código) -------------------------------------------------
+def crear_divisa(
+    session: Session, *, codigo: str, nombre: str, simbolo: str, decimales: int
+) -> Divisa:
+    repo = DivisaRepo(session)
+    if repo.get_por_codigo(codigo) is not None:
+        raise Conflicto(f"ya existe una divisa activa con código {codigo!r}")
+    return repo.add(
+        Divisa(codigo=codigo, nombre=nombre, simbolo=simbolo, decimales=decimales)
+    )
+
+
+def editar_divisa(session: Session, divisa_id: uuid.UUID, **campos) -> Divisa:
+    repo = DivisaRepo(session)
+    divisa = repo.get(divisa_id)
+    if divisa is None:
+        raise NoEncontrado("divisa no encontrada")
+    for campo in ("nombre", "simbolo", "decimales", "activa"):
+        if campo in campos and campos[campo] is not None:
+            setattr(divisa, campo, campos[campo])
+    return divisa
+
+
+def listar_divisas(session: Session) -> list[Divisa]:
+    return DivisaRepo(session).list()

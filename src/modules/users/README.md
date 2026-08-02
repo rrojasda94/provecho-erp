@@ -67,11 +67,24 @@ Claims del JWT: `sub` (usuario_id), `tipo`, `roles`, `sucursales`, `empresa_id`,
 | POST/GET/PATCH | `/api/v1/personas[/{id}]` | CRUD de persona (party model) — `PATCH` exige `version` |
 | POST | `/api/v1/personas/{id}/anonimizar` | Derecho de cancelación (Ley 29733) — permiso `personas.anonimizar` |
 
+### Búsqueda de persona (permiso `personas.leer`, no `users.gestionar`)
+
+| Método | Ruta | Acción |
+|--------|------|--------|
+| GET | `/api/v1/personas/buscar?q=` | Selector de "elegir persona existente" para otro módulo (RRHH al contratar, Compras al dar de alta un proveedor natural). Responde `PersonaBusquedaOut` (id, nombres, apellidos, numero_documento) — nunca domicilio/teléfono/email/fecha de nacimiento, así que puede abrirse sin exigir el permiso de administración completo. Ruta declarada antes de `/personas/{persona_id}` a propósito. |
+
 ### Organización — solo lectura (`Almacen` vive en `users` por historia, ver data-model §1)
 
 | Método | Ruta | Acción |
 |--------|------|--------|
 | GET | `/api/v1/almacenes` | Lista de referencia (nombre/tipo), escopada por tenant — sin `require_permission`: no es dato sensible, lo necesita cualquiera que elija un destino (ej. `purchases` al crear una OC) |
+
+### Divisas (RN-GER-010) — lectura abierta, escritura de Gerencia
+
+| Método | Ruta | Acción |
+|--------|------|--------|
+| GET | `/api/v1/divisas` | Cualquier autenticado — cualquier módulo que declare un monto necesita poder listar divisas válidas |
+| POST/PATCH | `/api/v1/divisas[/{id}]` | Permiso `gerencia.gestionar_parametros_empresa`. Antes solo se editaba por seeder/migración (ADR-014 Addendum b) — esto es lo que lo vuelve CRUD de verdad |
 
 ### Parámetros operativos por empresa (ADR-014, RN-GER-009)
 

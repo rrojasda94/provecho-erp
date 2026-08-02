@@ -62,6 +62,11 @@ PERMISOS = [
         "personas.anonimizar",
         "Anonimizar datos de una persona — derecho de cancelación (Ley 29733)",
     ),
+    (
+        "personas.leer",
+        "Buscar personas para asociarlas a otro registro (trabajador, proveedor "
+        "natural) — solo nombre y documento, no la ficha completa",
+    ),
     ("sales.crear", "Crear venta"),
     ("sales.cobrar", "Cobrar venta"),
     ("sales.leer", "Consultar ventas"),
@@ -243,6 +248,8 @@ ROLES = {
         "purchases.recepcionar",
         "purchases.anular",
         "purchases.dar_conformidad",
+        # Alta de proveedor natural liga a una persona existente.
+        "personas.leer",
     ],
     "jefe_cocina": [
         "production.crear",
@@ -260,6 +267,8 @@ ROLES = {
     ],
     "rrhh_admin": [
         "rrhh.leer",
+        # Alta de trabajador liga a una persona existente.
+        "personas.leer",
         "rrhh.trabajador_gestionar",
         "rrhh.contrato_gestionar",
         "rrhh.postulante_gestionar",

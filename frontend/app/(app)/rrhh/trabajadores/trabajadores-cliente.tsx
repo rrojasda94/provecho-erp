@@ -3,6 +3,7 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import { useActionState, useEffect, useMemo, useRef } from "react";
 
+import { PersonaPicker } from "@/components/persona-picker/persona-picker";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
 
 import { crearTrabajadorAction, type EstadoTrabajador } from "./actions";
@@ -21,14 +22,14 @@ export type Persona = {
   id: string;
   nombres: string;
   apellidos: string;
-  numero_documento: string;
+  numero_documento: string | null;
 };
 
 const TIPOS_VINCULO = ["planilla", "practicante", "locacion_servicios"] as const;
 
 const ESTADO_INICIAL: EstadoTrabajador = { error: "", ok: false };
 
-function DialogoNuevoTrabajador({ personas }: { personas: Persona[] }) {
+function DialogoNuevoTrabajador() {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const [estado, formAction, pendiente] = useActionState(crearTrabajadorAction, ESTADO_INICIAL);
@@ -45,8 +46,7 @@ function DialogoNuevoTrabajador({ personas }: { personas: Persona[] }) {
       <button
         type="button"
         onClick={() => dialogRef.current?.showModal()}
-        disabled={personas.length === 0}
-        className="rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary disabled:opacity-50"
+        className="rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary"
       >
         + Nuevo trabajador
       </button>
@@ -57,21 +57,9 @@ function DialogoNuevoTrabajador({ personas }: { personas: Persona[] }) {
       >
         <form ref={formRef} action={formAction} className="flex flex-col gap-4 p-6">
           <h2 className="font-heading text-lg italic uppercase text-dark">Nuevo trabajador</h2>
-          <p className="-mt-2 text-xs text-gray">
-            La persona debe existir de antes (CRUD de personas — módulo Usuarios).
-          </p>
           <label className="flex flex-col gap-1 text-sm font-semibold">
-            Persona
-            <select name="persona_id" required defaultValue="">
-              <option value="" disabled>
-                Elegir...
-              </option>
-              {personas.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.apellidos}, {p.nombres} — {p.numero_documento}
-                </option>
-              ))}
-            </select>
+            Persona (debe existir de antes)
+            <PersonaPicker name="persona_id" />
           </label>
           <label className="flex flex-col gap-1 text-sm font-semibold">
             Cargo
@@ -172,13 +160,8 @@ export function TrabajadoresCliente({
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h1 className="font-heading text-xl italic uppercase text-dark">Trabajadores</h1>
-        <DialogoNuevoTrabajador personas={personas} />
+        <DialogoNuevoTrabajador />
       </div>
-      {personas.length === 0 && (
-        <p className="text-sm text-secondary">
-          No hay personas registradas todavía — créalas primero en Usuarios.
-        </p>
-      )}
       <TablaDatos
         columnas={columnas}
         datos={trabajadores}

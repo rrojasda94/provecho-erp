@@ -7,18 +7,18 @@ export default async function TrabajadoresPage() {
   const { token } = await obtenerSesion();
 
   try {
-    // GET /personas hoy exige `users.gestionar` (no solo `rrhh.leer`) — un
-    // rol de RRHH puro sin ese permiso no puede armar el selector de alta,
-    // aunque sí pueda leer trabajadores. Gap de RBAC conocido, ver ROADMAP.
+    // `/personas/buscar`, no `/personas`: la tabla solo necesita nombre,
+    // no la ficha completa, y así basta `personas.leer` — `users.gestionar`
+    // ya no bloquea a un rol de RRHH puro (RN-GEN-007, gap cerrado).
     const [trabajadores, personas] = await Promise.all([
       apiFetch<Trabajador[]>("/api/v1/rrhh/trabajadores", { token }),
-      apiFetch<Persona[]>("/api/v1/personas", { token }),
+      apiFetch<Persona[]>("/api/v1/personas/buscar", { token }),
     ]);
     return <TrabajadoresCliente trabajadores={trabajadores} personas={personas} />;
   } catch (e) {
     const mensaje =
       e instanceof ApiError && e.status === 403
-        ? "Tu usuario no tiene permiso para ver trabajadores (o para listar personas)."
+        ? "Tu usuario no tiene permiso para ver trabajadores."
         : "No se pudo cargar la lista de trabajadores.";
     return <p className="text-secondary">{mensaje}</p>;
   }

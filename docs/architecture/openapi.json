@@ -1864,6 +1864,53 @@
         "title": "CategoriaOut",
         "type": "object"
       },
+      "CategoriaUdmCreate": {
+        "properties": {
+          "nombre": {
+            "maxLength": 50,
+            "minLength": 1,
+            "title": "Nombre",
+            "type": "string"
+          }
+        },
+        "required": [
+          "nombre"
+        ],
+        "title": "CategoriaUdmCreate",
+        "type": "object"
+      },
+      "CategoriaUdmOut": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "unidad_base_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unidad Base Id"
+          }
+        },
+        "required": [
+          "id",
+          "nombre",
+          "unidad_base_id"
+        ],
+        "title": "CategoriaUdmOut",
+        "type": "object"
+      },
       "CategoriaUpdate": {
         "properties": {
           "asiento_contable_config": {
@@ -3584,6 +3631,133 @@
           "autorizacion"
         ],
         "title": "DescuentoCreate",
+        "type": "object"
+      },
+      "DivisaCreate": {
+        "properties": {
+          "codigo": {
+            "maxLength": 3,
+            "minLength": 3,
+            "title": "Codigo",
+            "type": "string"
+          },
+          "decimales": {
+            "default": 2,
+            "maximum": 6.0,
+            "minimum": 0.0,
+            "title": "Decimales",
+            "type": "integer"
+          },
+          "nombre": {
+            "maxLength": 50,
+            "minLength": 1,
+            "title": "Nombre",
+            "type": "string"
+          },
+          "simbolo": {
+            "maxLength": 5,
+            "minLength": 1,
+            "title": "Simbolo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "codigo",
+          "nombre",
+          "simbolo"
+        ],
+        "title": "DivisaCreate",
+        "type": "object"
+      },
+      "DivisaOut": {
+        "properties": {
+          "activa": {
+            "title": "Activa",
+            "type": "boolean"
+          },
+          "codigo": {
+            "title": "Codigo",
+            "type": "string"
+          },
+          "decimales": {
+            "title": "Decimales",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "simbolo": {
+            "title": "Simbolo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "codigo",
+          "nombre",
+          "simbolo",
+          "decimales",
+          "activa"
+        ],
+        "title": "DivisaOut",
+        "type": "object"
+      },
+      "DivisaUpdate": {
+        "properties": {
+          "activa": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activa"
+          },
+          "decimales": {
+            "anyOf": [
+              {
+                "maximum": 6.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decimales"
+          },
+          "nombre": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nombre"
+          },
+          "simbolo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Simbolo"
+          }
+        },
+        "title": "DivisaUpdate",
         "type": "object"
       },
       "EjecutarPagoIn": {
@@ -6652,6 +6826,43 @@
         "title": "PermisoOut",
         "type": "object"
       },
+      "PersonaBusquedaOut": {
+        "description": "Para el selector de \"elegir persona existente\" de otro módulo\n(trabajador, proveedor natural) — nunca domicilio/teléfono/email/fecha\nde nacimiento. Mismo principio de minimización que `sales.cliente`: el\nlookup no es la ficha completa.",
+        "properties": {
+          "apellidos": {
+            "title": "Apellidos",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nombres": {
+            "title": "Nombres",
+            "type": "string"
+          },
+          "numero_documento": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Numero Documento"
+          }
+        },
+        "required": [
+          "id",
+          "nombres",
+          "apellidos",
+          "numero_documento"
+        ],
+        "title": "PersonaBusquedaOut",
+        "type": "object"
+      },
       "PersonaCreate": {
         "properties": {
           "apellidos": {
@@ -8235,6 +8446,18 @@
             "title": "Id",
             "type": "string"
           },
+          "persona_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Persona Id"
+          },
           "razon_social": {
             "anyOf": [
               {
@@ -8266,6 +8489,7 @@
           "id",
           "empresa_id",
           "tipo",
+          "persona_id",
           "razon_social",
           "ruc",
           "formal",
@@ -10324,6 +10548,47 @@
         "title": "TransferenciaRecibirItem",
         "type": "object"
       },
+      "UnidadMedidaCreate": {
+        "properties": {
+          "categoria_udm_id": {
+            "format": "uuid",
+            "title": "Categoria Udm Id",
+            "type": "string"
+          },
+          "decimales": {
+            "default": 3,
+            "maximum": 6.0,
+            "minimum": 0.0,
+            "title": "Decimales",
+            "type": "integer"
+          },
+          "nombre": {
+            "maxLength": 50,
+            "minLength": 1,
+            "title": "Nombre",
+            "type": "string"
+          },
+          "ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "default": "1",
+            "title": "Ratio"
+          }
+        },
+        "required": [
+          "categoria_udm_id",
+          "nombre"
+        ],
+        "title": "UnidadMedidaCreate",
+        "type": "object"
+      },
       "UnidadMedidaOut": {
         "properties": {
           "categoria_udm_id": {
@@ -10358,6 +10623,51 @@
           "decimales"
         ],
         "title": "UnidadMedidaOut",
+        "type": "object"
+      },
+      "UnidadMedidaUpdate": {
+        "properties": {
+          "decimales": {
+            "anyOf": [
+              {
+                "maximum": 6.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decimales"
+          },
+          "nombre": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nombre"
+          },
+          "ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ratio"
+          }
+        },
+        "title": "UnidadMedidaUpdate",
         "type": "object"
       },
       "UsuarioCreate": {
@@ -12872,6 +13182,138 @@
         ]
       }
     },
+    "/api/v1/divisas": {
+      "get": {
+        "operationId": "listar_divisas_api_v1_divisas_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DivisaOut"
+                  },
+                  "title": "Response Listar Divisas Api V1 Divisas Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Divisas",
+        "tags": [
+          "gerencia"
+        ]
+      },
+      "post": {
+        "operationId": "crear_divisa_api_v1_divisas_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DivisaCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DivisaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Divisa",
+        "tags": [
+          "gerencia"
+        ]
+      }
+    },
+    "/api/v1/divisas/{divisa_id}": {
+      "patch": {
+        "operationId": "editar_divisa_api_v1_divisas__divisa_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "divisa_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Divisa Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DivisaUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DivisaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Editar Divisa",
+        "tags": [
+          "gerencia"
+        ]
+      }
+    },
     "/api/v1/inventory/ajustes": {
       "post": {
         "operationId": "solicitar_ajuste_api_v1_inventory_ajustes_post",
@@ -13273,6 +13715,80 @@
           }
         ],
         "summary": "Crear Categoria",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/categorias-udm": {
+      "get": {
+        "operationId": "listar_categorias_udm_api_v1_inventory_categorias_udm_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CategoriaUdmOut"
+                  },
+                  "title": "Response Listar Categorias Udm Api V1 Inventory Categorias Udm Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Categorias Udm",
+        "tags": [
+          "inventory"
+        ]
+      },
+      "post": {
+        "operationId": "crear_categoria_udm_api_v1_inventory_categorias_udm_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CategoriaUdmCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoriaUdmOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Categoria Udm",
         "tags": [
           "inventory"
         ]
@@ -14714,6 +15230,108 @@
           }
         ],
         "summary": "Listar Unidades Medida",
+        "tags": [
+          "inventory"
+        ]
+      },
+      "post": {
+        "operationId": "crear_unidad_medida_api_v1_inventory_unidades_medida_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnidadMedidaCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnidadMedidaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Unidad Medida",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/unidades-medida/{unidad_medida_id}": {
+      "patch": {
+        "operationId": "editar_unidad_medida_api_v1_inventory_unidades_medida__unidad_medida_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "unidad_medida_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Unidad Medida Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnidadMedidaUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnidadMedidaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Editar Unidad Medida",
         "tags": [
           "inventory"
         ]
@@ -16437,6 +17055,65 @@
           }
         ],
         "summary": "Crear Persona",
+        "tags": [
+          "personas"
+        ]
+      }
+    },
+    "/api/v1/personas/buscar": {
+      "get": {
+        "description": "Selector de \"elegir persona existente\" para otro módulo (RRHH al\ncontratar, Compras al dar de alta un proveedor natural). Responde con\n`PersonaBusquedaOut` — nunca la ficha completa — así que puede abrirse a\n`personas.leer` sin exponer domicilio/teléfono/email. Ruta declarada\nantes de `/personas/{persona_id}` a propósito: si quedara después,\n\"buscar\" se intentaría parsear como UUID y devolvería 422.",
+        "operationId": "buscar_personas_api_v1_personas_buscar_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PersonaBusquedaOut"
+                  },
+                  "title": "Response Buscar Personas Api V1 Personas Buscar Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Buscar Personas",
         "tags": [
           "personas"
         ]

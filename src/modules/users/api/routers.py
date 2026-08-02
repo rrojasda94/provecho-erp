@@ -160,6 +160,24 @@ def listar_personas(
     return admin.listar_personas(session, q)
 
 
+@router.get(
+    "/personas/buscar", response_model=list[schemas.PersonaBusquedaOut], tags=["personas"]
+)
+def buscar_personas(
+    q: str | None = None,
+    usuario: Usuario = Depends(get_current_user),
+    session: Session = Depends(get_db),
+):
+    """Selector de "elegir persona existente" para otro módulo (RRHH al
+    contratar, Compras al dar de alta un proveedor natural). Responde con
+    `PersonaBusquedaOut` — nunca la ficha completa — así que puede abrirse a
+    `personas.leer` sin exponer domicilio/teléfono/email. Ruta declarada
+    antes de `/personas/{persona_id}` a propósito: si quedara después,
+    "buscar" se intentaría parsear como UUID y devolvería 422."""
+    check_permission(session, usuario, GESTIONAR, "personas.leer")
+    return admin.listar_personas(session, q)
+
+
 @router.get("/almacenes", response_model=list[schemas.AlmacenOut], tags=["users"])
 def listar_almacenes(
     empresa_id: uuid.UUID | None = None,
@@ -542,3 +560,43 @@ def rechazar_parametro(
     )
     session.commit()
     return parametro
+
+
+# --- Divisas (RN-GER-010) ----------------------------------------------------
+# CRUD antes diferido (ADR-014 Addendum b): hoy solo se editaba por seeder.
+@router.post(
+    "/divisas",
+    response_model=schemas.DivisaOut,
+    status_code=status.HTTP_201_CREATED,
+    tags=["gerencia"],
+)
+def crear_divisa(
+    body: schemas.DivisaCreate,
+    _: Usuario = Depends(require_permission(GESTIONAR_PARAMETROS)),
+    session: Session = Depends(get_db),
+):
+    divisa = gerencia.crear_divisa(session, **body.model_dump())
+    session.commit()
+    return divisa
+
+
+@router.get("/divisas", response_model=list[schemas.DivisaOut], tags=["gerencia"])
+def listar_divisas(
+    _: Usuario = Depends(get_current_user),
+    session: Session = Depends(get_db),
+):
+    # Lectura abierta a cualquier autenticado (como /almacenes): cualquier
+    # módulo que declare un monto necesita poder listar divisas válidas.
+    return gerencia.listar_divisas(session)
+
+
+@router.patch("/divisas/{divisa_id}", response_model=schemas.DivisaOut, tags=["gerencia"])
+def editar_divisa(
+    divisa_id: uuid.UUID,
+    body: schemas.DivisaUpdate,
+    _: Usuario = Depends(require_permission(GESTIONAR_PARAMETROS)),
+    session: Session = Depends(get_db),
+):
+    divisa = gerencia.editar_divisa(session, divisa_id, **body.model_dump())
+    session.commit()
+    return divisa

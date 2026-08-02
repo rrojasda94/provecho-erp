@@ -172,26 +172,33 @@ Registro vivo de deuda técnica declarada al cerrar cada slice — para que no
 se olvide. Marcar ✅ al resolverse en el slice indicado.
 
 ### Transversal
-- ⬜ **`GET /personas` exige `users.gestionar`, demasiado amplio para un
-  lookup**: encontrado al construir RRHH → Trabajadores (2026-08-02), que
-  necesita listar personas para el selector de alta (`persona_id`
-  obligatorio) pero no debería requerir permisos de administración de
-  usuarios. `purchases` (proveedor natural) tiene la misma necesidad sin
-  construir todavía. Candidatos: permiso nuevo de solo-lectura
-  (`personas.leer`) que además de `users.gestionar` habilite el endpoint,
-  o restricciones JSONB por permiso (deuda ya declarada más abajo) que
-  acote `users.gestionar` a lectura vs. escritura. Ningún rol RRHH
-  seedeado hoy puede usarlo — mismo hueco que `gestionar_reglas_aprobacion`
-  antes: solo `admin` vía `*`.
-- ✅ 2026-08-02 **Tres endpoints de lectura que faltaban y bloqueaban
+- ✅ 2026-08-02 **`GET /personas` exigía `users.gestionar`, demasiado
+  amplio para un lookup**: nuevo endpoint minimizado
+  `GET /personas/buscar?q=` (permiso `personas.leer`, nuevo) que responde
+  `PersonaBusquedaOut` — id/nombres/apellidos/numero_documento, nunca
+  domicilio/teléfono/email/fecha de nacimiento — así que puede abrirse sin
+  el permiso de administración completo. `personas.leer` sembrado en los
+  roles `comprador` y `rrhh_admin`. `GET /personas` (ficha completa) sigue
+  exigiendo `users.gestionar` sin cambios — el lookup es un recurso
+  distinto, no un permiso más ancho sobre el mismo. RRHH/Trabajadores y
+  Compras/Proveedores (natural) ya migraron a este endpoint.
+- ✅ 2026-08-02 **CRUD de `unidad_medida`/`categoria_udm` (inventory) y
+  `divisa` (gerencia)** — antes solo se editaban por seeder/migración
+  (ADR-014 Addendum b). `POST/PATCH /inventory/unidades-medida[/{id}]`,
+  `POST /inventory/categorias-udm` (permiso `inventory.gestionar_catalogo`)
+  y `POST/PATCH /divisas[/{id}]` (permiso
+  `gerencia.gestionar_parametros_empresa`, lectura abierta a cualquier
+  autenticado — cualquier módulo que declare un monto necesita listar
+  divisas válidas). `decimales` por unidad/divisa (RN-GER-010) ahora se
+  corrige sin migración.
+- ✅ 2026-08-02 **Cuatro endpoints de lectura que faltaban y bloqueaban
   pantallas de frontend**: `GET /api/v1/inventory/unidades-medida`
   (catálogo global, sin tenant — Inventario/Artículos lo necesita para el
   selector de `unidad_medida_id`), `GET /api/v1/purchases/ordenes-compra`
   (listado, no existía ni por error — solo había `GET .../{id}`),
   `GET /api/v1/almacenes` (nuevo en `users`, sin `require_permission` a
   propósito — catálogo de referencia, no dato sensible — pero sí escopado
-  por tenant). Los tres son de solo lectura; ningún CRUD de escritura se
-  agregó de paso.
+  por tenant), `GET /api/v1/personas/buscar` (ver arriba).
 - ✅ 2026-08-02 **Deriva de esquema del slice de contratación** (migración
   `e4a2f9c17b3d`): `postulante.estado` seguía en VARCHAR(10) con nueve
   estados de hasta 15 caracteres — `preseleccionado` fallaba en Postgres y
@@ -1001,8 +1008,13 @@ del JWT sin verificar — ahora sale de `/users/me`.
 shadcn/ui todavía — ningún formulario construido necesitó overlay
 complejo):
 
-- **Compras → Proveedores** (2026-08-02). v1 solo proveedor jurídico; el
-  natural espera un selector de `persona_id` que el frontend no tiene.
+- **Compras → Proveedores** (2026-08-02, natural agregado el mismo día):
+  toggle jurídico/natural en el diálogo; natural usa `PersonaPicker`
+  (componente reusable, `components/persona-picker/`) contra
+  `/personas/buscar` con debounce — no un `<select>` con todo el
+  catálogo, que no escala pasadas unas pocas decenas de personas.
+  `ProveedorOut.persona_id` no viajaba y se agregó: sin eso, un proveedor
+  natural no tenía forma de mostrarse por nombre en la tabla.
 - **Compras → Órdenes de compra** (2026-08-02): ítems dinámicos (agregar/
   quitar fila, total en vivo), `idempotency_key` client-generada.
   Requirió 2 endpoints GET que no existían y bloqueaban la pantalla:
@@ -1012,21 +1024,22 @@ complejo):
 - **Inventario → Artículos** (2026-08-02): requirió
   `GET /api/v1/inventory/unidades-medida`, que tampoco existía — sin
   eso el selector de `unidad_medida_id` (obligatorio para crear) queda
-  vacío. CRUD propio de `unidad_medida` sigue diferido (ver Deuda técnica
-  → Transversal); esto es solo lectura.
-- **RRHH → Trabajadores** (2026-08-02): alta exige `persona_id` existente
-  (ya había `GET /personas`, sin endpoint nuevo). Gap de RBAC encontrado
-  y **no corregido**: `GET /personas` exige `users.gestionar`, no algo
-  más acorde a RRHH — un rol RRHH puro sin ese permiso no puede armar el
-  selector de alta aunque sí pueda leer trabajadores.
+  vacío. CRUD de escritura de `unidad_medida`/`categoria_udm` agregado el
+  mismo día (ver Deuda técnica → Transversal) — sigue sin pantalla propia,
+  se gestiona por API.
+- **RRHH → Trabajadores** (2026-08-02): alta usa `PersonaPicker` (mismo
+  componente que Proveedores). El gap de RBAC que esta pantalla encontró
+  (`GET /personas` exigía `users.gestionar`) se cerró el mismo día con
+  `GET /personas/buscar` + permiso `personas.leer` — ver Deuda técnica.
 - **Ventas**: el tile del home apuntaba a `/ventas` (404); corregido a
   `/pdv` — el PDV es pantalla completa fuera del shell a propósito
   (ADR-013), no una ruta bajo `(app)`.
 
 Verificado end-to-end en Docker con datos reales, por API y por navegador
 (curl + interacción real): crear artículo → aparece en tabla; crear OC de
-2 ítems → total correcto; crear trabajador → nombre resuelto. Sin errores
-de consola.
+2 ítems → total correcto; crear trabajador → nombre resuelto; crear
+proveedor natural con `PersonaPicker` → nombre resuelto en la tabla. Sin
+errores de consola.
 
 Módulos sin pantalla todavía (solo tile en el home, 404 limpio de
 Next.js): ventas de back-office (más allá del PDV), producción,

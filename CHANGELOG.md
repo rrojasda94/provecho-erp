@@ -22,6 +22,32 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Added
 
+- **`personas.leer`, CRUD de `unidad_medida`/`categoria_udm`/`divisa`, y
+  proveedor natural en el frontend** (2026-08-02):
+  - **`GET /personas/buscar?q=`** (permiso nuevo `personas.leer`, sembrado
+    en `comprador` y `rrhh_admin`): responde `PersonaBusquedaOut` (id,
+    nombres, apellidos, numero_documento) — nunca domicilio/teléfono/
+    email/fecha de nacimiento, así que no exige `users.gestionar` como
+    `GET /personas` (que sigue igual, sin cambios). Cierra el gap de RBAC
+    que RRHH/Trabajadores había encontrado: un rol RRHH puro ya puede
+    armar su propio selector de alta.
+  - **CRUD de `unidad_medida`/`categoria_udm`** (`inventory`, permiso
+    `gestionar_catalogo`) y de **`divisa`** (`users`, permiso
+    `gerencia.gestionar_parametros_empresa`, lectura abierta a cualquier
+    autenticado) — ambos antes solo se editaban por seeder/migración
+    (ADR-014 Addendum b). `decimales` por unidad/divisa (RN-GER-010) ahora
+    se corrige con un `PATCH`, sin migración.
+  - **`components/persona-picker/`**: buscador reusable con debounce
+    contra `/personas/buscar` — reemplaza el `<select>` con todo el
+    catálogo cargado (no escala) en RRHH/Trabajadores, y habilita
+    **proveedor natural en Compras/Proveedores** (toggle jurídico/natural
+    en el diálogo). `ProveedorOut.persona_id` no viajaba y se agregó: sin
+    eso, un proveedor natural no tenía forma de mostrarse por nombre en
+    la tabla.
+  - 11 tests nuevos (`tests/test_catalogo_udm_divisa.py`): CRUD de UdM/
+    divisa, permisos, y que `/personas/buscar` de verdad solo devuelve
+    los 4 campos mínimos.
+
 - **Tres pantallas reales más — Inventario/Artículos, Compras/Órdenes de
   compra, RRHH/Trabajadores** (2026-08-02), siguiendo el patrón de
   Compras/Proveedores (tabla TanStack + alta con `<dialog>` nativo):
