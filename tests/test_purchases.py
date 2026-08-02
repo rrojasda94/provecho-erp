@@ -22,6 +22,7 @@ from src.modules.inventory.infrastructure.models import (
     Sku,
     UnidadMedida,
 )
+from src.modules.purchases.application import proveedores as proveedores_uc
 from src.modules.users.api.deps import get_db
 from src.modules.users.infrastructure.models import (
     Almacen,
@@ -132,6 +133,17 @@ def test_crear_proveedor_juridico(env):
     r = _crear_proveedor(client, h, ids)
     assert r.status_code == 201
     assert r.json()["ruc"] == "20111111111"
+
+
+def test_crear_proveedor_juridico_consulta_factiliza_para_la_razon_social(env, monkeypatch):
+    client, ids, _ = env
+    monkeypatch.setattr(
+        proveedores_uc, "razon_social_desde_ruc", lambda ruc, fallback: "SERVICIOS RENTAURANT S.A.C"
+    )
+    h = _token(client)
+    r = _crear_proveedor(client, h, ids, ruc="20610077782")
+    assert r.status_code == 201
+    assert r.json()["razon_social"] == "SERVICIOS RENTAURANT S.A.C"
 
 
 def test_crear_proveedor_juridico_sin_ruc_409(env):

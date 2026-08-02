@@ -22,6 +22,22 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Added
 
+- **Consulta RUC/DNI vía Factiliza en alta de cliente/proveedor jurídico**
+  (2026-08-02): `FactilizaClient.consultar_dni`/`consultar_ruc`
+  (`src/shared/integrations/factiliza/`) contra `api.factiliza.com`
+  (`FACTILIZA_CONSULTA_BASE_URL`, host distinto al de emisión de
+  comprobantes) — RENIEC/SUNAT, mismo token. `nombres_desde_dni`/
+  `razon_social_desde_ruc` hacen fallback a lo tecleado si Factiliza no
+  responde o no encuentra el documento, para que el alta nunca se bloquee
+  por un proveedor externo caído. Cableado en `sales.crear_cliente`
+  (natural por DNI nuevo, jurídico por RUC nuevo) y
+  `purchases.crear_proveedor` (jurídico por RUC nuevo); un documento ya
+  registrado en `persona` no vuelve a consultar. Probado con datos reales
+  de QA (DNI 73632127, RUC 20610077782). 20 tests nuevos
+  (`tests/test_factiliza_consulta.py` + casos en `test_pdv_slice.py`/
+  `test_purchases.py`); `tests/conftest.py` nuevo, autouse que fuerza
+  `factiliza_token=""` por test para que el suite nunca dependa de la red.
+
 - **`personas.leer`, CRUD de `unidad_medida`/`categoria_udm`/`divisa`, y
   proveedor natural en el frontend** (2026-08-02):
   - **`GET /personas/buscar?q=`** (permiso nuevo `personas.leer`, sembrado

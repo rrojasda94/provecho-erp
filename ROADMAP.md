@@ -638,6 +638,27 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
     humano autorizado, con motivo y responsable; mezclarlos haría imposible
     auditar cuál descuento fue manual y cuál automático (ADR-018 →
     «Frontera explícita»).
+  - ✅ 2026-08-02 **Alta de cliente/proveedor jurídico consulta Factiliza
+    para el nombre/razón social** (`RENIEC`/`SUNAT` vía el mismo proveedor,
+    ADR-005 ya lo dejaba previsto). `FactilizaClient.consultar_dni`/
+    `consultar_ruc` (host propio, `FACTILIZA_CONSULTA_BASE_URL` —
+    `api.factiliza.com`, **distinto** de `FACTILIZA_BASE_URL` que es solo
+    emisión de comprobantes contra la QA `apife-qa.factiliza.com`; mismo
+    token). `nombres_desde_dni`/`razon_social_desde_ruc`
+    (`src/shared/integrations/factiliza/`) hacen fallback a lo tecleado si
+    Factiliza no responde o no encuentra el documento — el alta nunca se
+    bloquea por un proveedor externo caído. Cableado en
+    `sales/application/clientes.py` (natural por DNI nuevo, jurídico por RUC
+    nuevo) y `purchases/application/proveedores.py` (jurídico por RUC).
+    Documento ya registrado en `persona` no vuelve a consultar. Probado con
+    datos reales de QA: DNI 73632127 (Carlos Renato Rojas del Aguila) y RUC
+    20610077782 (Servicios Rentaurant S.A.C., estado BAJA DE OFICIO — el
+    consumo no valida `estado`/`condicion`, solo usa el nombre; bloquear por
+    RUC no-HABIDO queda para cuando el negocio lo pida). 20 tests nuevos
+    (`tests/test_factiliza_consulta.py` + casos en `test_pdv_slice.py`/
+    `test_purchases.py`); `tests/conftest.py` nuevo, autouse que fuerza
+    `factiliza_token=""` por test para que el suite nunca dependa de la red
+    aunque el `.env` local tenga un token real.
   - ✅ 2026-07-28 **Cliente identificado por teléfono** (migración
     `e1c4a9d6b038`): `persona.numero_documento`/`tipo_documento` pasan a
     nullable, conservando el UNIQUE. Registrar a una persona natural exige

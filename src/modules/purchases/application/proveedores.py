@@ -11,6 +11,7 @@ from src.modules.purchases.domain import rules
 from src.modules.purchases.infrastructure.models import Proveedor
 from src.modules.purchases.infrastructure.repositories import ProveedorRepo
 from src.modules.users.infrastructure.models import Persona
+from src.shared.integrations.factiliza import razon_social_desde_ruc
 
 
 def crear_proveedor(
@@ -41,6 +42,7 @@ def crear_proveedor(
         if not razon_social or not ruc:
             raise ReglaNegocio("proveedor jurídico requiere razon_social y ruc")
         persona_id = None
+        razon_social = razon_social_desde_ruc(ruc, razon_social)
     else:
         raise ReglaNegocio(f"tipo de proveedor inválido: {tipo}")
 

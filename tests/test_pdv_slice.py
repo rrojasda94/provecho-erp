@@ -519,6 +519,71 @@ def test_dni_crea_cliente_natural_y_reutiliza_la_persona_existente(session, base
     assert otro.persona_id == base["usuario"].persona_id
 
 
+def test_ruc_nuevo_consulta_factiliza_para_la_razon_social(session, base, monkeypatch):
+    """RN-PTS-004 addendum: la razón social del RUC no se confía a lo
+    tecleado en caja, sale de la consulta a Factiliza."""
+    monkeypatch.setattr(
+        clientes_uc, "razon_social_desde_ruc", lambda ruc, fallback: "SERVICIOS RENTAURANT S.A.C"
+    )
+    cliente = clientes_uc.crear_cliente(
+        session,
+        grupo_id=base["grupo"].id,
+        nombre="lo que haya tecleado el cajero",
+        numero_documento="20610077782",
+    )
+    assert cliente.razon_social == "SERVICIOS RENTAURANT S.A.C"
+
+
+def test_dni_nuevo_consulta_factiliza_para_el_nombre(session, base, monkeypatch):
+    llamado = {}
+
+    def fake(dni, nombres, apellidos):
+        llamado["dni"] = dni
+        return "CARLOS RENATO", "ROJAS DEL AGUILA"
+
+    monkeypatch.setattr(clientes_uc, "nombres_desde_dni", fake)
+    cliente = clientes_uc.crear_cliente(
+        session,
+        grupo_id=base["grupo"].id,
+        nombre="lo que haya tecleado el cajero",
+        numero_documento="73632127",
+        telefono="900000010",
+    )
+    persona = session.get(Persona, cliente.persona_id)
+    assert llamado["dni"] == "73632127"
+    assert persona.nombres == "CARLOS RENATO"
+    assert persona.apellidos == "ROJAS DEL AGUILA"
+
+
+def test_documento_ya_registrado_no_vuelve_a_consultar_factiliza(session, base, monkeypatch):
+    """Solo la PRIMERA vez que se ve el documento se consulta. Reutilizar
+    una persona que ya existe no debe volver a llamar a Factiliza."""
+    persona = Persona(
+        nombres="Carlos",
+        apellidos="Preexistente",
+        tipo_documento="dni",
+        numero_documento="73632127",
+        telefono="900000013",
+    )
+    session.add(persona)
+    session.flush()
+
+    def explota(*a, **k):
+        raise AssertionError("no debe consultar Factiliza si el documento ya existe")
+
+    monkeypatch.setattr(clientes_uc, "nombres_desde_dni", explota)
+    cliente = clientes_uc.crear_cliente(
+        session,
+        grupo_id=base["grupo"].id,
+        nombre="Ignorado",
+        numero_documento="73632127",
+        telefono="900000014",
+    )
+    p = session.get(Persona, cliente.persona_id)
+    assert p.nombres == "Carlos"
+    assert p.apellidos == "Preexistente"
+
+
 def test_fecha_nacimiento_se_guarda_y_no_se_pisa(session, base):
     """Cumpleaños del cliente: se guarda al registrar y, si la persona ya
     existía sin ese dato, se completa sin pisar uno que ya tuviera."""

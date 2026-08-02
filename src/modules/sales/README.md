@@ -66,6 +66,13 @@ cuatro huecos que el punto de venta necesitaba y el modelo no daba.
   teléfono, documento o nombre en `GET /sales/clientes/buscar?q=`
   (RN-PTS-006). **Trabajador y usuario siguen exigiendo documento**: esa
   validación vive en `users.application.admin`, no en el esquema.
+- **Nombre/razón social vía Factiliza en alta nueva** (2026-08-02):
+  documento (DNI/RUC) que la persona todavía no tiene registrado consulta
+  `FactilizaClient.consultar_dni`/`consultar_ruc` (RENIEC/SUNAT,
+  `src/shared/integrations/factiliza/`) para el nombre real, en vez de
+  confiar en lo tecleado en caja. Documento ya visto no vuelve a consultar.
+  Sin respuesta de Factiliza (o no encontrado) cae a lo tecleado — el alta
+  nunca se bloquea.
 
 **Cierre para alfa (2026-07-28, migraciones `f2a8c15e94d7` y `b6d41e07af92`):**
 
