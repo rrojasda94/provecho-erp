@@ -4,6 +4,7 @@ Cubre resolución por ámbito (sucursal/canal/modalidad), promoción que gana
 mientras está vigente y se restaura sola al vencer, y venta sin precio.
 """
 
+import uuid
 from datetime import date, timedelta
 from decimal import Decimal
 
@@ -18,6 +19,7 @@ from src.core.app import create_app
 from src.core.database import Base
 from src.modules.inventory.application import listeners
 from src.modules.inventory.infrastructure.models import (
+    Categoria,
     CategoriaUdm,
     Receta,
     UnidadMedida,
@@ -197,6 +199,32 @@ def test_carta_expone_precio_resuelto(env):
     carta = r.json()
     assert len(carta) == 1
     assert Decimal(carta[0]["precio_unitario"]) == Decimal("20.00")
+
+
+def test_carta_expone_nombre_de_categoria(env):
+    """El PDV agrupa el catálogo por categoría (pizzas, bebidas...); sin el
+    nombre resuelto solo tendría el id para pintar la pestaña."""
+    client, ids = env
+    h = _token(client)
+    _lista(client, h, ids, "20.00")
+
+    session = next(client.app.dependency_overrides[get_db]())
+    empresa = session.scalar(select(Empresa))
+    categoria = Categoria(empresa_id=empresa.id, nombre="Pizzas")
+    session.add(categoria)
+    session.flush()
+    producto = session.get(ProductoComercial, uuid.UUID(ids["producto_id"]))
+    producto.categoria_id = categoria.id
+    session.commit()
+
+    r = client.get(
+        f"/api/v1/sales/carta?sucursal_id={ids['sucursal_id']}"
+        "&canal=pdv&modalidad=takeout",
+        headers=h,
+    )
+    assert r.status_code == 200
+    carta = r.json()
+    assert carta[0]["categoria_nombre"] == "Pizzas"
 
 
 def test_carta_omite_producto_sin_precio(env):

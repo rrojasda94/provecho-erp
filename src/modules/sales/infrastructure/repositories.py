@@ -11,9 +11,11 @@ from src.modules.sales.infrastructure.models import (
     Cliente,
     ListaPrecio,
     MedioPago,
+    Mesa,
     Pago,
     Precio,
     ProductoComercial,
+    ProductoComercialExtra,
     PuntoVenta,
     Venta,
     VentaItem,
@@ -45,10 +47,44 @@ class VentaRepo:
         self.s.flush()
         return venta
 
-    def items(self, venta_id: uuid.UUID) -> list[VentaItem]:
-        return list(
-            self.s.scalars(select(VentaItem).where(VentaItem.venta_id == venta_id))
+    def items(
+        self, venta_id: uuid.UUID, grupo_cobro: int | None = None
+    ) -> list[VentaItem]:
+        q = select(VentaItem).where(VentaItem.venta_id == venta_id)
+        if grupo_cobro is not None:
+            q = q.where(VentaItem.grupo_cobro == grupo_cobro)
+        return list(self.s.scalars(q))
+
+    def grupos_de_cobro(self, venta_id: uuid.UUID) -> list[int]:
+        return sorted(
+            set(
+                self.s.scalars(
+                    select(VentaItem.grupo_cobro).where(
+                        VentaItem.venta_id == venta_id
+                    )
+                )
+            )
         )
+
+    def del_dia(
+        self,
+        *,
+        sucursal_id: uuid.UUID,
+        fecha: date,
+        estados: tuple[str, ...] | None = None,
+        punto_venta_id: uuid.UUID | None = None,
+    ) -> list[Venta]:
+        """Ventas de una jornada. Base de la pestaña de cobrados del PDV y
+        del cierre de caja: sin esto el cajero no puede verificar lo vendido
+        ni reenviar un comprobante que el cliente perdió."""
+        q = select(Venta).where(
+            Venta.sucursal_id == sucursal_id, Venta.fecha_orden == fecha
+        )
+        if estados:
+            q = q.where(Venta.estado.in_(estados))
+        if punto_venta_id is not None:
+            q = q.where(Venta.punto_venta_id == punto_venta_id)
+        return list(self.s.scalars(q.order_by(Venta.numero_orden)))
 
 
 class PagoRepo:
@@ -66,14 +102,17 @@ class PagoRepo:
         self.s.flush()
         return pago
 
-    def confirmados(self, venta_id: uuid.UUID) -> list[Decimal]:
-        return list(
-            self.s.scalars(
-                select(Pago.monto).where(
-                    Pago.venta_id == venta_id, Pago.estado == "confirmado"
-                )
-            )
+    def confirmados(
+        self, venta_id: uuid.UUID, grupo_cobro: int | None = None
+    ) -> list[Decimal]:
+        """Sin `grupo_cobro` devuelve los pagos de toda la venta (el uso
+        histórico); con él, solo los de esa cuenta."""
+        q = select(Pago.monto).where(
+            Pago.venta_id == venta_id, Pago.estado == "confirmado"
         )
+        if grupo_cobro is not None:
+            q = q.where(Pago.grupo_cobro == grupo_cobro)
+        return list(self.s.scalars(q))
 
 
 class ProductoComercialRepo:
@@ -101,6 +140,37 @@ class ProductoComercialRepo:
         self.s.flush()
         return producto
 
+    # Anotación entre comillas a propósito: `list` está sombreado por el
+    # método de arriba dentro del cuerpo de esta clase.
+    def extras_de(self, producto_id: uuid.UUID) -> "list[ProductoComercialExtra]":
+        return [
+            *self.s.scalars(
+                select(ProductoComercialExtra).where(
+                    ProductoComercialExtra.producto_comercial_id == producto_id
+                )
+            )
+        ]
+
+    def admite_extra(
+        self, producto_id: uuid.UUID, extra_id: uuid.UUID
+    ) -> ProductoComercialExtra | None:
+        return self.s.scalar(
+            select(ProductoComercialExtra).where(
+                ProductoComercialExtra.producto_comercial_id == producto_id,
+                ProductoComercialExtra.extra_id == extra_id,
+            )
+        )
+
+    def vincular_extra(
+        self, producto_id: uuid.UUID, extra_id: uuid.UUID, maximo: int | None = None
+    ) -> ProductoComercialExtra:
+        vinculo = ProductoComercialExtra(
+            producto_comercial_id=producto_id, extra_id=extra_id, maximo=maximo
+        )
+        self.s.add(vinculo)
+        self.s.flush()
+        return vinculo
+
 
 class ClienteRepo:
     def __init__(self, session: Session) -> None:
@@ -109,6 +179,80 @@ class ClienteRepo:
     def get(self, cliente_id: uuid.UUID) -> Cliente | None:
         return self.s.get(Cliente, cliente_id)
 
+    def add(self, cliente: Cliente) -> Cliente:
+        self.s.add(cliente)
+        self.s.flush()
+        return cliente
+
+    def por_ruc(self, grupo_id: uuid.UUID, ruc: str) -> Cliente | None:
+        """Evita duplicar el cliente corporativo al crearlo desde caja."""
+        return self.s.scalar(
+            select(Cliente).where(
+                Cliente.grupo_id == grupo_id,
+                Cliente.ruc == ruc,
+                Cliente.deleted_at.is_(None),
+            )
+        )
+
+    def por_persona(
+        self, grupo_id: uuid.UUID, persona_id: uuid.UUID
+    ) -> Cliente | None:
+        """Una persona es cliente a lo más una vez por grupo: registrar dos
+        veces al mismo señor partiría su historial de compras en dos."""
+        return self.s.scalar(
+            select(Cliente).where(
+                Cliente.grupo_id == grupo_id,
+                Cliente.persona_id == persona_id,
+                Cliente.deleted_at.is_(None),
+            )
+        )
+
+
+class MesaRepo:
+    def __init__(self, session: Session) -> None:
+        self.s = session
+
+    def get(self, mesa_id: uuid.UUID) -> Mesa | None:
+        return self.s.get(Mesa, mesa_id)
+
+    def add(self, mesa: Mesa) -> Mesa:
+        self.s.add(mesa)
+        self.s.flush()
+        return mesa
+
+    def por_numero(self, sucursal_id: uuid.UUID, numero: int) -> Mesa | None:
+        return self.s.scalar(
+            select(Mesa).where(
+                Mesa.sucursal_id == sucursal_id,
+                Mesa.numero == numero,
+                Mesa.deleted_at.is_(None),
+            )
+        )
+
+    def de_sucursal(
+        self, sucursal_id: uuid.UUID, solo_activas: bool = True
+    ) -> list[Mesa]:
+        q = select(Mesa).where(
+            Mesa.sucursal_id == sucursal_id, Mesa.deleted_at.is_(None)
+        )
+        if solo_activas:
+            q = q.where(Mesa.activa.is_(True))
+        return list(self.s.scalars(q.order_by(Mesa.numero)))
+
+    def ocupadas(self, sucursal_id: uuid.UUID, fecha: date) -> list[Venta]:
+        """Ventas de mesa que siguen en `orden` — las que el mapa del PDV
+        pinta como ocupadas. Una venta pagada libera la mesa."""
+        return list(
+            self.s.scalars(
+                select(Venta).where(
+                    Venta.sucursal_id == sucursal_id,
+                    Venta.fecha_orden == fecha,
+                    Venta.mesa_id.is_not(None),
+                    Venta.estado == "orden",
+                )
+            )
+        )
+
 
 class PuntoVentaRepo:
     def __init__(self, session: Session) -> None:
@@ -116,6 +260,13 @@ class PuntoVentaRepo:
 
     def get(self, punto_venta_id: uuid.UUID) -> PuntoVenta | None:
         return self.s.get(PuntoVenta, punto_venta_id)
+
+    def de_sucursal(self, sucursal_id: uuid.UUID) -> list[PuntoVenta]:
+        return list(
+            self.s.scalars(
+                select(PuntoVenta).where(PuntoVenta.sucursal_id == sucursal_id)
+            )
+        )
 
 
 class ComprobanteRepo:
@@ -126,8 +277,31 @@ class ComprobanteRepo:
         return self.s.get(Comprobante, comprobante_id)
 
     def por_venta(self, venta_id: uuid.UUID) -> Comprobante | None:
+        """El primero de la venta. Con cobro dividido hay más de uno; para
+        ese caso usar `por_venta_y_grupo` o `todos_de_venta`."""
         return self.s.scalar(
-            select(Comprobante).where(Comprobante.venta_id == venta_id)
+            select(Comprobante)
+            .where(Comprobante.venta_id == venta_id)
+            .order_by(Comprobante.grupo_cobro)
+        )
+
+    def por_venta_y_grupo(
+        self, venta_id: uuid.UUID, grupo_cobro: int
+    ) -> Comprobante | None:
+        return self.s.scalar(
+            select(Comprobante).where(
+                Comprobante.venta_id == venta_id,
+                Comprobante.grupo_cobro == grupo_cobro,
+            )
+        )
+
+    def todos_de_venta(self, venta_id: uuid.UUID) -> list[Comprobante]:
+        return list(
+            self.s.scalars(
+                select(Comprobante)
+                .where(Comprobante.venta_id == venta_id)
+                .order_by(Comprobante.grupo_cobro)
+            )
         )
 
     def siguiente_correlativo(self, empresa_id: uuid.UUID, serie: str) -> int:

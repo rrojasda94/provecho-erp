@@ -13,7 +13,15 @@ dominio, no en el esquema.
 
 import uuid
 
-from sqlalchemy import Enum, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import (
+    Enum,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -22,13 +30,30 @@ from src.core.model_base import JsonB, TimestampMixin, UuidPkMixin
 
 class Comprobante(Base, UuidPkMixin, TimestampMixin):
     __tablename__ = "comprobante"
-    __table_args__ = (UniqueConstraint("empresa_id", "serie", "correlativo"),)
+    __table_args__ = (
+        UniqueConstraint("empresa_id", "serie", "correlativo"),
+        # Una venta dividida tiene varios comprobantes: se busca por
+        # (venta, grupo) al cobrar cada cuenta.
+        Index("ix_comprobante_venta_grupo", "venta_id", "grupo_cobro"),
+    )
 
     empresa_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("empresa.id"))
     # Si direccion=emitido.
     venta_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("venta.id"), nullable=True
     )
+    # Cuenta de la venta que este comprobante documenta (RN-COM-018). Una
+    # venta dividida entre varios pagadores emite un comprobante por grupo,
+    # por eso `venta_id` dejó de ser único. Vale 1 en toda venta sin dividir.
+    grupo_cobro: Mapped[int] = mapped_column(
+        Integer, default=1, server_default="1", nullable=False
+    )
+    # Receptor tecleado en caja cuando no hay `cliente` registrado: el PDV
+    # pide DNI o RUC al cobrar y eso decide boleta/factura (RN-CPP-003).
+    # Cuando vienen informados ganan sobre `venta.cliente_id` al armar el
+    # envío a SUNAT; si están vacíos se usa el cliente de la venta como antes.
+    receptor_num_doc: Mapped[str | None] = mapped_column(String(11), nullable=True)
+    receptor_nombre: Mapped[str | None] = mapped_column(String(255), nullable=True)
     # Si direccion=recibido — FK diferida (purchases sin tablas de recepción aún).
     compra_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
     # Origen de la serie si direccion=emitido.

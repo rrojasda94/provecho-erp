@@ -10,9 +10,20 @@ from pydantic import BaseModel, ConfigDict, Field
 # El precio NO viaja en el request: lo fija el servidor contra
 # `lista_precio` (RN-PRC-003). `venta_item.precio_unitario` guarda el
 # snapshot de lo resuelto.
+class ExtraIn(BaseModel):
+    producto_comercial_id: uuid.UUID
+    cantidad: Decimal = Field(default=Decimal(1), gt=0)
+
+
 class VentaItemIn(BaseModel):
     producto_comercial_id: uuid.UUID
     cantidad: Decimal = Field(gt=0)
+    # Cuenta a la que va la línea cuando el pedido se divide entre varios
+    # pagadores. Omitirlo = todo en una sola cuenta (RN-COM-018).
+    grupo_cobro: int = Field(default=1, ge=1)
+    # Extras agregados a ESTA línea. Cada uno se guarda como línea propia
+    # colgada de ella y hereda su grupo de cobro (RN-COM-021).
+    extras: list[ExtraIn] = []
 
 
 class VentaCreate(BaseModel):
@@ -23,8 +34,11 @@ class VentaCreate(BaseModel):
     idempotency_key: str = Field(min_length=8, max_length=100)
     items: list[VentaItemIn] = Field(min_length=1)
     cliente_id: uuid.UUID | None = None
-    # "Mesa 5", "Carlos", "Rappi #1042" — visible en KDS y comanda.
+    # "Carlos", "Rappi #1042" — visible en KDS y comanda. Para modalidad
+    # `mesa` el dato tipado es `mesa_id`.
     referencia_atencion: str | None = Field(default=None, max_length=50)
+    mesa_id: uuid.UUID | None = None
+    comensales: int | None = Field(default=None, ge=1)
     # Identificador generado por el cliente. El PDV puede crear la venta sin
     # conexión y conservar su id al llegar al servidor (ADR-009); si no lo
     # manda, lo genera el servidor como siempre.
@@ -42,6 +56,44 @@ class VentaOut(BaseModel):
     estado: str
     total: Decimal
     referencia_atencion: str | None
+    mesa_id: uuid.UUID | None = None
+    comensales: int | None = None
+    descuento_modo: str | None = None
+    descuento_valor: Decimal | None = None
+    descuento_motivo: str | None = None
+
+
+class DescuentoCreate(BaseModel):
+    """`modo=None` quita el descuento. Motivo y autorizador son obligatorios
+    al aplicarlo: el reporte de descuentos necesita saber por qué y quién.
+
+    `autorizacion` es el token que devuelve `POST /auth/autorizar` cuando el
+    supervisor teclea su PIN en el terminal del cajero. **Quién autorizó sale
+    de ahí, nunca del cuerpo**: un id suelto en el request sería una firma
+    falsificable y el reporte de descuentos dejaría de valer (RN-AUD-005).
+    """
+
+    modo: str | None = None
+    valor: Decimal | None = Field(default=None, gt=0)
+    motivo: str | None = None
+    autorizacion: str
+
+
+class AnularLineasCreate(BaseModel):
+    """Quitar líneas de una orden ya enviada a cocina. `autorizacion` es el
+    token de `POST /auth/autorizar`: es inventario que se repone, lo
+    autoriza un supervisor (RN-COM-020)."""
+
+    venta_item_ids: list[uuid.UUID] = Field(min_length=1)
+    motivo: str = Field(min_length=3, max_length=120)
+    autorizacion: str
+
+
+class PrecuentaOut(BaseModel):
+    venta_id: uuid.UUID
+    grupo_cobro: int | None
+    total: Decimal
+    texto: str
 
 
 class PagoCreate(BaseModel):
@@ -49,6 +101,11 @@ class PagoCreate(BaseModel):
     monto: Decimal = Field(gt=0)
     idempotency_key: str = Field(min_length=8, max_length=100)
     referencia_externa: str | None = None
+    grupo_cobro: int = Field(default=1, ge=1)
+    # Documento que el cliente pidió en caja. 11 dígitos = factura, 8 o
+    # vacío = boleta (RN-CPP-003). Solo se usa al cerrarse la cuenta.
+    receptor_num_doc: str | None = Field(default=None, max_length=11)
+    receptor_nombre: str | None = Field(default=None, max_length=255)
     id: uuid.UUID | None = None
 
 
@@ -58,7 +115,100 @@ class PagoOut(BaseModel):
     venta_id: uuid.UUID
     medio_pago_id: uuid.UUID
     monto: Decimal
+    grupo_cobro: int
     estado: str
+
+
+class PuntoVentaOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    sucursal_id: uuid.UUID
+    canal: str
+    serie_boleta: str
+    serie_factura: str
+    modalidades_habilitadas: list | None
+    politica_pago: str
+
+
+# --- Mesas del salón --------------------------------------------------------
+class MesaCreate(BaseModel):
+    sucursal_id: uuid.UUID
+    numero: int = Field(ge=1)
+    zona: str | None = Field(default=None, max_length=50)
+    capacidad: int | None = Field(default=None, ge=1)
+
+
+class MesaOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    sucursal_id: uuid.UUID
+    numero: int
+    zona: str | None
+    capacidad: int | None
+    activa: bool
+
+
+class MesaEnMapaOut(BaseModel):
+    """Una mesa y la orden abierta que tenga. `venta_id=None` = libre."""
+
+    id: uuid.UUID
+    numero: int
+    zona: str | None
+    capacidad: int | None
+    venta_id: uuid.UUID | None
+    numero_orden: int | None
+    comensales: int | None
+    total: Decimal
+
+
+# --- Cliente creado desde caja ----------------------------------------------
+class ClienteCreate(BaseModel):
+    """El tipo lo decide el documento: 11 dígitos crea cliente jurídico con
+    RUC; el resto, uno natural con su persona.
+
+    El documento es **opcional** para una persona natural — mucha gente no
+    lo da en el mostrador — pero entonces el **teléfono es obligatorio**,
+    porque algo tiene que servir para encontrarla después (RN-PTS-002). Para
+    facturar a una empresa el RUC sí es obligatorio.
+    """
+
+    nombre: str = Field(min_length=1, max_length=255)
+    telefono: str | None = Field(default=None, max_length=20)
+    numero_documento: str | None = Field(default=None, max_length=11)
+    email: str | None = Field(default=None, max_length=255)
+    direccion: str | None = Field(default=None, max_length=255)
+    fecha_nacimiento: date | None = None
+    tipo_documento: str = "dni"
+
+
+class ClienteDocumentoUpdate(BaseModel):
+    """Completar el documento de un cliente registrado solo por teléfono."""
+
+    numero_documento: str = Field(min_length=8, max_length=11)
+    tipo_documento: str = "dni"
+
+
+class ClienteOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    tipo: str
+    razon_social: str | None
+    ruc: str | None
+    persona_id: uuid.UUID | None
+
+
+class ClienteBuscadoOut(BaseModel):
+    """Lo que el PDV necesita para pintar un resultado de búsqueda."""
+
+    id: uuid.UUID
+    tipo: str
+    nombre: str
+    telefono: str | None
+    numero_documento: str | None
+    direccion: str | None
+    # False si no dio documento o dio el genérico: queda fuera de las
+    # promociones para clientes registrados con documento (RN-PTS-002).
+    identificado: bool
 
 
 # --- Lote de sincronización del hub (ADR-009) -------------------------------
@@ -76,6 +226,11 @@ class VentaItemSyncIn(BaseModel):
     cantidad: Decimal = Field(gt=0)
     precio_unitario: Decimal = Field(ge=0)
     descuento: Decimal = Decimal(0)
+    # Ausente en los lotes emitidos antes del cobro dividido: esa venta
+    # tenía una sola cuenta.
+    grupo_cobro: int = Field(default=1, ge=1)
+    # Anidados bajo su línea padre para no perder de qué plato colgaban.
+    extras: list["VentaItemSyncIn"] = []
 
 
 class VentaSyncIn(BaseModel):
@@ -96,6 +251,14 @@ class VentaSyncIn(BaseModel):
     items: list[VentaItemSyncIn] = Field(min_length=1)
     cliente_id: uuid.UUID | None = None
     referencia_atencion: str | None = Field(default=None, max_length=50)
+    mesa_id: uuid.UUID | None = None
+    comensales: int | None = Field(default=None, ge=1)
+    # El descuento del local viaja con su motivo y autorizador para que la
+    # nube no lo pierda ni tenga que re-autorizarlo.
+    descuento_modo: str | None = None
+    descuento_valor: Decimal | None = None
+    descuento_motivo: str | None = None
+    descuento_autorizado_por: uuid.UUID | None = None
 
 
 class PagoSyncIn(BaseModel):
@@ -105,6 +268,7 @@ class PagoSyncIn(BaseModel):
     monto: Decimal = Field(gt=0)
     idempotency_key: str = Field(min_length=8, max_length=100)
     referencia_externa: str | None = None
+    grupo_cobro: int = Field(default=1, ge=1)
 
 
 class LoteSyncIn(BaseModel):
@@ -119,6 +283,18 @@ class ProductoCreate(BaseModel):
     receta_id: uuid.UUID
     empaque_id: uuid.UUID | None = None
     modalidades_empaque: list[str] | None = None
+    # Un extra tiene su propia receta y se ejecuta en la sucursal: se suma
+    # a la del producto al que se agrega (RN-COM-021). No sale suelto en la
+    # carta.
+    es_extra: bool = False
+
+
+class VincularExtraCreate(BaseModel):
+    """Habilita un extra sobre un producto. `maximo` es el tope de unidades
+    del extra en una misma línea; NULL = sin tope."""
+
+    extra_id: uuid.UUID
+    maximo: int | None = Field(default=None, ge=1)
 
 
 class ProductoUpdate(BaseModel):
@@ -136,6 +312,7 @@ class ProductoOut(BaseModel):
     nombre: str
     receta_id: uuid.UUID
     activo: bool
+    es_extra: bool = False
 
 
 class MedioPagoCreate(BaseModel):
@@ -187,12 +364,45 @@ class PrecioOut(BaseModel):
     monto: Decimal
 
 
+class ExtraDeCartaOut(BaseModel):
+    """Extra ofrecible sobre un producto, con su precio ya resuelto para
+    este ámbito (RN-COM-021)."""
+
+    producto_comercial_id: uuid.UUID
+    nombre: str
+    precio_unitario: Decimal
+    maximo: int | None
+
+
 class CartaItemOut(BaseModel):
     producto_comercial_id: uuid.UUID
     id_interno: str
     nombre: str
     categoria_id: uuid.UUID | None
+    categoria_nombre: str | None = None
     precio_unitario: Decimal
+    extras: list[ExtraDeCartaOut] = []
+
+
+class VentaItemExtraOut(BaseModel):
+    id: uuid.UUID
+    producto_comercial_id: uuid.UUID
+    nombre: str
+    cantidad: Decimal
+    precio_unitario: Decimal
+
+
+class VentaItemOut(BaseModel):
+    """Línea de una venta ya confirmada, para reabrirla en el PDV (mesa en
+    curso) o para elegir qué anular (RN-COM-020)."""
+
+    id: uuid.UUID
+    producto_comercial_id: uuid.UUID
+    nombre: str
+    cantidad: Decimal
+    precio_unitario: Decimal
+    grupo_cobro: int
+    extras: list[VentaItemExtraOut] = []
 
 
 class ClientePublicoOut(BaseModel):
@@ -219,6 +429,11 @@ class ComprobanteOut(BaseModel):
     tipo: str
     serie: str
     correlativo: int
+    # Cuenta que documenta y a quién se emitió: la pestaña de cobrados los
+    # necesita para reimprimir el comprobante correcto de una venta dividida.
+    grupo_cobro: int
+    receptor_num_doc: str | None
+    receptor_nombre: str | None
     estado_emision: str
     hash_proveedor: str | None
     detalle_emision: str | None

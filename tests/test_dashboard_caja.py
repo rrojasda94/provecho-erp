@@ -49,6 +49,7 @@ from src.modules.users.infrastructure.models import (
     Sucursal,
     Usuario,
     UsuarioRol,
+    UsuarioSucursal,
 )
 from src.modules.users.infrastructure.security import hash_pin
 
@@ -132,6 +133,8 @@ def env(monkeypatch):
         s.flush()
         rol_cajero = s.scalar(select(Rol).where(Rol.nombre == "cajero"))
         s.add(UsuarioRol(usuario_id=cajero.id, rol_id=rol_cajero.id))
+        # Sin sucursal el JWT sale sin `empresa_id` y todo responde 403 (ADR-004).
+        s.add(UsuarioSucursal(usuario_id=cajero.id, sucursal_id=sucursal.id))
 
         ids.update(
             empresa_id=str(empresa.id), sucursal_id=str(sucursal.id), pv_id=str(pv.id),

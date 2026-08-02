@@ -39,5 +39,7 @@ def crear_regla_asiento(
     )
 
 
-def listar_reglas_asiento(session: Session, empresa_id: uuid.UUID) -> list[ReglaAsiento]:
+def listar_reglas_asiento(
+    session: Session, empresa_id: uuid.UUID | None = None
+) -> list[ReglaAsiento]:
     return ReglaAsientoRepo(session).list(empresa_id)

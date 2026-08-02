@@ -37,12 +37,23 @@ _EXCEPCIONES_CRUZADAS = {
     "purchases": ("inventory.infrastructure.models",),
     "production": ("inventory.infrastructure.models",),
     # Caja compone el resumen de ventas del día.
-    "accounting": ("sales.application.queries_publicas",),
+    # `autorizacion.verificar`/`TokenInvalido` son la elevación de PIN de
+    # supervisor (RN-AUD-005): caja y PDV la necesitan en el mismo request
+    # que negocia el permiso, no como notificación async. Pide un contrato
+    # público de `users` para la verificación de PIN puntual.
+    "accounting": ("sales.application.queries_publicas", "users.application"),
+    # `precios.py` lee `Categoria` de inventory para resolver la carta por
+    # categoría (deuda anterior a este test, no introducida acá).
+    "sales": ("users.application", "inventory.infrastructure.models.categoria"),
+    # `privacidad.anonimizar_postulante` reusa el mismo candado de PIN que
+    # `personas.anonimizar` (ADR-011): mismo custodio, misma verificación,
+    # otra tabla. Pide el mismo contrato público que falta arriba.
+    "rrhh": ("users.infrastructure.repositories",),
 }
 
 
 def _imports(archivo: pathlib.Path) -> list[str]:
-    arbol = ast.parse(archivo.read_text(), filename=str(archivo))
+    arbol = ast.parse(archivo.read_text(encoding="utf-8"), filename=str(archivo))
     nombres: list[str] = []
     for nodo in ast.walk(arbol):
         if isinstance(nodo, ast.Import):

@@ -27,6 +27,30 @@ Cada paso tiene su SOP en
 [docs/diagrams/Procesos/Recursos-Humanos/](../diagrams/Procesos/Recursos-Humanos/):
 `Reclutamiento/` (pasos 1-6), `Contratacion/` (7-9), `Induccion/` (10-13).
 
+## El flujo en el ERP: un tablero por convocatoria
+
+Desde 2026-08-01 los 13 pasos se manejan en **un solo tablero** (módulo RRHH →
+Convocatorias), una columna por etapa:
+
+```
+recibido → preseleccionado → entrevistado → verificado → oferta_enviada
+         → contratado → inducido → confirmado          (· descartado)
+```
+
+- La **convocatoria** es el expediente de la búsqueda: se crea desde la
+  requisición aprobada (paso 1) y no se publica sin perfil de puesto
+  (RN-RRHH-013).
+- Los postulantes llenan un **Google Form** cuyo enlace va en el aviso; cada
+  respuesta entra sola a la columna `recibido` (ver el SOP de publicación de
+  convocatoria para el formulario y su conexión).
+- El candidato **no es una persona registrada del ERP** mientras es candidato:
+  su ficha vive aparte y recién al contratar se crea su `persona` y su
+  `trabajador`. Nadie entra a la base de personas por haber postulado.
+- Se avanza de a una columna y **descartar exige motivo escrito** — es lo que
+  sustenta la decisión si después hay un reclamo.
+- La ficha se cierra en `confirmado`, al pasar el periodo de prueba (paso 13),
+  no al firmar el contrato.
+
 ## Documentos del área
 
 | Documento | Contenido |

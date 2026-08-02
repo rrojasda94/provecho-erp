@@ -19,6 +19,8 @@ from src.modules.accounting.api.routers import router as accounting_router
 from src.modules.accounting.application import listeners as accounting_listeners
 from src.modules.inventory.api.routers import router as inventory_router
 from src.modules.inventory.application import listeners as inventory_listeners
+from src.modules.marketing.api.routers import router as marketing_router
+from src.modules.marketing.application import listeners as marketing_listeners
 from src.modules.production.api.routers import router as production_router
 from src.modules.purchases.api.routers import router as purchases_router
 from src.modules.rrhh.api.routers import router as rrhh_router
@@ -82,6 +84,13 @@ TAGS_METADATA = [
     {
         "name": "rrhh",
         "description": "Ciclo laboral: contrato, nómina, disciplina, permisos, asistencia.",
+    },
+    {
+        "name": "marketing",
+        "description": (
+            "Campañas, calendario de contenido, leads con atribución a la venta "
+            "y encuesta de satisfacción."
+        ),
     },
     {
         "name": "dashboard",
@@ -213,7 +222,9 @@ def create_app() -> FastAPI:
     app.include_router(production_router, prefix="/api/v1")
     app.include_router(accounting_router, prefix="/api/v1")
     app.include_router(rrhh_router, prefix="/api/v1")
+    app.include_router(marketing_router, prefix="/api/v1")
     app.include_router(sync_router, prefix="/api/v1")
     inventory_listeners.register()
     accounting_listeners.register()
+    marketing_listeners.register()
     return app

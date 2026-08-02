@@ -14,15 +14,26 @@ pendiente de redactar, ver Pendientes.
 | Dato | Vive en | Titular | Base legal del tratamiento |
 |------|---------|---------|------------------------------|
 | Nombre, documento, fecha de nacimiento, domicilio, teléfono, email | `persona` (fuente única — RN-GEN-007) | Trabajador, cliente natural, usuario humano | Ejecución de contrato (laboral, de venta) o consentimiento |
-| CV, puesto postulado | `postulante` → `archivo` (S3) | Postulante | Consentimiento previo, informado y expreso (RN-PER-004) |
+| Nombre, teléfono, email, CV, puesto postulado y respuestas del formulario | `postulante` (datos propios, **no** en `persona`) → `archivo` (S3) | Postulante | Consentimiento previo, informado y expreso (RN-PER-004) |
 | Remuneración, régimen previsional, cargo | `trabajador` | Trabajador | Obligación legal (planilla, PLAME) |
 | Historial de acciones (login, cambios, pagos) | `audit_log` | Cualquier usuario autenticado | Interés legítimo — seguridad y trazabilidad |
 | IP de acceso | `audit_log`, logs de aplicación | Cualquier usuario | Interés legítimo — seguridad |
 
-`persona` es la única tabla con datos identificables "de fondo" —
-`trabajador`/`cliente`/`usuario` la referencian por `persona_id` y no
-duplican nombre/documento (RN-GEN-007). Esto simplifica el cumplimiento:
-casi todo ARCO se resuelve tocando una sola entidad.
+`persona` es la tabla con datos identificables "de fondo" de la gente que
+tiene relación con la empresa — `trabajador`/`cliente`/`usuario` la
+referencian por `persona_id` y no duplican nombre/documento (RN-GEN-007).
+Esto simplifica el cumplimiento: casi todo ARCO se resuelve tocando una sola
+entidad.
+
+**La excepción deliberada es `postulante`** (2026-08-01): un candidato no es
+todavía nadie de la empresa y la mayoría nunca lo será, así que sus datos
+viven en su propia ficha y solo se copian a `persona` si se le contrata.
+Registrarlos en `persona` habría metido a cada postulante en la fuente única
+de la empresa —con su documento— por el solo hecho de postular. La
+contrapartida es que el ARCO de un postulante **no se resuelve por
+`/api/v1/personas/{id}`**: tiene sus propios endpoints sobre la ficha (tabla
+de abajo). Si llega a contratarse, sus datos pasan a `persona` y desde ahí
+su ARCO se ejerce como el de cualquier trabajador.
 
 **Lo que el ERP NO almacena**: número de tarjeta, CVV o credenciales de
 pago (las procesa Izipay directamente, `pago.pasarela` solo guarda la
@@ -31,6 +42,8 @@ referencia externa); contraseñas o PIN en texto plano (Argon2id,
 
 ## Derechos ARCO
 
+Sobre `persona` (trabajador, cliente natural, usuario humano):
+
 | Derecho | Cómo se ejerce | Estado |
 |---------|-----------------|--------|
 | **Acceso** | `GET /api/v1/personas/{id}` | Implementado (slice de auth, 2026-07-25) |
@@ -38,9 +51,34 @@ referencia externa); contraseñas o PIN en texto plano (Argon2id,
 | **Cancelación** | `POST /api/v1/personas/{id}/anonimizar` — anonimización irreversible, no borrado físico | Implementado 2026-07-26 (ADR-011, RN-PER-007) |
 | **Oposición** | — | Solo política: hoy no hay procesamiento de marketing automatizado al que oponerse. Se construye cuando exista. |
 
-Los tres primeros exigen el permiso correspondiente (`users.gestionar` para
-acceso/rectificación, `personas.anonimizar` — dedicado, más restrictivo —
-para cancelación): el titular no accede directo a la API, ejerce su derecho
+Sobre `postulante` (candidato no contratado):
+
+| Derecho | Cómo se ejerce | Estado |
+|---------|-----------------|--------|
+| **Acceso** | `GET /api/v1/rrhh/postulantes/{id}` | Implementado 2026-08-01 |
+| **Rectificación** | `PATCH /api/v1/rrhh/postulantes/{id}` (datos de contacto; 409 si ya está anonimizado) | Implementado 2026-08-01 |
+| **Cancelación** | `POST /api/v1/rrhh/postulantes/{id}/anonimizar` — irreversible. 409 si ya se contrató: sus datos pasaron a `persona` y su ARCO se ejerce allá | Implementado 2026-08-01 |
+| **Oposición** | — | Igual que arriba: solo política |
+
+**Por qué anonimizar y no borrar, si nada referencia `postulante`**: el
+borrado se llevaría `motivo_descarte` y `canal_origen` — la evidencia de por
+qué se descartó a alguien (defensa ante un reclamo de discriminación, Ley
+26772) y la constancia de que la solicitud de cancelación existió. Lo que
+sobrevive es deliberadamente no identificable: puesto, canal, fechas y el
+criterio del descarte. Por eso **`motivo_descarte` se redacta como criterio
+("sin disponibilidad para turno noche"), nunca con datos personales**.
+
+**Plazo de conservación aplicado, no solo declarado**: cada ficha nace con
+`plazo_conservacion_declarado` (`RRHH_PLAZO_CONSERVACION_POSTULANTE_MESES`,
+12 meses por defecto) y `python -m src.modules.rrhh.purga` anonimiza lo
+vencido desde el cron del host. Nunca toca al contratado: su retención es
+laboral, no la del aviso de privacidad.
+
+Todos exigen el permiso correspondiente (`users.gestionar` para
+acceso/rectificación de persona, `rrhh.leer`/`rrhh.postulante_gestionar`
+para las de postulante, y `personas.anonimizar` — dedicado, más restrictivo —
+para cancelar en cualquiera de las dos tablas: es la misma capacidad legal y
+el mismo custodio). El titular no accede directo a la API, ejerce su derecho
 a través de quien administra el ERP (hoy, el administrador). Un titular
 externo (cliente, postulante) solicita por el canal que corresponda
 (atención al cliente, RRHH) y el administrador ejecuta la acción.
@@ -128,6 +166,9 @@ legales del titular de la empresa:
 
 ## Deuda técnica (ver ROADMAP → Deuda técnica → Protección de datos)
 
+- La purga de postulantes vencidos existe como comando pero **no está dada de
+  alta en ningún cron**: hasta que corra en el servidor, el plazo declarado
+  sigue sin aplicarse en la práctica.
 - Anonimización no borra el `archivo` (CV en S3) de un `postulante`.
 - Sin purga automática de `audit_log`/logs por antigüedad.
 - Backups sin cifrar en reposo.

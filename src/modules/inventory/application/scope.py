@@ -10,7 +10,16 @@ from sqlalchemy.orm import Session
 
 from src.core.tenant import Tenant
 from src.modules.inventory.application.errors import NoEncontrado
-from src.modules.inventory.infrastructure.models import Ajuste, Articulo, Lote
+from src.modules.inventory.infrastructure.models import (
+    Ajuste,
+    Articulo,
+    Categoria,
+    Conteo,
+    Lote,
+    ReservaStock,
+    SolicitudInsumos,
+    Transferencia,
+)
 from src.modules.users.infrastructure.models import Almacen
 
 
@@ -38,6 +47,54 @@ def exigir_lote(session: Session, lote_id: uuid.UUID, tenant: Tenant) -> Lote:
         raise NoEncontrado("lote no encontrado")
     exigir_articulo(session, lote.articulo_id, tenant)
     return lote
+
+
+def exigir_categoria(
+    session: Session, categoria_id: uuid.UUID, tenant: Tenant
+) -> Categoria:
+    categoria = session.get(Categoria, categoria_id)
+    if categoria is None or categoria.deleted_at is not None:
+        raise NoEncontrado("categoría no encontrada")
+    tenant.exigir_empresa(categoria.empresa_id)
+    return categoria
+
+
+def exigir_conteo(session: Session, conteo_id: uuid.UUID, tenant: Tenant) -> Conteo:
+    conteo = session.get(Conteo, conteo_id)
+    if conteo is None:
+        raise NoEncontrado("conteo no encontrado")
+    exigir_almacen(session, conteo.almacen_id, tenant)
+    return conteo
+
+
+def exigir_solicitud(
+    session: Session, solicitud_id: uuid.UUID, tenant: Tenant
+) -> SolicitudInsumos:
+    solicitud = session.get(SolicitudInsumos, solicitud_id)
+    if solicitud is None:
+        raise NoEncontrado("solicitud no encontrada")
+    exigir_almacen(session, solicitud.almacen_solicitante_id, tenant)
+    return solicitud
+
+
+def exigir_transferencia(
+    session: Session, transferencia_id: uuid.UUID, tenant: Tenant
+) -> Transferencia:
+    transferencia = session.get(Transferencia, transferencia_id)
+    if transferencia is None:
+        raise NoEncontrado("transferencia no encontrada")
+    exigir_almacen(session, transferencia.origen_almacen_id, tenant)
+    return transferencia
+
+
+def exigir_reserva(
+    session: Session, reserva_id: uuid.UUID, tenant: Tenant
+) -> ReservaStock:
+    reserva = session.get(ReservaStock, reserva_id)
+    if reserva is None:
+        raise NoEncontrado("reserva no encontrada")
+    exigir_almacen(session, reserva.almacen_id, tenant)
+    return reserva
 
 
 def exigir_ajuste(session: Session, ajuste_id: uuid.UUID, tenant: Tenant) -> Ajuste:

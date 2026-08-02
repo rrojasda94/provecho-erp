@@ -2,14 +2,15 @@
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from src.config.settings import settings
+from src.core.tenant import Tenant
 from src.modules.production.api import schemas
 from src.modules.production.application import ordenes
-from src.modules.production.infrastructure.repositories import OrdenProduccionRepo
-from src.modules.users.api.deps import get_db, require_permission
+from src.modules.production.application.scope import exigir_almacen, exigir_orden
+from src.modules.users.api.deps import get_db, get_tenant, require_permission
 from src.modules.users.infrastructure.models import Usuario
 
 router = APIRouter(prefix="/production", tags=["production"])
@@ -23,8 +24,10 @@ COMPLETAR = "production.completar"
 def crear_orden(
     body: schemas.OrdenProduccionCreate,
     actor: Usuario = Depends(require_permission(CREAR)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
+    exigir_almacen(session, body.almacen_id, tenant)
     orden = ordenes.crear_orden_produccion(
         session,
         articulo_id=body.articulo_id,
@@ -41,12 +44,10 @@ def crear_orden(
 def ver_orden(
     orden_id: uuid.UUID,
     _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    orden = OrdenProduccionRepo(session).get(orden_id)
-    if orden is None:
-        raise HTTPException(404, "orden de producción no encontrada")
-    return orden
+    return exigir_orden(session, orden_id, tenant)
 
 
 @router.post("/ordenes/{orden_id}/consumo", response_model=schemas.OrdenProduccionOut)
@@ -54,8 +55,10 @@ def registrar_consumo(
     orden_id: uuid.UUID,
     body: schemas.ConsumoCreate,
     _: Usuario = Depends(require_permission(CREAR)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
+    exigir_orden(session, orden_id, tenant)
     orden = ordenes.registrar_consumo(
         session, orden_id, items=[it.model_dump() for it in body.items]
     )
@@ -68,8 +71,10 @@ def completar_orden(
     orden_id: uuid.UUID,
     body: schemas.CompletarOrdenIn,
     _: Usuario = Depends(require_permission(COMPLETAR)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
+    exigir_orden(session, orden_id, tenant)
     orden = ordenes.completar_orden_produccion(
         session,
         orden_id,

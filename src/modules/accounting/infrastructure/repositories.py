@@ -9,6 +9,7 @@ repositorio solo encapsula queries."""
 from __future__ import annotations
 
 import uuid
+from decimal import Decimal
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -20,6 +21,7 @@ from src.modules.accounting.infrastructure.models import (
     AsientoLinea,
     CierreCaja,
     CuentaContable,
+    MovimientoCaja,
     MovimientoDinero,
     PeriodoContable,
     ReglaAsiento,
@@ -41,14 +43,11 @@ class CuentaContableRepo:
             )
         )
 
-    def list(self, empresa_id: uuid.UUID) -> list[CuentaContable]:
-        return list(
-            self.s.scalars(
-                select(CuentaContable)
-                .where(CuentaContable.empresa_id == empresa_id, CuentaContable.deleted_at.is_(None))
-                .order_by(CuentaContable.codigo)
-            )
-        )
+    def list(self, empresa_id: uuid.UUID | None = None) -> list[CuentaContable]:
+        q = select(CuentaContable).where(CuentaContable.deleted_at.is_(None))
+        if empresa_id is not None:
+            q = q.where(CuentaContable.empresa_id == empresa_id)
+        return list(self.s.scalars(q.order_by(CuentaContable.codigo)))
 
     def add(self, cuenta: CuentaContable) -> CuentaContable:
         self.s.add(cuenta)
@@ -72,13 +71,12 @@ class PeriodoContableRepo:
             )
         )
 
-    def list(self, empresa_id: uuid.UUID) -> list[PeriodoContable]:
+    def list(self, empresa_id: uuid.UUID | None = None) -> list[PeriodoContable]:
+        q = select(PeriodoContable)
+        if empresa_id is not None:
+            q = q.where(PeriodoContable.empresa_id == empresa_id)
         return list(
-            self.s.scalars(
-                select(PeriodoContable)
-                .where(PeriodoContable.empresa_id == empresa_id)
-                .order_by(PeriodoContable.anio.desc(), PeriodoContable.mes.desc())
-            )
+            self.s.scalars(q.order_by(PeriodoContable.anio.desc(), PeriodoContable.mes.desc()))
         )
 
     def add(self, periodo: PeriodoContable) -> PeriodoContable:
@@ -94,14 +92,11 @@ class AsientoRepo:
     def get(self, asiento_id: uuid.UUID) -> Asiento | None:
         return self.s.get(Asiento, asiento_id)
 
-    def list(self, empresa_id: uuid.UUID) -> list[Asiento]:
-        return list(
-            self.s.scalars(
-                select(Asiento)
-                .where(Asiento.empresa_id == empresa_id)
-                .order_by(Asiento.fecha.desc())
-            )
-        )
+    def list(self, empresa_id: uuid.UUID | None = None) -> list[Asiento]:
+        q = select(Asiento)
+        if empresa_id is not None:
+            q = q.where(Asiento.empresa_id == empresa_id)
+        return list(self.s.scalars(q.order_by(Asiento.fecha.desc())))
 
     def lineas(self, asiento_id: uuid.UUID) -> list[AsientoLinea]:
         return list(
@@ -144,14 +139,11 @@ class ReglaAsientoRepo:
             )
         )
 
-    def list(self, empresa_id: uuid.UUID) -> list[ReglaAsiento]:
-        return list(
-            self.s.scalars(
-                select(ReglaAsiento)
-                .where(ReglaAsiento.empresa_id == empresa_id)
-                .order_by(ReglaAsiento.evento)
-            )
-        )
+    def list(self, empresa_id: uuid.UUID | None = None) -> list[ReglaAsiento]:
+        q = select(ReglaAsiento)
+        if empresa_id is not None:
+            q = q.where(ReglaAsiento.empresa_id == empresa_id)
+        return list(self.s.scalars(q.order_by(ReglaAsiento.evento)))
 
     def add(self, regla: ReglaAsiento) -> ReglaAsiento:
         self.s.add(regla)
@@ -171,14 +163,11 @@ class MovimientoDineroRepo:
             select(MovimientoDinero).where(MovimientoDinero.comprobante_id == comprobante_id)
         )
 
-    def list(self, empresa_id: uuid.UUID) -> list[MovimientoDinero]:
-        return list(
-            self.s.scalars(
-                select(MovimientoDinero)
-                .where(MovimientoDinero.empresa_id == empresa_id)
-                .order_by(MovimientoDinero.created_at.desc())
-            )
-        )
+    def list(self, empresa_id: uuid.UUID | None = None) -> list[MovimientoDinero]:
+        q = select(MovimientoDinero)
+        if empresa_id is not None:
+            q = q.where(MovimientoDinero.empresa_id == empresa_id)
+        return list(self.s.scalars(q.order_by(MovimientoDinero.created_at.desc())))
 
     def add(self, movimiento: MovimientoDinero) -> MovimientoDinero:
         self.s.add(movimiento)
@@ -221,6 +210,38 @@ class AperturaCajaRepo:
         self.s.add(apertura)
         self.s.flush()
         return apertura
+
+
+class MovimientoCajaRepo:
+    def __init__(self, session: Session) -> None:
+        self.s = session
+
+    def get_by_idempotency(self, key: str) -> MovimientoCaja | None:
+        return self.s.scalar(
+            select(MovimientoCaja).where(MovimientoCaja.idempotency_key == key)
+        )
+
+    def de_apertura(self, apertura_caja_id: uuid.UUID) -> list[MovimientoCaja]:
+        return list(
+            self.s.scalars(
+                select(MovimientoCaja)
+                .where(MovimientoCaja.apertura_caja_id == apertura_caja_id)
+                .order_by(MovimientoCaja.created_at)
+            )
+        )
+
+    def neto(self, apertura_caja_id: uuid.UUID) -> Decimal:
+        """Ingresos menos retiros. Es lo que hay que sumarle al esperado del
+        cierre para que cuadre contra el cajón real."""
+        total = Decimal(0)
+        for mov in self.de_apertura(apertura_caja_id):
+            total += mov.monto if mov.tipo == "ingreso" else -mov.monto
+        return total
+
+    def add(self, movimiento: MovimientoCaja) -> MovimientoCaja:
+        self.s.add(movimiento)
+        self.s.flush()
+        return movimiento
 
 
 class CierreCajaRepo:

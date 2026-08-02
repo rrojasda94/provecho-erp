@@ -26,7 +26,9 @@ def abrir_periodo(
     return repo.add(PeriodoContable(empresa_id=empresa_id, anio=anio, mes=mes, estado="abierto"))
 
 
-def listar_periodos(session: Session, empresa_id: uuid.UUID) -> list[PeriodoContable]:
+def listar_periodos(
+    session: Session, empresa_id: uuid.UUID | None = None
+) -> list[PeriodoContable]:
     return PeriodoContableRepo(session).list(empresa_id)
 
 

@@ -8,7 +8,10 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class ProveedorCreate(BaseModel):
-    empresa_id: uuid.UUID
+    # `empresa_id` sale del JWT (ADR-004). Solo un superusuario sin empresa
+    # asignada puede indicarla; a cualquier otro usuario, una empresa
+    # distinta a la suya le responde 403.
+    empresa_id: uuid.UUID | None = None
     tipo: str
     condicion_pago: str
     persona_id: uuid.UUID | None = None

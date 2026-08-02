@@ -1,8 +1,8 @@
 # Módulo `marketing` — Marca, contenido y campañas
 
-**Estado (2026-07-22):** spec técnica, sin implementación. Resuelve el
-pendiente "módulo `marketing`: README/contrato propio" del ROADMAP.
-Documentado por dependencia: `sales` atribuye ventas a leads de campaña.
+**Estado (2026-08-01):** slice core implementado — las 5 entidades de §8d,
+17 endpoints bajo `/api/v1/marketing`, migración `e9c3b7412a68`. Lo que
+queda fuera de este slice está en `ROADMAP.md` → Deuda técnica → marketing.
 
 ## Objetivo
 
@@ -26,6 +26,27 @@ encuesta (selectiva, RN-COM-007) y al enviarla emite
 
 `contrato` (transversal) y las compras de material/agencia (`purchases`)
 no se duplican aquí — Marketing las usa.
+
+## Endpoints
+
+| Recurso | Endpoints | Permiso |
+|---|---|---|
+| Campaña | `POST/GET /campanas`, `GET /campanas/{id}`, `PATCH /campanas/{id}/brief`, `POST /campanas/{id}/{aprobacion,lanzamiento,cierre}` | `marketing.campana_gestionar`, aprobación con `marketing.campana_aprobar` |
+| Material en sucursal | `POST /campanas/{id}/implementaciones` | `marketing.campana_gestionar` |
+| Contenido | `POST /piezas`, `PATCH /piezas/{id}/validacion`, `POST /piezas/{id}/{publicacion,descarte}` | `marketing.contenido_gestionar` |
+| Lead | `POST /leads`, `GET /campanas/{id}/leads`, `POST /leads/{id}/atribucion` | `marketing.lead_gestionar` |
+| Encuesta | `POST /encuestas`, `POST /encuestas/{id}/{respuesta,expiracion}` | `marketing.encuesta_gestionar` |
+
+Lectura general con `marketing.leer`. El rol semilla `marketing` no lleva
+`marketing.campana_aprobar`: quien escribe el brief no lo aprueba — ese
+permiso vive en `supervisor` (RN-MKT-003, RN-GER-007).
+
+## Alcance de tenant (ADR-004)
+
+`campana` lleva `empresa_id` propio y es la raíz del alcance: pieza, lead e
+implementación de material se validan por su campaña. La encuesta se
+escopa por la sucursal de su venta, leída por el contrato público de
+`sales` — marketing nunca importa `Venta`.
 
 ## Casos de uso
 
@@ -65,8 +86,12 @@ leads registrados → atribución lead→venta con `sales` → cierre y medició
 
 ## Relaciones
 
-- Escucha: `sales.venta_confirmada` (atribuye la venta a un `lead` cuando
-  aplica).
+- Escucha: `sales.venta_confirmada` → atribuye la venta a un `lead`
+  (`application/listeners.py`) **solo si no hay ambigüedad**: el cliente
+  tiene exactamente un lead abierto en una campaña en curso. Con dos o más,
+  adivinar cuál campaña convirtió falsearía la medición — esos casos van
+  por `POST /leads/{id}/atribucion`. Requiere `cliente_id` en el payload
+  del evento (agregado 2026-08-01).
 - Publica: `marketing.campana_lanzada` (informativo/BI),
   `marketing.lead_generado` (consumido por `sales` para la atribución
   lead→venta).

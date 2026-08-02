@@ -12,6 +12,7 @@ from src.modules.rrhh.infrastructure.models import (
     BoletaPago,
     CertificadoTrabajo,
     ContratoLaboral,
+    Convocatoria,
     LiquidacionBss,
     Memorandum,
     PactoPermanencia,
@@ -61,6 +62,36 @@ class ContratoLaboralRepo:
         return contrato
 
 
+class ConvocatoriaRepo:
+    def __init__(self, session: Session) -> None:
+        self.s = session
+
+    def get(self, convocatoria_id: uuid.UUID) -> Convocatoria | None:
+        return self.s.get(Convocatoria, convocatoria_id)
+
+    def get_por_token(self, token: str) -> Convocatoria | None:
+        return self.s.scalar(
+            select(Convocatoria).where(
+                Convocatoria.token_publico == token, Convocatoria.deleted_at.is_(None)
+            )
+        )
+
+    def list(
+        self, empresa_id: uuid.UUID | None = None, estado: str | None = None
+    ) -> list[Convocatoria]:
+        q = select(Convocatoria).where(Convocatoria.deleted_at.is_(None))
+        if empresa_id is not None:
+            q = q.where(Convocatoria.empresa_id == empresa_id)
+        if estado is not None:
+            q = q.where(Convocatoria.estado == estado)
+        return list(self.s.scalars(q))
+
+    def add(self, convocatoria: Convocatoria) -> Convocatoria:
+        self.s.add(convocatoria)
+        self.s.flush()
+        return convocatoria
+
+
 class PostulanteRepo:
     def __init__(self, session: Session) -> None:
         self.s = session
@@ -68,11 +99,20 @@ class PostulanteRepo:
     def get(self, postulante_id: uuid.UUID) -> Postulante | None:
         return self.s.get(Postulante, postulante_id)
 
-    def list(self, estado: str | None = None) -> list[Postulante]:
+    def list(
+        self,
+        estado: str | None = None,
+        empresa_id: uuid.UUID | None = None,
+        convocatoria_id: uuid.UUID | None = None,
+    ) -> list[Postulante]:
         q = select(Postulante).where(Postulante.deleted_at.is_(None))
         if estado is not None:
             q = q.where(Postulante.estado == estado)
-        return list(self.s.scalars(q))
+        if empresa_id is not None:
+            q = q.where(Postulante.empresa_id == empresa_id)
+        if convocatoria_id is not None:
+            q = q.where(Postulante.convocatoria_id == convocatoria_id)
+        return list(self.s.scalars(q.order_by(Postulante.fecha_postulacion)))
 
     def add(self, postulante: Postulante) -> Postulante:
         self.s.add(postulante)
@@ -87,8 +127,15 @@ class SocioRepo:
     def get(self, socio_id: uuid.UUID) -> Socio | None:
         return self.s.get(Socio, socio_id)
 
-    def list(self) -> list[Socio]:
-        return list(self.s.scalars(select(Socio).where(Socio.deleted_at.is_(None))))
+    def list(self, empresa_id: uuid.UUID | None = None) -> list[Socio]:
+        """Filtrar por empresa incluye a los socios del grupo (`empresa_id`
+        NULL): participan del grupo entero, no de una sola empresa."""
+        q = select(Socio).where(Socio.deleted_at.is_(None))
+        if empresa_id is not None:
+            q = q.where(
+                (Socio.empresa_id == empresa_id) | (Socio.empresa_id.is_(None))
+            )
+        return list(self.s.scalars(q))
 
     def add(self, socio: Socio) -> Socio:
         self.s.add(socio)

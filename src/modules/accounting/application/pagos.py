@@ -63,7 +63,9 @@ def registrar_pago(
     )
 
 
-def listar_pagos(session: Session, empresa_id: uuid.UUID) -> list[MovimientoDinero]:
+def listar_pagos(
+    session: Session, empresa_id: uuid.UUID | None = None
+) -> list[MovimientoDinero]:
     return MovimientoDineroRepo(session).list(empresa_id)
 
 

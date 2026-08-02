@@ -14,7 +14,13 @@ from src.modules.users.api.deps import (
     require_permission,
 )
 from src.modules.users.api.error_handlers import http_exception
-from src.modules.users.application import admin, auth, gerencia, privacidad
+from src.modules.users.application import (
+    admin,
+    auth,
+    autorizacion,
+    gerencia,
+    privacidad,
+)
 from src.modules.users.application.errors import (
     CredencialesInvalidas,
     TokenInvalido,
@@ -47,6 +53,37 @@ def login(body: schemas.LoginIn, request: Request, session: Session = Depends(ge
         raise http_exception(e) from e
     session.commit()
     return tokens
+
+
+@router.post(
+    "/auth/autorizar",
+    response_model=schemas.AutorizacionOut,
+    tags=["auth"],
+    dependencies=[Depends(rate_limit_login)],
+)
+def autorizar(
+    body: schemas.AutorizacionIn, request: Request, session: Session = Depends(get_db)
+):
+    """Elevación puntual de supervisor sobre el terminal de otro: verifica
+    su PIN **y** que tenga el permiso, y devuelve un token de corta vida
+    acotado a esa acción (RN-AUD-005).
+
+    Va detrás del mismo rate limit que el login: es un endpoint que recibe
+    PINes y sin freno sería el camino cómodo para probarlos.
+    """
+    try:
+        resultado = autorizacion.emitir(
+            session,
+            username=body.username,
+            pin=body.pin,
+            permiso=body.permiso,
+            ip=client_ip(request),
+        )
+    except CredencialesInvalidas as e:
+        session.commit()  # persistir el rastro del intento
+        raise http_exception(e) from e
+    session.commit()
+    return resultado
 
 
 @router.post(

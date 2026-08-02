@@ -74,5 +74,12 @@ def require_permission(codigo: str):
     return _dep
 
 
+def tiene_permiso(session: Session, usuario: Usuario, codigo: str) -> bool:
+    """Chequeo sin bloquear, para respuestas que muestran más o menos según
+    el rol (ej. el conteo "a ciegas" oculta el stock esperado, RN-INV-005).
+    `require_permission` sigue siendo la vía para negar el acceso."""
+    return rules.permite(UsuarioRepo(session).permiso_codigos(usuario.id), codigo)
+
+
 def client_ip(request: Request) -> str | None:
     return request.client.host if request.client else None

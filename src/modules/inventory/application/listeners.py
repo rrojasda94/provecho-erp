@@ -323,6 +323,9 @@ def register() -> None:
     _registrado = True
     event_bus.subscribe("sales.venta_confirmada", on_venta_confirmada)
     event_bus.subscribe("sales.venta_anulada", on_venta_anulada)
+    # Anular líneas sueltas repone igual que anular la venta entera: el
+    # payload trae solo las líneas quitadas.
+    event_bus.subscribe("sales.lineas_anuladas", on_venta_anulada)
     event_bus.subscribe("purchases.compra_recibida", on_compra_recibida)
     event_bus.subscribe("production.consumo_registrado", on_consumo_registrado)
     event_bus.subscribe("production.orden_completada", on_orden_completada)

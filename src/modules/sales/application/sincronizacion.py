@@ -36,6 +36,7 @@ from src.modules.sales.infrastructure.models import (
     Pago,
     Precio,
     ProductoComercial,
+    ProductoComercialExtra,
     PuntoVenta,
     Venta,
 )
@@ -69,12 +70,26 @@ RECURSOS = (
             "margen_contribucion",
             "empaque_id",
             "modalidades_empaque",
+            "es_extra",
             "updated_at",
         ),
         filtro=lambda q, a: q.where(
             ProductoComercial.marca_id.in_(_marca_de_la_sucursal(a))
         ),
         motivo="La carta del local: sin esto no hay nada que vender offline.",
+    ),
+    RecursoSync(
+        nombre="producto_comercial_extra",
+        modelo=ProductoComercialExtra,
+        campos=("id", "producto_comercial_id", "extra_id", "maximo", "updated_at"),
+        filtro=lambda q, a: q.join(
+            ProductoComercial,
+            ProductoComercial.id == ProductoComercialExtra.producto_comercial_id,
+        ).where(ProductoComercial.marca_id.in_(_marca_de_la_sucursal(a))),
+        motivo=(
+            "Qué extra admite cada producto: sin esto el hub ofrecería extras "
+            "imposibles o rechazaría los válidos durante el corte (RN-COM-021)."
+        ),
     ),
     RecursoSync(
         nombre="lista_precio",
@@ -179,20 +194,65 @@ def _venta_a_dict(session: Session, venta: Venta) -> dict:
         "usuario_id": str(venta.usuario_id),
         "cliente_id": str(venta.cliente_id) if venta.cliente_id else None,
         "referencia_atencion": venta.referencia_atencion,
+        "mesa_id": str(venta.mesa_id) if venta.mesa_id else None,
+        "comensales": venta.comensales,
         "idempotency_key": venta.idempotency_key,
         "fecha_orden": venta.fecha_orden.isoformat(),
         "numero_orden": venta.numero_orden,
         "estado": venta.estado,
-        "items": [
-            {
-                "producto_comercial_id": str(it.producto_comercial_id),
-                "cantidad": str(it.cantidad),
-                "precio_unitario": str(it.precio_unitario),
-                "descuento": str(it.descuento),
-            }
-            for it in VentaRepo(session).items(venta.id)
-        ],
+        # El descuento viaja con su motivo y autorizador: reconstruirlo en la
+        # nube a partir del total dejaría la venta sin trazabilidad.
+        "descuento_modo": venta.descuento_modo,
+        "descuento_valor": (
+            str(venta.descuento_valor) if venta.descuento_valor is not None else None
+        ),
+        "descuento_motivo": venta.descuento_motivo,
+        "descuento_autorizado_por": (
+            str(venta.descuento_autorizado_por)
+            if venta.descuento_autorizado_por
+            else None
+        ),
+        # Los extras viajan ANIDADOS bajo su línea padre, igual que en el
+        # request de creación: aplanarlos haría que el replay los recreara
+        # como líneas sueltas y se perdería de qué plato colgaban.
+        "items": _items_a_dict(VentaRepo(session).items(venta.id)),
     }
+
+
+def _items_a_dict(filas: list) -> list[dict]:
+    def basico(it) -> dict:
+        return {
+            "producto_comercial_id": str(it.producto_comercial_id),
+            "cantidad": str(it.cantidad),
+            "precio_unitario": str(it.precio_unitario),
+            "descuento": str(it.descuento),
+            "grupo_cobro": it.grupo_cobro,
+        }
+
+    hijos: dict = {}
+    for it in filas:
+        if it.padre_venta_item_id:
+            hijos.setdefault(it.padre_venta_item_id, []).append(it)
+    salida = []
+    for it in filas:
+        if it.padre_venta_item_id:
+            continue
+        fila = basico(it)
+        if it.id in hijos:
+            # El extra se guarda con la cantidad TOTAL (por plato × platos),
+            # pero el request la espera POR PLATO y la vuelve a multiplicar.
+            # Sin dividir acá, cada sincronización duplicaría los extras.
+            fila["extras"] = [
+                {
+                    **basico(h),
+                    "cantidad": str(
+                        h.cantidad / it.cantidad if it.cantidad else h.cantidad
+                    ),
+                }
+                for h in hijos[it.id]
+            ]
+        salida.append(fila)
+    return salida
 
 
 def _pago_a_dict(pago: Pago) -> dict:
@@ -201,6 +261,7 @@ def _pago_a_dict(pago: Pago) -> dict:
         "venta_id": str(pago.venta_id),
         "medio_pago_id": str(pago.medio_pago_id),
         "monto": str(pago.monto),
+        "grupo_cobro": pago.grupo_cobro,
         "idempotency_key": pago.idempotency_key,
         "referencia_externa": pago.referencia_externa,
     }
@@ -288,14 +349,41 @@ def _crear(session: Session, datos: dict) -> None:
                 "cantidad": Decimal(it["cantidad"]),
                 "precio_unitario": Decimal(it["precio_unitario"]),
                 "descuento": Decimal(it["descuento"]),
+                # Los lotes emitidos antes del cobro dividido no traen la
+                # clave: esa venta tenía una sola cuenta.
+                "grupo_cobro": it.get("grupo_cobro", 1),
+                "extras": [
+                    {
+                        "producto_comercial_id": uuid.UUID(
+                            ex["producto_comercial_id"]
+                        ),
+                        "cantidad": Decimal(ex["cantidad"]),
+                        "precio_unitario": Decimal(ex["precio_unitario"]),
+                        "descuento": Decimal(ex.get("descuento") or 0),
+                    }
+                    for ex in it.get("extras") or []
+                ],
             }
             for it in datos["items"]
         ],
         cliente_id=uuid.UUID(datos["cliente_id"]) if datos.get("cliente_id") else None,
         referencia_atencion=datos.get("referencia_atencion"),
+        mesa_id=uuid.UUID(datos["mesa_id"]) if datos.get("mesa_id") else None,
+        comensales=datos.get("comensales"),
         fecha_orden=date.fromisoformat(datos["fecha_orden"]),
         numero_orden=datos["numero_orden"],
     )
+    if datos.get("descuento_modo"):
+        # Se reaplica tal cual se autorizó en el local; el motivo y el
+        # supervisor viajan con la venta, no se re-piden en la nube.
+        ventas_uc.aplicar_descuento(
+            session,
+            venta_id=uuid.UUID(datos["id"]),
+            modo=datos["descuento_modo"],
+            valor=Decimal(datos["descuento_valor"]),
+            motivo=datos.get("descuento_motivo"),
+            autorizado_por=uuid.UUID(datos["descuento_autorizado_por"]),
+        )
 
 
 def _cobrar(session: Session, datos: dict):
@@ -305,6 +393,7 @@ def _cobrar(session: Session, datos: dict):
         venta_id=uuid.UUID(datos["venta_id"]),
         medio_pago_id=uuid.UUID(datos["medio_pago_id"]),
         monto=Decimal(datos["monto"]),
+        grupo_cobro=datos.get("grupo_cobro", 1),
         idempotency_key=datos["idempotency_key"],
         referencia_externa=datos.get("referencia_externa"),
     )

@@ -34,9 +34,73 @@ al emitir.
 **Precio server-side (2026-07-27):** `lista_precio` + `precio` (migración
 `d4b1f0a7c3e9`). El PDV ya no manda el monto — ver sección propia abajo.
 
-Diferido a un slice posterior: `modificador`, `variante_producto`,
-`combo`, `promocion`, `carrito`, `central_pedidos`,
-`cuenta_puntos`/`puntos_movimiento`, `carta_disputa_pago`.
+**Slice PDV (2026-07-28, migración `d7e3b8c14f52`, ADR-018):** cierra los
+cuatro huecos que el punto de venta necesitaba y el modelo no daba.
+
+- `mesa` (`sucursal_id`, `numero` único por sucursal, `zona`, `capacidad`,
+  `activa`) + `venta.mesa_id` / `venta.comensales`. La mesa **no guarda
+  ocupación**: está ocupada si tiene una venta en `orden`. El mapa
+  (`GET /sales/mesas/mapa`) es lectura derivada.
+  `venta.referencia_atencion` **se conserva** como texto libre para
+  takeout/delivery ("Carlos", "Rappi #1042").
+- `grupo_cobro` (entero, default 1) en `venta_item`, `pago` y
+  `comprobante` (RN-COM-018): una orden se divide en cuentas, cada una con
+  sus pagos y **su propio comprobante**. La venta pasa a `pagada` recién
+  cuando ninguna cuenta queda con saldo.
+- `comprobante.receptor_num_doc` / `receptor_nombre` (RN-CPP-003): el
+  DNI/RUC que el cajero teclea al cobrar, sin exigir cliente registrado.
+  11 dígitos → factura; 8, `00000000` o vacío → boleta.
+- Descuento manual de orden en `venta` (`descuento_modo`,
+  `descuento_valor`, `descuento_motivo`, `descuento_autorizado_por`,
+  RN-COM-017), con permiso propio `sales.aplicar_descuento` (supervisor,
+  no cajero). Se prorratea entre grupos de cobro.
+- **Cliente identificado por teléfono** (migración `e1c4a9d6b038`):
+  `persona.numero_documento`/`tipo_documento` pasan a nullable. Registrar a
+  una persona natural exige **teléfono**, no DNI (RN-PTS-004) — el
+  documento se completa después con
+  `PATCH /sales/clientes/{id}/documento`. Para facturar a una empresa el
+  **RUC sigue siendo obligatorio**. Sin documento (o con `00000000`) el
+  cliente **no cuenta como identificado** y queda fuera de las promociones
+  para clientes registrados (RN-PTS-005) — regla derivada
+  `rules.cliente_identificado`, no una columna. Búsqueda de caja por
+  teléfono, documento o nombre en `GET /sales/clientes/buscar?q=`
+  (RN-PTS-006). **Trabajador y usuario siguen exigiendo documento**: esa
+  validación vive en `users.application.admin`, no en el esquema.
+
+**Cierre para alfa (2026-07-28, migraciones `f2a8c15e94d7` y `b6d41e07af92`):**
+
+- **Extras** (RN-COM-021): un extra **es** un `producto_comercial` con
+  `es_extra=True` y su propia receta, que se ejecuta en la sucursal y se
+  suma a la del producto al agregarse. Modelarlo así le da gratis precio
+  server-side por lista, aparición en la carta y descuento de insumos por
+  el mismo evento. Lo propio es `producto_comercial_extra` (qué producto
+  admite qué extra, con tope) y `venta_item.padre_venta_item_id` (de qué
+  línea cuelga). Hereda el grupo de cobro del padre y su consumo se
+  multiplica por el plato.
+- **Anular líneas enviadas** (RN-COM-020):
+  `POST /ventas/{id}/anular-lineas`, con autorización de supervisor y
+  motivo; publica `sales.lineas_anuladas` → inventory repone. Quitar todas
+  anula la orden. Antes de enviar, el pedido vive en el PDV y no pasa
+  por acá.
+- **Precuenta** (RN-COM-019): `GET /ventas/{id}/precuenta`, documento **no
+  fiscal**, opcionalmente por cuenta. No cambia el estado ni se audita.
+- **Autorización de supervisor** (RN-AUD-005): `POST /auth/autorizar`
+  (módulo `users`) verifica PIN + permiso y devuelve una elevación de 3
+  minutos acotada a esa acción. Descuento y anulación de líneas la exigen;
+  `autorizado_por` sale de ahí, nunca del cuerpo del request.
+
+Diferido a un slice posterior: `variante_producto`, `combo`, `promocion`,
+`carrito`, `central_pedidos`, `cuenta_puntos`/`puntos_movimiento`,
+`carta_disputa_pago`.
+
+> **Descuento ≠ promoción.** `venta.descuento_*` es un acto humano
+> autorizado, con motivo y responsable. Las **promociones** se definen por
+> marca/sucursal, son condicionales y automáticas (ej. segunda pizza a
+> mitad de precio si el cliente pide dos del mismo tamaño, en días
+> vigentes, sobre el precio base de la más barata y sin extras) y exigen un
+> motor de reglas que **todavía no existe**. Quien lo construya no debe
+> reutilizar estos campos: mezclarlos haría imposible auditar cuál
+> descuento fue humano y cuál automático. Ver ADR-018 y `ROADMAP.md`.
 
 ## Estado (slice PDV implementado 2026-07-25)
 
@@ -284,6 +348,9 @@ Producto comercial → receta → confirmar venta → evento `sales.venta_confir
 
 - Publica: `sales.venta_confirmada`, `sales.venta_anulada`, `sales.pago_registrado`,
   `sales.comprobante_emitido` (comprobante aceptado por SUNAT vía Factiliza),
-  `sales.carrito_abandonado` (analítica de embudo, RN-COM-013).
+  `sales.descuento_aplicado` (RN-COM-017 — alimenta el reporte de
+  descuentos), `sales.lineas_anuladas` (RN-COM-020 — inventory repone lo
+  que ya no se prepara), `sales.carrito_abandonado` (analítica de embudo,
+  RN-COM-013).
 - Escucha: nada (consulta stock vía contrato público de inventory).
 - Integraciones: Factiliza (facturación electrónica), Izipay, Meta API (pedidos por WhatsApp).

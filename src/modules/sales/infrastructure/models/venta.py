@@ -64,9 +64,37 @@ class Venta(Base, UuidPkMixin, TimestampMixin):
     )
     # Contador de impresiones de comanda (>1 = reimpresión, auditable).
     comanda_impresa_veces: Mapped[int] = mapped_column(Integer, default=0)
-    # Para quién es el pedido, como lo canta el mesero: "Mesa 5", "Carlos",
+    # Para quién es el pedido, como lo canta el mesero: "Carlos",
     # "Rappi #1042". Texto libre — no exige cliente registrado. Visible en
-    # KDS y comanda para aclarar problemas en cocina.
+    # KDS y comanda para aclarar problemas en cocina. Para `modalidad=mesa`
+    # el dato tipado es `mesa_id`; este campo queda para takeout/delivery.
     referencia_atencion: Mapped[str | None] = mapped_column(
         String(50), nullable=True
+    )
+    # Solo si modalidad=mesa (validado en el dominio, no en el esquema).
+    # Nullable también por compatibilidad: las ventas anteriores a la
+    # entidad `mesa` solo tienen `referencia_atencion`.
+    mesa_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("mesa.id"), nullable=True
+    )
+    # Cuántos comen en la mesa. Opcional: el cajero no siempre lo pregunta.
+    # Base del ticket promedio por comensal.
+    comensales: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # --- Descuento manual de la orden (RN-COM-017) ---------------------------
+    # Distinto de `venta_item.descuento` (monto por línea que sale de listas
+    # promocionales) y de las promociones condicionales por marca/sucursal,
+    # que son un motor aparte aún no construido. Este es el descuento que el
+    # cajero aplica al total y un supervisor autoriza; se guarda con motivo y
+    # autor para que salga en los reportes.
+    descuento_modo: Mapped[str | None] = mapped_column(
+        Enum("porcentaje", "monto", name="modo_descuento_venta", native_enum=False),
+        nullable=True,
+    )
+    descuento_valor: Mapped[Decimal | None] = mapped_column(
+        Numeric(10, 2), nullable=True
+    )
+    descuento_motivo: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    # Quién lo autorizó con su PIN — nunca es el mismo acto que aplicarlo.
+    descuento_autorizado_por: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("usuario.id"), nullable=True
     )

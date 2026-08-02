@@ -34,6 +34,7 @@ from src.modules.users.infrastructure.models import (
     Empresa,
     Grupo,
     Marca,
+    Persona,
     Rol,
     Sucursal,
     Usuario,
@@ -53,7 +54,7 @@ def _sucursal(s, marca, empresa, nombre):
     return suc
 
 
-def _cajero(s, username, sucursal, rol):
+def _usuario(s, username, sucursal, rol):
     u = Usuario(username=username, pin_hash=hash_pin("654321"), tipo="humano")
     s.add(u)
     s.flush()
@@ -124,10 +125,22 @@ def env(monkeypatch):
         s.add(Precio(lista_precio_id=lista.id, producto_comercial_id=producto.id,
                      monto=Decimal("25.00")))
 
-        rol_cajero = s.scalar(select(Rol).where(Rol.nombre == "cajero"))
-        rol_alm = s.scalar(select(Rol).where(Rol.nombre == "almacenero"))
-        _cajero(s, "cajero_a", suc_a, rol_cajero)
-        _cajero(s, "almacenero_a", suc_a, rol_alm)
+        def _rol(nombre):
+            return s.scalar(select(Rol).where(Rol.nombre == nombre))
+
+        cajero_a = _usuario(s, "cajero_a", suc_a, _rol("cajero"))
+        _usuario(s, "almacenero_a", suc_a, _rol("almacenero"))
+        _usuario(s, "comprador_a", suc_a, _rol("comprador"))
+        _usuario(s, "jefe_cocina_a", suc_a, _rol("jefe_cocina"))
+        _usuario(s, "contador_a", suc_a, _rol("contador"))
+        _usuario(s, "rrhh_a", suc_a, _rol("rrhh_admin"))
+
+        persona = Persona(
+            nombres="Ana", apellidos="Torres", tipo_documento="dni",
+            numero_documento="10000123",
+        )
+        s.add(persona)
+        s.flush()
 
         ids.update(
             suc_a=str(suc_a.id), suc_b=str(suc_b.id),
@@ -135,7 +148,8 @@ def env(monkeypatch):
             alm_a=str(alm_a.id), alm_b=str(alm_b.id),
             producto=str(producto.id), marca=str(marca.id),
             empresa_a=str(empresa_a.id), empresa_b=str(empresa_b.id),
-            art_b=str(art_b.id),
+            art_b=str(art_b.id), persona=str(persona.id),
+            cajero_a=str(cajero_a.id),
         )
         s.commit()
 
@@ -220,6 +234,101 @@ def test_empresa_explicita_ajena_403(env):
         f"/api/v1/sales/medios-pago?empresa_id={ids['empresa_b']}", headers=h
     )
     assert r.status_code == 403
+
+
+# --- purchases / production / accounting / rrhh / dashboard -------------------
+def _proveedor_body(**overrides):
+    body = {
+        "tipo": "juridico", "condicion_pago": "contado",
+        "razon_social": "Molinera SAC", "ruc": "20111111111",
+    }
+    body.update(overrides)
+    return body
+
+
+def test_proveedor_se_crea_en_la_empresa_del_jwt(env):
+    client, ids = env
+    h = _token(client, "comprador_a")
+    r = client.post("/api/v1/purchases/proveedores", headers=h, json=_proveedor_body())
+    assert r.status_code == 201
+    assert r.json()["empresa_id"] == ids["empresa_a"]
+
+
+def test_proveedor_con_empresa_ajena_403(env):
+    client, ids = env
+    h = _token(client, "comprador_a")
+    r = client.post("/api/v1/purchases/proveedores", headers=h,
+                    json=_proveedor_body(empresa_id=ids["empresa_b"]))
+    assert r.status_code == 403
+
+
+def test_orden_produccion_en_almacen_ajeno_403(env):
+    client, ids = env
+    h = _token(client, "jefe_cocina_a")
+    r = client.post("/api/v1/production/ordenes", headers=h, json={
+        "articulo_id": ids["art_b"], "almacen_id": ids["alm_b"],
+        "cantidad_planeada": "10", "idempotency_key": "iso-prod-0001",
+    })
+    assert r.status_code == 403
+
+
+def test_cuentas_contables_de_empresa_ajena_403(env):
+    client, ids = env
+    h = _token(client, "contador_a")
+    r = client.get(
+        f"/api/v1/accounting/cuentas-contables?empresa_id={ids['empresa_b']}", headers=h
+    )
+    assert r.status_code == 403
+
+
+def test_abrir_caja_en_punto_venta_ajeno_403(env):
+    client, ids = env
+    h = _token(client, "cajero_a")
+    body = {
+        "punto_venta_id": ids["pv_b"], "relevo_encargado_id": ids["cajero_a"],
+        "monto_apertura": "100.00",
+    }
+    assert client.post("/api/v1/accounting/cajas/apertura",
+                       headers=h, json=body).status_code == 403
+    body["punto_venta_id"] = ids["pv_a"]
+    assert client.post("/api/v1/accounting/cajas/apertura",
+                       headers=h, json=body).status_code == 201
+
+
+def test_trabajador_se_crea_en_la_empresa_del_jwt(env):
+    client, ids = env
+    h = _token(client, "rrhh_a")
+    r = client.post("/api/v1/rrhh/trabajadores", headers=h, json={
+        "persona_id": ids["persona"], "cargo": "Mozo", "area": "Salón",
+        "tipo_vinculo": "planilla", "fecha_ingreso": "2026-01-01",
+    })
+    assert r.status_code == 201
+    assert r.json()["empresa_id"] == ids["empresa_a"]
+    ajeno = client.get(
+        f"/api/v1/rrhh/trabajadores?empresa_id={ids['empresa_b']}", headers=h
+    )
+    assert ajeno.status_code == 403
+
+
+def test_dashboard_de_empresa_ajena_403(env):
+    client, ids = env
+    h = _token(client, "contador_a")
+    assert client.get("/api/v1/dashboard/resumen", headers=h).status_code == 200
+    r = client.get(
+        f"/api/v1/dashboard/resumen?empresa_id={ids['empresa_b']}", headers=h
+    )
+    assert r.status_code == 403
+
+
+def test_seed_deja_al_admin_con_empresa(env):
+    """Regresión: sin `usuario_sucursal` el admin del seeder no tenía
+    `empresa_id` en el JWT y toda operación escopada respondía 403."""
+    client, ids = env
+    h = _token(client, "admin", "123456")
+    r = client.post("/api/v1/purchases/proveedores", headers=h,
+                    json=_proveedor_body(ruc="20222222222"))
+    assert r.status_code == 201
+    assert r.json()["empresa_id"] == ids["empresa_a"]
 
 
 # --- Reglas puras del contexto -----------------------------------------------
