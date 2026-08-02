@@ -22,6 +22,21 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Added
 
+- **Restricciones JSONB de permiso, aplicadas (ADR-022)** (2026-08-02):
+  `permiso.restricciones` pasa de campo descriptivo a evaluado.
+  `users.domain.rules.ContextoPermiso`/`cumple_restricciones` (monto/
+  estado/horario, puras) + `UsuarioRepo.restricciones` (comodín `*` o
+  cualquier rol que otorgue el permiso sin condición ⇒ sin restricción) +
+  `check_permission(session, usuario, *codigos, contexto=...)`
+  (`users/api/deps.py`, retrocompatible — sin `contexto` no cambia nada;
+  re-exporta `ContextoPermiso` para que otros módulos no toquen
+  `users.domain` directo, exigido por `tests/test_arquitectura.py`).
+  `require_permission` no cambia — no tiene el body para evaluar una
+  condición. Primer uso real: `sales.aplicar_descuento` respeta un
+  `monto_maximo` por rol (el router calcula el descuento real con
+  `ventas.calcular_monto_descuento` y valida ANTES de aplicarlo, 403 si lo
+  supera). 15 tests nuevos.
+
 - **Consulta RUC/DNI vía Factiliza en alta de cliente/proveedor jurídico**
   (2026-08-02): `FactilizaClient.consultar_dni`/`consultar_ruc`
   (`src/shared/integrations/factiliza/`) contra `api.factiliza.com`

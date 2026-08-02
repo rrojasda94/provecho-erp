@@ -87,6 +87,38 @@ class UsuarioRepo:
             )
         )
 
+    def restricciones(self, usuario_id: uuid.UUID, codigo: str) -> dict | None:
+        """`restricciones` (JSONB) del permiso `codigo` para este usuario.
+
+        `None` = sin restricción: comodín `*`, o alguno de los roles que le
+        dan `codigo` lo otorga sin condición (basta uno libre para no
+        acotar — mismo criterio OR que `permite`). Llamar solo tras
+        confirmar el permiso con `permite`/`check_permission`; sin ninguna
+        fila que lo otorgue también devuelve `None` (nada que restringir).
+        """
+        from src.modules.users.domain.rules import PERMISO_TODO
+
+        filas = list(
+            self.s.scalars(
+                select(Permiso)
+                .join(RolPermiso, RolPermiso.permiso_id == Permiso.id)
+                .join(UsuarioRol, UsuarioRol.rol_id == RolPermiso.rol_id)
+                .where(
+                    UsuarioRol.usuario_id == usuario_id,
+                    Permiso.codigo.in_((codigo, PERMISO_TODO)),
+                )
+            )
+        )
+        if any(p.codigo == PERMISO_TODO for p in filas):
+            return None
+        if not filas or any(p.restricciones is None for p in filas):
+            return None
+        # ponytail: primera fila con restricciones — fusionar caps distintos
+        # de dos roles sobre el mismo permiso el día que los datos sembrados
+        # realmente lo hagan (hoy un usuario tiene un solo rol que otorga
+        # cada código).
+        return filas[0].restricciones
+
 
 class RolRepo:
     def __init__(self, session: Session) -> None:

@@ -53,7 +53,13 @@ cuatro huecos que el punto de venta necesitaba y el modelo no daba.
 - Descuento manual de orden en `venta` (`descuento_modo`,
   `descuento_valor`, `descuento_motivo`, `descuento_autorizado_por`,
   RN-COM-017), con permiso propio `sales.aplicar_descuento` (supervisor,
-  no cajero). Se prorratea entre grupos de cobro.
+  no cajero). Se prorratea entre grupos de cobro. **Tope por rol
+  (ADR-022, 2026-08-02)**: si `permiso.restricciones` trae `monto_maximo`
+  para quien autorizó, el router calcula el monto real del descuento
+  (`ventas.calcular_monto_descuento`) y lo valida con
+  `check_permission(..., contexto=ContextoPermiso(monto=...))` ANTES de
+  aplicarlo — 403 si lo supera, sin tocar la venta. Sin restricciones en el
+  permiso, sigue sin tope (comportamiento de siempre).
 - **Cliente identificado por teléfono** (migración `e1c4a9d6b038`):
   `persona.numero_documento`/`tipo_documento` pasan a nullable. Registrar a
   una persona natural exige **teléfono**, no DNI (RN-PTS-004) — el

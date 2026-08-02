@@ -120,8 +120,20 @@ con Argon2id + JWT, `repositories.py`), `application/` (`auth.py`, `admin.py`),
 python -m src.seeders.seed
 ```
 
-Pendiente: aplicar las `restricciones` (JSONB) de cada permiso — hoy la
-autorización solo valida el código, no la condición (monto/estado/horario).
+**Restricciones de permiso (ADR-022, 2026-08-02):** `permiso.restricciones`
+(JSONB) ya se evalúa, no solo se guarda. `domain/rules.ContextoPermiso` +
+`cumple_restricciones` (monto/estado/horario — claves `monto_maximo`,
+`estados_permitidos`, `horario`) son puras; `UsuarioRepo.restricciones(usuario_id,
+codigo)` resuelve la del usuario (comodín `*` o cualquier rol que lo otorgue
+sin condición ⇒ sin restricción, mismo criterio OR que `permite`).
+`check_permission(session, usuario, *codigos, contexto=...)` (`api/deps.py`,
+re-exporta `ContextoPermiso` para que otros módulos lo usen sin tocar
+`users.domain`) la aplica cuando el llamador pasa `contexto`; sin él, se
+comporta igual que siempre. `require_permission` (el `Depends` sin acceso al
+body) no cambia — la condición depende del body, así que solo
+`check_permission` puede evaluarla. Primer uso real:
+`sales.aplicar_descuento` acepta un `monto_maximo` por rol (ver
+`sales/README.md`).
 
 ## Sincronización con el hub de sucursal (implementado 2026-07-27)
 

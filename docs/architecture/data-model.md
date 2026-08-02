@@ -180,7 +180,11 @@ erDiagram
   `inventory.requerir` | `inventory.ajustar` | `inventory.autorizar_ajuste`
   | `inventory.transferir`), restricciones (JSONB — ej. alcance
   `sucursal_propia`\`toda_empresa`, visibilidad `stock_esperado`\`ciego`,
-  RN-INV-005).
+  RN-INV-005). **Evaluada** desde ADR-022 (2026-08-02) para `monto_maximo`,
+  `estados_permitidos` y `horario` — `users.domain.rules.cumple_restricciones`
+  + `check_permission(..., contexto=...)`; alcance/visibilidad siguen
+  resolviéndose por su propio mecanismo (ej. RN-INV-005), no por este campo
+  todavía.
 - **usuario_rol**, **rol_permiso**, **usuario_sucursal** (alcance por sucursal).
 - **refresh_token**: hash, expiración, revocado.
 - **audit_log**: usuario_id, entidad, entidad_id, acción, datos_antes (JSONB),
