@@ -44,7 +44,7 @@ from src.modules.sales.infrastructure.models import (
     ProductoComercialExtra,
     PuntoVenta,
 )
-from src.modules.users.infrastructure.models import Empresa, Marca, Sucursal
+from src.modules.users.infrastructure.models import Empresa, Marca, Persona, Sucursal
 
 # (id_interno, nombre, precio, es_extra)
 CARTA = [
@@ -53,6 +53,15 @@ CARTA = [
     ("P003", "Inca Kola 1L", "9.00", False),
     ("P004", "Alitas BBQ x6", "24.00", False),
     ("E001", "Extra queso", "5.00", True),
+]
+
+# (nombres, apellidos, dni) — ninguna vinculada a un trabajador todavía; la
+# demo de RRHH la usa para probar el alta de `trabajador` (persona_id
+# existente es obligatorio, RN-GEN-007) sin depender de una pantalla de
+# personas que todavía no existe en el frontend.
+PERSONAS_DEMO = [
+    ("Rosa", "Mendoza Vela", "70011223"),
+    ("Carlos", "Ríos Pinedo", "70011224"),
 ]
 
 MEDIOS = [
@@ -116,6 +125,36 @@ def _receta_base(session: Session, empresa: Empresa) -> Receta:
     return receta
 
 
+def _unidades_medida_demo(session: Session) -> None:
+    """UdM extra para poder probar la pantalla de Artículos (inventory) más
+    allá de "Unidad" — CRUD propio de `unidad_medida` sigue diferido, ver
+    ROADMAP → Deuda técnica → Transversal."""
+    for categoria_nombre, udm_nombre, decimales in (
+        ("Peso", "Kilo", 3),
+        ("Volumen", "Litro", 3),
+    ):
+        cat_udm = _obtener_o_crear(session, CategoriaUdm, {"nombre": categoria_nombre})
+        _obtener_o_crear(
+            session,
+            UnidadMedida,
+            {"nombre": udm_nombre, "categoria_udm_id": cat_udm.id},
+            ratio=Decimal(1),
+            decimales=decimales,
+        )
+
+
+def _personas_demo(session: Session) -> None:
+    for nombres, apellidos, dni in PERSONAS_DEMO:
+        _obtener_o_crear(
+            session,
+            Persona,
+            {"numero_documento": dni},
+            nombres=nombres,
+            apellidos=apellidos,
+            tipo_documento="dni",
+        )
+
+
 def sembrar(session: Session) -> None:
     empresa = session.scalar(select(Empresa))
     marca = session.scalar(select(Marca))
@@ -151,6 +190,8 @@ def sembrar(session: Session) -> None:
             capacidad=4,
         )
 
+    _unidades_medida_demo(session)
+    _personas_demo(session)
     receta = _receta_base(session, empresa)
     productos = {}
     for id_interno, nombre, _precio, es_extra in CARTA:

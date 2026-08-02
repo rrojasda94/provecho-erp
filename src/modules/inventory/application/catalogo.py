@@ -21,6 +21,7 @@ from src.modules.inventory.infrastructure.repositories import (
     ArticuloRepo,
     CategoriaRepo,
     SkuRepo,
+    UnidadMedidaRepo,
 )
 
 
@@ -87,6 +88,10 @@ def listar_categorias(
     session: Session, empresa_id: uuid.UUID | None = None
 ) -> list[Categoria]:
     return CategoriaRepo(session).list(empresa_id)
+
+
+def listar_unidades_medida(session: Session) -> list[UnidadMedida]:
+    return UnidadMedidaRepo(session).list()
 
 
 def crear_articulo(

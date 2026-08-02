@@ -37,6 +37,18 @@ class CategoriaOut(BaseModel):
     frecuencia_conteo: str | None
 
 
+# --- Unidades de medida ---
+# Catálogo global, no por empresa (a diferencia de categoría/artículo): la
+# conversión kilo↔gramo es la misma para cualquier empresa que use el ERP.
+class UnidadMedidaOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    categoria_udm_id: uuid.UUID
+    nombre: str
+    ratio: Decimal
+    decimales: int
+
+
 # --- Artículos ---
 class ArticuloCreate(BaseModel):
     empresa_id: uuid.UUID | None = None

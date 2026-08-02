@@ -12,6 +12,7 @@ from src.modules.purchases.infrastructure.models import (
     RecepcionCompra,
     RecepcionItem,
 )
+from src.modules.users.infrastructure.models import Almacen
 
 
 class ProveedorRepo:
@@ -58,6 +59,16 @@ class OrdenCompraRepo:
         self.s.add(orden)
         self.s.flush()
         return orden
+
+    def list(self, empresa_id: uuid.UUID | None = None) -> list[OrdenCompra]:
+        # `orden_compra` no tiene empresa_id propio — el tenant sale de su
+        # almacén destino (mismo patrón que `application/scope.py`).
+        stmt = select(OrdenCompra).order_by(OrdenCompra.created_at.desc())
+        if empresa_id is not None:
+            stmt = stmt.join(Almacen, Almacen.id == OrdenCompra.almacen_destino_id).where(
+                Almacen.empresa_id == empresa_id
+            )
+        return list(self.s.scalars(stmt))
 
 
 class RecepcionCompraRepo:

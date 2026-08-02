@@ -266,6 +266,61 @@
         "title": "AjusteOut",
         "type": "object"
       },
+      "AlmacenOut": {
+        "properties": {
+          "direccion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direccion"
+          },
+          "empresa_id": {
+            "format": "uuid",
+            "title": "Empresa Id",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "sucursal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sucursal Id"
+          },
+          "tipo": {
+            "title": "Tipo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "empresa_id",
+          "sucursal_id",
+          "nombre",
+          "tipo",
+          "direccion"
+        ],
+        "title": "AlmacenOut",
+        "type": "object"
+      },
       "AmonestacionCreate": {
         "properties": {
           "descargo": {
@@ -10269,6 +10324,42 @@
         "title": "TransferenciaRecibirItem",
         "type": "object"
       },
+      "UnidadMedidaOut": {
+        "properties": {
+          "categoria_udm_id": {
+            "format": "uuid",
+            "title": "Categoria Udm Id",
+            "type": "string"
+          },
+          "decimales": {
+            "title": "Decimales",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "ratio": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Ratio",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "categoria_udm_id",
+          "nombre",
+          "ratio",
+          "decimales"
+        ],
+        "title": "UnidadMedidaOut",
+        "type": "object"
+      },
       "UsuarioCreate": {
         "properties": {
           "email": {
@@ -12508,6 +12599,66 @@
         ]
       }
     },
+    "/api/v1/almacenes": {
+      "get": {
+        "description": "Lista de referencia (nombre/tipo de almacén, no dato sensible) — abierta\na cualquier usuario autenticado, la necesita cualquiera que tenga que\nelegir un destino (ej. compras crea una OC). Sin `require_permission`\na propósito: no es un recurso a proteger, es un catálogo de apoyo. Sí\nescopada por tenant — un almacén de otra empresa no es \"no sensible\".",
+        "operationId": "listar_almacenes_api_v1_almacenes_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "empresa_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Empresa Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AlmacenOut"
+                  },
+                  "title": "Response Listar Almacenes Api V1 Almacenes Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Almacenes",
+        "tags": [
+          "users"
+        ]
+      }
+    },
     "/api/v1/auth/autorizar": {
       "post": {
         "description": "Elevación puntual de supervisor sobre el terminal de otro: verifica\nsu PIN **y** que tenga el permiso, y devuelve un token de corta vida\nacotado a esa acción (RN-AUD-005).\n\nVa detrás del mismo rate limit que el login: es un endpoint que recibe\nPINes y sin freno sería el camino cómodo para probarlos.",
@@ -14533,6 +14684,36 @@
           }
         ],
         "summary": "Recibir Transferencia",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/unidades-medida": {
+      "get": {
+        "operationId": "listar_unidades_medida_api_v1_inventory_unidades_medida_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/UnidadMedidaOut"
+                  },
+                  "title": "Response Listar Unidades Medida Api V1 Inventory Unidades Medida Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Unidades Medida",
         "tags": [
           "inventory"
         ]
@@ -16635,6 +16816,63 @@
       }
     },
     "/api/v1/purchases/ordenes-compra": {
+      "get": {
+        "operationId": "listar_ordenes_compra_api_v1_purchases_ordenes_compra_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "empresa_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Empresa Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/OrdenCompraOut"
+                  },
+                  "title": "Response Listar Ordenes Compra Api V1 Purchases Ordenes Compra Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Ordenes Compra",
+        "tags": [
+          "purchases"
+        ]
+      },
       "post": {
         "operationId": "crear_orden_compra_api_v1_purchases_ordenes_compra_post",
         "requestBody": {

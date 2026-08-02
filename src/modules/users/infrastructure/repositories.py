@@ -18,6 +18,7 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from src.modules.users.infrastructure.models import (
+    Almacen,
     AuditLog,
     Permiso,
     Persona,
@@ -198,6 +199,17 @@ class PersonaRepo:
             return None
         self.s.flush()
         return self.get(persona_id)
+
+
+class AlmacenRepo:
+    def __init__(self, session: Session) -> None:
+        self.s = session
+
+    def list(self, empresa_id: uuid.UUID | None = None) -> list[Almacen]:
+        stmt = select(Almacen).where(Almacen.deleted_at.is_(None))
+        if empresa_id is not None:
+            stmt = stmt.where(Almacen.empresa_id == empresa_id)
+        return list(self.s.scalars(stmt.order_by(Almacen.nombre)))
 
 
 class AuditLogRepo:

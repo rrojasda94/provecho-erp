@@ -6,12 +6,14 @@ from fastapi import APIRouter, Depends, Request, Response, status
 from sqlalchemy.orm import Session
 
 from src.core.rate_limit import rate_limit_login
+from src.core.tenant import Tenant
 from src.modules.users.api import schemas
 from src.modules.users.api.deps import (
     check_permission,
     client_ip,
     get_current_user,
     get_db,
+    get_tenant,
     require_permission,
 )
 from src.modules.users.api.error_handlers import http_exception
@@ -156,6 +158,21 @@ def listar_personas(
     session: Session = Depends(get_db),
 ):
     return admin.listar_personas(session, q)
+
+
+@router.get("/almacenes", response_model=list[schemas.AlmacenOut], tags=["users"])
+def listar_almacenes(
+    empresa_id: uuid.UUID | None = None,
+    _: Usuario = Depends(get_current_user),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Lista de referencia (nombre/tipo de almacén, no dato sensible) — abierta
+    a cualquier usuario autenticado, la necesita cualquiera que tenga que
+    elegir un destino (ej. compras crea una OC). Sin `require_permission`
+    a propósito: no es un recurso a proteger, es un catálogo de apoyo. Sí
+    escopada por tenant — un almacén de otra empresa no es "no sensible"."""
+    return admin.listar_almacenes(session, tenant.filtro_empresa(empresa_id))
 
 
 @router.get("/personas/{persona_id}", response_model=schemas.PersonaOut, tags=["personas"])

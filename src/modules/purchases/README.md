@@ -37,6 +37,7 @@ cualquier recepción). Capas `domain/rules.py`,
 |--------|------|---------|
 | POST/GET/PATCH | `/proveedores[/{id}]` | `purchases.crear` / `leer` |
 | POST | `/ordenes-compra` | `purchases.crear` |
+| GET | `/ordenes-compra` | `purchases.leer` — listado; tenant vía join a `almacen` (la orden no tiene `empresa_id` propio) |
 | GET | `/ordenes-compra/{id}` | `purchases.leer` |
 | POST | `/ordenes-compra/{id}/emitir` | `purchases.crear` (+ `aprobar` sobre umbral) |
 | POST | `/ordenes-compra/{id}/recepciones` | `purchases.recepcionar` |

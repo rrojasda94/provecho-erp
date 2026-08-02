@@ -90,6 +90,16 @@ class PersonaOut(BaseModel):
     anonimizado_at: datetime | None
 
 
+class AlmacenOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    empresa_id: uuid.UUID
+    sucursal_id: uuid.UUID | None
+    nombre: str
+    tipo: str
+    direccion: str | None
+
+
 class AnonimizarPersonaIn(BaseModel):
     motivo: str = Field(min_length=3, max_length=500)
 

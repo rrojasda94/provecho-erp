@@ -67,6 +67,12 @@ Claims del JWT: `sub` (usuario_id), `tipo`, `roles`, `sucursales`, `empresa_id`,
 | POST/GET/PATCH | `/api/v1/personas[/{id}]` | CRUD de persona (party model) — `PATCH` exige `version` |
 | POST | `/api/v1/personas/{id}/anonimizar` | Derecho de cancelación (Ley 29733) — permiso `personas.anonimizar` |
 
+### Organización — solo lectura (`Almacen` vive en `users` por historia, ver data-model §1)
+
+| Método | Ruta | Acción |
+|--------|------|--------|
+| GET | `/api/v1/almacenes` | Lista de referencia (nombre/tipo), escopada por tenant — sin `require_permission`: no es dato sensible, lo necesita cualquiera que elija un destino (ej. `purchases` al crear una OC) |
+
 ### Parámetros operativos por empresa (ADR-014, RN-GER-009)
 
 | Método | Ruta | Acción |

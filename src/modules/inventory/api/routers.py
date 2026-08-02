@@ -97,6 +97,14 @@ def listar_categorias(
     return catalogo.listar_categorias(session, tenant.filtro_empresa(empresa_id))
 
 
+@router.get("/unidades-medida", response_model=list[schemas.UnidadMedidaOut])
+def listar_unidades_medida(
+    _: Usuario = Depends(require_permission(LEER)),
+    session: Session = Depends(get_db),
+):
+    return catalogo.listar_unidades_medida(session)
+
+
 # --- Artículos --------------------------------------------------------------
 @router.post("/articulos", response_model=schemas.ArticuloOut, status_code=201)
 def crear_articulo(

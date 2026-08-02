@@ -210,6 +210,7 @@ Endpoints `/api/v1/inventory`:
 | Método | Ruta | Permiso |
 |--------|------|---------|
 | POST/GET | `/categorias` | `gestionar_catalogo` / `leer` |
+| GET | `/unidades-medida` | `leer` — catálogo global, sin filtro de tenant (`data-model.md` §3) |
 | POST/GET/PATCH | `/articulos[/{id}]` | `gestionar_catalogo` / `leer` |
 | POST | `/skus` | `gestionar_catalogo` |
 | GET | `/stock` | `leer` |

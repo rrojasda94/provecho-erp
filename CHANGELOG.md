@@ -22,6 +22,47 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Added
 
+- **Tres pantallas reales más — Inventario/Artículos, Compras/Órdenes de
+  compra, RRHH/Trabajadores** (2026-08-02), siguiendo el patrón de
+  Compras/Proveedores (tabla TanStack + alta con `<dialog>` nativo):
+  - **Inventario → Artículos**: crear exige `unidad_medida_id`, que no
+    tenía ningún endpoint de lectura — nuevo `GET /api/v1/inventory/
+    unidades-medida` (catálogo global, sin filtro de tenant:
+    `UnidadMedidaRepo`, `catalogo.listar_unidades_medida`). Seeder de
+    demo (`pdv_demo.py`, no `seed.py` — ver más abajo) agrega Kilo/Litro
+    además del "Unidad" que ya creaba.
+  - **Compras → Órdenes de compra**: alta con ítems dinámicos
+    (agregar/quitar fila, total en vivo) e `idempotency_key` generada en
+    el cliente (`crypto.randomUUID()`). Dos endpoints nuevos que
+    bloqueaban la pantalla: `GET /api/v1/purchases/ordenes-compra`
+    (`OrdenCompraRepo.list`, tenant vía join a `almacen` — la orden no
+    tiene `empresa_id` propio) y `GET /api/v1/almacenes` (`AlmacenRepo`
+    en `users`, sin `require_permission` a propósito: catálogo de
+    referencia, no dato sensible, pero sí escopado por tenant).
+  - **RRHH → Trabajadores**: alta exige una `persona_id` existente
+    (party model) — sin endpoint nuevo, ya existía `GET /personas`, pero
+    gatillado por `users.gestionar` en vez de algo más acorde a RRHH; un
+    rol RRHH puro sin ese permiso no puede armar el selector de alta hoy
+    (gap de RBAC documentado, no corregido en este cambio).
+  - Home tile de **Ventas** corregido: apuntaba a `/ventas` (404); el PDV
+    es pantalla completa fuera del shell a propósito (ADR-013), el tile
+    ahora enlaza directo a `/pdv`.
+  - Cerrados los tres hallazgos menores de la revisión del PR anterior:
+    `<select>` sin estilo en `globals.css`, altura del sidebar con
+    número mágico (`calc(100vh-56px)` → `flex-1` real), y comentario en
+    `lib/sesion.ts` documentando la dependencia de la memoización de
+    `fetch` de Next.js.
+  - **`pdv_demo.py` (no `seed.py`) gana 2 `Persona` de demo** —
+    necesarias para poder probar el alta de Trabajador sin una pantalla
+    de Personas que todavía no existe. Se evaluó agregar UdM/Personas al
+    propio `seed()`, pero **17 archivos de test** crean su propia
+    `CategoriaUdm("Peso")` asumiendo que `seed()` no toca `inventory`;
+    ese camino se revirtió antes de commitear.
+  - Verificado end-to-end en Docker con datos reales (curl + navegador):
+    crear artículo → aparece en la tabla; crear OC de 2 ítems → total
+    calculado correcto (390.00 = 20×18.50 + 5×4.00); crear trabajador →
+    nombre resuelto desde `persona_id`.
+
 - **Shell estilo Odoo, F2.11 (tablas) y primera pantalla real de frontend**
   (2026-08-02): TanStack Table como librería de tabla del ERP
   (`frontend/components/tabla/tabla-datos.tsx`, v1 orden/búsqueda/filtro/

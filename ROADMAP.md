@@ -172,6 +172,26 @@ Registro vivo de deuda técnica declarada al cerrar cada slice — para que no
 se olvide. Marcar ✅ al resolverse en el slice indicado.
 
 ### Transversal
+- ⬜ **`GET /personas` exige `users.gestionar`, demasiado amplio para un
+  lookup**: encontrado al construir RRHH → Trabajadores (2026-08-02), que
+  necesita listar personas para el selector de alta (`persona_id`
+  obligatorio) pero no debería requerir permisos de administración de
+  usuarios. `purchases` (proveedor natural) tiene la misma necesidad sin
+  construir todavía. Candidatos: permiso nuevo de solo-lectura
+  (`personas.leer`) que además de `users.gestionar` habilite el endpoint,
+  o restricciones JSONB por permiso (deuda ya declarada más abajo) que
+  acote `users.gestionar` a lectura vs. escritura. Ningún rol RRHH
+  seedeado hoy puede usarlo — mismo hueco que `gestionar_reglas_aprobacion`
+  antes: solo `admin` vía `*`.
+- ✅ 2026-08-02 **Tres endpoints de lectura que faltaban y bloqueaban
+  pantallas de frontend**: `GET /api/v1/inventory/unidades-medida`
+  (catálogo global, sin tenant — Inventario/Artículos lo necesita para el
+  selector de `unidad_medida_id`), `GET /api/v1/purchases/ordenes-compra`
+  (listado, no existía ni por error — solo había `GET .../{id}`),
+  `GET /api/v1/almacenes` (nuevo en `users`, sin `require_permission` a
+  propósito — catálogo de referencia, no dato sensible — pero sí escopado
+  por tenant). Los tres son de solo lectura; ningún CRUD de escritura se
+  agregó de paso.
 - ✅ 2026-08-02 **Deriva de esquema del slice de contratación** (migración
   `e4a2f9c17b3d`): `postulante.estado` seguía en VARCHAR(10) con nueve
   estados de hasta 15 caracteres — `preseleccionado` fallaba en Postgres y
@@ -977,15 +997,40 @@ ya existentes (`globals.css`), sin hex nuevo. El dashboard existente se
 relocalizó como primera app del shell y de paso dejó de leer `empresa_id`
 del JWT sin verificar — ahora sale de `/users/me`.
 
-**Primera pantalla real de un módulo**: Compras → Proveedores (listado
-TanStack + alta con `<dialog>` nativo, sin shadcn/ui todavía — ningún
-formulario construido necesitó overlay complejo). v1 solo proveedor
-jurídico; el natural espera un selector de `persona_id` que el frontend no
-tiene. Verificado end-to-end en Docker (migrar + seed contra el Postgres
-del compose, login → home → crear proveedor → tabla se actualiza), sin
-errores de consola. Resto de módulos (inventario, ventas, producción,
-contabilidad, rrhh, marketing, gerencia, usuarios) solo tienen tile en el
-home — sus rutas dan 404 limpio, no hay pantalla construida todavía.
+**Pantallas reales** (listado TanStack + alta con `<dialog>` nativo, sin
+shadcn/ui todavía — ningún formulario construido necesitó overlay
+complejo):
+
+- **Compras → Proveedores** (2026-08-02). v1 solo proveedor jurídico; el
+  natural espera un selector de `persona_id` que el frontend no tiene.
+- **Compras → Órdenes de compra** (2026-08-02): ítems dinámicos (agregar/
+  quitar fila, total en vivo), `idempotency_key` client-generada.
+  Requirió 2 endpoints GET que no existían y bloqueaban la pantalla:
+  `/api/v1/purchases/ordenes-compra` (listado) y `/api/v1/almacenes`
+  (nuevo, `users`, catálogo de referencia sin `require_permission` a
+  propósito pero sí escopado por tenant).
+- **Inventario → Artículos** (2026-08-02): requirió
+  `GET /api/v1/inventory/unidades-medida`, que tampoco existía — sin
+  eso el selector de `unidad_medida_id` (obligatorio para crear) queda
+  vacío. CRUD propio de `unidad_medida` sigue diferido (ver Deuda técnica
+  → Transversal); esto es solo lectura.
+- **RRHH → Trabajadores** (2026-08-02): alta exige `persona_id` existente
+  (ya había `GET /personas`, sin endpoint nuevo). Gap de RBAC encontrado
+  y **no corregido**: `GET /personas` exige `users.gestionar`, no algo
+  más acorde a RRHH — un rol RRHH puro sin ese permiso no puede armar el
+  selector de alta aunque sí pueda leer trabajadores.
+- **Ventas**: el tile del home apuntaba a `/ventas` (404); corregido a
+  `/pdv` — el PDV es pantalla completa fuera del shell a propósito
+  (ADR-013), no una ruta bajo `(app)`.
+
+Verificado end-to-end en Docker con datos reales, por API y por navegador
+(curl + interacción real): crear artículo → aparece en tabla; crear OC de
+2 ítems → total correcto; crear trabajador → nombre resuelto. Sin errores
+de consola.
+
+Módulos sin pantalla todavía (solo tile en el home, 404 limpio de
+Next.js): ventas de back-office (más allá del PDV), producción,
+contabilidad, marketing, gerencia, usuarios.
 
 Todo lo demás (theming multi-marca, accesibilidad — catálogo ya definido,
 tiempo real de KDS, i18n, hardware, testing — Playwright ya decidido por

@@ -21,6 +21,7 @@ from src.modules.inventory.infrastructure.models import (
     StockLote,
     Transferencia,
     TransferenciaItem,
+    UnidadMedida,
 )
 from src.modules.users.infrastructure.models import Almacen
 
@@ -71,6 +72,15 @@ class CategoriaRepo:
         self.s.add(categoria)
         self.s.flush()
         return categoria
+
+
+class UnidadMedidaRepo:
+    def __init__(self, session: Session) -> None:
+        self.s = session
+
+    def list(self) -> list[UnidadMedida]:
+        # Global: sin filtro de empresa (RN-GER-010, docstring del modelo).
+        return list(self.s.scalars(select(UnidadMedida).order_by(UnidadMedida.nombre)))
 
 
 class SkuRepo:
