@@ -7,6 +7,56 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Added
 
+- **Toda magnitud lleva su unidad — RN-GER-010, ADR-014 Addendum b**
+  (2026-08-02, migración `c93e5a7b1d42`): un parámetro monetario declara su
+  `divisa` y uno físico su `unidad_medida_id`; un número suelto (`{"monto":
+  2000}`) responde 409 — `MagnitudInvalida` hereda de `ReglaNegocio`, la
+  jerarquía común de `src/shared/errors.py`, así que la traduce el handler
+  global sin `try/except` por endpoint. Los **decimales son configurables
+  por unidad**:
+  nueva entidad transversal `divisa` (`codigo`, `nombre`, `simbolo`,
+  `decimales`, `activa`; sembrada con PEN/S//2) y nueva columna
+  `unidad_medida.decimales` (default 3 — Kilo necesita gramos, Unidad
+  necesita 0). `src/shared/magnitudes.py` valida la forma del valor y
+  redondea con los decimales de esa unidad, en texto y no en float, con
+  `ROUND_HALF_UP` (en dinero el medio centavo sube). Nueva columna
+  `parametro_empresa.valor_display` con la magnitud formateada ("S/ 2000.00",
+  "5.000 Kilo") tal como se le mostró a Gerencia, congelada con la fila. La
+  misma validación corre al proponer y al modificar-y-aprobar. La UdM se lee
+  por el contrato público nuevo
+  `inventory.application.queries_publicas.unidad_medida_para_magnitud` —
+  `shared` no consulta el catálogo de otro módulo. La migración completa
+  `divisa: PEN` en los umbrales que venían de `regla_aprobacion`. Tests en
+  `tests/test_magnitudes.py`. **No** cambia RN-PRC-004: `precio` sigue sin
+  columna de divisa, la operación sigue siendo PEN única. Sin CRUD de
+  `divisa`/`unidad_medida` todavía (ROADMAP → Deuda técnica → Transversal).
+
+- **`parametro_empresa` con aprobación de Gerencia — ADR-014 Addendum**
+  (2026-08-02, RN-GER-008/009): los valores operativos configurables
+  (umbral de OC, margen de contribución mínimo, frecuencia de conteo,
+  margen de error de ajuste, monto de caja chica, plazo de envío de
+  comprobantes, rangos salariales) se **proponen desde el módulo al que
+  pertenecen** y **no surten efecto hasta que Gerencia los aprueba**, que
+  puede aceptar, rechazar con motivo, o modificar el valor al aprobar.
+  Mientras la propuesta está pendiente, el módulo sigue leyendo el valor
+  anterior. Sin tabla de solicitudes aparte: cada propuesta es una fila de
+  `parametro_empresa` con `estado` (`propuesto` → `vigente` | `rechazado`,
+  más `reemplazado`) y un índice único parcial `WHERE estado='vigente'`;
+  la lectura (`src/shared/parametros.py::valor_vigente`) solo devuelve el
+  vigente, así que una propuesta pendiente es invisible para el módulo. El
+  historial (quién propuso, quién resolvió, cuándo, valor anterior) es la
+  propia tabla — no escribe en `audit_log`. Endpoints
+  `POST/GET /api/v1/parametros`, `POST /api/v1/parametros/{id}/aprobar`
+  (con `valor` opcional = modificar al aprobar) y `.../rechazar`.
+  Migración `a71c9f4b2e60`. **Un permiso por módulo** para proponer
+  (`<modulo>.proponer_parametro`, catálogo en
+  `src/shared/parametros.py::MODULOS`) — Compras no propone parámetros de
+  RRHH; el `modulo` se valida como `Literal` en el schema (422 si es
+  inventado) y `GET /parametros` sin filtro de `modulo` exige el permiso de
+  Gerencia, porque los rangos salariales de RRHH no son de lectura general.
+  Aprobar/rechazar/modificar sigue bajo
+  `gerencia.gestionar_parametros_empresa`. Tests en
+  `tests/test_parametros_empresa.py`.
 - **Slice core del módulo `marketing`** (2026-08-01, migración
   `e9c3b7412a68`). El módulo existía solo como README de spec desde el
   2026-07-22; ahora tiene código. Las 5 entidades de data-model §8d y 17
@@ -463,11 +513,28 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 - **`tests/test_errores_http.py`** (2026-08-01, 13 casos): fija el mapeo
   unificado, incluidas las subclases que antes caían al 400.
 
+### Removed
+
+- **`regla_aprobacion` retirada** (2026-08-02, migración `b82d4c1f7a35`,
+  ADR-014 Addendum): `parametro_empresa` queda como **única** tabla de
+  configuración por empresa. La migración copia las filas vigentes como
+  parámetros ya aprobados (`valor={"monto": ...}`, atribuidos a `admin`) y
+  borra la tabla; se van también el modelo, el repo, los tres endpoints
+  `/api/v1/reglas-aprobacion` y el permiso
+  `gerencia.gestionar_reglas_aprobacion`. `permiso_requerido` se descarta:
+  era informativo, la verificación real siempre la hizo el módulo
+  consumidor. `src/shared/aprobaciones.py::umbral_vigente` sobrevive como
+  envoltorio tipado (`Decimal`) sobre `parametro_empresa`, así
+  `purchases`/`accounting` no cambiaron una línea. Se descarta también la
+  FK `parametro_empresa.decision_gerencial_id` prevista en ADR-014: el par
+  propuesta/aprobación ya deja ese rastro. La migración de datos se prueba en
+  `tests/test_migracion_retiro_regla_aprobacion.py` (copia solo lo vigente,
+  no pisa un parámetro ya cargado a mano, monto canónico a 2 decimales).
+
+
 - **Permiso `gerencia.gestionar_parametros_empresa`** (2026-07-27,
-  ADR-014): sembrado en `src/seeders/seed.py`, mismo patrón que
-  `gestionar_reglas_aprobacion`. Adelantado a la entidad `parametro_empresa`
-  en sí, que sigue siendo spec — sin modelo, migración ni endpoints
-  todavía (`ROADMAP.md` → Deuda técnica → Transversal).
+  ADR-014): sembrado en `src/seeders/seed.py` adelantado a la entidad
+  `parametro_empresa`, implementada el 2026-08-02 (entrada de arriba).
 
 - **Lote y FEFO en `inventory` — ADR-015** (2026-07-27, RN-VNC-001..003,
   RN-LOT-001): nuevas entidades `lote` (código, vencimiento, origen,

@@ -68,7 +68,7 @@ Marcar aquí cuando cada uno se resuelva (y actualizar el doc que lo
 contiene, buscando su `[[ COMPLETAR ]]`):
 
 - ✅ 2026-07-27 **Mecanismo para los valores operativos configurables**
-  (umbral de OC, margen de contribución mínimo, frecuencia de conteo,
+  (umbral de OC, margen de contribución mínimo,
   margen de error de ajuste, monto de caja chica, plazo de envío de
   comprobantes, rangos salariales): decidido con el usuario que **no son
   valores fijos** — se configuran en `parametro_empresa` por empresa, los
@@ -76,27 +76,32 @@ contiene, buscando su `[[ COMPLETAR ]]`):
   (`decision_gerencial`) cuando amerite (no obligatorio para un ajuste
   rutinario). Ver ADR-014, `data-model.md` §8c, RN-GER-008 y
   `docs/gerencia/politica-gerencia.md#parámetros-operativos-configurables`.
+  **Ampliado 2026-08-02** (ADR-014 Addendum, RN-GER-009): cada parámetro
+  se configura **desde el módulo al que pertenece**, pero el cambio **no
+  surte efecto hasta que Gerencia lo aprueba** en su sección de
+  aprobaciones (aceptar / rechazar / modificar). Implementado: entidad,
+  migración `a71c9f4b2e60`, endpoints `/api/v1/parametros[/{id}/aprobar|
+  /rechazar]`, un permiso por módulo `<modulo>.proponer_parametro`.
   Lo que queda abierto por cada uno de los puntos de abajo ya **no es el
-  mecanismo** (resuelto) sino que **Gerencia cargue el valor real** —
-  trabajo de configuración/negocio, no bloquea código:
+  mecanismo** (resuelto e implementado) sino que **el área proponga y
+  Gerencia apruebe el valor real** — trabajo de configuración/negocio, no
+  bloquea código:
   - ⬜ Umbral de aprobación de OC en soles (`purchases/oc_umbral`, ya vive
-    en `regla_aprobacion` — solo falta que Gerencia lo configure por
-    empresa; valor semilla S/2000 mientras tanto). ¿Umbral separado para
+    en `parametro_empresa` — solo falta que Compras lo proponga y Gerencia
+    lo apruebe; valor semilla S/2000 mientras tanto). ¿Umbral separado para
     activos?
-  - ⬜ Margen de contribución mínimo objetivo (`comercial/margen_minimo`).
+  - ⬜ Margen de contribución mínimo objetivo (`sales/margen_minimo`).
   - ⬜ Esquema de incentivo/comisión de metas de venta (Comercial + RRHH +
     Gerencia, nunca retroactivo) — el valor numérico va en
     `parametro_empresa`; el diseño del esquema en sí sigue siendo decisión
     de negocio a definir con esas tres áreas.
-  - ⬜ Frecuencia de conteo cíclico y de conteo general de Almacén Central
-    (`inventory/frecuencia_conteo_<categoria>`).
   - ⬜ Margen de error de ajuste de inventario
     (`inventory/margen_error_ajuste`).
   - ⬜ Monto del fondo de caja chica de compras
     (`purchases/monto_caja_chica`) — el mecanismo de reposición ante
     faltante sigue siendo decisión de proceso aparte, no solo de valor.
   - ⬜ Plazo interno de envío de comprobantes al contador
-    (`contabilidad/plazo_envio_comprobante`).
+    (`accounting/plazo_envio_comprobante`).
   - ⬜ Rangos salariales de los 7 perfiles de puesto
     (`rrhh/rango_salarial_<perfil>`).
   Quedan **fuera** de este mecanismo por ser decisión de rol, no de valor
@@ -193,24 +198,55 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   PDV/Kiosk, preferencias de accesibilidad (paleta daltonismo, tamaño de
   fuente) persistidas en el perfil de `usuario`. Catálogo de paletas y
   niveles ya definido (2026-07-27) — sin implementar.
-- ⬜ **`parametro_empresa`** (ADR-014, `data-model.md` §8c, RN-GER-008):
-  entidad transversal para valores operativos configurables por empresa
-  (rango salarial, margen de error de ajuste, monto de caja chica, plazos
-  internos) con `valor` JSONB y
-  `decision_gerencial_id` opcional como sustento. **Sin modelo, migración
-  ni endpoints todavía** — candidato natural para el primer uso real:
-  rango salarial de RRHH. La frecuencia de conteo cíclico **salió de esta
-  lista** (ADR-019, 2026-08-01): es por categoría, no por empresa, y vive
-  en `categoria.frecuencia_conteo`. El permiso `gerencia.gestionar_parametros_empresa`
-  ya está sembrado en `src/seeders/seed.py` (2026-07-27, mismo patrón que
-  `gestionar_reglas_aprobacion`) para no bloquear el RBAC del primer slice
-  que lo implemente — hoy solo lo tiene `admin` vía `*`, no hay rol
-  `gerente` explícito (mismo hueco que `gestionar_reglas_aprobacion`).
+- ✅ 2026-08-02 **`parametro_empresa` con aprobación de Gerencia**
+  (ADR-014 + Addendum, RN-GER-008/009): entidad transversal implementada
+  (`src/shared/models/parametro_empresa.py`, migración `a71c9f4b2e60`).
+  **El área propone desde su módulo, Gerencia acepta / rechaza / modifica**
+  y recién ahí el valor llega al módulo. Lectura vía
+  `src.shared.parametros.valor_vigente`. Permisos:
+  `<modulo>.proponer_parametro` (uno por módulo) y
+  `gerencia.gestionar_parametros_empresa`. Sigue sin existir un rol
+  `gerente` explícito — hoy solo `admin` vía `*`. Falta que cada área
+  proponga sus valores reales (ver "Pendientes de decisión") y el frontend
+  de la bandeja.
+- ✅ 2026-08-02 **`regla_aprobacion` retirada** (migración `b82d4c1f7a35`):
+  sus umbrales vigentes se copiaron a `parametro_empresa` como
+  `{"monto": ...}` ya aprobados; se borraron tabla, modelo, repo, los tres
+  endpoints `/reglas-aprobacion` y el permiso
+  `gerencia.gestionar_reglas_aprobacion`. `permiso_requerido` se descartó
+  (era informativo). `umbral_vigente()` queda como envoltorio tipado
+  (`Decimal`) sobre `parametro_empresa`. Una sola tabla de configuración
+  por empresa, un solo flujo de aprobación.
+- ✅ 2026-08-02 **RBAC por módulo al proponer parámetros**: un permiso por
+  módulo (`<modulo>.proponer_parametro`, catálogo en
+  `src/shared/parametros.py::MODULOS`) — Compras no propone parámetros de
+  RRHH. `modulo` se valida como `Literal` en el schema (422 si es
+  inventado) y `GET /parametros` sin filtro de `modulo` exige el permiso de
+  Gerencia, porque los rangos salariales no son de lectura general.
+- ✅ 2026-08-02 **`parametro_empresa.decision_gerencial_id` descartado**
+  (previsto en ADR-014): el par propuesta/aprobación ya registra quién,
+  qué, cuándo y con qué sustento (`motivo`) — la FK duplicaba ese rastro.
+- ✅ 2026-08-02 **Toda magnitud lleva su unidad** (RN-GER-010, ADR-014
+  Addendum b, migración `c93e5a7b1d42`): nueva entidad `divisa`
+  (codigo/simbolo/**decimales**, sembrada con PEN), nueva columna
+  `unidad_medida.decimales` (default 3) y `parametro_empresa.valor_display`
+  con la magnitud formateada que lee Gerencia. `src/shared/magnitudes.py`
+  valida y redondea con los decimales de la unidad (`ROUND_HALF_UP`, texto
+  no float). Un monto sin `divisa` o una cantidad sin `unidad_medida_id`
+  responden 422, al proponer y al modificar-y-aprobar.
+- ⬜ **CRUD de `divisa` y de `unidad_medida`**: `decimales` es configurable
+  en el dato pero hoy solo se edita por seeder/migración — ninguna de las
+  dos tablas tiene endpoints. El de `unidad_medida` va con el slice de
+  catálogo de `inventory`; el de `divisa`, cuando exista una segunda moneda
+  (hoy PEN única, RN-PRC-004).
+  La frecuencia de conteo cíclico **salió de esta lista** (ADR-019,
+  2026-08-01): es por categoría, no por empresa, y vive en
+  `categoria.frecuencia_conteo`.
 - ⬜ **`decision_gerencial`** (materializa el acta de decisión gerencial,
   RN-GER-002, `data-model.md` §8c): documentado desde el slice de Gerencia
-  (2026-07-22) pero **sin modelo ni migración en código todavía** —
-  `parametro_empresa.decision_gerencial_id` depende de que esta entidad
-  exista primero.
+  (2026-07-22) pero **sin modelo ni migración en código todavía**. Su caso
+  propio es la aprobación de OC escalada, la campaña sobre presupuesto y la
+  sanción — ya no bloquea nada de `parametro_empresa`.
 - ✅ 2026-07-25 **Lock optimista en `persona`** (`VersionedMixin`,
   `src/core/model_base.py`): `PATCH /api/v1/personas/{id}` exige `version`
   vigente, 409 si está desactualizada. Aplicado solo a `persona` por
@@ -767,7 +803,7 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   (`movimiento_dinero`). `purchases.comprobante_conforme` encola
   (`registrar_pago`, idempotente por `comprobante_id` RN-CTB-008);
   `ejecutar_pago` exige `accounting.pago_gestionar` + umbral vía
-  `regla_aprobacion` (código `pago_umbral`, RN-CTB-005, `accounting.pago_aprobar`
+  `parametro_empresa` (código `pago_umbral`, RN-CTB-005, `accounting.pago_aprobar`
   sobre el umbral) y genera asiento vía `regla_asiento`
   (`accounting.pago_ejecutado`); `rechazar_pago` cierra sin ejecutar.
   Eventos `accounting.pago_ejecutado`/`pago_requiere_aprobacion` ya se

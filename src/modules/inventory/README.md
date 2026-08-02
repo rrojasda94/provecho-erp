@@ -284,3 +284,8 @@ entre `aprobada` y `despachada` no cambia qué se puede hacer (ADR-020).
   responsable si el lote vencido seguía disponible),
   `inventory.conteo_vencido` (reporte a almacén y gerencia de la categoría
   que no se contó en su fecha, RN-INV-021).
+- Contrato público de lectura: `application/queries_publicas.py` — hoy
+  `unidad_medida_para_magnitud` (nombre y `decimales` de una UdM, para que
+  otro módulo exprese una cantidad con su unidad, RN-GER-010). Mismo criterio
+  que `sales.queries_publicas`: devuelve dicts, nunca el ORM, y nadie importa
+  `inventory.infrastructure` desde afuera.
