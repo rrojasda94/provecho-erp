@@ -56,5 +56,7 @@ export async function loginAction(
     maxAge: 60 * 60 * 24 * DIAS_REFRESH,
   });
 
-  redirect("/dashboard");
+  // Home de apps (F2.6a, ADR-013), no el dashboard directo — el usuario
+  // elige el módulo, el dashboard es una app más del grid.
+  redirect("/");
 }

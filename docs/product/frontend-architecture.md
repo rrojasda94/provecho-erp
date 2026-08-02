@@ -205,14 +205,15 @@ no existen todavía), componente `EmptyState`/`ErrorState` reutilizable
 
 ## F2.11 Tablas
 
-⬜ **Sin empezar.** Ninguna tabla construida — es probablemente el
-componente más usado de todo el ERP (inventario, ventas, compras,
-proveedores, usuarios...). **Viable e importante cerrar su spec antes del
-alfa**: qué librería (TanStack Table es la elección estándar para
-React/Next sin atarse a un design system completo) y qué subconjunto de
-funcionalidad entra en v1 (orden, filtro, búsqueda, paginación) vs. v2
-(congelar/mover/ocultar columnas, selección + acciones masivas, scroll
-virtual, totales) — no se necesita todo de entrada.
+✅ **Resuelto (2026-08-02)**: **TanStack Table** (`@tanstack/react-table`,
+headless — sin componentes propios, encaja con Tailwind y no ata a un
+design system) para toda tabla del ERP. **v1** (implementado en el primer
+listado real, `compras/proveedores`): orden por columna, búsqueda, filtro,
+paginación. **v2, diferido hasta que una pantalla real lo necesite**:
+congelar/mover/ocultar columnas, selección + acciones masivas, scroll
+virtual, totales — TanStack Table ya soporta todo eso vía plugins, así que
+no es una migración de librería, es prender la función cuando haga falta.
+El componente reusable vive en `frontend/components/tabla/`.
 
 ## F2.12 Formularios
 
@@ -393,24 +394,20 @@ que requiera su propia decisión previa.
 
 ## Resumen — qué cerrar antes de los diseños finales del alfa
 
-**Actualizado 2026-07-27 tras ADR-013**: de las 6 prioridades originales,
-5 ya están resueltas (layout, componentes base, permisos visuales,
-arquitectura de carpetas, estado). Queda una sola bloqueante real:
+**Actualizado 2026-08-02**: las 6 prioridades originales están resueltas
+(layout, componentes base, permisos visuales, arquitectura de carpetas,
+estado, tablas). **Primera implementación en código** (no solo spec):
+shell Odoo (home de apps + sidebar + `layout.tsx` de guard por módulo,
+`frontend/app/(app)/`) y primera pantalla real de un módulo
+(`compras/proveedores`: tabla TanStack + alta con `<dialog>` nativo, sin
+librería de modal — YAGNI hasta que un formulario complejo la justifique).
+El dashboard existente se relocalizó bajo el mismo shell como segunda app.
 
-1. **F2.11 Tablas** — elegir librería (candidata: TanStack Table) y
-   alcance v1 (orden/filtro/búsqueda/paginación) vs. v2 (columnas
-   congelar/mover/ocultar, selección + acciones masivas, scroll virtual,
-   totales). Es el componente más usado de todo el ERP y ninguna tabla
-   está construida todavía — el único hueco de arquitectura que ADR-013
-   no cubrió (resuelve overlays/interacción, no grillas de datos).
-
-Resueltas por ADR-013 (`docs/architecture/adr/ADR-013-arquitectura-frontend.md`),
-sin implementar todavía en código: F2.6 (home de apps + sidebar estilo
-Odoo), F2.4 (Tailwind + shadcn/ui sobre Base UI), F2.28 (permisos vía
-`/users/me` + guard por `layout.tsx`), F2.2 (carpetas por módulo), F2.8
-(sin Zustand/Redux, confirmado), más F2.1 (Android = PWA/responsive) y
-F2.25 (Playwright para e2e).
+Sigue en Tailwind + CSS por variables, **sin shadcn/ui todavía**: las
+pantallas construidas no necesitaron overlay/combobox/dialog complejo
+(el `<dialog>` nativo de alta de proveedor cubrió el caso); shadcn se
+instala cuando una pantalla real lo pida, no antes.
 
 El resto de las 31 secciones tiene decisión tomada, está correctamente
 diferido, o depende de un módulo backend que todavía no llega a pantalla —
-no bloquean empezar a diseñar.
+no bloquean seguir construyendo pantallas.

@@ -9,6 +9,7 @@
         "lint": "next lint"
     },
     "dependencies": {
+        "@tanstack/react-table": "^8.21.3",
         "next": "^15.3.0",
         "react": "^19.0.0",
         "react-dom": "^19.0.0"
@@ -17,8 +18,11 @@
         "@types/node": "^22.0.0",
         "@types/react": "^19.0.0",
         "@types/react-dom": "^19.0.0",
+        "autoprefixer": "^10.5.4",
         "eslint": "^9.0.0",
         "eslint-config-next": "^15.3.0",
+        "postcss": "^8.5.25",
+        "tailwindcss": "^3.4.19",
         "typescript": "^5.5.0"
     }
 }

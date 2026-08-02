@@ -1,10 +1,5 @@
-import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
-
 import { ApiError, apiFetch } from "@/lib/api";
-import { COOKIE_TOKEN, decodificarClaims } from "@/lib/auth";
-
-import { logoutAction } from "./actions";
+import { obtenerSesion } from "@/lib/sesion";
 
 type DashboardResumen = {
   ventas_hoy: { fecha: string; cantidad: number; total: string };
@@ -33,37 +28,12 @@ async function obtenerResumen(empresaId: string, token: string): Promise<Resulta
     );
     return { ok: true, resumen };
   } catch (e) {
-    if (e instanceof ApiError && e.status === 401) {
-      redirect("/login");
-    }
     const mensaje =
       e instanceof ApiError && e.status === 403
         ? "Tu usuario no tiene permiso para ver el dashboard."
         : "No se pudo cargar el dashboard. Intentar de nuevo.";
     return { ok: false, mensaje };
   }
-}
-
-function CabeceraDashboard() {
-  return (
-    <header className="dashboard-header">
-      <h1>Dashboard</h1>
-      <form action={logoutAction}>
-        <button type="submit" className="logout-button">
-          Cerrar sesión
-        </button>
-      </form>
-    </header>
-  );
-}
-
-function PaginaConError({ mensaje }: { mensaje: string }) {
-  return (
-    <main className="dashboard-page">
-      <CabeceraDashboard />
-      <p className="dashboard-error">{mensaje}</p>
-    </main>
-  );
 }
 
 function TarjetaVentas({ resumen }: { resumen: DashboardResumen }) {
@@ -111,30 +81,27 @@ function TarjetaCajas({ resumen }: { resumen: DashboardResumen }) {
 }
 
 export default async function DashboardPage() {
-  const store = await cookies();
-  const token = store.get(COOKIE_TOKEN)?.value;
-  if (!token) redirect("/login");
-
-  const claims = decodificarClaims(token);
-  if (!claims?.empresa_id) {
+  // `empresa_id` sale de `/users/me` (verificado por la API), ya no del JWT
+  // decodificado sin firma en el cliente.
+  const { token, usuario } = await obtenerSesion();
+  if (!usuario.empresa_id) {
     return (
-      <PaginaConError mensaje="Tu usuario no tiene una empresa asignada — no se puede cargar el dashboard." />
+      <p className="dashboard-error">
+        Tu usuario no tiene una empresa asignada — no se puede cargar el dashboard.
+      </p>
     );
   }
 
-  const resultado = await obtenerResumen(claims.empresa_id, token);
+  const resultado = await obtenerResumen(usuario.empresa_id, token);
   if (!resultado.ok) {
-    return <PaginaConError mensaje={resultado.mensaje} />;
+    return <p className="dashboard-error">{resultado.mensaje}</p>;
   }
 
   return (
-    <main className="dashboard-page">
-      <CabeceraDashboard />
-      <section className="dashboard-grid">
-        <TarjetaVentas resumen={resultado.resumen} />
-        <TarjetaStock resumen={resultado.resumen} />
-        <TarjetaCajas resumen={resultado.resumen} />
-      </section>
-    </main>
+    <section className="dashboard-grid">
+      <TarjetaVentas resumen={resultado.resumen} />
+      <TarjetaStock resumen={resultado.resumen} />
+      <TarjetaCajas resumen={resultado.resumen} />
+    </section>
   );
 }

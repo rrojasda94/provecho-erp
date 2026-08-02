@@ -22,6 +22,22 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Added
 
+- **Shell estilo Odoo, F2.11 (tablas) y primera pantalla real de frontend**
+  (2026-08-02): TanStack Table como librería de tabla del ERP
+  (`frontend/components/tabla/tabla-datos.tsx`, v1 orden/búsqueda/filtro/
+  paginación). Shell en dos niveles (`frontend/app/(app)/`): guard de
+  sesión real vía `/users/me` + barra superior compartida, y sidebar +
+  guard de permiso real por `[modulo]/layout.tsx` (server-side, no solo
+  filtro visual — entrar por URL sin el permiso cae en "Sin permiso").
+  Home de apps con grid de 10 módulos filtrado por `permisos`. Dashboard
+  existente relocalizado bajo el shell y migrado a leer `empresa_id` de
+  `/users/me` en vez del JWT decodificado sin verificar. Primera pantalla
+  real de un módulo: Compras → Proveedores, listado + alta con `<dialog>`
+  nativo (sin shadcn/ui, YAGNI hasta que un formulario lo exija). Tailwind
+  CSS instalado sobre los tokens existentes. Verificado end-to-end en
+  Docker. Deuda: CRUD de proveedor natural (falta selector de persona),
+  resto de módulos sin pantalla (solo tile + 404).
+
 - **Toda magnitud lleva su unidad — RN-GER-010, ADR-014 Addendum b**
   (2026-08-02, migración `c93e5a7b1d42`): un parámetro monetario declara su
   `divisa` y uno físico su `unidad_medida_id`; un número suelto (`{"monto":
