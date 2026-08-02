@@ -9,6 +9,10 @@ __pycache__/
 # Node
 node_modules/
 frontend/.next/
+# Override local para apuntar la API/worker al Postgres del compose en vez
+# de la DATABASE_URL de .env (Supabase u otra remota) — solo conveniencia
+# de dev, docker-compose lo carga automático si existe.
+docker-compose.override.yml
 frontend/out/
 
 # Entorno

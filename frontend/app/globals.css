@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 /* Tokens de marca Provecho (docs/product/ui-ux.md).
    El PDV sobreescribe estas variables con el branding de cada marca. */
 :root {
@@ -122,40 +126,7 @@ input:focus {
     font-weight: 600;
 }
 
-/* --- Dashboard --- */
-.dashboard-page {
-    max-width: 1080px;
-    margin: 0 auto;
-    padding: 2rem 1.5rem;
-}
-
-.dashboard-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 2rem;
-    border-bottom: 2px solid var(--color-dark);
-    padding-bottom: 1rem;
-}
-
-.dashboard-header h1 {
-    color: var(--color-primary);
-    font-size: 1.75rem;
-}
-
-.logout-button {
-    background: transparent;
-    border: 1px solid var(--color-gray);
-    color: var(--color-dark);
-    padding: 0.5rem 1rem;
-    font-size: 0.85rem;
-    font-weight: 600;
-}
-
-.logout-button:hover {
-    border-color: var(--color-dark);
-}
-
+/* --- Dashboard (cabecera y logout ahora los da el shell, Tailwind) --- */
 .dashboard-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
