@@ -172,6 +172,13 @@ Registro vivo de deuda técnica declarada al cerrar cada slice — para que no
 se olvide. Marcar ✅ al resolverse en el slice indicado.
 
 ### Transversal
+- ✅ 2026-08-02 **Deriva de esquema del slice de contratación** (migración
+  `e4a2f9c17b3d`): `postulante.estado` seguía en VARCHAR(10) con nueve
+  estados de hasta 15 caracteres — `preseleccionado` fallaba en Postgres y
+  pasaba en los tests porque SQLite ignora el largo. Además, `UNIQUE`
+  duplicado en `convocatoria.token_publico`. Con esto el job `migraciones`
+  de CI vuelve a verde: llevaba en rojo desde el 2026-08-01 y ningún PR
+  podía pasar el check.
 - ✅ **Contexto de tenant desde el JWT** (ADR-004): resuelto 2026-07-27 en
   `users`, `inventory`, `sales` y `kds`; completado 2026-08-01 en
   `purchases`, `production`, `accounting`, `rrhh` y el dashboard gerencial

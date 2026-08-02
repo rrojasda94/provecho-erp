@@ -5,6 +5,21 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **`postulante.estado` no entraba en su propia columna** (2026-08-02,
+  migración `e4a2f9c17b3d`). La columna nació como
+  `Enum('en_proceso','rechazado','contratado')` → VARCHAR(10), y el slice de
+  contratación (`a7f2c81e4b95`) la pasó a nueve estados migrando los datos
+  pero **sin ensanchar el tipo**. En Postgres, mover un postulante a
+  `preseleccionado` (15 caracteres) u `oferta_enviada` (14) fallaba con
+  `value too long for type character varying(10)`. Los tests no lo cazaron
+  porque SQLite ignora el largo de VARCHAR; lo cazó el job `migraciones` de
+  CI (`alembic check`), que llevaba en rojo desde ese slice. De paso se da de
+  baja el `UNIQUE` redundante de `convocatoria.token_publico`: el modelo
+  declara `unique=True, index=True`, que SQLAlchemy resuelve como **un**
+  índice único, y la migración además creaba una constraint aparte.
+
 ### Added
 
 - **Shell estilo Odoo, F2.11 (tablas) y primera pantalla real de frontend**
