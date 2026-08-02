@@ -17,7 +17,7 @@ Dos derivas entre el modelo y el esquema que dejó el slice de contratación
    único; la constraint sobraba y era la que `alembic check` reportaba.
 
 Revision ID: e4a2f9c17b3d
-Revises: b1d09e574c23
+Revises: c93e5a7b1d42
 Create Date: 2026-08-02 17:00:00.000000
 
 """
@@ -28,7 +28,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = 'e4a2f9c17b3d'
-down_revision: str | None = 'b1d09e574c23'
+down_revision: str | None = 'c93e5a7b1d42'
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
