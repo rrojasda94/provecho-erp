@@ -3581,6 +3581,214 @@
         "title": "DashboardResumenOut",
         "type": "object"
       },
+      "DecisionGerencialCreate": {
+        "description": "`decidido_por_id` NO viaja en el cuerpo: sale del token de quien\nejerce el permiso. Un id suelto en el request permitiría atribuirle la\ndecisión a otro gerente (mismo criterio que el descuento, RN-AUD-005).",
+        "properties": {
+          "archivo_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archivo Id"
+          },
+          "condiciones": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Condiciones"
+          },
+          "ejecuta_area": {
+            "anyOf": [
+              {
+                "enum": [
+                  "accounting",
+                  "inventory",
+                  "marketing",
+                  "production",
+                  "purchases",
+                  "rrhh",
+                  "sales",
+                  "users"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ejecuta Area"
+          },
+          "empresa_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Empresa Id"
+          },
+          "fecha": {
+            "format": "date",
+            "title": "Fecha",
+            "type": "string"
+          },
+          "referencia_id": {
+            "format": "uuid",
+            "title": "Referencia Id",
+            "type": "string"
+          },
+          "referencia_tipo": {
+            "maxLength": 50,
+            "minLength": 1,
+            "title": "Referencia Tipo",
+            "type": "string"
+          },
+          "resultado": {
+            "enum": [
+              "aprobado",
+              "aprobado_con_condiciones",
+              "rechazado",
+              "diferido",
+              "elevado_a_socios"
+            ],
+            "title": "Resultado",
+            "type": "string"
+          },
+          "sustento": {
+            "minLength": 1,
+            "title": "Sustento",
+            "type": "string"
+          },
+          "tipo": {
+            "enum": [
+              "aprobacion",
+              "directiva",
+              "accion_correctiva",
+              "decision_estrategica"
+            ],
+            "title": "Tipo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tipo",
+          "referencia_tipo",
+          "referencia_id",
+          "sustento",
+          "resultado",
+          "fecha"
+        ],
+        "title": "DecisionGerencialCreate",
+        "type": "object"
+      },
+      "DecisionGerencialOut": {
+        "properties": {
+          "archivo_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archivo Id"
+          },
+          "condiciones": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Condiciones"
+          },
+          "decidido_por_id": {
+            "format": "uuid",
+            "title": "Decidido Por Id",
+            "type": "string"
+          },
+          "ejecuta_area": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ejecuta Area"
+          },
+          "empresa_id": {
+            "format": "uuid",
+            "title": "Empresa Id",
+            "type": "string"
+          },
+          "fecha": {
+            "format": "date",
+            "title": "Fecha",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "referencia_id": {
+            "format": "uuid",
+            "title": "Referencia Id",
+            "type": "string"
+          },
+          "referencia_tipo": {
+            "title": "Referencia Tipo",
+            "type": "string"
+          },
+          "resultado": {
+            "title": "Resultado",
+            "type": "string"
+          },
+          "sustento": {
+            "title": "Sustento",
+            "type": "string"
+          },
+          "tipo": {
+            "title": "Tipo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "empresa_id",
+          "tipo",
+          "referencia_tipo",
+          "referencia_id",
+          "decidido_por_id",
+          "sustento",
+          "resultado",
+          "condiciones",
+          "ejecuta_area",
+          "fecha",
+          "archivo_id"
+        ],
+        "title": "DecisionGerencialOut",
+        "type": "object"
+      },
       "DescuentoCreate": {
         "description": "`modo=None` quita el descuento. Motivo y autorizador son obligatorios\nal aplicarlo: el reporte de descuentos necesita saber por qué y quién.\n\n`autorizacion` es el token que devuelve `POST /auth/autorizar` cuando el\nsupervisor teclea su PIN en el terminal del cajero. **Quién autorizó sale\nde ahí, nunca del cuerpo**: un id suelto en el request sería una firma\nfalsificable y el reporte de descuentos dejaría de valer (RN-AUD-005).",
         "properties": {
@@ -13179,6 +13387,208 @@
         "summary": "Resumen",
         "tags": [
           "dashboard"
+        ]
+      }
+    },
+    "/api/v1/decisiones-gerenciales": {
+      "get": {
+        "description": "El acceso típico es `?referencia_tipo=orden_compra&referencia_id=...`:\n\"qué decidió Gerencia sobre esto\", desde el módulo que lo tiene en\npantalla.",
+        "operationId": "listar_decisiones_gerenciales_api_v1_decisiones_gerenciales_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "empresa_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Empresa Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "referencia_tipo",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Referencia Tipo"
+            }
+          },
+          {
+            "in": "query",
+            "name": "referencia_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Referencia Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tipo",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tipo"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DecisionGerencialOut"
+                  },
+                  "title": "Response Listar Decisiones Gerenciales Api V1 Decisiones Gerenciales Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Decisiones Gerenciales",
+        "tags": [
+          "gerencia"
+        ]
+      },
+      "post": {
+        "description": "Materializa el acta de una decisión gerencial: una decisión verbal no\ntiene validez operativa (RN-GER-002). `decidido_por_id` sale del token,\nnunca del cuerpo — atribuirle la decisión a otro gerente invalidaría el\nacta entera.",
+        "operationId": "registrar_decision_gerencial_api_v1_decisiones_gerenciales_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecisionGerencialCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecisionGerencialOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Registrar Decision Gerencial",
+        "tags": [
+          "gerencia"
+        ]
+      }
+    },
+    "/api/v1/decisiones-gerenciales/{decision_id}": {
+      "get": {
+        "operationId": "ver_decision_gerencial_api_v1_decisiones_gerenciales__decision_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "decision_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Decision Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecisionGerencialOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Ver Decision Gerencial",
+        "tags": [
+          "gerencia"
         ]
       }
     },

@@ -7,6 +7,18 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Fixed
 
+- **`npm audit` del frontend en cero** (2026-08-03). Eran 4 altas:
+  `brace-expansion` (la resolvió `npm audit fix`) y tres colgando de `next`.
+  El JSON del audit deja claro que `next` **no** estaba marcado por CVEs
+  propias — su `via` es literalmente `["postcss","sharp"]`: todo venía de
+  que Next pinea `postcss@8.4.31` y arrastra `sharp<0.35`. Subir de major
+  no arreglaba nada (**Next 16 pinea el mismo postcss**) y
+  `npm audit fix --force` proponía `next@9.3.3`, un downgrade de 6 majors.
+  Se fuerzan las versiones parcheadas con `overrides` en
+  `frontend/package.json`, y el rango de `next` sube a `^15.5.22` — que ya
+  era la versión instalada; el `^15.3.0` viejo daba la impresión falsa de
+  estar atrasado. `tsc`, `next lint` y `next build` limpios después.
+
 - **`postulante.estado` no entraba en su propia columna** (2026-08-02,
   migración `e4a2f9c17b3d`). La columna nació como
   `Enum('en_proceso','rechazado','contratado')` → VARCHAR(10), y el slice de
@@ -21,6 +33,21 @@ Versionado: [SemVer](https://semver.org/lang/es/).
   índice único, y la migración además creaba una constraint aparte.
 
 ### Added
+
+- **`decision_gerencial` — acta de decisión gerencial** (2026-08-03,
+  migración `1805c0904c5c`, RN-GER-002): documentada en `data-model.md` §8c
+  desde el slice de Gerencia (2026-07-22), ahora con modelo (en `shared`),
+  repo, casos de uso y API. `POST/GET /api/v1/decisiones-gerenciales[/{id}]`
+  con permisos nuevos `gerencia.decidir` (firmar) y
+  `gerencia.leer_decisiones` (consultar — el área ejecutora la necesita sin
+  poder decidir, RN-GER-005; sembrado en `supervisor`). `decidido_por_id`
+  sale del token, nunca del cuerpo: atribuirle la decisión a otro gerente
+  invalidaría el acta. `referencia_tipo`/`referencia_id` son polimórficos
+  **sin FK** — la decisión aplica a una OC escalada, una campaña sobre
+  presupuesto o una sanción, y ni `shared` gana una FK hacia los módulos ni
+  al revés. `aprobado_con_condiciones` sin condiciones es 409: un acta que
+  no dice qué cumplir no le sirve al área ejecutora. 12 tests. Ningún
+  módulo la escribe todavía — ese es el paso siguiente.
 
 - **Restricciones JSONB de permiso, aplicadas (ADR-022)** (2026-08-02):
   `permiso.restricciones` pasa de campo descriptivo a evaluado.

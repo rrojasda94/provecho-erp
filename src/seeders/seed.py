@@ -151,6 +151,15 @@ PERMISOS = [
         "gerencia.gestionar_parametros_empresa",
         "Aprobar, rechazar o modificar parámetros operativos por empresa (ADR-014)",
     ),
+    (
+        "gerencia.decidir",
+        "Firmar el acta de una decisión gerencial (RN-GER-002)",
+    ),
+    (
+        "gerencia.leer_decisiones",
+        "Consultar actas de decisión gerencial — el área ejecutora las necesita "
+        "sin poder decidir (RN-GER-005)",
+    ),
     ("sales.leer_clientes_externos", "Consultar clientes para análisis fuera de sales"),
     ("rrhh.leer", "Consultar trabajadores, contratos, nómina y documentos de RRHH"),
     ("rrhh.trabajador_gestionar", "Crear, actualizar y cesar trabajadores"),
@@ -213,6 +222,9 @@ ROLES = {
         "rrhh.leer",
         "rrhh.permiso_aprobar",
         "rrhh.asistencia_marcar",
+        # Lee el acta pero no la firma: decidir es de Gerencia (RN-GER-002),
+        # ejecutar es del área (RN-GER-005).
+        "gerencia.leer_decisiones",
     ],
     "cajero": [
         "sales.crear",

@@ -10,9 +10,14 @@
     },
     "dependencies": {
         "@tanstack/react-table": "^8.21.3",
-        "next": "^15.3.0",
+        "next": "^15.5.22",
         "react": "^19.0.0",
         "react-dom": "^19.0.0"
+    },
+    "//overrides": "next pinea postcss@8.4.31 y trae sharp<0.35 (igual en Next 16, no es cosa de estar atrasado): las unicas dos vulnerabilidades que npm audit reporta contra next son transitivas por ahi. Se fuerzan las versiones parcheadas en vez de degradar next -- el `npm audit fix --force` propone next@9.3.3, que es un downgrade de 6 majors.",
+    "overrides": {
+        "postcss": "^8.5.25",
+        "sharp": "^0.35.3"
     },
     "devDependencies": {
         "@types/node": "^22.0.0",

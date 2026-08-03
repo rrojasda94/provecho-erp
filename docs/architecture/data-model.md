@@ -977,7 +977,18 @@ tabla. Ver [docs/gerencia/README.md](../gerencia/README.md).
   ejecuta_area (quién ejecuta la decisión — ej. `rrhh` para una sanción),
   fecha, archivo_id (opcional). Materializa el acta de decisión gerencial
   (RN-GER-002); toda aprobación de la matriz de aprobaciones (RN-GER-003)
-  genera una fila.
+  genera una fila. **Implementada 2026-08-03** (migración `1805c0904c5c`):
+  `POST/GET /api/v1/decisiones-gerenciales[/{id}]`, permisos
+  `gerencia.decidir` (firmar) y `gerencia.leer_decisiones` (consultar — el
+  área ejecutora la necesita sin poder decidir, RN-GER-005). `decidido_por`
+  es un `usuario` (no un `trabajador` suelto): es la misma identidad que
+  autenticó y que audita el sistema, y sale del token, nunca del cuerpo.
+  `referencia_tipo`/`referencia_id` son **polimórficos sin FK** a propósito:
+  ni `shared` gana una FK hacia los módulos ni los módulos hacia `shared`;
+  el índice compuesto sirve el acceso real ("qué decidió Gerencia sobre
+  esto"). No reemplaza el rastro propuesta/aprobación de
+  `parametro_empresa` (RN-GER-009) — es para las decisiones **sin** flujo
+  tipado propio.
 - **divisa** (entidad transversal, vive en `shared` — el dinero no es de
   ningún módulo): codigo (ISO 4217: PEN, USD), nombre, simbolo, decimales,
   activa. Existe porque los decimales de una moneda no son 2 por decreto y

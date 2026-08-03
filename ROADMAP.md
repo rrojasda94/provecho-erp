@@ -275,19 +275,27 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   valida y redondea con los decimales de la unidad (`ROUND_HALF_UP`, texto
   no float). Un monto sin `divisa` o una cantidad sin `unidad_medida_id`
   responden 422, al proponer y al modificar-y-aprobar.
-- ⬜ **CRUD de `divisa` y de `unidad_medida`**: `decimales` es configurable
-  en el dato pero hoy solo se edita por seeder/migración — ninguna de las
-  dos tablas tiene endpoints. El de `unidad_medida` va con el slice de
-  catálogo de `inventory`; el de `divisa`, cuando exista una segunda moneda
-  (hoy PEN única, RN-PRC-004).
+- ✅ 2026-08-02 **CRUD de `divisa` y de `unidad_medida`** — resuelto el
+  mismo día; ver la entrada de la sección *Transversal* de esta lista.
+  `decimales` ya se corrige con un `PATCH`, sin migración.
   La frecuencia de conteo cíclico **salió de esta lista** (ADR-019,
   2026-08-01): es por categoría, no por empresa, y vive en
   `categoria.frecuencia_conteo`.
-- ⬜ **`decision_gerencial`** (materializa el acta de decisión gerencial,
-  RN-GER-002, `data-model.md` §8c): documentado desde el slice de Gerencia
-  (2026-07-22) pero **sin modelo ni migración en código todavía**. Su caso
-  propio es la aprobación de OC escalada, la campaña sobre presupuesto y la
-  sanción — ya no bloquea nada de `parametro_empresa`.
+- ✅ 2026-08-03 **`decision_gerencial`** (acta de decisión gerencial,
+  RN-GER-002, `data-model.md` §8c, migración `1805c0904c5c`): documentado
+  desde el slice de Gerencia (2026-07-22), ahora con modelo en `shared`,
+  repo, casos de uso y API — `POST/GET /api/v1/decisiones-gerenciales[/{id}]`,
+  permisos nuevos `gerencia.decidir` y `gerencia.leer_decisiones` (el área
+  ejecutora lee sin poder firmar, RN-GER-005; `leer_decisiones` sembrado en
+  `supervisor`). `decidido_por_id` sale del token, no del cuerpo.
+  `referencia_tipo`/`referencia_id` polimórficos sin FK: la decisión aplica
+  a una OC escalada, una campaña sobre presupuesto o una sanción, y ningún
+  módulo gana una FK hacia `shared`. `aprobado_con_condiciones` sin
+  condiciones es 409 — un acta que no dice qué cumplir no sirve. 12 tests
+  (`tests/test_decision_gerencial.py`). **Pendiente derivado:** ningún
+  módulo la escribe todavía — `campana.aprobada_por` y la OC escalada
+  siguen resolviendo por permiso, sin generar el acta (ver deuda de
+  `marketing` más abajo).
 - ✅ 2026-07-25 **Lock optimista en `persona`** (`VersionedMixin`,
   `src/core/model_base.py`): `PATCH /api/v1/personas/{id}` exige `version`
   vigente, 409 si está desactualizada. Aplicado solo a `persona` por
@@ -998,6 +1006,19 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   `contrato` transversal (misma deuda que `rrhh`).
 
 ### Frontend (F2 — arquitectura y UX, documento 2026-07-27, actualizado tras ADR-013)
+
+- ✅ 2026-08-03 **`npm audit` en cero.** Eran 4 vulnerabilidades altas:
+  `brace-expansion` (la resolvió `npm audit fix`) y tres que colgaban de
+  `next`. Diagnóstico: `next` **no** estaba marcado por CVEs propias — su
+  `via` en el JSON del audit es exactamente `["postcss", "sharp"]`, o sea
+  todo venía de que Next pinea `postcss@8.4.31` y arrastra `sharp<0.35`.
+  Subir de major no arregla nada: **Next 16 pinea el mismo postcss**, y
+  `npm audit fix --force` proponía `next@9.3.3` — un downgrade de 6 majors.
+  Solución: `overrides` de `postcss`/`sharp` a las versiones parcheadas en
+  `frontend/package.json`, y el rango de `next` subido a `^15.5.22` (que ya
+  era lo instalado; `^15.3.0` daba la impresión falsa de estar atrasado).
+  `tsc`, `next lint` y `next build` limpios después del cambio.
+
 
 Detalle completo por sección en `docs/product/frontend-architecture.md`.
 De las 6 prioridades que este documento marcaba como bloqueantes del

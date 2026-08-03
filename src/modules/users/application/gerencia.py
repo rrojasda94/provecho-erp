@@ -8,18 +8,27 @@ que Gerencia aprueba, el módulo sigue leyendo el valor anterior (RN-GER-009).
 """
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 from sqlalchemy.orm import Session
 
 from src.modules.inventory.application.queries_publicas import (
     unidad_medida_para_magnitud,
 )
-from src.modules.users.application.errors import Conflicto, NoEncontrado
-from src.shared import magnitudes
+from src.modules.users.application.errors import (
+    Conflicto,
+    NoEncontrado,
+    ReglaNegocio,
+)
+from src.shared import magnitudes, parametros
 from src.shared.magnitudes import MagnitudInvalida, Unidad
-from src.shared.models import Divisa, ParametroEmpresa
-from src.shared.repositories import DivisaRepo, ParametroEmpresaRepo
+from src.shared.models import DecisionGerencial, Divisa, ParametroEmpresa
+from src.shared.models.decision_gerencial import RESULTADOS, TIPOS
+from src.shared.repositories import (
+    DecisionGerencialRepo,
+    DivisaRepo,
+    ParametroEmpresaRepo,
+)
 
 
 def proponer_parametro(
@@ -163,3 +172,76 @@ def editar_divisa(session: Session, divisa_id: uuid.UUID, **campos) -> Divisa:
 
 def listar_divisas(session: Session) -> list[Divisa]:
     return DivisaRepo(session).list()
+
+
+# --- Acta de decisión gerencial (RN-GER-002) ----------------------------
+def registrar_decision(
+    session: Session,
+    *,
+    empresa_id: uuid.UUID,
+    tipo: str,
+    referencia_tipo: str,
+    referencia_id: uuid.UUID,
+    decidido_por_id: uuid.UUID,
+    sustento: str,
+    resultado: str,
+    fecha: date,
+    condiciones: str | None = None,
+    ejecuta_area: str | None = None,
+    archivo_id: uuid.UUID | None = None,
+) -> DecisionGerencial:
+    """Materializa el acta: una decisión verbal no tiene validez operativa.
+
+    `referencia_tipo`/`referencia_id` apuntan a lo decidido sin FK — la
+    decisión aplica a una OC, una campaña o una sanción, y ninguna de esas
+    tablas puede ganar una FK hacia `shared` (ver el modelo).
+    """
+    if tipo not in TIPOS:
+        raise ReglaNegocio(f"tipo de decisión inválido: {tipo}")
+    if resultado not in RESULTADOS:
+        raise ReglaNegocio(f"resultado de decisión inválido: {resultado}")
+    if not (sustento or "").strip():
+        raise ReglaNegocio("la decisión necesita sustento (RN-GER-002)")
+    # Aprobar "con condiciones" sin decir cuáles deja al área ejecutora sin
+    # saber qué cumplir: el acta no sirve para nada.
+    if resultado == "aprobado_con_condiciones" and not (condiciones or "").strip():
+        raise ReglaNegocio(
+            "'aprobado_con_condiciones' exige detallar las condiciones"
+        )
+    if ejecuta_area is not None and ejecuta_area not in parametros.MODULOS:
+        raise ReglaNegocio(f"área ejecutora desconocida: {ejecuta_area}")
+
+    return DecisionGerencialRepo(session).add(
+        DecisionGerencial(
+            empresa_id=empresa_id,
+            tipo=tipo,
+            referencia_tipo=referencia_tipo,
+            referencia_id=referencia_id,
+            decidido_por_id=decidido_por_id,
+            sustento=sustento,
+            resultado=resultado,
+            condiciones=condiciones,
+            ejecuta_area=ejecuta_area,
+            fecha=fecha,
+            archivo_id=archivo_id,
+        )
+    )
+
+
+def listar_decisiones(
+    session: Session,
+    empresa_id: uuid.UUID | None = None,
+    referencia_tipo: str | None = None,
+    referencia_id: uuid.UUID | None = None,
+    tipo: str | None = None,
+) -> list[DecisionGerencial]:
+    return DecisionGerencialRepo(session).list(
+        empresa_id, referencia_tipo, referencia_id, tipo
+    )
+
+
+def obtener_decision(session: Session, decision_id: uuid.UUID) -> DecisionGerencial:
+    decision = DecisionGerencialRepo(session).get(decision_id)
+    if decision is None or decision.deleted_at is not None:
+        raise NoEncontrado("decisión gerencial no encontrada")
+    return decision
