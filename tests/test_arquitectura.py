@@ -15,6 +15,9 @@ import pathlib
 
 import pytest
 
+from src.core.app import create_app
+from src.seeders.seed import PERMISOS
+
 SRC = pathlib.Path(__file__).resolve().parent.parent / "src"
 MODULOS = sorted(p.name for p in (SRC / "modules").iterdir() if (p / "__init__.py").exists())
 
@@ -156,3 +159,71 @@ def test_shared_no_depende_de_ningun_modulo() -> None:
         if imp.startswith("src.modules.")
     ]
     assert not violaciones, "\n".join(violaciones)
+
+
+# --- Activación de un módulo -------------------------------------------------
+# Un módulo se escribe en su carpeta pero se ACTIVA en `core` y en el seeder
+# (docs/engineering/module-guide.md §2). Saltarse uno de esos registros no
+# rompe ningún test funcional: la tabla no entra en `Base.metadata` y Alembic
+# propone borrarla, o el endpoint existe y ningún rol puede alcanzarlo. Estos
+# tres cierran los pasos que sí se pueden verificar solos.
+
+
+def _rutas(app):
+    """Recorre las rutas montadas. FastAPI ≥0.140 no aplana los routers
+    incluidos: deja un `_IncludedRouter` que envuelve al original."""
+    pendientes = list(app.routes)
+    while pendientes:
+        ruta = pendientes.pop()
+        yield ruta
+        hijas = getattr(ruta, "routes", None)
+        if hijas is None:
+            hijas = getattr(getattr(ruta, "original_router", None), "routes", None)
+        pendientes += list(hijas or [])
+
+
+@pytest.mark.parametrize("modulo", MODULOS)
+def test_modelos_del_modulo_registrados_para_alembic(modulo: str) -> None:
+    """Sin la línea en `models_registry`, `alembic autogenerate` no ve las
+    tablas del módulo y genera una migración que borra las de los demás."""
+    if not (SRC / "modules" / modulo / "infrastructure" / "models").exists():
+        pytest.skip(f"{modulo} no tiene modelos todavía")
+    registro = (SRC / "core" / "models_registry.py").read_text(encoding="utf-8")
+    assert f"src.modules.{modulo}.infrastructure.models" in registro, (
+        f"{modulo} tiene modelos pero no está en src/core/models_registry.py"
+    )
+
+
+@pytest.mark.parametrize("modulo", MODULOS)
+def test_router_del_modulo_montado_en_la_app(modulo: str) -> None:
+    """Un router que existe pero no se incluye en `create_app` es un módulo
+    invisible: pasa sus tests unitarios y no responde una sola petición."""
+    routers = sorted((SRC / "modules" / modulo / "api").glob("*routers.py"))
+    if not routers:
+        pytest.skip(f"{modulo} no expone API todavía")
+    app_py = (SRC / "core" / "app.py").read_text(encoding="utf-8")
+    faltan = [
+        r.stem for r in routers
+        if f"src.modules.{modulo}.api.{r.stem} import router" not in app_py
+    ]
+    assert not faltan, f"{modulo}: routers sin montar en src/core/app.py: {faltan}"
+
+
+def test_permisos_exigidos_por_la_api_existen_en_el_seeder() -> None:
+    """Un permiso que ningún rol puede tener porque no está sembrado deja el
+    endpoint en 403 permanente — y el 403 no dice que la causa sea esa."""
+    exigidos = set()
+    for ruta in _rutas(create_app()):
+        dependant = getattr(ruta, "dependant", None)
+        for dep in getattr(dependant, "dependencies", []):
+            codigo_py = getattr(dep.call, "__code__", None)
+            # `require_permission(codigo)` devuelve un closure sobre `codigo`.
+            if codigo_py and "codigo" in codigo_py.co_freevars:
+                celda = dep.call.__closure__[codigo_py.co_freevars.index("codigo")]
+                exigidos.add(celda.cell_contents)
+    sembrados = {codigo for codigo, _ in PERMISOS}
+    assert exigidos, "no se detectó ningún permiso: cambió require_permission"
+    assert not exigidos - sembrados, (
+        "permisos exigidos por la API y ausentes de PERMISOS en "
+        f"src/seeders/seed.py: {sorted(exigidos - sembrados)}"
+    )

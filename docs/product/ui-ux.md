@@ -137,6 +137,49 @@ implementar todavía, ver `docs/product/frontend-architecture.md` F2.14.
   configuran en el mismo dialog o en uno propio (`combo_item`), y el
   comportamiento en Kiosk (autoservicio, sin cajero) vs. PDV asistido.
 
+### KDS — tarjeta de pedido, tachar ítem por ítem (implementado 2026-08-03)
+
+Referencia explícita: la *preparation display* de Odoo (se revisó su
+documentación antes de diseñar esta pantalla). Se replica lo que resuelve
+el problema y se descarta lo que choca con las reglas ya decididas.
+
+- **Una tarjeta por pedido**, en grilla; encabezado con `#numero_orden`,
+  `referencia_atencion` ("Mesa 5", "Rappi #1042"), modalidad/canal y el
+  estado agregado del pedido. El borde superior colorea ese estado
+  (gris pendiente → ámbar en preparación → verde listo) para leerlo a
+  distancia.
+- **Un toque sobre el ítem lo tacha** (`line-through` + check + fondo
+  verde): así lo hace Odoo y así se opera con las manos ocupadas. El toque
+  lleva el ítem hasta `listo`, encadenando `en_preparacion` si venía en
+  `pendiente` — la API solo acepta avanzar de a un estado.
+- **Botón "Todo listo"** = el "click en la tarjeta" de Odoo: marca de una
+  vez todos los ítems que faltan.
+- **El ítem tachado se queda a la vista**, no desaparece: la tarjeta sale
+  de la cola de esa estación recién cuando todos sus ítems están listos
+  (igual que en Odoo, donde la tarjeta avanza de etapa al tacharse
+  entera). Requirió corregir `cola_pantalla` en el backend.
+- **El avance se ve en TODAS las pantallas de la sucursal** donde aparezca
+  ese pedido, porque ninguna pantalla guarda estado propio: el avance vive
+  en `venta_item.estado_preparacion` (RN-CUP-003) y cada pantalla es un
+  filtro sobre él. Hoy la propagación es por **polling cada 3 s**; el push
+  en vivo es deuda declarada (`ROADMAP.md`).
+- **No se replica el "recall"** (deshacer/retroceder) de Odoo: RN-CUP-002
+  prohíbe el retroceso de estado. Tocar un ítem ya tachado no lo devuelve,
+  avisa que el avance no se deshace.
+- **La entrega no se marca ítem por ítem**: en pantallas de tipo
+  `despacho`, y solo con `sales.entregar_pedido` (RN-CUP-006), la tarjeta
+  muestra "Entregar" cuando el pedido completo está listo.
+- Pantalla completa fuera del shell (como el PDV), paleta oscura, objetivos
+  táctiles ≥ 3 rem, sin interacciones hover-only. La estación elegida viaja
+  en la URL (`/kds?pantalla=<id>`) para que cada tablet la deje en
+  favoritos.
+- **`/kds` sin estación = tablero de estaciones**: la misma lista sirve para
+  elegir dónde queda la tablet y para **configurar las pantallas** (crear,
+  editar, activar/desactivar; filtro por categorías) con `kds.configurar`.
+  Van juntas a propósito — es la misma lista, y quien configura una estación
+  lo hace mirando el tablero que la cocina usa. Desactivar es baja lógica:
+  la pantalla deja de aparecer en cocina, no se borra.
+
 ### Navegación — breadcrumbs por ruta de usuario, no por jerarquía
 
 - El breadcrumb sigue la **ruta que recorrió el usuario**, no la jerarquía

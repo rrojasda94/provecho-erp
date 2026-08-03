@@ -5,6 +5,25 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Las colas de preparación ya no esconden el ítem recién tachado**
+  (2026-08-03, `kds.cola_pantalla`): una pantalla de `preparacion`
+  devolvía solo los ítems `pendiente`/`en_preparacion` de sus categorías,
+  así que marcar un ítem lo hacía **desaparecer** de la tarjeta — lo
+  contrario de lo que necesita la cocina (y de lo que hace Odoo, donde la
+  línea queda tachada). Ahora la pantalla devuelve todos sus ítems con su
+  estado, y el pedido sale de esa cola cuando la estación terminó todo lo
+  suyo. Se detectó verificando el KDS end-to-end contra el stack real.
+  Test nuevo:
+  `test_item_tachado_sigue_visible_hasta_terminar_la_estacion`.
+
+- **Cliente HTTP del navegador extraído a `frontend/lib/cliente-api.ts`**
+  (2026-08-03): el `fetch` contra `/api/proxy`, el parseo de `detail` y
+  `claveIdempotencia` vivían dentro de `lib/pdv.ts`; con el KDS pasaron a
+  tener dos consumidores. `lib/pdv.ts` los re-exporta, ningún import
+  existente cambia.
+
 ### Fixed
 
 - **`npm audit` del frontend en cero** (2026-08-03). Eran 4 altas:
@@ -48,6 +67,54 @@ Versionado: [SemVer](https://semver.org/lang/es/).
   al revés. `aprobado_con_condiciones` sin condiciones es 409: un acta que
   no dice qué cumplir no le sirve al área ejecutora. 12 tests. Ningún
   módulo la escribe todavía — ese es el paso siguiente.
+
+- **Guía para crear un módulo + tests que la exigen** (2026-08-03,
+  `docs/engineering/module-guide.md`). La estructura de un módulo ya era
+  replicable; lo que no estaba escrito en ningún lado es que **activarlo son
+  siete registros fuera de su carpeta** (router, tag OpenAPI y `register()`
+  de listeners en `core/app.py`; import en `models_registry.py`; migración;
+  `PERMISOS`/`ROLES` del seeder; entrada en `frontend/lib/modulos.ts`) —
+  olvidar uno da errores que no apuntan a la causa: Alembic proponiendo
+  borrar tablas ajenas, o un 403 permanente por un permiso que ningún rol
+  puede tener. La guía los lista con archivo y consecuencia, nombra a
+  `purchases` como módulo de referencia y aclara cuándo corresponde
+  `listeners.py`/`queries_publicas.py`. Tres de los siete pasan de disciplina
+  a test en `tests/test_arquitectura.py`: modelos registrados para Alembic,
+  routers montados en la app (detecta también los secundarios, tipo
+  `kds_routers`) y **todo permiso exigido por un endpoint existe en el
+  seeder** — se leen los 63 códigos del closure de `require_permission`
+  recorriendo las 221 rutas montadas. De paso se corrige la afirmación de
+  CLAUDE.md de que un módulo es "removible": lo es para el dominio de los
+  demás, no para el ensamblado. Deuda declarada en `ROADMAP.md` →
+  Transversal.
+- **Pantalla de cocina (KDS)** (2026-08-03, `frontend/app/kds/`): pantalla
+  completa táctil fuera del shell (como el PDV, ADR-013), una tarjeta por
+  pedido con `#orden`, `referencia_atencion`, modalidad/canal y estado
+  agregado. **Un toque tacha el ítem preparado** y "Todo listo" tacha el
+  pedido entero — patrón de la *preparation display* de Odoo, cuya
+  documentación se revisó antes de diseñar la pantalla. El toque encadena
+  `en_preparacion → listo` porque `POST /kds/items/{id}/avanzar` solo
+  acepta el estado inmediatamente siguiente (RN-CUP-002). Lo tachado en
+  una estación aparece en **toda otra pantalla de la sucursal** que
+  muestre ese pedido: el avance vive en `venta_item.estado_preparacion`
+  (fuente única, RN-CUP-003) y ninguna pantalla guarda estado propio; la
+  propagación es por polling cada 3 s (pausado con la pestaña oculta) —
+  el push WS/Redis sigue como deuda. Sin "recall" de Odoo: el retroceso
+  está prohibido, tocar un ítem tachado avisa en vez de deshacer. En
+  pantallas de `despacho` y solo con `sales.entregar_pedido` aparece
+  "Entregar" (RN-CUP-006). La estación va en la URL
+  (`/kds?pantalla=<id>`); tile propio en el home filtrado por `kds.*`.
+  Sin endpoints nuevos: el backend del KDS estaba completo desde
+  2026-07-25/27.
+
+- **Tablero de estaciones del KDS** (2026-08-03): `/kds` sin `?pantalla=`
+  lista las estaciones de la sucursal y, con `kds.configurar`, permite
+  **crear, editar y desactivar** pantallas (nombre, tipo
+  `preparacion`/`despacho`, filtro por categorías contra
+  `GET /inventory/categorias`; sin categorías = todas). Cierra el hueco de
+  que `kds_pantalla` solo se creara por API: una sucursal nueva no podía
+  arrancar su cocina desde la UI. Desactivar es baja lógica — la pantalla
+  deja de aparecer en cocina, no se borra.
 
 - **Restricciones JSONB de permiso, aplicadas (ADR-022)** (2026-08-02):
   `permiso.restricciones` pasa de campo descriptivo a evaluado.

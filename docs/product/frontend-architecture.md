@@ -128,9 +128,11 @@ de tablas resuelve accesibilidad de overlays, es un problema distinto.
 
 ## F2.5 Componentes especializados del ERP
 
-⬜ **Sin empezar**, y depende de F2.4. Primeros candidatos reales por orden
-de aparición en el backend: Ticket/Carrito POS y tarjeta de KDS (ya hay
-contrato en `sales` — pantallas, `estado_preparacion`), tarjeta de producto
+🔶 **Parcial**. Ticket/Carrito POS (`app/pdv/ticket.tsx`, 2026-07-28) y
+tarjeta de KDS (`app/kds/`, 2026-08-03) ya existen, construidos en su
+pantalla y con CSS propio — no promovidos todavía a `components/` porque
+hasta ahora ninguno tiene un segundo consumidor. Siguientes candidatos:
+tarjeta de producto
 con dialog de personalización (ya especificado en `ui-ux.md`), tabla de
 stock/inventario. El resto (receta, subreceta, lote, proveedor, factura,
 guía, merma) se construye cuando su módulo backend tenga pantalla asignada.
@@ -186,9 +188,16 @@ idempotencia (`idempotency_key`/`id` client-generado en ventas/pagos/
 movimientos — ADR-009 fase 2), así que el frontend puede confiar en
 reintentos seguros cuando se necesiten.
 
-⬜ **Sin decidir**: WebSockets/SSE (KDS tiempo real hoy sería polling según
-`ROADMAP.md` — WS/Redis pub-sub es la vía documentada pero no implementada
-en backend todavía), cache/invalidación en cliente, cancelación de
+El KDS (2026-08-03) agrega el patrón de **cliente desde el navegador**:
+`lib/cliente-api.ts` (fetch + error tipado vía el proxy que adjunta el
+token) compartido por PDV y KDS, con `lib/pdv.ts`/`lib/kds.ts` aportando
+solo tipos y rutas.
+
+⬜ **Sin decidir**: WebSockets/SSE. El KDS ya está en producción de código
+con **polling cada 3 s** (`REFRESCO_MS`, pausado con la pestaña oculta) —
+suficiente para que una pantalla vea lo que tachó otra, pero el push
+(WS/Redis pub-sub) sigue sin implementar en backend. También sin decidir:
+cache/invalidación en cliente, cancelación de
 requests, batch requests. No bloquean el alfa si el alcance inicial es
 back-office (sin tiempo real crítico); si el PDV/KDS entra al alfa, esto
 sube de prioridad.

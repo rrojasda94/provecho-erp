@@ -9,6 +9,10 @@
         "esModuleInterop": true,
         "module": "esnext",
         "moduleResolution": "bundler",
+        // Solo lo usan los archivos `*.test.ts`, que corren con `node --test`
+        // (ESM real, resuelve por ruta): permitir la extensión no obliga a
+        // usarla en el resto del código, que sigue importando sin ella.
+        "allowImportingTsExtensions": true,
         "resolveJsonModule": true,
         "isolatedModules": true,
         "jsx": "preserve",

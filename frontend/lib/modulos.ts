@@ -51,6 +51,15 @@ export const MODULOS: Modulo[] = [
     icono: "🛒",
   },
   {
+    clave: "kds",
+    nombre: "Cocina (KDS)",
+    descripcion: "Cola de preparación y despacho por estación",
+    // Igual que el PDV: pantalla completa táctil fuera del shell (ADR-013).
+    href: "/kds",
+    prefijoPermiso: "kds.",
+    icono: "🍳",
+  },
+  {
     clave: "produccion",
     nombre: "Producción",
     descripcion: "Órdenes de producción y consumo",

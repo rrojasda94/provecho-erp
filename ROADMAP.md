@@ -20,7 +20,7 @@ Registro de lo construido y lo pendiente. Actualizar en cada cambio relevante.
 | Seeders (admin / PIN 123456, org base) | ✅ 2026-07-27 | `src/seeders/seed.py` (idempotente, prohibido en prod): matriz de roles/permisos semilla, `admin`/PIN `123456` y la **organización real** del grupo — empresa Majambo EIRL (RUC 20450311520, Jr. Ramón Castilla 248 - Tarapoto, zona `amazonia_ley27037`), marca Charlie's Pizzas **licenciada** a la empresa (`licencia_marca`), sucursales `CH1` (Jr. Ramón Castilla 248) y `CH2` (Jr. Lamas 299) activas y alquiladas (RN-IMP-004), almacén central `WH1` (`sucursal_id` NULL). Requirió `almacen.direccion` (migración `e5a1c93b7d40`): el central no cuelga de ninguna sucursal y no había dónde guardar su ubicación. Correr: `python -m src.seeders.seed`. Diferido: almacenes de sucursal de CH1/CH2 (no pedidos; su mín./máx. por SKU depende de datos de operación inexistentes) y CRUD de organización por API — hoy empresa/sucursal/almacén solo se crean por seeder. |
 | Módulo `inventory` | 🔶 slices 1-4 ✅ 2026-08-01 | **Slice 1**: catálogo (CRUD artículos/categorías/SKUs), stock por almacén (vía `movimiento_inventario` inmutable) y ajuste con segregación (`solicitar_ajuste` ≠ `aprobar_ajuste`, aprobador ≠ solicitante). Migración `be914c92a94b`. **Slice 2 — lote/FEFO** (2026-07-27, ADR-015): `lote` + `stock_lote`, control **opcional por artículo** (`articulo.controla_lote` — el queso sí, las servilletas no). La salida reparte por FEFO (vence antes, sale antes; sin vencimiento va al final → FIFO) y genera **un movimiento por lote tomado**, con `lote_id` explícito como override. El lote vencido se bloquea cuando el picking lo toca y publica `inventory.lote_vencido_detectado`; `POST /lotes/bloquear-vencidos` hace el barrido a demanda. La recepción de compra transporta el lote y vencimiento del proveedor (RN-VNC-002) y producción crea el suyo. Nada entra sin lote si el artículo lo controla: un ingreso sin lote cae en el lote del día. `POST /movimientos` pasa a devolver **lista** de movimientos. El hub replica `lote`/`stock_lote` (ADR-009, 28 recursos). Migración `c9a2f4e18b60`. Tests: `tests/test_lotes.py`. **Slice 3 — conteo cíclico** (2026-08-01, ADR-019): `conteo` + `conteo_item` con la periodicidad configurada **en la categoría** (`categoria.frecuencia_conteo`, RN-INV-007) — no hay número universal. Calendario derivado del último conteo cerrado + frecuencia, sin tabla de programación; conteo general que pone al día a todas las categorías del almacén; stock esperado congelado al abrir; conteo **a ciegas** por defecto (`inventory.ver_stock_esperado`); el cierre genera un `ajuste` pendiente por diferencia (`ajuste.conteo_id`) sin mover stock, con margen `INVENTORY_MARGEN_AJUSTE_PCT`; `inventory.conteo_vencido` reporta a almacén y gerencia lo no contado en su fecha (RN-INV-021). Permisos nuevos `inventory.contar` y `inventory.ver_stock_esperado`. Migración `c4e70a91d5b8`. Tests: `tests/test_conteos.py`. **Slice 4 — abastecimiento interno** (2026-08-01, ADR-020): `reserva_stock` + `solicitud_insumos`/`solicitud_item` + `transferencia`/`transferencia_item`. El local pide, el supervisor aprueba **y reserva** el stock en el abastecedor, el central despacha (FEFO, un `transferencia_item` por lote) y el local recibe. `GET /stock` expone `cantidad`/`reservado`/`disponible` (RN-INV-009): reservar exige disponible, pero consumir nunca se bloquea por una reserva —una venta ya ocurrida no se niega— y por eso el disponible puede quedar negativo. Diferencias registradas, no corregidas: no se despacha más de lo aprobado ni se recibe más de lo enviado, menos sí (RN-INV-001/002). Cancelar libera reservas (RN-INV-010) y hay liberación manual (RN-INV-011). Transferencia lateral sucursal↔sucursal con la misma entidad. Migración `d8b35f1ca207`. Tests: `tests/test_transferencias.py`. Diferido: devolución, guía remisión, `stock_merma`. |
 | Módulo `purchases` | 🔶 slice core ✅ 2026-07-25 | CRUD de proveedores (natural liga a `persona`, jurídico con RUC propio) y ciclo de OC tipo `insumo` (crear → emitir → recibir → anular), con idempotencia y umbral de aprobación configurable. `purchases.compra_recibida` → inventory suma stock y recalcula `costo_promedio`. Conformidad de comprobante (`purchases.dar_conformidad`) registra el `comprobante` recibido y dispara `purchases.comprobante_conforme` → cola de pago en `accounting`. Migración `4ff85f833b29` aplicada. Diferido: ver Deuda técnica. |
-| Módulo `sales` (PDV) | 🔶 slices 1-3 ✅ 2026-07-27 | Venta con correlativo+idempotencia → `sales.venta_confirmada` → inventory descuenta por receta (+merma+empaque); cobro con pagos parciales → `pagada`; anulación pre-pago repone stock; CRUD productos/medios de pago. **KDS** (slice 2): pantallas configurables por sucursal y categorías (`kds_pantalla`, migración `7672566bf189`), avance por ítem en `venta_item.estado_preparacion` (fuente única → todas las pantallas ven el avance real), tipos preparación/despacho, comanda imprimible con contador de reimpresiones, evento `sales.pedido_listo`, rol `cocinero`. Kiosk/Central de Pedidos = clientes del mismo contrato, no módulos. **Cumplimiento de pedido** (slice 3, 2026-07-27): `PROC-OPE-002` definido como UN proceso (área Operaciones) y su etapa de entrega implementada — `POST /sales/ventas/{id}/entrega` con permiso propio `sales.entregar_pedido` y rol `despachador`, idempotente, publica `sales.venta_entregada` (disparador de la encuesta de marketing, RN-COM-007). **Slice PDV** (slice 4, 2026-07-28, ADR-018, migración `d7e3b8c14f52`): `mesa` tipada por sucursal + mapa de salón derivado; `grupo_cobro` para dividir la cuenta y emitir un comprobante por pagador (RN-COM-018); receptor tecleado en caja que decide boleta/factura sin cliente registrado (RN-CPP-003); descuento manual de orden con motivo y autorizador (RN-COM-017, permiso propio). Suma `POST /sales/clientes` y `GET /sales/ventas`. Diferido: ver Deuda técnica. |
+| Módulo `sales` (PDV) | 🔶 slices 1-3 ✅ 2026-07-27 | Venta con correlativo+idempotencia → `sales.venta_confirmada` → inventory descuenta por receta (+merma+empaque); cobro con pagos parciales → `pagada`; anulación pre-pago repone stock; CRUD productos/medios de pago. **KDS** (slice 2): pantallas configurables por sucursal y categorías (`kds_pantalla`, migración `7672566bf189`), avance por ítem en `venta_item.estado_preparacion` (fuente única → todas las pantallas ven el avance real), tipos preparación/despacho, comanda imprimible con contador de reimpresiones, evento `sales.pedido_listo`, rol `cocinero`; **pantalla KDS** en `frontend/app/kds/` (2026-08-03, tarjeta por pedido con tachado por ítem, polling 3 s). Kiosk/Central de Pedidos = clientes del mismo contrato, no módulos. **Cumplimiento de pedido** (slice 3, 2026-07-27): `PROC-OPE-002` definido como UN proceso (área Operaciones) y su etapa de entrega implementada — `POST /sales/ventas/{id}/entrega` con permiso propio `sales.entregar_pedido` y rol `despachador`, idempotente, publica `sales.venta_entregada` (disparador de la encuesta de marketing, RN-COM-007). **Slice PDV** (slice 4, 2026-07-28, ADR-018, migración `d7e3b8c14f52`): `mesa` tipada por sucursal + mapa de salón derivado; `grupo_cobro` para dividir la cuenta y emitir un comprobante por pagador (RN-COM-018); receptor tecleado en caja que decide boleta/factura sin cliente registrado (RN-CPP-003); descuento manual de orden con motivo y autorizador (RN-COM-017, permiso propio). Suma `POST /sales/clientes` y `GET /sales/ventas`. Diferido: ver Deuda técnica. |
 | Persona CRUD + lock optimista + matriz de aprobaciones + contrato público | ✅ 2026-07-25 | `POST/GET/PATCH /api/v1/personas` (sin Delete); `persona.version` con lock optimista (409 si desactualizada); `regla_aprobacion` (nuevo, `src/shared/`) reemplaza el umbral fijo de `purchases` por empresa, admin en `/api/v1/reglas-aprobacion`; primer contrato público de lectura cross-módulo (`sales.cliente` para marketing/comercial, `GET /api/v1/sales/clientes`). Migración `af8a246e2c25`. Ver detalle abajo. |
 | Módulo `accounting` | 🔶 slice core+tesorería ✅ 2026-07-25 | Libro contable núcleo: plan de cuentas (`cuenta_contable`), periodo (`periodo_contable`, abrir/cerrar), asiento manual (`asiento`/`asiento_linea`, cuadre RN-CTB-001, anulación por asiento inverso RN-CTB-002) y mapeo configurable evento→cuentas (`regla_asiento`) que alimenta la generación automática para 4 eventos operativos ya publicados en código (`purchases.oc_emitida`, `purchases.compra_recibida`, `sales.venta_confirmada`, `purchases.comprobante_conforme`). **Pago a proveedor** (PROC-CTB-003, `movimiento_dinero`): cola idempotente por comprobante (RN-CTB-008) → ejecutar con umbral configurable + permiso (RN-CTB-005) → asiento automático. Migraciones `5402d99333fa`+`cbf904a9fc1b` aplicadas. Diferido: ver Deuda técnica. |
 | Producción (fabricación) | 🔶 slice core ✅ 2026-07-25 | Orden de producción ad-hoc (crear → registrar consumo → completar con resultado de control de calidad) y costeo automático. Construido antes de tiempo a pedido del usuario — primera cocina real sigue planeada 2027. `receta.articulo_id` nuevo liga receta↔subreceta. Diferido: ver Deuda técnica. |
@@ -172,6 +172,22 @@ Registro vivo de deuda técnica declarada al cerrar cada slice — para que no
 se olvide. Marcar ✅ al resolverse en el slice indicado.
 
 ### Transversal
+- **Un módulo se activa a mano en siete lugares** (2026-08-03). La estructura
+  interna es replicable —los 8 módulos tienen la misma forma— pero no hay
+  manifiesto por módulo ni autodescubrimiento: router y tag OpenAPI y
+  `register()` de listeners en `src/core/app.py`, import en
+  `models_registry.py`, migración, `PERMISOS`/`ROLES` en `src/seeders/seed.py`
+  y entrada en `frontend/lib/modulos.ts`. Consecuencia: **borrar la carpeta de
+  un módulo deja `core` sin compilar** — la promesa de "removible" es hoy del
+  dominio, no del ensamblado. Mitigado, no resuelto:
+  `docs/engineering/module-guide.md` documenta los siete pasos y
+  `tests/test_arquitectura.py` exige tres de ellos (modelos en el registro,
+  router montado, permisos de la API sembrados). Pendiente si algún día hay
+  módulos opcionales de verdad: `MODULOS_ACTIVOS` en settings + carga por
+  convención (`importlib`), que colapsa 1-4 en una línea; y `PERMISOS`
+  declarados en el módulo en vez del seeder. No hacerlo antes de tener un
+  caso real de módulo instalable/desinstalable — hoy los 8 están siempre
+  encendidos.
 - ✅ 2026-08-02 **`GET /personas` exigía `users.gestionar`, demasiado
   amplio para un lookup**: nuevo endpoint minimizado
   `GET /personas/buscar?q=` (permiso `personas.leer`, nuevo) que responde
@@ -778,8 +794,14 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   elegido (ej. bebidas) + producto en promoción vigente. UX especificada
   en `docs/product/ui-ux.md`; falta definir cómo se configura la relación
   producto→complemento (fija vs. regla de venta cruzada).
-- ⬜ **KDS tiempo real**: hoy el frontend refresca por polling; push por
-  WebSocket/Redis pub-sub (Redis reservado para pantallas/colas/sesiones).
+- ⬜ **KDS tiempo real**: la pantalla (2026-08-03) refresca por polling
+  cada 3 s; push por WebSocket/Redis pub-sub (Redis reservado para
+  pantallas/colas/sesiones) sigue sin implementar.
+- ⬜ **KDS sin reloj por pedido**: Odoo colorea la tarjeta al superar un
+  umbral de espera; acá `GET /kds/pantallas/{id}/cola` no devuelve
+  `fecha_orden`, así que no hay de dónde calcular el tiempo transcurrido.
+  Va junto con "KDS tiempos" (abajo): agregar el timestamp al payload es
+  el primer paso.
 - ⬜ **KDS aviso de anulación**: si anulan un pedido ya en preparación, la
   tarjeta solo desaparece al refrescar — falta aviso explícito "ANULADO"
   (llega natural con el push de tiempo real).
@@ -1019,7 +1041,6 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   era lo instalado; `^15.3.0` daba la impresión falsa de estar atrasado).
   `tsc`, `next lint` y `next build` limpios después del cambio.
 
-
 Detalle completo por sección en `docs/product/frontend-architecture.md`.
 De las 6 prioridades que este documento marcaba como bloqueantes del
 alfa, **ADR-013** (misma fecha, sesión distinta — arquitectura frontend:
@@ -1083,6 +1104,42 @@ complejo):
 - **Ventas**: el tile del home apuntaba a `/ventas` (404); corregido a
   `/pdv` — el PDV es pantalla completa fuera del shell a propósito
   (ADR-013), no una ruta bajo `(app)`.
+- **Cocina (KDS)** (2026-08-03, `frontend/app/kds/`): segunda pantalla
+  completa fuera del shell, táctil y oscura como el PDV. Tarjeta por
+  pedido; **un toque tacha el ítem preparado** (patrón de la *preparation
+  display* de Odoo, cuya documentación se revisó antes de diseñarla) y
+  "Todo listo" tacha el pedido entero. El toque encadena
+  `en_preparacion → listo` porque la API solo avanza de a un estado.
+  Como el avance vive en `venta_item.estado_preparacion` y ninguna
+  pantalla guarda estado propio, lo tachado en una estación aparece en
+  toda otra pantalla de la sucursal que muestre ese pedido — hoy con
+  polling de 3 s (pausado si la pestaña está oculta). Sin "recall": el
+  retroceso lo prohíbe RN-CUP-002, tocar un ítem tachado avisa en vez de
+  deshacer. En pantallas de `despacho` y solo con `sales.entregar_pedido`
+  aparece "Entregar" (RN-CUP-006). Estación elegida en la URL
+  (`/kds?pantalla=<id>`) para que cada tablet la deje en favoritos; sin ese
+  parámetro `/kds` muestra el **tablero de estaciones**, que es a la vez el
+  selector y la configuración (alta/edición/baja lógica de `kds_pantalla`
+  con `kds.configurar`, filtro por categorías contra
+  `GET /inventory/categorias`). Antes las pantallas solo se creaban por
+  API: una sucursal nueva no tenía forma de arrancar su cocina desde la UI.
+  De paso, el cliente HTTP de navegador se extrajo a `lib/cliente-api.ts`
+  (lo compartían PDV y KDS). **Un solo cambio de backend**, encontrado
+  justamente al verificar end-to-end: `cola_pantalla` devolvía a una
+  pantalla de preparación solo los ítems `pendiente`/`en_preparacion`, así
+  que tachar un ítem lo hacía desaparecer de la tarjeta — lo contrario de
+  lo que necesita la cocina. Ahora la estación ve todos sus ítems con su
+  estado y el pedido sale de su cola cuando terminó todo lo suyo (test
+  `test_item_tachado_sigue_visible_hasta_terminar_la_estacion`).
+  **Verificación end-to-end** (2026-08-03, stack Docker completo, datos
+  reales): venta takeout de 3 ítems creada por API; ambas estaciones
+  ("Horno" preparación, "Pase / Despacho") creadas **desde la UI**; tachar
+  "Inca Kola" en una tablet y verla tachada (`line-through`) en una
+  segunda tablet de la misma estación sin tocarla, por polling; "Todo
+  listo" → los 3 ítems en `listo` en la BD; la pantalla de despacho
+  muestra el pedido LISTO con "Entregar"; entrega registrada → ítems
+  `entregado` y ambas colas vacías. `tsc`, `next lint`, `next build` y los
+  12 tests de `tests/test_kds.py` en verde.
 
 Verificado end-to-end en Docker con datos reales, por API y por navegador
 (curl + interacción real): crear artículo → aparece en tabla; crear OC de

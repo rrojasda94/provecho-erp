@@ -271,8 +271,12 @@ tiempo real (Redis/WebSocket) es deuda declarada.
   `categoria_ids` (filtro por categorías de producto comercial; vacío =
   todas). `producto_comercial.categoria_id` (nuevo, reusa `categoria`)
   rutea cada ítem a su estación (pizzas → horno, bebidas → barra).
-- **Preparación**: ve ítems pendientes/en curso de sus categorías; bump
-  por ítem (`POST /kds/items/{id}/avanzar`).
+- **Preparación**: ve **todos** los ítems de sus categorías, incluidos los
+  ya `listo` — el ítem tachado tiene que seguir a la vista de quien lo
+  tachó y de las demás pantallas (corregido 2026-08-03: antes desaparecía
+  al marcarlo, que es justo lo contrario de lo que hace la cocina). El
+  pedido sale de esta cola cuando la estación terminó **todo lo suyo**.
+  Bump por ítem (`POST /kds/items/{id}/avanzar`).
 - **Despacho**: ve pedidos con ítems listos + `estado_pedido` agregado
   (el ítem más atrasado manda); al estar todo listo se publica
   `sales.pedido_listo`.
@@ -301,6 +305,16 @@ tiempo real (Redis/WebSocket) es deuda declarada.
 
 Roles seed: `cocinero` (kds.operar, **no** entrega), `despachador`
 (kds.operar + entrega), cajero opera y entrega; supervisor configura.
+
+**Pantalla** (2026-08-03): `frontend/app/kds/` — pantalla completa táctil
+fuera del shell, una tarjeta por pedido, un toque tacha el ítem preparado
+(encadena `en_preparacion` → `listo`, porque la API solo avanza de a un
+estado). Refresca la cola cada 3 s: como el estado vive en `venta_item`,
+ese intervalo es lo que tarda una pantalla en ver lo que tachó otra. La
+estación va en la URL (`/kds?pantalla=<id>`); `/kds` sin parámetro es el
+tablero de estaciones, que además crea/edita/desactiva pantallas con
+`kds.configurar`. Diseño e interacción en
+[ui-ux.md](../../../docs/product/ui-ux.md#kds--tarjeta-de-pedido-tachar-ítem-por-ítem-implementado-2026-08-03).
 
 ## Sincronización con el hub de sucursal (implementado 2026-07-27)
 

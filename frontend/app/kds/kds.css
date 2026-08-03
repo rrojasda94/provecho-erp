@@ -1,0 +1,432 @@
+/* Pantalla de cocina (KDS).
+   Misma paleta oscura del PDV y por la misma razón: se lee a 1-2 m de
+   distancia, con vapor, luz mala y las manos ocupadas. Tipografía grande,
+   objetivos táctiles gordos, cero hover-only. */
+
+.kds,
+.kds-vacio {
+    --kds-bg: #0d0d0f;
+    --kds-surface: #18181b;
+    --kds-surface-alta: #202024;
+    --kds-borde: rgba(255, 255, 255, 0.1);
+    --kds-borde-fuerte: rgba(255, 255, 255, 0.2);
+    --kds-texto: #f4f4f2;
+    --kds-muted: #9a9a9f;
+    --kds-verde: #22c55e;
+    --kds-verde-tenue: rgba(34, 197, 94, 0.14);
+    --kds-ambar: #fbbf24;
+
+    background: var(--kds-bg);
+    color: var(--kds-texto);
+}
+
+.kds {
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    user-select: none;
+}
+
+.kds-vacio {
+    padding: 3rem;
+    max-width: 44rem;
+    margin: 0 auto;
+    display: grid;
+    gap: 0.75rem;
+    align-content: center;
+    min-height: 100dvh;
+}
+
+.kds-vacio h1 {
+    font-style: normal;
+    letter-spacing: 0.02em;
+}
+
+.kds-selector {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+    gap: 0.75rem;
+    margin-top: 1rem;
+}
+
+.kds-selector-item {
+    border-radius: 12px;
+    background: var(--kds-surface);
+    border: 1px solid var(--kds-borde);
+}
+
+.kds-selector-item.inactiva {
+    opacity: 0.5;
+}
+
+.kds-selector-item a {
+    display: block;
+    padding: 1.25rem;
+    color: var(--kds-texto);
+    text-decoration: none;
+}
+
+.kds-selector-item em {
+    display: block;
+    margin-top: 0.25rem;
+    font-style: normal;
+    font-size: 0.8125rem;
+    color: var(--kds-muted);
+}
+
+.kds-selector-acciones {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0 0.75rem 0.75rem;
+}
+
+.kds-selector-acciones button {
+    flex: 1;
+    padding: 0.5rem;
+    border: 1px solid var(--kds-borde);
+    border-radius: 8px;
+    background: none;
+    color: var(--kds-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+/* --- Diálogo de configuración de estación --- */
+.kds-dialogo {
+    border: none;
+    border-radius: 16px;
+    padding: 0;
+    max-width: min(94vw, 34rem);
+    width: 100%;
+    background: var(--kds-surface, #18181b);
+    color: var(--kds-texto, #f4f4f2);
+}
+
+.kds-dialogo::backdrop {
+    background: rgba(0, 0, 0, 0.6);
+}
+
+.kds-dialogo header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.125rem 1.25rem 0.875rem;
+}
+
+.kds-dialogo header h3 {
+    font-size: 0.9375rem;
+    font-style: normal;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 700;
+}
+
+.kds-dialogo header button {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--kds-texto, #f4f4f2);
+}
+
+.kds-dialogo-cuerpo {
+    padding: 0 1.25rem 1.25rem;
+    max-height: min(70vh, 38rem);
+    overflow-y: auto;
+}
+
+.kds-dialogo-pie {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 1.25rem;
+    padding-top: 0.875rem;
+    border-top: 1px solid var(--kds-borde, rgba(255, 255, 255, 0.1));
+}
+
+.kds-etiqueta {
+    display: block;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--kds-muted, #9a9a9f);
+    margin: 0.875rem 0 0.4375rem;
+}
+
+.kds-campo {
+    width: 100%;
+    height: 2.75rem;
+    padding: 0 0.8125rem;
+    border: 1px solid var(--kds-borde-fuerte, rgba(255, 255, 255, 0.2));
+    border-radius: 8px;
+    background: var(--kds-surface-alta, #202024);
+    color: var(--kds-texto, #f4f4f2);
+    font: inherit;
+}
+
+.kds-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+}
+
+.kds-chip {
+    border: 1px solid var(--kds-borde-fuerte, rgba(255, 255, 255, 0.2));
+    border-radius: 999px;
+    padding: 0.5rem 0.875rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    background: none;
+    color: var(--kds-texto, #f4f4f2);
+}
+
+.kds-chip.on {
+    background: var(--kds-verde, #22c55e);
+    border-color: var(--kds-verde, #22c55e);
+    color: #06210f;
+}
+
+.kds-nota {
+    font-size: 0.75rem;
+    color: var(--kds-muted, #9a9a9f);
+    line-height: 1.55;
+    margin-top: 0.5rem;
+}
+
+.kds-error {
+    margin-top: 0.75rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #f87171;
+}
+
+/* --- Barra superior --- */
+.kds-top {
+    flex: none;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    gap: 0.875rem;
+    padding: 0 1rem;
+    background: var(--kds-surface);
+    border-bottom: 1px solid var(--kds-borde);
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+
+.kds-marca strong {
+    display: block;
+    font-size: 1rem;
+}
+
+.kds-marca small {
+    color: var(--kds-muted);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.kds-spacer {
+    flex: 1;
+}
+
+.kds-meta {
+    font-size: 0.875rem;
+    color: var(--kds-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.kds-cambiar {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--kds-texto);
+    text-decoration: underline;
+}
+
+/* --- Tarjetas --- */
+.kds-grid {
+    flex: 1;
+    padding: 1rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+    gap: 0.75rem;
+    align-content: start;
+}
+
+.kds-nada {
+    padding: 4rem 1.5rem;
+    text-align: center;
+    color: var(--kds-muted);
+    font-size: 1rem;
+}
+
+.kds-card {
+    background: var(--kds-surface);
+    border: 1px solid var(--kds-borde);
+    border-top: 4px solid var(--kds-borde-fuerte);
+    border-radius: 12px;
+    padding: 0.875rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+/* El color del borde superior es el estado del PEDIDO completo (el ítem más
+   atrasado manda), no el de esta pantalla: en despacho hace falta saber si
+   la barra ya sacó las bebidas aunque esta estación ya terminara. */
+.kds-card.en_preparacion {
+    border-top-color: var(--kds-ambar);
+}
+
+.kds-card.listo {
+    border-top-color: var(--kds-verde);
+}
+
+.kds-card header {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+}
+
+.kds-orden {
+    font-size: 1.375rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.kds-ref {
+    flex: 1;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--kds-texto);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.kds-badge {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--kds-muted);
+}
+
+.kds-canal {
+    font-size: 0.75rem;
+    color: var(--kds-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.kds-items {
+    list-style: none;
+    display: grid;
+    gap: 0.375rem;
+    margin: 0;
+    padding: 0;
+}
+
+.kds-item {
+    display: grid;
+    grid-template-columns: 2.5rem minmax(0, 1fr) 1.5rem;
+    align-items: center;
+    gap: 0.625rem;
+    width: 100%;
+    min-height: 3.25rem;
+    padding: 0.625rem 0.75rem;
+    border: 1px solid var(--kds-borde);
+    border-radius: 8px;
+    background: var(--kds-surface-alta);
+    color: var(--kds-texto);
+    text-align: left;
+}
+
+.kds-item:active {
+    transform: scale(0.99);
+}
+
+.kds-item.en_preparacion {
+    border-color: var(--kds-ambar);
+}
+
+.kds-item.hecho {
+    background: var(--kds-verde-tenue);
+    border-color: transparent;
+    color: var(--kds-muted);
+}
+
+.kds-item.hecho .kds-nombre {
+    text-decoration: line-through;
+}
+
+.kds-cant {
+    display: grid;
+    place-items: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.08);
+    font-weight: 700;
+    font-size: 1rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.kds-nombre {
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1.25;
+}
+
+.kds-check {
+    color: var(--kds-verde);
+    font-weight: 700;
+}
+
+.kds-acciones {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: auto;
+}
+
+.kds-boton {
+    flex: 1;
+    padding: 0.75rem 0.5rem;
+    border: 1px solid var(--kds-borde-fuerte);
+    border-radius: 8px;
+    background: none;
+    color: var(--kds-texto);
+    font-size: 0.8125rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.kds-boton.pri {
+    background: var(--kds-verde, #22c55e);
+    border-color: var(--kds-verde, #22c55e);
+    color: #06210f;
+}
+
+/* El botón de "Nueva pantalla" vive en el tablero de estaciones, que es un
+   `grid` centrado: sin esto se estira a todo el ancho de la columna. */
+.kds-boton.ancho {
+    justify-self: start;
+    padding-inline: 1.25rem;
+}
+
+.kds-aviso {
+    position: fixed;
+    left: 50%;
+    bottom: 1.625rem;
+    transform: translateX(-50%);
+    background: var(--kds-surface-alta);
+    color: var(--kds-texto);
+    border: 1px solid var(--kds-borde-fuerte);
+    padding: 0.75rem 1.25rem;
+    border-radius: 999px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    z-index: 9;
+}
