@@ -97,6 +97,60 @@ def listar_categorias(
     return catalogo.listar_categorias(session, tenant.filtro_empresa(empresa_id))
 
 
+@router.get("/unidades-medida", response_model=list[schemas.UnidadMedidaOut])
+def listar_unidades_medida(
+    _: Usuario = Depends(require_permission(LEER)),
+    session: Session = Depends(get_db),
+):
+    return catalogo.listar_unidades_medida(session)
+
+
+@router.post(
+    "/unidades-medida", response_model=schemas.UnidadMedidaOut, status_code=201
+)
+def crear_unidad_medida(
+    body: schemas.UnidadMedidaCreate,
+    _: Usuario = Depends(require_permission(CATALOGO)),
+    session: Session = Depends(get_db),
+):
+    unidad = catalogo.crear_unidad_medida(session, **body.model_dump())
+    session.commit()
+    return unidad
+
+
+@router.patch("/unidades-medida/{unidad_medida_id}", response_model=schemas.UnidadMedidaOut)
+def editar_unidad_medida(
+    unidad_medida_id: uuid.UUID,
+    body: schemas.UnidadMedidaUpdate,
+    _: Usuario = Depends(require_permission(CATALOGO)),
+    session: Session = Depends(get_db),
+):
+    unidad = catalogo.editar_unidad_medida(session, unidad_medida_id, **body.model_dump())
+    session.commit()
+    return unidad
+
+
+@router.get("/categorias-udm", response_model=list[schemas.CategoriaUdmOut])
+def listar_categorias_udm(
+    _: Usuario = Depends(require_permission(LEER)),
+    session: Session = Depends(get_db),
+):
+    return catalogo.listar_categorias_udm(session)
+
+
+@router.post(
+    "/categorias-udm", response_model=schemas.CategoriaUdmOut, status_code=201
+)
+def crear_categoria_udm(
+    body: schemas.CategoriaUdmCreate,
+    _: Usuario = Depends(require_permission(CATALOGO)),
+    session: Session = Depends(get_db),
+):
+    categoria = catalogo.crear_categoria_udm(session, **body.model_dump())
+    session.commit()
+    return categoria
+
+
 # --- Artículos --------------------------------------------------------------
 @router.post("/articulos", response_model=schemas.ArticuloOut, status_code=201)
 def crear_articulo(

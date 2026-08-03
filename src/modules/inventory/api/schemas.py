@@ -37,6 +37,45 @@ class CategoriaOut(BaseModel):
     frecuencia_conteo: str | None
 
 
+# --- Unidades de medida ---
+# Catálogo global, no por empresa (a diferencia de categoría/artículo): la
+# conversión kilo↔gramo es la misma para cualquier empresa que use el ERP.
+class CategoriaUdmCreate(BaseModel):
+    nombre: str = Field(min_length=1, max_length=50)
+
+
+class CategoriaUdmOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    nombre: str
+    unidad_base_id: uuid.UUID | None
+
+
+class UnidadMedidaCreate(BaseModel):
+    categoria_udm_id: uuid.UUID
+    nombre: str = Field(min_length=1, max_length=50)
+    ratio: Decimal = Decimal(1)
+    # Kilo necesita gramos (3), Unidad no admite fracción (0) — RN-GER-010,
+    # no hay un default universal correcto; el default del modelo (3) es
+    # solo el más común, quien crea la unidad decide el suyo.
+    decimales: int = Field(ge=0, le=6, default=3)
+
+
+class UnidadMedidaUpdate(BaseModel):
+    nombre: str | None = None
+    ratio: Decimal | None = None
+    decimales: int | None = Field(default=None, ge=0, le=6)
+
+
+class UnidadMedidaOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    categoria_udm_id: uuid.UUID
+    nombre: str
+    ratio: Decimal
+    decimales: int
+
+
 # --- Artículos ---
 class ArticuloCreate(BaseModel):
     empresa_id: uuid.UUID | None = None

@@ -15,12 +15,12 @@ Registro de lo construido y lo pendiente. Actualizar en cada cambio relevante.
 | Core (app factory, settings, db, event bus) | ✅ 2026-07-04 | Endpoint `/health` operativo. **Bus revisado 2026-08-01 (ADR-016)**: el evento se despacha recién al commitear la sesión que lo publicó — antes se entregaba en medio de la transacción y un rollback dejaba stock descontado por una venta inexistente. |
 | Auditoría arquitectónica | ✅ 2026-08-01 | `docs/architecture/audit-2026-08-01.md`. Veredicto: arquitectura sana y proporcionada, sin sobreingeniería; separación de capas al 100 % y dominio puro. Aplicado: eventos post-commit (ADR-016), jerarquía de errores unificada (ADR-017, −251 líneas en routers), contrato público `users.tiene_permiso`, y `tests/test_arquitectura.py` (98 casos) que congela los límites. Descartado con justificación: dividir `rules.py` (120 líneas el mayor), dividir `repositories.py` (ya son 9-13 clases pequeñas por archivo), eventos tipados (sin type checker en CI el beneficio es solo documental) y separar eventos sync/async (lo asíncrono real ya vive en Celery). Diferido: `Empresa`/`Sucursal`/`Almacen`/`Persona` de `users` a `shared/models` (37 archivos; conviene junto al CRUD de organización), contrato público de `inventory` para `Articulo`/`Receta`, y `core/dashboard_router` a un módulo propio. |
 | Modelado de base de datos completo (SQLAlchemy + Alembic) | 🔶 en curso 2026-07-25 | Bloque transversal + organización (11) + slice Venta núcleo (11) + slice Cobro/Comprobante/Caja (8) + slice auth/RBAC (7) + slice inventory core (3) — 40 tablas en total. BD de desarrollo corre en **Supabase** (Postgres gestionado, solo BD — sin su Auth/RLS, ver `docs/engineering/devops.md`); Docker local sigue disponible como alternativa. Resto por slice vertical. |
-| Módulo `users` (auth JWT + PIN + RBAC) | ✅ 2026-07-25 | Slice auth+CRUD implementado: 7 tablas RBAC (`rol`, `permiso`, `usuario_rol`, `rol_permiso`, `usuario_sucursal`, `refresh_token`, `audit_log`) + lockout en `usuario`. Login/refresh(rotativo+detección de reuso)/logout/me + CRUD admin de usuarios/roles/permisos/asignaciones. Argon2id, JWT, `require_permission` deny por defecto. `docs/security/authorization.md`. Restricciones JSONB por permiso: pendientes de aplicar (hoy solo chequeo por código). |
+| Módulo `users` (auth JWT + PIN + RBAC) | ✅ 2026-07-25 | Slice auth+CRUD implementado: 7 tablas RBAC (`rol`, `permiso`, `usuario_rol`, `rol_permiso`, `usuario_sucursal`, `refresh_token`, `audit_log`) + lockout en `usuario`. Login/refresh(rotativo+detección de reuso)/logout/me + CRUD admin de usuarios/roles/permisos/asignaciones. Argon2id, JWT, `require_permission` deny por defecto. `docs/security/authorization.md`. Restricciones JSONB por permiso: aplicadas desde 2026-08-02 (ADR-022, ver Deuda técnica). |
 | Migraciones Alembic iniciales | 🔶 en curso 2026-07-25 | 6 migraciones aplicadas a la BD dev (head `be914c92a94b`): transversal+org, slice Venta, cobro/caja, cliente opcional, slice auth/RBAC, slice inventory core (stock/movimiento/ajuste). |
 | Seeders (admin / PIN 123456, org base) | ✅ 2026-07-27 | `src/seeders/seed.py` (idempotente, prohibido en prod): matriz de roles/permisos semilla, `admin`/PIN `123456` y la **organización real** del grupo — empresa Majambo EIRL (RUC 20450311520, Jr. Ramón Castilla 248 - Tarapoto, zona `amazonia_ley27037`), marca Charlie's Pizzas **licenciada** a la empresa (`licencia_marca`), sucursales `CH1` (Jr. Ramón Castilla 248) y `CH2` (Jr. Lamas 299) activas y alquiladas (RN-IMP-004), almacén central `WH1` (`sucursal_id` NULL). Requirió `almacen.direccion` (migración `e5a1c93b7d40`): el central no cuelga de ninguna sucursal y no había dónde guardar su ubicación. Correr: `python -m src.seeders.seed`. Diferido: almacenes de sucursal de CH1/CH2 (no pedidos; su mín./máx. por SKU depende de datos de operación inexistentes) y CRUD de organización por API — hoy empresa/sucursal/almacén solo se crean por seeder. |
 | Módulo `inventory` | 🔶 slices 1-4 ✅ 2026-08-01 | **Slice 1**: catálogo (CRUD artículos/categorías/SKUs), stock por almacén (vía `movimiento_inventario` inmutable) y ajuste con segregación (`solicitar_ajuste` ≠ `aprobar_ajuste`, aprobador ≠ solicitante). Migración `be914c92a94b`. **Slice 2 — lote/FEFO** (2026-07-27, ADR-015): `lote` + `stock_lote`, control **opcional por artículo** (`articulo.controla_lote` — el queso sí, las servilletas no). La salida reparte por FEFO (vence antes, sale antes; sin vencimiento va al final → FIFO) y genera **un movimiento por lote tomado**, con `lote_id` explícito como override. El lote vencido se bloquea cuando el picking lo toca y publica `inventory.lote_vencido_detectado`; `POST /lotes/bloquear-vencidos` hace el barrido a demanda. La recepción de compra transporta el lote y vencimiento del proveedor (RN-VNC-002) y producción crea el suyo. Nada entra sin lote si el artículo lo controla: un ingreso sin lote cae en el lote del día. `POST /movimientos` pasa a devolver **lista** de movimientos. El hub replica `lote`/`stock_lote` (ADR-009, 28 recursos). Migración `c9a2f4e18b60`. Tests: `tests/test_lotes.py`. **Slice 3 — conteo cíclico** (2026-08-01, ADR-019): `conteo` + `conteo_item` con la periodicidad configurada **en la categoría** (`categoria.frecuencia_conteo`, RN-INV-007) — no hay número universal. Calendario derivado del último conteo cerrado + frecuencia, sin tabla de programación; conteo general que pone al día a todas las categorías del almacén; stock esperado congelado al abrir; conteo **a ciegas** por defecto (`inventory.ver_stock_esperado`); el cierre genera un `ajuste` pendiente por diferencia (`ajuste.conteo_id`) sin mover stock, con margen `INVENTORY_MARGEN_AJUSTE_PCT`; `inventory.conteo_vencido` reporta a almacén y gerencia lo no contado en su fecha (RN-INV-021). Permisos nuevos `inventory.contar` y `inventory.ver_stock_esperado`. Migración `c4e70a91d5b8`. Tests: `tests/test_conteos.py`. **Slice 4 — abastecimiento interno** (2026-08-01, ADR-020): `reserva_stock` + `solicitud_insumos`/`solicitud_item` + `transferencia`/`transferencia_item`. El local pide, el supervisor aprueba **y reserva** el stock en el abastecedor, el central despacha (FEFO, un `transferencia_item` por lote) y el local recibe. `GET /stock` expone `cantidad`/`reservado`/`disponible` (RN-INV-009): reservar exige disponible, pero consumir nunca se bloquea por una reserva —una venta ya ocurrida no se niega— y por eso el disponible puede quedar negativo. Diferencias registradas, no corregidas: no se despacha más de lo aprobado ni se recibe más de lo enviado, menos sí (RN-INV-001/002). Cancelar libera reservas (RN-INV-010) y hay liberación manual (RN-INV-011). Transferencia lateral sucursal↔sucursal con la misma entidad. Migración `d8b35f1ca207`. Tests: `tests/test_transferencias.py`. Diferido: devolución, guía remisión, `stock_merma`. |
 | Módulo `purchases` | 🔶 slice core ✅ 2026-07-25 | CRUD de proveedores (natural liga a `persona`, jurídico con RUC propio) y ciclo de OC tipo `insumo` (crear → emitir → recibir → anular), con idempotencia y umbral de aprobación configurable. `purchases.compra_recibida` → inventory suma stock y recalcula `costo_promedio`. Conformidad de comprobante (`purchases.dar_conformidad`) registra el `comprobante` recibido y dispara `purchases.comprobante_conforme` → cola de pago en `accounting`. Migración `4ff85f833b29` aplicada. Diferido: ver Deuda técnica. |
-| Módulo `sales` (PDV) | 🔶 slices 1-3 ✅ 2026-07-27 | Venta con correlativo+idempotencia → `sales.venta_confirmada` → inventory descuenta por receta (+merma+empaque); cobro con pagos parciales → `pagada`; anulación pre-pago repone stock; CRUD productos/medios de pago. **KDS** (slice 2): pantallas configurables por sucursal y categorías (`kds_pantalla`, migración `7672566bf189`), avance por ítem en `venta_item.estado_preparacion` (fuente única → todas las pantallas ven el avance real), tipos preparación/despacho, comanda imprimible con contador de reimpresiones, evento `sales.pedido_listo`, rol `cocinero`. Kiosk/Central de Pedidos = clientes del mismo contrato, no módulos. **Cumplimiento de pedido** (slice 3, 2026-07-27): `PROC-OPE-002` definido como UN proceso (área Operaciones) y su etapa de entrega implementada — `POST /sales/ventas/{id}/entrega` con permiso propio `sales.entregar_pedido` y rol `despachador`, idempotente, publica `sales.venta_entregada` (disparador de la encuesta de marketing, RN-COM-007). **Slice PDV** (slice 4, 2026-07-28, ADR-018, migración `d7e3b8c14f52`): `mesa` tipada por sucursal + mapa de salón derivado; `grupo_cobro` para dividir la cuenta y emitir un comprobante por pagador (RN-COM-018); receptor tecleado en caja que decide boleta/factura sin cliente registrado (RN-CPP-003); descuento manual de orden con motivo y autorizador (RN-COM-017, permiso propio). Suma `POST /sales/clientes` y `GET /sales/ventas`. Diferido: ver Deuda técnica. |
+| Módulo `sales` (PDV) | 🔶 slices 1-3 ✅ 2026-07-27 | Venta con correlativo+idempotencia → `sales.venta_confirmada` → inventory descuenta por receta (+merma+empaque); cobro con pagos parciales → `pagada`; anulación pre-pago repone stock; CRUD productos/medios de pago. **KDS** (slice 2): pantallas configurables por sucursal y categorías (`kds_pantalla`, migración `7672566bf189`), avance por ítem en `venta_item.estado_preparacion` (fuente única → todas las pantallas ven el avance real), tipos preparación/despacho, comanda imprimible con contador de reimpresiones, evento `sales.pedido_listo`, rol `cocinero`; **pantalla KDS** en `frontend/app/kds/` (2026-08-03, tarjeta por pedido con tachado por ítem, polling 3 s). Kiosk/Central de Pedidos = clientes del mismo contrato, no módulos. **Cumplimiento de pedido** (slice 3, 2026-07-27): `PROC-OPE-002` definido como UN proceso (área Operaciones) y su etapa de entrega implementada — `POST /sales/ventas/{id}/entrega` con permiso propio `sales.entregar_pedido` y rol `despachador`, idempotente, publica `sales.venta_entregada` (disparador de la encuesta de marketing, RN-COM-007). **Slice PDV** (slice 4, 2026-07-28, ADR-018, migración `d7e3b8c14f52`): `mesa` tipada por sucursal + mapa de salón derivado; `grupo_cobro` para dividir la cuenta y emitir un comprobante por pagador (RN-COM-018); receptor tecleado en caja que decide boleta/factura sin cliente registrado (RN-CPP-003); descuento manual de orden con motivo y autorizador (RN-COM-017, permiso propio). Suma `POST /sales/clientes` y `GET /sales/ventas`. Diferido: ver Deuda técnica. |
 | Persona CRUD + lock optimista + matriz de aprobaciones + contrato público | ✅ 2026-07-25 | `POST/GET/PATCH /api/v1/personas` (sin Delete); `persona.version` con lock optimista (409 si desactualizada); `regla_aprobacion` (nuevo, `src/shared/`) reemplaza el umbral fijo de `purchases` por empresa, admin en `/api/v1/reglas-aprobacion`; primer contrato público de lectura cross-módulo (`sales.cliente` para marketing/comercial, `GET /api/v1/sales/clientes`). Migración `af8a246e2c25`. Ver detalle abajo. |
 | Módulo `accounting` | 🔶 slice core+tesorería ✅ 2026-07-25 | Libro contable núcleo: plan de cuentas (`cuenta_contable`), periodo (`periodo_contable`, abrir/cerrar), asiento manual (`asiento`/`asiento_linea`, cuadre RN-CTB-001, anulación por asiento inverso RN-CTB-002) y mapeo configurable evento→cuentas (`regla_asiento`) que alimenta la generación automática para 4 eventos operativos ya publicados en código (`purchases.oc_emitida`, `purchases.compra_recibida`, `sales.venta_confirmada`, `purchases.comprobante_conforme`). **Pago a proveedor** (PROC-CTB-003, `movimiento_dinero`): cola idempotente por comprobante (RN-CTB-008) → ejecutar con umbral configurable + permiso (RN-CTB-005) → asiento automático. Migraciones `5402d99333fa`+`cbf904a9fc1b` aplicadas. Diferido: ver Deuda técnica. |
 | Producción (fabricación) | 🔶 slice core ✅ 2026-07-25 | Orden de producción ad-hoc (crear → registrar consumo → completar con resultado de control de calidad) y costeo automático. Construido antes de tiempo a pedido del usuario — primera cocina real sigue planeada 2027. `receta.articulo_id` nuevo liga receta↔subreceta. Diferido: ver Deuda técnica. |
@@ -172,6 +172,49 @@ Registro vivo de deuda técnica declarada al cerrar cada slice — para que no
 se olvide. Marcar ✅ al resolverse en el slice indicado.
 
 ### Transversal
+- **Un módulo se activa a mano en siete lugares** (2026-08-03). La estructura
+  interna es replicable —los 8 módulos tienen la misma forma— pero no hay
+  manifiesto por módulo ni autodescubrimiento: router y tag OpenAPI y
+  `register()` de listeners en `src/core/app.py`, import en
+  `models_registry.py`, migración, `PERMISOS`/`ROLES` en `src/seeders/seed.py`
+  y entrada en `frontend/lib/modulos.ts`. Consecuencia: **borrar la carpeta de
+  un módulo deja `core` sin compilar** — la promesa de "removible" es hoy del
+  dominio, no del ensamblado. Mitigado, no resuelto:
+  `docs/engineering/module-guide.md` documenta los siete pasos y
+  `tests/test_arquitectura.py` exige tres de ellos (modelos en el registro,
+  router montado, permisos de la API sembrados). Pendiente si algún día hay
+  módulos opcionales de verdad: `MODULOS_ACTIVOS` en settings + carga por
+  convención (`importlib`), que colapsa 1-4 en una línea; y `PERMISOS`
+  declarados en el módulo en vez del seeder. No hacerlo antes de tener un
+  caso real de módulo instalable/desinstalable — hoy los 8 están siempre
+  encendidos.
+- ✅ 2026-08-02 **`GET /personas` exigía `users.gestionar`, demasiado
+  amplio para un lookup**: nuevo endpoint minimizado
+  `GET /personas/buscar?q=` (permiso `personas.leer`, nuevo) que responde
+  `PersonaBusquedaOut` — id/nombres/apellidos/numero_documento, nunca
+  domicilio/teléfono/email/fecha de nacimiento — así que puede abrirse sin
+  el permiso de administración completo. `personas.leer` sembrado en los
+  roles `comprador` y `rrhh_admin`. `GET /personas` (ficha completa) sigue
+  exigiendo `users.gestionar` sin cambios — el lookup es un recurso
+  distinto, no un permiso más ancho sobre el mismo. RRHH/Trabajadores y
+  Compras/Proveedores (natural) ya migraron a este endpoint.
+- ✅ 2026-08-02 **CRUD de `unidad_medida`/`categoria_udm` (inventory) y
+  `divisa` (gerencia)** — antes solo se editaban por seeder/migración
+  (ADR-014 Addendum b). `POST/PATCH /inventory/unidades-medida[/{id}]`,
+  `POST /inventory/categorias-udm` (permiso `inventory.gestionar_catalogo`)
+  y `POST/PATCH /divisas[/{id}]` (permiso
+  `gerencia.gestionar_parametros_empresa`, lectura abierta a cualquier
+  autenticado — cualquier módulo que declare un monto necesita listar
+  divisas válidas). `decimales` por unidad/divisa (RN-GER-010) ahora se
+  corrige sin migración.
+- ✅ 2026-08-02 **Cuatro endpoints de lectura que faltaban y bloqueaban
+  pantallas de frontend**: `GET /api/v1/inventory/unidades-medida`
+  (catálogo global, sin tenant — Inventario/Artículos lo necesita para el
+  selector de `unidad_medida_id`), `GET /api/v1/purchases/ordenes-compra`
+  (listado, no existía ni por error — solo había `GET .../{id}`),
+  `GET /api/v1/almacenes` (nuevo en `users`, sin `require_permission` a
+  propósito — catálogo de referencia, no dato sensible — pero sí escopado
+  por tenant), `GET /api/v1/personas/buscar` (ver arriba).
 - ✅ 2026-08-02 **Deriva de esquema del slice de contratación** (migración
   `e4a2f9c17b3d`): `postulante.estado` seguía en VARCHAR(10) con nueve
   estados de hasta 15 caracteres — `preseleccionado` fallaba en Postgres y
@@ -197,8 +240,15 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   `created_at` usa `CURRENT_TIMESTAMP` (UTC): corriendo después de las
   19:00 hora Perú fallan cuatro casos por un día de diferencia. Falla
   preexistente de zona horaria, no de la lógica de conteo.
-- ⬜ `users`: aplicar **restricciones JSONB** por permiso (hoy autoriza solo
-  por código, no por condición monto/estado/horario).
+- ✅ 2026-08-02 `users`: aplicar **restricciones JSONB** por permiso
+  (ADR-022). `rules.ContextoPermiso`/`cumple_restricciones` (monto/estado/
+  horario) + `UsuarioRepo.restricciones` + `check_permission(...,
+  contexto=...)` (`api/deps.py`, retrocompatible — sin `contexto` se
+  comporta igual que siempre; `require_permission` no cambia, no tiene
+  acceso al body). Primer uso real: `sales.aplicar_descuento` acepta
+  `monto_maximo` por rol, validado antes de aplicar el descuento. 15 tests
+  nuevos (`tests/test_restricciones_permiso.py` + 3 casos HTTP en
+  `test_sales.py`).
 - ⬜ `users`: auth de **`agente_ia` por token** (hoy exige PIN como humano).
 - ⬜ **Theming multi-marca + accesibilidad** (frontend, spec en
   `docs/product/ui-ux.md`): resolver de tema por marca/sucursal para
@@ -241,19 +291,27 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   valida y redondea con los decimales de la unidad (`ROUND_HALF_UP`, texto
   no float). Un monto sin `divisa` o una cantidad sin `unidad_medida_id`
   responden 422, al proponer y al modificar-y-aprobar.
-- ⬜ **CRUD de `divisa` y de `unidad_medida`**: `decimales` es configurable
-  en el dato pero hoy solo se edita por seeder/migración — ninguna de las
-  dos tablas tiene endpoints. El de `unidad_medida` va con el slice de
-  catálogo de `inventory`; el de `divisa`, cuando exista una segunda moneda
-  (hoy PEN única, RN-PRC-004).
+- ✅ 2026-08-02 **CRUD de `divisa` y de `unidad_medida`** — resuelto el
+  mismo día; ver la entrada de la sección *Transversal* de esta lista.
+  `decimales` ya se corrige con un `PATCH`, sin migración.
   La frecuencia de conteo cíclico **salió de esta lista** (ADR-019,
   2026-08-01): es por categoría, no por empresa, y vive en
   `categoria.frecuencia_conteo`.
-- ⬜ **`decision_gerencial`** (materializa el acta de decisión gerencial,
-  RN-GER-002, `data-model.md` §8c): documentado desde el slice de Gerencia
-  (2026-07-22) pero **sin modelo ni migración en código todavía**. Su caso
-  propio es la aprobación de OC escalada, la campaña sobre presupuesto y la
-  sanción — ya no bloquea nada de `parametro_empresa`.
+- ✅ 2026-08-03 **`decision_gerencial`** (acta de decisión gerencial,
+  RN-GER-002, `data-model.md` §8c, migración `1805c0904c5c`): documentado
+  desde el slice de Gerencia (2026-07-22), ahora con modelo en `shared`,
+  repo, casos de uso y API — `POST/GET /api/v1/decisiones-gerenciales[/{id}]`,
+  permisos nuevos `gerencia.decidir` y `gerencia.leer_decisiones` (el área
+  ejecutora lee sin poder firmar, RN-GER-005; `leer_decisiones` sembrado en
+  `supervisor`). `decidido_por_id` sale del token, no del cuerpo.
+  `referencia_tipo`/`referencia_id` polimórficos sin FK: la decisión aplica
+  a una OC escalada, una campaña sobre presupuesto o una sanción, y ningún
+  módulo gana una FK hacia `shared`. `aprobado_con_condiciones` sin
+  condiciones es 409 — un acta que no dice qué cumplir no sirve. 12 tests
+  (`tests/test_decision_gerencial.py`). **Pendiente derivado:** ningún
+  módulo la escribe todavía — `campana.aprobada_por` y la OC escalada
+  siguen resolviendo por permiso, sin generar el acta (ver deuda de
+  `marketing` más abajo).
 - ✅ 2026-07-25 **Lock optimista en `persona`** (`VersionedMixin`,
   `src/core/model_base.py`): `PATCH /api/v1/personas/{id}` exige `version`
   vigente, 409 si está desactualizada. Aplicado solo a `persona` por
@@ -611,6 +669,27 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
     humano autorizado, con motivo y responsable; mezclarlos haría imposible
     auditar cuál descuento fue manual y cuál automático (ADR-018 →
     «Frontera explícita»).
+  - ✅ 2026-08-02 **Alta de cliente/proveedor jurídico consulta Factiliza
+    para el nombre/razón social** (`RENIEC`/`SUNAT` vía el mismo proveedor,
+    ADR-005 ya lo dejaba previsto). `FactilizaClient.consultar_dni`/
+    `consultar_ruc` (host propio, `FACTILIZA_CONSULTA_BASE_URL` —
+    `api.factiliza.com`, **distinto** de `FACTILIZA_BASE_URL` que es solo
+    emisión de comprobantes contra la QA `apife-qa.factiliza.com`; mismo
+    token). `nombres_desde_dni`/`razon_social_desde_ruc`
+    (`src/shared/integrations/factiliza/`) hacen fallback a lo tecleado si
+    Factiliza no responde o no encuentra el documento — el alta nunca se
+    bloquea por un proveedor externo caído. Cableado en
+    `sales/application/clientes.py` (natural por DNI nuevo, jurídico por RUC
+    nuevo) y `purchases/application/proveedores.py` (jurídico por RUC).
+    Documento ya registrado en `persona` no vuelve a consultar. Probado con
+    datos reales de QA: DNI 73632127 (Carlos Renato Rojas del Aguila) y RUC
+    20610077782 (Servicios Rentaurant S.A.C., estado BAJA DE OFICIO — el
+    consumo no valida `estado`/`condicion`, solo usa el nombre; bloquear por
+    RUC no-HABIDO queda para cuando el negocio lo pida). 20 tests nuevos
+    (`tests/test_factiliza_consulta.py` + casos en `test_pdv_slice.py`/
+    `test_purchases.py`); `tests/conftest.py` nuevo, autouse que fuerza
+    `factiliza_token=""` por test para que el suite nunca dependa de la red
+    aunque el `.env` local tenga un token real.
   - ✅ 2026-07-28 **Cliente identificado por teléfono** (migración
     `e1c4a9d6b038`): `persona.numero_documento`/`tipo_documento` pasan a
     nullable, conservando el UNIQUE. Registrar a una persona natural exige
@@ -715,8 +794,14 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   elegido (ej. bebidas) + producto en promoción vigente. UX especificada
   en `docs/product/ui-ux.md`; falta definir cómo se configura la relación
   producto→complemento (fija vs. regla de venta cruzada).
-- ⬜ **KDS tiempo real**: hoy el frontend refresca por polling; push por
-  WebSocket/Redis pub-sub (Redis reservado para pantallas/colas/sesiones).
+- ⬜ **KDS tiempo real**: la pantalla (2026-08-03) refresca por polling
+  cada 3 s; push por WebSocket/Redis pub-sub (Redis reservado para
+  pantallas/colas/sesiones) sigue sin implementar.
+- ⬜ **KDS sin reloj por pedido**: Odoo colorea la tarjeta al superar un
+  umbral de espera; acá `GET /kds/pantallas/{id}/cola` no devuelve
+  `fecha_orden`, así que no hay de dónde calcular el tiempo transcurrido.
+  Va junto con "KDS tiempos" (abajo): agregar el timestamp al payload es
+  el primer paso.
 - ⬜ **KDS aviso de anulación**: si anulan un pedido ya en preparación, la
   tarjeta solo desaparece al refrescar — falta aviso explícito "ANULADO"
   (llega natural con el push de tiempo real).
@@ -944,6 +1029,18 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
 
 ### Frontend (F2 — arquitectura y UX, documento 2026-07-27, actualizado tras ADR-013)
 
+- ✅ 2026-08-03 **`npm audit` en cero.** Eran 4 vulnerabilidades altas:
+  `brace-expansion` (la resolvió `npm audit fix`) y tres que colgaban de
+  `next`. Diagnóstico: `next` **no** estaba marcado por CVEs propias — su
+  `via` en el JSON del audit es exactamente `["postcss", "sharp"]`, o sea
+  todo venía de que Next pinea `postcss@8.4.31` y arrastra `sharp<0.35`.
+  Subir de major no arregla nada: **Next 16 pinea el mismo postcss**, y
+  `npm audit fix --force` proponía `next@9.3.3` — un downgrade de 6 majors.
+  Solución: `overrides` de `postcss`/`sharp` a las versiones parcheadas en
+  `frontend/package.json`, y el rango de `next` subido a `^15.5.22` (que ya
+  era lo instalado; `^15.3.0` daba la impresión falsa de estar atrasado).
+  `tsc`, `next lint` y `next build` limpios después del cambio.
+
 Detalle completo por sección en `docs/product/frontend-architecture.md`.
 De las 6 prioridades que este documento marcaba como bloqueantes del
 alfa, **ADR-013** (misma fecha, sesión distinta — arquitectura frontend:
@@ -977,15 +1074,82 @@ ya existentes (`globals.css`), sin hex nuevo. El dashboard existente se
 relocalizó como primera app del shell y de paso dejó de leer `empresa_id`
 del JWT sin verificar — ahora sale de `/users/me`.
 
-**Primera pantalla real de un módulo**: Compras → Proveedores (listado
-TanStack + alta con `<dialog>` nativo, sin shadcn/ui todavía — ningún
-formulario construido necesitó overlay complejo). v1 solo proveedor
-jurídico; el natural espera un selector de `persona_id` que el frontend no
-tiene. Verificado end-to-end en Docker (migrar + seed contra el Postgres
-del compose, login → home → crear proveedor → tabla se actualiza), sin
-errores de consola. Resto de módulos (inventario, ventas, producción,
-contabilidad, rrhh, marketing, gerencia, usuarios) solo tienen tile en el
-home — sus rutas dan 404 limpio, no hay pantalla construida todavía.
+**Pantallas reales** (listado TanStack + alta con `<dialog>` nativo, sin
+shadcn/ui todavía — ningún formulario construido necesitó overlay
+complejo):
+
+- **Compras → Proveedores** (2026-08-02, natural agregado el mismo día):
+  toggle jurídico/natural en el diálogo; natural usa `PersonaPicker`
+  (componente reusable, `components/persona-picker/`) contra
+  `/personas/buscar` con debounce — no un `<select>` con todo el
+  catálogo, que no escala pasadas unas pocas decenas de personas.
+  `ProveedorOut.persona_id` no viajaba y se agregó: sin eso, un proveedor
+  natural no tenía forma de mostrarse por nombre en la tabla.
+- **Compras → Órdenes de compra** (2026-08-02): ítems dinámicos (agregar/
+  quitar fila, total en vivo), `idempotency_key` client-generada.
+  Requirió 2 endpoints GET que no existían y bloqueaban la pantalla:
+  `/api/v1/purchases/ordenes-compra` (listado) y `/api/v1/almacenes`
+  (nuevo, `users`, catálogo de referencia sin `require_permission` a
+  propósito pero sí escopado por tenant).
+- **Inventario → Artículos** (2026-08-02): requirió
+  `GET /api/v1/inventory/unidades-medida`, que tampoco existía — sin
+  eso el selector de `unidad_medida_id` (obligatorio para crear) queda
+  vacío. CRUD de escritura de `unidad_medida`/`categoria_udm` agregado el
+  mismo día (ver Deuda técnica → Transversal) — sigue sin pantalla propia,
+  se gestiona por API.
+- **RRHH → Trabajadores** (2026-08-02): alta usa `PersonaPicker` (mismo
+  componente que Proveedores). El gap de RBAC que esta pantalla encontró
+  (`GET /personas` exigía `users.gestionar`) se cerró el mismo día con
+  `GET /personas/buscar` + permiso `personas.leer` — ver Deuda técnica.
+- **Ventas**: el tile del home apuntaba a `/ventas` (404); corregido a
+  `/pdv` — el PDV es pantalla completa fuera del shell a propósito
+  (ADR-013), no una ruta bajo `(app)`.
+- **Cocina (KDS)** (2026-08-03, `frontend/app/kds/`): segunda pantalla
+  completa fuera del shell, táctil y oscura como el PDV. Tarjeta por
+  pedido; **un toque tacha el ítem preparado** (patrón de la *preparation
+  display* de Odoo, cuya documentación se revisó antes de diseñarla) y
+  "Todo listo" tacha el pedido entero. El toque encadena
+  `en_preparacion → listo` porque la API solo avanza de a un estado.
+  Como el avance vive en `venta_item.estado_preparacion` y ninguna
+  pantalla guarda estado propio, lo tachado en una estación aparece en
+  toda otra pantalla de la sucursal que muestre ese pedido — hoy con
+  polling de 3 s (pausado si la pestaña está oculta). Sin "recall": el
+  retroceso lo prohíbe RN-CUP-002, tocar un ítem tachado avisa en vez de
+  deshacer. En pantallas de `despacho` y solo con `sales.entregar_pedido`
+  aparece "Entregar" (RN-CUP-006). Estación elegida en la URL
+  (`/kds?pantalla=<id>`) para que cada tablet la deje en favoritos; sin ese
+  parámetro `/kds` muestra el **tablero de estaciones**, que es a la vez el
+  selector y la configuración (alta/edición/baja lógica de `kds_pantalla`
+  con `kds.configurar`, filtro por categorías contra
+  `GET /inventory/categorias`). Antes las pantallas solo se creaban por
+  API: una sucursal nueva no tenía forma de arrancar su cocina desde la UI.
+  De paso, el cliente HTTP de navegador se extrajo a `lib/cliente-api.ts`
+  (lo compartían PDV y KDS). **Un solo cambio de backend**, encontrado
+  justamente al verificar end-to-end: `cola_pantalla` devolvía a una
+  pantalla de preparación solo los ítems `pendiente`/`en_preparacion`, así
+  que tachar un ítem lo hacía desaparecer de la tarjeta — lo contrario de
+  lo que necesita la cocina. Ahora la estación ve todos sus ítems con su
+  estado y el pedido sale de su cola cuando terminó todo lo suyo (test
+  `test_item_tachado_sigue_visible_hasta_terminar_la_estacion`).
+  **Verificación end-to-end** (2026-08-03, stack Docker completo, datos
+  reales): venta takeout de 3 ítems creada por API; ambas estaciones
+  ("Horno" preparación, "Pase / Despacho") creadas **desde la UI**; tachar
+  "Inca Kola" en una tablet y verla tachada (`line-through`) en una
+  segunda tablet de la misma estación sin tocarla, por polling; "Todo
+  listo" → los 3 ítems en `listo` en la BD; la pantalla de despacho
+  muestra el pedido LISTO con "Entregar"; entrega registrada → ítems
+  `entregado` y ambas colas vacías. `tsc`, `next lint`, `next build` y los
+  12 tests de `tests/test_kds.py` en verde.
+
+Verificado end-to-end en Docker con datos reales, por API y por navegador
+(curl + interacción real): crear artículo → aparece en tabla; crear OC de
+2 ítems → total correcto; crear trabajador → nombre resuelto; crear
+proveedor natural con `PersonaPicker` → nombre resuelto en la tabla. Sin
+errores de consola.
+
+Módulos sin pantalla todavía (solo tile en el home, 404 limpio de
+Next.js): ventas de back-office (más allá del PDV), producción,
+contabilidad, marketing, gerencia, usuarios.
 
 Todo lo demás (theming multi-marca, accesibilidad — catálogo ya definido,
 tiempo real de KDS, i18n, hardware, testing — Playwright ya decidido por

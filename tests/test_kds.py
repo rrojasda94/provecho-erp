@@ -224,6 +224,38 @@ def test_avance_real_compartido_entre_pantallas(env):
     assert _cola(client, h, despacho["id"]) == []
 
 
+def test_item_tachado_sigue_visible_hasta_terminar_la_estacion(env):
+    """Tachar un ítem no lo saca de la pantalla: sigue en la tarjeta con
+    estado `listo` (la línea tachada de la cocina) para quien lo tachó y
+    para cualquier otra pantalla que muestre ese pedido. El pedido sale de
+    la cola recién cuando la estación terminó todo lo suyo."""
+    client, ids = env
+    h = _token(client)
+    _setup_pantallas_y_venta(client, ids, h)
+    # Pantalla sin filtro: ve la pizza y la bebida del mismo pedido.
+    pase = client.post("/api/v1/kds/pantallas", headers=h, json={
+        "sucursal_id": ids["sucursal_id"], "nombre": "Pase", "tipo": "preparacion",
+    }).json()
+
+    items = _cola(client, h, pase["id"])[0]["items"]
+    assert len(items) == 2
+
+    for estado in ("en_preparacion", "listo"):
+        client.post(f"/api/v1/kds/items/{items[0]['venta_item_id']}/avanzar",
+                    headers=h, json={"estado": estado})
+
+    cola = _cola(client, h, pase["id"])
+    assert len(cola) == 1, "el pedido sigue en cola: falta un ítem"
+    estados = {i["venta_item_id"]: i["estado"] for i in cola[0]["items"]}
+    assert estados[items[0]["venta_item_id"]] == "listo"  # tachado, visible
+    assert estados[items[1]["venta_item_id"]] == "pendiente"
+
+    for estado in ("en_preparacion", "listo"):
+        client.post(f"/api/v1/kds/items/{items[1]['venta_item_id']}/avanzar",
+                    headers=h, json={"estado": estado})
+    assert _cola(client, h, pase["id"]) == []
+
+
 def test_no_retroceso(env):
     client, ids = env
     h = _token(client)

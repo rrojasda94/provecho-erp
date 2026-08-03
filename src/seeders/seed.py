@@ -62,6 +62,11 @@ PERMISOS = [
         "personas.anonimizar",
         "Anonimizar datos de una persona — derecho de cancelación (Ley 29733)",
     ),
+    (
+        "personas.leer",
+        "Buscar personas para asociarlas a otro registro (trabajador, proveedor "
+        "natural) — solo nombre y documento, no la ficha completa",
+    ),
     ("sales.crear", "Crear venta"),
     ("sales.cobrar", "Cobrar venta"),
     ("sales.leer", "Consultar ventas"),
@@ -146,6 +151,15 @@ PERMISOS = [
         "gerencia.gestionar_parametros_empresa",
         "Aprobar, rechazar o modificar parámetros operativos por empresa (ADR-014)",
     ),
+    (
+        "gerencia.decidir",
+        "Firmar el acta de una decisión gerencial (RN-GER-002)",
+    ),
+    (
+        "gerencia.leer_decisiones",
+        "Consultar actas de decisión gerencial — el área ejecutora las necesita "
+        "sin poder decidir (RN-GER-005)",
+    ),
     ("sales.leer_clientes_externos", "Consultar clientes para análisis fuera de sales"),
     ("rrhh.leer", "Consultar trabajadores, contratos, nómina y documentos de RRHH"),
     ("rrhh.trabajador_gestionar", "Crear, actualizar y cesar trabajadores"),
@@ -208,6 +222,9 @@ ROLES = {
         "rrhh.leer",
         "rrhh.permiso_aprobar",
         "rrhh.asistencia_marcar",
+        # Lee el acta pero no la firma: decidir es de Gerencia (RN-GER-002),
+        # ejecutar es del área (RN-GER-005).
+        "gerencia.leer_decisiones",
     ],
     "cajero": [
         "sales.crear",
@@ -243,6 +260,8 @@ ROLES = {
         "purchases.recepcionar",
         "purchases.anular",
         "purchases.dar_conformidad",
+        # Alta de proveedor natural liga a una persona existente.
+        "personas.leer",
     ],
     "jefe_cocina": [
         "production.crear",
@@ -260,6 +279,8 @@ ROLES = {
     ],
     "rrhh_admin": [
         "rrhh.leer",
+        # Alta de trabajador liga a una persona existente.
+        "personas.leer",
         "rrhh.trabajador_gestionar",
         "rrhh.contrato_gestionar",
         "rrhh.postulante_gestionar",

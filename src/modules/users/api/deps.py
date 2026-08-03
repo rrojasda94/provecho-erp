@@ -12,9 +12,14 @@ from sqlalchemy.orm import Session
 from src.core.database import SessionLocal
 from src.core.tenant import Tenant
 from src.modules.users.domain import rules
+from src.modules.users.domain.rules import ContextoPermiso  # noqa: F401 — reexport
 from src.modules.users.infrastructure.models import Usuario
 from src.modules.users.infrastructure.repositories import UsuarioRepo
 from src.modules.users.infrastructure.security import decode_access_token
+
+# `ContextoPermiso` queda re-exportado acá: `api.deps` es la única superficie
+# de `users` que otro módulo puede importar (tests/test_arquitectura.py), así
+# que el contrato público de `check_permission` vive completo en este archivo.
 
 _bearer = HTTPBearer(auto_error=True)
 
@@ -81,14 +86,33 @@ def tiene_permiso(session: Session, usuario: Usuario, codigo: str) -> bool:
     return rules.permite(UsuarioRepo(session).permiso_codigos(usuario.id), codigo)
 
 
-def check_permission(session: Session, usuario: Usuario, *codigos: str) -> None:
+def check_permission(
+    session: Session,
+    usuario: Usuario,
+    *codigos: str,
+    contexto: rules.ContextoPermiso | None = None,
+) -> None:
     """Igual que `require_permission` pero dentro del handler: para cuando el
     permiso exigido depende del body y no puede resolverse en un `Depends`.
     Basta con tener uno de `codigos`. Una sola consulta, a diferencia de
-    llamar `tiene_permiso` en bucle."""
-    concedidos = UsuarioRepo(session).permiso_codigos(usuario.id)
-    if not any(rules.permite(concedidos, codigo) for codigo in codigos):
+    llamar `tiene_permiso` en bucle.
+
+    `contexto` evalúa `permiso.restricciones` (monto/estado/horario, ver
+    `rules.cumple_restricciones`) contra los códigos que sí tiene: basta que
+    UNO de ellos cumpla — mismo criterio OR que el permiso en sí. Sin
+    `contexto`, el comportamiento es el de siempre (no evalúa restricciones).
+    """
+    repo = UsuarioRepo(session)
+    concedidos = repo.permiso_codigos(usuario.id)
+    otorgados = [codigo for codigo in codigos if rules.permite(concedidos, codigo)]
+    if not otorgados:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Permiso denegado")
+    if contexto is None:
+        return
+    for codigo in otorgados:
+        if rules.cumple_restricciones(repo.restricciones(usuario.id, codigo), contexto):
+            return
+    raise HTTPException(status.HTTP_403_FORBIDDEN, "Permiso denegado por restricción")
 
 
 def client_ip(request: Request) -> str | None:

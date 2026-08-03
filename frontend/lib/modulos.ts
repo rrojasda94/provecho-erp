@@ -28,7 +28,7 @@ export const MODULOS: Modulo[] = [
     clave: "compras",
     nombre: "Compras",
     descripcion: "Proveedores y órdenes de compra",
-    href: "/compras/proveedores",
+    href: "/compras/ordenes-compra",
     prefijoPermiso: "purchases.",
     icono: "🧾",
   },
@@ -36,7 +36,7 @@ export const MODULOS: Modulo[] = [
     clave: "inventario",
     nombre: "Inventario",
     descripcion: "Artículos, stock y movimientos",
-    href: "/inventario",
+    href: "/inventario/articulos",
     prefijoPermiso: "inventory.",
     icono: "📦",
   },
@@ -44,9 +44,20 @@ export const MODULOS: Modulo[] = [
     clave: "ventas",
     nombre: "Ventas",
     descripcion: "Punto de venta y comprobantes",
-    href: "/ventas",
+    // El PDV es pantalla completa a propósito (ADR-013: táctil, sin sidebar)
+    // — no vive bajo el shell (app), va directo fuera de él.
+    href: "/pdv",
     prefijoPermiso: "sales.",
     icono: "🛒",
+  },
+  {
+    clave: "kds",
+    nombre: "Cocina (KDS)",
+    descripcion: "Cola de preparación y despacho por estación",
+    // Igual que el PDV: pantalla completa táctil fuera del shell (ADR-013).
+    href: "/kds",
+    prefijoPermiso: "kds.",
+    icono: "🍳",
   },
   {
     clave: "produccion",
@@ -68,7 +79,7 @@ export const MODULOS: Modulo[] = [
     clave: "rrhh",
     nombre: "RRHH",
     descripcion: "Trabajadores, contratos y contratación",
-    href: "/rrhh",
+    href: "/rrhh/trabajadores",
     prefijoPermiso: "rrhh.",
     icono: "👥",
   },

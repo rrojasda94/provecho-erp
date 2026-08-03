@@ -9,10 +9,19 @@ import { COOKIE_TOKEN } from "@/lib/auth";
 
 export type EstadoProveedor = { error: string; ok: boolean };
 
-type DatosProveedor = { razonSocial: string; ruc: string; condicionPago: string; plazoDias: string };
+type DatosProveedor = {
+  tipo: string;
+  personaId: string;
+  razonSocial: string;
+  ruc: string;
+  condicionPago: string;
+  plazoDias: string;
+};
 
 function leerFormulario(formData: FormData): DatosProveedor {
   return {
+    tipo: String(formData.get("tipo") ?? "juridico"),
+    personaId: String(formData.get("persona_id") ?? ""),
     razonSocial: String(formData.get("razon_social") ?? "").trim(),
     ruc: String(formData.get("ruc") ?? "").trim(),
     condicionPago: String(formData.get("condicion_pago") ?? "contado"),
@@ -21,22 +30,18 @@ function leerFormulario(formData: FormData): DatosProveedor {
 }
 
 function validar(datos: DatosProveedor): string | null {
-  if (!datos.razonSocial || !datos.ruc) return "Razón social y RUC son obligatorios.";
-  if (datos.ruc.length !== 11) return "El RUC debe tener 11 dígitos.";
+  if (datos.tipo === "natural") {
+    if (!datos.personaId) return "Elegir la persona.";
+  } else {
+    if (!datos.razonSocial || !datos.ruc) return "Razón social y RUC son obligatorios.";
+    if (datos.ruc.length !== 11) return "El RUC debe tener 11 dígitos.";
+  }
   if (datos.condicionPago === "credito" && !datos.plazoDias) {
     return "Crédito exige un plazo de días.";
   }
   return null;
 }
 
-/**
- * Alta de proveedor **jurídico únicamente** en v1: el natural exige elegir
- * una `persona_id` existente (party model, `docs/architecture/data-model.md`
- * §1), y esta pantalla todavía no tiene selector de persona. No es un
- * recorte silencioso — el formulario solo pide lo que un proveedor jurídico
- * necesita (RUC + razón social); agregar el flujo natural es la extensión
- * natural del día que un buscador de persona exista en el frontend.
- */
 export async function crearProveedorAction(
   _previo: EstadoProveedor,
   formData: FormData,
@@ -54,9 +59,10 @@ export async function crearProveedorAction(
       token,
       metodo: "POST",
       cuerpo: {
-        tipo: "juridico",
-        razon_social: datos.razonSocial,
-        ruc: datos.ruc,
+        tipo: datos.tipo,
+        persona_id: datos.tipo === "natural" ? datos.personaId : undefined,
+        razon_social: datos.tipo === "juridico" ? datos.razonSocial : undefined,
+        ruc: datos.tipo === "juridico" ? datos.ruc : undefined,
         condicion_pago: datos.condicionPago,
         plazo_dias_credito:
           datos.condicionPago === "credito" ? Number(datos.plazoDias) : undefined,

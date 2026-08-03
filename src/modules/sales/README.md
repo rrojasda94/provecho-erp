@@ -53,7 +53,13 @@ cuatro huecos que el punto de venta necesitaba y el modelo no daba.
 - Descuento manual de orden en `venta` (`descuento_modo`,
   `descuento_valor`, `descuento_motivo`, `descuento_autorizado_por`,
   RN-COM-017), con permiso propio `sales.aplicar_descuento` (supervisor,
-  no cajero). Se prorratea entre grupos de cobro.
+  no cajero). Se prorratea entre grupos de cobro. **Tope por rol
+  (ADR-022, 2026-08-02)**: si `permiso.restricciones` trae `monto_maximo`
+  para quien autorizó, el router calcula el monto real del descuento
+  (`ventas.calcular_monto_descuento`) y lo valida con
+  `check_permission(..., contexto=ContextoPermiso(monto=...))` ANTES de
+  aplicarlo — 403 si lo supera, sin tocar la venta. Sin restricciones en el
+  permiso, sigue sin tope (comportamiento de siempre).
 - **Cliente identificado por teléfono** (migración `e1c4a9d6b038`):
   `persona.numero_documento`/`tipo_documento` pasan a nullable. Registrar a
   una persona natural exige **teléfono**, no DNI (RN-PTS-004) — el
@@ -66,6 +72,13 @@ cuatro huecos que el punto de venta necesitaba y el modelo no daba.
   teléfono, documento o nombre en `GET /sales/clientes/buscar?q=`
   (RN-PTS-006). **Trabajador y usuario siguen exigiendo documento**: esa
   validación vive en `users.application.admin`, no en el esquema.
+- **Nombre/razón social vía Factiliza en alta nueva** (2026-08-02):
+  documento (DNI/RUC) que la persona todavía no tiene registrado consulta
+  `FactilizaClient.consultar_dni`/`consultar_ruc` (RENIEC/SUNAT,
+  `src/shared/integrations/factiliza/`) para el nombre real, en vez de
+  confiar en lo tecleado en caja. Documento ya visto no vuelve a consultar.
+  Sin respuesta de Factiliza (o no encontrado) cae a lo tecleado — el alta
+  nunca se bloquea.
 
 **Cierre para alfa (2026-07-28, migraciones `f2a8c15e94d7` y `b6d41e07af92`):**
 
@@ -258,8 +271,12 @@ tiempo real (Redis/WebSocket) es deuda declarada.
   `categoria_ids` (filtro por categorías de producto comercial; vacío =
   todas). `producto_comercial.categoria_id` (nuevo, reusa `categoria`)
   rutea cada ítem a su estación (pizzas → horno, bebidas → barra).
-- **Preparación**: ve ítems pendientes/en curso de sus categorías; bump
-  por ítem (`POST /kds/items/{id}/avanzar`).
+- **Preparación**: ve **todos** los ítems de sus categorías, incluidos los
+  ya `listo` — el ítem tachado tiene que seguir a la vista de quien lo
+  tachó y de las demás pantallas (corregido 2026-08-03: antes desaparecía
+  al marcarlo, que es justo lo contrario de lo que hace la cocina). El
+  pedido sale de esta cola cuando la estación terminó **todo lo suyo**.
+  Bump por ítem (`POST /kds/items/{id}/avanzar`).
 - **Despacho**: ve pedidos con ítems listos + `estado_pedido` agregado
   (el ítem más atrasado manda); al estar todo listo se publica
   `sales.pedido_listo`.
@@ -288,6 +305,16 @@ tiempo real (Redis/WebSocket) es deuda declarada.
 
 Roles seed: `cocinero` (kds.operar, **no** entrega), `despachador`
 (kds.operar + entrega), cajero opera y entrega; supervisor configura.
+
+**Pantalla** (2026-08-03): `frontend/app/kds/` — pantalla completa táctil
+fuera del shell, una tarjeta por pedido, un toque tacha el ítem preparado
+(encadena `en_preparacion` → `listo`, porque la API solo avanza de a un
+estado). Refresca la cola cada 3 s: como el estado vive en `venta_item`,
+ese intervalo es lo que tarda una pantalla en ver lo que tachó otra. La
+estación va en la URL (`/kds?pantalla=<id>`); `/kds` sin parámetro es el
+tablero de estaciones, que además crea/edita/desactiva pantallas con
+`kds.configurar`. Diseño e interacción en
+[ui-ux.md](../../../docs/product/ui-ux.md#kds--tarjeta-de-pedido-tachar-ítem-por-ítem-implementado-2026-08-03).
 
 ## Sincronización con el hub de sucursal (implementado 2026-07-27)
 

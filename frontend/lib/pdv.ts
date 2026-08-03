@@ -1,56 +1,15 @@
 /**
  * Cliente del PDV visto desde el navegador y tipos del contrato.
  *
- * Todo pasa por `/api/proxy` (ver `app/api/proxy/[...ruta]/route.ts`): el
- * token queda del lado del servidor. Los tipos espejan `openapi.json`; si
- * alguno se desincroniza, el error aparece acá y no como un `undefined`
- * silencioso en medio de un cobro.
+ * El transporte (proxy, errores, idempotencia) vive en `lib/cliente-api.ts`
+ * y se re-exporta acá para no romper los imports existentes. Los tipos
+ * espejan `openapi.json`; si alguno se desincroniza, el error aparece acá y
+ * no como un `undefined` silencioso en medio de un cobro.
  */
 
-const BASE = "/api/proxy/api/v1";
+import { pedir } from "./cliente-api";
 
-export class ErrorApi extends Error {
-  status: number;
-
-  constructor(status: number, mensaje: string) {
-    super(mensaje);
-    this.status = status;
-  }
-}
-
-async function pedir<T>(
-  ruta: string,
-  opciones: { metodo?: string; cuerpo?: unknown } = {},
-): Promise<T> {
-  const respuesta = await fetch(`${BASE}${ruta}`, {
-    method: opciones.metodo ?? "GET",
-    headers: { "Content-Type": "application/json" },
-    body: opciones.cuerpo ? JSON.stringify(opciones.cuerpo) : undefined,
-  });
-  if (!respuesta.ok) {
-    throw new ErrorApi(respuesta.status, await mensajeDeError(respuesta));
-  }
-  return (await respuesta.json()) as T;
-}
-
-async function mensajeDeError(respuesta: Response): Promise<string> {
-  try {
-    const cuerpo = await respuesta.json();
-    if (typeof cuerpo.detail === "string") return cuerpo.detail;
-    if (Array.isArray(cuerpo.detail)) {
-      return cuerpo.detail.map((d: { msg?: string }) => d.msg).join("; ");
-    }
-  } catch {
-    // Cuerpo no-JSON: cae al mensaje genérico.
-  }
-  return `Error ${respuesta.status}`;
-}
-
-/** Cada operación crítica necesita su clave (RN-COM-002): un reintento por
- * red inestable no puede convertirse en un segundo cobro. */
-export function claveIdempotencia(prefijo: string): string {
-  return `${prefijo}-${crypto.randomUUID()}`;
-}
+export { ErrorApi, claveIdempotencia } from "./cliente-api";
 
 // --- Tipos del contrato -----------------------------------------------------
 export type ExtraDeCarta = {

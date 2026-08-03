@@ -6,12 +6,14 @@ from fastapi import APIRouter, Depends, Request, Response, status
 from sqlalchemy.orm import Session
 
 from src.core.rate_limit import rate_limit_login
+from src.core.tenant import Tenant
 from src.modules.users.api import schemas
 from src.modules.users.api.deps import (
     check_permission,
     client_ip,
     get_current_user,
     get_db,
+    get_tenant,
     require_permission,
 )
 from src.modules.users.api.error_handlers import http_exception
@@ -35,6 +37,12 @@ router = APIRouter()
 
 GESTIONAR = "users.gestionar"  # permiso para el CRUD administrativo
 GESTIONAR_PARAMETROS = "gerencia.gestionar_parametros_empresa"  # aprobar/rechazar
+# Decidir es la facultad gerencial en sí (RN-GER-002), separada de configurar
+# parámetros: un gerente firma actas aunque no toque umbrales.
+DECIDIR = "gerencia.decidir"
+# Leer el acta es más ancho que firmarla: el área ejecutora (RN-GER-005)
+# necesita ver qué se decidió y con qué condiciones, sin poder decidir.
+LEER_DECISIONES = "gerencia.leer_decisiones"
 ANONIMIZAR = "personas.anonimizar"  # derecho de cancelación (Ley 29733, ADR-011)
 
 
@@ -156,6 +164,39 @@ def listar_personas(
     session: Session = Depends(get_db),
 ):
     return admin.listar_personas(session, q)
+
+
+@router.get(
+    "/personas/buscar", response_model=list[schemas.PersonaBusquedaOut], tags=["personas"]
+)
+def buscar_personas(
+    q: str | None = None,
+    usuario: Usuario = Depends(get_current_user),
+    session: Session = Depends(get_db),
+):
+    """Selector de "elegir persona existente" para otro módulo (RRHH al
+    contratar, Compras al dar de alta un proveedor natural). Responde con
+    `PersonaBusquedaOut` — nunca la ficha completa — así que puede abrirse a
+    `personas.leer` sin exponer domicilio/teléfono/email. Ruta declarada
+    antes de `/personas/{persona_id}` a propósito: si quedara después,
+    "buscar" se intentaría parsear como UUID y devolvería 422."""
+    check_permission(session, usuario, GESTIONAR, "personas.leer")
+    return admin.listar_personas(session, q)
+
+
+@router.get("/almacenes", response_model=list[schemas.AlmacenOut], tags=["users"])
+def listar_almacenes(
+    empresa_id: uuid.UUID | None = None,
+    _: Usuario = Depends(get_current_user),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Lista de referencia (nombre/tipo de almacén, no dato sensible) — abierta
+    a cualquier usuario autenticado, la necesita cualquiera que tenga que
+    elegir un destino (ej. compras crea una OC). Sin `require_permission`
+    a propósito: no es un recurso a proteger, es un catálogo de apoyo. Sí
+    escopada por tenant — un almacén de otra empresa no es "no sensible"."""
+    return admin.listar_almacenes(session, tenant.filtro_empresa(empresa_id))
 
 
 @router.get("/personas/{persona_id}", response_model=schemas.PersonaOut, tags=["personas"])
@@ -525,3 +566,111 @@ def rechazar_parametro(
     )
     session.commit()
     return parametro
+
+
+# --- Divisas (RN-GER-010) ----------------------------------------------------
+# CRUD antes diferido (ADR-014 Addendum b): hoy solo se editaba por seeder.
+@router.post(
+    "/divisas",
+    response_model=schemas.DivisaOut,
+    status_code=status.HTTP_201_CREATED,
+    tags=["gerencia"],
+)
+def crear_divisa(
+    body: schemas.DivisaCreate,
+    _: Usuario = Depends(require_permission(GESTIONAR_PARAMETROS)),
+    session: Session = Depends(get_db),
+):
+    divisa = gerencia.crear_divisa(session, **body.model_dump())
+    session.commit()
+    return divisa
+
+
+@router.get("/divisas", response_model=list[schemas.DivisaOut], tags=["gerencia"])
+def listar_divisas(
+    _: Usuario = Depends(get_current_user),
+    session: Session = Depends(get_db),
+):
+    # Lectura abierta a cualquier autenticado (como /almacenes): cualquier
+    # módulo que declare un monto necesita poder listar divisas válidas.
+    return gerencia.listar_divisas(session)
+
+
+@router.patch("/divisas/{divisa_id}", response_model=schemas.DivisaOut, tags=["gerencia"])
+def editar_divisa(
+    divisa_id: uuid.UUID,
+    body: schemas.DivisaUpdate,
+    _: Usuario = Depends(require_permission(GESTIONAR_PARAMETROS)),
+    session: Session = Depends(get_db),
+):
+    divisa = gerencia.editar_divisa(session, divisa_id, **body.model_dump())
+    session.commit()
+    return divisa
+
+
+# --- Acta de decisión gerencial (RN-GER-002) --------------------------------
+@router.post(
+    "/decisiones-gerenciales",
+    response_model=schemas.DecisionGerencialOut,
+    status_code=status.HTTP_201_CREATED,
+    tags=["gerencia"],
+)
+def registrar_decision_gerencial(
+    body: schemas.DecisionGerencialCreate,
+    usuario: Usuario = Depends(require_permission(DECIDIR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Materializa el acta de una decisión gerencial: una decisión verbal no
+    tiene validez operativa (RN-GER-002). `decidido_por_id` sale del token,
+    nunca del cuerpo — atribuirle la decisión a otro gerente invalidaría el
+    acta entera."""
+    campos = body.model_dump()
+    campos["empresa_id"] = tenant.empresa(campos.pop("empresa_id"))
+    decision = gerencia.registrar_decision(
+        session, decidido_por_id=usuario.id, **campos
+    )
+    session.commit()
+    return decision
+
+
+@router.get(
+    "/decisiones-gerenciales",
+    response_model=list[schemas.DecisionGerencialOut],
+    tags=["gerencia"],
+)
+def listar_decisiones_gerenciales(
+    empresa_id: uuid.UUID | None = None,
+    referencia_tipo: str | None = None,
+    referencia_id: uuid.UUID | None = None,
+    tipo: str | None = None,
+    _: Usuario = Depends(require_permission(LEER_DECISIONES)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """El acceso típico es `?referencia_tipo=orden_compra&referencia_id=...`:
+    "qué decidió Gerencia sobre esto", desde el módulo que lo tiene en
+    pantalla."""
+    return gerencia.listar_decisiones(
+        session,
+        tenant.filtro_empresa(empresa_id),
+        referencia_tipo,
+        referencia_id,
+        tipo,
+    )
+
+
+@router.get(
+    "/decisiones-gerenciales/{decision_id}",
+    response_model=schemas.DecisionGerencialOut,
+    tags=["gerencia"],
+)
+def ver_decision_gerencial(
+    decision_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(LEER_DECISIONES)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    decision = gerencia.obtener_decision(session, decision_id)
+    tenant.exigir_empresa(decision.empresa_id)
+    return decision

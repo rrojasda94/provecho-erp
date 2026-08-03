@@ -164,7 +164,14 @@ erDiagram
   (nullable, 2026-07-26): derecho de cancelación (Ley 29733, RN-PER-007,
   ADR-011) — `POST /api/v1/personas/{id}/anonimizar` sobrescribe los campos
   identificables sin borrar la fila; distinto del soft-delete genérico
-  (`deleted_at`), que oculta sin destruir el dato.
+  (`deleted_at`), que oculta sin destruir el dato. **Lookup minimizado**
+  (`GET /api/v1/personas/buscar?q=`, permiso `personas.leer`,
+  implementado 2026-08-02): responde solo id/nombres/apellidos/
+  numero_documento, nunca domicilio/teléfono/email/fecha de nacimiento —
+  el CRUD completo sigue exigiendo `users.gestionar`. Lo consumen los
+  selectores de "elegir persona existente" de otro módulo (RRHH al
+  contratar un `trabajador`, Compras al dar de alta un proveedor
+  `natural`) sin exigirles el permiso de administración completo.
 - **usuario**: username, pin_hash (Argon2id), persona_id (nullable — NULL
   si `agente_ia`), nombre_display (fallback para agente_ia), email, tipo
   (`humano` | `agente_ia`), activo.
@@ -173,7 +180,11 @@ erDiagram
   `inventory.requerir` | `inventory.ajustar` | `inventory.autorizar_ajuste`
   | `inventory.transferir`), restricciones (JSONB — ej. alcance
   `sucursal_propia`\`toda_empresa`, visibilidad `stock_esperado`\`ciego`,
-  RN-INV-005).
+  RN-INV-005). **Evaluada** desde ADR-022 (2026-08-02) para `monto_maximo`,
+  `estados_permitidos` y `horario` — `users.domain.rules.cumple_restricciones`
+  + `check_permission(..., contexto=...)`; alcance/visibilidad siguen
+  resolviéndose por su propio mecanismo (ej. RN-INV-005), no por este campo
+  todavía.
 - **usuario_rol**, **rol_permiso**, **usuario_sucursal** (alcance por sucursal).
 - **refresh_token**: hash, expiración, revocado.
 - **audit_log**: usuario_id, entidad, entidad_id, acción, datos_antes (JSONB),
@@ -212,7 +223,10 @@ erDiagram
   gramos importan, 0 para Unidad porque media botella no existe;
   configurable por unidad, no una constante del código — RN-GER-010). Un
   artículo/receta/producto comercial solo admite UdM de su propia categoría
-  (RN-UDM-001). Default: categoría "Unidades" con UdM base "Unidad".
+  (RN-UDM-001). Default: categoría "Unidades" con UdM base "Unidad". CRUD
+  (`POST/PATCH /api/v1/inventory/unidades-medida[/{id}]`,
+  `POST /api/v1/inventory/categorias-udm`, permiso `gestionar_catalogo`,
+  implementado 2026-08-02) — antes solo se editaba por seeder/migración.
 - **articulo** (inventariable): empresa_id (tenant directo — `categoria_id`
   es opcional, no sirve de puente de tenant por sí solo), id_interno (4
   alfanuméricos, autogenerado, inmutable, único — RN-GEN-005), nombre,
@@ -963,13 +977,29 @@ tabla. Ver [docs/gerencia/README.md](../gerencia/README.md).
   ejecuta_area (quién ejecuta la decisión — ej. `rrhh` para una sanción),
   fecha, archivo_id (opcional). Materializa el acta de decisión gerencial
   (RN-GER-002); toda aprobación de la matriz de aprobaciones (RN-GER-003)
-  genera una fila.
+  genera una fila. **Implementada 2026-08-03** (migración `1805c0904c5c`):
+  `POST/GET /api/v1/decisiones-gerenciales[/{id}]`, permisos
+  `gerencia.decidir` (firmar) y `gerencia.leer_decisiones` (consultar — el
+  área ejecutora la necesita sin poder decidir, RN-GER-005). `decidido_por`
+  es un `usuario` (no un `trabajador` suelto): es la misma identidad que
+  autenticó y que audita el sistema, y sale del token, nunca del cuerpo.
+  `referencia_tipo`/`referencia_id` son **polimórficos sin FK** a propósito:
+  ni `shared` gana una FK hacia los módulos ni los módulos hacia `shared`;
+  el índice compuesto sirve el acceso real ("qué decidió Gerencia sobre
+  esto"). No reemplaza el rastro propuesta/aprobación de
+  `parametro_empresa` (RN-GER-009) — es para las decisiones **sin** flujo
+  tipado propio.
 - **divisa** (entidad transversal, vive en `shared` — el dinero no es de
   ningún módulo): codigo (ISO 4217: PEN, USD), nombre, simbolo, decimales,
   activa. Existe porque los decimales de una moneda no son 2 por decreto y
   porque toda magnitud monetaria debe poder nombrar su unidad (RN-GER-010).
   Sembrada con PEN (S/, 2 decimales). **No** cambia que la operación sea PEN
-  única (RN-PRC-004): `precio` sigue sin columna de divisa.
+  única (RN-PRC-004): `precio` sigue sin columna de divisa. CRUD
+  (`POST/PATCH /api/v1/divisas[/{id}]`, permiso
+  `gerencia.gestionar_parametros_empresa`, implementado 2026-08-02):
+  lectura abierta a cualquier autenticado (`GET /divisas`), escritura
+  gobernada por Gerencia — así `decimales` se corrige con un `PATCH`, no
+  con una migración.
 - ~~**regla_aprobacion**~~ — **retirada el 2026-08-02** (migración
   `b82d4c1f7a35`). Sus umbrales (`purchases/oc_umbral`,
   `accounting/pago_umbral`) son filas de `parametro_empresa` con

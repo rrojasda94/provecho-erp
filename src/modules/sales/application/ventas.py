@@ -305,27 +305,38 @@ def crear_venta(
     return venta
 
 
+def _subtotal(items: list[VentaItem]) -> Decimal:
+    return rules.total_venta(
+        [(f.cantidad, f.precio_unitario, f.descuento) for f in items]
+    )
+
+
 def total_a_cobrar(session: Session, venta: Venta, grupo_cobro: int | None = None):
     """Lo que realmente debe pagarse: subtotal de las líneas menos la parte
     del descuento manual que le corresponde. Sin `grupo_cobro` es la venta
     entera; con él, solo esa cuenta.
     """
-    repo = VentaRepo(session)
-    todos = repo.items(venta.id)
-    base = rules.total_venta(
-        [(f.cantidad, f.precio_unitario, f.descuento) for f in todos]
-    )
+    todos = VentaRepo(session).items(venta.id)
+    base = _subtotal(todos)
     if grupo_cobro is None:
         return base - rules.monto_descuento(
             venta.descuento_modo, venta.descuento_valor, base
         )
     filas = [f for f in todos if f.grupo_cobro == grupo_cobro]
-    parcial = rules.total_venta(
-        [(f.cantidad, f.precio_unitario, f.descuento) for f in filas]
-    )
+    parcial = _subtotal(filas)
     return parcial - rules.descuento_prorrateado(
         venta.descuento_modo, venta.descuento_valor, base, parcial
     )
+
+
+def calcular_monto_descuento(
+    session: Session, venta: Venta, modo: str | None, valor: Decimal | None
+) -> Decimal:
+    """Cuánto descontaría `modo`/`valor` sobre el subtotal actual — sin
+    aplicarlo. El router lo usa para validar `permiso.restricciones`
+    (ADR-022, `monto_maximo`) ANTES de comprometer el cambio."""
+    base = _subtotal(VentaRepo(session).items(venta.id))
+    return rules.monto_descuento(modo, valor, base)
 
 
 def aplicar_descuento(

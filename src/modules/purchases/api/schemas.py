@@ -39,6 +39,10 @@ class ProveedorOut(BaseModel):
     id: uuid.UUID
     empresa_id: uuid.UUID
     tipo: str
+    # Si tipo=natural: nombre/documento se resuelven en `persona` a partir
+    # de esto (RN-GEN-007) — antes ni siquiera viajaba, así que un
+    # proveedor natural no tenía forma de mostrarse por nombre.
+    persona_id: uuid.UUID | None
     razon_social: str | None
     ruc: str | None
     formal: bool

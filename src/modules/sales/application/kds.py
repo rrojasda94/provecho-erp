@@ -136,9 +136,14 @@ def cola_pantalla(session: Session, pantalla_id: uuid.UUID) -> list[dict]:
             if _pertenece(pantalla, prod)
         ]
         if pantalla.tipo == "preparacion":
-            # Estación: solo ítems aún no listos de sus categorías.
-            mios = [m for m in mios if m["estado"] in ("pendiente", "en_preparacion")]
-            if not mios:
+            # La estación ve TODOS sus ítems, incluidos los ya listos: el
+            # ítem tachado tiene que seguir a la vista de quien lo tachó y
+            # de cualquier otra pantalla que muestre el pedido. El pedido
+            # desaparece de esta cola recién cuando la estación terminó
+            # todo lo suyo — no ítem por ítem.
+            if not mios or all(
+                m["estado"] in ("listo", "entregado") for m in mios
+            ):
                 continue
         else:
             # Despacho: muestra pedidos con algo listo o todo listo.

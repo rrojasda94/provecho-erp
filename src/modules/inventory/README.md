@@ -210,6 +210,10 @@ Endpoints `/api/v1/inventory`:
 | Método | Ruta | Permiso |
 |--------|------|---------|
 | POST/GET | `/categorias` | `gestionar_catalogo` / `leer` |
+| GET | `/unidades-medida` | `leer` — catálogo global, sin filtro de tenant (`data-model.md` §3) |
+| POST | `/unidades-medida` | `gestionar_catalogo` — CRUD antes diferido (ADR-014 Addendum b); requiere `categoria_udm_id` existente |
+| PATCH | `/unidades-medida/{id}` | `gestionar_catalogo` — corrige `decimales` (RN-GER-010) sin recrear la unidad |
+| GET/POST | `/categorias-udm` | `leer` / `gestionar_catalogo` |
 | POST/GET/PATCH | `/articulos[/{id}]` | `gestionar_catalogo` / `leer` |
 | POST | `/skus` | `gestionar_catalogo` |
 | GET | `/stock` | `leer` |
