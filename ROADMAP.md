@@ -1526,8 +1526,40 @@ errores de consola.
   existía) y `GET /api/v1/marcas` en `users`: el de `sales` exige
   `sales.leer` y pedirle eso a un usuario de marketing para llenar un
   `<select>` sería abrirle la carta entera.
-- ⬜ Módulos que siguen sin pantalla (solo tile en el home, 404 limpio de
-  Next.js): ventas de back-office (más allá del PDV) y gerencia.
+- **Gerencia** (2026-08-04): *Parámetros* como bandeja —filtrada a
+  pendientes por defecto— con las tres salidas de ADR-014 Addendum: aprobar,
+  aprobar **modificando el valor**, o rechazar con motivo obligatorio. El
+  formulario de propuesta obliga a elegir **qué clase de magnitud** es el
+  valor (monto con divisa, cantidad con unidad de medida, o adimensional),
+  que es exactamente lo que RN-GER-010 exige y lo que el backend responde
+  422 si falta. *Decisiones* con el acta (RN-GER-002): el campo de
+  condiciones aparece y se vuelve obligatorio solo al elegir "aprobado con
+  condiciones", y el botón de firmar solo existe con `gerencia.decidir` —
+  el área ejecutora lee pero no firma (RN-GER-005). *Divisas* con sus
+  decimales, que son los que deciden el redondeo de todo importe en esa
+  moneda.
+- **Ventas — back-office** (2026-08-04): la jornada de una sucursal por
+  fecha y estado, con totales (cobradas, monto, sin cobrar), el comprobante
+  de cada venta y sus dos acciones reales: **reintentar la emisión** que
+  SUNAT rechazó —mostrando el detalle del rechazo y los intentos— y
+  **anular** una orden que nunca se cobró. Los filtros viven en la URL: la
+  jornada de una sucursal en una fecha es una dirección que se comparte.
+  El tile del home pasó a apuntar acá y el PDV se abre desde su sidebar;
+  antes el tile iba directo al PDV y lo administrativo no tenía puerta.
+- ⬜ **Deriva de esquema en la base local de Docker** (hallada 2026-08-04 al
+  verificar Gerencia): `alembic_version` decía `b6d1e83f47ac` con seis
+  migraciones sin correr, y —peor— `1805c0904c5c` figuraba aplicada sin que
+  `decision_gerencial` existiera, así que `GET /decisiones-gerenciales`
+  respondía 500. Se puso al día (`alembic upgrade head`) y se creó la tabla
+  faltante con el SQL de esa misma revisión. **Falta verificar si la base de
+  Supabase tiene la misma deriva**: el chequeo es
+  `Base.metadata.tables - inspect(engine).get_table_names()`, y convendría
+  que corra en CI o en el arranque, porque hoy una migración marcada y no
+  aplicada solo se descubre cuando un endpoint revienta en producción.
+- ⬜ **La jornada pide el comprobante venta por venta** (N+1 contra la API):
+  aceptable para un día de una sucursal, no para un histórico. Si aparece
+  el listado de varios días, el comprobante tiene que venir en el listado
+  o en un endpoint por lote.
 - ⬜ **Marketing sin pantalla de leads ni de encuestas**: el backend las
   tiene (`/leads`, `/encuestas`, atribución lead→venta) pero la UI cubre
   campañas y contenido. Van cuando haya campañas reales corriendo.

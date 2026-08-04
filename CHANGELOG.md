@@ -35,6 +35,27 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Added
 
+- **Pantallas de Gerencia y Ventas back-office** (2026-08-04). Con estas
+  **ningún tile del home queda en 404**: los doce módulos del shell tienen
+  pantalla.
+  **Gerencia**: bandeja de parámetros operativos con las tres salidas de
+  ADR-014 (aprobar, aprobar modificando el valor, rechazar con motivo), y el
+  formulario de propuesta obliga a declarar **qué clase de magnitud** es el
+  valor —monto con divisa, cantidad con unidad de medida, o adimensional—
+  que es justo lo que RN-GER-010 exige. Actas de decisión gerencial, donde
+  las condiciones aparecen y se vuelven obligatorias solo al elegir
+  "aprobado con condiciones", y firmar exige `gerencia.decidir`: el área
+  ejecutora lee pero no firma (RN-GER-005). Divisas con sus decimales.
+  **Ventas back-office**: la jornada de una sucursal por fecha y estado, con
+  totales y el comprobante de cada venta, más sus dos acciones reales —
+  reintentar la emisión que SUNAT rechazó (con el detalle del rechazo y los
+  intentos) y anular una orden que nunca se cobró. Los filtros viven en la
+  URL, no en estado del cliente: la jornada de una sucursal en una fecha es
+  una dirección que se comparte y se recarga.
+  El tile del home de Ventas pasó a apuntar al back-office y el PDV se abre
+  desde su sidebar; antes el tile iba directo al PDV y lo administrativo no
+  tenía puerta de entrada.
+
 - **Pantallas de Producción y Marketing** (2026-08-04). Otros dos tiles del
   home que llevaban a un 404.
   **Producción**: órdenes con su ciclo real (crear → registrar el consumo
