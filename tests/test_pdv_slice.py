@@ -46,6 +46,7 @@ from src.modules.users.infrastructure.models import (
     Sucursal,
     Usuario,
 )
+from src.shared import fechas
 
 pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")
 
@@ -831,9 +832,9 @@ def test_venta_del_dia_lista_lo_cobrado_en_la_jornada(session, base):
     _crear(session, base, [_item(base["productos"][1], precio="30.00")])
 
     repo = VentaRepo(session)
-    todas = repo.del_dia(sucursal_id=base["sucursal"].id, fecha=date.today())
+    todas = repo.del_dia(sucursal_id=base["sucursal"].id, fecha=fechas.hoy())
     pagadas = repo.del_dia(
-        sucursal_id=base["sucursal"].id, fecha=date.today(), estados=("pagada",)
+        sucursal_id=base["sucursal"].id, fecha=fechas.hoy(), estados=("pagada",)
     )
     assert len(todas) == 2
     assert [v.id for v in pagadas] == [venta.id]

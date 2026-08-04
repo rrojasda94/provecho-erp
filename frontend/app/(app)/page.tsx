@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { MODULOS } from "@/lib/modulos";
-import { tieneAccesoModulo } from "@/lib/permisos";
+import { puedeVerModulo } from "@/lib/permisos";
 import { obtenerSesion } from "@/lib/sesion";
 
 /** Home de apps (F2.6a, ADR-013): grilla de módulos filtrada por permiso —
@@ -9,7 +9,7 @@ import { obtenerSesion } from "@/lib/sesion";
  * `[modulo]/layout.tsx`). `admin` (comodín `*`) ve todo el catálogo. */
 export default async function HomePage() {
   const { usuario } = await obtenerSesion();
-  const visibles = MODULOS.filter((m) => tieneAccesoModulo(usuario.permisos, m.prefijoPermiso));
+  const visibles = MODULOS.filter((m) => puedeVerModulo(usuario.permisos, m));
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-10">

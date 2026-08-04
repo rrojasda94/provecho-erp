@@ -17,6 +17,7 @@ from src.modules.sales.application.errors import Conflicto, NoEncontrado
 from src.modules.sales.domain import rules
 from src.modules.sales.infrastructure.models import Mesa
 from src.modules.sales.infrastructure.repositories import MesaRepo, VentaRepo
+from src.shared import fechas
 
 
 @dataclass
@@ -61,7 +62,7 @@ def mapa(
 ) -> list[MesaEnMapa]:
     """Todas las mesas activas de la sucursal, con la orden abierta que
     tenga cada una. Las libres vienen con `venta_id=None`."""
-    dia = fecha or date.today()
+    dia = fecha or fechas.hoy()
     mesa_repo = MesaRepo(session)
     venta_repo = VentaRepo(session)
     abiertas = {v.mesa_id: v for v in mesa_repo.ocupadas(sucursal_id, dia)}
@@ -94,7 +95,7 @@ def desactivar_mesa(session: Session, mesa_id: uuid.UUID) -> Mesa:
     mesa = MesaRepo(session).get(mesa_id)
     if mesa is None or mesa.deleted_at is not None:
         raise NoEncontrado("mesa no encontrada")
-    ocupadas = MesaRepo(session).ocupadas(mesa.sucursal_id, date.today())
+    ocupadas = MesaRepo(session).ocupadas(mesa.sucursal_id, fechas.hoy())
     if any(v.mesa_id == mesa.id for v in ocupadas):
         raise Conflicto("la mesa tiene una orden abierta; ciérrala primero")
     mesa.activa = False

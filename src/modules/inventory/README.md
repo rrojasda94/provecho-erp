@@ -29,6 +29,11 @@ almacenamiento), `conteo`, `ajuste` (motivo, solicitante, aprobador),
 ## Casos de uso
 
 - CRUD de artículos y categorías.
+- CRUD de **recetas** (ficha técnica): la línea acepta aritmética tecleada
+  ("1000/3") y guarda el resultado redondeado a los decimales de la unidad
+  del insumo, con la expresión al lado para reeditarla; duplicar clona con
+  sufijo "(copy)" y escalar por factor redondea cada línea con **su propia**
+  unidad (RN-COM-024, ADR-023).
 - Consultar stock por almacén / artículo; alertas de stock mínimo (punto de
   reorden, calculado con el dato de consumo real de `inventory`, definido
   en conjunto con `production` y `accounting` — `inventory` no compra, solo
@@ -56,6 +61,25 @@ almacenamiento), `conteo`, `ajuste` (motivo, solicitante, aprobador),
 - Devolución a proveedor: genera evento consumido por `purchases` para
   gestionar reclamo/nota de crédito; devolución sucursal→central usa el
   mismo flujo de `transferencia` con motivo `devolucion`.
+
+## Estado (slice 5 — recetas editables, 2026-08-03)
+
+`POST/GET/PATCH /inventory/recetas` + `items` (alta, edición y borrado de
+línea), `POST /recetas/{id}/duplicar` y `POST /recetas/{id}/escalar`, más
+`GET /inventory/unidades-medida` (los decimales de un campo de cantidad
+salen del catálogo, no de una constante del frontend — RN-GER-010). Permiso
+`inventory.gestionar_catalogo` para escribir, `inventory.leer` para leer.
+
+La cantidad se expresa **en la unidad del artículo**: no hay UdM en la línea
+porque sería una segunda verdad sobre la misma cantidad y la que manda en el
+descuento de stock es la del artículo (RN-UDM-001). La aritmética la evalúa
+el servidor (`shared/aritmetica.py`, `ast` con lista blanca — nunca `eval`):
+si el cliente mandara resultado y expresión por separado, nada garantizaría
+que uno corresponda al otro. Migración `b6d1e83f47ac` (`receta_item.expresion`).
+
+Contrato público nuevo: `queries_publicas.receta_resumen`, con el que
+`sales` valida la receta que asigna a un producto comercial sin importar el
+ORM de `inventory`.
 
 ## Reglas
 

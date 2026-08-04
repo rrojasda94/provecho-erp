@@ -33,6 +33,7 @@ from src.modules.sales.infrastructure.repositories import (
     PrecioRepo,
     ProductoComercialRepo,
 )
+from src.shared import fechas
 
 
 def crear_lista(
@@ -92,6 +93,11 @@ def fijar_precio(
         raise NoEncontrado("producto comercial no encontrado")
     if producto.marca_id != lista.marca_id:
         raise Conflicto("el producto no pertenece a la marca de la lista")
+    if ProductoComercialRepo(session).variantes_de(producto_comercial_id):
+        raise Conflicto(
+            f"'{producto.nombre}' se vende por variante: el precio va en cada "
+            "una (RN-COM-022)"
+        )
     if monto < 0:
         raise Conflicto("el precio no puede ser negativo")
     repo = PrecioRepo(session)
@@ -117,7 +123,7 @@ def resolver_precio(
     modalidad: str,
     fecha: date | None = None,
 ) -> Decimal:
-    fecha = fecha or date.today()
+    fecha = fecha or fechas.hoy()
     listas = ListaPrecioRepo(session).vigentes(
         marca_id=producto.marca_id,
         sucursal_id=sucursal_id,
@@ -147,8 +153,14 @@ def carta(
     fecha: date | None = None,
 ) -> list[dict]:
     """Lo que el PDV/kiosko renderiza: productos activos con su precio ya
-    resuelto y los extras que admite cada uno. Los que no tienen precio
-    vigente no se muestran (no se pueden vender)."""
+    resuelto, sus variantes y los extras que admite cada uno.
+
+    Lo que no se puede vender no se muestra: un producto simple sin precio
+    vigente queda fuera, y uno con variantes queda fuera si ninguna de sus
+    variantes tiene precio. Las variantes no salen sueltas en la grilla
+    —aparecen dentro de su padre (RN-COM-022)—, igual que los extras
+    (RN-COM-021).
+    """
     repo = ProductoComercialRepo(session)
     precio_de = {}
     productos = repo.list(marca_id)
@@ -175,10 +187,26 @@ def carta(
     }
     items = []
     for producto in productos:
-        # Los extras no se listan sueltos: salen dentro del producto que
-        # los admite (RN-COM-021).
-        if producto.es_extra or producto.id not in precio_de:
+        if producto.es_extra or producto.producto_padre_id is not None:
             continue
+        variantes = [
+            {
+                "producto_comercial_id": v.id,
+                "nombre": v.nombre,
+                "precio_unitario": precio_de[v.id],
+                "orden": v.orden,
+            }
+            for v in repo.variantes_de(producto.id)
+            if v.id in precio_de
+        ]
+        # El precio de la tarjeta con variantes es el "desde": el que se
+        # cobra sale de la variante elegida.
+        precio = min((v["precio_unitario"] for v in variantes), default=None)
+        if precio is None:
+            precio = precio_de.get(producto.id)
+        if precio is None:
+            continue
+        grupos_por_id = {g.id: g for g in repo.grupos_de(producto.id)}
         extras = []
         for vinculo in repo.extras_de(producto.id):
             extra = por_id.get(vinculo.extra_id)
@@ -186,12 +214,17 @@ def carta(
             # mismo criterio que un producto sin precio.
             if extra is None or vinculo.extra_id not in precio_de:
                 continue
+            grupo = grupos_por_id.get(vinculo.grupo_id)
             extras.append(
                 {
                     "producto_comercial_id": extra.id,
                     "nombre": extra.nombre,
                     "precio_unitario": precio_de[extra.id],
                     "maximo": vinculo.maximo,
+                    "grupo_id": vinculo.grupo_id,
+                    "grupo_nombre": grupo.nombre if grupo else None,
+                    "grupo_minimo": grupo.minimo if grupo else 0,
+                    "grupo_maximo": grupo.maximo if grupo else None,
                 }
             )
         items.append(
@@ -201,7 +234,8 @@ def carta(
                 "nombre": producto.nombre,
                 "categoria_id": producto.categoria_id,
                 "categoria_nombre": nombre_categoria.get(producto.categoria_id),
-                "precio_unitario": precio_de[producto.id],
+                "precio_unitario": precio,
+                "variantes": sorted(variantes, key=lambda v: (v["orden"], v["nombre"])),
                 "extras": extras,
             }
         )

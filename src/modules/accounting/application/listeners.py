@@ -18,7 +18,6 @@ todavía no los publican — ver ROADMAP, deuda técnica de accounting.
 
 import logging
 import uuid
-from datetime import date
 from decimal import Decimal
 
 from src.core.database import SessionLocal
@@ -26,6 +25,7 @@ from src.core.events import event_bus
 from src.modules.accounting.application import asientos as asientos_uc
 from src.modules.accounting.application import pagos as pagos_uc
 from src.modules.users.infrastructure.models import Almacen, Sucursal
+from src.shared import fechas
 
 log = logging.getLogger(__name__)
 
@@ -48,7 +48,7 @@ def _generar(session, *, empresa_id, evento, referencia_origen, monto, glosa) ->
         session,
         empresa_id=empresa_id,
         evento=evento,
-        fecha=date.today(),
+        fecha=fechas.hoy(),
         glosa=glosa,
         referencia_origen=referencia_origen,
         monto=monto,

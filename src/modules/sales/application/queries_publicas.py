@@ -20,11 +20,13 @@ from src.modules.sales.infrastructure.models import (
     Cliente,
     MedioPago,
     Pago,
+    ProductoComercial,
     PuntoVenta,
     Venta,
     VentaItem,
 )
 from src.modules.users.infrastructure.models import Persona, Sucursal
+from src.shared import fechas
 
 
 def listar_clientes_para_analisis(
@@ -74,7 +76,7 @@ def resumen_ventas_del_dia(
     Filtra por `fecha_orden` (día de negocio) y `empresa_id`, vía
     `sucursal.empresa_id` — `venta` no repite el tenant directo.
     """
-    fecha = fecha or date.today()
+    fecha = fecha or fechas.hoy()
     fila = session.execute(
         select(func.count(Venta.id), func.coalesce(func.sum(Venta.total), 0))
         .join(Sucursal, Sucursal.id == Venta.sucursal_id)
@@ -155,3 +157,20 @@ def total_efectivo_cobrado(
         )
     )
     return Decimal(total)
+
+
+def productos_que_usan_receta(session: Session, receta_id: uuid.UUID) -> list[str]:
+    """Nombres de los productos comerciales que apuntan a esta receta.
+
+    Lo consulta `inventory` antes de borrarla: la FK lo impediría igual, pero
+    en la base y con un error de integridad ilegible. Acá el mensaje puede
+    decir **cuál** producto la está usando, que es lo que el usuario necesita
+    para desatascarse.
+    """
+    return list(
+        session.scalars(
+            select(ProductoComercial.nombre)
+            .where(ProductoComercial.receta_id == receta_id)
+            .order_by(ProductoComercial.nombre)
+        )
+    )

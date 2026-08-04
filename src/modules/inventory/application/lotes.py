@@ -21,6 +21,7 @@ from src.modules.inventory.application.errors import (
 from src.modules.inventory.domain import rules
 from src.modules.inventory.infrastructure.models import Articulo, Lote, Sku, StockLote
 from src.modules.inventory.infrastructure.repositories import LoteRepo, StockLoteRepo
+from src.shared import fechas
 
 ORIGENES = {"compra", "produccion", "carga_inicial", "ajuste"}
 CONDICIONES = {"refrigerado", "congelado", "ambiente"}
@@ -59,7 +60,7 @@ def crear_lote(
         raise ReglaNegocio(
             f"condición de almacenamiento inválida: {condicion_almacenamiento}"
         )
-    codigo = codigo or rules.codigo_lote_auto(fecha_vencimiento or (hoy or date.today()))
+    codigo = codigo or rules.codigo_lote_auto(fecha_vencimiento or (hoy or fechas.hoy()))
     repo = LoteRepo(session)
     existente = repo.get_by_codigo(articulo_id, codigo)
     if existente is not None:
@@ -135,7 +136,7 @@ def disponibles_fefo(
     `inventory.lote_vencido_detectado`: el momento de tocarlo es el momento
     en que se descubre, sin depender de que alguien corra el barrido.
     """
-    hoy = hoy or date.today()
+    hoy = hoy or fechas.hoy()
     resultado: list[StockLote] = []
     for fila in StockLoteRepo(session).fefo(almacen_id, sku_id):
         lote = session.get(Lote, fila.lote_id)
@@ -157,7 +158,7 @@ def bloquear_vencidos(
 ) -> list[StockLote]:
     """Barrido explícito: bloquea todo lote vencido que aún tenga saldo
     disponible. Lo mismo que hace el picking, pero sin esperar a la salida."""
-    hoy = hoy or date.today()
+    hoy = hoy or fechas.hoy()
     bloqueados = []
     for fila, lote in StockLoteRepo(session).list(almacen_id, None, empresa_id):
         if (
@@ -179,7 +180,7 @@ def listar(
     por_vencer_dias: int | None = None,
     hoy: date | None = None,
 ) -> list[dict]:
-    hoy = hoy or date.today()
+    hoy = hoy or fechas.hoy()
     filas = StockLoteRepo(session).list(almacen_id, sku_id, empresa_id)
     if por_vencer_dias is not None:
         filas = [

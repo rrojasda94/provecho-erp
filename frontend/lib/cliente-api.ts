@@ -45,6 +45,9 @@ export async function pedir<T>(
   if (!respuesta.ok) {
     throw new ErrorApi(respuesta.status, await mensajeDeError(respuesta));
   }
+  // 204 (los DELETE) no traen cuerpo: pedirle `.json()` a una respuesta
+  // vacía revienta con un error de sintaxis que no dice nada.
+  if (respuesta.status === 204) return undefined as T;
   return (await respuesta.json()) as T;
 }
 

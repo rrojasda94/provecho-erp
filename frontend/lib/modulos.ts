@@ -1,9 +1,15 @@
 /**
  * Catálogo de apps del home (F2.6, ADR-013). Cada entrada es un módulo con
  * backend real — el ícono del home y el ítem de sidebar salen de aquí, no se
- * hardcodean por pantalla. `prefijoPermiso` decide si el módulo aparece en el
- * grid (filtro de UX, ver `lib/permisos.ts`); el guard real vive en el
- * `layout.tsx` de cada módulo.
+ * hardcodean por pantalla. El guard real vive en el `layout.tsx` de cada
+ * módulo; esto decide qué se ve.
+ *
+ * Un módulo se abre por **prefijo** (`inventory.` — cualquier permiso del
+ * área alcanza) o por **permiso exacto** (`permiso`), cuando ver el módulo
+ * ya es un privilegio. Catálogo usa el segundo: un cajero tiene `sales.leer`
+ * y con el filtro por prefijo terminaba viendo la lista de productos y
+ * chocando con un 403 al guardar. Que la API lo rechace no basta — lo que no
+ * le corresponde administrar no debería siquiera aparecerle.
  */
 
 export type Modulo = {
@@ -11,7 +17,10 @@ export type Modulo = {
   nombre: string;
   descripcion: string;
   href: string;
+  /** Abre el módulo cualquier permiso que empiece así. */
   prefijoPermiso: string;
+  /** Si está, manda sobre el prefijo: exige exactamente este permiso. */
+  permiso?: string;
   icono: string; // emoji: cero dependencias, ya es texto accesible por defecto
 };
 
@@ -43,12 +52,24 @@ export const MODULOS: Modulo[] = [
   {
     clave: "ventas",
     nombre: "Ventas",
-    descripcion: "Punto de venta y comprobantes",
+    descripcion: "Punto de venta, mesas y cobro",
     // El PDV es pantalla completa a propósito (ADR-013: táctil, sin sidebar)
     // — no vive bajo el shell (app), va directo fuera de él.
     href: "/pdv",
     prefijoPermiso: "sales.",
     icono: "🛒",
+  },
+  {
+    clave: "catalogo",
+    nombre: "Catálogo",
+    descripcion: "Productos comerciales, variantes y recetas",
+    href: "/catalogo/productos",
+    prefijoPermiso: "sales.",
+    // Administrar la carta es acto de supervisor, no de quien vende con
+    // ella: el mismo permiso que la API exige para escribir decide acá si
+    // el módulo se ve.
+    permiso: "sales.gestionar_catalogo",
+    icono: "🍕",
   },
   {
     clave: "kds",

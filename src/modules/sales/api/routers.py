@@ -38,6 +38,7 @@ from src.modules.users.application import autorizacion
 from src.modules.users.application import queries_publicas as usuarios_queries
 from src.modules.users.application.errors import TokenInvalido
 from src.modules.users.infrastructure.models import Usuario
+from src.shared import fechas
 from src.shared.integrations.factiliza import FactilizaError
 
 router = APIRouter(prefix="/sales", tags=["sales"])
@@ -99,7 +100,7 @@ def listar_ventas_del_dia(
     tenant.exigir_sucursal(sucursal_id)
     return VentaRepo(session).del_dia(
         sucursal_id=sucursal_id,
-        fecha=fecha or date.today(),
+        fecha=fecha or fechas.hoy(),
         estados=(estado,) if estado else None,
     )
 
@@ -122,7 +123,7 @@ def aplicar_descuento(
     except TokenInvalido as e:
         raise HTTPException(status.HTTP_403_FORBIDDEN, str(e)) from e
     venta = exigir_venta(session, venta_id, tenant)
-    # Tope de `permiso.restricciones` para quien autorizó (ADR-022): un rol
+    # Tope de `permiso.restricciones` para quien autorizó (ADR-023): un rol
     # puede tener `sales.aplicar_descuento` con `monto_maximo` — no todo
     # supervisor autoriza cualquier monto. Solo aplica al dar un descuento
     # nuevo, no al quitarlo (`modo=None`); se valida ANTES de comprometer
@@ -347,13 +348,57 @@ def vincular_extra(
         producto_id=producto_id,
         extra_id=body.extra_id,
         maximo=body.maximo,
+        grupo_id=body.grupo_id,
     )
     session.commit()
     return {
         "producto_comercial_id": str(vinculo.producto_comercial_id),
         "extra_id": str(vinculo.extra_id),
         "maximo": vinculo.maximo,
+        "grupo_id": str(vinculo.grupo_id) if vinculo.grupo_id else None,
     }
+
+
+@router.post("/productos/{producto_id}/grupos", response_model=schemas.GrupoOpcionOut,
+             status_code=201)
+def crear_grupo_opcion(
+    producto_id: uuid.UUID,
+    body: schemas.GrupoOpcionCreate,
+    _: Usuario = Depends(require_permission(CATALOGO)),
+    session: Session = Depends(get_db),
+):
+    """Agrupa extras y define cuántos hay que elegir. `minimo >= 1` hace el
+    grupo obligatorio en el PDV (RN-COM-023)."""
+    grupo = catalogo.crear_grupo_opcion(session, producto_id=producto_id, **body.model_dump())
+    session.commit()
+    return {
+        "id": grupo.id,
+        "nombre": grupo.nombre,
+        "minimo": grupo.minimo,
+        "maximo": grupo.maximo,
+        "orden": grupo.orden,
+        "extras": [],
+    }
+
+
+@router.get("/marcas", response_model=list[schemas.MarcaOut])
+def listar_marcas(
+    _: Usuario = Depends(require_permission(LEER)),
+    session: Session = Depends(get_db),
+):
+    """Marcas disponibles para colgar un producto. Vive en `sales` y no en
+    `users` porque el único consumidor es el catálogo comercial."""
+    return catalogo.listar_marcas(session)
+
+
+@router.get("/productos/{producto_id}", response_model=schemas.ProductoDetalleOut)
+def ver_producto(
+    producto_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(LEER)),
+    session: Session = Depends(get_db),
+):
+    """Ficha completa: el producto, sus variantes y sus grupos de extras."""
+    return catalogo.detalle_producto(session, producto_id)
 
 
 @router.get("/productos", response_model=list[schemas.ProductoOut])
@@ -375,6 +420,18 @@ def editar_producto(
     prod = catalogo.editar_producto(session, producto_id, **body.model_dump())
     session.commit()
     return prod
+
+
+@router.delete("/productos/{producto_id}", status_code=204)
+def eliminar_producto(
+    producto_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(CATALOGO)),
+    session: Session = Depends(get_db),
+):
+    """Borra un producto que nunca se vendió. Si ya tiene ventas responde 409:
+    ahí se descontinúa (`activo=False`), no se borra."""
+    catalogo.eliminar_producto(session, producto_id)
+    session.commit()
 
 
 @router.post("/medios-pago", response_model=schemas.MedioPagoOut, status_code=201)

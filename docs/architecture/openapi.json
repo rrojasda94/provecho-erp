@@ -1765,6 +1765,14 @@
             "format": "uuid",
             "title": "Producto Comercial Id",
             "type": "string"
+          },
+          "variantes": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/VarianteDeCartaOut"
+            },
+            "title": "Variantes",
+            "type": "array"
           }
         },
         "required": [
@@ -4182,6 +4190,45 @@
       "ExtraDeCartaOut": {
         "description": "Extra ofrecible sobre un producto, con su precio ya resuelto para\neste ámbito (RN-COM-021).",
         "properties": {
+          "grupo_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grupo Id"
+          },
+          "grupo_maximo": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grupo Maximo"
+          },
+          "grupo_minimo": {
+            "default": 0,
+            "title": "Grupo Minimo",
+            "type": "integer"
+          },
+          "grupo_nombre": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grupo Nombre"
+          },
           "maximo": {
             "anyOf": [
               {
@@ -4217,6 +4264,50 @@
         "title": "ExtraDeCartaOut",
         "type": "object"
       },
+      "ExtraDeProductoOut": {
+        "properties": {
+          "extra_id": {
+            "format": "uuid",
+            "title": "Extra Id",
+            "type": "string"
+          },
+          "maximo": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maximo"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "receta_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receta Id"
+          }
+        },
+        "required": [
+          "extra_id",
+          "nombre",
+          "receta_id",
+          "maximo"
+        ],
+        "title": "ExtraDeProductoOut",
+        "type": "object"
+      },
       "ExtraIn": {
         "properties": {
           "cantidad": {
@@ -4243,6 +4334,94 @@
           "producto_comercial_id"
         ],
         "title": "ExtraIn",
+        "type": "object"
+      },
+      "GrupoOpcionCreate": {
+        "description": "Grupo de extras del producto. `minimo >= 1` lo vuelve obligatorio: el\nPDV no deja agregar la línea hasta elegir (RN-COM-023).",
+        "properties": {
+          "maximo": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maximo"
+          },
+          "minimo": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Minimo",
+            "type": "integer"
+          },
+          "nombre": {
+            "maxLength": 50,
+            "minLength": 1,
+            "title": "Nombre",
+            "type": "string"
+          },
+          "orden": {
+            "default": 0,
+            "title": "Orden",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "nombre"
+        ],
+        "title": "GrupoOpcionCreate",
+        "type": "object"
+      },
+      "GrupoOpcionOut": {
+        "properties": {
+          "extras": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ExtraDeProductoOut"
+            },
+            "title": "Extras",
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "maximo": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maximo"
+          },
+          "minimo": {
+            "title": "Minimo",
+            "type": "integer"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "orden": {
+            "title": "Orden",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "nombre",
+          "minimo",
+          "maximo",
+          "orden"
+        ],
+        "title": "GrupoOpcionOut",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -5007,6 +5186,30 @@
           }
         },
         "title": "LoteSyncIn",
+        "type": "object"
+      },
+      "MarcaOut": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "tipo": {
+            "title": "Tipo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "nombre",
+          "tipo"
+        ],
+        "title": "MarcaOut",
         "type": "object"
       },
       "MeOut": {
@@ -8279,6 +8482,18 @@
       },
       "ProductoCreate": {
         "properties": {
+          "categoria_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Categoria Id"
+          },
           "empaque_id": {
             "anyOf": [
               {
@@ -8327,19 +8542,174 @@
             "title": "Nombre",
             "type": "string"
           },
+          "orden": {
+            "default": 0,
+            "title": "Orden",
+            "type": "integer"
+          },
+          "producto_padre_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Producto Padre Id"
+          },
           "receta_id": {
-            "format": "uuid",
-            "title": "Receta Id",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receta Id"
           }
         },
         "required": [
           "id_interno",
           "marca_id",
-          "nombre",
-          "receta_id"
+          "nombre"
         ],
         "title": "ProductoCreate",
+        "type": "object"
+      },
+      "ProductoDetalleOut": {
+        "description": "La ficha que edita la pantalla de catálogo: producto + variantes +\ngrupos de extras, en una sola lectura.",
+        "properties": {
+          "activo": {
+            "title": "Activo",
+            "type": "boolean"
+          },
+          "categoria_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Categoria Id"
+          },
+          "empaque_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Empaque Id"
+          },
+          "es_extra": {
+            "default": false,
+            "title": "Es Extra",
+            "type": "boolean"
+          },
+          "extras_sueltos": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ExtraDeProductoOut"
+            },
+            "title": "Extras Sueltos",
+            "type": "array"
+          },
+          "grupos": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/GrupoOpcionOut"
+            },
+            "title": "Grupos",
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "id_interno": {
+            "title": "Id Interno",
+            "type": "string"
+          },
+          "marca_id": {
+            "format": "uuid",
+            "title": "Marca Id",
+            "type": "string"
+          },
+          "modalidades_empaque": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modalidades Empaque"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "orden": {
+            "default": 0,
+            "title": "Orden",
+            "type": "integer"
+          },
+          "producto_padre_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Producto Padre Id"
+          },
+          "receta_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receta Id"
+          },
+          "variantes": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ProductoOut"
+            },
+            "title": "Variantes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "id_interno",
+          "marca_id",
+          "nombre",
+          "activo"
+        ],
+        "title": "ProductoDetalleOut",
         "type": "object"
       },
       "ProductoOut": {
@@ -8347,6 +8717,30 @@
           "activo": {
             "title": "Activo",
             "type": "boolean"
+          },
+          "categoria_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Categoria Id"
+          },
+          "empaque_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Empaque Id"
           },
           "es_extra": {
             "default": false,
@@ -8367,14 +8761,52 @@
             "title": "Marca Id",
             "type": "string"
           },
+          "modalidades_empaque": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modalidades Empaque"
+          },
           "nombre": {
             "title": "Nombre",
             "type": "string"
           },
+          "orden": {
+            "default": 0,
+            "title": "Orden",
+            "type": "integer"
+          },
+          "producto_padre_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Producto Padre Id"
+          },
           "receta_id": {
-            "format": "uuid",
-            "title": "Receta Id",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receta Id"
           }
         },
         "required": [
@@ -8382,7 +8814,6 @@
           "id_interno",
           "marca_id",
           "nombre",
-          "receta_id",
           "activo"
         ],
         "title": "ProductoOut",
@@ -8400,6 +8831,18 @@
               }
             ],
             "title": "Activo"
+          },
+          "categoria_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Categoria Id"
           },
           "empaque_id": {
             "anyOf": [
@@ -8437,6 +8880,34 @@
               }
             ],
             "title": "Nombre"
+          },
+          "orden": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orden"
+          },
+          "quitar_receta": {
+            "default": false,
+            "title": "Quitar Receta",
+            "type": "boolean"
+          },
+          "receta_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receta Id"
           }
         },
         "title": "ProductoUpdate",
@@ -9009,6 +9480,518 @@
           "recibido_por"
         ],
         "title": "RecepcionOut",
+        "type": "object"
+      },
+      "RecetaCreate": {
+        "properties": {
+          "articulo_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Articulo Id"
+          },
+          "criterio_ajuste": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Criterio Ajuste"
+          },
+          "flexible": {
+            "default": false,
+            "title": "Flexible",
+            "type": "boolean"
+          },
+          "nombre": {
+            "maxLength": 150,
+            "minLength": 1,
+            "title": "Nombre",
+            "type": "string"
+          },
+          "rendimiento_cantidad": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Rendimiento Cantidad"
+          },
+          "rendimiento_unidad_medida_id": {
+            "format": "uuid",
+            "title": "Rendimiento Unidad Medida Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "nombre",
+          "rendimiento_cantidad",
+          "rendimiento_unidad_medida_id"
+        ],
+        "title": "RecetaCreate",
+        "type": "object"
+      },
+      "RecetaDetalleOut": {
+        "properties": {
+          "articulo_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Articulo Id"
+          },
+          "costo_total": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Costo Total",
+            "type": "string"
+          },
+          "criterio_ajuste": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Criterio Ajuste"
+          },
+          "flexible": {
+            "title": "Flexible",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RecetaItemOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "rendimiento_cantidad": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Rendimiento Cantidad",
+            "type": "string"
+          },
+          "rendimiento_unidad_medida_id": {
+            "format": "uuid",
+            "title": "Rendimiento Unidad Medida Id",
+            "type": "string"
+          },
+          "rendimiento_unidad_medida_nombre": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rendimiento Unidad Medida Nombre"
+          }
+        },
+        "required": [
+          "id",
+          "nombre",
+          "rendimiento_cantidad",
+          "rendimiento_unidad_medida_id",
+          "rendimiento_unidad_medida_nombre",
+          "articulo_id",
+          "flexible",
+          "criterio_ajuste",
+          "items",
+          "costo_total"
+        ],
+        "title": "RecetaDetalleOut",
+        "type": "object"
+      },
+      "RecetaEscalarIn": {
+        "properties": {
+          "factor": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Factor"
+          }
+        },
+        "required": [
+          "factor"
+        ],
+        "title": "RecetaEscalarIn",
+        "type": "object"
+      },
+      "RecetaItemCreate": {
+        "description": "`cantidad` o `expresion`, no ambas obligatorias: si viene la\noperación (\"1000/3\"), el servidor la evalúa y el número que mande el\ncliente se ignora.",
+        "properties": {
+          "articulo_id": {
+            "format": "uuid",
+            "title": "Articulo Id",
+            "type": "string"
+          },
+          "cantidad": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cantidad"
+          },
+          "expresion": {
+            "anyOf": [
+              {
+                "maxLength": 60,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expresion"
+          },
+          "merma_pct": {
+            "anyOf": [
+              {
+                "exclusiveMaximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "default": "0",
+            "title": "Merma Pct"
+          }
+        },
+        "required": [
+          "articulo_id"
+        ],
+        "title": "RecetaItemCreate",
+        "type": "object"
+      },
+      "RecetaItemOut": {
+        "properties": {
+          "articulo_id": {
+            "format": "uuid",
+            "title": "Articulo Id",
+            "type": "string"
+          },
+          "articulo_nombre": {
+            "title": "Articulo Nombre",
+            "type": "string"
+          },
+          "cantidad": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Cantidad",
+            "type": "string"
+          },
+          "costo_linea": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Costo Linea",
+            "type": "string"
+          },
+          "costo_unitario": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Costo Unitario",
+            "type": "string"
+          },
+          "decimales": {
+            "title": "Decimales",
+            "type": "integer"
+          },
+          "expresion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expresion"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "merma_pct": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Merma Pct",
+            "type": "string"
+          },
+          "unidad_medida_id": {
+            "format": "uuid",
+            "title": "Unidad Medida Id",
+            "type": "string"
+          },
+          "unidad_medida_nombre": {
+            "title": "Unidad Medida Nombre",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "articulo_id",
+          "articulo_nombre",
+          "unidad_medida_id",
+          "unidad_medida_nombre",
+          "decimales",
+          "cantidad",
+          "expresion",
+          "merma_pct",
+          "costo_unitario",
+          "costo_linea"
+        ],
+        "title": "RecetaItemOut",
+        "type": "object"
+      },
+      "RecetaItemUpdate": {
+        "properties": {
+          "cantidad": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cantidad"
+          },
+          "expresion": {
+            "anyOf": [
+              {
+                "maxLength": 60,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expresion"
+          },
+          "merma_pct": {
+            "anyOf": [
+              {
+                "exclusiveMaximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Merma Pct"
+          }
+        },
+        "title": "RecetaItemUpdate",
+        "type": "object"
+      },
+      "RecetaOut": {
+        "properties": {
+          "articulo_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Articulo Id"
+          },
+          "criterio_ajuste": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Criterio Ajuste"
+          },
+          "flexible": {
+            "title": "Flexible",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "rendimiento_cantidad": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Rendimiento Cantidad",
+            "type": "string"
+          },
+          "rendimiento_unidad_medida_id": {
+            "format": "uuid",
+            "title": "Rendimiento Unidad Medida Id",
+            "type": "string"
+          },
+          "rendimiento_unidad_medida_nombre": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rendimiento Unidad Medida Nombre"
+          }
+        },
+        "required": [
+          "id",
+          "nombre",
+          "rendimiento_cantidad",
+          "rendimiento_unidad_medida_id",
+          "rendimiento_unidad_medida_nombre",
+          "articulo_id",
+          "flexible",
+          "criterio_ajuste"
+        ],
+        "title": "RecetaOut",
+        "type": "object"
+      },
+      "RecetaUpdate": {
+        "properties": {
+          "articulo_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Articulo Id"
+          },
+          "criterio_ajuste": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Criterio Ajuste"
+          },
+          "flexible": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flexible"
+          },
+          "nombre": {
+            "anyOf": [
+              {
+                "maxLength": 150,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nombre"
+          },
+          "rendimiento_cantidad": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rendimiento Cantidad"
+          },
+          "rendimiento_unidad_medida_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rendimiento Unidad Medida Id"
+          }
+        },
+        "title": "RecetaUpdate",
         "type": "object"
       },
       "RecursoOut": {
@@ -11094,6 +12077,37 @@
         "title": "ValidationError",
         "type": "object"
       },
+      "VarianteDeCartaOut": {
+        "description": "Tamaño/presentación del producto, con precio propio y completo — no\nun recargo sobre el padre (RN-COM-022). Elegir una es obligatorio.",
+        "properties": {
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "orden": {
+            "title": "Orden",
+            "type": "integer"
+          },
+          "precio_unitario": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Precio Unitario",
+            "type": "string"
+          },
+          "producto_comercial_id": {
+            "format": "uuid",
+            "title": "Producto Comercial Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "producto_comercial_id",
+          "nombre",
+          "precio_unitario",
+          "orden"
+        ],
+        "title": "VarianteDeCartaOut",
+        "type": "object"
+      },
       "VentaCreate": {
         "properties": {
           "canal": {
@@ -11720,12 +12734,24 @@
         "type": "object"
       },
       "VincularExtraCreate": {
-        "description": "Habilita un extra sobre un producto. `maximo` es el tope de unidades\ndel extra en una misma línea; NULL = sin tope.",
+        "description": "Habilita un extra sobre un producto. `maximo` es el tope de unidades\ndel extra en una misma línea; NULL = sin tope. `grupo_id` lo mete en un\ngrupo de opciones; sin grupo, el extra es siempre opcional.",
         "properties": {
           "extra_id": {
             "format": "uuid",
             "title": "Extra Id",
             "type": "string"
+          },
+          "grupo_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grupo Id"
           },
           "maximo": {
             "anyOf": [
@@ -14833,6 +15859,514 @@
         ]
       }
     },
+    "/api/v1/inventory/recetas": {
+      "get": {
+        "operationId": "listar_recetas_api_v1_inventory_recetas_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RecetaOut"
+                  },
+                  "title": "Response Listar Recetas Api V1 Inventory Recetas Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Recetas",
+        "tags": [
+          "inventory"
+        ]
+      },
+      "post": {
+        "operationId": "crear_receta_api_v1_inventory_recetas_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecetaCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecetaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Receta",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/recetas/{receta_id}": {
+      "delete": {
+        "description": "Borra la receta y sus líneas. Responde 409 si algún producto comercial\nla usa, nombrándolo: sin receta ese producto no se podría preparar.",
+        "operationId": "eliminar_receta_api_v1_inventory_recetas__receta_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "receta_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Receta Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Eliminar Receta",
+        "tags": [
+          "inventory"
+        ]
+      },
+      "get": {
+        "operationId": "ver_receta_api_v1_inventory_recetas__receta_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "receta_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Receta Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecetaDetalleOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Ver Receta",
+        "tags": [
+          "inventory"
+        ]
+      },
+      "patch": {
+        "operationId": "editar_receta_api_v1_inventory_recetas__receta_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "receta_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Receta Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecetaUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecetaDetalleOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Editar Receta",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/recetas/{receta_id}/duplicar": {
+      "post": {
+        "description": "Clona la receta con sufijo \"(copy)\" para editarla desde ahí en vez de\nvolver a teclear 15 insumos.",
+        "operationId": "duplicar_receta_api_v1_inventory_recetas__receta_id__duplicar_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "receta_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Receta Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecetaDetalleOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Duplicar Receta",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/recetas/{receta_id}/escalar": {
+      "post": {
+        "description": "Multiplica todas las cantidades por un factor, redondeando cada línea\ncon los decimales de su propia unidad.",
+        "operationId": "escalar_receta_api_v1_inventory_recetas__receta_id__escalar_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "receta_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Receta Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecetaEscalarIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecetaDetalleOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Escalar Receta",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/recetas/{receta_id}/items": {
+      "post": {
+        "operationId": "agregar_item_receta_api_v1_inventory_recetas__receta_id__items_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "receta_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Receta Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecetaItemCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecetaDetalleOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Agregar Item Receta",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/recetas/{receta_id}/items/{item_id}": {
+      "delete": {
+        "operationId": "eliminar_item_receta_api_v1_inventory_recetas__receta_id__items__item_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "receta_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Receta Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecetaDetalleOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Eliminar Item Receta",
+        "tags": [
+          "inventory"
+        ]
+      },
+      "patch": {
+        "operationId": "editar_item_receta_api_v1_inventory_recetas__receta_id__items__item_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "receta_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Receta Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecetaItemUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecetaDetalleOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Editar Item Receta",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
     "/api/v1/inventory/reservas": {
       "get": {
         "description": "Reservas activas — lo que ya está prometido y por eso no figura en\nel `disponible` de `GET /stock` (RN-INV-009).",
@@ -15617,6 +17151,7 @@
     },
     "/api/v1/inventory/unidades-medida": {
       "get": {
+        "description": "Lo necesita cualquier pantalla que teclee una cantidad: los decimales\ndel campo salen de acá, no de una constante del frontend (RN-GER-010).",
         "operationId": "listar_unidades_medida_api_v1_inventory_unidades_medida_get",
         "responses": {
           "200": {
@@ -21471,6 +23006,37 @@
         ]
       }
     },
+    "/api/v1/sales/marcas": {
+      "get": {
+        "description": "Marcas disponibles para colgar un producto. Vive en `sales` y no en\n`users` porque el único consumidor es el catálogo comercial.",
+        "operationId": "listar_marcas_api_v1_sales_marcas_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MarcaOut"
+                  },
+                  "title": "Response Listar Marcas Api V1 Sales Marcas Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Marcas",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
     "/api/v1/sales/medios-pago": {
       "get": {
         "operationId": "listar_medios_pago_api_v1_sales_medios_pago_get",
@@ -21892,6 +23458,93 @@
       }
     },
     "/api/v1/sales/productos/{producto_id}": {
+      "delete": {
+        "description": "Borra un producto que nunca se vendió. Si ya tiene ventas responde 409:\nahí se descontinúa (`activo=False`), no se borra.",
+        "operationId": "eliminar_producto_api_v1_sales_productos__producto_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "producto_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Producto Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Eliminar Producto",
+        "tags": [
+          "sales"
+        ]
+      },
+      "get": {
+        "description": "Ficha completa: el producto, sus variantes y sus grupos de extras.",
+        "operationId": "ver_producto_api_v1_sales_productos__producto_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "producto_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Producto Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductoDetalleOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Ver Producto",
+        "tags": [
+          "sales"
+        ]
+      },
       "patch": {
         "operationId": "editar_producto_api_v1_sales_productos__producto_id__patch",
         "parameters": [
@@ -22001,6 +23654,65 @@
           }
         ],
         "summary": "Vincular Extra",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/productos/{producto_id}/grupos": {
+      "post": {
+        "description": "Agrupa extras y define cuántos hay que elegir. `minimo >= 1` hace el\ngrupo obligatorio en el PDV (RN-COM-023).",
+        "operationId": "crear_grupo_opcion_api_v1_sales_productos__producto_id__grupos_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "producto_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Producto Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GrupoOpcionCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GrupoOpcionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Grupo Opcion",
         "tags": [
           "sales"
         ]

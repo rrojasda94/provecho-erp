@@ -7,6 +7,8 @@
  * nada (F2.7/F2.28, ADR-013).
  */
 
+import type { Modulo } from "@/lib/modulos";
+
 const COMODIN = "*";
 
 /** ¿El usuario tiene algún permiso que empiece con `prefijo` (ej. "inventory.")? */
@@ -17,4 +19,16 @@ export function tieneAccesoModulo(permisos: string[], prefijo: string): boolean 
 /** ¿Tiene exactamente ese permiso? Para gates puntuales (un botón, una acción). */
 export function tienePermiso(permisos: string[], codigo: string): boolean {
   return permisos.includes(COMODIN) || permisos.includes(codigo);
+}
+
+/**
+ * ¿Le corresponde este módulo? Un `permiso` exacto en la definición manda
+ * sobre el prefijo: es la diferencia entre "trabaja en el área" y "le toca
+ * administrar esto". Sin esta distinción, un cajero (`sales.crear`) entraba
+ * al Catálogo por tener un permiso del área.
+ */
+export function puedeVerModulo(permisos: string[], modulo: Modulo): boolean {
+  return modulo.permiso
+    ? tienePermiso(permisos, modulo.permiso)
+    : tieneAccesoModulo(permisos, modulo.prefijoPermiso);
 }

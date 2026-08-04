@@ -180,7 +180,7 @@ erDiagram
   `inventory.requerir` | `inventory.ajustar` | `inventory.autorizar_ajuste`
   | `inventory.transferir`), restricciones (JSONB — ej. alcance
   `sucursal_propia`\`toda_empresa`, visibilidad `stock_esperado`\`ciego`,
-  RN-INV-005). **Evaluada** desde ADR-022 (2026-08-02) para `monto_maximo`,
+  RN-INV-005). **Evaluada** desde ADR-023 (2026-08-02) para `monto_maximo`,
   `estados_permitidos` y `horario` — `users.domain.rules.cumple_restricciones`
   + `check_permission(..., contexto=...)`; alcance/visibilidad siguen
   resolviéndose por su propio mecanismo (ej. RN-INV-005), no por este campo
@@ -205,8 +205,10 @@ erDiagram
     articulo ||--o{ receta_item : compone
     receta ||--o{ receta_item : contiene
     articulo ||--o| receta : "subreceta tiene BOM"
-    producto_comercial }o--|| receta : usa
+    producto_comercial }o--o| receta : usa
     producto_comercial }o--|| marca : pertenece
+    producto_comercial ||--o{ producto_comercial : "variantes (tamaños)"
+    producto_comercial ||--o{ producto_opcion_grupo : agrupa
     categoria ||--o{ articulo : agrupa
     articulo ||--o{ sku : tiene
     categoria_udm ||--o{ unidad_medida : define
@@ -279,9 +281,18 @@ erDiagram
 - **receta_item**: receta_id, articulo_id, cantidad, merma_pct (desperdicio
   esperado del insumo, ej. cáscara/semilla del tomate — base del costeo
   real de producción, RN-PRD-018), tipo_desperdicio (texto descriptivo,
-  opcional — ej. "cáscara y semilla").
+  opcional — ej. "cáscara y semilla"), **expresion** (ADR-023: la operación
+  tecleada si la cantidad salió de una, ej. "1000/3"; se guarda para poder
+  reeditarla, no para recalcularla). La cantidad se expresa **en la unidad
+  del artículo** y se redondea a sus decimales (RN-UDM-001, RN-COM-024): la
+  línea no tiene columna de UdM porque sería una segunda verdad sobre la
+  misma cantidad.
 - **producto_comercial** (vendible): id_interno (4 alfanuméricos,
-  autogenerado, inmutable, único), marca_id, nombre, receta_id, categoría
+  autogenerado, inmutable, único), marca_id, nombre, receta_id (**nullable
+  desde ADR-023**: NULL solo en el padre de un grupo de variantes),
+  **producto_padre_id** (nullable, auto-FK — si está seteado, esta fila es
+  una variante: Pizza Peperoni Familiar cuelga de Pizza Peperoni),
+  **orden** (posición de la tarjeta en el PDV), categoría
   de carta, activo (bool — al descontinuarse pasa a false/archivado, nunca
   se elimina), margen_contribucion (calculado; revisado por comercial/
   contabilidad para pricing), empaque_id (FK articulo tipo=empaque,
@@ -289,14 +300,14 @@ erDiagram
   cuáles se descuenta stock del empaque, RN-EMP-003). Precios en
   **lista_precio** / **precio** (por sucursal/canal/modalidad de consumo,
   RN-MDC-003). Puede formar parte de uno o más **combo** (N:N).
-- **modificador**: producto_comercial_id, tipo (`tamano` | `combinacion` |
-  `extra` | `resta`), receta_delta (ítems que agrega/quita de la receta
-  base), delta de precio. El orden de cálculo es siempre
-  tamaño → combinación → extra → resta (RN-PRD-004), independiente del
-  orden de selección del cliente/trabajador.
-- **variante_producto**: producto_comercial_id (base), modificadores
-  aplicados (ordenados), receta_resultante_id, precio_resultante. Es el
-  producto comercial final vendido.
+- ~~**modificador**~~ / ~~**variante_producto**~~: **reemplazados por
+  ADR-023**, nunca implementados. Ambos modelaban la variante como un delta
+  sobre una receta y un precio base. En la operación real cada tamaño lleva
+  otra receta (cambia el bollo, no solo los gramos) y otro precio completo,
+  así que la variante es un **producto hijo** (`producto_padre_id`) y el
+  extra es un producto comercial propio (ADR-018, RN-COM-021/022). Lo que
+  sobrevive del diseño anterior es la idea de grupo de opciones, ahora en
+  `producto_opcion_grupo`.
 - **combo**: es un producto_comercial (extiende 1:1 o flag `es_combo`)
   que une varios productos comerciales para venderse juntos bajo un nombre
   y precio propios — sube el ticket medio y ayuda a rotar inventarios.
@@ -543,7 +554,8 @@ descuenta stock vía la receta (ver [../domain/domain-model.md](../domain/domain
   saturación del local + ruta de entrega). Ventana de anulación: 5 min desde
   emisión. Escalamiento genera **reporte_escalamiento** (supervisor o
   encargado de sucursal).
-- **carrito**: cliente_id/usuario_id, punto_venta_id, items (variante_producto_id,
+- **carrito**: cliente_id/usuario_id, punto_venta_id, items (producto_comercial_id
+  — la variante elegida, ADR-023;
   cantidad), reserva_stock_id (origen `carrito`, RN-CAR-001), estado
   (`abierto` | `enviado` | `abandonado` | `convertido_a_venta`). Al enviarse,
   se convierte en `venta` (estado `orden`), y según si el POS admite
@@ -595,9 +607,17 @@ Solicitud.
   alguien cobre desde otra caja.
 - **producto_comercial_extra** (ADR-018): producto_comercial_id, extra_id
   (también un `producto_comercial`, con `es_extra=True`), maximo (tope de
-  unidades del extra en una línea, NULL = sin tope). Define qué extra admite
-  cada producto (RN-COM-021). Sin esta tabla nada impediría agregarle
-  "extra queso" a una gaseosa.
+  unidades del extra en una línea, NULL = sin tope), **grupo_id** (ADR-023,
+  nullable — grupo de opciones al que pertenece; NULL = extra suelto,
+  siempre opcional). Define qué extra admite cada producto (RN-COM-021). Sin
+  esta tabla nada impediría agregarle "extra queso" a una gaseosa.
+- **producto_opcion_grupo** (ADR-023): producto_comercial_id, nombre
+  ("Salsas", "Toppings"), **minimo** (cuántas opciones hay que elegir; `>= 1`
+  vuelve el grupo obligatorio y bloquea el pedido hasta elegirlas — no hay
+  columna `obligatorio`, sería el mismo dato dos veces), maximo (tope de
+  **opciones distintas** del grupo; el tope de unidades de un mismo extra
+  vive en `producto_comercial_extra.maximo`), orden. El grupo de tamaños no
+  vive acá: son variantes, y elegir una siempre es obligatorio (RN-COM-022).
 - **venta_item**: producto_comercial_id, cantidad, precio unitario,
   descuento (monto por línea que sale de listas promocionales — distinto
   del descuento manual de `venta`), **padre_venta_item_id** (nullable,

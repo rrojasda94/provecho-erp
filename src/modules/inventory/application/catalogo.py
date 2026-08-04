@@ -25,6 +25,7 @@ from src.modules.inventory.infrastructure.repositories import (
     SkuRepo,
     UnidadMedidaRepo,
 )
+from src.shared.texto import a_titulo
 
 
 def _existe(session: Session, model, entidad_id, nombre: str) -> None:
@@ -41,6 +42,7 @@ def crear_categoria(
     frecuencia_conteo: str | None = None,
 ) -> Categoria:
     _validar_frecuencia(frecuencia_conteo)
+    nombre = a_titulo(nombre)
     repo = CategoriaRepo(session)
     if repo.get_by_nombre(empresa_id, nombre):
         raise Conflicto(f"categoría '{nombre}' ya existe en la empresa")
@@ -76,7 +78,7 @@ def editar_categoria(
     if categoria is None:
         raise NoEncontrado("categoría no encontrada")
     if nombre is not None:
-        categoria.nombre = nombre
+        categoria.nombre = a_titulo(nombre)
     if asiento_contable_config is not None:
         categoria.asiento_contable_config = asiento_contable_config
     if quitar_frecuencia:
@@ -160,7 +162,7 @@ def crear_articulo(
         Articulo(
             empresa_id=empresa_id,
             id_interno=id_interno,
-            nombre=nombre,
+            nombre=a_titulo(nombre),
             unidad_medida_id=unidad_medida_id,
             tipo=tipo,
             categoria_id=categoria_id,
@@ -174,8 +176,10 @@ def editar_articulo(session: Session, articulo_id: uuid.UUID, **campos) -> Artic
     articulo = ArticuloRepo(session).get(articulo_id)
     if articulo is None:
         raise NoEncontrado("artículo no encontrado")
+    if campos.get("nombre") is not None:
+        articulo.nombre = a_titulo(campos["nombre"])
     for campo in (
-        "nombre", "categoria_id", "tipo", "costo_promedio", "archivado", "controla_lote",
+        "categoria_id", "tipo", "costo_promedio", "archivado", "controla_lote",
     ):
         if campo in campos and campos[campo] is not None:
             setattr(articulo, campo, campos[campo])

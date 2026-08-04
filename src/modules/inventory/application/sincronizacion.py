@@ -129,7 +129,15 @@ RECURSOS = (
     RecursoSync(
         nombre="receta_item",
         modelo=RecetaItem,
-        campos=("id", "receta_id", "articulo_id", "cantidad", "merma_pct", "updated_at"),
+        campos=(
+            "id",
+            "receta_id",
+            "articulo_id",
+            "cantidad",
+            "merma_pct",
+            "expresion",
+            "updated_at",
+        ),
         filtro=lambda q, a: q,
         motivo="El detalle de la receta: qué y cuánto se descuenta.",
     ),

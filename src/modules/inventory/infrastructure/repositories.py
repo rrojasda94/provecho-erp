@@ -14,6 +14,8 @@ from src.modules.inventory.infrastructure.models import (
     ConteoItem,
     Lote,
     MovimientoInventario,
+    Receta,
+    RecetaItem,
     ReservaStock,
     Sku,
     SolicitudInsumos,
@@ -47,6 +49,46 @@ class ArticuloRepo:
         self.s.add(articulo)
         self.s.flush()
         return articulo
+
+
+class RecetaRepo:
+    def __init__(self, session: Session) -> None:
+        self.s = session
+
+    def get(self, receta_id: uuid.UUID) -> Receta | None:
+        return self.s.get(Receta, receta_id)
+
+    def get_by_nombre(self, nombre: str) -> Receta | None:
+        return self.s.scalar(select(Receta).where(Receta.nombre == nombre))
+
+    def list(self) -> list[Receta]:
+        return list(self.s.scalars(select(Receta).order_by(Receta.nombre)))
+
+    def add(self, receta: Receta) -> Receta:
+        self.s.add(receta)
+        self.s.flush()
+        return receta
+
+    # Anotación entre comillas: `list` está sombreado por el método de arriba.
+    def items(self, receta_id: uuid.UUID) -> "list[RecetaItem]":
+        return [
+            *self.s.scalars(
+                select(RecetaItem)
+                .where(RecetaItem.receta_id == receta_id)
+                .order_by(RecetaItem.created_at, RecetaItem.id)
+            )
+        ]
+
+    def get_item(self, item_id: uuid.UUID) -> RecetaItem | None:
+        return self.s.get(RecetaItem, item_id)
+
+    def add_item(self, item: RecetaItem) -> RecetaItem:
+        self.s.add(item)
+        self.s.flush()
+        return item
+
+    def borrar_item(self, item: RecetaItem) -> None:
+        self.s.delete(item)
 
 
 class CategoriaRepo:

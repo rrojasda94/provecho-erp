@@ -32,8 +32,9 @@ from src.modules.users.infrastructure.models import (
     Marca,
     Sucursal,
 )
+from src.shared import fechas
 
-HOY = date.today()
+HOY = fechas.hoy()
 AYER = HOY - timedelta(days=1)
 MANANA = HOY + timedelta(days=1)
 

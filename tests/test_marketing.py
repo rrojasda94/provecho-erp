@@ -6,7 +6,6 @@ SQLite en memoria + override de get_db, mismo patrón que test_production.py.
 """
 
 import uuid
-from datetime import date
 from decimal import Decimal
 
 import pytest
@@ -44,6 +43,7 @@ from src.modules.users.infrastructure.models import (
     UsuarioSucursal,
 )
 from src.modules.users.infrastructure.security import hash_pin
+from src.shared import fechas
 
 
 @pytest.fixture()
@@ -286,7 +286,7 @@ def test_pieza_no_pertinente_no_se_publica(env):
             "marca_id": ids["marca_id"],
             "titulo": "Meme viral del momento",
             "canal": "tiktok",
-            "fecha_publicacion": str(date.today()),
+            "fecha_publicacion": str(fechas.hoy()),
             "uso_marca_validado": True,
         },
     )

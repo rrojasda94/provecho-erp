@@ -10,7 +10,7 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from src.modules.inventory.infrastructure.models import UnidadMedida
+from src.modules.inventory.infrastructure.models import Receta, UnidadMedida
 
 
 def unidad_medida_para_magnitud(session: Session, udm_id: uuid.UUID) -> dict | None:
@@ -20,3 +20,19 @@ def unidad_medida_para_magnitud(session: Session, udm_id: uuid.UUID) -> dict | N
     if udm is None:
         return None
     return {"id": udm.id, "nombre": udm.nombre, "decimales": udm.decimales}
+
+
+def receta_resumen(session: Session, receta_id: uuid.UUID) -> dict | None:
+    """Nombre y rendimiento de una receta, para que `sales` valide que la
+    que le asignan a un producto comercial existe sin importar su ORM.
+    `None` si no existe."""
+    receta = session.scalar(select(Receta).where(Receta.id == receta_id))
+    if receta is None:
+        return None
+    return {
+        "id": receta.id,
+        "nombre": receta.nombre,
+        "rendimiento_cantidad": receta.rendimiento_cantidad,
+        "rendimiento_unidad_medida_id": receta.rendimiento_unidad_medida_id,
+        "articulo_id": receta.articulo_id,
+    }

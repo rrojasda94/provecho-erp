@@ -27,6 +27,7 @@ from src.modules.sales.infrastructure.repositories import (
     ProductoComercialRepo,
     VentaRepo,
 )
+from src.shared import fechas
 from src.shared.models import Comprobante
 
 
@@ -47,6 +48,13 @@ def _armar_item(
     if prod is None or not prod.activo:
         raise NoEncontrado(
             f"producto comercial {it['producto_comercial_id']} no encontrado"
+        )
+    # Un producto con variantes no se prepara ni se cobra: lo que se vende
+    # es la variante (RN-COM-022). Sin receta no hay qué descontar, así que
+    # dejarlo pasar vendería sin mover inventario.
+    if prod.receta_id is None:
+        raise ReglaNegocio(
+            f"'{prod.nombre}' se vende por variante: elige tamaño/presentación"
         )
     cantidad = Decimal(str(it["cantidad"]))
     if cantidad <= 0:
@@ -143,6 +151,36 @@ def _armar_extras(
     return filas, detalles
 
 
+def _validar_grupos(
+    productos: ProductoComercialRepo, prod, extras: list[dict]
+) -> None:
+    """Cuántas opciones exige cada grupo del producto (RN-COM-023).
+
+    Se valida en el servidor y no solo en el PDV porque el kiosko, la
+    central de pedidos y cualquier integración futura entran por el mismo
+    endpoint: una regla que solo vive en una pantalla no es una regla.
+    """
+    grupos = productos.grupos_de(prod.id)
+    if not grupos:
+        return
+    elegidos: dict[uuid.UUID, int] = {}
+    for ex in extras:
+        vinculo = productos.admite_extra(prod.id, ex["producto_comercial_id"])
+        if vinculo is not None and vinculo.grupo_id is not None:
+            elegidos[vinculo.grupo_id] = elegidos.get(vinculo.grupo_id, 0) + 1
+    for grupo in grupos:
+        cuantos = elegidos.get(grupo.id, 0)
+        if cuantos < grupo.minimo:
+            raise ReglaNegocio(
+                f"'{prod.nombre}': '{grupo.nombre}' exige elegir "
+                f"{grupo.minimo}, llegaron {cuantos}"
+            )
+        if grupo.maximo is not None and cuantos > grupo.maximo:
+            raise ReglaNegocio(
+                f"'{prod.nombre}': '{grupo.nombre}' admite hasta {grupo.maximo}"
+            )
+
+
 def _armar_lineas(
     session: Session,
     items: list[dict],
@@ -151,11 +189,16 @@ def _armar_lineas(
     canal: str,
     modalidad: str,
     dia: date,
+    exigir_opciones: bool = True,
 ) -> tuple[list[VentaItem], list[list[VentaItem]], list[dict]]:
     """Líneas padre, sus extras y el detalle que viaja a inventory.
 
     Los extras van aparte y no en `filas` porque `padre_venta_item_id`
     necesita el id del padre, que recién existe tras el flush.
+
+    `exigir_opciones=False` en el replay del hub (ADR-009): la venta ya
+    ocurrió y se cobró: rechazarla ahora porque alguien volvió obligatorio
+    un grupo durante el corte perdería una venta real.
     """
     productos = ProductoComercialRepo(session)
     filas: list[VentaItem] = []
@@ -166,6 +209,8 @@ def _armar_lineas(
             session, it, productos=productos, sucursal_id=sucursal_id,
             canal=canal, modalidad=modalidad, dia=dia,
         )
+        if exigir_opciones:
+            _validar_grupos(productos, prod, it.get("extras") or [])
         hijos, dets_hijos = _armar_extras(
             session, fila, prod, it.get("extras") or [],
             productos=productos, sucursal_id=sucursal_id,
@@ -246,10 +291,13 @@ def crear_venta(
     if id is not None and repo.get(id) is not None:
         raise Conflicto(f"ya existe una venta con id {id} y otra idempotency_key")
 
-    dia = fecha_orden or date.today()
+    dia = fecha_orden or fechas.hoy()
     filas, extras_por_padre, detalle_evento = _armar_lineas(
         session, items, sucursal_id=sucursal_id, canal=canal,
         modalidad=modalidad, dia=dia,
+        # Replay del hub: la venta ya ocurrió (trae su número de orden), no
+        # se la vuelve a validar contra reglas que pudieron cambiar.
+        exigir_opciones=numero_orden is None,
     )
 
     venta = Venta(
@@ -334,7 +382,7 @@ def calcular_monto_descuento(
 ) -> Decimal:
     """Cuánto descontaría `modo`/`valor` sobre el subtotal actual — sin
     aplicarlo. El router lo usa para validar `permiso.restricciones`
-    (ADR-022, `monto_maximo`) ANTES de comprometer el cambio."""
+    (ADR-023, `monto_maximo`) ANTES de comprometer el cambio."""
     base = _subtotal(VentaRepo(session).items(venta.id))
     return rules.monto_descuento(modo, valor, base)
 

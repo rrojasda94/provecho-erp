@@ -5,7 +5,6 @@ SQLite en memoria + override de get_db, mismo patrón que test_purchases.py.
 """
 
 import uuid
-from datetime import date
 from decimal import Decimal
 
 import pytest
@@ -31,6 +30,7 @@ from src.modules.users.infrastructure.models import (
     UsuarioSucursal,
 )
 from src.modules.users.infrastructure.security import hash_pin
+from src.shared import fechas
 
 
 @pytest.fixture()
@@ -99,7 +99,7 @@ def _crear_cuenta(client, headers, ids, codigo, nombre, tipo):
 
 
 def _abrir_periodo_actual(client, headers, ids):
-    hoy = date.today()
+    hoy = fechas.hoy()
     return client.post(
         "/api/v1/accounting/periodos",
         headers=headers,
@@ -147,7 +147,7 @@ def test_crear_asiento_manual_sin_periodo_abierto_409(env):
         headers=h,
         json={
             "empresa_id": ids["empresa_id"],
-            "fecha": date.today().isoformat(),
+            "fecha": fechas.hoy().isoformat(),
             "glosa": "Venta al contado",
             "lineas": [
                 {"cuenta_contable_id": caja_id, "tipo": "debe", "monto": "100.00"},
@@ -169,7 +169,7 @@ def test_crear_asiento_manual_cuadrado_y_descuadrado(env):
         headers=h,
         json={
             "empresa_id": ids["empresa_id"],
-            "fecha": date.today().isoformat(),
+            "fecha": fechas.hoy().isoformat(),
             "glosa": "Venta al contado",
             "lineas": [
                 {"cuenta_contable_id": caja_id, "tipo": "debe", "monto": "100.00"},
@@ -185,7 +185,7 @@ def test_crear_asiento_manual_cuadrado_y_descuadrado(env):
         headers=h,
         json={
             "empresa_id": ids["empresa_id"],
-            "fecha": date.today().isoformat(),
+            "fecha": fechas.hoy().isoformat(),
             "glosa": "Descuadrado",
             "lineas": [
                 {"cuenta_contable_id": caja_id, "tipo": "debe", "monto": "100.00"},
@@ -207,7 +207,7 @@ def test_anular_asiento_genera_reversa_y_anula_original(env):
         headers=h,
         json={
             "empresa_id": ids["empresa_id"],
-            "fecha": date.today().isoformat(),
+            "fecha": fechas.hoy().isoformat(),
             "glosa": "Venta al contado",
             "lineas": [
                 {"cuenta_contable_id": caja_id, "tipo": "debe", "monto": "100.00"},
@@ -246,7 +246,7 @@ def test_cerrar_periodo_bloquea_nuevos_asientos_y_no_admite_doble_cierre(env):
         headers=h,
         json={
             "empresa_id": ids["empresa_id"],
-            "fecha": date.today().isoformat(),
+            "fecha": fechas.hoy().isoformat(),
             "glosa": "No debería registrar",
             "lineas": [
                 {"cuenta_contable_id": caja_id, "tipo": "debe", "monto": "10.00"},

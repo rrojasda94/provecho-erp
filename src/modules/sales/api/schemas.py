@@ -278,9 +278,18 @@ class LoteSyncIn(BaseModel):
 
 class ProductoCreate(BaseModel):
     id_interno: str = Field(min_length=1, max_length=4)
+    # En una variante se ignora: hereda la marca del padre.
     marca_id: uuid.UUID
     nombre: str = Field(min_length=1, max_length=150)
-    receta_id: uuid.UUID
+    # NULL solo si el producto agrupa variantes: entonces la receta va en
+    # cada hija (RN-COM-022).
+    receta_id: uuid.UUID | None = None
+    categoria_id: uuid.UUID | None = None
+    # Si viene, este producto es una variante de aquel (Pizza Peperoni
+    # Familiar cuelga de Pizza Peperoni).
+    producto_padre_id: uuid.UUID | None = None
+    # Orden de la tarjeta en el PDV: Personal, Mediana, Familiar.
+    orden: int = 0
     empaque_id: uuid.UUID | None = None
     modalidades_empaque: list[str] | None = None
     # Un extra tiene su propia receta y se ejecuta en la sucursal: se suma
@@ -289,17 +298,58 @@ class ProductoCreate(BaseModel):
     es_extra: bool = False
 
 
+class GrupoOpcionCreate(BaseModel):
+    """Grupo de extras del producto. `minimo >= 1` lo vuelve obligatorio: el
+    PDV no deja agregar la línea hasta elegir (RN-COM-023)."""
+
+    nombre: str = Field(min_length=1, max_length=50)
+    minimo: int = Field(default=0, ge=0)
+    maximo: int | None = Field(default=None, ge=1)
+    orden: int = 0
+
+
+class MarcaOut(BaseModel):
+    id: uuid.UUID
+    nombre: str
+    tipo: str
+
+
+class ExtraDeProductoOut(BaseModel):
+    extra_id: uuid.UUID
+    nombre: str
+    receta_id: uuid.UUID | None
+    maximo: int | None
+
+
+class GrupoOpcionOut(BaseModel):
+    id: uuid.UUID
+    nombre: str
+    minimo: int
+    maximo: int | None
+    orden: int
+    extras: list[ExtraDeProductoOut] = []
+
+
 class VincularExtraCreate(BaseModel):
     """Habilita un extra sobre un producto. `maximo` es el tope de unidades
-    del extra en una misma línea; NULL = sin tope."""
+    del extra en una misma línea; NULL = sin tope. `grupo_id` lo mete en un
+    grupo de opciones; sin grupo, el extra es siempre opcional."""
 
     extra_id: uuid.UUID
     maximo: int | None = Field(default=None, ge=1)
+    grupo_id: uuid.UUID | None = None
 
 
 class ProductoUpdate(BaseModel):
     nombre: str | None = None
     activo: bool | None = None
+    receta_id: uuid.UUID | None = None
+    # Único modo de dejar el producto sin receta: `receta_id=None` es
+    # indistinguible de "no lo mandaron". Es el paso previo a venderlo por
+    # presentaciones (RN-COM-022).
+    quitar_receta: bool = False
+    categoria_id: uuid.UUID | None = None
+    orden: int | None = None
     empaque_id: uuid.UUID | None = None
     modalidades_empaque: list[str] | None = None
 
@@ -310,9 +360,23 @@ class ProductoOut(BaseModel):
     id_interno: str
     marca_id: uuid.UUID
     nombre: str
-    receta_id: uuid.UUID
+    categoria_id: uuid.UUID | None = None
+    receta_id: uuid.UUID | None = None
+    producto_padre_id: uuid.UUID | None = None
+    orden: int = 0
     activo: bool
     es_extra: bool = False
+    empaque_id: uuid.UUID | None = None
+    modalidades_empaque: list[str] | None = None
+
+
+class ProductoDetalleOut(ProductoOut):
+    """La ficha que edita la pantalla de catálogo: producto + variantes +
+    grupos de extras, en una sola lectura."""
+
+    variantes: list[ProductoOut] = []
+    grupos: list[GrupoOpcionOut] = []
+    extras_sueltos: list[ExtraDeProductoOut] = []
 
 
 class MedioPagoCreate(BaseModel):
@@ -372,6 +436,23 @@ class ExtraDeCartaOut(BaseModel):
     nombre: str
     precio_unitario: Decimal
     maximo: int | None
+    # Grupo al que pertenece dentro de este producto. El cliente agrupa por
+    # `grupo_id` y bloquea el agregado si un grupo con `grupo_minimo >= 1`
+    # quedó sin elegir (RN-COM-023). NULL = extra suelto, opcional.
+    grupo_id: uuid.UUID | None = None
+    grupo_nombre: str | None = None
+    grupo_minimo: int = 0
+    grupo_maximo: int | None = None
+
+
+class VarianteDeCartaOut(BaseModel):
+    """Tamaño/presentación del producto, con precio propio y completo — no
+    un recargo sobre el padre (RN-COM-022). Elegir una es obligatorio."""
+
+    producto_comercial_id: uuid.UUID
+    nombre: str
+    precio_unitario: Decimal
+    orden: int
 
 
 class CartaItemOut(BaseModel):
@@ -380,7 +461,10 @@ class CartaItemOut(BaseModel):
     nombre: str
     categoria_id: uuid.UUID | None
     categoria_nombre: str | None = None
+    # Con variantes, es el precio de la más barata ("desde S/ 25"): lo que
+    # se cobra sale de la variante elegida, nunca de este campo.
     precio_unitario: Decimal
+    variantes: list[VarianteDeCartaOut] = []
     extras: list[ExtraDeCartaOut] = []
 
 

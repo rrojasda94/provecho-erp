@@ -1,5 +1,5 @@
 /**
- * Cliente del PDV visto desde el navegador y tipos del contrato.
+ * Operaciones del PDV vistas desde el navegador y tipos del contrato.
  *
  * El transporte (proxy, errores, idempotencia) vive en `lib/cliente-api.ts`
  * y se re-exporta acá para no romper los imports existentes. Los tipos
@@ -17,6 +17,22 @@ export type ExtraDeCarta = {
   nombre: string;
   precio_unitario: string;
   maximo: number | null;
+  /** Grupo al que pertenece dentro de este producto. Con `grupo_minimo >= 1`
+   * el grupo es obligatorio: no se puede agregar la línea sin elegir
+   * (RN-COM-023). NULL = extra suelto, opcional. */
+  grupo_id: string | null;
+  grupo_nombre: string | null;
+  grupo_minimo: number;
+  grupo_maximo: number | null;
+};
+
+/** Tamaño/presentación con precio propio y completo (RN-COM-022). Elegir
+ * una es obligatorio: la tarjeta padre no se vende. */
+export type VarianteDeCarta = {
+  producto_comercial_id: string;
+  nombre: string;
+  precio_unitario: string;
+  orden: number;
 };
 
 export type ItemDeCarta = {
@@ -25,7 +41,9 @@ export type ItemDeCarta = {
   nombre: string;
   categoria_id: string | null;
   categoria_nombre: string | null;
+  /** Con variantes es el "desde": lo que se cobra sale de la elegida. */
   precio_unitario: string;
+  variantes: VarianteDeCarta[];
   extras: ExtraDeCarta[];
 };
 

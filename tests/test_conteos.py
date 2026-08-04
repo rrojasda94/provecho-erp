@@ -38,8 +38,9 @@ from src.modules.users.infrastructure.models import (
     UsuarioSucursal,
 )
 from src.modules.users.infrastructure.security import hash_pin
+from src.shared import fechas
 
-HOY = datetime.date.today()
+HOY = fechas.hoy()
 
 
 @pytest.fixture()

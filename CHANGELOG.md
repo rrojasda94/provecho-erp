@@ -26,6 +26,28 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Fixed
 
+- **El calendario se corría un día pasadas las 19:00 hora Perú** (2026-08-03,
+  `src/shared/fechas.py`). Estaba anotado en el ROADMAP como una falla de los
+  tests de `conteos`; al ir a arreglarla resultó ser de la aplicación. El ERP
+  tenía tres relojes y los mezclaba: la base escribe sus timestamps en **UTC**
+  (`func.now()`), el proceso corre con la zona del sistema —**UTC dentro de
+  Docker**— y el negocio abre y cierra en **America/Lima**. `conteos` derivaba
+  "hoy" con `date.today()` y lo comparaba contra `cerrado_at`, en UTC: un
+  conteo cerrado el lunes a las 20:00 contaba como martes y el programa de
+  conteo cíclico se desfasaba entero.
+  - El mismo patrón estaba en otros 10 archivos, varios con consecuencia de
+    caja: correlativo de venta por día, resolución de precio vigente (una
+    promoción que vence "hoy" dejaba de aplicar cinco horas antes),
+    vencimiento de lotes y FEFO, fecha del asiento contable y del pago a
+    proveedor, y el día del mapa de mesas. Todos derivan la fecha de
+    calendario con `fechas.hoy()`; los instantes siguen guardándose en UTC,
+    que es lo correcto.
+  - La zona es configuración (`settings.zona_horaria`), no una constante: el
+    grupo opera en Perú hoy, pero el dato no es del código.
+  - Los 4 casos de `test_conteos` que fallaban pasaron **sin tocar un solo
+    test** — la prueba de que el error nunca estuvo ahí.
+    `tests/test_fechas_negocio.py` congela la regla y falla si algún módulo
+    vuelve a usar `date.today()`.
 - **`npm audit` del frontend en cero** (2026-08-03). Eran 4 altas:
   `brace-expansion` (la resolvió `npm audit fix`) y tres colgando de `next`.
   El JSON del audit deja claro que `next` **no** estaba marcado por CVEs
@@ -53,6 +75,122 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Added
 
+- **Variantes de producto, grupos de opciones y recetas** (2026-08-03,
+  ADR-023, migración `b6d1e83f47ac`). Una Pizza
+  Peperoni se vende en Personal, Mediana y Familiar: **tres productos hijos**
+  (`producto_comercial.producto_padre_id`) con receta y **precio completo**
+  propios —no un recargo sobre un precio base—, porque cada tamaño lleva
+  otra receta de verdad. El padre agrupa y no se vende: `receta_id` pasa a
+  nullable, `fijar_precio` lo rechaza y venderlo devuelve 409 (RN-COM-022).
+  Se eligió esto sobre atributos con recargo porque precio server-side,
+  margen por tamaño, descuento de insumos, KDS y réplica al hub siguen
+  funcionando sin escribir una línea.
+  - **Grupos de opciones** (`producto_opcion_grupo`, RN-COM-023): "Salsas:
+    elige 1" y "Toppings: hasta 3, opcional" son el mismo mecanismo con
+    distinto mínimo. `minimo >= 1` **es** ser obligatorio — no hay columna
+    `obligatorio`, sería el mismo dato dos veces. La regla se hace cumplir al
+    confirmar la venta y no solo en el PDV, porque el kiosko entra por el
+    mismo endpoint; el replay del hub se exceptúa (ADR-009): una venta ya
+    cobrada no se rechaza por una regla que cambió durante el corte.
+  - **Aritmética en la cantidad de receta** (RN-COM-024): se teclea "1000/3"
+    y se guarda **el resultado**, redondeado a los decimales de la unidad de
+    medida del insumo, más la expresión al lado para poder reeditarla. La
+    evalúa el servidor (`shared/aritmetica.py`, `ast` con lista blanca de
+    nodos, nunca `eval`): si el cliente mandara resultado y expresión por
+    separado, nada garantizaría que uno corresponda al otro. Suma
+    **duplicar** una receta con sufijo "(copy)" y **escalar por factor**,
+    que redondea cada línea con *su propia* unidad — 1.5 bollos de masa son
+    2, mientras el queso en gramos sí admite el decimal.
+  - **Nombres en formato título** (`shared/texto.py` + `frontend/lib/texto.ts`):
+    "queso mozzarella", "Queso Mozzarella" y "QUESO MOZZARELLA" son tres
+    filas distintas en un reporte. Regla del español —conectores en
+    minúscula salvo al inicio, siglas cortas respetadas— aplicada al salir
+    del campo y **de nuevo en el servidor**, que tiene más clientes que esa
+    pantalla.
+  - Endpoints nuevos: `POST/GET/PATCH /inventory/recetas` + `items`,
+    `/recetas/{id}/duplicar`, `/recetas/{id}/escalar`,
+    `GET /inventory/unidades-medida`, `POST /sales/productos/{id}/grupos`,
+    `GET /sales/productos/{id}`, `GET /sales/marcas`. `GET /sales/carta`
+    gana `variantes[]` por ítem y el grupo de cada extra.
+  - **Convertir un producto simple en uno con presentaciones**:
+    `PATCH /sales/productos/{id}` acepta `quitar_receta: true` (bandera
+    explícita, porque `receta_id: null` es indistinguible de "no lo mandaron",
+    mismo criterio que `quitar_frecuencia` en categorías). La receta soltada
+    **no se borra**: queda en el módulo de recetas, lista para asignarse a la
+    primera presentación. Se niega en una presentación y en un extra: sin
+    receta no se podrían preparar.
+  - **Borrar presentaciones y recetas**: `DELETE /sales/productos/{id}` borra
+    un producto **que nunca se vendió** —con su precio y sus vínculos de
+    extra, que solo existían por él— y responde 409 si ya tiene ventas,
+    porque `venta_item` apunta ahí y borrarlo reescribiría lo ya cobrado; en
+    ese caso se descontinúa (RN-GEN-006). `DELETE /inventory/recetas/{id}`
+    borra la receta y sus líneas, y responde 409 **nombrando** a los
+    productos que la usan: la clave foránea lo impediría igual, pero con un
+    error de integridad que no dice qué corregir. Esa consulta va por un
+    contrato público nuevo de `sales` (`productos_que_usan_receta`), no por
+    su ORM.
+  - **En la ficha del producto la receta se elige, no se edita**: el editor
+    completo estaba incrustado ahí y también en Catálogo → Recetas, y tener
+    lo mismo en dos lados hacía pensar que eran dos recetas distintas. Ahora
+    la ficha muestra una tabla de **presentaciones** —una fila por tarjeta del
+    PDV: nombre, receta (desplegable de las ya creadas), orden y precio— con
+    un enlace "editar" al módulo que sí las arma. Crear una presentación sin
+    elegir receta crea una vacía con su nombre, para no mandar al usuario a
+    otro módulo antes de poder cargar la fila.
+  - **La tarjeta del PDV muestra la etiqueta corta**: dentro del diálogo de
+    "Pizza Peperoni" las tarjetas dicen "Personal" y "Familiar", no "Pizza
+    Peperoni Personal" — el nombre del producto ya está en el título. El
+    nombre completo se conserva en la línea, que es lo que sale impreso en el
+    ticket y el comprobante.
+  - **Pantalla de artículos** (`/inventario/articulos`): crear insumos,
+    subrecetas, mercadería y empaques con su unidad de medida, costo de
+    arranque, categoría y control de lote. Era el bloqueante real del
+    catálogo — sin insumos propios, una receta solo podía usar los tres
+    artículos del seeder de demo. El backend existía desde el slice 1 de
+    `inventory`; faltaba la pantalla. La UdM no se edita después de crear el
+    artículo: cambiarla reescribiría en silencio el significado de todo el
+    stock y de cada receta que lo use (RN-UDM-002).
+  - **Listado de recetas** (`/catalogo/recetas`) y ficha propia: hasta ahora
+    una receta solo era visible desde el producto que la usaba, así que las
+    **subrecetas** —lo que la cocina produce para usar después: masa, salsa—
+    no tenían dónde existir, y las copias sueltas quedaban invisibles. La
+    ficha suma "¿Qué produce?", que liga la receta al artículo `subreceta`
+    que genera (`PATCH /inventory/recetas/{id}` acepta `articulo_id`, con la
+    relación exclusiva: dos recetas produciendo lo mismo dejarían a
+    `production` sin saber cuál explotar).
+  - **El formato título también se aplica a artículos y categorías**: se
+    normalizaba el nombre de receta y de producto, pero no el de un insumo
+    —"masa de pizza" se guardaba tal cual—, que es justo donde el duplicado
+    por mayúsculas más daña un reporte de consumo.
+  - **La receta se puede renombrar, rehacer y cambiar desde la ficha**
+    (2026-08-03, tarde): faltaba lo que hacía útil a todo lo demás. El
+    nombre, el rendimiento y su unidad se editan donde se leen (`PATCH
+    /inventory/recetas/{id}`, que ya existía pero no tenía UI), un botón
+    "Otra receta" arma una desde cero para un producto que ya tiene otra, y
+    el selector "…o reusar una existente" permite apuntar a otra receta ya
+    cargada. Sin esto, duplicar dejaba una copia llamada "(copy)" para
+    siempre y no había forma de partir de cero: el único camino era duplicar.
+  - **El sufijo de copia deja de apilarse**: duplicar "Pizza (copy)" ahora da
+    "Pizza (copy) 2", no "Pizza (copy) (copy)" — a la tercera el nombre ya
+    era ilegible.
+  - **Catálogo es su propio módulo, separado del punto de venta** (enmienda a
+    ADR-013): administrar la carta es acto de supervisor, no de quien vende
+    con ella. Las pantallas se mudan de `/ventas/productos` a
+    `/catalogo/productos` y el módulo se abre con el **permiso exacto**
+    `sales.gestionar_catalogo` en vez del prefijo `sales.` — con el prefijo,
+    un cajero (`sales.crear`) veía el módulo y leía el catálogo entero,
+    chocando con el 403 recién al guardar. `lib/modulos.ts` acepta `permiso`
+    exacto y `puedeVerModulo()` es el único punto que decide, usado tanto por
+    el grid del home como por el guard de `ModuloShell`. El módulo Ventas
+    queda apuntando al PDV.
+  - Frontend: módulo **Catálogo** con la ficha que edita producto,
+    variantes y recetas en la misma pantalla (patrón Odoo), y selector
+    obligatorio de tamaño + extras agrupados en el PDV, que bloquea el
+    agregado cuando falta algo en vez de dejar que el servidor lo rechace al
+    enviar.
+  - Contrato público nuevo de `inventory`: `queries_publicas.receta_resumen`.
+    Descartados por reemplazo: `modificador` y `variante_producto` del
+    data-model, nunca implementados.
 - **`decision_gerencial` — acta de decisión gerencial** (2026-08-03,
   migración `1805c0904c5c`, RN-GER-002): documentada en `data-model.md` §8c
   desde el slice de Gerencia (2026-07-22), ahora con modelo (en `shared`),
