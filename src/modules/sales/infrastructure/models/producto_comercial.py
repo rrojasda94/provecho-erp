@@ -54,7 +54,9 @@ class ProductoComercial(Base, UuidPkMixin, TimestampMixin):
     # Variante: cuelga de otro producto comercial. Un solo nivel — una
     # variante no admite variantes (RN-COM-022).
     producto_padre_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("producto_comercial.id"), nullable=True
+        # Indexado: la ficha y la carta piden las variantes de un padre en
+        # cada carga.
+        ForeignKey("producto_comercial.id"), nullable=True, index=True
     )
     # En qué orden salen las tarjetas en el PDV: Personal, Mediana,
     # Familiar no es orden alfabético ni de creación.

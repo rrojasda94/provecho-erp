@@ -52,7 +52,7 @@ def upgrade() -> None:
         ["id"],
     )
     op.create_index(
-        "ix_producto_comercial_padre",
+        "ix_producto_comercial_producto_padre_id",
         "producto_comercial",
         ["producto_padre_id"],
     )
@@ -73,10 +73,16 @@ def upgrade() -> None:
         sa.Column("maximo", sa.Integer(), nullable=True),
         sa.Column("orden", sa.Integer(), nullable=False, server_default="0"),
         sa.Column(
-            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now()
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
         ),
         sa.Column(
-            "updated_at", sa.DateTime(timezone=True), server_default=sa.func.now()
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
         ),
         sa.UniqueConstraint("producto_comercial_id", "nombre", name="uq_producto_grupo"),
     )
@@ -107,7 +113,10 @@ def downgrade() -> None:
     # bajar la migración lo dejaría sin receta y la venta fallaría. Se
     # borran primero las variantes, que en este esquema no tienen sentido.
     op.execute("DELETE FROM producto_comercial WHERE producto_padre_id IS NOT NULL")
-    op.drop_index("ix_producto_comercial_padre", table_name="producto_comercial")
+    op.drop_index(
+        "ix_producto_comercial_producto_padre_id",
+        table_name="producto_comercial",
+    )
     op.drop_constraint(
         "fk_producto_comercial_padre", "producto_comercial", type_="foreignkey"
     )
