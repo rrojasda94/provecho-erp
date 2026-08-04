@@ -30,13 +30,18 @@ al día falla el PR que lo causó (ADR-010).
 
 ## Formato de respuestas
 
-- Éxito: JSON del recurso. Las colecciones hoy devuelven un array plano
-  (`list[Schema]`), **no** el sobre `{items, total, page, page_size}` — esta
-  guía lo afirmaba sin que ningún endpoint lo implementara (corregido
-  2026-07-26). Paginación real es deuda técnica, a construir cuando una
-  colección lo justifique (ver ROADMAP); hasta entonces, documentar acá el
-  formato real evita que un cliente externo codifique contra un contrato
-  que no existe.
+- Éxito: JSON del recurso. Las colecciones tienen **dos formatos** según
+  qué las hace crecer (ADR-026, 2026-08-04):
+  - **Operativas** (ventas, movimientos, personas, órdenes de compra…):
+    sobre `{items, total, page, page_size}` con query params `page` (desde
+    1) y `page_size` (defecto 50, máximo 200). Sin parámetros se devuelven
+    las primeras 50 filas — un cliente que espera todo se lleva una página.
+  - **Catálogos de configuración** (roles, permisos, divisas, unidades de
+    medida, medios de pago, sucursales, mesas, plan de cuentas…): array
+    plano. Son decenas de filas escritas a mano y se consumen enteras;
+    paginarlas sería un sobre que desenvolver para nada.
+  La frontera es el origen del volumen, no su tamaño de hoy: si las filas
+  las crea la operación, se pagina; si las escribe alguien configurando, no.
 - Error: `{detail}` (FastAPI) con código HTTP correcto:
   `400` validación, `401` sin auth, `403` sin permiso, `404` no existe,
   `409` conflicto/idempotencia, `422` reglas de negocio.

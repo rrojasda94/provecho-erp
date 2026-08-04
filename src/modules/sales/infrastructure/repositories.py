@@ -67,6 +67,27 @@ class VentaRepo:
             )
         )
 
+    def q_del_dia(
+        self,
+        *,
+        sucursal_id: uuid.UUID,
+        fecha: date,
+        estados: tuple[str, ...] | None = None,
+        punto_venta_id: uuid.UUID | None = None,
+    ):
+        """Ventas de una jornada, sin ejecutar: el router la pagina
+        (ADR-026). Base de la pestaña de cobrados del PDV y del cierre de
+        caja: sin esto el cajero no puede verificar lo vendido ni reenviar
+        un comprobante que el cliente perdió."""
+        q = select(Venta).where(
+            Venta.sucursal_id == sucursal_id, Venta.fecha_orden == fecha
+        )
+        if estados:
+            q = q.where(Venta.estado.in_(estados))
+        if punto_venta_id is not None:
+            q = q.where(Venta.punto_venta_id == punto_venta_id)
+        return q.order_by(Venta.numero_orden)
+
     def del_dia(
         self,
         *,
@@ -75,17 +96,16 @@ class VentaRepo:
         estados: tuple[str, ...] | None = None,
         punto_venta_id: uuid.UUID | None = None,
     ) -> list[Venta]:
-        """Ventas de una jornada. Base de la pestaña de cobrados del PDV y
-        del cierre de caja: sin esto el cajero no puede verificar lo vendido
-        ni reenviar un comprobante que el cliente perdió."""
-        q = select(Venta).where(
-            Venta.sucursal_id == sucursal_id, Venta.fecha_orden == fecha
+        return list(
+            self.s.scalars(
+                self.q_del_dia(
+                    sucursal_id=sucursal_id,
+                    fecha=fecha,
+                    estados=estados,
+                    punto_venta_id=punto_venta_id,
+                )
+            )
         )
-        if estados:
-            q = q.where(Venta.estado.in_(estados))
-        if punto_venta_id is not None:
-            q = q.where(Venta.punto_venta_id == punto_venta_id)
-        return list(self.s.scalars(q.order_by(Venta.numero_orden)))
 
 
 class PagoRepo:

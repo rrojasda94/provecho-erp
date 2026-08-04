@@ -94,11 +94,15 @@ class AsientoRepo:
     def get(self, asiento_id: uuid.UUID) -> Asiento | None:
         return self.s.get(Asiento, asiento_id)
 
-    def list(self, empresa_id: uuid.UUID | None = None) -> list[Asiento]:
+    def q_list(self, empresa_id: uuid.UUID | None = None):
+        """La consulta, sin ejecutar: el router la pagina (ADR-026)."""
         q = select(Asiento)
         if empresa_id is not None:
             q = q.where(Asiento.empresa_id == empresa_id)
-        return list(self.s.scalars(q.order_by(Asiento.fecha.desc())))
+        return q.order_by(Asiento.fecha.desc())
+
+    def list(self, empresa_id: uuid.UUID | None = None) -> list[Asiento]:
+        return list(self.s.scalars(self.q_list(empresa_id)))
 
     def lineas(self, asiento_id: uuid.UUID) -> list[AsientoLinea]:
         return list(
@@ -165,11 +169,14 @@ class MovimientoDineroRepo:
             select(MovimientoDinero).where(MovimientoDinero.comprobante_id == comprobante_id)
         )
 
-    def list(self, empresa_id: uuid.UUID | None = None) -> list[MovimientoDinero]:
+    def q_list(self, empresa_id: uuid.UUID | None = None):
         q = select(MovimientoDinero)
         if empresa_id is not None:
             q = q.where(MovimientoDinero.empresa_id == empresa_id)
-        return list(self.s.scalars(q.order_by(MovimientoDinero.created_at.desc())))
+        return q.order_by(MovimientoDinero.created_at.desc())
+
+    def list(self, empresa_id: uuid.UUID | None = None) -> list[MovimientoDinero]:
+        return list(self.s.scalars(self.q_list(empresa_id)))
 
     def add(self, movimiento: MovimientoDinero) -> MovimientoDinero:
         self.s.add(movimiento)

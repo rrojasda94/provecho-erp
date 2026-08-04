@@ -8,6 +8,19 @@
  */
 export const API_INTERNAL_URL = process.env.API_INTERNAL_URL ?? "http://localhost:8000";
 
+/**
+ * Sobre de los listados que crecen con la operación (ADR-026). Los
+ * catálogos de configuración —roles, divisas, unidades de medida— siguen
+ * devolviendo un array plano: paginarlos sería un sobre que desenvolver
+ * para nada.
+ */
+export type Pagina<T> = {
+  items: T[];
+  total: number;
+  page: number;
+  page_size: number;
+};
+
 export class ApiError extends Error {
   status: number;
 

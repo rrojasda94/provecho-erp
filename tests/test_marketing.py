@@ -496,4 +496,4 @@ def test_campana_de_otra_empresa_no_es_visible(env):
 
     mkt = _token(client, username="mkt1", pin="111111")
     assert client.get(f"/api/v1/marketing/campanas/{campana_id}", headers=mkt).status_code == 403
-    assert client.get("/api/v1/marketing/campanas", headers=mkt).json() == []
+    assert client.get("/api/v1/marketing/campanas", headers=mkt).json()["items"] == []

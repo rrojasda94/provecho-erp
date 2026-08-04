@@ -37,6 +37,7 @@ from src.modules.users.api.deps import (
     tiene_permiso,
 )
 from src.modules.users.infrastructure.models import Usuario
+from src.shared.paginacion import Pagina, Paginacion, paginacion, paginar
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])
 
@@ -179,14 +180,17 @@ def crear_articulo(
     return art
 
 
-@router.get("/articulos", response_model=list[schemas.ArticuloOut])
+@router.get("/articulos", response_model=Pagina[schemas.ArticuloOut])
 def listar_articulos(
     empresa_id: uuid.UUID | None = None,
     _: Usuario = Depends(require_permission(LEER)),
     tenant: Tenant = Depends(get_tenant),
+    p: Paginacion = Depends(paginacion),
     session: Session = Depends(get_db),
 ):
-    return catalogo.listar_articulos(session, tenant.filtro_empresa(empresa_id))
+    return paginar(
+        session, catalogo.q_articulos(session, tenant.filtro_empresa(empresa_id)), p
+    )
 
 
 @router.patch("/articulos/{articulo_id}", response_model=schemas.ArticuloOut)
@@ -223,16 +227,19 @@ def crear_sku(
 
 
 # --- Stock / movimientos ----------------------------------------------------
-@router.get("/stock", response_model=list[schemas.StockOut])
+@router.get("/stock", response_model=Pagina[schemas.StockOut])
 def consultar_stock(
     almacen_id: uuid.UUID | None = None,
     _: Usuario = Depends(require_permission(LEER)),
     tenant: Tenant = Depends(get_tenant),
+    p: Paginacion = Depends(paginacion),
     session: Session = Depends(get_db),
 ):
     if almacen_id is not None:
         exigir_almacen(session, almacen_id, tenant)
-    return stock_uc.consultar_stock(session, almacen_id, tenant.filtro_empresa())
+    return stock_uc.consultar_stock_pagina(
+        session, p, almacen_id, tenant.filtro_empresa()
+    )
 
 
 @router.post("/movimientos", response_model=list[schemas.MovimientoOut], status_code=201)
@@ -395,21 +402,26 @@ def crear_solicitud(
     return solicitud
 
 
-@router.get("/solicitudes", response_model=list[schemas.SolicitudOut])
+@router.get("/solicitudes", response_model=Pagina[schemas.SolicitudOut])
 def listar_solicitudes(
     almacen_solicitante_id: uuid.UUID | None = None,
     estado: str | None = None,
     _: Usuario = Depends(require_permission(LEER)),
     tenant: Tenant = Depends(get_tenant),
+    p: Paginacion = Depends(paginacion),
     session: Session = Depends(get_db),
 ):
     if almacen_solicitante_id is not None:
         exigir_almacen(session, almacen_solicitante_id, tenant)
-    return solicitudes_uc.listar(
+    return paginar(
         session,
-        almacen_solicitante_id=almacen_solicitante_id,
-        estado=estado,
-        empresa_id=tenant.filtro_empresa(),
+        solicitudes_uc.q_listar(
+            session,
+            almacen_solicitante_id=almacen_solicitante_id,
+            estado=estado,
+            empresa_id=tenant.filtro_empresa(),
+        ),
+        p,
     )
 
 
@@ -535,22 +547,27 @@ def despachar_transferencia(
     return transferencia
 
 
-@router.get("/transferencias", response_model=list[schemas.TransferenciaOut])
+@router.get("/transferencias", response_model=Pagina[schemas.TransferenciaOut])
 def listar_transferencias(
     almacen_id: uuid.UUID | None = None,
     estado: str | None = None,
     _: Usuario = Depends(require_permission(LEER)),
     tenant: Tenant = Depends(get_tenant),
+    p: Paginacion = Depends(paginacion),
     session: Session = Depends(get_db),
 ):
     """`almacen_id` matchea origen o destino: lo que sale y lo que llega."""
     if almacen_id is not None:
         exigir_almacen(session, almacen_id, tenant)
-    return transferencias_uc.listar(
+    return paginar(
         session,
-        almacen_id=almacen_id,
-        estado=estado,
-        empresa_id=tenant.filtro_empresa(),
+        transferencias_uc.q_listar(
+            session,
+            almacen_id=almacen_id,
+            estado=estado,
+            empresa_id=tenant.filtro_empresa(),
+        ),
+        p,
     )
 
 

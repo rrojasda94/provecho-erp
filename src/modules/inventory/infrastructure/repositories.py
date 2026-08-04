@@ -39,11 +39,15 @@ class ArticuloRepo:
     def get_by_id_interno(self, id_interno: str) -> Articulo | None:
         return self.s.scalar(select(Articulo).where(Articulo.id_interno == id_interno))
 
-    def list(self, empresa_id: uuid.UUID | None = None) -> list[Articulo]:
+    def q_list(self, empresa_id: uuid.UUID | None = None):
+        """La consulta, sin ejecutar: el router la pagina (ADR-026)."""
         q = select(Articulo).where(Articulo.deleted_at.is_(None))
         if empresa_id is not None:
             q = q.where(Articulo.empresa_id == empresa_id)
-        return list(self.s.scalars(q.order_by(Articulo.nombre)))
+        return q.order_by(Articulo.nombre)
+
+    def list(self, empresa_id: uuid.UUID | None = None) -> list[Articulo]:
+        return list(self.s.scalars(self.q_list(empresa_id)))
 
     def add(self, articulo: Articulo) -> Articulo:
         self.s.add(articulo)
@@ -195,11 +199,11 @@ class StockRepo:
             q = q.with_for_update()
         return self.s.scalar(q)
 
-    def list(
+    def q_list(
         self,
         almacen_id: uuid.UUID | None = None,
         empresa_id: uuid.UUID | None = None,
-    ) -> list[Stock]:
+    ):
         q = select(Stock)
         if almacen_id is not None:
             q = q.where(Stock.almacen_id == almacen_id)
@@ -208,7 +212,16 @@ class StockRepo:
             q = q.join(Almacen, Almacen.id == Stock.almacen_id).where(
                 Almacen.empresa_id == empresa_id
             )
-        return list(self.s.scalars(q))
+        # Orden estable: sin él, dos páginas seguidas pueden repetir u
+        # omitir filas (Postgres no promete orden sin `ORDER BY`).
+        return q.order_by(Stock.almacen_id, Stock.sku_id)
+
+    def list(
+        self,
+        almacen_id: uuid.UUID | None = None,
+        empresa_id: uuid.UUID | None = None,
+    ) -> list[Stock]:
+        return list(self.s.scalars(self.q_list(almacen_id, empresa_id)))
 
     def add(self, stock: Stock) -> Stock:
         self.s.add(stock)
@@ -225,17 +238,18 @@ class MovimientoRepo:
         self.s.flush()
         return mov
 
-    def list(self, almacen_id: uuid.UUID, sku_id: uuid.UUID) -> list[MovimientoInventario]:
-        return list(
-            self.s.scalars(
-                select(MovimientoInventario)
-                .where(
-                    MovimientoInventario.almacen_id == almacen_id,
-                    MovimientoInventario.sku_id == sku_id,
-                )
-                .order_by(MovimientoInventario.ts)
+    def q_list(self, almacen_id: uuid.UUID, sku_id: uuid.UUID):
+        return (
+            select(MovimientoInventario)
+            .where(
+                MovimientoInventario.almacen_id == almacen_id,
+                MovimientoInventario.sku_id == sku_id,
             )
+            .order_by(MovimientoInventario.ts)
         )
+
+    def list(self, almacen_id: uuid.UUID, sku_id: uuid.UUID) -> list[MovimientoInventario]:
+        return list(self.s.scalars(self.q_list(almacen_id, sku_id)))
 
 
 class LoteRepo:
@@ -408,12 +422,12 @@ class SolicitudRepo:
     # `list` va al final: nombrar así un método sombrea al builtin dentro
     # del cuerpo de la clase, y cualquier anotación `list[...]` que venga
     # después reventaría al evaluarse.
-    def list(
+    def q_list(
         self,
         almacen_solicitante_id: uuid.UUID | None = None,
         estado: str | None = None,
         empresa_id: uuid.UUID | None = None,
-    ) -> "list[SolicitudInsumos]":
+    ):
         q = select(SolicitudInsumos)
         if almacen_solicitante_id is not None:
             q = q.where(
@@ -425,7 +439,19 @@ class SolicitudRepo:
             q = q.join(
                 Almacen, Almacen.id == SolicitudInsumos.almacen_solicitante_id
             ).where(Almacen.empresa_id == empresa_id)
-        return list(self.s.scalars(q.order_by(SolicitudInsumos.created_at.desc())))
+        return q.order_by(SolicitudInsumos.created_at.desc())
+
+    def list(
+        self,
+        almacen_solicitante_id: uuid.UUID | None = None,
+        estado: str | None = None,
+        empresa_id: uuid.UUID | None = None,
+    ) -> "list[SolicitudInsumos]":
+        return list(
+            self.s.scalars(
+                self.q_list(almacen_solicitante_id, estado, empresa_id)
+            )
+        )
 
 
 class TransferenciaRepo:
@@ -455,12 +481,12 @@ class TransferenciaRepo:
         return item
 
     # Ver la nota de `SolicitudRepo.list`: este método sombrea al builtin.
-    def list(
+    def q_list(
         self,
         almacen_id: uuid.UUID | None = None,
         estado: str | None = None,
         empresa_id: uuid.UUID | None = None,
-    ) -> "list[Transferencia]":
+    ):
         """`almacen_id` matchea origen o destino: quien mira un almacén
         quiere ver lo que sale y lo que le llega."""
         q = select(Transferencia)
@@ -477,7 +503,15 @@ class TransferenciaRepo:
             q = q.join(
                 Almacen, Almacen.id == Transferencia.origen_almacen_id
             ).where(Almacen.empresa_id == empresa_id)
-        return list(self.s.scalars(q.order_by(Transferencia.created_at.desc())))
+        return q.order_by(Transferencia.created_at.desc())
+
+    def list(
+        self,
+        almacen_id: uuid.UUID | None = None,
+        estado: str | None = None,
+        empresa_id: uuid.UUID | None = None,
+    ) -> "list[Transferencia]":
+        return list(self.s.scalars(self.q_list(almacen_id, estado, empresa_id)))
 
 
 class ConteoRepo:

@@ -33,6 +33,7 @@ from src.modules.users.application.errors import (
 from src.modules.users.infrastructure.models import Usuario
 from src.modules.users.infrastructure.repositories import UsuarioRepo
 from src.shared import parametros
+from src.shared.paginacion import Pagina, Paginacion, paginacion, paginar
 
 router = APIRouter()
 
@@ -158,13 +159,14 @@ def crear_persona(
     return persona
 
 
-@router.get("/personas", response_model=list[schemas.PersonaOut], tags=["personas"])
+@router.get("/personas", response_model=Pagina[schemas.PersonaOut], tags=["personas"])
 def listar_personas(
     q: str | None = None,
     _: Usuario = Depends(require_permission(GESTIONAR)),
+    p: Paginacion = Depends(paginacion),
     session: Session = Depends(get_db),
 ):
-    return admin.listar_personas(session, q)
+    return paginar(session, admin.q_personas(session, q), p)
 
 
 @router.get(
@@ -201,17 +203,22 @@ def listar_almacenes(
 
 
 @router.get(
-    "/notificaciones", response_model=list[schemas.NotificacionOut], tags=["users"]
+    "/notificaciones", response_model=Pagina[schemas.NotificacionOut], tags=["users"]
 )
 def listar_notificaciones(
     solo_no_leidas: bool = True,
     usuario: Usuario = Depends(get_current_user),
+    p: Paginacion = Depends(paginacion),
     session: Session = Depends(get_db),
 ):
     """La bandeja del usuario autenticado. Sin `require_permission` a
     propósito: no es un recurso a proteger por rol, cada uno ve **lo suyo**
     y el filtro es la identidad, no un permiso."""
-    return notificaciones.bandeja(session, usuario.id, solo_no_leidas=solo_no_leidas)
+    return paginar(
+        session,
+        notificaciones.q_bandeja(usuario.id, solo_no_leidas=solo_no_leidas),
+        p,
+    )
 
 
 @router.post(
@@ -332,12 +339,13 @@ def crear_usuario(
     return usuario
 
 
-@router.get("/users", response_model=list[schemas.UsuarioOut], tags=["users-admin"])
+@router.get("/users", response_model=Pagina[schemas.UsuarioOut], tags=["users-admin"])
 def listar_usuarios(
     _: Usuario = Depends(require_permission(GESTIONAR)),
+    p: Paginacion = Depends(paginacion),
     session: Session = Depends(get_db),
 ):
-    return admin.listar_usuarios(session)
+    return paginar(session, admin.q_usuarios(session), p)
 
 
 @router.patch(

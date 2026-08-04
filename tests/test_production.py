@@ -169,7 +169,7 @@ def test_flujo_completo_conforme_actualiza_stock_y_costo(env):
 
     stock = client.get(
         f"/api/v1/inventory/stock?almacen_id={ids['almacen_id']}", headers=h
-    ).json()
+    ).json()["items"]
     por_sku = {s["sku_id"]: Decimal(s["cantidad"]) for s in stock}
     assert Decimal("990") in por_sku.values()  # harina: 1000 - 10
     assert Decimal("10") in por_sku.values()  # masa producida

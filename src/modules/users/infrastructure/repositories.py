@@ -47,14 +47,16 @@ class UsuarioRepo:
             )
         )
 
-    def list(self) -> list[Usuario]:
-        return list(
-            self.s.scalars(
-                select(Usuario).where(Usuario.deleted_at.is_(None)).order_by(
-                    Usuario.username
-                )
-            )
+    def q_list(self):
+        """La consulta, sin ejecutar: el router la pagina (ADR-026)."""
+        return (
+            select(Usuario)
+            .where(Usuario.deleted_at.is_(None))
+            .order_by(Usuario.username)
         )
+
+    def list(self) -> list[Usuario]:
+        return list(self.s.scalars(self.q_list()))
 
     def add(self, usuario: Usuario) -> Usuario:
         self.s.add(usuario)
@@ -200,7 +202,7 @@ class PersonaRepo:
             )
         )
 
-    def list(self, q: str | None = None) -> list[Persona]:
+    def q_list(self, q: str | None = None):
         stmt = select(Persona).where(Persona.deleted_at.is_(None))
         if q:
             patron = f"%{q}%"
@@ -209,7 +211,10 @@ class PersonaRepo:
                 | (Persona.apellidos.ilike(patron))
                 | (Persona.numero_documento.ilike(patron))
             )
-        return list(self.s.scalars(stmt.order_by(Persona.apellidos, Persona.nombres)))
+        return stmt.order_by(Persona.apellidos, Persona.nombres)
+
+    def list(self, q: str | None = None) -> list[Persona]:
+        return list(self.s.scalars(self.q_list(q)))
 
     def add(self, persona: Persona) -> Persona:
         self.s.add(persona)

@@ -32,6 +32,7 @@ from src.modules.users.application import autorizacion
 from src.modules.users.application.errors import TokenInvalido
 from src.modules.users.application.queries_publicas import tiene_permiso
 from src.modules.users.infrastructure.models import Usuario
+from src.shared.paginacion import Pagina, Paginacion, paginacion, paginar
 
 router = APIRouter(prefix="/accounting", tags=["accounting"])
 
@@ -168,14 +169,17 @@ def crear_asiento_manual(
     return asiento
 
 
-@router.get("/asientos", response_model=list[schemas.AsientoOut])
+@router.get("/asientos", response_model=Pagina[schemas.AsientoOut])
 def listar_asientos(
     empresa_id: uuid.UUID | None = None,
     _: Usuario = Depends(require_permission(LEER)),
     tenant: Tenant = Depends(get_tenant),
+    p: Paginacion = Depends(paginacion),
     session: Session = Depends(get_db),
 ):
-    return AsientoRepo(session).list(tenant.filtro_empresa(empresa_id))
+    return paginar(
+        session, AsientoRepo(session).q_list(tenant.filtro_empresa(empresa_id)), p
+    )
 
 
 @router.get("/asientos/{asiento_id}", response_model=schemas.AsientoOut)
@@ -254,14 +258,17 @@ def registrar_pago(
     return movimiento
 
 
-@router.get("/pagos-proveedor", response_model=list[schemas.MovimientoDineroOut])
+@router.get("/pagos-proveedor", response_model=Pagina[schemas.MovimientoDineroOut])
 def listar_pagos(
     empresa_id: uuid.UUID | None = None,
     _: Usuario = Depends(require_permission(LEER)),
     tenant: Tenant = Depends(get_tenant),
+    p: Paginacion = Depends(paginacion),
     session: Session = Depends(get_db),
 ):
-    return pagos.listar_pagos(session, tenant.filtro_empresa(empresa_id))
+    return paginar(
+        session, pagos.q_pagos(session, tenant.filtro_empresa(empresa_id)), p
+    )
 
 
 @router.post(

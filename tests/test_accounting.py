@@ -354,7 +354,7 @@ def test_oc_emitida_con_regla_configurada_genera_asiento_automatico(env):
 
     asientos = client.get(
         f"/api/v1/accounting/asientos?empresa_id={ids['empresa_id']}", headers=h
-    ).json()
+    ).json()["items"]
     generado = [a for a in asientos if a["referencia_origen"] == oc["id"]]
     assert len(generado) == 1
     assert generado[0]["evento_origen"] == "purchases.oc_emitida"
@@ -414,7 +414,7 @@ def test_oc_emitida_sin_regla_no_genera_asiento(env):
 
     asientos = client.get(
         f"/api/v1/accounting/asientos?empresa_id={ids['empresa_id']}", headers=h
-    ).json()
+    ).json()["items"]
     assert not any(a["evento_origen"] == "purchases.oc_emitida" for a in asientos)
 
 
@@ -437,7 +437,7 @@ def test_venta_confirmada_con_regla_configurada_genera_asiento_automatico(env):
 
     asientos = client.get(
         f"/api/v1/accounting/asientos?empresa_id={ids['empresa_id']}", headers=h
-    ).json()
+    ).json()["items"]
     generado = [a for a in asientos if a["referencia_origen"] == venta_id]
     assert len(generado) == 1
     assert generado[0]["evento_origen"] == "sales.venta_confirmada"
@@ -504,7 +504,7 @@ def test_conformidad_comprobante_encola_pago_pendiente(env):
 
     pagos = client.get(
         f"/api/v1/accounting/pagos-proveedor?empresa_id={ids['empresa_id']}", headers=h
-    ).json()
+    ).json()["items"]
     generado = [p for p in pagos if p["orden_compra_id"] == oc["id"]]
     assert len(generado) == 1
     assert generado[0]["estado"] == "pendiente"
@@ -521,7 +521,7 @@ def test_conformidad_comprobante_reintento_no_duplica_pago(env):
 
     pagos = client.get(
         f"/api/v1/accounting/pagos-proveedor?empresa_id={ids['empresa_id']}", headers=h
-    ).json()
+    ).json()["items"]
     generado = [p for p in pagos if p["orden_compra_id"] == oc["id"]]
     assert len(generado) == 1
 
@@ -538,7 +538,7 @@ def test_ejecutar_pago_bajo_umbral_genera_asiento(env):
     _dar_conformidad(client, h, oc["id"])
     pago = client.get(
         f"/api/v1/accounting/pagos-proveedor?empresa_id={ids['empresa_id']}", headers=h
-    ).json()[0]
+    ).json()["items"][0]
 
     ejecutado = client.post(
         f"/api/v1/accounting/pagos-proveedor/{pago['id']}/ejecutar",
@@ -572,7 +572,7 @@ def test_ejecutar_pago_sobre_umbral_requiere_permiso_aprobar(env):
     _dar_conformidad(client, h_admin, oc["id"])
     pago = client.get(
         f"/api/v1/accounting/pagos-proveedor?empresa_id={ids['empresa_id']}", headers=h_admin
-    ).json()[0]
+    ).json()["items"][0]
     assert Decimal(pago["monto"]) == Decimal("2500.00")
 
     r = client.post(
@@ -597,7 +597,7 @@ def test_rechazar_pago_bloquea_ejecucion_posterior(env):
     _dar_conformidad(client, h, oc["id"])
     pago = client.get(
         f"/api/v1/accounting/pagos-proveedor?empresa_id={ids['empresa_id']}", headers=h
-    ).json()[0]
+    ).json()["items"][0]
 
     r = client.post(f"/api/v1/accounting/pagos-proveedor/{pago['id']}/rechazar", headers=h)
     assert r.status_code == 200

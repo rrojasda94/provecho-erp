@@ -26,6 +26,7 @@ from src.modules.inventory.infrastructure.repositories import (
 # users/infrastructure por historia. Import de modelo (no dominio)
 # permitido — mismo precedente que `application/listeners.py`.
 from src.modules.users.infrastructure.models import Almacen
+from src.shared.paginacion import Paginacion, paginar
 
 
 def aplicar_a_stock(
@@ -206,6 +207,22 @@ def registrar_salida(
     return movs
 
 
+def consultar_stock_pagina(
+    session: Session,
+    p: Paginacion,
+    almacen_id: uuid.UUID | None = None,
+    empresa_id: uuid.UUID | None = None,
+) -> dict:
+    """Igual que `consultar_stock`, pero una página a la vez (ADR-026).
+
+    El corte va sobre `stock`, y las reservas se componen solo para las
+    filas de esa página: es donde vive el volumen (un SKU por almacén).
+    """
+    pagina = paginar(session, StockRepo(session).q_list(almacen_id, empresa_id), p)
+    pagina["items"] = _componer(session, pagina["items"], almacen_id, empresa_id)
+    return pagina
+
+
 def consultar_stock(
     session: Session,
     almacen_id: uuid.UUID | None = None,
@@ -213,7 +230,17 @@ def consultar_stock(
 ) -> list[dict]:
     """`cantidad` es el físico; `disponible` descuenta las reservas activas
     (RN-INV-009) — es el número contra el que se compromete stock nuevo."""
-    filas = StockRepo(session).list(almacen_id, empresa_id)
+    return _componer(
+        session, StockRepo(session).list(almacen_id, empresa_id), almacen_id, empresa_id
+    )
+
+
+def _componer(
+    session: Session,
+    filas: list,
+    almacen_id: uuid.UUID | None,
+    empresa_id: uuid.UUID | None,
+) -> list[dict]:
     reservado: dict[tuple[uuid.UUID, uuid.UUID], Decimal] = {}
     for r in ReservaRepo(session).activas(almacen_id, None, empresa_id):
         clave = (r.almacen_id, r.sku_id)

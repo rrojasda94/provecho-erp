@@ -30,11 +30,15 @@ class TrabajadorRepo:
     def get(self, trabajador_id: uuid.UUID) -> Trabajador | None:
         return self.s.get(Trabajador, trabajador_id)
 
-    def list(self, empresa_id: uuid.UUID | None = None) -> list[Trabajador]:
+    def q_list(self, empresa_id: uuid.UUID | None = None):
+        """La consulta, sin ejecutar: el router la pagina (ADR-026)."""
         q = select(Trabajador).where(Trabajador.deleted_at.is_(None))
         if empresa_id is not None:
             q = q.where(Trabajador.empresa_id == empresa_id)
-        return list(self.s.scalars(q))
+        return q.order_by(Trabajador.created_at.desc())
+
+    def list(self, empresa_id: uuid.UUID | None = None) -> list[Trabajador]:
+        return list(self.s.scalars(self.q_list(empresa_id)))
 
     def add(self, trabajador: Trabajador) -> Trabajador:
         self.s.add(trabajador)
@@ -99,12 +103,12 @@ class PostulanteRepo:
     def get(self, postulante_id: uuid.UUID) -> Postulante | None:
         return self.s.get(Postulante, postulante_id)
 
-    def list(
+    def q_list(
         self,
         estado: str | None = None,
         empresa_id: uuid.UUID | None = None,
         convocatoria_id: uuid.UUID | None = None,
-    ) -> list[Postulante]:
+    ):
         q = select(Postulante).where(Postulante.deleted_at.is_(None))
         if estado is not None:
             q = q.where(Postulante.estado == estado)
@@ -112,7 +116,17 @@ class PostulanteRepo:
             q = q.where(Postulante.empresa_id == empresa_id)
         if convocatoria_id is not None:
             q = q.where(Postulante.convocatoria_id == convocatoria_id)
-        return list(self.s.scalars(q.order_by(Postulante.fecha_postulacion)))
+        return q.order_by(Postulante.fecha_postulacion)
+
+    def list(
+        self,
+        estado: str | None = None,
+        empresa_id: uuid.UUID | None = None,
+        convocatoria_id: uuid.UUID | None = None,
+    ) -> list[Postulante]:
+        return list(
+            self.s.scalars(self.q_list(estado, empresa_id, convocatoria_id))
+        )
 
     def add(self, postulante: Postulante) -> Postulante:
         self.s.add(postulante)

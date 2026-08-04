@@ -100,6 +100,16 @@ def notificar(
     return creadas
 
 
+def q_bandeja(usuario_id: uuid.UUID, *, solo_no_leidas: bool = True):
+    """La consulta de la bandeja, sin ejecutar: el router la pagina
+    (ADR-026). La bandeja de alguien que estuvo de vacaciones no cabe en
+    una pantalla."""
+    stmt = select(Notificacion).where(Notificacion.usuario_id == usuario_id)
+    if solo_no_leidas:
+        stmt = stmt.where(Notificacion.leida_at.is_(None))
+    return stmt.order_by(Notificacion.created_at.desc())
+
+
 def bandeja(
     session: Session,
     usuario_id: uuid.UUID,
@@ -107,12 +117,8 @@ def bandeja(
     solo_no_leidas: bool = True,
     limite: int = 50,
 ) -> list[Notificacion]:
-    stmt = select(Notificacion).where(Notificacion.usuario_id == usuario_id)
-    if solo_no_leidas:
-        stmt = stmt.where(Notificacion.leida_at.is_(None))
-    return list(
-        session.scalars(stmt.order_by(Notificacion.created_at.desc()).limit(limite))
-    )
+    stmt = q_bandeja(usuario_id, solo_no_leidas=solo_no_leidas)
+    return list(session.scalars(stmt.limit(limite)))
 
 
 def marcar_leida(

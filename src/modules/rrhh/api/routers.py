@@ -40,6 +40,7 @@ from src.modules.rrhh.application.scope import (
 from src.modules.users.api.deps import get_db, get_tenant, require_permission
 from src.modules.users.infrastructure.models import Usuario
 from src.shared import fechas
+from src.shared.paginacion import Pagina, Paginacion, paginacion, paginar
 
 router = APIRouter(prefix="/rrhh", tags=["rrhh"])
 
@@ -81,14 +82,19 @@ def crear_trabajador(
     return trabajador
 
 
-@router.get("/trabajadores", response_model=list[schemas.TrabajadorOut])
+@router.get("/trabajadores", response_model=Pagina[schemas.TrabajadorOut])
 def listar_trabajadores(
     empresa_id: uuid.UUID | None = None,
     _: Usuario = Depends(require_permission(LEER)),
     tenant: Tenant = Depends(get_tenant),
+    p: Paginacion = Depends(paginacion),
     session: Session = Depends(get_db),
 ):
-    return trabajadores.listar_trabajadores(session, tenant.filtro_empresa(empresa_id))
+    return paginar(
+        session,
+        trabajadores.q_trabajadores(session, tenant.filtro_empresa(empresa_id)),
+        p,
+    )
 
 
 @router.get("/trabajadores/{trabajador_id}", response_model=schemas.TrabajadorOut)
@@ -312,16 +318,21 @@ def crear_postulante(
     return postulante
 
 
-@router.get("/postulantes", response_model=list[schemas.PostulanteOut])
+@router.get("/postulantes", response_model=Pagina[schemas.PostulanteOut])
 def listar_postulantes(
     estado: str | None = None,
     convocatoria_id: uuid.UUID | None = None,
     _: Usuario = Depends(require_permission(LEER)),
     tenant: Tenant = Depends(get_tenant),
+    p: Paginacion = Depends(paginacion),
     session: Session = Depends(get_db),
 ):
-    return postulantes.listar_postulantes(
-        session, estado, tenant.filtro_empresa(), convocatoria_id
+    return paginar(
+        session,
+        postulantes.q_postulantes(
+            session, estado, tenant.filtro_empresa(), convocatoria_id
+        ),
+        p,
     )
 
 

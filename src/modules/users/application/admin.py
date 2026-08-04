@@ -91,6 +91,11 @@ def listar_usuarios(session: Session) -> list[Usuario]:
     return UsuarioRepo(session).list()
 
 
+def q_usuarios(session: Session):
+    """La consulta sin ejecutar, para que el router la pagine (ADR-026)."""
+    return UsuarioRepo(session).q_list()
+
+
 # --- Persona (party model, RN-GEN-007) --------------------------------------
 def crear_persona(
     session: Session,
@@ -127,6 +132,11 @@ def obtener_persona(session: Session, persona_id: uuid.UUID) -> Persona:
 
 def listar_personas(session: Session, q: str | None = None) -> list[Persona]:
     return PersonaRepo(session).list(q)
+
+
+def q_personas(session: Session, q: str | None = None):
+    """La consulta sin ejecutar, para que el router la pagine (ADR-026)."""
+    return PersonaRepo(session).q_list(q)
 
 
 # --- Organización (Almacen vive acá por historia, ver data-model §1) --------

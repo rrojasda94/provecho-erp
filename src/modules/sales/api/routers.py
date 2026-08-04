@@ -40,6 +40,7 @@ from src.modules.users.application.errors import TokenInvalido
 from src.modules.users.infrastructure.models import Usuario
 from src.shared import fechas
 from src.shared.integrations.factiliza import FactilizaError
+from src.shared.paginacion import Pagina, Paginacion, paginacion, paginar
 
 router = APIRouter(prefix="/sales", tags=["sales"])
 
@@ -85,23 +86,28 @@ def crear_venta(
     return venta
 
 
-@router.get("/ventas", response_model=list[schemas.VentaOut])
+@router.get("/ventas", response_model=Pagina[schemas.VentaOut])
 def listar_ventas_del_dia(
     sucursal_id: uuid.UUID,
     fecha: date | None = None,
     estado: str | None = None,
     _: Usuario = Depends(require_permission(LEER)),
     tenant: Tenant = Depends(get_tenant),
+    p: Paginacion = Depends(paginacion),
     session: Session = Depends(get_db),
 ):
     """Jornada de una sucursal. Alimenta la pestaña de cobrados del PDV:
     verificar lo vendido y reimprimir un comprobante que el cliente perdió.
     """
     tenant.exigir_sucursal(sucursal_id)
-    return VentaRepo(session).del_dia(
-        sucursal_id=sucursal_id,
-        fecha=fecha or fechas.hoy(),
-        estados=(estado,) if estado else None,
+    return paginar(
+        session,
+        VentaRepo(session).q_del_dia(
+            sucursal_id=sucursal_id,
+            fecha=fecha or fechas.hoy(),
+            estados=(estado,) if estado else None,
+        ),
+        p,
     )
 
 

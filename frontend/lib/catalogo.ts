@@ -9,6 +9,7 @@
  * lo que el servidor calculó (el redondeo por UdM se decide allá).
  */
 
+import { type Pagina } from "@/lib/api";
 import { pedir } from "@/lib/cliente-api";
 
 // --- Tipos del contrato -----------------------------------------------------
@@ -105,7 +106,10 @@ export type ProductoDetalle = Producto & {
 // --- Operaciones ------------------------------------------------------------
 export const catalogoApi = {
   unidadesMedida: () => pedir<UnidadMedida[]>("/inventory/unidades-medida"),
-  articulos: () => pedir<Articulo[]>("/inventory/articulos"),
+  // Listado paginado (ADR-026): la carta del PDV no lo usa, sí el
+  // editor de recetas, que pide la primera página.
+  articulos: async () =>
+    (await pedir<Pagina<Articulo>>("/inventory/articulos")).items,
 
   marcas: () => pedir<Marca[]>("/sales/marcas"),
   productos: () => pedir<Producto[]>("/sales/productos"),

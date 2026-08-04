@@ -192,6 +192,11 @@ def listar_articulos(
     return ArticuloRepo(session).list(empresa_id)
 
 
+def q_articulos(session: Session, empresa_id: uuid.UUID | None = None):
+    """La consulta sin ejecutar, para que el router la pagine (ADR-026)."""
+    return ArticuloRepo(session).q_list(empresa_id)
+
+
 def crear_sku(
     session: Session,
     *,

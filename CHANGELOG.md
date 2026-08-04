@@ -5,6 +5,34 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Paginación real en los listados operativos** (2026-08-04, ADR-026).
+  Ningún endpoint paginaba: cada listado devolvía la tabla entera y la guía
+  de API lo documentaba honestamente como deuda. Ahora los **18 listados
+  que crecen con la operación** —ventas del día, artículos, stock,
+  movimientos, solicitudes, transferencias, proveedores, órdenes de compra,
+  asientos, pagos a proveedor, trabajadores, postulantes, campañas, leads,
+  personas, usuarios y notificaciones— devuelven
+  `{items, total, page, page_size}` con `page`/`page_size` (defecto 50,
+  máximo 200: sin techo, `page_size=1000000` es una forma cómoda de tumbar
+  la API con una sola petición autenticada).
+  **Los catálogos de configuración siguen devolviendo un array plano**
+  (roles, permisos, divisas, unidades de medida, medios de pago,
+  sucursales, mesas, plan de cuentas…). La frontera no es cuántas filas
+  tiene la tabla hoy sino qué las crea: si nacen de la operación, crecen
+  solas y se paginan; si las escribe alguien configurando el sistema, son
+  decenas y se consumen enteras para llenar un `<select>`.
+  El corte va **en la base** (`LIMIT`/`OFFSET` + `COUNT`), no trayendo todo
+  y cortando en Python: cada repositorio expone ahora `q_list()` —la
+  consulta sin ejecutar— junto a su `list()` de siempre, así que solo
+  cambia el router.
+  **Cambio de contrato, no compatible hacia atrás**: frontend migrado
+  (5 fetchers), `openapi.json` regenerado y `api-guidelines.md` actualizado
+  con los dos formatos. Todavía sin controles de paginación en pantalla —
+  las 4 tablas existentes muestran la primera página. 9 tests en
+  `tests/test_paginacion.py`.
+
 ### Added
 
 - **Ciclo de caja completo** (2026-08-04, ADR-025, migración

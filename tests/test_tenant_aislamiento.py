@@ -223,7 +223,7 @@ def test_listado_de_articulos_solo_ve_su_empresa(env):
     client, ids = env
     h = _token(client, "almacenero_a")
     nombres = [a["nombre"] for a in
-               client.get("/api/v1/inventory/articulos", headers=h).json()]
+               client.get("/api/v1/inventory/articulos", headers=h).json()["items"]]
     assert "Insumo B" not in nombres
 
 

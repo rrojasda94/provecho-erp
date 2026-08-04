@@ -25,15 +25,21 @@ class CampanaRepo:
             select(Campana).where(Campana.idempotency_key == idempotency_key)
         )
 
-    def listar(
+    def q_listar(
         self, empresa_id: uuid.UUID | None, *, estado: str | None = None
-    ) -> list[Campana]:
+    ):
+        """La consulta, sin ejecutar: el router la pagina (ADR-026)."""
         stmt = select(Campana).where(Campana.deleted_at.is_(None))
         if empresa_id is not None:
             stmt = stmt.where(Campana.empresa_id == empresa_id)
         if estado is not None:
             stmt = stmt.where(Campana.estado == estado)
-        return list(self.s.scalars(stmt.order_by(Campana.created_at.desc())))
+        return stmt.order_by(Campana.created_at.desc())
+
+    def listar(
+        self, empresa_id: uuid.UUID | None, *, estado: str | None = None
+    ) -> list[Campana]:
+        return list(self.s.scalars(self.q_listar(empresa_id, estado=estado)))
 
     def add(self, campana: Campana) -> Campana:
         self.s.add(campana)
@@ -66,8 +72,15 @@ class LeadRepo:
             )
         )
 
+    def q_de_campana(self, campana_id: uuid.UUID):
+        return (
+            select(Lead)
+            .where(Lead.campana_id == campana_id)
+            .order_by(Lead.created_at.desc())
+        )
+
     def de_campana(self, campana_id: uuid.UUID) -> list[Lead]:
-        return list(self.s.scalars(select(Lead).where(Lead.campana_id == campana_id)))
+        return list(self.s.scalars(self.q_de_campana(campana_id)))
 
     def add(self, lead: Lead) -> Lead:
         self.s.add(lead)

@@ -25,6 +25,7 @@ from src.modules.marketing.infrastructure.repositories import CampanaRepo, LeadR
 from src.modules.sales.application.queries_publicas import venta_para_encuesta
 from src.modules.users.api.deps import get_db, get_tenant, require_permission
 from src.modules.users.infrastructure.models import Usuario
+from src.shared.paginacion import Pagina, Paginacion, paginacion, paginar
 
 router = APIRouter(prefix="/marketing", tags=["marketing"])
 
@@ -77,14 +78,19 @@ def crear_campana(
     return campana
 
 
-@router.get("/campanas", response_model=list[schemas.CampanaOut])
+@router.get("/campanas", response_model=Pagina[schemas.CampanaOut])
 def listar_campanas(
     estado: str | None = None,
     _: Usuario = Depends(require_permission(LEER)),
     tenant: Tenant = Depends(get_tenant),
+    p: Paginacion = Depends(paginacion),
     session: Session = Depends(get_db),
 ):
-    return CampanaRepo(session).listar(tenant.filtro_empresa(), estado=estado)
+    return paginar(
+        session,
+        CampanaRepo(session).q_listar(tenant.filtro_empresa(), estado=estado),
+        p,
+    )
 
 
 @router.get("/campanas/{campana_id}", response_model=schemas.CampanaOut)
@@ -314,18 +320,19 @@ def registrar_lead(
     return lead
 
 
-@router.get("/campanas/{campana_id}/leads", response_model=list[schemas.LeadOut])
+@router.get("/campanas/{campana_id}/leads", response_model=Pagina[schemas.LeadOut])
 def listar_leads(
     campana_id: uuid.UUID,
     _: Usuario = Depends(require_permission(LEER)),
     tenant: Tenant = Depends(get_tenant),
+    p: Paginacion = Depends(paginacion),
     session: Session = Depends(get_db),
 ):
     try:
         exigir_campana(session, campana_id, tenant)
     except NoEncontrado as e:
         raise _http(e) from e
-    return LeadRepo(session).de_campana(campana_id)
+    return paginar(session, LeadRepo(session).q_de_campana(campana_id), p)
 
 
 @router.post("/leads/{lead_id}/atribucion", response_model=schemas.LeadOut)
