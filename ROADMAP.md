@@ -1546,16 +1546,27 @@ errores de consola.
   jornada de una sucursal en una fecha es una dirección que se comparte.
   El tile del home pasó a apuntar acá y el PDV se abre desde su sidebar;
   antes el tile iba directo al PDV y lo administrativo no tenía puerta.
-- ⬜ **Deriva de esquema en la base local de Docker** (hallada 2026-08-04 al
-  verificar Gerencia): `alembic_version` decía `b6d1e83f47ac` con seis
-  migraciones sin correr, y —peor— `1805c0904c5c` figuraba aplicada sin que
-  `decision_gerencial` existiera, así que `GET /decisiones-gerenciales`
-  respondía 500. Se puso al día (`alembic upgrade head`) y se creó la tabla
-  faltante con el SQL de esa misma revisión. **Falta verificar si la base de
-  Supabase tiene la misma deriva**: el chequeo es
-  `Base.metadata.tables - inspect(engine).get_table_names()`, y convendría
-  que corra en CI o en el arranque, porque hoy una migración marcada y no
-  aplicada solo se descubre cuando un endpoint revienta en producción.
+- ✅ 2026-08-04 **Deriva de esquema detectada y con guard permanente**
+  (`src/core/esquema.py`). Hallada al abrir la pantalla de Gerencia: la base
+  local de Docker estaba seis migraciones atrás y —peor— tenía
+  `1805c0904c5c` marcada como aplicada sin que `decision_gerencial`
+  existiera, así que `GET /decisiones-gerenciales` respondía 500 con CI en
+  verde (`alembic check` compara modelo contra migraciones **sobre una base
+  limpia**, no contra la base real; por eso no lo vio). Ahora hay
+  `python -m src.core.esquema` —tablas del modelo que faltan en la base, más
+  revisión de `alembic_version` contra la cabeza del repo— y el mismo
+  chequeo corre **al arrancar**: en producción aborta, en desarrollo avisa
+  (`src/main.py`). Se compara solo existencia de tablas, no columnas: el
+  grueso del daño con muy poco código, sin los falsos positivos de comparar
+  tipos por dialecto. 8 tests. Base local ya corregida.
+- ⬜ **Supabase sigue con la deriva** (verificado 2026-08-04): revisión
+  `b6d1e83f47ac` y le faltan `alerta_pedido`, `decision_gerencial`,
+  `notificacion`, `pos_tarjeta` y `tablero`. Cuatro son migraciones que
+  nunca corrieron; `decision_gerencial` es el mismo defecto de marca falsa
+  que tenía la local. Correr `alembic upgrade head` contra Supabase toca la
+  base compartida de desarrollo, así que **se hace con el usuario presente**
+  y después hay que crear a mano la tabla de la revisión ya marcada (el SQL
+  sale de `alembic upgrade e4a2f9c17b3d:1805c0904c5c --sql`).
 - ⬜ **La jornada pide el comprobante venta por venta** (N+1 contra la API):
   aceptable para un día de una sucursal, no para un histórico. Si aparece
   el listado de varios días, el comprobante tiene que venir en el listado

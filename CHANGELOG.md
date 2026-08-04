@@ -35,6 +35,26 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Added
 
+- **Chequeo de deriva de esquema** (2026-08-04, `src/core/esquema.py`).
+  Nace de un fallo real: las dos bases de desarrollo tenían
+  `alembic_version` en una revisión **posterior** a la que crea
+  `decision_gerencial`, sin que la tabla existiera. `alembic current` decía
+  "al día", CI estaba verde —`alembic check` compara modelo contra
+  migraciones sobre una base **limpia**, no contra la base real— y
+  `GET /decisiones-gerenciales` respondía 500. Se descubrió abriendo la
+  pantalla.
+  Ahora `python -m src.core.esquema` responde dos preguntas que fallan
+  distinto: **qué tablas del modelo no están en la base** (mira el estado
+  real, atrapa la migración marcada y no corrida, la aplicada a medias y la
+  base restaurada de un backup viejo) y **si la revisión coincide con la
+  cabeza del repo** (mira el marcador, atrapa el despliegue sin `upgrade`
+  aunque todas las tablas existan). El mismo chequeo corre al arrancar el
+  servidor: en producción **aborta**, en desarrollo avisa — mismo criterio
+  que la validación de configuración.
+  Se compara solo existencia de tablas, no columnas ni tipos: el grueso del
+  daño con muy poco código y sin los falsos positivos que da comparar tipos
+  por dialecto. 8 tests.
+
 - **Pantallas de Gerencia y Ventas back-office** (2026-08-04). Con estas
   **ningún tile del home queda en 404**: los doce módulos del shell tienen
   pantalla.
