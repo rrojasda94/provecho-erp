@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 from src.modules.users.infrastructure.models import (
     Almacen,
     AuditLog,
+    Marca,
     Permiso,
     Persona,
     RefreshToken,
@@ -274,6 +275,27 @@ class AlmacenRepo:
         if empresa_id is not None:
             stmt = stmt.where(Almacen.empresa_id == empresa_id)
         return list(self.s.scalars(stmt.order_by(Almacen.nombre)))
+
+
+class MarcaRepo:
+    def __init__(self, session: Session) -> None:
+        self.s = session
+
+    def list(self, empresa_id: uuid.UUID | None = None) -> list[Marca]:
+        """Marcas que la empresa opera, vía sus sucursales.
+
+        La marca es del **grupo**, no de la empresa (una marca licenciada
+        puede operarla más de una): el filtro sale de qué marcas tienen
+        sucursal en esta empresa. Sin `empresa_id` (superusuario) van todas.
+        """
+        stmt = select(Marca).where(Marca.deleted_at.is_(None))
+        if empresa_id is not None:
+            stmt = stmt.where(
+                Marca.id.in_(
+                    select(Sucursal.marca_id).where(Sucursal.empresa_id == empresa_id)
+                )
+            )
+        return list(self.s.scalars(stmt.order_by(Marca.nombre)))
 
 
 class SucursalRepo:

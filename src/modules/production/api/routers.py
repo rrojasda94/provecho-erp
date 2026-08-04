@@ -12,6 +12,7 @@ from src.modules.production.application import ordenes
 from src.modules.production.application.scope import exigir_almacen, exigir_orden
 from src.modules.users.api.deps import get_db, get_tenant, require_permission
 from src.modules.users.infrastructure.models import Usuario
+from src.shared.paginacion import Pagina, Paginacion, paginacion, paginar
 
 router = APIRouter(prefix="/production", tags=["production"])
 
@@ -38,6 +39,34 @@ def crear_orden(
     )
     session.commit()
     return orden
+
+
+@router.get("/ordenes", response_model=Pagina[schemas.OrdenProduccionOut])
+def listar_ordenes(
+    almacen_id: uuid.UUID | None = None,
+    estado: str | None = None,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    p: Paginacion = Depends(paginacion),
+    session: Session = Depends(get_db),
+):
+    """Las órdenes del alcance del usuario, la más reciente primero.
+
+    No existía: solo se podía ver una orden si ya se sabía su id, lo que
+    dejaba a la cocina sin forma de mirar su propia jornada.
+    """
+    if almacen_id is not None:
+        exigir_almacen(session, almacen_id, tenant)
+    return paginar(
+        session,
+        ordenes.q_ordenes(
+            session,
+            empresa_id=tenant.filtro_empresa(),
+            almacen_id=almacen_id,
+            estado=estado,
+        ),
+        p,
+    )
 
 
 @router.get("/ordenes/{orden_id}", response_model=schemas.OrdenProduccionOut)

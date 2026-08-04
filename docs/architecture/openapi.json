@@ -5442,30 +5442,6 @@
         "title": "LoteSyncIn",
         "type": "object"
       },
-      "MarcaOut": {
-        "properties": {
-          "id": {
-            "format": "uuid",
-            "title": "Id",
-            "type": "string"
-          },
-          "nombre": {
-            "title": "Nombre",
-            "type": "string"
-          },
-          "tipo": {
-            "title": "Tipo",
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "nombre",
-          "tipo"
-        ],
-        "title": "MarcaOut",
-        "type": "object"
-      },
       "MeOut": {
         "properties": {
           "empresa_id": {
@@ -6960,6 +6936,37 @@
         "title": "Pagina[OrdenCompraOut]",
         "type": "object"
       },
+      "Pagina_OrdenProduccionOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/OrdenProduccionOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "Pagina[OrdenProduccionOut]",
+        "type": "object"
+      },
       "Pagina_PersonaOut_": {
         "properties": {
           "items": {
@@ -6989,6 +6996,37 @@
           "page_size"
         ],
         "title": "Pagina[PersonaOut]",
+        "type": "object"
+      },
+      "Pagina_PiezaOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PiezaOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "Pagina[PiezaOut]",
         "type": "object"
       },
       "Pagina_PostulanteOut_": {
@@ -14289,6 +14327,60 @@
         "title": "ComprobanteOut",
         "type": "object"
       },
+      "src__modules__sales__api__schemas__MarcaOut": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "tipo": {
+            "title": "Tipo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "nombre",
+          "tipo"
+        ],
+        "title": "MarcaOut",
+        "type": "object"
+      },
+      "src__modules__users__api__schemas__MarcaOut": {
+        "properties": {
+          "grupo_id": {
+            "format": "uuid",
+            "title": "Grupo Id",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "tipo": {
+            "title": "Tipo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "grupo_id",
+          "nombre",
+          "tipo"
+        ],
+        "title": "MarcaOut",
+        "type": "object"
+      },
       "src__modules__users__api__schemas__RolOut": {
         "properties": {
           "descripcion": {
@@ -19606,6 +19698,66 @@
         ]
       }
     },
+    "/api/v1/marcas": {
+      "get": {
+        "description": "Mismo criterio que `/almacenes`: catálogo de referencia, abierto a\ncualquier autenticado pero escopado por tenant.\n\nExiste además de `GET /sales/marcas` porque aquel exige `sales.leer`, y\nquien arma una campaña o una pieza de contenido tiene `marketing.*`, no\npermisos de ventas — pedirle `sales.leer` para llenar un `<select>`\nsería abrirle la carta entera.",
+        "operationId": "listar_marcas_organizacion_api_v1_marcas_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "empresa_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Empresa Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/src__modules__users__api__schemas__MarcaOut"
+                  },
+                  "title": "Response Listar Marcas Organizacion Api V1 Marcas Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Marcas Organizacion",
+        "tags": [
+          "users"
+        ]
+      }
+    },
     "/api/v1/marketing/campanas": {
       "get": {
         "operationId": "listar_campanas_api_v1_marketing_campanas_get",
@@ -20371,6 +20523,86 @@
       }
     },
     "/api/v1/marketing/piezas": {
+      "get": {
+        "description": "Calendario de contenido del tenant. No existía: una pieza solo se\npodía consultar sabiendo su id, así que no había forma de ver qué está\nplanificado esta semana.",
+        "operationId": "listar_piezas_api_v1_marketing_piezas_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "estado",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Estado"
+            }
+          },
+          {
+            "description": "Página, empezando en 1",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "description": "Página, empezando en 1",
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Filas por página (máx. 200)",
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Filas por página (máx. 200)",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pagina_PiezaOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Piezas",
+        "tags": [
+          "marketing"
+        ]
+      },
       "post": {
         "operationId": "planificar_pieza_api_v1_marketing_piezas_post",
         "requestBody": {
@@ -21402,6 +21634,103 @@
       }
     },
     "/api/v1/production/ordenes": {
+      "get": {
+        "description": "Las órdenes del alcance del usuario, la más reciente primero.\n\nNo existía: solo se podía ver una orden si ya se sabía su id, lo que\ndejaba a la cocina sin forma de mirar su propia jornada.",
+        "operationId": "listar_ordenes_api_v1_production_ordenes_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "almacen_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Almacen Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "estado",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Estado"
+            }
+          },
+          {
+            "description": "Página, empezando en 1",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "description": "Página, empezando en 1",
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Filas por página (máx. 200)",
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Filas por página (máx. 200)",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pagina_OrdenProduccionOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Ordenes",
+        "tags": [
+          "production"
+        ]
+      },
       "post": {
         "operationId": "crear_orden_api_v1_production_ordenes_post",
         "requestBody": {
@@ -25417,7 +25746,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/MarcaOut"
+                    "$ref": "#/components/schemas/src__modules__sales__api__schemas__MarcaOut"
                   },
                   "title": "Response Listar Marcas Api V1 Sales Marcas Get",
                   "type": "array"

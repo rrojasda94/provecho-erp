@@ -128,6 +128,14 @@ class AlmacenOut(BaseModel):
     direccion: str | None
 
 
+class MarcaOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    grupo_id: uuid.UUID
+    nombre: str
+    tipo: str
+
+
 class SucursalOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID

@@ -202,6 +202,24 @@ def listar_almacenes(
     return admin.listar_almacenes(session, tenant.filtro_empresa(empresa_id))
 
 
+@router.get("/marcas", response_model=list[schemas.MarcaOut], tags=["users"])
+def listar_marcas_organizacion(
+    empresa_id: uuid.UUID | None = None,
+    _: Usuario = Depends(get_current_user),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Mismo criterio que `/almacenes`: catálogo de referencia, abierto a
+    cualquier autenticado pero escopado por tenant.
+
+    Existe además de `GET /sales/marcas` porque aquel exige `sales.leer`, y
+    quien arma una campaña o una pieza de contenido tiene `marketing.*`, no
+    permisos de ventas — pedirle `sales.leer` para llenar un `<select>`
+    sería abrirle la carta entera.
+    """
+    return admin.listar_marcas(session, tenant.filtro_empresa(empresa_id))
+
+
 @router.get(
     "/notificaciones", response_model=Pagina[schemas.NotificacionOut], tags=["users"]
 )

@@ -28,6 +28,17 @@ from src.modules.production.infrastructure.repositories import OrdenProduccionRe
 from src.modules.users.infrastructure.models import Almacen
 
 
+def q_ordenes(
+    session: Session,
+    *,
+    empresa_id: uuid.UUID | None = None,
+    almacen_id: uuid.UUID | None = None,
+    estado: str | None = None,
+):
+    """La consulta sin ejecutar, para que el router la pagine (ADR-026)."""
+    return OrdenProduccionRepo(session).q_list(empresa_id, almacen_id, estado)
+
+
 def crear_orden_produccion(
     session: Session,
     *,

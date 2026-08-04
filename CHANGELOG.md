@@ -35,6 +35,30 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Added
 
+- **Pantallas de Producción y Marketing** (2026-08-04). Otros dos tiles del
+  home que llevaban a un 404.
+  **Producción**: órdenes con su ciclo real (crear → registrar el consumo
+  que la cocina sacó de verdad → cerrar con el control de calidad). La
+  columna de acciones muestra **solo el paso que aplica** al estado de la
+  orden; ofrecer el otro solo invita al 409. El diálogo de cierre cambia
+  según el resultado: cantidad producida si es conforme, evidencia de
+  destrucción si se desecha.
+  **Marketing**: campañas con el ciclo brief → aprobada → en curso →
+  cerrada, donde la tabla dice **qué campo del brief falta** en vez de
+  fallar recién al aprobar, y el botón de aprobar aparece solo si el usuario
+  tiene el permiso — quien redacta el brief no lo aprueba (RN-MKT-003), así
+  que ofrecérselo a todos sería prometer un 403. Contenido con el calendario
+  de piezas y sus dos validaciones de marca como etiquetas que se tocan
+  (RN-MKT-001/002); publicar queda deshabilitado hasta tener las dos.
+  **Tres endpoints de lectura que no existían** y que estas pantallas
+  necesitaban: `GET /production/ordenes` (solo se podía ver una orden
+  sabiendo su id — la cocina no tenía forma de mirar su propia jornada),
+  `GET /marketing/piezas` (sin él no hay calendario de contenido) y
+  `GET /api/v1/marcas` en `users`, porque el de `sales` exige `sales.leer` y
+  pedirle eso a un usuario de marketing para llenar un `<select>` sería
+  abrirle la carta entera. Los dos primeros paginados (ADR-026); el tercero
+  plano, que es lo que corresponde a un catálogo de organización.
+
 - **Pantallas de Usuarios y Contabilidad** (2026-08-04). Dos de los siete
   tiles del home que llevaban a un 404.
   **Usuarios**: cuentas con sus roles editables en la misma fila (asignar y

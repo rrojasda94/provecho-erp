@@ -13,6 +13,7 @@ from src.modules.users.application.errors import (
 from src.modules.users.domain import rules
 from src.modules.users.infrastructure.models import (
     Almacen,
+    Marca,
     Permiso,
     Persona,
     Rol,
@@ -25,6 +26,7 @@ from src.modules.users.infrastructure.models import (
 from src.modules.users.infrastructure.repositories import (
     AlmacenRepo,
     AuditLogRepo,
+    MarcaRepo,
     PermisoRepo,
     PersonaRepo,
     RolRepo,
@@ -142,6 +144,10 @@ def q_personas(session: Session, q: str | None = None):
 # --- Organización (Almacen vive acá por historia, ver data-model §1) --------
 def listar_almacenes(session: Session, empresa_id: uuid.UUID | None = None) -> list[Almacen]:
     return AlmacenRepo(session).list(empresa_id)
+
+
+def listar_marcas(session: Session, empresa_id: uuid.UUID | None = None) -> list[Marca]:
+    return MarcaRepo(session).list(empresa_id)
 
 
 def listar_sucursales(

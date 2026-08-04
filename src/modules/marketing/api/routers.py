@@ -21,7 +21,11 @@ from src.modules.marketing.application.scope import (
     exigir_pieza,
     exigir_sucursal,
 )
-from src.modules.marketing.infrastructure.repositories import CampanaRepo, LeadRepo
+from src.modules.marketing.infrastructure.repositories import (
+    CampanaRepo,
+    LeadRepo,
+    PiezaContenidoRepo,
+)
 from src.modules.sales.application.queries_publicas import venta_para_encuesta
 from src.modules.users.api.deps import get_db, get_tenant, require_permission
 from src.modules.users.infrastructure.models import Usuario
@@ -236,6 +240,25 @@ def planificar_pieza(
         raise _http(e) from e
     session.commit()
     return pieza
+
+
+@router.get("/piezas", response_model=Pagina[schemas.PiezaOut])
+def listar_piezas(
+    estado: str | None = None,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    p: Paginacion = Depends(paginacion),
+    session: Session = Depends(get_db),
+):
+    """Calendario de contenido del tenant. No existía: una pieza solo se
+    podía consultar sabiendo su id, así que no había forma de ver qué está
+    planificado esta semana."""
+    campanas = CampanaRepo(session).listar(tenant.filtro_empresa())
+    return paginar(
+        session,
+        PiezaContenidoRepo(session).q_listar([c.id for c in campanas], estado),
+        p,
+    )
 
 
 @router.patch("/piezas/{pieza_id}/validacion", response_model=schemas.PiezaOut)

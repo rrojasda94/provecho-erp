@@ -1506,9 +1506,35 @@ errores de consola.
   (ADR-024) en vez de recalcular el mismo número por segunda vez; abrir y
   cerrar siguen por API porque cada paso exige el PIN del encargado
   (RN-MDP-002) y esa pantalla va con el PDV.
+- **Producción** (2026-08-04): órdenes con su ciclo real —crear, registrar
+  el consumo que la cocina sacó de verdad, cerrar con el control de
+  calidad—. La columna de acciones muestra **solo el paso que aplica** al
+  estado de la orden (consumo en `borrador`, completar en `en_proceso`):
+  ofrecer el otro solo invita al 409. El diálogo de cierre cambia según el
+  resultado (cantidad producida si es conforme, evidencia de destrucción si
+  se desecha). Requirió `GET /production/ordenes` **paginado, que no
+  existía**: solo se podía ver una orden sabiendo su id, o sea que la cocina
+  no tenía forma de mirar su propia jornada.
+- **Marketing** (2026-08-04): *Campañas* con el ciclo brief → aprobada → en
+  curso → cerrada; la tabla dice **qué campo del brief falta** en vez de
+  fallar recién al aprobar, y el botón de aprobar aparece solo si el usuario
+  tiene `marketing.campana_aprobar` — quien redacta el brief no lo aprueba
+  (RN-MKT-003), así que ofrecerlo a todos sería prometer un 403.
+  *Contenido* con el calendario de piezas y sus dos validaciones de marca
+  como etiquetas que se tocan (RN-MKT-001/002); publicar queda deshabilitado
+  hasta que las dos estén. Requirió `GET /marketing/piezas` (tampoco
+  existía) y `GET /api/v1/marcas` en `users`: el de `sales` exige
+  `sales.leer` y pedirle eso a un usuario de marketing para llenar un
+  `<select>` sería abrirle la carta entera.
 - ⬜ Módulos que siguen sin pantalla (solo tile en el home, 404 limpio de
-  Next.js): ventas de back-office (más allá del PDV), producción, marketing
-  y gerencia.
+  Next.js): ventas de back-office (más allá del PDV) y gerencia.
+- ⬜ **Marketing sin pantalla de leads ni de encuestas**: el backend las
+  tiene (`/leads`, `/encuestas`, atribución lead→venta) pero la UI cubre
+  campañas y contenido. Van cuando haya campañas reales corriendo.
+- ⬜ **Producción sin plan ni checklist de inocuidad**: la pantalla cubre la
+  orden ad-hoc, que es lo único que el backend implementa hoy
+  (`plan_produccion` y `checklist_inocuidad_turno` siguen en deuda del
+  módulo).
 
 Todo lo demás (theming multi-marca, accesibilidad — catálogo ya definido,
 tiempo real de KDS, i18n, hardware, testing — Playwright ya decidido por
