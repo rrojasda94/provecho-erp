@@ -8,7 +8,7 @@ un contador lo registra a mano)."""
 
 import logging
 import uuid
-from datetime import date, datetime
+from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy.orm import Session
@@ -19,7 +19,7 @@ from src.modules.accounting.application.errors import Conflicto, NoEncontrado, R
 from src.modules.accounting.domain import rules
 from src.modules.accounting.infrastructure.models import MovimientoDinero
 from src.modules.accounting.infrastructure.repositories import MovimientoDineroRepo
-from src.shared import aprobaciones
+from src.shared import aprobaciones, fechas
 
 log = logging.getLogger(__name__)
 
@@ -114,7 +114,7 @@ def ejecutar_pago(
         session,
         empresa_id=movimiento.empresa_id,
         evento="accounting.pago_ejecutado",
-        fecha=date.today(),
+        fecha=fechas.hoy(),
         glosa=f"Pago a proveedor — movimiento {movimiento.id}",
         referencia_origen=str(movimiento.id),
         monto=movimiento.monto,

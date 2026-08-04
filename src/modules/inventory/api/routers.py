@@ -13,6 +13,7 @@ from src.modules.inventory.api import schemas
 from src.modules.inventory.application import ajustes, catalogo
 from src.modules.inventory.application import conteos as conteos_uc
 from src.modules.inventory.application import lotes as lotes_uc
+from src.modules.inventory.application import recetas as recetas_uc
 from src.modules.inventory.application import reservas as reservas_uc
 from src.modules.inventory.application import solicitudes as solicitudes_uc
 from src.modules.inventory.application import stock as stock_uc
@@ -684,3 +685,136 @@ def rechazar_ajuste(
     aj = ajustes.rechazar_ajuste(session, ajuste_id, actor.id)
     session.commit()
     return aj
+
+
+# --- Unidades de medida -----------------------------------------------------
+@router.get("/unidades-medida", response_model=list[schemas.UnidadMedidaOut])
+def listar_unidades_medida(
+    _: Usuario = Depends(require_permission(LEER)),
+    session: Session = Depends(get_db),
+):
+    """Catálogo global de unidades. Lo necesita cualquier pantalla que
+    teclee una cantidad: los decimales del campo salen de acá, no de una
+    constante del frontend (RN-GER-010)."""
+    return catalogo.listar_unidades_medida(session)
+
+
+# --- Recetas ----------------------------------------------------------------
+@router.post("/recetas", response_model=schemas.RecetaOut, status_code=201)
+def crear_receta(
+    body: schemas.RecetaCreate,
+    _: Usuario = Depends(require_permission(CATALOGO)),
+    session: Session = Depends(get_db),
+):
+    receta = recetas_uc.crear_receta(session, **body.model_dump())
+    session.commit()
+    return recetas_uc.detalle_receta(session, receta.id)
+
+
+@router.get("/recetas", response_model=list[schemas.RecetaOut])
+def listar_recetas(
+    _: Usuario = Depends(require_permission(LEER)),
+    session: Session = Depends(get_db),
+):
+    return recetas_uc.listar_recetas(session)
+
+
+@router.get("/recetas/{receta_id}", response_model=schemas.RecetaDetalleOut)
+def ver_receta(
+    receta_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(LEER)),
+    session: Session = Depends(get_db),
+):
+    return recetas_uc.detalle_receta(session, receta_id)
+
+
+@router.patch("/recetas/{receta_id}", response_model=schemas.RecetaDetalleOut)
+def editar_receta(
+    receta_id: uuid.UUID,
+    body: schemas.RecetaUpdate,
+    _: Usuario = Depends(require_permission(CATALOGO)),
+    session: Session = Depends(get_db),
+):
+    recetas_uc.editar_receta(session, receta_id, **body.model_dump())
+    session.commit()
+    return recetas_uc.detalle_receta(session, receta_id)
+
+
+@router.delete("/recetas/{receta_id}", status_code=204)
+def eliminar_receta(
+    receta_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(CATALOGO)),
+    session: Session = Depends(get_db),
+):
+    """Borra la receta y sus líneas. Responde 409 si algún producto comercial
+    la usa, nombrándolo: sin receta ese producto no se podría preparar."""
+    recetas_uc.eliminar_receta(session, receta_id)
+    session.commit()
+
+
+@router.post("/recetas/{receta_id}/duplicar", response_model=schemas.RecetaDetalleOut,
+             status_code=201)
+def duplicar_receta(
+    receta_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(CATALOGO)),
+    session: Session = Depends(get_db),
+):
+    """Clona la receta con sufijo "(copy)" para editarla desde ahí en vez de
+    volver a teclear 15 insumos."""
+    copia = recetas_uc.duplicar_receta(session, receta_id)
+    session.commit()
+    return recetas_uc.detalle_receta(session, copia.id)
+
+
+@router.post("/recetas/{receta_id}/escalar", response_model=schemas.RecetaDetalleOut)
+def escalar_receta(
+    receta_id: uuid.UUID,
+    body: schemas.RecetaEscalarIn,
+    _: Usuario = Depends(require_permission(CATALOGO)),
+    session: Session = Depends(get_db),
+):
+    """Multiplica todas las cantidades por un factor, redondeando cada línea
+    con los decimales de su propia unidad."""
+    recetas_uc.escalar_receta(session, receta_id, body.factor)
+    session.commit()
+    return recetas_uc.detalle_receta(session, receta_id)
+
+
+@router.post("/recetas/{receta_id}/items", response_model=schemas.RecetaDetalleOut,
+             status_code=201)
+def agregar_item_receta(
+    receta_id: uuid.UUID,
+    body: schemas.RecetaItemCreate,
+    _: Usuario = Depends(require_permission(CATALOGO)),
+    session: Session = Depends(get_db),
+):
+    recetas_uc.agregar_item(session, receta_id, **body.model_dump())
+    session.commit()
+    return recetas_uc.detalle_receta(session, receta_id)
+
+
+@router.patch("/recetas/{receta_id}/items/{item_id}",
+              response_model=schemas.RecetaDetalleOut)
+def editar_item_receta(
+    receta_id: uuid.UUID,
+    item_id: uuid.UUID,
+    body: schemas.RecetaItemUpdate,
+    _: Usuario = Depends(require_permission(CATALOGO)),
+    session: Session = Depends(get_db),
+):
+    recetas_uc.editar_item(session, item_id, **body.model_dump())
+    session.commit()
+    return recetas_uc.detalle_receta(session, receta_id)
+
+
+@router.delete("/recetas/{receta_id}/items/{item_id}",
+               response_model=schemas.RecetaDetalleOut)
+def eliminar_item_receta(
+    receta_id: uuid.UUID,
+    item_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(CATALOGO)),
+    session: Session = Depends(get_db),
+):
+    recetas_uc.eliminar_item(session, item_id)
+    session.commit()
+    return recetas_uc.detalle_receta(session, receta_id)

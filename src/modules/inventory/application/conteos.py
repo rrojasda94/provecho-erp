@@ -42,10 +42,14 @@ from src.modules.inventory.infrastructure.repositories import (
     StockRepo,
 )
 from src.modules.users.infrastructure.models import Almacen
+from src.shared import fechas
 
 
 def _hoy(hoy: datetime.date | None) -> datetime.date:
-    return hoy or datetime.date.today()
+    """El día **del negocio**, no el del servidor: en Docker el proceso corre
+    en UTC y un cierre de las 20:00 hora Perú caía al día siguiente, corriendo
+    todo el calendario de conteos (`src/shared/fechas.py`)."""
+    return hoy or fechas.hoy()
 
 
 def _stock_de_categoria(
@@ -140,8 +144,8 @@ def _fecha_base(
     """
     ultimo = ConteoRepo(session).ultimo_cerrado(almacen_id, categoria.id)
     if ultimo is not None and ultimo.cerrado_at is not None:
-        return ultimo.cerrado_at.date(), ultimo
-    alta = categoria.created_at.date() if categoria.created_at else _hoy(hoy)
+        return fechas.a_fecha_local(ultimo.cerrado_at), ultimo
+    alta = fechas.a_fecha_local(categoria.created_at) or _hoy(hoy)
     return alta, None
 
 
@@ -266,7 +270,9 @@ def programa(
                     "categoria_id": categoria.id,
                     "categoria": categoria.nombre,
                     "frecuencia": categoria.frecuencia_conteo,
-                    "ultimo_conteo": ultimo.cerrado_at.date() if ultimo else None,
+                    "ultimo_conteo": fechas.a_fecha_local(
+                        ultimo.cerrado_at if ultimo else None
+                    ),
                     "proxima_fecha": proxima,
                     "estado": estado,
                     "dias_atraso": atraso,

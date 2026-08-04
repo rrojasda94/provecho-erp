@@ -64,6 +64,7 @@ from src.modules.users.infrastructure.models import (
 from src.modules.users.infrastructure.security import hash_pin, verify_pin
 from src.seeders.hub import alta_hub
 from src.seeders.seed import seed
+from src.shared import fechas
 
 PIN_CAJERO = "123456"
 PIN_HUB = "654321"
@@ -455,7 +456,7 @@ def test_venta_offline_se_reproduce_en_la_nube_con_su_identidad(entorno):
         assert venta.usuario_id == entorno.ids["cajero_id"], "no la vendió el hub"
         assert venta.referencia_atencion == "Mesa 5"
         assert venta.numero_orden == 1
-        assert venta.fecha_orden == date.today()
+        assert venta.fecha_orden == fechas.hoy()
         assert s.scalar(select(func.count()).select_from(Pago)) == 1
 
 
@@ -530,7 +531,7 @@ def test_una_venta_rechazada_no_arrastra_al_resto_ni_avanza_la_marca(entorno):
         fantasma = Venta(
             sucursal_id=entorno.ids["sucursal_id"],
             punto_venta_id=entorno.ids["pv_id"],
-            fecha_orden=date.today(), numero_orden=99,
+            fecha_orden=fechas.hoy(), numero_orden=99,
             canal="pdv", modalidad="mesa",
             usuario_id=entorno.ids["cajero_id"],
             estado="orden", total=Decimal("10.00"),
@@ -567,7 +568,7 @@ def test_el_hub_no_puede_empujar_ventas_de_otra_sucursal(entorno):
             "canal": "pdv", "modalidad": "mesa",
             "usuario_id": str(entorno.ids["cajero_id"]),
             "idempotency_key": "venta-ajena",
-            "fecha_orden": date.today().isoformat(),
+            "fecha_orden": fechas.hoy().isoformat(),
             "numero_orden": 1,
             "estado": "orden",
             "items": [{

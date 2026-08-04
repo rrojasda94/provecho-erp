@@ -41,6 +41,12 @@ async function reenviar(req: Request, ruta: string[]): Promise<Response> {
     cache: "no-store",
   });
 
+  // 204 y 304 no admiten cuerpo: construir una Response con uno lanza
+  // TypeError y el borrado parecería fallar aunque el servidor lo hizo.
+  if (respuesta.status === 204 || respuesta.status === 304) {
+    return new Response(null, { status: respuesta.status });
+  }
+
   // Se devuelve el cuerpo tal cual: el detalle de error de la API es lo que
   // el cajero necesita ver ("el pago excede el saldo de la cuenta"), no un
   // mensaje genérico inventado acá.
@@ -62,5 +68,9 @@ export async function POST(req: Request, { params }: Contexto) {
 }
 
 export async function PATCH(req: Request, { params }: Contexto) {
+  return reenviar(req, (await params).ruta);
+}
+
+export async function DELETE(req: Request, { params }: Contexto) {
   return reenviar(req, (await params).ruta);
 }

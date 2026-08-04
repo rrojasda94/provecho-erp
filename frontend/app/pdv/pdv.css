@@ -966,3 +966,47 @@
         grid-template-columns: 1fr;
     }
 }
+
+/* Variantes: tarjetas de tamaño dentro del diálogo del producto. Son
+   obligatorias (RN-COM-022), por eso se ven como opciones grandes y no
+   como un desplegable: en pantalla táctil el desplegable se salta. */
+.pdv-variantes {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+    gap: 0.5rem;
+}
+
+.pdv-variante {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    align-items: flex-start;
+    border: 1px solid var(--pdv-borde);
+    border-radius: 10px;
+    padding: 0.625rem 0.75rem;
+    background: var(--pdv-surface-alta);
+    cursor: pointer;
+    text-align: left;
+}
+
+.pdv-variante[aria-pressed="true"] {
+    border-color: var(--pdv-verde);
+    background: var(--pdv-verde-tenue);
+}
+
+.pdv-variante-nombre {
+    font-weight: 700;
+    font-size: 0.875rem;
+}
+
+.pdv-variante-precio {
+    font-size: 0.8125rem;
+    color: var(--pdv-muted);
+}
+
+/* Lo que falta para poder guardar la línea, junto al botón que bloquea. */
+.pdv-falta {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--pdv-rojo);
+}

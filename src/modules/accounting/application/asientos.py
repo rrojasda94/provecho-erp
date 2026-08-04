@@ -19,6 +19,7 @@ from src.modules.accounting.infrastructure.repositories import (
     CuentaContableRepo,
     ReglaAsientoRepo,
 )
+from src.shared import fechas
 
 
 def _construir_lineas(
@@ -97,7 +98,7 @@ def anular_asiento(session: Session, asiento_id: uuid.UUID, *, actor_id: uuid.UU
     if original.estado != "registrado":
         raise Conflicto(f"el asiento ya está {original.estado}")
 
-    hoy = date.today()
+    hoy = fechas.hoy()
     periodo = periodos.periodo_de_fecha(session, original.empresa_id, hoy)
     if periodo is None or not rules.puede_registrar(periodo.estado):
         raise Conflicto("no hay periodo contable abierto para registrar la reversión")

@@ -1165,6 +1165,30 @@ producción se hace en cocinas de sucursal. Ver
   propia colgada de la del plato, y **hereda su cuenta**: dividir la cuenta
   no puede dejar la pizza en una y su extra en otra. Su consumo se
   multiplica por el plato — dos pizzas con extra queso llevan dos porciones.
+- **RN-COM-022** Un producto comercial puede venderse **por variante**:
+  "Pizza Peperoni Personal / Mediana / Familiar" son productos hijos del
+  mismo padre, cada uno con **su propia receta y su propio precio completo**
+  —no un recargo sobre un precio base—. El padre agrupa y **no se vende**:
+  no tiene receta ni admite precio, y en el punto de venta elegir una
+  variante es **obligatorio**. Las variantes no aparecen sueltas en la carta
+  y no admiten variantes propias (un solo nivel). La tarjeta del padre
+  muestra el precio de la variante más barata como "desde".
+- **RN-COM-023** Los extras de un producto pueden organizarse en **grupos**
+  ("Salsas", "Toppings"), y cada grupo declara **cuántas opciones hay que
+  elegir**: mínimo 1 lo vuelve obligatorio y bloquea el pedido hasta que se
+  elija; mínimo 0 lo deja opcional. El máximo del grupo limita **opciones
+  distintas**, no unidades de una misma (RN-COM-021 ya limita eso). Un extra
+  sin grupo es siempre opcional. La regla se hace cumplir al confirmar la
+  venta, no solo en la pantalla: el kiosko y la central de pedidos entran
+  por el mismo endpoint.
+- **RN-COM-024** Toda **cantidad de una línea de receta** puede escribirse
+  como operación aritmética ("1000/3", "250*1.5"). Se guarda **el
+  resultado**, redondeado a los decimales de la unidad de medida del insumo
+  (RN-GER-010, RN-UDM-001), junto con la expresión tecleada para poder
+  reeditarla. La expresión no se recalcula sola: la verdad es la cantidad
+  guardada. Duplicar una receta la clona con el sufijo "(copy)" y sin
+  destino asignado; escalarla por un factor redondea **cada línea con su
+  propia unidad** (1.5 bollos de masa son 2, no 1.5).
 
 ## Cumplimiento de pedido
 

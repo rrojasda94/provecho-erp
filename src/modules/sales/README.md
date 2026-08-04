@@ -89,9 +89,35 @@ cuatro huecos que el punto de venta necesitaba y el modelo no daba.
   minutos acotada a esa acción. Descuento y anulación de líneas la exigen;
   `autorizado_por` sale de ahí, nunca del cuerpo del request.
 
-Diferido a un slice posterior: `variante_producto`, `combo`, `promocion`,
-`carrito`, `central_pedidos`, `cuenta_puntos`/`puntos_movimiento`,
-`carta_disputa_pago`.
+**Variantes y grupos de opciones (2026-08-03, migración `b6d1e83f47ac`,
+ADR-022):**
+
+- **Variantes** (RN-COM-022): Personal/Mediana/Familiar son
+  `producto_comercial` hijos (`producto_padre_id`), cada uno con **su
+  receta y su precio completo** en la lista —no un recargo sobre un precio
+  base—. `receta_id` pasa a nullable: el padre agrupa, no se prepara ni se
+  vende, y `fijar_precio` lo rechaza. Vender el padre devuelve 409 ("elige
+  tamaño"). `GET /carta` devuelve las variantes **dentro** del padre y usa
+  el precio de la más barata como "desde"; las variantes no salen sueltas
+  en la grilla, igual que los extras.
+- **Grupos de opciones** (RN-COM-023): `producto_opcion_grupo`
+  (`POST /productos/{id}/grupos`) agrupa extras y declara cuántos hay que
+  elegir. `minimo >= 1` **es** ser obligatorio —no hay flag aparte— y
+  `ventas._validar_grupos` lo hace cumplir al confirmar, no solo en el PDV:
+  el kiosko entra por el mismo endpoint. El replay del hub se exceptúa
+  (ADR-009): una venta que ya se cobró no se rechaza por una regla que
+  cambió durante el corte.
+- **Ficha del producto**: `GET /productos/{id}` devuelve producto +
+  variantes + grupos en una lectura, para editar todo en la misma pantalla
+  (patrón Odoo). `GET /marcas` acompaña al alta.
+- **Nombres en formato título**: `shared.texto.a_titulo` normaliza `nombre`
+  de producto y grupo en el servidor. El frontend hace lo mismo al salir
+  del campo, pero la API tiene más clientes que esa pantalla.
+
+Diferido a un slice posterior: `combo`, `promocion`, `carrito`,
+`central_pedidos`, `cuenta_puntos`/`puntos_movimiento`,
+`carta_disputa_pago`. `modificador`/`variante_producto` quedan **descartados**
+(ADR-022 los reemplaza).
 
 > **Descuento ≠ promoción.** `venta.descuento_*` es un acto humano
 > autorizado, con motivo y responsable. Las **promociones** se definen por
@@ -296,7 +322,8 @@ hub local de cada sucursal (ADR-009 fase 2). Es la única parte de `sales`
 que sabe del modo offline; el motor vive en `core/sync` y no conoce
 ninguna entidad de negocio.
 
-- **Hacia el hub** (`RECURSOS`): `producto_comercial`, `medio_pago`,
+- **Hacia el hub** (`RECURSOS`): `producto_comercial` (con
+  `producto_padre_id`/`orden`), `producto_opcion_grupo`, `medio_pago`,
   `punto_venta`, `kds_pantalla` — la carta del local, sus medios de cobro,
   sus cajas y sus pantallas de cocina, filtrados por la marca/sucursal del
   hub.

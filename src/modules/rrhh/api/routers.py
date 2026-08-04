@@ -1,7 +1,6 @@
 """Routers FastAPI del módulo rrhh: ciclo laboral completo."""
 
 import uuid
-from datetime import date
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
@@ -40,6 +39,7 @@ from src.modules.rrhh.application.scope import (
 )
 from src.modules.users.api.deps import get_db, get_tenant, require_permission
 from src.modules.users.infrastructure.models import Usuario
+from src.shared import fechas
 
 router = APIRouter(prefix="/rrhh", tags=["rrhh"])
 
@@ -292,7 +292,7 @@ def recibir_postulacion(
     convocatoria publicada es lo único que autoriza a escribir, y solo puede
     crear un postulante."""
     postulante = postulantes.recibir_postulacion(
-        session, token=token, fecha_postulacion=date.today(), **body.model_dump()
+        session, token=token, fecha_postulacion=fechas.hoy(), **body.model_dump()
     )
     session.commit()
     return postulante

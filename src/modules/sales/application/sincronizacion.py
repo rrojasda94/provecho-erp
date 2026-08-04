@@ -37,6 +37,7 @@ from src.modules.sales.infrastructure.models import (
     Precio,
     ProductoComercial,
     ProductoComercialExtra,
+    ProductoOpcionGrupo,
     PuntoVenta,
     Venta,
 )
@@ -66,6 +67,8 @@ RECURSOS = (
             "nombre",
             "categoria_id",
             "receta_id",
+            "producto_padre_id",
+            "orden",
             "activo",
             "margen_contribucion",
             "empaque_id",
@@ -81,7 +84,14 @@ RECURSOS = (
     RecursoSync(
         nombre="producto_comercial_extra",
         modelo=ProductoComercialExtra,
-        campos=("id", "producto_comercial_id", "extra_id", "maximo", "updated_at"),
+        campos=(
+            "id",
+            "producto_comercial_id",
+            "extra_id",
+            "maximo",
+            "grupo_id",
+            "updated_at",
+        ),
         filtro=lambda q, a: q.join(
             ProductoComercial,
             ProductoComercial.id == ProductoComercialExtra.producto_comercial_id,
@@ -89,6 +99,20 @@ RECURSOS = (
         motivo=(
             "Qué extra admite cada producto: sin esto el hub ofrecería extras "
             "imposibles o rechazaría los válidos durante el corte (RN-COM-021)."
+        ),
+    ),
+    RecursoSync(
+        nombre="producto_opcion_grupo",
+        modelo=ProductoOpcionGrupo,
+        campos=("id", "producto_comercial_id", "nombre", "minimo", "maximo",
+                "orden", "updated_at"),
+        filtro=lambda q, a: q.join(
+            ProductoComercial,
+            ProductoComercial.id == ProductoOpcionGrupo.producto_comercial_id,
+        ).where(ProductoComercial.marca_id.in_(_marca_de_la_sucursal(a))),
+        motivo=(
+            "Qué grupo de extras es obligatorio: sin esto el hub aceptaría "
+            "durante el corte pedidos que la nube rechaza (RN-COM-023)."
         ),
     ),
     RecursoSync(

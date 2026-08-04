@@ -199,6 +199,29 @@ el prefijo) — el filtro del home es UX, no el único gate; sin esto alguien
 con el link directo entraría a un módulo sin permiso aunque no lo vea en el
 grid.
 
+**Enmienda 2026-08-03 — el prefijo no alcanza para todos los módulos.**
+Filtrar solo por prefijo asume que trabajar en un área equivale a poder
+administrarla, y no es cierto: un cajero tiene `sales.crear`, `sales.cobrar`
+y `sales.leer`, así que con el filtro por prefijo veía el módulo Catálogo y
+entraba a la lista de productos comerciales —los leía completos, y recién
+al guardar chocaba con el 403 de la API—. Que el backend lo rechace es
+necesario pero no suficiente: lo que no le corresponde administrar no
+debería aparecerle.
+
+Por eso una entrada de `lib/modulos.ts` puede declarar `permiso` (código
+exacto) además de `prefijoPermiso`, y el exacto manda cuando está presente:
+
+```ts
+{ clave: "catalogo", prefijoPermiso: "sales.", permiso: "sales.gestionar_catalogo", ... }
+```
+
+`puedeVerModulo()` (en `lib/permisos.ts`) es el único punto que resuelve
+cuál de los dos aplica, y lo usan tanto el grid del home como el guard de
+`ModuloShell` — un módulo no puede quedar visible en uno y bloqueado en el
+otro. El permiso elegido es **el mismo que la API exige para escribir**, no
+uno inventado para la pantalla: si mañana Catálogo pasa de Operaciones a
+Comercial, se reasigna ese permiso a otro rol y no se toca código.
+
 ### 4. Convención de carpetas por módulo
 
 ```

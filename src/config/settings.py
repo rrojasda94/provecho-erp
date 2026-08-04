@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     environment: str = "local"
     debug: bool = False
     database_url: str = "postgresql+psycopg://provecho:provecho@localhost:5432/provecho"
+    # Zona del negocio, no la del servidor: de ella sale "qué día es hoy"
+    # para el ERP (`src/shared/fechas.py`). En Docker el sistema corre en UTC,
+    # y con eso un cierre de las 20:00 hora Perú caía al día siguiente.
+    zona_horaria: str = "America/Lima"
     redis_url: str = "redis://localhost:6379/0"
     jwt_secret: str = _PLACEHOLDER_SECRETO
     jwt_algorithm: str = "HS256"

@@ -22,6 +22,7 @@ from src.modules.marketing.infrastructure.models import (
 )
 from src.modules.marketing.infrastructure.repositories import CampanaRepo
 from src.modules.users.infrastructure.models import Marca
+from src.shared import fechas
 
 
 def crear_campana(
@@ -153,7 +154,7 @@ def registrar_implementacion_material(
     if not completa and not incidencia:
         raise ReglaNegocio("una implementación incompleta requiere incidencia")
 
-    fecha = fecha or date.today()
+    fecha = fecha or fechas.hoy()
     registro = session.scalar(
         select(ImplementacionMaterialSucursal).where(
             ImplementacionMaterialSucursal.campana_id == campana_id,

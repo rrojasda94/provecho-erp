@@ -5,9 +5,11 @@ import { useEffect, useRef, useState } from "react";
 import {
   soles,
   type ClienteBuscado,
+  type ExtraDeCarta,
   type ItemDeCarta,
   type MedioPago,
   type MesaEnMapa,
+  type VarianteDeCarta,
 } from "@/lib/pdv";
 
 import type { Borrador, LineaBorrador } from "./tipos";
@@ -256,9 +258,20 @@ export function DialogoCierre({
 
 const NOTAS_RAPIDAS = ["Sin cebolla", "Sin ají", "Bien cocida", "Para llevar aparte"];
 
-/** Configuración de la línea: cantidad, nota a cocina y extras. Los extras
- * salen de la carta (`item.extras`), ya con su precio resuelto para esta
- * sucursal y canal. */
+/**
+ * Configuración de la línea: variante, cantidad, nota a cocina y extras.
+ * Todo sale de la carta (`item`), ya con precios resueltos para esta
+ * sucursal y canal.
+ *
+ * Dos obligaciones distintas conviven acá:
+ * - **Presentación** (Personal/Mediana/Familiar): si el producto tiene,
+ *   elegir una es obligatorio y define el precio de la línea (RN-COM-022).
+ * - **Grupos de extras**: obligatorios solo si el producto lo declaró
+ *   (`grupo_minimo >= 1`, RN-COM-023).
+ *
+ * Lo que falta se dice en el pie y bloquea Guardar, en vez de dejar armar
+ * una línea que el servidor va a rechazar al enviar el pedido.
+ */
 export function DialogoProducto({
   linea,
   item,
@@ -281,6 +294,7 @@ export function DialogoProducto({
   const [cantidad, setCantidad] = useState(1);
   const [nota, setNota] = useState("");
   const [extras, setExtras] = useState<Record<string, number>>({});
+  const [varianteId, setVarianteId] = useState("");
   const [pidiendoPin, setPidiendoPin] = useState(false);
   const [usuario, setUsuario] = useState("");
   const [pin, setPin] = useState("");
@@ -292,14 +306,26 @@ export function DialogoProducto({
     setExtras(
       Object.fromEntries(linea.extras.map((e) => [e.productoId, e.cantidad])),
     );
+    // Al reabrir una línea ya armada, su producto ES la variante elegida.
+    setVarianteId(
+      item?.variantes.some((v) => v.producto_comercial_id === linea.productoId)
+        ? linea.productoId
+        : "",
+    );
     setPidiendoPin(false);
     setUsuario("");
     setPin("");
-  }, [linea]);
+  }, [linea, item]);
 
   if (!linea) return null;
 
+  const variantes = item?.variantes ?? [];
+  const variante = variantes.find((v) => v.producto_comercial_id === varianteId);
+  const grupos = agruparExtras(item?.extras ?? []);
+  const falta = queFalta(variantes, variante, grupos, extras);
+
   const guardar = () => {
+    if (falta) return;
     const elegidos = (item?.extras ?? [])
       .filter((e) => (extras[e.producto_comercial_id] ?? 0) > 0)
       .map((e) => ({
@@ -308,11 +334,28 @@ export function DialogoProducto({
         precio: Number(e.precio_unitario),
         cantidad: extras[e.producto_comercial_id],
       }));
-    onGuardar({ ...linea, cantidad, nota: nota.trim(), extras: elegidos });
+    onGuardar({
+      ...linea,
+      // La variante ES el producto que se vende: su id y su precio son los
+      // que viajan al servidor, no los del padre.
+      productoId: variante?.producto_comercial_id ?? linea.productoId,
+      nombre: variante?.nombre ?? linea.nombre,
+      precio: variante ? Number(variante.precio_unitario) : linea.precio,
+      cantidad,
+      nota: nota.trim(),
+      extras: elegidos,
+    });
   };
 
   return (
     <Dialogo titulo={linea.nombre} abierto onCerrar={onCerrar}>
+      <Variantes
+        variantes={variantes}
+        producto={item}
+        elegida={varianteId}
+        onElegir={setVarianteId}
+      />
+
       <p className="pdv-etiqueta">Cantidad</p>
       <div className="pdv-stepper">
         <button type="button" onClick={() => setCantidad(Math.max(1, cantidad - 1))}>
@@ -324,51 +367,7 @@ export function DialogoProducto({
         </button>
       </div>
 
-      {(item?.extras.length ?? 0) > 0 && (
-        <>
-          <p className="pdv-etiqueta">Extras</p>
-          <div className="pdv-lista">
-            {item!.extras.map((e) => {
-              const n = extras[e.producto_comercial_id] ?? 0;
-              const tope = e.maximo ?? 99;
-              return (
-                <div key={e.producto_comercial_id} className="pdv-extra">
-                  <span>
-                    {e.nombre}
-                    <em>{soles(e.precio_unitario)} c/u</em>
-                  </span>
-                  <div className="pdv-stepper chico">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setExtras({
-                          ...extras,
-                          [e.producto_comercial_id]: Math.max(0, n - 1),
-                        })
-                      }
-                    >
-                      −
-                    </button>
-                    <span>{n}</span>
-                    <button
-                      type="button"
-                      disabled={n >= tope}
-                      onClick={() =>
-                        setExtras({
-                          ...extras,
-                          [e.producto_comercial_id]: Math.min(tope, n + 1),
-                        })
-                      }
-                    >
-                      +
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </>
-      )}
+      <GruposDeExtras grupos={grupos} elegidos={extras} onCambiar={setExtras} />
 
       <p className="pdv-etiqueta">Nota para cocina</p>
       <input
@@ -440,12 +439,196 @@ export function DialogoProducto({
             Quitar del pedido
           </button>
         )}
-        <button type="button" className="pdv-boton-pri" onClick={guardar}>
+        {falta && <span className="pdv-falta">{falta}</span>}
+        <button
+          type="button"
+          className="pdv-boton-pri"
+          disabled={Boolean(falta)}
+          onClick={guardar}
+        >
           Guardar
         </button>
       </footer>
     </Dialogo>
   );
+}
+
+/** Tarjetas de presentación. Obligatorias cuando existen (RN-COM-022). */
+function Variantes({
+  variantes,
+  producto,
+  elegida,
+  onElegir,
+}: {
+  variantes: VarianteDeCarta[];
+  producto: ItemDeCarta | null;
+  elegida: string;
+  onElegir: (id: string) => void;
+}) {
+  if (variantes.length === 0) return null;
+  const nombreProducto = producto?.nombre ?? "";
+  return (
+    <>
+      <p className="pdv-etiqueta">Presentación · obligatorio</p>
+      <div className="pdv-variantes">
+        {variantes.map((v) => (
+          <button
+            key={v.producto_comercial_id}
+            type="button"
+            className="pdv-variante"
+            aria-pressed={elegida === v.producto_comercial_id}
+            onClick={() => onElegir(v.producto_comercial_id)}
+          >
+            <span className="pdv-variante-nombre">
+              {etiquetaCorta(v.nombre, nombreProducto)}
+            </span>
+            <span className="pdv-variante-precio">{soles(v.precio_unitario)}</span>
+          </button>
+        ))}
+      </div>
+    </>
+  );
+}
+
+/** La tarjeta dice "Familiar", no "Pizza Peperoni Familiar": el nombre del
+ * producto ya está en el título del diálogo. El nombre completo se conserva
+ * en la línea, que es lo que sale impreso en el ticket y el comprobante. */
+function etiquetaCorta(nombre: string, nombreProducto: string): string {
+  return nombre.toLowerCase().startsWith(nombreProducto.toLowerCase())
+    ? nombre.slice(nombreProducto.length).trim() || nombre
+    : nombre;
+}
+
+/** Extras agrupados, cada grupo diciendo si obliga a elegir y hasta
+ * cuántas opciones admite (RN-COM-023). */
+function GruposDeExtras({
+  grupos,
+  elegidos,
+  onCambiar,
+}: {
+  grupos: GrupoDeExtras[];
+  elegidos: Record<string, number>;
+  onCambiar: (v: Record<string, number>) => void;
+}) {
+  return (
+    <>
+      {grupos.map((grupo) => (
+        <div key={grupo.id ?? "sueltos"}>
+          <p className="pdv-etiqueta">
+            {grupo.nombre ?? "Extras"} ·{" "}
+            {grupo.minimo >= 1 ? `obligatorio (elige ${grupo.minimo})` : "opcional"}
+            {grupo.maximo ? ` · hasta ${grupo.maximo}` : ""}
+          </p>
+          <div className="pdv-lista">
+            {grupo.extras.map((e) => (
+              <FilaExtra
+                key={e.producto_comercial_id}
+                extra={e}
+                grupo={grupo}
+                elegidos={elegidos}
+                onCambiar={onCambiar}
+              />
+            ))}
+          </div>
+        </div>
+      ))}
+    </>
+  );
+}
+
+function FilaExtra({
+  extra,
+  grupo,
+  elegidos,
+  onCambiar,
+}: {
+  extra: ExtraDeCarta;
+  grupo: GrupoDeExtras;
+  elegidos: Record<string, number>;
+  onCambiar: (v: Record<string, number>) => void;
+}) {
+  const n = elegidos[extra.producto_comercial_id] ?? 0;
+  const tope = extra.maximo ?? 99;
+  // El tope del grupo cuenta opciones distintas, no unidades: "hasta 3
+  // toppings" no impide pedir doble de uno.
+  const grupoLleno =
+    grupo.maximo !== null && n === 0 && elegidosEn(grupo, elegidos) >= grupo.maximo;
+  const poner = (cantidad: number) =>
+    onCambiar({ ...elegidos, [extra.producto_comercial_id]: cantidad });
+
+  return (
+    <div className="pdv-extra">
+      <span>
+        {extra.nombre}
+        <em>{soles(extra.precio_unitario)} c/u</em>
+      </span>
+      <div className="pdv-stepper chico">
+        <button type="button" onClick={() => poner(Math.max(0, n - 1))}>
+          −
+        </button>
+        <span>{n}</span>
+        <button
+          type="button"
+          disabled={n >= tope || grupoLleno}
+          onClick={() => poner(Math.min(tope, n + 1))}
+        >
+          +
+        </button>
+      </div>
+    </div>
+  );
+}
+
+type GrupoDeExtras = {
+  id: string | null;
+  nombre: string | null;
+  minimo: number;
+  maximo: number | null;
+  extras: ExtraDeCarta[];
+};
+
+/** Los extras vienen planos del backend con su grupo adentro; acá se
+ * agrupan para dibujarlos. Los sueltos (sin grupo) caen al final, siempre
+ * opcionales. */
+function agruparExtras(extras: ExtraDeCarta[]): GrupoDeExtras[] {
+  const grupos: GrupoDeExtras[] = [];
+  for (const extra of extras) {
+    const existente = grupos.find((g) => g.id === extra.grupo_id);
+    if (existente) {
+      existente.extras.push(extra);
+      continue;
+    }
+    grupos.push({
+      id: extra.grupo_id,
+      nombre: extra.grupo_nombre,
+      minimo: extra.grupo_minimo,
+      maximo: extra.grupo_maximo,
+      extras: [extra],
+    });
+  }
+  return grupos.sort((a, b) => Number(a.id === null) - Number(b.id === null));
+}
+
+function elegidosEn(grupo: GrupoDeExtras, extras: Record<string, number>): number {
+  return grupo.extras.filter((e) => (extras[e.producto_comercial_id] ?? 0) > 0).length;
+}
+
+/** Qué le falta a la línea para poder guardarse. Mismo criterio que valida
+ * el servidor al confirmar la venta, dicho en el momento en que se puede
+ * corregir. */
+function queFalta(
+  variantes: VarianteDeCarta[],
+  variante: VarianteDeCarta | undefined,
+  grupos: GrupoDeExtras[],
+  extras: Record<string, number>,
+): string | null {
+  if (variantes.length > 0 && !variante) return "Elige una presentación";
+  for (const grupo of grupos) {
+    if (elegidosEn(grupo, extras) < grupo.minimo) {
+      return `Elige ${grupo.minimo} en ${grupo.nombre ?? "Extras"}`;
+    }
+  }
+  return null;
 }
 
 const TIPOS = [

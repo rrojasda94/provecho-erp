@@ -30,3 +30,9 @@ class ProductoComercialExtra(Base, UuidPkMixin, TimestampMixin):
     # Tope de unidades del extra en una misma línea (ej. hasta 3 porciones
     # de queso). NULL = sin tope.
     maximo: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Grupo al que pertenece el extra dentro de este producto; de ahí sale
+    # si elegirlo es obligatorio (RN-COM-023). NULL = extra suelto, siempre
+    # opcional.
+    grupo_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("producto_opcion_grupo.id"), nullable=True
+    )

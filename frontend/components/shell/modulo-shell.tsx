@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import type { Modulo } from "@/lib/modulos";
-import { tieneAccesoModulo } from "@/lib/permisos";
+import { puedeVerModulo } from "@/lib/permisos";
 import { obtenerSesion } from "@/lib/sesion";
 
 type ItemSubmenu = { label: string; href: string };
@@ -23,7 +23,7 @@ export async function ModuloShell({
 }) {
   const { usuario } = await obtenerSesion();
 
-  if (!tieneAccesoModulo(usuario.permisos, modulo.prefijoPermiso)) {
+  if (!puedeVerModulo(usuario.permisos, modulo)) {
     return (
       <main className="mx-auto max-w-md px-6 py-16 text-center">
         <p className="font-heading text-lg italic uppercase text-secondary">Sin permiso</p>

@@ -135,10 +135,22 @@ function ProductosGrid({
           onClick={() => onProducto(p)}
         >
           <span className="pdv-producto-nombre">{p.nombre}</span>
-          <span className="pdv-producto-precio">{soles(p.precio_unitario)}</span>
-          {p.extras.length > 0 && (
+          <span className="pdv-producto-precio">
+            {/* Con variantes el precio de la tarjeta es el "desde": el que
+                se cobra sale del tamaño que se elija. */}
+            {p.variantes.length > 0 ? "desde " : ""}
+            {soles(p.precio_unitario)}
+          </span>
+          {(p.variantes.length > 0 || p.extras.length > 0) && (
             <span className="pdv-producto-extras">
-              {p.extras.length} {p.extras.length === 1 ? "extra" : "extras"}
+              {[
+                p.variantes.length > 0 ? `${p.variantes.length} presentaciones` : "",
+                p.extras.length > 0
+                  ? `${p.extras.length} ${p.extras.length === 1 ? "extra" : "extras"}`
+                  : "",
+              ]
+                .filter(Boolean)
+                .join(" · ")}
             </span>
           )}
         </button>

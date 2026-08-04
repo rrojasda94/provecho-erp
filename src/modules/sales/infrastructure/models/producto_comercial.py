@@ -1,9 +1,19 @@
 """Producto comercial: ítem vendible en el PDV. Apunta a una receta.
 
 No es inventariable, pero genera registros de venta para medir margen de
-contribución. Variantes y combos se modelan en un slice posterior — no son
+contribución. Los combos se modelan en un slice posterior — no son
 dependencia dura de venta_item, que guarda su propio precio_unitario al
 momento de la venta.
+
+**Las variantes son productos hijos** (`producto_padre_id`): "Pizza
+Peperoni Personal/Mediana/Familiar" son tres filas colgadas de "Pizza
+Peperoni", cada una con su receta y su precio completo en la lista —no un
+recargo sobre un precio base—. Modelarlo así hace que el precio server-side
+(RN-PRC-003), el margen por tamaño, el descuento de insumos y el KDS
+funcionen sin una línea nueva: todo eso ya opera sobre `producto_comercial`.
+El padre existe solo para agrupar: no tiene receta, no tiene precio y no se
+vende (RN-COM-022). Elegir variante es obligatorio en el PDV; los grupos de
+extras deciden su obligatoriedad en `producto_opcion_grupo`.
 
 **Los extras son productos comerciales** (`es_extra=True`, ADR-018): un
 "extra queso" tiene su propia receta, que se ejecuta en la sucursal y se
@@ -18,7 +28,7 @@ cuelga al venderse (`venta_item.padre_venta_item_id`).
 import uuid
 from decimal import Decimal
 
-from sqlalchemy import Boolean, ForeignKey, Numeric, String, false
+from sqlalchemy import Boolean, ForeignKey, Integer, Numeric, String, false, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -36,7 +46,21 @@ class ProductoComercial(Base, UuidPkMixin, TimestampMixin):
     categoria_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("categoria.id"), nullable=True
     )
-    receta_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("receta.id"))
+    # NULL solo en el padre de un grupo de variantes: lo que se prepara lo
+    # define la variante elegida, no el agrupador.
+    receta_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("receta.id"), nullable=True
+    )
+    # Variante: cuelga de otro producto comercial. Un solo nivel — una
+    # variante no admite variantes (RN-COM-022).
+    producto_padre_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("producto_comercial.id"), nullable=True
+    )
+    # En qué orden salen las tarjetas en el PDV: Personal, Mediana,
+    # Familiar no es orden alfabético ni de creación.
+    orden: Mapped[int] = mapped_column(
+        Integer, default=0, server_default=text("0"), nullable=False
+    )
     # Al descontinuarse pasa a False/archivado, nunca se elimina.
     activo: Mapped[bool] = mapped_column(Boolean, default=True)
     # Un extra no se vende solo: no sale en la grilla del catálogo, solo

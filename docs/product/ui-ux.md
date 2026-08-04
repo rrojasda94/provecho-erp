@@ -222,6 +222,21 @@ implementar todavía, ver `docs/product/frontend-architecture.md` F2.14.
   perfil del usuario logueado, no del dispositivo.
 - Responsive en todas las pantallas (webapp + Android 15+); táctil
   obligatorio en PDV/Kiosk/KDS/Inventario — ver "Responsive y plataformas".
+- **Formato título automático en nombres** (ADR-022): todo campo que nombre
+  una entidad (producto, receta, insumo, grupo de opciones) se normaliza al
+  **salir del campo**, no mientras se escribe —corregir el texto bajo los
+  dedos del usuario es peor que no corregirlo—. Regla del español:
+  conectores en minúscula salvo al inicio ("Pizza de Peperoni Familiar"),
+  siglas cortas en mayúscula respetadas ("Pizza XL"). El servidor aplica lo
+  mismo (`shared/texto.py`): la pantalla es comodidad, la garantía está en
+  la API.
+- **Campos de cantidad que aceptan aritmética** (RN-COM-024): en recetas,
+  el campo admite "1000/3" o "250*1.5" y muestra el resultado debajo
+  mientras se escribe. Lo que se guarda lo calcula el **servidor** a partir
+  de la expresión, redondeado a los decimales de la unidad de medida
+  correspondiente (RN-GER-010); el navegador solo previsualiza. Una
+  expresión a medio escribir ("250*") no es un error: no se muestra
+  resultado y no se envía nada.
 
 ## Pendiente de definición (con el negocio)
 

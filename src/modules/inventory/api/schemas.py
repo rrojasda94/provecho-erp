@@ -357,3 +357,90 @@ class ProgramaConteoOut(BaseModel):
     proxima_fecha: date
     estado: str  # al_dia | vence_hoy | vencido
     dias_atraso: int
+
+
+# --- Unidades de medida ---
+class UnidadMedidaOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    categoria_udm_id: uuid.UUID
+    nombre: str
+    ratio: Decimal
+    # Con cuántos decimales se teclea una cantidad en esta unidad
+    # (RN-GER-010): 3 para kilos, 0 para unidades sueltas.
+    decimales: int
+
+
+# --- Recetas ---
+class RecetaCreate(BaseModel):
+    nombre: str = Field(min_length=1, max_length=150)
+    rendimiento_cantidad: Decimal = Field(gt=0)
+    rendimiento_unidad_medida_id: uuid.UUID
+    # Solo si la receta produce una subreceta inventariable; NULL si es el
+    # BOM de un producto comercial de venta directa.
+    articulo_id: uuid.UUID | None = None
+    flexible: bool = False
+    criterio_ajuste: str | None = Field(default=None, max_length=255)
+
+
+class RecetaUpdate(BaseModel):
+    nombre: str | None = Field(default=None, min_length=1, max_length=150)
+    rendimiento_cantidad: Decimal | None = Field(default=None, gt=0)
+    rendimiento_unidad_medida_id: uuid.UUID | None = None
+    # Artículo (tipo `subreceta`) que esta receta produce. Exclusivo: dos
+    # recetas produciendo lo mismo dejarían a `production` sin saber cuál
+    # explotar.
+    articulo_id: uuid.UUID | None = None
+    flexible: bool | None = None
+    criterio_ajuste: str | None = Field(default=None, max_length=255)
+
+
+class RecetaItemCreate(BaseModel):
+    """`cantidad` o `expresion`, no ambas obligatorias: si viene la
+    operación ("1000/3"), el servidor la evalúa y el número que mande el
+    cliente se ignora."""
+
+    articulo_id: uuid.UUID
+    cantidad: Decimal | None = None
+    expresion: str | None = Field(default=None, max_length=60)
+    merma_pct: Decimal = Field(default=Decimal(0), ge=0, lt=100)
+
+
+class RecetaItemUpdate(BaseModel):
+    cantidad: Decimal | None = None
+    expresion: str | None = Field(default=None, max_length=60)
+    merma_pct: Decimal | None = Field(default=None, ge=0, lt=100)
+
+
+class RecetaEscalarIn(BaseModel):
+    factor: Decimal = Field(gt=0)
+
+
+class RecetaItemOut(BaseModel):
+    id: uuid.UUID
+    articulo_id: uuid.UUID
+    articulo_nombre: str
+    unidad_medida_id: uuid.UUID
+    unidad_medida_nombre: str
+    decimales: int
+    cantidad: Decimal
+    expresion: str | None
+    merma_pct: Decimal
+    costo_unitario: Decimal
+    costo_linea: Decimal
+
+
+class RecetaOut(BaseModel):
+    id: uuid.UUID
+    nombre: str
+    rendimiento_cantidad: Decimal
+    rendimiento_unidad_medida_id: uuid.UUID
+    rendimiento_unidad_medida_nombre: str | None
+    articulo_id: uuid.UUID | None
+    flexible: bool
+    criterio_ajuste: str | None
+
+
+class RecetaDetalleOut(RecetaOut):
+    items: list[RecetaItemOut]
+    costo_total: Decimal

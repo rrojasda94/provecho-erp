@@ -546,8 +546,14 @@ export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props)
       <DialogoProducto
         linea={lineaEnEdicion}
         item={
+          // La línea puede apuntar al producto o a una de sus variantes
+          // (al reabrirla, `productoId` ya es la variante elegida).
           datos.carta.find(
-            (c) => c.producto_comercial_id === lineaEnEdicion?.productoId,
+            (c) =>
+              c.producto_comercial_id === lineaEnEdicion?.productoId ||
+              c.variantes.some(
+                (v) => v.producto_comercial_id === lineaEnEdicion?.productoId,
+              ),
           ) ?? null
         }
         enviado={Boolean(activo?.ventaId)}

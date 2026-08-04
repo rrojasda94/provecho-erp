@@ -3,7 +3,7 @@ vencidos y convivencia con los artículos que no controlan lote.
 SQLite en memoria + override de get_db, igual que `test_inventory.py`.
 """
 
-from datetime import date, timedelta
+from datetime import timedelta
 from decimal import Decimal
 
 import pytest
@@ -25,8 +25,9 @@ from src.modules.inventory.infrastructure.models import (
 )
 from src.modules.users.api.deps import get_db
 from src.modules.users.infrastructure.models import Almacen, Empresa
+from src.shared import fechas
 
-HOY = date.today()
+HOY = fechas.hoy()
 
 
 @pytest.fixture()

@@ -18,9 +18,9 @@ Registro de lo construido y lo pendiente. Actualizar en cada cambio relevante.
 | Módulo `users` (auth JWT + PIN + RBAC) | ✅ 2026-07-25 | Slice auth+CRUD implementado: 7 tablas RBAC (`rol`, `permiso`, `usuario_rol`, `rol_permiso`, `usuario_sucursal`, `refresh_token`, `audit_log`) + lockout en `usuario`. Login/refresh(rotativo+detección de reuso)/logout/me + CRUD admin de usuarios/roles/permisos/asignaciones. Argon2id, JWT, `require_permission` deny por defecto. `docs/security/authorization.md`. Restricciones JSONB por permiso: pendientes de aplicar (hoy solo chequeo por código). |
 | Migraciones Alembic iniciales | 🔶 en curso 2026-07-25 | 6 migraciones aplicadas a la BD dev (head `be914c92a94b`): transversal+org, slice Venta, cobro/caja, cliente opcional, slice auth/RBAC, slice inventory core (stock/movimiento/ajuste). |
 | Seeders (admin / PIN 123456, org base) | ✅ 2026-07-27 | `src/seeders/seed.py` (idempotente, prohibido en prod): matriz de roles/permisos semilla, `admin`/PIN `123456` y la **organización real** del grupo — empresa Majambo EIRL (RUC 20450311520, Jr. Ramón Castilla 248 - Tarapoto, zona `amazonia_ley27037`), marca Charlie's Pizzas **licenciada** a la empresa (`licencia_marca`), sucursales `CH1` (Jr. Ramón Castilla 248) y `CH2` (Jr. Lamas 299) activas y alquiladas (RN-IMP-004), almacén central `WH1` (`sucursal_id` NULL). Requirió `almacen.direccion` (migración `e5a1c93b7d40`): el central no cuelga de ninguna sucursal y no había dónde guardar su ubicación. Correr: `python -m src.seeders.seed`. Diferido: almacenes de sucursal de CH1/CH2 (no pedidos; su mín./máx. por SKU depende de datos de operación inexistentes) y CRUD de organización por API — hoy empresa/sucursal/almacén solo se crean por seeder. |
-| Módulo `inventory` | 🔶 slices 1-4 ✅ 2026-08-01 | **Slice 1**: catálogo (CRUD artículos/categorías/SKUs), stock por almacén (vía `movimiento_inventario` inmutable) y ajuste con segregación (`solicitar_ajuste` ≠ `aprobar_ajuste`, aprobador ≠ solicitante). Migración `be914c92a94b`. **Slice 2 — lote/FEFO** (2026-07-27, ADR-015): `lote` + `stock_lote`, control **opcional por artículo** (`articulo.controla_lote` — el queso sí, las servilletas no). La salida reparte por FEFO (vence antes, sale antes; sin vencimiento va al final → FIFO) y genera **un movimiento por lote tomado**, con `lote_id` explícito como override. El lote vencido se bloquea cuando el picking lo toca y publica `inventory.lote_vencido_detectado`; `POST /lotes/bloquear-vencidos` hace el barrido a demanda. La recepción de compra transporta el lote y vencimiento del proveedor (RN-VNC-002) y producción crea el suyo. Nada entra sin lote si el artículo lo controla: un ingreso sin lote cae en el lote del día. `POST /movimientos` pasa a devolver **lista** de movimientos. El hub replica `lote`/`stock_lote` (ADR-009, 28 recursos). Migración `c9a2f4e18b60`. Tests: `tests/test_lotes.py`. **Slice 3 — conteo cíclico** (2026-08-01, ADR-019): `conteo` + `conteo_item` con la periodicidad configurada **en la categoría** (`categoria.frecuencia_conteo`, RN-INV-007) — no hay número universal. Calendario derivado del último conteo cerrado + frecuencia, sin tabla de programación; conteo general que pone al día a todas las categorías del almacén; stock esperado congelado al abrir; conteo **a ciegas** por defecto (`inventory.ver_stock_esperado`); el cierre genera un `ajuste` pendiente por diferencia (`ajuste.conteo_id`) sin mover stock, con margen `INVENTORY_MARGEN_AJUSTE_PCT`; `inventory.conteo_vencido` reporta a almacén y gerencia lo no contado en su fecha (RN-INV-021). Permisos nuevos `inventory.contar` y `inventory.ver_stock_esperado`. Migración `c4e70a91d5b8`. Tests: `tests/test_conteos.py`. **Slice 4 — abastecimiento interno** (2026-08-01, ADR-020): `reserva_stock` + `solicitud_insumos`/`solicitud_item` + `transferencia`/`transferencia_item`. El local pide, el supervisor aprueba **y reserva** el stock en el abastecedor, el central despacha (FEFO, un `transferencia_item` por lote) y el local recibe. `GET /stock` expone `cantidad`/`reservado`/`disponible` (RN-INV-009): reservar exige disponible, pero consumir nunca se bloquea por una reserva —una venta ya ocurrida no se niega— y por eso el disponible puede quedar negativo. Diferencias registradas, no corregidas: no se despacha más de lo aprobado ni se recibe más de lo enviado, menos sí (RN-INV-001/002). Cancelar libera reservas (RN-INV-010) y hay liberación manual (RN-INV-011). Transferencia lateral sucursal↔sucursal con la misma entidad. Migración `d8b35f1ca207`. Tests: `tests/test_transferencias.py`. Diferido: devolución, guía remisión, `stock_merma`. |
+| Módulo `inventory` | 🔶 slices 1-4 ✅ 2026-08-01 | **Slice 1**: catálogo (CRUD artículos/categorías/SKUs), stock por almacén (vía `movimiento_inventario` inmutable) y ajuste con segregación (`solicitar_ajuste` ≠ `aprobar_ajuste`, aprobador ≠ solicitante). Migración `be914c92a94b`. **Slice 2 — lote/FEFO** (2026-07-27, ADR-015): `lote` + `stock_lote`, control **opcional por artículo** (`articulo.controla_lote` — el queso sí, las servilletas no). La salida reparte por FEFO (vence antes, sale antes; sin vencimiento va al final → FIFO) y genera **un movimiento por lote tomado**, con `lote_id` explícito como override. El lote vencido se bloquea cuando el picking lo toca y publica `inventory.lote_vencido_detectado`; `POST /lotes/bloquear-vencidos` hace el barrido a demanda. La recepción de compra transporta el lote y vencimiento del proveedor (RN-VNC-002) y producción crea el suyo. Nada entra sin lote si el artículo lo controla: un ingreso sin lote cae en el lote del día. `POST /movimientos` pasa a devolver **lista** de movimientos. El hub replica `lote`/`stock_lote` (ADR-009, 28 recursos). Migración `c9a2f4e18b60`. Tests: `tests/test_lotes.py`. **Slice 3 — conteo cíclico** (2026-08-01, ADR-019): `conteo` + `conteo_item` con la periodicidad configurada **en la categoría** (`categoria.frecuencia_conteo`, RN-INV-007) — no hay número universal. Calendario derivado del último conteo cerrado + frecuencia, sin tabla de programación; conteo general que pone al día a todas las categorías del almacén; stock esperado congelado al abrir; conteo **a ciegas** por defecto (`inventory.ver_stock_esperado`); el cierre genera un `ajuste` pendiente por diferencia (`ajuste.conteo_id`) sin mover stock, con margen `INVENTORY_MARGEN_AJUSTE_PCT`; `inventory.conteo_vencido` reporta a almacén y gerencia lo no contado en su fecha (RN-INV-021). Permisos nuevos `inventory.contar` y `inventory.ver_stock_esperado`. Migración `c4e70a91d5b8`. Tests: `tests/test_conteos.py`. **Slice 4 — abastecimiento interno** (2026-08-01, ADR-020): `reserva_stock` + `solicitud_insumos`/`solicitud_item` + `transferencia`/`transferencia_item`. El local pide, el supervisor aprueba **y reserva** el stock en el abastecedor, el central despacha (FEFO, un `transferencia_item` por lote) y el local recibe. `GET /stock` expone `cantidad`/`reservado`/`disponible` (RN-INV-009): reservar exige disponible, pero consumir nunca se bloquea por una reserva —una venta ya ocurrida no se niega— y por eso el disponible puede quedar negativo. Diferencias registradas, no corregidas: no se despacha más de lo aprobado ni se recibe más de lo enviado, menos sí (RN-INV-001/002). Cancelar libera reservas (RN-INV-010) y hay liberación manual (RN-INV-011). Transferencia lateral sucursal↔sucursal con la misma entidad. Migración `d8b35f1ca207`. Tests: `tests/test_transferencias.py`. **Slice 5 — recetas editables** (2026-08-03, ADR-022): CRUD de receta e ítems, duplicar con "(copy)", escalar por factor y **aritmética tecleada** en la cantidad ("1000/3"), evaluada en el servidor con `ast` y lista blanca —nunca `eval`— y redondeada a los decimales de la UdM del insumo (RN-COM-024); `receta_item.expresion` guarda lo tecleado para reeditarlo. `GET /inventory/unidades-medida` y contrato público `receta_resumen`. Migración `b6d1e83f47ac`. Tests: `tests/test_recetas_variantes.py`. Diferido: devolución, guía remisión, `stock_merma`. |
 | Módulo `purchases` | 🔶 slice core ✅ 2026-07-25 | CRUD de proveedores (natural liga a `persona`, jurídico con RUC propio) y ciclo de OC tipo `insumo` (crear → emitir → recibir → anular), con idempotencia y umbral de aprobación configurable. `purchases.compra_recibida` → inventory suma stock y recalcula `costo_promedio`. Conformidad de comprobante (`purchases.dar_conformidad`) registra el `comprobante` recibido y dispara `purchases.comprobante_conforme` → cola de pago en `accounting`. Migración `4ff85f833b29` aplicada. Diferido: ver Deuda técnica. |
-| Módulo `sales` (PDV) | 🔶 slices 1-3 ✅ 2026-07-27 | Venta con correlativo+idempotencia → `sales.venta_confirmada` → inventory descuenta por receta (+merma+empaque); cobro con pagos parciales → `pagada`; anulación pre-pago repone stock; CRUD productos/medios de pago. **KDS** (slice 2): pantallas configurables por sucursal y categorías (`kds_pantalla`, migración `7672566bf189`), avance por ítem en `venta_item.estado_preparacion` (fuente única → todas las pantallas ven el avance real), tipos preparación/despacho, comanda imprimible con contador de reimpresiones, evento `sales.pedido_listo`, rol `cocinero`. Kiosk/Central de Pedidos = clientes del mismo contrato, no módulos. **Cumplimiento de pedido** (slice 3, 2026-07-27): `PROC-OPE-002` definido como UN proceso (área Operaciones) y su etapa de entrega implementada — `POST /sales/ventas/{id}/entrega` con permiso propio `sales.entregar_pedido` y rol `despachador`, idempotente, publica `sales.venta_entregada` (disparador de la encuesta de marketing, RN-COM-007). **Slice PDV** (slice 4, 2026-07-28, ADR-018, migración `d7e3b8c14f52`): `mesa` tipada por sucursal + mapa de salón derivado; `grupo_cobro` para dividir la cuenta y emitir un comprobante por pagador (RN-COM-018); receptor tecleado en caja que decide boleta/factura sin cliente registrado (RN-CPP-003); descuento manual de orden con motivo y autorizador (RN-COM-017, permiso propio). Suma `POST /sales/clientes` y `GET /sales/ventas`. Diferido: ver Deuda técnica. |
+| Módulo `sales` (PDV) | 🔶 slices 1-3 ✅ 2026-07-27 | Venta con correlativo+idempotencia → `sales.venta_confirmada` → inventory descuenta por receta (+merma+empaque); cobro con pagos parciales → `pagada`; anulación pre-pago repone stock; CRUD productos/medios de pago. **KDS** (slice 2): pantallas configurables por sucursal y categorías (`kds_pantalla`, migración `7672566bf189`), avance por ítem en `venta_item.estado_preparacion` (fuente única → todas las pantallas ven el avance real), tipos preparación/despacho, comanda imprimible con contador de reimpresiones, evento `sales.pedido_listo`, rol `cocinero`. Kiosk/Central de Pedidos = clientes del mismo contrato, no módulos. **Cumplimiento de pedido** (slice 3, 2026-07-27): `PROC-OPE-002` definido como UN proceso (área Operaciones) y su etapa de entrega implementada — `POST /sales/ventas/{id}/entrega` con permiso propio `sales.entregar_pedido` y rol `despachador`, idempotente, publica `sales.venta_entregada` (disparador de la encuesta de marketing, RN-COM-007). **Slice PDV** (slice 4, 2026-07-28, ADR-018, migración `d7e3b8c14f52`): `mesa` tipada por sucursal + mapa de salón derivado; `grupo_cobro` para dividir la cuenta y emitir un comprobante por pagador (RN-COM-018); receptor tecleado en caja que decide boleta/factura sin cliente registrado (RN-CPP-003); descuento manual de orden con motivo y autorizador (RN-COM-017, permiso propio). Suma `POST /sales/clientes` y `GET /sales/ventas`. **Variantes y opciones** (slice 5, 2026-08-03, ADR-022, migración `b6d1e83f47ac`): Personal/Mediana/Familiar son productos hijos con receta y precio completo propios (RN-COM-022) — no un recargo sobre un precio base; el padre agrupa y no se vende. `producto_opcion_grupo` declara cuántos extras hay que elegir (RN-COM-023): `minimo >= 1` **es** ser obligatorio, sin flag aparte, y la regla se hace cumplir al confirmar la venta porque el kiosko entra por el mismo endpoint. Nombres normalizados a formato título en el servidor. Frontend: **Catálogo como módulo propio** (`/catalogo/productos`, no `/ventas`), con gate por permiso exacto `sales.gestionar_catalogo` — un cajero tiene `sales.crear` y con el filtro por prefijo veía y leía toda la carta; ahora el módulo no le aparece ni entrando por URL (enmienda a ADR-013). Ficha de producto con recetas inline (patrón Odoo) y selector de tamaño/extras en el PDV. Diferido: ver Deuda técnica. |
 | Persona CRUD + lock optimista + matriz de aprobaciones + contrato público | ✅ 2026-07-25 | `POST/GET/PATCH /api/v1/personas` (sin Delete); `persona.version` con lock optimista (409 si desactualizada); `regla_aprobacion` (nuevo, `src/shared/`) reemplaza el umbral fijo de `purchases` por empresa, admin en `/api/v1/reglas-aprobacion`; primer contrato público de lectura cross-módulo (`sales.cliente` para marketing/comercial, `GET /api/v1/sales/clientes`). Migración `af8a246e2c25`. Ver detalle abajo. |
 | Módulo `accounting` | 🔶 slice core+tesorería ✅ 2026-07-25 | Libro contable núcleo: plan de cuentas (`cuenta_contable`), periodo (`periodo_contable`, abrir/cerrar), asiento manual (`asiento`/`asiento_linea`, cuadre RN-CTB-001, anulación por asiento inverso RN-CTB-002) y mapeo configurable evento→cuentas (`regla_asiento`) que alimenta la generación automática para 4 eventos operativos ya publicados en código (`purchases.oc_emitida`, `purchases.compra_recibida`, `sales.venta_confirmada`, `purchases.comprobante_conforme`). **Pago a proveedor** (PROC-CTB-003, `movimiento_dinero`): cola idempotente por comprobante (RN-CTB-008) → ejecutar con umbral configurable + permiso (RN-CTB-005) → asiento automático. Migraciones `5402d99333fa`+`cbf904a9fc1b` aplicadas. Diferido: ver Deuda técnica. |
 | Producción (fabricación) | 🔶 slice core ✅ 2026-07-25 | Orden de producción ad-hoc (crear → registrar consumo → completar con resultado de control de calidad) y costeo automático. Construido antes de tiempo a pedido del usuario — primera cocina real sigue planeada 2027. `receta.articulo_id` nuevo liga receta↔subreceta. Diferido: ver Deuda técnica. |
@@ -193,10 +193,19 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   usuario que la contratación es de la empresa, no del grupo (el grupo no
   tiene planilla). `postulante.empresa_id` obligatorio, heredado de la
   convocatoria cuando viene del formulario público.
-- ⬜ Los tests de `conteos` comparan contra `date.today()` local mientras
-  `created_at` usa `CURRENT_TIMESTAMP` (UTC): corriendo después de las
-  19:00 hora Perú fallan cuatro casos por un día de diferencia. Falla
-  preexistente de zona horaria, no de la lógica de conteo.
+- ✅ 2026-08-03 **Zona horaria del negocio** (`src/shared/fechas.py`,
+  `settings.zona_horaria = "America/Lima"`). Se había anotado como "falla de
+  los tests de conteos"; al revisarla resultó ser **de producción**: la
+  aplicación derivaba "hoy" con `date.today()` —la zona del proceso, que en
+  Docker es UTC— y la comparaba contra `created_at`/`cerrado_at`, que la base
+  escribe en UTC. Pasadas las 19:00 hora Perú los dos relojes discrepaban un
+  día y el calendario de conteo cíclico se corría entero. El mismo patrón
+  estaba en otros 10 archivos —correlativo de venta por día, precio vigente,
+  vencimiento de lotes, fecha de asiento contable, cierre de caja—, así que
+  todos pasan por `fechas.hoy()`. Los 4 casos de `test_conteos` pasaron **sin
+  tocar un solo test**, que es la prueba de que el error no estaba ahí.
+  `tests/test_fechas_negocio.py` congela la regla, incluido un caso que falla
+  si algún módulo vuelve a usar `date.today()`.
 - ⬜ `users`: aplicar **restricciones JSONB** por permiso (hoy autoriza solo
   por código, no por condición monto/estado/horario).
 - ⬜ `users`: auth de **`agente_ia` por token** (hoy exige PIN como humano).
@@ -484,6 +493,19 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   trabajadores y clientes (Ley 29733). Hoy va en claro al disco y al bucket.
 
 ### Módulo inventory (slices siguientes)
+- ✅ 2026-08-03 **Recetas editables** (ADR-022, migración `b6d1e83f47ac`):
+  CRUD de receta e ítems, duplicar con "(copy)", escalar por factor y
+  aritmética tecleada en la cantidad (`receta_item.expresion`), redondeada
+  a los decimales de la UdM del insumo (RN-COM-024). `GET
+  /inventory/unidades-medida` nuevo. Contrato público
+  `queries_publicas.receta_resumen` — cierra la mitad `Receta` de la deuda
+  "contrato público de inventory para `Articulo`/`Receta`" de la auditoría
+  2026-08-01; `Articulo` sigue pendiente (`purchases` y `production` aún
+  importan su ORM).
+- ⬜ **Recetas sin tenant**: `receta` no tiene columna de empresa (por eso el
+  hub la replica completa) y su CRUD no filtra por tenant. Con un solo
+  grupo operando no se nota; con dos empresas que no deban verse entre sí,
+  la columna va antes que cualquier otra cosa.
 - ✅ 2026-07-25 **Listener `sales.venta_confirmada`** → consumo por receta
   (+merma % + empaque por modalidad) y `sales.venta_anulada` → reposición.
 - ✅ 2026-07-25 **Listener `purchases.compra_recibida`** → suma stock en el
@@ -588,6 +610,46 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   `bajo_minimo` derivado en la consulta de stock).
 
 ### Módulo sales (slices siguientes)
+- ✅ 2026-08-03 **Variantes y grupos de opciones** (ADR-022, migración
+  `b6d1e83f47ac`): la variante es un `producto_comercial` hijo con receta y
+  **precio completo** propios (RN-COM-022) — no un recargo sobre un precio
+  base; el padre no se prepara, no admite precio y vender el padre es 409.
+  `producto_opcion_grupo` con `minimo`/`maximo` decide qué grupo de extras
+  obliga a elegir (RN-COM-023), validado al confirmar la venta y no solo en
+  el PDV; el replay del hub se exceptúa. `GET /productos/{id}` (ficha
+  completa) y `GET /marcas` nuevos; `GET /carta` devuelve `variantes[]` y el
+  grupo de cada extra. Nombres normalizados a formato título en el servidor
+  (`shared/texto.py`). Descartados por reemplazo: `modificador` y
+  `variante_producto` del data-model.
+- ✅ 2026-08-03 **Pantallas de artículos y de recetas**:
+  `/inventario/articulos` (alta y edición de insumos, subrecetas, mercadería
+  y empaques) y `/catalogo/recetas` (listado + ficha con "¿qué produce?").
+  Cierran el hueco que hacía inusable el catálogo: no había forma de crear un
+  insumo propio ni de ver una receta que no colgara de un producto. Con esto
+  `/inventario` deja de ser un ícono que lleva a 404.
+- ⬜ **7 íconos del home siguen llevando a 404** (`/produccion`, `/rrhh`,
+  `/marketing`, `/gerencia`, `/usuarios`, `/contabilidad`, y el resto de
+  `/inventario`): el grid lista los módulos que tienen **backend**, no los que
+  tienen pantalla. O se construyen, o el grid deja de mostrar lo que no existe.
+- ✅ 2026-08-03 **Catálogo separado del PDV en el frontend**: módulo propio
+  (`/catalogo/productos`) con gate por permiso **exacto**
+  `sales.gestionar_catalogo`, el mismo que la API exige para escribir. El
+  filtro por prefijo del home (ADR-013) dejaba entrar a cualquiera con un
+  permiso del área: un cajero leía el catálogo completo y recién al guardar
+  chocaba con el 403. `puedeVerModulo()` resuelve prefijo vs permiso exacto
+  en un solo lugar, usado por el grid y por el guard de `ModuloShell`.
+- ⬜ **El backend del catálogo sigue en `sales`**: se evaluó mover
+  `producto_comercial`/`precio` a un módulo `catalog` propio y se descartó —
+  la autorización es por permiso, no por módulo, así que mover 5 tablas y sus
+  FKs no habría ganado nada de seguridad. Revisar si algún día el catálogo
+  necesita reglas de dominio que hoy no tiene.
+- ⬜ **Ordenar y desarmar grupos de extras**: `orden` se teclea (ya editable
+  en la ficha), pero no hay endpoint para quitar un extra de un grupo ni
+  borrar un grupo. Alcanza para cargar el catálogo; molesta al mantenerlo.
+- ✅ 2026-08-03 **Convertir un producto simple en uno con presentaciones**
+  (`quitar_receta`) y **borrar presentaciones y recetas** con las dos
+  negativas que importan: un producto ya vendido se descontinúa en vez de
+  borrarse, y una receta en uso nombra al producto que la usa.
 - ✅ 2026-07-28 **Slice PDV** (ADR-018, migración `d7e3b8c14f52`): cierra
   los cuatro huecos que destapó el diseño del punto de venta —
   `mesa` tipada por sucursal + `venta.mesa_id`/`comensales` con mapa de

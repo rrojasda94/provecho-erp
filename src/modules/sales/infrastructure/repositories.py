@@ -16,6 +16,7 @@ from src.modules.sales.infrastructure.models import (
     Precio,
     ProductoComercial,
     ProductoComercialExtra,
+    ProductoOpcionGrupo,
     PuntoVenta,
     Venta,
     VentaItem,
@@ -135,6 +136,18 @@ class ProductoComercialRepo:
             q = q.where(ProductoComercial.marca_id == marca_id)
         return list(self.s.scalars(q.order_by(ProductoComercial.nombre)))
 
+    def variantes_de(self, producto_id: uuid.UUID) -> "list[ProductoComercial]":
+        return [
+            *self.s.scalars(
+                select(ProductoComercial)
+                .where(
+                    ProductoComercial.producto_padre_id == producto_id,
+                    ProductoComercial.activo.is_(True),
+                )
+                .order_by(ProductoComercial.orden, ProductoComercial.nombre)
+            )
+        ]
+
     def add(self, producto: ProductoComercial) -> ProductoComercial:
         self.s.add(producto)
         self.s.flush()
@@ -162,14 +175,64 @@ class ProductoComercialRepo:
         )
 
     def vincular_extra(
-        self, producto_id: uuid.UUID, extra_id: uuid.UUID, maximo: int | None = None
+        self,
+        producto_id: uuid.UUID,
+        extra_id: uuid.UUID,
+        maximo: int | None = None,
+        grupo_id: uuid.UUID | None = None,
     ) -> ProductoComercialExtra:
         vinculo = ProductoComercialExtra(
-            producto_comercial_id=producto_id, extra_id=extra_id, maximo=maximo
+            producto_comercial_id=producto_id,
+            extra_id=extra_id,
+            maximo=maximo,
+            grupo_id=grupo_id,
         )
         self.s.add(vinculo)
         self.s.flush()
         return vinculo
+
+    def tiene_ventas(self, producto_id: uuid.UUID) -> bool:
+        return (
+            self.s.scalar(
+                select(VentaItem.id)
+                .where(VentaItem.producto_comercial_id == producto_id)
+                .limit(1)
+            )
+            is not None
+        )
+
+    def borrar_con_dependencias(self, producto: ProductoComercial) -> None:
+        """Borra el producto y lo que solo existe por él: su precio en cada
+        lista y sus vínculos de extra. Nada de eso tiene sentido sin el
+        producto, y ninguna es información histórica —el precio histórico que
+        importa es el de `venta_item`, que ya se cobró y no se toca."""
+        for tabla, columna in (
+            (Precio, Precio.producto_comercial_id),
+            (ProductoComercialExtra, ProductoComercialExtra.producto_comercial_id),
+            (ProductoComercialExtra, ProductoComercialExtra.extra_id),
+            (ProductoOpcionGrupo, ProductoOpcionGrupo.producto_comercial_id),
+        ):
+            for fila in self.s.scalars(select(tabla).where(columna == producto.id)):
+                self.s.delete(fila)
+        self.s.flush()
+        self.s.delete(producto)
+
+    def grupos_de(self, producto_id: uuid.UUID) -> "list[ProductoOpcionGrupo]":
+        return [
+            *self.s.scalars(
+                select(ProductoOpcionGrupo)
+                .where(ProductoOpcionGrupo.producto_comercial_id == producto_id)
+                .order_by(ProductoOpcionGrupo.orden, ProductoOpcionGrupo.nombre)
+            )
+        ]
+
+    def get_grupo(self, grupo_id: uuid.UUID) -> ProductoOpcionGrupo | None:
+        return self.s.get(ProductoOpcionGrupo, grupo_id)
+
+    def add_grupo(self, grupo: ProductoOpcionGrupo) -> ProductoOpcionGrupo:
+        self.s.add(grupo)
+        self.s.flush()
+        return grupo
 
 
 class ClienteRepo:
