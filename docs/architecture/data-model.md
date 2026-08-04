@@ -798,6 +798,20 @@ Solicitud.
   (11 dígitos = factura; 8, `00000000` o vacío = boleta, RN-CPP-003). La
   clave de idempotencia del grupo 1 sigue siendo `venta:{id}`, para que los
   comprobantes anteriores a este cambio resuelvan igual.
+  **Nota de crédito** (RN-CPP-009, migración `c2f7a91b4e08`): la NC es una
+  fila más de `comprobante` con `tipo="nc"`, más cuatro campos —
+  **afecta_comprobante_id** (a qué documento corrige; sin él SUNAT la
+  rechaza y contablemente no dice nada), **motivo_nc** (código del catálogo
+  09) con su **motivo_nc_descripcion**, **detalle_nc** (JSONB
+  `[{venta_item_id, cantidad}]` cuando es parcial; NULL = total — es JSONB y
+  no tabla propia porque la fuente de verdad de las líneas sigue siendo
+  `venta_item`: esto solo congela cuánto de cada una se acreditó) y
+  **anulado_por_nc_id**, que se llena **en el comprobante afectado** cuando
+  su nota total es aceptada: es lo que impide acreditarlo dos veces y lo que
+  habilita reemitir el corregido. La NC numera en **serie propia**
+  (`punto_venta.serie_nc_boleta`/`serie_nc_factura`, nullable: sin ella el
+  ERP no emite y lo dice, en vez de quemar un correlativo en la serie
+  equivocada).
 - **cliente**: grupo_id (transversal al grupo, no a una empresa —
   RN-PTS-001), tipo (`natural` | `juridico` — ej. cliente corporativo:
   catering/eventos), persona_id (si `natural`) o razon_social + ruc (si

@@ -506,6 +506,32 @@ class MedioPagoOut(BaseModel):
     activo: bool
 
 
+class NotaCreditoItemIn(BaseModel):
+    venta_item_id: uuid.UUID
+    cantidad: Decimal = Field(gt=0)
+
+
+class NotaCreditoCreate(BaseModel):
+    """Acredita un comprobante ya aceptado (RN-CPP-009).
+
+    `motivo` es del catálogo 09 de SUNAT: 01 anulación de la operación, 02
+    anulación por error en el RUC, 03 corrección por error en la
+    descripción, 06 devolución total, 07 devolución por ítem.
+
+    Sin `detalle` la nota es **total**. Con `detalle`, acredita solo esas
+    líneas y esas cantidades.
+
+    `repone_stock` es explícito porque no hay respuesta universal: un plato
+    devuelto en cocina rara vez devuelve el insumo, y corregir el RUC de una
+    factura no toca el inventario.
+    """
+
+    motivo: str = Field(pattern="^(01|02|03|06|07)$")
+    motivo_descripcion: str | None = Field(default=None, max_length=255)
+    detalle: list[NotaCreditoItemIn] | None = None
+    repone_stock: bool = True
+
+
 class ComprobanteOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
@@ -522,6 +548,12 @@ class ComprobanteOut(BaseModel):
     hash_proveedor: str | None
     detalle_emision: str | None
     intentos_emision: int
+    # Nota de crédito: a qué documento corrige y por qué; y, en el
+    # comprobante afectado, qué nota lo anuló.
+    afecta_comprobante_id: uuid.UUID | None = None
+    motivo_nc: str | None = None
+    motivo_nc_descripcion: str | None = None
+    anulado_por_nc_id: uuid.UUID | None = None
 
 
 class EntregaOut(BaseModel):

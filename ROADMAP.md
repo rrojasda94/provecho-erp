@@ -1046,10 +1046,21 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
 - ✅ 2026-07-26 **Comprobante** (boleta/factura vía **Factiliza**) — venta
   `pagada` → `facturada`; series por `punto_venta`; correlativo por
   (empresa, serie); cola Celery con reintentos. Migración `b3d7f21ac094`.
-- ⬜ **Nota de crédito** (anulación post-pago): endpoint `/note/send` de
-  Factiliza ya relevado (requiere `afectado_Tipo_Doc`/`afectado_Num_Doc` +
-  `motivo_Cod` del catálogo 09). Bloqueado por la decisión de flujo de
-  anulación post-pago, no por la integración.
+- ✅ 2026-08-04 **Nota de crédito** (RN-CPP-009, migración `c2f7a91b4e08`,
+  `sales/application/notas_credito.py`): total o **parcial por ítem**, con
+  motivo del catálogo 09, contra un comprobante aceptado y una sola vez por
+  documento. Serie propia por punto de venta (`serie_nc_boleta`/
+  `serie_nc_factura`, nullable — sin ella no emite y lo dice, en vez de
+  quemar un correlativo en la serie equivocada). Tres decisiones quedaron
+  explícitas porque no tienen respuesta universal: **`repone_stock` lo
+  declara quien acredita** (un plato devuelto en cocina rara vez devuelve el
+  insumo, y corregir un RUC no toca inventario); **el motivo decide si la
+  venta muere** —anulación y devolución la dan de baja, los de corrección de
+  datos (02/03) no, solo liberan el comprobante para reemitir el corregido—;
+  y **una nota rechazada por SUNAT no corrige nada**, queda registrada con
+  su motivo. Las notas parciales sucesivas cuentan contra lo que queda por
+  acreditar, no contra lo vendido. Permiso propio `sales.emitir_nota_credito`
+  (supervisor). 14 tests.
 - ⬜ **Descarga de PDF / XML / CDR** del comprobante emitido
   (`/invoice/pdf|xml|cdr`): hoy se guarda el `hash` y la respuesta cruda,
   pero el cliente no puede bajarse su representación impresa.

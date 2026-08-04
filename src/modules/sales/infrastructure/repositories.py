@@ -387,6 +387,28 @@ class ComprobanteRepo:
             )
         )
 
+    def notas_de_credito_de(self, comprobante_id: uuid.UUID) -> list[Comprobante]:
+        """Las notas que acreditan este comprobante, en orden de emisión."""
+        return list(
+            self.s.scalars(
+                select(Comprobante)
+                .where(Comprobante.afecta_comprobante_id == comprobante_id)
+                .order_by(Comprobante.created_at)
+            )
+        )
+
+    def cuantas_nc(self, comprobante_id: uuid.UUID) -> int:
+        """Incluye las rechazadas: la clave de idempotencia cuenta intentos
+        de documento, no documentos válidos."""
+        return (
+            self.s.scalar(
+                select(func.count()).where(
+                    Comprobante.afecta_comprobante_id == comprobante_id
+                )
+            )
+            or 0
+        )
+
     def siguiente_correlativo(self, empresa_id: uuid.UUID, serie: str) -> int:
         """El UNIQUE (empresa, serie, correlativo) corta la carrera: dos
         cajas que choquen fallan y el PDV reintenta con la misma

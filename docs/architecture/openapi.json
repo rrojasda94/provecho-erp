@@ -6253,6 +6253,80 @@
         "title": "MovimientoOut",
         "type": "object"
       },
+      "NotaCreditoCreate": {
+        "description": "Acredita un comprobante ya aceptado (RN-CPP-009).\n\n`motivo` es del catálogo 09 de SUNAT: 01 anulación de la operación, 02\nanulación por error en el RUC, 03 corrección por error en la\ndescripción, 06 devolución total, 07 devolución por ítem.\n\nSin `detalle` la nota es **total**. Con `detalle`, acredita solo esas\nlíneas y esas cantidades.\n\n`repone_stock` es explícito porque no hay respuesta universal: un plato\ndevuelto en cocina rara vez devuelve el insumo, y corregir el RUC de una\nfactura no toca el inventario.",
+        "properties": {
+          "detalle": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/NotaCreditoItemIn"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detalle"
+          },
+          "motivo": {
+            "pattern": "^(01|02|03|06|07)$",
+            "title": "Motivo",
+            "type": "string"
+          },
+          "motivo_descripcion": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Motivo Descripcion"
+          },
+          "repone_stock": {
+            "default": true,
+            "title": "Repone Stock",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "motivo"
+        ],
+        "title": "NotaCreditoCreate",
+        "type": "object"
+      },
+      "NotaCreditoItemIn": {
+        "properties": {
+          "cantidad": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Cantidad"
+          },
+          "venta_item_id": {
+            "format": "uuid",
+            "title": "Venta Item Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "venta_item_id",
+          "cantidad"
+        ],
+        "title": "NotaCreditoItemIn",
+        "type": "object"
+      },
       "NotificacionOut": {
         "properties": {
           "created_at": {
@@ -14224,6 +14298,30 @@
       },
       "src__modules__sales__api__schemas__ComprobanteOut": {
         "properties": {
+          "afecta_comprobante_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Afecta Comprobante Id"
+          },
+          "anulado_por_nc_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anulado Por Nc Id"
+          },
           "correlativo": {
             "title": "Correlativo",
             "type": "integer"
@@ -14266,6 +14364,28 @@
           "intentos_emision": {
             "title": "Intentos Emision",
             "type": "integer"
+          },
+          "motivo_nc": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Motivo Nc"
+          },
+          "motivo_nc_descripcion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Motivo Nc Descripcion"
           },
           "receptor_nombre": {
             "anyOf": [
@@ -25520,6 +25640,65 @@
           }
         ],
         "summary": "Actualizar Documento Cliente",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/comprobantes/{comprobante_id}/nota-credito": {
+      "post": {
+        "description": "Corrige una venta ya cobrada (RN-CPP-009). Permiso propio: acreditar\ndevuelve plata y no es acto de cajero.\n\nSin `detalle` la nota es total; con `detalle` acredita solo esas líneas.\n`repone_stock` lo decide quien emite — un plato devuelto en cocina rara\nvez devuelve el insumo, y corregir el RUC de una factura no toca el\ninventario.",
+        "operationId": "emitir_nota_credito_api_v1_sales_comprobantes__comprobante_id__nota_credito_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "comprobante_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Comprobante Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotaCreditoCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/src__modules__sales__api__schemas__ComprobanteOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Emitir Nota Credito",
         "tags": [
           "sales"
         ]

@@ -72,6 +72,10 @@ PERMISOS = [
     ("sales.leer", "Consultar ventas"),
     ("sales.anular", "Anular orden no pagada"),
     ("sales.gestionar_catalogo", "CRUD de productos comerciales y medios de pago"),
+    (
+        "sales.emitir_nota_credito",
+        "Acreditar una venta ya cobrada con nota de crédito (RN-CPP-009)",
+    ),
     ("sales.emitir_comprobante", "Reintentar la emisión de un comprobante a SUNAT"),
     (
         "sales.aplicar_descuento",
@@ -216,6 +220,9 @@ ROLES = {
         "sales.anular",
         "sales.gestionar_catalogo",
         "sales.emitir_comprobante",
+        # Acreditar devuelve plata: es acto de supervisor, no del cajero
+        # que emitio (RN-CPP-009).
+        "sales.emitir_nota_credito",
         "sales.entregar_pedido",
         # El descuento y el salón los autoriza el supervisor, nunca el
         # cajero que lo pide (RN-COM-017).

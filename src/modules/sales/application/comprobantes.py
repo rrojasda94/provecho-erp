@@ -107,6 +107,16 @@ def crear_comprobante_pendiente(
     return comprobante
 
 
+def documento_de(session: Session, comprobante: Comprobante) -> factiliza.Documento:
+    """El documento tal como se envió (o se enviaría) a SUNAT.
+
+    Público porque la nota de crédito lo reusa: sus líneas tienen que llevar
+    los mismos precios, el mismo descuento prorrateado y el mismo régimen de
+    IGV que el comprobante que corrige.
+    """
+    return _documento(session, comprobante)
+
+
 def _documento(session: Session, comprobante: Comprobante) -> factiliza.Documento:
     repo = ComprobanteRepo(session)
     empresa = repo.empresa(comprobante.empresa_id)

@@ -74,6 +74,7 @@ sales.venta_confirmada
 inventory.stock_consumido
    ↓ (sales) emite comprobante
 sales.comprobante_emitido
+sales.nota_credito_emitida
    ↓ (accounting) genera asiento
 accounting.asiento_generado
 ```
@@ -85,6 +86,7 @@ accounting.asiento_generado
 | `sales.venta_confirmada` | sales | inventory, accounting, marketing (atribución lead→venta) | venta_id, sucursal_id, cliente_id (opcional), items[], total | Al confirmar la venta. `cliente_id` se agregó 2026-08-01 para la atribución de marketing | RN-COM-001, RN-PRD-002, RN-MKT-003 |
 | `sales.pago_registrado` | sales | accounting | venta_id, medio, monto, ref_externa | Al registrar pago | RN-COM-002 |
 | `sales.comprobante_emitido` | sales | accounting | venta_id, tipo, serie_numero | Comprobante aceptado por SUNAT (Factiliza) | RN-COM-003 |
+| `sales.nota_credito_emitida` | sales | inventory (repone stock **solo si quien acredita lo pidió**: sin reposición el evento viaja con `items` vacío), auditoría/BI | nota_credito_id, comprobante_id, venta_id, sucursal_id, motivo, total, repone_stock, emitido_por, items | Se acredita una venta ya cobrada, total o por ítem | RN-CPP-009 |
 | `sales.venta_anulada` | sales | inventory, accounting | venta_id, motivo | Al anular | RN-GEN-002 |
 | `sales.descuento_aplicado` | sales | accounting, gerencia (reporte de descuentos) | venta_id, sucursal_id, modo, valor, motivo, autorizado_por | Un supervisor autoriza un descuento manual sobre el total de una orden | RN-COM-017 |
 | `sales.lineas_anuladas` | sales | inventory (repone stock), accounting | venta_id, sucursal_id, autorizado_por, motivo, items[] | Se quitan líneas de una orden YA enviada a cocina. Mismo payload que `venta_anulada` pero solo con lo quitado; inventory usa el mismo listener | RN-COM-020 |

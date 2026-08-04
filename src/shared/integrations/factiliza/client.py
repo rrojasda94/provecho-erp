@@ -110,11 +110,19 @@ class FactilizaClient:
         los fallos de transporte levantan `FactilizaError` para que la cola
         reintente.
         """
+        return self._enviar("/invoice/send", payload)
+
+    def enviar_nota_credito(self, payload: dict) -> RespuestaEmision:
+        """POST /note/send — nota de crédito. Mismo contrato de errores que
+        la emisión: rechazo es veredicto, transporte caído es excepción."""
+        return self._enviar("/note/send", payload)
+
+    def _enviar(self, ruta: str, payload: dict) -> RespuestaEmision:
         if not self.token:
             raise FactilizaError("FACTILIZA_TOKEN no configurado")
         try:
             respuesta = httpx.post(
-                f"{self.base_url}/invoice/send",
+                f"{self.base_url}{ruta}",
                 json=payload,
                 headers={"Authorization": f"Bearer {self.token}"},
                 timeout=self.timeout,

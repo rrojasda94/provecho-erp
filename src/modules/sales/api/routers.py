@@ -14,6 +14,7 @@ from src.modules.sales.application import (
     comprobantes,
     cumplimiento,
     mesas,
+    notas_credito,
     precios,
     precuenta,
     queries_publicas,
@@ -55,6 +56,9 @@ DESCONTAR = "sales.aplicar_descuento"
 GESTIONAR_MESAS = "sales.gestionar_mesas"
 LEER_CLIENTES_EXTERNOS = "sales.leer_clientes_externos"
 EMITIR = "sales.emitir_comprobante"
+# Acreditar una venta cobrada devuelve plata: permiso propio, no el del
+# cajero que emitió (RN-CPP-009).
+NOTA_CREDITO = "sales.emitir_nota_credito"
 ENTREGAR = "sales.entregar_pedido"
 
 
@@ -314,6 +318,51 @@ def reintentar_emision(
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(e)) from e
     session.commit()
     return comprobante
+
+
+@router.post(
+    "/comprobantes/{comprobante_id}/nota-credito",
+    response_model=schemas.ComprobanteOut,
+    status_code=201,
+)
+def emitir_nota_credito(
+    comprobante_id: uuid.UUID,
+    body: schemas.NotaCreditoCreate,
+    actor: Usuario = Depends(require_permission(NOTA_CREDITO)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Corrige una venta ya cobrada (RN-CPP-009). Permiso propio: acreditar
+    devuelve plata y no es acto de cajero.
+
+    Sin `detalle` la nota es total; con `detalle` acredita solo esas líneas.
+    `repone_stock` lo decide quien emite — un plato devuelto en cocina rara
+    vez devuelve el insumo, y corregir el RUC de una factura no toca el
+    inventario.
+    """
+    comprobante = ComprobanteRepo(session).get(comprobante_id)
+    if comprobante is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "comprobante no encontrado")
+    if comprobante.venta_id is not None:
+        exigir_venta(session, comprobante.venta_id, tenant)
+    try:
+        nota = notas_credito.emitir_nota_credito(
+            session,
+            comprobante_id,
+            motivo=body.motivo,
+            emitido_por=actor.id,
+            detalle=[d.model_dump() for d in body.detalle] if body.detalle else None,
+            repone_stock=body.repone_stock,
+            motivo_descripcion=body.motivo_descripcion,
+        )
+    except FactilizaError as e:
+        # Igual que al reintentar: el intento ya quedó contado en la fila y
+        # hay que persistirlo, así que este `except` decide sobre la
+        # transacción además de traducir.
+        session.commit()
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(e)) from e
+    session.commit()
+    return nota
 
 
 # --- Contrato público de lectura (marketing/comercial/análisis) -------------

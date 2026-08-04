@@ -50,6 +50,22 @@ cuatro huecos que el punto de venta necesitaba y el modelo no daba.
 - `comprobante.receptor_num_doc` / `receptor_nombre` (RN-CPP-003): el
   DNI/RUC que el cajero teclea al cobrar, sin exigir cliente registrado.
   11 dígitos → factura; 8, `00000000` o vacío → boleta.
+- **Nota de crédito** (RN-CPP-009, `application/notas_credito.py`,
+  `POST /sales/comprobantes/{id}/nota-credito`): una venta ya cobrada no se
+  anula, se acredita. Total o **parcial por ítem**, con motivo del catálogo
+  09 de SUNAT, contra un comprobante **aceptado** y **una sola vez**. Numera
+  en **serie propia** del punto de venta (`serie_nc_boleta`/
+  `serie_nc_factura`): mezclarla con la de la boleta es rechazo seguro.
+  Tres cosas las decide quien emite, porque no hay respuesta universal:
+  `repone_stock` (en cocina el plato devuelto rara vez devuelve el insumo),
+  el motivo —anulación y devolución dan de baja la venta; error de RUC o de
+  descripción **no**, solo liberan el comprobante para reemitir el
+  corregido— y el detalle. Una nota rechazada por SUNAT no corrige nada:
+  queda con su motivo y la venta sigue igual. Permiso propio
+  `sales.emitir_nota_credito` — acreditar devuelve dinero, no es acto de
+  cajero. La reposición viaja en `sales.nota_credito_emitida` con el mismo
+  shape que `venta_anulada`, así que la consume el listener de inventory que
+  ya existía.
 - Descuento manual de orden en `venta` (`descuento_modo`,
   `descuento_valor`, `descuento_motivo`, `descuento_autorizado_por`,
   RN-COM-017), con permiso propio `sales.aplicar_descuento` (supervisor,

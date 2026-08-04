@@ -35,6 +35,28 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Added
 
+- **Nota de crédito** (2026-08-04, RN-CPP-009, migración `c2f7a91b4e08`).
+  Cierra el hueco funcional más grande que quedaba: **una venta ya cobrada
+  no tenía forma de corregirse**. `anular_venta` seguía cubriendo solo la
+  orden sin pagar y mandaba al resto a un slice que no existía.
+  Ahora `POST /sales/comprobantes/{id}/nota-credito` acredita un comprobante
+  aceptado, **total o parcial por ítem**, con motivo del catálogo 09 de
+  SUNAT y una sola vez por documento. Numera en **serie propia** por punto
+  de venta: mezclarla con la de la boleta o factura es rechazo seguro.
+  Tres decisiones quedaron explícitas porque no tienen respuesta universal:
+  **`repone_stock` lo declara quien acredita** —un plato devuelto en cocina
+  rara vez devuelve el insumo, y corregir el RUC de una factura no toca el
+  inventario—; **el motivo decide si la venta muere** —anulación (01) y
+  devolución (06/07) la dan de baja; error en el RUC (02) o en la
+  descripción (03) **no**, porque la operación ocurrió y solo el papel
+  estaba mal, así que el comprobante queda liberado para reemitir el
+  corregido—; y **una nota rechazada por SUNAT no corrige nada**: queda
+  registrada con su motivo y la venta sigue igual.
+  Las notas parciales sucesivas cuentan contra lo que queda por acreditar y
+  no contra lo vendido, que es lo que impide devolver dos veces el mismo
+  plato. Permiso propio `sales.emitir_nota_credito` (supervisor): acreditar
+  devuelve dinero y no es acto de cajero. 14 tests.
+
 - **Chequeo de deriva de esquema** (2026-08-04, `src/core/esquema.py`).
   Nace de un fallo real: las dos bases de desarrollo tenían
   `alembic_version` en una revisión **posterior** a la que crea
