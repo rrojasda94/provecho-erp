@@ -1,5 +1,8 @@
-"""Reglas de dominio del libro contable: tipos de cuenta, cuadre de asiento
-y qué admite un periodo según su estado (RN-CTB-001/002)."""
+"""Reglas de dominio del libro contable y del ciclo de caja: tipos de
+cuenta, cuadre de asiento, qué admite un periodo según su estado
+(RN-CTB-001/002), conteo por denominación (RN-POS-003/007), cadena de
+custodia del efectivo (RN-MDP-002) y corrección de un cierre (RN-MDP-005).
+"""
 
 from decimal import Decimal
 
@@ -33,3 +36,64 @@ def puede_ejecutar_pago(estado: str) -> bool:
 
 def puede_rechazar_pago(estado: str) -> bool:
     return estado == "pendiente"
+
+
+# --- Conteo por denominación (RN-POS-003/007) --------------------------------
+# Billetes y monedas de curso legal en soles. El conteo se declara por pieza
+# ({"50": 3, "0.50": 8}), no como un total tipeado: un total que nadie
+# desglosó no es un conteo, es una afirmación.
+DENOMINACIONES_PEN = (
+    "200", "100", "50", "20", "10",  # billetes
+    "5", "2", "1", "0.50", "0.20", "0.10",  # monedas
+)
+
+
+def denominaciones_desconocidas(detalle: dict) -> list[str]:
+    return sorted(str(k) for k in detalle if str(k) not in DENOMINACIONES_PEN)
+
+
+def total_denominaciones(detalle: dict) -> Decimal:
+    """Suma del conteo. Una cantidad negativa o no entera es un error de
+    tipeo, no un billete: se rechaza antes de sumar."""
+    total = Decimal(0)
+    for valor, cantidad in detalle.items():
+        if not isinstance(cantidad, int) or isinstance(cantidad, bool) or cantidad < 0:
+            raise ValueError(f"cantidad inválida para la denominación {valor}")
+        total += Decimal(str(valor)) * cantidad
+    return total
+
+
+# --- Cadena de custodia del efectivo (RN-MDP-002/006) -----------------------
+# El efectivo no "desaparece" al cerrar la caja: pasa de mano en mano y cada
+# tramo tiene un responsable con nombre. `disponible` es el final del
+# recorrido — depositado o convertido en el fondo de la siguiente apertura.
+CUSTODIA_TRANSICIONES: dict[str, tuple[str, ...]] = {
+    "en_caja": ("en_supervisor",),
+    # Con caja fuerte y monto bajo el efectivo se queda en la sucursal
+    # (RN-MDP-006): el encargado lo libera como fondo del día siguiente sin
+    # pasar por contabilidad. Si no, lo traslada.
+    "en_supervisor": ("en_contabilidad", "disponible"),
+    "en_contabilidad": ("disponible",),
+    "disponible": (),
+}
+
+
+def puede_entregar_custodia(estado_actual: str, estado_siguiente: str) -> bool:
+    return estado_siguiente in CUSTODIA_TRANSICIONES.get(estado_actual, ())
+
+
+# --- Corrección de un cierre (RN-MDP-005) -----------------------------------
+_CIERRES_REABRIBLES = ("conforme", "con_irregularidad")
+
+
+def puede_reabrir_cierre(estado_cierre: str, estado_custodia: str) -> bool:
+    """Un cierre se corrige mientras el efectivo siga en el local.
+
+    Una vez que el dinero llegó a contabilidad o se liberó, recontar el
+    cajón ya no prueba nada: la corrección de ahí en adelante es un asiento
+    contable, no una reapertura.
+    """
+    return (
+        estado_cierre in _CIERRES_REABRIBLES
+        and estado_custodia in ("en_caja", "en_supervisor")
+    )

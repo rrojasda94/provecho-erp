@@ -30,6 +30,37 @@ services:
     restart: unless-stopped
     env_file: .env
     command: celery -A src.core.celery_app worker --loglevel=info
+    # El HEALTHCHECK del Dockerfile pega a http://127.0.0.1:8000/health —
+    # correcto para la API, pero este proceso no levanta servidor HTTP, así
+    # que quedaba `unhealthy` de forma permanente. Peor que cosmético: un
+    # `depends_on: service_healthy` o una política de reinicio por salud lo
+    # reiniciarían en bucle. La salud REAL del worker se mide por su latido
+    # (`core.latido_worker` → /health/ready), que es justo el mecanismo que
+    # existe para esto.
+    healthcheck:
+      disable: true
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  beat:
+    image: ${PROVECHO_IMAGE:-ghcr.io/majambo/provecho:latest}
+    restart: unless-stopped
+    env_file: .env
+    # Planificador de tareas periódicas: barrido de pedidos demorados y
+    # latido del worker (lo que `/health/ready` lee para saber si el worker
+    # vive). **Una sola instancia por despliegue**: dos programadores
+    # encolarían cada tarea dos veces.
+    command: celery -A src.core.celery_app beat --loglevel=info
+    # El HEALTHCHECK del Dockerfile pega a http://127.0.0.1:8000/health —
+    # correcto para la API, pero este proceso no levanta servidor HTTP, así
+    # que quedaba `unhealthy` de forma permanente. Peor que cosmético: un
+    # `depends_on: service_healthy` o una política de reinicio por salud lo
+    # reiniciarían en bucle. La salud REAL del worker se mide por su latido
+    # (`core.latido_worker` → /health/ready), que es justo el mecanismo que
+    # existe para esto.
+    healthcheck:
+      disable: true
     depends_on:
       redis:
         condition: service_healthy

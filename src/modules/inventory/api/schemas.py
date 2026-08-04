@@ -470,6 +470,14 @@ class RecetaOut(BaseModel):
     criterio_ajuste: str | None
 
 
+class SolicitudResumenOut(BaseModel):
+    articulo_id: uuid.UUID
+    articulo_nombre: str
+    sucursal_id: uuid.UUID | None
+    cantidad_total: Decimal
+    num_solicitudes: int
+
+
 class RecetaDetalleOut(RecetaOut):
     items: list[RecetaItemOut]
     costo_total: Decimal

@@ -57,7 +57,11 @@ select = ["E", "F", "I", "UP", "B", "C901"]
 # B008: FastAPI usa `Depends(...)` en valores por defecto (patrón idiomático).
 "src/modules/*/api/*" = ["B008"]
 "src/core/*_router.py" = ["B008"]
+"src/core/**/router.py" = ["B008"]
 "src/core/sync/api/*" = ["B008"]
+# F811: la fixture `env` se importa de otro módulo de test para no duplicar
+# un entorno de 100 líneas; ruff la lee como redefinida en cada parámetro.
+"tests/test_caja_ciclo.py" = ["F811"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 10

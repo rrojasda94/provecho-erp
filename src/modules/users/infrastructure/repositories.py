@@ -12,6 +12,7 @@ commit/rollback. Los repos solo encapsulan las queries.
 # nunca se evalúan así.
 from __future__ import annotations
 
+import logging
 import uuid
 
 from sqlalchemy import select, update
@@ -25,6 +26,7 @@ from src.modules.users.infrastructure.models import (
     RefreshToken,
     Rol,
     RolPermiso,
+    Sucursal,
     Usuario,
     UsuarioRol,
     UsuarioSucursal,
@@ -244,6 +246,23 @@ class AlmacenRepo:
         return list(self.s.scalars(stmt.order_by(Almacen.nombre)))
 
 
+class SucursalRepo:
+    def __init__(self, session: Session) -> None:
+        self.s = session
+
+    def list(self, empresa_id: uuid.UUID | None = None) -> list[Sucursal]:
+        stmt = select(Sucursal).where(Sucursal.deleted_at.is_(None))
+        if empresa_id is not None:
+            stmt = stmt.where(Sucursal.empresa_id == empresa_id)
+        return list(self.s.scalars(stmt.order_by(Sucursal.nombre)))
+
+
+# Logger propio: el flujo `auditoria` que `logging_config` declaraba y
+# nadie emitía. Separado de `provecho.app` para que un colector pueda
+# rutearlo aparte (retención distinta, alertas distintas).
+log_auditoria = logging.getLogger("provecho.auditoria")
+
+
 class AuditLogRepo:
     def __init__(self, session: Session) -> None:
         self.s = session
@@ -251,4 +270,20 @@ class AuditLogRepo:
     def registrar(self, **campos) -> AuditLog:
         entry = AuditLog(**campos)
         self.s.add(entry)
+        # Además de la fila, una línea en el log estructurado. No es
+        # duplicar por gusto: la tabla es el rastro legal (consultable, con
+        # su propia retención) y el log es lo que un colector externo puede
+        # vigilar en vivo — si alguien borrara la fila, la línea ya salió
+        # del proceso. Solo metadatos: `datos_antes`/`datos_despues` pueden
+        # traer PII (Ley 29733) y ese detalle se queda en la tabla.
+        log_auditoria.info(
+            "auditoria",
+            extra={
+                "accion": campos.get("accion"),
+                "entidad": campos.get("entidad"),
+                "entidad_id": str(campos.get("entidad_id") or ""),
+                "usuario_id": str(campos.get("usuario_id") or ""),
+                "ip": campos.get("ip"),
+            },
+        )
         return entry

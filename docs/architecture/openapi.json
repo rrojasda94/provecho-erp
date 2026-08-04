@@ -2,35 +2,20 @@
   "components": {
     "schemas": {
       "AbrirCajaIn": {
+        "description": "`monto_declarado` es lo que el encargado dice entregar;\n`detalle_denominaciones` es lo que el cajero cuenta. La diferencia la\ncalcula el servidor (RN-POS-011/012) — nunca se teclea.\n\n`autorizacion` es el token de `POST /auth/autorizar` del encargado que\nreleva: sin su PIN no hay cadena de custodia (RN-MDP-002).",
         "properties": {
+          "autorizacion": {
+            "title": "Autorizacion",
+            "type": "string"
+          },
           "detalle_denominaciones": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Detalle Denominaciones"
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Detalle Denominaciones",
+            "type": "object"
           },
-          "diferencia_reportada": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Diferencia Reportada"
-          },
-          "monto_apertura": {
+          "monto_declarado": {
             "anyOf": [
               {
                 "minimum": 0.0,
@@ -41,23 +26,33 @@
                 "type": "string"
               }
             ],
-            "title": "Monto Apertura"
+            "title": "Monto Declarado"
+          },
+          "pos_verificados": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/PosVerificadoIn"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pos Verificados"
           },
           "punto_venta_id": {
             "format": "uuid",
             "title": "Punto Venta Id",
             "type": "string"
-          },
-          "relevo_encargado_id": {
-            "format": "uuid",
-            "title": "Relevo Encargado Id",
-            "type": "string"
           }
         },
         "required": [
           "punto_venta_id",
-          "relevo_encargado_id",
-          "monto_apertura"
+          "monto_declarado",
+          "detalle_denominaciones",
+          "autorizacion"
         ],
         "title": "AbrirCajaIn",
         "type": "object"
@@ -485,6 +480,18 @@
             "title": "Created At",
             "type": "string"
           },
+          "detalle_denominaciones": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detalle Denominaciones"
+          },
           "diferencia_reportada": {
             "anyOf": [
               {
@@ -507,6 +514,18 @@
             "title": "Monto Apertura",
             "type": "string"
           },
+          "pos_verificados": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pos Verificados"
+          },
           "punto_venta_id": {
             "format": "uuid",
             "title": "Punto Venta Id",
@@ -524,7 +543,9 @@
           "cajero_id",
           "relevo_encargado_id",
           "monto_apertura",
+          "detalle_denominaciones",
           "diferencia_reportada",
+          "pos_verificados",
           "created_at"
         ],
         "title": "AperturaCajaOut",
@@ -1785,6 +1806,30 @@
         "title": "CartaItemOut",
         "type": "object"
       },
+      "CatalogoOut": {
+        "properties": {
+          "rangos": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Rangos",
+            "type": "object"
+          },
+          "reportes": {
+            "items": {
+              "$ref": "#/components/schemas/ReporteOut"
+            },
+            "title": "Reportes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "reportes",
+          "rangos"
+        ],
+        "title": "CatalogoOut",
+        "type": "object"
+      },
       "CategoriaCreate": {
         "properties": {
           "asiento_contable_config": {
@@ -1967,7 +2012,12 @@
         "type": "object"
       },
       "CerrarCajaIn": {
+        "description": "El monto real sale del conteo por denominación (RN-POS-007), y el\nefectivo se entrega al encargado que firma con su PIN (RN-MDP-002).",
         "properties": {
+          "autorizacion": {
+            "title": "Autorizacion",
+            "type": "string"
+          },
           "custodia": {
             "title": "Custodia",
             "type": "string"
@@ -1983,23 +2033,18 @@
             ],
             "title": "Descuadre Atribucion"
           },
-          "monto_real": {
-            "anyOf": [
-              {
-                "minimum": 0.0,
-                "type": "number"
-              },
-              {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-                "type": "string"
-              }
-            ],
-            "title": "Monto Real"
+          "detalle_denominaciones": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Detalle Denominaciones",
+            "type": "object"
           }
         },
         "required": [
-          "monto_real",
-          "custodia"
+          "detalle_denominaciones",
+          "custodia",
+          "autorizacion"
         ],
         "title": "CerrarCajaIn",
         "type": "object"
@@ -2089,6 +2134,18 @@
             "title": "Cajero Id",
             "type": "string"
           },
+          "correcciones": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correcciones"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -2122,16 +2179,30 @@
             "format": "uuid",
             "title": "Id",
             "type": "string"
+          },
+          "montos_esperados": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Montos Esperados"
           }
         },
         "required": [
           "id",
           "apertura_caja_id",
           "cajero_id",
+          "montos_esperados",
           "descuadre_monto",
           "descuadre_atribucion",
           "custodia",
           "estado",
+          "correcciones",
           "created_at"
         ],
         "title": "CierreCajaOut",
@@ -2402,6 +2473,29 @@
           "contacto"
         ],
         "title": "ClientePublicoOut",
+        "type": "object"
+      },
+      "ColumnaOut": {
+        "properties": {
+          "clave": {
+            "title": "Clave",
+            "type": "string"
+          },
+          "tipo": {
+            "title": "Tipo",
+            "type": "string"
+          },
+          "titulo": {
+            "title": "Titulo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "clave",
+          "titulo",
+          "tipo"
+        ],
+        "title": "ColumnaOut",
         "type": "object"
       },
       "ComandaOut": {
@@ -3564,6 +3658,56 @@
         "title": "CuentaContableUpdate",
         "type": "object"
       },
+      "CustodiaEfectivoOut": {
+        "properties": {
+          "apertura_caja_id": {
+            "format": "uuid",
+            "title": "Apertura Caja Id",
+            "type": "string"
+          },
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "monto": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Monto",
+            "type": "string"
+          },
+          "responsable_actual_id": {
+            "format": "uuid",
+            "title": "Responsable Actual Id",
+            "type": "string"
+          },
+          "timestamps_relevo": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timestamps Relevo"
+          }
+        },
+        "required": [
+          "id",
+          "apertura_caja_id",
+          "monto",
+          "responsable_actual_id",
+          "estado",
+          "timestamps_relevo"
+        ],
+        "title": "CustodiaEfectivoOut",
+        "type": "object"
+      },
       "DashboardResumenOut": {
         "properties": {
           "cajas_abiertas": {
@@ -3587,6 +3731,48 @@
           "cajas_abiertas"
         ],
         "title": "DashboardResumenOut",
+        "type": "object"
+      },
+      "DatosOut": {
+        "properties": {
+          "codigo": {
+            "title": "Codigo",
+            "type": "string"
+          },
+          "columnas": {
+            "items": {
+              "$ref": "#/components/schemas/ColumnaOut"
+            },
+            "title": "Columnas",
+            "type": "array"
+          },
+          "desde": {
+            "format": "date",
+            "title": "Desde",
+            "type": "string"
+          },
+          "filas": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Filas",
+            "type": "array"
+          },
+          "hasta": {
+            "format": "date",
+            "title": "Hasta",
+            "type": "string"
+          }
+        },
+        "required": [
+          "codigo",
+          "desde",
+          "hasta",
+          "columnas",
+          "filas"
+        ],
+        "title": "DatosOut",
         "type": "object"
       },
       "DecisionGerencialCreate": {
@@ -4164,6 +4350,25 @@
         "title": "EntregaOut",
         "type": "object"
       },
+      "EntregarCustodiaIn": {
+        "properties": {
+          "autorizacion": {
+            "title": "Autorizacion",
+            "type": "string"
+          },
+          "estado_siguiente": {
+            "pattern": "^(en_supervisor|en_contabilidad|disponible)$",
+            "title": "Estado Siguiente",
+            "type": "string"
+          }
+        },
+        "required": [
+          "estado_siguiente",
+          "autorizacion"
+        ],
+        "title": "EntregarCustodiaIn",
+        "type": "object"
+      },
       "ErrorSyncOut": {
         "properties": {
           "detalle": {
@@ -4334,6 +4539,55 @@
           "producto_comercial_id"
         ],
         "title": "ExtraIn",
+        "type": "object"
+      },
+      "FiltrosIn": {
+        "properties": {
+          "desde": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Desde"
+          },
+          "hasta": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hasta"
+          },
+          "limite": {
+            "default": 50,
+            "minimum": 1.0,
+            "title": "Limite",
+            "type": "integer"
+          },
+          "preset": {
+            "default": "mes_actual",
+            "title": "Preset",
+            "type": "string"
+          },
+          "sucursal_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Sucursal Ids",
+            "type": "array"
+          }
+        },
+        "title": "FiltrosIn",
         "type": "object"
       },
       "GrupoOpcionCreate": {
@@ -6021,6 +6275,104 @@
           "lote_id"
         ],
         "title": "MovimientoOut",
+        "type": "object"
+      },
+      "NotificacionOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "cuerpo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cuerpo"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "leida_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Leida At"
+          },
+          "nivel": {
+            "title": "Nivel",
+            "type": "string"
+          },
+          "referencia_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referencia Id"
+          },
+          "referencia_tipo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referencia Tipo"
+          },
+          "sucursal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sucursal Id"
+          },
+          "tipo": {
+            "title": "Tipo",
+            "type": "string"
+          },
+          "titulo": {
+            "title": "Titulo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "tipo",
+          "nivel",
+          "titulo",
+          "cuerpo",
+          "referencia_tipo",
+          "referencia_id",
+          "sucursal_id",
+          "leida_at",
+          "created_at"
+        ],
+        "title": "NotificacionOut",
         "type": "object"
       },
       "OrdenCompraCreate": {
@@ -7745,6 +8097,207 @@
         "title": "PinChange",
         "type": "object"
       },
+      "PosTarjetaIn": {
+        "properties": {
+          "codigo_comercio": {
+            "maxLength": 50,
+            "minLength": 2,
+            "title": "Codigo Comercio",
+            "type": "string"
+          },
+          "empresa_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Empresa Id"
+          },
+          "es_emergencia": {
+            "default": false,
+            "title": "Es Emergencia",
+            "type": "boolean"
+          },
+          "operador": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operador"
+          },
+          "serie": {
+            "maxLength": 50,
+            "minLength": 2,
+            "title": "Serie",
+            "type": "string"
+          },
+          "sucursal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sucursal Id"
+          }
+        },
+        "required": [
+          "serie",
+          "codigo_comercio"
+        ],
+        "title": "PosTarjetaIn",
+        "type": "object"
+      },
+      "PosTarjetaOut": {
+        "properties": {
+          "codigo_comercio": {
+            "title": "Codigo Comercio",
+            "type": "string"
+          },
+          "empresa_id": {
+            "format": "uuid",
+            "title": "Empresa Id",
+            "type": "string"
+          },
+          "es_emergencia": {
+            "title": "Es Emergencia",
+            "type": "boolean"
+          },
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "operador": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operador"
+          },
+          "serie": {
+            "title": "Serie",
+            "type": "string"
+          },
+          "sucursal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sucursal Id"
+          }
+        },
+        "required": [
+          "id",
+          "empresa_id",
+          "sucursal_id",
+          "serie",
+          "codigo_comercio",
+          "operador",
+          "estado",
+          "es_emergencia"
+        ],
+        "title": "PosTarjetaOut",
+        "type": "object"
+      },
+      "PosTarjetaPatch": {
+        "properties": {
+          "es_emergencia": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Es Emergencia"
+          },
+          "estado": {
+            "anyOf": [
+              {
+                "pattern": "^(operativo|averiado|baja)$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estado"
+          },
+          "sucursal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sucursal Id"
+          }
+        },
+        "title": "PosTarjetaPatch",
+        "type": "object"
+      },
+      "PosVerificadoIn": {
+        "description": "Estado de un POS de tarjeta al abrir la caja (RN-POS-010/011).",
+        "properties": {
+          "observacion": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observacion"
+          },
+          "operativo": {
+            "default": true,
+            "title": "Operativo",
+            "type": "boolean"
+          },
+          "pos_tarjeta_id": {
+            "format": "uuid",
+            "title": "Pos Tarjeta Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "pos_tarjeta_id"
+        ],
+        "title": "PosVerificadoIn",
+        "type": "object"
+      },
       "PostulacionPublica": {
         "description": "Cuerpo del formulario público. Sin `fecha_postulacion`: la pone el\nservidor, si no el cliente podría postular fuera de la fecha límite.",
         "properties": {
@@ -9364,6 +9917,26 @@
         "title": "PushOut",
         "type": "object"
       },
+      "ReabrirCierreIn": {
+        "properties": {
+          "autorizacion": {
+            "title": "Autorizacion",
+            "type": "string"
+          },
+          "motivo": {
+            "maxLength": 200,
+            "minLength": 5,
+            "title": "Motivo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "motivo",
+          "autorizacion"
+        ],
+        "title": "ReabrirCierreIn",
+        "type": "object"
+      },
       "RecepcionCreate": {
         "properties": {
           "idempotency_key": {
@@ -10119,6 +10692,65 @@
         "title": "ReglaAsientoOut",
         "type": "object"
       },
+      "ReporteOut": {
+        "properties": {
+          "codigo": {
+            "title": "Codigo",
+            "type": "string"
+          },
+          "columnas": {
+            "items": {
+              "$ref": "#/components/schemas/ColumnaOut"
+            },
+            "title": "Columnas",
+            "type": "array"
+          },
+          "descripcion": {
+            "title": "Descripcion",
+            "type": "string"
+          },
+          "etiqueta": {
+            "title": "Etiqueta",
+            "type": "string"
+          },
+          "filtra_sucursal": {
+            "title": "Filtra Sucursal",
+            "type": "boolean"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "valor": {
+            "title": "Valor",
+            "type": "string"
+          },
+          "visual": {
+            "title": "Visual",
+            "type": "string"
+          },
+          "visuales": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Visuales",
+            "type": "array"
+          }
+        },
+        "required": [
+          "codigo",
+          "nombre",
+          "descripcion",
+          "visual",
+          "visuales",
+          "etiqueta",
+          "valor",
+          "filtra_sucursal",
+          "columnas"
+        ],
+        "title": "ReporteOut",
+        "type": "object"
+      },
       "ReservaOut": {
         "properties": {
           "almacen_id": {
@@ -10222,37 +10854,6 @@
           "rol_id"
         ],
         "title": "RolIdIn",
-        "type": "object"
-      },
-      "RolOut": {
-        "properties": {
-          "descripcion": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Descripcion"
-          },
-          "id": {
-            "format": "uuid",
-            "title": "Id",
-            "type": "string"
-          },
-          "nombre": {
-            "title": "Nombre",
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "nombre",
-          "descripcion"
-        ],
-        "title": "RolOut",
         "type": "object"
       },
       "SkuCreate": {
@@ -10917,6 +11518,49 @@
         "title": "SolicitudPermisoOut",
         "type": "object"
       },
+      "SolicitudResumenOut": {
+        "properties": {
+          "articulo_id": {
+            "format": "uuid",
+            "title": "Articulo Id",
+            "type": "string"
+          },
+          "articulo_nombre": {
+            "title": "Articulo Nombre",
+            "type": "string"
+          },
+          "cantidad_total": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Cantidad Total",
+            "type": "string"
+          },
+          "num_solicitudes": {
+            "title": "Num Solicitudes",
+            "type": "integer"
+          },
+          "sucursal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sucursal Id"
+          }
+        },
+        "required": [
+          "articulo_id",
+          "articulo_nombre",
+          "sucursal_id",
+          "cantidad_total",
+          "num_solicitudes"
+        ],
+        "title": "SolicitudResumenOut",
+        "type": "object"
+      },
       "StockLoteOut": {
         "description": "Saldo por lote — el listado que el picking lee en orden FEFO.",
         "properties": {
@@ -11054,6 +11698,42 @@
         "title": "SucursalIdIn",
         "type": "object"
       },
+      "SucursalOut": {
+        "properties": {
+          "empresa_id": {
+            "format": "uuid",
+            "title": "Empresa Id",
+            "type": "string"
+          },
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "marca_id": {
+            "format": "uuid",
+            "title": "Marca Id",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "empresa_id",
+          "marca_id",
+          "nombre",
+          "estado"
+        ],
+        "title": "SucursalOut",
+        "type": "object"
+      },
       "TableroColumna": {
         "properties": {
           "estado": {
@@ -11073,6 +11753,165 @@
           "postulantes"
         ],
         "title": "TableroColumna",
+        "type": "object"
+      },
+      "TableroIn": {
+        "properties": {
+          "filtros": {
+            "$ref": "#/components/schemas/FiltrosIn"
+          },
+          "nombre": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Nombre",
+            "type": "string"
+          },
+          "predeterminado": {
+            "default": false,
+            "title": "Predeterminado",
+            "type": "boolean"
+          },
+          "rol_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rol Id"
+          },
+          "tarjetas": {
+            "items": {
+              "$ref": "#/components/schemas/TarjetaIn"
+            },
+            "maxItems": 24,
+            "title": "Tarjetas",
+            "type": "array"
+          }
+        },
+        "required": [
+          "nombre"
+        ],
+        "title": "TableroIn",
+        "type": "object"
+      },
+      "TableroOut": {
+        "properties": {
+          "compartido_por": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Compartido Por"
+          },
+          "filtros": {
+            "additionalProperties": true,
+            "title": "Filtros",
+            "type": "object"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "predeterminado": {
+            "title": "Predeterminado",
+            "type": "boolean"
+          },
+          "propio": {
+            "default": true,
+            "title": "Propio",
+            "type": "boolean"
+          },
+          "rol_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rol Id"
+          },
+          "tarjetas": {
+            "items": {},
+            "title": "Tarjetas",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "nombre",
+          "predeterminado",
+          "tarjetas",
+          "filtros"
+        ],
+        "title": "TableroOut",
+        "type": "object"
+      },
+      "TarjetaIn": {
+        "properties": {
+          "alto": {
+            "default": "mediano",
+            "enum": [
+              "chico",
+              "mediano",
+              "grande"
+            ],
+            "title": "Alto",
+            "type": "string"
+          },
+          "ancho": {
+            "default": 2,
+            "maximum": 4.0,
+            "minimum": 1.0,
+            "title": "Ancho",
+            "type": "integer"
+          },
+          "codigo": {
+            "title": "Codigo",
+            "type": "string"
+          },
+          "titulo": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Titulo"
+          },
+          "visual": {
+            "default": "tabla",
+            "enum": [
+              "tabla",
+              "barras",
+              "lineas"
+            ],
+            "title": "Visual",
+            "type": "string"
+          }
+        },
+        "required": [
+          "codigo"
+        ],
+        "title": "TarjetaIn",
         "type": "object"
       },
       "TokenPair": {
@@ -12772,6 +13611,25 @@
         "title": "VincularExtraCreate",
         "type": "object"
       },
+      "src__core__reportes__router__RolOut": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "nombre"
+        ],
+        "title": "RolOut",
+        "type": "object"
+      },
       "src__modules__purchases__api__schemas__ComprobanteOut": {
         "properties": {
           "compra_id": {
@@ -12933,6 +13791,37 @@
           "intentos_emision"
         ],
         "title": "ComprobanteOut",
+        "type": "object"
+      },
+      "src__modules__users__api__schemas__RolOut": {
+        "properties": {
+          "descripcion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descripcion"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "nombre",
+          "descripcion"
+        ],
+        "title": "RolOut",
         "type": "object"
       }
     },
@@ -13308,6 +14197,7 @@
     },
     "/api/v1/accounting/cajas/apertura": {
       "post": {
+        "description": "Abre el turno: el cajero cuenta el fondo, el encargado lo firma con su\nPIN y los POS de tarjeta quedan verificados (RN-MDP-002, RN-POS-003/010).\n\nUn faltante de sencillo o un POS averiado **no impiden abrir**\n(RN-POS-011): quedan reportados y el local abre en su horario.",
         "operationId": "abrir_caja_api_v1_accounting_cajas_apertura_post",
         "requestBody": {
           "content": {
@@ -13354,6 +14244,7 @@
     },
     "/api/v1/accounting/cajas/apertura/{apertura_caja_id}/cierre": {
       "post": {
+        "description": "Cierra el turno contra el conteo por denominación y entrega el\nefectivo al encargado, que firma con su PIN (RN-POS-007, RN-MDP-002).\n\nSi el cierre venía reabierto, este mismo endpoint lo recalcula sobre el\nregistro existente — un turno tiene un solo cierre, con su historial de\ncorrecciones.",
         "operationId": "cerrar_caja_api_v1_accounting_cajas_apertura__apertura_caja_id__cierre_post",
         "parameters": [
           {
@@ -13405,6 +14296,54 @@
           }
         ],
         "summary": "Cerrar Caja",
+        "tags": [
+          "accounting"
+        ]
+      }
+    },
+    "/api/v1/accounting/cajas/apertura/{apertura_caja_id}/custodia": {
+      "get": {
+        "operationId": "ver_custodia_api_v1_accounting_cajas_apertura__apertura_caja_id__custodia_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "apertura_caja_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Apertura Caja Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustodiaEfectivoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Ver Custodia",
         "tags": [
           "accounting"
         ]
@@ -13514,6 +14453,124 @@
           }
         ],
         "summary": "Registrar Movimiento Caja",
+        "tags": [
+          "accounting"
+        ]
+      }
+    },
+    "/api/v1/accounting/cajas/cierres/{cierre_id}/reabrir": {
+      "post": {
+        "description": "Devuelve un cierre a `en_proceso` para recontar (RN-MDP-005).\n\nSolo mientras el efectivo siga en el local: una vez que llegó a\ncontabilidad, corregir es un asiento, no un recuento.",
+        "operationId": "reabrir_cierre_api_v1_accounting_cajas_cierres__cierre_id__reabrir_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "cierre_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Cierre Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReabrirCierreIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CierreCajaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Reabrir Cierre",
+        "tags": [
+          "accounting"
+        ]
+      }
+    },
+    "/api/v1/accounting/cajas/custodias/{custodia_id}/entregar": {
+      "post": {
+        "description": "Avanza la cadena de custodia; quien **recibe** firma con su PIN\n(RN-MDP-002).",
+        "operationId": "entregar_custodia_api_v1_accounting_cajas_custodias__custodia_id__entregar_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "custodia_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Custodia Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EntregarCustodiaIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustodiaEfectivoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Entregar Custodia",
         "tags": [
           "accounting"
         ]
@@ -14035,6 +15092,185 @@
           }
         ],
         "summary": "Cerrar Periodo",
+        "tags": [
+          "accounting"
+        ]
+      }
+    },
+    "/api/v1/accounting/pos-tarjeta": {
+      "get": {
+        "description": "Terminales de la sucursal más los de emergencia del pool (RN-POS-009).",
+        "operationId": "listar_pos_api_v1_accounting_pos_tarjeta_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "empresa_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Empresa Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sucursal_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sucursal Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PosTarjetaOut"
+                  },
+                  "title": "Response Listar Pos Api V1 Accounting Pos Tarjeta Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Pos",
+        "tags": [
+          "accounting"
+        ]
+      },
+      "post": {
+        "operationId": "registrar_pos_api_v1_accounting_pos_tarjeta_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PosTarjetaIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosTarjetaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Registrar Pos",
+        "tags": [
+          "accounting"
+        ]
+      }
+    },
+    "/api/v1/accounting/pos-tarjeta/{pos_id}": {
+      "patch": {
+        "operationId": "actualizar_pos_api_v1_accounting_pos_tarjeta__pos_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pos_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Pos Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PosTarjetaPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PosTarjetaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Actualizar Pos",
         "tags": [
           "accounting"
         ]
@@ -16658,6 +17894,93 @@
         ]
       }
     },
+    "/api/v1/inventory/solicitudes/resumen": {
+      "get": {
+        "description": "Qué artículos y sucursales piden más (contrato público, ver\n`docs/architecture/events.md`) — insumo de `purchases` para negociar\nvolumen con proveedores.",
+        "operationId": "resumen_solicitudes_api_v1_inventory_solicitudes_resumen_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "desde",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Desde"
+            }
+          },
+          {
+            "in": "query",
+            "name": "hasta",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Hasta"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SolicitudResumenOut"
+                  },
+                  "title": "Response Resumen Solicitudes Api V1 Inventory Solicitudes Resumen Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Resumen Solicitudes",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
     "/api/v1/inventory/solicitudes/{solicitud_id}": {
       "get": {
         "operationId": "ver_solicitud_api_v1_inventory_solicitudes__solicitud_id__get",
@@ -18577,6 +19900,131 @@
         ]
       }
     },
+    "/api/v1/notificaciones": {
+      "get": {
+        "description": "La bandeja del usuario autenticado. Sin `require_permission` a\npropósito: no es un recurso a proteger por rol, cada uno ve **lo suyo**\ny el filtro es la identidad, no un permiso.",
+        "operationId": "listar_notificaciones_api_v1_notificaciones_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "solo_no_leidas",
+            "required": false,
+            "schema": {
+              "default": true,
+              "title": "Solo No Leidas",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/NotificacionOut"
+                  },
+                  "title": "Response Listar Notificaciones Api V1 Notificaciones Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Notificaciones",
+        "tags": [
+          "users"
+        ]
+      }
+    },
+    "/api/v1/notificaciones/leer-todas": {
+      "post": {
+        "operationId": "leer_todas_las_notificaciones_api_v1_notificaciones_leer_todas_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Leer Todas Las Notificaciones",
+        "tags": [
+          "users"
+        ]
+      }
+    },
+    "/api/v1/notificaciones/{notificacion_id}/leer": {
+      "post": {
+        "operationId": "leer_notificacion_api_v1_notificaciones__notificacion_id__leer_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "notificacion_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Notificacion Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificacionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Leer Notificacion",
+        "tags": [
+          "users"
+        ]
+      }
+    },
     "/api/v1/parametros": {
       "get": {
         "description": "`?estado=propuesto` = bandeja de aprobaciones de Gerencia. Sin filtro de\n`modulo` hace falta el permiso de Gerencia: hay parámetros sensibles (los\nrangos salariales de RRHH) que no son de lectura general.",
@@ -19961,6 +21409,90 @@
         ]
       }
     },
+    "/api/v1/reportes": {
+      "get": {
+        "description": "Solo los reportes que este usuario puede pedir: el catálogo mismo es\nuna lista de capacidades, no se muestra lo que después daría 403.",
+        "operationId": "listar_catalogo_api_v1_reportes_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Catalogo",
+        "tags": [
+          "reportes"
+        ]
+      }
+    },
+    "/api/v1/reportes/{codigo}/datos": {
+      "post": {
+        "operationId": "datos_api_v1_reportes__codigo__datos_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "codigo",
+            "required": true,
+            "schema": {
+              "title": "Codigo",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FiltrosIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatosOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Datos",
+        "tags": [
+          "reportes"
+        ]
+      }
+    },
     "/api/v1/roles": {
       "get": {
         "operationId": "listar_roles_api_v1_roles_get",
@@ -19970,7 +21502,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/RolOut"
+                    "$ref": "#/components/schemas/src__modules__users__api__schemas__RolOut"
                   },
                   "title": "Response Listar Roles Api V1 Roles Get",
                   "type": "array"
@@ -20007,7 +21539,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RolOut"
+                  "$ref": "#/components/schemas/src__modules__users__api__schemas__RolOut"
                 }
               }
             },
@@ -24388,6 +25920,66 @@
         ]
       }
     },
+    "/api/v1/sucursales": {
+      "get": {
+        "description": "Catálogo de referencia (nombre/estado), mismo criterio que\n`/almacenes`: cualquier autenticado que tenga que elegir una sucursal lo\nnecesita — el filtro por sucursales del tablero de reportes, entre\notros. Escopado por tenant; el RBAC real lo aplica cada endpoint que\ndespués use ese `sucursal_id`.",
+        "operationId": "listar_sucursales_api_v1_sucursales_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "empresa_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Empresa Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SucursalOut"
+                  },
+                  "title": "Response Listar Sucursales Api V1 Sucursales Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Sucursales",
+        "tags": [
+          "users"
+        ]
+      }
+    },
     "/api/v1/sync/pull": {
       "get": {
         "description": "Filas del recurso con `campo_marca >= desde`, acotadas a la sucursal\nde la cuenta. Sin `desde` es la carga inicial del hub.",
@@ -24539,6 +26131,209 @@
         "summary": "Listar Recursos",
         "tags": [
           "sync"
+        ]
+      }
+    },
+    "/api/v1/tableros": {
+      "get": {
+        "description": "Los míos, más los que alguien compartió con un rol que tengo.",
+        "operationId": "listar_tableros_api_v1_tableros_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TableroOut"
+                  },
+                  "title": "Response Listar Tableros Api V1 Tableros Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Tableros",
+        "tags": [
+          "reportes"
+        ]
+      },
+      "post": {
+        "operationId": "crear_tablero_api_v1_tableros_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TableroIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TableroOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Tablero",
+        "tags": [
+          "reportes"
+        ]
+      }
+    },
+    "/api/v1/tableros/roles": {
+      "get": {
+        "description": "Los roles con los que este usuario puede compartir. Un superusuario\nlos ve todos; el resto, los suyos. Declarada antes de `/{tablero_id}`:\nsi quedara después, \"roles\" se intentaría parsear como UUID.",
+        "operationId": "roles_para_compartir_api_v1_tableros_roles_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/src__core__reportes__router__RolOut"
+                  },
+                  "title": "Response Roles Para Compartir Api V1 Tableros Roles Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Roles Para Compartir",
+        "tags": [
+          "reportes"
+        ]
+      }
+    },
+    "/api/v1/tableros/{tablero_id}": {
+      "delete": {
+        "operationId": "borrar_tablero_api_v1_tableros__tablero_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tablero_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tablero Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Borrar Tablero",
+        "tags": [
+          "reportes"
+        ]
+      },
+      "patch": {
+        "operationId": "actualizar_tablero_api_v1_tableros__tablero_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tablero_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tablero Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TableroIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TableroOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Actualizar Tablero",
+        "tags": [
+          "reportes"
         ]
       }
     },
@@ -25114,6 +26909,10 @@
     {
       "description": "Agregado gerencial de solo lectura: ventas del día, stock crítico, caja.",
       "name": "dashboard"
+    },
+    {
+      "description": "Catálogo cerrado de reportes del tablero (ADR-024) y tableros guardados por usuario. El cliente elige un `codigo` del catálogo y filtros tipados; no existe constructor de consultas.",
+      "name": "reportes"
     },
     {
       "description": "Replicación con el hub local de sucursal (ADR-009): catálogo y RBAC hacia el hub, ventas y cobros del corte hacia la nube.",

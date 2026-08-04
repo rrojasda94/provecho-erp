@@ -5,6 +5,216 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
+### Added
+
+- **Ciclo de caja completo** (2026-08-04, ADR-025, migración
+  `f3a1c62d90b4`). El slice mínimo registraba el ciclo; ahora lo verifica.
+  Cuatro cambios que van juntos porque solos no sirven:
+  **(1) No se cobra sin caja abierta.** `POST /sales/ventas/{id}/pagos`
+  responde 409 si el punto de venta no tiene turno, preguntando por el
+  contrato público `accounting.hay_caja_abierta` (`sales` nunca ve
+  `AperturaCaja`). Vale para todo medio de pago, no solo efectivo. La plata
+  cobrada fuera de un turno no la espera ningún cierre: el faltante recién
+  aparecía en contabilidad, sin responsable posible. Única excepción, el
+  replay del push del hub (ADR-009): el cobro ya ocurrió en la sucursal con
+  su caja abierta.
+  **(2) El monto sale del conteo, no del teclado.** Apertura y cierre
+  reciben el desglose por billete y moneda (RN-POS-003/007) validado contra
+  las denominaciones de curso legal, y el servidor suma. En la apertura, la
+  diferencia entre lo que el encargado declara entregar y lo que el cajero
+  cuenta **se calcula** y no bloquea abrir (RN-POS-011): el local abre en
+  su horario y el problema queda reportado.
+  **(3) Cada relevo lo firma quien recibe, con su PIN** (RN-MDP-002),
+  reusando la elevación de `POST /auth/autorizar` con el permiso nuevo
+  `accounting.caja_relevar` — el identificador del encargado sale del
+  token, nunca del cuerpo, que sería una firma falsificable. Nadie se
+  releva a sí mismo. `custodia_efectivo` pasa a ser máquina de estados real
+  (`en_caja → en_supervisor → en_contabilidad → disponible`, con el atajo a
+  `disponible` de RN-MDP-006 cuando el efectivo se queda en la caja fuerte
+  del local).
+  **(4) Un cierre con faltante se corrige, no se reescribe.**
+  `POST /cajas/cierres/{id}/reabrir` lo devuelve a `en_proceso` guardando
+  motivo, autorizador y descuadre anterior en `cierre_caja.correcciones`
+  (RN-MDP-005); volver a cerrar recalcula **el mismo** registro. Solo
+  mientras el efectivo siga en el local: una vez en contabilidad, corregir
+  es un asiento, no un recuento.
+  Suma `pos_tarjeta` — inventario de terminales con serie y código de
+  comercio (RN-POS-010), donde el de emergencia es una fila con
+  `sucursal_id` en NULL (RN-POS-009) que el listado por sucursal siempre
+  incluye — y la verificación de POS al abrir, que marca el averiado y
+  publica `accounting.pos_averiado_reportado` sin bloquear la apertura.
+  De paso, `efectivo_esperado` del reporte de caja y el arqueo pasan a
+  descontar `movimiento_caja`: eran un techo, no un arqueo.
+  Permisos nuevos: `accounting.caja_relevar`, `accounting.caja_reabrir`,
+  `accounting.pos_administrar`. 17 tests en `tests/test_caja_ciclo.py`.
+
+- **Tablero de reportes con catálogo cerrado** (2026-08-04, ADR-024,
+  migración `998e335369a1`). El dashboard deja de ser tres tarjetas fijas:
+  ahora el usuario arma sus vistas, elige rango (preset o personalizado),
+  filtra sucursales por checkbox, ajusta ancho (1-4/4) y alto de cada
+  tarjeta, cambia entre tabla/barras/líneas y **guarda la disposición**
+  (`tablero`, personal por usuario). Cinco reportes iniciales:
+  `ventas_por_dia`, `ventas_por_sucursal`, `top_productos`,
+  `compras_por_proveedor` y `solicitudes_por_articulo`.
+  `GET /reportes`, `POST /reportes/{codigo}/datos`, CRUD de `/tableros`.
+  **No hay constructor de consultas a propósito**: el cliente manda un
+  `codigo` del catálogo y filtros tipados, nunca tablas ni columnas —
+  evita a la vez la superficie de inyección y la fuga de RBAC que un
+  armador genérico abriría sobre todo el ERP. Cada reporte declara el
+  permiso de su módulo dueño, así que un `comprador` ve compras y no
+  ventas. Frontend en `frontend/components/reportes/` con Tailwind y
+  gráficos sin librería (barras = divs con ancho porcentual, serie =
+  `<polyline>` SVG). 21 tests y verificación end-to-end en navegador.
+
+- **Stack de observabilidad: GlitchTip + Loki + Alloy + Grafana**
+  (2026-08-04, `docker-compose.observabilidad.yml`). Va en un compose
+  **aparte** a propósito: son ocho contenedores que no son el negocio, y
+  poder pararlos sin tocar el del ERP es justo lo que se quiere el día que el
+  VPS ande corto de memoria. GlitchTip habla el protocolo de Sentry, así que
+  `src/core/sentry.py` no cambió una línea (ADR-006). Guía de puesta en
+  marcha en `docs/engineering/observabilidad.md`.
+
+- **`worker` y `beat` quedaban `unhealthy` para siempre** (2026-08-04).
+  Heredaban el `HEALTHCHECK` del Dockerfile, que pega a
+  `http://127.0.0.1:8000/health` — correcto para la API, pero ninguno de los
+  dos levanta servidor HTTP. Más que cosmético: un
+  `depends_on: service_healthy` o una política de reinicio por salud los
+  habría reiniciado en bucle. Se deshabilita en ambos; la salud real del
+  worker la da su latido (`/health/ready`), que es el mecanismo que existe
+  para eso. Encontrado al levantar el stack de verdad.
+
+- **`beat` faltaba en docker-compose** (2026-08-04). Se agregaron las tareas
+  periódicas en el turno anterior pero no el servicio que las corre: sin él
+  ni el barrido de pedidos demorados ni el latido del worker se ejecutaban
+  nunca. Agregado en dev y en producción, con la advertencia de **una sola
+  instancia por despliegue** — dos programadores encolarían cada tarea dos
+  veces.
+
+- **La alerta de cocina le llega al encargado de turno** (2026-08-04,
+  migración `7fda1eb759f7`). Entidad `notificacion` (bandeja por usuario,
+  transversal) + listener de `users` sobre `sales.pedido_demorado`.
+  Quién es el encargado de turno **no necesitó una entidad nueva**: sale del
+  `relevo_encargado_id` de la caja abierta, que ya registra quién está a
+  cargo del local (RN-MDP-002). Sin caja abierta, el aviso cae en los
+  supervisores de la sucursal — un aviso sin destinatario es un aviso
+  perdido. La regla vive en **una sola función**
+  (`notificaciones.destinatarios_de_sucursal`) para que hacerla configurable
+  después no toque ni el listener ni la entidad ni la pantalla.
+  `GET /notificaciones`, `POST /notificaciones/{id}/leer`,
+  `POST /notificaciones/leer-todas`.
+
+- **Salud del worker: se pregunta en vez de inferirse** (2026-08-04). Una
+  tarea de beat escribe un latido en Redis con TTL y `/health/ready` lo lee.
+  Antes se deducía de la profundidad de la cola, que solo delata al worker
+  cuando hay trabajo: con la cola vacía —la mayor parte del día en un
+  restaurante— un worker muerto y uno ocioso se veían idénticos.
+
+- **El flujo `auditoria` del log estructurado dejó de estar vacío**
+  (2026-08-04): `AuditLogRepo.registrar` emite además al logger
+  `provecho.auditoria`, solo metadatos. La tabla sigue siendo el rastro
+  legal; el log es lo que un colector externo puede vigilar en vivo.
+
+- **Alerta de pedido demorado en cocina** (2026-08-04, migración
+  `d4e21b0c13d0`). Al confirmarse una venta, un listener agenda una revisión
+  para 15 minutos después; si el pedido sigue en cocina, se registra
+  `alerta_pedido` y se publica `sales.pedido_demorado`. Un barrido de Celery
+  beat cada 5 minutos repasa lo que siga abierto: la tarea puntual sola se
+  pierde si el worker estuvo caído, y para una alerta el fallo que importa
+  es no avisar. Los dos caminos convergen en la misma fila sin duplicar
+  (`UNIQUE (venta_id, minutos_umbral)` + pre-chequeo + SAVEPOINT). El umbral
+  lo fija Gerencia por empresa (`parametro_empresa`) y **queda congelado en
+  la alerta**: subirlo después no reescribe lo que ya fue demora.
+
+- **Dos reportes nuevos en el tablero**: `pedidos_demorados` y
+  `estado_caja` — este último con horas sin cerrar y efectivo esperado, no
+  solo el conteo que ya daba el KPI. Diez reportes en total.
+
+- **ADR-013 instalado, tres semanas después de decidirse** (2026-08-04):
+  shadcn/ui sobre **Base UI** (cero paquetes de Radix, como exigía la
+  decisión) más Recharts, dnd-kit, react-day-picker y sonner. Obligó a subir
+  a **Tailwind v4** — el registro de Base UI solo existe en shadcn v4, que
+  no corre sobre v3. `tailwind.config.ts` desaparece: el tema vive en
+  `globals.css`, con los roles semánticos de shadcn apuntando a la paleta
+  Provecho y no al gris del preset.
+
+- **El tablero se comparte, se exporta y se reordena** (2026-08-04,
+  ADR-024 Addendum, migración `5e1c7775f6ca`). Cierra la deuda declarada el
+  mismo día:
+  - **Compartir por rol** (`tablero.rol_id`): NULL = privado; con rol lo ve
+    en solo lectura quien lo tenga, lo edita el dueño. Por rol y no por
+    lista de personas porque se administra solo — quien cesa deja de verlo
+    al perder el rol, sin que nadie lo saque a mano de cada tablero.
+    Compartir **no expone datos**: cada tarjeta revalida el permiso de su
+    módulo, así que se comparte la disposición, no el contenido.
+  - **Exportación a CSV** por tarjeta, armada en el cliente (los datos ya
+    están ahí). RFC 4180, BOM UTF-8 para Excel y montos crudos —
+    `S/ 1,234.50` no lo suma ninguna hoja de cálculo.
+  - **Reordenar por arrastre** con HTML5 nativo, sin librería.
+  - **Caché de 30 s** por (reporte + filtros): reordenar dentro de la
+    ventana cuesta 0 peticiones.
+  - **Tres reportes más**: `ventas_por_hora` (en hora del negocio: se
+    agrupa en UTC y se reetiqueta con `fechas.desfase_horas()`),
+    `ventas_por_trabajador` (primer contrato público de `rrhh` — nombre y
+    cargo, nada más) y `margen_por_producto`, donde un producto **sin
+    receta muestra costo y margen vacíos, nunca cero**: cero se leería como
+    100 % de margen sobre un dato que falta.
+
+- **Contrato público `inventory` → `purchases`** (2026-08-04):
+  `solicitudes_resumen_para_negociacion` / `GET /inventory/solicitudes/resumen`
+  (permiso `inventory.leer_solicitudes_externas`, sembrado en `comprador`) —
+  qué artículo pide más cada almacén, para negociar volumen con
+  proveedores. Suma lo **solicitado** (no lo aprobado ni lo despachado: es
+  la demanda real) y excluye las canceladas.
+
+- **`GET /api/v1/sucursales`** (2026-08-04): catálogo de referencia con el
+  mismo criterio que `/almacenes` — cualquier autenticado que tenga que
+  elegir una sucursal lo necesita, escopado por tenant. Lo pedía el filtro
+  de sucursales del tablero y no existía.
+
+- **`.github/dependabot.yml`** (2026-08-04): pip, npm, github-actions y
+  docker. Complementa a `pip-audit`, que solo avisa de una CVE publicada —
+  Dependabot abre el PR que la cierra.
+
+### Fixed
+
+- **El timestamp del log no era RFC3339** (2026-08-04,
+  `src/core/logging_config.py`). `ts` salía como `2026-08-04T12:35:19-0500`:
+  offset **sin los dos puntos**, que es ISO 8601 pero no RFC3339. El
+  colector no lo parsea y lo descarta en silencio, estampando la hora de
+  ingesta — así que un hub de sucursal que sube sus logs atrasados tras un
+  corte los mostraría como recién ocurridos, que es justo cuando la hora
+  real importa. Ahora se emite en RFC3339 UTC, por la misma regla que ya
+  fijaba `shared/fechas.py`: un instante va en UTC. Test que congela el
+  contrato: `test_el_timestamp_es_rfc3339_en_utc`.
+
+- **Encolar una tarea podía colgar el request que la encola** (2026-08-04,
+  `src/core/celery_app.py`). Lo destapó el listener de alertas: al encolar
+  en cada venta confirmada, el suite de tests pasó de ~5 a **63 minutos**.
+  La causa no era el listener sino Celery: `apply_async` abre la conexión al
+  broker **dentro de la llamada** y con reintentos, así que con Redis
+  inalcanzable (el `.env` local apunta a `redis://redis:6379`, el hostname
+  de Docker) cada encolado pagaba segundos de DNS fallido. En producción eso
+  es un cajero mirando una pantalla congelada cuando Redis se cae. Ahora el
+  broker tiene timeouts de 1 s, no reintenta al arrancar, y el encolado de
+  la alerta usa `retry=False`: o entra al instante o no entra, y el barrido
+  periódico lo recupera. Los tests usan el transporte en memoria de kombu
+  (`memory://`), con el mismo criterio que ya se aplicaba al token de
+  Factiliza: ningún test habla con un servicio externo real.
+
+### Security
+
+- **Content-Security-Policy en la API y en el frontend** (2026-08-04). La
+  API devuelve JSON y no debe cargar nada, así que va la más restrictiva
+  posible (`default-src 'none'` + `frame-ancestors`/`base-uri`/`form-action`
+  en `'none'`), lo que además vuelve inerte cualquier respuesta que
+  llegara a interpretarse como HTML; `/docs` se exceptúa porque Swagger UI
+  carga de un CDN y en producción no existe. El frontend usa **nonce por
+  request** con `'strict-dynamic'` (`frontend/middleware.ts`): Next inyecta
+  scripts inline propios y sin nonce habría que admitir `'unsafe-inline'`
+  en `script-src`, que anularía la protección contra XSS. `style-src`
+  mantiene `'unsafe-inline'` — concesión conocida del patrón, no afecta al
+  vector de ejecución de script.
+
 ### Changed
 
 - **Las colas de preparación ya no esconden el ítem recién tachado**

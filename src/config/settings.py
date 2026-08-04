@@ -80,6 +80,9 @@ class Settings(BaseSettings):
     # Horas sin backup a partir de las cuales el chequeo pasa a `caido`.
     # 26 y no 24: deja margen para que el cron diario corra sin falsa alarma.
     health_backup_max_horas: int = 26
+    # El worker anuncia su latido cada minuto (Celery beat) con este TTL.
+    # 3× el intervalo: tolera un ciclo perdido sin declararlo muerto.
+    health_latido_worker_ttl: int = 180
     # --- Backups ------------------------------------------------------------
     backup_dir: str = "backups"
     backup_retencion_dias: int = 30

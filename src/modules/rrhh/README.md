@@ -158,3 +158,16 @@ escuchar `trabajador_cesado`. Ver ROADMAP.
 - `convocatoria.sucursal_id` (opcional) indica dónde se necesita cubrir.
 - Consumido por `sales` para el ranking de ventas por trabajador
   (`tests/test_venta_slice.py`).
+- **Contrato público de lectura** (`application/queries_publicas.py`, primero
+  de este módulo — 2026-08-04): `nombres_por_usuario(usuario_ids)` devuelve
+  `usuario_id → {nombre, cargo}` para que otro módulo pueda **rotular** un
+  ranking sin importar el ORM de `rrhh`. Hoy lo usa el reporte
+  `ventas_por_trabajador` del tablero (ADR-024), que cruza el
+  `venta.usuario_id` de `sales` con este contrato.
+
+  Lo expuesto es deliberadamente lo mínimo identificatorio: **remuneración,
+  régimen pensionario, contratos, permisos y sanciones no salen de `rrhh`
+  por ningún contrato** — quien los necesite pasa por la API con
+  `rrhh.leer`. Un `usuario_id` sin trabajador (cuenta de servicio del hub,
+  `agente_ia`) simplemente no aparece en el resultado: inventarle un nombre
+  acá sería peor que dejar que el llamador decida cómo mostrarlo.

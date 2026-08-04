@@ -420,6 +420,9 @@ def _cobrar(session: Session, datos: dict):
         grupo_cobro=datos.get("grupo_cobro", 1),
         idempotency_key=datos["idempotency_key"],
         referencia_externa=datos.get("referencia_externa"),
+        # El turno de caja vive en el hub y no se replica todavía: exigirlo
+        # acá rechazaría un cobro que ya ocurrió en la sucursal.
+        exigir_caja_abierta=False,
     )
 
 

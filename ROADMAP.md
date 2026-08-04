@@ -50,6 +50,7 @@ Registro de lo construido y lo pendiente. Actualizar en cada cambio relevante.
 | Modo offline del PDV — hub local de sucursal | ✅ fase 1 2026-07-26 · fase 2 2026-07-27 | ADR-009: hub local dedicado por sucursal (misma imagen del backend, Postgres propio), los 3 clientes (web/Android/PC) le hablan siempre al hub por LAN. **Fase 1**: `DEPLOYMENT_MODE=hub` + validación de config, detector de conectividad, `GET /health/sync`, `docker-compose.hub.yml`. **Fase 2 — motor de sync**: ciclo que **empuja y después jala** (`src/core/sync/motor.py`, proceso `python -m src.core.sync.runner`); `id` client-generado en `crear_venta`/`registrar_pago`/`registrar_movimiento` (el cambio previo que pedía la fase 1, sin migración); endpoints dedicados `GET /sync/pull` + `POST /sync/push` (permisos `sync.leer`/`sync.empujar`, rol `hub_sucursal`) porque los públicos no alcanzaban (no traen `pin_hash` ni los campos del catálogo, no son incrementales, y el push necesita conservar quién vendió y el número de orden); contrato declarativo por módulo (`application/sincronizacion.py`, 28 recursos
 tras sumar precios y lote/FEFO) que el motor solo ensambla; tabla `sync_watermark` por recurso y dirección; `/health/sync` con avance y último error por recurso; alta de la cuenta de servicio con `python -m src.seeders.hub`. El hub NO empuja movimientos de inventario (el listener de la nube los regenera; duplicaría el consumo). 24 casos en `tests/test_sync_motor.py` sincronizando dos bases reales. Pendiente: ver Deuda técnica. |
 | Backups automáticos | ✅ 2026-07-26 | `python -m src.backups.backup`: dump `pg_dump --format=custom` → verificación del archivo (firma + tablas críticas) → restauración probada contra base desechable → copia a S3 (opcional) → purga con retención de 30 días que nunca borra la copia más reciente. **Diario** (antes se declaraba mensual e incremental). Cron del host, no Celery beat. Runbook en `docs/engineering/devops.md#backups`. Pendiente: alerta ante fallo, ver Deuda técnica. |
+| Ciclo de caja completo | ✅ 2026-08-04 | ADR-025, migración `f3a1c62d90b4`. **No se cobra sin caja abierta** (contrato público `accounting.hay_caja_abierta`; el replay del hub es la única excepción); el monto de apertura y cierre **sale del conteo por denominación** (RN-POS-003/007) y la diferencia contra lo declarado se calcula sin bloquear la apertura (RN-POS-011); **cada relevo lo firma quien recibe con su PIN** (RN-MDP-002, permiso `accounting.caja_relevar`) y `custodia_efectivo` es máquina de estados real hasta `disponible`; **un cierre con faltante se reabre y se recuenta** dejando motivo y autorizador en `cierre_caja.correcciones` (RN-MDP-005), solo mientras el efectivo siga en el local. Nueva entidad `pos_tarjeta` (serie + código de comercio, RN-POS-010; emergencia = `sucursal_id` NULL, RN-POS-009) verificada al abrir. `tests/test_caja_ciclo.py` (17 casos). |
 | Dashboard gerencial mínimo | ✅ 2026-07-26 | `GET /api/v1/dashboard/resumen` (`src/core/dashboard_router.py`, permiso `dashboard.leer`): ventas del día (cantidad+total), stock bajo mínimo, cajas abiertas — agregador en `core`, nunca importa dominio de otro módulo (ADR-012). Requirió construir dos huecos que no existían: `sales` no tenía ningún listado de ventas, `accounting` tenía los modelos de caja (`apertura_caja`/`cierre_caja`/`arqueo`, migrados desde 2026-07-20) sin capa de aplicación. **Slice mínimo de caja** (`accounting.application.caja`): abrir/cerrar/arquear con **reconciliación real** (el cierre calcula `monto_esperado` desde los pagos en efectivo reales, vía contrato público de `sales`, no un número tipeado sin verificar). Primer frontend real: login por PIN + pantalla de dashboard en Next.js. Fuera de esta fase, a propósito: RN-POS-009..013 completas, relevo autenticado por PIN, máquina de estados de `custodia_efectivo` — ver Deuda técnica. |
 | Protección de datos personales (Ley 29733) | 🔶 ARCO técnico ✅ 2026-07-26 | `docs/security/proteccion-datos-personales.md`: qué datos trata el ERP y dónde viven (casi todo en `persona`, fuente única — RN-GEN-007; la excepción deliberada es `postulante`, ver 2026-08-01), derechos ARCO, plazos de conservación, medidas de seguridad ya vigentes (referenciadas, no reconstruidas), proceso de brecha. Cancelación implementada como **anonimización irreversible** de `persona`, no `DELETE` — `POST /api/v1/personas/{id}/anonimizar`, permiso dedicado `personas.anonimizar`, migración `dad43729501d` (RN-PER-007, ADR-011). Acceso/Rectificación ya existían (`GET`/`PATCH /personas/{id}`). Pendiente de **acción del usuario, no de código**: registro del banco de datos ante la ANPD, aviso de privacidad público, confirmar plazos de retención con el contador/abogado, jurisdicción de transferencia internacional. Pendiente técnico: ver Deuda técnica. |
 | Contrato OpenAPI de la API | ✅ 2026-07-26 | `docs/architecture/openapi.json` exportado (`python -m src.core.openapi_export`) y verificado en CI — un endpoint que cambia sin regenerar el contrato falla el PR (ADR-010). `TAGS_METADATA` en `src/core/app.py` describe los 15 tags de la API; un tag nuevo sin descripción falla un test. De paso, corregidas dos afirmaciones falsas en `api-guidelines.md`: `idempotency_key` es campo del body, no header; las colecciones devuelven array plano, no `{items,total,page,page_size}` (nunca se implementó paginación). |
@@ -333,11 +334,18 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   vigente, 409 si está desactualizada. Aplicado solo a `persona` por
   ahora — extender a otras entidades compartidas si aparecen más choques
   reales de edición concurrente.
-- ⬜ **Contrato de lectura `purchases` ↔ `inventory.solicitud_insumos`**
-  ("qué usuarios/sucursales piden más productos"): **desbloqueado** desde
-  2026-08-01 — `solicitud_insumos` ya existe en código (ADR-020). Falta
-  exponer el contrato público, replicando el patrón de `sales.cliente`
-  (ver `docs/architecture/events.md`).
+- ✅ 2026-08-04 **Contrato de lectura `purchases` ↔ `inventory.solicitud_insumos`**
+  ("qué se pide más y desde dónde", insumo para negociar volumen con
+  proveedores): mismo patrón de `sales.cliente`.
+  `inventory/application/queries_publicas.py::solicitudes_resumen_para_negociacion`
+  suma `cantidad_solicitada` por artículo y sucursal (`Almacen.sucursal_id`),
+  excluye solicitudes `cancelada` —lo pedido cuenta como demanda real aunque
+  no se haya aprobado ni despachado— y filtra por rango de fecha en zona de
+  negocio (`fechas.zona()`, no UTC crudo). Expuesto en
+  `GET /api/v1/inventory/solicitudes/resumen`, permiso nuevo
+  `inventory.leer_solicitudes_externas` (sembrado en el rol `comprador`).
+  `sucursal_id` sale `None` para almacenes sin sucursal (central,
+  producción) — su demanda cuenta, solo no se atribuye a un local.
 
 ### Seguridad (tras el endurecimiento base de 2026-07-26)
 - ⬜ **Rate limit global**, no solo en auth: el resto de la API sigue sin
@@ -349,43 +357,201 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
 - ⬜ **Rate limit por usuario además de por IP**: una IP compartida (la
   sucursal entera sale por la misma) puede agotar el límite de todos.
   Evaluar cuando haya varias cajas por local.
-- ⬜ **Content-Security-Policy**: falta definirla junto con el frontend
-  (hoy solo hay cabeceras que no dependen del contenido).
-- ⬜ **Escaneo de dependencias** (`pip-audit`/Dependabot) en CI.
+- ✅ 2026-08-04 **Content-Security-Policy**, en las dos puntas y con
+  criterios distintos porque son dos cosas distintas:
+  **API** (`src/core/app.py`) devuelve JSON y no tiene por qué cargar nada,
+  así que va la más restrictiva posible —
+  `default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'`
+  — que además vuelve inerte cualquier respuesta que llegara a
+  interpretarse como HTML. `/docs` queda exceptuado porque Swagger UI carga
+  de un CDN; en producción no existe (`docs_url=None`), así que la
+  excepción solo vive en desarrollo. **Frontend** (`frontend/middleware.ts`)
+  usa **nonce por request** con `'strict-dynamic'`: Next inyecta scripts
+  inline propios (hidratación, streaming RSC) y sin nonce habría que poner
+  `'unsafe-inline'` en `script-src`, que es tanto como no tener CSP contra
+  XSS. Concesión conocida y acotada: `style-src` sí lleva
+  `'unsafe-inline'` (Next emite estilos críticos inline sin nonce) — el
+  vector que importa, ejecución de script, queda cerrado igual.
+  Verificado con `curl` contra ambos y sin violaciones en consola.
+- ✅ 2026-08-04 **Escaneo de dependencias**: `.github/dependabot.yml` con
+  los cuatro ecosistemas (pip, npm, github-actions, docker). Complementa a
+  `pip-audit`, que solo *avisa* de una CVE publicada — Dependabot además
+  abre el PR que la cierra. Agrupado por ecosistema para no recibir veinte
+  PRs sueltos cada lunes; las de seguridad quedan fuera del grupo a
+  propósito, para que lleguen solas y se vean. **Sigue pendiente**
+  `pip-audit` bloqueante (hoy `|| true`) — ver la sección CI/CD.
 - ⬜ **Verificación de firma en webhooks entrantes** (Izipay, Meta):
   documentada en `security.md`, sin implementar — llega con las
   integraciones.
 
 ### Dashboard y caja (tras la implementación de 2026-07-26 — ADR-012)
-- ⬜ **Hallazgo real de la verificación en navegador**: `src/seeders/seed.py`
-  no crea ninguna `Sucursal` ni asigna `admin` a una — `build_claims`
-  deriva `empresa_id` desde las sucursales del usuario, así que en una
-  instalación recién sembrada el dashboard (y cualquier otra pantalla que
-  dependa de `empresa_id` del JWT) falla con "sin empresa asignada" hasta
-  que alguien asigna una sucursal a mano. No es un bug de esta fase — ya
-  existía — pero recién se hizo visible al construir la primera pantalla
-  que de verdad depende de ese claim. Corregirlo en el seeder base (crear
-  al menos una sucursal semilla y asignar `admin`) queda pendiente.
-- ⬜ **Ciclo de caja completo**: RN-POS-009 a RN-POS-013 (verificación de
-  series de POS, denominaciones obligatorias por billete/moneda), relevo
-  autenticado por ambas partes con PIN propio (hoy solo se registra
-  `relevo_encargado_id`, sin exigir su sesión), `custodia_efectivo` como
-  máquina de estados real (cajero→supervisor→contabilidad).
-- ⬜ **Enlace caja↔venta**: no bloquea cobrar sin caja abierta — deuda ya
-  declarada en el slice de `sales`, sigue sin resolverse.
-- ⬜ **`rechazar_pago` / reapertura de cierre**: si un cierre queda
-  `con_irregularidad` no hay flujo de corrección, solo el registro.
+- ✅ **Seeder sin sucursal semilla** — **la entrada estaba obsoleta**
+  (verificado 2026-08-04): `_seed_organizacion` sí crea las sucursales de
+  `SUCURSALES` y el bloque final de `seed()` asigna `admin` a todas, así
+  que `build_claims` deriva `empresa_id` sin intervención manual. Se
+  confirmó levantando el stack y entrando al dashboard con `admin` recién
+  sembrado.
+- ✅ 2026-08-04 **Ciclo de caja completo** (ADR-025, migración
+  `f3a1c62d90b4`). Cuatro deudas cerradas de una: **no se cobra sin caja
+  abierta** (`sales.registrar_pago` pregunta por el contrato público
+  `accounting.hay_caja_abierta`; el replay del hub es la única excepción,
+  porque el cobro ya ocurrió en la sucursal); **el monto sale del conteo
+  por denominación** y no del teclado (RN-POS-003/007 — en la apertura la
+  diferencia contra lo declarado por el encargado se calcula y no bloquea
+  abrir, RN-POS-011); **cada relevo lo firma quien recibe con su PIN**
+  (RN-MDP-002, reusando la elevación de `POST /auth/autorizar` con el
+  permiso nuevo `accounting.caja_relevar`, y `custodia_efectivo` pasa a ser
+  máquina de estados real hasta `disponible`); y **un cierre con faltante
+  se corrige sin reescribirse** (reapertura con motivo y autorizador en
+  `cierre_caja.correcciones`, solo mientras el efectivo siga en el local).
+  Suma `pos_tarjeta` (serie + código de comercio, RN-POS-010; el de
+  emergencia es una fila con `sucursal_id` NULL, RN-POS-009) y la
+  verificación de terminales al abrir, que marca el averiado y avisa sin
+  bloquear. `efectivo_esperado` del reporte de caja y el arqueo ahora
+  descuentan `movimiento_caja`. RN-POS-012/013 quedan fuera de código a
+  propósito: son organizativas y viven en el SOP. 17 tests nuevos
+  (`tests/test_caja_ciclo.py`).
+- ⬜ **El turno de caja no se replica al hub** (deuda nueva de ADR-025): el
+  push del hub reproduce el cobro con `exigir_caja_abierta=False` porque la
+  nube no conoce la apertura que sí existió en la sucursal. Sincronizar
+  `apertura_caja`/`cierre_caja` abre preguntas propias (¿quién cierra un
+  turno que empezó offline?) — no antes de que haya un hub real corriendo.
+- ⬜ **El cierre no cuadra tarjetas contra el reporte de lote**
+  (RN-POS-004): `cierre_caja.reportes_pos` sigue vacío y `montos_reales`
+  solo lleva efectivo. Con `pos_tarjeta` ya inventariado (ADR-025) el
+  siguiente paso es exigir un reporte de lote por terminal operativo.
+- ⬜ **Pagos por link de pago sin verificación automática al cierre**
+  (RN-POS-008): hoy nada los concilia ni los computa en la caja principal
+  de la sucursal. Llega con la integración de pasarela (Izipay).
+- ⬜ **Caja sin pantalla**: apertura, cierre, custodia, reapertura y el
+  inventario de POS se operan por API. La UI va con las pantallas de
+  Contabilidad.
 - ⬜ **`GET /ventas` genérico** (listado paginado con filtros): el
   dashboard resuelve su propio agregado (`resumen_ventas_del_dia`); un
   listado general de ventas para otros usos queda pendiente.
 - ⬜ **Caché/paginación del agregador**: cada llamada a
   `/dashboard/resumen` recalcula todo en vivo — aceptable al volumen de hoy,
   revisar si empieza a pesar.
-- ⬜ **Más indicadores**: el dashboard de hoy es mínimo (3 tarjetas). Serie
-  de ventas por hora, ranking de productos, alertas de KDS demorado, etc.
-  quedan para iteraciones futuras.
+- ✅ 2026-08-04 **Más indicadores → tablero de reportes** (ADR-024,
+  migración `998e335369a1`). Ya no son 3 tarjetas fijas: catálogo cerrado
+  de reportes (`src/core/reportes/`) + tableros guardados por usuario
+  (`shared/models/tablero.py`). Cinco reportes iniciales —
+  `ventas_por_dia` (serie), `ventas_por_sucursal`, `top_productos`,
+  `compras_por_proveedor`, `solicitudes_por_articulo`—, rangos preset y
+  personalizado, filtro de sucursales por checkbox, tarjetas con ancho
+  (1-4/4) y alto ajustables, y visualización tabla/barras/líneas por
+  tarjeta. `GET /reportes`, `POST /reportes/{codigo}/datos`, CRUD de
+  `/tableros`. Sin constructor de consultas a propósito — el motivo está
+  en el ADR. Frontend en `frontend/components/reportes/` (Tailwind,
+  gráficos sin librería). 21 tests (`tests/test_reportes.py`) y
+  verificación end-to-end en navegador con 290 ventas de muestra.
+- ✅ 2026-08-04 **Tres reportes más** (ADR-024 Addendum): `ventas_por_hora`,
+  `ventas_por_trabajador` y `margen_por_producto` — 8 en total. Dos
+  decisiones que valen más que los reportes: (a) la **hora es la del
+  negocio** — se agrupa en SQL sobre UTC (`extract`, lo único portable
+  entre SQLite y Postgres) y la etiqueta se corre con
+  `fechas.desfase_horas()`; son 24 filas, reetiquetarlas es exacto y no
+  obliga a traer todas las ventas. La función falla si la zona configurada
+  tuviera un desfase que no sea de horas enteras, así que la suposición
+  ("Perú no tiene horario de verano") está verificada y no escrita a mano.
+  (b) **costo desconocido no es costo cero**: un producto sin receta sale
+  con `costo`/`margen` en `null`, porque cero mostraría 100 % de margen
+  sobre un dato que falta. El costo sale de `inventory.recetas.costo_linea`
+  —que ya contempla merma— en vez de recalcularse con otro criterio.
+  Contratos públicos nuevos: `rrhh.nombres_por_usuario` (el primero de
+  `rrhh`; expone nombre y cargo, nada de remuneración ni contratos),
+  `inventory.costo_unitario_de_recetas` y tres de `sales`.
+- ✅ 2026-08-04 **Exportación a CSV**, botón por tarjeta. Se arma **en el
+  cliente**: los datos ya están en el navegador y un endpoint nuevo
+  repetiría consulta, RBAC y rango para producir las mismas filas. Escapado
+  RFC 4180 (una razón social con coma partiría la fila), BOM UTF-8 (sin él
+  Excel abre "Lácteos" como mojibake) y montos crudos, no formateados —
+  `S/ 1,234.50` no lo suma ninguna hoja de cálculo. Se exporta lo que se
+  ve; para más filas se sube `limite` (tope 500, de seguridad). 11 tests en
+  `frontend/lib/reportes.test.ts` (`npm test`).
+- ✅ 2026-08-04 **Reordenar tarjetas por arrastre**, con HTML5 nativo — no
+  hacía falta librería de drag-and-drop, que fue el motivo por el que se
+  había diferido. Cada tarjeta lleva un `uid` estable **solo en el
+  cliente** (no se persiste: el orden ya lo da el índice del array) para
+  que la clave de React no sea la posición.
+- ✅ 2026-08-04 **Tableros compartidos por rol** (`tablero.rol_id`,
+  migración `5e1c7775f6ca`). NULL = privado; con rol, lo ve en solo lectura
+  quien tenga ese rol y lo edita solo el dueño. Por rol y no por lista de
+  personas porque **se administra solo**: alguien cambia de puesto y gana o
+  pierde el tablero sin que nadie actualice nada, y quien cesa deja de
+  verlo al perder el rol — con una lista habría que sacarlo de cada
+  tablero, y el que se olvide es una fuga. Dos guardas: solo se comparte
+  hacia un rol propio, y **compartir no expone datos** (cada tarjeta
+  revalida el permiso de su módulo, así que quien no tenga `purchases.leer`
+  ve la tarjeta en 403). Se comparte la disposición, no el contenido.
+- ✅ 2026-08-04 **Caché por tarjeta**: 30 s por (reporte + filtros), en
+  memoria del módulo. Un reporte es una foto, no un dato editable — no hay
+  nada que invalidar salvo el tiempo. Medido en navegador: reordenar dentro
+  de la ventana cuesta **0 peticiones**. Caché de verdad (compartida entre
+  usuarios, invalidada por evento) iría del lado del servidor con Redis, y
+  eso sigue sin caso real.
+- ✅ 2026-08-04 **Alerta de KDS demorado y estado de caja como reporte**
+  (migración `d4e21b0c13d0`). 10 reportes en el catálogo.
+  **`alerta_pedido`** (`sales`) con dos disparadores que convergen: el
+  listener de `sales.venta_confirmada` agenda una revisión puntual a 15 min
+  (`countdown` de Celery) y un **barrido de Celery beat cada 5 min** repasa
+  todo lo que siga en cocina. Se mantienen los dos porque para un sistema de
+  alertas el fallo que importa es **no avisar**: la tarea puntual sola se
+  pierde si el worker estuvo caído o el broker soltó el mensaje, y el
+  barrido solo llegaría con hasta un ciclo de retraso. Convergen sin
+  duplicar por `UNIQUE (venta_id, minutos_umbral)` + pre-chequeo, y el
+  INSERT va en **SAVEPOINT**: un `rollback()` de sesión se habría llevado
+  por delante las alertas que el mismo barrido ya creó (lo encontró un test).
+  El umbral es `parametro_empresa` `sales/minutos_alerta_pedido` y **se
+  congela en la fila**: subirlo mañana no reescribe lo que ayer fue demora.
+  Nuevo evento `sales.pedido_demorado`; nuevo contrato público
+  `accounting.estado_de_caja` (horas sin cerrar + efectivo esperado, no solo
+  el conteo del KPI). 12 tests (`tests/test_alerta_pedido.py`).
+- ✅ 2026-08-04 **Encolar ya no puede colgar el request** (hallazgo derivado
+  del listener). `apply_async` conecta al broker **dentro** de la llamada y
+  con reintentos: con Redis inalcanzable, cada venta confirmada pagaba
+  segundos de DNS fallido — el suite pasó de 5 a 63 minutos y en producción
+  habría sido el cajero esperando. Timeouts de 1 s en `celery_app`,
+  `retry=False` al encolar la alerta, y `memory://` en los tests (mismo
+  criterio que el token de Factiliza en `conftest.py`).
+- ✅ 2026-08-04 **La alerta notifica al encargado de turno** (migración
+  `7fda1eb759f7`). `users` escucha `sales.pedido_demorado` y crea una
+  `notificacion` — entidad nueva, transversal, con `referencia_tipo`/
+  `referencia_id` polimórficos y sin FK (mismo criterio que
+  `decision_gerencial`).
+  **Quién es el "encargado de turno" no necesitó una entidad nueva**: sale
+  del `relevo_encargado_id` de la caja abierta, que es exactamente la
+  persona a cargo del local en ese momento y ya se registraba al abrir turno
+  (RN-MDP-002). Respaldo cuando no hay caja abierta: los `supervisor`/
+  `admin` de esa sucursal — un aviso sin destinatario es un aviso perdido.
+  **El punto de configuración futuro es una sola función**
+  (`notificaciones.destinatarios_de_sucursal`): cambiar la regla no toca ni
+  el listener ni la entidad ni la pantalla. 14 tests.
+  `GET /notificaciones`, `POST /notificaciones/{id}/leer`,
+  `POST /notificaciones/leer-todas` — sin `require_permission` a propósito:
+  cada uno ve lo suyo, el filtro es la identidad y no un rol.
+- ⬜ **La bandeja no se empuja a ningún lado**: la notificación existe y se
+  consulta, pero nadie la manda al teléfono. Falta push/WhatsApp — y cuando
+  llegue debe **leer de esta tabla**, no reemplazarla: un aviso que solo
+  viajó por push no deja rastro de si alguien lo vio.
+- ⬜ **La bandeja no tiene pantalla todavía**: los endpoints están, el
+  frontend no. Con `sonner` ya instalado, la campana del shell es el
+  siguiente paso natural.
+- ⬜ **Preferencias de aviso por usuario**: hoy la regla de destinatarios es
+  fija. Se difiere a propósito hasta que haya un caso real ("de noche
+  avisar también al dueño", "este local no usa la bandeja") — una tabla de
+  preferencias sin nadie que la administre es un formulario más.
+- ✅ 2026-08-04 **`efectivo_esperado` descuenta `movimiento_caja`**
+  (ADR-025): el reporte de estado de caja y el arqueo usan el mismo cálculo
+  que el cierre (`apertura + cobrado + ingresos − retiros`) y el desglose
+  viaja en una columna nueva del reporte. Era un techo, no un arqueo.
+- ⬜ **La exportación baja lo que se ve, no el dataset completo**: si
+  contabilidad pide "todo el año en un archivo", 500 filas no alcanzan y
+  ahí sí hace falta un endpoint que transmita en streaming — con su propio
+  límite y probablemente asíncrono. No antes de que lo pidan.
 - ⬜ **`empresa_id` seguirá viniendo por query param** en `/dashboard/resumen`
-  hasta que se resuelva ADR-004 (tenant desde el JWT).
+  hasta que se resuelva ADR-004 (tenant desde el JWT). Los endpoints de
+  `/reportes` y `/tableros` ya lo derivan del token, sin query param.
 
 ### Protección de datos personales (tras la implementación de 2026-07-26 — ADR-011)
 - ✅ 2026-08-01 **ARCO de postulante** (migración `b1d09e574c23`): los datos
@@ -512,31 +678,62 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   regreso verificado.
 
 ### Observabilidad y salud (tras las implementaciones de 2026-07-26)
-- ⬜ **Elegir proveedor y cargar `SENTRY_DSN`**: el código está listo pero
-  sin DSN no reporta nada. Decidir Sentry SaaS (plan gratis) vs GlitchTip
-  autoalojado en el mismo VPS — el código es el mismo para ambos (ADR-006).
+- ✅ 2026-08-04 **GlitchTip autoalojado** (decisión del usuario sobre las
+  dos que ADR-006 dejaba abiertas). Pesa que los datos no salgan del VPS: un
+  reporte de error lleva rutas, parámetros y trazas, y aunque
+  `_limpiar_evento` redacta PIN/tokens/cabeceras antes de enviar nada, lo
+  que nunca sale de la máquina no hay que confiar en que esté bien
+  redactado. Costo aceptado: un Postgres, un Redis y dos procesos más en el
+  mismo VPS. Stack en `docker-compose.observabilidad.yml`, guía en
+  `docs/engineering/observabilidad.md`.
+  **Pendiente del usuario**: crear el proyecto en GlitchTip y pegar su DSN
+  en `SENTRY_DSN` — sin ese paso el código sigue sin reportar nada.
+- ✅ 2026-08-04 **Colector de logs: Loki + Alloy + Grafana** (decisión del
+  usuario). El ERP ya emitía una línea de JSON por evento; lo que faltaba
+  era que no muriera en `docker logs`. Alloy descubre los contenedores por
+  el socket de Docker (montado **solo lectura**) y empuja a Loki; Grafana
+  arranca con el datasource provisionado, porque sin él Loki es un agujero
+  de solo escritura que nadie va a consultar por `curl` a las 2 a.m.
+  `nivel`/`flujo`/`entorno` son etiquetas; `request_id` y `usuario_id`
+  **no** —tienen tantos valores como requests y harían explotar el índice—
+  y se filtran con LogQL, con el enlace ya armado en Grafana.
 - ⬜ **Contratar el monitor externo** y darle de alta las tres sondas
   (`/health` 1 min, `/health/ready` 5 min, `/health/backups` 1 h). Sin
   monitor, los endpoints no alertan a nadie: el ERP expone, el monitor avisa
-  (ADR-007).
-- ⬜ **Colector de logs**: hoy el JSON sale a stdout y queda en `docker logs`
-  / journald. Falta enviarlo a algún lado consultable (Loki, o el propio
-  Sentry para el flujo de errores).
+  (ADR-007). **Es lo único que no se puede resolver dentro del VPS**: un
+  monitor que corre en la misma máquina no avisa cuando la máquina se cae.
+- ⬜ **Métricas siguen faltando**: Loki guarda logs, no series temporales.
+  Prometheus + node-exporter serían dos contenedores más; se difiere hasta
+  que haya tráfico que justifique mirarlas.
 - ⬜ **Métricas** (CPU, memoria, latencia, disponibilidad) y **trazas de
   rendimiento**: `SENTRY_TRACES_SAMPLE_RATE` está en 0. Subirlo cuando haya
   tráfico real que valga la pena perfilar.
 - ✅ 2026-07-26 **Health check profundo**: `/health/ready` comprueba base de
   datos, Redis y profundidad de la cola; `/health/backups` comprueba
   frescura. Liveness quedó separado y sin dependencias a propósito.
-- ⬜ **Salud del worker**: se infiere de la cola (si crece, el worker murió),
-  no se pregunta directo. Suficiente por ahora; un `celery inspect ping` es
-  caro para un endpoint que se sondea cada minuto.
-- ⬜ **Handler de listener que revienta**: `EventBus.publish` corre los
-  handlers en línea; si uno lanza, arrastra al publicador (una venta podría
-  fallar por un listener contable). Evaluar aislar cada handler y reportar
-  el fallo sin tumbar la operación.
-- ⬜ **Flujo `auditoria` sin usuarios**: el `audit_log` va a base de datos
-  pero no emite al log estructurado; el flujo está definido y vacío.
+- ✅ 2026-08-04 **Salud del worker**: ahora se pregunta, no se infiere.
+  Una tarea de beat (`core.latido_worker`, cada minuto) escribe una clave en
+  Redis con TTL de 3 min, y `/health/ready` la lee. Motivo del cambio: la
+  cola solo delata al worker **cuando hay trabajo** — con cola vacía, un
+  worker muerto y uno ocioso se ven idénticos, y en un restaurante la cola
+  está vacía la mayor parte del día, justo cuando conviene enterarse
+  temprano. Se usa TTL en vez de comparar timestamps para que la clave
+  desaparezca sola y nadie tenga que decidir "cuán viejo es demasiado
+  viejo". Degrada sin sacar de rotación: sin worker la caja sigue vendiendo,
+  lo que se posterga es el comprobante y la alerta de cocina.
+- ✅ **Handler de listener que revienta** — **la entrada estaba obsoleta**
+  (verificado 2026-08-04): `EventBus._despachar` ya envuelve cada handler en
+  `try/except` y registra con `log.exception`, así que un listener roto no
+  arrastra al publicador ni impide que corran los demás. Se agregó el test
+  que faltaba para congelarlo
+  (`test_un_listener_que_revienta_no_arrastra_al_publicador`).
+- ✅ 2026-08-04 **Flujo `auditoria` con contenido**: `AuditLogRepo.registrar`
+  emite además al logger `provecho.auditoria`. No es duplicar por gusto: la
+  tabla es el rastro legal (consultable, con su retención) y el log es lo
+  que un colector externo puede vigilar en vivo — si alguien borrara la
+  fila, la línea ya salió del proceso. **Solo metadatos**: `datos_antes`/
+  `datos_despues` pueden traer PII (Ley 29733) y ese detalle se queda en la
+  tabla.
 
 ### Backups (tras la implementación de 2026-07-26)
 - ✅ 2026-07-26 **Alerta ante fallo**: el comando reporta a Sentry
@@ -837,8 +1034,11 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   `FACTILIZA_TOKEN`).
 - ⬜ **Webhook de pasarela** (Izipay): hoy el pago nace `confirmado`
   (PDV presencial); pago online requiere estado `pendiente` + confirmación.
-- ⬜ **Enlace con caja** (`apertura_caja`/`cierre_caja` de accounting):
-  validar que el punto de venta tenga caja abierta al cobrar.
+- ✅ 2026-08-04 **Enlace con caja** (ADR-025): `registrar_pago` rechaza el
+  cobro con 409 si el punto de venta no tiene turno abierto, preguntando
+  por el contrato público `accounting.hay_caja_abierta`. Vale para todo
+  medio de pago, no solo efectivo — el cierre cuadra también las tarjetas
+  (RN-POS-004). Única excepción: el replay del push del hub.
 - ⬜ **Consumo de subrecetas anidadas**: el listener expande un solo nivel
   de receta; una receta cuyo ítem es `subreceta` no explota recursivo aún.
 - ⬜ Modificadores/variantes/combos, `central_pedidos` (pantalla y
@@ -1097,6 +1297,40 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   `contrato` transversal (misma deuda que `rrhh`).
 
 ### Frontend (F2 — arquitectura y UX, documento 2026-07-27, actualizado tras ADR-013)
+
+- ✅ 2026-08-04 **ADR-013 por fin instalado.** La decisión era de
+  2026-07-27 y **nunca se había ejecutado**: `package.json` no tenía ni
+  shadcn ni Base UI, así que cada pantalla venía resolviendo con `<dialog>`
+  nativo y `<select>` a mano. Ahora sí: `shadcn init --base base` (Base UI,
+  **cero paquetes de Radix** — verificado en `package.json`, que es lo que
+  la decisión "sin Radix" exigía) + 14 componentes generados en
+  `components/ui/`.
+  **Costo no previsto: hubo que subir a Tailwind v4.** El flag `--base base`
+  solo existe en shadcn v4, que asume Tailwind v4; quedarse en v3 obligaba a
+  shadcn v2, que es Radix. Se corrió el codemod oficial y se corrigió a mano
+  lo que dejó mal: `@theme` con variables autorreferenciales
+  (`--color-primary: var(--color-primary)`), PostCSS todavía apuntando al
+  plugin viejo, y —lo más silencioso— shadcn había pisado la tipografía
+  (`--font-heading: var(--font-sans)`), que habría dejado los títulos sin
+  Anton. `tailwind.config.ts` desapareció: v4 es CSS-first y el tema vive en
+  `globals.css`, en tres capas (marca → roles semánticos → utilidades) para
+  que cambiar de marca siga siendo tocar seis colores.
+  Los **colores del preset se descartaron**, como manda el propio ADR: los
+  roles de shadcn (`--primary`, `--destructive`, `--chart-1..5`…) apuntan a
+  la paleta Provecho, no al gris neutro de fábrica.
+  Librerías autorizadas por el usuario e integradas: **Recharts** (tooltip
+  con hit-testing, que era lo que faltaba de verdad — no el dibujo),
+  **dnd-kit** (reemplaza el arrastre HTML5 propio; arrastre por asa y
+  accesible por teclado), **react-day-picker** (calendario del rango
+  personalizado) y **sonner** (los avisos del tablero pasaron de un `<span>`
+  gris a toasts).
+- ⬜ **Login y PDV siguen sin migrar a shadcn**: el login conserva sus
+  clases `.login-*` en `@layer components` y el PDV su CSS propio. Funcionan;
+  se migran cuando se los toque, no antes.
+- ⬜ **`components/ui/**` exento del límite de complejidad de ESLint**: es
+  código generado por el CLI y se regenera en cada `shadcn add`. Si alguna
+  vez se edita a mano de forma sustancial, deja de ser generado y el override
+  hay que revisarlo.
 
 - ✅ 2026-08-03 **`npm audit` en cero.** Eran 4 vulnerabilidades altas:
   `brace-expansion` (la resolvió `npm audit fix`) y tres que colgaban de

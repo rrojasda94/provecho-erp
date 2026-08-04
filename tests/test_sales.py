@@ -43,6 +43,7 @@ from src.modules.users.infrastructure.models import (
     UsuarioRol,
 )
 from src.modules.users.infrastructure.security import hash_pin
+from tests.conftest import abrir_caja_directa
 
 
 @pytest.fixture()
@@ -116,6 +117,10 @@ def env(monkeypatch):
                      producto_comercial_id=producto.id, monto=Decimal("25.00")))
         # Stock inicial: 10 kg de harina.
         s.add(Stock(almacen_id=almacen.id, sku_id=sku.id, cantidad=Decimal(10)))
+        # Cobrar exige turno de caja abierto (RN-MDP-002); acá se prueba la
+        # venta, no la caja, así que el turno se inserta directo.
+        admin = s.scalar(select(Usuario).where(Usuario.username == "admin"))
+        abrir_caja_directa(s, punto_venta_id=pv.id, cajero_id=admin.id)
         ids.update(
             sucursal_id=str(sucursal.id), pv_id=str(pv.id),
             producto_id=str(producto.id), medio_id=str(medio.id),

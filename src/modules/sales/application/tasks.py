@@ -10,7 +10,7 @@ import uuid
 from src.config.settings import settings
 from src.core.celery_app import celery_app
 from src.core.database import SessionLocal
-from src.modules.sales.application import comprobantes
+from src.modules.sales.application import alertas, comprobantes
 from src.shared.integrations.factiliza import FactilizaError
 
 # Reintentos espaciados: 1, 2, 4... minutos. Un rechazo de SUNAT no
@@ -58,3 +58,69 @@ def encolar(comprobante_id: uuid.UUID) -> None:
     if settings.es_hub or not comprobantes.emision_habilitada():
         return
     emitir_comprobante.delay(str(comprobante_id))
+
+
+# --- Alerta de pedido demorado ----------------------------------------------
+@celery_app.task(name="sales.revisar_demora_pedido")
+def revisar_demora_pedido(venta_id: str) -> bool:
+    """Revisión puntual: ¿este pedido sigue en cocina pasado el umbral?
+
+    Devuelve si se creó la alerta. Sin reintentos a propósito: si falla, el
+    barrido periódico lo vuelve a mirar en el próximo ciclo — reintentar
+    acá solo adelantaría lo que la red de seguridad ya hace.
+    """
+    session = SessionLocal()
+    try:
+        alerta = alertas.revisar_pedido(session, uuid.UUID(venta_id))
+        session.commit()
+        return alerta is not None
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+@celery_app.task(name="sales.barrer_pedidos_demorados")
+def barrer_pedidos_demorados() -> int:
+    """Barrido periódico (Celery beat). Red de seguridad de la revisión
+    puntual: levanta lo que se perdió porque el worker estaba caído, el
+    broker soltó la tarea, o la venta nació sin worker escuchando."""
+    session = SessionLocal()
+    try:
+        creadas = alertas.barrer(session)
+        session.commit()
+        return len(creadas)
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+def programar_revision_demora(venta_id: str) -> None:
+    """Agenda la revisión para dentro del umbral, desde el listener de
+    `sales.venta_confirmada`.
+
+    El `countdown` usa el umbral por defecto y no el de la empresa: leerlo
+    exigiría una sesión dentro del listener, y de todos modos la tarea
+    revalida el umbral real al ejecutarse. Si Gerencia lo subió, la
+    revisión puntual simplemente no encuentra nada y el barrido alerta
+    cuando corresponde.
+
+    En un hub de sucursal no hace nada — no corre Celery (ADR-009).
+
+    **`retry=False` no es un detalle.** Por defecto `apply_async` reintenta
+    la conexión al broker *dentro* de la llamada, con backoff: si Redis está
+    caído, el request que confirmó la venta se queda esperando ahí y el
+    cajero mira una pantalla colgada. Como esto corre en el listener de
+    `sales.venta_confirmada`, o falla al instante o no vale la pena — y si
+    falla, el barrido periódico levanta el pedido igual.
+    """
+    if settings.es_hub:
+        return
+    revisar_demora_pedido.apply_async(
+        args=[venta_id],
+        countdown=alertas.UMBRAL_DEFECTO_MINUTOS * 60,
+        retry=False,
+    )

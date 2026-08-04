@@ -128,6 +128,7 @@ supervisor aprueba y reserva, el central despacha, el local recibe.
 | GET | `/reservas?almacen_id&sku_id` | `leer` |
 | POST | `/reservas/{id}/liberar` | `liberar_reserva` |
 | POST/GET | `/solicitudes` | `solicitar_insumos` / `leer` |
+| GET | `/solicitudes/resumen` | `leer_solicitudes_externas` |
 | GET | `/solicitudes/{id}` | `leer` |
 | POST | `/solicitudes/{id}/aprobar` \| `/rechazar` | `aprobar_solicitud` |
 | POST | `/solicitudes/{id}/cancelar` | `solicitar_insumos` |
@@ -314,6 +315,19 @@ entre `aprobada` y `despachada` no cambia qué se puede hacer (ADR-020).
   que no se contó en su fecha, RN-INV-021).
 - Contrato público de lectura: `application/queries_publicas.py` — hoy
   `unidad_medida_para_magnitud` (nombre y `decimales` de una UdM, para que
-  otro módulo exprese una cantidad con su unidad, RN-GER-010). Mismo criterio
-  que `sales.queries_publicas`: devuelve dicts, nunca el ORM, y nadie importa
-  `inventory.infrastructure` desde afuera.
+  otro módulo exprese una cantidad con su unidad, RN-GER-010),
+  `receta_resumen` (que `sales` valide la receta de un producto comercial) y
+  `solicitudes_resumen_para_negociacion` (`GET /solicitudes/resumen`, permiso
+  `leer_solicitudes_externas`: qué artículo pide más cada sucursal, para que
+  `purchases` negocie volumen — ver `docs/architecture/events.md`) y
+  `costo_unitario_de_recetas` (costo de **una unidad de rendimiento**, con
+  merma, para que el reporte de margen del tablero no tenga que conocer el
+  modelo de recetas). Mismo criterio que `sales.queries_publicas`: devuelve
+  dicts, nunca el ORM, y nadie importa `inventory.infrastructure` desde
+  afuera.
+
+  `costo_unitario_de_recetas` reusa `recetas.costo_linea` en vez de
+  recalcular con otro criterio —dos pantallas del ERP no pueden mostrar
+  números distintos para lo mismo— y **omite** del resultado la receta sin
+  insumos o sin rendimiento válido: nunca devuelve costo cero, que se leería
+  como "gratis" en lugar de "desconocido".

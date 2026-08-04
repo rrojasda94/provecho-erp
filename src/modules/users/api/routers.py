@@ -2,7 +2,7 @@
 
 import uuid
 
-from fastapi import APIRouter, Depends, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
 from src.core.rate_limit import rate_limit_login
@@ -22,6 +22,7 @@ from src.modules.users.application import (
     auth,
     autorizacion,
     gerencia,
+    notificaciones,
     privacidad,
 )
 from src.modules.users.application.errors import (
@@ -197,6 +198,62 @@ def listar_almacenes(
     a propósito: no es un recurso a proteger, es un catálogo de apoyo. Sí
     escopada por tenant — un almacén de otra empresa no es "no sensible"."""
     return admin.listar_almacenes(session, tenant.filtro_empresa(empresa_id))
+
+
+@router.get(
+    "/notificaciones", response_model=list[schemas.NotificacionOut], tags=["users"]
+)
+def listar_notificaciones(
+    solo_no_leidas: bool = True,
+    usuario: Usuario = Depends(get_current_user),
+    session: Session = Depends(get_db),
+):
+    """La bandeja del usuario autenticado. Sin `require_permission` a
+    propósito: no es un recurso a proteger por rol, cada uno ve **lo suyo**
+    y el filtro es la identidad, no un permiso."""
+    return notificaciones.bandeja(session, usuario.id, solo_no_leidas=solo_no_leidas)
+
+
+@router.post(
+    "/notificaciones/{notificacion_id}/leer",
+    response_model=schemas.NotificacionOut,
+    tags=["users"],
+)
+def leer_notificacion(
+    notificacion_id: uuid.UUID,
+    usuario: Usuario = Depends(get_current_user),
+    session: Session = Depends(get_db),
+):
+    fila = notificaciones.marcar_leida(session, notificacion_id, usuario.id)
+    if fila is None:
+        raise HTTPException(404, "Notificación no encontrada")
+    session.commit()
+    return fila
+
+
+@router.post("/notificaciones/leer-todas", tags=["users"])
+def leer_todas_las_notificaciones(
+    usuario: Usuario = Depends(get_current_user),
+    session: Session = Depends(get_db),
+):
+    marcadas = notificaciones.marcar_todas_leidas(session, usuario.id)
+    session.commit()
+    return {"marcadas": marcadas}
+
+
+@router.get("/sucursales", response_model=list[schemas.SucursalOut], tags=["users"])
+def listar_sucursales(
+    empresa_id: uuid.UUID | None = None,
+    _: Usuario = Depends(get_current_user),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Catálogo de referencia (nombre/estado), mismo criterio que
+    `/almacenes`: cualquier autenticado que tenga que elegir una sucursal lo
+    necesita — el filtro por sucursales del tablero de reportes, entre
+    otros. Escopado por tenant; el RBAC real lo aplica cada endpoint que
+    después use ese `sucursal_id`."""
+    return admin.listar_sucursales(session, tenant.filtro_empresa(empresa_id))
 
 
 @router.get("/personas/{persona_id}", response_model=schemas.PersonaOut, tags=["personas"])

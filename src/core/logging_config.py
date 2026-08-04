@@ -13,6 +13,7 @@ import json
 import logging
 import sys
 from contextvars import ContextVar
+from datetime import UTC, datetime
 
 from src.config.settings import settings
 
@@ -84,7 +85,13 @@ class FormateadorJson(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         evento = {
-            "ts": self.formatTime(record, "%Y-%m-%dT%H:%M:%S%z"),
+            # RFC3339 en UTC. `formatTime` con `%z` daba `-0500` (sin los dos
+            # puntos), que **no** es RFC3339 y el colector no parsea: Alloy
+            # lo descartaba en silencio y estampaba la hora de ingesta, así
+            # que un hub que subía logs atrasados los mostraba como recién
+            # ocurridos. UTC y no hora local por la regla que ya fija
+            # `shared/fechas.py`: un instante se guarda en UTC.
+            "ts": datetime.fromtimestamp(record.created, tz=UTC).isoformat(),
             "nivel": record.levelname,
             "flujo": flujo_de(record.name),
             "logger": record.name,

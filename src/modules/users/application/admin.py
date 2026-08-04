@@ -17,6 +17,7 @@ from src.modules.users.infrastructure.models import (
     Persona,
     Rol,
     RolPermiso,
+    Sucursal,
     Usuario,
     UsuarioRol,
     UsuarioSucursal,
@@ -27,6 +28,7 @@ from src.modules.users.infrastructure.repositories import (
     PermisoRepo,
     PersonaRepo,
     RolRepo,
+    SucursalRepo,
     UsuarioRepo,
 )
 from src.modules.users.infrastructure.security import hash_pin
@@ -130,6 +132,12 @@ def listar_personas(session: Session, q: str | None = None) -> list[Persona]:
 # --- Organización (Almacen vive acá por historia, ver data-model §1) --------
 def listar_almacenes(session: Session, empresa_id: uuid.UUID | None = None) -> list[Almacen]:
     return AlmacenRepo(session).list(empresa_id)
+
+
+def listar_sucursales(
+    session: Session, empresa_id: uuid.UUID | None = None
+) -> list[Sucursal]:
+    return SucursalRepo(session).list(empresa_id)
 
 
 def editar_persona(

@@ -189,6 +189,28 @@ erDiagram
 - **refresh_token**: hash, expiración, revocado.
 - **audit_log**: usuario_id, entidad, entidad_id, acción, datos_antes (JSONB),
   datos_despues (JSONB), sucursal_id, ip, timestamp. Solo inserción.
+  Desde 2026-08-04 cada inserción emite además una línea al logger
+  `provecho.auditoria` **con solo metadatos**: la tabla es el rastro legal,
+  el log es lo que un colector externo vigila en vivo, y `datos_antes`/
+  `datos_despues` pueden traer PII (Ley 29733) que no debe salir del proceso.
+- **notificacion** (2026-08-04): usuario_id (destinatario), tipo (código del
+  hecho, ej. `sales.pedido_demorado`), nivel (`info` | `aviso` | `urgente` —
+  cuánto interrumpe, no qué pasó), titulo, cuerpo, **referencia_tipo /
+  referencia_id** (polimórficos, sin FK: la bandeja apunta a una venta hoy y
+  a lo que venga mañana sin ganar una FK por tipo — mismo criterio que
+  `decision_gerencial`), sucursal_id, leida_at (NULL = pendiente).
+  Índice `ix_notificacion_bandeja (usuario_id, leida_at)`: es la consulta
+  que corre en cada carga de pantalla.
+
+  Es **bandeja, no transporte**: la fila se crea siempre y el frontend la
+  consulta. Empujarla a un teléfono es una capa aparte que todavía no
+  existe, y cuando exista leerá de acá en vez de reemplazarla — un aviso que
+  solo viajó por push no deja rastro de si alguien lo vio.
+
+  A quién le llega lo decide `users.application.notificaciones.
+  destinatarios_de_sucursal`: el **encargado de turno** (derivado del
+  `relevo_encargado_id` de la caja abierta) y, si no hay caja abierta, los
+  `supervisor`/`admin` de esa sucursal.
 - **auditoria**: empresa_id, tipo (`interna` | `externa`), area_responsable
   (si interna) o entidad_auditora (si externa — grupo empresarial o
   consultora), alcance (proceso/registro/estado evaluado), disparador
@@ -631,6 +653,22 @@ Solicitud.
   fuente única del progreso del pedido; `updated_at` de cada transición es
   la base para medir tiempos de preparación y de despacho,
   RN-CUP-002/003).
+- **alerta_pedido** (2026-08-04): venta_id, sucursal_id, **minutos_umbral**,
+  minutos_transcurridos, estado_al_alertar (`pendiente` |
+  `en_preparacion` — el peor estado del pedido; que cocina ni lo haya
+  empezado pesa distinto a que lo esté haciendo), items_pendientes,
+  atendida_at / atendida_por / nota (NULL = sigue abierta).
+  `UNIQUE (venta_id, minutos_umbral)`.
+
+  Registra un pedido que superó su tiempo en cocina y seguía sin salir. El
+  umbral **se copia a la fila** en vez de leerse al reportar: es
+  `parametro_empresa` (`sales/minutos_alerta_pedido`, 15 por defecto) y
+  subirlo mañana no puede reescribir lo que ayer se consideró demora.
+
+  El `UNIQUE` no es cosmético: la alerta la pueden crear dos caminos que se
+  solapan a propósito —la revisión agendada al confirmar la venta y el
+  barrido periódico de Celery beat— y es lo que hace que converjan en una
+  sola fila. Ver `src/modules/sales/README.md`.
 - **entrega** (pendiente de slice — rama delivery de `PROC-OPE-002`):
   venta_id (único: una entrega por venta, RN-CUP-005), entregado_por
   (usuario_id de quien registra), fecha_entrega,
@@ -661,24 +699,44 @@ Solicitud.
   RN-COM-002), estado.
 - **custodia_efectivo**: apertura_caja_id, monto, responsable_actual_id,
   estado (`en_caja` | `en_supervisor` | `en_contabilidad` | `disponible`),
-  timestamps por relevo (RN-MDP-002). Cada transición exige confirmación
-  de valores correctos por el receptor.
+  timestamps por relevo (RN-MDP-002). **Máquina de estados desde ADR-025**:
+  nace en `en_supervisor` al cerrar la caja (el cierre ya exigió la firma
+  del encargado, así que el tramo cajero→encargado acaba de ocurrir) y
+  avanza a `en_contabilidad` o directo a `disponible` cuando el efectivo
+  se queda en la caja fuerte del local como fondo del día siguiente
+  (RN-MDP-006). Cada transición exige que **quien recibe** se autentique
+  con su PIN; no se vuelve atrás.
 - **apertura_caja** (PROC-CTB-002): punto_venta_id, cajero_id,
   relevo_encargado_id (relevo autenticado por ambas partes con
-  usuario+PIN), monto_apertura (RN-POS-003), detalle_denominaciones
-  (JSONB — conteo por billete/moneda), diferencia_reportada (opcional —
-  no se apertura sin registrarla; notifica a contabilidad y gerencia),
-  pos_verificados (JSONB — serie/código de comercio de cada POS de
-  tarjeta, RN-POS-010), timestamp. Inicia la cadena de custodia inversa
-  (RN-MDP-002).
+  usuario+PIN — desde ADR-025 sale del token de `POST /auth/autorizar`,
+  nunca del cuerpo del request), monto_apertura (RN-POS-003, **suma del
+  conteo**, no un número tecleado), detalle_denominaciones (JSONB —
+  conteo por billete/moneda, obligatorio), diferencia_reportada
+  (calculada: contado − declarado por el encargado; no bloquea la
+  apertura, RN-POS-011), pos_verificados (JSONB — un registro por POS de
+  tarjeta con `operativo` y observación, RN-POS-010), timestamp. Inicia la
+  cadena de custodia inversa (RN-MDP-002).
+- **pos_tarjeta** (ADR-025, RN-POS-009/010): empresa_id, sucursal_id
+  (**NULL = terminal de emergencia** del pool de contabilidad, que se
+  presta a la sucursal que lo necesite), serie (única), codigo_comercio,
+  operador, estado (`operativo` | `averiado` | `baja`), es_emergencia.
+  Inventario de terminales: sin él no se puede exigir el reporte de lote
+  de cada POS al cierre ni detectar que uno lleva días averiado. La
+  apertura lo marca `averiado` sin bloquearse (RN-POS-011).
 - **cierre_caja** (PROC-CTB-001 v1.1): apertura_caja_id, cajero_id,
   montos_esperados (JSONB por medio de pago), montos_reales (JSONB),
   descuadre (monto + atribución: `cajero` | `tercero_reportado` |
   `encargado` — según reporte previo y validación del relevo),
   reportes_pos (archivos de cierre de lote), relevos (cajero → encargado
   → contabilidad, cada uno autenticado con usuario+PIN, timestamps),
+  correcciones (JSONB, ADR-025 — un registro por reapertura con motivo,
+  autorizador y descuadre anterior: un cierre con faltante se corrige
+  dejando rastro, no reescribiendo el número, RN-MDP-005),
   custodia (`local_caja_fuerte` | `traslado_contabilidad`, RN-MDP-006),
-  estado. Irregularidades notifican a contabilidad, gerencia y RRHH.
+  estado. `montos_reales` guarda el conteo por denominación y el total sale
+  de ahí (RN-POS-007). Irregularidades notifican a contabilidad, gerencia
+  y RRHH. **Uno por apertura**: volver a cerrar tras una reapertura
+  recalcula el mismo registro.
 - **movimiento_caja** (ADR-018): apertura_caja_id, tipo (`ingreso` |
   `retiro`), monto (siempre positivo — el signo lo da `tipo`; guardar
   negativos invita a sumar mal), motivo (obligatorio: un movimiento sin
@@ -1095,6 +1153,42 @@ tabla. Ver [docs/gerencia/README.md](../gerencia/README.md).
   con qué sustento (`motivo`) — la FK duplicaba ese rastro. `decision_gerencial`
   sigue pendiente para **su** caso propio (aprobación de OC escalada,
   campaña sobre presupuesto, sanción), no para parámetros.
+
+- **tablero** (entidad transversal, vive en `shared` — ADR-024): empresa_id,
+  usuario_id, nombre, predeterminado, tarjetas (JSONB), filtros (JSONB),
+  **rol_id** (nullable, ADR-024 Addendum).
+  Es **preferencia de presentación, no dato de negocio**: qué reportes mira
+  un usuario, en qué orden, de qué tamaño y con qué filtros por defecto.
+  Vive en `shared` por lo mismo que el motor de reportes vive en `core` —
+  compone reportes de varios módulos y no le pertenece a ninguno.
+
+  `tarjetas` es una lista de
+  `{codigo, titulo, visual, ancho (1-4), alto}` y `filtros` es
+  `{preset, desde, hasta, sucursal_ids, limite}`. Van en JSON a propósito:
+  la forma de una tarjeta cambia con cada tipo de visualización nuevo y
+  normalizarla obligaría a una migración por cada una. Lo que **no** es
+  libre es el `codigo`, que se valida contra el catálogo de reportes al
+  guardar — un tablero no puede referirse a un reporte inexistente ni a uno
+  que su dueño no tiene permiso de ver (si no, guardarlo sería una puerta
+  trasera al RBAC en la próxima carga).
+
+  Índice parcial `uq_tablero_predeterminado` (único por `usuario_id` donde
+  `predeterminado`): un solo tablero de arranque por usuario, sin impedir
+  que tenga varios guardados.
+
+  **`rol_id` NULL = privado.** Con rol, el tablero lo ve en **solo lectura**
+  cualquiera que tenga ese rol; editarlo y borrarlo siguen siendo del dueño
+  (`usuario_id`). Se comparte por rol y no con una lista de personas porque
+  así se administra solo: alguien cambia de puesto y gana o pierde el
+  tablero sin que nadie recuerde actualizar nada, y un trabajador que cesa
+  deja de verlo al perder el rol en vez de tener que ser removido a mano de
+  cada tablero. Solo se comparte hacia un **rol propio** — si no,
+  cualquiera podría publicar en la bandeja de un área ajena.
+
+  Compartir **no expone datos**: cada tarjeta revalida el permiso de su
+  módulo dueño al pedir sus filas, así que quien abra un tablero compartido
+  sin `purchases.leer` recibe 403 en esa tarjeta. Lo que se comparte es la
+  disposición, no el contenido.
 
 ## 8d. Marketing (módulo marketing)
 

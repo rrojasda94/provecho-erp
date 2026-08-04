@@ -4,13 +4,14 @@ Reusa las dependencias de auth/RBAC del módulo users (mecanismo transversal).
 """
 
 import uuid
+from datetime import date
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from src.core.tenant import Tenant
 from src.modules.inventory.api import schemas
-from src.modules.inventory.application import ajustes, catalogo
+from src.modules.inventory.application import ajustes, catalogo, queries_publicas
 from src.modules.inventory.application import conteos as conteos_uc
 from src.modules.inventory.application import lotes as lotes_uc
 from src.modules.inventory.application import recetas as recetas_uc
@@ -48,6 +49,7 @@ CONTAR = "inventory.contar"
 VER_ESPERADO = "inventory.ver_stock_esperado"
 SOLICITAR_INSUMOS = "inventory.solicitar_insumos"
 APROBAR_SOLICITUD = "inventory.aprobar_solicitud"
+LEER_SOLICITUDES_EXTERNAS = "inventory.leer_solicitudes_externas"
 LIBERAR_RESERVA = "inventory.liberar_reserva"
 # Permisos ya sembrados desde el slice 1, sin uso hasta ahora.
 TRANSFERIR = "inventory.transferir"
@@ -408,6 +410,25 @@ def listar_solicitudes(
         almacen_solicitante_id=almacen_solicitante_id,
         estado=estado,
         empresa_id=tenant.filtro_empresa(),
+    )
+
+
+@router.get(
+    "/solicitudes/resumen", response_model=list[schemas.SolicitudResumenOut]
+)
+def resumen_solicitudes(
+    desde: date | None = None,
+    hasta: date | None = None,
+    limit: int = 50,
+    _: Usuario = Depends(require_permission(LEER_SOLICITUDES_EXTERNAS)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Qué artículos y sucursales piden más (contrato público, ver
+    `docs/architecture/events.md`) — insumo de `purchases` para negociar
+    volumen con proveedores."""
+    return queries_publicas.solicitudes_resumen_para_negociacion(
+        session, tenant.filtro_empresa(), desde=desde, hasta=hasta, limit=limit
     )
 
 

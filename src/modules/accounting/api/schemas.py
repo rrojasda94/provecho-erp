@@ -124,12 +124,28 @@ class EjecutarPagoIn(BaseModel):
 
 
 # --- Caja (PROC-CTB-001/002) -------------------------------------------------
+class PosVerificadoIn(BaseModel):
+    """Estado de un POS de tarjeta al abrir la caja (RN-POS-010/011)."""
+
+    pos_tarjeta_id: uuid.UUID
+    operativo: bool = True
+    observacion: str | None = Field(default=None, max_length=200)
+
+
 class AbrirCajaIn(BaseModel):
+    """`monto_declarado` es lo que el encargado dice entregar;
+    `detalle_denominaciones` es lo que el cajero cuenta. La diferencia la
+    calcula el servidor (RN-POS-011/012) — nunca se teclea.
+
+    `autorizacion` es el token de `POST /auth/autorizar` del encargado que
+    releva: sin su PIN no hay cadena de custodia (RN-MDP-002).
+    """
+
     punto_venta_id: uuid.UUID
-    relevo_encargado_id: uuid.UUID
-    monto_apertura: Decimal = Field(ge=0)
-    detalle_denominaciones: dict | None = None
-    diferencia_reportada: Decimal | None = None
+    monto_declarado: Decimal = Field(ge=0)
+    detalle_denominaciones: dict[str, int]
+    autorizacion: str
+    pos_verificados: list[PosVerificadoIn] | None = None
 
 
 class AperturaCajaOut(BaseModel):
@@ -139,13 +155,19 @@ class AperturaCajaOut(BaseModel):
     cajero_id: uuid.UUID
     relevo_encargado_id: uuid.UUID
     monto_apertura: Decimal
+    detalle_denominaciones: dict | None
     diferencia_reportada: Decimal | None
+    pos_verificados: list | None
     created_at: datetime
 
 
 class CerrarCajaIn(BaseModel):
-    monto_real: Decimal = Field(ge=0)
+    """El monto real sale del conteo por denominación (RN-POS-007), y el
+    efectivo se entrega al encargado que firma con su PIN (RN-MDP-002)."""
+
+    detalle_denominaciones: dict[str, int]
     custodia: str
+    autorizacion: str
     descuadre_atribucion: str | None = None
 
 
@@ -154,11 +176,61 @@ class CierreCajaOut(BaseModel):
     id: uuid.UUID
     apertura_caja_id: uuid.UUID
     cajero_id: uuid.UUID
+    montos_esperados: dict | None
     descuadre_monto: Decimal
     descuadre_atribucion: str | None
     custodia: str
     estado: str
+    correcciones: list | None
     created_at: datetime
+
+
+class ReabrirCierreIn(BaseModel):
+    motivo: str = Field(min_length=5, max_length=200)
+    autorizacion: str
+
+
+class CustodiaEfectivoOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    apertura_caja_id: uuid.UUID
+    monto: Decimal
+    responsable_actual_id: uuid.UUID
+    estado: str
+    timestamps_relevo: list | None
+
+
+class EntregarCustodiaIn(BaseModel):
+    estado_siguiente: str = Field(pattern="^(en_supervisor|en_contabilidad|disponible)$")
+    autorizacion: str
+
+
+class PosTarjetaIn(BaseModel):
+    serie: str = Field(min_length=2, max_length=50)
+    codigo_comercio: str = Field(min_length=2, max_length=50)
+    empresa_id: uuid.UUID | None = None
+    # NULL = terminal de emergencia del pool de contabilidad (RN-POS-009).
+    sucursal_id: uuid.UUID | None = None
+    operador: str | None = Field(default=None, max_length=50)
+    es_emergencia: bool = False
+
+
+class PosTarjetaPatch(BaseModel):
+    estado: str | None = Field(default=None, pattern="^(operativo|averiado|baja)$")
+    sucursal_id: uuid.UUID | None = None
+    es_emergencia: bool | None = None
+
+
+class PosTarjetaOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    empresa_id: uuid.UUID
+    sucursal_id: uuid.UUID | None
+    serie: str
+    codigo_comercio: str
+    operador: str | None
+    estado: str
+    es_emergencia: bool
 
 
 class MovimientoCajaIn(BaseModel):

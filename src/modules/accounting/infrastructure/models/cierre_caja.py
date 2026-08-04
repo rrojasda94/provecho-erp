@@ -38,6 +38,11 @@ class CierreCaja(Base, UuidPkMixin, TimestampMixin):
     # Cajero → encargado → contabilidad, cada uno autenticado con
     # usuario+PIN — lista de {rol, usuario_id, timestamp}.
     relevos: Mapped[list | None] = mapped_column(JsonB, nullable=True)
+    # Reaperturas y recuentos: un cierre con faltante se corrige, y la
+    # corrección tiene que verse. Lista de {motivo, autorizado_por,
+    # descuadre_anterior, timestamp} — un registro por reapertura
+    # (RN-MDP-005).
+    correcciones: Mapped[list | None] = mapped_column(JsonB, nullable=True)
     custodia: Mapped[str] = mapped_column(
         Enum(
             "local_caja_fuerte",

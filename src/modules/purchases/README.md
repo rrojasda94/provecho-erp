@@ -137,3 +137,10 @@ Compra directa → Caja chica → Rendición semanal → `accounting`.
   `purchases.caja_chica_rendida` (accounting concilia y repone fondo),
   `purchases.evaluacion_proveedor_actualizada` (informativo, sin
   consumidor obligatorio todavía).
+- Consume el contrato público de lectura de `inventory`:
+  `queries_publicas.solicitudes_resumen_para_negociacion`
+  (`GET /api/v1/inventory/solicitudes/resumen`, permiso
+  `inventory.leer_solicitudes_externas`, sembrado en el rol `comprador`) —
+  qué artículo pide más cada sucursal, para negociar volumen con
+  proveedores. Mismo patrón que `sales.cliente` (ver
+  `docs/architecture/events.md`).

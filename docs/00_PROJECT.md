@@ -41,13 +41,14 @@ renumera nada). Este archivo define el orden de lectura recomendado.
 | | [data-model.md](architecture/data-model.md) | Modelo de datos (tablas, ERD) |
 | | [events.md](architecture/events.md) | Catálogo de eventos internos |
 | | [audit-2026-08-01.md](architecture/audit-2026-08-01.md) | Auditoría arquitectónica: riesgos priorizados, qué se aplicó y qué se descartó |
-| | [adr/](architecture/adr/) | Decisiones de arquitectura — 001 modular monolith, 002 stack, 003 Izipay, 004 tenant, 005 Factiliza, 006 observabilidad, 007 backups y salud, 008 entrega continua, 009 modo offline del PDV, 010 contrato OpenAPI, 011 derechos ARCO, 012 dashboard + caja, 013 arquitectura frontend, 014 parámetros configurables por empresa, 015 lote y FEFO, 016 eventos post-commit, 017 jerarquía de errores compartida, 018 cobro dividido/mesa/descuento de orden, 019 conteo cíclico por categoría, 020 reserva/solicitud/transferencia, 021 atribución lead→venta y dueño de la encuesta |
+| | [adr/](architecture/adr/) | Decisiones de arquitectura — 001 modular monolith, 002 stack, 003 Izipay, 004 tenant, 005 Factiliza, 006 observabilidad, 007 backups y salud, 008 entrega continua, 009 modo offline del PDV, 010 contrato OpenAPI, 011 derechos ARCO, 012 dashboard + caja, 013 arquitectura frontend, 014 parámetros configurables por empresa, 015 lote y FEFO, 016 eventos post-commit, 017 jerarquía de errores compartida, 018 cobro dividido/mesa/descuento de orden, 019 conteo cíclico por categoría, 020 reserva/solicitud/transferencia, 021 atribución lead→venta y dueño de la encuesta, 022 restricciones de permiso, 023 variantes de producto y recetas en la ficha, 024 catálogo cerrado de reportes, 025 ciclo de caja completo |
 | **engineering/** | [engineering-guide.md](engineering/engineering-guide.md) | Guía principal para constructores (humano + IA) |
 | | [module-guide.md](engineering/module-guide.md) | Cómo crear un módulo: estructura, los 7 registros para activarlo, módulo de referencia |
 | | [coding-standards.md](engineering/coding-standards.md) | Convenciones, formato, linters |
 | | [api-guidelines.md](engineering/api-guidelines.md) | Convenciones de API REST |
 | | [testing.md](engineering/testing.md) | Estrategia de pruebas |
-| | [devops.md](engineering/devops.md) | Docker, entornos, CI/CD, observabilidad |
+| | [devops.md](engineering/devops.md) | Docker, entornos, CI/CD, despliegue |
+| | [observabilidad.md](engineering/observabilidad.md) | GlitchTip (errores), Loki (logs), salud y monitor |
 | **security/** | [security.md](security/security.md) | Autenticación, hardening, auditoría, backups |
 | | [authorization.md](security/authorization.md) | RBAC, roles, permisos, restricciones tenant |
 | | [proteccion-datos-personales.md](security/proteccion-datos-personales.md) | Ley 29733: qué datos, derechos ARCO, retención, brecha |

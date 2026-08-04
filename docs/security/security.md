@@ -41,6 +41,24 @@ Autenticación, endurecimiento, auditoría y backups. El control de acceso
   emite `Strict-Transport-Security` cuando `ENVIRONMENT=production`.
 - Cabeceras en toda respuesta: `X-Content-Type-Options: nosniff`,
   `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`.
+- **Content-Security-Policy**, distinta en cada punta porque protegen cosas
+  distintas:
+  - **API** (`src/core/app.py`): devuelve JSON y no debe cargar nada, así
+    que va la más restrictiva posible —
+    `default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'`.
+    Vuelve inerte cualquier respuesta que llegara a interpretarse como
+    HTML. `/docs` queda exceptuado (Swagger UI carga de un CDN) y en
+    producción ni existe.
+  - **Frontend** (`frontend/middleware.ts`): **nonce por request** +
+    `'strict-dynamic'`. Next inyecta scripts inline propios (hidratación,
+    streaming RSC); sin nonce habría que admitir `'unsafe-inline'` en
+    `script-src`, que anula la defensa contra XSS. `style-src` sí mantiene
+    `'unsafe-inline'` — Next emite estilos críticos inline sin nonce; es la
+    concesión conocida del patrón y no toca el vector de ejecución de
+    script.
+- **Escaneo de dependencias**: `pip-audit` en CI (informativo hoy) y
+  `.github/dependabot.yml` para pip, npm, github-actions y docker — el
+  primero avisa de la CVE, el segundo abre el PR que la cierra.
 - `TrustedHostMiddleware` (dominios permitidos) y CORS con orígenes
   explícitos — comodines prohibidos en producción.
 - `/docs` y `/openapi.json` deshabilitados en producción.

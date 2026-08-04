@@ -26,8 +26,29 @@ Uptime Kuma) haga el aviso:
 | Endpoint | Qué responde | 503 cuando |
 |----------|--------------|------------|
 | `/health` | liveness — el proceso responde | nunca |
-| `/health/ready` | readiness — base de datos, Redis, cola | cae una dependencia crítica |
+| `/health/ready` | readiness — base de datos, Redis, cola, **latido del worker** | cae una dependencia crítica |
 | `/health/backups` | frescura del último backup | pasaron más de 26 h |
+
+### Addendum (2026-08-04) — el worker se pregunta, no se infiere
+
+`revisar_cola` alcanzaba mientras la única tarea era emitir comprobantes:
+si la cola crecía, el worker había muerto. Con el barrido de pedidos
+demorados eso dejó de bastar, porque **la cola solo delata al worker cuando
+hay trabajo**: con la cola vacía, un worker muerto y uno ocioso se ven
+idénticos — y en un restaurante la cola está vacía la mayor parte del día,
+que es justo cuando conviene enterarse temprano.
+
+`core.latido_worker` (Celery beat, cada minuto) escribe
+`provecho:worker:latido` en Redis con TTL de 3 minutos, y `revisar_worker`
+comprueba que la clave exista. **TTL en vez de comparar timestamps**: la
+clave desaparece sola y nadie tiene que decidir del lado que lee cuán viejo
+es demasiado viejo. Tres minutos = 3× el intervalo, para tolerar un ciclo
+perdido sin gritar.
+
+Degrada pero **no saca de rotación**: sin worker la caja sigue vendiendo, lo
+que se posterga es el comprobante y la alerta de cocina. Se descartó
+`celery inspect ping` — es un round-trip a todos los workers, caro para un
+endpoint que un monitor sondea cada minuto.
 
 ## Consecuencias
 

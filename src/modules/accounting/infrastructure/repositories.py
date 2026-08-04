@@ -21,9 +21,11 @@ from src.modules.accounting.infrastructure.models import (
     AsientoLinea,
     CierreCaja,
     CuentaContable,
+    CustodiaEfectivo,
     MovimientoCaja,
     MovimientoDinero,
     PeriodoContable,
+    PosTarjeta,
     ReglaAsiento,
 )
 
@@ -248,6 +250,9 @@ class CierreCajaRepo:
     def __init__(self, session: Session) -> None:
         self.s = session
 
+    def get(self, cierre_id: uuid.UUID) -> CierreCaja | None:
+        return self.s.get(CierreCaja, cierre_id)
+
     def get_by_apertura(self, apertura_caja_id: uuid.UUID) -> CierreCaja | None:
         return self.s.scalar(
             select(CierreCaja).where(CierreCaja.apertura_caja_id == apertura_caja_id)
@@ -257,6 +262,58 @@ class CierreCajaRepo:
         self.s.add(cierre)
         self.s.flush()
         return cierre
+
+
+class CustodiaEfectivoRepo:
+    def __init__(self, session: Session) -> None:
+        self.s = session
+
+    def get(self, custodia_id: uuid.UUID) -> CustodiaEfectivo | None:
+        return self.s.get(CustodiaEfectivo, custodia_id)
+
+    def de_apertura(self, apertura_caja_id: uuid.UUID) -> CustodiaEfectivo | None:
+        return self.s.scalar(
+            select(CustodiaEfectivo).where(
+                CustodiaEfectivo.apertura_caja_id == apertura_caja_id
+            )
+        )
+
+    def add(self, custodia: CustodiaEfectivo) -> CustodiaEfectivo:
+        self.s.add(custodia)
+        self.s.flush()
+        return custodia
+
+
+class PosTarjetaRepo:
+    def __init__(self, session: Session) -> None:
+        self.s = session
+
+    def get(self, pos_id: uuid.UUID) -> PosTarjeta | None:
+        return self.s.get(PosTarjeta, pos_id)
+
+    def get_by_serie(self, serie: str) -> PosTarjeta | None:
+        return self.s.scalar(select(PosTarjeta).where(PosTarjeta.serie == serie))
+
+    def list(
+        self, empresa_id: uuid.UUID, sucursal_id: uuid.UUID | None = None
+    ) -> list[PosTarjeta]:
+        """Los terminales de la sucursal **más** los de emergencia del pool
+        (`sucursal_id` NULL): la caja que abre necesita ver los dos, que es
+        justo lo que hace útil a RN-POS-009."""
+        q = select(PosTarjeta).where(
+            PosTarjeta.empresa_id == empresa_id, PosTarjeta.estado != "baja"
+        )
+        if sucursal_id is not None:
+            q = q.where(
+                (PosTarjeta.sucursal_id == sucursal_id)
+                | (PosTarjeta.sucursal_id.is_(None))
+            )
+        return list(self.s.scalars(q.order_by(PosTarjeta.serie)))
+
+    def add(self, pos: PosTarjeta) -> PosTarjeta:
+        self.s.add(pos)
+        self.s.flush()
+        return pos
 
 
 class ArqueoRepo:

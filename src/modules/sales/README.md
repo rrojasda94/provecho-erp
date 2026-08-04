@@ -405,6 +405,35 @@ Producto comercial → receta → confirmar venta → evento `sales.venta_confir
   `sales.descuento_aplicado` (RN-COM-017 — alimenta el reporte de
   descuentos), `sales.lineas_anuladas` (RN-COM-020 — inventory repone lo
   que ya no se prepara), `sales.carrito_abandonado` (analítica de embudo,
-  RN-COM-013).
-- Escucha: nada (consulta stock vía contrato público de inventory).
+  RN-COM-013), `sales.pedido_demorado` (el pedido superó su tiempo en
+  cocina — ver abajo).
+- Escucha: **`sales.venta_confirmada`, de sí mismo**
+  (`application/listeners.py`). Es el único listener del módulo y no hace
+  trabajo: encola la revisión de demora y vuelve. El bus es síncrono y en
+  proceso, así que bloquear ahí congelaría la caja que acaba de cobrar.
+  También consulta stock vía el contrato público de inventory.
+
+### Alerta de pedido demorado
+
+`alerta_pedido` registra un pedido que superó su tiempo en cocina y seguía
+sin salir. Dos caminos la disparan y **se solapan a propósito**:
+
+1. `on_venta_confirmada` agenda `sales.revisar_demora_pedido` con
+   `countdown` = umbral (llega puntual).
+2. `sales.barrer_pedidos_demorados`, en Celery beat cada 5 min, repasa todo
+   lo que siga en cocina (llega igual si el worker estuvo caído, si el
+   broker soltó la tarea, o si la venta nació sin worker escuchando).
+
+Para una alerta el modo de fallo que importa es **no avisar**: la tarea
+puntual sola es silenciosamente frágil y el barrido solo llegaría con hasta
+un ciclo de retraso. Tenerlos juntos es seguro porque
+`revisar_pedido` es idempotente — pre-chequeo + `UNIQUE (venta_id,
+minutos_umbral)`, y el INSERT dentro de un SAVEPOINT para que una carrera
+entre dos workers no se lleve por delante lo que el barrido ya creó.
+
+El umbral es `parametro_empresa` `sales/minutos_alerta_pedido` (15 por
+defecto) y **se copia a la fila**: subirlo mañana no reescribe lo que ayer
+fue demora. El reporte `pedidos_demorados` del tablero lee esta tabla.
+
+Levantar el barrido: `celery -A src.core.celery_app.celery_app beat`.
 - Integraciones: Factiliza (facturación electrónica), Izipay, Meta API (pedidos por WhatsApp).
