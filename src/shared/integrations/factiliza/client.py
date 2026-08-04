@@ -25,6 +25,32 @@ class RespuestaEmision:
     crudo: dict
 
 
+@dataclass(frozen=True)
+class ConsultaPersona:
+    """Resultado de consultar un DNI contra Factiliza/RENIEC (RN-PTS-004,
+    alta de cliente/trabajador/proveedor natural la primera vez que se ve
+    ese documento — `nombres`/`apellidos` separados, mismo formato que
+    `Persona`, para no reparsear "nombre completo")."""
+
+    encontrado: bool
+    numero_documento: str
+    nombres: str
+    apellidos: str
+    crudo: dict
+
+
+@dataclass(frozen=True)
+class ConsultaEmpresa:
+    """Resultado de consultar un RUC contra Factiliza/SUNAT."""
+
+    encontrado: bool
+    numero_documento: str
+    razon_social: str
+    estado: str
+    condicion: str
+    crudo: dict
+
+
 def _interpretar(cuerpo: dict) -> RespuestaEmision:
     datos = cuerpo.get("data") or {}
     sunat = datos.get("sunatResponse") or {}
@@ -38,6 +64,32 @@ def _interpretar(cuerpo: dict) -> RespuestaEmision:
     )
 
 
+def _interpretar_dni(numero: str, cuerpo: dict) -> ConsultaPersona:
+    datos = cuerpo.get("data") or {}
+    apellidos = " ".join(
+        filter(None, [datos.get("apellido_paterno"), datos.get("apellido_materno")])
+    )
+    return ConsultaPersona(
+        encontrado=bool(cuerpo.get("success")) and bool(datos.get("nombres")),
+        numero_documento=str(datos.get("numero") or numero),
+        nombres=datos.get("nombres") or "",
+        apellidos=apellidos,
+        crudo=cuerpo,
+    )
+
+
+def _interpretar_ruc(numero: str, cuerpo: dict) -> ConsultaEmpresa:
+    datos = cuerpo.get("data") or {}
+    return ConsultaEmpresa(
+        encontrado=bool(cuerpo.get("success")) and bool(datos.get("nombre_o_razon_social")),
+        numero_documento=str(datos.get("numero") or numero),
+        razon_social=datos.get("nombre_o_razon_social") or "",
+        estado=datos.get("estado") or "",
+        condicion=datos.get("condicion") or "",
+        crudo=cuerpo,
+    )
+
+
 class FactilizaClient:
     def __init__(
         self,
@@ -46,6 +98,7 @@ class FactilizaClient:
         timeout: float | None = None,
     ) -> None:
         self.base_url = (base_url or settings.factiliza_base_url).rstrip("/")
+        self.consulta_base_url = settings.factiliza_consulta_base_url.rstrip("/")
         self.token = token if token is not None else settings.factiliza_token
         self.timeout = timeout or settings.factiliza_timeout_segundos
 
@@ -74,3 +127,67 @@ class FactilizaClient:
         if respuesta.status_code >= 500:
             raise FactilizaError(f"Factiliza devolvió {respuesta.status_code}")
         return _interpretar(cuerpo)
+
+    def _consultar(self, ruta: str, numero: str) -> dict | None:
+        """GET de consulta RUC/DNI, contra `consulta_base_url` — producto
+        distinto de `invoice/send` (esa es solo emisión, apunta a la QA de
+        facturación). Un 404 vacío es "no encontrado", respuesta válida, no
+        excepción; solo transporte/servidor caído levanta `FactilizaError`."""
+        if not self.token:
+            raise FactilizaError("FACTILIZA_TOKEN no configurado")
+        try:
+            respuesta = httpx.get(
+                f"{self.consulta_base_url}/{ruta}/info/{numero}",
+                headers={"Authorization": f"Bearer {self.token}"},
+                timeout=self.timeout,
+            )
+        except httpx.HTTPError as e:
+            raise FactilizaError(f"Factiliza no responde: {e}") from e
+        if respuesta.status_code == 404 and not respuesta.text:
+            return None
+        if respuesta.status_code >= 500:
+            raise FactilizaError(f"Factiliza devolvió {respuesta.status_code}")
+        try:
+            return respuesta.json()
+        except ValueError as e:
+            raise FactilizaError(f"Respuesta ilegible de Factiliza: {e}") from e
+
+    def consultar_dni(self, dni: str) -> ConsultaPersona:
+        """GET /dni/info/{dni} — RENIEC vía Factiliza."""
+        cuerpo = self._consultar("dni", dni)
+        if cuerpo is None:
+            return ConsultaPersona(False, dni, "", "", {})
+        return _interpretar_dni(dni, cuerpo)
+
+    def consultar_ruc(self, ruc: str) -> ConsultaEmpresa:
+        """GET /ruc/info/{ruc} — SUNAT vía Factiliza."""
+        cuerpo = self._consultar("ruc", ruc)
+        if cuerpo is None:
+            return ConsultaEmpresa(False, ruc, "", "", "", {})
+        return _interpretar_ruc(ruc, cuerpo)
+
+
+def nombres_desde_dni(dni: str, nombres_tecleado: str, apellidos_tecleado: str) -> tuple[str, str]:
+    """Alta con DNI que todavía no existe en `persona`: el nombre lo da
+    RENIEC vía Factiliza, no lo tecleado en caja/mostrador (RN-PTS-004
+    addendum 2026-08-02). Si Factiliza no responde o no encuentra el
+    documento, se usa lo tecleado — el alta nunca se bloquea por un
+    proveedor externo caído (mismo criterio que ADR-005)."""
+    try:
+        consulta = FactilizaClient().consultar_dni(dni)
+    except FactilizaError:
+        return nombres_tecleado, apellidos_tecleado
+    if not consulta.encontrado:
+        return nombres_tecleado, apellidos_tecleado
+    return consulta.nombres, consulta.apellidos
+
+
+def razon_social_desde_ruc(ruc: str, razon_social_tecleada: str) -> str:
+    """Mismo criterio que `nombres_desde_dni`, para RUC (SUNAT)."""
+    try:
+        consulta = FactilizaClient().consultar_ruc(ruc)
+    except FactilizaError:
+        return razon_social_tecleada
+    if not consulta.encontrado:
+        return razon_social_tecleada
+    return consulta.razon_social

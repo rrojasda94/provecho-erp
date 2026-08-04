@@ -1,6 +1,6 @@
 """variantes de producto, grupos de opciones y expresión en la receta
 
-Tres cambios de un mismo slice (ADR-022):
+Tres cambios de un mismo slice (ADR-023):
 
 1. **Variantes** (`producto_comercial.producto_padre_id` + `orden`): "Pizza
    Peperoni Personal/Mediana/Familiar" son productos hijos con receta y
@@ -19,7 +19,7 @@ Nada de lo ya cargado cambia de comportamiento: todo producto existente
 queda sin padre (producto simple) y todo extra queda sin grupo (opcional).
 
 Revision ID: b6d1e83f47ac
-Revises: e4a2f9c17b3d
+Revises: 1805c0904c5c
 """
 
 import sqlalchemy as sa
@@ -27,7 +27,7 @@ from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision = "b6d1e83f47ac"
-down_revision = "e4a2f9c17b3d"
+down_revision = "1805c0904c5c"
 branch_labels = None
 depends_on = None
 

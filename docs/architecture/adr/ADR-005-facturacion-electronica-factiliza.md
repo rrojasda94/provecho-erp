@@ -40,6 +40,17 @@ Motivos:
   (transporte HTTP) y `mapper.py` (traducción del dominio a los catálogos
   SUNAT 01/06/07/51/52). El dominio de `sales` no conoce Factiliza — sigue la
   regla de CLAUDE.md de que ninguna integración se llama desde el dominio.
+- La consulta RUC/DNI (`FactilizaClient.consultar_dni`/`consultar_ruc`,
+  2026-08-02) vive en un **host distinto** al de emisión: `api.factiliza.com`
+  (`FACTILIZA_CONSULTA_BASE_URL`), no `apife-qa.factiliza.com`
+  (`FACTILIZA_BASE_URL`) — son productos separados de Factiliza aunque
+  comparten token. La consulta no tiene sandbox QA propio: la prueba con
+  datos reales (DNI 73632127, RUC 20610077782) se hizo contra ese único
+  host. `nombres_desde_dni`/`razon_social_desde_ruc` envuelven la consulta
+  con el mismo criterio de "nunca bloquear": sin respuesta o documento no
+  encontrado, cae a lo tecleado por el usuario. Cableado en el alta de
+  cliente (`sales`) y proveedor jurídico (`purchases`) — ver RN-PTS-004 en
+  `docs/domain/business-rules.md`.
 - El mapper es la pieza que **no** es reutilizable si se cambia de proveedor:
   los catálogos SUNAT sí son estándar, pero el nombre y la forma de cada
   campo son de Factiliza. El `client.py` sí es intercambiable.

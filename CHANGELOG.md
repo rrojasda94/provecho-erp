@@ -5,6 +5,25 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Las colas de preparación ya no esconden el ítem recién tachado**
+  (2026-08-03, `kds.cola_pantalla`): una pantalla de `preparacion`
+  devolvía solo los ítems `pendiente`/`en_preparacion` de sus categorías,
+  así que marcar un ítem lo hacía **desaparecer** de la tarjeta — lo
+  contrario de lo que necesita la cocina (y de lo que hace Odoo, donde la
+  línea queda tachada). Ahora la pantalla devuelve todos sus ítems con su
+  estado, y el pedido sale de esa cola cuando la estación terminó todo lo
+  suyo. Se detectó verificando el KDS end-to-end contra el stack real.
+  Test nuevo:
+  `test_item_tachado_sigue_visible_hasta_terminar_la_estacion`.
+
+- **Cliente HTTP del navegador extraído a `frontend/lib/cliente-api.ts`**
+  (2026-08-03): el `fetch` contra `/api/proxy`, el parseo de `detail` y
+  `claveIdempotencia` vivían dentro de `lib/pdv.ts`; con el KDS pasaron a
+  tener dos consumidores. `lib/pdv.ts` los re-exporta, ningún import
+  existente cambia.
+
 ### Fixed
 
 - **El calendario se corría un día pasadas las 19:00 hora Perú** (2026-08-03,
@@ -29,6 +48,17 @@ Versionado: [SemVer](https://semver.org/lang/es/).
     test** — la prueba de que el error nunca estuvo ahí.
     `tests/test_fechas_negocio.py` congela la regla y falla si algún módulo
     vuelve a usar `date.today()`.
+- **`npm audit` del frontend en cero** (2026-08-03). Eran 4 altas:
+  `brace-expansion` (la resolvió `npm audit fix`) y tres colgando de `next`.
+  El JSON del audit deja claro que `next` **no** estaba marcado por CVEs
+  propias — su `via` es literalmente `["postcss","sharp"]`: todo venía de
+  que Next pinea `postcss@8.4.31` y arrastra `sharp<0.35`. Subir de major
+  no arreglaba nada (**Next 16 pinea el mismo postcss**) y
+  `npm audit fix --force` proponía `next@9.3.3`, un downgrade de 6 majors.
+  Se fuerzan las versiones parcheadas con `overrides` en
+  `frontend/package.json`, y el rango de `next` sube a `^15.5.22` — que ya
+  era la versión instalada; el `^15.3.0` viejo daba la impresión falsa de
+  estar atrasado. `tsc`, `next lint` y `next build` limpios después.
 
 - **`postulante.estado` no entraba en su propia columna** (2026-08-02,
   migración `e4a2f9c17b3d`). La columna nació como
@@ -46,7 +76,7 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 ### Added
 
 - **Variantes de producto, grupos de opciones y recetas** (2026-08-03,
-  ADR-022, migración `b6d1e83f47ac`). Una Pizza
+  ADR-023, migración `b6d1e83f47ac`). Una Pizza
   Peperoni se vende en Personal, Mediana y Familiar: **tres productos hijos**
   (`producto_comercial.producto_padre_id`) con receta y **precio completo**
   propios —no un recargo sobre un precio base—, porque cada tamaño lleva
@@ -161,6 +191,166 @@ Versionado: [SemVer](https://semver.org/lang/es/).
   - Contrato público nuevo de `inventory`: `queries_publicas.receta_resumen`.
     Descartados por reemplazo: `modificador` y `variante_producto` del
     data-model, nunca implementados.
+- **`decision_gerencial` — acta de decisión gerencial** (2026-08-03,
+  migración `1805c0904c5c`, RN-GER-002): documentada en `data-model.md` §8c
+  desde el slice de Gerencia (2026-07-22), ahora con modelo (en `shared`),
+  repo, casos de uso y API. `POST/GET /api/v1/decisiones-gerenciales[/{id}]`
+  con permisos nuevos `gerencia.decidir` (firmar) y
+  `gerencia.leer_decisiones` (consultar — el área ejecutora la necesita sin
+  poder decidir, RN-GER-005; sembrado en `supervisor`). `decidido_por_id`
+  sale del token, nunca del cuerpo: atribuirle la decisión a otro gerente
+  invalidaría el acta. `referencia_tipo`/`referencia_id` son polimórficos
+  **sin FK** — la decisión aplica a una OC escalada, una campaña sobre
+  presupuesto o una sanción, y ni `shared` gana una FK hacia los módulos ni
+  al revés. `aprobado_con_condiciones` sin condiciones es 409: un acta que
+  no dice qué cumplir no le sirve al área ejecutora. 12 tests. Ningún
+  módulo la escribe todavía — ese es el paso siguiente.
+
+- **Guía para crear un módulo + tests que la exigen** (2026-08-03,
+  `docs/engineering/module-guide.md`). La estructura de un módulo ya era
+  replicable; lo que no estaba escrito en ningún lado es que **activarlo son
+  siete registros fuera de su carpeta** (router, tag OpenAPI y `register()`
+  de listeners en `core/app.py`; import en `models_registry.py`; migración;
+  `PERMISOS`/`ROLES` del seeder; entrada en `frontend/lib/modulos.ts`) —
+  olvidar uno da errores que no apuntan a la causa: Alembic proponiendo
+  borrar tablas ajenas, o un 403 permanente por un permiso que ningún rol
+  puede tener. La guía los lista con archivo y consecuencia, nombra a
+  `purchases` como módulo de referencia y aclara cuándo corresponde
+  `listeners.py`/`queries_publicas.py`. Tres de los siete pasan de disciplina
+  a test en `tests/test_arquitectura.py`: modelos registrados para Alembic,
+  routers montados en la app (detecta también los secundarios, tipo
+  `kds_routers`) y **todo permiso exigido por un endpoint existe en el
+  seeder** — se leen los 63 códigos del closure de `require_permission`
+  recorriendo las 221 rutas montadas. De paso se corrige la afirmación de
+  CLAUDE.md de que un módulo es "removible": lo es para el dominio de los
+  demás, no para el ensamblado. Deuda declarada en `ROADMAP.md` →
+  Transversal.
+- **Pantalla de cocina (KDS)** (2026-08-03, `frontend/app/kds/`): pantalla
+  completa táctil fuera del shell (como el PDV, ADR-013), una tarjeta por
+  pedido con `#orden`, `referencia_atencion`, modalidad/canal y estado
+  agregado. **Un toque tacha el ítem preparado** y "Todo listo" tacha el
+  pedido entero — patrón de la *preparation display* de Odoo, cuya
+  documentación se revisó antes de diseñar la pantalla. El toque encadena
+  `en_preparacion → listo` porque `POST /kds/items/{id}/avanzar` solo
+  acepta el estado inmediatamente siguiente (RN-CUP-002). Lo tachado en
+  una estación aparece en **toda otra pantalla de la sucursal** que
+  muestre ese pedido: el avance vive en `venta_item.estado_preparacion`
+  (fuente única, RN-CUP-003) y ninguna pantalla guarda estado propio; la
+  propagación es por polling cada 3 s (pausado con la pestaña oculta) —
+  el push WS/Redis sigue como deuda. Sin "recall" de Odoo: el retroceso
+  está prohibido, tocar un ítem tachado avisa en vez de deshacer. En
+  pantallas de `despacho` y solo con `sales.entregar_pedido` aparece
+  "Entregar" (RN-CUP-006). La estación va en la URL
+  (`/kds?pantalla=<id>`); tile propio en el home filtrado por `kds.*`.
+  Sin endpoints nuevos: el backend del KDS estaba completo desde
+  2026-07-25/27.
+
+- **Tablero de estaciones del KDS** (2026-08-03): `/kds` sin `?pantalla=`
+  lista las estaciones de la sucursal y, con `kds.configurar`, permite
+  **crear, editar y desactivar** pantallas (nombre, tipo
+  `preparacion`/`despacho`, filtro por categorías contra
+  `GET /inventory/categorias`; sin categorías = todas). Cierra el hueco de
+  que `kds_pantalla` solo se creara por API: una sucursal nueva no podía
+  arrancar su cocina desde la UI. Desactivar es baja lógica — la pantalla
+  deja de aparecer en cocina, no se borra.
+
+- **Restricciones JSONB de permiso, aplicadas (ADR-022)** (2026-08-02):
+  `permiso.restricciones` pasa de campo descriptivo a evaluado.
+  `users.domain.rules.ContextoPermiso`/`cumple_restricciones` (monto/
+  estado/horario, puras) + `UsuarioRepo.restricciones` (comodín `*` o
+  cualquier rol que otorgue el permiso sin condición ⇒ sin restricción) +
+  `check_permission(session, usuario, *codigos, contexto=...)`
+  (`users/api/deps.py`, retrocompatible — sin `contexto` no cambia nada;
+  re-exporta `ContextoPermiso` para que otros módulos no toquen
+  `users.domain` directo, exigido por `tests/test_arquitectura.py`).
+  `require_permission` no cambia — no tiene el body para evaluar una
+  condición. Primer uso real: `sales.aplicar_descuento` respeta un
+  `monto_maximo` por rol (el router calcula el descuento real con
+  `ventas.calcular_monto_descuento` y valida ANTES de aplicarlo, 403 si lo
+  supera). 15 tests nuevos.
+
+- **Consulta RUC/DNI vía Factiliza en alta de cliente/proveedor jurídico**
+  (2026-08-02): `FactilizaClient.consultar_dni`/`consultar_ruc`
+  (`src/shared/integrations/factiliza/`) contra `api.factiliza.com`
+  (`FACTILIZA_CONSULTA_BASE_URL`, host distinto al de emisión de
+  comprobantes) — RENIEC/SUNAT, mismo token. `nombres_desde_dni`/
+  `razon_social_desde_ruc` hacen fallback a lo tecleado si Factiliza no
+  responde o no encuentra el documento, para que el alta nunca se bloquee
+  por un proveedor externo caído. Cableado en `sales.crear_cliente`
+  (natural por DNI nuevo, jurídico por RUC nuevo) y
+  `purchases.crear_proveedor` (jurídico por RUC nuevo); un documento ya
+  registrado en `persona` no vuelve a consultar. Probado con datos reales
+  de QA (DNI 73632127, RUC 20610077782). 20 tests nuevos
+  (`tests/test_factiliza_consulta.py` + casos en `test_pdv_slice.py`/
+  `test_purchases.py`); `tests/conftest.py` nuevo, autouse que fuerza
+  `factiliza_token=""` por test para que el suite nunca dependa de la red.
+
+- **`personas.leer`, CRUD de `unidad_medida`/`categoria_udm`/`divisa`, y
+  proveedor natural en el frontend** (2026-08-02):
+  - **`GET /personas/buscar?q=`** (permiso nuevo `personas.leer`, sembrado
+    en `comprador` y `rrhh_admin`): responde `PersonaBusquedaOut` (id,
+    nombres, apellidos, numero_documento) — nunca domicilio/teléfono/
+    email/fecha de nacimiento, así que no exige `users.gestionar` como
+    `GET /personas` (que sigue igual, sin cambios). Cierra el gap de RBAC
+    que RRHH/Trabajadores había encontrado: un rol RRHH puro ya puede
+    armar su propio selector de alta.
+  - **CRUD de `unidad_medida`/`categoria_udm`** (`inventory`, permiso
+    `gestionar_catalogo`) y de **`divisa`** (`users`, permiso
+    `gerencia.gestionar_parametros_empresa`, lectura abierta a cualquier
+    autenticado) — ambos antes solo se editaban por seeder/migración
+    (ADR-014 Addendum b). `decimales` por unidad/divisa (RN-GER-010) ahora
+    se corrige con un `PATCH`, sin migración.
+  - **`components/persona-picker/`**: buscador reusable con debounce
+    contra `/personas/buscar` — reemplaza el `<select>` con todo el
+    catálogo cargado (no escala) en RRHH/Trabajadores, y habilita
+    **proveedor natural en Compras/Proveedores** (toggle jurídico/natural
+    en el diálogo). `ProveedorOut.persona_id` no viajaba y se agregó: sin
+    eso, un proveedor natural no tenía forma de mostrarse por nombre en
+    la tabla.
+  - 11 tests nuevos (`tests/test_catalogo_udm_divisa.py`): CRUD de UdM/
+    divisa, permisos, y que `/personas/buscar` de verdad solo devuelve
+    los 4 campos mínimos.
+
+- **Tres pantallas reales más — Inventario/Artículos, Compras/Órdenes de
+  compra, RRHH/Trabajadores** (2026-08-02), siguiendo el patrón de
+  Compras/Proveedores (tabla TanStack + alta con `<dialog>` nativo):
+  - **Inventario → Artículos**: crear exige `unidad_medida_id`, que no
+    tenía ningún endpoint de lectura — nuevo `GET /api/v1/inventory/
+    unidades-medida` (catálogo global, sin filtro de tenant:
+    `UnidadMedidaRepo`, `catalogo.listar_unidades_medida`). Seeder de
+    demo (`pdv_demo.py`, no `seed.py` — ver más abajo) agrega Kilo/Litro
+    además del "Unidad" que ya creaba.
+  - **Compras → Órdenes de compra**: alta con ítems dinámicos
+    (agregar/quitar fila, total en vivo) e `idempotency_key` generada en
+    el cliente (`crypto.randomUUID()`). Dos endpoints nuevos que
+    bloqueaban la pantalla: `GET /api/v1/purchases/ordenes-compra`
+    (`OrdenCompraRepo.list`, tenant vía join a `almacen` — la orden no
+    tiene `empresa_id` propio) y `GET /api/v1/almacenes` (`AlmacenRepo`
+    en `users`, sin `require_permission` a propósito: catálogo de
+    referencia, no dato sensible, pero sí escopado por tenant).
+  - **RRHH → Trabajadores**: alta exige una `persona_id` existente
+    (party model) — sin endpoint nuevo, ya existía `GET /personas`, pero
+    gatillado por `users.gestionar` en vez de algo más acorde a RRHH; un
+    rol RRHH puro sin ese permiso no puede armar el selector de alta hoy
+    (gap de RBAC documentado, no corregido en este cambio).
+  - Home tile de **Ventas** corregido: apuntaba a `/ventas` (404); el PDV
+    es pantalla completa fuera del shell a propósito (ADR-013), el tile
+    ahora enlaza directo a `/pdv`.
+  - Cerrados los tres hallazgos menores de la revisión del PR anterior:
+    `<select>` sin estilo en `globals.css`, altura del sidebar con
+    número mágico (`calc(100vh-56px)` → `flex-1` real), y comentario en
+    `lib/sesion.ts` documentando la dependencia de la memoización de
+    `fetch` de Next.js.
+  - **`pdv_demo.py` (no `seed.py`) gana 2 `Persona` de demo** —
+    necesarias para poder probar el alta de Trabajador sin una pantalla
+    de Personas que todavía no existe. Se evaluó agregar UdM/Personas al
+    propio `seed()`, pero **17 archivos de test** crean su propia
+    `CategoriaUdm("Peso")` asumiendo que `seed()` no toca `inventory`;
+    ese camino se revirtió antes de commitear.
+  - Verificado end-to-end en Docker con datos reales (curl + navegador):
+    crear artículo → aparece en la tabla; crear OC de 2 ítems → total
+    calculado correcto (390.00 = 20×18.50 + 5×4.00); crear trabajador →
+    nombre resuelto desde `persona_id`.
 
 - **Shell estilo Odoo, F2.11 (tablas) y primera pantalla real de frontend**
   (2026-08-02): TanStack Table como librería de tabla del ERP

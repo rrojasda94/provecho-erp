@@ -8,7 +8,10 @@ duplica en CLAUDE.md.
 ## Filosofía de desarrollo
 
 Construir lo mínimo que resuelve el problema real. Especificar antes de
-implementar. Cada capacidad, agregable o removible sin romper el resto.
+implementar. Cada capacidad, agregable sin romper el resto — y removible sin
+que su ausencia se sienta en el dominio de los demás (hoy sacar un módulo
+todavía obliga a limpiar sus siete registros en `core`, seeder y frontend;
+ver [module-guide.md](module-guide.md)).
 Principios de negocio en [../foundation/business-philosophy.md](../foundation/business-philosophy.md).
 
 ## Arquitectura y patrones obligatorios
@@ -56,7 +59,12 @@ py -3.12 -m venv .venv && .venv/Scripts/python -m pip install -e ".[dev,backups]
 2. Registrar reglas nuevas en [../domain/business-rules.md](../domain/business-rules.md)
    y estados en [../domain/state-machines.md](../domain/state-machines.md).
 3. Capas: `domain/` → `application/` → `infrastructure/` → `api/`.
-4. Activar registrando router + handlers en `core`.
+4. Activar el módulo: router, tag OpenAPI, listeners, modelos, migración,
+   permisos y entrada de frontend son **siete registros fuera del módulo**.
+
+Checklist completo, archivo por archivo, y módulo de referencia
+(`purchases`): [module-guide.md](module-guide.md). Tres de esos siete
+registros los exige `tests/test_arquitectura.py`.
 
 ## Reglas para generar APIs
 

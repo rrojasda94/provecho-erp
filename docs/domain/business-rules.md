@@ -212,7 +212,12 @@ de su módulo y se prueban de forma aislada.
   negarse a registrarlo por eso pierde la venta y su historial. El
   documento se completa después sin trámite
   (`PATCH /sales/clientes/{id}/documento`). Para **facturar a una empresa
-  el RUC sí es obligatorio** — sin él no hay factura.
+  el RUC sí es obligatorio** — sin él no hay factura. La **primera vez**
+  que un RUC o DNI se registra (persona/RUC nuevo, no reutilización de uno
+  ya existente) el nombre/razón social sale de la **consulta RUC/DNI de
+  Factiliza** (ADR-005) en vez de confiarse en lo tecleado en caja; si
+  Factiliza no responde o no encuentra el documento, se usa lo tecleado —
+  el alta nunca se bloquea por un proveedor externo caído.
 - **RN-PTS-005** Un cliente **sin documento**, o con el genérico
   `00000000`, **no cuenta como cliente registrado con documento**: compra,
   recibe su boleta a su nombre y figura en el historial, pero queda **fuera

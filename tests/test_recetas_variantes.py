@@ -1,4 +1,4 @@
-"""Recetas editables, variantes de producto y grupos de opciones (ADR-022).
+"""Recetas editables, variantes de producto y grupos de opciones (ADR-023).
 
 Cubre las tres promesas del slice:
 

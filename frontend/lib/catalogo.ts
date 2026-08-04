@@ -1,15 +1,15 @@
 /**
  * Ficha de producto comercial y recetas, vista desde el navegador.
  *
- * La pantalla edita producto, variantes, grupos de extras y recetas en la
- * misma vista, así que cada acción es una llamada suelta contra la API por
- * el proxy — no una Server Action por campo. Los endpoints de receta
+ * La pantalla edita producto, presentaciones y grupos de extras en la misma
+ * vista, así que cada acción es una llamada suelta contra la API por el
+ * proxy — no una Server Action por campo. Los endpoints de receta
  * devuelven la receta completa después de cada cambio: así la pantalla no
  * mantiene su propia copia del estado y no puede quedar desincronizada de
  * lo que el servidor calculó (el redondeo por UdM se decide allá).
  */
 
-import { pedir } from "@/lib/proxy";
+import { pedir } from "@/lib/cliente-api";
 
 // --- Tipos del contrato -----------------------------------------------------
 export type UnidadMedida = {
@@ -32,22 +32,6 @@ export type Articulo = {
   controla_lote: boolean;
 };
 
-export type Categoria = { id: string; nombre: string; frecuencia_conteo: string | null };
-
-/**
- * Qué puede ser un artículo. `articulo.tipo` es texto libre a propósito en
- * la base (se agregan tipos sin migración), pero la pantalla ofrece los que
- * el modelo de datos documenta: tipear "insummo" una vez y el reporte queda
- * partido en dos para siempre.
- */
-export const TIPOS_ARTICULO = [
-  { valor: "insumo", etiqueta: "Insumo (se compra y se consume)" },
-  { valor: "subreceta", etiqueta: "Subreceta (se produce en cocina)" },
-  { valor: "mercaderia", etiqueta: "Mercadería (se compra y se revende)" },
-  { valor: "empaque", etiqueta: "Empaque" },
-  { valor: "suministro", etiqueta: "Suministro (limpieza, oficina)" },
-  { valor: "repuesto", etiqueta: "Repuesto" },
-] as const;
 
 export type RecetaItem = {
   id: string;
@@ -122,29 +106,6 @@ export type ProductoDetalle = Producto & {
 export const catalogoApi = {
   unidadesMedida: () => pedir<UnidadMedida[]>("/inventory/unidades-medida"),
   articulos: () => pedir<Articulo[]>("/inventory/articulos"),
-  categorias: () => pedir<Categoria[]>("/inventory/categorias"),
-
-  crearArticulo: (cuerpo: {
-    id_interno: string;
-    nombre: string;
-    unidad_medida_id: string;
-    tipo: string;
-    categoria_id?: string | null;
-    costo_promedio?: string;
-    controla_lote?: boolean;
-  }) => pedir<Articulo>("/inventory/articulos", { metodo: "POST", cuerpo }),
-
-  editarArticulo: (
-    id: string,
-    cuerpo: Partial<{
-      nombre: string;
-      tipo: string;
-      categoria_id: string;
-      costo_promedio: string;
-      controla_lote: boolean;
-      archivado: boolean;
-    }>,
-  ) => pedir<Articulo>(`/inventory/articulos/${id}`, { metodo: "PATCH", cuerpo }),
 
   marcas: () => pedir<Marca[]>("/sales/marcas"),
   productos: () => pedir<Producto[]>("/sales/productos"),

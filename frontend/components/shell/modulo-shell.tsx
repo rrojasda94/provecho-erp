@@ -38,7 +38,7 @@ export async function ModuloShell({
   }
 
   return (
-    <div className="flex min-h-[calc(100vh-56px)]">
+    <div className="flex h-full">
       <aside className="w-56 shrink-0 border-r border-gray/20 bg-white px-4 py-6">
         <Link href="/" className="mb-6 block text-sm text-gray hover:text-primary">
           ← Inicio

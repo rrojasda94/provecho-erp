@@ -33,7 +33,7 @@ almacenamiento), `conteo`, `ajuste` (motivo, solicitante, aprobador),
   ("1000/3") y guarda el resultado redondeado a los decimales de la unidad
   del insumo, con la expresión al lado para reeditarla; duplicar clona con
   sufijo "(copy)" y escalar por factor redondea cada línea con **su propia**
-  unidad (RN-COM-024, ADR-022).
+  unidad (RN-COM-024, ADR-023).
 - Consultar stock por almacén / artículo; alertas de stock mínimo (punto de
   reorden, calculado con el dato de consumo real de `inventory`, definido
   en conjunto con `production` y `accounting` — `inventory` no compra, solo
@@ -234,6 +234,10 @@ Endpoints `/api/v1/inventory`:
 | Método | Ruta | Permiso |
 |--------|------|---------|
 | POST/GET | `/categorias` | `gestionar_catalogo` / `leer` |
+| GET | `/unidades-medida` | `leer` — catálogo global, sin filtro de tenant (`data-model.md` §3) |
+| POST | `/unidades-medida` | `gestionar_catalogo` — CRUD antes diferido (ADR-014 Addendum b); requiere `categoria_udm_id` existente |
+| PATCH | `/unidades-medida/{id}` | `gestionar_catalogo` — corrige `decimales` (RN-GER-010) sin recrear la unidad |
+| GET/POST | `/categorias-udm` | `leer` / `gestionar_catalogo` |
 | POST/GET/PATCH | `/articulos[/{id}]` | `gestionar_catalogo` / `leer` |
 | POST | `/skus` | `gestionar_catalogo` |
 | GET | `/stock` | `leer` |

@@ -67,6 +67,25 @@ Claims del JWT: `sub` (usuario_id), `tipo`, `roles`, `sucursales`, `empresa_id`,
 | POST/GET/PATCH | `/api/v1/personas[/{id}]` | CRUD de persona (party model) — `PATCH` exige `version` |
 | POST | `/api/v1/personas/{id}/anonimizar` | Derecho de cancelación (Ley 29733) — permiso `personas.anonimizar` |
 
+### Búsqueda de persona (permiso `personas.leer`, no `users.gestionar`)
+
+| Método | Ruta | Acción |
+|--------|------|--------|
+| GET | `/api/v1/personas/buscar?q=` | Selector de "elegir persona existente" para otro módulo (RRHH al contratar, Compras al dar de alta un proveedor natural). Responde `PersonaBusquedaOut` (id, nombres, apellidos, numero_documento) — nunca domicilio/teléfono/email/fecha de nacimiento, así que puede abrirse sin exigir el permiso de administración completo. Ruta declarada antes de `/personas/{persona_id}` a propósito. |
+
+### Organización — solo lectura (`Almacen` vive en `users` por historia, ver data-model §1)
+
+| Método | Ruta | Acción |
+|--------|------|--------|
+| GET | `/api/v1/almacenes` | Lista de referencia (nombre/tipo), escopada por tenant — sin `require_permission`: no es dato sensible, lo necesita cualquiera que elija un destino (ej. `purchases` al crear una OC) |
+
+### Divisas (RN-GER-010) — lectura abierta, escritura de Gerencia
+
+| Método | Ruta | Acción |
+|--------|------|--------|
+| GET | `/api/v1/divisas` | Cualquier autenticado — cualquier módulo que declare un monto necesita poder listar divisas válidas |
+| POST/PATCH | `/api/v1/divisas[/{id}]` | Permiso `gerencia.gestionar_parametros_empresa`. Antes solo se editaba por seeder/migración (ADR-014 Addendum b) — esto es lo que lo vuelve CRUD de verdad |
+
 ### Parámetros operativos por empresa (ADR-014, RN-GER-009)
 
 | Método | Ruta | Acción |
@@ -101,8 +120,20 @@ con Argon2id + JWT, `repositories.py`), `application/` (`auth.py`, `admin.py`),
 python -m src.seeders.seed
 ```
 
-Pendiente: aplicar las `restricciones` (JSONB) de cada permiso — hoy la
-autorización solo valida el código, no la condición (monto/estado/horario).
+**Restricciones de permiso (ADR-022, 2026-08-02):** `permiso.restricciones`
+(JSONB) ya se evalúa, no solo se guarda. `domain/rules.ContextoPermiso` +
+`cumple_restricciones` (monto/estado/horario — claves `monto_maximo`,
+`estados_permitidos`, `horario`) son puras; `UsuarioRepo.restricciones(usuario_id,
+codigo)` resuelve la del usuario (comodín `*` o cualquier rol que lo otorgue
+sin condición ⇒ sin restricción, mismo criterio OR que `permite`).
+`check_permission(session, usuario, *codigos, contexto=...)` (`api/deps.py`,
+re-exporta `ContextoPermiso` para que otros módulos lo usen sin tocar
+`users.domain`) la aplica cuando el llamador pasa `contexto`; sin él, se
+comporta igual que siempre. `require_permission` (el `Depends` sin acceso al
+body) no cambia — la condición depende del body, así que solo
+`check_permission` puede evaluarla. Primer uso real:
+`sales.aplicar_descuento` acepta un `monto_maximo` por rol (ver
+`sales/README.md`).
 
 ## Sincronización con el hub de sucursal (implementado 2026-07-27)
 

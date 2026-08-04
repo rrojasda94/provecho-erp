@@ -23,7 +23,11 @@ de área/gerencia, ligada a la OC de tipo `activo`). Detalle en
 
 Operativo en `/api/v1/purchases`: CRUD de proveedores (natural liga a
 `persona` — mismo party model que `cliente`, RN-GEN-007 — jurídico trae
-razón social/RUC propios) y ciclo de OC tipo `insumo`: crear (borrador,
+razón social/RUC propios; `ProveedorOut.persona_id` viaja desde 2026-08-02,
+antes un proveedor natural no tenía forma de mostrarse por nombre en un
+listado; el jurídico consulta Factiliza —`consultar_ruc`, RENIEC/SUNAT—
+para la razón social real en vez de confiar en lo tecleado, mismo criterio
+que `sales.crear_cliente`, ver ADR-005) y ciclo de OC tipo `insumo`: crear (borrador,
 idempotente) → emitir (permiso `purchases.aprobar` exigido si el total
 supera el umbral vigente en `parametro_empresa` — `shared`, módulo
 `purchases`, código `oc_umbral`; sin fila configurada cae al valor semilla
@@ -37,6 +41,7 @@ cualquier recepción). Capas `domain/rules.py`,
 |--------|------|---------|
 | POST/GET/PATCH | `/proveedores[/{id}]` | `purchases.crear` / `leer` |
 | POST | `/ordenes-compra` | `purchases.crear` |
+| GET | `/ordenes-compra` | `purchases.leer` — listado; tenant vía join a `almacen` (la orden no tiene `empresa_id` propio) |
 | GET | `/ordenes-compra/{id}` | `purchases.leer` |
 | POST | `/ordenes-compra/{id}/emitir` | `purchases.crear` (+ `aprobar` sobre umbral) |
 | POST | `/ordenes-compra/{id}/recepciones` | `purchases.recepcionar` |

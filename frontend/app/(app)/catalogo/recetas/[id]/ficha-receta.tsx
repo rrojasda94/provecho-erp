@@ -11,7 +11,7 @@ import {
   type RecetaDetalle,
   type UnidadMedida,
 } from "@/lib/catalogo";
-import { ErrorApi } from "@/lib/proxy";
+import { ErrorApi } from "@/lib/cliente-api";
 
 /**
  * Una receta vista fuera de un producto: mismo editor, más la pregunta que

@@ -33,6 +33,7 @@ from src.modules.sales.domain import rules
 from src.modules.sales.infrastructure.models import Cliente
 from src.modules.sales.infrastructure.repositories import ClienteRepo
 from src.modules.users.infrastructure.models import Empresa, Persona
+from src.shared.integrations.factiliza import nombres_desde_dni, razon_social_desde_ruc
 
 TIPOS_DOCUMENTO_NATURAL = ("dni", "ce", "pasaporte")
 
@@ -117,6 +118,8 @@ def crear_cliente(
     persona = _persona_por_documento(session, numero_documento) if numero_documento else None
     if persona is None:
         nombres, apellidos = _partir_nombre(nombre)
+        if numero_documento and len(numero_documento) == rules.LARGO_DNI:
+            nombres, apellidos = nombres_desde_dni(numero_documento, nombres, apellidos)
         persona = Persona(
             nombres=nombres,
             apellidos=apellidos,
@@ -158,6 +161,7 @@ def _crear_juridico(
     existente = repo.por_ruc(grupo_id, ruc)
     if existente is not None:
         raise Conflicto(f"ya existe un cliente con RUC {ruc}")
+    razon_social = razon_social_desde_ruc(ruc, razon_social)
     return repo.add(
         Cliente(
             grupo_id=grupo_id,

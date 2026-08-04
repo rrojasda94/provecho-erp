@@ -7,7 +7,7 @@ import { useMemo, useRef, useState } from "react";
 
 import { TablaDatos } from "@/components/tabla/tabla-datos";
 import { catalogoApi, type Marca, type Producto } from "@/lib/catalogo";
-import { ErrorApi } from "@/lib/proxy";
+import { ErrorApi } from "@/lib/cliente-api";
 import { aTitulo } from "@/lib/texto";
 
 /** Qué se está creando. La diferencia no es cosmética: un producto con

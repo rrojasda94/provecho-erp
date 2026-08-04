@@ -1,4 +1,4 @@
-# ADR-022 — Variantes de producto, grupos de opciones y recetas en la ficha
+# ADR-023 — Variantes de producto, grupos de opciones y recetas en la ficha
 
 - Estado: aceptado
 - Fecha: 2026-08-03

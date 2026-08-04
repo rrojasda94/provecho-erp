@@ -1,21 +1,15 @@
 /**
  * Operaciones del PDV vistas desde el navegador y tipos del contrato.
  *
- * El transporte (proxy + manejo de error) vive en `lib/proxy.ts`, compartido
- * con las demás pantallas interactivas. Los tipos espejan `openapi.json`; si
- * alguno se desincroniza, el error aparece acá y no como un `undefined`
- * silencioso en medio de un cobro.
+ * El transporte (proxy, errores, idempotencia) vive en `lib/cliente-api.ts`
+ * y se re-exporta acá para no romper los imports existentes. Los tipos
+ * espejan `openapi.json`; si alguno se desincroniza, el error aparece acá y
+ * no como un `undefined` silencioso en medio de un cobro.
  */
 
-import { pedir } from "@/lib/proxy";
+import { pedir } from "./cliente-api";
 
-export { ErrorApi } from "@/lib/proxy";
-
-/** Cada operación crítica necesita su clave (RN-COM-002): un reintento por
- * red inestable no puede convertirse en un segundo cobro. */
-export function claveIdempotencia(prefijo: string): string {
-  return `${prefijo}-${crypto.randomUUID()}`;
-}
+export { ErrorApi, claveIdempotencia } from "./cliente-api";
 
 // --- Tipos del contrato -----------------------------------------------------
 export type ExtraDeCarta = {

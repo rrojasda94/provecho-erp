@@ -90,6 +90,16 @@ def crear_orden_compra(
     return orden
 
 
+@router.get("/ordenes-compra", response_model=list[schemas.OrdenCompraOut])
+def listar_ordenes_compra(
+    empresa_id: uuid.UUID | None = None,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    return ordenes.listar_ordenes_compra(session, tenant.filtro_empresa(empresa_id))
+
+
 @router.get("/ordenes-compra/{orden_compra_id}", response_model=schemas.OrdenCompraOut)
 def ver_orden_compra(
     orden_compra_id: uuid.UUID,

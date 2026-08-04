@@ -27,8 +27,15 @@ from src.modules.sales.infrastructure.repositories import (
     PuntoVentaRepo,
     VentaRepo,
 )
-from src.modules.users.api.deps import get_db, get_tenant, require_permission
+from src.modules.users.api.deps import (
+    ContextoPermiso,
+    check_permission,
+    get_db,
+    get_tenant,
+    require_permission,
+)
 from src.modules.users.application import autorizacion
+from src.modules.users.application import queries_publicas as usuarios_queries
 from src.modules.users.application.errors import TokenInvalido
 from src.modules.users.infrastructure.models import Usuario
 from src.shared import fechas
@@ -115,7 +122,18 @@ def aplicar_descuento(
         autorizado_por = autorizacion.verificar(body.autorizacion, DESCONTAR)
     except TokenInvalido as e:
         raise HTTPException(status.HTTP_403_FORBIDDEN, str(e)) from e
-    exigir_venta(session, venta_id, tenant)
+    venta = exigir_venta(session, venta_id, tenant)
+    # Tope de `permiso.restricciones` para quien autorizó (ADR-023): un rol
+    # puede tener `sales.aplicar_descuento` con `monto_maximo` — no todo
+    # supervisor autoriza cualquier monto. Solo aplica al dar un descuento
+    # nuevo, no al quitarlo (`modo=None`); se valida ANTES de comprometer
+    # el cambio, no después.
+    if body.modo is not None:
+        autorizante = usuarios_queries.obtener_usuario(session, autorizado_por)
+        monto = ventas.calcular_monto_descuento(session, venta, body.modo, body.valor)
+        check_permission(
+            session, autorizante, DESCONTAR, contexto=ContextoPermiso(monto=monto)
+        )
     venta = ventas.aplicar_descuento(
         session,
         venta_id=venta_id,

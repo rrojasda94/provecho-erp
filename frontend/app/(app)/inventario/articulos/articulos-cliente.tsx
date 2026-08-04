@@ -1,151 +1,56 @@
 "use client";
 
 import type { ColumnDef } from "@tanstack/react-table";
-import { useMemo, useRef, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef } from "react";
 
 import { TablaDatos } from "@/components/tabla/tabla-datos";
-import {
-  catalogoApi,
-  TIPOS_ARTICULO,
-  type Articulo,
-  type Categoria,
-  type UnidadMedida,
-} from "@/lib/catalogo";
-import { ErrorApi } from "@/lib/proxy";
-import { aTitulo } from "@/lib/texto";
 
-/**
- * Artículos: lo que se compra, se guarda y se consume.
- *
- * Es la base de toda receta — sin insumos propios cargados, la ficha de un
- * producto solo puede ofrecer los tres del seeder de demo. Por eso esta
- * pantalla existe antes que cualquier otra de inventario: stock, lotes y
- * conteos ya tienen API, pero no sirven de nada si no hay qué contar.
- *
- * La unidad de medida **no se edita** después de crear el artículo: cambiarla
- * reescribiría en silencio el significado de todo el stock y de cada receta
- * que lo use (RN-UDM-002 exige un proceso propio de conversión).
- */
-export function ArticulosCliente({
-  articulos,
-  unidades,
-  categorias,
-}: {
-  articulos: Articulo[];
-  unidades: UnidadMedida[];
-  categorias: Categoria[];
-}) {
-  const [filas, setFilas] = useState(articulos);
-  const nombreUdm = useMemo(
-    () => new Map(unidades.map((u) => [u.id, u.nombre])),
-    [unidades],
-  );
-  const etiquetaTipo = useMemo(
-    () =>
-      new Map<string, string>(
-        TIPOS_ARTICULO.map((t) => [t.valor, t.etiqueta.split(" (")[0]]),
-      ),
-    [],
-  );
+import { crearArticuloAction, type EstadoArticulo } from "./actions";
 
-  const columnas = useMemo<ColumnDef<Articulo>[]>(
-    () => [
-      { accessorKey: "nombre", header: "Artículo" },
-      { accessorKey: "id_interno", header: "Código" },
-      {
-        id: "tipo",
-        header: "Tipo",
-        accessorFn: (a) => etiquetaTipo.get(a.tipo) ?? a.tipo,
-      },
-      {
-        id: "unidad",
-        header: "Unidad",
-        accessorFn: (a) => nombreUdm.get(a.unidad_medida_id) ?? "—",
-      },
-      {
-        id: "costo",
-        header: "Costo promedio",
-        accessorFn: (a) => `S/ ${Number(a.costo_promedio).toFixed(4)}`,
-      },
-      {
-        accessorKey: "controla_lote",
-        header: "Lote / FEFO",
-        cell: ({ getValue }) => (getValue<boolean>() ? "Sí" : "—"),
-      },
-    ],
-    [etiquetaTipo, nombreUdm],
-  );
+export type Articulo = {
+  id: string;
+  id_interno: string;
+  nombre: string;
+  unidad_medida_id: string;
+  tipo: string;
+  categoria_id: string | null;
+  costo_promedio: string;
+  archivado: boolean;
+  controla_lote: boolean;
+};
 
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="font-heading text-xl italic uppercase text-dark">Artículos</h1>
-          <p className="text-xs text-gray">
-            Insumos, subrecetas, mercadería y empaques. Son los que aparecen al
-            armar una receta.
-          </p>
-        </div>
-        <DialogoNuevoArticulo
-          unidades={unidades}
-          categorias={categorias}
-          onCreado={(a) => setFilas((f) => [...f, a].sort((x, y) => x.nombre.localeCompare(y.nombre)))}
-        />
-      </div>
-      <TablaDatos
-        columnas={columnas}
-        datos={filas}
-        placeholderBusqueda="Buscar artículo..."
-      />
-    </div>
-  );
-}
+export type Categoria = { id: string; nombre: string };
+export type UnidadMedida = { id: string; nombre: string; decimales: number };
+
+// README del módulo: enum extensible, hoy estos 6 valores.
+const TIPOS_ARTICULO = [
+  "insumo",
+  "subreceta",
+  "mercaderia",
+  "empaque",
+  "repuesto",
+  "suministro",
+] as const;
+
+const ESTADO_INICIAL: EstadoArticulo = { error: "", ok: false };
 
 function DialogoNuevoArticulo({
-  unidades,
   categorias,
-  onCreado,
+  unidadesMedida,
 }: {
-  unidades: UnidadMedida[];
   categorias: Categoria[];
-  onCreado: (articulo: Articulo) => void;
+  unidadesMedida: UnidadMedida[];
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
-  const [nombre, setNombre] = useState("");
-  const [idInterno, setIdInterno] = useState("");
-  const [tipo, setTipo] = useState<string>("insumo");
-  const [udmId, setUdmId] = useState(unidades[0]?.id ?? "");
-  const [categoriaId, setCategoriaId] = useState("");
-  const [costo, setCosto] = useState("0");
-  const [controlaLote, setControlaLote] = useState(false);
-  const [error, setError] = useState("");
-  const [guardando, setGuardando] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+  const [estado, formAction, pendiente] = useActionState(crearArticuloAction, ESTADO_INICIAL);
 
-  async function crear() {
-    setError("");
-    setGuardando(true);
-    try {
-      const articulo = await catalogoApi.crearArticulo({
-        id_interno: idInterno.trim().toUpperCase(),
-        nombre,
-        unidad_medida_id: udmId,
-        tipo,
-        categoria_id: categoriaId || null,
-        costo_promedio: costo || "0",
-        controla_lote: controlaLote,
-      });
-      onCreado(articulo);
+  useEffect(() => {
+    if (estado.ok) {
+      formRef.current?.reset();
       dialogRef.current?.close();
-      setNombre("");
-      setIdInterno("");
-      setCosto("0");
-      setControlaLote(false);
-    } catch (e) {
-      setError(e instanceof ErrorApi ? e.message : "No se pudo crear el artículo.");
-    } finally {
-      setGuardando(false);
     }
-  }
+  }, [estado.ok]);
 
   return (
     <>
@@ -153,97 +58,71 @@ function DialogoNuevoArticulo({
         type="button"
         onClick={() => dialogRef.current?.showModal()}
         className="rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary"
-        disabled={unidades.length === 0}
       >
         + Nuevo artículo
       </button>
-      <dialog ref={dialogRef} className="w-full max-w-md rounded-lg p-0 backdrop:bg-dark/40">
-        <div className="flex flex-col gap-4 p-6">
-          <h2 className="font-heading text-lg italic uppercase text-dark">
-            Nuevo artículo
-          </h2>
+      <dialog
+        ref={dialogRef}
+        className="w-full max-w-md rounded-lg p-0 backdrop:bg-dark/40"
+        onClose={() => formRef.current?.reset()}
+      >
+        <form ref={formRef} action={formAction} className="flex flex-col gap-4 p-6">
+          <h2 className="font-heading text-lg italic uppercase text-dark">Nuevo artículo</h2>
           <label className="flex flex-col gap-1 text-sm font-semibold">
-            Nombre
-            <input
-              value={nombre}
-              onChange={(e) => setNombre(e.target.value)}
-              onBlur={() => setNombre((n) => aTitulo(n))}
-              maxLength={150}
-              placeholder="Queso Mozzarella"
-            />
+            Código interno (máx. 4)
+            <input name="id_interno" required maxLength={4} placeholder="H001" />
           </label>
           <label className="flex flex-col gap-1 text-sm font-semibold">
-            Código interno (4)
-            <input
-              value={idInterno}
-              onChange={(e) => setIdInterno(e.target.value.slice(0, 4))}
-              maxLength={4}
-              placeholder="QMOZ"
-            />
+            Nombre
+            <input name="nombre" required maxLength={150} />
           </label>
           <label className="flex flex-col gap-1 text-sm font-semibold">
             Tipo
-            <select value={tipo} onChange={(e) => setTipo(e.target.value)}>
-              {TIPOS_ARTICULO.map((t) => (
-                <option key={t.valor} value={t.valor}>
-                  {t.etiqueta}
+            <select name="tipo" defaultValue="insumo">
+              {TIPOS_ARTICULO.map((tipo) => (
+                <option key={tipo} value={tipo}>
+                  {tipo}
                 </option>
               ))}
             </select>
           </label>
           <label className="flex flex-col gap-1 text-sm font-semibold">
             Unidad de medida
-            <select value={udmId} onChange={(e) => setUdmId(e.target.value)}>
-              {unidades.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.nombre} ({u.decimales} decimales)
+            {unidadesMedida.length === 0 ? (
+              <span className="text-xs font-normal text-secondary">
+                No hay unidades de medida cargadas — no se puede crear un artículo todavía.
+              </span>
+            ) : (
+              <select name="unidad_medida_id" required defaultValue="">
+                <option value="" disabled>
+                  Elegir...
                 </option>
-              ))}
-            </select>
-            <span className="text-xs font-normal text-gray">
-              No se puede cambiar después: cambiaría el significado de todo el
-              stock y de cada receta que lo use.
-            </span>
-          </label>
-          {categorias.length > 0 && (
-            <label className="flex flex-col gap-1 text-sm font-semibold">
-              Categoría
-              <select
-                value={categoriaId}
-                onChange={(e) => setCategoriaId(e.target.value)}
-              >
-                <option value="">Sin categoría</option>
-                {categorias.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.nombre}
+                {unidadesMedida.map((udm) => (
+                  <option key={udm.id} value={udm.id}>
+                    {udm.nombre}
                   </option>
                 ))}
               </select>
-            </label>
-          )}
+            )}
+          </label>
           <label className="flex flex-col gap-1 text-sm font-semibold">
-            Costo promedio (S/)
-            <input
-              value={costo}
-              onChange={(e) => setCosto(e.target.value)}
-              inputMode="decimal"
-            />
-            <span className="text-xs font-normal text-gray">
-              Se recalcula solo con cada compra recibida; esto es el valor de
-              arranque.
-            </span>
+            Categoría (opcional)
+            <select name="categoria_id" defaultValue="">
+              <option value="">Sin categoría</option>
+              {categorias.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.nombre}
+                </option>
+              ))}
+            </select>
           </label>
-          <label className="flex items-center gap-2 text-sm font-semibold">
-            <input
-              type="checkbox"
-              checked={controlaLote}
-              onChange={(e) => setControlaLote(e.target.checked)}
-            />
-            Controla lote y vencimiento (FEFO)
+          <label className="flex flex-col gap-1 text-sm font-semibold">
+            Costo promedio inicial
+            <input name="costo_promedio" type="number" min={0} step="0.01" defaultValue="0" />
           </label>
-          {error && (
+          {estado.error && (
             <p role="alert" className="text-sm font-semibold text-secondary">
-              {error}
+              {estado.error}
             </p>
           )}
           <div className="mt-2 flex justify-end gap-2">
@@ -255,16 +134,79 @@ function DialogoNuevoArticulo({
               Cancelar
             </button>
             <button
-              type="button"
-              onClick={crear}
-              disabled={guardando || !nombre.trim() || !idInterno || !udmId}
+              type="submit"
+              disabled={pendiente || unidadesMedida.length === 0}
               className="rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary disabled:opacity-50"
             >
-              {guardando ? "Creando..." : "Crear artículo"}
+              {pendiente ? "Creando..." : "Crear"}
             </button>
           </div>
-        </div>
+        </form>
       </dialog>
     </>
+  );
+}
+
+export function ArticulosCliente({
+  articulos,
+  categorias,
+  unidadesMedida,
+}: {
+  articulos: Articulo[];
+  categorias: Categoria[];
+  unidadesMedida: UnidadMedida[];
+}) {
+  const nombreCategoria = useMemo(
+    () => new Map(categorias.map((c) => [c.id, c.nombre])),
+    [categorias],
+  );
+  const nombreUdm = useMemo(
+    () => new Map(unidadesMedida.map((u) => [u.id, u.nombre])),
+    [unidadesMedida],
+  );
+
+  const columnas: ColumnDef<Articulo>[] = useMemo(
+    () => [
+      { accessorKey: "id_interno", header: "Código" },
+      { accessorKey: "nombre", header: "Nombre" },
+      { accessorKey: "tipo", header: "Tipo" },
+      {
+        id: "categoria",
+        header: "Categoría",
+        accessorFn: (a) => (a.categoria_id ? nombreCategoria.get(a.categoria_id) : "—") ?? "—",
+      },
+      {
+        id: "unidad_medida",
+        header: "UdM",
+        accessorFn: (a) => nombreUdm.get(a.unidad_medida_id) ?? "—",
+      },
+      { accessorKey: "costo_promedio", header: "Costo promedio" },
+      {
+        accessorKey: "archivado",
+        header: "Estado",
+        cell: ({ getValue }) => (
+          <span
+            className={
+              getValue<boolean>()
+                ? "rounded-full bg-gray/20 px-2 py-0.5 text-xs font-semibold text-gray"
+                : "rounded-full bg-accent/30 px-2 py-0.5 text-xs font-semibold text-dark"
+            }
+          >
+            {getValue<boolean>() ? "Archivado" : "Activo"}
+          </span>
+        ),
+      },
+    ],
+    [nombreCategoria, nombreUdm],
+  );
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between">
+        <h1 className="font-heading text-xl italic uppercase text-dark">Artículos</h1>
+        <DialogoNuevoArticulo categorias={categorias} unidadesMedida={unidadesMedida} />
+      </div>
+      <TablaDatos columnas={columnas} datos={articulos} placeholderBusqueda="Buscar artículo..." />
+    </div>
   );
 }

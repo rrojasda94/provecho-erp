@@ -105,6 +105,12 @@ def crear_orden_compra(
     return orden
 
 
+def listar_ordenes_compra(
+    session: Session, empresa_id: uuid.UUID | None = None
+) -> list[OrdenCompra]:
+    return OrdenCompraRepo(session).list(empresa_id)
+
+
 def emitir_orden_compra(
     session: Session,
     orden_compra_id: uuid.UUID,

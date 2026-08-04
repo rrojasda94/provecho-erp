@@ -36,8 +36,13 @@ from src.modules.users.infrastructure.models import (
     Empresa,
     Grupo,
     Marca,
+    Permiso,
+    Rol,
     Sucursal,
+    Usuario,
+    UsuarioRol,
 )
+from src.modules.users.infrastructure.security import hash_pin
 
 
 @pytest.fixture()
@@ -236,3 +241,87 @@ def test_correlativo_por_dia_y_sucursal(env):
     n2 = client.post("/api/v1/sales/ventas", headers=h,
                      json=_venta_body(ids, key="k-0000002")).json()["numero_orden"]
     assert (n1, n2) == (1, 2)
+
+
+# --- Restricciones de permiso en el descuento (ADR-022) ----------------------
+def _crear_supervisor(TestSession):
+    """Un supervisor real (no admin — el comodín `*` nunca queda acotado
+    por `restricciones`, así que no sirve para probar el tope)."""
+    with TestSession() as s:
+        rol = s.scalar(select(Rol).where(Rol.nombre == "supervisor"))
+        supervisor = Usuario(
+            username="supervisor1", pin_hash=hash_pin("222222"), tipo="humano"
+        )
+        s.add(supervisor)
+        s.flush()
+        s.add(UsuarioRol(usuario_id=supervisor.id, rol_id=rol.id))
+        s.commit()
+
+
+def _fijar_tope_descuento(TestSession, monto_maximo: str) -> None:
+    with TestSession() as s:
+        permiso = s.scalar(
+            select(Permiso).where(Permiso.codigo == "sales.aplicar_descuento")
+        )
+        permiso.restricciones = {"monto_maximo": monto_maximo}
+        s.commit()
+
+
+def _autorizar(client, permiso="sales.aplicar_descuento"):
+    r = client.post("/api/v1/auth/autorizar", json={
+        "username": "supervisor1", "pin": "222222", "permiso": permiso,
+    })
+    assert r.status_code == 200, r.text
+    return r.json()["autorizacion"]
+
+
+def test_descuento_dentro_del_tope_de_restricciones_pasa(env):
+    client, ids, TestSession = env
+    _crear_supervisor(TestSession)
+    _fijar_tope_descuento(TestSession, "20.00")
+    h = _token(client)
+    venta = client.post("/api/v1/sales/ventas", headers=h, json=_venta_body(ids)).json()
+
+    token = _autorizar(client)
+    r = client.post(
+        f"/api/v1/sales/ventas/{venta['id']}/descuento", headers=h,
+        json={"modo": "monto", "valor": "20.00", "motivo": "cortesia", "autorizacion": token},
+    )
+    assert r.status_code == 200, r.text
+    assert Decimal(r.json()["total"]) == Decimal("30.00")
+
+
+def test_descuento_sobre_el_tope_de_restricciones_403(env):
+    client, ids, TestSession = env
+    _crear_supervisor(TestSession)
+    _fijar_tope_descuento(TestSession, "5.00")
+    h = _token(client)
+    venta = client.post("/api/v1/sales/ventas", headers=h, json=_venta_body(ids)).json()
+
+    # Total de la venta es 50.00; un descuento de 10.00 supera el tope de
+    # 5.00 que le quedó al rol supervisor — la autorización es válida (el
+    # permiso lo tiene), pero la restricción de monto lo frena.
+    token = _autorizar(client)
+    r = client.post(
+        f"/api/v1/sales/ventas/{venta['id']}/descuento", headers=h,
+        json={"modo": "monto", "valor": "10.00", "motivo": "cortesia", "autorizacion": token},
+    )
+    assert r.status_code == 403
+    # La venta no quedó modificada: la restricción se evalúa antes de aplicar.
+    assert client.get(
+        f"/api/v1/sales/ventas/{venta['id']}", headers=h
+    ).json()["total"] == "50.00"
+
+
+def test_sin_restricciones_el_supervisor_no_tiene_tope(env):
+    client, ids, TestSession = env
+    _crear_supervisor(TestSession)
+    h = _token(client)
+    venta = client.post("/api/v1/sales/ventas", headers=h, json=_venta_body(ids)).json()
+
+    token = _autorizar(client)
+    r = client.post(
+        f"/api/v1/sales/ventas/{venta['id']}/descuento", headers=h,
+        json={"modo": "monto", "valor": "50.00", "motivo": "cortesia", "autorizacion": token},
+    )
+    assert r.status_code == 200, r.text

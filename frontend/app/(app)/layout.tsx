@@ -9,9 +9,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const { usuario } = await obtenerSesion();
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="flex min-h-screen flex-col bg-background">
       <TopBar username={usuario.username} />
-      {children}
+      {/* flex-1, no un cálculo con la altura de TopBar en píxeles: el alto
+          real de la barra (fuentes custom, line-height) no es una constante
+          que valga la pena asumir. */}
+      <div className="flex-1">{children}</div>
     </div>
   );
 }

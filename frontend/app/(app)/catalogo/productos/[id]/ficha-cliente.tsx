@@ -12,7 +12,7 @@ import {
   type Receta,
   type UnidadMedida,
 } from "@/lib/catalogo";
-import { ErrorApi, pedir } from "@/lib/proxy";
+import { ErrorApi, pedir } from "@/lib/cliente-api";
 import { aTitulo } from "@/lib/texto";
 
 export type ListaPrecio = {

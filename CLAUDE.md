@@ -10,10 +10,15 @@ Estas reglas son obligatorias durante todo el desarrollo.
 - **Repository Pattern** + **Unit of Work** para acceso a datos.
 - **Event-driven interno**: los módulos se comunican entre sí SOLO vía eventos
   (`src/core/events.py`) o contratos públicos. Nunca importar el dominio de otro módulo.
-- Cada módulo es independiente, extensible y removible.
+- Cada módulo es independiente y extensible. Removerlo no toca el dominio de
+  los demás, pero sí obliga a deshacer sus registros en `core`/seeder/frontend
+  (no hay manifiesto ni autodescubrimiento — ver `ROADMAP.md` → Deuda técnica).
 - Estructura por módulo (crear capas solo al implementarlas):
   `domain/` (entidades, reglas), `application/` (casos de uso), `infrastructure/`
   (repositorios SQLAlchemy), `api/` (routers FastAPI).
+- **Crear un módulo nuevo: seguir `docs/engineering/module-guide.md`** — la
+  estructura se copia de `purchases`, pero activarlo son 7 registros fuera
+  del módulo.
 
 ## Estructura de carpetas
 
