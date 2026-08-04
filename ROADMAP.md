@@ -1559,14 +1559,16 @@ errores de consola.
   (`src/main.py`). Se compara solo existencia de tablas, no columnas: el
   grueso del daño con muy poco código, sin los falsos positivos de comparar
   tipos por dialecto. 8 tests. Base local ya corregida.
-- ⬜ **Supabase sigue con la deriva** (verificado 2026-08-04): revisión
-  `b6d1e83f47ac` y le faltan `alerta_pedido`, `decision_gerencial`,
-  `notificacion`, `pos_tarjeta` y `tablero`. Cuatro son migraciones que
-  nunca corrieron; `decision_gerencial` es el mismo defecto de marca falsa
-  que tenía la local. Correr `alembic upgrade head` contra Supabase toca la
-  base compartida de desarrollo, así que **se hace con el usuario presente**
-  y después hay que crear a mano la tabla de la revisión ya marcada (el SQL
-  sale de `alembic upgrade e4a2f9c17b3d:1805c0904c5c --sql`).
+- ✅ 2026-08-04 **Supabase corregida** (autorizado por el usuario). Estaba en
+  `b6d1e83f47ac` con cinco tablas ausentes: `decision_gerencial` —de una
+  revisión que ya figuraba aplicada, el mismo defecto de marca falsa que la
+  local— y `alerta_pedido`, `notificacion`, `pos_tarjeta` y `tablero`, de
+  cuatro migraciones que nunca corrieron. Se creó primero la tabla de la
+  revisión marcada con el SQL de esa misma revisión y después
+  `alembic upgrade head`. Quedó en `f3a1c62d90b4`, 95 tablas, sin deriva
+  (`python -m src.core.esquema` → 0) y con los datos previos intactos. Las
+  cuatro migraciones eran aditivas (tablas nuevas y una columna nullable),
+  por eso no hubo que tocar datos.
 - ⬜ **La jornada pide el comprobante venta por venta** (N+1 contra la API):
   aceptable para un día de una sucursal, no para un histórico. Si aparece
   el listado de varios días, el comprobante tiene que venir en el listado
