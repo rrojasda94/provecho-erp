@@ -339,6 +339,21 @@ def crear_usuario(
     return usuario
 
 
+@router.get(
+    "/users/{usuario_id}/roles",
+    response_model=list[schemas.RolOut],
+    tags=["users-admin"],
+)
+def listar_roles_de_usuario(
+    usuario_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(GESTIONAR)),
+    session: Session = Depends(get_db),
+):
+    """Los roles de una cuenta, con su id — `rol_nombres` del token solo
+    trae nombres y la pantalla necesita poder quitarlos."""
+    return admin.roles_de_usuario(session, usuario_id)
+
+
 @router.get("/users", response_model=Pagina[schemas.UsuarioOut], tags=["users-admin"])
 def listar_usuarios(
     _: Usuario = Depends(require_permission(GESTIONAR)),
@@ -479,6 +494,21 @@ def listar_roles(
     session: Session = Depends(get_db),
 ):
     return admin.listar_roles(session)
+
+
+@router.get(
+    "/roles/{rol_id}/permisos",
+    response_model=list[schemas.PermisoOut],
+    tags=["users-admin"],
+)
+def listar_permisos_de_rol(
+    rol_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(GESTIONAR)),
+    session: Session = Depends(get_db),
+):
+    """Qué habilita el rol. Asignar un rol a ciegas es exactamente el error
+    que este endpoint evita."""
+    return admin.permisos_de_rol(session, rol_id)
 
 
 @router.post(

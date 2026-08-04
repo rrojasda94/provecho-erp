@@ -81,6 +81,19 @@ class UsuarioRepo:
             )
         )
 
+    def roles_de(self, usuario_id: uuid.UUID) -> list[Rol]:
+        """Los roles asignados, con id y descripción — `rol_nombres` solo
+        devuelve el nombre y la pantalla de administración necesita poder
+        quitar el rol, o sea su id."""
+        return list(
+            self.s.scalars(
+                select(Rol)
+                .join(UsuarioRol, UsuarioRol.rol_id == Rol.id)
+                .where(UsuarioRol.usuario_id == usuario_id)
+                .order_by(Rol.nombre)
+            )
+        )
+
     def permiso_codigos(self, usuario_id: uuid.UUID) -> set[str]:
         return set(
             self.s.scalars(
@@ -136,6 +149,18 @@ class RolRepo:
 
     def list(self) -> list[Rol]:
         return list(self.s.scalars(select(Rol).where(Rol.deleted_at.is_(None))))
+
+    def permisos_de(self, rol_id: uuid.UUID) -> list[Permiso]:
+        """Qué habilita este rol. Sin esto, la pantalla de roles muestra
+        nombres sueltos y nadie sabe qué está asignando."""
+        return list(
+            self.s.scalars(
+                select(Permiso)
+                .join(RolPermiso, RolPermiso.permiso_id == Permiso.id)
+                .where(RolPermiso.rol_id == rol_id, Permiso.deleted_at.is_(None))
+                .order_by(Permiso.codigo)
+            )
+        )
 
     def add(self, rol: Rol) -> Rol:
         self.s.add(rol)

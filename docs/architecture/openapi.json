@@ -22340,6 +22340,57 @@
       }
     },
     "/api/v1/roles/{rol_id}/permisos": {
+      "get": {
+        "description": "Qué habilita el rol. Asignar un rol a ciegas es exactamente el error\nque este endpoint evita.",
+        "operationId": "listar_permisos_de_rol_api_v1_roles__rol_id__permisos_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rol_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Rol Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PermisoOut"
+                  },
+                  "title": "Response Listar Permisos De Rol Api V1 Roles  Rol Id  Permisos Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Permisos De Rol",
+        "tags": [
+          "users-admin"
+        ]
+      },
       "post": {
         "operationId": "asignar_permiso_api_v1_roles__rol_id__permisos_post",
         "parameters": [
@@ -27423,6 +27474,57 @@
       }
     },
     "/api/v1/users/{usuario_id}/roles": {
+      "get": {
+        "description": "Los roles de una cuenta, con su id — `rol_nombres` del token solo\ntrae nombres y la pantalla necesita poder quitarlos.",
+        "operationId": "listar_roles_de_usuario_api_v1_users__usuario_id__roles_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "usuario_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Usuario Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/src__modules__users__api__schemas__RolOut"
+                  },
+                  "title": "Response Listar Roles De Usuario Api V1 Users  Usuario Id  Roles Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Roles De Usuario",
+        "tags": [
+          "users-admin"
+        ]
+      },
       "post": {
         "operationId": "asignar_rol_api_v1_users__usuario_id__roles_post",
         "parameters": [

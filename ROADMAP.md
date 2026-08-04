@@ -217,6 +217,13 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   `GET /api/v1/almacenes` (nuevo en `users`, sin `require_permission` a
   propósito — catálogo de referencia, no dato sensible — pero sí escopado
   por tenant), `GET /api/v1/personas/buscar` (ver arriba).
+- ✅ 2026-08-04 **Dos endpoints de lectura de RBAC que faltaban** y hacían
+  inútil la pantalla de Usuarios: `GET /users/{id}/roles` —el token trae
+  `roles` por nombre, sin id, así que desde la UI no había forma de
+  desasignar— y `GET /roles/{id}/permisos`, porque asignar un rol sin poder
+  ver qué habilita es exactamente el error que hay que evitar. Ambos con
+  `users.gestionar`, sin permiso nuevo: son la misma administración que ya
+  cubría crear y asignar.
 - ✅ 2026-08-02 **Deriva de esquema del slice de contratación** (migración
   `e4a2f9c17b3d`): `postulante.estado` seguía en VARCHAR(10) con nueve
   estados de hasta 15 caracteres — `preseleccionado` fallaba en Postgres y
@@ -1473,9 +1480,35 @@ Verificado end-to-end en Docker con datos reales, por API y por navegador
 proveedor natural con `PersonaPicker` → nombre resuelto en la tabla. Sin
 errores de consola.
 
-Módulos sin pantalla todavía (solo tile en el home, 404 limpio de
-Next.js): ventas de back-office (más allá del PDV), producción,
-contabilidad, marketing, gerencia, usuarios.
+- **Usuarios** (2026-08-04): cuentas con sus roles editables **en la fila**
+  —asignar y quitar rol es lo que más se hace acá y un modal por cambio
+  sería un clic de más cada vez—, alta de cuenta, activar/desactivar y
+  filtro por rol. Subpantalla **Roles** como acordeón, no tabla: cada rol
+  tiene decenas de permisos y una celda con 30 etiquetas no se lee; el
+  selector de permisos va agrupado por módulo (`optgroup`) porque el
+  catálogo pasa los 90. Requirió **dos GET que no existían y sin los cuales
+  la pantalla era inútil**: `GET /users/{id}/roles` (el token trae nombres,
+  no ids, así que no se podía desasignar nada) y `GET /roles/{id}/permisos`
+  (asignar un rol sin ver qué habilita es justo el error a evitar).
+- **Contabilidad** (2026-08-04): cinco pantallas. *Asientos* — listado,
+  alta manual con líneas dinámicas y **cuadre en vivo** (RN-CTB-001: el
+  error típico es un monto de más y verlo antes de enviar ahorra el viaje),
+  y anulación por asiento inverso. *Periodos* — abrir y cerrar; se sumó al
+  verificar la pantalla end-to-end: el primer asiento de una empresa nueva
+  falla con "no hay periodo contable abierto" y hasta ahora abrirlo era
+  exclusivamente por API, o sea que la pantalla de asientos no se podía
+  estrenar sin curl. *Plan de cuentas* — listado y alta con cuenta padre. *Pagos a proveedor* — cola filtrada a pendientes por
+  defecto, con ejecutar (medio de pago + constancia) y rechazar; el nombre
+  del proveedor se resuelve contra `/purchases/proveedores` y si el contador
+  no tiene ese permiso la pantalla sigue viva mostrando el id, mismo
+  criterio que Proveedores con las personas. *Caja* — turnos abiertos con
+  su efectivo esperado, leídos del reporte `estado_caja` del catálogo
+  (ADR-024) en vez de recalcular el mismo número por segunda vez; abrir y
+  cerrar siguen por API porque cada paso exige el PIN del encargado
+  (RN-MDP-002) y esa pantalla va con el PDV.
+- ⬜ Módulos que siguen sin pantalla (solo tile en el home, 404 limpio de
+  Next.js): ventas de back-office (más allá del PDV), producción, marketing
+  y gerencia.
 
 Todo lo demás (theming multi-marca, accesibilidad — catálogo ya definido,
 tiempo real de KDS, i18n, hardware, testing — Playwright ya decidido por

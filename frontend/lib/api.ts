@@ -62,5 +62,9 @@ export async function apiFetch<T>(
   if (!respuesta.ok) {
     throw new ApiError(respuesta.status, await mensajeDeError(respuesta));
   }
+  // 204 no trae cuerpo (asignar/quitar rol, marcar leída): pedirle `.json()`
+  // revienta con "Unexpected end of JSON input" sobre una llamada que salió
+  // bien.
+  if (respuesta.status === 204) return undefined as T;
   return respuesta.json() as Promise<T>;
 }

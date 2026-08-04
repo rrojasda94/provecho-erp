@@ -35,6 +35,34 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Added
 
+- **Pantallas de Usuarios y Contabilidad** (2026-08-04). Dos de los siete
+  tiles del home que llevaban a un 404.
+  **Usuarios**: cuentas con sus roles editables en la misma fila (asignar y
+  quitar es lo que más se hace en esa pantalla; un modal por cambio sería un
+  clic de más cada vez), alta de cuenta, activar/desactivar y filtro por
+  rol. La subpantalla de **Roles** es un acordeón y no una tabla —un rol
+  tiene decenas de permisos y una celda con 30 etiquetas no se lee— con el
+  selector de permisos agrupado por módulo, porque el catálogo pasa los 90.
+  Requirió **dos endpoints de lectura que no existían**: `GET
+  /users/{id}/roles` (el token trae los nombres de rol pero no sus ids, así
+  que desde la UI no se podía desasignar nada) y `GET /roles/{id}/permisos`
+  (asignar un rol sin ver qué habilita es justo el error que se quiere
+  evitar).
+  **Contabilidad**: asientos (listado, alta manual con líneas dinámicas y
+  **cuadre debe/haber en vivo** —RN-CTB-001, el error típico es un monto de
+  más y verlo antes de enviar ahorra el viaje— y anulación por asiento
+  inverso), periodos contables (abrir y cerrar: sin un periodo abierto el
+  primer asiento falla, y abrirlo era exclusivamente por API — la pantalla
+  de asientos no se podía estrenar sin curl), plan de cuentas (listado y
+  alta), pagos a proveedor (cola
+  filtrada a pendientes, ejecutar con medio de pago y constancia, rechazar)
+  y caja (turnos abiertos con su efectivo esperado, leídos del reporte
+  `estado_caja` del catálogo en vez de recalcular el mismo número por
+  segunda vez).
+  De paso, `apiFetch` dejó de reventar con las respuestas **204 sin cuerpo**
+  (asignar/quitar rol, marcar notificación leída): pedirle `.json()` a un
+  204 falla sobre una llamada que salió bien.
+
 - **Ciclo de caja completo** (2026-08-04, ADR-025, migración
   `f3a1c62d90b4`). El slice mínimo registraba el ciclo; ahora lo verifica.
   Cuatro cambios que van juntos porque solos no sirven:

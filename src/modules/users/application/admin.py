@@ -184,6 +184,16 @@ def listar_roles(session: Session) -> list[Rol]:
     return RolRepo(session).list()
 
 
+def roles_de_usuario(session: Session, usuario_id: uuid.UUID) -> list[Rol]:
+    _get(UsuarioRepo(session).get(usuario_id), "usuario")
+    return UsuarioRepo(session).roles_de(usuario_id)
+
+
+def permisos_de_rol(session: Session, rol_id: uuid.UUID) -> list[Permiso]:
+    _get(RolRepo(session).get(rol_id), "rol")
+    return RolRepo(session).permisos_de(rol_id)
+
+
 # --- Permisos ---------------------------------------------------------------
 def crear_permiso(
     session: Session,
