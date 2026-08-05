@@ -1269,6 +1269,25 @@ No hay tabla de mapeo hub-id↔nube-id: `venta`, `pago` y
 
 ## 9. Módulos futuros
 
-Transporte (ruta, despacho), tesorería, activos, proyectos, BI/reportes:
-se especifican en su módulo antes de implementarse. Caja ya no es futuro:
-apertura/cierre/arqueo quedaron especificados en §6 (PROC-CTB-001/002).
+Revisado 2026-08-05: de la lista original casi nada sigue siendo futuro, y
+dos cosas nunca van a ser un módulo.
+
+- **Despacho** ✅ vive en `inventory` (ADR-020): `solicitud_insumos`,
+  `reserva_stock`, `transferencia`/`transferencia_item`. El picking reparte
+  por FEFO y emite una línea por lote tomado. Un módulo aparte habría
+  necesitado el dominio de `inventory` para hacer eso mismo.
+- **Ruta / flota** ⬜ sigue sin dueño, y sin operación real que lo pida. Lo
+  único pendiente del transporte de hoy es la **guía de remisión**, que es
+  un comprobante (deuda de `inventory` y de `sales`), no un módulo.
+- **Tesorería** ✅ dentro de `accounting` por decisión del usuario:
+  `movimiento_dinero`, caja, `custodia_efectivo`.
+- **BI/reportes** ✅ en `core/reportes` (ADR-024): catálogo de reportes +
+  `tablero` guardado por usuario y compartido por rol.
+- **Activos** ⬜ con dueño repartido a propósito: se compran en `purchases`
+  (`requerimiento_activo`, OC tipo `activo`) y se deprecian en `accounting`
+  (activo fijo, PROC-CTB-007/010).
+- **Proyectos** ⬜ sin caso: el grupo no ejecuta obra ni proyectos
+  facturables.
+
+Caja ya no es futuro: apertura/cierre/arqueo quedaron especificados en §6
+(PROC-CTB-001/002) e implementados en ADR-025.
