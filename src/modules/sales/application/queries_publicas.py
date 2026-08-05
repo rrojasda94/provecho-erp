@@ -485,6 +485,32 @@ def total_efectivo_cobrado(
     return Decimal(total)
 
 
+def total_tarjeta_cobrado(
+    session: Session, punto_venta_id: uuid.UUID, desde: datetime
+) -> Decimal:
+    """Lo cobrado con tarjeta en este punto de venta desde `desde`.
+
+    El cierre de caja cuadra efectivo **y** tarjetas (RN-POS-004): sin este
+    número, la mitad del turno se cierra a ojo y un cobro mal pasado en el
+    POS solo aparece en la liquidación del operador, semanas después.
+
+    Crédito y débito juntos: al arqueo le importa el total que el lote de
+    los terminales tiene que respaldar, no con cuál de las dos se pagó.
+    """
+    total = session.scalar(
+        select(func.coalesce(func.sum(Pago.monto), 0))
+        .join(Venta, Venta.id == Pago.venta_id)
+        .join(MedioPago, MedioPago.id == Pago.medio_pago_id)
+        .where(
+            Venta.punto_venta_id == punto_venta_id,
+            Pago.estado == "confirmado",
+            Pago.created_at >= desde,
+            MedioPago.tipo.in_(("tarjeta_credito", "tarjeta_debito")),
+        )
+    )
+    return Decimal(total)
+
+
 def productos_que_usan_receta(session: Session, receta_id: uuid.UUID) -> list[str]:
     """Nombres de los productos comerciales que apuntan a esta receta.
 

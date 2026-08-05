@@ -423,10 +423,15 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   nube no conoce la apertura que sí existió en la sucursal. Sincronizar
   `apertura_caja`/`cierre_caja` abre preguntas propias (¿quién cierra un
   turno que empezó offline?) — no antes de que haya un hub real corriendo.
-- ⬜ **El cierre no cuadra tarjetas contra el reporte de lote**
-  (RN-POS-004): `cierre_caja.reportes_pos` sigue vacío y `montos_reales`
-  solo lleva efectivo. Con `pos_tarjeta` ya inventariado (ADR-025) el
-  siguiente paso es exigir un reporte de lote por terminal operativo.
+- ✅ 2026-08-04 **El cierre cuadra tarjetas** (RN-POS-004): exige el reporte
+  de lote de **cada POS que abrió operativo** —uno averiado no cobró nada,
+  así que no se le pide— y contrasta la suma contra lo cobrado con tarjeta
+  en el turno (contrato público `sales.total_tarjeta_cobrado`, crédito y
+  débito juntos: al arqueo le importa el total que el lote respalda).
+  `descuadre_monto` sigue siendo **el del cajón** —es la plata que alguien
+  responde— y el de tarjetas viaja en `montos_esperados`/`montos_reales`;
+  cualquiera de los dos deja el cierre irregular. Un local sin terminales
+  verificados no tiene nada que cuadrar y el cierre no le pide nada.
 - ⬜ **Pagos por link de pago sin verificación automática al cierre**
   (RN-POS-008): hoy nada los concilia ni los computa en la caja principal
   de la sucursal. Llega con la integración de pasarela (Izipay).
@@ -1061,9 +1066,14 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   su motivo. Las notas parciales sucesivas cuentan contra lo que queda por
   acreditar, no contra lo vendido. Permiso propio `sales.emitir_nota_credito`
   (supervisor). 14 tests.
-- ⬜ **Descarga de PDF / XML / CDR** del comprobante emitido
-  (`/invoice/pdf|xml|cdr`): hoy se guarda el `hash` y la respuesta cruda,
-  pero el cliente no puede bajarse su representación impresa.
+- ✅ 2026-08-04 **Descarga de PDF / XML / CDR**
+  (`GET /sales/comprobantes/{id}/descargar/{formato}`, permiso `sales.leer`):
+  el PDF que se entrega al cliente y el **XML firmado** y el **CDR** que son
+  el respaldo ante SUNAT. Se piden a Factiliza en el momento y **no se
+  archivan**: su copia es la buena mientras el proveedor siga activo, y una
+  nuestra podría quedar desincronizada sin ganar nada. Los bytes vuelven tal
+  cual — reescribir un XML firmado lo invalida. Solo de un comprobante
+  `aceptado`: antes no hay XML ni CDR que bajar.
 - ⬜ **Guía de remisión electrónica** (`/despatch-*` de Factiliza) —
   se cruza con `guia_remision`, deuda de `inventory`.
 - ⬜ **Comprobante sin correlativo reservado**: si Factiliza rechaza, el

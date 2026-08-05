@@ -365,6 +365,7 @@ def cerrar_caja(
         detalle_denominaciones=body.detalle_denominaciones,
         custodia=body.custodia,
         descuadre_atribucion=body.descuadre_atribucion,
+        reportes_pos=[r.model_dump(mode="json") for r in body.reportes_pos or []] or None,
     )
     session.commit()
     return cierre

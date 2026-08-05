@@ -33,6 +33,64 @@ export async function anularVentaAction(ventaId: string): Promise<EstadoVenta> {
   return { error: "", ok: true };
 }
 
+export type LineaVenta = {
+  id: string;
+  nombre: string;
+  cantidad: string;
+  precio_unitario: string;
+  grupo_cobro: number;
+};
+
+/** Las líneas se piden al abrir el diálogo, no al pintar la jornada: solo
+ * hacen falta para acreditar y traerlas por cada venta del día sería un
+ * viaje por fila para algo que casi nunca se usa. */
+export async function lineasDeVentaAction(ventaId: string): Promise<LineaVenta[]> {
+  try {
+    return await apiFetch<LineaVenta[]>(`/api/v1/sales/ventas/${ventaId}/items`, {
+      token: await token(),
+    });
+  } catch {
+    return [];
+  }
+}
+
+export async function emitirNotaCreditoAction(
+  _previo: EstadoVenta,
+  formData: FormData,
+): Promise<EstadoVenta> {
+  const comprobanteId = String(formData.get("comprobante_id") ?? "");
+  const motivo = String(formData.get("motivo") ?? "");
+  const parcial = formData.get("alcance") === "parcial";
+  if (!comprobanteId || !motivo) return { error: "Falta el motivo.", ok: false };
+
+  // Las cantidades viajan como filas paralelas; solo entran las > 0, así
+  // que dejar una línea en cero equivale a no devolverla.
+  const ids = formData.getAll("linea_id").map(String);
+  const cantidades = formData.getAll("linea_cantidad").map(String);
+  const detalle = ids
+    .map((id, i) => ({ venta_item_id: id, cantidad: cantidades[i] ?? "0" }))
+    .filter((d) => Number(d.cantidad) > 0);
+  if (parcial && detalle.length === 0) {
+    return { error: "Una nota parcial necesita al menos una línea.", ok: false };
+  }
+
+  try {
+    await apiFetch(`/api/v1/sales/comprobantes/${comprobanteId}/nota-credito`, {
+      token: await token(),
+      metodo: "POST",
+      cuerpo: {
+        motivo,
+        detalle: parcial ? detalle : undefined,
+        repone_stock: formData.get("repone_stock") === "on",
+      },
+    });
+  } catch (e) {
+    return { error: mensajeDe(e, "No se pudo emitir la nota de crédito."), ok: false };
+  }
+  revalidatePath("/ventas");
+  return { error: "", ok: true };
+}
+
 export async function reintentarComprobanteAction(
   comprobanteId: string,
 ): Promise<EstadoVenta> {

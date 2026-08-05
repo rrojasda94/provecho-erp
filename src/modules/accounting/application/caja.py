@@ -51,6 +51,7 @@ from src.modules.accounting.infrastructure.repositories import (
 from src.modules.sales.application.queries_publicas import (
     puntos_venta_de_empresa,
     total_efectivo_cobrado,
+    total_tarjeta_cobrado,
 )
 
 
@@ -268,6 +269,31 @@ def efectivo_esperado(session: Session, apertura: AperturaCaja) -> dict:
     }
 
 
+def _cuadre_de_tarjetas(
+    session: Session, apertura: AperturaCaja, reportes_pos: list | None
+) -> dict:
+    """Lo cobrado con tarjeta contra lo que declaran los lotes (RN-POS-004).
+
+    Exige el reporte de **cada terminal que la apertura dio por operativo**:
+    uno averiado no cobró nada, así que no se le pide. Un local sin
+    terminales verificados no tiene nada que cuadrar y esto no estorba.
+    """
+    faltantes = rules.pos_sin_reporte(apertura.pos_verificados, reportes_pos)
+    if faltantes:
+        raise Conflicto(
+            "falta el reporte de lote de estos POS operativos: " + ", ".join(faltantes)
+        )
+    cobrado = total_tarjeta_cobrado(
+        session, apertura.punto_venta_id, apertura.created_at
+    )
+    declarado = rules.total_declarado_en_pos(reportes_pos)
+    return {
+        "cobrado": cobrado,
+        "declarado": declarado,
+        "descuadre": declarado - cobrado,
+    }
+
+
 def cerrar_caja(
     session: Session,
     apertura_caja_id: uuid.UUID,
@@ -277,8 +303,17 @@ def cerrar_caja(
     detalle_denominaciones: dict,
     custodia: str,
     descuadre_atribucion: str | None = None,
+    reportes_pos: list | None = None,
 ) -> CierreCaja:
-    """Cierra el turno contando el cajón y entregando el efectivo.
+    """Cierra el turno: cuenta el cajón, cuadra las tarjetas y entrega el
+    efectivo.
+
+    El cierre no cuadra solo efectivo (RN-POS-004): cada POS que abrió
+    operativo trae su reporte de lote, y la suma se contrasta con lo cobrado
+    con tarjeta en el turno. `descuadre_monto` sigue siendo **el del cajón**
+    —es la plata que alguien tiene que responder— y el de tarjetas viaja en
+    `montos_esperados`/`montos_reales`; cualquiera de los dos marca el
+    cierre como irregular.
 
     Si el cierre venía reabierto (`en_proceso`), este mismo caso de uso lo
     **recalcula sobre el registro existente**: la corrección de un cierre no
@@ -297,11 +332,19 @@ def cerrar_caja(
     monto_real = _contar(detalle_denominaciones, "el cierre de caja")
     desglose = efectivo_esperado(session, apertura)
     descuadre = monto_real - desglose["esperado"]
-    estado = "conforme" if descuadre == 0 else "con_irregularidad"
+    tarjetas = _cuadre_de_tarjetas(session, apertura, reportes_pos)
+    # Un descuadre en cualquiera de los dos frentes deja el cierre irregular:
+    # cuadrar el cajón no dice nada de lo que pasó por los terminales.
+    estado = (
+        "conforme" if descuadre == 0 and tarjetas["descuadre"] == 0 else "con_irregularidad"
+    )
     montos_esperados = {k: str(v) for k, v in desglose.items()}
+    montos_esperados["tarjeta"] = str(tarjetas["cobrado"])
     montos_reales = {
         "efectivo": str(monto_real),
         "denominaciones": detalle_denominaciones,
+        "tarjeta": str(tarjetas["declarado"]),
+        "descuadre_tarjeta": str(tarjetas["descuadre"]),
     }
 
     if cierre is None:
@@ -312,7 +355,8 @@ def cerrar_caja(
                 montos_esperados=montos_esperados,
                 montos_reales=montos_reales,
                 descuadre_monto=descuadre,
-                descuadre_atribucion=descuadre_atribucion if descuadre != 0 else None,
+                descuadre_atribucion=descuadre_atribucion if estado != "conforme" else None,
+                reportes_pos=reportes_pos,
                 custodia=custodia,
                 estado=estado,
                 relevos=[_relevo("cajero", cajero_id), _relevo("encargado", receptor_id)],
@@ -322,7 +366,8 @@ def cerrar_caja(
         cierre.montos_esperados = montos_esperados
         cierre.montos_reales = montos_reales
         cierre.descuadre_monto = descuadre
-        cierre.descuadre_atribucion = descuadre_atribucion if descuadre != 0 else None
+        cierre.descuadre_atribucion = descuadre_atribucion if estado != "conforme" else None
+        cierre.reportes_pos = reportes_pos
         cierre.custodia = custodia
         cierre.estado = estado
         cierre.relevos = (cierre.relevos or []) + [_relevo("encargado", receptor_id)]
@@ -343,6 +388,7 @@ def cerrar_caja(
             {
                 "cierre_caja_id": str(cierre.id),
                 "descuadre_monto": str(descuadre),
+                "descuadre_tarjeta": str(tarjetas["descuadre"]),
                 "descuadre_atribucion": descuadre_atribucion,
             },
             session=session,

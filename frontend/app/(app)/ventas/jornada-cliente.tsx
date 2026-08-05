@@ -1,9 +1,16 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
 
-import { anularVentaAction, reintentarComprobanteAction } from "./actions";
+import {
+  anularVentaAction,
+  emitirNotaCreditoAction,
+  lineasDeVentaAction,
+  reintentarComprobanteAction,
+  type EstadoVenta,
+  type LineaVenta,
+} from "./actions";
 
 export type Venta = {
   id: string;
@@ -23,6 +30,8 @@ export type Comprobante = {
   estado_emision: string;
   detalle_emision: string | null;
   intentos_emision: number;
+  // Presente = ya fue acreditado por una nota total y no admite otra.
+  anulado_por_nc_id: string | null;
 };
 export type Sucursal = { id: string; nombre: string };
 
@@ -86,12 +95,206 @@ function CeldaComprobante({ comprobante }: { comprobante?: Comprobante }) {
   );
 }
 
+const ESTADO_INICIAL: EstadoVenta = { error: "", ok: false };
+
+// Catálogo 09 de SUNAT, con los cinco motivos que este negocio produce. Los
+// dos de corrección no dan de baja la venta: arreglan el papel.
+const MOTIVOS_NC = [
+  { codigo: "01", texto: "Anulación de la operación", corrige: false },
+  { codigo: "06", texto: "Devolución total", corrige: false },
+  { codigo: "07", texto: "Devolución por ítem", corrige: false },
+  { codigo: "02", texto: "Anulación por error en el RUC", corrige: true },
+  { codigo: "03", texto: "Corrección por error en la descripción", corrige: true },
+];
+
+function DialogoNotaCredito({
+  venta,
+  comprobante,
+}: {
+  venta: Venta;
+  comprobante: Comprobante;
+}) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const [motivo, setMotivo] = useState("01");
+  const [alcance, setAlcance] = useState<"total" | "parcial">("total");
+  const [lineas, setLineas] = useState<LineaVenta[]>([]);
+  const [estado, formAction, pendiente] = useActionState(
+    emitirNotaCreditoAction,
+    ESTADO_INICIAL,
+  );
+
+  useEffect(() => {
+    if (estado.ok) dialogRef.current?.close();
+  }, [estado.ok]);
+
+  const abrir = async () => {
+    dialogRef.current?.showModal();
+    if (lineas.length === 0) setLineas(await lineasDeVentaAction(venta.id));
+  };
+
+  const deCorreccion = MOTIVOS_NC.find((m) => m.codigo === motivo)?.corrige ?? false;
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={abrir}
+        className="text-xs font-bold text-primary hover:underline"
+      >
+        Nota de crédito
+      </button>
+      <dialog ref={dialogRef} className="w-full max-w-lg rounded-lg p-0 backdrop:bg-dark/40">
+        <form ref={formRef} action={formAction} className="flex flex-col gap-4 p-6">
+          <input type="hidden" name="comprobante_id" value={comprobante.id} />
+          <h2 className="font-heading text-lg italic uppercase text-dark">
+            Nota de crédito · {comprobante.serie}-{comprobante.correlativo}
+          </h2>
+          <p className="text-xs text-gray">
+            Una venta cobrada no se anula, se acredita. La nota sale en serie propia y
+            solo puede emitirse una vez por comprobante.
+          </p>
+
+          <label className="flex flex-col gap-1 text-sm font-semibold">
+            Motivo (catálogo 09 de SUNAT)
+            <select name="motivo" value={motivo} onChange={(e) => setMotivo(e.target.value)}>
+              {MOTIVOS_NC.map((m) => (
+                <option key={m.codigo} value={m.codigo}>
+                  {m.codigo} · {m.texto}
+                </option>
+              ))}
+            </select>
+            {deCorreccion && (
+              <span className="text-xs font-normal text-gray">
+                Corrige el documento, no la operación: la venta sigue viva y el
+                comprobante queda liberado para reemitir el corregido.
+              </span>
+            )}
+          </label>
+
+          <fieldset className="flex flex-col gap-2 rounded border border-gray/20 p-3">
+            <legend className="px-1 text-xs font-semibold uppercase text-gray">
+              Qué se acredita
+            </legend>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="radio"
+                name="alcance"
+                value="total"
+                checked={alcance === "total"}
+                onChange={() => setAlcance("total")}
+              />
+              Todo el comprobante
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="radio"
+                name="alcance"
+                value="parcial"
+                checked={alcance === "parcial"}
+                onChange={() => setAlcance("parcial")}
+              />
+              Solo algunas líneas
+            </label>
+            {alcance === "parcial" && (
+              <div className="mt-1 flex flex-col gap-1.5">
+                {lineas.length === 0 && (
+                  <span className="text-xs text-gray">Cargando las líneas...</span>
+                )}
+                {lineas.map((linea) => (
+                  <div key={linea.id} className="flex items-center gap-2 text-sm">
+                    <input type="hidden" name="linea_id" value={linea.id} />
+                    <span className="flex-1">
+                      {linea.nombre}{" "}
+                      <span className="text-xs text-gray">
+                        (vendidas {linea.cantidad})
+                      </span>
+                    </span>
+                    <input
+                      name="linea_cantidad"
+                      type="number"
+                      step="0.001"
+                      min="0"
+                      max={linea.cantidad}
+                      defaultValue="0"
+                      aria-label={`Cantidad a devolver de ${linea.nombre}`}
+                      className="w-24 rounded border border-gray/40 px-2 py-1"
+                    />
+                  </div>
+                ))}
+                <span className="text-xs text-gray">
+                  Cero = no se devuelve. Cuenta contra lo que quede sin acreditar, no
+                  contra lo vendido.
+                </span>
+              </div>
+            )}
+          </fieldset>
+
+          <label className="flex items-start gap-2 text-sm font-semibold">
+            <input
+              type="checkbox"
+              name="repone_stock"
+              defaultChecked={!deCorreccion}
+              className="mt-1"
+            />
+            <span>
+              Devolver el insumo al stock
+              <span className="block text-xs font-normal text-gray">
+                En cocina el plato devuelto rara vez vuelve al inventario, y corregir un
+                dato del comprobante no lo toca en absoluto.
+              </span>
+            </span>
+          </label>
+
+          {estado.error && (
+            <p role="alert" className="text-sm font-semibold text-secondary">
+              {estado.error}
+            </p>
+          )}
+          <div className="mt-2 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => dialogRef.current?.close()}
+              className="rounded border border-gray px-4 py-2 text-sm font-semibold text-dark"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={pendiente}
+              className="rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary"
+            >
+              {pendiente ? "Emitiendo..." : "Emitir"}
+            </button>
+          </div>
+        </form>
+      </dialog>
+    </>
+  );
+}
+
+/** Anular o acreditar, nunca las dos: antes de cobrar se anula, después
+ * solo queda la nota de crédito (RN-CPP-009). */
+function Acciones({ venta, comprobante }: { venta: Venta; comprobante?: Comprobante }) {
+  if (venta.estado === "orden") return <BotonAnular venta={venta} />;
+  const acreditable =
+    comprobante !== undefined &&
+    comprobante.tipo !== "nc" &&
+    comprobante.estado_emision === "aceptado" &&
+    !comprobante.anulado_por_nc_id;
+  if (acreditable) return <DialogoNotaCredito venta={venta} comprobante={comprobante} />;
+  if (comprobante?.anulado_por_nc_id) {
+    return <span className="text-xs text-gray">acreditado</span>;
+  }
+  return <span className="text-xs text-gray">—</span>;
+}
+
+
 function BotonAnular({ venta }: { venta: Venta }) {
   const [pendiente, startTransition] = useTransition();
   const [error, setError] = useState("");
   // Anular repone el stock y solo aplica antes de cobrar: una venta pagada se
   // corrige con nota de crédito, no borrándola.
-  if (venta.estado !== "orden") return <span className="text-xs text-gray">—</span>;
   return (
     <div className="flex flex-col gap-0.5">
       <button
@@ -246,7 +449,7 @@ export function JornadaCliente({
                   <CeldaComprobante comprobante={comprobantes[v.id]} />
                 </td>
                 <td className="py-2">
-                  <BotonAnular venta={v} />
+                  <Acciones venta={v} comprobante={comprobantes[v.id]} />
                 </td>
               </tr>
             ))}

@@ -35,6 +35,38 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Added
 
+- **El cierre de caja cuadra tarjetas** (2026-08-04, RN-POS-004). Hasta
+  ahora el cierre verificaba solo el cajón: la mitad del turno se cerraba a
+  ojo y un cobro mal pasado en el POS aparecía recién en la liquidación del
+  operador, semanas después. Ahora exige el **reporte de lote de cada
+  terminal que abrió operativo** —uno averiado no cobró nada, así que no se
+  le pide— y contrasta la suma contra lo cobrado con tarjeta en el turno.
+  `descuadre_monto` sigue siendo el del efectivo (es la plata que alguien
+  responde) y el de tarjetas viaja aparte; **cualquiera de los dos deja el
+  cierre irregular**, porque cuadrar el cajón no dice nada de lo que pasó
+  por los terminales. Un local sin POS verificados no tiene nada que cuadrar
+  y el cierre no le pide nada.
+
+- **Descarga de PDF, XML y CDR** (2026-08-04,
+  `GET /sales/comprobantes/{id}/descargar/{formato}`). El PDF que se entrega
+  al cliente, y el **XML firmado** y el **CDR** que son el respaldo ante
+  SUNAT y hay que poder recuperar años después. Se piden a Factiliza en el
+  momento y **no se archivan**: su copia es la buena mientras el proveedor
+  siga activo, y guardar una propia agregaría un archivo que puede quedar
+  desincronizado sin ganar nada. Los bytes vuelven sin tocar — reescribir un
+  XML firmado lo invalida. Solo de un comprobante aceptado: antes de eso no
+  hay XML ni CDR que bajar.
+
+- **Pantalla de nota de crédito** (2026-08-04, en la jornada de Ventas). El
+  diálogo pide el motivo del catálogo 09 y **avisa cuando el elegido corrige
+  el documento en vez de la operación**; permite acreditar todo o elegir
+  líneas con su cantidad (las líneas se piden al abrir, no al pintar la
+  jornada: traerlas por cada venta del día sería un viaje por fila para algo
+  que casi nunca se usa); y la casilla de devolver el insumo viene marcada
+  salvo en los motivos de corrección, que no tocan inventario. La fila
+  ofrece **anular o acreditar, nunca las dos**: antes de cobrar se anula,
+  después solo queda la nota.
+
 - **Nota de crédito** (2026-08-04, RN-CPP-009, migración `c2f7a91b4e08`).
   Cierra el hueco funcional más grande que quedaba: **una venta ya cobrada
   no tenía forma de corregirse**. `anular_venta` seguía cubriendo solo la

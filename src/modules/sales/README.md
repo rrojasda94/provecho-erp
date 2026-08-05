@@ -50,6 +50,12 @@ cuatro huecos que el punto de venta necesitaba y el modelo no daba.
 - `comprobante.receptor_num_doc` / `receptor_nombre` (RN-CPP-003): el
   DNI/RUC que el cajero teclea al cobrar, sin exigir cliente registrado.
   11 dígitos → factura; 8, `00000000` o vacío → boleta.
+- **Descarga del comprobante emitido**
+  (`GET /sales/comprobantes/{id}/descargar/{pdf|xml|cdr}`): el PDF para el
+  cliente, el XML firmado y el CDR como respaldo ante SUNAT. Se piden a
+  Factiliza en el momento y no se archivan — su copia es la buena mientras
+  el proveedor siga activo — y los bytes vuelven sin tocar, porque
+  reescribir un XML firmado lo invalida.
 - **Nota de crédito** (RN-CPP-009, `application/notas_credito.py`,
   `POST /sales/comprobantes/{id}/nota-credito`): una venta ya cobrada no se
   anula, se acredita. Total o **parcial por ítem**, con motivo del catálogo

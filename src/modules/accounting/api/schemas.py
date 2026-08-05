@@ -161,14 +161,29 @@ class AperturaCajaOut(BaseModel):
     created_at: datetime
 
 
+class ReportePosIn(BaseModel):
+    """Cierre de lote de un POS de tarjeta: lo que el terminal dice haber
+    cobrado en el turno (RN-POS-004)."""
+
+    pos_tarjeta_id: uuid.UUID
+    monto_lote: Decimal = Field(ge=0)
+    referencia: str | None = Field(default=None, max_length=100)
+
+
 class CerrarCajaIn(BaseModel):
     """El monto real sale del conteo por denominación (RN-POS-007), y el
-    efectivo se entrega al encargado que firma con su PIN (RN-MDP-002)."""
+    efectivo se entrega al encargado que firma con su PIN (RN-MDP-002).
+
+    `reportes_pos` trae el cierre de lote de cada terminal que abrió
+    operativo: sin ellos el cierre no cuadra las tarjetas y se rechaza
+    (RN-POS-004). Un local sin POS verificados no manda nada.
+    """
 
     detalle_denominaciones: dict[str, int]
     custodia: str
     autorizacion: str
     descuadre_atribucion: str | None = None
+    reportes_pos: list[ReportePosIn] | None = None
 
 
 class CierreCajaOut(BaseModel):

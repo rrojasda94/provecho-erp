@@ -390,3 +390,46 @@ def test_el_evento_lleva_los_items_solo_si_se_pidio_reponer(session, venta_factu
     assert capturados[-1]["items"] == []
     assert capturados[-1]["repone_stock"] is False
     assert capturados[-1]["total"] is True
+
+
+# --- Descarga de PDF / XML / CDR ----------------------------------------------
+class _ClienteDescarga:
+    def __init__(self) -> None:
+        self.pedidos: list[tuple] = []
+
+    def descargar(self, formato, tipo_doc, serie, correlativo):
+        self.pedidos.append((formato, tipo_doc, serie, correlativo))
+        return factiliza.DocumentoDescargado(
+            formato=formato,
+            contenido=b"%PDF-1.4 fake",
+            content_type=factiliza.CONTENT_TYPES[formato],
+            nombre_archivo=f"{serie}-{correlativo:08d}.{formato}",
+        )
+
+
+def test_se_descarga_el_documento_de_un_comprobante_aceptado(session, venta_facturada):
+    _venta, comprobante, _usuario = venta_facturada
+    cliente = _ClienteDescarga()
+
+    doc = comprobantes.descargar_documento(session, comprobante.id, "xml", cliente)
+
+    assert doc.content_type == "application/xml"
+    assert doc.contenido == b"%PDF-1.4 fake"
+    # Pide el tipo de documento en el catálogo de SUNAT, no el nombre interno.
+    assert cliente.pedidos[-1][:2] == ("xml", factiliza.TIPO_DOC_BOLETA)
+
+
+def test_no_se_descarga_lo_que_sunat_no_acepto(session, venta_facturada):
+    """Antes de la aceptación no hay XML firmado ni CDR, y el PDF sería de un
+    documento que SUNAT no reconoce."""
+    _venta, comprobante, _usuario = venta_facturada
+    comprobante.estado_emision = "pendiente"
+
+    with pytest.raises(Conflicto, match="sin aceptación"):
+        comprobantes.descargar_documento(session, comprobante.id, "pdf", _ClienteDescarga())
+
+
+def test_formato_desconocido_se_rechaza(session, venta_facturada):
+    _venta, comprobante, _usuario = venta_facturada
+    with pytest.raises(ReglaNegocio, match="no descargable"):
+        comprobantes.descargar_documento(session, comprobante.id, "docx", _ClienteDescarga())

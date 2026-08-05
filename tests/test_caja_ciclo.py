@@ -373,3 +373,102 @@ def test_el_esperado_del_arqueo_descuenta_los_retiros(env):
     assert r.status_code == 201
     assert Decimal(r.json()["monto_esperado"]) == Decimal("60.00")
     assert Decimal(r.json()["diferencia"]) == 0
+
+
+# --- Cuadre de tarjetas al cierre (RN-POS-004) --------------------------------
+def test_el_cierre_exige_el_lote_de_cada_pos_operativo(env):
+    """Cerrar cuadrando solo el cajón deja la mitad del turno sin verificar:
+    un cobro mal pasado en el POS aparecería recién en la liquidación."""
+    client, ids, _ = env
+    h = _token(client)
+    pos_id = _crear_pos(client, h, ids).json()["id"]
+    apertura = client.post(
+        "/api/v1/accounting/cajas/apertura",
+        headers=h,
+        json={
+            "punto_venta_id": ids["pv_id"],
+            "monto_declarado": "100.00",
+            "detalle_denominaciones": billetes("100.00"),
+            "autorizacion": _autorizacion(client, "accounting.caja_relevar"),
+            "pos_verificados": [{"pos_tarjeta_id": pos_id, "operativo": True}],
+        },
+    ).json()
+
+    r = _cerrar_caja(client, h, apertura["id"], "100.00")
+    assert r.status_code == 409
+    assert "reporte de lote" in r.json()["detail"]
+
+    ok = _cerrar_caja(
+        client,
+        h,
+        apertura["id"],
+        "100.00",
+        reportes_pos=[{"pos_tarjeta_id": pos_id, "monto_lote": "0.00"}],
+    )
+    assert ok.status_code == 200
+    assert ok.json()["estado"] == "conforme"
+
+
+def test_un_pos_averiado_no_debe_reporte(env):
+    """No cobró nada: exigirle el lote sería trabar el cierre por un
+    terminal que estuvo apagado todo el turno (RN-POS-011)."""
+    client, ids, _ = env
+    h = _token(client)
+    pos_id = _crear_pos(client, h, ids).json()["id"]
+    apertura = client.post(
+        "/api/v1/accounting/cajas/apertura",
+        headers=h,
+        json={
+            "punto_venta_id": ids["pv_id"],
+            "monto_declarado": "100.00",
+            "detalle_denominaciones": billetes("100.00"),
+            "autorizacion": _autorizacion(client, "accounting.caja_relevar"),
+            "pos_verificados": [{"pos_tarjeta_id": pos_id, "operativo": False}],
+        },
+    ).json()
+
+    assert _cerrar_caja(client, h, apertura["id"], "100.00").status_code == 200
+
+
+def test_un_lote_que_no_cuadra_deja_el_cierre_irregular(env):
+    """El cajón puede cuadrar perfecto y las tarjetas no: son dos frentes
+    distintos y cualquiera de los dos marca el cierre."""
+    client, ids, _ = env
+    h = _token(client)
+    pos_id = _crear_pos(client, h, ids).json()["id"]
+    apertura = client.post(
+        "/api/v1/accounting/cajas/apertura",
+        headers=h,
+        json={
+            "punto_venta_id": ids["pv_id"],
+            "monto_declarado": "100.00",
+            "detalle_denominaciones": billetes("100.00"),
+            "autorizacion": _autorizacion(client, "accounting.caja_relevar"),
+            "pos_verificados": [{"pos_tarjeta_id": pos_id, "operativo": True}],
+        },
+    ).json()
+
+    # El terminal declara S/50 y no hubo ningún cobro con tarjeta.
+    r = _cerrar_caja(
+        client,
+        h,
+        apertura["id"],
+        "100.00",
+        descuadre_atribucion="cajero",
+        reportes_pos=[{"pos_tarjeta_id": pos_id, "monto_lote": "50.00"}],
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["estado"] == "con_irregularidad"
+    # El descuadre del cajón sigue siendo cero: el problema está en tarjetas.
+    assert Decimal(body["descuadre_monto"]) == 0
+    # Comparado como Decimal: "0" y "0.00" son el mismo número.
+    assert Decimal(body["montos_esperados"]["tarjeta"]) == 0
+
+
+def test_sin_pos_verificados_el_cierre_no_pide_nada(env):
+    """Un local sin terminales no tiene tarjetas que cuadrar."""
+    client, ids, _ = env
+    h = _token(client)
+    apertura = _abrir_caja(client, h, ids, monto="100.00").json()
+    assert _cerrar_caja(client, h, apertura["id"], "100.00").status_code == 200

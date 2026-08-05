@@ -2012,7 +2012,7 @@
         "type": "object"
       },
       "CerrarCajaIn": {
-        "description": "El monto real sale del conteo por denominación (RN-POS-007), y el\nefectivo se entrega al encargado que firma con su PIN (RN-MDP-002).",
+        "description": "El monto real sale del conteo por denominación (RN-POS-007), y el\nefectivo se entrega al encargado que firma con su PIN (RN-MDP-002).\n\n`reportes_pos` trae el cierre de lote de cada terminal que abrió\noperativo: sin ellos el cierre no cuadra las tarjetas y se rechaza\n(RN-POS-004). Un local sin POS verificados no manda nada.",
         "properties": {
           "autorizacion": {
             "title": "Autorizacion",
@@ -2039,6 +2039,20 @@
             },
             "title": "Detalle Denominaciones",
             "type": "object"
+          },
+          "reportes_pos": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ReportePosIn"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reportes Pos"
           }
         },
         "required": [
@@ -11357,6 +11371,47 @@
           "columnas"
         ],
         "title": "ReporteOut",
+        "type": "object"
+      },
+      "ReportePosIn": {
+        "description": "Cierre de lote de un POS de tarjeta: lo que el terminal dice haber\ncobrado en el turno (RN-POS-004).",
+        "properties": {
+          "monto_lote": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Monto Lote"
+          },
+          "pos_tarjeta_id": {
+            "format": "uuid",
+            "title": "Pos Tarjeta Id",
+            "type": "string"
+          },
+          "referencia": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referencia"
+          }
+        },
+        "required": [
+          "pos_tarjeta_id",
+          "monto_lote"
+        ],
+        "title": "ReportePosIn",
         "type": "object"
       },
       "ReservaOut": {
@@ -25640,6 +25695,62 @@
           }
         ],
         "summary": "Actualizar Documento Cliente",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/comprobantes/{comprobante_id}/descargar/{formato}": {
+      "get": {
+        "description": "Baja el PDF que se entrega al cliente, o el XML firmado y el CDR que\nson el respaldo ante SUNAT.\n\nSe piden a Factiliza en el momento y no se archivan: su copia es la\nbuena mientras el proveedor siga activo. Devuelve los bytes tal cual —\nreescribir un XML firmado lo invalida.",
+        "operationId": "descargar_comprobante_api_v1_sales_comprobantes__comprobante_id__descargar__formato__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "comprobante_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Comprobante Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "formato",
+            "required": true,
+            "schema": {
+              "enum": [
+                "pdf",
+                "xml",
+                "cdr"
+              ],
+              "title": "Formato",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Descargar Comprobante",
         "tags": [
           "sales"
         ]

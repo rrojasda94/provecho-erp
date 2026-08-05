@@ -2,8 +2,9 @@
 
 import uuid
 from datetime import date
+from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from src.core.tenant import Tenant
@@ -318,6 +319,35 @@ def reintentar_emision(
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(e)) from e
     session.commit()
     return comprobante
+
+
+@router.get(
+    "/comprobantes/{comprobante_id}/descargar/{formato}", response_class=Response
+)
+def descargar_comprobante(
+    comprobante_id: uuid.UUID,
+    formato: Literal["pdf", "xml", "cdr"],
+    _: Usuario = Depends(require_permission(LEER)),
+    session: Session = Depends(get_db),
+):
+    """Baja el PDF que se entrega al cliente, o el XML firmado y el CDR que
+    son el respaldo ante SUNAT.
+
+    Se piden a Factiliza en el momento y no se archivan: su copia es la
+    buena mientras el proveedor siga activo. Devuelve los bytes tal cual —
+    reescribir un XML firmado lo invalida.
+    """
+    try:
+        documento = comprobantes.descargar_documento(session, comprobante_id, formato)
+    except FactilizaError as e:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(e)) from e
+    return Response(
+        content=documento.contenido,
+        media_type=documento.content_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{documento.nombre_archivo}"'
+        },
+    )
 
 
 @router.post(

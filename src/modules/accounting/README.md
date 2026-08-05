@@ -103,6 +103,11 @@ finanzas documentados en el área:
     cobrado desde la apertura + ingresos − retiros del turno`, el cobrado
     vía el contrato público de `sales` (`total_efectivo_cobrado` —
     `accounting` no importa el dominio de `sales`).
+  - **Y cuadra tarjetas** (RN-POS-004, 2026-08-04): exige el reporte de lote
+    de cada POS que abrió operativo —uno averiado no cobró nada— y lo
+    contrasta con `total_tarjeta_cobrado`. `descuadre_monto` sigue siendo el
+    del cajón; el de tarjetas va en `montos_esperados`/`montos_reales` y
+    cualquiera de los dos deja el cierre irregular.
   - **El monto sale del conteo por denominación** (RN-POS-003/007), no de
     un número tecleado; en la apertura la diferencia contra lo declarado
     por el encargado se calcula y **no bloquea abrir** (RN-POS-011).

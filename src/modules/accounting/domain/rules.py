@@ -63,6 +63,35 @@ def total_denominaciones(detalle: dict) -> Decimal:
     return total
 
 
+# --- Cuadre de tarjetas al cierre (RN-POS-004) ------------------------------
+def pos_sin_reporte(
+    pos_verificados: list | None, reportes: list | None
+) -> list[str]:
+    """Terminales que la apertura dio por operativos y no trajeron su
+    reporte de lote al cierre.
+
+    El cierre cuadra efectivo **y** tarjetas: sin el lote de cada terminal
+    operativo, la mitad del turno queda sin verificar y un cobro mal pasado
+    aparece recién en la liquidación del operador, semanas después. Un POS
+    que se abrió averiado no cobró nada, así que no se le exige nada.
+    """
+    if not pos_verificados:
+        return []
+    declarados = {str(r.get("pos_tarjeta_id")) for r in (reportes or [])}
+    return sorted(
+        str(p["pos_tarjeta_id"])
+        for p in pos_verificados
+        if p.get("operativo", True) and str(p["pos_tarjeta_id"]) not in declarados
+    )
+
+
+def total_declarado_en_pos(reportes: list | None) -> Decimal:
+    """Suma de los lotes que el cajero declaró, terminal por terminal."""
+    return sum(
+        (Decimal(str(r.get("monto_lote", 0))) for r in (reportes or [])), Decimal(0)
+    )
+
+
 # --- Cadena de custodia del efectivo (RN-MDP-002/006) -----------------------
 # El efectivo no "desaparece" al cerrar la caja: pasa de mano en mano y cada
 # tramo tiene un responsable con nombre. `disponible` es el final del
