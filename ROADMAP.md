@@ -1766,12 +1766,32 @@ errores de consola.
   orden ad-hoc, que es lo único que el backend implementa hoy
   (`plan_produccion` y `checklist_inocuidad_turno` siguen en deuda del
   módulo).
-- ⬜ **Ninguna pantalla tiene prueba automatizada** (deuda vieja con causa
-  nueva, 2026-08-05): el PDV estuvo mandando el contrato pre-ADR-025 a la
-  apertura y el cierre de caja durante un día entero sin que nada fallara en
-  CI, porque lo único que cubre esas pantallas es abrirlas a mano. Playwright
-  está decidido desde ADR-013 y sigue en cero. El caso mínimo que habría
-  atrapado esto es abrir y cerrar caja desde el PDV contra la API real.
+- 🔶 **Pruebas e2e del flujo del dinero — armadas, todavía en rojo**
+  (2026-08-05). Playwright instalado, `frontend/playwright.config.ts`,
+  `frontend/e2e/caja.spec.ts` (abrir caja → vender → cobrar → cerrar, más
+  RN-POS-011) y `src/seeders/e2e.py` con los datos que el PDV necesita.
+  Corre con `npm run test:e2e` desde `frontend`.
+  **Lo que ya funciona, verificado**: login, home, PDV, apertura de caja con
+  conteo por denominación y verificación de POS, y la ficha de producto.
+  **Lo que falta**: la suite no llega verde de punta a punta. Tres cosas
+  encontradas en el camino, dos ya resueltas y una no:
+  1. ✅ El `env` del `webServer` de Playwright **no llega** al proceso hijo
+     en este entorno. La API corría contra el `.env` del repo —o sea contra
+     **Supabase**— y Next se iba al `localhost:8000` por defecto, donde en
+     Windows la conexión no rebota: se cuelga. Resuelto con dos lanzadores
+     (`e2e/servidor-api.mjs`, `e2e/servidor-web.mjs`) que fijan la variable
+     dentro del proceso que la usa.
+  2. ✅ `waitForURL` no sirve tras una Server Action: el `redirect` lo
+     resuelve el cliente y nunca dispara el evento `load`. Se espera el
+     contenido del destino.
+  3. ⬜ **Queda inestable**: Next en modo desarrollo tira
+     `SyntaxError: Unexpected end of JSON input` de forma intermitente y la
+     corrida falla en el login. Con `build`+`start` no sirve como está: en
+     producción Next valida el origen de las Server Actions y las rechaza.
+     Ese es el nudo a desatar antes de meterlo en CI.
+  Hasta que esté verde, **sigue siendo cierto que ninguna pantalla tiene
+  prueba automatizada** — y el precio ya se pagó: la caja del PDV estuvo
+  rota un día entero sin que nada fallara en CI.
 - ⬜ **Los enums de la base no tienen una sola fuente en el frontend**: la
   pantalla de caja repite los valores de `custodia`, `descuadre_atribucion`
   y los estados en constantes propias. Mientras el `pattern` del schema los

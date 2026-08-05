@@ -77,6 +77,7 @@ function EstadoCaja({
     <button
       type="button"
       className={`pdv-pill ${caja ? "ok" : "off"}`}
+      data-testid="estado-caja"
       disabled={!caja}
       onClick={onClick}
     >

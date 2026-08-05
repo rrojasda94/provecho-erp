@@ -133,6 +133,7 @@ export function DialogoApertura({
         step="0.10"
         inputMode="decimal"
         placeholder="0.00"
+        data-testid="apertura-declarado"
         value={declarado}
         onChange={(e) => setDeclarado(e.target.value)}
       />
@@ -195,6 +196,7 @@ export function DialogoApertura({
           className="pdv-campo"
           placeholder="Usuario del encargado"
           autoComplete="off"
+          data-testid="apertura-usuario"
           value={usuario}
           onChange={(e) => setUsuario(e.target.value)}
         />
@@ -204,6 +206,7 @@ export function DialogoApertura({
           inputMode="numeric"
           placeholder="PIN"
           autoComplete="off"
+          data-testid="apertura-pin"
           value={pin}
           onChange={(e) => setPin(e.target.value)}
         />
@@ -266,6 +269,7 @@ function ConteoDenominaciones({
                 <input
                   type="number"
                   min={0}
+                  data-testid={`denom-${v}`}
                   value={conteo[v] ?? 0}
                   onChange={(e) =>
                     onCambiar({ ...conteo, [v]: Math.max(0, +e.target.value || 0) })
@@ -358,6 +362,7 @@ export function DialogoCierre({
                 step="0.10"
                 inputMode="decimal"
                 placeholder="0.00"
+                data-testid={`lote-${p.serie}`}
                 value={lotes[p.pos_tarjeta_id] ?? ""}
                 onChange={(e) =>
                   setLotes((previos) => ({
@@ -377,6 +382,7 @@ export function DialogoCierre({
           suelto que no coincidía con nadie. */}
       <select
         className="pdv-campo"
+        data-testid="cierre-custodia"
         value={custodia}
         onChange={(e) => setCustodia(e.target.value)}
       >
@@ -390,6 +396,7 @@ export function DialogoCierre({
           className="pdv-campo"
           placeholder="Usuario de quien recibe"
           autoComplete="off"
+          data-testid="cierre-usuario"
           value={usuario}
           onChange={(e) => setUsuario(e.target.value)}
         />
@@ -399,6 +406,7 @@ export function DialogoCierre({
           inputMode="numeric"
           placeholder="PIN"
           autoComplete="off"
+          data-testid="cierre-pin"
           value={pin}
           onChange={(e) => setPin(e.target.value)}
         />

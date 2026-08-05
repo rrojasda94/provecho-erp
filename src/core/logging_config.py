@@ -122,11 +122,37 @@ class FormateadorTexto(logging.Formatter):
         return f"{base} [req={rid}]" if rid else base
 
 
+def _salida_utf8():
+    """`sys.stdout` capaz de escribir el log sin importar la consola.
+
+    En Windows la consola es **cp1252** salvo que alguien la cambie, y un
+    solo carácter fuera de ese juego —el `→` del log de acceso, un nombre de
+    artículo con tilde, una razón social con `ñ`— hace fallar el `emit` del
+    handler. Python no propaga ese error: imprime "--- Logging error ---"
+    con un traceback de 40 líneas **por cada request**, así que el síntoma no
+    es un log perdido sino la salida inutilizable y el proceso arrastrándose.
+
+    `errors="replace"` a propósito: un carácter que no se puede representar
+    sale como `?` y el log sigue. Perder un acento es aceptable; perder el
+    log entero de una caja que descuadró, no.
+    """
+    salida = sys.stdout
+    reconfigurar = getattr(salida, "reconfigure", None)
+    if reconfigurar is not None:
+        try:
+            reconfigurar(encoding="utf-8", errors="replace")
+        except (ValueError, OSError):
+            # stdout redirigido a algo que no admite reconfigurar (un pipe ya
+            # envuelto, un buffer de prueba): se usa tal cual.
+            pass
+    return salida
+
+
 def configurar_logging() -> None:
     """Configura el root logger. Idempotente: se puede llamar en el arranque
     de la API, del worker y de los comandos de consola."""
     usar_json = settings.log_json or settings.es_produccion
-    handler = logging.StreamHandler(sys.stdout)
+    handler = logging.StreamHandler(_salida_utf8())
     handler.set_name(NOMBRE_HANDLER)
     handler.setFormatter(
         FormateadorJson()
