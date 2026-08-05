@@ -203,16 +203,42 @@ contiene, buscando su `[[ COMPLETAR ]]`):
   visión. Sin implementar todavía.
 - ✅ 2026-07-27 Grupo Majambo **no tiene tema propio** — Provecho es el
   único tema fuera de PDV/Kiosk (`docs/product/ui-ux.md`).
-- ⬜ **Pendiente del usuario para desplegar el endurecimiento de producción**
-  (2026-07-26, ver ROADMAP → Deuda técnica → Seguridad): no bloquea seguir
-  desarrollando, solo hace falta al desplegar de verdad.
-  1. Dominio real de producción → fijar `ALLOWED_HOSTS` y `CORS_ORIGINS` en
-     el `.env` del servidor.
-  2. Generar el `JWT_SECRET` real: `python -c "import secrets;
-     print(secrets.token_urlsafe(48))"` — nunca el placeholder `change-me`.
-  3. Cuando exista el VPS: Claude escribe el `nginx.conf` concreto (TLS,
-     `proxy_pass`, `X-Forwarded-For`/`X-Forwarded-Proto`,
-     `FORWARDED_ALLOW_IPS` con la IP real del proxy).
+- ⬜ **Cuando haya servidor** (parqueado 2026-08-05 por decisión del
+  usuario). Nada de esto bloquea seguir desarrollando: son cosas que no se
+  pueden hacer —ni probar de verdad— contra una máquina que todavía no
+  existe. Estaban repartidas por seis secciones de este documento; acá
+  quedan juntas para no descubrirlas de a una el día del despliegue.
+
+  **Lo que solo puede hacer el usuario:**
+  1. **Dominio real de producción** → fijar `ALLOWED_HOSTS` y
+     `CORS_ORIGINS` en el `.env` del servidor. Sin esto, la validación de
+     config aborta el arranque en `production`, que es a propósito.
+  2. **Generar el `JWT_SECRET` real en el servidor**:
+     `python -c "import secrets; print(secrets.token_urlsafe(48))"`. Nunca
+     el placeholder `change-me` — y nunca generado acá: un secreto que pasó
+     por una conversación ya no es secreto.
+  3. **Contratar el monitor externo** y dar de alta las tres sondas
+     (`/health`, `/health/ready`, `/health/backups`). **Es lo único que no
+     se puede resolver dentro del VPS** (ADR-007): un monitor que corre en
+     la máquina que vigila deja de avisar justo cuando esa máquina cae.
+  4. **Decidir dónde vive la copia on-premise** de los backups: hoy solo
+     hay dump local + S3 opcional.
+
+  **Lo que Claude escribe cuando exista la máquina** (no antes, porque sin
+  la IP y el dominio reales serían plantillas que hay que reescribir):
+  5. `nginx.conf` concreto: TLS, `proxy_pass`,
+     `X-Forwarded-For`/`X-Forwarded-Proto` y `FORWARDED_ALLOW_IPS` con la IP
+     real del proxy.
+  6. **Cron del host** para las dos tareas que hoy existen y nadie ejecuta:
+     `python -m src.backups.backup` (diario) y
+     `python -m src.modules.rrhh.purga` (anonimiza postulantes vencidos —
+     mientras no corra, el plazo de conservación que el aviso de privacidad
+     promete no se aplica en la práctica).
+  7. **Job de despliegue** en CI y **entorno de staging**: hoy se saltaría
+     de CI a producción directo. Automatizar por SSH contra una máquina
+     inexistente es escribir a ciegas (ADR-008).
+  8. **Stack de observabilidad** (`docker-compose.observabilidad.yml`,
+     GlitchTip + Loki/Alloy/Grafana) levantado en el mismo VPS.
 
 ## Deuda técnica pendiente (backlog)
 
@@ -676,7 +702,8 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   (`RRHH_PLAZO_CONSERVACION_POSTULANTE_MESES`, 12 por defecto) porque un
   plazo NULL volvía la ficha inpurgable y el aviso de privacidad prometía
   algo que nadie aplicaba. Tests: `tests/test_rrhh_arco_postulante.py`.
-- ⬜ **La purga no está dada de alta en ningún cron todavía**: el comando
+- ⬜ **La purga no está dada de alta en ningún cron todavía** (ver
+  *Cuando haya servidor*, punto 6): el comando
   existe y está probado, pero hasta que corra en el servidor el plazo sigue
   sin aplicarse en la práctica. Va junto con el cron de backups cuando exista
   el VPS.
@@ -786,7 +813,7 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   todavía por sucursal.
 
 ### CI/CD (tras la implementación de 2026-07-26)
-- ⬜ **Job de despliegue**: hoy el despliegue es manual y documentado. Se
+- ⬜ **Job de despliegue** (ver *Cuando haya servidor*, punto 7): hoy el despliegue es manual y documentado. Se
   escribe cuando exista el VPS — automatizar por SSH contra una máquina que
   no existe da automatización no probada (ADR-008).
 - ⬜ **Imagen de producción del frontend**: su `Dockerfile` sigue siendo de
@@ -797,7 +824,7 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   Pasar a bloqueante cuando el equipo tenga rutina de revisión.
 - ⬜ **Escaneo de la imagen** (Trivy/Grype) y firma del artefacto: el
   contenido de la imagen base no se audita todavía.
-- ⬜ **Entorno de staging**: hoy se saltaría de CI a producción directo.
+- ⬜ **Entorno de staging** (ver *Cuando haya servidor*, punto 7): hoy se saltaría de CI a producción directo.
 - ⬜ **Migraciones con vuelta atrás probada**: `alembic downgrade` existe por
   archivo pero nunca se ejercita; un despliegue fallido no tiene camino de
   regreso verificado.
@@ -822,7 +849,8 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   `nivel`/`flujo`/`entorno` son etiquetas; `request_id` y `usuario_id`
   **no** —tienen tantos valores como requests y harían explotar el índice—
   y se filtran con LogQL, con el enlace ya armado en Grafana.
-- ⬜ **Contratar el monitor externo** y darle de alta las tres sondas
+- ⬜ **Contratar el monitor externo** (ver *Cuando haya servidor*,
+  punto 3) y darle de alta las tres sondas
   (`/health` 1 min, `/health/ready` 5 min, `/health/backups` 1 h). Sin
   monitor, los endpoints no alertan a nadie: el ERP expone, el monitor avisa
   (ADR-007). **Es lo único que no se puede resolver dentro del VPS**: un
@@ -871,7 +899,7 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   es opcional y, si falta, solo se valida el archivo. Levantar la base de
   verificación en el servidor de producción para que la prueba real corra
   siempre (al menos semanal).
-- ⬜ **Copia on-premise**: `security.md` declara redundancia on-premise +
+- ⬜ **Copia on-premise** (ver *Cuando haya servidor*, punto 4): `security.md` declara redundancia on-premise +
   nube; hoy están el disco del servidor y S3 (ambos "nube" si el servidor es
   un VPS). Falta definir dónde vive la copia dentro de la empresa.
 - ⬜ **Backup de archivos de S3** (`archivo`): solo se respalda Postgres.
