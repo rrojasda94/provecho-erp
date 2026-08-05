@@ -215,7 +215,11 @@ PERMISOS = [
 ROLES = {
     "admin": ["*"],
     "supervisor": [
-        "purchases.aprobar",
+        # **No aprueba órdenes de compra** (decisión 2026-08-05): una OC sobre
+        # el umbral es una decisión de plata y la toma un administrador. El
+        # suplente en ausencia del titular es *otro administrador*, no el
+        # encargado de turno — si no, el suplente termina siendo quien está
+        # más cerca del proveedor.
         "purchases.leer",
         "sales.leer",
         "sales.anular",
@@ -233,6 +237,10 @@ ROLES = {
         "kds.operar",
         "inventory.leer",
         "inventory.gestionar_catalogo",
+        # El ajuste de inventario sí lo aprueba el supervisor (decisión
+        # 2026-08-05): está en el local, ve el faltante y decide en el
+        # momento. Nunca quien lo solicitó — esa segregación vive en el
+        # dominio (`solicitar_ajuste` ≠ `aprobar_ajuste`), no en el rol.
         "inventory.aprobar_ajuste",
         "inventory.ver_stock_esperado",
         # El encargado aprueba lo que pide su gente, no lo pide él.

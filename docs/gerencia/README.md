@@ -47,6 +47,7 @@ procedimiento fijo.
 | [politica-gerencia.md](politica-gerencia.md) | Gobierno corporativo, matriz de aprobaciones, dirección estratégica, supervisión y control |
 | [perfiles/gerente-general.md](perfiles/gerente-general.md) | Perfil del puesto (misión, funciones, facultades delegadas) |
 | [../templates/gerencia/](../templates/gerencia/) | Acta de decisión gerencial, evaluación de nuevo mercado/marca, propuesta de presupuesto anual |
+| [propuesta-parametros-operativos.md](propuesta-parametros-operativos.md) | Los 13 valores propuestos para `parametro_empresa` (2026-08-05) con su sustento, qué pasa si están mal y cuándo revisarlos — pendientes de aprobación en `/gerencia/parametros` |
 | [../diagrams/Procesos/Gerencia/](../diagrams/Procesos/Gerencia/) | SOP de definición del presupuesto anual |
 
 ## Principios del área

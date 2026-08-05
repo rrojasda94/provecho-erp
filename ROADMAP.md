@@ -88,29 +88,49 @@ contiene, buscando su `[[ COMPLETAR ]]`):
   mecanismo** (resuelto e implementado) sino que **el área proponga y
   Gerencia apruebe el valor real** — trabajo de configuración/negocio, no
   bloquea código:
-  - ⬜ Umbral de aprobación de OC en soles (`purchases/oc_umbral`, ya vive
-    en `parametro_empresa` — solo falta que Compras lo proponga y Gerencia
-    lo apruebe; valor semilla S/2000 mientras tanto). ¿Umbral separado para
-    activos?
-  - ⬜ Margen de contribución mínimo objetivo (`sales/margen_minimo`).
-  - ⬜ Esquema de incentivo/comisión de metas de venta (Comercial + RRHH +
-    Gerencia, nunca retroactivo) — el valor numérico va en
-    `parametro_empresa`; el diseño del esquema en sí sigue siendo decisión
-    de negocio a definir con esas tres áreas.
-  - ⬜ Margen de error de ajuste de inventario
-    (`inventory/margen_error_ajuste`).
-  - ⬜ Monto del fondo de caja chica de compras
-    (`purchases/monto_caja_chica`) — el mecanismo de reposición ante
-    faltante sigue siendo decisión de proceso aparte, no solo de valor.
-  - ⬜ Plazo interno de envío de comprobantes al contador
-    (`accounting/plazo_envio_comprobante`).
-  - ⬜ Rangos salariales de los 7 perfiles de puesto
-    (`rrhh/rango_salarial_<perfil>`).
+  **Propuestos 2026-08-05** con su sustento en
+  `docs/gerencia/propuesta-parametros-operativos.md` y cargados como
+  `estado='propuesto'` (`python -m src.seeders.parametros`, idempotente):
+  13 filas esperando en `/gerencia/parametros`. Cada propuesta declara de
+  dónde sale el número, **qué pasa si está mal** y cuándo revisarlo — un
+  parámetro mal puesto no rompe nada, distorsiona una decisión diaria
+  durante meses sin que nadie lo note.
+  - 🔶 `purchases/oc_umbral` — propuesto S/ 2,000 (confirma el semilla).
+    **El de menor base**: no hay histórico de OC contra el cual calibrarlo.
+    Sigue abierto si hace falta un umbral separado para activos.
+  - 🔶 `sales/margen_minimo` — propuesto 60 %, desde food cost 32 % +
+    empaque 3 % + comisión 4 %, y alcanzable porque Amazonía exonera el IGV.
+  - 🔶 `sales/incentivo_meta_pct` — propuesto bono **grupal por sucursal**,
+    3 % del excedente sobre la meta, techo 0.5 RMV. Sigue necesitando la
+    aprobación conjunta de Comercial + RRHH + Gerencia (política §3).
+  - 🔶 `inventory/margen_error_ajuste` — propuesto 2 % **más piso de
+    S/ 20**: el porcentaje solo castiga a las categorías baratas y vuelve
+    ruido la alerta. El piso **exige código**, ver deuda de inventory.
+  - 🔶 `purchases/monto_caja_chica` — propuesto S/ 500 con reposición al
+    bajar de S/ 150.
+  - 🔶 `accounting/plazo_envio_comprobante` — propuesto 5 días hábiles
+    desde el cierre. Es plazo **interno**: el vencimiento real de SUNAT
+    depende del último dígito del RUC.
+  - 🔶 `rrhh/rango_salarial_<perfil>` × 7 — propuestos como **múltiplo de
+    RMV** (1.00–2.80 según perfil), no en soles. Dos cosas antes de
+    aprobar: **confirmar la RMV vigente** (el marco legal la registra en
+    S/ 1,130 con nota de verificar) y contrastar contra avisos reales de
+    Tarapoto — la propuesta tiene la estructura de responsabilidad, no el
+    mercado local.
   Quedan **fuera** de este mecanismo por ser decisión de rol, no de valor
-  (siguen abiertas tal cual):
-  - ⬜ Aprobador suplente de OC en ausencia del administrador.
-  - ⬜ Quién autoriza ajustes de inventario (admin vs. supervisor de
-    logística — rol aún no existe formalmente).
+  (resueltas 2026-08-05 con el usuario):
+  - ✅ 2026-08-05 **El suplente de OC es otro administrador**, no el
+    encargado de turno: una OC sobre el umbral es una decisión de plata.
+    Consecuencia en código: se **retiró** `purchases.aprobar` del rol
+    `supervisor`, que lo tenía desde el slice inicial y contradecía esta
+    decisión. Revocado también en la BD dev — el seeder solo agrega.
+  - ✅ 2026-08-05 **Los ajustes de inventario los aprueba el supervisor**
+    de turno: está en el local, ve el faltante y decide en el momento. Ya
+    tenía `inventory.aprobar_ajuste`; queda confirmado y comentado. El
+    "supervisor de logística" como rol aparte se descarta: sería un rol
+    nuevo para una sola capacidad que el supervisor ya ejerce. La
+    segregación que importa —quien solicita no aprueba— vive en el dominio,
+    no en el rol.
 - ✅ 2026-07-20 `reporte_escalamiento`: definido con el usuario — cadena
   atención al cliente → supervisor (redacta solución) → comercial/gerencia
   (acciones reportadas); se almacena para mejora continua
@@ -368,6 +388,14 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   producción) — su demanda cuenta, solo no se atribuye a un local.
 
 ### Seguridad (tras el endurecimiento base de 2026-07-26)
+- ⬜ **El seeder no revoca** (encontrado 2026-08-05 al retirarle
+  `purchases.aprobar` al rol `supervisor`): `ROLES` solo agrega los permisos
+  que faltan, así que sacar uno del mapa no lo quita de ninguna base ya
+  sembrada. Un permiso retirado por decisión de negocio sigue vigente en
+  producción hasta que alguien lo borra a mano —que es lo que hubo que
+  hacer acá—. Sincronizar en los dos sentidos es fácil; lo que hay que
+  pensar antes es qué pasa con los permisos que un admin asignó a mano y no
+  están en el mapa, porque una sincronización ingenua se los lleva puestos.
 - ⬜ **Rate limit global**, no solo en auth: el resto de la API sigue sin
   límite. Se resuelve mejor en nginx/Caddy (`limit_req`) que en la
   aplicación — decidir al configurar el servidor de producción.
@@ -988,6 +1016,13 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
 - ⬜ **La guía no se replica al hub**: la emite el almacén central, que
   está en la nube. Una sucursal offline que despache una transferencia
   lateral no puede emitir su guía hasta reconectar.
+- ⬜ **Piso absoluto en el margen de ajuste** (deuda nueva 2026-08-05, de
+  la propuesta de parámetros): `conteos.py` solo evalúa el porcentaje
+  (`INVENTORY_MARGEN_AJUSTE_PCT`). Un 2 % sobre un conteo de S/ 30 en
+  servilletas son 60 céntimos, así que cualquier diferencia real dispara
+  `inventory.ajuste_fuera_margen` y la alerta se vuelve ruido que nadie
+  mira — la peor falla posible en un control. El valor propuesto ya trae el
+  piso (`{"porcentaje": 2, "piso": "20.00"}`); falta que el código lo lea.
 - ⬜ **`stock_merma`** (subtipo reservado, no disponible) + reporte
   consolidado a `accounting`.
 - ⬜ **Alerta `inventory.stock_bajo_minimo`** como evento (hoy solo flag
