@@ -25,7 +25,7 @@ Registro de lo construido y lo pendiente. Actualizar en cada cambio relevante.
 | Persona CRUD + lock optimista + matriz de aprobaciones + contrato público | ✅ 2026-07-25 | `POST/GET/PATCH /api/v1/personas` (sin Delete); `persona.version` con lock optimista (409 si desactualizada); `regla_aprobacion` (nuevo, `src/shared/`) reemplaza el umbral fijo de `purchases` por empresa, admin en `/api/v1/reglas-aprobacion`; primer contrato público de lectura cross-módulo (`sales.cliente` para marketing/comercial, `GET /api/v1/sales/clientes`). Migración `af8a246e2c25`. Ver detalle abajo. |
 | Módulo `accounting` | 🔶 slice core+tesorería ✅ 2026-07-25 | Libro contable núcleo: plan de cuentas (`cuenta_contable`), periodo (`periodo_contable`, abrir/cerrar), asiento manual (`asiento`/`asiento_linea`, cuadre RN-CTB-001, anulación por asiento inverso RN-CTB-002) y mapeo configurable evento→cuentas (`regla_asiento`) que alimenta la generación automática para 4 eventos operativos ya publicados en código (`purchases.oc_emitida`, `purchases.compra_recibida`, `sales.venta_confirmada`, `purchases.comprobante_conforme`). **Pago a proveedor** (PROC-CTB-003, `movimiento_dinero`): cola idempotente por comprobante (RN-CTB-008) → ejecutar con umbral configurable + permiso (RN-CTB-005) → asiento automático. Migraciones `5402d99333fa`+`cbf904a9fc1b` aplicadas. Diferido: ver Deuda técnica. |
 | Producción (fabricación) | 🔶 slice core ✅ 2026-07-25 | Orden de producción ad-hoc (crear → registrar consumo → completar con resultado de control de calidad) y costeo automático. Construido antes de tiempo a pedido del usuario — primera cocina real sigue planeada 2027. `receta.articulo_id` nuevo liga receta↔subreceta. Diferido: ver Deuda técnica. |
-| Solicitudes / picking / transporte | 🔶 solicitudes y picking ✅ 2026-08-01 | **La fila estaba obsoleta** (verificado 2026-08-05): `requests` y `logistics` eran el plan de 2026-07-04 y el slice 4 de `inventory` (ADR-020) los dejó sin objeto. **Solicitudes** = `solicitud_insumos`/`solicitud_item` con su ciclo real (el local pide → el supervisor aprueba y reserva → el central despacha → el local recibe), más `reserva_stock`. **Picking** = el despacho reparte por FEFO y emite un `transferencia_item` por lote tomado. **Transferencias** sucursal↔sucursal con la misma entidad. Un módulo aparte habría necesitado el dominio de `inventory` (stock, lote, FEFO) para hacer exactamente eso, y CLAUDE.md prohíbe importarlo. Lo único que falta de transporte es la **guía de remisión**, ya declarada como deuda de `inventory` (documento) y de `sales` (electrónica, `/despatch-*` de Factiliza) — es un comprobante, no un módulo. Queda sin dueño el transporte con ruteo/flota/liquidación propios, que hoy no existe como operación. |
+| Solicitudes / picking / transporte | 🔶 solicitudes y picking ✅ 2026-08-01 | **La fila estaba obsoleta** (verificado 2026-08-05): `requests` y `logistics` eran el plan de 2026-07-04 y el slice 4 de `inventory` (ADR-020) los dejó sin objeto. **Solicitudes** = `solicitud_insumos`/`solicitud_item` con su ciclo real (el local pide → el supervisor aprueba y reserva → el central despacha → el local recibe), más `reserva_stock`. **Picking** = el despacho reparte por FEFO y emite un `transferencia_item` por lote tomado. **Transferencias** sucursal↔sucursal con la misma entidad. Un módulo aparte habría necesitado el dominio de `inventory` (stock, lote, FEFO) para hacer exactamente eso, y CLAUDE.md prohíbe importarlo. La **guía de remisión** se cerró el 2026-08-05 (ADR-027) dentro de `inventory`, que era el argumento: es el comprobante del traslado, no un módulo. Queda sin dueño el transporte con ruteo/flota/liquidación propios, que hoy no existe como operación. |
 | Módulo `rrhh` | ✅ ciclo laboral 2026-07-25 · contratación 2026-08-01 | Ciclo laboral completo: `trabajador` (con capa de aplicación que faltaba) + 12 entidades de §8b — `contrato_laboral` (borrador→firmado→finalizado), `postulante` (RN-PER-004), `socio`, `boleta_pago`/`liquidacion_bss` (idempotentes, RN-RRHH-001/003), `memorandum`/`amonestacion`/`acta`/`certificado_trabajo` (RN-RRHH-002/004/007), `solicitud_permiso` (RN-RRHH-005), `pacto_permanencia` (reembolso proporcional, RN-RRHH-006), `asistencia` (RN-RRHH-009, bloqueada para locación de servicios RN-PER-002). Migración `9e1b6a4c7d23`. **Slice contratación** (2026-08-01, migración `a7f2c81e4b95`): `convocatoria` como expediente de la búsqueda (borrador→publicada→cerrada) con RN-RRHH-013 aplicada en código —sin perfil de puesto no se publica—; formulario público de postulación por token (`POST /rrhh/postulaciones/{token}`, sin JWT, rate limit 20/h por IP, consentimiento obligatorio RN-PER-004, fecha puesta por el servidor) que se llena con **Google Forms + un Apps Script de 12 líneas**, no con un formulario propio ni la API de Google; `postulante` con datos propios y `respuestas` JSONB — **el candidato no entra a `persona` mientras es candidato**, `persona`+`trabajador` nacen al contratar (o se reusa la persona del recontratado, RN-GEN-007); y **un solo tablero** para los 13 pasos de incorporación (`recibido`→`preseleccionado`→`entrevistado`→`verificado`→`oferta_enviada`→`contratado`→`inducido`→`confirmado`, más `descartado`), avance de a una columna y descarte con motivo obligatorio porque el historial es la defensa ante un reclamo (Ley 26772). `postulante` gana `empresa_id` y cierra la excepción de tenant del mismo día. Permiso nuevo `rrhh.convocatoria_gestionar`. Tests: `tests/test_rrhh_convocatoria.py`. Diferido: ver Deuda técnica. |
 | RRHH: procesos y plantillas (reclutamiento, contratación, inducción) | ✅ 2026-07-19 | `docs/rrhh/`, 13 SOPs, 9 plantillas — ver detalle abajo. |
 | Compras: procesos y plantillas (proveedores, cotización, OC, recepción, pago, caja chica, activos) | ✅ 2026-07-19 | `docs/compras/`, 11 SOPs, 6 plantillas — ver detalle abajo. Módulo backend `purchases` actualizado conforme al flujo |
@@ -38,7 +38,7 @@ Registro de lo construido y lo pendiente. Actualizar en cada cambio relevante.
 | Contabilidad: procesos y plantillas | ✅ 2026-07-24 | `docs/contabilidad/` (política + marco legal + perfil contador/tesorero), 3 SOPs nuevos (pago a proveedor PROC-CTB-003, conciliación bancaria PROC-CTB-004, arqueo sorpresa PROC-CTB-005), 4 plantillas — ver detalle abajo. Área = tesorería + finanzas + registro + auditoría interna en un solo responsable, supervisada por Gerencia (RN-CTB-004..009; control en dos niveles: Contabilidad audita a las operativas, Gerencia audita a Contabilidad). Quedan propuestos PROC-CTB-006..013 |
 | Mantenimiento, Sistemas/TI como áreas propias | ⬜ | Definidas como áreas del negocio (posible tercerización); documentación pendiente, desactivadas por ahora |
 | Supervisión, CRM, tesorería, activos, proyectos, BI/reportes | 🔶 revisada 2026-08-05 | **Cuatro de los siete ya no son futuros y dos no van a ser módulos.** **BI/reportes** ✅ 2026-08-04: `src/core/reportes/` (ADR-024) con catálogo cerrado de 10 reportes, tableros guardados por usuario y compartidos por rol, filtros y exportación a CSV. **Tesorería** ✅ 2026-07-25: vive **dentro de `accounting`** por decisión explícita del usuario —pago a proveedor, `movimiento_dinero`, caja y custodia— y separarla al salir de REMYPE es un pendiente de organización, no de código. **Supervisión** no es módulo: es el rol RBAC `supervisor` más la matriz de aprobaciones de Gerencia (`parametro_empresa` + `decision_gerencial`); un módulo "supervisión" sería un permiso disfrazado de dominio. **CRM** parcial: `sales.cliente` (con contrato público de lectura) y `marketing.lead`/`campana`/`encuesta_satisfaccion` con atribución lead→venta ya cubren captar y medir; falta historial de interacciones y segmentación, sin caso hasta que haya campañas reales corriendo. **Activos** ⬜ pero **ya tiene dueño**: se compran en `purchases` (OC tipo `activo` + `requerimiento_activo`, deuda declarada) y se deprecian en `accounting` (activo fijo/depreciación, PROC-CTB-007/010) — partirlos en un tercer módulo cortaría el ciclo de compra en dos. **Proyectos** ⬜ sin caso: el grupo no ejecuta obra ni proyectos facturables hoy. |
-| Integración de facturación electrónica (**Factiliza**) | 🔶 boleta/factura ✅ 2026-07-26 | **Reemplaza a Nubefact** (decisión del usuario). Adaptador en `src/shared/integrations/factiliza/`; cola Celery + servicio `worker`; migración `b3d7f21ac094`. Emite boleta/factura con IGV desglosado y exoneración de Amazonía (RN-IMP-001). Diferido: nota de crédito, PDF/XML/CDR, guía de remisión — ver Deuda técnica → sales. |
+| Integración de facturación electrónica (**Factiliza**) | 🔶 boleta/factura ✅ 2026-07-26 | **Reemplaza a Nubefact** (decisión del usuario). Adaptador en `src/shared/integrations/factiliza/`; cola Celery + servicio `worker`; migración `b3d7f21ac094`. Emite boleta/factura con IGV desglosado y exoneración de Amazonía (RN-IMP-001). Nota de crédito, PDF/XML/CDR ✅ 2026-08-04. **Guía de remisión ✅ 2026-08-05** (ADR-027) — construida en `inventory`, no en `sales`: declara un traslado entre almacenes, no una venta. |
 | Integración Izipay | ⬜ | Proveedor decidido (ADR-003) |
 | Integraciones Google / Meta | ⬜ | |
 | Agentes IA para pedidos | ⬜ | |
@@ -934,9 +934,43 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   - ⬜ **Frecuencias en días fijos** (mensual = 30 días desde el último
     conteo, no el mismo día del mes). Si el negocio pide anclar al día del
     mes, cambia `rules.proxima_fecha_conteo` y nada más.
-- ⬜ **Devolución** (`devolucion`) + **`guia_remision`**. La guía ya tiene
-  de dónde colgarse: una transferencia entre almacenes de distinta
-  dirección la necesita (RN-GDR-002).
+- ✅ 2026-08-05 **Guía de remisión** (ADR-027, migración `a4c8f21e6b09`):
+  `guia_remision` + `guia_remision_item` colgando de `transferencia`, porque
+  lo que la guía declara es un traslado y el traslado es un hecho de
+  inventario (RN-GDR-002). Las líneas **se derivan** de `transferencia_item`
+  agrupadas por SKU —RN-TRP-002 exige que lo transportado coincida con lo
+  declarado, y un formulario de ítems aparte es la forma de que no coincidan;
+  el reparto FEFO por lote es control interno que SUNAT no declara. Se teclea
+  solo lo que el sistema no puede saber: chofer, vehículo, peso bruto y fecha
+  de inicio del viaje. Un traslado, una guía (`transferencia_id` único,
+  emisión idempotente) y correlativo por `(empresa, serie)` calculado al
+  emitir, no reservado antes —una guía reservada que no se emite deja un
+  hueco en la numeración que también hay que justificar—. Envío a SUNAT
+  asíncrono (`POST /despatch/send` vía Celery, `factiliza/guias.py` aparte
+  del mapper de facturas porque una guía no tiene aritmética tributaria).
+  Permiso nuevo `inventory.emitir_guia` en el rol `almacenero`. 14 tests
+  (`tests/test_guia_remision.py`). **Sin entidad `vehiculo`**: sin flota, una
+  tabla de vehículos sería un formulario que hay que llenar antes de emitir
+  la primera guía.
+- ⬜ **Devolución** (`devolucion`). Se cruza con la guía ya construida: una
+  devolución al proveedor viaja con su propia guía de remisión.
+- ⬜ **Guía de una venta con reparto**: hoy `guia_remision.transferencia_id`
+  es obligatorio porque el único emisor es un traslado entre almacenes.
+  Cuando exista reparto propio pasa a nullable — la migración es aditiva y
+  el camino contrario no lo sería, por eso arranca estricta.
+- ⬜ **Descarga de PDF/XML/CDR de la guía y anulación por comunicación de
+  baja**: `FactilizaClient.descargar` apunta a `/invoice/...`; la guía
+  necesita su ruta `/despatch/...`, y el payload de `/despatch/send` sigue
+  **pendiente de verificación contra el sandbox real** de Factiliza — igual
+  que estuvo la boleta antes de su primera emisión.
+- ⬜ **`codigo_sunat` por unidad de medida**: hoy el mapper traduce con un
+  diccionario de doce unidades y cae en `NIU` lo que no reconoce. El lugar
+  correcto es una columna en `unidad_medida` editable desde Catálogo;
+  mientras solo la guía lo necesite, una columna que alguien tiene que
+  llenar a mano es más trabajo que el diccionario.
+- ⬜ **La guía no se replica al hub**: la emite el almacén central, que
+  está en la nube. Una sucursal offline que despache una transferencia
+  lateral no puede emitir su guía hasta reconectar.
 - ⬜ **`stock_merma`** (subtipo reservado, no disponible) + reporte
   consolidado a `accounting`.
 - ⬜ **Alerta `inventory.stock_bajo_minimo`** como evento (hoy solo flag
@@ -1110,8 +1144,12 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   nuestra podría quedar desincronizada sin ganar nada. Los bytes vuelven tal
   cual — reescribir un XML firmado lo invalida. Solo de un comprobante
   `aceptado`: antes no hay XML ni CDR que bajar.
-- ⬜ **Guía de remisión electrónica** (`/despatch-*` de Factiliza) —
-  se cruza con `guia_remision`, deuda de `inventory`.
+- ✅ 2026-08-05 **Guía de remisión electrónica** (`/despatch/send`) — se
+  construyó en **`inventory`**, no acá (ADR-027): lo que la guía declara es
+  un traslado entre almacenes, no una venta, y `sales` no conoce almacenes.
+  Que sea un documento de SUNAT no la vuelve de este módulo. Lo que sí es
+  deuda de `sales` es la guía de una **venta con reparto a domicilio**, y
+  espera a que exista reparto propio.
 - ⬜ **Comprobante sin correlativo reservado**: si Factiliza rechaza, el
   correlativo queda consumido por una fila `rechazado`. SUNAT admite
   huecos, pero conviene revisar si el negocio quiere reusarlo.

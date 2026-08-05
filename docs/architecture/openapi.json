@@ -4656,6 +4656,408 @@
         "title": "GrupoOpcionOut",
         "type": "object"
       },
+      "GuiaRemisionCreate": {
+        "description": "Lo que el sistema **no** puede saber del traslado: quién maneja, en\nqué vehículo, cuánto pesa la carga y qué día arranca el viaje.\n\nLos bienes no se piden: salen de `transferencia_item`, que es el\nregistro de lo que de verdad se descontó del origen (RN-TRP-002).",
+        "properties": {
+          "chofer_apellidos": {
+            "maxLength": 120,
+            "minLength": 2,
+            "title": "Chofer Apellidos",
+            "type": "string"
+          },
+          "chofer_licencia": {
+            "maxLength": 20,
+            "minLength": 6,
+            "title": "Chofer Licencia",
+            "type": "string"
+          },
+          "chofer_nombres": {
+            "maxLength": 120,
+            "minLength": 2,
+            "title": "Chofer Nombres",
+            "type": "string"
+          },
+          "chofer_num_doc": {
+            "maxLength": 15,
+            "minLength": 8,
+            "title": "Chofer Num Doc",
+            "type": "string"
+          },
+          "fecha_inicio_traslado": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Inicio Traslado"
+          },
+          "modalidad_traslado": {
+            "default": "02",
+            "pattern": "^(01|02)$",
+            "title": "Modalidad Traslado",
+            "type": "string"
+          },
+          "motivo_traslado": {
+            "default": "04",
+            "pattern": "^(01|04|13|18)$",
+            "title": "Motivo Traslado",
+            "type": "string"
+          },
+          "observacion": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observacion"
+          },
+          "peso_bruto_kg": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Peso Bruto Kg"
+          },
+          "vehiculo_placa": {
+            "maxLength": 10,
+            "minLength": 6,
+            "title": "Vehiculo Placa",
+            "type": "string"
+          }
+        },
+        "required": [
+          "chofer_nombres",
+          "chofer_apellidos",
+          "chofer_num_doc",
+          "chofer_licencia",
+          "vehiculo_placa",
+          "peso_bruto_kg"
+        ],
+        "title": "GuiaRemisionCreate",
+        "type": "object"
+      },
+      "GuiaRemisionDetalleOut": {
+        "properties": {
+          "chofer_apellidos": {
+            "title": "Chofer Apellidos",
+            "type": "string"
+          },
+          "chofer_licencia": {
+            "title": "Chofer Licencia",
+            "type": "string"
+          },
+          "chofer_nombres": {
+            "title": "Chofer Nombres",
+            "type": "string"
+          },
+          "chofer_num_doc": {
+            "title": "Chofer Num Doc",
+            "type": "string"
+          },
+          "correlativo": {
+            "title": "Correlativo",
+            "type": "integer"
+          },
+          "detalle_emision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detalle Emision"
+          },
+          "empresa_id": {
+            "format": "uuid",
+            "title": "Empresa Id",
+            "type": "string"
+          },
+          "estado_emision": {
+            "title": "Estado Emision",
+            "type": "string"
+          },
+          "fecha_inicio_traslado": {
+            "format": "date",
+            "title": "Fecha Inicio Traslado",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/GuiaRemisionItemOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "lugar_destino": {
+            "title": "Lugar Destino",
+            "type": "string"
+          },
+          "lugar_origen": {
+            "title": "Lugar Origen",
+            "type": "string"
+          },
+          "modalidad_traslado": {
+            "title": "Modalidad Traslado",
+            "type": "string"
+          },
+          "motivo_traslado": {
+            "title": "Motivo Traslado",
+            "type": "string"
+          },
+          "observacion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observacion"
+          },
+          "peso_bruto_kg": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Peso Bruto Kg",
+            "type": "string"
+          },
+          "ruc_emisor": {
+            "title": "Ruc Emisor",
+            "type": "string"
+          },
+          "ruc_receptor": {
+            "title": "Ruc Receptor",
+            "type": "string"
+          },
+          "serie": {
+            "title": "Serie",
+            "type": "string"
+          },
+          "transferencia_id": {
+            "format": "uuid",
+            "title": "Transferencia Id",
+            "type": "string"
+          },
+          "vehiculo_placa": {
+            "title": "Vehiculo Placa",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "empresa_id",
+          "transferencia_id",
+          "serie",
+          "correlativo",
+          "fecha_inicio_traslado",
+          "motivo_traslado",
+          "modalidad_traslado",
+          "peso_bruto_kg",
+          "ruc_emisor",
+          "ruc_receptor",
+          "lugar_origen",
+          "lugar_destino",
+          "chofer_nombres",
+          "chofer_apellidos",
+          "chofer_num_doc",
+          "chofer_licencia",
+          "vehiculo_placa",
+          "estado_emision",
+          "detalle_emision",
+          "observacion",
+          "items"
+        ],
+        "title": "GuiaRemisionDetalleOut",
+        "type": "object"
+      },
+      "GuiaRemisionItemOut": {
+        "properties": {
+          "cantidad": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Cantidad",
+            "type": "string"
+          },
+          "descripcion": {
+            "title": "Descripcion",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "sku_id": {
+            "format": "uuid",
+            "title": "Sku Id",
+            "type": "string"
+          },
+          "unidad": {
+            "title": "Unidad",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "sku_id",
+          "cantidad",
+          "descripcion",
+          "unidad"
+        ],
+        "title": "GuiaRemisionItemOut",
+        "type": "object"
+      },
+      "GuiaRemisionOut": {
+        "properties": {
+          "chofer_apellidos": {
+            "title": "Chofer Apellidos",
+            "type": "string"
+          },
+          "chofer_licencia": {
+            "title": "Chofer Licencia",
+            "type": "string"
+          },
+          "chofer_nombres": {
+            "title": "Chofer Nombres",
+            "type": "string"
+          },
+          "chofer_num_doc": {
+            "title": "Chofer Num Doc",
+            "type": "string"
+          },
+          "correlativo": {
+            "title": "Correlativo",
+            "type": "integer"
+          },
+          "detalle_emision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detalle Emision"
+          },
+          "empresa_id": {
+            "format": "uuid",
+            "title": "Empresa Id",
+            "type": "string"
+          },
+          "estado_emision": {
+            "title": "Estado Emision",
+            "type": "string"
+          },
+          "fecha_inicio_traslado": {
+            "format": "date",
+            "title": "Fecha Inicio Traslado",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "lugar_destino": {
+            "title": "Lugar Destino",
+            "type": "string"
+          },
+          "lugar_origen": {
+            "title": "Lugar Origen",
+            "type": "string"
+          },
+          "modalidad_traslado": {
+            "title": "Modalidad Traslado",
+            "type": "string"
+          },
+          "motivo_traslado": {
+            "title": "Motivo Traslado",
+            "type": "string"
+          },
+          "observacion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observacion"
+          },
+          "peso_bruto_kg": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Peso Bruto Kg",
+            "type": "string"
+          },
+          "ruc_emisor": {
+            "title": "Ruc Emisor",
+            "type": "string"
+          },
+          "ruc_receptor": {
+            "title": "Ruc Receptor",
+            "type": "string"
+          },
+          "serie": {
+            "title": "Serie",
+            "type": "string"
+          },
+          "transferencia_id": {
+            "format": "uuid",
+            "title": "Transferencia Id",
+            "type": "string"
+          },
+          "vehiculo_placa": {
+            "title": "Vehiculo Placa",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "empresa_id",
+          "transferencia_id",
+          "serie",
+          "correlativo",
+          "fecha_inicio_traslado",
+          "motivo_traslado",
+          "modalidad_traslado",
+          "peso_bruto_kg",
+          "ruc_emisor",
+          "ruc_receptor",
+          "lugar_origen",
+          "lugar_destino",
+          "chofer_nombres",
+          "chofer_apellidos",
+          "chofer_num_doc",
+          "chofer_licencia",
+          "vehiculo_placa",
+          "estado_emision",
+          "detalle_emision",
+          "observacion"
+        ],
+        "title": "GuiaRemisionOut",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -6862,6 +7264,37 @@
           "page_size"
         ],
         "title": "Pagina[CampanaOut]",
+        "type": "object"
+      },
+      "Pagina_GuiaRemisionOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/GuiaRemisionOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "Pagina[GuiaRemisionOut]",
         "type": "object"
       },
       "Pagina_LeadOut_": {
@@ -17961,6 +18394,88 @@
         ]
       }
     },
+    "/api/v1/inventory/guias-remision": {
+      "get": {
+        "description": "Las guías de la empresa. `estado_emision=rechazado` es la bandeja que\nde verdad hay que mirar: una guía rechazada por SUNAT hay que\ncorregirla y reemitirla.",
+        "operationId": "listar_guias_api_v1_inventory_guias_remision_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "estado_emision",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Estado Emision"
+            }
+          },
+          {
+            "description": "Página, empezando en 1",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "description": "Página, empezando en 1",
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Filas por página (máx. 200)",
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Filas por página (máx. 200)",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pagina_GuiaRemisionOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Guias",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
     "/api/v1/inventory/lotes": {
       "get": {
         "description": "Saldo por lote en orden de vencimiento. `por_vencer_dias` acota a los\nque vencen dentro de esa ventana (incluye los ya vencidos).",
@@ -19591,6 +20106,111 @@
           }
         ],
         "summary": "Ver Transferencia",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/transferencias/{transferencia_id}/guia": {
+      "get": {
+        "operationId": "ver_guia_de_transferencia_api_v1_inventory_transferencias__transferencia_id__guia_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "transferencia_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Transferencia Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuiaRemisionDetalleOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Ver Guia De Transferencia",
+        "tags": [
+          "inventory"
+        ]
+      },
+      "post": {
+        "description": "Emite la guía del traslado. Los bienes declarados salen de la\ntransferencia, no del request (RN-TRP-002): lo que viaja tiene que ser\nexactamente lo que se descontó del origen.\n\nIdempotente por transferencia — pedirla dos veces devuelve la misma\nguía, porque dos guías del mismo traslado declaran la misma mercadería\ndos veces.",
+        "operationId": "emitir_guia_api_v1_inventory_transferencias__transferencia_id__guia_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "transferencia_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Transferencia Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GuiaRemisionCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuiaRemisionDetalleOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Emitir Guia",
         "tags": [
           "inventory"
         ]

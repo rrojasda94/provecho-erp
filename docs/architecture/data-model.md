@@ -487,11 +487,25 @@ descuenta stock vía la receta (ver [../domain/domain-model.md](../domain/domain
   fila por movimiento de salida. Al recibir entra al stock lo que de verdad
   llegó; la diferencia contra lo enviado queda registrada y viaja en
   `inventory.transferencia_recibida` (RN-INV-002), no se corrige sola.
-- **guia_remision**: empresa_id, transferencia_id (opcional — traslado
-  entre almacenes), fecha_inicio_traslado, items (articulo/sku, cantidad),
-  ruc_emisor, ruc_receptor, lugar_origen, lugar_destino, motivo_traslado,
-  chofer, vehiculo_id. Emitida por el área de almacén (RN-GDR-002);
-  resguardada por contabilidad (RN-GDR-003).
+- **guia_remision** (implementada 2026-08-05, ADR-027): empresa_id,
+  transferencia_id, serie + correlativo, fecha_inicio_traslado,
+  motivo_traslado y modalidad_traslado (catálogos 20 y 18 de SUNAT),
+  peso_bruto_kg, ruc_emisor, ruc_receptor, lugar_origen, lugar_destino,
+  datos del chofer (nombres, apellidos, documento, licencia),
+  vehiculo_placa, emitida_por, y el juego de emisión electrónica
+  (estado_emision, hash, detalle, intentos, respuesta). Emitida por el área
+  de almacén (RN-GDR-002); resguardada por contabilidad (RN-GDR-003).
+  **`transferencia_id` es obligatorio y único** —un traslado, una guía— y
+  no opcional como decía la especificación de julio: el único emisor de hoy
+  es un traslado entre almacenes. La guía de una venta con reparto lo
+  volverá nullable cuando exista reparto propio.
+  **No hay `vehiculo_id`**: sin flota, una tabla de vehículos sería un
+  formulario que hay que llenar antes de emitir la primera guía (ADR-027).
+- **guia_remision_item**: guia_remision_id, sku_id, cantidad, descripcion y
+  unidad (códigos snapshot). Las líneas **se derivan** de
+  `transferencia_item` y se agrupan por SKU: RN-TRP-002 exige que lo
+  transportado coincida con lo declarado, y el reparto FEFO por lote es
+  control interno que SUNAT no declara.
 
 ## 5. Compras (módulo purchases)
 

@@ -2,7 +2,7 @@
 
 import uuid
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from src.modules.inventory.infrastructure.models import (
@@ -12,6 +12,8 @@ from src.modules.inventory.infrastructure.models import (
     CategoriaUdm,
     Conteo,
     ConteoItem,
+    GuiaRemision,
+    GuiaRemisionItem,
     Lote,
     MovimientoInventario,
     Receta,
@@ -512,6 +514,80 @@ class TransferenciaRepo:
         empresa_id: uuid.UUID | None = None,
     ) -> "list[Transferencia]":
         return list(self.s.scalars(self.q_list(almacen_id, estado, empresa_id)))
+
+
+class GuiaRemisionRepo:
+    def __init__(self, session: Session) -> None:
+        self.s = session
+
+    def get(self, guia_id: uuid.UUID) -> GuiaRemision | None:
+        return self.s.get(GuiaRemision, guia_id)
+
+    def de_transferencia(self, transferencia_id: uuid.UUID) -> GuiaRemision | None:
+        return self.s.scalar(
+            select(GuiaRemision).where(
+                GuiaRemision.transferencia_id == transferencia_id
+            )
+        )
+
+    def items(self, guia_id: uuid.UUID) -> list[GuiaRemisionItem]:
+        return list(
+            self.s.scalars(
+                select(GuiaRemisionItem).where(
+                    GuiaRemisionItem.guia_remision_id == guia_id
+                )
+            )
+        )
+
+    def siguiente_correlativo(self, empresa_id: uuid.UUID, serie: str) -> int:
+        """El correlativo es por (empresa, serie), que es como lo lleva SUNAT.
+
+        Se calcula al emitir y no se reserva antes: una guía que no llegó a
+        emitirse dejaría un hueco en la numeración, y un hueco hay que
+        justificarlo ante una fiscalización.
+        """
+        actual = self.s.scalar(
+            select(func.max(GuiaRemision.correlativo)).where(
+                GuiaRemision.empresa_id == empresa_id, GuiaRemision.serie == serie
+            )
+        )
+        return (actual or 0) + 1
+
+    def add(self, guia: GuiaRemision) -> GuiaRemision:
+        self.s.add(guia)
+        self.s.flush()
+        return guia
+
+    def add_item(self, item: GuiaRemisionItem) -> GuiaRemisionItem:
+        self.s.add(item)
+        self.s.flush()
+        return item
+
+    # Ver la nota de `SolicitudRepo.list`: este método sombrea al builtin.
+    def q_list(
+        self,
+        empresa_id: uuid.UUID | None = None,
+        estado_emision: str | None = None,
+    ):
+        q = select(GuiaRemision)
+        if empresa_id is not None:
+            q = q.where(GuiaRemision.empresa_id == empresa_id)
+        if estado_emision is not None:
+            q = q.where(GuiaRemision.estado_emision == estado_emision)
+        return q.order_by(GuiaRemision.created_at.desc())
+
+    def pendientes(self, limite: int = 50) -> "list[GuiaRemision]":
+        """Guías que quedaron sin respuesta de SUNAT. Es la red de seguridad
+        de la cola: un worker caído deja la guía en `pendiente` y nada más
+        la vuelve a mirar."""
+        return list(
+            self.s.scalars(
+                select(GuiaRemision)
+                .where(GuiaRemision.estado_emision.in_(("pendiente", "error")))
+                .order_by(GuiaRemision.created_at)
+                .limit(limite)
+            )
+        )
 
 
 class ConteoRepo:

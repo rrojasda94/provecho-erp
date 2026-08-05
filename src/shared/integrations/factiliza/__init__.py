@@ -1,5 +1,6 @@
 """Adaptador de Factiliza — facturación electrónica ante SUNAT (Perú)."""
 
+from src.shared.integrations.factiliza import guias
 from src.shared.integrations.factiliza.client import (
     CONTENT_TYPES,
     ConsultaEmpresa,
@@ -49,6 +50,7 @@ __all__ = [
     "FactilizaError",
     "Item",
     "RespuestaEmision",
+    "guias",
     "construir_payload",
     "construir_payload_nota_credito",
     "monto_en_letras",

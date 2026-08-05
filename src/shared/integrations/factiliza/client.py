@@ -141,6 +141,15 @@ class FactilizaClient:
         la emisión: rechazo es veredicto, transporte caído es excepción."""
         return self._enviar("/note/send", payload)
 
+    def enviar_guia_remision(self, payload: dict) -> RespuestaEmision:
+        """POST /despatch/send — guía de remisión remitente (GRE).
+
+        Mismo contrato de errores que los otros dos envíos. El camión ya
+        salió cuando esto corre: un rechazo se corrige y se reemite, no
+        detiene el traslado — la guía impresa es el documento que viaja.
+        """
+        return self._enviar("/despatch/send", payload)
+
     def _enviar(self, ruta: str, payload: dict) -> RespuestaEmision:
         if not self.token:
             raise FactilizaError("FACTILIZA_TOKEN no configurado")

@@ -18,6 +18,7 @@ celery_app = Celery(
     backend=settings.broker_url,
     include=[
         "src.core.tasks_salud",
+        "src.modules.inventory.application.tasks",
         "src.modules.sales.application.tasks",
     ],
 )

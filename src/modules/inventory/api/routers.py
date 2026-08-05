@@ -13,11 +13,13 @@ from src.core.tenant import Tenant
 from src.modules.inventory.api import schemas
 from src.modules.inventory.application import ajustes, catalogo, queries_publicas
 from src.modules.inventory.application import conteos as conteos_uc
+from src.modules.inventory.application import guias as guias_uc
 from src.modules.inventory.application import lotes as lotes_uc
 from src.modules.inventory.application import recetas as recetas_uc
 from src.modules.inventory.application import reservas as reservas_uc
 from src.modules.inventory.application import solicitudes as solicitudes_uc
 from src.modules.inventory.application import stock as stock_uc
+from src.modules.inventory.application import tasks as inventory_tasks
 from src.modules.inventory.application import transferencias as transferencias_uc
 from src.modules.inventory.application.scope import (
     exigir_ajuste,
@@ -55,6 +57,9 @@ LIBERAR_RESERVA = "inventory.liberar_reserva"
 # Permisos ya sembrados desde el slice 1, sin uso hasta ahora.
 TRANSFERIR = "inventory.transferir"
 RECEPCION = "inventory.recepcion"
+# La guía la emite el área de almacén (RN-GDR-002), no quien despacha ni
+# quien factura: permiso propio.
+EMITIR_GUIA = "inventory.emitir_guia"
 
 
 # --- Categorías -------------------------------------------------------------
@@ -614,6 +619,86 @@ def recibir_transferencia(
     return schemas.TransferenciaDetalleOut(
         **schemas.TransferenciaOut.model_validate(transferencia).model_dump(),
         items=[schemas.TransferenciaItemOut.model_validate(i) for i in items],
+    )
+
+
+# --- Guía de remisión (RN-GDR-001..003, RN-TRP-002) --------------------------
+@router.post(
+    "/transferencias/{transferencia_id}/guia",
+    response_model=schemas.GuiaRemisionDetalleOut,
+    status_code=201,
+)
+def emitir_guia(
+    transferencia_id: uuid.UUID,
+    body: schemas.GuiaRemisionCreate,
+    actor: Usuario = Depends(require_permission(EMITIR_GUIA)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Emite la guía del traslado. Los bienes declarados salen de la
+    transferencia, no del request (RN-TRP-002): lo que viaja tiene que ser
+    exactamente lo que se descontó del origen.
+
+    Idempotente por transferencia — pedirla dos veces devuelve la misma
+    guía, porque dos guías del mismo traslado declaran la misma mercadería
+    dos veces.
+    """
+    exigir_transferencia(session, transferencia_id, tenant)
+    guia = guias_uc.emitir_guia(
+        session,
+        transferencia_id,
+        emitida_por=actor.id,
+        **body.model_dump(),
+    )
+    session.commit()
+    # Después del commit: el worker corre en otro proceso y solo ve filas ya
+    # confirmadas.
+    inventory_tasks.encolar(guia.id)
+    guia, items = guias_uc.detalle(session, guia.id)
+    return schemas.GuiaRemisionDetalleOut(
+        **schemas.GuiaRemisionOut.model_validate(guia).model_dump(),
+        items=[schemas.GuiaRemisionItemOut.model_validate(i) for i in items],
+    )
+
+
+@router.get(
+    "/transferencias/{transferencia_id}/guia",
+    response_model=schemas.GuiaRemisionDetalleOut,
+)
+def ver_guia_de_transferencia(
+    transferencia_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    exigir_transferencia(session, transferencia_id, tenant)
+    guia = guias_uc.de_transferencia(session, transferencia_id)
+    guia, items = guias_uc.detalle(session, guia.id)
+    return schemas.GuiaRemisionDetalleOut(
+        **schemas.GuiaRemisionOut.model_validate(guia).model_dump(),
+        items=[schemas.GuiaRemisionItemOut.model_validate(i) for i in items],
+    )
+
+
+@router.get("/guias-remision", response_model=Pagina[schemas.GuiaRemisionOut])
+def listar_guias(
+    estado_emision: str | None = None,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    p: Paginacion = Depends(paginacion),
+    session: Session = Depends(get_db),
+):
+    """Las guías de la empresa. `estado_emision=rechazado` es la bandeja que
+    de verdad hay que mirar: una guía rechazada por SUNAT hay que
+    corregirla y reemitirla."""
+    return paginar(
+        session,
+        guias_uc.q_listar(
+            session,
+            empresa_id=tenant.filtro_empresa(),
+            estado_emision=estado_emision,
+        ),
+        p,
     )
 
 

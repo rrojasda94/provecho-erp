@@ -91,6 +91,7 @@ PERMISOS = [
     ("sales.crear_pedido", "Crear pedido (canal agente IA)"),
     ("inventory.transferir", "Despachar una transferencia entre almacenes"),
     ("inventory.recepcion", "Recepcionar mercadería y transferencias"),
+    ("inventory.emitir_guia", "Emitir la guía de remisión de un traslado"),
     ("inventory.solicitar_insumos", "Crear y cancelar solicitudes de insumos"),
     ("inventory.aprobar_solicitud", "Aprobar o rechazar solicitudes de insumos"),
     ("inventory.liberar_reserva", "Liberar a mano una reserva de stock"),
@@ -276,6 +277,8 @@ ROLES = {
     "almacenero": [
         "inventory.transferir",
         "inventory.recepcion",
+        # La guía la emite el almacén (RN-GDR-002).
+        "inventory.emitir_guia",
         "inventory.ajustar",
         "inventory.leer",
         "inventory.registrar_movimiento",

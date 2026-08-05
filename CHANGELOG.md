@@ -30,6 +30,23 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Added
 
+- **Guía de remisión de traslados** (2026-08-05, ADR-027, migración
+  `a4c8f21e6b09`). Charlie's Pizzas mueve mercadería entre el almacén
+  central, CH1 y CH2 todos los días y hasta hoy ese traslado viajaba sin el
+  documento que lo sustenta. `guia_remision` + `guia_remision_item` cuelgan
+  de `transferencia`, en `inventory` y no en un módulo `logistics` ni en
+  `sales`: lo que la guía declara es un traslado, y el traslado es un hecho
+  de inventario (RN-GDR-002, la emite el almacén).
+  Las líneas **se derivan** de `transferencia_item`, agrupadas por SKU:
+  RN-TRP-002 exige que lo transportado coincida exactamente con lo
+  declarado, y un formulario de ítems aparte es justamente la forma de que
+  no coincidan. Se teclea solo lo que el sistema no puede saber —chofer,
+  vehículo, peso bruto, fecha de inicio del viaje—. Un traslado, una guía
+  (emisión idempotente) y correlativo por `(empresa, serie)` calculado al
+  emitir, no reservado antes. Envío a SUNAT asíncrono vía Celery
+  (`POST /despatch/send`): la guía impresa es la que viaja, y un rechazo se
+  corrige y reemite en vez de detener el camión. Permiso nuevo
+  `inventory.emitir_guia` en el rol `almacenero`; 14 tests.
 - **Pantalla de caja en contabilidad** (2026-08-05): turnos cerrados con su
   descuadre y el tramo de la cadena de custodia, entrega de custodia firmada
   con PIN, reapertura de un cierre con motivo (RN-MDP-005) e inventario de

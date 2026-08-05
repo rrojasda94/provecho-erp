@@ -13,8 +13,9 @@ productos (`articulo`, `sku`, `receta`, `receta_item`), `stock`,
 `movimiento_inventario`, `ajuste`, `lote` + `stock_lote` (FEFO),
 `conteo` + `conteo_item` (conteo cíclico) y el ciclo de abastecimiento
 interno (`reserva_stock`, `solicitud_insumos` + `solicitud_item`,
-`transferencia` + `transferencia_item`). `stock_merma`, `devolucion` y
-`guia_remision` siguen pendientes de sus slices.
+`transferencia` + `transferencia_item`) con su `guia_remision` +
+`guia_remision_item`. `stock_merma` y `devolucion` siguen pendientes de
+sus slices.
 
 `articulo` (tipos `insumo` | `subreceta` | `mercaderia` | `empaque` |
 `repuesto` | `suministro` — enum extensible), `categoria`, `stock`,
@@ -135,6 +136,8 @@ supervisor aprueba y reserva, el central despacha, el local recibe.
 | POST/GET | `/transferencias` | `transferir` / `leer` |
 | GET | `/transferencias/{id}` | `leer` |
 | POST | `/transferencias/{id}/recibir` | `recepcion` |
+| POST/GET | `/transferencias/{id}/guia` | `emitir_guia` / `leer` |
+| GET | `/guias-remision?estado_emision=` | `leer` |
 
 Solicitar y aprobar son permisos distintos y el aprobador no puede ser
 quien pidió (RN-INV-006). `transferir` y `recepcion` ya estaban sembrados
@@ -257,8 +260,18 @@ alerta `bajo_minimo` derivada en la consulta; evento
 `application/listeners.py`), consumido por `core.dashboard_router` para el
 dashboard gerencial.
 
-**Diferido (deuda del módulo):** devolución, guía de remisión,
-`stock_merma`. Del slice de abastecimiento: el disponible negativo no
+**Guía de remisión** (2026-08-05, ADR-027): cuelga de `transferencia`
+porque lo que declara es un traslado, y el traslado es un hecho de
+inventario (RN-GDR-002: la emite el almacén). Las líneas **se derivan**
+de `transferencia_item` agrupadas por SKU —RN-TRP-002 exige que lo
+transportado coincida con lo declarado, así que no hay formulario de
+ítems— y solo se teclea lo que el sistema no puede saber: chofer,
+vehículo, peso bruto y fecha de inicio del viaje. Un traslado, una guía
+(`transferencia_id` único) y correlativo por `(empresa, serie)`. El envío
+a SUNAT es asíncrono (`POST /despatch/send` vía Celery): la guía impresa
+es la que viaja y un rechazo se corrige y reemite, no detiene el camión.
+
+**Diferido (deuda del módulo):** devolución, `stock_merma`. Del slice de abastecimiento: el disponible negativo no
 tiene alerta, `reserva_stock` nace con tres tipos sin productor
 (`produccion`, `carrito`, `merma`), la transferencia no lleva vehículo ni
 tracking (`vehiculo` no existe), la recepción es de una sola pasada (sin
