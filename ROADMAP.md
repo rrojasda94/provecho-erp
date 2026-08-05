@@ -1489,7 +1489,24 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   tablero (`inducido`, `confirmado`), no ítems con responsable y evidencia.
   Modelarlos aparte solo si la inducción empieza a fallar por pasos que nadie
   hizo.
-- ⬜ **Sin pantallas de RRHH**: el tablero existe en la API
+- 🔶 **Pantallas de RRHH — contratación ✅ 2026-08-05, el resto no**:
+  `/rrhh/contratacion` con las convocatorias (crear, publicar exigiendo
+  perfil por RN-RRHH-013, cerrar) y **el tablero de las 8 etapas**: avance
+  de a una columna, descarte con motivo obligatorio (Ley 26772) y
+  contratación —que es donde nacen `persona` y `trabajador`—. Los
+  descartados van plegados aparte: no son parte del flujo, pero esconderlos
+  borraría la evidencia de por qué se descartó a alguien. La convocatoria
+  seleccionada viaja en el query param para poder compartir la URL.
+  Verificado en navegador de punta a punta: crear → publicar → dos
+  postulaciones por el endpoint público → avanzar cuatro columnas →
+  contratar (creó a Rosa Pinedo como Cocinera) → descartar con motivo.
+  **Lo que sigue sin pantalla y por qué**: boletas, liquidaciones,
+  memorándums, amonestaciones, actas, permisos, pactos y asistencia solo
+  tienen `POST` y `GET /{id}` en la API — **no hay endpoint de listado**,
+  así que no se pueden dibujar sin agregarlos primero. El legajo del
+  trabajador es el slice que los junta, y necesita backend antes que
+  frontend.
+- ⬜ **Sin listados en el legajo de RRHH**: el tablero existe en la API
   (`GET /convocatorias/{id}/tablero` devuelve las columnas en orden), no en el
   frontend — hoy se opera por API. Es la pieza a construir cuando el volumen
   de contratación lo justifique.
