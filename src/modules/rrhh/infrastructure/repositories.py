@@ -1,6 +1,7 @@
 """Repositorios SQLAlchemy del módulo rrhh. La sesión es la Unit of Work."""
 
 import uuid
+from datetime import date
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -187,6 +188,15 @@ class LiquidacionBssRepo:
     def get(self, liquidacion_id: uuid.UUID) -> LiquidacionBss | None:
         return self.s.get(LiquidacionBss, liquidacion_id)
 
+    def list_por_trabajador(self, trabajador_id: uuid.UUID) -> list[LiquidacionBss]:
+        return list(
+            self.s.scalars(
+                select(LiquidacionBss)
+                .where(LiquidacionBss.trabajador_id == trabajador_id)
+                .order_by(LiquidacionBss.fecha_pago.desc())
+            )
+        )
+
     def get_by_idempotency(self, idempotency_key: str) -> LiquidacionBss | None:
         return self.s.scalar(
             select(LiquidacionBss).where(LiquidacionBss.idempotency_key == idempotency_key)
@@ -204,6 +214,18 @@ class MemorandumRepo:
 
     def get(self, memorandum_id: uuid.UUID) -> Memorandum | None:
         return self.s.get(Memorandum, memorandum_id)
+
+    def list_por_trabajador(self, trabajador_id: uuid.UUID) -> list[Memorandum]:
+        """Los dirigidos a esa persona. Un memorándum puede ir a un área
+        entera (`destinatario_trabajador_id` NULL) y ese no es de nadie en
+        particular: no entra en el legajo de nadie."""
+        return list(
+            self.s.scalars(
+                select(Memorandum)
+                .where(Memorandum.destinatario_trabajador_id == trabajador_id)
+                .order_by(Memorandum.fecha.desc())
+            )
+        )
 
     def add(self, memorandum: Memorandum) -> Memorandum:
         self.s.add(memorandum)
@@ -251,6 +273,15 @@ class CertificadoTrabajoRepo:
     def get(self, certificado_id: uuid.UUID) -> CertificadoTrabajo | None:
         return self.s.get(CertificadoTrabajo, certificado_id)
 
+    def list_por_trabajador(self, trabajador_id: uuid.UUID) -> list[CertificadoTrabajo]:
+        return list(
+            self.s.scalars(
+                select(CertificadoTrabajo)
+                .where(CertificadoTrabajo.trabajador_id == trabajador_id)
+                .order_by(CertificadoTrabajo.fecha_emision.desc())
+            )
+        )
+
     def add(self, certificado: CertificadoTrabajo) -> CertificadoTrabajo:
         self.s.add(certificado)
         self.s.flush()
@@ -271,6 +302,32 @@ class SolicitudPermisoRepo:
             )
         )
 
+    # Ver la nota de `TrabajadorRepo.q_list`: este método sombrea al builtin.
+    def q_list(
+        self,
+        empresa_id: uuid.UUID | None = None,
+        estado: str | None = None,
+        trabajador_id: uuid.UUID | None = None,
+    ):
+        """La bandeja de aprobación, sin ejecutar (ADR-026).
+
+        Se filtra por empresa a través de `trabajador`: `solicitud_permiso`
+        no la tiene y agregársela duplicaría un dato que ya vive un salto
+        más allá — el trabajador es de una sola empresa por definición.
+        """
+        q = select(SolicitudPermiso)
+        if empresa_id is not None:
+            q = q.join(
+                Trabajador, Trabajador.id == SolicitudPermiso.trabajador_id
+            ).where(Trabajador.empresa_id == empresa_id)
+        if estado is not None:
+            q = q.where(SolicitudPermiso.estado == estado)
+        if trabajador_id is not None:
+            q = q.where(SolicitudPermiso.trabajador_id == trabajador_id)
+        # Las más viejas primero: una solicitud de vacaciones que envejece
+        # sin respuesta es la que hay que atender, no la última que entró.
+        return q.order_by(SolicitudPermiso.fecha_desde)
+
     def add(self, solicitud: SolicitudPermiso) -> SolicitudPermiso:
         self.s.add(solicitud)
         self.s.flush()
@@ -283,6 +340,15 @@ class PactoPermanenciaRepo:
 
     def get(self, pacto_id: uuid.UUID) -> PactoPermanencia | None:
         return self.s.get(PactoPermanencia, pacto_id)
+
+    def list_por_trabajador(self, trabajador_id: uuid.UUID) -> list[PactoPermanencia]:
+        return list(
+            self.s.scalars(
+                select(PactoPermanencia)
+                .where(PactoPermanencia.trabajador_id == trabajador_id)
+                .order_by(PactoPermanencia.fecha_inicio.desc())
+            )
+        )
 
     def add(self, pacto: PactoPermanencia) -> PactoPermanencia:
         self.s.add(pacto)
@@ -308,6 +374,33 @@ class AsistenciaRepo:
         return list(
             self.s.scalars(select(Asistencia).where(Asistencia.trabajador_id == trabajador_id))
         )
+
+    # Ver la nota de `TrabajadorRepo.q_list`: este método sombrea al builtin.
+    def q_list(
+        self,
+        empresa_id: uuid.UUID | None = None,
+        trabajador_id: uuid.UUID | None = None,
+        desde: date | None = None,
+        hasta: date | None = None,
+    ):
+        """Marcaciones del rango, sin ejecutar (ADR-026).
+
+        Es la única tabla del legajo que crece sin techo —una fila por día y
+        por trabajador— y por eso no viaja dentro del legajo: se pide
+        siempre acotada por rango.
+        """
+        q = select(Asistencia)
+        if empresa_id is not None:
+            q = q.join(Trabajador, Trabajador.id == Asistencia.trabajador_id).where(
+                Trabajador.empresa_id == empresa_id
+            )
+        if trabajador_id is not None:
+            q = q.where(Asistencia.trabajador_id == trabajador_id)
+        if desde is not None:
+            q = q.where(Asistencia.fecha >= desde)
+        if hasta is not None:
+            q = q.where(Asistencia.fecha <= hasta)
+        return q.order_by(Asistencia.fecha.desc())
 
     def add(self, asistencia: Asistencia) -> Asistencia:
         self.s.add(asistencia)

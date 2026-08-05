@@ -5336,6 +5336,88 @@
         "title": "LeadOut",
         "type": "object"
       },
+      "LegajoOut": {
+        "description": "El expediente del trabajador en una sola lectura.\n\n`nomina_visible` no es decoración: dice si las listas de boletas y\nliquidaciones vinieron vacías porque no hay nada, o porque quien\npregunta no tiene `rrhh.nomina_gestionar`. Sin ese campo, un legajo sin\nsueldos se lee igual que uno censurado.",
+        "properties": {
+          "amonestaciones": {
+            "items": {
+              "$ref": "#/components/schemas/AmonestacionOut"
+            },
+            "title": "Amonestaciones",
+            "type": "array"
+          },
+          "boletas": {
+            "items": {
+              "$ref": "#/components/schemas/BoletaPagoOut"
+            },
+            "title": "Boletas",
+            "type": "array"
+          },
+          "certificados": {
+            "items": {
+              "$ref": "#/components/schemas/CertificadoTrabajoOut"
+            },
+            "title": "Certificados",
+            "type": "array"
+          },
+          "contratos": {
+            "items": {
+              "$ref": "#/components/schemas/ContratoLaboralOut"
+            },
+            "title": "Contratos",
+            "type": "array"
+          },
+          "liquidaciones": {
+            "items": {
+              "$ref": "#/components/schemas/LiquidacionBssOut"
+            },
+            "title": "Liquidaciones",
+            "type": "array"
+          },
+          "memorandums": {
+            "items": {
+              "$ref": "#/components/schemas/MemorandumOut"
+            },
+            "title": "Memorandums",
+            "type": "array"
+          },
+          "nomina_visible": {
+            "title": "Nomina Visible",
+            "type": "boolean"
+          },
+          "pactos_permanencia": {
+            "items": {
+              "$ref": "#/components/schemas/PactoPermanenciaOut"
+            },
+            "title": "Pactos Permanencia",
+            "type": "array"
+          },
+          "permisos": {
+            "items": {
+              "$ref": "#/components/schemas/SolicitudPermisoOut"
+            },
+            "title": "Permisos",
+            "type": "array"
+          },
+          "trabajador": {
+            "$ref": "#/components/schemas/TrabajadorOut"
+          }
+        },
+        "required": [
+          "trabajador",
+          "contratos",
+          "amonestaciones",
+          "memorandums",
+          "certificados",
+          "permisos",
+          "pactos_permanencia",
+          "nomina_visible",
+          "boletas",
+          "liquidaciones"
+        ],
+        "title": "LegajoOut",
+        "type": "object"
+      },
       "LiquidacionBssCreate": {
         "properties": {
           "cts_pendiente": {
@@ -7235,6 +7317,37 @@
         "title": "Pagina[AsientoOut]",
         "type": "object"
       },
+      "Pagina_AsistenciaOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AsistenciaOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "Pagina[AsistenciaOut]",
+        "type": "object"
+      },
       "Pagina_CampanaOut_": {
         "properties": {
           "items": {
@@ -7605,6 +7718,37 @@
           "page_size"
         ],
         "title": "Pagina[SolicitudOut]",
+        "type": "object"
+      },
+      "Pagina_SolicitudPermisoOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SolicitudPermisoOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "Pagina[SolicitudPermisoOut]",
         "type": "object"
       },
       "Pagina_StockOut_": {
@@ -24086,6 +24230,140 @@
         ]
       }
     },
+    "/api/v1/rrhh/asistencia": {
+      "get": {
+        "description": "Marcaciones del rango. Sin fechas, el mes en curso: pedir la\nasistencia entera de una empresa no es un caso de uso, es un accidente.",
+        "operationId": "listar_asistencia_api_v1_rrhh_asistencia_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "trabajador_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Trabajador Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "desde",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Desde"
+            }
+          },
+          {
+            "in": "query",
+            "name": "hasta",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Hasta"
+            }
+          },
+          {
+            "in": "query",
+            "name": "empresa_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Empresa Id"
+            }
+          },
+          {
+            "description": "Página, empezando en 1",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "description": "Página, empezando en 1",
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Filas por página (máx. 200)",
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Filas por página (máx. 200)",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pagina_AsistenciaOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Asistencia",
+        "tags": [
+          "rrhh"
+        ]
+      }
+    },
     "/api/v1/rrhh/asistencia/entrada": {
       "post": {
         "operationId": "marcar_entrada_api_v1_rrhh_asistencia_entrada_post",
@@ -25813,6 +26091,120 @@
       }
     },
     "/api/v1/rrhh/solicitudes-permiso": {
+      "get": {
+        "description": "Bandeja de aprobación. `estado=pendiente` es la vista que importa:\nquien aprueba entra por \"qué tengo pendiente\", no por un trabajador.\nOrdenadas por fecha de inicio ascendente — la que envejece sin respuesta\nes la que hay que atender.",
+        "operationId": "listar_solicitudes_permiso_api_v1_rrhh_solicitudes_permiso_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "estado",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Estado"
+            }
+          },
+          {
+            "in": "query",
+            "name": "trabajador_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Trabajador Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "empresa_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Empresa Id"
+            }
+          },
+          {
+            "description": "Página, empezando en 1",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "description": "Página, empezando en 1",
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Filas por página (máx. 200)",
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Filas por página (máx. 200)",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pagina_SolicitudPermisoOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Solicitudes Permiso",
+        "tags": [
+          "rrhh"
+        ]
+      },
       "post": {
         "operationId": "crear_solicitud_permiso_api_v1_rrhh_solicitudes_permiso_post",
         "requestBody": {
@@ -26285,6 +26677,55 @@
           }
         ],
         "summary": "Cesar Trabajador",
+        "tags": [
+          "rrhh"
+        ]
+      }
+    },
+    "/api/v1/rrhh/trabajadores/{trabajador_id}/legajo": {
+      "get": {
+        "description": "El expediente completo en una sola lectura: contratos, amonestaciones,\nmemorándums, certificados, permisos y pactos.\n\n**La nómina va solo con `rrhh.nomina_gestionar`.** Boletas y\nliquidaciones llevan remuneración, y `rrhh.leer` lo tiene el supervisor,\nque necesita ver las amonestaciones de su gente pero no cuánto gana. Que\nuna boleta ya fuera legible pidiéndola por su id no es razón para\nvolverla navegable. Cuando no viaja, `nomina_visible` lo dice: un legajo\nsin sueldos no puede leerse igual que uno censurado.\n\n`asistencia` no entra acá — crece una fila por día y por trabajador, y\nse pide por `GET /rrhh/asistencia` acotada por rango.",
+        "operationId": "ver_legajo_api_v1_rrhh_trabajadores__trabajador_id__legajo_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "trabajador_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Trabajador Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LegajoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Ver Legajo",
         "tags": [
           "rrhh"
         ]

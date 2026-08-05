@@ -118,6 +118,23 @@ versión genérica.
   reembolso proporcional al tiempo de permanencia no cumplido (RN-RRHH-006).
 - **`application/asistencia.py`**: marcar entrada/salida; bloqueado
   (`ReglaNegocio`) si `trabajador.registra_asistencia=false` (RN-PER-002).
+- **`application/legajo.py`** (2026-08-05): el **file personal** en una sola
+  lectura (`GET /trabajadores/{id}/legajo`) — contratos, amonestaciones,
+  memorándums, certificados, permisos y pactos. Es un endpoint y no ocho
+  porque el file es un documento, no ocho: nadie pregunta por las
+  amonestaciones de alguien sin querer ver también sus contratos.
+  Tres exclusiones deliberadas: **asistencia** (única tabla que crece sin
+  techo, va por `GET /asistencia` acotada por rango), **actas** (`acta` no
+  cuelga de un trabajador, es un acto de la empresa) y **nómina**, que solo
+  viaja con `rrhh.nomina_gestionar`. Esto último es una restricción nueva:
+  `rrhh.leer` lo tiene el rol `supervisor`, que necesita ver las
+  amonestaciones de su gente pero no cuánto gana, y que una boleta ya fuera
+  legible pidiéndola por su id no es razón para volverla navegable. Cuando
+  no viaja, `nomina_visible=false` lo dice — un legajo censurado no puede
+  leerse igual que uno sin boletas.
+  Suma también `GET /solicitudes-permiso` (bandeja de aprobación, ordenada
+  por la que envejece primero: quien aprueba entra por "qué tengo
+  pendiente", no por un trabajador) y `GET /asistencia` con rango.
 
 Casos de uso base en `docs/rrhh/README.md` (flujo de 13 pasos de
 incorporación) y SOPs en `docs/diagrams/Procesos/Recursos-Humanos/`.

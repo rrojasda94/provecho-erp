@@ -1506,10 +1506,25 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   así que no se pueden dibujar sin agregarlos primero. El legajo del
   trabajador es el slice que los junta, y necesita backend antes que
   frontend.
-- ⬜ **Sin listados en el legajo de RRHH**: el tablero existe en la API
-  (`GET /convocatorias/{id}/tablero` devuelve las columnas en orden), no en el
-  frontend — hoy se opera por API. Es la pieza a construir cuando el volumen
-  de contratación lo justifique.
+- ✅ 2026-08-05 **Listados del legajo de RRHH**: `application/legajo.py` +
+  `GET /trabajadores/{id}/legajo` (contratos, amonestaciones, memorándums,
+  certificados, permisos y pactos en **una** lectura),
+  `GET /solicitudes-permiso` (bandeja de aprobación paginada, la que
+  envejece primero) y `GET /asistencia` con rango. Un endpoint y no ocho: el
+  file personal es un documento, no ocho. **La nómina exige
+  `rrhh.nomina_gestionar`** — restricción nueva: `rrhh.leer` lo tiene el
+  supervisor, y que una boleta ya fuera legible por su id no es razón para
+  volverla navegable; `nomina_visible` dice cuándo no viajó. 7 tests
+  (`tests/test_rrhh_legajo.py`).
+- ⬜ **Sin pantalla del legajo**: los endpoints están, el frontend cubre
+  contratación y trabajadores. Es el siguiente paso natural.
+- ⬜ **Sin listados generales de disciplina y nómina**: `memorandum`,
+  `amonestacion`, `acta`, `boleta_pago` y `liquidacion_bss` se listan **por
+  trabajador**, no de corrido. Una bandeja "todas las amonestaciones del
+  mes" o "las boletas del periodo" necesitaría su propio endpoint; hoy no
+  hay quién la pida.
+- ✅ 2026-08-05 **El tablero pasó al frontend**: `/rrhh/contratacion`
+  dibuja las columnas que `GET /convocatorias/{id}/tablero` ya devolvía.
 - ⬜ **Uniforme/EPP (RN-RRHH-014/015)** y **parentesco/relaciones
   (RN-RRHH-016/017)**: sin modelo — hoy son controles manuales/SOP.
 - ⬜ **`boleta_pago`/`liquidacion_bss` sin cálculo automático de PLAME**: la
