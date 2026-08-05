@@ -177,12 +177,23 @@ contiene, buscando su `[[ COMPLETAR ]]`):
   solo el cumplimiento final convierte la meta en un número que se mira
   cuando ya no hay nada que hacer, que es justo lo que el SOP quiere
   evitar. Falta el slice que las implemente.
-- ⬜ BPMN de las áreas nuevas (RRHH, Compras, Comercial-estrategia,
-  Almacén-Logística): enfoque vigente es **primero SOP, luego BPMN** —
-  los BPMN se agregan por área cuando sus SOPs estén estables, y en ese
-  momento se registran los PROC en el registro maestro.
-- ⬜ BPMN pendientes ya declarados: contingencias de personal faltante
-  (RN-RRHH-011) y tardanza/falta del encargado (RN-RRHH-010).
+- ✅ 2026-08-05 BPMN de las cuatro áreas nuevas, con sus PROC registrados
+  en el maestro y su narrativa en `workflows.md` (el enfoque era *primero
+  SOP, luego BPMN*, y los SOPs ya estaban estables):
+  **PROC-RRH-001** Incorporación de personal ·
+  **PROC-CMP-001 v2.0** Compras (los tres caminos: informal con caja chica,
+  preferente sin cotización, estándar/activo con RFQ) ·
+  **PROC-COM-003** Definición y revisión de precio ·
+  **PROC-INV-001 v0.2** Abastecimiento de locales, que además pasa de
+  Borrador a **Vigente**: el ciclo está implementado (ADR-020) y el traslado
+  ya emite guía (ADR-027).
+- ✅ 2026-08-05 BPMN de las dos contingencias:
+  **PROC-RRH-002** personal faltante en la apertura (RN-RRHH-011 — el local
+  **abre igual**, el pago extra del reemplazo se le descuenta al faltante
+  salvo constancia médica) y **PROC-RRH-003** tardanza o falta del encargado
+  (RN-RRHH-010 — hasta 30 min es memorándum y *no es sanción*, más de 30 min
+  o falta es amonestación). Ninguna de las dos tiene soporte en código
+  todavía: son proceso, no pantalla.
 - ✅ 2026-07-27 Catálogo de paletas de accesibilidad y niveles de tamaño de
   fuente — propuesta técnica definida (dos paletas: Provecho estándar y
   un modo alto contraste/daltonismo inspirado en Okabe-Ito que cubre

@@ -30,6 +30,26 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Added
 
+- **Seis diagramas BPMN de las áreas nuevas** (2026-08-05), con sus PROC
+  registrados en el maestro y su narrativa en `workflows.md`. El enfoque
+  vigente era *primero SOP, luego BPMN*; los SOPs ya estaban estables.
+  `PROC-RRH-001` incorporación de personal · `PROC-RRH-002` contingencia de
+  personal faltante (RN-RRHH-011) · `PROC-RRH-003` tardanza o falta del
+  encargado (RN-RRHH-010) · `PROC-CMP-001 v2.0` compras con sus tres
+  caminos · `PROC-COM-003` definición y revisión de precio ·
+  `PROC-INV-001 v0.2` abastecimiento de locales, que además pasa de
+  Borrador a **Vigente** porque el ciclo está implementado (ADR-020) y el
+  traslado ya emite guía (ADR-027).
+- **Entidades de Comercial-estrategia y RRHH-proceso en `data-model.md`**
+  (2026-08-05): `meta_venta` + `meta_venta_seguimiento`, `hallazgo_mercado`,
+  `entrevista`, `plan_induccion` + `plan_induccion_item`,
+  `evaluacion_periodo_prueba`, `evaluacion_desempeno` y `capacitacion` +
+  `capacitacion_asistente`. Especificadas, sin implementar.
+- **Valores propuestos para los 13 `parametro_empresa`** (2026-08-05) con
+  su sustento en `docs/gerencia/propuesta-parametros-operativos.md`,
+  cargados en estado `propuesto` a la espera de Gerencia
+  (`python -m src.seeders.parametros`).
+
 - **Guía de remisión de traslados** (2026-08-05, ADR-027, migración
   `a4c8f21e6b09`). Charlie's Pizzas mueve mercadería entre el almacén
   central, CH1 y CH2 todos los días y hasta hoy ese traslado viajaba sin el

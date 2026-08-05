@@ -122,6 +122,9 @@ enviado (RN-MKT-004/005). Detalle narrativo, SOPs y plantillas:
 
 `PROC-INV-001` · v0.2 · Borrador
 
+Diagrama BPMN completo:
+[PROC-INV-001-v0.2.bpmn](../diagrams/Procesos/Logistica-Almacen/PROC-INV-001-v0.2.bpmn).
+
 ```mermaid
 flowchart LR
     CT[Conteo de fin de jornada: cocina + atencion al cliente] --> VD{Se desvia del margen de error? RN-INV-015}
@@ -503,6 +506,81 @@ Atribución del faltante — ver [RN-MDP-005](business-rules.md#medio-de-pago):
 depende de en qué etapa se detecta y documenta (cierre/validación vs.
 recién en contabilidad), y de si el cajero ya había reportado un cobro mal
 hecho por un tercero según [PROC-COM-002](#cobro-y-emisión-de-comprobante-de-pago).
+
+## Incorporación de personal
+
+`PROC-RRH-001` · v1.0 · Vigente
+
+Empieza cuando un encargado detecta que hay que cubrir un puesto y termina
+cuando el trabajador supera —o no— el periodo de prueba. Cubre los 13 pasos
+de [docs/rrhh/](../rrhh/README.md). Tres reglas lo gobiernan y explican por
+qué el proceso tiene la forma que tiene: **sin perfil de puesto no se
+publica convocatoria** (RN-RRHH-013), porque una búsqueda sin perfil no
+sabe a quién busca; **nadie inicia labores sin contrato firmado y alta en
+T-Registro** (RN-RRHH-012); y **todo descarte lleva motivo**, que es la
+defensa documental ante un reclamo por la Ley 26772. El candidato no entra
+a `persona` mientras es candidato: vive en `postulante`, y `persona` +
+`trabajador` nacen recién al contratar. Diagrama BPMN completo:
+[PROC-RRH-001-v1.0.bpmn](../diagrams/Procesos/Recursos-Humanos/PROC-RRH-001-v1.0.bpmn).
+
+Estado de implementación: convocatoria, formulario público de postulación y
+tablero de 13 columnas están en código (2026-08-01). Entrevista, plan de
+inducción y evaluación de periodo de prueba quedaron **especificados** en
+`data-model.md §8b` (2026-08-05) y esperan su slice.
+
+## Contingencia de personal faltante en la apertura
+
+`PROC-RRH-002` · v1.0 · Vigente
+
+Empieza cuando falta personal en la apertura de una sucursal y termina con
+el turno cubierto y la consecuencia económica resuelta (RN-RRHH-011).
+
+Lo primero que hay que entender es lo que el proceso **no** hace: no
+posterga la apertura. El personal presente redistribuye las funciones
+críticas y el local abre en su horario mientras Administración busca
+reemplazo en otra sucursal o entre quienes están en día de descanso. El
+reemplazo recibe pago extra y ese monto se le descuenta al trabajador
+faltante, **salvo que presente constancia médica** — que es la única
+excepción y por eso es una decisión explícita del flujo, no un criterio de
+quien liquida. Diagrama BPMN completo:
+[PROC-RRH-002-v1.0.bpmn](../diagrams/Procesos/Recursos-Humanos/PROC-RRH-002-v1.0.bpmn).
+
+Se cruza con [PROC-OPE-001](#apertura-de-sucursal): es el proceso que esta
+contingencia tiene prohibido detener.
+
+## Tardanza o falta del encargado a la apertura
+
+`PROC-RRH-003` · v1.0 · Vigente
+
+Empieza cuando el encargado de tienda o el supervisor no llega a la hora de
+apertura **sin aviso previo de al menos 24 horas ni coordinación con un
+supervisor**, y termina con la medida documentada (RN-RRHH-010).
+
+La gradualidad es el punto: hasta 30 minutos de retraso es **memorándum, y
+un memorándum no es sanción** —es la constancia de que se advirtió—; más de
+30 minutos, o falta completa, es carta de amonestación (RN-RRHH-004) y el
+encargado asume la responsabilidad documentada. Con aviso previo o
+coordinación el proceso ni se dispara: hay cobertura acordada y no hay nada
+que sancionar. Diagrama BPMN completo:
+[PROC-RRH-003-v1.0.bpmn](../diagrams/Procesos/Recursos-Humanos/PROC-RRH-003-v1.0.bpmn).
+
+## Definición y revisión de precio
+
+`PROC-COM-003` · v1.0 · Vigente
+
+Empieza con un disparador —producto nuevo, cambio de costo de insumo,
+revisión periódica o presión de la competencia— y termina con el precio
+publicado en la lista vigente. Tres áreas aportan lo suyo antes de que
+exista un precio: Comercial el valor percibido y la competencia, I+D+i la
+receta, Contabilidad el costo variable real (RN-PRC-002).
+
+Dos reglas hacen el proceso: **todo precio se calcula con margen de
+contribución explícito antes de publicarse** (RN-PRC-001), y **el precio en
+POS es fijo e innegociable, solo varía por lista de precios** (RN-PRC-003)
+— nunca se edita en caja. Un precio bajo el margen mínimo no está prohibido,
+pero necesita sustento escrito y aprobación de Gerencia: la excepción existe
+y queda registrada como excepción. Diagrama BPMN completo:
+[PROC-COM-003-v1.0.bpmn](../diagrams/Procesos/Comercial/PROC-COM-003-v1.0.bpmn).
 
 ## Estados clave
 
