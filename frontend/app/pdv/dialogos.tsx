@@ -9,6 +9,8 @@ import {
   type ItemDeCarta,
   type MedioPago,
   type MesaEnMapa,
+  type PosTarjeta,
+  type PosVerificado,
   type VarianteDeCarta,
 } from "@/lib/pdv";
 
@@ -82,24 +84,33 @@ const MONEDAS = [5, 2, 1, 0.5, 0.2, 0.1];
  * que un faltante tenga a quién preguntarle. */
 export function DialogoApertura({
   abierto,
+  pos,
   onAbrir,
   ocupado,
 }: {
   abierto: boolean;
-  onAbrir: (
-    monto: number,
-    detalle: Record<string, number>,
-    encargado: { username: string; pin: string },
-  ) => void;
+  pos: PosTarjeta[];
+  onAbrir: (datos: {
+    montoDeclarado: number;
+    detalle: Record<string, number>;
+    posVerificados: { pos_tarjeta_id: string; operativo: boolean; observacion?: string }[];
+    encargado: { username: string; pin: string };
+  }) => void;
   ocupado: boolean;
 }) {
   const [conteo, setConteo] = useState<Record<string, number>>({});
+  const [declarado, setDeclarado] = useState("");
+  const [averiados, setAveriados] = useState<Record<string, string>>({});
   const [usuario, setUsuario] = useState("");
   const [pin, setPin] = useState("");
   const total = Object.entries(conteo).reduce(
     (a, [v, n]) => a + Number(v) * (n || 0),
     0,
   );
+  // Lo contado menos lo que el encargado dice entregar. No bloquea abrir
+  // (RN-POS-011): se muestra para que los dos lo vean antes de firmar, y el
+  // servidor lo recalcula igual — acá es información, no el dato que manda.
+  const diferencia = total - (Number(declarado) || 0);
 
   return (
     <Dialogo
@@ -113,6 +124,71 @@ export function DialogoApertura({
         denominación.
       </p>
       <ConteoDenominaciones conteo={conteo} onCambiar={setConteo} />
+
+      <p className="pdv-etiqueta">El encargado declara entregar</p>
+      <input
+        className="pdv-campo"
+        type="number"
+        min={0}
+        step="0.10"
+        inputMode="decimal"
+        placeholder="0.00"
+        value={declarado}
+        onChange={(e) => setDeclarado(e.target.value)}
+      />
+      {declarado !== "" && diferencia !== 0 && (
+        <p className="pdv-nota">
+          Lo contado difiere en {soles(diferencia)} de lo declarado. Queda
+          registrado y la caja abre igual.
+        </p>
+      )}
+
+      {pos.length > 0 && (
+        <>
+          <p className="pdv-etiqueta">Terminales de tarjeta</p>
+          <p className="pdv-nota">
+            Marca el que no esté funcionando. Un POS averiado no impide abrir:
+            queda reportado para que contabilidad mande el de emergencia.
+          </p>
+          {pos.map((p) => {
+            const averiado = p.id in averiados;
+            return (
+              <div key={p.id}>
+                <label className="pdv-check">
+                  <input
+                    type="checkbox"
+                    checked={averiado}
+                    onChange={(e) =>
+                      setAveriados((previos) => {
+                        const siguiente = { ...previos };
+                        if (e.target.checked) siguiente[p.id] = "";
+                        else delete siguiente[p.id];
+                        return siguiente;
+                      })
+                    }
+                  />
+                  <span>
+                    {p.serie}
+                    {p.operador ? ` · ${p.operador}` : ""}
+                    {p.es_emergencia ? " · emergencia" : ""} — averiado
+                  </span>
+                </label>
+                {averiado && (
+                  <input
+                    className="pdv-campo"
+                    placeholder="Qué le pasa (opcional)"
+                    value={averiados[p.id]}
+                    onChange={(e) =>
+                      setAveriados((previos) => ({ ...previos, [p.id]: e.target.value }))
+                    }
+                  />
+                )}
+              </div>
+            );
+          })}
+        </>
+      )}
+
       <p className="pdv-etiqueta">Entrega el encargado</p>
       <div className="pdv-dos">
         <input
@@ -145,8 +221,19 @@ export function DialogoApertura({
         <button
           type="button"
           className="pdv-boton-pri"
-          disabled={ocupado || !usuario.trim() || !pin.trim()}
-          onClick={() => onAbrir(total, conteo, { username: usuario.trim(), pin })}
+          disabled={ocupado || !usuario.trim() || !pin.trim() || declarado === ""}
+          onClick={() =>
+            onAbrir({
+              montoDeclarado: Number(declarado) || 0,
+              detalle: conteo,
+              posVerificados: pos.map((p) => ({
+                pos_tarjeta_id: p.id,
+                operativo: !(p.id in averiados),
+                observacion: averiados[p.id]?.trim() || undefined,
+              })),
+              encargado: { username: usuario.trim(), pin },
+            })
+          }
         >
           Abrir caja
         </button>
@@ -196,31 +283,54 @@ function ConteoDenominaciones({
   );
 }
 
-/** Cierre: mismo conteo pieza por pieza que la apertura, más a quién se le
- * entrega el efectivo contado. El descuadre lo calcula el servidor —
- * conoce lo cobrado y los movimientos del turno, el PDV no. */
+/** Cierre: mismo conteo pieza por pieza que la apertura, el reporte de lote
+ * de cada terminal que abrió operativo (RN-POS-004) y la firma de quien
+ * recibe el efectivo (RN-MDP-002).
+ *
+ * Los descuadres los calcula el servidor —conoce lo cobrado y los
+ * movimientos del turno, el PDV no—; acá solo se le entrega lo contado y lo
+ * declarado por cada POS. */
 export function DialogoCierre({
   abierto,
+  posVerificados,
   onCerrar,
   onCerrarCaja,
   ocupado,
 }: {
   abierto: boolean;
+  posVerificados: PosVerificado[];
   onCerrar: () => void;
-  onCerrarCaja: (montoReal: number, detalle: Record<string, number>, custodia: string) => void;
+  onCerrarCaja: (datos: {
+    detalle: Record<string, number>;
+    custodia: string;
+    atribucion: string;
+    reportesPos: { pos_tarjeta_id: string; monto_lote: string; referencia?: string }[];
+    receptor: { username: string; pin: string };
+  }) => void;
   ocupado: boolean;
 }) {
   const [conteo, setConteo] = useState<Record<string, number>>({});
   const [custodia, setCustodia] = useState("");
+  const [atribucion, setAtribucion] = useState("");
+  const [lotes, setLotes] = useState<Record<string, string>>({});
+  const [usuario, setUsuario] = useState("");
+  const [pin, setPin] = useState("");
   const total = Object.entries(conteo).reduce(
     (a, [v, n]) => a + Number(v) * (n || 0),
     0,
   );
+  // Solo los que abrieron operativos: a un terminal averiado no se le pide
+  // lote porque no cobró nada, y el servidor tampoco se lo pide.
+  const operativos = posVerificados.filter((p) => p.operativo);
 
   useEffect(() => {
     if (!abierto) return;
     setConteo({});
     setCustodia("");
+    setAtribucion("");
+    setLotes({});
+    setUsuario("");
+    setPin("");
   }, [abierto]);
 
   return (
@@ -230,13 +340,84 @@ export function DialogoCierre({
         contra lo cobrado y los movimientos registrados.
       </p>
       <ConteoDenominaciones conteo={conteo} onCambiar={setConteo} />
-      <p className="pdv-etiqueta">Se entrega a</p>
-      <input
+
+      {operativos.length > 0 && (
+        <>
+          <p className="pdv-etiqueta">Cierre de lote por terminal</p>
+          <p className="pdv-nota">
+            Saca el cierre de lote de cada POS y copia el total. Sin esto el
+            cierre no cuadra las tarjetas.
+          </p>
+          {operativos.map((p) => (
+            <label key={p.pos_tarjeta_id} className="pdv-etiqueta">
+              <span>{p.serie}</span>
+              <input
+                className="pdv-campo"
+                type="number"
+                min={0}
+                step="0.10"
+                inputMode="decimal"
+                placeholder="0.00"
+                value={lotes[p.pos_tarjeta_id] ?? ""}
+                onChange={(e) =>
+                  setLotes((previos) => ({
+                    ...previos,
+                    [p.pos_tarjeta_id]: e.target.value,
+                  }))
+                }
+              />
+            </label>
+          ))}
+        </>
+      )}
+
+      <p className="pdv-etiqueta">A dónde va el efectivo</p>
+      {/* El destino, no el nombre de quien recibe: a quién se le entregó ya
+          queda probado por el PIN de abajo, y escribirlo además era un dato
+          suelto que no coincidía con nadie. */}
+      <select
         className="pdv-campo"
-        placeholder="Nombre de quien recibe el efectivo"
         value={custodia}
         onChange={(e) => setCustodia(e.target.value)}
-      />
+      >
+        <option value="">Elegir destino...</option>
+        <option value="local_caja_fuerte">Caja fuerte del local</option>
+        <option value="traslado_contabilidad">Traslado a contabilidad</option>
+      </select>
+      <p className="pdv-etiqueta">Recibe</p>
+      <div className="pdv-dos">
+        <input
+          className="pdv-campo"
+          placeholder="Usuario de quien recibe"
+          autoComplete="off"
+          value={usuario}
+          onChange={(e) => setUsuario(e.target.value)}
+        />
+        <input
+          className="pdv-campo"
+          type="password"
+          inputMode="numeric"
+          placeholder="PIN"
+          autoComplete="off"
+          value={pin}
+          onChange={(e) => setPin(e.target.value)}
+        />
+      </div>
+
+      <p className="pdv-etiqueta">Si hay descuadre, a quién se le atribuye</p>
+      {/* Tres valores y no texto libre: es un enum en la base (RN-MDP-005), y
+          además un descuadre se atribuye a alguien concreto — "no sé qué pasó"
+          escrito de veinte maneras distintas no se puede sumar después. */}
+      <select
+        className="pdv-campo"
+        value={atribucion}
+        onChange={(e) => setAtribucion(e.target.value)}
+      >
+        <option value="">Sin atribuir todavía</option>
+        <option value="cajero">Cajero</option>
+        <option value="encargado">Encargado</option>
+        <option value="tercero_reportado">Tercero reportado</option>
+      </select>
 
       <footer className="pdv-dialogo-pie">
         <div>
@@ -246,8 +427,25 @@ export function DialogoCierre({
         <button
           type="button"
           className="pdv-boton-pri"
-          disabled={ocupado || !custodia.trim()}
-          onClick={() => onCerrarCaja(total, conteo, custodia.trim())}
+          disabled={
+            ocupado ||
+            !custodia ||
+            !usuario.trim() ||
+            !pin.trim() ||
+            operativos.some((p) => !lotes[p.pos_tarjeta_id])
+          }
+          onClick={() =>
+            onCerrarCaja({
+              detalle: conteo,
+              custodia,
+              atribucion: atribucion.trim(),
+              reportesPos: operativos.map((p) => ({
+                pos_tarjeta_id: p.pos_tarjeta_id,
+                monto_lote: String(Number(lotes[p.pos_tarjeta_id]) || 0),
+              })),
+              receptor: { username: usuario.trim(), pin },
+            })
+          }
         >
           Cerrar caja
         </button>

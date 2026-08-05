@@ -142,3 +142,33 @@ reserva mientras el local sigue vendiendo.
   cálculo que el cierre.
 - Sin pantalla todavía: el ciclo se opera por API. La UI de caja va con las
   pantallas de contabilidad.
+
+## Addendum 2026-08-05 — pantallas, y dos enums que se estaban corrompiendo
+
+El PDV **ya tenía** diálogos de apertura y cierre, escritos antes de este
+ADR. Al construir la pantalla de contabilidad se descubrió que seguían
+mandando el contrato anterior (`monto_apertura` en vez de `monto_declarado`,
+`relevo_encargado_id` en vez del token de `autorizacion`, `monto_real` en vez
+del conteo por denominación): las dos operaciones devolvían **422 desde el
+día en que se implementó este ADR**, y no lo detectó nadie porque ninguna
+prueba automatizada toca esa pantalla. Actualizados al contrato, más
+verificación de POS al abrir y reporte de lote por terminal al cerrar.
+
+El hallazgo que importa más que las pantallas: `cierre_caja.custodia` y
+`cierre_caja.descuadre_atribucion` son **columnas `Enum`**, y `CerrarCajaIn`
+las declaraba `str` sin validar. La pantalla vieja mandaba el nombre de una
+persona en `custodia` ("Juan el encargado"), la escritura **pasaba sin
+protestar** —`native_enum=False` sobre SQLite/Postgres no lo frenó— y la
+fila quedaba **ilegible**: cualquier lectura posterior reventaba con
+`LookupError` al mapear el valor al enum. Un dato que se puede escribir y no
+se puede volver a leer es peor que un rechazo, porque el error aparece lejos
+de su causa y sobre una fila que ya es evidencia contable.
+
+Se cierra con `pattern` en el schema (422 en el borde) y la UI ofreciendo los
+valores reales. De paso queda explícito qué significa `custodia`: **a dónde
+va el efectivo**, no quién lo recibe — eso ya lo prueba la firma del PIN, y
+tenerlo dos veces era garantizar que un día no coincidan.
+
+Suma `GET /accounting/cajas/turnos` (turno + cierre + tramo de custodia en
+una consulta) y `pos_verificados` en `CajaAbiertaOut`, que es lo único que
+le dice al cierre a qué terminales pedirles su lote.

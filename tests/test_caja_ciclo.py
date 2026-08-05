@@ -472,3 +472,83 @@ def test_sin_pos_verificados_el_cierre_no_pide_nada(env):
     h = _token(client)
     apertura = _abrir_caja(client, h, ids, monto="100.00").json()
     assert _cerrar_caja(client, h, apertura["id"], "100.00").status_code == 200
+
+
+# --- Listado de turnos cerrados (pantalla de contabilidad) --------------------
+def test_turnos_cerrados_traen_descuadre_y_tramo_de_custodia(env):
+    """La fila con la que trabaja contabilidad: sin este listado, reabrir un
+    cierre o recibir el efectivo exigía conocer de memoria el id de la
+    apertura."""
+    client, ids, _ = env
+    h = _token(client)
+    apertura = _abrir_caja(client, h, ids, monto="100.00").json()
+    _cerrar_caja(client, h, apertura["id"], "90.00")
+
+    turnos = client.get("/api/v1/accounting/cajas/turnos", headers=h).json()
+    assert len(turnos) == 1
+    turno = turnos[0]
+    assert turno["apertura_caja_id"] == apertura["id"]
+    assert Decimal(turno["descuadre_monto"]) == Decimal("-10.00")
+    assert turno["estado"] == "con_irregularidad"
+    # El efectivo arranca en el encargado: el tramo cajero→encargado ya lo
+    # firmó el cierre.
+    assert turno["custodia_estado"] == "en_supervisor"
+    assert turno["custodia_id"] is not None
+    assert turno["caja"]
+
+
+def test_un_turno_abierto_no_aparece_entre_los_cerrados(env):
+    client, ids, _ = env
+    h = _token(client)
+    _abrir_caja(client, h, ids, monto="100.00")
+    assert client.get("/api/v1/accounting/cajas/turnos", headers=h).json() == []
+
+
+def test_turnos_con_rango_invertido_400(env):
+    client, _, _ = env
+    h = _token(client)
+    r = client.get(
+        "/api/v1/accounting/cajas/turnos?desde=2026-08-05&hasta=2026-08-04", headers=h
+    )
+    assert r.status_code == 400
+
+
+def test_atribucion_del_descuadre_fuera_del_enum_se_rechaza(env):
+    """Texto libre entraba y dejaba el turno **ilegible**: la columna es un
+    enum de tres valores y la lectura reventaba después con `LookupError` al
+    mapear la fila. Se rechaza en el borde."""
+    client, ids, _ = env
+    h = _token(client)
+    apertura = _abrir_caja(client, h, ids, monto="100.00").json()
+    r = client.post(
+        f"/api/v1/accounting/cajas/apertura/{apertura['id']}/cierre",
+        headers=h,
+        json={
+            "detalle_denominaciones": billetes("90.00"),
+            "custodia": "Encargado de turno",
+            "autorizacion": _autorizacion(client, "accounting.caja_relevar"),
+            "descuadre_atribucion": "falta un billete de 20",
+        },
+    )
+    assert r.status_code == 422
+    # Y el turno sigue siendo legible: nada se escribió.
+    assert client.get("/api/v1/accounting/cajas/turnos", headers=h).json() == []
+
+
+def test_destino_de_custodia_fuera_del_enum_se_rechaza(env):
+    """`custodia` es a dónde va el efectivo, no el nombre de quien lo recibe
+    —eso ya lo prueba la firma—. Un nombre tecleado entraba y dejaba el turno
+    ilegible igual que la atribución del descuadre."""
+    client, ids, _ = env
+    h = _token(client)
+    apertura = _abrir_caja(client, h, ids, monto="100.00").json()
+    r = client.post(
+        f"/api/v1/accounting/cajas/apertura/{apertura['id']}/cierre",
+        headers=h,
+        json={
+            "detalle_denominaciones": billetes("100.00"),
+            "custodia": "Juan el encargado",
+            "autorizacion": _autorizacion(client, "accounting.caja_relevar"),
+        },
+    )
+    assert r.status_code == 422

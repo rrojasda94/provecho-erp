@@ -5,6 +5,47 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **La apertura y el cierre de caja del PDV devolvían 422** (2026-08-05,
+  ADR-025 Addendum). Los diálogos existían desde antes de ADR-025 y seguían
+  mandando el contrato viejo (`monto_apertura` en vez de `monto_declarado`,
+  el id del encargado en vez del token de `autorizacion`, un monto tecleado
+  en vez del conteo por denominación). Estuvo roto un día entero sin que
+  nada lo detectara: ninguna prueba automatizada toca esas pantallas.
+- **`custodia` y `descuadre_atribucion` aceptaban texto libre sobre una
+  columna `Enum`** (2026-08-05). Lo escrito entraba sin protestar y la fila
+  quedaba **ilegible**: la lectura reventaba después con `LookupError` al
+  mapear el enum, sobre una fila que es evidencia contable. Ahora se validan
+  con `pattern` en el schema (422 en el borde) y la UI ofrece los valores
+  reales. `custodia` es *a dónde va el efectivo*
+  (`local_caja_fuerte`/`traslado_contabilidad`), no quién lo recibe — eso ya
+  lo prueba la firma del PIN.
+- **Las pestañas de cobrados y pedidos abiertos del PDV se dibujaban
+  vacías** (2026-08-05). Desde la paginación del 2026-08-04 `GET /ventas`
+  devuelve `{items, total, ...}` y `lib/pdv.ts` lo seguía leyendo como
+  array; el `vs.filter is not a function` lo tragaba un `.catch` y la
+  pantalla mostraba una jornada sin ventas. No había un solo test HTTP del
+  listado; ahora hay cuatro.
+
+### Added
+
+- **Pantalla de caja en contabilidad** (2026-08-05): turnos cerrados con su
+  descuadre y el tramo de la cadena de custodia, entrega de custodia firmada
+  con PIN, reapertura de un cierre con motivo (RN-MDP-005) e inventario de
+  terminales de tarjeta. Nuevo `GET /accounting/cajas/turnos` (turno +
+  cierre + custodia en una consulta, no un N+1 por turno) y
+  `pos_verificados` en `CajaAbiertaOut`, que es lo que le dice al cierre a
+  qué terminales pedirles su reporte de lote.
+- **Campana de notificaciones en la barra superior** (2026-08-05): los
+  endpoints existían desde el 2026-08-04 sin ninguna pantalla que los
+  usara. Muestra solo lo no leído y marca leída al abrir la fila, no al
+  abrir el panel — mirar de reojo no es haberse enterado.
+- **`GET /sales/ventas` con rango de fechas** (2026-08-05): `desde`/`hasta`
+  inclusivos, sucursal opcional dentro del alcance del tenant y filtro por
+  punto de venta. Un solo endpoint para la jornada del PDV y el histórico
+  del back-office.
+
 ### Changed
 
 - **Paginación real en los listados operativos** (2026-08-04, ADR-026).

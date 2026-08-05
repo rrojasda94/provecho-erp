@@ -2,6 +2,7 @@
 y mapeo de asientos automáticos."""
 
 import uuid
+from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -32,6 +33,7 @@ from src.modules.users.application import autorizacion
 from src.modules.users.application.errors import TokenInvalido
 from src.modules.users.application.queries_publicas import tiene_permiso
 from src.modules.users.infrastructure.models import Usuario
+from src.shared import fechas
 from src.shared.paginacion import Pagina, Paginacion, paginacion, paginar
 
 router = APIRouter(prefix="/accounting", tags=["accounting"])
@@ -496,6 +498,28 @@ def listar_movimientos_caja(
 ):
     exigir_apertura_caja(session, apertura_caja_id, tenant)
     return MovimientoCajaRepo(session).de_apertura(apertura_caja_id)
+
+
+@router.get("/cajas/turnos", response_model=list[schemas.TurnoCerradoOut])
+def listar_turnos_cerrados(
+    desde: date | None = None,
+    hasta: date | None = None,
+    empresa_id: uuid.UUID | None = None,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Turnos cerrados del rango (por defecto hoy), con su descuadre y el
+    tramo de la cadena de custodia en el que está el efectivo."""
+    desde = desde or fechas.hoy()
+    hasta = hasta or desde
+    if hasta < desde:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, "`hasta` no puede ser anterior a `desde`"
+        )
+    return caja.turnos_cerrados(
+        session, tenant.filtro_empresa(empresa_id), desde=desde, hasta=hasta
+    )
 
 
 @router.get("/cajas/abiertas", response_model=list[schemas.CajaAbiertaOut])

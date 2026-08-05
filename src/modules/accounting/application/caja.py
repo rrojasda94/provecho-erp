@@ -25,7 +25,7 @@ importando `Venta`/`Pago` directo.
 """
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 from sqlalchemy.orm import Session
@@ -50,9 +50,11 @@ from src.modules.accounting.infrastructure.repositories import (
 )
 from src.modules.sales.application.queries_publicas import (
     puntos_venta_de_empresa,
+    puntos_venta_rotulados,
     total_efectivo_cobrado,
     total_tarjeta_cobrado,
 )
+from src.shared import fechas
 
 
 def _contar(detalle: dict | None, que: str) -> Decimal:
@@ -543,6 +545,50 @@ def registrar_arqueo(
     return arqueo
 
 
+def turnos_cerrados(
+    session: Session,
+    empresa_id: uuid.UUID | None,
+    *,
+    desde: date,
+    hasta: date,
+) -> list[dict]:
+    """Turnos cerrados de la empresa en el rango, con custodia y descuadre.
+
+    Es la lista sobre la que trabaja contabilidad: reabrir un cierre con
+    faltante (RN-MDP-005) y recibir el efectivo (RN-MDP-002) se hacen sobre
+    un turno concreto, y sin este listado hacía falta conocer de memoria el
+    id de la apertura para llegar a cualquiera de las dos cosas.
+    """
+    punto_venta_ids = puntos_venta_de_empresa(session, empresa_id)
+    filas = CierreCajaRepo(session).cerrados_entre(
+        punto_venta_ids, fechas.inicio_dia_utc(desde), fechas.fin_dia_utc(hasta)
+    )
+    # El rótulo lo da `sales`, dueño de `punto_venta` (mismo contrato público
+    # que usa el reporte de estado de caja): una tabla de turnos que no dice
+    # de qué caja habla no sirve para ir a reclamar un faltante.
+    rotulos = puntos_venta_rotulados(session, [a.punto_venta_id for _, a, _ in filas])
+    return [
+        {
+            "cierre_id": cierre.id,
+            "apertura_caja_id": apertura.id,
+            "punto_venta_id": apertura.punto_venta_id,
+            "caja": rotulos.get(apertura.punto_venta_id, "(sin rótulo)"),
+            "cajero_id": apertura.cajero_id,
+            "abierta_desde": apertura.created_at,
+            "monto_apertura": apertura.monto_apertura,
+            "descuadre_monto": cierre.descuadre_monto,
+            "descuadre_atribucion": cierre.descuadre_atribucion,
+            "estado": cierre.estado,
+            "custodia_destino": cierre.custodia,
+            "custodia_id": custodia.id if custodia else None,
+            "custodia_estado": custodia.estado if custodia else None,
+            "custodia_monto": custodia.monto if custodia else None,
+            "correcciones": cierre.correcciones,
+        }
+        for cierre, apertura, custodia in filas
+    ]
+
+
 def cajas_abiertas(session: Session, empresa_id: uuid.UUID | None = None) -> list[dict]:
     """Estado actual de caja por punto de venta de la empresa — para el
     dashboard gerencial (`core.dashboard_router`)."""
@@ -555,6 +601,7 @@ def cajas_abiertas(session: Session, empresa_id: uuid.UUID | None = None) -> lis
             "cajero_id": a.cajero_id,
             "monto_apertura": a.monto_apertura,
             "abierta_desde": a.created_at,
+            "pos_verificados": a.pos_verificados,
         }
         for a in aperturas
     ]

@@ -180,9 +180,19 @@ class CerrarCajaIn(BaseModel):
     """
 
     detalle_denominaciones: dict[str, int]
-    custodia: str
+    # A dónde va el efectivo, no quién lo recibe: a quién se le entregó ya lo
+    # prueba la firma de `autorizacion`. También es enum en la base, y sin el
+    # patrón un nombre tecleado dejaba el turno ilegible.
+    custodia: str = Field(pattern="^(local_caja_fuerte|traslado_contabilidad)$")
     autorizacion: str
-    descuadre_atribucion: str | None = None
+    # La columna es un enum de tres valores (RN-MDP-005). Sin este patrón, un
+    # texto libre entraba, se guardaba, y el turno quedaba **ilegible**: la
+    # lectura reventaba después con `LookupError` al mapear la fila. Un 422 en
+    # el borde es infinitamente mejor que una fila que no se puede volver a
+    # leer.
+    descuadre_atribucion: str | None = Field(
+        default=None, pattern="^(cajero|tercero_reportado|encargado)$"
+    )
     reportes_pos: list[ReportePosIn] | None = None
 
 
@@ -298,6 +308,32 @@ class CajaAbiertaOut(BaseModel):
     cajero_id: uuid.UUID
     monto_apertura: Decimal
     abierta_desde: datetime
+    # Viaja acá porque es lo único que le dice al cierre qué terminales
+    # tienen que traer su reporte de lote (RN-POS-004): sin esto el cajero
+    # descubre cuáles faltan recién cuando el servidor le rechaza el cierre.
+    pos_verificados: list | None = None
+
+
+class TurnoCerradoOut(BaseModel):
+    """Un turno ya cerrado visto desde contabilidad: qué descuadró y dónde
+    está el efectivo. Es la fila sobre la que se reabre un cierre
+    (RN-MDP-005) o se recibe la custodia (RN-MDP-002)."""
+
+    cierre_id: uuid.UUID
+    apertura_caja_id: uuid.UUID
+    punto_venta_id: uuid.UUID
+    caja: str
+    cajero_id: uuid.UUID
+    abierta_desde: datetime
+    monto_apertura: Decimal
+    descuadre_monto: Decimal
+    descuadre_atribucion: str | None
+    estado: str
+    custodia_destino: str | None
+    custodia_id: uuid.UUID | None
+    custodia_estado: str | None
+    custodia_monto: Decimal | None
+    correcciones: list | None
 
 
 class MovimientoDineroOut(BaseModel):

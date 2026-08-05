@@ -1,6 +1,8 @@
 import { ApiError, apiFetch } from "@/lib/api";
 import { obtenerSesion } from "@/lib/sesion";
 
+import { CajaCliente, type Pos, type Sucursal, type Turno } from "./caja-cliente";
+
 type FilaCaja = {
   caja: string;
   horas_abierta: number;
@@ -37,6 +39,28 @@ export default async function CajaPage() {
         ? "Tu usuario no tiene permiso para ver el estado de caja."
         : "No se pudo cargar el estado de caja.";
     return <p className="text-secondary">{mensaje}</p>;
+  }
+
+  // Sin `.catch(() => [])`: un listado que falla y se dibuja vacío dice
+  // "no hay turnos cerrados" cuando lo que pasó es que la consulta reventó,
+  // y eso se descubre el día que alguien busca un faltante y no lo encuentra.
+  let turnos: Turno[];
+  let pos: Pos[];
+  let sucursales: Sucursal[];
+  try {
+    [turnos, pos, sucursales] = await Promise.all([
+      apiFetch<Turno[]>("/api/v1/accounting/cajas/turnos", { token }),
+      apiFetch<Pos[]>("/api/v1/accounting/pos-tarjeta", { token }),
+      apiFetch<Sucursal[]>("/api/v1/sucursales", { token }),
+    ]);
+  } catch (e) {
+    return (
+      <p className="text-secondary">
+        {e instanceof ApiError && e.status === 403
+          ? "Tu usuario no tiene permiso para ver los turnos de caja."
+          : "No se pudieron cargar los turnos de caja."}
+      </p>
+    );
   }
 
   return (
@@ -104,10 +128,11 @@ export default async function CajaPage() {
         </div>
       )}
       <p className="text-xs text-gray">
-        Abrir, cerrar, reabrir un cierre y mover el efectivo por la cadena de custodia se
-        hacen por API todavía: cada paso exige el PIN del encargado (RN-MDP-002) y esa
-        pantalla va con el PDV.
+        Abrir y cerrar el turno se hacen desde el PDV, en el terminal del cajero: es donde
+        está el cajón que se cuenta.
       </p>
+
+      <CajaCliente turnos={turnos} pos={pos} sucursales={sucursales} />
     </div>
   );
 }

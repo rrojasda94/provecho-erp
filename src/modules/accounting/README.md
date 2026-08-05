@@ -123,6 +123,17 @@ finanzas documentados en el área:
     `accounting.caja_relevar` y `accounting.caja_reabrir`
     (`supervisor`/`contador`), `accounting.pos_administrar` (`contador`),
     `accounting.arqueo_registrar` (`supervisor`/`contador`).
+  - **`custodia` y `descuadre_atribucion` son enums, no texto libre**:
+    `custodia` es *a dónde va el efectivo* (`local_caja_fuerte` /
+    `traslado_contabilidad`) —a quién se le entregó ya lo prueba la firma
+    del PIN— y `descuadre_atribucion` es `cajero` / `encargado` /
+    `tercero_reportado`. Los dos se validan con `pattern` en el schema: sin
+    eso, un texto libre se escribía sin protestar y dejaba la fila
+    **ilegible**, porque la lectura reventaba después al mapear el enum.
+  - **Turnos cerrados**: `GET /accounting/cajas/turnos` devuelve el cierre,
+    el descuadre y el tramo de custodia en una sola consulta — es la lista
+    con la que trabaja contabilidad para reabrir un cierre o recibir el
+    efectivo, y traerlos por separado era un N+1 por turno.
   - **Fuera del slice**: el turno de caja no se replica al hub, y
     RN-POS-012/013 (prever sencillo, dedicación exclusiva durante el
     conteo) son organizativas — viven en el SOP, no en código.
@@ -143,6 +154,7 @@ finanzas documentados en el área:
 | POST | `/accounting/cajas/custodias/{id}/entregar` | `accounting.caja_operar` + PIN `caja_relevar` |
 | POST | `/accounting/cajas/cierres/{id}/reabrir` | `accounting.caja_operar` + PIN `caja_reabrir` |
 | GET | `/accounting/cajas/abiertas?empresa_id=` | `accounting.leer` |
+| GET | `/accounting/cajas/turnos?desde=&hasta=` | `accounting.leer` |
 | POST | `/accounting/arqueos` | `accounting.arqueo_registrar` |
 | POST | `/accounting/pos-tarjeta` | `accounting.pos_administrar` |
 | GET | `/accounting/pos-tarjeta?sucursal_id=` | `accounting.leer` |

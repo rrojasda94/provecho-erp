@@ -35,7 +35,13 @@ async function jornadaDe(
 ): Promise<Venta[]> {
   const query = new URLSearchParams({ sucursal_id: sucursalId });
   // Sin fecha, el backend usa hoy en zona del negocio — no la del navegador.
-  if (filtros.fecha) query.set("fecha", filtros.fecha);
+  // La pantalla mira un día y el endpoint acepta rango, así que va el mismo
+  // día en las dos puntas; el histórico de varios días espera a que el
+  // comprobante deje de pedirse venta por venta (N+1, ver ROADMAP).
+  if (filtros.fecha) {
+    query.set("desde", filtros.fecha);
+    query.set("hasta", filtros.fecha);
+  }
   if (filtros.estado) query.set("estado", filtros.estado);
   const pagina = await apiFetch<Pagina<Venta>>(`/api/v1/sales/ventas?${query}`, { token });
   return pagina.items;

@@ -33,6 +33,7 @@ import {
   type Borrador,
   type LineaBorrador,
 } from "./tipos";
+import { useCajaPdv } from "./use-caja-pdv";
 import { useDatosPdv } from "./use-datos-pdv";
 
 type Props = {
@@ -104,6 +105,16 @@ export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props)
   const [ocupado, setOcupado] = useState(false);
 
   const activo = borradores.find((b) => b.id === activoId) ?? borradores[0] ?? null;
+
+  const { abrirCaja, cerrarCaja, posDelTurno } = useCajaPdv({
+    puntoVentaId: puntoVenta.id,
+    caja: datos.caja,
+    setCaja: datos.setCaja,
+    setOcupado,
+    notificar: (texto) => notificar(texto),
+    mensajeDe,
+    alCerrarTurno: () => setDialogo(null),
+  });
 
   const notificar = useCallback((texto: string) => {
     setAviso(texto);
@@ -259,37 +270,6 @@ export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props)
     return { ventaId: venta.id, numero: venta.numero_orden };
   };
 
-  const abrirCaja = async (
-    monto: number,
-    detalle: Record<string, number>,
-    encargado: { username: string; pin: string },
-  ) => {
-    setOcupado(true);
-    try {
-      // El PIN del encargado sirve para dos cosas a la vez: verifica que
-      // realmente es él y devuelve su id, que es el `relevo_encargado_id`
-      // de la cadena de custodia (RN-MDP-002).
-      const elevacion = await api.autorizar(
-        encargado.username,
-        encargado.pin,
-        "accounting.caja_operar",
-      );
-      datos.setCaja(
-        await api.abrirCaja({
-          punto_venta_id: puntoVenta.id,
-          relevo_encargado_id: elevacion.autorizado_por,
-          monto_apertura: String(monto),
-          detalle_denominaciones: detalle,
-        }),
-      );
-      notificar(`Caja abierta con ${soles(monto)}`);
-    } catch (e) {
-      notificar(mensajeDe(e, "No se pudo abrir la caja"));
-    } finally {
-      setOcupado(false);
-    }
-  };
-
   /** Reabre una orden ya confirmada (mesa en curso, o para llevar/delivery
    * enviado a cocina) en una pestaña editable — con sus líneas reales, no
    * las que el navegador todavía recordara de antes de recargar. */
@@ -433,32 +413,6 @@ export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props)
     }
   };
 
-  const cerrarCaja = async (
-    montoReal: number,
-    _detalle: Record<string, number>,
-    custodia: string,
-  ) => {
-    if (!datos.caja) return;
-    setOcupado(true);
-    try {
-      const cierre = await api.cerrarCaja(datos.caja.apertura_caja_id, {
-        monto_real: String(montoReal),
-        custodia,
-      });
-      datos.setCaja(null);
-      setDialogo(null);
-      notificar(
-        cierre.estado === "conforme"
-          ? "Caja cerrada: conforme"
-          : `Caja cerrada con descuadre de ${soles(cierre.descuadre_monto)}`,
-      );
-    } catch (e) {
-      notificar(mensajeDe(e, "No se pudo cerrar la caja"));
-    } finally {
-      setOcupado(false);
-    }
-  };
-
   const verOrdenAbierta = (venta: Venta) => {
     reabrirOrden({
       ventaId: venta.id,
@@ -534,11 +488,13 @@ export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props)
 
       <DialogoApertura
         abierto={!datos.caja}
+        pos={datos.pos}
         onAbrir={abrirCaja}
         ocupado={ocupado}
       />
       <DialogoCierre
         abierto={dialogo === "cierre"}
+        posVerificados={posDelTurno}
         onCerrar={() => setDialogo(null)}
         onCerrarCaja={cerrarCaja}
         ocupado={ocupado}

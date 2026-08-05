@@ -50,7 +50,7 @@ Registro de lo construido y lo pendiente. Actualizar en cada cambio relevante.
 | Modo offline del PDV — hub local de sucursal | ✅ fase 1 2026-07-26 · fase 2 2026-07-27 | ADR-009: hub local dedicado por sucursal (misma imagen del backend, Postgres propio), los 3 clientes (web/Android/PC) le hablan siempre al hub por LAN. **Fase 1**: `DEPLOYMENT_MODE=hub` + validación de config, detector de conectividad, `GET /health/sync`, `docker-compose.hub.yml`. **Fase 2 — motor de sync**: ciclo que **empuja y después jala** (`src/core/sync/motor.py`, proceso `python -m src.core.sync.runner`); `id` client-generado en `crear_venta`/`registrar_pago`/`registrar_movimiento` (el cambio previo que pedía la fase 1, sin migración); endpoints dedicados `GET /sync/pull` + `POST /sync/push` (permisos `sync.leer`/`sync.empujar`, rol `hub_sucursal`) porque los públicos no alcanzaban (no traen `pin_hash` ni los campos del catálogo, no son incrementales, y el push necesita conservar quién vendió y el número de orden); contrato declarativo por módulo (`application/sincronizacion.py`, 28 recursos
 tras sumar precios y lote/FEFO) que el motor solo ensambla; tabla `sync_watermark` por recurso y dirección; `/health/sync` con avance y último error por recurso; alta de la cuenta de servicio con `python -m src.seeders.hub`. El hub NO empuja movimientos de inventario (el listener de la nube los regenera; duplicaría el consumo). 24 casos en `tests/test_sync_motor.py` sincronizando dos bases reales. Pendiente: ver Deuda técnica. |
 | Backups automáticos | ✅ 2026-07-26 | `python -m src.backups.backup`: dump `pg_dump --format=custom` → verificación del archivo (firma + tablas críticas) → restauración probada contra base desechable → copia a S3 (opcional) → purga con retención de 30 días que nunca borra la copia más reciente. **Diario** (antes se declaraba mensual e incremental). Cron del host, no Celery beat. Runbook en `docs/engineering/devops.md#backups`. Pendiente: alerta ante fallo, ver Deuda técnica. |
-| Ciclo de caja completo | ✅ 2026-08-04 | ADR-025, migración `f3a1c62d90b4`. **No se cobra sin caja abierta** (contrato público `accounting.hay_caja_abierta`; el replay del hub es la única excepción); el monto de apertura y cierre **sale del conteo por denominación** (RN-POS-003/007) y la diferencia contra lo declarado se calcula sin bloquear la apertura (RN-POS-011); **cada relevo lo firma quien recibe con su PIN** (RN-MDP-002, permiso `accounting.caja_relevar`) y `custodia_efectivo` es máquina de estados real hasta `disponible`; **un cierre con faltante se reabre y se recuenta** dejando motivo y autorizador en `cierre_caja.correcciones` (RN-MDP-005), solo mientras el efectivo siga en el local. Nueva entidad `pos_tarjeta` (serie + código de comercio, RN-POS-010; emergencia = `sucursal_id` NULL, RN-POS-009) verificada al abrir. `tests/test_caja_ciclo.py` (17 casos). |
+| Ciclo de caja completo | ✅ 2026-08-04 | ADR-025, migración `f3a1c62d90b4`. **No se cobra sin caja abierta** (contrato público `accounting.hay_caja_abierta`; el replay del hub es la única excepción); el monto de apertura y cierre **sale del conteo por denominación** (RN-POS-003/007) y la diferencia contra lo declarado se calcula sin bloquear la apertura (RN-POS-011); **cada relevo lo firma quien recibe con su PIN** (RN-MDP-002, permiso `accounting.caja_relevar`) y `custodia_efectivo` es máquina de estados real hasta `disponible`; **un cierre con faltante se reabre y se recuenta** dejando motivo y autorizador en `cierre_caja.correcciones` (RN-MDP-005), solo mientras el efectivo siga en el local. Nueva entidad `pos_tarjeta` (serie + código de comercio, RN-POS-010; emergencia = `sucursal_id` NULL, RN-POS-009) verificada al abrir. `tests/test_caja_ciclo.py` (17 casos). **Pantallas (2026-08-05)**: los diálogos del PDV se pusieron al día con este contrato —hablaban el anterior y devolvían 422 desde el día que se implementó— y contabilidad gana `/contabilidad/caja` con turnos cerrados, cadena de custodia firmada con PIN, reapertura e inventario de POS (`GET /accounting/cajas/turnos`). En el camino se cerró un agujero de integridad: `custodia` y `descuadre_atribucion` son enums y el schema los aceptaba como texto libre, dejando la fila ilegible al leerla. 24 casos. |
 | Dashboard gerencial mínimo | ✅ 2026-07-26 | `GET /api/v1/dashboard/resumen` (`src/core/dashboard_router.py`, permiso `dashboard.leer`): ventas del día (cantidad+total), stock bajo mínimo, cajas abiertas — agregador en `core`, nunca importa dominio de otro módulo (ADR-012). Requirió construir dos huecos que no existían: `sales` no tenía ningún listado de ventas, `accounting` tenía los modelos de caja (`apertura_caja`/`cierre_caja`/`arqueo`, migrados desde 2026-07-20) sin capa de aplicación. **Slice mínimo de caja** (`accounting.application.caja`): abrir/cerrar/arquear con **reconciliación real** (el cierre calcula `monto_esperado` desde los pagos en efectivo reales, vía contrato público de `sales`, no un número tipeado sin verificar). Primer frontend real: login por PIN + pantalla de dashboard en Next.js. Fuera de esta fase, a propósito: RN-POS-009..013 completas, relevo autenticado por PIN, máquina de estados de `custodia_efectivo` — ver Deuda técnica. |
 | Protección de datos personales (Ley 29733) | 🔶 ARCO técnico ✅ 2026-07-26 | `docs/security/proteccion-datos-personales.md`: qué datos trata el ERP y dónde viven (casi todo en `persona`, fuente única — RN-GEN-007; la excepción deliberada es `postulante`, ver 2026-08-01), derechos ARCO, plazos de conservación, medidas de seguridad ya vigentes (referenciadas, no reconstruidas), proceso de brecha. Cancelación implementada como **anonimización irreversible** de `persona`, no `DELETE` — `POST /api/v1/personas/{id}/anonimizar`, permiso dedicado `personas.anonimizar`, migración `dad43729501d` (RN-PER-007, ADR-011). Acceso/Rectificación ya existían (`GET`/`PATCH /personas/{id}`). Pendiente de **acción del usuario, no de código**: registro del banco de datos ante la ANPD, aviso de privacidad público, confirmar plazos de retención con el contador/abogado, jurisdicción de transferencia internacional. Pendiente técnico: ver Deuda técnica. |
 | Contrato OpenAPI de la API | ✅ 2026-07-26 | `docs/architecture/openapi.json` exportado (`python -m src.core.openapi_export`) y verificado en CI — un endpoint que cambia sin regenerar el contrato falla el PR (ADR-010). `TAGS_METADATA` en `src/core/app.py` describe los 15 tags de la API; un tag nuevo sin descripción falla un test. De paso, corregidas dos afirmaciones falsas en `api-guidelines.md`: `idempotency_key` es campo del body, no header; las colecciones devuelven array plano, no `{items,total,page,page_size}` (nunca se implementó paginación). |
@@ -258,8 +258,6 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   tocar un solo test**, que es la prueba de que el error no estaba ahí.
   `tests/test_fechas_negocio.py` congela la regla, incluido un caso que falla
   si algún módulo vuelve a usar `date.today()`.
-- ⬜ `users`: aplicar **restricciones JSONB** por permiso (hoy autoriza solo
-  por código, no por condición monto/estado/horario).
 - ⬜ Los tests de `conteos` comparan contra `date.today()` local mientras
   `created_at` usa `CURRENT_TIMESTAMP` (UTC): corriendo después de las
   19:00 hora Perú fallan cuatro casos por un día de diferencia. Falla
@@ -435,12 +433,41 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
 - ⬜ **Pagos por link de pago sin verificación automática al cierre**
   (RN-POS-008): hoy nada los concilia ni los computa en la caja principal
   de la sucursal. Llega con la integración de pasarela (Izipay).
-- ⬜ **Caja sin pantalla**: apertura, cierre, custodia, reapertura y el
-  inventario de POS se operan por API. La UI va con las pantallas de
-  Contabilidad.
-- ⬜ **`GET /ventas` genérico** (listado paginado con filtros): el
-  dashboard resuelve su propio agregado (`resumen_ventas_del_dia`); un
-  listado general de ventas para otros usos queda pendiente.
+- ✅ 2026-08-05 **Caja con pantalla, y dos columnas que se estaban
+  corrompiendo.** El PDV ya tenía diálogos de apertura y cierre, pero
+  hablaban el contrato **anterior** a ADR-025 (`monto_apertura` en vez de
+  `monto_declarado`, `relevo_encargado_id` en vez del token de
+  `autorizacion`, `monto_real` en vez del conteo por denominación): las dos
+  operaciones respondían 422 desde el 2026-08-04 y nadie lo había notado
+  porque ningún test cubre esa pantalla. Ahora la apertura pide lo declarado
+  por el encargado —y muestra la diferencia contra lo contado sin bloquear,
+  RN-POS-011— y la verificación de terminales; el cierre pide el reporte de
+  lote de cada POS que abrió operativo, el destino del efectivo y el PIN de
+  quien recibe.
+  **El hallazgo de fondo**: `cierre_caja.custodia` y
+  `cierre_caja.descuadre_atribucion` son **enums** en la base, y el schema
+  los declaraba `str` sin validar. La pantalla mandaba texto libre ("Juan el
+  encargado" en el destino del efectivo), la escritura pasaba, y la fila
+  quedaba **ilegible**: cualquier lectura posterior reventaba con
+  `LookupError` al mapear el enum. Se valida con `pattern` en el borde (422)
+  y la UI ofrece los valores reales — el destino es *a dónde va la plata*,
+  no quién la recibe, que ya lo prueba la firma. Dos tests congelan cada uno.
+  Del lado de contabilidad, `GET /accounting/cajas/turnos` (nuevo) lista los
+  turnos cerrados con su descuadre y el tramo de custodia, y la pantalla
+  `/contabilidad/caja` suma cadena de custodia firmada con PIN, reapertura
+  con motivo e inventario de POS. `CajaAbiertaOut` gana `pos_verificados`:
+  es lo único que le dice al cierre a qué terminales pedirles lote.
+  Verificado en navegador: ciclo completo abrir → cerrar → recibir custodia →
+  reapertura rechazada por RN-MDP-005.
+- ✅ 2026-08-05 **`GET /ventas` genérico**: rango de fechas (`desde`/`hasta`,
+  ambos inclusivos, por defecto hoy), sucursal opcional dentro del alcance
+  del tenant y filtro por punto de venta. Un solo endpoint para el PDV y el
+  back-office en vez de uno por uso. De paso apareció una **regresión que
+  llevaba desde la paginación del 2026-08-04**: el endpoint pasó a devolver
+  `{items, total, ...}` y `lib/pdv.ts` lo seguía leyendo como array, así que
+  las pestañas de cobrados y de pedidos abiertos del PDV se dibujaban vacías
+  sin ningún error visible (`vs.filter is not a function` lo tragaba el
+  `.catch`). No había un solo test del listado por HTTP; ahora hay cuatro.
 - ⬜ **Caché/paginación del agregador**: cada llamada a
   `/dashboard/resumen` recalcula todo en vivo — aceptable al volumen de hoy,
   revisar si empieza a pesar.
@@ -546,9 +573,15 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   consulta, pero nadie la manda al teléfono. Falta push/WhatsApp — y cuando
   llegue debe **leer de esta tabla**, no reemplazarla: un aviso que solo
   viajó por push no deja rastro de si alguien lo vio.
-- ⬜ **La bandeja no tiene pantalla todavía**: los endpoints están, el
-  frontend no. Con `sonner` ya instalado, la campana del shell es el
-  siguiente paso natural.
+- ✅ 2026-08-05 **La bandeja tiene pantalla**: campana en la barra superior
+  (`components/shell/campana.tsx`), contador de no leídas y panel con el
+  detalle. Muestra **solo lo no leído** —la campana contesta "¿hay algo que
+  atender?", y mezclar lo ya visto obliga a releer la lista entera para
+  contestar eso— y marca leída **al hacer click en la fila, no al abrir el
+  panel**: abrir para mirar de reojo no es haberse enterado. Refresca cada
+  60 s, que es el ritmo del barrido de Celery que las genera; pedirlas más
+  seguido no adelanta ninguna noticia. Sobre el `Popover` de shadcn que ya
+  estaba instalado, sin componente propio de dropdown.
 - ⬜ **Preferencias de aviso por usuario**: hoy la regla de destinatarios es
   fija. Se difiere a propósito hasta que haya un caso real ("de noche
   avisar también al dueño", "este local no usa la bandeja") — una tabla de
@@ -561,9 +594,12 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   contabilidad pide "todo el año en un archivo", 500 filas no alcanzan y
   ahí sí hace falta un endpoint que transmita en streaming — con su propio
   límite y probablemente asíncrono. No antes de que lo pidan.
-- ⬜ **`empresa_id` seguirá viniendo por query param** en `/dashboard/resumen`
-  hasta que se resuelva ADR-004 (tenant desde el JWT). Los endpoints de
-  `/reportes` y `/tableros` ya lo derivan del token, sin query param.
+- ✅ **`empresa_id` por query param en `/dashboard/resumen`** — **la entrada
+  estaba obsoleta** (verificado 2026-08-05): ADR-004 se resolvió el
+  2026-07-27 y el endpoint ya deriva la empresa del JWT vía
+  `tenant.empresa(empresa_id)`. El query param sobrevive como el escape
+  documentado del superusuario sin empresa asignada, igual que en el resto
+  de la API — no como la vía normal.
 
 ### Protección de datos personales (tras la implementación de 2026-07-26 — ADR-011)
 - ✅ 2026-08-01 **ARCO de postulante** (migración `b1d09e574c23`): los datos
@@ -1601,6 +1637,22 @@ errores de consola.
   orden ad-hoc, que es lo único que el backend implementa hoy
   (`plan_produccion` y `checklist_inocuidad_turno` siguen en deuda del
   módulo).
+- ⬜ **Ninguna pantalla tiene prueba automatizada** (deuda vieja con causa
+  nueva, 2026-08-05): el PDV estuvo mandando el contrato pre-ADR-025 a la
+  apertura y el cierre de caja durante un día entero sin que nada fallara en
+  CI, porque lo único que cubre esas pantallas es abrirlas a mano. Playwright
+  está decidido desde ADR-013 y sigue en cero. El caso mínimo que habría
+  atrapado esto es abrir y cerrar caja desde el PDV contra la API real.
+- ⬜ **Los enums de la base no tienen una sola fuente en el frontend**: la
+  pantalla de caja repite los valores de `custodia`, `descuadre_atribucion`
+  y los estados en constantes propias. Mientras el `pattern` del schema los
+  valide, un desalineado da 422 y no una fila corrupta —que era el problema
+  real—, pero generar estas listas desde `openapi.json` evitaría tener que
+  acordarse. No antes de que haya un tercer lugar que las repita.
+- ⬜ **La bandeja de notificaciones no se abre en la pantalla del PDV ni en
+  el KDS**: las dos viven fuera del shell (`app/pdv`, `app/kds`) y no llevan
+  barra superior. Un cajero no se entera de un pedido demorado por la
+  campana; se entera por el KDS. Va cuando exista push (mismo pendiente).
 
 Todo lo demás (theming multi-marca, accesibilidad — catálogo ya definido,
 tiempo real de KDS, i18n, hardware, testing — Playwright ya decidido por

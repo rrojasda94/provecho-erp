@@ -175,12 +175,19 @@ CRUD de productos comerciales y medios de pago. Capas `domain/rules.py`,
 | Método | Ruta | Permiso |
 |--------|------|---------|
 | POST | `/ventas` | `sales.crear` |
+| GET | `/ventas?sucursal_id=&desde=&hasta=&estado=&punto_venta_id=` | `sales.leer` |
 | GET | `/ventas/{id}` | `sales.leer` |
 | POST | `/ventas/{id}/pagos` | `sales.cobrar` |
 | POST | `/ventas/{id}/anular` | `sales.anular` |
 | POST/GET/PATCH | `/productos[/{id}]` | `gestionar_catalogo` / `leer` |
 | POST/GET | `/medios-pago` | `gestionar_catalogo` / `leer` |
 | GET | `/clientes?grupo_id=` | `sales.leer_clientes_externos` |
+
+`GET /ventas` es **uno solo** para el PDV y el back-office (paginado,
+ADR-026): sin parámetros da la jornada de hoy en las sucursales del usuario
+—que es lo que el PDV pide para su pestaña de cobrados— y con `desde`/`hasta`
+(inclusivos) da el histórico. Un endpoint por uso terminaba en dos consultas
+que se desincronizan.
 
 **Kiosk y Central de Pedidos NO son módulos**: son clientes del mismo
 contrato `POST /ventas` (`punto_venta.canal = kiosko|web|trabajador`),

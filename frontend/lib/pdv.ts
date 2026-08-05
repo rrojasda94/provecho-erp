@@ -114,12 +114,34 @@ export type Venta = {
   comensales: number | null;
 };
 
+/** Terminal de tarjeta de la sucursal, más los de emergencia del pool
+ * (RN-POS-009/010). */
+export type PosTarjeta = {
+  id: string;
+  serie: string;
+  codigo_comercio: string;
+  operador: string | null;
+  estado: string;
+  es_emergencia: boolean;
+  sucursal_id: string | null;
+};
+
+/** Cómo quedó un POS al abrir el turno. El cierre solo le pide reporte de
+ * lote a los que abrieron operativos: uno averiado no cobró nada. */
+export type PosVerificado = {
+  pos_tarjeta_id: string;
+  serie: string;
+  operativo: boolean;
+  observacion: string | null;
+};
+
 export type CajaAbierta = {
   apertura_caja_id: string;
   punto_venta_id: string;
   cajero_id: string;
   monto_apertura: string;
   abierta_desde: string;
+  pos_verificados: PosVerificado[] | null;
 };
 
 export type Autorizacion = {
@@ -161,10 +183,19 @@ export const api = {
 
   mediosPago: () => pedir<MedioPago[]>("/sales/medios-pago"),
 
-  ventasDelDia: (sucursalId: string, estado?: string) =>
-    pedir<Venta[]>(
-      `/sales/ventas?sucursal_id=${sucursalId}${estado ? `&estado=${estado}` : ""}`,
-    ),
+  /** El endpoint devuelve el sobre paginado de ADR-026; el PDV quiere la
+   * jornada entera y se le desenvuelve acá. `page_size` al techo (200): una
+   * sucursal que pase de 200 ventas cobradas en un día perdería las más
+   * viejas de la pestaña de cobrados, y ahí recién hace falta paginar la
+   * pestaña en vez de subir un número. */
+  ventasDelDia: async (sucursalId: string, estado?: string): Promise<Venta[]> => {
+    const pagina = await pedir<{ items: Venta[] }>(
+      `/sales/ventas?sucursal_id=${sucursalId}&page_size=200${
+        estado ? `&estado=${estado}` : ""
+      }`,
+    );
+    return pagina.items;
+  },
 
   crearVenta: (cuerpo: Record<string, unknown>) =>
     pedir<Venta>("/sales/ventas", { metodo: "POST", cuerpo }),
@@ -201,6 +232,12 @@ export const api = {
   cajasAbiertas: (empresaId: string) =>
     pedir<CajaAbierta[]>(`/accounting/cajas/abiertas?empresa_id=${empresaId}`),
 
+  /** Terminales que le toca verificar a esta sucursal al abrir: los suyos
+   * más los de emergencia del pool, que es lo que devuelve el endpoint
+   * cuando se le pasa la sucursal (RN-POS-009). */
+  posDeSucursal: (sucursalId: string) =>
+    pedir<PosTarjeta[]>(`/accounting/pos-tarjeta?sucursal_id=${sucursalId}`),
+
   /** `POST /cajas/apertura` devuelve el registro completo de la apertura
    * (`id`, `relevo_encargado_id`, `diferencia_reportada`...); `GET
    * /cajas/abiertas` devuelve la vista liviana de la lista, con
@@ -213,6 +250,7 @@ export const api = {
       punto_venta_id: string;
       cajero_id: string;
       monto_apertura: string;
+      pos_verificados: PosVerificado[] | null;
       created_at: string;
     }>("/accounting/cajas/apertura", { metodo: "POST", cuerpo });
     return {
@@ -221,6 +259,7 @@ export const api = {
       cajero_id: apertura.cajero_id,
       monto_apertura: apertura.monto_apertura,
       abierta_desde: apertura.created_at,
+      pos_verificados: apertura.pos_verificados,
     };
   },
 

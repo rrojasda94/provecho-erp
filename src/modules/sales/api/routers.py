@@ -92,25 +92,50 @@ def crear_venta(
 
 
 @router.get("/ventas", response_model=Pagina[schemas.VentaOut])
-def listar_ventas_del_dia(
-    sucursal_id: uuid.UUID,
-    fecha: date | None = None,
+def listar_ventas(
+    sucursal_id: uuid.UUID | None = None,
+    desde: date | None = None,
+    hasta: date | None = None,
     estado: str | None = None,
+    punto_venta_id: uuid.UUID | None = None,
     _: Usuario = Depends(require_permission(LEER)),
     tenant: Tenant = Depends(get_tenant),
     p: Paginacion = Depends(paginacion),
     session: Session = Depends(get_db),
 ):
-    """Jornada de una sucursal. Alimenta la pestaña de cobrados del PDV:
-    verificar lo vendido y reimprimir un comprobante que el cliente perdió.
+    """Ventas del alcance del usuario, filtrables por sucursal, rango de
+    fechas, estado y punto de venta.
+
+    Los defaults son la jornada de hoy en las sucursales del usuario: así el
+    PDV pide su pestaña de cobrados sin parámetros de fecha y el back-office
+    pide un histórico con `desde`/`hasta` (ambos inclusivos) por el mismo
+    endpoint, en vez de tener uno para cada uso.
     """
-    tenant.exigir_sucursal(sucursal_id)
+    if sucursal_id is not None:
+        tenant.exigir_sucursal(sucursal_id)
+        sucursales: list[uuid.UUID] | None = [sucursal_id]
+    elif tenant.superusuario:
+        # Mismo criterio que `Tenant.exigir_sucursal`, que ya lo deja pasar a
+        # cualquier sucursal: al superusuario no se le recorta el alcance, o
+        # el listado sin filtro mostraría menos que el listado con filtro.
+        sucursales = None
+    else:
+        sucursales = list(tenant.sucursal_ids)
+
+    desde = desde or fechas.hoy()
+    hasta = hasta or desde
+    if hasta < desde:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, "`hasta` no puede ser anterior a `desde`"
+        )
     return paginar(
         session,
-        VentaRepo(session).q_del_dia(
-            sucursal_id=sucursal_id,
-            fecha=fecha or fechas.hoy(),
+        VentaRepo(session).q_listar(
+            sucursal_ids=sucursales,
+            desde=desde,
+            hasta=hasta,
             estados=(estado,) if estado else None,
+            punto_venta_id=punto_venta_id,
         ),
         p,
     )

@@ -9,6 +9,7 @@ repositorio solo encapsula queries."""
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -264,6 +265,40 @@ class CierreCajaRepo:
         return self.s.scalar(
             select(CierreCaja).where(CierreCaja.apertura_caja_id == apertura_caja_id)
         )
+
+    def cerrados_entre(
+        self,
+        punto_venta_ids: list[uuid.UUID],
+        desde: datetime,
+        hasta: datetime,
+    ) -> list[tuple[CierreCaja, AperturaCaja, CustodiaEfectivo | None]]:
+        """Turnos ya cerrados, con su apertura y el tramo de custodia.
+
+        Los tres van juntos en una consulta y no en tres viajes: la pantalla
+        de contabilidad los muestra en la misma fila (cuánto se contó, cuánto
+        descuadró, dónde está la plata) y separarlos era un N+1 por turno.
+
+        El rango se compara contra instantes UTC ya convertidos desde la
+        fecha del negocio (`fechas.inicio_dia_utc`): comparar `created_at`
+        crudo contra una fecha corre el borde hasta cinco horas.
+        """
+        if not punto_venta_ids:
+            return []
+        filas = self.s.execute(
+            select(CierreCaja, AperturaCaja, CustodiaEfectivo)
+            .join(AperturaCaja, AperturaCaja.id == CierreCaja.apertura_caja_id)
+            .outerjoin(
+                CustodiaEfectivo,
+                CustodiaEfectivo.apertura_caja_id == AperturaCaja.id,
+            )
+            .where(
+                AperturaCaja.punto_venta_id.in_(punto_venta_ids),
+                AperturaCaja.created_at >= desde,
+                AperturaCaja.created_at <= hasta,
+            )
+            .order_by(AperturaCaja.created_at.desc())
+        )
+        return [(c, a, cu) for c, a, cu in filas]
 
     def add(self, cierre: CierreCaja) -> CierreCaja:
         self.s.add(cierre)

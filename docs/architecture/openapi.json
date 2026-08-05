@@ -1479,44 +1479,6 @@
         "title": "BriefUpdate",
         "type": "object"
       },
-      "CajaAbiertaOut": {
-        "properties": {
-          "abierta_desde": {
-            "format": "date-time",
-            "title": "Abierta Desde",
-            "type": "string"
-          },
-          "apertura_caja_id": {
-            "format": "uuid",
-            "title": "Apertura Caja Id",
-            "type": "string"
-          },
-          "cajero_id": {
-            "format": "uuid",
-            "title": "Cajero Id",
-            "type": "string"
-          },
-          "monto_apertura": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-            "title": "Monto Apertura",
-            "type": "string"
-          },
-          "punto_venta_id": {
-            "format": "uuid",
-            "title": "Punto Venta Id",
-            "type": "string"
-          }
-        },
-        "required": [
-          "apertura_caja_id",
-          "punto_venta_id",
-          "cajero_id",
-          "monto_apertura",
-          "abierta_desde"
-        ],
-        "title": "CajaAbiertaOut",
-        "type": "object"
-      },
       "CampanaCreate": {
         "properties": {
           "canal": {
@@ -2019,12 +1981,14 @@
             "type": "string"
           },
           "custodia": {
+            "pattern": "^(local_caja_fuerte|traslado_contabilidad)$",
             "title": "Custodia",
             "type": "string"
           },
           "descuadre_atribucion": {
             "anyOf": [
               {
+                "pattern": "^(cajero|tercero_reportado|encargado)$",
                 "type": "string"
               },
               {
@@ -3726,7 +3690,7 @@
         "properties": {
           "cajas_abiertas": {
             "items": {
-              "$ref": "#/components/schemas/CajaAbiertaOut"
+              "$ref": "#/components/schemas/src__core__dashboard_router__CajaAbiertaOut"
             },
             "title": "Cajas Abiertas",
             "type": "array"
@@ -13241,6 +13205,142 @@
         "title": "TransferenciaRecibirItem",
         "type": "object"
       },
+      "TurnoCerradoOut": {
+        "description": "Un turno ya cerrado visto desde contabilidad: qué descuadró y dónde\nestá el efectivo. Es la fila sobre la que se reabre un cierre\n(RN-MDP-005) o se recibe la custodia (RN-MDP-002).",
+        "properties": {
+          "abierta_desde": {
+            "format": "date-time",
+            "title": "Abierta Desde",
+            "type": "string"
+          },
+          "apertura_caja_id": {
+            "format": "uuid",
+            "title": "Apertura Caja Id",
+            "type": "string"
+          },
+          "caja": {
+            "title": "Caja",
+            "type": "string"
+          },
+          "cajero_id": {
+            "format": "uuid",
+            "title": "Cajero Id",
+            "type": "string"
+          },
+          "cierre_id": {
+            "format": "uuid",
+            "title": "Cierre Id",
+            "type": "string"
+          },
+          "correcciones": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correcciones"
+          },
+          "custodia_destino": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Custodia Destino"
+          },
+          "custodia_estado": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Custodia Estado"
+          },
+          "custodia_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Custodia Id"
+          },
+          "custodia_monto": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Custodia Monto"
+          },
+          "descuadre_atribucion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descuadre Atribucion"
+          },
+          "descuadre_monto": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Descuadre Monto",
+            "type": "string"
+          },
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          },
+          "monto_apertura": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Monto Apertura",
+            "type": "string"
+          },
+          "punto_venta_id": {
+            "format": "uuid",
+            "title": "Punto Venta Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "cierre_id",
+          "apertura_caja_id",
+          "punto_venta_id",
+          "caja",
+          "cajero_id",
+          "abierta_desde",
+          "monto_apertura",
+          "descuadre_monto",
+          "descuadre_atribucion",
+          "estado",
+          "custodia_destino",
+          "custodia_id",
+          "custodia_estado",
+          "custodia_monto",
+          "correcciones"
+        ],
+        "title": "TurnoCerradoOut",
+        "type": "object"
+      },
       "UnidadMedidaCreate": {
         "properties": {
           "categoria_udm_id": {
@@ -14274,6 +14374,44 @@
         "title": "VincularExtraCreate",
         "type": "object"
       },
+      "src__core__dashboard_router__CajaAbiertaOut": {
+        "properties": {
+          "abierta_desde": {
+            "format": "date-time",
+            "title": "Abierta Desde",
+            "type": "string"
+          },
+          "apertura_caja_id": {
+            "format": "uuid",
+            "title": "Apertura Caja Id",
+            "type": "string"
+          },
+          "cajero_id": {
+            "format": "uuid",
+            "title": "Cajero Id",
+            "type": "string"
+          },
+          "monto_apertura": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Monto Apertura",
+            "type": "string"
+          },
+          "punto_venta_id": {
+            "format": "uuid",
+            "title": "Punto Venta Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "apertura_caja_id",
+          "punto_venta_id",
+          "cajero_id",
+          "monto_apertura",
+          "abierta_desde"
+        ],
+        "title": "CajaAbiertaOut",
+        "type": "object"
+      },
       "src__core__reportes__router__RolOut": {
         "properties": {
           "id": {
@@ -14291,6 +14429,56 @@
           "nombre"
         ],
         "title": "RolOut",
+        "type": "object"
+      },
+      "src__modules__accounting__api__schemas__CajaAbiertaOut": {
+        "properties": {
+          "abierta_desde": {
+            "format": "date-time",
+            "title": "Abierta Desde",
+            "type": "string"
+          },
+          "apertura_caja_id": {
+            "format": "uuid",
+            "title": "Apertura Caja Id",
+            "type": "string"
+          },
+          "cajero_id": {
+            "format": "uuid",
+            "title": "Cajero Id",
+            "type": "string"
+          },
+          "monto_apertura": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Monto Apertura",
+            "type": "string"
+          },
+          "pos_verificados": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pos Verificados"
+          },
+          "punto_venta_id": {
+            "format": "uuid",
+            "title": "Punto Venta Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "apertura_caja_id",
+          "punto_venta_id",
+          "cajero_id",
+          "monto_apertura",
+          "abierta_desde"
+        ],
+        "title": "CajaAbiertaOut",
         "type": "object"
       },
       "src__modules__purchases__api__schemas__ComprobanteOut": {
@@ -14950,7 +15138,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/CajaAbiertaOut"
+                    "$ref": "#/components/schemas/src__modules__accounting__api__schemas__CajaAbiertaOut"
                   },
                   "title": "Response Listar Cajas Abiertas Api V1 Accounting Cajas Abiertas Get",
                   "type": "array"
@@ -15357,6 +15545,100 @@
           }
         ],
         "summary": "Entregar Custodia",
+        "tags": [
+          "accounting"
+        ]
+      }
+    },
+    "/api/v1/accounting/cajas/turnos": {
+      "get": {
+        "description": "Turnos cerrados del rango (por defecto hoy), con su descuadre y el\ntramo de la cadena de custodia en el que está el efectivo.",
+        "operationId": "listar_turnos_cerrados_api_v1_accounting_cajas_turnos_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "desde",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Desde"
+            }
+          },
+          {
+            "in": "query",
+            "name": "hasta",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Hasta"
+            }
+          },
+          {
+            "in": "query",
+            "name": "empresa_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Empresa Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TurnoCerradoOut"
+                  },
+                  "title": "Response Listar Turnos Cerrados Api V1 Accounting Cajas Turnos Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Turnos Cerrados",
         "tags": [
           "accounting"
         ]
@@ -26793,22 +27075,29 @@
     },
     "/api/v1/sales/ventas": {
       "get": {
-        "description": "Jornada de una sucursal. Alimenta la pestaña de cobrados del PDV:\nverificar lo vendido y reimprimir un comprobante que el cliente perdió.",
-        "operationId": "listar_ventas_del_dia_api_v1_sales_ventas_get",
+        "description": "Ventas del alcance del usuario, filtrables por sucursal, rango de\nfechas, estado y punto de venta.\n\nLos defaults son la jornada de hoy en las sucursales del usuario: así el\nPDV pide su pestaña de cobrados sin parámetros de fecha y el back-office\npide un histórico con `desde`/`hasta` (ambos inclusivos) por el mismo\nendpoint, en vez de tener uno para cada uso.",
+        "operationId": "listar_ventas_api_v1_sales_ventas_get",
         "parameters": [
           {
             "in": "query",
             "name": "sucursal_id",
-            "required": true,
+            "required": false,
             "schema": {
-              "format": "uuid",
-              "title": "Sucursal Id",
-              "type": "string"
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sucursal Id"
             }
           },
           {
             "in": "query",
-            "name": "fecha",
+            "name": "desde",
             "required": false,
             "schema": {
               "anyOf": [
@@ -26820,7 +27109,24 @@
                   "type": "null"
                 }
               ],
-              "title": "Fecha"
+              "title": "Desde"
+            }
+          },
+          {
+            "in": "query",
+            "name": "hasta",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Hasta"
             }
           },
           {
@@ -26837,6 +27143,23 @@
                 }
               ],
               "title": "Estado"
+            }
+          },
+          {
+            "in": "query",
+            "name": "punto_venta_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Punto Venta Id"
             }
           },
           {
@@ -26894,7 +27217,7 @@
             "HTTPBearer": []
           }
         ],
-        "summary": "Listar Ventas Del Dia",
+        "summary": "Listar Ventas",
         "tags": [
           "sales"
         ]

@@ -80,8 +80,10 @@ ninguna capa de aplicación ni endpoint — el ciclo de caja completo
   cual) — descartado: un cierre de caja que no verifica nada no es un
   control, es un formulario. El costo de calcular `monto_esperado` es una
   función más, no otro slice.
-- **Endpoint de listado de ventas genérico** (`GET /ventas?fecha=...`) en
-  vez de un resumen agregado — descartado para el dashboard: lo que la
-  vista gerencial necesita es cantidad+total, no la lista completa. Un
-  listado paginado de ventas queda como pendiente de API general (ver
-  ROADMAP → Contrato de API), no se resuelve de paso acá.
+- **Endpoint de listado de ventas genérico** en vez de un resumen agregado
+  — descartado para el dashboard: lo que la vista gerencial necesita es
+  cantidad+total, no la lista completa. Un listado paginado de ventas queda
+  como pendiente de API general, no se resuelve de paso acá.
+  *Resuelto aparte el 2026-08-05*: `GET /sales/ventas` acepta
+  `desde`/`hasta`, sucursal y punto de venta, paginado (ADR-026). El
+  dashboard sigue con su agregado propio, que es lo que este ADR decidió.
