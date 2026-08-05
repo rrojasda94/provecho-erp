@@ -424,6 +424,22 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   `sucursal_id` sale `None` para almacenes sin sucursal (central,
   producción) — su demanda cuenta, solo no se atribuye a un local.
 
+- ⬜ **La base de desarrollo está en la nube y eso hace lento todo**
+  (medido 2026-08-05): `DATABASE_URL` apunta a Supabase y cada consulta
+  cuesta **~130 ms de ida y vuelta** — `SELECT 1` tarda lo mismo que contar
+  usuarios, así que es distancia, no trabajo de base. Todo request
+  autenticado paga una consulta solo para resolver permisos, y una pantalla
+  típica (4 llamadas × 3-6 consultas) se va a **2-3 segundos de puro viaje
+  de red** antes de renderizar nada.
+  El arreglo ya está escrito y comentado en `.env`: el Postgres local de
+  `docker-compose` en el puerto 5433, que baja esos 130 ms a ~1. Queda como
+  decisión del usuario porque implica correr las migraciones y el seeder
+  contra esa base y trabajar con datos propios en vez de los compartidos.
+  Supabase sigue siendo la correcta para verificar deriva de esquema y para
+  lo que tenga que ver con datos reales.
+  Mitigado en paralelo: `next dev --turbopack` (2026-08-05) saca la
+  recompilación por ruta, que era el otro sumando.
+
 ### Seguridad (tras el endurecimiento base de 2026-07-26)
 - ⬜ **El seeder no revoca** (encontrado 2026-08-05 al retirarle
   `purchases.aprobar` al rol `supervisor`): `ROLES` solo agrega los permisos

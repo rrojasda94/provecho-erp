@@ -46,6 +46,7 @@ renumera nada). Este archivo define el orden de lectura recomendado.
 | | [module-guide.md](engineering/module-guide.md) | Cómo crear un módulo: estructura, los 7 registros para activarlo, módulo de referencia |
 | | [coding-standards.md](engineering/coding-standards.md) | Convenciones, formato, linters |
 | | [api-guidelines.md](engineering/api-guidelines.md) | Convenciones de API REST |
+| | [testing-strategy.md](engineering/testing-strategy.md) | Qué se prueba y en qué nivel; por qué el hueco real era el contrato cliente↔servidor y no el e2e |
 | | [testing.md](engineering/testing.md) | Estrategia de pruebas |
 | | [devops.md](engineering/devops.md) | Docker, entornos, CI/CD, despliegue |
 | | [observabilidad.md](engineering/observabilidad.md) | GlitchTip (errores), Loki (logs), salud y monitor |
