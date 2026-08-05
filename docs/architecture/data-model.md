@@ -874,6 +874,45 @@ Evento `sales.venta_confirmada` → inventory descuenta insumos según receta.
   público `sales/application/queries_publicas.py::venta_para_encuesta` —
   marketing no importa `Venta`.
 
+### Comercial-estrategia (spec 2026-08-05, sin implementar)
+
+Lo que el área Comercial decide **antes y alrededor** de la venta, y que
+hoy vive solo en SOPs y hojas sueltas. Dos de las cuatro entidades del
+pendiente original quedan acá; las otras dos —evaluación de desempeño y
+capacitación— viven en §8b y el motivo está explicado allá.
+
+- **meta_venta**: empresa_id, sucursal_id (nulo = meta del grupo),
+  canal (opcional — `pdv` | `kiosko` | `web` | `delivery`), periodo_desde,
+  periodo_hasta, tipo (`monto_venta` | `ticket_promedio` |
+  `unidades_producto`), producto_comercial_id (solo si el tipo es
+  unidades), valor_objetivo, es_rampa (bool — sucursal nueva arranca con
+  meta creciente, no con la de una consolidada), factor_ajuste y
+  motivo_ajuste (mes con feriados o evento atípico: se ajusta declarando
+  por qué, nunca se baja en silencio), comunicada_at, definida_por.
+  `comunicada_at` es columna y no un detalle de proceso: el SOP obliga a
+  comunicar la meta **antes** de que empiece el periodo, y una meta que
+  nadie supo que existía no se puede reclamar al cierre.
+- **meta_venta_seguimiento**: meta_venta_id, fecha_corte, acumulado_real,
+  proyeccion_al_ritmo, desvio, causa (texto — fricción de venta, quiebre
+  de stock, personal nuevo sin capacitar), correccion_acordada,
+  registrado_por. Una fila por corte semanal.
+  Existe como tabla aparte porque el seguimiento es el punto del SOP:
+  guardar solo el cumplimiento final convierte la meta en un número que se
+  mira cuando ya no hay nada que hacer. El cumplimiento al cierre es el
+  último `meta_venta_seguimiento`, no una columna que lo duplique.
+- **hallazgo_mercado**: empresa_id, sucursal_id (opcional — el hallazgo
+  suele ser de una zona), pregunta (la que se quiso responder; sin
+  pregunta concreta la investigación no llega a ningún lado),
+  fuente (`dato_interno` | `observacion_competencia` | `encuesta_cliente` |
+  `conversacion_cliente`), hallazgo, fecha, registrado_por,
+  archivo_id (opcional — foto de carta de competencia, planilla).
+  Es lo que separa una decisión con respaldo de una apuesta: el SOP dice
+  que una decisión de precio, producto nuevo o campaña **sin hallazgo
+  documentado se marca como apuesta**. Para que eso sea verificable,
+  `precio`, `producto_comercial` y `campana` referencian el hallazgo que
+  las sustenta (nullable — una apuesta declarada sigue siendo válida, solo
+  queda dicho que lo es).
+
 ## 7. Producción (módulo futuro production)
 
 Spec a futuro (2026-07-20) — primera cocina de producción planeada 2027,
@@ -1066,6 +1105,99 @@ un trabajador puede o no tener usuario, y no todo usuario es trabajador
 Los documentos de RRHH que son cartas/actas usan plantillas versionadas
 (ver `docs/templates/rrhh/`), rellenadas con datos del ERP + campos
 manuales, y visadas por abogado antes de uso (RN-CTR-002).
+
+### Proceso de incorporación (spec 2026-08-05, sin implementar)
+
+Las tres etapas que hoy solo viven en SOPs y en papel: entrevistar,
+inducir y decidir si el trabajador se queda. `convocatoria` y `postulante`
+(arriba) ya cubren desde la requisición hasta la contratación; esto es lo
+que pasa **después de decir que sí**.
+
+Las tres comparten una forma y conviene verla antes de las tablas: son
+**evaluaciones con criterios puntuados 1-4**. La escala es la misma a
+propósito en toda la organización —entrevista, periodo de prueba y
+desempeño comercial— para que RRHH pueda comparar a una persona consigo
+misma a lo largo del tiempo, que es lo único que vuelve útil un legajo. Por
+eso los criterios van en JSONB y no en columnas: cada puesto pregunta lo
+suyo y una tabla de criterios fijos obligaría a migrar el esquema cada vez
+que cambia una ficha.
+
+- **entrevista**: postulante_id, entrevistador_id (usuario), fecha,
+  modalidad (`presencial` | `telefonica` | `virtual`), puntualidad
+  (`puntual` | `tarde` | `no_asistio` — es el primer dato real de
+  comportamiento, no un trámite), criterios (JSONB: lista de
+  `{criterio, puntaje 1-4, nota}`), prueba_practica (JSONB opcional — corte
+  básico para cocina, cálculo de vuelto para caja), referencias (JSONB:
+  `{nombre, cargo, telefono, verificada, resultado}`), disponibilidad_real
+  (turnos, feriados, cómo llega), plazo_respuesta_dias, recomendacion
+  (`avanzar` | `descartar` | `en_duda`), observacion.
+  El puntaje se registra **al terminar la entrevista**, no "después": el
+  SOP lo dice porque después se olvida y se mezclan candidatos. Esa regla
+  es de proceso, pero explica por qué la ficha es una entidad y no un campo
+  de texto en `postulante`.
+- **plan_induccion**: trabajador_id, tipo (`grupo_empresa_marca` |
+  `puesto_operativo`), instructor_id, fecha_inicio, fecha_fin_prevista,
+  estado (`en_curso` | `completado` | `interrumpido`),
+  constancia_archivo_id (la firma del encargado al cerrar la semana).
+- **plan_induccion_item**: plan_induccion_id, tipo (`sop` | `curso` |
+  `entrega`), referencia (código del SOP o del curso — texto, no FK: los
+  SOPs viven en `docs/`, no en la base), orden, critico (bool — seguridad e
+  higiene van primero), completado_at, instructor_iniciales.
+  Un ítem por SOP/curso que el perfil exige, marcado con fecha e iniciales
+  a medida que se completa. Es lo que hace que "se le indujo" sea
+  verificable y no una afirmación.
+- **evaluacion_periodo_prueba**: trabajador_id, hito (`mes_1` | `mes_2_5`),
+  evaluador_id, fecha, criterios (JSONB, misma escala 1-4: asistencia y
+  puntualidad, dominio de los SOPs de su puesto, trato con clientes y
+  equipo, actitud ante la corrección), retroalimentacion_dada (bool),
+  constancia_archivo_id, decision (`continua` | `no_continua` — solo en el
+  hito `mes_2_5`), motivo_decision.
+  Dos filas por trabajador, no una: **la tendencia importa más que la
+  foto**, y guardar solo la última evaluación borra justamente el dato que
+  sustenta la decisión. El cese dentro del periodo de prueba no requiere
+  causa, pero sí requiere haber avisado en el mes 1 — y eso es lo que
+  prueba la primera fila.
+
+Ninguna de las tres tiene tabla todavía. Van en el slice de incorporación,
+detrás del tablero de contratación que ya existe.
+
+### Evaluación y capacitación (spec 2026-08-05, sin implementar)
+
+Estas dos las **ejecuta Comercial** (SOPs de evaluación de desempeño
+comercial y de capacitación de venta) y aun así viven en `rrhh`: su
+artefacto termina en el file personal del trabajador, y `sales` no puede
+ser dueño de datos de `trabajador` sin importar el dominio de `rrhh`
+(CLAUDE.md). Comercial las produce; RRHH las custodia. Quien evalúa queda
+en `evaluador_id`, que es lo que hace visible que el evaluador fue de otra
+área.
+
+- **evaluacion_desempeno**: trabajador_id, area (`comercial` | `cocina` |
+  `almacen` | …), periodo_desde, periodo_hasta, evaluador_id,
+  indicadores (JSONB — para Comercial: ticket promedio, quejas asociadas,
+  desistimientos atendidos y su resolución, extraídos del ERP),
+  criterios (JSONB, escala 1-4, la misma de toda la organización),
+  observacion_en_sitio (la visita no anunciada, mismo criterio que la
+  supervisión de SOPs de limpieza y apertura),
+  retroalimentacion_dada_at (bool con fecha — el SOP exige darla **de
+  inmediato**, no esperar al cierre de mes si algo se puede corregir ya),
+  senalado_a_rrhh (bool), archivo_id.
+  `senalado_a_rrhh` no es decoración: con desempeño bajo dos meses
+  seguidos, Comercial **señala pero no actúa** — la acción (plan de
+  mejora, cambio de puesto, cese) la decide RRHH/administración. Un flag
+  que marca "esto ya se escaló" es lo que evita que el caso se pierda entre
+  dos áreas que cada una cree que le toca a la otra.
+- **capacitacion**: empresa_id, tema, motivo (`guion_nuevo` |
+  `producto_nuevo` | `promocion` | `refuerzo_desempeno`), contenido
+  (JSONB — qué se dice, preguntas frecuentes anticipadas, material de
+  Marketing si aplica), area_solicitante, fecha, duracion_min,
+  sucursal_id (nulo = todo el grupo), instructor_id, es_parte_de_induccion
+  (bool — el mismo contenido puede darse dentro de la inducción al puesto
+  en vez de como sesión aparte), verificacion_comprension (JSONB — las 2-3
+  preguntas rápidas antes de cerrar).
+- **capacitacion_asistente**: capacitacion_id, trabajador_id,
+  constancia_archivo_id. Una fila por asistente: la constancia firmada va
+  al file personal de **cada uno**, no de la sesión. Sin esto, "el equipo
+  fue capacitado" no se puede sostener ante un reclamo individual.
 
 ## 8c. Gerencia y gobierno (transversal)
 

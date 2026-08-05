@@ -137,11 +137,26 @@ contiene, buscando su `[[ COMPLETAR ]]`):
   REMYPE, y llevar entidades contables (asiento, plan de cuentas, activo
   fijo, conciliación) a `data-model.md` en su slice.
 - ⬜ Tratamiento de contratos vigentes al salir de REMYPE (~jul 2027).
-- ⬜ Entidades de datos de Comercial-estrategia (metas de venta,
-  evaluación de desempeño comercial, plan de capacitación, hallazgos de
-  mercado) y de RRHH-proceso (convocatoria, entrevista/evaluación,
-  inducción, evaluación de periodo de prueba) — SOPs y plantillas ya
-  existen, falta llevarlas a `data-model.md`.
+- ✅ 2026-08-05 Entidades de **Comercial-estrategia** y **RRHH-proceso**
+  llevadas a `data-model.md`. `convocatoria` y `postulante` ya estaban
+  desde el slice de contratación (2026-08-01) — la entrada las seguía
+  listando como pendientes. Especificadas ahora, sin implementar:
+  `meta_venta` + `meta_venta_seguimiento` y `hallazgo_mercado` en §6;
+  `entrevista`, `plan_induccion` + `plan_induccion_item`,
+  `evaluacion_periodo_prueba`, `evaluacion_desempeno` y `capacitacion` +
+  `capacitacion_asistente` en §8b.
+  Tres decisiones que valen más que las tablas: (a) **la escala 1-4 es la
+  misma en toda la organización** —entrevista, periodo de prueba, desempeño
+  comercial— para poder comparar a una persona consigo misma a lo largo del
+  tiempo, y los criterios van en JSONB porque cada puesto pregunta lo suyo;
+  (b) **evaluación de desempeño y capacitación viven en `rrhh` aunque las
+  ejecute Comercial**: su artefacto termina en el file personal y `sales`
+  no puede ser dueño de datos de `trabajador` — Comercial produce, RRHH
+  custodia, y `evaluador_id` deja visible que el evaluador fue de otra
+  área; (c) **el seguimiento de la meta es tabla, no columna**: guardar
+  solo el cumplimiento final convierte la meta en un número que se mira
+  cuando ya no hay nada que hacer, que es justo lo que el SOP quiere
+  evitar. Falta el slice que las implemente.
 - ⬜ BPMN de las áreas nuevas (RRHH, Compras, Comercial-estrategia,
   Almacén-Logística): enfoque vigente es **primero SOP, luego BPMN** —
   los BPMN se agregan por área cuando sus SOPs estén estables, y en ese
