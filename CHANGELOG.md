@@ -48,6 +48,33 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Added
 
+- **Pruebas de pantalla de sesión y del gate de módulo por permiso**
+  (2026-08-06, `frontend/e2e/sesion.spec.ts`). Con esto quedan cubiertos los
+  **tres** casos que `docs/engineering/testing-strategy.md` da por
+  justificados para un e2e; el documento es también el techo, no una lista
+  de deseos. Siete casos en total:
+  - Una ruta protegida sin sesión manda al login.
+  - El login deja el token en cookie **httpOnly** —el atributo se afirma
+    explícitamente porque no se ve en ninguna pantalla y se rompe en
+    silencio; un token legible por `document.cookie` lo roba cualquier XSS—
+    y el logout la mata de verdad: la ruta protegida vuelve a rebotar, no
+    solo cambia la pantalla.
+  - **El cajero no ve Catálogo ni entrando por `/catalogo/productos`**, y el
+    admin sí. Se prueba de a pares a propósito: un gate que esconde el
+    módulo para *todos* pasaría por bueno con la mitad de la prueba. Por URL
+    directa y no solo por el home, porque el filtro del home es UX — lo que
+    decide es el `layout.tsx` (ADR-013 + enmienda 2026-08-03).
+  - **Un rechazo del servidor deja el formulario de apertura abierto con lo
+    tecleado.** Recontar el cajón entero porque alguien erró seis dígitos
+    del PIN es la clase de fricción que termina en un conteo inventado, y
+    ese conteo es la evidencia sobre la que se calcula el descuadre del
+    turno.
+  Sigue faltando —y sigue siendo la prioridad— el test de contrato
+  cliente↔servidor: estos e2e cubren arranque y candados, no el desacuerdo
+  de forma que originó los dos bugs de ADR-025/026.
+- **`cajero_e2e` en el seeder de e2e** (2026-08-06): el usuario con menos
+  permisos que igual opera una pantalla. Existe para probar lo contrario que
+  el encargado — qué **no** se ve.
 - **Job `e2e` en `ci.yml`** (2026-08-06): corre `npm run test:e2e` sobre
   chromium y sube `test-results/` como artefacto cuando falla — sin el trace
   y las capturas, un rojo en CI es una línea de texto. Es el único job que

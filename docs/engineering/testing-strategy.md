@@ -46,16 +46,27 @@ las pantallas de una vez en lugar de una por prueba.
 
 ## Qué sí justifica un e2e
 
-Tres cosas, y ninguna es una regla de negocio:
+Tres cosas, y ninguna es una regla de negocio. **Las tres están cubiertas**
+(2026-08-06) — la lista es también el techo: lo que no entra acá no se
+escribe como e2e.
 
 1. **Que la sesión funcione**: login → cookie httpOnly → una pantalla
    protegida. Si esto se rompe, no importa qué más ande.
+   `e2e/sesion.spec.ts`. El atributo `httpOnly` se afirma explícitamente: no
+   se ve en ninguna pantalla, así que se rompe en silencio, y un token
+   legible por `document.cookie` lo roba cualquier XSS.
 2. **Un solo flujo del dinero completo**: abrir caja → vender → cobrar →
    cerrar. No para verificar el descuadre —eso es dominio— sino para
-   verificar que las cuatro pantallas encadenan.
+   verificar que las cuatro pantallas encadenan. `e2e/caja.spec.ts`.
 3. **Los candados que solo existen en pantalla**: el diálogo bloqueante de
-   apertura (sin caja no se vende), y que un rechazo del servidor deje el
-   formulario abierto con lo tecleado en vez de perderlo.
+   apertura (sin caja no se vende), que un rechazo del servidor deje el
+   formulario abierto con lo tecleado en vez de perderlo, y el **gate de
+   módulo por permiso** (ADR-013 + enmienda 2026-08-03) probado **entrando
+   por URL directa** — el filtro del home es UX, lo que decide es el
+   `layout.tsx`, y solo la URL directa distingue uno del otro.
+
+Un gate se prueba **de a pares**: el cajero no ve Catálogo *y* el admin sí.
+Sin la contraparte, un gate que esconde el módulo para todos pasa por bueno.
 
 Todo lo demás que se sienta como "hay que probar la pantalla" es, casi
 siempre, un test de contrato o de dominio mal ubicado.
@@ -95,9 +106,13 @@ Aprendidas a los golpes; cada una costó tiempo:
 - Dominio y API: **887 casos**, en verde, en CI.
 - Unidad de frontend: 14 casos (`npm test`). **No corren en CI todavía** —
   el job de frontend solo hace `lint` y `build`.
-- Contrato cliente↔servidor: **no existe**. Es la prioridad.
-- e2e: **2 casos en verde y en CI** (job `e2e`), solo sobre el PDV. Ver
-  ROADMAP → Frontend.
+- Contrato cliente↔servidor: **no existe**. **Sigue siendo la prioridad** —
+  los e2e de abajo cubren el arranque y los candados, no el desacuerdo de
+  forma entre lo que el cliente manda y lo que el servidor espera, que es de
+  donde salieron los dos bugs que originaron todo esto.
+- e2e: **7 casos en verde y en CI** (job `e2e`), sobre PDV, sesión y el gate
+  de módulo. Los tres puntos de "qué sí justifica un e2e" quedan cubiertos.
+  Ver ROADMAP → Frontend.
 
 ## Nota de velocidad
 

@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { ENCARGADO, contar, dialogo, ingresar } from "./util";
+
 /**
  * El flujo del dinero de punta a punta: abrir caja → vender → cobrar →
  * cerrar caja.
@@ -13,40 +15,7 @@ import { expect, test, type Page } from "@playwright/test";
  * `e2e.db`.
  */
 
-const ADMIN = { usuario: "admin", pin: "123456" };
-// Abrir caja exige que el encargado que releva **no** sea el cajero
-// (RN-MDP-002): son dos personas, y por eso la prueba necesita dos usuarios.
-const ENCARGADO = { usuario: "encargado_e2e", pin: "654321" };
 const PRODUCTO = "Pizza E2E";
-
-async function ingresar(page: Page) {
-  await page.goto("/login");
-  await page.getByRole("textbox").first().fill(ADMIN.usuario);
-  await page.locator('input[type="password"]').fill(ADMIN.pin);
-  await page.getByRole("button", { name: "Ingresar" }).click();
-  // Se espera el **contenido** del destino, no la navegación: el `redirect`
-  // de una Server Action lo resuelve el cliente sin recargar, así que nunca
-  // se dispara el evento `load` que `waitForURL` espera por defecto y la
-  // prueba se queda mirando una página que ya cambió.
-  await expect(page.getByText(/Elige un módulo/i)).toBeVisible({ timeout: 30_000 });
-}
-
-/** El diálogo visible. Los de apertura y cierre están **los dos montados**
- * en el DOM —solo uno abierto— y comparten los testids del conteo por
- * denominación, así que buscar por testid a nivel de página encuentra dos
- * elementos y Playwright lo rechaza. Acotar al `dialog[open]` es también lo
- * correcto: la prueba interactúa con lo que el cajero ve. */
-function dialogo(page: Page) {
-  return page.locator("dialog[open]");
-}
-
-/** Teclea el conteo por denominación. Las claves son el valor del billete,
- * igual que el `detalle_denominaciones` que viaja al servidor. */
-async function contar(page: Page, conteo: Record<string, number>) {
-  for (const [valor, piezas] of Object.entries(conteo)) {
-    await dialogo(page).getByTestId(`denom-${valor}`).fill(String(piezas));
-  }
-}
 
 async function abrirCaja(page: Page, { declarado }: { declarado: string }) {
   await contar(page, { "100": 1, "50": 2 }); // 200.00
@@ -59,11 +28,12 @@ async function abrirCaja(page: Page, { declarado }: { declarado: string }) {
   });
 }
 
-// `serial`: la segunda prueba necesita la caja cerrada, y quien la cierra es
-// la primera. Sin esto, un fallo en la primera hace fallar a la segunda con
-// "no aparece el diálogo de apertura" — un síntoma que no dice nada del error
-// real. En serie, la segunda queda **saltada** y el reporte señala una sola
-// causa.
+// `serial`: estas pruebas se pasan el estado de la caja entre ellas —la
+// primera la abre y la cierra, la segunda la vuelve a abrir— y el orden de
+// declaración es el orden de ejecución. Sin esto, un fallo en la primera
+// hace fallar a las siguientes con "no aparece el diálogo de apertura", un
+// síntoma que no dice nada del error real. En serie quedan **saltadas** y el
+// reporte señala una sola causa.
 test.describe.serial("Flujo del dinero", () => {
   test("abrir caja, vender, cobrar y cerrar", async ({ page }) => {
     await ingresar(page);
@@ -119,6 +89,34 @@ test.describe.serial("Flujo del dinero", () => {
     await expect(page.getByTestId("estado-caja")).toContainText("Caja cerrada", {
       timeout: 15_000,
     });
+  });
+
+  test("un rechazo del servidor deja el formulario abierto con lo tecleado", async ({
+    page,
+  }) => {
+    // El candado que solo existe en pantalla: si el PIN del encargado no
+    // valida, el diálogo **no** puede limpiarse. Recontar el cajón entero
+    // porque alguien tecleó mal seis dígitos es la clase de fricción que
+    // termina en un conteo inventado — y el conteo es la evidencia sobre la
+    // que se calcula el descuadre de todo el turno.
+    await ingresar(page);
+    await page.goto("/pdv");
+    await expect(dialogo(page).getByText("Apertura de caja")).toBeVisible();
+
+    await contar(page, { "100": 1, "50": 2 });
+    await dialogo(page).getByTestId("apertura-declarado").fill("200");
+    await dialogo(page).getByTestId("apertura-usuario").fill(ENCARGADO.usuario);
+    await dialogo(page).getByTestId("apertura-pin").fill("000000");
+    await dialogo(page).getByRole("button", { name: "Abrir caja" }).click();
+
+    await expect(page.getByText(/No se pudo abrir la caja|credencial/i)).toBeVisible({
+      timeout: 15_000,
+    });
+    // Lo que importa no es el aviso, es que nada se perdió.
+    await expect(dialogo(page).getByText("Apertura de caja")).toBeVisible();
+    await expect(dialogo(page).getByTestId("denom-100")).toHaveValue("1");
+    await expect(dialogo(page).getByTestId("denom-50")).toHaveValue("2");
+    await expect(dialogo(page).getByTestId("apertura-declarado")).toHaveValue("200");
   });
 
   test("la diferencia entre lo contado y lo declarado no impide abrir", async ({

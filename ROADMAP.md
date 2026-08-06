@@ -46,7 +46,7 @@ Registro de lo construido y lo pendiente. Actualizar en cada cambio relevante.
 | Auditoría (audit_log) | ⬜ | Especificada en data-model |
 | Endurecimiento de producción (rate limit, secretos, HTTPS, cabeceras) | 🔶 base ✅ 2026-07-26 | Rate limit por IP en login/refresh (Redis, fail-open), validación de config que aborta el arranque en `production` con valores de desarrollo, CORS + `TrustedHost` + cabeceras de seguridad + HSTS, `/docs` cerrado en producción, uvicorn `--proxy-headers`. Runbook de rotación de credenciales y custodia de `.env` en `docs/engineering/devops.md`. Pendiente: ver Deuda técnica → Seguridad. |
 | App Android (15+) | ⬜ | **Decidido (ADR-013): PWA/responsive, no app nativa** — Next.js + Tailwind + Base UI es 100% web, sin base de código separada; debe hablar con el hub local de sucursal igual que web y PC, ver ADR-009 |
-| Arquitectura frontend (Tailwind, shadcn/ui, shell estilo Odoo) | ✅ spec 2026-07-27 | ADR-013 (revisado): Tailwind sobre los tokens de marca existentes (`tailwind.config.ts` → `var(--color-*)`, sin hex mágico); **shadcn/ui** (componentes copiados y editables, corre sobre Base UI, no Radix) para overlays/combobox/dialog y catálogo base — token set semántico + `--radius` único, mejor ajuste para editar color/forma por marca rápido que construir a mano; home de apps + sidebar por módulo estilo Odoo; grid y rutas filtrados por `permisos` de `GET /users/me` (ya existente, sin cambio de backend), guard real server-side en cada `layout.tsx` de módulo — el filtro del grid es solo UX. Sin librería de estado global (YAGNI). Playwright para e2e de flujos críticos: **2 casos del flujo del dinero en verde y en CI desde 2026-08-06**, ver Deuda técnica → Frontend. `docs/prompts/frontend.md` actualizado con las reglas técnicas. Sin implementación de código todavía. |
+| Arquitectura frontend (Tailwind, shadcn/ui, shell estilo Odoo) | ✅ spec 2026-07-27 | ADR-013 (revisado): Tailwind sobre los tokens de marca existentes (`tailwind.config.ts` → `var(--color-*)`, sin hex mágico); **shadcn/ui** (componentes copiados y editables, corre sobre Base UI, no Radix) para overlays/combobox/dialog y catálogo base — token set semántico + `--radius` único, mejor ajuste para editar color/forma por marca rápido que construir a mano; home de apps + sidebar por módulo estilo Odoo; grid y rutas filtrados por `permisos` de `GET /users/me` (ya existente, sin cambio de backend), guard real server-side en cada `layout.tsx` de módulo — el filtro del grid es solo UX. Sin librería de estado global (YAGNI). Playwright para e2e de flujos críticos: **7 casos en verde y en CI desde 2026-08-06** (flujo del dinero, sesión y gate de módulo por permiso), ver Deuda técnica → Frontend. `docs/prompts/frontend.md` actualizado con las reglas técnicas. Sin implementación de código todavía. |
 | Modo offline del PDV — hub local de sucursal | ✅ fase 1 2026-07-26 · fase 2 2026-07-27 | ADR-009: hub local dedicado por sucursal (misma imagen del backend, Postgres propio), los 3 clientes (web/Android/PC) le hablan siempre al hub por LAN. **Fase 1**: `DEPLOYMENT_MODE=hub` + validación de config, detector de conectividad, `GET /health/sync`, `docker-compose.hub.yml`. **Fase 2 — motor de sync**: ciclo que **empuja y después jala** (`src/core/sync/motor.py`, proceso `python -m src.core.sync.runner`); `id` client-generado en `crear_venta`/`registrar_pago`/`registrar_movimiento` (el cambio previo que pedía la fase 1, sin migración); endpoints dedicados `GET /sync/pull` + `POST /sync/push` (permisos `sync.leer`/`sync.empujar`, rol `hub_sucursal`) porque los públicos no alcanzaban (no traen `pin_hash` ni los campos del catálogo, no son incrementales, y el push necesita conservar quién vendió y el número de orden); contrato declarativo por módulo (`application/sincronizacion.py`, 28 recursos
 tras sumar precios y lote/FEFO) que el motor solo ensambla; tabla `sync_watermark` por recurso y dirección; `/health/sync` con avance y último error por recurso; alta de la cuenta de servicio con `python -m src.seeders.hub`. El hub NO empuja movimientos de inventario (el listener de la nube los regenera; duplicaría el consumo). 24 casos en `tests/test_sync_motor.py` sincronizando dos bases reales. Pendiente: ver Deuda técnica. |
 | Backups automáticos | ✅ 2026-07-26 | `python -m src.backups.backup`: dump `pg_dump --format=custom` → verificación del archivo (firma + tablas críticas) → restauración probada contra base desechable → copia a S3 (opcional) → purga con retención de 30 días que nunca borra la copia más reciente. **Diario** (antes se declaraba mensual e incremental). Cron del host, no Celery beat. Runbook en `docs/engineering/devops.md#backups`. Pendiente: alerta ante fallo, ver Deuda técnica. |
@@ -1844,9 +1844,33 @@ errores de consola.
      lo que hace pensar en flakiness. Con 240 s el recorrido completo entra
      en ~96 s. **No hizo falta pasar a `build`+`start`**, y con eso queda sin
      efecto lo que decía este punto sobre el origen de las Server Actions.
-  Deuda que deja: son **dos** casos sobre una sola pantalla. El resto del
-  ERP sigue sin prueba de pantalla, y el job tarda ~4 min porque levanta
-  Next en modo desarrollo.
+- ✅ 2026-08-06 **Los tres casos que la estrategia da por justificados,
+  cubiertos.** `docs/engineering/testing-strategy.md` limita el e2e a tres
+  cosas y ninguna es una regla de negocio; con el flujo del dinero ya verde,
+  faltaban las otras dos. **7 casos** en total.
+  `e2e/sesion.spec.ts` (nuevo): una ruta protegida sin sesión manda al
+  login; el login deja el token en cookie **httpOnly** —se afirma el
+  atributo, que no se ve en ninguna pantalla y por eso se rompe en
+  silencio— y el logout la mata de verdad (la ruta protegida vuelve a
+  rebotar, no solo cambia la pantalla); y el **gate de módulo por permiso**
+  probado **entrando por URL directa**: el cajero no ve Catálogo ni
+  escribiendo `/catalogo/productos`, y el admin sí. El par importa — un gate
+  que esconde el módulo para *todos* pasaría por bueno con la mitad de la
+  prueba, y es justo el agujero que la enmienda a ADR-013 cerró.
+  `e2e/caja.spec.ts` suma el candado que faltaba: **un rechazo del servidor
+  deja el formulario abierto con lo tecleado**. Recontar el cajón entero
+  porque alguien erró seis dígitos del PIN es la clase de fricción que
+  termina en un conteo inventado, y ese conteo es la evidencia sobre la que
+  se calcula el descuadre del turno.
+  Seeder: `cajero_e2e` (rol `cajero`), el usuario con menos permisos que
+  igual opera una pantalla — es con él que se verifica qué **no** se ve.
+  Helpers compartidos en `e2e/util.ts` (no es `.spec.ts` a propósito:
+  Playwright solo recolecta `*.spec.ts`).
+  Deuda que deja: el **test de contrato cliente↔servidor sigue sin existir**
+  y sigue siendo la prioridad — estos e2e cubren arranque y candados, no el
+  desacuerdo de forma que originó los dos bugs. Fuera del PDV, el resto de
+  las pantallas del ERP sigue sin prueba, y el job tarda ~5 min porque
+  levanta Next en modo desarrollo.
 - ⬜ **Los enums de la base no tienen una sola fuente en el frontend**: la
   pantalla de caja repite los valores de `custodia`, `descuadre_atribucion`
   y los estados en constantes propias. Mientras el `pattern` del schema los

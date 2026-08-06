@@ -54,6 +54,11 @@ from src.modules.users.infrastructure.security import hash_pin
 
 ENCARGADO_USUARIO = "encargado_e2e"
 ENCARGADO_PIN = "654321"
+# El cajero existe para probar lo contrario que el encargado: qué **no** se
+# ve. Es el rol con menos permisos que igual opera una pantalla, así que es
+# con él que se verifica el gate del home y el de cada `layout.tsx`.
+CAJERO_USUARIO = "cajero_e2e"
+CAJERO_PIN = "111111"
 PRODUCTO_NOMBRE = "Pizza E2E"
 PRODUCTO_PRECIO = Decimal("25.00")
 
@@ -106,25 +111,10 @@ def sembrar_e2e(session: Session) -> dict:
             )
     punto_venta = puntos_venta[0]
 
-    encargado = session.scalar(
-        select(Usuario).where(Usuario.username == ENCARGADO_USUARIO)
-    )
-    if encargado is None:
-        encargado = Usuario(
-            username=ENCARGADO_USUARIO,
-            pin_hash=hash_pin(ENCARGADO_PIN),
-            tipo="humano",
-            activo=True,
-        )
-        session.add(encargado)
-        session.flush()
-        # `supervisor` es quien releva la caja (RN-MDP-002): tiene
-        # `accounting.caja_relevar`, que es el permiso que la apertura exige.
-        supervisor = session.scalar(select(Rol).where(Rol.nombre == "supervisor"))
-        session.add(UsuarioRol(usuario_id=encargado.id, rol_id=supervisor.id))
-        session.add(
-            UsuarioSucursal(usuario_id=encargado.id, sucursal_id=sucursal.id)
-        )
+    # `supervisor` es quien releva la caja (RN-MDP-002): tiene
+    # `accounting.caja_relevar`, que es el permiso que la apertura exige.
+    _usuario_con_rol(session, ENCARGADO_USUARIO, ENCARGADO_PIN, "supervisor", sucursal)
+    _usuario_con_rol(session, CAJERO_USUARIO, CAJERO_PIN, "cajero", sucursal)
 
     producto = session.scalar(
         select(ProductoComercial).where(ProductoComercial.nombre == PRODUCTO_NOMBRE)
@@ -147,6 +137,27 @@ def sembrar_e2e(session: Session) -> dict:
         "punto_venta_id": str(punto_venta.id),
         "producto": PRODUCTO_NOMBRE,
     }
+
+
+def _usuario_con_rol(
+    session: Session, username: str, pin: str, rol: str, sucursal: Sucursal
+) -> Usuario:
+    usuario = session.scalar(select(Usuario).where(Usuario.username == username))
+    if usuario is not None:
+        return usuario
+    usuario = Usuario(
+        username=username, pin_hash=hash_pin(pin), tipo="humano", activo=True
+    )
+    session.add(usuario)
+    session.flush()
+    session.add(
+        UsuarioRol(
+            usuario_id=usuario.id,
+            rol_id=session.scalar(select(Rol).where(Rol.nombre == rol)).id,
+        )
+    )
+    session.add(UsuarioSucursal(usuario_id=usuario.id, sucursal_id=sucursal.id))
+    return usuario
 
 
 def _crear_producto_vendible(session, empresa, marca) -> ProductoComercial:
