@@ -36,8 +36,8 @@ Ninguno necesitaba un navegador. Los dos se cazan comparando lo que el
 cliente manda contra `docs/architecture/openapi.json`, que **ya se genera y
 ya se verifica en CI**.
 
-✅ **Escrito el 2026-08-06** (`frontend/lib/contrato.test.ts`, 58 casos en
-~250 ms). Son **dos capas**, y la primera importa más que la segunda:
+✅ **Escrito el 2026-08-06** (`frontend/lib/contrato.test.ts`, **162 casos en
+~350 ms**). Son **dos capas**, y la primera importa más que la segunda:
 
 **1. El tipo, que es el que trabaja todo el día.** Los cinco cuerpos de
 request del PDV viajaban como `Record<string, unknown>` — sin contrato del
@@ -48,11 +48,27 @@ en CI. Tiparlos destapó cinco desacuerdos el primer día, entre ellos que
 se manda), y dos enums que viajaban como `string` suelto.
 
 **2. El test, que verifica que esos tipos y el contrato digan lo mismo.**
-Por cada operación de `lib/pdv.ts`, con `fetch` intervenido: que la ruta y
-el método existan en el contrato, que el cuerpo valide contra su
-`requestBody`, y —alimentando al cliente con una respuesta **generada desde
-el contrato**— que la sepa leer. Esto último es lo que caza ADR-026: el
-cliente recibe `{items, total, …}` de verdad y tiene que devolver un array.
+Cubre en **dos profundidades**, y la diferencia importa:
+
+- **Los cuatro módulos importables** (`pdv` 19 operaciones, `catalogo` 20,
+  `kds` 7, `reportes` 6) exponen la API como un objeto llamable, así que se
+  ejercitan de verdad con `fetch` intervenido: ruta, método, cuerpo contra
+  su `requestBody`, y —alimentando al cliente con una respuesta **generada
+  desde el contrato**— que la sepa leer. Esto último es lo que caza ADR-026.
+  Un `204` se responde vacío de verdad, que es la rama de `pedir` que existe
+  porque pedirle `.json()` a una respuesta sin cuerpo revienta.
+  Cada lista se compara contra el objeto real del módulo: **una operación
+  nueva sin caso hace fallar el test**, no queda sin cubrir en silencio.
+- **Todo el resto del frontend** llama desde Server Components y Server
+  Actions, que piden `next/headers` y un request y no se pueden importar en
+  un `node --test`. Para esos hay un **escaneo del código fuente**: toda
+  ruta que el frontend nombra tiene que existir en el contrato con ese
+  método. Son ~170 llamadas de Compras, Inventario, RRHH, Gerencia,
+  Contabilidad, Marketing y Usuarios. Caza la clase de error que antes no
+  cazaba nada: un endpoint renombrado en el backend rompe veinte pantallas y
+  el diff de `openapi.json` no sabe quién lo llamaba. **No** valida el
+  cuerpo que esas pantallas arman — eso sigue siendo trabajo de `tsc` sobre
+  tipos escritos a mano.
 
 El validador cubre a propósito solo lo que se rompe en silencio: requerido
 que no viaja, campo que el contrato no conoce, tipo equivocado. `pattern`,
@@ -60,8 +76,10 @@ que no viaja, campo que el contrato no conoce, tipo equivocado. `pattern`,
 replicarlos acá sería mantener dos validadores desincronizándose.
 
 Verificado por mutación, que es lo único que prueba que un test verde pueda
-ponerse rojo: reintroducidos los dos bugs históricos (más un endpoint
-renombrado), los tres fallan con el nombre de la operación y el del campo.
+ponerse rojo. Cinco mutaciones, cinco rojos: los dos bugs históricos, un
+endpoint renombrado en `lib/`, otro renombrado en un Server Action, y una
+operación nueva sin caso de contrato. Más un piso (`> 150 llamadas`) para
+que el escaneo no pase por vacío si alguien cambia cómo se llama a la API.
 
 ## Qué sí justifica un e2e
 
@@ -123,18 +141,19 @@ Aprendidas a los golpes; cada una costó tiempo:
 ## Estado actual (2026-08-06)
 
 - Dominio y API: **895 casos**, en verde, en CI.
-- Unidad de frontend + contrato: **72 casos** (`npm test`), en CI desde
-  2026-08-06 — el job de frontend hacía solo `lint` y `build`. De esos, 58
+- Unidad de frontend + contrato: **176 casos** (`npm test`), en CI desde
+  2026-08-06 — el job de frontend hacía solo `lint` y `build`. De esos, 162
   son de contrato.
 - e2e: **7 casos en verde y en CI** (job `e2e`), sobre PDV, sesión y el gate
   de módulo. Los tres puntos de "qué sí justifica un e2e" quedan cubiertos.
   Ver ROADMAP → Frontend.
 
-Los cuatro niveles de la tabla existen. **Lo que falta ya no es un nivel
-sino cobertura**: el contrato cubre las 19 operaciones del PDV, y las de
-Compras, Inventario, RRHH y el resto del back-office siguen sin él —
-`lib/cliente-api.ts` y los Server Components llaman a la API por su cuenta.
-Extenderlo es repetir el patrón, no inventarlo.
+Los cuatro niveles de la tabla existen y ninguno está vacío. Lo que queda
+abierto, dicho sin adornos: **el cuerpo que arman las pantallas de Compras,
+Inventario, RRHH, Gerencia, Contabilidad, Marketing y Usuarios no está
+verificado contra el contrato** — de esas solo se comprueba la ruta. Se
+cerraría moviendo sus llamadas a módulos importables como los cuatro que ya
+lo son, no escribiendo otro tipo de test.
 
 ## Nota de velocidad
 

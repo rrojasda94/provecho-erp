@@ -1901,9 +1901,37 @@ errores de consola.
   renombrado, los tres fallan nombrando la operación y el campo.
   `npm test` entra al job `frontend` de CI: los 72 casos del frontend
   **nunca habían corrido en CI** (el job hacía solo `lint` y `build`).
-  Deuda que deja: cubre el PDV. Compras, Inventario, RRHH y el resto del
-  back-office llaman a la API por `lib/cliente-api.ts` y por Server
-  Components, sin contrato verificado. Extenderlo es repetir el patrón.
+- ✅ 2026-08-06 **Contrato extendido al resto del frontend** — **162 casos
+  en ~350 ms**. Cubre en dos profundidades, y la diferencia importa:
+  **(a) Los cuatro módulos importables** —`pdv` (19 operaciones),
+  `catalogo` (20), `kds` (7), `reportes` (6)— exponen la API como objeto
+  llamable y se ejercitan de verdad: ruta, método, cuerpo y lectura de la
+  respuesta. Cada lista se compara contra el objeto real del módulo, así que
+  **una operación nueva sin caso hace fallar el test** en vez de quedar sin
+  cubrir. El arnés ahora respeta el código de respuesta del contrato: un
+  `204` se responde vacío de verdad, que es la rama de `pedir` que existe
+  porque pedirle `.json()` a una respuesta sin cuerpo revienta.
+  **(b) Todo el resto** —Compras, Inventario, RRHH, Gerencia, Contabilidad,
+  Marketing, Usuarios— llama desde Server Components y Server Actions, que
+  piden `next/headers` y un request y **no se pueden importar** en un
+  `node --test`. Para esos hay un escaneo del código fuente: toda ruta que
+  el frontend nombra debe existir en el contrato con ese método. **~170
+  llamadas** en un test de 14 ms. Caza lo que antes no cazaba nada: un
+  endpoint renombrado en el backend rompe veinte pantallas y el diff de
+  `openapi.json` no sabe quién lo llamaba.
+  Un caso no se puede resolver estáticamente —
+  `marketing/campanas/${id}/${paso}`, donde el último segmento toma tres
+  valores literales— y en vez de dejarlo como agujero se declara con sus
+  tres valores y se verifican **todos**. El test además exige un piso de
+  llamadas encontradas: si alguien cambia cómo se llama a la API, el escaneo
+  devolvería cero y pasaría por vacío.
+  **Cinco mutaciones, cinco rojos**: los dos bugs históricos, un endpoint
+  renombrado en `lib/`, otro renombrado en un Server Action, y una operación
+  nueva sin caso. `npm test` pasa de 72 a **176 casos**.
+  Deuda que deja, sin adornos: **el cuerpo que arman las pantallas del
+  back-office no está verificado** — de esas solo se comprueba la ruta. Se
+  cierra moviendo sus llamadas a módulos importables como los cuatro que ya
+  lo son, no escribiendo otro tipo de test.
 - ⬜ **Los enums de la base no tienen una sola fuente en el frontend**: la
   pantalla de caja repite los valores de `custodia`, `descuadre_atribucion`
   y los estados en constantes propias. Mientras el `pattern` del schema los

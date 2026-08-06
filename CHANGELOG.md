@@ -61,6 +61,29 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Added
 
+- **Contrato extendido al resto del frontend** (2026-08-06): de 58 a **162
+  casos**, en ~350 ms. Dos profundidades, y la diferencia importa:
+  - **Los cuatro módulos importables** (`pdv` 19 operaciones, `catalogo` 20,
+    `kds` 7, `reportes` 6) exponen la API como objeto llamable y se
+    ejercitan de verdad. Cada lista se compara contra el objeto real del
+    módulo: una operación nueva sin caso **hace fallar el test**. El arnés
+    además respeta el código de respuesta del contrato, así que un `204` se
+    responde vacío y ejercita la rama de `pedir` que existe porque pedirle
+    `.json()` a una respuesta sin cuerpo revienta.
+  - **Todo el resto** (Compras, Inventario, RRHH, Gerencia, Contabilidad,
+    Marketing, Usuarios) llama desde Server Components y Server Actions, que
+    piden `next/headers` y no se pueden importar en un `node --test`. Para
+    esos hay un escaneo del código fuente: **~170 llamadas**, toda ruta que
+    el frontend nombra tiene que existir en el contrato con ese método, en
+    14 ms. Caza lo que antes no cazaba nada: un endpoint renombrado en el
+    backend rompe veinte pantallas y el diff de `openapi.json` no sabe quién
+    lo llamaba.
+  El único caso irresoluble estáticamente —
+  `marketing/campanas/${id}/${paso}`, cuyo último segmento toma tres valores
+  literales— se declara con sus tres valores y se verifican todos, en vez de
+  quedar como agujero. Y el test exige un piso de llamadas encontradas: si
+  cambia la forma de llamar a la API, el escaneo daría cero y pasaría por
+  vacío. Cinco mutaciones, cinco rojos.
 - **Test de contrato cliente↔servidor** (2026-08-06,
   `frontend/lib/contrato.test.ts`), el que la estrategia de pruebas
   declaraba prioridad por encima de más e2e. 58 casos en ~250 ms, sin
