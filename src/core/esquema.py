@@ -108,8 +108,20 @@ def _revision_de_la_base(engine: Engine) -> tuple[str | None, tuple[str, ...]]:
 
 
 def diagnosticar(engine: Engine, metadata) -> Diagnostico:
-    """Compara `metadata` (los modelos) contra la base de `engine`."""
-    existentes = set(inspect(engine).get_table_names())
+    """Compara `metadata` (los modelos) contra la base de `engine`.
+
+    Una base inalcanzable **no es deriva**: es no haber podido mirar. Se
+    reporta como alerta y sin tablas faltantes, para no confundir "el
+    esquema está incompleto" con "no se pudo comparar" — de eso avisa
+    `/health/ready`, que es quien mide si la base responde.
+    """
+    try:
+        existentes = set(inspect(engine).get_table_names())
+    except Exception:  # noqa: BLE001 — base caída, credenciales, red
+        return Diagnostico(
+            revision_repo=head_del_repo(),
+            alertas=("no se pudo conectar a la base: el esquema no se comparó",),
+        )
     faltantes = tuple(sorted(set(metadata.tables) - existentes))
     revision_bd, alertas = _revision_de_la_base(engine)
     return Diagnostico(
@@ -129,6 +141,8 @@ def verificar_al_arrancar(engine: Engine, metadata, *, estricto: bool) -> Diagno
     desarrollo solo avisa: media migración a medio escribir es normal ahí.
     """
     diagnostico = diagnosticar(engine, metadata)
+    for alerta in diagnostico.alertas:
+        log.warning("Chequeo de esquema: %s", alerta)
     if not diagnostico.hay_deriva:
         return diagnostico
     mensaje = f"Deriva de esquema: {diagnostico.resumen()}"

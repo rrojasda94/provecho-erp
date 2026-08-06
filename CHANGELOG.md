@@ -16,6 +16,27 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Fixed
 
+- **Tres jobs de CI en rojo, destapados al integrar la rama a `main`**
+  (2026-08-06). Los tres pasaban desapercibidos porque la rama nunca había
+  corrido el pipeline completo contra `main`:
+  - `migraciones`: `alembic check` proponía borrar y recrear el mismo
+    `UNIQUE (empresa_id, serie, correlativo)` de `guia_remision` en cada
+    corrida. La convención de nombres de `database.py` rinde
+    `uq_<tabla>_<primera columna>` —o sea `uq_guia_remision_empresa_id`—
+    y la migración `a4c8f21e6b09` le había puesto el nombre con las tres
+    columnas. Nombre explícito en el modelo; sin migración nueva, porque el
+    nombre en la base ya era el correcto.
+  - `imagen`: el guard de deriva de esquema (`src/core/esquema.py`) mataba
+    el contenedor al arrancar cuando la base no responde. El job levanta la
+    imagen con un `DATABASE_URL` de juguete solo para ver si contesta
+    `/health`, así que nunca llegaba a servir. Una base inalcanzable ahora
+    es **alerta, no deriva**: no se pudo mirar no es lo mismo que faltan
+    tablas, y de la base caída avisa `/health/ready`, que es quien la mide.
+  - `frontend`: `npm test` moría con `ERR_UNKNOWN_FILE_EXTENSION` en los
+    tres `.test.ts` antes de ejecutar un solo caso. El job estaba fijado en
+    Node 20 y el stripping de tipos de `node --test` recién viene de fábrica
+    desde 22.18; pasa a Node 24, que es el de la máquina de desarrollo.
+
 - **Cinco desacuerdos de contrato en el PDV**, destapados al tipar los
   cuerpos de request (2026-08-06). Ninguno había fallado todavía, y los
   cinco son de la misma familia que el 422 de la caja:

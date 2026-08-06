@@ -127,18 +127,23 @@ jobs:
         working-directory: frontend
     steps:
       - uses: actions/checkout@v4
+      # Node 24: `npm test` corre los `.test.ts` con `node --test` sin
+      # transpilar nada, y el stripping de tipos recién viene de fábrica
+      # desde 22.18. En Node 20 la suite entera moría con
+      # `ERR_UNKNOWN_FILE_EXTENSION` antes de ejecutar un solo caso.
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npm run lint
-      # 72 casos en ~0.3 s, sin framework ni servidores. Entre ellos el de
-      # contrato (`lib/contrato.test.ts`), que compara lo que el PDV manda
-      # contra `docs/architecture/openapi.json` — el mismo archivo que el job
-      # `backend` verifica que esté al día. Los dos bugs de ADR-025/026
-      # habrían muerto acá, en milisegundos, en vez de en producción.
+      # 176 casos en menos de un segundo, sin framework ni servidores. Entre
+      # ellos el de contrato (`lib/contrato.test.ts`), que compara lo que el
+      # PDV manda contra `docs/architecture/openapi.json` — el mismo archivo
+      # que el job `backend` verifica que esté al día. Los dos bugs de
+      # ADR-025/026 habrían muerto acá, en milisegundos, en vez de en
+      # producción.
       - run: npm test
       - run: npm run build
 

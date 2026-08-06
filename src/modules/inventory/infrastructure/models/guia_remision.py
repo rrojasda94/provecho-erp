@@ -61,7 +61,17 @@ MODALIDAD_TRASLADO = Enum(
 class GuiaRemision(Base, UuidPkMixin, TimestampMixin):
     __tablename__ = "guia_remision"
     __table_args__ = (
-        UniqueConstraint("empresa_id", "serie", "correlativo"),
+        # Nombre explícito: la convención de `database.py` rinde
+        # `uq_<tabla>_<primera columna>`, que para tres columnas queda como
+        # `uq_guia_remision_empresa_id` y no coincide con el nombre que la
+        # migración le puso. Sin esto, `alembic check` propone borrar y
+        # recrear la misma constraint en cada corrida.
+        UniqueConstraint(
+            "empresa_id",
+            "serie",
+            "correlativo",
+            name="uq_guia_remision_empresa_id_serie_correlativo",
+        ),
         # Un traslado, una guía: reemitir sobre la misma transferencia
         # produciría dos documentos que declaran la misma mercadería.
         UniqueConstraint("transferencia_id"),

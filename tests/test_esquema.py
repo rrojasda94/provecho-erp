@@ -110,3 +110,30 @@ def test_sin_deriva_el_arranque_estricto_pasa(engine):
     _marcar_revision(engine, head_del_repo())
 
     assert not verificar_al_arrancar(engine, metadata, estricto=True).hay_deriva
+
+
+# --- Base inalcanzable: no se pudo mirar, que no es lo mismo que deriva ------
+def _engine_muerto():
+    """Puerto 1 de loopback: la conexión se rechaza en el acto, sin esperas."""
+    return create_engine("postgresql+psycopg://x:x@127.0.0.1:1/x")
+
+
+def test_base_inalcanzable_no_reporta_tablas_faltantes():
+    diagnostico = diagnosticar(_engine_muerto(), _metadata_con("uno", "dos"))
+
+    assert diagnostico.tablas_faltantes == ()
+    assert not diagnostico.hay_deriva
+    assert diagnostico.alertas == ("no se pudo conectar a la base: el esquema no se comparó",)
+
+
+def test_base_inalcanzable_no_aborta_ni_en_produccion(caplog):
+    """El caso del job `imagen` de CI: la imagen se levanta con un
+    `DATABASE_URL` de juguete solo para ver si responde `/health`. Antes el
+    arranque moría con `OperationalError` y el contenedor no servía nada."""
+    with caplog.at_level("WARNING"):
+        diagnostico = verificar_al_arrancar(
+            _engine_muerto(), _metadata_con("uno"), estricto=True
+        )
+
+    assert not diagnostico.hay_deriva
+    assert "no se pudo conectar a la base" in caplog.text
