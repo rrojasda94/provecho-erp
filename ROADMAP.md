@@ -841,9 +841,10 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
 - ⬜ **Escaneo de la imagen** (Trivy/Grype) y firma del artefacto: el
   contenido de la imagen base no se audita todavía.
 - ⬜ **Entorno de staging** (ver *Cuando haya servidor*, punto 7): hoy se saltaría de CI a producción directo.
-- ⬜ **Migraciones con vuelta atrás probada**: `alembic downgrade` existe por
-  archivo pero nunca se ejercita; un despliegue fallido no tiene camino de
-  regreso verificado.
+- ✅ 2026-07-28 **Migraciones con vuelta atrás probada**: el job `migraciones`
+  de `.github/workflows/ci.yml` corre `alembic downgrade base` y vuelve a
+  subir contra un Postgres 16 real en cada push y PR, así que el camino de
+  regreso se ejercita antes de que haga falta revertir un despliegue.
 
 ### Observabilidad y salud (tras las implementaciones de 2026-07-26)
 - ✅ 2026-08-04 **GlitchTip autoalojado** (decisión del usuario sobre las

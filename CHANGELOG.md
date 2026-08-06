@@ -5,6 +5,15 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Deuda "migraciones con vuelta atrás probada" cerrada en el ROADMAP**
+  (2026-08-06): seguía abierta pese a que el job `migraciones` de
+  `.github/workflows/ci.yml` corre `alembic downgrade base` y vuelve a subir
+  desde 2026-07-28. `docs/engineering/devops.md` tampoco listaba ese job en
+  la tabla de CI; ahora sí, junto con el chequeo del contrato OpenAPI del
+  job `backend`.
+
 ### Fixed
 
 - **Cinco desacuerdos de contrato en el PDV**, destapados al tipar los
