@@ -7,6 +7,13 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Changed
 
+- **Deuda "migraciones con vuelta atrás probada" cerrada en el ROADMAP**
+  (2026-08-06): seguía abierta pese a que el job `migraciones` de
+  `.github/workflows/ci.yml` corre `alembic downgrade base` y vuelve a subir
+  desde 2026-07-28. `docs/engineering/devops.md` tampoco listaba ese job en
+  la tabla de CI; ahora sí, junto con el chequeo del contrato OpenAPI del
+  job `backend`.
+
 - **Las colas de preparación ya no esconden el ítem recién tachado**
   (2026-08-03, `kds.cola_pantalla`): una pantalla de `preparacion`
   devolvía solo los ítems `pendiente`/`en_preparacion` de sus categorías,
