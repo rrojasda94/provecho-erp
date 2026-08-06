@@ -31,6 +31,49 @@ def hoy() -> datetime.date:
     return datetime.datetime.now(zona()).date()
 
 
+def desfase_horas(referencia: datetime.date | None = None) -> int:
+    """Horas que hay que sumarle a un instante UTC para leerlo en hora local.
+
+    Perú no aplica horario de verano desde 1994, así que el desfase es
+    constante (-5) y se puede usar para **reetiquetar** un agrupamiento que
+    la base hizo en UTC en vez de convertir fila por fila: agrupar por hora
+    en SQL da 24 filas, y correr la etiqueta de cada una es exacto mientras
+    el desfase sea de horas enteras.
+
+    Se deriva de la zona configurada y no se escribe `-5` a mano: si algún
+    día el negocio abre en otro país, esto sigue estando bien. `referencia`
+    existe para poder pedir el desfase de una fecha concreta si esa zona sí
+    tuviera horario de verano.
+    """
+    momento = datetime.datetime.combine(referencia or hoy(), datetime.time(12))
+    desfase = momento.replace(tzinfo=zona()).utcoffset()
+    assert desfase is not None
+    segundos = int(desfase.total_seconds())
+    if segundos % 3600:
+        raise ValueError(
+            f"La zona {settings.zona_horaria} tiene un desfase que no es de "
+            "horas enteras: reetiquetar buckets horarios daría mal."
+        )
+    return segundos // 3600
+
+
+def inicio_dia_utc(dia: datetime.date) -> datetime.datetime:
+    """Instante UTC en que **empieza** ese día de calendario del negocio.
+
+    Para filtrar por rango una columna que la base guarda en UTC
+    (`created_at`) usando fechas que el usuario piensa en hora Perú: comparar
+    `created_at >= date(...)` crudo corre el borde hasta 5 horas.
+    """
+    local = datetime.datetime.combine(dia, datetime.time.min, tzinfo=zona())
+    return local.astimezone(datetime.UTC)
+
+
+def fin_dia_utc(dia: datetime.date) -> datetime.datetime:
+    """Instante UTC en que **termina** ese día de calendario del negocio."""
+    local = datetime.datetime.combine(dia, datetime.time.max, tzinfo=zona())
+    return local.astimezone(datetime.UTC)
+
+
 def a_fecha_local(momento: datetime.datetime | None) -> datetime.date | None:
     """Fecha de calendario del negocio para un instante guardado en la base.
 

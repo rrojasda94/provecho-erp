@@ -1,4 +1,4 @@
-import { ApiError, apiFetch } from "@/lib/api";
+import { ApiError, apiFetch, type Pagina } from "@/lib/api";
 import { obtenerSesion } from "@/lib/sesion";
 
 import { TrabajadoresCliente, type Persona, type Trabajador } from "./trabajadores-cliente";
@@ -11,10 +11,10 @@ export default async function TrabajadoresPage() {
     // no la ficha completa, y así basta `personas.leer` — `users.gestionar`
     // ya no bloquea a un rol de RRHH puro (RN-GEN-007, gap cerrado).
     const [trabajadores, personas] = await Promise.all([
-      apiFetch<Trabajador[]>("/api/v1/rrhh/trabajadores", { token }),
+      apiFetch<Pagina<Trabajador>>("/api/v1/rrhh/trabajadores", { token }),
       apiFetch<Persona[]>("/api/v1/personas/buscar", { token }),
     ]);
-    return <TrabajadoresCliente trabajadores={trabajadores} personas={personas} />;
+    return <TrabajadoresCliente trabajadores={trabajadores.items} personas={personas} />;
   } catch (e) {
     const mensaje =
       e instanceof ApiError && e.status === 403

@@ -25,15 +25,21 @@ class CampanaRepo:
             select(Campana).where(Campana.idempotency_key == idempotency_key)
         )
 
-    def listar(
+    def q_listar(
         self, empresa_id: uuid.UUID | None, *, estado: str | None = None
-    ) -> list[Campana]:
+    ):
+        """La consulta, sin ejecutar: el router la pagina (ADR-026)."""
         stmt = select(Campana).where(Campana.deleted_at.is_(None))
         if empresa_id is not None:
             stmt = stmt.where(Campana.empresa_id == empresa_id)
         if estado is not None:
             stmt = stmt.where(Campana.estado == estado)
-        return list(self.s.scalars(stmt.order_by(Campana.created_at.desc())))
+        return stmt.order_by(Campana.created_at.desc())
+
+    def listar(
+        self, empresa_id: uuid.UUID | None, *, estado: str | None = None
+    ) -> list[Campana]:
+        return list(self.s.scalars(self.q_listar(empresa_id, estado=estado)))
 
     def add(self, campana: Campana) -> Campana:
         self.s.add(campana)
@@ -66,8 +72,15 @@ class LeadRepo:
             )
         )
 
+    def q_de_campana(self, campana_id: uuid.UUID):
+        return (
+            select(Lead)
+            .where(Lead.campana_id == campana_id)
+            .order_by(Lead.created_at.desc())
+        )
+
     def de_campana(self, campana_id: uuid.UUID) -> list[Lead]:
-        return list(self.s.scalars(select(Lead).where(Lead.campana_id == campana_id)))
+        return list(self.s.scalars(self.q_de_campana(campana_id)))
 
     def add(self, lead: Lead) -> Lead:
         self.s.add(lead)
@@ -78,6 +91,30 @@ class LeadRepo:
 class PiezaContenidoRepo:
     def __init__(self, session: Session) -> None:
         self.s = session
+
+    def q_listar(
+        self,
+        campana_ids: list[uuid.UUID] | None = None,
+        estado: str | None = None,
+    ):
+        """La consulta sin ejecutar: el router la pagina (ADR-026).
+
+        `pieza_contenido` no lleva empresa —cuelga de la marca, y la marca es
+        del grupo, no de una empresa— así que el alcance se acota por las
+        campañas del tenant. La pieza **sin campaña** (contenido de marca
+        siempre-verde) queda visible para cualquiera con `marketing.leer`,
+        igual que hoy al pedirla por id (`scope.exigir_pieza` no la
+        restringe). Es una excepción de tenant declarada, no un descuido.
+        """
+        q = select(PiezaContenido)
+        if campana_ids is not None:
+            q = q.where(
+                PiezaContenido.campana_id.in_(campana_ids)
+                | PiezaContenido.campana_id.is_(None)
+            )
+        if estado is not None:
+            q = q.where(PiezaContenido.estado == estado)
+        return q.order_by(PiezaContenido.fecha_publicacion.desc())
 
     def get(self, pieza_id: uuid.UUID) -> PiezaContenido | None:
         return self.s.get(PiezaContenido, pieza_id)

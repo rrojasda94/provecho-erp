@@ -9,6 +9,7 @@ repositorio solo encapsula queries."""
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -21,9 +22,11 @@ from src.modules.accounting.infrastructure.models import (
     AsientoLinea,
     CierreCaja,
     CuentaContable,
+    CustodiaEfectivo,
     MovimientoCaja,
     MovimientoDinero,
     PeriodoContable,
+    PosTarjeta,
     ReglaAsiento,
 )
 
@@ -92,11 +95,15 @@ class AsientoRepo:
     def get(self, asiento_id: uuid.UUID) -> Asiento | None:
         return self.s.get(Asiento, asiento_id)
 
-    def list(self, empresa_id: uuid.UUID | None = None) -> list[Asiento]:
+    def q_list(self, empresa_id: uuid.UUID | None = None):
+        """La consulta, sin ejecutar: el router la pagina (ADR-026)."""
         q = select(Asiento)
         if empresa_id is not None:
             q = q.where(Asiento.empresa_id == empresa_id)
-        return list(self.s.scalars(q.order_by(Asiento.fecha.desc())))
+        return q.order_by(Asiento.fecha.desc())
+
+    def list(self, empresa_id: uuid.UUID | None = None) -> list[Asiento]:
+        return list(self.s.scalars(self.q_list(empresa_id)))
 
     def lineas(self, asiento_id: uuid.UUID) -> list[AsientoLinea]:
         return list(
@@ -163,11 +170,14 @@ class MovimientoDineroRepo:
             select(MovimientoDinero).where(MovimientoDinero.comprobante_id == comprobante_id)
         )
 
-    def list(self, empresa_id: uuid.UUID | None = None) -> list[MovimientoDinero]:
+    def q_list(self, empresa_id: uuid.UUID | None = None):
         q = select(MovimientoDinero)
         if empresa_id is not None:
             q = q.where(MovimientoDinero.empresa_id == empresa_id)
-        return list(self.s.scalars(q.order_by(MovimientoDinero.created_at.desc())))
+        return q.order_by(MovimientoDinero.created_at.desc())
+
+    def list(self, empresa_id: uuid.UUID | None = None) -> list[MovimientoDinero]:
+        return list(self.s.scalars(self.q_list(empresa_id)))
 
     def add(self, movimiento: MovimientoDinero) -> MovimientoDinero:
         self.s.add(movimiento)
@@ -248,15 +258,104 @@ class CierreCajaRepo:
     def __init__(self, session: Session) -> None:
         self.s = session
 
+    def get(self, cierre_id: uuid.UUID) -> CierreCaja | None:
+        return self.s.get(CierreCaja, cierre_id)
+
     def get_by_apertura(self, apertura_caja_id: uuid.UUID) -> CierreCaja | None:
         return self.s.scalar(
             select(CierreCaja).where(CierreCaja.apertura_caja_id == apertura_caja_id)
         )
 
+    def cerrados_entre(
+        self,
+        punto_venta_ids: list[uuid.UUID],
+        desde: datetime,
+        hasta: datetime,
+    ) -> list[tuple[CierreCaja, AperturaCaja, CustodiaEfectivo | None]]:
+        """Turnos ya cerrados, con su apertura y el tramo de custodia.
+
+        Los tres van juntos en una consulta y no en tres viajes: la pantalla
+        de contabilidad los muestra en la misma fila (cuánto se contó, cuánto
+        descuadró, dónde está la plata) y separarlos era un N+1 por turno.
+
+        El rango se compara contra instantes UTC ya convertidos desde la
+        fecha del negocio (`fechas.inicio_dia_utc`): comparar `created_at`
+        crudo contra una fecha corre el borde hasta cinco horas.
+        """
+        if not punto_venta_ids:
+            return []
+        filas = self.s.execute(
+            select(CierreCaja, AperturaCaja, CustodiaEfectivo)
+            .join(AperturaCaja, AperturaCaja.id == CierreCaja.apertura_caja_id)
+            .outerjoin(
+                CustodiaEfectivo,
+                CustodiaEfectivo.apertura_caja_id == AperturaCaja.id,
+            )
+            .where(
+                AperturaCaja.punto_venta_id.in_(punto_venta_ids),
+                AperturaCaja.created_at >= desde,
+                AperturaCaja.created_at <= hasta,
+            )
+            .order_by(AperturaCaja.created_at.desc())
+        )
+        return [(c, a, cu) for c, a, cu in filas]
+
     def add(self, cierre: CierreCaja) -> CierreCaja:
         self.s.add(cierre)
         self.s.flush()
         return cierre
+
+
+class CustodiaEfectivoRepo:
+    def __init__(self, session: Session) -> None:
+        self.s = session
+
+    def get(self, custodia_id: uuid.UUID) -> CustodiaEfectivo | None:
+        return self.s.get(CustodiaEfectivo, custodia_id)
+
+    def de_apertura(self, apertura_caja_id: uuid.UUID) -> CustodiaEfectivo | None:
+        return self.s.scalar(
+            select(CustodiaEfectivo).where(
+                CustodiaEfectivo.apertura_caja_id == apertura_caja_id
+            )
+        )
+
+    def add(self, custodia: CustodiaEfectivo) -> CustodiaEfectivo:
+        self.s.add(custodia)
+        self.s.flush()
+        return custodia
+
+
+class PosTarjetaRepo:
+    def __init__(self, session: Session) -> None:
+        self.s = session
+
+    def get(self, pos_id: uuid.UUID) -> PosTarjeta | None:
+        return self.s.get(PosTarjeta, pos_id)
+
+    def get_by_serie(self, serie: str) -> PosTarjeta | None:
+        return self.s.scalar(select(PosTarjeta).where(PosTarjeta.serie == serie))
+
+    def list(
+        self, empresa_id: uuid.UUID, sucursal_id: uuid.UUID | None = None
+    ) -> list[PosTarjeta]:
+        """Los terminales de la sucursal **más** los de emergencia del pool
+        (`sucursal_id` NULL): la caja que abre necesita ver los dos, que es
+        justo lo que hace útil a RN-POS-009."""
+        q = select(PosTarjeta).where(
+            PosTarjeta.empresa_id == empresa_id, PosTarjeta.estado != "baja"
+        )
+        if sucursal_id is not None:
+            q = q.where(
+                (PosTarjeta.sucursal_id == sucursal_id)
+                | (PosTarjeta.sucursal_id.is_(None))
+            )
+        return list(self.s.scalars(q.order_by(PosTarjeta.serie)))
+
+    def add(self, pos: PosTarjeta) -> PosTarjeta:
+        self.s.add(pos)
+        self.s.flush()
+        return pos
 
 
 class ArqueoRepo:

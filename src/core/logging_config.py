@@ -13,6 +13,7 @@ import json
 import logging
 import sys
 from contextvars import ContextVar
+from datetime import UTC, datetime
 
 from src.config.settings import settings
 
@@ -84,7 +85,13 @@ class FormateadorJson(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         evento = {
-            "ts": self.formatTime(record, "%Y-%m-%dT%H:%M:%S%z"),
+            # RFC3339 en UTC. `formatTime` con `%z` daba `-0500` (sin los dos
+            # puntos), que **no** es RFC3339 y el colector no parsea: Alloy
+            # lo descartaba en silencio y estampaba la hora de ingesta, así
+            # que un hub que subía logs atrasados los mostraba como recién
+            # ocurridos. UTC y no hora local por la regla que ya fija
+            # `shared/fechas.py`: un instante se guarda en UTC.
+            "ts": datetime.fromtimestamp(record.created, tz=UTC).isoformat(),
             "nivel": record.levelname,
             "flujo": flujo_de(record.name),
             "logger": record.name,
@@ -115,11 +122,37 @@ class FormateadorTexto(logging.Formatter):
         return f"{base} [req={rid}]" if rid else base
 
 
+def _salida_utf8():
+    """`sys.stdout` capaz de escribir el log sin importar la consola.
+
+    En Windows la consola es **cp1252** salvo que alguien la cambie, y un
+    solo carácter fuera de ese juego —el `→` del log de acceso, un nombre de
+    artículo con tilde, una razón social con `ñ`— hace fallar el `emit` del
+    handler. Python no propaga ese error: imprime "--- Logging error ---"
+    con un traceback de 40 líneas **por cada request**, así que el síntoma no
+    es un log perdido sino la salida inutilizable y el proceso arrastrándose.
+
+    `errors="replace"` a propósito: un carácter que no se puede representar
+    sale como `?` y el log sigue. Perder un acento es aceptable; perder el
+    log entero de una caja que descuadró, no.
+    """
+    salida = sys.stdout
+    reconfigurar = getattr(salida, "reconfigure", None)
+    if reconfigurar is not None:
+        try:
+            reconfigurar(encoding="utf-8", errors="replace")
+        except (ValueError, OSError):
+            # stdout redirigido a algo que no admite reconfigurar (un pipe ya
+            # envuelto, un buffer de prueba): se usa tal cual.
+            pass
+    return salida
+
+
 def configurar_logging() -> None:
     """Configura el root logger. Idempotente: se puede llamar en el arranque
     de la API, del worker y de los comandos de consola."""
     usar_json = settings.log_json or settings.es_produccion
-    handler = logging.StreamHandler(sys.stdout)
+    handler = logging.StreamHandler(_salida_utf8())
     handler.set_name(NOMBRE_HANDLER)
     handler.setFormatter(
         FormateadorJson()

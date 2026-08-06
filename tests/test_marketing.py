@@ -496,4 +496,34 @@ def test_campana_de_otra_empresa_no_es_visible(env):
 
     mkt = _token(client, username="mkt1", pin="111111")
     assert client.get(f"/api/v1/marketing/campanas/{campana_id}", headers=mkt).status_code == 403
-    assert client.get("/api/v1/marketing/campanas", headers=mkt).json() == []
+    assert client.get("/api/v1/marketing/campanas", headers=mkt).json()["items"] == []
+
+
+def test_listar_piezas_del_tenant_y_por_estado(env):
+    """Sin listado no había forma de ver el calendario de contenido: la
+    pieza solo se consultaba sabiendo su id."""
+    client, ids, _ = env
+    h = _token(client)
+    campana_id = _crear_campana(client, h, ids, key="mkt-piezas-1").json()["id"]
+    for titulo, campana in (("Post de campaña", campana_id), ("Post siempre-verde", None)):
+        r = client.post(
+            "/api/v1/marketing/piezas",
+            headers=h,
+            json={
+                "marca_id": ids["marca_id"],
+                "titulo": titulo,
+                "canal": "instagram",
+                "fecha_publicacion": str(fechas.hoy()),
+                "campana_id": campana,
+                "pertinente_marca": True,
+                "uso_marca_validado": True,
+            },
+        )
+        assert r.status_code == 201
+
+    listado = client.get("/api/v1/marketing/piezas", headers=h).json()
+    assert listado["total"] == 2
+    # Ninguna publicada todavía: el filtro por estado no las trae.
+    assert client.get(
+        "/api/v1/marketing/piezas?estado=publicada", headers=h
+    ).json()["total"] == 0

@@ -69,6 +69,11 @@ def listar_pagos(
     return MovimientoDineroRepo(session).list(empresa_id)
 
 
+def q_pagos(session: Session, empresa_id: uuid.UUID | None = None):
+    """La consulta sin ejecutar, para que el router la pagine (ADR-026)."""
+    return MovimientoDineroRepo(session).q_list(empresa_id)
+
+
 def ejecutar_pago(
     session: Session,
     movimiento_id: uuid.UUID,

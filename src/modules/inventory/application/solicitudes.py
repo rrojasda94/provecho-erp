@@ -185,3 +185,14 @@ def listar(
     empresa_id: uuid.UUID | None = None,
 ) -> list[SolicitudInsumos]:
     return SolicitudRepo(session).list(almacen_solicitante_id, estado, empresa_id)
+
+
+def q_listar(
+    session: Session,
+    *,
+    almacen_solicitante_id: uuid.UUID | None = None,
+    estado: str | None = None,
+    empresa_id: uuid.UUID | None = None,
+):
+    """La consulta sin ejecutar, para que el router la pagine (ADR-026)."""
+    return SolicitudRepo(session).q_list(almacen_solicitante_id, estado, empresa_id)

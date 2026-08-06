@@ -21,10 +21,15 @@ from src.modules.marketing.application.scope import (
     exigir_pieza,
     exigir_sucursal,
 )
-from src.modules.marketing.infrastructure.repositories import CampanaRepo, LeadRepo
+from src.modules.marketing.infrastructure.repositories import (
+    CampanaRepo,
+    LeadRepo,
+    PiezaContenidoRepo,
+)
 from src.modules.sales.application.queries_publicas import venta_para_encuesta
 from src.modules.users.api.deps import get_db, get_tenant, require_permission
 from src.modules.users.infrastructure.models import Usuario
+from src.shared.paginacion import Pagina, Paginacion, paginacion, paginar
 
 router = APIRouter(prefix="/marketing", tags=["marketing"])
 
@@ -77,14 +82,19 @@ def crear_campana(
     return campana
 
 
-@router.get("/campanas", response_model=list[schemas.CampanaOut])
+@router.get("/campanas", response_model=Pagina[schemas.CampanaOut])
 def listar_campanas(
     estado: str | None = None,
     _: Usuario = Depends(require_permission(LEER)),
     tenant: Tenant = Depends(get_tenant),
+    p: Paginacion = Depends(paginacion),
     session: Session = Depends(get_db),
 ):
-    return CampanaRepo(session).listar(tenant.filtro_empresa(), estado=estado)
+    return paginar(
+        session,
+        CampanaRepo(session).q_listar(tenant.filtro_empresa(), estado=estado),
+        p,
+    )
 
 
 @router.get("/campanas/{campana_id}", response_model=schemas.CampanaOut)
@@ -232,6 +242,25 @@ def planificar_pieza(
     return pieza
 
 
+@router.get("/piezas", response_model=Pagina[schemas.PiezaOut])
+def listar_piezas(
+    estado: str | None = None,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    p: Paginacion = Depends(paginacion),
+    session: Session = Depends(get_db),
+):
+    """Calendario de contenido del tenant. No existía: una pieza solo se
+    podía consultar sabiendo su id, así que no había forma de ver qué está
+    planificado esta semana."""
+    campanas = CampanaRepo(session).listar(tenant.filtro_empresa())
+    return paginar(
+        session,
+        PiezaContenidoRepo(session).q_listar([c.id for c in campanas], estado),
+        p,
+    )
+
+
 @router.patch("/piezas/{pieza_id}/validacion", response_model=schemas.PiezaOut)
 def validar_pieza(
     pieza_id: uuid.UUID,
@@ -314,18 +343,19 @@ def registrar_lead(
     return lead
 
 
-@router.get("/campanas/{campana_id}/leads", response_model=list[schemas.LeadOut])
+@router.get("/campanas/{campana_id}/leads", response_model=Pagina[schemas.LeadOut])
 def listar_leads(
     campana_id: uuid.UUID,
     _: Usuario = Depends(require_permission(LEER)),
     tenant: Tenant = Depends(get_tenant),
+    p: Paginacion = Depends(paginacion),
     session: Session = Depends(get_db),
 ):
     try:
         exigir_campana(session, campana_id, tenant)
     except NoEncontrado as e:
         raise _http(e) from e
-    return LeadRepo(session).de_campana(campana_id)
+    return paginar(session, LeadRepo(session).q_de_campana(campana_id), p)
 
 
 @router.post("/leads/{lead_id}/atribucion", response_model=schemas.LeadOut)

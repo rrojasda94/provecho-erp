@@ -1,0 +1,23 @@
+# Datasource provisionado: Grafana arranca con Loki ya conectado, sin que
+# nadie tenga que configurarlo a mano tras cada `docker compose down -v`.
+
+apiVersion: 1
+
+datasources:
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    isDefault: true
+    jsonData:
+      # Sin multi-tenancy: `auth_enabled: false` en loki.yml.
+      maxLines: 2000
+      derivedFields:
+        # Convierte el `request_id` de una línea en un enlace que trae todas
+        # las demás líneas del mismo request: es la consulta que uno hace
+        # siempre cuando un usuario reporta "me dio error" con su ID.
+        - name: request_id
+          matcherRegex: '"request_id":\s*"([^"]+)"'
+          url: '${__value.raw}'
+          datasourceUid: loki
+          query: '{entorno="production"} | json | request_id="${__value.raw}"'

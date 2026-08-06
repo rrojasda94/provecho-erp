@@ -150,7 +150,7 @@ def _crear_lote(client, h, ids, codigo, vencimiento):
 
 def _stock(client, h, almacen_id, sku):
     filas = client.get(
-        f"/api/v1/inventory/stock?almacen_id={almacen_id}", headers=h).json()
+        f"/api/v1/inventory/stock?almacen_id={almacen_id}", headers=h).json()["items"]
     return next((f for f in filas if f["sku_id"] == sku), None)
 
 
@@ -596,4 +596,4 @@ def test_despachar_sin_stock_falla_entera(env):
     assert "insuficiente" in r.json()["detail"]
     assert client.get(
         f"/api/v1/inventory/transferencias?almacen_id={ids['local_id']}", headers=h
-    ).json() == []
+    ).json()["items"] == []

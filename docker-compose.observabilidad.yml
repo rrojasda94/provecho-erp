@@ -1,0 +1,158 @@
+# Stack de observabilidad: GlitchTip (errores) + Loki (logs) + Grafana.
+#
+# Vive en un archivo aparte a propósito. Son ocho contenedores que NO son el
+# ERP: si se caen, el restaurante sigue vendiendo, y poder pararlos sin tocar
+# `docker-compose.prod.yml` es justo lo que se quiere el día que el VPS ande
+# corto de memoria. Levantar:
+#
+#   docker compose -f docker-compose.observabilidad.yml up -d
+#
+# Puesta en marcha (una sola vez), en docs/engineering/observabilidad.md:
+#   1. Levantar el stack.
+#   2. Crear la cuenta en GlitchTip (http://localhost:8088) y un proyecto.
+#   3. Copiar su DSN a SENTRY_DSN del .env del ERP y reiniciar api/worker.
+#
+# GlitchTip habla el mismo protocolo que Sentry: `src/core/sentry.py` no
+# cambia una línea (ADR-006).
+#
+# Todo escucha en 127.0.0.1: son consolas internas, el proxy decide cuáles
+# publica y con qué autenticación. Ninguna de estas tres debería quedar
+# abierta a internet sin auth delante.
+
+services:
+  # --- GlitchTip: reporte de errores ----------------------------------------
+  glitchtip-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: glitchtip
+      POSTGRES_PASSWORD: ${GLITCHTIP_DB_PASSWORD:?definir GLITCHTIP_DB_PASSWORD}
+      POSTGRES_DB: glitchtip
+    volumes:
+      - glitchtip-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U glitchtip"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  # Redis propio: compartirlo con el del ERP mezclaría la cola de
+  # comprobantes con la de ingesta de errores, y un pico de errores no puede
+  # retrasar una factura.
+  glitchtip-redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --save 60 1 --appendonly no
+    volumes:
+      - glitchtip-redisdata:/data
+
+  glitchtip-web:
+    image: glitchtip/glitchtip:v4.1
+    restart: unless-stopped
+    depends_on:
+      glitchtip-db:
+        condition: service_healthy
+      glitchtip-redis:
+        condition: service_started
+    environment: &glitchtip-env
+      DATABASE_URL: postgres://glitchtip:${GLITCHTIP_DB_PASSWORD}@glitchtip-db:5432/glitchtip
+      REDIS_URL: redis://glitchtip-redis:6379/0
+      SECRET_KEY: ${GLITCHTIP_SECRET_KEY:?definir GLITCHTIP_SECRET_KEY}
+      GLITCHTIP_DOMAIN: ${GLITCHTIP_DOMAIN:-http://localhost:8088}
+      DEFAULT_FROM_EMAIL: ${GLITCHTIP_FROM_EMAIL:-errores@majambo.pe}
+      EMAIL_URL: ${GLITCHTIP_EMAIL_URL:-consolemail://}
+      # Sin esto cualquiera con la URL se registra y ve los errores del ERP,
+      # que incluyen rutas, parámetros y trazas internas.
+      ENABLE_open_USER_REGISTRATION: "false"
+      ENABLE_ORGANIZATION_CREATION: "false"
+      # Retención: 90 días alcanza para ver una regresión estacional sin que
+      # el disco del VPS crezca sin techo.
+      GLITCHTIP_MAX_EVENT_LIFE_DAYS: "90"
+    ports:
+      # Puerto configurable: 8080 es de los más disputados de un host
+      # (en el de desarrollo lo tenía otro servicio). Cambiarlo no obliga
+      # a tocar este archivo.
+      - "127.0.0.1:${GLITCHTIP_PORT:-8088}:8080"
+
+  glitchtip-worker:
+    image: glitchtip/glitchtip:v4.1
+    restart: unless-stopped
+    command: ./bin/run-celery-with-beat.sh
+    depends_on:
+      glitchtip-db:
+        condition: service_healthy
+      glitchtip-redis:
+        condition: service_started
+    environment: *glitchtip-env
+
+  glitchtip-migrate:
+    image: glitchtip/glitchtip:v4.1
+    command: ./manage.py migrate
+    depends_on:
+      glitchtip-db:
+        condition: service_healthy
+    environment: *glitchtip-env
+    restart: on-failure
+
+  # --- Loki: logs -----------------------------------------------------------
+  loki:
+    image: grafana/loki:3.4.2
+    restart: unless-stopped
+    command: -config.file=/etc/loki/loki.yml
+    volumes:
+      - ./infra/observabilidad/loki.yml:/etc/loki/loki.yml:ro
+      - lokidata:/loki
+    ports:
+      - "127.0.0.1:${LOKI_PORT:-3100}:3100"
+
+  # Alloy recoge los logs de Docker y los empuja a Loki. Es el agente
+  # vigente de Grafana; Promtail quedó como legado.
+  alloy:
+    image: grafana/alloy:v1.7.5
+    restart: unless-stopped
+    command:
+      - run
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --storage.path=/var/lib/alloy/data
+      - /etc/alloy/config.alloy
+    volumes:
+      - ./infra/observabilidad/config.alloy:/etc/alloy/config.alloy:ro
+      # Solo lectura del socket: Alloy descubre contenedores y lee sus logs,
+      # nunca los arranca ni los para.
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - alloydata:/var/lib/alloy/data
+    environment:
+      # Qué proyectos de compose vigilar. Por defecto solo el ERP: Alloy
+      # ve todo el host, y en un VPS con otros proyectos sus logs
+      # terminarían en este Loki. Varios: "provecho-erp|otro".
+      ALLOY_PROYECTOS: ${ALLOY_PROYECTOS:-provecho-erp}
+    depends_on:
+      - loki
+
+  # --- Grafana: la ventana a Loki -------------------------------------------
+  # Sin esto Loki es un agujero de solo escritura: se puede consultar por
+  # `curl` con LogQL, pero nadie lo va a hacer a las 2 a.m.
+  grafana:
+    image: grafana/grafana:11.6.0
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?definir GRAFANA_ADMIN_PASSWORD}
+      # Consola interna detrás del proxy: registrarse solo no tiene sentido.
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./infra/observabilidad/grafana-datasources.yml:/etc/grafana/provisioning/datasources/loki.yml:ro
+      - grafanadata:/var/lib/grafana
+    ports:
+      # 3002 y no 3001: en un host con Docker Desktop el 3001 lo ocupa
+      # `com.docker.backend` y el contenedor no arranca. Configurable
+      # porque cada host colisiona distinto.
+      - "127.0.0.1:${GRAFANA_PORT:-3002}:3000"
+    depends_on:
+      - loki
+
+volumes:
+  glitchtip-pgdata:
+  glitchtip-redisdata:
+  lokidata:
+  alloydata:
+  grafanadata:

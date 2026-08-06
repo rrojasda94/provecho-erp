@@ -1,8 +1,9 @@
 """Routers FastAPI del módulo rrhh: ciclo laboral completo."""
 
 import uuid
+from datetime import date
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from src.core.rate_limit import rate_limit
@@ -23,6 +24,9 @@ from src.modules.rrhh.application import (
     socios,
     trabajadores,
 )
+from src.modules.rrhh.application import (
+    legajo as legajo_uc,
+)
 from src.modules.rrhh.application.scope import (
     exigir_acta,
     exigir_amonestacion,
@@ -38,8 +42,10 @@ from src.modules.rrhh.application.scope import (
     exigir_trabajador,
 )
 from src.modules.users.api.deps import get_db, get_tenant, require_permission
+from src.modules.users.application.queries_publicas import tiene_permiso
 from src.modules.users.infrastructure.models import Usuario
 from src.shared import fechas
+from src.shared.paginacion import Pagina, Paginacion, paginacion, paginar
 
 router = APIRouter(prefix="/rrhh", tags=["rrhh"])
 
@@ -81,14 +87,19 @@ def crear_trabajador(
     return trabajador
 
 
-@router.get("/trabajadores", response_model=list[schemas.TrabajadorOut])
+@router.get("/trabajadores", response_model=Pagina[schemas.TrabajadorOut])
 def listar_trabajadores(
     empresa_id: uuid.UUID | None = None,
     _: Usuario = Depends(require_permission(LEER)),
     tenant: Tenant = Depends(get_tenant),
+    p: Paginacion = Depends(paginacion),
     session: Session = Depends(get_db),
 ):
-    return trabajadores.listar_trabajadores(session, tenant.filtro_empresa(empresa_id))
+    return paginar(
+        session,
+        trabajadores.q_trabajadores(session, tenant.filtro_empresa(empresa_id)),
+        p,
+    )
 
 
 @router.get("/trabajadores/{trabajador_id}", response_model=schemas.TrabajadorOut)
@@ -129,6 +140,101 @@ def cesar_trabajador(
     )
     session.commit()
     return trabajador
+
+
+# --- Legajo del trabajador (file personal) -----------------------------------
+@router.get("/trabajadores/{trabajador_id}/legajo", response_model=schemas.LegajoOut)
+def ver_legajo(
+    trabajador_id: uuid.UUID,
+    actor: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """El expediente completo en una sola lectura: contratos, amonestaciones,
+    memorándums, certificados, permisos y pactos.
+
+    **La nómina va solo con `rrhh.nomina_gestionar`.** Boletas y
+    liquidaciones llevan remuneración, y `rrhh.leer` lo tiene el supervisor,
+    que necesita ver las amonestaciones de su gente pero no cuánto gana. Que
+    una boleta ya fuera legible pidiéndola por su id no es razón para
+    volverla navegable. Cuando no viaja, `nomina_visible` lo dice: un legajo
+    sin sueldos no puede leerse igual que uno censurado.
+
+    `asistencia` no entra acá — crece una fila por día y por trabajador, y
+    se pide por `GET /rrhh/asistencia` acotada por rango.
+    """
+    exigir_trabajador(session, trabajador_id, tenant)
+    return legajo_uc.legajo(
+        session,
+        trabajador_id,
+        incluir_nomina=tiene_permiso(session, actor.id, NOMINA_GESTIONAR),
+    )
+
+
+@router.get(
+    "/solicitudes-permiso", response_model=Pagina[schemas.SolicitudPermisoOut]
+)
+def listar_solicitudes_permiso(
+    estado: str | None = None,
+    trabajador_id: uuid.UUID | None = None,
+    empresa_id: uuid.UUID | None = None,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    p: Paginacion = Depends(paginacion),
+    session: Session = Depends(get_db),
+):
+    """Bandeja de aprobación. `estado=pendiente` es la vista que importa:
+    quien aprueba entra por "qué tengo pendiente", no por un trabajador.
+    Ordenadas por fecha de inicio ascendente — la que envejece sin respuesta
+    es la que hay que atender."""
+    if trabajador_id is not None:
+        exigir_trabajador(session, trabajador_id, tenant)
+    return paginar(
+        session,
+        legajo_uc.q_permisos(
+            session,
+            empresa_id=tenant.filtro_empresa(empresa_id),
+            estado=estado,
+            trabajador_id=trabajador_id,
+        ),
+        p,
+    )
+
+
+@router.get("/asistencia", response_model=Pagina[schemas.AsistenciaOut])
+def listar_asistencia(
+    trabajador_id: uuid.UUID | None = None,
+    desde: date | None = None,
+    hasta: date | None = None,
+    empresa_id: uuid.UUID | None = None,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    p: Paginacion = Depends(paginacion),
+    session: Session = Depends(get_db),
+):
+    """Marcaciones del rango. Sin fechas, el mes en curso: pedir la
+    asistencia entera de una empresa no es un caso de uso, es un accidente.
+    """
+    if trabajador_id is not None:
+        exigir_trabajador(session, trabajador_id, tenant)
+    hoy = fechas.hoy()
+    desde = desde or hoy.replace(day=1)
+    hasta = hasta or hoy
+    if hasta < desde:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, "`hasta` no puede ser anterior a `desde`"
+        )
+    return paginar(
+        session,
+        legajo_uc.q_asistencia(
+            session,
+            empresa_id=tenant.filtro_empresa(empresa_id),
+            trabajador_id=trabajador_id,
+            desde=desde,
+            hasta=hasta,
+        ),
+        p,
+    )
 
 
 # --- Contrato laboral ------------------------------------------------------------
@@ -312,16 +418,21 @@ def crear_postulante(
     return postulante
 
 
-@router.get("/postulantes", response_model=list[schemas.PostulanteOut])
+@router.get("/postulantes", response_model=Pagina[schemas.PostulanteOut])
 def listar_postulantes(
     estado: str | None = None,
     convocatoria_id: uuid.UUID | None = None,
     _: Usuario = Depends(require_permission(LEER)),
     tenant: Tenant = Depends(get_tenant),
+    p: Paginacion = Depends(paginacion),
     session: Session = Depends(get_db),
 ):
-    return postulantes.listar_postulantes(
-        session, estado, tenant.filtro_empresa(), convocatoria_id
+    return paginar(
+        session,
+        postulantes.q_postulantes(
+            session, estado, tenant.filtro_empresa(), convocatoria_id
+        ),
+        p,
     )
 
 

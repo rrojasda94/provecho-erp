@@ -11,6 +11,7 @@ obligatorios). Diferido a un slice posterior: combo, `promocion`, carrito,
 central_pedidos, cuenta_puntos, carta_disputa_pago.
 """
 
+from src.modules.sales.infrastructure.models.alerta_pedido import AlertaPedido
 from src.modules.sales.infrastructure.models.cliente import Cliente
 from src.modules.sales.infrastructure.models.kds_pantalla import KdsPantalla
 from src.modules.sales.infrastructure.models.lista_precio import ListaPrecio
@@ -32,6 +33,7 @@ from src.modules.sales.infrastructure.models.venta import Venta
 from src.modules.sales.infrastructure.models.venta_item import VentaItem
 
 __all__ = [
+    "AlertaPedido",
     "Cliente",
     "KdsPantalla",
     "ListaPrecio",

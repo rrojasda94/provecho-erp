@@ -1,183 +1,236 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
-/* Tokens de marca Provecho (docs/product/ui-ux.md).
-   El PDV sobreescribe estas variables con el branding de cada marca. */
+/* Tailwind v4 es CSS-first: no hay `tailwind.config.ts`, el tema vive acá.
+   Tres capas, en este orden y por este motivo:
+
+   1. `--marca-*`: los 6 colores de Provecho (docs/product/ui-ux.md). Única
+      fuente de verdad del color. El PDV los sobreescribe por marca.
+   2. Roles semánticos de shadcn (`--primary`, `--background`, `--radius`…)
+      **mapeados a los de marca**. ADR-013 es explícito: el preset de shadcn
+      aporta forma y espaciado, nunca los colores — por eso ninguno queda
+      con el gris neutro que trae de fábrica.
+   3. `@theme`: expone lo anterior como utilidades (`bg-primary`,
+      `text-foreground`, `font-heading`…).
+
+   Cambiar de marca = tocar el bloque 1. Cambiar la forma de todos los
+   componentes = tocar `--radius`. */
+
 :root {
-    --color-primary: #f4511e;
-    --color-secondary: #b71c1c;
-    --color-dark: #161616;
-    --color-cream: #fff1dc;
-    --color-accent: #aeea00;
-    --color-gray: #757575;
+    /* 1. Marca */
+    --marca-primary: #f4511e;
+    --marca-secondary: #b71c1c;
+    --marca-dark: #161616;
+    --marca-cream: #fff1dc;
+    --marca-accent: #aeea00;
+    --marca-gray: #757575;
 
-    --color-background: var(--color-cream);
-    --color-foreground: var(--color-dark);
+    /* 2. Roles de shadcn sobre la marca */
+    --background: var(--marca-cream);
+    --foreground: var(--marca-dark);
+    --card: #ffffff;
+    --card-foreground: var(--marca-dark);
+    --popover: #ffffff;
+    --popover-foreground: var(--marca-dark);
+    --primary: var(--marca-primary);
+    --primary-foreground: var(--marca-cream);
+    --secondary: var(--marca-secondary);
+    --secondary-foreground: var(--marca-cream);
+    --muted: #f2ece2;
+    --muted-foreground: var(--marca-gray);
+    --accent: var(--marca-accent);
+    --accent-foreground: var(--marca-dark);
+    --destructive: var(--marca-secondary);
+    --destructive-foreground: var(--marca-cream);
+    --border: color-mix(in srgb, var(--marca-dark) 12%, transparent);
+    --input: color-mix(in srgb, var(--marca-dark) 20%, transparent);
+    --ring: var(--marca-primary);
+    --radius: 8px;
+
+    /* Series de gráficos: la marca primero, después tonos que contrastan
+       entre sí y con el fondo crema. */
+    --chart-1: var(--marca-primary);
+    --chart-2: #1e88a8;
+    --chart-3: var(--marca-secondary);
+    --chart-4: #6a1b9a;
+    --chart-5: #2e7d32;
+
+    --sidebar: #ffffff;
+    --sidebar-foreground: var(--marca-dark);
+    --sidebar-primary: var(--marca-primary);
+    --sidebar-primary-foreground: var(--marca-cream);
+    --sidebar-accent: var(--marca-cream);
+    --sidebar-accent-foreground: var(--marca-dark);
+    --sidebar-border: color-mix(in srgb, var(--marca-dark) 12%, transparent);
+    --sidebar-ring: var(--marca-primary);
 }
 
-* {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
+/* 3. Utilidades de Tailwind. `inline` = la utilidad referencia la variable
+   viva, así el PDV puede recolorear la marca sin recompilar. */
+@theme inline {
+    --color-primary: var(--primary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-secondary: var(--secondary);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+    --color-card: var(--card);
+    --color-card-foreground: var(--card-foreground);
+    --color-popover: var(--popover);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-muted: var(--muted);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-accent: var(--accent);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-destructive: var(--destructive);
+    --color-destructive-foreground: var(--destructive-foreground);
+    --color-border: var(--border);
+    --color-input: var(--input);
+    --color-ring: var(--ring);
+
+    /* Nombres de marca que el código ya usa (`text-cream`, `text-gray`). */
+    --color-dark: var(--marca-dark);
+    --color-cream: var(--marca-cream);
+    --color-gray: var(--marca-gray);
+
+    --color-chart-1: var(--chart-1);
+    --color-chart-2: var(--chart-2);
+    --color-chart-3: var(--chart-3);
+    --color-chart-4: var(--chart-4);
+    --color-chart-5: var(--chart-5);
+
+    --color-sidebar: var(--sidebar);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-ring: var(--sidebar-ring);
+
+    /* `next/font` inyecta `--fuente-*`; el nombre difiere del token de
+       Tailwind a propósito — si coincidieran, la variable se referenciaría a
+       sí misma y la fuente no cargaría. */
+    --font-heading: var(--fuente-titulo), sans-serif;
+    --font-body: var(--fuente-texto), system-ui, sans-serif;
+    --font-sans: var(--fuente-texto), system-ui, sans-serif;
 }
 
-body {
-    font-family: var(--font-body), system-ui, sans-serif;
-    background: var(--color-background);
-    color: var(--color-foreground);
+@layer base {
+    * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        /* v4 cambió el borde por defecto a `currentcolor`; se conserva el
+           comportamiento de v3 para no repintar cada borde del ERP. */
+        border-color: var(--border);
+    }
+
+    body {
+        font-family: var(--fuente-texto), system-ui, sans-serif;
+        background: var(--background);
+        color: var(--foreground);
+    }
+
+    h1,
+    h2,
+    h3,
+    h4 {
+        font-family: var(--fuente-titulo), sans-serif;
+        font-style: italic;
+        text-transform: uppercase;
+    }
+
+    button {
+        font-family: inherit;
+        cursor: pointer;
+    }
+
+    button:disabled {
+        cursor: not-allowed;
+    }
+
+    input:focus-visible,
+    select:focus-visible {
+        outline: 2px solid var(--ring);
+        outline-offset: 1px;
+    }
 }
 
-h1,
-h2,
-h3,
-h4 {
-    font-family: var(--font-heading), sans-serif;
-    font-style: italic;
-    text-transform: uppercase;
-}
+/* Clases heredadas del login, anteriores a Tailwind. Se conservan porque esa
+   pantalla todavía no se migró; el resto del ERP ya usa utilidades. */
+@layer components {
+    .login-page {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1.5rem;
+    }
 
-button {
-    font-family: inherit;
-    cursor: pointer;
-    border: none;
-    border-radius: 8px;
-}
+    .login-card {
+        width: 100%;
+        max-width: 360px;
+        background: var(--card);
+        border-radius: calc(var(--radius) * 2);
+        padding: 2rem;
+        box-shadow: 0 8px 24px rgba(22, 22, 22, 0.12);
+    }
 
-button:disabled {
-    cursor: not-allowed;
-    opacity: 0.6;
-}
+    .login-card h1 {
+        color: var(--primary);
+        font-size: 2rem;
+    }
 
-input,
-select {
-    font-family: inherit;
-    font-size: 1rem;
-    padding: 0.6rem 0.75rem;
-    border: 1px solid var(--color-gray);
-    border-radius: 8px;
-    background: #fff;
-    color: var(--color-dark);
-}
+    .login-tagline {
+        color: var(--muted-foreground);
+        margin-top: 0.25rem;
+        margin-bottom: 1.5rem;
+    }
 
-input:focus,
-select:focus {
-    outline: 2px solid var(--color-primary);
-    outline-offset: 1px;
-}
+    .login-form {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
 
-/* --- Login --- */
-.login-page {
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 1.5rem;
-}
+    .login-form label {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        font-size: 0.9rem;
+        font-weight: 600;
+    }
 
-.login-card {
-    width: 100%;
-    max-width: 360px;
-    background: #fff;
-    border-radius: 16px;
-    padding: 2rem;
-    box-shadow: 0 8px 24px rgba(22, 22, 22, 0.12);
-}
+    .login-form input {
+        font-family: inherit;
+        font-size: 1rem;
+        padding: 0.6rem 0.75rem;
+        border: 1px solid var(--input);
+        border-radius: var(--radius);
+        background: #fff;
+        color: var(--foreground);
+    }
 
-.login-card h1 {
-    color: var(--color-primary);
-    font-size: 2rem;
-}
+    .login-form button {
+        margin-top: 0.5rem;
+        padding: 0.75rem;
+        background: var(--primary);
+        color: var(--primary-foreground);
+        font-weight: 700;
+        font-size: 1rem;
+        border: none;
+        border-radius: var(--radius);
+    }
 
-.login-tagline {
-    color: var(--color-gray);
-    margin-top: 0.25rem;
-    margin-bottom: 1.5rem;
-}
+    .login-form button:not(:disabled):hover {
+        background: var(--secondary);
+    }
 
-.login-form {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-
-.login-form label {
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-    font-size: 0.9rem;
-    font-weight: 600;
-}
-
-.login-form button {
-    margin-top: 0.5rem;
-    padding: 0.75rem;
-    background: var(--color-primary);
-    color: #fff;
-    font-weight: 700;
-    font-size: 1rem;
-}
-
-.login-form button:not(:disabled):hover {
-    background: var(--color-secondary);
-}
-
-.login-error {
-    color: var(--color-secondary);
-    font-size: 0.9rem;
-    font-weight: 600;
-}
-
-/* --- Dashboard (cabecera y logout ahora los da el shell, Tailwind) --- */
-.dashboard-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 1.25rem;
-}
-
-.dashboard-card {
-    background: #fff;
-    border-radius: 16px;
-    padding: 1.5rem;
-    box-shadow: 0 4px 16px rgba(22, 22, 22, 0.08);
-}
-
-.dashboard-card h2 {
-    font-size: 1rem;
-    color: var(--color-gray);
-    margin-bottom: 0.75rem;
-}
-
-.dashboard-metric {
-    font-size: 2.5rem;
-    font-weight: 700;
-    color: var(--color-dark);
-    line-height: 1;
-}
-
-.dashboard-metric--alerta {
-    color: var(--color-secondary);
-}
-
-.dashboard-submetric {
-    margin-top: 0.35rem;
-    color: var(--color-gray);
-    font-weight: 600;
-}
-
-.dashboard-list {
-    list-style: none;
-    margin-top: 1rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.4rem;
-    font-size: 0.85rem;
-    color: var(--color-gray);
-}
-
-.dashboard-error {
-    color: var(--color-secondary);
-    font-weight: 600;
-    text-align: center;
-    margin-top: 2rem;
+    .login-error {
+        color: var(--destructive);
+        font-size: 0.9rem;
+        font-weight: 600;
+    }
 }

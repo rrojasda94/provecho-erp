@@ -3,6 +3,7 @@ sensibles antes de que salgan del proceso."""
 
 import json
 import logging
+from datetime import datetime, timedelta
 
 import pytest
 from fastapi import FastAPI
@@ -65,6 +66,20 @@ def test_el_log_json_trae_los_campos_del_contrato() -> None:
     evento = _formatear(_record())
     assert set(evento) >= {"ts", "nivel", "flujo", "logger", "mensaje", "app", "entorno"}
     assert evento["mensaje"] == "hola"
+
+
+def test_el_timestamp_es_rfc3339_en_utc() -> None:
+    """El colector (Alloy → Loki) parsea `ts` como RFC3339 para respetar la
+    hora del evento y no la de ingesta. Antes salía `-0500` **sin los dos
+    puntos**, que no es RFC3339: Alloy lo descartaba en silencio y estampaba
+    la hora de recolección, así que un hub que subía logs atrasados los
+    mostraba como recién ocurridos. Este test congela el contrato."""
+    ts = _formatear(_record())["ts"]
+    momento = datetime.fromisoformat(ts)  # falla si no es ISO8601/RFC3339
+    assert momento.tzinfo is not None, "el instante debe llevar zona"
+    assert momento.utcoffset() == timedelta(0), "los instantes van en UTC"
+    # El offset se escribe `+00:00`, no `+0000`: es lo que exige RFC3339.
+    assert ts.endswith("+00:00")
 
 
 def test_el_contexto_extra_se_redacta_en_el_log() -> None:

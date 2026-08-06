@@ -1,4 +1,4 @@
-import { ApiError, apiFetch } from "@/lib/api";
+import { ApiError, apiFetch, type Pagina } from "@/lib/api";
 import { obtenerSesion } from "@/lib/sesion";
 
 import {
@@ -15,13 +15,13 @@ export default async function ArticulosPage() {
     // En paralelo: la tabla necesita el listado, el diálogo de alta
     // necesita las dos listas de referencia — ninguna depende de la otra.
     const [articulos, categorias, unidadesMedida] = await Promise.all([
-      apiFetch<Articulo[]>("/api/v1/inventory/articulos", { token }),
+      apiFetch<Pagina<Articulo>>("/api/v1/inventory/articulos", { token }),
       apiFetch<Categoria[]>("/api/v1/inventory/categorias", { token }),
       apiFetch<UnidadMedida[]>("/api/v1/inventory/unidades-medida", { token }),
     ]);
     return (
       <ArticulosCliente
-        articulos={articulos}
+        articulos={articulos.items}
         categorias={categorias}
         unidadesMedida={unidadesMedida}
       />

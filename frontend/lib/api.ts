@@ -8,6 +8,19 @@
  */
 export const API_INTERNAL_URL = process.env.API_INTERNAL_URL ?? "http://localhost:8000";
 
+/**
+ * Sobre de los listados que crecen con la operación (ADR-026). Los
+ * catálogos de configuración —roles, divisas, unidades de medida— siguen
+ * devolviendo un array plano: paginarlos sería un sobre que desenvolver
+ * para nada.
+ */
+export type Pagina<T> = {
+  items: T[];
+  total: number;
+  page: number;
+  page_size: number;
+};
+
 export class ApiError extends Error {
   status: number;
 
@@ -49,5 +62,9 @@ export async function apiFetch<T>(
   if (!respuesta.ok) {
     throw new ApiError(respuesta.status, await mensajeDeError(respuesta));
   }
+  // 204 no trae cuerpo (asignar/quitar rol, marcar leída): pedirle `.json()`
+  // revienta con "Unexpected end of JSON input" sobre una llamada que salió
+  // bien.
+  if (respuesta.status === 204) return undefined as T;
   return respuesta.json() as Promise<T>;
 }

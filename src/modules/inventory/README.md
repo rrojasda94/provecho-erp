@@ -13,8 +13,9 @@ productos (`articulo`, `sku`, `receta`, `receta_item`), `stock`,
 `movimiento_inventario`, `ajuste`, `lote` + `stock_lote` (FEFO),
 `conteo` + `conteo_item` (conteo cíclico) y el ciclo de abastecimiento
 interno (`reserva_stock`, `solicitud_insumos` + `solicitud_item`,
-`transferencia` + `transferencia_item`). `stock_merma`, `devolucion` y
-`guia_remision` siguen pendientes de sus slices.
+`transferencia` + `transferencia_item`) con su `guia_remision` +
+`guia_remision_item`. `stock_merma` y `devolucion` siguen pendientes de
+sus slices.
 
 `articulo` (tipos `insumo` | `subreceta` | `mercaderia` | `empaque` |
 `repuesto` | `suministro` — enum extensible), `categoria`, `stock`,
@@ -128,12 +129,15 @@ supervisor aprueba y reserva, el central despacha, el local recibe.
 | GET | `/reservas?almacen_id&sku_id` | `leer` |
 | POST | `/reservas/{id}/liberar` | `liberar_reserva` |
 | POST/GET | `/solicitudes` | `solicitar_insumos` / `leer` |
+| GET | `/solicitudes/resumen` | `leer_solicitudes_externas` |
 | GET | `/solicitudes/{id}` | `leer` |
 | POST | `/solicitudes/{id}/aprobar` \| `/rechazar` | `aprobar_solicitud` |
 | POST | `/solicitudes/{id}/cancelar` | `solicitar_insumos` |
 | POST/GET | `/transferencias` | `transferir` / `leer` |
 | GET | `/transferencias/{id}` | `leer` |
 | POST | `/transferencias/{id}/recibir` | `recepcion` |
+| POST/GET | `/transferencias/{id}/guia` | `emitir_guia` / `leer` |
+| GET | `/guias-remision?estado_emision=` | `leer` |
 
 Solicitar y aprobar son permisos distintos y el aprobador no puede ser
 quien pidió (RN-INV-006). `transferir` y `recepcion` ya estaban sembrados
@@ -256,8 +260,18 @@ alerta `bajo_minimo` derivada en la consulta; evento
 `application/listeners.py`), consumido por `core.dashboard_router` para el
 dashboard gerencial.
 
-**Diferido (deuda del módulo):** devolución, guía de remisión,
-`stock_merma`. Del slice de abastecimiento: el disponible negativo no
+**Guía de remisión** (2026-08-05, ADR-027): cuelga de `transferencia`
+porque lo que declara es un traslado, y el traslado es un hecho de
+inventario (RN-GDR-002: la emite el almacén). Las líneas **se derivan**
+de `transferencia_item` agrupadas por SKU —RN-TRP-002 exige que lo
+transportado coincida con lo declarado, así que no hay formulario de
+ítems— y solo se teclea lo que el sistema no puede saber: chofer,
+vehículo, peso bruto y fecha de inicio del viaje. Un traslado, una guía
+(`transferencia_id` único) y correlativo por `(empresa, serie)`. El envío
+a SUNAT es asíncrono (`POST /despatch/send` vía Celery): la guía impresa
+es la que viaja y un rechazo se corrige y reemite, no detiene el camión.
+
+**Diferido (deuda del módulo):** devolución, `stock_merma`. Del slice de abastecimiento: el disponible negativo no
 tiene alerta, `reserva_stock` nace con tres tipos sin productor
 (`produccion`, `carrito`, `merma`), la transferencia no lleva vehículo ni
 tracking (`vehiculo` no existe), la recepción es de una sola pasada (sin
@@ -314,6 +328,19 @@ entre `aprobada` y `despachada` no cambia qué se puede hacer (ADR-020).
   que no se contó en su fecha, RN-INV-021).
 - Contrato público de lectura: `application/queries_publicas.py` — hoy
   `unidad_medida_para_magnitud` (nombre y `decimales` de una UdM, para que
-  otro módulo exprese una cantidad con su unidad, RN-GER-010). Mismo criterio
-  que `sales.queries_publicas`: devuelve dicts, nunca el ORM, y nadie importa
-  `inventory.infrastructure` desde afuera.
+  otro módulo exprese una cantidad con su unidad, RN-GER-010),
+  `receta_resumen` (que `sales` valide la receta de un producto comercial) y
+  `solicitudes_resumen_para_negociacion` (`GET /solicitudes/resumen`, permiso
+  `leer_solicitudes_externas`: qué artículo pide más cada sucursal, para que
+  `purchases` negocie volumen — ver `docs/architecture/events.md`) y
+  `costo_unitario_de_recetas` (costo de **una unidad de rendimiento**, con
+  merma, para que el reporte de margen del tablero no tenga que conocer el
+  modelo de recetas). Mismo criterio que `sales.queries_publicas`: devuelve
+  dicts, nunca el ORM, y nadie importa `inventory.infrastructure` desde
+  afuera.
+
+  `costo_unitario_de_recetas` reusa `recetas.costo_linea` en vez de
+  recalcular con otro criterio —dos pantallas del ERP no pueden mostrar
+  números distintos para lo mismo— y **omite** del resultado la receta sin
+  insumos o sin rendimiento válido: nunca devuelve costo cero, que se leería
+  como "gratis" en lugar de "desconocido".

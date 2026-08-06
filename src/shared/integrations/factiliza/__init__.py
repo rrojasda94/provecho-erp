@@ -1,8 +1,11 @@
 """Adaptador de Factiliza — facturación electrónica ante SUNAT (Perú)."""
 
+from src.shared.integrations.factiliza import guias
 from src.shared.integrations.factiliza.client import (
+    CONTENT_TYPES,
     ConsultaEmpresa,
     ConsultaPersona,
+    DocumentoDescargado,
     FactilizaClient,
     FactilizaError,
     RespuestaEmision,
@@ -10,27 +13,46 @@ from src.shared.integrations.factiliza.client import (
     razon_social_desde_ruc,
 )
 from src.shared.integrations.factiliza.mapper import (
+    MOTIVO_NC_ANULACION,
+    MOTIVO_NC_DEVOLUCION_POR_ITEM,
+    MOTIVO_NC_DEVOLUCION_TOTAL,
+    MOTIVOS_NC,
+    MOTIVOS_NC_DE_CORRECCION,
     TIPO_DOC_BOLETA,
     TIPO_DOC_FACTURA,
+    TIPO_DOC_NOTA_CREDITO,
     Cliente,
     Documento,
+    DocumentoAfectado,
     Item,
     construir_payload,
+    construir_payload_nota_credito,
     monto_en_letras,
 )
 
 __all__ = [
+    "CONTENT_TYPES",
+    "MOTIVOS_NC",
+    "MOTIVOS_NC_DE_CORRECCION",
+    "MOTIVO_NC_ANULACION",
+    "MOTIVO_NC_DEVOLUCION_POR_ITEM",
+    "MOTIVO_NC_DEVOLUCION_TOTAL",
     "TIPO_DOC_BOLETA",
     "TIPO_DOC_FACTURA",
+    "TIPO_DOC_NOTA_CREDITO",
     "Cliente",
+    "DocumentoAfectado",
     "ConsultaEmpresa",
     "ConsultaPersona",
     "Documento",
+    "DocumentoDescargado",
     "FactilizaClient",
     "FactilizaError",
     "Item",
     "RespuestaEmision",
+    "guias",
     "construir_payload",
+    "construir_payload_nota_credito",
     "monto_en_letras",
     "nombres_desde_dni",
     "razon_social_desde_ruc",

@@ -107,6 +107,16 @@ def crear_comprobante_pendiente(
     return comprobante
 
 
+def documento_de(session: Session, comprobante: Comprobante) -> factiliza.Documento:
+    """El documento tal como se envió (o se enviaría) a SUNAT.
+
+    Público porque la nota de crédito lo reusa: sus líneas tienen que llevar
+    los mismos precios, el mismo descuento prorrateado y el mismo régimen de
+    IGV que el comprobante que corrige.
+    """
+    return _documento(session, comprobante)
+
+
 def _documento(session: Session, comprobante: Comprobante) -> factiliza.Documento:
     repo = ComprobanteRepo(session)
     empresa = repo.empresa(comprobante.empresa_id)
@@ -277,3 +287,51 @@ def emitir_comprobante(
         session=session,
     )
     return comprobante
+
+
+FORMATOS_DESCARGA = ("pdf", "xml", "cdr")
+
+
+def descargar_documento(
+    session: Session,
+    comprobante_id: uuid.UUID,
+    formato: str,
+    client: factiliza.FactilizaClient | None = None,
+) -> factiliza.DocumentoDescargado:
+    """Baja el PDF, el XML firmado o el CDR de un comprobante aceptado.
+
+    Se pide al proveedor en el momento y no se guarda: Factiliza es el
+    emisor y su copia es la buena. Guardar una nuestra agregaría un archivo
+    que puede quedar desincronizado del que SUNAT tiene, sin ganar nada
+    mientras el proveedor siga activo — cuando haga falta archivarlo por
+    contingencia, va a `archivo` con su hash (ver ROADMAP).
+
+    Solo de un comprobante `aceptado`: antes de eso no hay XML firmado ni
+    CDR que bajar, y el PDF sería de un documento que SUNAT no reconoce.
+    """
+    if formato not in FORMATOS_DESCARGA:
+        raise ReglaNegocio(f"formato no descargable: {formato}")
+    comprobante = ComprobanteRepo(session).get(comprobante_id)
+    if comprobante is None:
+        raise NoEncontrado("comprobante no encontrado")
+    if comprobante.direccion != "emitido":
+        raise Conflicto("solo se descarga un comprobante propio, no uno recibido")
+    if comprobante.estado_emision != "aceptado":
+        raise Conflicto(
+            f"el comprobante está {comprobante.estado_emision}: sin aceptación de "
+            "SUNAT no hay documento que descargar"
+        )
+    return (client or factiliza.FactilizaClient()).descargar(
+        formato,
+        _tipo_doc_sunat(comprobante.tipo),
+        comprobante.serie,
+        comprobante.correlativo,
+    )
+
+
+def _tipo_doc_sunat(tipo: str) -> str:
+    return {
+        "factura": factiliza.TIPO_DOC_FACTURA,
+        "boleta": factiliza.TIPO_DOC_BOLETA,
+        "nc": factiliza.TIPO_DOC_NOTA_CREDITO,
+    }[tipo]

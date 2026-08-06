@@ -19,6 +19,7 @@ from src.modules.sales.infrastructure.models import Cliente, MedioPago
 from src.modules.users.infrastructure.models import Persona
 from src.shared.integrations import factiliza
 from src.shared.integrations.factiliza import FactilizaError, RespuestaEmision
+from tests.conftest import abrir_caja_directa
 from tests.test_venta_slice import _crear_cadena_base, _crear_trabajador
 
 
@@ -165,6 +166,11 @@ def _venta_pagada(session, cliente=None):
     )
     session.add(medio)
     session.flush()
+    # No se cobra sin turno de caja abierto (RN-MDP-002); acá se prueba la
+    # facturación, no la caja, así que el turno se inserta directo.
+    abrir_caja_directa(
+        session, punto_venta_id=punto_venta.id, cajero_id=usuario.id
+    )
 
     venta = ventas.crear_venta(
         session,

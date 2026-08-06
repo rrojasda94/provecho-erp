@@ -12,6 +12,7 @@ commit/rollback. Los repos solo encapsulan las queries.
 # nunca se evalúan así.
 from __future__ import annotations
 
+import logging
 import uuid
 
 from sqlalchemy import select, update
@@ -20,11 +21,13 @@ from sqlalchemy.orm import Session
 from src.modules.users.infrastructure.models import (
     Almacen,
     AuditLog,
+    Marca,
     Permiso,
     Persona,
     RefreshToken,
     Rol,
     RolPermiso,
+    Sucursal,
     Usuario,
     UsuarioRol,
     UsuarioSucursal,
@@ -45,14 +48,16 @@ class UsuarioRepo:
             )
         )
 
-    def list(self) -> list[Usuario]:
-        return list(
-            self.s.scalars(
-                select(Usuario).where(Usuario.deleted_at.is_(None)).order_by(
-                    Usuario.username
-                )
-            )
+    def q_list(self):
+        """La consulta, sin ejecutar: el router la pagina (ADR-026)."""
+        return (
+            select(Usuario)
+            .where(Usuario.deleted_at.is_(None))
+            .order_by(Usuario.username)
         )
+
+    def list(self) -> list[Usuario]:
+        return list(self.s.scalars(self.q_list()))
 
     def add(self, usuario: Usuario) -> Usuario:
         self.s.add(usuario)
@@ -74,6 +79,19 @@ class UsuarioRepo:
                 select(Rol.nombre)
                 .join(UsuarioRol, UsuarioRol.rol_id == Rol.id)
                 .where(UsuarioRol.usuario_id == usuario_id)
+            )
+        )
+
+    def roles_de(self, usuario_id: uuid.UUID) -> list[Rol]:
+        """Los roles asignados, con id y descripción — `rol_nombres` solo
+        devuelve el nombre y la pantalla de administración necesita poder
+        quitar el rol, o sea su id."""
+        return list(
+            self.s.scalars(
+                select(Rol)
+                .join(UsuarioRol, UsuarioRol.rol_id == Rol.id)
+                .where(UsuarioRol.usuario_id == usuario_id)
+                .order_by(Rol.nombre)
             )
         )
 
@@ -132,6 +150,18 @@ class RolRepo:
 
     def list(self) -> list[Rol]:
         return list(self.s.scalars(select(Rol).where(Rol.deleted_at.is_(None))))
+
+    def permisos_de(self, rol_id: uuid.UUID) -> list[Permiso]:
+        """Qué habilita este rol. Sin esto, la pantalla de roles muestra
+        nombres sueltos y nadie sabe qué está asignando."""
+        return list(
+            self.s.scalars(
+                select(Permiso)
+                .join(RolPermiso, RolPermiso.permiso_id == Permiso.id)
+                .where(RolPermiso.rol_id == rol_id, Permiso.deleted_at.is_(None))
+                .order_by(Permiso.codigo)
+            )
+        )
 
     def add(self, rol: Rol) -> Rol:
         self.s.add(rol)
@@ -198,7 +228,7 @@ class PersonaRepo:
             )
         )
 
-    def list(self, q: str | None = None) -> list[Persona]:
+    def q_list(self, q: str | None = None):
         stmt = select(Persona).where(Persona.deleted_at.is_(None))
         if q:
             patron = f"%{q}%"
@@ -207,7 +237,10 @@ class PersonaRepo:
                 | (Persona.apellidos.ilike(patron))
                 | (Persona.numero_documento.ilike(patron))
             )
-        return list(self.s.scalars(stmt.order_by(Persona.apellidos, Persona.nombres)))
+        return stmt.order_by(Persona.apellidos, Persona.nombres)
+
+    def list(self, q: str | None = None) -> list[Persona]:
+        return list(self.s.scalars(self.q_list(q)))
 
     def add(self, persona: Persona) -> Persona:
         self.s.add(persona)
@@ -244,6 +277,44 @@ class AlmacenRepo:
         return list(self.s.scalars(stmt.order_by(Almacen.nombre)))
 
 
+class MarcaRepo:
+    def __init__(self, session: Session) -> None:
+        self.s = session
+
+    def list(self, empresa_id: uuid.UUID | None = None) -> list[Marca]:
+        """Marcas que la empresa opera, vía sus sucursales.
+
+        La marca es del **grupo**, no de la empresa (una marca licenciada
+        puede operarla más de una): el filtro sale de qué marcas tienen
+        sucursal en esta empresa. Sin `empresa_id` (superusuario) van todas.
+        """
+        stmt = select(Marca).where(Marca.deleted_at.is_(None))
+        if empresa_id is not None:
+            stmt = stmt.where(
+                Marca.id.in_(
+                    select(Sucursal.marca_id).where(Sucursal.empresa_id == empresa_id)
+                )
+            )
+        return list(self.s.scalars(stmt.order_by(Marca.nombre)))
+
+
+class SucursalRepo:
+    def __init__(self, session: Session) -> None:
+        self.s = session
+
+    def list(self, empresa_id: uuid.UUID | None = None) -> list[Sucursal]:
+        stmt = select(Sucursal).where(Sucursal.deleted_at.is_(None))
+        if empresa_id is not None:
+            stmt = stmt.where(Sucursal.empresa_id == empresa_id)
+        return list(self.s.scalars(stmt.order_by(Sucursal.nombre)))
+
+
+# Logger propio: el flujo `auditoria` que `logging_config` declaraba y
+# nadie emitía. Separado de `provecho.app` para que un colector pueda
+# rutearlo aparte (retención distinta, alertas distintas).
+log_auditoria = logging.getLogger("provecho.auditoria")
+
+
 class AuditLogRepo:
     def __init__(self, session: Session) -> None:
         self.s = session
@@ -251,4 +322,20 @@ class AuditLogRepo:
     def registrar(self, **campos) -> AuditLog:
         entry = AuditLog(**campos)
         self.s.add(entry)
+        # Además de la fila, una línea en el log estructurado. No es
+        # duplicar por gusto: la tabla es el rastro legal (consultable, con
+        # su propia retención) y el log es lo que un colector externo puede
+        # vigilar en vivo — si alguien borrara la fila, la línea ya salió
+        # del proceso. Solo metadatos: `datos_antes`/`datos_despues` pueden
+        # traer PII (Ley 29733) y ese detalle se queda en la tabla.
+        log_auditoria.info(
+            "auditoria",
+            extra={
+                "accion": campos.get("accion"),
+                "entidad": campos.get("entidad"),
+                "entidad_id": str(campos.get("entidad_id") or ""),
+                "usuario_id": str(campos.get("usuario_id") or ""),
+                "ip": campos.get("ip"),
+            },
+        )
         return entry

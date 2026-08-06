@@ -1,4 +1,11 @@
+import { Tablero } from "@/components/reportes/tablero";
 import { ApiError, apiFetch } from "@/lib/api";
+import type {
+  Catalogo,
+  Rol,
+  Sucursal,
+  Tablero as TableroGuardado,
+} from "@/lib/reportes";
 import { obtenerSesion } from "@/lib/sesion";
 
 type DashboardResumen = {
@@ -13,69 +20,37 @@ type DashboardResumen = {
   }>;
 };
 
-type ResultadoResumen =
-  | { ok: true; resumen: DashboardResumen }
-  | { ok: false; mensaje: string };
-
-/** Separado del componente para no acumular ramas de error dentro del
- * cuerpo de la página (regla de complejidad de ESLint) — cada motivo de
- * fallo es un mensaje, no una decisión de layout. */
-async function obtenerResumen(empresaId: string, token: string): Promise<ResultadoResumen> {
+/** Cada bloque falla por su cuenta: que el usuario no tenga `sales.leer` no
+ * puede dejar el tablero entero en blanco. `null` = no disponible. */
+async function opcional<T>(promesa: Promise<T>): Promise<T | null> {
   try {
-    const resumen = await apiFetch<DashboardResumen>(
-      `/api/v1/dashboard/resumen?empresa_id=${empresaId}`,
-      { token },
-    );
-    return { ok: true, resumen };
+    return await promesa;
   } catch (e) {
-    const mensaje =
-      e instanceof ApiError && e.status === 403
-        ? "Tu usuario no tiene permiso para ver el dashboard."
-        : "No se pudo cargar el dashboard. Intentar de nuevo.";
-    return { ok: false, mensaje };
+    if (e instanceof ApiError) return null;
+    throw e;
   }
 }
 
-function TarjetaVentas({ resumen }: { resumen: DashboardResumen }) {
+function Kpi({
+  titulo,
+  valor,
+  detalle,
+  alerta,
+}: {
+  titulo: string;
+  valor: string | number;
+  detalle?: string;
+  alerta?: boolean;
+}) {
   return (
-    <article className="dashboard-card">
-      <h2>Ventas de hoy</h2>
-      <p className="dashboard-metric">{resumen.ventas_hoy.cantidad}</p>
-      <p className="dashboard-submetric">S/ {resumen.ventas_hoy.total}</p>
-    </article>
-  );
-}
-
-function TarjetaStock({ resumen }: { resumen: DashboardResumen }) {
-  const hayAlerta = resumen.stock_bajo_minimo > 0;
-  return (
-    <article className="dashboard-card">
-      <h2>Stock bajo mínimo</h2>
-      <p className={hayAlerta ? "dashboard-metric dashboard-metric--alerta" : "dashboard-metric"}>
-        {resumen.stock_bajo_minimo}
+    <article className="rounded border border-foreground/10 bg-background p-4 shadow-sm">
+      <h2 className="text-xs font-medium uppercase tracking-wide text-gray">{titulo}</h2>
+      <p
+        className={`mt-1 font-heading text-3xl font-semibold ${alerta ? "text-accent" : ""}`}
+      >
+        {valor}
       </p>
-    </article>
-  );
-}
-
-function TarjetaCajas({ resumen }: { resumen: DashboardResumen }) {
-  return (
-    <article className="dashboard-card">
-      <h2>Cajas abiertas</h2>
-      <p className="dashboard-metric">{resumen.cajas_abiertas.length}</p>
-      {resumen.cajas_abiertas.length > 0 && (
-        <ul className="dashboard-list">
-          {resumen.cajas_abiertas.map((c) => (
-            <li key={c.apertura_caja_id}>
-              S/ {c.monto_apertura} — desde{" "}
-              {new Date(c.abierta_desde).toLocaleTimeString("es-PE", {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </li>
-          ))}
-        </ul>
-      )}
+      {detalle && <p className="text-sm text-gray">{detalle}</p>}
     </article>
   );
 }
@@ -86,22 +61,71 @@ export default async function DashboardPage() {
   const { token, usuario } = await obtenerSesion();
   if (!usuario.empresa_id) {
     return (
-      <p className="dashboard-error">
+      <p className="rounded border border-accent/40 bg-accent/5 p-4 text-sm text-accent">
         Tu usuario no tiene una empresa asignada — no se puede cargar el dashboard.
       </p>
     );
   }
 
-  const resultado = await obtenerResumen(usuario.empresa_id, token);
-  if (!resultado.ok) {
-    return <p className="dashboard-error">{resultado.mensaje}</p>;
+  const [resumen, catalogo, sucursales, tableros, roles] = await Promise.all([
+    opcional(
+      apiFetch<DashboardResumen>(
+        `/api/v1/dashboard/resumen?empresa_id=${usuario.empresa_id}`,
+        { token },
+      ),
+    ),
+    opcional(apiFetch<Catalogo>("/api/v1/reportes", { token })),
+    opcional(apiFetch<Sucursal[]>("/api/v1/sucursales", { token })),
+    opcional(apiFetch<TableroGuardado[]>("/api/v1/tableros", { token })),
+    opcional(apiFetch<Rol[]>("/api/v1/tableros/roles", { token })),
+  ]);
+
+  if (!catalogo) {
+    return (
+      <p className="rounded border border-accent/40 bg-accent/5 p-4 text-sm text-accent">
+        Tu usuario no tiene permiso para ver el dashboard.
+      </p>
+    );
   }
 
+  // Un usuario solo filtra por las sucursales de su alcance: pedir otra
+  // devuelve 403 igual, pero ofrecérsela en el checkbox sería mentirle.
+  const visibles = (sucursales ?? []).filter(
+    (s) => usuario.sucursales.length === 0 || usuario.sucursales.includes(s.id),
+  );
+
   return (
-    <section className="dashboard-grid">
-      <TarjetaVentas resumen={resultado.resumen} />
-      <TarjetaStock resumen={resultado.resumen} />
-      <TarjetaCajas resumen={resultado.resumen} />
-    </section>
+    <div className="flex flex-col gap-6">
+      {resumen && (
+        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <Kpi
+            titulo="Ventas de hoy"
+            valor={resumen.ventas_hoy.cantidad}
+            detalle={`S/ ${resumen.ventas_hoy.total}`}
+          />
+          <Kpi
+            titulo="Stock bajo mínimo"
+            valor={resumen.stock_bajo_minimo}
+            alerta={resumen.stock_bajo_minimo > 0}
+          />
+          <Kpi
+            titulo="Cajas abiertas"
+            valor={resumen.cajas_abiertas.length}
+            detalle={
+              resumen.cajas_abiertas.length > 0
+                ? `Apertura S/ ${resumen.cajas_abiertas[0].monto_apertura}`
+                : undefined
+            }
+          />
+        </section>
+      )}
+
+      <Tablero
+        catalogo={catalogo}
+        sucursales={visibles}
+        tableros={tableros ?? []}
+        roles={roles ?? []}
+      />
+    </div>
   );
 }

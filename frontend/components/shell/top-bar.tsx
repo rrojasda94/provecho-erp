@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { logoutAction } from "@/app/(app)/actions";
+import { Campana } from "@/components/shell/campana";
 
 /** Barra superior del shell (F2.6): siempre visible, home de apps a un
  * click, usuario + logout en un solo lugar — antes cada pantalla repetía su
@@ -12,6 +13,7 @@ export function TopBar({ username }: { username: string }) {
         Provecho
       </Link>
       <div className="flex items-center gap-4">
+        <Campana />
         <span className="text-sm font-semibold text-gray">{username}</span>
         <form action={logoutAction}>
           <button

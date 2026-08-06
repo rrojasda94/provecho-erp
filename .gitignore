@@ -40,3 +40,9 @@ Thumbs.db
 
 # Tooling local de Claude Code (config y skills personales)
 .claude/
+
+# Base desechable y artefactos de las pruebas e2e.
+e2e.db
+frontend/test-results/
+frontend/playwright-report/
+frontend/blob-report/

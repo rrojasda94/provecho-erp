@@ -1,0 +1,226 @@
+"use client";
+
+import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
+
+import {
+  asignarPermisoAction,
+  crearRolAction,
+  quitarPermisoAction,
+  type EstadoRol,
+} from "./actions";
+
+export type Rol = { id: string; nombre: string; descripcion: string | null };
+export type Permiso = {
+  id: string;
+  codigo: string;
+  descripcion: string | null;
+  restricciones: Record<string, unknown> | null;
+};
+
+const ESTADO_INICIAL: EstadoRol = { error: "", ok: false };
+
+/** Prefijo del código (`sales.cobrar` → `sales`): el catálogo pasa los 90
+ * permisos y sin agrupar es una lista imposible de leer. */
+function modulo(codigo: string): string {
+  return codigo.includes(".") ? codigo.split(".")[0] : "general";
+}
+
+function DialogoNuevoRol() {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const [estado, formAction, pendiente] = useActionState(crearRolAction, ESTADO_INICIAL);
+
+  useEffect(() => {
+    if (estado.ok) {
+      formRef.current?.reset();
+      dialogRef.current?.close();
+    }
+  }, [estado.ok]);
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => dialogRef.current?.showModal()}
+        className="rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary"
+      >
+        + Nuevo rol
+      </button>
+      <dialog ref={dialogRef} className="w-full max-w-md rounded-lg p-0 backdrop:bg-dark/40">
+        <form ref={formRef} action={formAction} className="flex flex-col gap-4 p-6">
+          <h2 className="font-heading text-lg italic uppercase text-dark">Nuevo rol</h2>
+          <label className="flex flex-col gap-1 text-sm font-semibold">
+            Nombre
+            <input name="nombre" required maxLength={50} placeholder="ej. supervisor_turno" />
+          </label>
+          <label className="flex flex-col gap-1 text-sm font-semibold">
+            Descripción
+            <input name="descripcion" maxLength={200} placeholder="Qué hace quien lo tiene" />
+          </label>
+          {estado.error && (
+            <p role="alert" className="text-sm font-semibold text-secondary">
+              {estado.error}
+            </p>
+          )}
+          <div className="mt-2 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => dialogRef.current?.close()}
+              className="rounded border border-gray px-4 py-2 text-sm font-semibold text-dark"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={pendiente}
+              className="rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary"
+            >
+              {pendiente ? "Creando..." : "Crear"}
+            </button>
+          </div>
+        </form>
+      </dialog>
+    </>
+  );
+}
+
+function PermisosDelRol({
+  rol,
+  permisos,
+  asignados,
+}: {
+  rol: Rol;
+  permisos: Permiso[];
+  asignados: Permiso[];
+}) {
+  const [estado, formAction] = useActionState(asignarPermisoAction, ESTADO_INICIAL);
+  const [pendiente, startTransition] = useTransition();
+  const disponibles = useMemo(
+    () => permisos.filter((p) => !asignados.some((a) => a.id === p.id)),
+    [permisos, asignados],
+  );
+  const porModulo = useMemo(() => {
+    const mapa = new Map<string, Permiso[]>();
+    for (const p of disponibles) {
+      const clave = modulo(p.codigo);
+      mapa.set(clave, [...(mapa.get(clave) ?? []), p]);
+    }
+    return [...mapa.entries()].sort(([a], [b]) => a.localeCompare(b));
+  }, [disponibles]);
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap gap-1.5">
+        {asignados.length === 0 && (
+          <span className="text-sm text-gray">
+            Sin permisos: quien tenga este rol entra y no ve nada.
+          </span>
+        )}
+        {asignados.map((p) => (
+          <span
+            key={p.id}
+            title={p.descripcion ?? undefined}
+            className="flex items-center gap-1 rounded-full bg-cream px-2 py-0.5 text-xs font-semibold text-dark"
+          >
+            {p.codigo}
+            <button
+              type="button"
+              aria-label={`Quitar ${p.codigo} de ${rol.nombre}`}
+              disabled={pendiente}
+              onClick={() => startTransition(() => void quitarPermisoAction(rol.id, p.id))}
+              className="text-gray hover:text-secondary"
+            >
+              ×
+            </button>
+          </span>
+        ))}
+      </div>
+      {disponibles.length > 0 && (
+        <form action={formAction} className="flex items-center gap-2">
+          <input type="hidden" name="rol_id" value={rol.id} />
+          <select
+            name="permiso_id"
+            defaultValue=""
+            aria-label={`Agregar permiso a ${rol.nombre}`}
+            className="max-w-xs rounded border border-gray/40 px-2 py-1 text-xs"
+          >
+            <option value="" disabled>
+              Elegir permiso...
+            </option>
+            {porModulo.map(([mod, lista]) => (
+              <optgroup key={mod} label={mod}>
+                {lista.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.codigo}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+          <button type="submit" className="text-xs font-bold text-primary hover:underline">
+            Agregar
+          </button>
+          {estado.error && <span className="text-xs text-secondary">{estado.error}</span>}
+        </form>
+      )}
+    </div>
+  );
+}
+
+export function RolesCliente({
+  roles,
+  permisos,
+  permisosPorRol,
+}: {
+  roles: Rol[];
+  permisos: Permiso[];
+  permisosPorRol: Record<string, Permiso[]>;
+}) {
+  // Acordeón en vez de tabla: cada rol tiene decenas de permisos y una
+  // celda con 30 etiquetas no se lee. Se abre el que se está tocando.
+  const [abierto, setAbierto] = useState<string | null>(null);
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between">
+        <h1 className="font-heading text-xl italic uppercase text-dark">Roles</h1>
+        <DialogoNuevoRol />
+      </div>
+      <p className="text-sm text-gray">
+        Un rol es un conjunto de permisos. El ERP deniega por defecto: lo que no está
+        acá, no se puede hacer.
+      </p>
+      <ul className="flex flex-col gap-2">
+        {roles.map((rol) => {
+          const asignados = permisosPorRol[rol.id] ?? [];
+          const activo = abierto === rol.id;
+          return (
+            <li key={rol.id} className="rounded border border-gray/20 bg-white">
+              <button
+                type="button"
+                onClick={() => setAbierto(activo ? null : rol.id)}
+                aria-expanded={activo}
+                className="flex w-full items-center justify-between px-4 py-3 text-left"
+              >
+                <span className="flex flex-col">
+                  <span className="font-semibold text-dark">{rol.nombre}</span>
+                  {rol.descripcion && (
+                    <span className="text-xs text-gray">{rol.descripcion}</span>
+                  )}
+                </span>
+                <span className="text-xs text-gray">
+                  {asignados.length} permiso{asignados.length === 1 ? "" : "s"} {activo ? "▲" : "▼"}
+                </span>
+              </button>
+              {activo && (
+                <div className="border-t border-gray/20 px-4 py-3">
+                  <PermisosDelRol rol={rol} permisos={permisos} asignados={asignados} />
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}

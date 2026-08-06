@@ -111,8 +111,47 @@ def venta_totalmente_pagada(saldos_por_grupo: list[Decimal]) -> bool:
 
 def puede_anular(estado: str) -> bool:
     """Solo una orden aún no pagada se anula por esta vía; anulación
-    post-pago = nota de crédito (slice posterior)."""
+    post-pago = nota de crédito (`comprobantes.emitir_nota_credito`)."""
     return estado == "orden"
+
+
+# --- Nota de crédito (RN-CPP-009) --------------------------------------------
+def puede_notacreditar(estado_emision: str, ya_anulado: bool) -> bool:
+    """Solo se acredita lo que SUNAT aceptó, y una sola vez.
+
+    Un comprobante `pendiente` o `rechazado` no existe para SUNAT: si está
+    mal, se corrige antes de emitirlo. Y un documento ya anulado por una NC
+    total no admite otra — acreditar dos veces la misma venta la duplicaría
+    en negativo.
+    """
+    return estado_emision == "aceptado" and not ya_anulado
+
+
+def cantidades_acreditables(
+    devueltas: dict, vendidas: dict, ya_acreditadas: dict
+) -> list[str]:
+    """Errores de un detalle de NC parcial contra lo que queda por acreditar.
+
+    Devuelve la lista de problemas (vacía = detalle válido). Acreditar más
+    de lo vendido convierte una devolución en una nota de crédito inventada,
+    y sumada a NC anteriores del mismo comprobante es la forma fácil de
+    devolver dos veces el mismo plato.
+    """
+    problemas = []
+    for item_id, cantidad in devueltas.items():
+        if cantidad <= 0:
+            problemas.append(f"la línea {item_id} devuelve una cantidad no positiva")
+            continue
+        vendida = vendidas.get(item_id)
+        if vendida is None:
+            problemas.append(f"la línea {item_id} no pertenece a este comprobante")
+            continue
+        disponible = vendida - ya_acreditadas.get(item_id, 0)
+        if cantidad > disponible:
+            problemas.append(
+                f"la línea {item_id} devuelve {cantidad} y solo quedan {disponible}"
+            )
+    return problemas
 
 
 def precio_unitario_neto(

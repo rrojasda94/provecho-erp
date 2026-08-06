@@ -17,6 +17,7 @@ from src.modules.purchases.application.scope import (
 from src.modules.users.api.deps import get_db, get_tenant, require_permission
 from src.modules.users.application.queries_publicas import tiene_permiso
 from src.modules.users.infrastructure.models import Usuario
+from src.shared.paginacion import Pagina, Paginacion, paginacion, paginar
 
 router = APIRouter(prefix="/purchases", tags=["purchases"])
 
@@ -43,14 +44,19 @@ def crear_proveedor(
     return proveedor
 
 
-@router.get("/proveedores", response_model=list[schemas.ProveedorOut])
+@router.get("/proveedores", response_model=Pagina[schemas.ProveedorOut])
 def listar_proveedores(
     empresa_id: uuid.UUID | None = None,
     _: Usuario = Depends(require_permission(LEER)),
     tenant: Tenant = Depends(get_tenant),
+    p: Paginacion = Depends(paginacion),
     session: Session = Depends(get_db),
 ):
-    return proveedores.listar_proveedores(session, tenant.filtro_empresa(empresa_id))
+    return paginar(
+        session,
+        proveedores.q_proveedores(session, tenant.filtro_empresa(empresa_id)),
+        p,
+    )
 
 
 @router.patch("/proveedores/{proveedor_id}", response_model=schemas.ProveedorOut)
@@ -90,14 +96,19 @@ def crear_orden_compra(
     return orden
 
 
-@router.get("/ordenes-compra", response_model=list[schemas.OrdenCompraOut])
+@router.get("/ordenes-compra", response_model=Pagina[schemas.OrdenCompraOut])
 def listar_ordenes_compra(
     empresa_id: uuid.UUID | None = None,
     _: Usuario = Depends(require_permission(LEER)),
     tenant: Tenant = Depends(get_tenant),
+    p: Paginacion = Depends(paginacion),
     session: Session = Depends(get_db),
 ):
-    return ordenes.listar_ordenes_compra(session, tenant.filtro_empresa(empresa_id))
+    return paginar(
+        session,
+        ordenes.q_ordenes_compra(session, tenant.filtro_empresa(empresa_id)),
+        p,
+    )
 
 
 @router.get("/ordenes-compra/{orden_compra_id}", response_model=schemas.OrdenCompraOut)

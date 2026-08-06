@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="Definitions_RRH002" targetNamespace="http://www.bizagi.com/definitions/_rrh002_provecho" xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL">
+  <process id="Process_RRH002" name="CONTINGENCIA DE PERSONAL FALTANTE EN LA APERTURA">
+    <documentation>Alcance: RN-RRHH-011. Empieza cuando falta personal en la apertura de una sucursal y termina con el turno cubierto y la consecuencia economica resuelta. El local abre igual: el personal presente cubre las funciones criticas mientras se busca reemplazo. El reemplazo recibe pago extra y ese monto se le descuenta al trabajador faltante, salvo constancia medica. Se conecta con PROC-OPE-001 (apertura de sucursal), que es el proceso que este no puede detener.</documentation>
+    <laneSet id="LaneSet_1">
+      <lane id="Lane_Encargado2" name="Encargado de tienda"><childLaneSet id="cls_Lane_Encargado2" /></lane>
+      <lane id="Lane_Presente" name="Personal presente del turno"><childLaneSet id="cls_Lane_Presente" /></lane>
+      <lane id="Lane_Admin2" name="Administrador"><childLaneSet id="cls_Lane_Admin2" /></lane>
+      <lane id="Lane_Faltante" name="Trabajador faltante"><childLaneSet id="cls_Lane_Faltante" /></lane>
+    </laneSet>
+
+    <startEvent id="cf_start" name="Falta personal en la apertura"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#E6FF97" /><bizagi:BizagiProperty name="borderColor" value="#62A716" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <outgoing>f1</outgoing>
+    </startEvent>
+    <task id="cf_detectar" name="Identificar que funciones quedan sin cubrir y cuales son criticas"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f1</incoming>
+      <outgoing>f2</outgoing>
+    </task>
+    <task id="cf_redistribuir" name="Redistribuir las funciones criticas entre el personal presente"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f2</incoming>
+      <outgoing>f3</outgoing>
+    </task>
+    <task id="cf_abrir" name="Abrir el local en horario (la contingencia no posterga la apertura)"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f3</incoming>
+      <outgoing>f4</outgoing>
+    </task>
+    <task id="cf_avisar" name="Reportar la falta al administrador con hora y funciones afectadas"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f4</incoming>
+      <outgoing>f5</outgoing>
+    </task>
+    <task id="cf_buscar" name="Buscar reemplazo: otra sucursal o personal en dia de descanso"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f5</incoming>
+      <outgoing>f6</outgoing>
+    </task>
+    <exclusiveGateway id="cf_gw_reemplazo" name="Hay reemplazo disponible?" gatewayDirection="Mixed"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFFFCC" /><bizagi:BizagiProperty name="borderColor" value="#A6A61D" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f6</incoming>
+      <outgoing>f7</outgoing>
+      <outgoing>f8</outgoing>
+    </exclusiveGateway>
+    <task id="cf_sin" name="Operar el turno completo con el personal reducido y dejarlo registrado"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f7</incoming>
+      <outgoing>f10</outgoing>
+    </task>
+    <task id="cf_convocar" name="Convocar al reemplazo e informarle el pago extra"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f8</incoming>
+      <outgoing>f9</outgoing>
+    </task>
+    <task id="cf_cubrir" name="Cubrir el turno"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f9</incoming>
+      <outgoing>f11</outgoing>
+    </task>
+    <task id="cf_justificar" name="Presentar justificacion dentro del plazo"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f10</incoming>
+      <incoming>f11</incoming>
+      <outgoing>f12</outgoing>
+    </task>
+    <exclusiveGateway id="cf_gw_constancia" name="Presenta constancia medica?" gatewayDirection="Mixed"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFFFCC" /><bizagi:BizagiProperty name="borderColor" value="#A6A61D" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f12</incoming>
+      <outgoing>f13</outgoing>
+      <outgoing>f14</outgoing>
+    </exclusiveGateway>
+    <task id="cf_sin_descuento" name="Registrar la ausencia como justificada, sin descuento"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f13</incoming>
+      <outgoing>f15</outgoing>
+    </task>
+    <task id="cf_descontar" name="Descontar al faltante el pago extra del reemplazo (RN-RRHH-011)"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f14</incoming>
+      <outgoing>f16</outgoing>
+    </task>
+    <task id="cf_evaluar" name="Evaluar reincidencia y aplicar memorandum o amonestacion si corresponde"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f15</incoming>
+      <incoming>f16</incoming>
+      <outgoing>f17</outgoing>
+    </task>
+    <endEvent id="cf_end" name="Turno cubierto y consecuencia resuelta"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFD9D9" /><bizagi:BizagiProperty name="borderColor" value="#C0392B" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f17</incoming>
+    </endEvent>
+
+    <sequenceFlow id="f1" sourceRef="cf_start" targetRef="cf_detectar" />
+    <sequenceFlow id="f2" sourceRef="cf_detectar" targetRef="cf_redistribuir" />
+    <sequenceFlow id="f3" sourceRef="cf_redistribuir" targetRef="cf_abrir" />
+    <sequenceFlow id="f4" sourceRef="cf_abrir" targetRef="cf_avisar" />
+    <sequenceFlow id="f5" sourceRef="cf_avisar" targetRef="cf_buscar" />
+    <sequenceFlow id="f6" sourceRef="cf_buscar" targetRef="cf_gw_reemplazo" />
+    <sequenceFlow id="f7" name="No hay" sourceRef="cf_gw_reemplazo" targetRef="cf_sin" />
+    <sequenceFlow id="f8" name="Si hay" sourceRef="cf_gw_reemplazo" targetRef="cf_convocar" />
+    <sequenceFlow id="f9" sourceRef="cf_convocar" targetRef="cf_cubrir" />
+    <sequenceFlow id="f10" sourceRef="cf_sin" targetRef="cf_justificar" />
+    <sequenceFlow id="f11" sourceRef="cf_cubrir" targetRef="cf_justificar" />
+    <sequenceFlow id="f12" sourceRef="cf_justificar" targetRef="cf_gw_constancia" />
+    <sequenceFlow id="f13" name="Si" sourceRef="cf_gw_constancia" targetRef="cf_sin_descuento" />
+    <sequenceFlow id="f14" name="No" sourceRef="cf_gw_constancia" targetRef="cf_descontar" />
+    <sequenceFlow id="f15" sourceRef="cf_sin_descuento" targetRef="cf_evaluar" />
+    <sequenceFlow id="f16" sourceRef="cf_descontar" targetRef="cf_evaluar" />
+    <sequenceFlow id="f17" sourceRef="cf_evaluar" targetRef="cf_end" />
+  </process>
+  <collaboration id="Collab_1" name="CONTINGENCIA DE PERSONAL FALTANTE EN LA APERTURA - Provecho ERP">
+    <participant id="Participant_RRH002" name="CONTINGENCIA DE PERSONAL FALTANTE EN LA APERTURA" processRef="Process_RRH002" />
+  </collaboration>
+  <bpmndi:BPMNDiagram xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:omgdc="http://www.omg.org/spec/DD/20100524/DC" xmlns:omgdi="http://www.omg.org/spec/DD/20100524/DI" id="Diagram_1">
+    <bpmndi:BPMNPlane id="Plane_1" bpmnElement="Collab_1">
+      <bpmndi:BPMNShape id="DE_Participant_RRH002" bpmnElement="Participant_RRH002" isHorizontal="true">
+        <omgdc:Bounds x="20" y="20" width="2310" height="1010" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_Lane_Encargado2" bpmnElement="Lane_Encargado2" isHorizontal="true">
+        <omgdc:Bounds x="50" y="90" width="2280" height="220" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_Lane_Presente" bpmnElement="Lane_Presente" isHorizontal="true">
+        <omgdc:Bounds x="50" y="310" width="2280" height="220" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_Lane_Admin2" bpmnElement="Lane_Admin2" isHorizontal="true">
+        <omgdc:Bounds x="50" y="530" width="2280" height="220" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_Lane_Faltante" bpmnElement="Lane_Faltante" isHorizontal="true">
+        <omgdc:Bounds x="50" y="750" width="2280" height="220" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="DE_cf_start" bpmnElement="cf_start"><omgdc:Bounds x="90" y="185" width="30" height="30" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cf_detectar" bpmnElement="cf_detectar"><omgdc:Bounds x="240" y="170" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cf_redistribuir" bpmnElement="cf_redistribuir"><omgdc:Bounds x="390" y="390" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cf_abrir" bpmnElement="cf_abrir"><omgdc:Bounds x="540" y="170" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cf_avisar" bpmnElement="cf_avisar"><omgdc:Bounds x="690" y="170" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cf_buscar" bpmnElement="cf_buscar"><omgdc:Bounds x="840" y="610" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cf_gw_reemplazo" bpmnElement="cf_gw_reemplazo"><omgdc:Bounds x="990" y="620" width="40" height="40" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cf_sin" bpmnElement="cf_sin"><omgdc:Bounds x="1140" y="390" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cf_convocar" bpmnElement="cf_convocar"><omgdc:Bounds x="1140" y="610" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cf_cubrir" bpmnElement="cf_cubrir"><omgdc:Bounds x="1290" y="390" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cf_justificar" bpmnElement="cf_justificar"><omgdc:Bounds x="1440" y="830" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cf_gw_constancia" bpmnElement="cf_gw_constancia"><omgdc:Bounds x="1590" y="620" width="40" height="40" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cf_sin_descuento" bpmnElement="cf_sin_descuento"><omgdc:Bounds x="1740" y="610" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cf_descontar" bpmnElement="cf_descontar"><omgdc:Bounds x="1740" y="610" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cf_evaluar" bpmnElement="cf_evaluar"><omgdc:Bounds x="1890" y="610" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cf_end" bpmnElement="cf_end"><omgdc:Bounds x="2040" y="625" width="30" height="30" /></bpmndi:BPMNShape>
+
+      <bpmndi:BPMNEdge id="DE_f1" bpmnElement="f1"><omgdi:waypoint x="120" y="200" /><omgdi:waypoint x="240" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f2" bpmnElement="f2"><omgdi:waypoint x="330" y="200" /><omgdi:waypoint x="390" y="420" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f3" bpmnElement="f3"><omgdi:waypoint x="480" y="420" /><omgdi:waypoint x="540" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f4" bpmnElement="f4"><omgdi:waypoint x="630" y="200" /><omgdi:waypoint x="690" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f5" bpmnElement="f5"><omgdi:waypoint x="780" y="200" /><omgdi:waypoint x="840" y="640" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f6" bpmnElement="f6"><omgdi:waypoint x="930" y="640" /><omgdi:waypoint x="990" y="640" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f7" bpmnElement="f7"><omgdi:waypoint x="1030" y="640" /><omgdi:waypoint x="1140" y="420" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f8" bpmnElement="f8"><omgdi:waypoint x="1030" y="640" /><omgdi:waypoint x="1140" y="640" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f9" bpmnElement="f9"><omgdi:waypoint x="1230" y="640" /><omgdi:waypoint x="1290" y="420" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f10" bpmnElement="f10"><omgdi:waypoint x="1230" y="420" /><omgdi:waypoint x="1440" y="860" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f11" bpmnElement="f11"><omgdi:waypoint x="1380" y="420" /><omgdi:waypoint x="1440" y="860" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f12" bpmnElement="f12"><omgdi:waypoint x="1530" y="860" /><omgdi:waypoint x="1590" y="640" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f13" bpmnElement="f13"><omgdi:waypoint x="1630" y="640" /><omgdi:waypoint x="1740" y="640" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f14" bpmnElement="f14"><omgdi:waypoint x="1630" y="640" /><omgdi:waypoint x="1740" y="640" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f15" bpmnElement="f15"><omgdi:waypoint x="1830" y="640" /><omgdi:waypoint x="1890" y="640" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f16" bpmnElement="f16"><omgdi:waypoint x="1830" y="640" /><omgdi:waypoint x="1890" y="640" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f17" bpmnElement="f17"><omgdi:waypoint x="1980" y="640" /><omgdi:waypoint x="2040" y="640" /></bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</definitions>

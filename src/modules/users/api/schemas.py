@@ -104,6 +104,20 @@ class PersonaBusquedaOut(BaseModel):
     numero_documento: str | None
 
 
+class NotificacionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    tipo: str
+    nivel: str
+    titulo: str
+    cuerpo: str | None
+    referencia_tipo: str | None
+    referencia_id: uuid.UUID | None
+    sucursal_id: uuid.UUID | None
+    leida_at: datetime | None
+    created_at: datetime
+
+
 class AlmacenOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
@@ -112,6 +126,23 @@ class AlmacenOut(BaseModel):
     nombre: str
     tipo: str
     direccion: str | None
+
+
+class MarcaOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    grupo_id: uuid.UUID
+    nombre: str
+    tipo: str
+
+
+class SucursalOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    empresa_id: uuid.UUID
+    marca_id: uuid.UUID
+    nombre: str
+    estado: str
 
 
 class AnonimizarPersonaIn(BaseModel):

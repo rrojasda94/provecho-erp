@@ -66,3 +66,45 @@ devuelto en la cabecera `X-Request-ID` y en el cuerpo de todo error 500.
   por ahora: sin tráfico real que perfilar, agrega infraestructura que nadie
   mira. `SENTRY_TRACES_SAMPLE_RATE` queda en 0, listo para subirse cuando
   haya algo que medir.
+
+## Addendum (2026-08-04) — resuelta la elección diferida
+
+Este ADR difirió a propósito la elección entre **Sentry SaaS** y
+**GlitchTip autoalojado**, porque el protocolo es el mismo y la decisión no
+tocaba el código. Se resolvió al desplegar: **GlitchTip, en el mismo VPS**.
+
+Lo que inclinó la balanza no fue el precio sino el dato. Un reporte de error
+del ERP lleva rutas, parámetros y trazas internas; `_limpiar_evento` redacta
+PIN, tokens y cabeceras de autorización antes de enviar nada y
+`send_default_pii` está en `False`, pero **lo que nunca sale de la máquina
+no hay que confiar en que esté bien redactado**. Con un ERP que maneja datos
+de trabajadores y clientes bajo Ley 29733, esa diferencia pesa más que el
+mantenimiento extra.
+
+Costo aceptado: un Postgres, un Redis y dos procesos más en el mismo VPS.
+
+`src/core/sentry.py` **no cambió una línea**, que es exactamente lo que este
+ADR predijo al diferir la decisión.
+
+En el mismo movimiento se cerró la otra pieza que faltaba: el **colector de
+logs**. El ERP ya emitía una línea de JSON por evento, pero moría en
+`docker logs` — consultable solo entrando al servidor y perdido al recrear
+el contenedor. Ahora **Alloy** (el agente vigente de Grafana; Promtail quedó
+como legado) descubre los contenedores por el socket de Docker montado en
+solo lectura y los empuja a **Loki**, con **Grafana** para consultarlos.
+
+Decisión de diseño que importa: `nivel`, `flujo` y `entorno` son etiquetas
+de Loki; `request_id` y `usuario_id` **no**. Loki crea un flujo por
+combinación de etiquetas, y esos dos tienen tantos valores distintos como
+requests: ponerlos en el índice lo haría explotar. Quedan en el cuerpo y se
+filtran con LogQL, con el enlace ya provisionado en Grafana para la consulta
+que uno hace siempre — todas las líneas de un request del que un usuario se
+quejó.
+
+Todo vive en `docker-compose.observabilidad.yml`, **aparte del ERP**: si el
+stack se cae, el restaurante sigue vendiendo. Guía operativa en
+`docs/engineering/observabilidad.md`.
+
+**Sigue pendiente el monitor externo** (ADR-007): es lo único que no se puede
+resolver dentro del VPS, porque un monitor que corre en la misma máquina no
+avisa cuando la máquina se cae.

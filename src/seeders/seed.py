@@ -72,6 +72,10 @@ PERMISOS = [
     ("sales.leer", "Consultar ventas"),
     ("sales.anular", "Anular orden no pagada"),
     ("sales.gestionar_catalogo", "CRUD de productos comerciales y medios de pago"),
+    (
+        "sales.emitir_nota_credito",
+        "Acreditar una venta ya cobrada con nota de crédito (RN-CPP-009)",
+    ),
     ("sales.emitir_comprobante", "Reintentar la emisión de un comprobante a SUNAT"),
     (
         "sales.aplicar_descuento",
@@ -87,6 +91,7 @@ PERMISOS = [
     ("sales.crear_pedido", "Crear pedido (canal agente IA)"),
     ("inventory.transferir", "Despachar una transferencia entre almacenes"),
     ("inventory.recepcion", "Recepcionar mercadería y transferencias"),
+    ("inventory.emitir_guia", "Emitir la guía de remisión de un traslado"),
     ("inventory.solicitar_insumos", "Crear y cancelar solicitudes de insumos"),
     ("inventory.aprobar_solicitud", "Aprobar o rechazar solicitudes de insumos"),
     ("inventory.liberar_reserva", "Liberar a mano una reserva de stock"),
@@ -131,6 +136,20 @@ PERMISOS = [
         "accounting.caja_retirar",
         "Autorizar el retiro de efectivo del cajón durante el turno (RN-MDP-007)",
     ),
+    (
+        "accounting.caja_relevar",
+        "Entregar o recibir el efectivo en la cadena de custodia: apertura, "
+        "cierre y traslado a contabilidad (RN-MDP-002)",
+    ),
+    (
+        "accounting.caja_reabrir",
+        "Autorizar la reapertura de un cierre de caja para recontar (RN-MDP-005)",
+    ),
+    (
+        "accounting.pos_administrar",
+        "Inventariar los POS de pago con tarjeta: serie, código de comercio, "
+        "estado y terminal de emergencia (RN-POS-009/010)",
+    ),
     ("marketing.leer", "Consultar campañas, contenido, leads y encuestas"),
     ("marketing.campana_gestionar", "Crear, editar el brief, lanzar y cerrar campañas"),
     (
@@ -161,6 +180,11 @@ PERMISOS = [
         "sin poder decidir (RN-GER-005)",
     ),
     ("sales.leer_clientes_externos", "Consultar clientes para análisis fuera de sales"),
+    (
+        "inventory.leer_solicitudes_externas",
+        "Consultar el resumen de solicitudes de insumos por artículo/sucursal "
+        "fuera de inventory (negociación de volumen con proveedores)",
+    ),
     ("rrhh.leer", "Consultar trabajadores, contratos, nómina y documentos de RRHH"),
     ("rrhh.trabajador_gestionar", "Crear, actualizar y cesar trabajadores"),
     ("rrhh.contrato_gestionar", "Crear, firmar y finalizar contratos laborales"),
@@ -191,12 +215,19 @@ PERMISOS = [
 ROLES = {
     "admin": ["*"],
     "supervisor": [
-        "purchases.aprobar",
+        # **No aprueba órdenes de compra** (decisión 2026-08-05): una OC sobre
+        # el umbral es una decisión de plata y la toma un administrador. El
+        # suplente en ausencia del titular es *otro administrador*, no el
+        # encargado de turno — si no, el suplente termina siendo quien está
+        # más cerca del proveedor.
         "purchases.leer",
         "sales.leer",
         "sales.anular",
         "sales.gestionar_catalogo",
         "sales.emitir_comprobante",
+        # Acreditar devuelve plata: es acto de supervisor, no del cajero
+        # que emitio (RN-CPP-009).
+        "sales.emitir_nota_credito",
         "sales.entregar_pedido",
         # El descuento y el salón los autoriza el supervisor, nunca el
         # cajero que lo pide (RN-COM-017).
@@ -206,6 +237,10 @@ ROLES = {
         "kds.operar",
         "inventory.leer",
         "inventory.gestionar_catalogo",
+        # El ajuste de inventario sí lo aprueba el supervisor (decisión
+        # 2026-08-05): está en el local, ve el faltante y decide en el
+        # momento. Nunca quien lo solicitó — esa segregación vive en el
+        # dominio (`solicitar_ajuste` ≠ `aprobar_ajuste`), no en el rol.
         "inventory.aprobar_ajuste",
         "inventory.ver_stock_esperado",
         # El encargado aprueba lo que pide su gente, no lo pide él.
@@ -215,6 +250,14 @@ ROLES = {
         "accounting.pago_aprobar",
         "accounting.arqueo_registrar",
         "accounting.caja_retirar",
+        # También opera caja cuando le toca cubrir el turno; el candado de
+        # que nadie se releve a sí mismo vive en el dominio, no en el rol.
+        "accounting.caja_operar",
+        # El encargado entrega el fondo al abrir y recibe el efectivo al
+        # cerrar: es la contraparte del cajero en la cadena de custodia
+        # (RN-MDP-002), y quien autoriza recontar un cierre (RN-MDP-005).
+        "accounting.caja_relevar",
+        "accounting.caja_reabrir",
         # Marketing arma el brief; quien lo aprueba nunca es quien lo escribe.
         "marketing.leer",
         "marketing.campana_aprobar",
@@ -242,6 +285,8 @@ ROLES = {
     "almacenero": [
         "inventory.transferir",
         "inventory.recepcion",
+        # La guía la emite el almacén (RN-GDR-002).
+        "inventory.emitir_guia",
         "inventory.ajustar",
         "inventory.leer",
         "inventory.registrar_movimiento",
@@ -262,6 +307,9 @@ ROLES = {
         "purchases.dar_conformidad",
         # Alta de proveedor natural liga a una persona existente.
         "personas.leer",
+        # Qué se pide más y desde dónde, para negociar volumen (contrato
+        # público de inventory).
+        "inventory.leer_solicitudes_externas",
     ],
     "jefe_cocina": [
         "production.crear",
@@ -275,6 +323,11 @@ ROLES = {
         "accounting.leer",
         "accounting.pago_gestionar",
         "accounting.arqueo_registrar",
+        # Contabilidad recibe el efectivo trasladado, inventaría los POS y
+        # autoriza recontar un cierre (RN-MDP-002/005, RN-POS-010).
+        "accounting.caja_relevar",
+        "accounting.caja_reabrir",
+        "accounting.pos_administrar",
         "dashboard.leer",
     ],
     "rrhh_admin": [

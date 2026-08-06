@@ -12,6 +12,7 @@ from decimal import Decimal
 from sqlalchemy.orm import Session
 
 from src.core.events import event_bus
+from src.modules.accounting.application.queries_publicas import hay_caja_abierta
 from src.modules.sales.application import comprobantes, precios
 from src.modules.sales.application.errors import (
     Conflicto,
@@ -451,6 +452,34 @@ def aplicar_descuento(
     return venta
 
 
+def _validar_cobro(
+    session: Session,
+    venta: Venta,
+    *,
+    medio_pago_id: uuid.UUID,
+    monto: Decimal,
+    exigir_caja_abierta: bool,
+) -> None:
+    """Lo que tiene que ser cierto antes de aceptar plata.
+
+    El candado de caja (RN-MDP-002): la plata cobrada fuera de un turno no
+    la espera ningún cierre, así que el faltante aparece recién en
+    contabilidad y ya sin responsable (RN-MDP-005). Se pregunta por el
+    contrato público de `accounting`; `sales` nunca ve `AperturaCaja`.
+    """
+    if venta.estado not in ("orden",):
+        raise Conflicto(f"la venta está {venta.estado}; no admite pagos")
+    if exigir_caja_abierta and not hay_caja_abierta(session, venta.punto_venta_id):
+        raise Conflicto(
+            "no hay caja abierta en este punto de venta: abre el turno antes "
+            "de cobrar (RN-MDP-002)"
+        )
+    if MedioPagoRepo(session).get(medio_pago_id) is None:
+        raise NoEncontrado("medio de pago no encontrado")
+    if monto <= 0:
+        raise ReglaNegocio("el monto debe ser > 0")
+
+
 def registrar_pago(
     session: Session,
     *,
@@ -463,6 +492,7 @@ def registrar_pago(
     receptor_num_doc: str | None = None,
     receptor_nombre: str | None = None,
     id: uuid.UUID | None = None,
+    exigir_caja_abierta: bool = True,
 ) -> tuple[Pago, Venta, Comprobante | None]:
     """El pago nace `confirmado` (PDV presencial). Pasarela con webhook de
     confirmación async = slice Izipay posterior.
@@ -470,6 +500,16 @@ def registrar_pago(
     Al cubrirse el total se crea el `comprobante` en estado `pendiente`; el
     envío a SUNAT lo hace la cola (el tercer valor devuelto es lo que el
     router encola tras el commit).
+
+    **No se cobra sin caja abierta** en el punto de venta: la plata cobrada
+    fuera de un turno no la espera ningún cierre, así que el faltante recién
+    aparece en contabilidad y ya no tiene responsable (RN-MDP-005). Se
+    consulta por el contrato público de `accounting`, no importando su
+    dominio.
+
+    `exigir_caja_abierta=False` es solo para el **replay del hub** (ADR-009):
+    el cobro ya ocurrió en la sucursal con su caja abierta, y volver a
+    exigirla en la nube rechazaría una venta que físicamente pasó.
 
     `id` explícito: mismo motivo que en `crear_venta` — un cobro hecho
     offline conserva su identificador al reproducirse en la nube (ADR-009).
@@ -484,12 +524,13 @@ def registrar_pago(
     if id is not None and repo.get(id) is not None:
         raise Conflicto(f"ya existe un pago con id {id} y otra idempotency_key")
 
-    if venta.estado not in ("orden",):
-        raise Conflicto(f"la venta está {venta.estado}; no admite pagos")
-    if MedioPagoRepo(session).get(medio_pago_id) is None:
-        raise NoEncontrado("medio de pago no encontrado")
-    if monto <= 0:
-        raise ReglaNegocio("el monto debe ser > 0")
+    _validar_cobro(
+        session,
+        venta,
+        medio_pago_id=medio_pago_id,
+        monto=monto,
+        exigir_caja_abierta=exigir_caja_abierta,
+    )
 
     venta_repo = VentaRepo(session)
     grupos = venta_repo.grupos_de_cobro(venta_id)

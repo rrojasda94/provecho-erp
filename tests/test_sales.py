@@ -1,7 +1,8 @@
 """Tests del slice Sales/PDV: venta → consumo de stock, cobro → pagada,
 idempotencia, anulación → reposición, RBAC."""
 
-from datetime import date
+import uuid
+from datetime import date, timedelta
 from decimal import Decimal
 
 import pytest
@@ -29,6 +30,7 @@ from src.modules.sales.infrastructure.models import (
     Precio,
     ProductoComercial,
     PuntoVenta,
+    Venta,
 )
 from src.modules.users.api.deps import get_db
 from src.modules.users.infrastructure.models import (
@@ -43,6 +45,8 @@ from src.modules.users.infrastructure.models import (
     UsuarioRol,
 )
 from src.modules.users.infrastructure.security import hash_pin
+from src.shared import fechas
+from tests.conftest import abrir_caja_directa
 
 
 @pytest.fixture()
@@ -116,6 +120,10 @@ def env(monkeypatch):
                      producto_comercial_id=producto.id, monto=Decimal("25.00")))
         # Stock inicial: 10 kg de harina.
         s.add(Stock(almacen_id=almacen.id, sku_id=sku.id, cantidad=Decimal(10)))
+        # Cobrar exige turno de caja abierto (RN-MDP-002); acá se prueba la
+        # venta, no la caja, así que el turno se inserta directo.
+        admin = s.scalar(select(Usuario).where(Usuario.username == "admin"))
+        abrir_caja_directa(s, punto_venta_id=pv.id, cajero_id=admin.id)
         ids.update(
             sucursal_id=str(sucursal.id), pv_id=str(pv.id),
             producto_id=str(producto.id), medio_id=str(medio.id),
@@ -325,3 +333,57 @@ def test_sin_restricciones_el_supervisor_no_tiene_tope(env):
         json={"modo": "monto", "valor": "50.00", "motivo": "cortesia", "autorizacion": token},
     )
     assert r.status_code == 200, r.text
+
+
+# --- Listado de ventas (GET /ventas) ----------------------------------------
+def test_listado_devuelve_el_sobre_paginado(env):
+    """La regresión que esto congela: el listado pasó a devolver
+    `{items, total, ...}` (ADR-026) y el PDV lo seguía leyendo como array,
+    así que la pestaña de cobrados quedaba vacía sin ningún error visible."""
+    client, ids, _ = env
+    h = _token(client)
+    client.post("/api/v1/sales/ventas", headers=h, json=_venta_body(ids))
+
+    r = client.get("/api/v1/sales/ventas", headers=h)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["total"] == 1
+    assert [v["numero_orden"] for v in body["items"]] == [1]
+
+
+def test_listado_sin_sucursal_usa_el_alcance_del_usuario(env):
+    client, ids, _ = env
+    h = _token(client)
+    client.post("/api/v1/sales/ventas", headers=h, json=_venta_body(ids))
+
+    con_sucursal = client.get(
+        f"/api/v1/sales/ventas?sucursal_id={ids['sucursal_id']}", headers=h
+    ).json()
+    sin_sucursal = client.get("/api/v1/sales/ventas", headers=h).json()
+    assert sin_sucursal["total"] == con_sucursal["total"] == 1
+
+
+def test_listado_por_rango_de_fechas(env):
+    client, ids, TestSession = env
+    h = _token(client)
+    venta = client.post("/api/v1/sales/ventas", headers=h, json=_venta_body(ids)).json()
+    ayer = fechas.hoy() - timedelta(days=1)
+    with TestSession() as s:
+        v = s.get(Venta, uuid.UUID(venta["id"]))
+        v.fecha_orden = ayer
+        s.commit()
+
+    # El default es hoy: una venta de ayer no aparece sin pedirla.
+    assert client.get("/api/v1/sales/ventas", headers=h).json()["total"] == 0
+    r = client.get(f"/api/v1/sales/ventas?desde={ayer}", headers=h).json()
+    assert r["total"] == 1
+
+
+def test_listado_con_rango_invertido_400(env):
+    client, _, _ = env
+    h = _token(client)
+    hoy = fechas.hoy()
+    r = client.get(
+        f"/api/v1/sales/ventas?desde={hoy}&hasta={hoy - timedelta(days=1)}", headers=h
+    )
+    assert r.status_code == 400

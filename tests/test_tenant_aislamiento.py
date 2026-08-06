@@ -223,7 +223,7 @@ def test_listado_de_articulos_solo_ve_su_empresa(env):
     client, ids = env
     h = _token(client, "almacenero_a")
     nombres = [a["nombre"] for a in
-               client.get("/api/v1/inventory/articulos", headers=h).json()]
+               client.get("/api/v1/inventory/articulos", headers=h).json()["items"]]
     assert "Insumo B" not in nombres
 
 
@@ -284,9 +284,21 @@ def test_cuentas_contables_de_empresa_ajena_403(env):
 def test_abrir_caja_en_punto_venta_ajeno_403(env):
     client, ids = env
     h = _token(client, "cajero_a")
+    # El relevo lo firma contabilidad con su PIN, no el cajero desde su
+    # sesión (RN-MDP-002).
+    autorizacion = client.post(
+        "/api/v1/auth/autorizar",
+        json={
+            "username": "contador_a",
+            "pin": "654321",
+            "permiso": "accounting.caja_relevar",
+        },
+    ).json()["autorizacion"]
     body = {
-        "punto_venta_id": ids["pv_b"], "relevo_encargado_id": ids["cajero_a"],
-        "monto_apertura": "100.00",
+        "punto_venta_id": ids["pv_b"],
+        "monto_declarado": "100.00",
+        "detalle_denominaciones": {"50": 2},
+        "autorizacion": autorizacion,
     }
     assert client.post("/api/v1/accounting/cajas/apertura",
                        headers=h, json=body).status_code == 403

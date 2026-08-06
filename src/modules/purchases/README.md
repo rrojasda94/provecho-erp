@@ -56,8 +56,15 @@ almacén que recibe, ver `ponytail:` en
 `purchases.comprobante_conforme` (2026-07-25 — registra `comprobante`
 recibido, transversal en `src/shared/models/`, y dispara en `accounting`
 la cola de pago a proveedor, `application/pagos.registrar_pago`). Rol
-semilla `comprador` (crear/leer/recepcionar/anular/dar_conformidad);
-`supervisor` y `admin` tienen `purchases.aprobar`.
+semilla `comprador` (crear/leer/recepcionar/anular/dar_conformidad).
+
+**`purchases.aprobar` es solo del `admin`** (decisión 2026-08-05). Una OC
+sobre el umbral es una decisión de plata: el suplente en ausencia del
+titular es *otro administrador*, no el encargado de turno — si no, el
+suplente termina siendo quien está más cerca del proveedor. El rol
+`supervisor` lo tenía desde el slice inicial y se le retiró. Ojo al
+desplegar: el seeder solo agrega permisos, así que en una base ya sembrada
+hay que revocarlo a mano (ver ROADMAP → Deuda técnica → Seguridad).
 
 Deuda del slice (ver ROADMAP): `cotizacion` (camino no-preferente sin
 modelar — hoy toda OC insumo emite sin cotización comparativa),
@@ -137,3 +144,10 @@ Compra directa → Caja chica → Rendición semanal → `accounting`.
   `purchases.caja_chica_rendida` (accounting concilia y repone fondo),
   `purchases.evaluacion_proveedor_actualizada` (informativo, sin
   consumidor obligatorio todavía).
+- Consume el contrato público de lectura de `inventory`:
+  `queries_publicas.solicitudes_resumen_para_negociacion`
+  (`GET /api/v1/inventory/solicitudes/resumen`, permiso
+  `inventory.leer_solicitudes_externas`, sembrado en el rol `comprador`) —
+  qué artículo pide más cada sucursal, para negociar volumen con
+  proveedores. Mismo patrón que `sales.cliente` (ver
+  `docs/architecture/events.md`).

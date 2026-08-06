@@ -7,6 +7,7 @@ from src.modules.users.infrastructure.models.empresa import Empresa
 from src.modules.users.infrastructure.models.grupo import Grupo
 from src.modules.users.infrastructure.models.licencia_marca import LicenciaMarca
 from src.modules.users.infrastructure.models.marca import Marca
+from src.modules.users.infrastructure.models.notificacion import Notificacion
 from src.modules.users.infrastructure.models.permiso import Permiso
 from src.modules.users.infrastructure.models.persona import Persona
 from src.modules.users.infrastructure.models.refresh_token import RefreshToken
@@ -24,6 +25,7 @@ __all__ = [
     "Grupo",
     "LicenciaMarca",
     "Marca",
+    "Notificacion",
     "Permiso",
     "Persona",
     "RefreshToken",

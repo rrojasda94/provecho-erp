@@ -4,19 +4,22 @@ Reusa las dependencias de auth/RBAC del módulo users (mecanismo transversal).
 """
 
 import uuid
+from datetime import date
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from src.core.tenant import Tenant
 from src.modules.inventory.api import schemas
-from src.modules.inventory.application import ajustes, catalogo
+from src.modules.inventory.application import ajustes, catalogo, queries_publicas
 from src.modules.inventory.application import conteos as conteos_uc
+from src.modules.inventory.application import guias as guias_uc
 from src.modules.inventory.application import lotes as lotes_uc
 from src.modules.inventory.application import recetas as recetas_uc
 from src.modules.inventory.application import reservas as reservas_uc
 from src.modules.inventory.application import solicitudes as solicitudes_uc
 from src.modules.inventory.application import stock as stock_uc
+from src.modules.inventory.application import tasks as inventory_tasks
 from src.modules.inventory.application import transferencias as transferencias_uc
 from src.modules.inventory.application.scope import (
     exigir_ajuste,
@@ -36,6 +39,7 @@ from src.modules.users.api.deps import (
     tiene_permiso,
 )
 from src.modules.users.infrastructure.models import Usuario
+from src.shared.paginacion import Pagina, Paginacion, paginacion, paginar
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])
 
@@ -48,10 +52,14 @@ CONTAR = "inventory.contar"
 VER_ESPERADO = "inventory.ver_stock_esperado"
 SOLICITAR_INSUMOS = "inventory.solicitar_insumos"
 APROBAR_SOLICITUD = "inventory.aprobar_solicitud"
+LEER_SOLICITUDES_EXTERNAS = "inventory.leer_solicitudes_externas"
 LIBERAR_RESERVA = "inventory.liberar_reserva"
 # Permisos ya sembrados desde el slice 1, sin uso hasta ahora.
 TRANSFERIR = "inventory.transferir"
 RECEPCION = "inventory.recepcion"
+# La guía la emite el área de almacén (RN-GDR-002), no quien despacha ni
+# quien factura: permiso propio.
+EMITIR_GUIA = "inventory.emitir_guia"
 
 
 # --- Categorías -------------------------------------------------------------
@@ -177,14 +185,17 @@ def crear_articulo(
     return art
 
 
-@router.get("/articulos", response_model=list[schemas.ArticuloOut])
+@router.get("/articulos", response_model=Pagina[schemas.ArticuloOut])
 def listar_articulos(
     empresa_id: uuid.UUID | None = None,
     _: Usuario = Depends(require_permission(LEER)),
     tenant: Tenant = Depends(get_tenant),
+    p: Paginacion = Depends(paginacion),
     session: Session = Depends(get_db),
 ):
-    return catalogo.listar_articulos(session, tenant.filtro_empresa(empresa_id))
+    return paginar(
+        session, catalogo.q_articulos(session, tenant.filtro_empresa(empresa_id)), p
+    )
 
 
 @router.patch("/articulos/{articulo_id}", response_model=schemas.ArticuloOut)
@@ -221,16 +232,19 @@ def crear_sku(
 
 
 # --- Stock / movimientos ----------------------------------------------------
-@router.get("/stock", response_model=list[schemas.StockOut])
+@router.get("/stock", response_model=Pagina[schemas.StockOut])
 def consultar_stock(
     almacen_id: uuid.UUID | None = None,
     _: Usuario = Depends(require_permission(LEER)),
     tenant: Tenant = Depends(get_tenant),
+    p: Paginacion = Depends(paginacion),
     session: Session = Depends(get_db),
 ):
     if almacen_id is not None:
         exigir_almacen(session, almacen_id, tenant)
-    return stock_uc.consultar_stock(session, almacen_id, tenant.filtro_empresa())
+    return stock_uc.consultar_stock_pagina(
+        session, p, almacen_id, tenant.filtro_empresa()
+    )
 
 
 @router.post("/movimientos", response_model=list[schemas.MovimientoOut], status_code=201)
@@ -393,21 +407,45 @@ def crear_solicitud(
     return solicitud
 
 
-@router.get("/solicitudes", response_model=list[schemas.SolicitudOut])
+@router.get("/solicitudes", response_model=Pagina[schemas.SolicitudOut])
 def listar_solicitudes(
     almacen_solicitante_id: uuid.UUID | None = None,
     estado: str | None = None,
     _: Usuario = Depends(require_permission(LEER)),
     tenant: Tenant = Depends(get_tenant),
+    p: Paginacion = Depends(paginacion),
     session: Session = Depends(get_db),
 ):
     if almacen_solicitante_id is not None:
         exigir_almacen(session, almacen_solicitante_id, tenant)
-    return solicitudes_uc.listar(
+    return paginar(
         session,
-        almacen_solicitante_id=almacen_solicitante_id,
-        estado=estado,
-        empresa_id=tenant.filtro_empresa(),
+        solicitudes_uc.q_listar(
+            session,
+            almacen_solicitante_id=almacen_solicitante_id,
+            estado=estado,
+            empresa_id=tenant.filtro_empresa(),
+        ),
+        p,
+    )
+
+
+@router.get(
+    "/solicitudes/resumen", response_model=list[schemas.SolicitudResumenOut]
+)
+def resumen_solicitudes(
+    desde: date | None = None,
+    hasta: date | None = None,
+    limit: int = 50,
+    _: Usuario = Depends(require_permission(LEER_SOLICITUDES_EXTERNAS)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Qué artículos y sucursales piden más (contrato público, ver
+    `docs/architecture/events.md`) — insumo de `purchases` para negociar
+    volumen con proveedores."""
+    return queries_publicas.solicitudes_resumen_para_negociacion(
+        session, tenant.filtro_empresa(), desde=desde, hasta=hasta, limit=limit
     )
 
 
@@ -514,22 +552,27 @@ def despachar_transferencia(
     return transferencia
 
 
-@router.get("/transferencias", response_model=list[schemas.TransferenciaOut])
+@router.get("/transferencias", response_model=Pagina[schemas.TransferenciaOut])
 def listar_transferencias(
     almacen_id: uuid.UUID | None = None,
     estado: str | None = None,
     _: Usuario = Depends(require_permission(LEER)),
     tenant: Tenant = Depends(get_tenant),
+    p: Paginacion = Depends(paginacion),
     session: Session = Depends(get_db),
 ):
     """`almacen_id` matchea origen o destino: lo que sale y lo que llega."""
     if almacen_id is not None:
         exigir_almacen(session, almacen_id, tenant)
-    return transferencias_uc.listar(
+    return paginar(
         session,
-        almacen_id=almacen_id,
-        estado=estado,
-        empresa_id=tenant.filtro_empresa(),
+        transferencias_uc.q_listar(
+            session,
+            almacen_id=almacen_id,
+            estado=estado,
+            empresa_id=tenant.filtro_empresa(),
+        ),
+        p,
     )
 
 
@@ -576,6 +619,86 @@ def recibir_transferencia(
     return schemas.TransferenciaDetalleOut(
         **schemas.TransferenciaOut.model_validate(transferencia).model_dump(),
         items=[schemas.TransferenciaItemOut.model_validate(i) for i in items],
+    )
+
+
+# --- Guía de remisión (RN-GDR-001..003, RN-TRP-002) --------------------------
+@router.post(
+    "/transferencias/{transferencia_id}/guia",
+    response_model=schemas.GuiaRemisionDetalleOut,
+    status_code=201,
+)
+def emitir_guia(
+    transferencia_id: uuid.UUID,
+    body: schemas.GuiaRemisionCreate,
+    actor: Usuario = Depends(require_permission(EMITIR_GUIA)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Emite la guía del traslado. Los bienes declarados salen de la
+    transferencia, no del request (RN-TRP-002): lo que viaja tiene que ser
+    exactamente lo que se descontó del origen.
+
+    Idempotente por transferencia — pedirla dos veces devuelve la misma
+    guía, porque dos guías del mismo traslado declaran la misma mercadería
+    dos veces.
+    """
+    exigir_transferencia(session, transferencia_id, tenant)
+    guia = guias_uc.emitir_guia(
+        session,
+        transferencia_id,
+        emitida_por=actor.id,
+        **body.model_dump(),
+    )
+    session.commit()
+    # Después del commit: el worker corre en otro proceso y solo ve filas ya
+    # confirmadas.
+    inventory_tasks.encolar(guia.id)
+    guia, items = guias_uc.detalle(session, guia.id)
+    return schemas.GuiaRemisionDetalleOut(
+        **schemas.GuiaRemisionOut.model_validate(guia).model_dump(),
+        items=[schemas.GuiaRemisionItemOut.model_validate(i) for i in items],
+    )
+
+
+@router.get(
+    "/transferencias/{transferencia_id}/guia",
+    response_model=schemas.GuiaRemisionDetalleOut,
+)
+def ver_guia_de_transferencia(
+    transferencia_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    exigir_transferencia(session, transferencia_id, tenant)
+    guia = guias_uc.de_transferencia(session, transferencia_id)
+    guia, items = guias_uc.detalle(session, guia.id)
+    return schemas.GuiaRemisionDetalleOut(
+        **schemas.GuiaRemisionOut.model_validate(guia).model_dump(),
+        items=[schemas.GuiaRemisionItemOut.model_validate(i) for i in items],
+    )
+
+
+@router.get("/guias-remision", response_model=Pagina[schemas.GuiaRemisionOut])
+def listar_guias(
+    estado_emision: str | None = None,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    p: Paginacion = Depends(paginacion),
+    session: Session = Depends(get_db),
+):
+    """Las guías de la empresa. `estado_emision=rechazado` es la bandeja que
+    de verdad hay que mirar: una guía rechazada por SUNAT hay que
+    corregirla y reemitirla."""
+    return paginar(
+        session,
+        guias_uc.q_listar(
+            session,
+            empresa_id=tenant.filtro_empresa(),
+            estado_emision=estado_emision,
+        ),
+        p,
     )
 
 

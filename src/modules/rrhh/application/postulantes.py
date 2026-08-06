@@ -134,6 +134,16 @@ def listar_postulantes(
     return PostulanteRepo(session).list(estado, empresa_id, convocatoria_id)
 
 
+def q_postulantes(
+    session: Session,
+    estado: str | None = None,
+    empresa_id: uuid.UUID | None = None,
+    convocatoria_id: uuid.UUID | None = None,
+):
+    """La consulta sin ejecutar, para que el router la pagine (ADR-026)."""
+    return PostulanteRepo(session).q_list(estado, empresa_id, convocatoria_id)
+
+
 def _cargar(session: Session, postulante_id: uuid.UUID) -> Postulante:
     postulante = PostulanteRepo(session).get(postulante_id)
     if postulante is None or postulante.deleted_at is not None:

@@ -462,3 +462,25 @@ class AsistenciaOut(BaseModel):
     hora_salida: time | None
     tardanza_min: int
     horas_extra: Decimal
+
+
+# --- Legajo (file personal) ------------------------------------------------------
+class LegajoOut(BaseModel):
+    """El expediente del trabajador en una sola lectura.
+
+    `nomina_visible` no es decoración: dice si las listas de boletas y
+    liquidaciones vinieron vacías porque no hay nada, o porque quien
+    pregunta no tiene `rrhh.nomina_gestionar`. Sin ese campo, un legajo sin
+    sueldos se lee igual que uno censurado.
+    """
+
+    trabajador: TrabajadorOut
+    contratos: list[ContratoLaboralOut]
+    amonestaciones: list[AmonestacionOut]
+    memorandums: list[MemorandumOut]
+    certificados: list[CertificadoTrabajoOut]
+    permisos: list[SolicitudPermisoOut]
+    pactos_permanencia: list[PactoPermanenciaOut]
+    nomina_visible: bool
+    boletas: list[BoletaPagoOut]
+    liquidaciones: list[LiquidacionBssOut]

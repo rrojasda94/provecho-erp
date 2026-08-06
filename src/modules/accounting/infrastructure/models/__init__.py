@@ -20,6 +20,7 @@ from src.modules.accounting.infrastructure.models.movimiento_dinero import (
 from src.modules.accounting.infrastructure.models.periodo_contable import (
     PeriodoContable,
 )
+from src.modules.accounting.infrastructure.models.pos_tarjeta import PosTarjeta
 from src.modules.accounting.infrastructure.models.regla_asiento import ReglaAsiento
 
 __all__ = [
@@ -33,5 +34,6 @@ __all__ = [
     "MovimientoCaja",
     "MovimientoDinero",
     "PeriodoContable",
+    "PosTarjeta",
     "ReglaAsiento",
 ]

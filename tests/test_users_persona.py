@@ -89,7 +89,9 @@ def test_listar_personas(client):
     _crear_persona(client, headers)
     r = client.get("/api/v1/personas", headers=headers)
     assert r.status_code == 200
-    assert len(r.json()) == 1
+    # Sobre de paginación (ADR-026): el total va aparte de la página.
+    assert r.json()["total"] == 1
+    assert len(r.json()["items"]) == 1
 
 
 def test_editar_persona_version_correcta_incrementa_version(client):

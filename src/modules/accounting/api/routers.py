@@ -2,6 +2,7 @@
 y mapeo de asientos automáticos."""
 
 import uuid
+from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -10,16 +11,21 @@ from src.config.settings import settings
 from src.core.tenant import Tenant
 from src.modules.accounting.api import schemas
 from src.modules.accounting.application import asientos, caja, cuentas, pagos, periodos, reglas
+from src.modules.accounting.application import pos as pos_uc
 from src.modules.accounting.application.scope import (
     exigir_apertura_caja,
     exigir_asiento,
+    exigir_cierre_caja,
     exigir_cuenta,
+    exigir_custodia,
     exigir_pago,
     exigir_periodo,
+    exigir_pos_tarjeta,
     exigir_punto_venta,
 )
 from src.modules.accounting.infrastructure.repositories import (
     AsientoRepo,
+    CustodiaEfectivoRepo,
     MovimientoCajaRepo,
 )
 from src.modules.users.api.deps import get_db, get_tenant, require_permission
@@ -27,6 +33,8 @@ from src.modules.users.application import autorizacion
 from src.modules.users.application.errors import TokenInvalido
 from src.modules.users.application.queries_publicas import tiene_permiso
 from src.modules.users.infrastructure.models import Usuario
+from src.shared import fechas
+from src.shared.paginacion import Pagina, Paginacion, paginacion, paginar
 
 router = APIRouter(prefix="/accounting", tags=["accounting"])
 
@@ -41,6 +49,24 @@ ARQUEO_REGISTRAR = "accounting.arqueo_registrar"
 # Retirar efectivo del cajón lo autoriza un supervisor, no el cajero solo
 # (RN-MDP-007).
 CAJA_RETIRAR = "accounting.caja_retirar"
+# Recibir o entregar el efectivo en cada tramo de la cadena de custodia
+# (RN-MDP-002): apertura, cierre y traslado a contabilidad.
+CAJA_RELEVAR = "accounting.caja_relevar"
+# Corregir un cierre ya registrado (RN-MDP-005).
+CAJA_REABRIR = "accounting.caja_reabrir"
+POS_ADMINISTRAR = "accounting.pos_administrar"
+
+
+def _autorizado(token: str, permiso: str) -> uuid.UUID:
+    """Quién firmó con su PIN (`POST /auth/autorizar`), o 403.
+
+    El identificador nunca sale del cuerpo del request: sería una firma
+    falsificable y la cadena de custodia dejaría de probar nada.
+    """
+    try:
+        return autorizacion.verificar(token, permiso)
+    except TokenInvalido as e:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, str(e)) from e
 
 
 # --- Plan de cuentas ----------------------------------------------------------
@@ -145,14 +171,17 @@ def crear_asiento_manual(
     return asiento
 
 
-@router.get("/asientos", response_model=list[schemas.AsientoOut])
+@router.get("/asientos", response_model=Pagina[schemas.AsientoOut])
 def listar_asientos(
     empresa_id: uuid.UUID | None = None,
     _: Usuario = Depends(require_permission(LEER)),
     tenant: Tenant = Depends(get_tenant),
+    p: Paginacion = Depends(paginacion),
     session: Session = Depends(get_db),
 ):
-    return AsientoRepo(session).list(tenant.filtro_empresa(empresa_id))
+    return paginar(
+        session, AsientoRepo(session).q_list(tenant.filtro_empresa(empresa_id)), p
+    )
 
 
 @router.get("/asientos/{asiento_id}", response_model=schemas.AsientoOut)
@@ -231,14 +260,17 @@ def registrar_pago(
     return movimiento
 
 
-@router.get("/pagos-proveedor", response_model=list[schemas.MovimientoDineroOut])
+@router.get("/pagos-proveedor", response_model=Pagina[schemas.MovimientoDineroOut])
 def listar_pagos(
     empresa_id: uuid.UUID | None = None,
     _: Usuario = Depends(require_permission(LEER)),
     tenant: Tenant = Depends(get_tenant),
+    p: Paginacion = Depends(paginacion),
     session: Session = Depends(get_db),
 ):
-    return pagos.listar_pagos(session, tenant.filtro_empresa(empresa_id))
+    return paginar(
+        session, pagos.q_pagos(session, tenant.filtro_empresa(empresa_id)), p
+    )
 
 
 @router.post(
@@ -289,8 +321,22 @@ def abrir_caja(
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
+    """Abre el turno: el cajero cuenta el fondo, el encargado lo firma con su
+    PIN y los POS de tarjeta quedan verificados (RN-MDP-002, RN-POS-003/010).
+
+    Un faltante de sencillo o un POS averiado **no impiden abrir**
+    (RN-POS-011): quedan reportados y el local abre en su horario.
+    """
     exigir_punto_venta(session, body.punto_venta_id, tenant)
-    apertura = caja.abrir_caja(session, cajero_id=actor.id, **body.model_dump())
+    apertura = caja.abrir_caja(
+        session,
+        punto_venta_id=body.punto_venta_id,
+        cajero_id=actor.id,
+        relevo_encargado_id=_autorizado(body.autorizacion, CAJA_RELEVAR),
+        monto_declarado=body.monto_declarado,
+        detalle_denominaciones=body.detalle_denominaciones,
+        pos_verificados=[p.model_dump() for p in body.pos_verificados or []],
+    )
     session.commit()
     return apertura
 
@@ -305,12 +351,95 @@ def cerrar_caja(
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
+    """Cierra el turno contra el conteo por denominación y entrega el
+    efectivo al encargado, que firma con su PIN (RN-POS-007, RN-MDP-002).
+
+    Si el cierre venía reabierto, este mismo endpoint lo recalcula sobre el
+    registro existente — un turno tiene un solo cierre, con su historial de
+    correcciones.
+    """
     exigir_apertura_caja(session, apertura_caja_id, tenant)
     cierre = caja.cerrar_caja(
-        session, apertura_caja_id, cajero_id=actor.id, **body.model_dump()
+        session,
+        apertura_caja_id,
+        cajero_id=actor.id,
+        receptor_id=_autorizado(body.autorizacion, CAJA_RELEVAR),
+        detalle_denominaciones=body.detalle_denominaciones,
+        custodia=body.custodia,
+        descuadre_atribucion=body.descuadre_atribucion,
+        reportes_pos=[r.model_dump(mode="json") for r in body.reportes_pos or []] or None,
     )
     session.commit()
     return cierre
+
+
+@router.post(
+    "/cajas/cierres/{cierre_id}/reabrir", response_model=schemas.CierreCajaOut
+)
+def reabrir_cierre(
+    cierre_id: uuid.UUID,
+    body: schemas.ReabrirCierreIn,
+    _: Usuario = Depends(require_permission(CAJA_OPERAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Devuelve un cierre a `en_proceso` para recontar (RN-MDP-005).
+
+    Solo mientras el efectivo siga en el local: una vez que llegó a
+    contabilidad, corregir es un asiento, no un recuento.
+    """
+    exigir_cierre_caja(session, cierre_id, tenant)
+    cierre = caja.reabrir_cierre(
+        session,
+        cierre_id,
+        motivo=body.motivo,
+        autorizado_por=_autorizado(body.autorizacion, CAJA_REABRIR),
+    )
+    session.commit()
+    return cierre
+
+
+@router.get(
+    "/cajas/apertura/{apertura_caja_id}/custodia",
+    response_model=schemas.CustodiaEfectivoOut,
+)
+def ver_custodia(
+    apertura_caja_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    exigir_apertura_caja(session, apertura_caja_id, tenant)
+    custodia = CustodiaEfectivoRepo(session).de_apertura(apertura_caja_id)
+    if custodia is None:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND, "la caja todavía no fue cerrada"
+        )
+    return custodia
+
+
+@router.post(
+    "/cajas/custodias/{custodia_id}/entregar",
+    response_model=schemas.CustodiaEfectivoOut,
+)
+def entregar_custodia(
+    custodia_id: uuid.UUID,
+    body: schemas.EntregarCustodiaIn,
+    _: Usuario = Depends(require_permission(CAJA_OPERAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Avanza la cadena de custodia; quien **recibe** firma con su PIN
+    (RN-MDP-002)."""
+    exigir_custodia(session, custodia_id, tenant)
+    custodia = caja.entregar_custodia(
+        session,
+        custodia_id,
+        estado_siguiente=body.estado_siguiente,
+        receptor_id=_autorizado(body.autorizacion, CAJA_RELEVAR),
+    )
+    session.commit()
+    return custodia
 
 
 @router.post(
@@ -371,6 +500,28 @@ def listar_movimientos_caja(
     return MovimientoCajaRepo(session).de_apertura(apertura_caja_id)
 
 
+@router.get("/cajas/turnos", response_model=list[schemas.TurnoCerradoOut])
+def listar_turnos_cerrados(
+    desde: date | None = None,
+    hasta: date | None = None,
+    empresa_id: uuid.UUID | None = None,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Turnos cerrados del rango (por defecto hoy), con su descuadre y el
+    tramo de la cadena de custodia en el que está el efectivo."""
+    desde = desde or fechas.hoy()
+    hasta = hasta or desde
+    if hasta < desde:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, "`hasta` no puede ser anterior a `desde`"
+        )
+    return caja.turnos_cerrados(
+        session, tenant.filtro_empresa(empresa_id), desde=desde, hasta=hasta
+    )
+
+
 @router.get("/cajas/abiertas", response_model=list[schemas.CajaAbiertaOut])
 def listar_cajas_abiertas(
     empresa_id: uuid.UUID | None = None,
@@ -379,6 +530,53 @@ def listar_cajas_abiertas(
     session: Session = Depends(get_db),
 ):
     return caja.cajas_abiertas(session, tenant.filtro_empresa(empresa_id))
+
+
+# --- Inventario de POS de tarjeta (RN-POS-009/010) ---------------------------
+@router.post("/pos-tarjeta", response_model=schemas.PosTarjetaOut, status_code=201)
+def registrar_pos(
+    body: schemas.PosTarjetaIn,
+    _: Usuario = Depends(require_permission(POS_ADMINISTRAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    campos = body.model_dump()
+    campos["empresa_id"] = tenant.empresa(campos["empresa_id"])
+    if campos["sucursal_id"] is not None:
+        tenant.exigir_sucursal(campos["sucursal_id"])
+    pos = pos_uc.registrar_pos(session, **campos)
+    session.commit()
+    return pos
+
+
+@router.get("/pos-tarjeta", response_model=list[schemas.PosTarjetaOut])
+def listar_pos(
+    empresa_id: uuid.UUID | None = None,
+    sucursal_id: uuid.UUID | None = None,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Terminales de la sucursal más los de emergencia del pool (RN-POS-009)."""
+    if sucursal_id is not None:
+        tenant.exigir_sucursal(sucursal_id)
+    return pos_uc.listar_pos(session, tenant.empresa(empresa_id), sucursal_id)
+
+
+@router.patch("/pos-tarjeta/{pos_id}", response_model=schemas.PosTarjetaOut)
+def actualizar_pos(
+    pos_id: uuid.UUID,
+    body: schemas.PosTarjetaPatch,
+    _: Usuario = Depends(require_permission(POS_ADMINISTRAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    exigir_pos_tarjeta(session, pos_id, tenant)
+    if body.sucursal_id is not None:
+        tenant.exigir_sucursal(body.sucursal_id)
+    pos = pos_uc.actualizar_pos(session, pos_id, **body.model_dump(exclude_unset=True))
+    session.commit()
+    return pos
 
 
 @router.post("/arqueos", response_model=schemas.ArqueoOut, status_code=201)

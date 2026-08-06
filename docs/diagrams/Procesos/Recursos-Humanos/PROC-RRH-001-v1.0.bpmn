@@ -1,0 +1,241 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="Definitions_RRH001" targetNamespace="http://www.bizagi.com/definitions/_rrh001_provecho" xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL">
+  <process id="Process_RRH001" name="INCORPORACION DE PERSONAL">
+    <documentation>Alcance: desde que un encargado detecta la necesidad de cubrir un puesto hasta que el trabajador supera (o no) el periodo de prueba. Cubre los 13 pasos de docs/rrhh/README.md: requisicion y perfil, publicacion, filtrado, entrevista, verificacion, oferta, eleccion de modalidad, firma y alta en T-Registro, file personal, induccion al grupo y al puesto, entrega de uniforme y evaluaciones de mes 1 y mes 2.5. Reglas: sin perfil no hay convocatoria (RN-RRHH-013); nadie inicia labores sin contrato firmado y alta en T-Registro (RN-RRHH-012); el candidato no entra a persona mientras es candidato (RN-GEN-007, ADR de contratacion); todo descarte lleva motivo, que es la defensa ante un reclamo por la Ley 26772.</documentation>
+    <laneSet id="LaneSet_1">
+      <lane id="Lane_Encargado" name="Encargado de tienda"><childLaneSet id="cls_Lane_Encargado" /></lane>
+      <lane id="Lane_Admin" name="Administrador (ejecuta RRHH)"><childLaneSet id="cls_Lane_Admin" /></lane>
+      <lane id="Lane_Candidato" name="Candidato / Postulante"><childLaneSet id="cls_Lane_Candidato" /></lane>
+      <lane id="Lane_Contador" name="Contador externo"><childLaneSet id="cls_Lane_Contador" /></lane>
+    </laneSet>
+
+    <startEvent id="rr_start" name="Necesidad de cubrir un puesto"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#E6FF97" /><bizagi:BizagiProperty name="borderColor" value="#62A716" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <outgoing>f1</outgoing>
+    </startEvent>
+    <task id="rr_requisicion" name="Comunicar requisicion: puesto, sucursal, motivo, fecha, turnos"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f1</incoming>
+      <outgoing>f2</outgoing>
+    </task>
+    <task id="rr_valida" name="Validar el motivo contra venta, turnos y presupuesto de planilla"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f2</incoming>
+      <outgoing>f3</outgoing>
+    </task>
+    <exclusiveGateway id="rr_gw_perfil" name="Existe perfil del puesto?" gatewayDirection="Mixed"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFFFCC" /><bizagi:BizagiProperty name="borderColor" value="#A6A61D" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f3</incoming>
+      <outgoing>f4</outgoing>
+      <outgoing>f5</outgoing>
+    </exclusiveGateway>
+    <task id="rr_redactar" name="Redactar el perfil con la plantilla del catalogo"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f4</incoming>
+      <outgoing>f6</outgoing>
+    </task>
+    <task id="rr_publicar" name="Publicar convocatoria (sin perfil no se publica, RN-RRHH-013)"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f5</incoming>
+      <incoming>f6</incoming>
+      <outgoing>f7</outgoing>
+    </task>
+    <task id="rr_postular" name="Postular por el formulario publico con consentimiento de datos"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f7</incoming>
+      <outgoing>f8</outgoing>
+    </task>
+    <task id="rr_filtrar" name="Filtrar y preseleccionar contra los requisitos del perfil"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f8</incoming>
+      <outgoing>f9</outgoing>
+    </task>
+    <task id="rr_entrevistar" name="Entrevistar y puntuar la ficha 1-4 al terminar"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f9</incoming>
+      <outgoing>f10</outgoing>
+    </task>
+    <exclusiveGateway id="rr_gw_avanza" name="Avanza?" gatewayDirection="Mixed"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFFFCC" /><bizagi:BizagiProperty name="borderColor" value="#A6A61D" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f10</incoming>
+      <outgoing>f11</outgoing>
+      <outgoing>f13</outgoing>
+    </exclusiveGateway>
+    <task id="rr_descartar" name="Descartar con motivo obligatorio (Ley 26772)"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f11</incoming>
+      <outgoing>f12</outgoing>
+    </task>
+    <endEvent id="rr_end_desc" name="Candidato descartado con motivo registrado"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFD9D9" /><bizagi:BizagiProperty name="borderColor" value="#C0392B" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f12</incoming>
+    </endEvent>
+    <task id="rr_verificar" name="Verificar referencias laborales y documentos"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f13</incoming>
+      <outgoing>f14</outgoing>
+    </task>
+    <task id="rr_oferta" name="Enviar oferta: sueldo, jornada, turnos y fecha de inicio"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f14</incoming>
+      <outgoing>f15</outgoing>
+    </task>
+    <exclusiveGateway id="rr_gw_acepta" name="Acepta la oferta?" gatewayDirection="Mixed"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFFFCC" /><bizagi:BizagiProperty name="borderColor" value="#A6A61D" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f15</incoming>
+      <outgoing>f16</outgoing>
+      <outgoing>f17</outgoing>
+    </exclusiveGateway>
+    <endEvent id="rr_end_rech" name="Oferta rechazada, se retoma la terna"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFD9D9" /><bizagi:BizagiProperty name="borderColor" value="#C0392B" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f16</incoming>
+    </endEvent>
+    <task id="rr_modalidad" name="Elegir modalidad de contrato y jornada"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f17</incoming>
+      <outgoing>f18</outgoing>
+    </task>
+    <task id="rr_firmar" name="Firmar contrato y dar de alta en T-Registro (RN-RRHH-012)"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f18</incoming>
+      <outgoing>f19</outgoing>
+    </task>
+    <task id="rr_tregistro" name="Confirmar el alta ante SUNAT"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f19</incoming>
+      <outgoing>f20</outgoing>
+    </task>
+    <task id="rr_file" name="Abrir el file personal con la documentacion completa"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f20</incoming>
+      <outgoing>f21</outgoing>
+    </task>
+    <task id="rr_ind_grupo" name="Induccion al grupo, empresa y marca"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f21</incoming>
+      <outgoing>f22</outgoing>
+    </task>
+    <task id="rr_ind_puesto" name="Induccion al puesto: SOPs y cursos del perfil, semana 1"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f22</incoming>
+      <outgoing>f23</outgoing>
+    </task>
+    <task id="rr_uniforme" name="Entregar uniforme y EPP con cargo firmado"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f23</incoming>
+      <outgoing>f24</outgoing>
+    </task>
+    <task id="rr_eval1" name="Evaluacion de mes 1 con retroalimentacion firmada"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f24</incoming>
+      <outgoing>f25</outgoing>
+    </task>
+    <task id="rr_eval2" name="Evaluacion de mes 2.5 comparada contra la del mes 1"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f25</incoming>
+      <outgoing>f26</outgoing>
+    </task>
+    <exclusiveGateway id="rr_gw_continua" name="Continua tras el periodo de prueba?" gatewayDirection="Mixed"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFFFCC" /><bizagi:BizagiProperty name="borderColor" value="#A6A61D" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f26</incoming>
+      <outgoing>f27</outgoing>
+      <outgoing>f28</outgoing>
+    </exclusiveGateway>
+    <task id="rr_cese" name="Cese dentro del periodo de prueba y liquidacion de truncos (48 h)"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f28</incoming>
+      <outgoing>f29</outgoing>
+    </task>
+    <endEvent id="rr_end_cese" name="Cese registrado en el file personal"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFD9D9" /><bizagi:BizagiProperty name="borderColor" value="#C0392B" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f29</incoming>
+    </endEvent>
+    <endEvent id="rr_end_ok" name="Trabajador incorporado y confirmado"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFD9D9" /><bizagi:BizagiProperty name="borderColor" value="#C0392B" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f27</incoming>
+    </endEvent>
+
+    <sequenceFlow id="f1" sourceRef="rr_start" targetRef="rr_requisicion" />
+    <sequenceFlow id="f2" sourceRef="rr_requisicion" targetRef="rr_valida" />
+    <sequenceFlow id="f3" sourceRef="rr_valida" targetRef="rr_gw_perfil" />
+    <sequenceFlow id="f4" name="No existe" sourceRef="rr_gw_perfil" targetRef="rr_redactar" />
+    <sequenceFlow id="f5" name="Ya existe" sourceRef="rr_gw_perfil" targetRef="rr_publicar" />
+    <sequenceFlow id="f6" sourceRef="rr_redactar" targetRef="rr_publicar" />
+    <sequenceFlow id="f7" sourceRef="rr_publicar" targetRef="rr_postular" />
+    <sequenceFlow id="f8" sourceRef="rr_postular" targetRef="rr_filtrar" />
+    <sequenceFlow id="f9" sourceRef="rr_filtrar" targetRef="rr_entrevistar" />
+    <sequenceFlow id="f10" sourceRef="rr_entrevistar" targetRef="rr_gw_avanza" />
+    <sequenceFlow id="f11" name="No" sourceRef="rr_gw_avanza" targetRef="rr_descartar" />
+    <sequenceFlow id="f12" sourceRef="rr_descartar" targetRef="rr_end_desc" />
+    <sequenceFlow id="f13" name="Si" sourceRef="rr_gw_avanza" targetRef="rr_verificar" />
+    <sequenceFlow id="f14" sourceRef="rr_verificar" targetRef="rr_oferta" />
+    <sequenceFlow id="f15" sourceRef="rr_oferta" targetRef="rr_gw_acepta" />
+    <sequenceFlow id="f16" name="No acepta" sourceRef="rr_gw_acepta" targetRef="rr_end_rech" />
+    <sequenceFlow id="f17" name="Acepta" sourceRef="rr_gw_acepta" targetRef="rr_modalidad" />
+    <sequenceFlow id="f18" sourceRef="rr_modalidad" targetRef="rr_firmar" />
+    <sequenceFlow id="f19" sourceRef="rr_firmar" targetRef="rr_tregistro" />
+    <sequenceFlow id="f20" sourceRef="rr_tregistro" targetRef="rr_file" />
+    <sequenceFlow id="f21" sourceRef="rr_file" targetRef="rr_ind_grupo" />
+    <sequenceFlow id="f22" sourceRef="rr_ind_grupo" targetRef="rr_ind_puesto" />
+    <sequenceFlow id="f23" sourceRef="rr_ind_puesto" targetRef="rr_uniforme" />
+    <sequenceFlow id="f24" sourceRef="rr_uniforme" targetRef="rr_eval1" />
+    <sequenceFlow id="f25" sourceRef="rr_eval1" targetRef="rr_eval2" />
+    <sequenceFlow id="f26" sourceRef="rr_eval2" targetRef="rr_gw_continua" />
+    <sequenceFlow id="f27" name="Continua" sourceRef="rr_gw_continua" targetRef="rr_end_ok" />
+    <sequenceFlow id="f28" name="No continua" sourceRef="rr_gw_continua" targetRef="rr_cese" />
+    <sequenceFlow id="f29" sourceRef="rr_cese" targetRef="rr_end_cese" />
+  </process>
+  <collaboration id="Collab_1" name="INCORPORACION DE PERSONAL - Provecho ERP">
+    <participant id="Participant_RRH001" name="INCORPORACION DE PERSONAL" processRef="Process_RRH001" />
+  </collaboration>
+  <bpmndi:BPMNDiagram xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:omgdc="http://www.omg.org/spec/DD/20100524/DC" xmlns:omgdi="http://www.omg.org/spec/DD/20100524/DI" id="Diagram_1">
+    <bpmndi:BPMNPlane id="Plane_1" bpmnElement="Collab_1">
+      <bpmndi:BPMNShape id="DE_Participant_RRH001" bpmnElement="Participant_RRH001" isHorizontal="true">
+        <omgdc:Bounds x="20" y="20" width="3960" height="1010" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_Lane_Encargado" bpmnElement="Lane_Encargado" isHorizontal="true">
+        <omgdc:Bounds x="50" y="90" width="3930" height="220" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_Lane_Admin" bpmnElement="Lane_Admin" isHorizontal="true">
+        <omgdc:Bounds x="50" y="310" width="3930" height="220" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_Lane_Candidato" bpmnElement="Lane_Candidato" isHorizontal="true">
+        <omgdc:Bounds x="50" y="530" width="3930" height="220" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_Lane_Contador" bpmnElement="Lane_Contador" isHorizontal="true">
+        <omgdc:Bounds x="50" y="750" width="3930" height="220" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="DE_rr_start" bpmnElement="rr_start"><omgdc:Bounds x="90" y="185" width="30" height="30" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_rr_requisicion" bpmnElement="rr_requisicion"><omgdc:Bounds x="240" y="170" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_rr_valida" bpmnElement="rr_valida"><omgdc:Bounds x="390" y="390" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_rr_gw_perfil" bpmnElement="rr_gw_perfil"><omgdc:Bounds x="540" y="400" width="40" height="40" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_rr_redactar" bpmnElement="rr_redactar"><omgdc:Bounds x="690" y="390" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_rr_publicar" bpmnElement="rr_publicar"><omgdc:Bounds x="840" y="390" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_rr_postular" bpmnElement="rr_postular"><omgdc:Bounds x="990" y="610" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_rr_filtrar" bpmnElement="rr_filtrar"><omgdc:Bounds x="1140" y="390" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_rr_entrevistar" bpmnElement="rr_entrevistar"><omgdc:Bounds x="1290" y="390" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_rr_gw_avanza" bpmnElement="rr_gw_avanza"><omgdc:Bounds x="1440" y="400" width="40" height="40" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_rr_descartar" bpmnElement="rr_descartar"><omgdc:Bounds x="1590" y="390" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_rr_end_desc" bpmnElement="rr_end_desc"><omgdc:Bounds x="1740" y="405" width="30" height="30" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_rr_verificar" bpmnElement="rr_verificar"><omgdc:Bounds x="1590" y="390" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_rr_oferta" bpmnElement="rr_oferta"><omgdc:Bounds x="1740" y="390" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_rr_gw_acepta" bpmnElement="rr_gw_acepta"><omgdc:Bounds x="1890" y="620" width="40" height="40" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_rr_end_rech" bpmnElement="rr_end_rech"><omgdc:Bounds x="2040" y="625" width="30" height="30" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_rr_modalidad" bpmnElement="rr_modalidad"><omgdc:Bounds x="2040" y="390" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_rr_firmar" bpmnElement="rr_firmar"><omgdc:Bounds x="2190" y="390" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_rr_tregistro" bpmnElement="rr_tregistro"><omgdc:Bounds x="2340" y="830" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_rr_file" bpmnElement="rr_file"><omgdc:Bounds x="2490" y="390" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_rr_ind_grupo" bpmnElement="rr_ind_grupo"><omgdc:Bounds x="2640" y="390" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_rr_ind_puesto" bpmnElement="rr_ind_puesto"><omgdc:Bounds x="2790" y="170" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_rr_uniforme" bpmnElement="rr_uniforme"><omgdc:Bounds x="2940" y="170" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_rr_eval1" bpmnElement="rr_eval1"><omgdc:Bounds x="3090" y="170" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_rr_eval2" bpmnElement="rr_eval2"><omgdc:Bounds x="3240" y="170" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_rr_gw_continua" bpmnElement="rr_gw_continua"><omgdc:Bounds x="3390" y="400" width="40" height="40" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_rr_cese" bpmnElement="rr_cese"><omgdc:Bounds x="3540" y="390" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_rr_end_cese" bpmnElement="rr_end_cese"><omgdc:Bounds x="3690" y="405" width="30" height="30" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_rr_end_ok" bpmnElement="rr_end_ok"><omgdc:Bounds x="3540" y="185" width="30" height="30" /></bpmndi:BPMNShape>
+
+      <bpmndi:BPMNEdge id="DE_f1" bpmnElement="f1"><omgdi:waypoint x="120" y="200" /><omgdi:waypoint x="240" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f2" bpmnElement="f2"><omgdi:waypoint x="330" y="200" /><omgdi:waypoint x="390" y="420" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f3" bpmnElement="f3"><omgdi:waypoint x="480" y="420" /><omgdi:waypoint x="540" y="420" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f4" bpmnElement="f4"><omgdi:waypoint x="580" y="420" /><omgdi:waypoint x="690" y="420" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f5" bpmnElement="f5"><omgdi:waypoint x="580" y="420" /><omgdi:waypoint x="840" y="420" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f6" bpmnElement="f6"><omgdi:waypoint x="780" y="420" /><omgdi:waypoint x="840" y="420" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f7" bpmnElement="f7"><omgdi:waypoint x="930" y="420" /><omgdi:waypoint x="990" y="640" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f8" bpmnElement="f8"><omgdi:waypoint x="1080" y="640" /><omgdi:waypoint x="1140" y="420" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f9" bpmnElement="f9"><omgdi:waypoint x="1230" y="420" /><omgdi:waypoint x="1290" y="420" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f10" bpmnElement="f10"><omgdi:waypoint x="1380" y="420" /><omgdi:waypoint x="1440" y="420" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f11" bpmnElement="f11"><omgdi:waypoint x="1480" y="420" /><omgdi:waypoint x="1590" y="420" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f12" bpmnElement="f12"><omgdi:waypoint x="1680" y="420" /><omgdi:waypoint x="1740" y="420" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f13" bpmnElement="f13"><omgdi:waypoint x="1480" y="420" /><omgdi:waypoint x="1590" y="420" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f14" bpmnElement="f14"><omgdi:waypoint x="1680" y="420" /><omgdi:waypoint x="1740" y="420" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f15" bpmnElement="f15"><omgdi:waypoint x="1830" y="420" /><omgdi:waypoint x="1890" y="640" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f16" bpmnElement="f16"><omgdi:waypoint x="1930" y="640" /><omgdi:waypoint x="2040" y="640" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f17" bpmnElement="f17"><omgdi:waypoint x="1930" y="640" /><omgdi:waypoint x="2040" y="420" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f18" bpmnElement="f18"><omgdi:waypoint x="2130" y="420" /><omgdi:waypoint x="2190" y="420" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f19" bpmnElement="f19"><omgdi:waypoint x="2280" y="420" /><omgdi:waypoint x="2340" y="860" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f20" bpmnElement="f20"><omgdi:waypoint x="2430" y="860" /><omgdi:waypoint x="2490" y="420" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f21" bpmnElement="f21"><omgdi:waypoint x="2580" y="420" /><omgdi:waypoint x="2640" y="420" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f22" bpmnElement="f22"><omgdi:waypoint x="2730" y="420" /><omgdi:waypoint x="2790" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f23" bpmnElement="f23"><omgdi:waypoint x="2880" y="200" /><omgdi:waypoint x="2940" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f24" bpmnElement="f24"><omgdi:waypoint x="3030" y="200" /><omgdi:waypoint x="3090" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f25" bpmnElement="f25"><omgdi:waypoint x="3180" y="200" /><omgdi:waypoint x="3240" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f26" bpmnElement="f26"><omgdi:waypoint x="3330" y="200" /><omgdi:waypoint x="3390" y="420" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f27" bpmnElement="f27"><omgdi:waypoint x="3430" y="420" /><omgdi:waypoint x="3540" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f28" bpmnElement="f28"><omgdi:waypoint x="3430" y="420" /><omgdi:waypoint x="3540" y="420" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f29" bpmnElement="f29"><omgdi:waypoint x="3630" y="420" /><omgdi:waypoint x="3690" y="420" /></bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</definitions>

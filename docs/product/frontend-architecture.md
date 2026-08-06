@@ -346,10 +346,17 @@ diseñar hardware para un flujo que aún no tiene pantalla).
 🔶 **Parcial (ADR-013)**: Playwright adoptado para e2e de flujos críticos
 (login, filtrado del home de apps por permiso, crear venta, cobrar) —
 prioriza flujos de plata sobre cobertura unitaria de componentes sueltos.
-⬜ Sin implementar todavía (cero tests de frontend hoy) y sin decidir
-testing unitario de componentes/hooks (candidato: Vitest + Testing
-Library cuando exista F2.4). No bloquea el alfa si es una demo guiada,
-pero sí antes de producción real con dinero de por medio (POS).
+✅ **7 casos en verde y en el job `e2e` de CI** (2026-08-06):
+`frontend/e2e/caja.spec.ts` cubre abrir caja → vender → cobrar → cerrar,
+RN-POS-011 y que un rechazo del servidor no borre lo tecleado;
+`frontend/e2e/sesion.spec.ts` cubre login → cookie httpOnly → logout y el
+**gate de módulo por permiso entrando por URL directa** (el filtro del home
+es UX; lo que decide es el `layout.tsx`). Fuera del PDV, el resto de las
+pantallas sigue sin prueba.
+⬜ Sin decidir testing unitario de componentes/hooks (candidato: Vitest +
+Testing Library cuando exista F2.4); los 14 casos de `npm test` corren a
+mano y **no están en CI**. No bloquea el alfa si es una demo guiada, pero sí
+antes de producción real con dinero de por medio (POS).
 
 ## F2.26 Observabilidad
 
