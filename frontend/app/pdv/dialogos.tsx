@@ -3,8 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 
 import {
+  esAtribucion,
+  esCustodia,
   soles,
   type ClienteBuscado,
+  type CustodiaDestino,
+  type DescuadreAtribucion,
   type ExtraDeCarta,
   type ItemDeCarta,
   type MedioPago,
@@ -306,16 +310,19 @@ export function DialogoCierre({
   onCerrar: () => void;
   onCerrarCaja: (datos: {
     detalle: Record<string, number>;
-    custodia: string;
-    atribucion: string;
+    custodia: CustodiaDestino;
+    atribucion: DescuadreAtribucion | "";
     reportesPos: { pos_tarjeta_id: string; monto_lote: string; referencia?: string }[];
     receptor: { username: string; pin: string };
   }) => void;
   ocupado: boolean;
 }) {
   const [conteo, setConteo] = useState<Record<string, number>>({});
-  const [custodia, setCustodia] = useState("");
-  const [atribucion, setAtribucion] = useState("");
+  // Tipados con la unión del contrato y no con `string`: son enums en la
+  // base (RN-MDP-005) y el schema los valida con `pattern`. El `""` inicial
+  // es "todavía no eligió", no un valor que pueda viajar.
+  const [custodia, setCustodia] = useState<CustodiaDestino | "">("");
+  const [atribucion, setAtribucion] = useState<DescuadreAtribucion | "">("");
   const [lotes, setLotes] = useState<Record<string, string>>({});
   const [usuario, setUsuario] = useState("");
   const [pin, setPin] = useState("");
@@ -384,7 +391,7 @@ export function DialogoCierre({
         className="pdv-campo"
         data-testid="cierre-custodia"
         value={custodia}
-        onChange={(e) => setCustodia(e.target.value)}
+        onChange={(e) => setCustodia(esCustodia(e.target.value) ? e.target.value : "")}
       >
         <option value="">Elegir destino...</option>
         <option value="local_caja_fuerte">Caja fuerte del local</option>
@@ -419,7 +426,9 @@ export function DialogoCierre({
       <select
         className="pdv-campo"
         value={atribucion}
-        onChange={(e) => setAtribucion(e.target.value)}
+        onChange={(e) =>
+          setAtribucion(esAtribucion(e.target.value) ? e.target.value : "")
+        }
       >
         <option value="">Sin atribuir todavía</option>
         <option value="cajero">Cajero</option>
@@ -442,18 +451,23 @@ export function DialogoCierre({
             !pin.trim() ||
             operativos.some((p) => !lotes[p.pos_tarjeta_id])
           }
-          onClick={() =>
+          onClick={() => {
+            // El botón ya está deshabilitado sin destino; el chequeo existe
+            // para que el **tipo** lo sepa, no por desconfianza del
+            // `disabled`. Sin él, `""` sería un `custodia` válido para TS y
+            // el 422 volvería a aparecer recién en el servidor.
+            if (!custodia) return;
             onCerrarCaja({
               detalle: conteo,
               custodia,
-              atribucion: atribucion.trim(),
+              atribucion,
               reportesPos: operativos.map((p) => ({
                 pos_tarjeta_id: p.pos_tarjeta_id,
                 monto_lote: String(Number(lotes[p.pos_tarjeta_id]) || 0),
               })),
               receptor: { username: usuario.trim(), pin },
-            })
-          }
+            });
+          }}
         >
           Cerrar caja
         </button>

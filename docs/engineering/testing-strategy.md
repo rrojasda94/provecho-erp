@@ -34,15 +34,34 @@ contrato**, no de comportamiento:
 
 Ninguno necesitaba un navegador. Los dos se cazan comparando lo que el
 cliente manda contra `docs/architecture/openapi.json`, que **ya se genera y
-ya se verifica en CI**. Ese es el test barato que falta y el que hay que
-escribir primero:
+ya se verifica en CI**.
 
-> Por cada operación que el frontend invoca, afirmar que el cuerpo que arma
-> valida contra el `requestBody` del contrato, y que el tipo con el que lee
-> la respuesta coincide con el `responseBody`.
+✅ **Escrito el 2026-08-06** (`frontend/lib/contrato.test.ts`, 58 casos en
+~250 ms). Son **dos capas**, y la primera importa más que la segunda:
 
-Corre en milisegundos, no necesita servidores, no es flaky, y cubre **todas**
-las pantallas de una vez en lugar de una por prueba.
+**1. El tipo, que es el que trabaja todo el día.** Los cinco cuerpos de
+request del PDV viajaban como `Record<string, unknown>` — sin contrato del
+lado del cliente, que es por donde entró el bug de ADR-025. Tipados desde
+`openapi.json`, `tsc` los verifica **en cada punto de llamada** y ya corre
+en CI. Tiparlos destapó cinco desacuerdos el primer día, entre ellos que
+`PosVerificado` (lo que se lee, con `serie`) no es `PosVerificadoIn` (lo que
+se manda), y dos enums que viajaban como `string` suelto.
+
+**2. El test, que verifica que esos tipos y el contrato digan lo mismo.**
+Por cada operación de `lib/pdv.ts`, con `fetch` intervenido: que la ruta y
+el método existan en el contrato, que el cuerpo valide contra su
+`requestBody`, y —alimentando al cliente con una respuesta **generada desde
+el contrato**— que la sepa leer. Esto último es lo que caza ADR-026: el
+cliente recibe `{items, total, …}` de verdad y tiene que devolver un array.
+
+El validador cubre a propósito solo lo que se rompe en silencio: requerido
+que no viaja, campo que el contrato no conoce, tipo equivocado. `pattern`,
+`minimum` y enums los rechaza el servidor con un 422 que **se ve**;
+replicarlos acá sería mantener dos validadores desincronizándose.
+
+Verificado por mutación, que es lo único que prueba que un test verde pueda
+ponerse rojo: reintroducidos los dos bugs históricos (más un endpoint
+renombrado), los tres fallan con el nombre de la operación y el del campo.
 
 ## Qué sí justifica un e2e
 
@@ -103,16 +122,19 @@ Aprendidas a los golpes; cada una costó tiempo:
 
 ## Estado actual (2026-08-06)
 
-- Dominio y API: **887 casos**, en verde, en CI.
-- Unidad de frontend: 14 casos (`npm test`). **No corren en CI todavía** —
-  el job de frontend solo hace `lint` y `build`.
-- Contrato cliente↔servidor: **no existe**. **Sigue siendo la prioridad** —
-  los e2e de abajo cubren el arranque y los candados, no el desacuerdo de
-  forma entre lo que el cliente manda y lo que el servidor espera, que es de
-  donde salieron los dos bugs que originaron todo esto.
+- Dominio y API: **895 casos**, en verde, en CI.
+- Unidad de frontend + contrato: **72 casos** (`npm test`), en CI desde
+  2026-08-06 — el job de frontend hacía solo `lint` y `build`. De esos, 58
+  son de contrato.
 - e2e: **7 casos en verde y en CI** (job `e2e`), sobre PDV, sesión y el gate
   de módulo. Los tres puntos de "qué sí justifica un e2e" quedan cubiertos.
   Ver ROADMAP → Frontend.
+
+Los cuatro niveles de la tabla existen. **Lo que falta ya no es un nivel
+sino cobertura**: el contrato cubre las 19 operaciones del PDV, y las de
+Compras, Inventario, RRHH y el resto del back-office siguen sin él —
+`lib/cliente-api.ts` y los Server Components llaman a la API por su cuenta.
+Extenderlo es repetir el patrón, no inventarlo.
 
 ## Nota de velocidad
 

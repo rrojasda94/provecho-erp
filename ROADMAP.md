@@ -1866,11 +1866,44 @@ errores de consola.
   igual opera una pantalla — es con él que se verifica qué **no** se ve.
   Helpers compartidos en `e2e/util.ts` (no es `.spec.ts` a propósito:
   Playwright solo recolecta `*.spec.ts`).
-  Deuda que deja: el **test de contrato cliente↔servidor sigue sin existir**
-  y sigue siendo la prioridad — estos e2e cubren arranque y candados, no el
-  desacuerdo de forma que originó los dos bugs. Fuera del PDV, el resto de
-  las pantallas del ERP sigue sin prueba, y el job tarda ~5 min porque
-  levanta Next en modo desarrollo.
+  Deuda que deja: fuera del PDV, el resto de las pantallas del ERP sigue sin
+  prueba, y el job tarda ~5 min porque levanta Next en modo desarrollo.
+- ✅ 2026-08-06 **Test de contrato cliente↔servidor** — el que la estrategia
+  declaraba prioridad desde el 2026-08-05, por encima de más e2e.
+  `frontend/lib/contrato.test.ts`: **58 casos en ~250 ms**, sin servidores.
+  Son **dos capas, y la primera pesa más**:
+  **(1) El tipo.** Los cinco cuerpos de request del PDV viajaban como
+  `Record<string, unknown>` — o sea sin contrato del lado del cliente, que
+  es exactamente por donde entró el bug de ADR-025. Tipados desde
+  `openapi.json` (`VentaNueva`, `PagoNuevo`, `AperturaCajaNueva`,
+  `CierreCajaNuevo`, `MovimientoCajaNuevo`), `tsc` los verifica en **cada
+  punto de llamada** y ya corre en CI vía `npm run build`.
+  **Tiparlos destapó cinco desacuerdos el mismo día**: `modalidad` podía
+  viajar `null` (el guard existía, el tipo no lo sabía); `pos_verificados`
+  estaba tipado con `PosVerificado` —lo que se **lee**, con `serie`— cuando
+  el request es `PosVerificadoIn` sin ella; y `custodia`/
+  `descuadre_atribucion` eran `string` suelto sobre dos columnas `Enum`, que
+  es la misma clase de agujero que se cerró el 2026-08-05 en el schema del
+  servidor y seguía abierta del lado del cliente.
+  **(2) El test.** Por cada una de las 19 operaciones de `lib/pdv.ts`, con
+  `fetch` intervenido: que la ruta y el método existan en el contrato, que
+  el cuerpo valide contra su `requestBody`, y —alimentando al cliente con
+  una respuesta **generada desde el contrato**— que la sepa leer. Esto
+  último es lo que caza ADR-026: el cliente recibe `{items, total, …}` de
+  verdad y tiene que devolver un array.
+  El validador cubre solo lo que se rompe en silencio (requerido que no
+  viaja, campo que el contrato no conoce, tipo equivocado). `pattern`,
+  `minimum` y enums los rechaza el servidor con un 422 que se ve; replicarlo
+  sería mantener dos validadores desincronizándose — y si algún día hace
+  falta, la respuesta es una librería de JSON Schema, no hacer crecer eso.
+  **Verificado por mutación**, que es lo único que prueba que un test verde
+  pueda ponerse rojo: reintroducidos los dos bugs históricos más un endpoint
+  renombrado, los tres fallan nombrando la operación y el campo.
+  `npm test` entra al job `frontend` de CI: los 72 casos del frontend
+  **nunca habían corrido en CI** (el job hacía solo `lint` y `build`).
+  Deuda que deja: cubre el PDV. Compras, Inventario, RRHH y el resto del
+  back-office llaman a la API por `lib/cliente-api.ts` y por Server
+  Components, sin contrato verificado. Extenderlo es repetir el patrón.
 - ⬜ **Los enums de la base no tienen una sola fuente en el frontend**: la
   pantalla de caja repite los valores de `custodia`, `descuadre_atribucion`
   y los estados en constantes propias. Mientras el `pattern` del schema los

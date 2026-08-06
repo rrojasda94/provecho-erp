@@ -1,18 +1,27 @@
 "use client";
 
-import { api, soles, type CajaAbierta } from "@/lib/pdv";
+import {
+  api,
+  soles,
+  type CajaAbierta,
+  type CustodiaDestino,
+  type DescuadreAtribucion,
+  type PosVerificadoNuevo,
+} from "@/lib/pdv";
 
 export type DatosApertura = {
   montoDeclarado: number;
   detalle: Record<string, number>;
-  posVerificados: { pos_tarjeta_id: string; operativo: boolean; observacion?: string }[];
+  posVerificados: PosVerificadoNuevo[];
   encargado: { username: string; pin: string };
 };
 
 export type DatosCierre = {
   detalle: Record<string, number>;
-  custodia: string;
-  atribucion: string;
+  custodia: CustodiaDestino;
+  /** `""` = sin atribuir todavía, que es un caso legítimo: un descuadre se
+   * investiga después. Viaja como `null`. */
+  atribucion: DescuadreAtribucion | "";
   reportesPos: { pos_tarjeta_id: string; monto_lote: string; referencia?: string }[];
   receptor: { username: string; pin: string };
 };
@@ -88,7 +97,7 @@ export function useCajaPdv({
         detalle_denominaciones: datos.detalle,
         custodia: datos.custodia,
         autorizacion: elevacion.autorizacion,
-        descuadre_atribucion: datos.atribucion || null,
+        descuadre_atribucion: datos.atribucion === "" ? null : datos.atribucion,
         reportes_pos: datos.reportesPos,
       });
       setCaja(null);

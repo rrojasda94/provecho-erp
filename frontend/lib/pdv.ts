@@ -165,6 +165,116 @@ export type MovimientoCaja = {
   motivo: string;
 };
 
+// --- Cuerpos de request -----------------------------------------------------
+/**
+ * Los cinco cuerpos que hasta 2026-08-06 viajaban como
+ * `Record<string, unknown>` — o sea, sin contrato del lado del cliente.
+ * Ahí se coló el bug de ADR-025: el diálogo de apertura mandaba
+ * `monto_apertura` cuando el servidor ya esperaba `monto_declarado`, y
+ * nada lo dijo hasta que la caja devolvió 422 en producción. Con el tipo
+ * puesto, `tsc` —que ya corre en CI vía `npm run build`— lo caza en el
+ * punto de llamada, y `lib/contrato.test.ts` verifica que estos tipos y
+ * `openapi.json` sigan diciendo lo mismo.
+ *
+ * Los montos van como `string`: son decimales y el servidor los acepta
+ * así (`Decimal` en Pydantic). Mandarlos como `number` los hace pasar por
+ * el flotante binario, y el redondeo de un cobro no es lugar para eso.
+ */
+export type ExtraDeVentaNueva = {
+  producto_comercial_id: string;
+  cantidad: string;
+};
+
+export type ItemDeVentaNueva = {
+  producto_comercial_id: string;
+  cantidad: string;
+  grupo_cobro?: number;
+  extras?: ExtraDeVentaNueva[];
+};
+
+export type VentaNueva = {
+  sucursal_id: string;
+  punto_venta_id: string;
+  canal: string;
+  modalidad: string;
+  idempotency_key: string;
+  items: ItemDeVentaNueva[];
+  id?: string | null;
+  cliente_id?: string | null;
+  mesa_id?: string | null;
+  comensales?: number | null;
+  referencia_atencion?: string | null;
+};
+
+export type PagoNuevo = {
+  medio_pago_id: string;
+  monto: string;
+  idempotency_key: string;
+  id?: string | null;
+  grupo_cobro?: number;
+  receptor_nombre?: string | null;
+  receptor_num_doc?: string | null;
+  referencia_externa?: string | null;
+};
+
+/** Lo que se **manda** al verificar un POS al abrir. No es `PosVerificado`:
+ * ese es lo que se **lee**, y trae además la `serie` que el servidor
+ * resuelve. Confundirlos fue el primer hallazgo de tipar estos cuerpos. */
+export type PosVerificadoNuevo = {
+  pos_tarjeta_id: string;
+  operativo: boolean;
+  observacion?: string;
+};
+
+export type AperturaCajaNueva = {
+  punto_venta_id: string;
+  /** Lo que el encargado dice entregar. Lo que el cajero cuenta va en
+   * `detalle_denominaciones`; la diferencia la calcula el servidor
+   * (RN-POS-011/012) y **nunca** se teclea. */
+  monto_declarado: string;
+  /** Valor del billete → piezas contadas. */
+  detalle_denominaciones: Record<string, number>;
+  autorizacion: string;
+  pos_verificados?: PosVerificadoNuevo[] | null;
+};
+
+/** A dónde va el efectivo al cerrar. Es un enum en la base (RN-MDP-005) y
+ * el schema lo valida con `pattern`: un valor fuera de estos dos deja la
+ * fila ilegible al leerla. */
+export const CUSTODIAS = ["local_caja_fuerte", "traslado_contabilidad"] as const;
+export type CustodiaDestino = (typeof CUSTODIAS)[number];
+
+export const ATRIBUCIONES = ["cajero", "encargado", "tercero_reportado"] as const;
+export type DescuadreAtribucion = (typeof ATRIBUCIONES)[number];
+
+export const esCustodia = (v: string): v is CustodiaDestino =>
+  (CUSTODIAS as readonly string[]).includes(v);
+
+export const esAtribucion = (v: string): v is DescuadreAtribucion =>
+  (ATRIBUCIONES as readonly string[]).includes(v);
+
+export type CierreCajaNuevo = {
+  detalle_denominaciones: Record<string, number>;
+  custodia: CustodiaDestino;
+  autorizacion: string;
+  descuadre_atribucion?: DescuadreAtribucion | null;
+  reportes_pos?: {
+    pos_tarjeta_id: string;
+    monto_lote: string;
+    referencia?: string | null;
+  }[];
+};
+
+export type MovimientoCajaNuevo = {
+  tipo: "ingreso" | "retiro";
+  monto: string;
+  motivo: string;
+  idempotency_key: string;
+  /** Solo hace falta para retirar: meter plata al cajón no es la operación
+   * de la que hay que desconfiar. */
+  autorizacion?: string | null;
+};
+
 // --- Operaciones ------------------------------------------------------------
 export const api = {
   carta: (sucursalId: string, modalidad: string) =>
@@ -197,7 +307,7 @@ export const api = {
     return pagina.items;
   },
 
-  crearVenta: (cuerpo: Record<string, unknown>) =>
+  crearVenta: (cuerpo: VentaNueva) =>
     pedir<Venta>("/sales/ventas", { metodo: "POST", cuerpo }),
 
   itemsDeVenta: (ventaId: string) =>
@@ -217,7 +327,7 @@ export const api = {
   anularVenta: (ventaId: string) =>
     pedir<Venta>(`/sales/ventas/${ventaId}/anular`, { metodo: "POST" }),
 
-  registrarPago: (ventaId: string, cuerpo: Record<string, unknown>) =>
+  registrarPago: (ventaId: string, cuerpo: PagoNuevo) =>
     pedir<{ id: string }>(`/sales/ventas/${ventaId}/pagos`, {
       metodo: "POST",
       cuerpo,
@@ -244,7 +354,7 @@ export const api = {
    * `apertura_caja_id`. Se normaliza acá para que el resto del PDV — que
    * después necesita ese id para cerrar la caja o registrar propinas — no
    * tenga que saber de cuál de los dos endpoints vino el objeto. */
-  abrirCaja: async (cuerpo: Record<string, unknown>): Promise<CajaAbierta> => {
+  abrirCaja: async (cuerpo: AperturaCajaNueva): Promise<CajaAbierta> => {
     const apertura = await pedir<{
       id: string;
       punto_venta_id: string;
@@ -263,7 +373,7 @@ export const api = {
     };
   },
 
-  cerrarCaja: (aperturaCajaId: string, cuerpo: Record<string, unknown>) =>
+  cerrarCaja: (aperturaCajaId: string, cuerpo: CierreCajaNuevo) =>
     pedir<CierreCaja>(`/accounting/cajas/apertura/${aperturaCajaId}/cierre`, {
       metodo: "POST",
       cuerpo,
@@ -273,7 +383,7 @@ export const api = {
    * comprobante (decisión del usuario, 2026-08-01). */
   registrarMovimientoCaja: (
     aperturaCajaId: string,
-    cuerpo: Record<string, unknown>,
+    cuerpo: MovimientoCajaNuevo,
   ) =>
     pedir<MovimientoCaja>(
       `/accounting/cajas/apertura/${aperturaCajaId}/movimientos`,

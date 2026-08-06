@@ -134,6 +134,12 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npm run lint
+      # 72 casos en ~0.3 s, sin framework ni servidores. Entre ellos el de
+      # contrato (`lib/contrato.test.ts`), que compara lo que el PDV manda
+      # contra `docs/architecture/openapi.json` — el mismo archivo que el job
+      # `backend` verifica que esté al día. Los dos bugs de ADR-025/026
+      # habrían muerto acá, en milisegundos, en vez de en producción.
+      - run: npm test
       - run: npm run build
 
   # El flujo del dinero de punta a punta contra la API real. Es el único job

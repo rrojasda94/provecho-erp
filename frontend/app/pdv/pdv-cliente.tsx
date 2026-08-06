@@ -13,6 +13,7 @@ import {
   type MesaEnMapa,
   type Venta,
   type VentaItem,
+  type VentaNueva,
 } from "@/lib/pdv";
 
 import Catalogo from "./catalogo";
@@ -171,26 +172,33 @@ export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props)
     setLineaEnEdicion(lineaDesde(item));
   };
 
-  const cuerpoVenta = (b: Borrador) => ({
-    sucursal_id: sucursalId,
-    punto_venta_id: puntoVenta.id,
-    canal: "pdv",
-    modalidad: b.tipo,
-    idempotency_key: claveIdempotencia("venta"),
-    cliente_id: b.cliente?.id ?? null,
-    mesa_id: b.mesaId,
-    comensales: b.comensales,
-    referencia_atencion: b.tipo === "mesa" ? null : (b.cliente?.nombre ?? null),
-    items: b.lineas.map((l) => ({
-      producto_comercial_id: l.productoId,
-      cantidad: String(l.cantidad),
-      grupo_cobro: l.grupoCobro,
-      extras: l.extras.map((e) => ({
-        producto_comercial_id: e.productoId,
-        cantidad: String(e.cantidad),
+  /** `modalidad` es obligatoria en el contrato y `b.tipo` puede ser null
+   * mientras el borrador se arma. `revisarAntesDeSalir` ya lo impide antes
+   * de enviar o cobrar (RN-COM-005); esto lo hace explícito para el tipo,
+   * porque un `null` acá es un 422 en medio de un cobro. */
+  const cuerpoVenta = (b: Borrador): VentaNueva => {
+    if (!b.tipo) throw new Error("El pedido no tiene tipo de orden");
+    return {
+      sucursal_id: sucursalId,
+      punto_venta_id: puntoVenta.id,
+      canal: "pdv",
+      modalidad: b.tipo,
+      idempotency_key: claveIdempotencia("venta"),
+      cliente_id: b.cliente?.id ?? null,
+      mesa_id: b.mesaId,
+      comensales: b.comensales,
+      referencia_atencion: b.tipo === "mesa" ? null : (b.cliente?.nombre ?? null),
+      items: b.lineas.map((l) => ({
+        producto_comercial_id: l.productoId,
+        cantidad: String(l.cantidad),
+        grupo_cobro: l.grupoCobro,
+        extras: l.extras.map((e) => ({
+          producto_comercial_id: e.productoId,
+          cantidad: String(e.cantidad),
+        })),
       })),
-    })),
-  });
+    };
+  };
 
   /** Puerta común de Enviar y Cobrar: cobrar es enviar + cobrar, así que
    * exigen lo mismo (RN-COM-005). */

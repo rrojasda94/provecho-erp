@@ -7,6 +7,19 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Fixed
 
+- **Cinco desacuerdos de contrato en el PDV**, destapados al tipar los
+  cuerpos de request (2026-08-06). Ninguno había fallado todavía, y los
+  cinco son de la misma familia que el 422 de la caja:
+  - `modalidad` podía viajar `null` en `POST /sales/ventas`, que el
+    contrato exige. El guard de pantalla existía (RN-COM-005); el tipo no lo
+    sabía, así que nada impedía una llamada nueva sin él.
+  - `pos_verificados` estaba tipado con `PosVerificado` —lo que se **lee**,
+    que trae `serie`— cuando el request es `PosVerificadoIn`, que no la
+    tiene. Leer y escribir no son el mismo schema.
+  - `custodia` y `descuadre_atribucion` viajaban como `string` suelto sobre
+    dos columnas `Enum`. Es el mismo agujero que se cerró el 2026-08-05 en
+    el schema del servidor, que seguía abierto del lado del cliente: ahora
+    son uniones tipadas con su guard (`esCustodia`, `esAtribucion`).
 - **Las pruebas e2e del flujo del dinero pasan de rojo a verde y entran a
   CI** (2026-08-06). Dos causas, ninguna de la pantalla:
   1. **La prueba se saltaba el tipo de orden.** El PDV no deja cobrar sin él
@@ -48,6 +61,26 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Added
 
+- **Test de contrato cliente↔servidor** (2026-08-06,
+  `frontend/lib/contrato.test.ts`), el que la estrategia de pruebas
+  declaraba prioridad por encima de más e2e. 58 casos en ~250 ms, sin
+  servidores. Dos capas, y la primera pesa más:
+  1. **El tipo.** Los cinco cuerpos de request del PDV viajaban como
+     `Record<string, unknown>` — sin contrato del lado del cliente, que es
+     por donde entró el bug de ADR-025. Tipados desde `openapi.json`, `tsc`
+     los verifica en cada punto de llamada y ya corre en CI.
+  2. **El test.** Por cada operación de `lib/pdv.ts`, con `fetch`
+     intervenido: que la ruta y el método existan en el contrato, que el
+     cuerpo valide contra su `requestBody`, y —alimentando al cliente con
+     una respuesta **generada desde el contrato**— que la sepa leer. Eso
+     último caza ADR-026: el cliente recibe `{items, total, …}` de verdad y
+     tiene que devolver un array.
+  Verificado **por mutación**: reintroducidos los dos bugs históricos más un
+  endpoint renombrado, los tres fallan nombrando operación y campo. Un test
+  verde que nadie vio ponerse rojo no prueba nada.
+- **`npm test` entra a CI** (2026-08-06). Los 72 casos de unidad del
+  frontend **nunca habían corrido en CI**: el job hacía solo `lint` y
+  `build`.
 - **Pruebas de pantalla de sesión y del gate de módulo por permiso**
   (2026-08-06, `frontend/e2e/sesion.spec.ts`). Con esto quedan cubiertos los
   **tres** casos que `docs/engineering/testing-strategy.md` da por
