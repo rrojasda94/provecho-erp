@@ -111,6 +111,11 @@ def listar_ordenes_compra(
     return OrdenCompraRepo(session).list(empresa_id)
 
 
+def q_ordenes_compra(session: Session, empresa_id: uuid.UUID | None = None):
+    """La consulta sin ejecutar, para que el router la pagine (ADR-026)."""
+    return OrdenCompraRepo(session).q_list(empresa_id)
+
+
 def emitir_orden_compra(
     session: Session,
     orden_compra_id: uuid.UUID,

@@ -26,6 +26,7 @@ from src.core.database import Base
 from src.core.sync import estado_conexion, motor, watermark
 from src.core.sync.cliente_nube import ClienteNube, ErrorNube
 from src.core.sync.contratos import PULL, PUSH, RecursoSync
+from src.modules.accounting.infrastructure.repositories import AperturaCajaRepo
 from src.modules.inventory.application import listeners
 from src.modules.inventory.infrastructure.models import (
     Articulo,
@@ -65,6 +66,7 @@ from src.modules.users.infrastructure.security import hash_pin, verify_pin
 from src.seeders.hub import alta_hub
 from src.seeders.seed import seed
 from src.shared import fechas
+from tests.conftest import abrir_caja_directa
 
 PIN_CAJERO = "123456"
 PIN_HUB = "654321"
@@ -262,8 +264,18 @@ def _stock(Session, almacen_id) -> Decimal:
 
 
 def _venta_offline(entorno, key="venta-offline-1", cantidad="2") -> uuid.UUID:
-    """Una venta cobrada en el hub durante el corte."""
+    """Una venta cobrada en el hub durante el corte.
+
+    El turno de caja vive en el hub (cobrar exige caja abierta, RN-MDP-002) y
+    **no se replica a la nube**: por eso el replay del push la salta.
+    """
     with entorno.listeners_en("hub"), entorno.HubSession() as s:
+        if AperturaCajaRepo(s).abierta_en(entorno.ids["pv_id"]) is None:
+            abrir_caja_directa(
+                s,
+                punto_venta_id=entorno.ids["pv_id"],
+                cajero_id=entorno.ids["cajero_id"],
+            )
         venta = ventas_uc.crear_venta(
             s,
             sucursal_id=entorno.ids["sucursal_id"],

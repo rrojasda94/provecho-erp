@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="Definitions_COM003" targetNamespace="http://www.bizagi.com/definitions/_com003_provecho" xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL">
+  <process id="Process_COM003" name="DEFINICION Y REVISION DE PRECIO">
+    <documentation>Alcance: desde que aparece el disparador (producto nuevo, cambio de costo de insumo, revision periodica o presion de competencia) hasta que el precio queda publicado en la lista vigente. Reglas: todo precio se calcula con margen de contribucion explicito antes de publicarse (RN-PRC-001/002); el precio en POS es fijo e innegociable y solo varia por lista de precios (RN-PRC-003); la lista la crea Comercial con asesoria de Contabilidad (RN-PRC-005); un precio bajo el margen minimo necesita aprobacion de Gerencia. El precio nunca se edita directo en el POS. Un hallazgo de mercado documentado es lo que separa una decision con respaldo de una apuesta declarada.</documentation>
+    <laneSet id="LaneSet_1">
+      <lane id="Lane_Comercial" name="Comercial"><childLaneSet id="cls_Lane_Comercial" /></lane>
+      <lane id="Lane_ContabilidadP" name="Contabilidad"><childLaneSet id="cls_Lane_ContabilidadP" /></lane>
+      <lane id="Lane_GerenciaP" name="Gerencia"><childLaneSet id="cls_Lane_GerenciaP" /></lane>
+      <lane id="Lane_IDI" name="I+D+i / Cocina"><childLaneSet id="cls_Lane_IDI" /></lane>
+    </laneSet>
+
+    <startEvent id="pr_start" name="Disparador: producto nuevo, cambio de costo o revision"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#E6FF97" /><bizagi:BizagiProperty name="borderColor" value="#62A716" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <outgoing>f1</outgoing>
+    </startEvent>
+    <task id="pr_hallazgo" name="Reunir el hallazgo de mercado: competencia, valor percibido, demanda"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f1</incoming>
+      <outgoing>f2</outgoing>
+    </task>
+    <task id="pr_receta" name="Aportar la receta y el costo de produccion"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f2</incoming>
+      <outgoing>f3</outgoing>
+    </task>
+    <task id="pr_costo" name="Calcular el costo variable real: insumos, empaque y comision de medio de pago"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f3</incoming>
+      <outgoing>f4</outgoing>
+    </task>
+    <task id="pr_margen" name="Calcular el margen de contribucion del precio propuesto"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f4</incoming>
+      <incoming>f9</incoming>
+      <outgoing>f5</outgoing>
+    </task>
+    <exclusiveGateway id="pr_gw_margen" name="Alcanza el margen minimo?" gatewayDirection="Mixed"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFFFCC" /><bizagi:BizagiProperty name="borderColor" value="#A6A61D" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f5</incoming>
+      <outgoing>f6</outgoing>
+      <outgoing>f7</outgoing>
+    </exclusiveGateway>
+    <exclusiveGateway id="pr_gw_sustento" name="Hay sustento para vender bajo el minimo?" gatewayDirection="Mixed"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFFFCC" /><bizagi:BizagiProperty name="borderColor" value="#A6A61D" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f7</incoming>
+      <outgoing>f8</outgoing>
+      <outgoing>f10</outgoing>
+    </exclusiveGateway>
+    <task id="pr_ajustar" name="Ajustar precio o revisar la receta y volver a calcular"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f8</incoming>
+      <incoming>f12</incoming>
+      <outgoing>f9</outgoing>
+    </task>
+    <task id="pr_escalar" name="Escalar a Gerencia con el sustento escrito"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f10</incoming>
+      <outgoing>f11</outgoing>
+    </task>
+    <exclusiveGateway id="pr_gw_aprueba" name="Gerencia aprueba la excepcion?" gatewayDirection="Mixed"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFFFCC" /><bizagi:BizagiProperty name="borderColor" value="#A6A61D" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f11</incoming>
+      <outgoing>f12</outgoing>
+      <outgoing>f13</outgoing>
+    </exclusiveGateway>
+    <task id="pr_lista" name="Registrar el precio en la lista con su vigencia"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f6</incoming>
+      <incoming>f13</incoming>
+      <outgoing>f14</outgoing>
+    </task>
+    <task id="pr_visar" name="Visar la lista antes de publicarla (RN-PRC-005)"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f14</incoming>
+      <outgoing>f15</outgoing>
+    </task>
+    <task id="pr_publicar" name="Publicar la lista: el POS toma el precio de ahi, no se edita en caja"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f15</incoming>
+      <outgoing>f16</outgoing>
+    </task>
+    <task id="pr_comunicar" name="Comunicar el cambio a las sucursales antes de que rija"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f16</incoming>
+      <outgoing>f17</outgoing>
+    </task>
+    <endEvent id="pr_end" name="Precio vigente en lista"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFD9D9" /><bizagi:BizagiProperty name="borderColor" value="#C0392B" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f17</incoming>
+    </endEvent>
+
+    <sequenceFlow id="f1" sourceRef="pr_start" targetRef="pr_hallazgo" />
+    <sequenceFlow id="f2" sourceRef="pr_hallazgo" targetRef="pr_receta" />
+    <sequenceFlow id="f3" sourceRef="pr_receta" targetRef="pr_costo" />
+    <sequenceFlow id="f4" sourceRef="pr_costo" targetRef="pr_margen" />
+    <sequenceFlow id="f5" sourceRef="pr_margen" targetRef="pr_gw_margen" />
+    <sequenceFlow id="f6" name="Si alcanza" sourceRef="pr_gw_margen" targetRef="pr_lista" />
+    <sequenceFlow id="f7" name="No alcanza" sourceRef="pr_gw_margen" targetRef="pr_gw_sustento" />
+    <sequenceFlow id="f8" name="No hay" sourceRef="pr_gw_sustento" targetRef="pr_ajustar" />
+    <sequenceFlow id="f9" sourceRef="pr_ajustar" targetRef="pr_margen" />
+    <sequenceFlow id="f10" name="Si hay" sourceRef="pr_gw_sustento" targetRef="pr_escalar" />
+    <sequenceFlow id="f11" sourceRef="pr_escalar" targetRef="pr_gw_aprueba" />
+    <sequenceFlow id="f12" name="Rechaza" sourceRef="pr_gw_aprueba" targetRef="pr_ajustar" />
+    <sequenceFlow id="f13" name="Aprueba" sourceRef="pr_gw_aprueba" targetRef="pr_lista" />
+    <sequenceFlow id="f14" sourceRef="pr_lista" targetRef="pr_visar" />
+    <sequenceFlow id="f15" sourceRef="pr_visar" targetRef="pr_publicar" />
+    <sequenceFlow id="f16" sourceRef="pr_publicar" targetRef="pr_comunicar" />
+    <sequenceFlow id="f17" sourceRef="pr_comunicar" targetRef="pr_end" />
+  </process>
+  <collaboration id="Collab_1" name="DEFINICION Y REVISION DE PRECIO - Provecho ERP">
+    <participant id="Participant_COM003" name="DEFINICION Y REVISION DE PRECIO" processRef="Process_COM003" />
+  </collaboration>
+  <bpmndi:BPMNDiagram xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:omgdc="http://www.omg.org/spec/DD/20100524/DC" xmlns:omgdi="http://www.omg.org/spec/DD/20100524/DI" id="Diagram_1">
+    <bpmndi:BPMNPlane id="Plane_1" bpmnElement="Collab_1">
+      <bpmndi:BPMNShape id="DE_Participant_COM003" bpmnElement="Participant_COM003" isHorizontal="true">
+        <omgdc:Bounds x="20" y="20" width="2310" height="1010" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_Lane_Comercial" bpmnElement="Lane_Comercial" isHorizontal="true">
+        <omgdc:Bounds x="50" y="90" width="2280" height="220" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_Lane_ContabilidadP" bpmnElement="Lane_ContabilidadP" isHorizontal="true">
+        <omgdc:Bounds x="50" y="310" width="2280" height="220" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_Lane_GerenciaP" bpmnElement="Lane_GerenciaP" isHorizontal="true">
+        <omgdc:Bounds x="50" y="530" width="2280" height="220" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_Lane_IDI" bpmnElement="Lane_IDI" isHorizontal="true">
+        <omgdc:Bounds x="50" y="750" width="2280" height="220" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="DE_pr_start" bpmnElement="pr_start"><omgdc:Bounds x="90" y="185" width="30" height="30" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_pr_hallazgo" bpmnElement="pr_hallazgo"><omgdc:Bounds x="240" y="170" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_pr_receta" bpmnElement="pr_receta"><omgdc:Bounds x="390" y="830" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_pr_costo" bpmnElement="pr_costo"><omgdc:Bounds x="540" y="390" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_pr_margen" bpmnElement="pr_margen"><omgdc:Bounds x="690" y="170" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_pr_gw_margen" bpmnElement="pr_gw_margen"><omgdc:Bounds x="840" y="180" width="40" height="40" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_pr_gw_sustento" bpmnElement="pr_gw_sustento"><omgdc:Bounds x="990" y="180" width="40" height="40" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_pr_ajustar" bpmnElement="pr_ajustar"><omgdc:Bounds x="1140" y="170" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_pr_escalar" bpmnElement="pr_escalar"><omgdc:Bounds x="1140" y="170" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_pr_gw_aprueba" bpmnElement="pr_gw_aprueba"><omgdc:Bounds x="1290" y="620" width="40" height="40" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_pr_lista" bpmnElement="pr_lista"><omgdc:Bounds x="1440" y="170" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_pr_visar" bpmnElement="pr_visar"><omgdc:Bounds x="1590" y="390" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_pr_publicar" bpmnElement="pr_publicar"><omgdc:Bounds x="1740" y="170" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_pr_comunicar" bpmnElement="pr_comunicar"><omgdc:Bounds x="1890" y="170" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_pr_end" bpmnElement="pr_end"><omgdc:Bounds x="2040" y="185" width="30" height="30" /></bpmndi:BPMNShape>
+
+      <bpmndi:BPMNEdge id="DE_f1" bpmnElement="f1"><omgdi:waypoint x="120" y="200" /><omgdi:waypoint x="240" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f2" bpmnElement="f2"><omgdi:waypoint x="330" y="200" /><omgdi:waypoint x="390" y="860" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f3" bpmnElement="f3"><omgdi:waypoint x="480" y="860" /><omgdi:waypoint x="540" y="420" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f4" bpmnElement="f4"><omgdi:waypoint x="630" y="420" /><omgdi:waypoint x="690" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f5" bpmnElement="f5"><omgdi:waypoint x="780" y="200" /><omgdi:waypoint x="840" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f6" bpmnElement="f6"><omgdi:waypoint x="880" y="200" /><omgdi:waypoint x="1440" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f7" bpmnElement="f7"><omgdi:waypoint x="880" y="200" /><omgdi:waypoint x="990" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f8" bpmnElement="f8"><omgdi:waypoint x="1030" y="200" /><omgdi:waypoint x="1140" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f9" bpmnElement="f9"><omgdi:waypoint x="1230" y="200" /><omgdi:waypoint x="690" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f10" bpmnElement="f10"><omgdi:waypoint x="1030" y="200" /><omgdi:waypoint x="1140" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f11" bpmnElement="f11"><omgdi:waypoint x="1230" y="200" /><omgdi:waypoint x="1290" y="640" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f12" bpmnElement="f12"><omgdi:waypoint x="1330" y="640" /><omgdi:waypoint x="1140" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f13" bpmnElement="f13"><omgdi:waypoint x="1330" y="640" /><omgdi:waypoint x="1440" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f14" bpmnElement="f14"><omgdi:waypoint x="1530" y="200" /><omgdi:waypoint x="1590" y="420" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f15" bpmnElement="f15"><omgdi:waypoint x="1680" y="420" /><omgdi:waypoint x="1740" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f16" bpmnElement="f16"><omgdi:waypoint x="1830" y="200" /><omgdi:waypoint x="1890" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f17" bpmnElement="f17"><omgdi:waypoint x="1980" y="200" /><omgdi:waypoint x="2040" y="200" /></bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</definitions>

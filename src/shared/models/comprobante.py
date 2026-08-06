@@ -89,6 +89,25 @@ class Comprobante(Base, UuidPkMixin, TimestampMixin):
         )
     )
     idempotency_key: Mapped[str] = mapped_column(String(100), unique=True)
+    # --- Nota de crédito (tipo="nc", catálogo 09 de SUNAT) -------------------
+    # A qué comprobante corrige. Una NC sin documento afectado no existe:
+    # SUNAT la rechaza y contablemente no significa nada.
+    afecta_comprobante_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("comprobante.id"), nullable=True
+    )
+    motivo_nc: Mapped[str | None] = mapped_column(String(2), nullable=True)
+    motivo_nc_descripcion: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Qué se devolvió, cuando la NC es parcial: lista de
+    # {venta_item_id, cantidad}. NULL = la NC cubre el comprobante entero.
+    # JSONB y no tabla propia porque la fuente de verdad de las líneas sigue
+    # siendo `venta_item`: esto solo congela cuánto de cada una se acreditó.
+    detalle_nc: Mapped[list | None] = mapped_column(JsonB, nullable=True)
+    # Se llena en el comprobante AFECTADO cuando una NC total suya es
+    # aceptada. Que exista es lo que impide cobrarlo o notacreditarlo otra
+    # vez, y lo que habilita reemitir el corregido.
+    anulado_por_nc_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("comprobante.id"), nullable=True
+    )
     # --- Emisión electrónica (solo direccion=emitido) ------------------------
     # `pendiente` nace al cobrar; la cola lo lleva a `aceptado`/`rechazado`.
     # `error` = fallo de transporte, reintentable. Un comprobante recibido

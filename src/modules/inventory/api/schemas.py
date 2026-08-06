@@ -470,6 +470,76 @@ class RecetaOut(BaseModel):
     criterio_ajuste: str | None
 
 
+class SolicitudResumenOut(BaseModel):
+    articulo_id: uuid.UUID
+    articulo_nombre: str
+    sucursal_id: uuid.UUID | None
+    cantidad_total: Decimal
+    num_solicitudes: int
+
+
 class RecetaDetalleOut(RecetaOut):
     items: list[RecetaItemOut]
     costo_total: Decimal
+
+
+# --- Guía de remisión (RN-GDR-001..003) --------------------------------------
+class GuiaRemisionCreate(BaseModel):
+    """Lo que el sistema **no** puede saber del traslado: quién maneja, en
+    qué vehículo, cuánto pesa la carga y qué día arranca el viaje.
+
+    Los bienes no se piden: salen de `transferencia_item`, que es el
+    registro de lo que de verdad se descontó del origen (RN-TRP-002).
+    """
+
+    chofer_nombres: str = Field(min_length=2, max_length=120)
+    chofer_apellidos: str = Field(min_length=2, max_length=120)
+    chofer_num_doc: str = Field(min_length=8, max_length=15)
+    chofer_licencia: str = Field(min_length=6, max_length=20)
+    vehiculo_placa: str = Field(min_length=6, max_length=10)
+    peso_bruto_kg: Decimal = Field(gt=0)
+    fecha_inicio_traslado: date | None = None
+    # Catálogo 20 de SUNAT; `04` = traslado entre establecimientos propios,
+    # que es el caso de toda transferencia entre almacenes del grupo.
+    motivo_traslado: str = Field(default="04", pattern="^(01|04|13|18)$")
+    # Catálogo 18; `02` = transporte privado (vehículo del grupo).
+    modalidad_traslado: str = Field(default="02", pattern="^(01|02)$")
+    observacion: str | None = Field(default=None, max_length=500)
+
+
+class GuiaRemisionItemOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    sku_id: uuid.UUID
+    cantidad: Decimal
+    descripcion: str
+    unidad: str
+
+
+class GuiaRemisionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    empresa_id: uuid.UUID
+    transferencia_id: uuid.UUID
+    serie: str
+    correlativo: int
+    fecha_inicio_traslado: date
+    motivo_traslado: str
+    modalidad_traslado: str
+    peso_bruto_kg: Decimal
+    ruc_emisor: str
+    ruc_receptor: str
+    lugar_origen: str
+    lugar_destino: str
+    chofer_nombres: str
+    chofer_apellidos: str
+    chofer_num_doc: str
+    chofer_licencia: str
+    vehiculo_placa: str
+    estado_emision: str
+    detalle_emision: str | None
+    observacion: str | None
+
+
+class GuiaRemisionDetalleOut(GuiaRemisionOut):
+    items: list[GuiaRemisionItemOut]

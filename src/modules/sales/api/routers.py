@@ -2,8 +2,9 @@
 
 import uuid
 from datetime import date
+from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from src.core.tenant import Tenant
@@ -14,6 +15,7 @@ from src.modules.sales.application import (
     comprobantes,
     cumplimiento,
     mesas,
+    notas_credito,
     precios,
     precuenta,
     queries_publicas,
@@ -40,6 +42,7 @@ from src.modules.users.application.errors import TokenInvalido
 from src.modules.users.infrastructure.models import Usuario
 from src.shared import fechas
 from src.shared.integrations.factiliza import FactilizaError
+from src.shared.paginacion import Pagina, Paginacion, paginacion, paginar
 
 router = APIRouter(prefix="/sales", tags=["sales"])
 
@@ -54,6 +57,9 @@ DESCONTAR = "sales.aplicar_descuento"
 GESTIONAR_MESAS = "sales.gestionar_mesas"
 LEER_CLIENTES_EXTERNOS = "sales.leer_clientes_externos"
 EMITIR = "sales.emitir_comprobante"
+# Acreditar una venta cobrada devuelve plata: permiso propio, no el del
+# cajero que emitió (RN-CPP-009).
+NOTA_CREDITO = "sales.emitir_nota_credito"
 ENTREGAR = "sales.entregar_pedido"
 
 
@@ -85,23 +91,53 @@ def crear_venta(
     return venta
 
 
-@router.get("/ventas", response_model=list[schemas.VentaOut])
-def listar_ventas_del_dia(
-    sucursal_id: uuid.UUID,
-    fecha: date | None = None,
+@router.get("/ventas", response_model=Pagina[schemas.VentaOut])
+def listar_ventas(
+    sucursal_id: uuid.UUID | None = None,
+    desde: date | None = None,
+    hasta: date | None = None,
     estado: str | None = None,
+    punto_venta_id: uuid.UUID | None = None,
     _: Usuario = Depends(require_permission(LEER)),
     tenant: Tenant = Depends(get_tenant),
+    p: Paginacion = Depends(paginacion),
     session: Session = Depends(get_db),
 ):
-    """Jornada de una sucursal. Alimenta la pestaña de cobrados del PDV:
-    verificar lo vendido y reimprimir un comprobante que el cliente perdió.
+    """Ventas del alcance del usuario, filtrables por sucursal, rango de
+    fechas, estado y punto de venta.
+
+    Los defaults son la jornada de hoy en las sucursales del usuario: así el
+    PDV pide su pestaña de cobrados sin parámetros de fecha y el back-office
+    pide un histórico con `desde`/`hasta` (ambos inclusivos) por el mismo
+    endpoint, en vez de tener uno para cada uso.
     """
-    tenant.exigir_sucursal(sucursal_id)
-    return VentaRepo(session).del_dia(
-        sucursal_id=sucursal_id,
-        fecha=fecha or fechas.hoy(),
-        estados=(estado,) if estado else None,
+    if sucursal_id is not None:
+        tenant.exigir_sucursal(sucursal_id)
+        sucursales: list[uuid.UUID] | None = [sucursal_id]
+    elif tenant.superusuario:
+        # Mismo criterio que `Tenant.exigir_sucursal`, que ya lo deja pasar a
+        # cualquier sucursal: al superusuario no se le recorta el alcance, o
+        # el listado sin filtro mostraría menos que el listado con filtro.
+        sucursales = None
+    else:
+        sucursales = list(tenant.sucursal_ids)
+
+    desde = desde or fechas.hoy()
+    hasta = hasta or desde
+    if hasta < desde:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, "`hasta` no puede ser anterior a `desde`"
+        )
+    return paginar(
+        session,
+        VentaRepo(session).q_listar(
+            sucursal_ids=sucursales,
+            desde=desde,
+            hasta=hasta,
+            estados=(estado,) if estado else None,
+            punto_venta_id=punto_venta_id,
+        ),
+        p,
     )
 
 
@@ -308,6 +344,80 @@ def reintentar_emision(
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(e)) from e
     session.commit()
     return comprobante
+
+
+@router.get(
+    "/comprobantes/{comprobante_id}/descargar/{formato}", response_class=Response
+)
+def descargar_comprobante(
+    comprobante_id: uuid.UUID,
+    formato: Literal["pdf", "xml", "cdr"],
+    _: Usuario = Depends(require_permission(LEER)),
+    session: Session = Depends(get_db),
+):
+    """Baja el PDF que se entrega al cliente, o el XML firmado y el CDR que
+    son el respaldo ante SUNAT.
+
+    Se piden a Factiliza en el momento y no se archivan: su copia es la
+    buena mientras el proveedor siga activo. Devuelve los bytes tal cual —
+    reescribir un XML firmado lo invalida.
+    """
+    try:
+        documento = comprobantes.descargar_documento(session, comprobante_id, formato)
+    except FactilizaError as e:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(e)) from e
+    return Response(
+        content=documento.contenido,
+        media_type=documento.content_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{documento.nombre_archivo}"'
+        },
+    )
+
+
+@router.post(
+    "/comprobantes/{comprobante_id}/nota-credito",
+    response_model=schemas.ComprobanteOut,
+    status_code=201,
+)
+def emitir_nota_credito(
+    comprobante_id: uuid.UUID,
+    body: schemas.NotaCreditoCreate,
+    actor: Usuario = Depends(require_permission(NOTA_CREDITO)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Corrige una venta ya cobrada (RN-CPP-009). Permiso propio: acreditar
+    devuelve plata y no es acto de cajero.
+
+    Sin `detalle` la nota es total; con `detalle` acredita solo esas líneas.
+    `repone_stock` lo decide quien emite — un plato devuelto en cocina rara
+    vez devuelve el insumo, y corregir el RUC de una factura no toca el
+    inventario.
+    """
+    comprobante = ComprobanteRepo(session).get(comprobante_id)
+    if comprobante is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "comprobante no encontrado")
+    if comprobante.venta_id is not None:
+        exigir_venta(session, comprobante.venta_id, tenant)
+    try:
+        nota = notas_credito.emitir_nota_credito(
+            session,
+            comprobante_id,
+            motivo=body.motivo,
+            emitido_por=actor.id,
+            detalle=[d.model_dump() for d in body.detalle] if body.detalle else None,
+            repone_stock=body.repone_stock,
+            motivo_descripcion=body.motivo_descripcion,
+        )
+    except FactilizaError as e:
+        # Igual que al reintentar: el intento ya quedó contado en la fila y
+        # hay que persistirlo, así que este `except` decide sobre la
+        # transacción además de traducir.
+        session.commit()
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(e)) from e
+    session.commit()
+    return nota
 
 
 # --- Contrato público de lectura (marketing/comercial/análisis) -------------

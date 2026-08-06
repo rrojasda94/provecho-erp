@@ -230,7 +230,7 @@ def test_flujo_oc_completo_actualiza_stock_y_costo(env):
 
     stock = client.get(
         f"/api/v1/inventory/stock?almacen_id={ids['almacen_id']}", headers=h
-    ).json()
+    ).json()["items"]
     assert Decimal(stock[0]["cantidad"]) == Decimal("100")
 
     with TestSession() as s:

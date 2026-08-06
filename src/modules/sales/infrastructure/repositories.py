@@ -1,6 +1,7 @@
 """Repositorios SQLAlchemy del módulo sales. La sesión es la Unit of Work."""
 
 import uuid
+from collections.abc import Collection
 from datetime import date
 from decimal import Decimal
 
@@ -67,6 +68,39 @@ class VentaRepo:
             )
         )
 
+    def q_listar(
+        self,
+        *,
+        sucursal_ids: Collection[uuid.UUID] | None,
+        desde: date,
+        hasta: date,
+        estados: tuple[str, ...] | None = None,
+        punto_venta_id: uuid.UUID | None = None,
+    ):
+        """Ventas de un rango de fechas, sin ejecutar: el router la pagina
+        (ADR-026). Base de la pestaña de cobrados del PDV, del cierre de caja
+        y del histórico de back-office.
+
+        `sucursal_ids=None` es *sin filtro de sucursal* — solo lo usa el
+        superusuario, que no tiene alcance que recortar. Una lista vacía sí
+        filtra y no devuelve nada, que es lo correcto para un usuario sin
+        sucursales asignadas.
+
+        Ordena por `(fecha, número de orden)` y no solo por el número: el
+        correlativo reinicia cada día en cada sucursal, así que ordenar por
+        número mezclaría jornadas apenas el rango pase de un día.
+        """
+        q = select(Venta).where(
+            Venta.fecha_orden >= desde, Venta.fecha_orden <= hasta
+        )
+        if sucursal_ids is not None:
+            q = q.where(Venta.sucursal_id.in_(sucursal_ids))
+        if estados:
+            q = q.where(Venta.estado.in_(estados))
+        if punto_venta_id is not None:
+            q = q.where(Venta.punto_venta_id == punto_venta_id)
+        return q.order_by(Venta.fecha_orden, Venta.numero_orden)
+
     def del_dia(
         self,
         *,
@@ -75,17 +109,17 @@ class VentaRepo:
         estados: tuple[str, ...] | None = None,
         punto_venta_id: uuid.UUID | None = None,
     ) -> list[Venta]:
-        """Ventas de una jornada. Base de la pestaña de cobrados del PDV y
-        del cierre de caja: sin esto el cajero no puede verificar lo vendido
-        ni reenviar un comprobante que el cliente perdió."""
-        q = select(Venta).where(
-            Venta.sucursal_id == sucursal_id, Venta.fecha_orden == fecha
+        return list(
+            self.s.scalars(
+                self.q_listar(
+                    sucursal_ids=[sucursal_id],
+                    desde=fecha,
+                    hasta=fecha,
+                    estados=estados,
+                    punto_venta_id=punto_venta_id,
+                )
+            )
         )
-        if estados:
-            q = q.where(Venta.estado.in_(estados))
-        if punto_venta_id is not None:
-            q = q.where(Venta.punto_venta_id == punto_venta_id)
-        return list(self.s.scalars(q.order_by(Venta.numero_orden)))
 
 
 class PagoRepo:
@@ -365,6 +399,28 @@ class ComprobanteRepo:
                 .where(Comprobante.venta_id == venta_id)
                 .order_by(Comprobante.grupo_cobro)
             )
+        )
+
+    def notas_de_credito_de(self, comprobante_id: uuid.UUID) -> list[Comprobante]:
+        """Las notas que acreditan este comprobante, en orden de emisión."""
+        return list(
+            self.s.scalars(
+                select(Comprobante)
+                .where(Comprobante.afecta_comprobante_id == comprobante_id)
+                .order_by(Comprobante.created_at)
+            )
+        )
+
+    def cuantas_nc(self, comprobante_id: uuid.UUID) -> int:
+        """Incluye las rechazadas: la clave de idempotencia cuenta intentos
+        de documento, no documentos válidos."""
+        return (
+            self.s.scalar(
+                select(func.count()).where(
+                    Comprobante.afecta_comprobante_id == comprobante_id
+                )
+            )
+            or 0
         )
 
     def siguiente_correlativo(self, empresa_id: uuid.UUID, serie: str) -> int:

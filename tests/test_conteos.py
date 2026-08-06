@@ -381,7 +381,7 @@ def test_cerrar_genera_ajuste_por_diferencia(env):
 
     # El conteo no movió stock: el ajuste sigue pendiente de aprobación.
     stock = client.get(
-        f"/api/v1/inventory/stock?almacen_id={ids['almacen_id']}", headers=h).json()
+        f"/api/v1/inventory/stock?almacen_id={ids['almacen_id']}", headers=h).json()["items"]
     assert Decimal(next(
         s["cantidad"] for s in stock if s["sku_id"] == ids["sku_queso"])) == Decimal("10")
 
@@ -492,7 +492,7 @@ def test_el_ajuste_del_conteo_lo_aprueba_otro_usuario(env):
     assert r.status_code == 200, r.text
     stock = client.get(
         f"/api/v1/inventory/stock?almacen_id={ids['almacen_id']}", headers=h_admin
-    ).json()
+    ).json()["items"]
     assert Decimal(next(
         s["cantidad"] for s in stock if s["sku_id"] == ids["sku_queso"])) == Decimal("8")
 

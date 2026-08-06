@@ -24,6 +24,12 @@ class PuntoVenta(Base, UuidPkMixin, TimestampMixin):
     # copia el valor vigente al emitir (snapshot inmutable).
     serie_boleta: Mapped[str] = mapped_column(String(10))
     serie_factura: Mapped[str] = mapped_column(String(10))
+    # La nota de crédito numera aparte del documento que corrige: mezclarlas
+    # en la misma serie es rechazo de SUNAT. Nullable porque los puntos de
+    # venta que ya existían no las tenían; sin serie, el ERP no emite NC de
+    # ese tipo y lo dice.
+    serie_nc_boleta: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    serie_nc_factura: Mapped[str | None] = mapped_column(String(10), nullable=True)
     # Array `mesa`|`takeout`|`delivery` (RN-MDC-001).
     modalidades_habilitadas: Mapped[list | None] = mapped_column(JsonB, nullable=True)
     # Ej. delivery exige dirección (RN-MDC-002).

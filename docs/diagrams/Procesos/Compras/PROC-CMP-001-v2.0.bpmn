@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="Definitions_CMP001" targetNamespace="http://www.bizagi.com/definitions/_cmp001_provecho" xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL">
+  <process id="Process_CMP001" name="COMPRAS">
+    <documentation>Alcance: desde que se detecta la necesidad (punto de reorden, requerimiento de area, activo nuevo) hasta que Contabilidad ejecuta el pago al proveedor. v2.0 introduce los tres caminos de compra y traslada la ejecucion del pago a Contabilidad. Camino 1: proveedor informal, sin OC, con caja chica. Camino 2: proveedor de confianza recurrente, OC directa sin cotizacion comparativa; la comparacion vuelve en la evaluacion periodica del proveedor, no en cada compra. Camino 3: compra estandar o de activo, con RFQ y aprobacion sobre el umbral. Ninguna sucursal compra directo a proveedor externo por su cuenta. La aprobacion de OC sobre el umbral es del administrador (decision 2026-08-05): el suplente es otro administrador.</documentation>
+    <laneSet id="LaneSet_1">
+      <lane id="Lane_Solicitante" name="Area solicitante / Almacen"><childLaneSet id="cls_Lane_Solicitante" /></lane>
+      <lane id="Lane_Compras" name="Encargado de compras"><childLaneSet id="cls_Lane_Compras" /></lane>
+      <lane id="Lane_AdminC" name="Administrador"><childLaneSet id="cls_Lane_AdminC" /></lane>
+      <lane id="Lane_Proveedor" name="Proveedor"><childLaneSet id="cls_Lane_Proveedor" /></lane>
+      <lane id="Lane_ContabilidadC" name="Contabilidad"><childLaneSet id="cls_Lane_ContabilidadC" /></lane>
+    </laneSet>
+
+    <startEvent id="cm_start" name="Necesidad detectada"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#E6FF97" /><bizagi:BizagiProperty name="borderColor" value="#62A716" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <outgoing>f1</outgoing>
+    </startEvent>
+    <task id="cm_requerimiento" name="Registrar el requerimiento con articulo, cantidad y fecha"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f1</incoming>
+      <outgoing>f2</outgoing>
+    </task>
+    <exclusiveGateway id="cm_gw_camino" name="Que camino de compra corresponde?" gatewayDirection="Mixed"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFFFCC" /><bizagi:BizagiProperty name="borderColor" value="#A6A61D" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f2</incoming>
+      <outgoing>f3</outgoing>
+      <outgoing>f6</outgoing>
+    </exclusiveGateway>
+    <task id="cm_informal" name="Comprar a proveedor informal y sustentar con boleta o factura"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f3</incoming>
+      <outgoing>f4</outgoing>
+    </task>
+    <task id="cm_caja_chica" name="Pagar con caja chica de compras y rendir"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f4</incoming>
+      <outgoing>f5</outgoing>
+    </task>
+    <exclusiveGateway id="cm_gw_nuevo" name="Proveedor nuevo?" gatewayDirection="Mixed"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFFFCC" /><bizagi:BizagiProperty name="borderColor" value="#A6A61D" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f6</incoming>
+      <outgoing>f7</outgoing>
+      <outgoing>f9</outgoing>
+    </exclusiveGateway>
+    <task id="cm_alta" name="Dar de alta y evaluar al proveedor"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f7</incoming>
+      <outgoing>f8</outgoing>
+    </task>
+    <task id="cm_rfq" name="Solicitar cotizacion (RFQ) a uno o mas proveedores"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f8</incoming>
+      <incoming>f9</incoming>
+      <outgoing>f10</outgoing>
+    </task>
+    <task id="cm_cotizar" name="Cotizar"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f10</incoming>
+      <outgoing>f11</outgoing>
+    </task>
+    <exclusiveGateway id="cm_gw_activo" name="Es activo o equipamiento?" gatewayDirection="Mixed"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFFFCC" /><bizagi:BizagiProperty name="borderColor" value="#A6A61D" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f11</incoming>
+      <outgoing>f12</outgoing>
+      <outgoing>f14</outgoing>
+    </exclusiveGateway>
+    <task id="cm_validar_activo" name="Validar especificaciones con el area solicitante y con Gerencia"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f12</incoming>
+      <outgoing>f13</outgoing>
+    </task>
+    <task id="cm_emitir_oc" name="Emitir la orden de compra"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f13</incoming>
+      <incoming>f14</incoming>
+      <outgoing>f15</outgoing>
+    </task>
+    <exclusiveGateway id="cm_gw_umbral" name="Supera el umbral de aprobacion?" gatewayDirection="Mixed"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFFFCC" /><bizagi:BizagiProperty name="borderColor" value="#A6A61D" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f15</incoming>
+      <outgoing>f16</outgoing>
+      <outgoing>f18</outgoing>
+    </exclusiveGateway>
+    <task id="cm_aprobar" name="Aprobar la OC (permiso purchases.aprobar, solo administrador)"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f16</incoming>
+      <outgoing>f17</outgoing>
+    </task>
+    <task id="cm_enviar" name="Enviar la OC al proveedor"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f17</incoming>
+      <incoming>f18</incoming>
+      <outgoing>f19</outgoing>
+    </task>
+    <task id="cm_despachar" name="Despachar la mercaderia con su comprobante"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f19</incoming>
+      <outgoing>f20</outgoing>
+    </task>
+    <task id="cm_recibir" name="Recibir en almacen central: cantidad, lote y vencimiento"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f20</incoming>
+      <outgoing>f21</outgoing>
+    </task>
+    <exclusiveGateway id="cm_gw_conforme" name="Recepcion conforme?" gatewayDirection="Mixed"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFFFCC" /><bizagi:BizagiProperty name="borderColor" value="#A6A61D" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f21</incoming>
+      <outgoing>f22</outgoing>
+      <outgoing>f24</outgoing>
+    </exclusiveGateway>
+    <task id="cm_reclamo" name="Registrar la diferencia y gestionar el reclamo con el proveedor"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f22</incoming>
+      <outgoing>f23</outgoing>
+    </task>
+    <task id="cm_conformidad" name="Dar conformidad y registrar el comprobante recibido"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f23</incoming>
+      <incoming>f24</incoming>
+      <outgoing>f25</outgoing>
+    </task>
+    <task id="cm_cola_pago" name="Recibir el comprobante conforme en la cola de pago"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f25</incoming>
+      <outgoing>f26</outgoing>
+    </task>
+    <task id="cm_pagar" name="Ejecutar el pago en el plazo de la ficha del proveedor"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f26</incoming>
+      <outgoing>f27</outgoing>
+    </task>
+    <endEvent id="cm_end" name="Proveedor pagado y asiento generado"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFD9D9" /><bizagi:BizagiProperty name="borderColor" value="#C0392B" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f27</incoming>
+    </endEvent>
+    <endEvent id="cm_end_cc" name="Compra menor rendida con caja chica"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFD9D9" /><bizagi:BizagiProperty name="borderColor" value="#C0392B" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f5</incoming>
+    </endEvent>
+
+    <sequenceFlow id="f1" sourceRef="cm_start" targetRef="cm_requerimiento" />
+    <sequenceFlow id="f2" sourceRef="cm_requerimiento" targetRef="cm_gw_camino" />
+    <sequenceFlow id="f3" name="1: proveedor informal" sourceRef="cm_gw_camino" targetRef="cm_informal" />
+    <sequenceFlow id="f4" sourceRef="cm_informal" targetRef="cm_caja_chica" />
+    <sequenceFlow id="f5" sourceRef="cm_caja_chica" targetRef="cm_end_cc" />
+    <sequenceFlow id="f6" name="2 y 3: con OC" sourceRef="cm_gw_camino" targetRef="cm_gw_nuevo" />
+    <sequenceFlow id="f7" name="Si" sourceRef="cm_gw_nuevo" targetRef="cm_alta" />
+    <sequenceFlow id="f8" sourceRef="cm_alta" targetRef="cm_rfq" />
+    <sequenceFlow id="f9" name="No, ya evaluado" sourceRef="cm_gw_nuevo" targetRef="cm_rfq" />
+    <sequenceFlow id="f10" sourceRef="cm_rfq" targetRef="cm_cotizar" />
+    <sequenceFlow id="f11" sourceRef="cm_cotizar" targetRef="cm_gw_activo" />
+    <sequenceFlow id="f12" name="Si" sourceRef="cm_gw_activo" targetRef="cm_validar_activo" />
+    <sequenceFlow id="f13" sourceRef="cm_validar_activo" targetRef="cm_emitir_oc" />
+    <sequenceFlow id="f14" name="No" sourceRef="cm_gw_activo" targetRef="cm_emitir_oc" />
+    <sequenceFlow id="f15" sourceRef="cm_emitir_oc" targetRef="cm_gw_umbral" />
+    <sequenceFlow id="f16" name="Supera" sourceRef="cm_gw_umbral" targetRef="cm_aprobar" />
+    <sequenceFlow id="f17" sourceRef="cm_aprobar" targetRef="cm_enviar" />
+    <sequenceFlow id="f18" name="No supera" sourceRef="cm_gw_umbral" targetRef="cm_enviar" />
+    <sequenceFlow id="f19" sourceRef="cm_enviar" targetRef="cm_despachar" />
+    <sequenceFlow id="f20" sourceRef="cm_despachar" targetRef="cm_recibir" />
+    <sequenceFlow id="f21" sourceRef="cm_recibir" targetRef="cm_gw_conforme" />
+    <sequenceFlow id="f22" name="No" sourceRef="cm_gw_conforme" targetRef="cm_reclamo" />
+    <sequenceFlow id="f23" name="Por lo recibido" sourceRef="cm_reclamo" targetRef="cm_conformidad" />
+    <sequenceFlow id="f24" name="Si" sourceRef="cm_gw_conforme" targetRef="cm_conformidad" />
+    <sequenceFlow id="f25" sourceRef="cm_conformidad" targetRef="cm_cola_pago" />
+    <sequenceFlow id="f26" sourceRef="cm_cola_pago" targetRef="cm_pagar" />
+    <sequenceFlow id="f27" sourceRef="cm_pagar" targetRef="cm_end" />
+  </process>
+  <collaboration id="Collab_1" name="COMPRAS - Provecho ERP">
+    <participant id="Participant_CMP001" name="COMPRAS" processRef="Process_CMP001" />
+  </collaboration>
+  <bpmndi:BPMNDiagram xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:omgdc="http://www.omg.org/spec/DD/20100524/DC" xmlns:omgdi="http://www.omg.org/spec/DD/20100524/DI" id="Diagram_1">
+    <bpmndi:BPMNPlane id="Plane_1" bpmnElement="Collab_1">
+      <bpmndi:BPMNShape id="DE_Participant_CMP001" bpmnElement="Participant_CMP001" isHorizontal="true">
+        <omgdc:Bounds x="20" y="20" width="3210" height="1230" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_Lane_Solicitante" bpmnElement="Lane_Solicitante" isHorizontal="true">
+        <omgdc:Bounds x="50" y="90" width="3180" height="220" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_Lane_Compras" bpmnElement="Lane_Compras" isHorizontal="true">
+        <omgdc:Bounds x="50" y="310" width="3180" height="220" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_Lane_AdminC" bpmnElement="Lane_AdminC" isHorizontal="true">
+        <omgdc:Bounds x="50" y="530" width="3180" height="220" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_Lane_Proveedor" bpmnElement="Lane_Proveedor" isHorizontal="true">
+        <omgdc:Bounds x="50" y="750" width="3180" height="220" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_Lane_ContabilidadC" bpmnElement="Lane_ContabilidadC" isHorizontal="true">
+        <omgdc:Bounds x="50" y="970" width="3180" height="220" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="DE_cm_start" bpmnElement="cm_start"><omgdc:Bounds x="90" y="185" width="30" height="30" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cm_requerimiento" bpmnElement="cm_requerimiento"><omgdc:Bounds x="240" y="170" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cm_gw_camino" bpmnElement="cm_gw_camino"><omgdc:Bounds x="390" y="400" width="40" height="40" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cm_informal" bpmnElement="cm_informal"><omgdc:Bounds x="540" y="390" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cm_caja_chica" bpmnElement="cm_caja_chica"><omgdc:Bounds x="690" y="390" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cm_gw_nuevo" bpmnElement="cm_gw_nuevo"><omgdc:Bounds x="540" y="400" width="40" height="40" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cm_alta" bpmnElement="cm_alta"><omgdc:Bounds x="690" y="390" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cm_rfq" bpmnElement="cm_rfq"><omgdc:Bounds x="840" y="390" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cm_cotizar" bpmnElement="cm_cotizar"><omgdc:Bounds x="990" y="830" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cm_gw_activo" bpmnElement="cm_gw_activo"><omgdc:Bounds x="1140" y="400" width="40" height="40" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cm_validar_activo" bpmnElement="cm_validar_activo"><omgdc:Bounds x="1290" y="610" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cm_emitir_oc" bpmnElement="cm_emitir_oc"><omgdc:Bounds x="1440" y="390" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cm_gw_umbral" bpmnElement="cm_gw_umbral"><omgdc:Bounds x="1590" y="400" width="40" height="40" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cm_aprobar" bpmnElement="cm_aprobar"><omgdc:Bounds x="1740" y="610" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cm_enviar" bpmnElement="cm_enviar"><omgdc:Bounds x="1890" y="390" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cm_despachar" bpmnElement="cm_despachar"><omgdc:Bounds x="2040" y="830" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cm_recibir" bpmnElement="cm_recibir"><omgdc:Bounds x="2190" y="170" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cm_gw_conforme" bpmnElement="cm_gw_conforme"><omgdc:Bounds x="2340" y="180" width="40" height="40" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cm_reclamo" bpmnElement="cm_reclamo"><omgdc:Bounds x="2490" y="390" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cm_conformidad" bpmnElement="cm_conformidad"><omgdc:Bounds x="2490" y="390" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cm_cola_pago" bpmnElement="cm_cola_pago"><omgdc:Bounds x="2640" y="1050" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cm_pagar" bpmnElement="cm_pagar"><omgdc:Bounds x="2790" y="1050" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cm_end" bpmnElement="cm_end"><omgdc:Bounds x="2940" y="1065" width="30" height="30" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_cm_end_cc" bpmnElement="cm_end_cc"><omgdc:Bounds x="840" y="405" width="30" height="30" /></bpmndi:BPMNShape>
+
+      <bpmndi:BPMNEdge id="DE_f1" bpmnElement="f1"><omgdi:waypoint x="120" y="200" /><omgdi:waypoint x="240" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f2" bpmnElement="f2"><omgdi:waypoint x="330" y="200" /><omgdi:waypoint x="390" y="420" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f3" bpmnElement="f3"><omgdi:waypoint x="430" y="420" /><omgdi:waypoint x="540" y="420" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f4" bpmnElement="f4"><omgdi:waypoint x="630" y="420" /><omgdi:waypoint x="690" y="420" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f5" bpmnElement="f5"><omgdi:waypoint x="780" y="420" /><omgdi:waypoint x="840" y="420" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f6" bpmnElement="f6"><omgdi:waypoint x="430" y="420" /><omgdi:waypoint x="540" y="420" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f7" bpmnElement="f7"><omgdi:waypoint x="580" y="420" /><omgdi:waypoint x="690" y="420" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f8" bpmnElement="f8"><omgdi:waypoint x="780" y="420" /><omgdi:waypoint x="840" y="420" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f9" bpmnElement="f9"><omgdi:waypoint x="580" y="420" /><omgdi:waypoint x="840" y="420" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f10" bpmnElement="f10"><omgdi:waypoint x="930" y="420" /><omgdi:waypoint x="990" y="860" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f11" bpmnElement="f11"><omgdi:waypoint x="1080" y="860" /><omgdi:waypoint x="1140" y="420" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f12" bpmnElement="f12"><omgdi:waypoint x="1180" y="420" /><omgdi:waypoint x="1290" y="640" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f13" bpmnElement="f13"><omgdi:waypoint x="1380" y="640" /><omgdi:waypoint x="1440" y="420" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f14" bpmnElement="f14"><omgdi:waypoint x="1180" y="420" /><omgdi:waypoint x="1440" y="420" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f15" bpmnElement="f15"><omgdi:waypoint x="1530" y="420" /><omgdi:waypoint x="1590" y="420" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f16" bpmnElement="f16"><omgdi:waypoint x="1630" y="420" /><omgdi:waypoint x="1740" y="640" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f17" bpmnElement="f17"><omgdi:waypoint x="1830" y="640" /><omgdi:waypoint x="1890" y="420" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f18" bpmnElement="f18"><omgdi:waypoint x="1630" y="420" /><omgdi:waypoint x="1890" y="420" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f19" bpmnElement="f19"><omgdi:waypoint x="1980" y="420" /><omgdi:waypoint x="2040" y="860" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f20" bpmnElement="f20"><omgdi:waypoint x="2130" y="860" /><omgdi:waypoint x="2190" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f21" bpmnElement="f21"><omgdi:waypoint x="2280" y="200" /><omgdi:waypoint x="2340" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f22" bpmnElement="f22"><omgdi:waypoint x="2380" y="200" /><omgdi:waypoint x="2490" y="420" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f23" bpmnElement="f23"><omgdi:waypoint x="2580" y="420" /><omgdi:waypoint x="2490" y="420" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f24" bpmnElement="f24"><omgdi:waypoint x="2380" y="200" /><omgdi:waypoint x="2490" y="420" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f25" bpmnElement="f25"><omgdi:waypoint x="2580" y="420" /><omgdi:waypoint x="2640" y="1080" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f26" bpmnElement="f26"><omgdi:waypoint x="2730" y="1080" /><omgdi:waypoint x="2790" y="1080" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f27" bpmnElement="f27"><omgdi:waypoint x="2880" y="1080" /><omgdi:waypoint x="2940" y="1080" /></bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</definitions>

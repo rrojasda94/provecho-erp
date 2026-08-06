@@ -1,7 +1,8 @@
 """Modelos del módulo inventory — bloque transversal, base de productos,
 stock/movimientos/ajuste, lote/FEFO, conteo cíclico y el ciclo
-solicitud → reserva → transferencia → recepción (data-model §1, §3, §4).
-`devolucion`, `guia_remision` y `stock_merma` van en slices posteriores.
+solicitud → reserva → transferencia → recepción con su guía de remisión
+(data-model §1, §3, §4). `devolucion` y `stock_merma` van en slices
+posteriores.
 """
 
 from src.modules.inventory.infrastructure.models.ajuste import Ajuste
@@ -10,6 +11,10 @@ from src.modules.inventory.infrastructure.models.categoria import Categoria
 from src.modules.inventory.infrastructure.models.categoria_udm import CategoriaUdm
 from src.modules.inventory.infrastructure.models.conteo import Conteo
 from src.modules.inventory.infrastructure.models.conteo_item import ConteoItem
+from src.modules.inventory.infrastructure.models.guia_remision import GuiaRemision
+from src.modules.inventory.infrastructure.models.guia_remision_item import (
+    GuiaRemisionItem,
+)
 from src.modules.inventory.infrastructure.models.lote import Lote
 from src.modules.inventory.infrastructure.models.movimiento_inventario import (
     MovimientoInventario,
@@ -37,6 +42,8 @@ __all__ = [
     "CategoriaUdm",
     "Conteo",
     "ConteoItem",
+    "GuiaRemision",
+    "GuiaRemisionItem",
     "Lote",
     "MovimientoInventario",
     "Receta",

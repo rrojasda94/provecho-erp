@@ -52,10 +52,11 @@ export const MODULOS: Modulo[] = [
   {
     clave: "ventas",
     nombre: "Ventas",
-    descripcion: "Punto de venta, mesas y cobro",
-    // El PDV es pantalla completa a propósito (ADR-013: táctil, sin sidebar)
-    // — no vive bajo el shell (app), va directo fuera de él.
-    href: "/pdv",
+    descripcion: "Jornada, comprobantes y punto de venta",
+    // Entra por el back-office (jornada de la sucursal) y desde su sidebar se
+    // abre el PDV, que es pantalla completa táctil fuera del shell (ADR-013).
+    // Al revés —tile directo al PDV— dejaba sin puerta a lo administrativo.
+    href: "/ventas",
     prefijoPermiso: "sales.",
     icono: "🛒",
   },

@@ -177,4 +177,33 @@ resuelve tenant y permisos → endpoint autoriza acción → auditoría registra
 ## Relaciones
 
 - Publica: `users.usuario_creado`, `users.sesion_iniciada`.
+- Escucha: `sales.pedido_demorado` → crea la `notificacion` para el
+  encargado de turno (`application/listeners.py`).
 - Todos los módulos dependen de este para autorización y auditoría (vía core, no import directo).
+
+## Notificaciones
+
+`users` es el dueño del **destinatario**, así que es el módulo que sabe a
+quién avisarle. Los que publican el hecho no conocen al encargado de turno
+ni a la bandeja: publican qué pasó y siguen.
+
+`notificacion` es **bandeja, no transporte**. La fila se crea siempre y el
+frontend la consulta (`GET /notificaciones`, `POST /notificaciones/{id}/leer`,
+`POST /notificaciones/leer-todas`, todos sin `require_permission` a
+propósito: cada uno ve lo suyo y el filtro es la identidad, no un rol).
+Empujarla a un teléfono es una capa que todavía no existe, y cuando exista
+leerá de esta tabla en vez de reemplazarla — un aviso que solo viajó por
+push no deja rastro de si alguien lo vio.
+
+**A quién le llega** lo decide `notificaciones.destinatarios_de_sucursal`, y
+ese es el único punto a tocar cuando haya que hacerlo configurable:
+
+1. El **encargado de turno**, derivado del `relevo_encargado_id` de la caja
+   abierta (contrato público de `accounting`). No hizo falta una entidad
+   "turno": ese dato ya se registra al abrir caja (RN-MDP-002) y es
+   exactamente la persona a cargo del local en ese momento.
+2. Sin caja abierta (local cerrado, o abrieron sin registrarla), los
+   `supervisor`/`admin` asignados a esa sucursal. Un aviso sin destinatario
+   es un aviso perdido: prefiere avisarle a alguien de más que a nadie.
+3. Si no hay nadie, se registra en el log y se sigue — no poder avisar nunca
+   tumba la operación que originó el aviso.

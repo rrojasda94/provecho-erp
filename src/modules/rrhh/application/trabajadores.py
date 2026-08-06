@@ -85,6 +85,11 @@ def listar_trabajadores(session: Session, empresa_id: uuid.UUID | None = None) -
     return TrabajadorRepo(session).list(empresa_id)
 
 
+def q_trabajadores(session: Session, empresa_id: uuid.UUID | None = None):
+    """La consulta sin ejecutar, para que el router la pagine (ADR-026)."""
+    return TrabajadorRepo(session).q_list(empresa_id)
+
+
 def actualizar_trabajador(session: Session, trabajador_id: uuid.UUID, **campos) -> Trabajador:
     trabajador = TrabajadorRepo(session).get(trabajador_id)
     if trabajador is None:

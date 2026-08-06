@@ -15,9 +15,12 @@ from src.modules.accounting.application.errors import NoEncontrado
 from src.modules.accounting.infrastructure.models import (
     AperturaCaja,
     Asiento,
+    CierreCaja,
     CuentaContable,
+    CustodiaEfectivo,
     MovimientoDinero,
     PeriodoContable,
+    PosTarjeta,
 )
 from src.modules.sales.application.queries_publicas import sucursal_de_punto_venta
 
@@ -77,3 +80,33 @@ def exigir_apertura_caja(
         raise NoEncontrado("apertura de caja no encontrada")
     exigir_punto_venta(session, apertura.punto_venta_id, tenant)
     return apertura
+
+
+def exigir_cierre_caja(
+    session: Session, cierre_id: uuid.UUID, tenant: Tenant
+) -> CierreCaja:
+    cierre = session.get(CierreCaja, cierre_id)
+    if cierre is None:
+        raise NoEncontrado("cierre de caja no encontrado")
+    exigir_apertura_caja(session, cierre.apertura_caja_id, tenant)
+    return cierre
+
+
+def exigir_custodia(
+    session: Session, custodia_id: uuid.UUID, tenant: Tenant
+) -> CustodiaEfectivo:
+    custodia = session.get(CustodiaEfectivo, custodia_id)
+    if custodia is None:
+        raise NoEncontrado("custodia de efectivo no encontrada")
+    exigir_apertura_caja(session, custodia.apertura_caja_id, tenant)
+    return custodia
+
+
+def exigir_pos_tarjeta(
+    session: Session, pos_id: uuid.UUID, tenant: Tenant
+) -> PosTarjeta:
+    pos = session.get(PosTarjeta, pos_id)
+    if pos is None:
+        raise NoEncontrado("POS de tarjeta no encontrado")
+    tenant.exigir_empresa(pos.empresa_id)
+    return pos

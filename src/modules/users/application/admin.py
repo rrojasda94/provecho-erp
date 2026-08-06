@@ -13,10 +13,12 @@ from src.modules.users.application.errors import (
 from src.modules.users.domain import rules
 from src.modules.users.infrastructure.models import (
     Almacen,
+    Marca,
     Permiso,
     Persona,
     Rol,
     RolPermiso,
+    Sucursal,
     Usuario,
     UsuarioRol,
     UsuarioSucursal,
@@ -24,9 +26,11 @@ from src.modules.users.infrastructure.models import (
 from src.modules.users.infrastructure.repositories import (
     AlmacenRepo,
     AuditLogRepo,
+    MarcaRepo,
     PermisoRepo,
     PersonaRepo,
     RolRepo,
+    SucursalRepo,
     UsuarioRepo,
 )
 from src.modules.users.infrastructure.security import hash_pin
@@ -89,6 +93,11 @@ def listar_usuarios(session: Session) -> list[Usuario]:
     return UsuarioRepo(session).list()
 
 
+def q_usuarios(session: Session):
+    """La consulta sin ejecutar, para que el router la pagine (ADR-026)."""
+    return UsuarioRepo(session).q_list()
+
+
 # --- Persona (party model, RN-GEN-007) --------------------------------------
 def crear_persona(
     session: Session,
@@ -127,9 +136,24 @@ def listar_personas(session: Session, q: str | None = None) -> list[Persona]:
     return PersonaRepo(session).list(q)
 
 
+def q_personas(session: Session, q: str | None = None):
+    """La consulta sin ejecutar, para que el router la pagine (ADR-026)."""
+    return PersonaRepo(session).q_list(q)
+
+
 # --- Organización (Almacen vive acá por historia, ver data-model §1) --------
 def listar_almacenes(session: Session, empresa_id: uuid.UUID | None = None) -> list[Almacen]:
     return AlmacenRepo(session).list(empresa_id)
+
+
+def listar_marcas(session: Session, empresa_id: uuid.UUID | None = None) -> list[Marca]:
+    return MarcaRepo(session).list(empresa_id)
+
+
+def listar_sucursales(
+    session: Session, empresa_id: uuid.UUID | None = None
+) -> list[Sucursal]:
+    return SucursalRepo(session).list(empresa_id)
 
 
 def editar_persona(
@@ -164,6 +188,16 @@ def crear_rol(
 
 def listar_roles(session: Session) -> list[Rol]:
     return RolRepo(session).list()
+
+
+def roles_de_usuario(session: Session, usuario_id: uuid.UUID) -> list[Rol]:
+    _get(UsuarioRepo(session).get(usuario_id), "usuario")
+    return UsuarioRepo(session).roles_de(usuario_id)
+
+
+def permisos_de_rol(session: Session, rol_id: uuid.UUID) -> list[Permiso]:
+    _get(RolRepo(session).get(rol_id), "rol")
+    return RolRepo(session).permisos_de(rol_id)
 
 
 # --- Permisos ---------------------------------------------------------------

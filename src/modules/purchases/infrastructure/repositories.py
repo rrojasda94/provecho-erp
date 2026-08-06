@@ -22,11 +22,15 @@ class ProveedorRepo:
     def get(self, proveedor_id: uuid.UUID) -> Proveedor | None:
         return self.s.get(Proveedor, proveedor_id)
 
-    def list(self, empresa_id: uuid.UUID | None = None) -> list[Proveedor]:
+    def q_list(self, empresa_id: uuid.UUID | None = None):
+        """La consulta, sin ejecutar: el router la pagina (ADR-026)."""
         q = select(Proveedor).where(Proveedor.deleted_at.is_(None))
         if empresa_id is not None:
             q = q.where(Proveedor.empresa_id == empresa_id)
-        return list(self.s.scalars(q))
+        return q.order_by(Proveedor.razon_social)
+
+    def list(self, empresa_id: uuid.UUID | None = None) -> list[Proveedor]:
+        return list(self.s.scalars(self.q_list(empresa_id)))
 
     def add(self, proveedor: Proveedor) -> Proveedor:
         self.s.add(proveedor)
@@ -60,7 +64,7 @@ class OrdenCompraRepo:
         self.s.flush()
         return orden
 
-    def list(self, empresa_id: uuid.UUID | None = None) -> list[OrdenCompra]:
+    def q_list(self, empresa_id: uuid.UUID | None = None):
         # `orden_compra` no tiene empresa_id propio — el tenant sale de su
         # almacén destino (mismo patrón que `application/scope.py`).
         stmt = select(OrdenCompra).order_by(OrdenCompra.created_at.desc())
@@ -68,7 +72,10 @@ class OrdenCompraRepo:
             stmt = stmt.join(Almacen, Almacen.id == OrdenCompra.almacen_destino_id).where(
                 Almacen.empresa_id == empresa_id
             )
-        return list(self.s.scalars(stmt))
+        return stmt
+
+    def list(self, empresa_id: uuid.UUID | None = None) -> list[OrdenCompra]:
+        return list(self.s.scalars(self.q_list(empresa_id)))
 
 
 class RecepcionCompraRepo:

@@ -2,7 +2,7 @@
 
 import uuid
 
-from fastapi import APIRouter, Depends, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
 from src.core.rate_limit import rate_limit_login
@@ -22,6 +22,7 @@ from src.modules.users.application import (
     auth,
     autorizacion,
     gerencia,
+    notificaciones,
     privacidad,
 )
 from src.modules.users.application.errors import (
@@ -32,6 +33,7 @@ from src.modules.users.application.errors import (
 from src.modules.users.infrastructure.models import Usuario
 from src.modules.users.infrastructure.repositories import UsuarioRepo
 from src.shared import parametros
+from src.shared.paginacion import Pagina, Paginacion, paginacion, paginar
 
 router = APIRouter()
 
@@ -157,13 +159,14 @@ def crear_persona(
     return persona
 
 
-@router.get("/personas", response_model=list[schemas.PersonaOut], tags=["personas"])
+@router.get("/personas", response_model=Pagina[schemas.PersonaOut], tags=["personas"])
 def listar_personas(
     q: str | None = None,
     _: Usuario = Depends(require_permission(GESTIONAR)),
+    p: Paginacion = Depends(paginacion),
     session: Session = Depends(get_db),
 ):
-    return admin.listar_personas(session, q)
+    return paginar(session, admin.q_personas(session, q), p)
 
 
 @router.get(
@@ -197,6 +200,85 @@ def listar_almacenes(
     a propósito: no es un recurso a proteger, es un catálogo de apoyo. Sí
     escopada por tenant — un almacén de otra empresa no es "no sensible"."""
     return admin.listar_almacenes(session, tenant.filtro_empresa(empresa_id))
+
+
+@router.get("/marcas", response_model=list[schemas.MarcaOut], tags=["users"])
+def listar_marcas_organizacion(
+    empresa_id: uuid.UUID | None = None,
+    _: Usuario = Depends(get_current_user),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Mismo criterio que `/almacenes`: catálogo de referencia, abierto a
+    cualquier autenticado pero escopado por tenant.
+
+    Existe además de `GET /sales/marcas` porque aquel exige `sales.leer`, y
+    quien arma una campaña o una pieza de contenido tiene `marketing.*`, no
+    permisos de ventas — pedirle `sales.leer` para llenar un `<select>`
+    sería abrirle la carta entera.
+    """
+    return admin.listar_marcas(session, tenant.filtro_empresa(empresa_id))
+
+
+@router.get(
+    "/notificaciones", response_model=Pagina[schemas.NotificacionOut], tags=["users"]
+)
+def listar_notificaciones(
+    solo_no_leidas: bool = True,
+    usuario: Usuario = Depends(get_current_user),
+    p: Paginacion = Depends(paginacion),
+    session: Session = Depends(get_db),
+):
+    """La bandeja del usuario autenticado. Sin `require_permission` a
+    propósito: no es un recurso a proteger por rol, cada uno ve **lo suyo**
+    y el filtro es la identidad, no un permiso."""
+    return paginar(
+        session,
+        notificaciones.q_bandeja(usuario.id, solo_no_leidas=solo_no_leidas),
+        p,
+    )
+
+
+@router.post(
+    "/notificaciones/{notificacion_id}/leer",
+    response_model=schemas.NotificacionOut,
+    tags=["users"],
+)
+def leer_notificacion(
+    notificacion_id: uuid.UUID,
+    usuario: Usuario = Depends(get_current_user),
+    session: Session = Depends(get_db),
+):
+    fila = notificaciones.marcar_leida(session, notificacion_id, usuario.id)
+    if fila is None:
+        raise HTTPException(404, "Notificación no encontrada")
+    session.commit()
+    return fila
+
+
+@router.post("/notificaciones/leer-todas", tags=["users"])
+def leer_todas_las_notificaciones(
+    usuario: Usuario = Depends(get_current_user),
+    session: Session = Depends(get_db),
+):
+    marcadas = notificaciones.marcar_todas_leidas(session, usuario.id)
+    session.commit()
+    return {"marcadas": marcadas}
+
+
+@router.get("/sucursales", response_model=list[schemas.SucursalOut], tags=["users"])
+def listar_sucursales(
+    empresa_id: uuid.UUID | None = None,
+    _: Usuario = Depends(get_current_user),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Catálogo de referencia (nombre/estado), mismo criterio que
+    `/almacenes`: cualquier autenticado que tenga que elegir una sucursal lo
+    necesita — el filtro por sucursales del tablero de reportes, entre
+    otros. Escopado por tenant; el RBAC real lo aplica cada endpoint que
+    después use ese `sucursal_id`."""
+    return admin.listar_sucursales(session, tenant.filtro_empresa(empresa_id))
 
 
 @router.get("/personas/{persona_id}", response_model=schemas.PersonaOut, tags=["personas"])
@@ -275,12 +357,28 @@ def crear_usuario(
     return usuario
 
 
-@router.get("/users", response_model=list[schemas.UsuarioOut], tags=["users-admin"])
-def listar_usuarios(
+@router.get(
+    "/users/{usuario_id}/roles",
+    response_model=list[schemas.RolOut],
+    tags=["users-admin"],
+)
+def listar_roles_de_usuario(
+    usuario_id: uuid.UUID,
     _: Usuario = Depends(require_permission(GESTIONAR)),
     session: Session = Depends(get_db),
 ):
-    return admin.listar_usuarios(session)
+    """Los roles de una cuenta, con su id — `rol_nombres` del token solo
+    trae nombres y la pantalla necesita poder quitarlos."""
+    return admin.roles_de_usuario(session, usuario_id)
+
+
+@router.get("/users", response_model=Pagina[schemas.UsuarioOut], tags=["users-admin"])
+def listar_usuarios(
+    _: Usuario = Depends(require_permission(GESTIONAR)),
+    p: Paginacion = Depends(paginacion),
+    session: Session = Depends(get_db),
+):
+    return paginar(session, admin.q_usuarios(session), p)
 
 
 @router.patch(
@@ -414,6 +512,21 @@ def listar_roles(
     session: Session = Depends(get_db),
 ):
     return admin.listar_roles(session)
+
+
+@router.get(
+    "/roles/{rol_id}/permisos",
+    response_model=list[schemas.PermisoOut],
+    tags=["users-admin"],
+)
+def listar_permisos_de_rol(
+    rol_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(GESTIONAR)),
+    session: Session = Depends(get_db),
+):
+    """Qué habilita el rol. Asignar un rol a ciegas es exactamente el error
+    que este endpoint evita."""
+    return admin.permisos_de_rol(session, rol_id)
 
 
 @router.post(

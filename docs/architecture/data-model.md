@@ -189,6 +189,28 @@ erDiagram
 - **refresh_token**: hash, expiración, revocado.
 - **audit_log**: usuario_id, entidad, entidad_id, acción, datos_antes (JSONB),
   datos_despues (JSONB), sucursal_id, ip, timestamp. Solo inserción.
+  Desde 2026-08-04 cada inserción emite además una línea al logger
+  `provecho.auditoria` **con solo metadatos**: la tabla es el rastro legal,
+  el log es lo que un colector externo vigila en vivo, y `datos_antes`/
+  `datos_despues` pueden traer PII (Ley 29733) que no debe salir del proceso.
+- **notificacion** (2026-08-04): usuario_id (destinatario), tipo (código del
+  hecho, ej. `sales.pedido_demorado`), nivel (`info` | `aviso` | `urgente` —
+  cuánto interrumpe, no qué pasó), titulo, cuerpo, **referencia_tipo /
+  referencia_id** (polimórficos, sin FK: la bandeja apunta a una venta hoy y
+  a lo que venga mañana sin ganar una FK por tipo — mismo criterio que
+  `decision_gerencial`), sucursal_id, leida_at (NULL = pendiente).
+  Índice `ix_notificacion_bandeja (usuario_id, leida_at)`: es la consulta
+  que corre en cada carga de pantalla.
+
+  Es **bandeja, no transporte**: la fila se crea siempre y el frontend la
+  consulta. Empujarla a un teléfono es una capa aparte que todavía no
+  existe, y cuando exista leerá de acá en vez de reemplazarla — un aviso que
+  solo viajó por push no deja rastro de si alguien lo vio.
+
+  A quién le llega lo decide `users.application.notificaciones.
+  destinatarios_de_sucursal`: el **encargado de turno** (derivado del
+  `relevo_encargado_id` de la caja abierta) y, si no hay caja abierta, los
+  `supervisor`/`admin` de esa sucursal.
 - **auditoria**: empresa_id, tipo (`interna` | `externa`), area_responsable
   (si interna) o entidad_auditora (si externa — grupo empresarial o
   consultora), alcance (proceso/registro/estado evaluado), disparador
@@ -465,11 +487,25 @@ descuenta stock vía la receta (ver [../domain/domain-model.md](../domain/domain
   fila por movimiento de salida. Al recibir entra al stock lo que de verdad
   llegó; la diferencia contra lo enviado queda registrada y viaja en
   `inventory.transferencia_recibida` (RN-INV-002), no se corrige sola.
-- **guia_remision**: empresa_id, transferencia_id (opcional — traslado
-  entre almacenes), fecha_inicio_traslado, items (articulo/sku, cantidad),
-  ruc_emisor, ruc_receptor, lugar_origen, lugar_destino, motivo_traslado,
-  chofer, vehiculo_id. Emitida por el área de almacén (RN-GDR-002);
-  resguardada por contabilidad (RN-GDR-003).
+- **guia_remision** (implementada 2026-08-05, ADR-027): empresa_id,
+  transferencia_id, serie + correlativo, fecha_inicio_traslado,
+  motivo_traslado y modalidad_traslado (catálogos 20 y 18 de SUNAT),
+  peso_bruto_kg, ruc_emisor, ruc_receptor, lugar_origen, lugar_destino,
+  datos del chofer (nombres, apellidos, documento, licencia),
+  vehiculo_placa, emitida_por, y el juego de emisión electrónica
+  (estado_emision, hash, detalle, intentos, respuesta). Emitida por el área
+  de almacén (RN-GDR-002); resguardada por contabilidad (RN-GDR-003).
+  **`transferencia_id` es obligatorio y único** —un traslado, una guía— y
+  no opcional como decía la especificación de julio: el único emisor de hoy
+  es un traslado entre almacenes. La guía de una venta con reparto lo
+  volverá nullable cuando exista reparto propio.
+  **No hay `vehiculo_id`**: sin flota, una tabla de vehículos sería un
+  formulario que hay que llenar antes de emitir la primera guía (ADR-027).
+- **guia_remision_item**: guia_remision_id, sku_id, cantidad, descripcion y
+  unidad (códigos snapshot). Las líneas **se derivan** de
+  `transferencia_item` y se agrupan por SKU: RN-TRP-002 exige que lo
+  transportado coincida con lo declarado, y el reparto FEFO por lote es
+  control interno que SUNAT no declara.
 
 ## 5. Compras (módulo purchases)
 
@@ -631,6 +667,22 @@ Solicitud.
   fuente única del progreso del pedido; `updated_at` de cada transición es
   la base para medir tiempos de preparación y de despacho,
   RN-CUP-002/003).
+- **alerta_pedido** (2026-08-04): venta_id, sucursal_id, **minutos_umbral**,
+  minutos_transcurridos, estado_al_alertar (`pendiente` |
+  `en_preparacion` — el peor estado del pedido; que cocina ni lo haya
+  empezado pesa distinto a que lo esté haciendo), items_pendientes,
+  atendida_at / atendida_por / nota (NULL = sigue abierta).
+  `UNIQUE (venta_id, minutos_umbral)`.
+
+  Registra un pedido que superó su tiempo en cocina y seguía sin salir. El
+  umbral **se copia a la fila** en vez de leerse al reportar: es
+  `parametro_empresa` (`sales/minutos_alerta_pedido`, 15 por defecto) y
+  subirlo mañana no puede reescribir lo que ayer se consideró demora.
+
+  El `UNIQUE` no es cosmético: la alerta la pueden crear dos caminos que se
+  solapan a propósito —la revisión agendada al confirmar la venta y el
+  barrido periódico de Celery beat— y es lo que hace que converjan en una
+  sola fila. Ver `src/modules/sales/README.md`.
 - **entrega** (pendiente de slice — rama delivery de `PROC-OPE-002`):
   venta_id (único: una entrega por venta, RN-CUP-005), entregado_por
   (usuario_id de quien registra), fecha_entrega,
@@ -661,24 +713,44 @@ Solicitud.
   RN-COM-002), estado.
 - **custodia_efectivo**: apertura_caja_id, monto, responsable_actual_id,
   estado (`en_caja` | `en_supervisor` | `en_contabilidad` | `disponible`),
-  timestamps por relevo (RN-MDP-002). Cada transición exige confirmación
-  de valores correctos por el receptor.
+  timestamps por relevo (RN-MDP-002). **Máquina de estados desde ADR-025**:
+  nace en `en_supervisor` al cerrar la caja (el cierre ya exigió la firma
+  del encargado, así que el tramo cajero→encargado acaba de ocurrir) y
+  avanza a `en_contabilidad` o directo a `disponible` cuando el efectivo
+  se queda en la caja fuerte del local como fondo del día siguiente
+  (RN-MDP-006). Cada transición exige que **quien recibe** se autentique
+  con su PIN; no se vuelve atrás.
 - **apertura_caja** (PROC-CTB-002): punto_venta_id, cajero_id,
   relevo_encargado_id (relevo autenticado por ambas partes con
-  usuario+PIN), monto_apertura (RN-POS-003), detalle_denominaciones
-  (JSONB — conteo por billete/moneda), diferencia_reportada (opcional —
-  no se apertura sin registrarla; notifica a contabilidad y gerencia),
-  pos_verificados (JSONB — serie/código de comercio de cada POS de
-  tarjeta, RN-POS-010), timestamp. Inicia la cadena de custodia inversa
-  (RN-MDP-002).
+  usuario+PIN — desde ADR-025 sale del token de `POST /auth/autorizar`,
+  nunca del cuerpo del request), monto_apertura (RN-POS-003, **suma del
+  conteo**, no un número tecleado), detalle_denominaciones (JSONB —
+  conteo por billete/moneda, obligatorio), diferencia_reportada
+  (calculada: contado − declarado por el encargado; no bloquea la
+  apertura, RN-POS-011), pos_verificados (JSONB — un registro por POS de
+  tarjeta con `operativo` y observación, RN-POS-010), timestamp. Inicia la
+  cadena de custodia inversa (RN-MDP-002).
+- **pos_tarjeta** (ADR-025, RN-POS-009/010): empresa_id, sucursal_id
+  (**NULL = terminal de emergencia** del pool de contabilidad, que se
+  presta a la sucursal que lo necesite), serie (única), codigo_comercio,
+  operador, estado (`operativo` | `averiado` | `baja`), es_emergencia.
+  Inventario de terminales: sin él no se puede exigir el reporte de lote
+  de cada POS al cierre ni detectar que uno lleva días averiado. La
+  apertura lo marca `averiado` sin bloquearse (RN-POS-011).
 - **cierre_caja** (PROC-CTB-001 v1.1): apertura_caja_id, cajero_id,
   montos_esperados (JSONB por medio de pago), montos_reales (JSONB),
   descuadre (monto + atribución: `cajero` | `tercero_reportado` |
   `encargado` — según reporte previo y validación del relevo),
   reportes_pos (archivos de cierre de lote), relevos (cajero → encargado
   → contabilidad, cada uno autenticado con usuario+PIN, timestamps),
+  correcciones (JSONB, ADR-025 — un registro por reapertura con motivo,
+  autorizador y descuadre anterior: un cierre con faltante se corrige
+  dejando rastro, no reescribiendo el número, RN-MDP-005),
   custodia (`local_caja_fuerte` | `traslado_contabilidad`, RN-MDP-006),
-  estado. Irregularidades notifican a contabilidad, gerencia y RRHH.
+  estado. `montos_reales` guarda el conteo por denominación y el total sale
+  de ahí (RN-POS-007). Irregularidades notifican a contabilidad, gerencia
+  y RRHH. **Uno por apertura**: volver a cerrar tras una reapertura
+  recalcula el mismo registro.
 - **movimiento_caja** (ADR-018): apertura_caja_id, tipo (`ingreso` |
   `retiro`), monto (siempre positivo — el signo lo da `tipo`; guardar
   negativos invita a sumar mal), motivo (obligatorio: un movimiento sin
@@ -740,6 +812,20 @@ Solicitud.
   (11 dígitos = factura; 8, `00000000` o vacío = boleta, RN-CPP-003). La
   clave de idempotencia del grupo 1 sigue siendo `venta:{id}`, para que los
   comprobantes anteriores a este cambio resuelvan igual.
+  **Nota de crédito** (RN-CPP-009, migración `c2f7a91b4e08`): la NC es una
+  fila más de `comprobante` con `tipo="nc"`, más cuatro campos —
+  **afecta_comprobante_id** (a qué documento corrige; sin él SUNAT la
+  rechaza y contablemente no dice nada), **motivo_nc** (código del catálogo
+  09) con su **motivo_nc_descripcion**, **detalle_nc** (JSONB
+  `[{venta_item_id, cantidad}]` cuando es parcial; NULL = total — es JSONB y
+  no tabla propia porque la fuente de verdad de las líneas sigue siendo
+  `venta_item`: esto solo congela cuánto de cada una se acreditó) y
+  **anulado_por_nc_id**, que se llena **en el comprobante afectado** cuando
+  su nota total es aceptada: es lo que impide acreditarlo dos veces y lo que
+  habilita reemitir el corregido. La NC numera en **serie propia**
+  (`punto_venta.serie_nc_boleta`/`serie_nc_factura`, nullable: sin ella el
+  ERP no emite y lo dice, en vez de quemar un correlativo en la serie
+  equivocada).
 - **cliente**: grupo_id (transversal al grupo, no a una empresa —
   RN-PTS-001), tipo (`natural` | `juridico` — ej. cliente corporativo:
   catering/eventos), persona_id (si `natural`) o razon_social + ruc (si
@@ -787,6 +873,45 @@ Evento `sales.venta_confirmada` → inventory descuenta insumos según receta.
   `marketing.encuesta_enviada`. El estado de entrega lo lee del contrato
   público `sales/application/queries_publicas.py::venta_para_encuesta` —
   marketing no importa `Venta`.
+
+### Comercial-estrategia (spec 2026-08-05, sin implementar)
+
+Lo que el área Comercial decide **antes y alrededor** de la venta, y que
+hoy vive solo en SOPs y hojas sueltas. Dos de las cuatro entidades del
+pendiente original quedan acá; las otras dos —evaluación de desempeño y
+capacitación— viven en §8b y el motivo está explicado allá.
+
+- **meta_venta**: empresa_id, sucursal_id (nulo = meta del grupo),
+  canal (opcional — `pdv` | `kiosko` | `web` | `delivery`), periodo_desde,
+  periodo_hasta, tipo (`monto_venta` | `ticket_promedio` |
+  `unidades_producto`), producto_comercial_id (solo si el tipo es
+  unidades), valor_objetivo, es_rampa (bool — sucursal nueva arranca con
+  meta creciente, no con la de una consolidada), factor_ajuste y
+  motivo_ajuste (mes con feriados o evento atípico: se ajusta declarando
+  por qué, nunca se baja en silencio), comunicada_at, definida_por.
+  `comunicada_at` es columna y no un detalle de proceso: el SOP obliga a
+  comunicar la meta **antes** de que empiece el periodo, y una meta que
+  nadie supo que existía no se puede reclamar al cierre.
+- **meta_venta_seguimiento**: meta_venta_id, fecha_corte, acumulado_real,
+  proyeccion_al_ritmo, desvio, causa (texto — fricción de venta, quiebre
+  de stock, personal nuevo sin capacitar), correccion_acordada,
+  registrado_por. Una fila por corte semanal.
+  Existe como tabla aparte porque el seguimiento es el punto del SOP:
+  guardar solo el cumplimiento final convierte la meta en un número que se
+  mira cuando ya no hay nada que hacer. El cumplimiento al cierre es el
+  último `meta_venta_seguimiento`, no una columna que lo duplique.
+- **hallazgo_mercado**: empresa_id, sucursal_id (opcional — el hallazgo
+  suele ser de una zona), pregunta (la que se quiso responder; sin
+  pregunta concreta la investigación no llega a ningún lado),
+  fuente (`dato_interno` | `observacion_competencia` | `encuesta_cliente` |
+  `conversacion_cliente`), hallazgo, fecha, registrado_por,
+  archivo_id (opcional — foto de carta de competencia, planilla).
+  Es lo que separa una decisión con respaldo de una apuesta: el SOP dice
+  que una decisión de precio, producto nuevo o campaña **sin hallazgo
+  documentado se marca como apuesta**. Para que eso sea verificable,
+  `precio`, `producto_comercial` y `campana` referencian el hallazgo que
+  las sustenta (nullable — una apuesta declarada sigue siendo válida, solo
+  queda dicho que lo es).
 
 ## 7. Producción (módulo futuro production)
 
@@ -981,6 +1106,99 @@ Los documentos de RRHH que son cartas/actas usan plantillas versionadas
 (ver `docs/templates/rrhh/`), rellenadas con datos del ERP + campos
 manuales, y visadas por abogado antes de uso (RN-CTR-002).
 
+### Proceso de incorporación (spec 2026-08-05, sin implementar)
+
+Las tres etapas que hoy solo viven en SOPs y en papel: entrevistar,
+inducir y decidir si el trabajador se queda. `convocatoria` y `postulante`
+(arriba) ya cubren desde la requisición hasta la contratación; esto es lo
+que pasa **después de decir que sí**.
+
+Las tres comparten una forma y conviene verla antes de las tablas: son
+**evaluaciones con criterios puntuados 1-4**. La escala es la misma a
+propósito en toda la organización —entrevista, periodo de prueba y
+desempeño comercial— para que RRHH pueda comparar a una persona consigo
+misma a lo largo del tiempo, que es lo único que vuelve útil un legajo. Por
+eso los criterios van en JSONB y no en columnas: cada puesto pregunta lo
+suyo y una tabla de criterios fijos obligaría a migrar el esquema cada vez
+que cambia una ficha.
+
+- **entrevista**: postulante_id, entrevistador_id (usuario), fecha,
+  modalidad (`presencial` | `telefonica` | `virtual`), puntualidad
+  (`puntual` | `tarde` | `no_asistio` — es el primer dato real de
+  comportamiento, no un trámite), criterios (JSONB: lista de
+  `{criterio, puntaje 1-4, nota}`), prueba_practica (JSONB opcional — corte
+  básico para cocina, cálculo de vuelto para caja), referencias (JSONB:
+  `{nombre, cargo, telefono, verificada, resultado}`), disponibilidad_real
+  (turnos, feriados, cómo llega), plazo_respuesta_dias, recomendacion
+  (`avanzar` | `descartar` | `en_duda`), observacion.
+  El puntaje se registra **al terminar la entrevista**, no "después": el
+  SOP lo dice porque después se olvida y se mezclan candidatos. Esa regla
+  es de proceso, pero explica por qué la ficha es una entidad y no un campo
+  de texto en `postulante`.
+- **plan_induccion**: trabajador_id, tipo (`grupo_empresa_marca` |
+  `puesto_operativo`), instructor_id, fecha_inicio, fecha_fin_prevista,
+  estado (`en_curso` | `completado` | `interrumpido`),
+  constancia_archivo_id (la firma del encargado al cerrar la semana).
+- **plan_induccion_item**: plan_induccion_id, tipo (`sop` | `curso` |
+  `entrega`), referencia (código del SOP o del curso — texto, no FK: los
+  SOPs viven en `docs/`, no en la base), orden, critico (bool — seguridad e
+  higiene van primero), completado_at, instructor_iniciales.
+  Un ítem por SOP/curso que el perfil exige, marcado con fecha e iniciales
+  a medida que se completa. Es lo que hace que "se le indujo" sea
+  verificable y no una afirmación.
+- **evaluacion_periodo_prueba**: trabajador_id, hito (`mes_1` | `mes_2_5`),
+  evaluador_id, fecha, criterios (JSONB, misma escala 1-4: asistencia y
+  puntualidad, dominio de los SOPs de su puesto, trato con clientes y
+  equipo, actitud ante la corrección), retroalimentacion_dada (bool),
+  constancia_archivo_id, decision (`continua` | `no_continua` — solo en el
+  hito `mes_2_5`), motivo_decision.
+  Dos filas por trabajador, no una: **la tendencia importa más que la
+  foto**, y guardar solo la última evaluación borra justamente el dato que
+  sustenta la decisión. El cese dentro del periodo de prueba no requiere
+  causa, pero sí requiere haber avisado en el mes 1 — y eso es lo que
+  prueba la primera fila.
+
+Ninguna de las tres tiene tabla todavía. Van en el slice de incorporación,
+detrás del tablero de contratación que ya existe.
+
+### Evaluación y capacitación (spec 2026-08-05, sin implementar)
+
+Estas dos las **ejecuta Comercial** (SOPs de evaluación de desempeño
+comercial y de capacitación de venta) y aun así viven en `rrhh`: su
+artefacto termina en el file personal del trabajador, y `sales` no puede
+ser dueño de datos de `trabajador` sin importar el dominio de `rrhh`
+(CLAUDE.md). Comercial las produce; RRHH las custodia. Quien evalúa queda
+en `evaluador_id`, que es lo que hace visible que el evaluador fue de otra
+área.
+
+- **evaluacion_desempeno**: trabajador_id, area (`comercial` | `cocina` |
+  `almacen` | …), periodo_desde, periodo_hasta, evaluador_id,
+  indicadores (JSONB — para Comercial: ticket promedio, quejas asociadas,
+  desistimientos atendidos y su resolución, extraídos del ERP),
+  criterios (JSONB, escala 1-4, la misma de toda la organización),
+  observacion_en_sitio (la visita no anunciada, mismo criterio que la
+  supervisión de SOPs de limpieza y apertura),
+  retroalimentacion_dada_at (bool con fecha — el SOP exige darla **de
+  inmediato**, no esperar al cierre de mes si algo se puede corregir ya),
+  senalado_a_rrhh (bool), archivo_id.
+  `senalado_a_rrhh` no es decoración: con desempeño bajo dos meses
+  seguidos, Comercial **señala pero no actúa** — la acción (plan de
+  mejora, cambio de puesto, cese) la decide RRHH/administración. Un flag
+  que marca "esto ya se escaló" es lo que evita que el caso se pierda entre
+  dos áreas que cada una cree que le toca a la otra.
+- **capacitacion**: empresa_id, tema, motivo (`guion_nuevo` |
+  `producto_nuevo` | `promocion` | `refuerzo_desempeno`), contenido
+  (JSONB — qué se dice, preguntas frecuentes anticipadas, material de
+  Marketing si aplica), area_solicitante, fecha, duracion_min,
+  sucursal_id (nulo = todo el grupo), instructor_id, es_parte_de_induccion
+  (bool — el mismo contenido puede darse dentro de la inducción al puesto
+  en vez de como sesión aparte), verificacion_comprension (JSONB — las 2-3
+  preguntas rápidas antes de cerrar).
+- **capacitacion_asistente**: capacitacion_id, trabajador_id,
+  constancia_archivo_id. Una fila por asistente: la constancia firmada va
+  al file personal de **cada uno**, no de la sesión. Sin esto, "el equipo
+  fue capacitado" no se puede sostener ante un reclamo individual.
+
 ## 8c. Gerencia y gobierno (transversal)
 
 Gerencia es autoridad (RBAC) + documentos, no un módulo con lógica de
@@ -1096,6 +1314,42 @@ tabla. Ver [docs/gerencia/README.md](../gerencia/README.md).
   sigue pendiente para **su** caso propio (aprobación de OC escalada,
   campaña sobre presupuesto, sanción), no para parámetros.
 
+- **tablero** (entidad transversal, vive en `shared` — ADR-024): empresa_id,
+  usuario_id, nombre, predeterminado, tarjetas (JSONB), filtros (JSONB),
+  **rol_id** (nullable, ADR-024 Addendum).
+  Es **preferencia de presentación, no dato de negocio**: qué reportes mira
+  un usuario, en qué orden, de qué tamaño y con qué filtros por defecto.
+  Vive en `shared` por lo mismo que el motor de reportes vive en `core` —
+  compone reportes de varios módulos y no le pertenece a ninguno.
+
+  `tarjetas` es una lista de
+  `{codigo, titulo, visual, ancho (1-4), alto}` y `filtros` es
+  `{preset, desde, hasta, sucursal_ids, limite}`. Van en JSON a propósito:
+  la forma de una tarjeta cambia con cada tipo de visualización nuevo y
+  normalizarla obligaría a una migración por cada una. Lo que **no** es
+  libre es el `codigo`, que se valida contra el catálogo de reportes al
+  guardar — un tablero no puede referirse a un reporte inexistente ni a uno
+  que su dueño no tiene permiso de ver (si no, guardarlo sería una puerta
+  trasera al RBAC en la próxima carga).
+
+  Índice parcial `uq_tablero_predeterminado` (único por `usuario_id` donde
+  `predeterminado`): un solo tablero de arranque por usuario, sin impedir
+  que tenga varios guardados.
+
+  **`rol_id` NULL = privado.** Con rol, el tablero lo ve en **solo lectura**
+  cualquiera que tenga ese rol; editarlo y borrarlo siguen siendo del dueño
+  (`usuario_id`). Se comparte por rol y no con una lista de personas porque
+  así se administra solo: alguien cambia de puesto y gana o pierde el
+  tablero sin que nadie recuerde actualizar nada, y un trabajador que cesa
+  deja de verlo al perder el rol en vez de tener que ser removido a mano de
+  cada tablero. Solo se comparte hacia un **rol propio** — si no,
+  cualquiera podría publicar en la bandeja de un área ajena.
+
+  Compartir **no expone datos**: cada tarjeta revalida el permiso de su
+  módulo dueño al pedir sus filas, así que quien abra un tablero compartido
+  sin `purchases.leer` recibe 403 en esa tarjeta. Lo que se comparte es la
+  disposición, no el contenido.
+
 ## 8d. Marketing (módulo marketing)
 
 Marketing atrae demanda y cuida la marca; **Comercial** cierra la venta.
@@ -1161,6 +1415,25 @@ No hay tabla de mapeo hub-id↔nube-id: `venta`, `pago` y
 
 ## 9. Módulos futuros
 
-Transporte (ruta, despacho), tesorería, activos, proyectos, BI/reportes:
-se especifican en su módulo antes de implementarse. Caja ya no es futuro:
-apertura/cierre/arqueo quedaron especificados en §6 (PROC-CTB-001/002).
+Revisado 2026-08-05: de la lista original casi nada sigue siendo futuro, y
+dos cosas nunca van a ser un módulo.
+
+- **Despacho** ✅ vive en `inventory` (ADR-020): `solicitud_insumos`,
+  `reserva_stock`, `transferencia`/`transferencia_item`. El picking reparte
+  por FEFO y emite una línea por lote tomado. Un módulo aparte habría
+  necesitado el dominio de `inventory` para hacer eso mismo.
+- **Ruta / flota** ⬜ sigue sin dueño, y sin operación real que lo pida. Lo
+  único pendiente del transporte de hoy es la **guía de remisión**, que es
+  un comprobante (deuda de `inventory` y de `sales`), no un módulo.
+- **Tesorería** ✅ dentro de `accounting` por decisión del usuario:
+  `movimiento_dinero`, caja, `custodia_efectivo`.
+- **BI/reportes** ✅ en `core/reportes` (ADR-024): catálogo de reportes +
+  `tablero` guardado por usuario y compartido por rol.
+- **Activos** ⬜ con dueño repartido a propósito: se compran en `purchases`
+  (`requerimiento_activo`, OC tipo `activo`) y se deprecian en `accounting`
+  (activo fijo, PROC-CTB-007/010).
+- **Proyectos** ⬜ sin caso: el grupo no ejecuta obra ni proyectos
+  facturables.
+
+Caja ya no es futuro: apertura/cierre/arqueo quedaron especificados en §6
+(PROC-CTB-001/002) e implementados en ADR-025.

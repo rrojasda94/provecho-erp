@@ -95,29 +95,71 @@ finanzas documentados en el área:
   pago con comprobante conforme (RN-CMP-014), umbral de aprobación de
   Gerencia (RN-CTB-005), detracción SPOT (calculada, sin desglose contable
   propio aún) e idempotencia contra doble pago (RN-CTB-008).
-- **Apertura/cierre de caja** (PROC-CTB-002/001, **slice mínimo**
-  implementado 2026-07-26, ver ADR-012): `abrir_caja`/`cerrar_caja`/
-  `registrar_arqueo` en `application/caja.py`. El cierre **reconcilia de
-  verdad**: `monto_esperado = monto_apertura + efectivo cobrado desde la
-  apertura`, este último vía el contrato público de `sales`
-  (`total_efectivo_cobrado` — `accounting` no importa el dominio de
-  `sales`). Permisos `accounting.caja_operar` (rol `cajero`, abre/cierra su
-  propia caja) y `accounting.arqueo_registrar` (`supervisor`/`contador`).
-  **Diferido a un slice dedicado** (no incluido): verificación de series de
-  POS y denominaciones obligatorias (RN-POS-009..013), relevo autenticado
-  por PIN propio de ambas partes (hoy solo se registra
-  `relevo_encargado_id`), `custodia_efectivo` como máquina de estados real,
-  enlace con `sales` para bloquear el cobro sin caja abierta.
+- **Ciclo de caja** (PROC-CTB-002/001, slice mínimo 2026-07-26 con ADR-012,
+  **completado 2026-08-04 con ADR-025**): `abrir_caja`/`cerrar_caja`/
+  `reabrir_cierre`/`entregar_custodia`/`registrar_arqueo` en
+  `application/caja.py`, inventario de terminales en `application/pos.py`.
+  - El cierre **reconcilia de verdad**: `esperado = apertura + efectivo
+    cobrado desde la apertura + ingresos − retiros del turno`, el cobrado
+    vía el contrato público de `sales` (`total_efectivo_cobrado` —
+    `accounting` no importa el dominio de `sales`).
+  - **Y cuadra tarjetas** (RN-POS-004, 2026-08-04): exige el reporte de lote
+    de cada POS que abrió operativo —uno averiado no cobró nada— y lo
+    contrasta con `total_tarjeta_cobrado`. `descuadre_monto` sigue siendo el
+    del cajón; el de tarjetas va en `montos_esperados`/`montos_reales` y
+    cualquiera de los dos deja el cierre irregular.
+  - **El monto sale del conteo por denominación** (RN-POS-003/007), no de
+    un número tecleado; en la apertura la diferencia contra lo declarado
+    por el encargado se calcula y **no bloquea abrir** (RN-POS-011).
+  - **Cada relevo lo firma quien recibe con su PIN** (RN-MDP-002, permiso
+    `accounting.caja_relevar`), y el efectivo sigue por `custodia_efectivo`
+    hasta quedar `disponible`.
+  - **Un cierre con faltante se corrige, no se reescribe**: reapertura con
+    motivo y autorizador en `cierre_caja.correcciones` (RN-MDP-005).
+  - **No se cobra sin caja abierta**: `sales.registrar_pago` pregunta por
+    `queries_publicas.hay_caja_abierta`. Excepción única, el replay del
+    push del hub (ADR-009), porque el cobro ya ocurrió en la sucursal.
+  - Permisos: `accounting.caja_operar` (`cajero`, `supervisor`),
+    `accounting.caja_relevar` y `accounting.caja_reabrir`
+    (`supervisor`/`contador`), `accounting.pos_administrar` (`contador`),
+    `accounting.arqueo_registrar` (`supervisor`/`contador`).
+  - **`custodia` y `descuadre_atribucion` son enums, no texto libre**:
+    `custodia` es *a dónde va el efectivo* (`local_caja_fuerte` /
+    `traslado_contabilidad`) —a quién se le entregó ya lo prueba la firma
+    del PIN— y `descuadre_atribucion` es `cajero` / `encargado` /
+    `tercero_reportado`. Los dos se validan con `pattern` en el schema: sin
+    eso, un texto libre se escribía sin protestar y dejaba la fila
+    **ilegible**, porque la lectura reventaba después al mapear el enum.
+  - **Turnos cerrados**: `GET /accounting/cajas/turnos` devuelve el cierre,
+    el descuadre y el tramo de custodia en una sola consulta — es la lista
+    con la que trabaja contabilidad para reabrir un cierre o recibir el
+    efectivo, y traerlos por separado era un N+1 por turno.
+  - **Fuera del slice**: el turno de caja no se replica al hub, y
+    RN-POS-012/013 (prever sencillo, dedicación exclusiva durante el
+    conteo) son organizativas — viven en el SOP, no en código.
 - **Conciliación bancaria** (PROC-CTB-004): cuadra movimientos vs. extracto;
   visada por Gerencia, requisito de cierre de periodo (RN-CTB-006).
 - **Flujo de caja** y **activo fijo/depreciación**: pendientes de slice
   dedicado (PROC-CTB-007/010, propuestos).
 
-## Contrato API — caja (slice mínimo)
+## Contrato API — caja
 
 | Método | Ruta | Permiso |
 |--------|------|---------|
-| POST | `/accounting/cajas/apertura` | `accounting.caja_operar` |
-| POST | `/accounting/cajas/apertura/{id}/cierre` | `accounting.caja_operar` |
+| POST | `/accounting/cajas/apertura` | `accounting.caja_operar` + PIN `caja_relevar` |
+| POST | `/accounting/cajas/apertura/{id}/cierre` | `accounting.caja_operar` + PIN `caja_relevar` |
+| POST | `/accounting/cajas/apertura/{id}/movimientos` | `accounting.caja_operar` (+ PIN `caja_retirar` si es retiro) |
+| GET | `/accounting/cajas/apertura/{id}/movimientos` | `accounting.leer` |
+| GET | `/accounting/cajas/apertura/{id}/custodia` | `accounting.leer` |
+| POST | `/accounting/cajas/custodias/{id}/entregar` | `accounting.caja_operar` + PIN `caja_relevar` |
+| POST | `/accounting/cajas/cierres/{id}/reabrir` | `accounting.caja_operar` + PIN `caja_reabrir` |
 | GET | `/accounting/cajas/abiertas?empresa_id=` | `accounting.leer` |
+| GET | `/accounting/cajas/turnos?desde=&hasta=` | `accounting.leer` |
 | POST | `/accounting/arqueos` | `accounting.arqueo_registrar` |
+| POST | `/accounting/pos-tarjeta` | `accounting.pos_administrar` |
+| GET | `/accounting/pos-tarjeta?sucursal_id=` | `accounting.leer` |
+| PATCH | `/accounting/pos-tarjeta/{id}` | `accounting.pos_administrar` |
+
+"+ PIN" = token de `POST /auth/autorizar` en el cuerpo (`autorizacion`): la
+sesión del cajero no alcanza, tiene que firmar quien recibe o autoriza
+(RN-MDP-002, RN-AUD-005).

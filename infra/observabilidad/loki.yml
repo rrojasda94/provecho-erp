@@ -1,0 +1,65 @@
+# Loki en modo monolítico, con almacenamiento en disco local.
+#
+# Es lo correcto para un VPS con un ERP de un grupo de restaurantes: el modo
+# distribuido (ingester/querier/distributor separados) existe para volúmenes
+# de otra escala y acá solo sumaría piezas que se pueden caer.
+
+auth_enabled: false
+
+server:
+  http_listen_port: 3100
+  # Loki no se publica a internet: lo consultan Grafana y Alloy por la red
+  # interna de compose.
+  log_level: warn
+
+common:
+  instance_addr: 127.0.0.1
+  path_prefix: /loki
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks
+      rules_directory: /loki/rules
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: inmemory
+
+schema_config:
+  configs:
+    - from: 2024-01-01
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+
+limits_config:
+  # Un ERP puede emitir logs con timestamps desfasados si un hub de sucursal
+  # estuvo offline (ADR-009); aceptar hasta una semana de antigüedad evita
+  # descartarlos justo cuando importan.
+  reject_old_samples: true
+  reject_old_samples_max_age: 168h
+  # Retención: 90 días, igual que GlitchTip. Más que eso en un VPS es disco
+  # que nadie va a mirar.
+  retention_period: 2160h
+  # Techo por si un bucle de errores intenta llenar el disco.
+  ingestion_rate_mb: 8
+  ingestion_burst_size_mb: 16
+
+compactor:
+  working_directory: /loki/compactor
+  # Sin esto `retention_period` no borra nada: el compactor es quien aplica
+  # la retención de verdad.
+  retention_enabled: true
+  delete_request_store: filesystem
+
+ruler:
+  storage:
+    type: local
+    local:
+      directory: /loki/rules
+
+# Grafana no envía telemetría de uso desde acá.
+analytics:
+  reporting_enabled: false

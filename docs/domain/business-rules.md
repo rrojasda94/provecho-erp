@@ -447,6 +447,25 @@ de su módulo y se prueban de forma aislada.
   empresa y no se repiten dentro de ella.
 - **RN-CPP-008** El ERP o el proveedor de facturación debe garantizar un
   mecanismo que impida duplicados o reemisiones de un comprobante.
+- **RN-CPP-009** Una venta ya cobrada **no se anula: se acredita**. La
+  corrección es una **nota de crédito** con un motivo del catálogo 09 de
+  SUNAT, emitida contra un comprobante **aceptado** y **una sola vez** por
+  documento; numera en **serie propia**, distinta de la de la boleta o
+  factura que corrige. Puede ser **total** (acredita el comprobante entero)
+  o **parcial por ítem**, y ninguna acredita más de lo que quede sin
+  acreditar de esa línea. Tres consecuencias se deciden al emitirla, porque
+  no hay respuesta universal:
+  1. **La devolución del insumo es opcional** — un plato devuelto en cocina
+     rara vez vuelve al inventario; quien acredita declara si repone.
+  2. **El motivo decide si la venta muere**. Anulación (01) y devolución
+     (06/07) la dan de baja; los motivos de corrección de datos —error en
+     el RUC (02), error en la descripción (03)— **no**: la operación
+     ocurrió, el papel estaba mal, y el comprobante queda anulado solo para
+     poder reemitir el corregido.
+  3. **Una nota rechazada por SUNAT no corrige nada**: queda registrada con
+     su motivo de rechazo y la venta sigue exactamente como estaba.
+  Acreditar devuelve dinero: exige permiso propio, no el del cajero que
+  emitió (`sales.emitir_nota_credito`).
 - **RN-GDR-001** Toda guía de remisión contiene fecha de inicio de
   traslado, bienes y cantidades transportadas, RUC del emisor y del
   receptor, lugar de origen y destino, motivo del traslado, y datos del

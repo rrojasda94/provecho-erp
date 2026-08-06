@@ -119,8 +119,8 @@ def detalle_receta(session: Session, receta_id: uuid.UUID) -> dict:
     lineas, costo = [], Decimal(0)
     for item in items:
         articulo, udm = _articulo_y_udm(session, item.articulo_id)
-        costo_linea = _costo_linea(item, articulo)
-        costo += costo_linea
+        costo_linea_valor = costo_linea(item, articulo)
+        costo += costo_linea_valor
         lineas.append(
             {
                 "id": item.id,
@@ -133,7 +133,7 @@ def detalle_receta(session: Session, receta_id: uuid.UUID) -> dict:
                 "expresion": item.expresion,
                 "merma_pct": item.merma_pct,
                 "costo_unitario": articulo.costo_promedio,
-                "costo_linea": costo_linea,
+                "costo_linea": costo_linea_valor,
             }
         )
     return {**_resumen(session, receta), "items": lineas, "costo_total": costo}
@@ -351,7 +351,7 @@ def _validar_merma(merma_pct: Decimal) -> None:
         raise ReglaNegocio("la merma debe estar entre 0 y 100 %")
 
 
-def _costo_linea(item: RecetaItem, articulo: Articulo) -> Decimal:
+def costo_linea(item: RecetaItem, articulo: Articulo) -> Decimal:
     """La merma es insumo que entra y no llega al plato: se costea igual."""
     factor = Decimal(1) + (item.merma_pct / Decimal(100))
     return item.cantidad * factor * articulo.costo_promedio

@@ -15,6 +15,14 @@ class FactilizaError(RuntimeError):
     """Fallo de transporte o respuesta ilegible. Reintentable."""
 
 
+# El CDR llega comprimido: es el ZIP que SUNAT firma, no un XML suelto.
+CONTENT_TYPES = {
+    "pdf": "application/pdf",
+    "xml": "application/xml",
+    "cdr": "application/zip",
+}
+
+
 @dataclass(frozen=True)
 class RespuestaEmision:
     aceptado: bool
@@ -23,6 +31,22 @@ class RespuestaEmision:
     mensaje: str
     hash: str | None
     crudo: dict
+
+
+@dataclass(frozen=True)
+class DocumentoDescargado:
+    """Representación de un comprobante ya emitido: el PDF que se entrega al
+    cliente, el XML firmado o el CDR que devolvió SUNAT.
+
+    Se guarda el binario tal cual llega, sin interpretarlo: el XML y el CDR
+    son el respaldo legal de la operación y cualquier reescritura los
+    invalidaría.
+    """
+
+    formato: str  # pdf | xml | cdr
+    contenido: bytes
+    content_type: str
+    nombre_archivo: str
 
 
 @dataclass(frozen=True)
@@ -110,11 +134,28 @@ class FactilizaClient:
         los fallos de transporte levantan `FactilizaError` para que la cola
         reintente.
         """
+        return self._enviar("/invoice/send", payload)
+
+    def enviar_nota_credito(self, payload: dict) -> RespuestaEmision:
+        """POST /note/send — nota de crédito. Mismo contrato de errores que
+        la emisión: rechazo es veredicto, transporte caído es excepción."""
+        return self._enviar("/note/send", payload)
+
+    def enviar_guia_remision(self, payload: dict) -> RespuestaEmision:
+        """POST /despatch/send — guía de remisión remitente (GRE).
+
+        Mismo contrato de errores que los otros dos envíos. El camión ya
+        salió cuando esto corre: un rechazo se corrige y se reemite, no
+        detiene el traslado — la guía impresa es el documento que viaja.
+        """
+        return self._enviar("/despatch/send", payload)
+
+    def _enviar(self, ruta: str, payload: dict) -> RespuestaEmision:
         if not self.token:
             raise FactilizaError("FACTILIZA_TOKEN no configurado")
         try:
             respuesta = httpx.post(
-                f"{self.base_url}/invoice/send",
+                f"{self.base_url}{ruta}",
                 json=payload,
                 headers={"Authorization": f"Bearer {self.token}"},
                 timeout=self.timeout,
@@ -165,6 +206,45 @@ class FactilizaClient:
         if cuerpo is None:
             return ConsultaEmpresa(False, ruc, "", "", "", {})
         return _interpretar_ruc(ruc, cuerpo)
+
+    def descargar(
+        self, formato: str, tipo_doc: str, serie: str, correlativo: int
+    ) -> DocumentoDescargado:
+        """`GET /invoice/{pdf|xml|cdr}/{tipo}/{serie}/{correlativo}`.
+
+        El PDF es lo que se le entrega al cliente; el **XML firmado** y el
+        **CDR** son el respaldo ante SUNAT y hay que poder recuperarlos años
+        después. Se devuelven como bytes sin tocar: reescribir un XML
+        firmado lo invalida.
+
+        Un 404 es "todavía no está" —el documento puede seguir en cola— y
+        levanta `FactilizaError` para que quien llame lo trate como
+        reintentable, igual que un fallo de transporte.
+        """
+        if formato not in CONTENT_TYPES:
+            raise ValueError(f"formato no descargable: {formato}")
+        if not self.token:
+            raise FactilizaError("FACTILIZA_TOKEN no configurado")
+        url = f"{self.base_url}/invoice/{formato}/{tipo_doc}/{serie}/{correlativo}"
+        try:
+            respuesta = httpx.get(
+                url,
+                headers={"Authorization": f"Bearer {self.token}"},
+                timeout=self.timeout,
+            )
+        except httpx.HTTPError as e:
+            raise FactilizaError(f"Factiliza no responde: {e}") from e
+        if respuesta.status_code != 200:
+            raise FactilizaError(
+                f"Factiliza devolvió {respuesta.status_code} al pedir el {formato} "
+                f"de {serie}-{correlativo}"
+            )
+        return DocumentoDescargado(
+            formato=formato,
+            contenido=respuesta.content,
+            content_type=CONTENT_TYPES[formato],
+            nombre_archivo=f"{serie}-{correlativo:08d}.{formato if formato != 'cdr' else 'zip'}",
+        )
 
 
 def nombres_desde_dni(dni: str, nombres_tecleado: str, apellidos_tecleado: str) -> tuple[str, str]:

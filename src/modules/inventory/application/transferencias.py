@@ -285,3 +285,14 @@ def listar(
     empresa_id: uuid.UUID | None = None,
 ) -> list[Transferencia]:
     return TransferenciaRepo(session).list(almacen_id, estado, empresa_id)
+
+
+def q_listar(
+    session: Session,
+    *,
+    almacen_id: uuid.UUID | None = None,
+    estado: str | None = None,
+    empresa_id: uuid.UUID | None = None,
+):
+    """La consulta sin ejecutar, para que el router la pagine (ADR-026)."""
+    return TransferenciaRepo(session).q_list(almacen_id, estado, empresa_id)

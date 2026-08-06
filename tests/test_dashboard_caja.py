@@ -52,6 +52,7 @@ from src.modules.users.infrastructure.models import (
     UsuarioSucursal,
 )
 from src.modules.users.infrastructure.security import hash_pin
+from tests.conftest import billetes
 
 
 @pytest.fixture()
@@ -129,16 +130,25 @@ def env(monkeypatch):
         )
 
         cajero = Usuario(username="cajero1", pin_hash=hash_pin("111111"), tipo="humano")
-        s.add(cajero)
+        # La cadena de custodia necesita dos personas: quien entrega el fondo
+        # y quien lo recibe (RN-MDP-002). El encargado firma con su PIN.
+        encargado = Usuario(
+            username="encargado1", pin_hash=hash_pin("222222"), tipo="humano"
+        )
+        s.add_all([cajero, encargado])
         s.flush()
         rol_cajero = s.scalar(select(Rol).where(Rol.nombre == "cajero"))
+        rol_sup = s.scalar(select(Rol).where(Rol.nombre == "supervisor"))
         s.add(UsuarioRol(usuario_id=cajero.id, rol_id=rol_cajero.id))
+        s.add(UsuarioRol(usuario_id=encargado.id, rol_id=rol_sup.id))
         # Sin sucursal el JWT sale sin `empresa_id` y todo responde 403 (ADR-004).
         s.add(UsuarioSucursal(usuario_id=cajero.id, sucursal_id=sucursal.id))
+        s.add(UsuarioSucursal(usuario_id=encargado.id, sucursal_id=sucursal.id))
 
         ids.update(
             empresa_id=str(empresa.id), sucursal_id=str(sucursal.id), pv_id=str(pv.id),
             producto_id=str(producto.id), medio_id=str(medio.id), cajero_id=str(cajero.id),
+            encargado_id=str(encargado.id),
             marca_id=str(marca.id), lista_id=str(lista.id), receta_id=str(receta.id),
         )
         s.commit()
@@ -176,14 +186,39 @@ def _cruzar_segundo() -> None:
     time.sleep(1.1)
 
 
-def _abrir_caja(client, headers, ids, monto="100.00"):
+def _autorizacion(client, permiso, username="encargado1", pin="222222"):
+    """Elevación de PIN del encargado: es quien firma cada relevo del
+    efectivo (RN-MDP-002), no el cajero desde su propia sesión."""
+    r = client.post(
+        "/api/v1/auth/autorizar",
+        json={"username": username, "pin": pin, "permiso": permiso},
+    )
+    assert r.status_code == 200, r.text
+    return r.json()["autorizacion"]
+
+
+def _abrir_caja(client, headers, ids, monto="100.00", declarado=None):
     return client.post(
         "/api/v1/accounting/cajas/apertura",
         headers=headers,
         json={
             "punto_venta_id": ids["pv_id"],
-            "relevo_encargado_id": ids["cajero_id"],
-            "monto_apertura": monto,
+            "monto_declarado": declarado or monto,
+            "detalle_denominaciones": billetes(monto),
+            "autorizacion": _autorizacion(client, "accounting.caja_relevar"),
+        },
+    )
+
+
+def _cerrar_caja(client, headers, apertura_id, monto, **extra):
+    return client.post(
+        f"/api/v1/accounting/cajas/apertura/{apertura_id}/cierre",
+        headers=headers,
+        json={
+            "detalle_denominaciones": billetes(monto),
+            "custodia": "local_caja_fuerte",
+            "autorizacion": _autorizacion(client, "accounting.caja_relevar"),
+            **extra,
         },
     )
 
@@ -254,11 +289,7 @@ def test_cerrar_caja_sin_ventas_cuadra_exacto(env):
     client, ids, _ = env
     h = _token(client)
     apertura = _abrir_caja(client, h, ids).json()
-    r = client.post(
-        f"/api/v1/accounting/cajas/apertura/{apertura['id']}/cierre",
-        headers=h,
-        json={"monto_real": "100.00", "custodia": "local_caja_fuerte"},
-    )
+    r = _cerrar_caja(client, h, apertura["id"], "100.00")
     assert r.status_code == 200
     body = r.json()
     assert Decimal(body["descuadre_monto"]) == Decimal("0")
@@ -275,11 +306,7 @@ def test_cerrar_caja_reconcilia_ventas_en_efectivo(env):
     _vender_y_cobrar(client, h, ids, key="0001", precio="50.00")
     _vender_y_cobrar(client, h, ids, key="0002", precio="30.00", TestSession=TestSession)
 
-    r = client.post(
-        f"/api/v1/accounting/cajas/apertura/{apertura['id']}/cierre",
-        headers=h,
-        json={"monto_real": "180.00", "custodia": "local_caja_fuerte"},
-    )
+    r = _cerrar_caja(client, h, apertura["id"], "180.00")
     assert r.status_code == 200
     # 100 apertura + 50 + 30 vendido = 180 esperado; contado 180 → cuadra.
     assert Decimal(r.json()["descuadre_monto"]) == Decimal("0")
@@ -293,13 +320,8 @@ def test_cerrar_caja_con_descuadre_queda_con_irregularidad(env):
     _cruzar_segundo()
     _vender_y_cobrar(client, h, ids, key="0003", precio="50.00")
 
-    r = client.post(
-        f"/api/v1/accounting/cajas/apertura/{apertura['id']}/cierre",
-        headers=h,
-        json={
-            "monto_real": "140.00", "custodia": "local_caja_fuerte",
-            "descuadre_atribucion": "cajero",
-        },
+    r = _cerrar_caja(
+        client, h, apertura["id"], "140.00", descuadre_atribucion="cajero"
     )
     assert r.status_code == 200
     # Esperado 150 (100+50), contado 140 → falta 10.
@@ -311,19 +333,15 @@ def test_no_se_puede_cerrar_dos_veces_la_misma_apertura(env):
     client, ids, _ = env
     h = _token(client)
     apertura = _abrir_caja(client, h, ids).json()
-    body = {"monto_real": "100.00", "custodia": "local_caja_fuerte"}
-    ruta = f"/api/v1/accounting/cajas/apertura/{apertura['id']}/cierre"
-    assert client.post(ruta, headers=h, json=body).status_code == 200
-    assert client.post(ruta, headers=h, json=body).status_code == 409
+    assert _cerrar_caja(client, h, apertura["id"], "100.00").status_code == 200
+    assert _cerrar_caja(client, h, apertura["id"], "100.00").status_code == 409
 
 
 def test_cerrar_caja_inexistente_404(env):
     client, ids, _ = env
     h = _token(client)
-    r = client.post(
-        "/api/v1/accounting/cajas/apertura/00000000-0000-0000-0000-000000000000/cierre",
-        headers=h,
-        json={"monto_real": "0", "custodia": "local_caja_fuerte"},
+    r = _cerrar_caja(
+        client, h, "00000000-0000-0000-0000-000000000000", "0.00"
     )
     assert r.status_code == 404
 
@@ -463,7 +481,12 @@ def test_total_efectivo_cobrado_usa_hora_de_apertura_no_desde_siempre(env):
     client, ids, TestSession = env
     h = _token(client)
     ahora = datetime.now(UTC).replace(tzinfo=None)
+    # El cobro "de antes" pertenece al turno anterior: se cobra con esa caja
+    # abierta y recién después se cierra, que es la secuencia real ahora que
+    # cobrar exige turno (RN-MDP-002).
+    turno_anterior = _abrir_caja(client, h, ids, monto="0.00").json()
     _vender_y_cobrar(client, h, ids, key="antes0001", precio="999.00", TestSession=TestSession)
+    _cerrar_caja(client, h, turno_anterior["id"], "999.00")
     apertura = _abrir_caja(client, h, ids, monto="0.00").json()
     with TestSession() as s:
         s.execute(

@@ -64,6 +64,49 @@ def revisar_redis() -> dict:
     return _resultado(OK)
 
 
+CLAVE_LATIDO_WORKER = "provecho:worker:latido"
+
+
+def registrar_latido_worker() -> None:
+    """El worker deja su marca de vida en Redis. Lo llama una tarea de beat.
+
+    Se escribe con TTL en vez de comparar timestamps: si el worker muere, la
+    clave desaparece sola y no hay que decidir "cuán viejo es demasiado
+    viejo" en el lado que lee. El TTL es 3× el intervalo del latido para
+    tolerar un ciclo perdido sin gritar.
+    """
+    try:
+        _cliente_redis().set(
+            CLAVE_LATIDO_WORKER,
+            str(int(time.time())),
+            ex=settings.health_latido_worker_ttl,
+        )
+    except redis.RedisError as e:
+        # Que no se pueda anunciar no es motivo para tumbar la tarea: el
+        # síntoma lo recoge el chequeo del otro lado.
+        log.warning("El worker no pudo registrar su latido: %s", e)
+
+
+def revisar_worker() -> dict:
+    """¿El worker está vivo? Se pregunta por su latido, no por la cola.
+
+    La cola solo delata al worker **cuando hay trabajo**: con cola vacía, un
+    worker muerto y uno ocioso se ven igual, y en un restaurante la cola
+    está vacía casi siempre. El latido los distingue.
+
+    Degradado y no caído: sin worker la caja sigue vendiendo — lo que se
+    posterga es el comprobante y la alerta de cocina.
+    """
+    try:
+        vivo = _cliente_redis().exists(CLAVE_LATIDO_WORKER)
+    except redis.RedisError as e:
+        log.warning("Chequeo de latido del worker falló: %s", e)
+        return _resultado(DEGRADADO, motivo="redis_inalcanzable")
+    if not vivo:
+        return _resultado(DEGRADADO, motivo="sin_latido")
+    return _resultado(OK)
+
+
 def revisar_cola() -> dict:
     """Profundidad de la cola de tareas. Una cola que crece y no baja
     significa worker muerto, no tráfico alto."""
@@ -113,5 +156,6 @@ def revisar_todo() -> tuple[str, dict]:
         "base_datos": revisar_base_datos(),
         "redis": revisar_redis(),
         "cola": revisar_cola(),
+        "worker": revisar_worker(),
     }
     return estado_general(componentes), componentes

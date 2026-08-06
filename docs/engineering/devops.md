@@ -166,6 +166,42 @@ publica puerto — el proxy es la única puerta de entrada.
 Solo Alembic, versionadas en `alembic/versions/`. Nunca modificar la DB a
 mano en producción. `alembic upgrade head` como paso de despliegue.
 
+### Verificar que la base y el modelo cuentan la misma historia
+
+```bash
+docker compose exec api python -m src.core.esquema
+```
+
+Sale `0` si el esquema está al día y `1` con el detalle si no. Responde dos
+preguntas que fallan distinto:
+
+- **Faltan tablas que el modelo declara.** Mira el estado real, no el
+  marcador: atrapa la migración *marcada y no corrida*, la aplicada a
+  medias y la base restaurada de un backup viejo.
+- **La revisión no coincide con la cabeza del repo.** Mira el marcador:
+  atrapa el despliegue al que le falta `alembic upgrade head` aunque todas
+  las tablas existan (una migración que solo agrega columnas o índices no
+  se nota en la lista de tablas).
+
+El mismo chequeo corre **al arrancar el servidor** (`src/main.py`): en
+producción **aborta el arranque**, en desarrollo solo deja un warning en el
+log. Mismo criterio que la validación de configuración: un ERP que arranca
+contra un esquema incompleto atiende requests hasta que alguien toca la
+pantalla equivocada, y ahí el error aparece lejos de su causa.
+
+**Por qué existe** (2026-08-04): las dos bases de desarrollo —la local de
+Docker y la de Supabase— tenían `alembic_version` en una revisión
+*posterior* a la que crea `decision_gerencial`, sin que la tabla existiera.
+`alembic current` decía "al día", el CI estaba verde (`alembic check` compara
+modelo contra migraciones **sobre una base limpia**, no contra la base real)
+y `GET /decisiones-gerenciales` respondía 500. Se descubrió abriendo la
+pantalla, que es exactamente lo que este comando evita.
+
+Se compara solo la **existencia de tablas**, no columnas ni tipos: es el
+grueso del daño con muy poco código, y comparar columna a columna contra
+`Base.metadata` da falsos positivos por detalles de dialecto. Para eso ya
+está `alembic check` en CI.
+
 ## Monitoreo y observabilidad
 
 Implementado 2026-07-26 (`src/core/logging_config.py`, `src/core/sentry.py`).

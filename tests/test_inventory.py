@@ -142,7 +142,7 @@ def test_movimiento_actualiza_stock(env):
     assert r.status_code == 201
     stock = client.get(
         f"/api/v1/inventory/stock?almacen_id={ids['almacen_id']}", headers=h
-    ).json()
+    ).json()["items"]
     assert len(stock) == 1
     assert Decimal(stock[0]["cantidad"]) == Decimal("100")
 
@@ -188,7 +188,7 @@ def test_ajuste_flujo_segregado_ok(env):
     assert r.json()["estado"] == "aprobado"
     stock = client.get(
         f"/api/v1/inventory/stock?almacen_id={ids['almacen_id']}", headers=h_admin
-    ).json()
+    ).json()["items"]
     assert Decimal(stock[0]["cantidad"]) == Decimal("7")
 
 
@@ -205,7 +205,7 @@ def test_stock_bajo_minimo_flag(env):
         st = s.scalar(select(Stock))
         st.stock_minimo = Decimal("5")
         s.commit()
-    stock = client.get("/api/v1/inventory/stock", headers=h).json()
+    stock = client.get("/api/v1/inventory/stock", headers=h).json()["items"]
     assert stock[0]["bajo_minimo"] is True
 
 

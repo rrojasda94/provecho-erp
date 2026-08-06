@@ -146,3 +146,51 @@ def test_crear_usuario_pin_invalido_422(client):
         json={"username": "malpin", "pin": "12ab"},
     )
     assert r.status_code == 422
+
+
+def test_roles_de_un_usuario_traen_su_id_para_poder_quitarlos(client):
+    """La pantalla de Usuarios necesita el id del rol, no solo su nombre:
+    el token trae nombres y con eso no se puede desasignar nada."""
+    admin_token = _login(client).json()["access_token"]
+    h = _auth(admin_token)
+    usuario_id = client.post(
+        "/api/v1/users", headers=h, json={"username": "mozo1", "pin": "654321"}
+    ).json()["id"]
+    assert client.get(f"/api/v1/users/{usuario_id}/roles", headers=h).json() == []
+
+    roles = client.get("/api/v1/roles", headers=h).json()
+    cajero = next(r for r in roles if r["nombre"] == "cajero")
+    client.post(
+        f"/api/v1/users/{usuario_id}/roles", headers=h, json={"rol_id": cajero["id"]}
+    )
+
+    asignados = client.get(f"/api/v1/users/{usuario_id}/roles", headers=h).json()
+    assert [r["nombre"] for r in asignados] == ["cajero"]
+    assert asignados[0]["id"] == cajero["id"]
+
+    client.delete(f"/api/v1/users/{usuario_id}/roles/{cajero['id']}", headers=h)
+    assert client.get(f"/api/v1/users/{usuario_id}/roles", headers=h).json() == []
+
+
+def test_los_permisos_de_un_rol_se_pueden_consultar(client):
+    """Asignar un rol a ciegas —sin ver qué habilita— es justo el error que
+    este endpoint evita."""
+    admin_token = _login(client).json()["access_token"]
+    h = _auth(admin_token)
+    roles = client.get("/api/v1/roles", headers=h).json()
+    cajero = next(r for r in roles if r["nombre"] == "cajero")
+
+    r = client.get(f"/api/v1/roles/{cajero['id']}/permisos", headers=h)
+    assert r.status_code == 200
+    codigos = [p["codigo"] for p in r.json()]
+    assert "sales.cobrar" in codigos
+    assert codigos == sorted(codigos)
+
+
+def test_roles_de_un_usuario_inexistente_404(client):
+    admin_token = _login(client).json()["access_token"]
+    r = client.get(
+        "/api/v1/users/00000000-0000-0000-0000-000000000000/roles",
+        headers=_auth(admin_token),
+    )
+    assert r.status_code == 404

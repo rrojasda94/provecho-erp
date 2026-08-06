@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="Definitions_RRH003" targetNamespace="http://www.bizagi.com/definitions/_rrh003_provecho" xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL">
+  <process id="Process_RRH003" name="TARDANZA O FALTA DEL ENCARGADO A LA APERTURA">
+    <documentation>Alcance: RN-RRHH-010. Empieza cuando el encargado de tienda o el supervisor no llega a la hora de apertura sin aviso previo de al menos 24 horas ni coordinacion con un supervisor, y termina con la medida documentada. La gradualidad es la regla: hasta 30 minutos de retraso es memorandum y NO es sancion; mas de 30 minutos, o falta completa, es carta de amonestacion (RN-RRHH-004) y el encargado asume la responsabilidad documentada. Con aviso previo o coordinacion no aplica: hay cobertura acordada y el proceso no se dispara.</documentation>
+    <laneSet id="LaneSet_1">
+      <lane id="Lane_Encargado3" name="Encargado de tienda / Supervisor"><childLaneSet id="cls_Lane_Encargado3" /></lane>
+      <lane id="Lane_Personal3" name="Personal presente"><childLaneSet id="cls_Lane_Personal3" /></lane>
+      <lane id="Lane_Admin3" name="Administrador"><childLaneSet id="cls_Lane_Admin3" /></lane>
+    </laneSet>
+
+    <startEvent id="te_start" name="Hora de apertura sin el encargado"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#E6FF97" /><bizagi:BizagiProperty name="borderColor" value="#62A716" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <outgoing>f1</outgoing>
+    </startEvent>
+    <exclusiveGateway id="te_gw_aviso" name="Hubo aviso 24 h antes o coordinacion?" gatewayDirection="Mixed"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFFFCC" /><bizagi:BizagiProperty name="borderColor" value="#A6A61D" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f1</incoming>
+      <outgoing>f2</outgoing>
+      <outgoing>f4</outgoing>
+    </exclusiveGateway>
+    <task id="te_cobertura" name="Ejecutar la cobertura ya coordinada"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f2</incoming>
+      <outgoing>f3</outgoing>
+    </task>
+    <endEvent id="te_end_ok" name="Apertura cubierta, sin medida"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFD9D9" /><bizagi:BizagiProperty name="borderColor" value="#C0392B" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f3</incoming>
+    </endEvent>
+    <task id="te_reportar" name="Reportar la ausencia al administrador con la hora exacta"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f4</incoming>
+      <outgoing>f5</outgoing>
+    </task>
+    <task id="te_designar" name="Designar quien abre y registrar la hora real de apertura"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f5</incoming>
+      <outgoing>f6</outgoing>
+    </task>
+    <exclusiveGateway id="te_gw_llega" name="Llega el encargado?" gatewayDirection="Mixed"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFFFCC" /><bizagi:BizagiProperty name="borderColor" value="#A6A61D" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f6</incoming>
+      <outgoing>f7</outgoing>
+      <outgoing>f8</outgoing>
+    </exclusiveGateway>
+    <task id="te_falta" name="Registrar falta (no asistencia)"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f7</incoming>
+      <outgoing>f9</outgoing>
+    </task>
+    <exclusiveGateway id="te_gw_30" name="Retraso mayor a 30 minutos?" gatewayDirection="Mixed"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFFFCC" /><bizagi:BizagiProperty name="borderColor" value="#A6A61D" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f8</incoming>
+      <outgoing>f10</outgoing>
+      <outgoing>f11</outgoing>
+    </exclusiveGateway>
+    <task id="te_memo" name="Emitir memorandum: llamada de atencion, no es sancion"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f10</incoming>
+      <outgoing>f12</outgoing>
+    </task>
+    <task id="te_amonestacion" name="Emitir carta de amonestacion (RN-RRHH-004)"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f9</incoming>
+      <incoming>f11</incoming>
+      <outgoing>f13</outgoing>
+    </task>
+    <task id="te_responsabilidad" name="Dejar documentada la responsabilidad asumida por el encargado"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f13</incoming>
+      <outgoing>f14</outgoing>
+    </task>
+    <task id="te_descargo" name="Firmar cargo o dejar su descargo por escrito"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f12</incoming>
+      <incoming>f14</incoming>
+      <outgoing>f15</outgoing>
+    </task>
+    <task id="te_file" name="Archivar la medida en el file personal"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f15</incoming>
+      <outgoing>f16</outgoing>
+    </task>
+    <endEvent id="te_end" name="Medida documentada"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFD9D9" /><bizagi:BizagiProperty name="borderColor" value="#C0392B" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f16</incoming>
+    </endEvent>
+
+    <sequenceFlow id="f1" sourceRef="te_start" targetRef="te_gw_aviso" />
+    <sequenceFlow id="f2" name="Si hubo" sourceRef="te_gw_aviso" targetRef="te_cobertura" />
+    <sequenceFlow id="f3" sourceRef="te_cobertura" targetRef="te_end_ok" />
+    <sequenceFlow id="f4" name="No hubo" sourceRef="te_gw_aviso" targetRef="te_reportar" />
+    <sequenceFlow id="f5" sourceRef="te_reportar" targetRef="te_designar" />
+    <sequenceFlow id="f6" sourceRef="te_designar" targetRef="te_gw_llega" />
+    <sequenceFlow id="f7" name="No llega" sourceRef="te_gw_llega" targetRef="te_falta" />
+    <sequenceFlow id="f8" name="Llega tarde" sourceRef="te_gw_llega" targetRef="te_gw_30" />
+    <sequenceFlow id="f9" sourceRef="te_falta" targetRef="te_amonestacion" />
+    <sequenceFlow id="f10" name="Hasta 30 min" sourceRef="te_gw_30" targetRef="te_memo" />
+    <sequenceFlow id="f11" name="Mas de 30 min" sourceRef="te_gw_30" targetRef="te_amonestacion" />
+    <sequenceFlow id="f12" sourceRef="te_memo" targetRef="te_descargo" />
+    <sequenceFlow id="f13" sourceRef="te_amonestacion" targetRef="te_responsabilidad" />
+    <sequenceFlow id="f14" sourceRef="te_responsabilidad" targetRef="te_descargo" />
+    <sequenceFlow id="f15" sourceRef="te_descargo" targetRef="te_file" />
+    <sequenceFlow id="f16" sourceRef="te_file" targetRef="te_end" />
+  </process>
+  <collaboration id="Collab_1" name="TARDANZA O FALTA DEL ENCARGADO A LA APERTURA - Provecho ERP">
+    <participant id="Participant_RRH003" name="TARDANZA O FALTA DEL ENCARGADO A LA APERTURA" processRef="Process_RRH003" />
+  </collaboration>
+  <bpmndi:BPMNDiagram xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:omgdc="http://www.omg.org/spec/DD/20100524/DC" xmlns:omgdi="http://www.omg.org/spec/DD/20100524/DI" id="Diagram_1">
+    <bpmndi:BPMNPlane id="Plane_1" bpmnElement="Collab_1">
+      <bpmndi:BPMNShape id="DE_Participant_RRH003" bpmnElement="Participant_RRH003" isHorizontal="true">
+        <omgdc:Bounds x="20" y="20" width="2010" height="790" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_Lane_Encargado3" bpmnElement="Lane_Encargado3" isHorizontal="true">
+        <omgdc:Bounds x="50" y="90" width="1980" height="220" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_Lane_Personal3" bpmnElement="Lane_Personal3" isHorizontal="true">
+        <omgdc:Bounds x="50" y="310" width="1980" height="220" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_Lane_Admin3" bpmnElement="Lane_Admin3" isHorizontal="true">
+        <omgdc:Bounds x="50" y="530" width="1980" height="220" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="DE_te_start" bpmnElement="te_start"><omgdc:Bounds x="90" y="405" width="30" height="30" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_te_gw_aviso" bpmnElement="te_gw_aviso"><omgdc:Bounds x="240" y="400" width="40" height="40" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_te_cobertura" bpmnElement="te_cobertura"><omgdc:Bounds x="390" y="390" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_te_end_ok" bpmnElement="te_end_ok"><omgdc:Bounds x="540" y="405" width="30" height="30" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_te_reportar" bpmnElement="te_reportar"><omgdc:Bounds x="390" y="390" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_te_designar" bpmnElement="te_designar"><omgdc:Bounds x="540" y="610" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_te_gw_llega" bpmnElement="te_gw_llega"><omgdc:Bounds x="690" y="180" width="40" height="40" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_te_falta" bpmnElement="te_falta"><omgdc:Bounds x="840" y="610" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_te_gw_30" bpmnElement="te_gw_30"><omgdc:Bounds x="990" y="620" width="40" height="40" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_te_memo" bpmnElement="te_memo"><omgdc:Bounds x="1140" y="610" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_te_amonestacion" bpmnElement="te_amonestacion"><omgdc:Bounds x="1140" y="610" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_te_responsabilidad" bpmnElement="te_responsabilidad"><omgdc:Bounds x="1290" y="170" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_te_descargo" bpmnElement="te_descargo"><omgdc:Bounds x="1440" y="170" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_te_file" bpmnElement="te_file"><omgdc:Bounds x="1590" y="610" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_te_end" bpmnElement="te_end"><omgdc:Bounds x="1740" y="625" width="30" height="30" /></bpmndi:BPMNShape>
+
+      <bpmndi:BPMNEdge id="DE_f1" bpmnElement="f1"><omgdi:waypoint x="120" y="420" /><omgdi:waypoint x="240" y="420" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f2" bpmnElement="f2"><omgdi:waypoint x="280" y="420" /><omgdi:waypoint x="390" y="420" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f3" bpmnElement="f3"><omgdi:waypoint x="480" y="420" /><omgdi:waypoint x="540" y="420" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f4" bpmnElement="f4"><omgdi:waypoint x="280" y="420" /><omgdi:waypoint x="390" y="420" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f5" bpmnElement="f5"><omgdi:waypoint x="480" y="420" /><omgdi:waypoint x="540" y="640" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f6" bpmnElement="f6"><omgdi:waypoint x="630" y="640" /><omgdi:waypoint x="690" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f7" bpmnElement="f7"><omgdi:waypoint x="730" y="200" /><omgdi:waypoint x="840" y="640" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f8" bpmnElement="f8"><omgdi:waypoint x="730" y="200" /><omgdi:waypoint x="990" y="640" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f9" bpmnElement="f9"><omgdi:waypoint x="930" y="640" /><omgdi:waypoint x="1140" y="640" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f10" bpmnElement="f10"><omgdi:waypoint x="1030" y="640" /><omgdi:waypoint x="1140" y="640" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f11" bpmnElement="f11"><omgdi:waypoint x="1030" y="640" /><omgdi:waypoint x="1140" y="640" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f12" bpmnElement="f12"><omgdi:waypoint x="1230" y="640" /><omgdi:waypoint x="1440" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f13" bpmnElement="f13"><omgdi:waypoint x="1230" y="640" /><omgdi:waypoint x="1290" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f14" bpmnElement="f14"><omgdi:waypoint x="1380" y="200" /><omgdi:waypoint x="1440" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f15" bpmnElement="f15"><omgdi:waypoint x="1530" y="200" /><omgdi:waypoint x="1590" y="640" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f16" bpmnElement="f16"><omgdi:waypoint x="1680" y="640" /><omgdi:waypoint x="1740" y="640" /></bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</definitions>

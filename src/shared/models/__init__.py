@@ -5,6 +5,7 @@ from src.shared.models.comprobante import Comprobante
 from src.shared.models.decision_gerencial import DecisionGerencial
 from src.shared.models.divisa import Divisa
 from src.shared.models.parametro_empresa import ParametroEmpresa
+from src.shared.models.tablero import Tablero
 
 __all__ = [
     "Archivo",
@@ -12,4 +13,5 @@ __all__ = [
     "DecisionGerencial",
     "Divisa",
     "ParametroEmpresa",
+    "Tablero",
 ]

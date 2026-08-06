@@ -47,6 +47,7 @@ from src.modules.users.infrastructure.models import (
     Usuario,
 )
 from src.shared import fechas
+from tests.conftest import abrir_caja_directa
 
 pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")
 
@@ -156,6 +157,11 @@ def base(session):
     )
     session.add_all([usuario, medio])
     session.flush()
+    # Cobrar exige turno de caja abierto (RN-MDP-002). Este archivo prueba el
+    # PDV, no la caja: el turno se inserta directo.
+    abrir_caja_directa(
+        session, punto_venta_id=punto_venta.id, cajero_id=usuario.id
+    )
 
     return {
         "grupo": grupo,

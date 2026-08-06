@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="Definitions_INV001" targetNamespace="http://www.bizagi.com/definitions/_inv001_provecho" xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL">
+  <process id="Process_INV001" name="ABASTECIMIENTO DE LOCALES">
+    <documentation>Alcance: desde el conteo de fin de jornada en sucursal hasta que el local recibe la mercaderia y el stock queda actualizado. Implementado en el slice 4 de inventory (ADR-020): el local pide, el supervisor aprueba y RESERVA el stock en el abastecedor, el central despacha por FEFO y el local recibe. Reglas: no se despacha mas de lo aprobado ni se recibe mas de lo enviado, menos si, y la diferencia queda registrada sin corregirse sola (RN-INV-001/002); reservar exige disponible pero consumir nunca se bloquea por una reserva; el traslado viaja con guia de remision (RN-GDR-002, ADR-027). El conteo de fin de jornada alerta por margen de error (RN-INV-015) y alimenta el sugerido (RN-INV-013).</documentation>
+    <laneSet id="LaneSet_1">
+      <lane id="Lane_Local" name="Local / Sucursal"><childLaneSet id="cls_Lane_Local" /></lane>
+      <lane id="Lane_Supervisor" name="Supervisor"><childLaneSet id="cls_Lane_Supervisor" /></lane>
+      <lane id="Lane_Central" name="Almacen central"><childLaneSet id="cls_Lane_Central" /></lane>
+      <lane id="Lane_Transporte" name="Transporte"><childLaneSet id="cls_Lane_Transporte" /></lane>
+    </laneSet>
+
+    <startEvent id="ab_start" name="Cierre de jornada en sucursal"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#E6FF97" /><bizagi:BizagiProperty name="borderColor" value="#62A716" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <outgoing>f1</outgoing>
+    </startEvent>
+    <task id="ab_contar" name="Contar el stock de fin de jornada con balanza y QR"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f1</incoming>
+      <outgoing>f2</outgoing>
+    </task>
+    <exclusiveGateway id="ab_gw_margen" name="Diferencia dentro del margen?" gatewayDirection="Mixed"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFFFCC" /><bizagi:BizagiProperty name="borderColor" value="#A6A61D" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f2</incoming>
+      <outgoing>f3</outgoing>
+      <outgoing>f5</outgoing>
+    </exclusiveGateway>
+    <task id="ab_ajuste" name="Solicitar ajuste con evidencia (RN-INV-015)"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f3</incoming>
+      <outgoing>f4</outgoing>
+    </task>
+    <task id="ab_sugerido" name="Calcular el sugerido de reposicion (RN-INV-013)"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f4</incoming>
+      <incoming>f5</incoming>
+      <outgoing>f6</outgoing>
+    </task>
+    <task id="ab_solicitar" name="Registrar la solicitud de insumos al abastecedor"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f6</incoming>
+      <outgoing>f7</outgoing>
+    </task>
+    <task id="ab_revisar" name="Revisar lo pedido contra consumo real y stock del central"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f7</incoming>
+      <outgoing>f8</outgoing>
+    </task>
+    <exclusiveGateway id="ab_gw_aprueba" name="Aprueba?" gatewayDirection="Mixed"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFFFCC" /><bizagi:BizagiProperty name="borderColor" value="#A6A61D" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f8</incoming>
+      <outgoing>f9</outgoing>
+      <outgoing>f11</outgoing>
+    </exclusiveGateway>
+    <task id="ab_rechazar" name="Rechazar o recortar la solicitud dejando el motivo"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f9</incoming>
+      <outgoing>f10</outgoing>
+    </task>
+    <endEvent id="ab_end_rech" name="Solicitud cerrada sin despacho"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFD9D9" /><bizagi:BizagiProperty name="borderColor" value="#C0392B" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f10</incoming>
+    </endEvent>
+    <task id="ab_reservar" name="Aprobar y reservar el stock en el abastecedor"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f11</incoming>
+      <outgoing>f12</outgoing>
+    </task>
+    <task id="ab_picking" name="Hacer el picking por FEFO: una linea por lote tomado"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f12</incoming>
+      <outgoing>f13</outgoing>
+    </task>
+    <exclusiveGateway id="ab_gw_completo" name="Hay stock para todo lo aprobado?" gatewayDirection="Mixed"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFFFCC" /><bizagi:BizagiProperty name="borderColor" value="#A6A61D" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f13</incoming>
+      <outgoing>f14</outgoing>
+      <outgoing>f15</outgoing>
+    </exclusiveGateway>
+    <task id="ab_parcial" name="Despachar lo disponible y dejar la diferencia a la vista"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f14</incoming>
+      <outgoing>f16</outgoing>
+    </task>
+    <task id="ab_despachar" name="Despachar la transferencia: el stock sale y queda en transito"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f15</incoming>
+      <outgoing>f17</outgoing>
+    </task>
+    <task id="ab_guia" name="Emitir la guia de remision del traslado (RN-GDR-002)"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f16</incoming>
+      <incoming>f17</incoming>
+      <outgoing>f18</outgoing>
+    </task>
+    <task id="ab_trasladar" name="Trasladar la mercaderia con la guia a bordo"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f18</incoming>
+      <outgoing>f19</outgoing>
+    </task>
+    <task id="ab_recibir" name="Recibir y contar lote por lote contra lo enviado"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f19</incoming>
+      <outgoing>f20</outgoing>
+    </task>
+    <exclusiveGateway id="ab_gw_dif" name="Coincide con lo enviado?" gatewayDirection="Mixed"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFFFCC" /><bizagi:BizagiProperty name="borderColor" value="#A6A61D" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f20</incoming>
+      <outgoing>f21</outgoing>
+      <outgoing>f23</outgoing>
+    </exclusiveGateway>
+    <task id="ab_registrar_dif" name="Registrar la diferencia: entra lo que llego, no se corrige sola"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f21</incoming>
+      <outgoing>f22</outgoing>
+    </task>
+    <task id="ab_ingresar" name="Ingresar al stock del local"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#ECEFFF" /><bizagi:BizagiProperty name="borderColor" value="#03689A" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f22</incoming>
+      <incoming>f23</incoming>
+      <outgoing>f24</outgoing>
+    </task>
+    <endEvent id="ab_end" name="Local abastecido y stock actualizado"><extensionElements><bizagi:BizagiExtensions xmlns:bizagi="http://www.bizagi.com/bpmn20"><bizagi:BizagiProperties><bizagi:BizagiProperty name="bgColor" value="#FFD9D9" /><bizagi:BizagiProperty name="borderColor" value="#C0392B" /><bizagi:BizagiProperty name="textColor" value="#000000" /><bizagi:BizagiProperty name="textBackgroundColor" value="Transparent" /><bizagi:BizagiProperty name="textDirection" value="" /></bizagi:BizagiProperties></bizagi:BizagiExtensions></extensionElements>
+      <incoming>f24</incoming>
+    </endEvent>
+
+    <sequenceFlow id="f1" sourceRef="ab_start" targetRef="ab_contar" />
+    <sequenceFlow id="f2" sourceRef="ab_contar" targetRef="ab_gw_margen" />
+    <sequenceFlow id="f3" name="Fuera de margen" sourceRef="ab_gw_margen" targetRef="ab_ajuste" />
+    <sequenceFlow id="f4" sourceRef="ab_ajuste" targetRef="ab_sugerido" />
+    <sequenceFlow id="f5" name="Dentro" sourceRef="ab_gw_margen" targetRef="ab_sugerido" />
+    <sequenceFlow id="f6" sourceRef="ab_sugerido" targetRef="ab_solicitar" />
+    <sequenceFlow id="f7" sourceRef="ab_solicitar" targetRef="ab_revisar" />
+    <sequenceFlow id="f8" sourceRef="ab_revisar" targetRef="ab_gw_aprueba" />
+    <sequenceFlow id="f9" name="No" sourceRef="ab_gw_aprueba" targetRef="ab_rechazar" />
+    <sequenceFlow id="f10" sourceRef="ab_rechazar" targetRef="ab_end_rech" />
+    <sequenceFlow id="f11" name="Si" sourceRef="ab_gw_aprueba" targetRef="ab_reservar" />
+    <sequenceFlow id="f12" sourceRef="ab_reservar" targetRef="ab_picking" />
+    <sequenceFlow id="f13" sourceRef="ab_picking" targetRef="ab_gw_completo" />
+    <sequenceFlow id="f14" name="Parcial" sourceRef="ab_gw_completo" targetRef="ab_parcial" />
+    <sequenceFlow id="f15" name="Completo" sourceRef="ab_gw_completo" targetRef="ab_despachar" />
+    <sequenceFlow id="f16" sourceRef="ab_parcial" targetRef="ab_guia" />
+    <sequenceFlow id="f17" sourceRef="ab_despachar" targetRef="ab_guia" />
+    <sequenceFlow id="f18" sourceRef="ab_guia" targetRef="ab_trasladar" />
+    <sequenceFlow id="f19" sourceRef="ab_trasladar" targetRef="ab_recibir" />
+    <sequenceFlow id="f20" sourceRef="ab_recibir" targetRef="ab_gw_dif" />
+    <sequenceFlow id="f21" name="No coincide" sourceRef="ab_gw_dif" targetRef="ab_registrar_dif" />
+    <sequenceFlow id="f22" sourceRef="ab_registrar_dif" targetRef="ab_ingresar" />
+    <sequenceFlow id="f23" name="Coincide" sourceRef="ab_gw_dif" targetRef="ab_ingresar" />
+    <sequenceFlow id="f24" sourceRef="ab_ingresar" targetRef="ab_end" />
+  </process>
+  <collaboration id="Collab_1" name="ABASTECIMIENTO DE LOCALES - Provecho ERP">
+    <participant id="Participant_INV001" name="ABASTECIMIENTO DE LOCALES" processRef="Process_INV001" />
+  </collaboration>
+  <bpmndi:BPMNDiagram xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:omgdc="http://www.omg.org/spec/DD/20100524/DC" xmlns:omgdi="http://www.omg.org/spec/DD/20100524/DI" id="Diagram_1">
+    <bpmndi:BPMNPlane id="Plane_1" bpmnElement="Collab_1">
+      <bpmndi:BPMNShape id="DE_Participant_INV001" bpmnElement="Participant_INV001" isHorizontal="true">
+        <omgdc:Bounds x="20" y="20" width="3060" height="1010" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_Lane_Local" bpmnElement="Lane_Local" isHorizontal="true">
+        <omgdc:Bounds x="50" y="90" width="3030" height="220" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_Lane_Supervisor" bpmnElement="Lane_Supervisor" isHorizontal="true">
+        <omgdc:Bounds x="50" y="310" width="3030" height="220" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_Lane_Central" bpmnElement="Lane_Central" isHorizontal="true">
+        <omgdc:Bounds x="50" y="530" width="3030" height="220" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_Lane_Transporte" bpmnElement="Lane_Transporte" isHorizontal="true">
+        <omgdc:Bounds x="50" y="750" width="3030" height="220" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="DE_ab_start" bpmnElement="ab_start"><omgdc:Bounds x="90" y="185" width="30" height="30" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_ab_contar" bpmnElement="ab_contar"><omgdc:Bounds x="240" y="170" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_ab_gw_margen" bpmnElement="ab_gw_margen"><omgdc:Bounds x="390" y="180" width="40" height="40" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_ab_ajuste" bpmnElement="ab_ajuste"><omgdc:Bounds x="540" y="170" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_ab_sugerido" bpmnElement="ab_sugerido"><omgdc:Bounds x="690" y="170" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_ab_solicitar" bpmnElement="ab_solicitar"><omgdc:Bounds x="840" y="170" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_ab_revisar" bpmnElement="ab_revisar"><omgdc:Bounds x="990" y="390" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_ab_gw_aprueba" bpmnElement="ab_gw_aprueba"><omgdc:Bounds x="1140" y="400" width="40" height="40" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_ab_rechazar" bpmnElement="ab_rechazar"><omgdc:Bounds x="1290" y="390" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_ab_end_rech" bpmnElement="ab_end_rech"><omgdc:Bounds x="1440" y="405" width="30" height="30" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_ab_reservar" bpmnElement="ab_reservar"><omgdc:Bounds x="1290" y="390" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_ab_picking" bpmnElement="ab_picking"><omgdc:Bounds x="1440" y="610" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_ab_gw_completo" bpmnElement="ab_gw_completo"><omgdc:Bounds x="1590" y="620" width="40" height="40" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_ab_parcial" bpmnElement="ab_parcial"><omgdc:Bounds x="1740" y="610" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_ab_despachar" bpmnElement="ab_despachar"><omgdc:Bounds x="1740" y="610" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_ab_guia" bpmnElement="ab_guia"><omgdc:Bounds x="1890" y="610" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_ab_trasladar" bpmnElement="ab_trasladar"><omgdc:Bounds x="2040" y="830" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_ab_recibir" bpmnElement="ab_recibir"><omgdc:Bounds x="2190" y="170" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_ab_gw_dif" bpmnElement="ab_gw_dif"><omgdc:Bounds x="2340" y="180" width="40" height="40" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_ab_registrar_dif" bpmnElement="ab_registrar_dif"><omgdc:Bounds x="2490" y="170" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_ab_ingresar" bpmnElement="ab_ingresar"><omgdc:Bounds x="2640" y="170" width="90" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DE_ab_end" bpmnElement="ab_end"><omgdc:Bounds x="2790" y="185" width="30" height="30" /></bpmndi:BPMNShape>
+
+      <bpmndi:BPMNEdge id="DE_f1" bpmnElement="f1"><omgdi:waypoint x="120" y="200" /><omgdi:waypoint x="240" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f2" bpmnElement="f2"><omgdi:waypoint x="330" y="200" /><omgdi:waypoint x="390" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f3" bpmnElement="f3"><omgdi:waypoint x="430" y="200" /><omgdi:waypoint x="540" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f4" bpmnElement="f4"><omgdi:waypoint x="630" y="200" /><omgdi:waypoint x="690" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f5" bpmnElement="f5"><omgdi:waypoint x="430" y="200" /><omgdi:waypoint x="690" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f6" bpmnElement="f6"><omgdi:waypoint x="780" y="200" /><omgdi:waypoint x="840" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f7" bpmnElement="f7"><omgdi:waypoint x="930" y="200" /><omgdi:waypoint x="990" y="420" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f8" bpmnElement="f8"><omgdi:waypoint x="1080" y="420" /><omgdi:waypoint x="1140" y="420" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f9" bpmnElement="f9"><omgdi:waypoint x="1180" y="420" /><omgdi:waypoint x="1290" y="420" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f10" bpmnElement="f10"><omgdi:waypoint x="1380" y="420" /><omgdi:waypoint x="1440" y="420" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f11" bpmnElement="f11"><omgdi:waypoint x="1180" y="420" /><omgdi:waypoint x="1290" y="420" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f12" bpmnElement="f12"><omgdi:waypoint x="1380" y="420" /><omgdi:waypoint x="1440" y="640" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f13" bpmnElement="f13"><omgdi:waypoint x="1530" y="640" /><omgdi:waypoint x="1590" y="640" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f14" bpmnElement="f14"><omgdi:waypoint x="1630" y="640" /><omgdi:waypoint x="1740" y="640" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f15" bpmnElement="f15"><omgdi:waypoint x="1630" y="640" /><omgdi:waypoint x="1740" y="640" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f16" bpmnElement="f16"><omgdi:waypoint x="1830" y="640" /><omgdi:waypoint x="1890" y="640" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f17" bpmnElement="f17"><omgdi:waypoint x="1830" y="640" /><omgdi:waypoint x="1890" y="640" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f18" bpmnElement="f18"><omgdi:waypoint x="1980" y="640" /><omgdi:waypoint x="2040" y="860" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f19" bpmnElement="f19"><omgdi:waypoint x="2130" y="860" /><omgdi:waypoint x="2190" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f20" bpmnElement="f20"><omgdi:waypoint x="2280" y="200" /><omgdi:waypoint x="2340" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f21" bpmnElement="f21"><omgdi:waypoint x="2380" y="200" /><omgdi:waypoint x="2490" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f22" bpmnElement="f22"><omgdi:waypoint x="2580" y="200" /><omgdi:waypoint x="2640" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f23" bpmnElement="f23"><omgdi:waypoint x="2380" y="200" /><omgdi:waypoint x="2640" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DE_f24" bpmnElement="f24"><omgdi:waypoint x="2730" y="200" /><omgdi:waypoint x="2790" y="200" /></bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</definitions>

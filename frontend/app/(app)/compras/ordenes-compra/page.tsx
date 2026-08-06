@@ -1,4 +1,4 @@
-import { ApiError, apiFetch } from "@/lib/api";
+import { ApiError, apiFetch, type Pagina } from "@/lib/api";
 import { obtenerSesion } from "@/lib/sesion";
 
 import {
@@ -14,17 +14,17 @@ export default async function OrdenesCompraPage() {
 
   try {
     const [ordenes, proveedores, almacenes, articulos] = await Promise.all([
-      apiFetch<OrdenCompra[]>("/api/v1/purchases/ordenes-compra", { token }),
-      apiFetch<Proveedor[]>("/api/v1/purchases/proveedores", { token }),
+      apiFetch<Pagina<OrdenCompra>>("/api/v1/purchases/ordenes-compra", { token }),
+      apiFetch<Pagina<Proveedor>>("/api/v1/purchases/proveedores", { token }),
       apiFetch<Almacen[]>("/api/v1/almacenes", { token }),
-      apiFetch<Articulo[]>("/api/v1/inventory/articulos", { token }),
+      apiFetch<Pagina<Articulo>>("/api/v1/inventory/articulos", { token }),
     ]);
     return (
       <OrdenesCompraCliente
-        ordenes={ordenes}
-        proveedores={proveedores}
+        ordenes={ordenes.items}
+        proveedores={proveedores.items}
         almacenes={almacenes}
-        articulos={articulos}
+        articulos={articulos.items}
       />
     );
   } catch (e) {

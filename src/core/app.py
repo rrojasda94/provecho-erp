@@ -12,6 +12,8 @@ from src.core import error_handlers
 from src.core.dashboard_router import router as dashboard_router
 from src.core.health_router import router as health_router
 from src.core.logging_config import configurar_logging, request_id_var
+from src.core.reportes.router import router as reportes_router
+from src.core.reportes.router import router_tableros
 from src.core.sentry import iniciar_sentry
 from src.core.sync.api.routers import router as sync_router
 from src.core.tenant import FueraDeAlcance
@@ -26,8 +28,10 @@ from src.modules.purchases.api.routers import router as purchases_router
 from src.modules.rrhh.api.routers import router as rrhh_router
 from src.modules.sales.api.kds_routers import router as kds_router
 from src.modules.sales.api.routers import router as sales_router
+from src.modules.sales.application import listeners as sales_listeners
 from src.modules.users.api import error_handlers as users_error_handlers
 from src.modules.users.api.routers import router as users_router
+from src.modules.users.application import listeners as users_listeners
 
 log = logging.getLogger("provecho.app")
 
@@ -97,6 +101,14 @@ TAGS_METADATA = [
         "description": "Agregado gerencial de solo lectura: ventas del día, stock crítico, caja.",
     },
     {
+        "name": "reportes",
+        "description": (
+            "Catálogo cerrado de reportes del tablero (ADR-024) y tableros "
+            "guardados por usuario. El cliente elige un `codigo` del catálogo "
+            "y filtros tipados; no existe constructor de consultas."
+        ),
+    },
+    {
         "name": "sync",
         "description": (
             "Replicación con el hub local de sucursal (ADR-009): catálogo y RBAC "
@@ -164,6 +176,18 @@ def create_app() -> FastAPI:
         respuesta.headers["X-Content-Type-Options"] = "nosniff"
         respuesta.headers["X-Frame-Options"] = "DENY"
         respuesta.headers["Referrer-Policy"] = "no-referrer"
+        # Esta API devuelve JSON: no tiene por qué cargar *nada*. La CSP más
+        # restrictiva posible es la correcta acá, y convierte cualquier
+        # respuesta que llegara a interpretarse como HTML (un payload
+        # reflejado, un error mal serializado) en algo inerte.
+        # `/docs` queda fuera porque Swagger UI carga su JS/CSS de un CDN;
+        # en producción no existe (`docs_url=None`), así que la excepción
+        # solo vive en desarrollo.
+        if not request.url.path.startswith("/docs"):
+            respuesta.headers["Content-Security-Policy"] = (
+                "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; "
+                "form-action 'none'"
+            )
         if settings.es_produccion:
             # Solo en producción: en local fijaría https para localhost.
             respuesta.headers["Strict-Transport-Security"] = (
@@ -214,6 +238,8 @@ def create_app() -> FastAPI:
 
     app.include_router(health_router)
     app.include_router(dashboard_router, prefix="/api/v1")
+    app.include_router(reportes_router, prefix="/api/v1")
+    app.include_router(router_tableros, prefix="/api/v1")
     app.include_router(users_router, prefix="/api/v1")
     app.include_router(inventory_router, prefix="/api/v1")
     app.include_router(sales_router, prefix="/api/v1")
@@ -227,4 +253,6 @@ def create_app() -> FastAPI:
     inventory_listeners.register()
     accounting_listeners.register()
     marketing_listeners.register()
+    sales_listeners.register()
+    users_listeners.register()
     return app

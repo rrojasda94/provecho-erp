@@ -16,7 +16,11 @@ celery_app = Celery(
     "provecho",
     broker=settings.broker_url,
     backend=settings.broker_url,
-    include=["src.modules.sales.application.tasks"],
+    include=[
+        "src.core.tasks_salud",
+        "src.modules.inventory.application.tasks",
+        "src.modules.sales.application.tasks",
+    ],
 )
 
 celery_app.conf.update(
@@ -25,7 +29,42 @@ celery_app.conf.update(
     accept_content=["json"],
     timezone="America/Lima",
     enable_utc=True,
+    # Encolar NUNCA puede colgar al que encola. Quien llama a `apply_async`
+    # suele estar dentro de un request —el listener de `sales.venta_confirmada`
+    # corre en la transacción que acaba de cobrar—, así que un broker caído
+    # tiene que fallar en un segundo y no bloquear al cajero mirando una
+    # pantalla congelada. El barrido periódico recupera lo que no se encoló.
+    broker_connection_timeout=1.0,
+    broker_connection_retry_on_startup=False,
+    broker_transport_options={
+        "socket_connect_timeout": 1,
+        "socket_timeout": 1,
+    },
 )
+
+# Barrido periódico de pedidos demorados (Celery beat).
+#
+# Cada venta confirmada ya agenda su propia revisión puntual; esto es la red
+# de seguridad. Corre cada 5 minutos y no cada 15 porque no está sincronizado
+# con ningún pedido en particular: con 5, una alerta que la tarea puntual
+# perdió llega como mucho 5 minutos tarde.
+#
+# El barrido es idempotente (`UNIQUE (venta_id, minutos_umbral)`), así que
+# solaparse con la revisión puntual no duplica nada. Levantarlo:
+#   celery -A src.core.celery_app.celery_app beat
+celery_app.conf.beat_schedule = {
+    "barrer-pedidos-demorados": {
+        "task": "sales.barrer_pedidos_demorados",
+        "schedule": 300.0,
+    },
+    # Marca de vida del worker: `/health/ready` la lee en vez de deducir la
+    # salud del worker por la profundidad de la cola, que con cola vacía no
+    # distingue "muerto" de "ocioso". Cada minuto, con TTL de 3 min.
+    "latido-worker": {
+        "task": "core.latido_worker",
+        "schedule": 60.0,
+    },
+}
 
 
 @celeryd_init.connect

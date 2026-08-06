@@ -50,6 +50,28 @@ cuatro huecos que el punto de venta necesitaba y el modelo no daba.
 - `comprobante.receptor_num_doc` / `receptor_nombre` (RN-CPP-003): el
   DNI/RUC que el cajero teclea al cobrar, sin exigir cliente registrado.
   11 dígitos → factura; 8, `00000000` o vacío → boleta.
+- **Descarga del comprobante emitido**
+  (`GET /sales/comprobantes/{id}/descargar/{pdf|xml|cdr}`): el PDF para el
+  cliente, el XML firmado y el CDR como respaldo ante SUNAT. Se piden a
+  Factiliza en el momento y no se archivan — su copia es la buena mientras
+  el proveedor siga activo — y los bytes vuelven sin tocar, porque
+  reescribir un XML firmado lo invalida.
+- **Nota de crédito** (RN-CPP-009, `application/notas_credito.py`,
+  `POST /sales/comprobantes/{id}/nota-credito`): una venta ya cobrada no se
+  anula, se acredita. Total o **parcial por ítem**, con motivo del catálogo
+  09 de SUNAT, contra un comprobante **aceptado** y **una sola vez**. Numera
+  en **serie propia** del punto de venta (`serie_nc_boleta`/
+  `serie_nc_factura`): mezclarla con la de la boleta es rechazo seguro.
+  Tres cosas las decide quien emite, porque no hay respuesta universal:
+  `repone_stock` (en cocina el plato devuelto rara vez devuelve el insumo),
+  el motivo —anulación y devolución dan de baja la venta; error de RUC o de
+  descripción **no**, solo liberan el comprobante para reemitir el
+  corregido— y el detalle. Una nota rechazada por SUNAT no corrige nada:
+  queda con su motivo y la venta sigue igual. Permiso propio
+  `sales.emitir_nota_credito` — acreditar devuelve dinero, no es acto de
+  cajero. La reposición viaja en `sales.nota_credito_emitida` con el mismo
+  shape que `venta_anulada`, así que la consume el listener de inventory que
+  ya existía.
 - Descuento manual de orden en `venta` (`descuento_modo`,
   `descuento_valor`, `descuento_motivo`, `descuento_autorizado_por`,
   RN-COM-017), con permiso propio `sales.aplicar_descuento` (supervisor,
@@ -153,12 +175,19 @@ CRUD de productos comerciales y medios de pago. Capas `domain/rules.py`,
 | Método | Ruta | Permiso |
 |--------|------|---------|
 | POST | `/ventas` | `sales.crear` |
+| GET | `/ventas?sucursal_id=&desde=&hasta=&estado=&punto_venta_id=` | `sales.leer` |
 | GET | `/ventas/{id}` | `sales.leer` |
 | POST | `/ventas/{id}/pagos` | `sales.cobrar` |
 | POST | `/ventas/{id}/anular` | `sales.anular` |
 | POST/GET/PATCH | `/productos[/{id}]` | `gestionar_catalogo` / `leer` |
 | POST/GET | `/medios-pago` | `gestionar_catalogo` / `leer` |
 | GET | `/clientes?grupo_id=` | `sales.leer_clientes_externos` |
+
+`GET /ventas` es **uno solo** para el PDV y el back-office (paginado,
+ADR-026): sin parámetros da la jornada de hoy en las sucursales del usuario
+—que es lo que el PDV pide para su pestaña de cobrados— y con `desde`/`hasta`
+(inclusivos) da el histórico. Un endpoint por uso terminaba en dos consultas
+que se desincronizan.
 
 **Kiosk y Central de Pedidos NO son módulos**: son clientes del mismo
 contrato `POST /ventas` (`punto_venta.canal = kiosko|web|trabajador`),
@@ -405,6 +434,35 @@ Producto comercial → receta → confirmar venta → evento `sales.venta_confir
   `sales.descuento_aplicado` (RN-COM-017 — alimenta el reporte de
   descuentos), `sales.lineas_anuladas` (RN-COM-020 — inventory repone lo
   que ya no se prepara), `sales.carrito_abandonado` (analítica de embudo,
-  RN-COM-013).
-- Escucha: nada (consulta stock vía contrato público de inventory).
+  RN-COM-013), `sales.pedido_demorado` (el pedido superó su tiempo en
+  cocina — ver abajo).
+- Escucha: **`sales.venta_confirmada`, de sí mismo**
+  (`application/listeners.py`). Es el único listener del módulo y no hace
+  trabajo: encola la revisión de demora y vuelve. El bus es síncrono y en
+  proceso, así que bloquear ahí congelaría la caja que acaba de cobrar.
+  También consulta stock vía el contrato público de inventory.
+
+### Alerta de pedido demorado
+
+`alerta_pedido` registra un pedido que superó su tiempo en cocina y seguía
+sin salir. Dos caminos la disparan y **se solapan a propósito**:
+
+1. `on_venta_confirmada` agenda `sales.revisar_demora_pedido` con
+   `countdown` = umbral (llega puntual).
+2. `sales.barrer_pedidos_demorados`, en Celery beat cada 5 min, repasa todo
+   lo que siga en cocina (llega igual si el worker estuvo caído, si el
+   broker soltó la tarea, o si la venta nació sin worker escuchando).
+
+Para una alerta el modo de fallo que importa es **no avisar**: la tarea
+puntual sola es silenciosamente frágil y el barrido solo llegaría con hasta
+un ciclo de retraso. Tenerlos juntos es seguro porque
+`revisar_pedido` es idempotente — pre-chequeo + `UNIQUE (venta_id,
+minutos_umbral)`, y el INSERT dentro de un SAVEPOINT para que una carrera
+entre dos workers no se lleve por delante lo que el barrido ya creó.
+
+El umbral es `parametro_empresa` `sales/minutos_alerta_pedido` (15 por
+defecto) y **se copia a la fila**: subirlo mañana no reescribe lo que ayer
+fue demora. El reporte `pedidos_demorados` del tablero lee esta tabla.
+
+Levantar el barrido: `celery -A src.core.celery_app.celery_app beat`.
 - Integraciones: Factiliza (facturación electrónica), Izipay, Meta API (pedidos por WhatsApp).

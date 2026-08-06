@@ -169,7 +169,7 @@ def test_flujo_completo_conforme_actualiza_stock_y_costo(env):
 
     stock = client.get(
         f"/api/v1/inventory/stock?almacen_id={ids['almacen_id']}", headers=h
-    ).json()
+    ).json()["items"]
     por_sku = {s["sku_id"]: Decimal(s["cantidad"]) for s in stock}
     assert Decimal("990") in por_sku.values()  # harina: 1000 - 10
     assert Decimal("10") in por_sku.values()  # masa producida
@@ -266,4 +266,55 @@ def test_rol_sin_permiso_production_403(env):
 
     h_cajero = _token(client, "cajero_test", "222222")
     r = _crear_orden(client, h_cajero, ids, idempotency_key="op-key-8")
+    assert r.status_code == 403
+
+
+def test_listar_ordenes_filtra_por_estado_y_pagina(env):
+    """Sin listado, la cocina solo podía ver una orden si ya sabía su id."""
+    client, ids, _ = env
+    h = _token(client)
+    _crear_orden(client, h, ids, idempotency_key="op-list-1")
+    _crear_orden(client, h, ids, idempotency_key="op-list-2")
+
+    r = client.get("/api/v1/production/ordenes", headers=h)
+    assert r.status_code == 200
+    assert r.json()["total"] == 2
+    assert len(r.json()["items"]) == 2
+
+    # Recién creadas: todas en borrador, ninguna conforme.
+    borrador = client.get("/api/v1/production/ordenes?estado=borrador", headers=h).json()
+    assert borrador["total"] == 2
+    conformes = client.get("/api/v1/production/ordenes?estado=conforme", headers=h).json()
+    assert conformes["total"] == 0
+
+    pagina = client.get("/api/v1/production/ordenes?page_size=1", headers=h).json()
+    assert pagina["total"] == 2
+    assert len(pagina["items"]) == 1
+
+
+def test_listar_ordenes_de_un_almacen_ajeno_403(env):
+    client, ids, TestSession = env
+    h = _token(client)
+    with TestSession() as s:
+        empresa_base = s.get(Empresa, uuid.UUID(ids["empresa_id"]))
+        otra = Empresa(
+            grupo_id=empresa_base.grupo_id,
+            ruc="20600000009",
+            razon_social="Ajena EIRL",
+            domicilio_fiscal="Lima",
+            tipo="operativa",
+            zona_tributaria="amazonia_ley27037",
+        )
+        s.add(otra)
+        s.flush()
+        almacen = Almacen(
+            empresa_id=otra.id, sucursal_id=None, nombre="Ajeno", tipo="central"
+        )
+        s.add(almacen)
+        s.commit()
+        almacen_ajeno = str(almacen.id)
+
+    r = client.get(
+        f"/api/v1/production/ordenes?almacen_id={almacen_ajeno}", headers=h
+    )
     assert r.status_code == 403

@@ -8,6 +8,7 @@ import {
   type ItemDeCarta,
   type MedioPago,
   type MesaEnMapa,
+  type PosTarjeta,
   type Venta,
 } from "@/lib/pdv";
 
@@ -33,7 +34,15 @@ export function useDatosPdv(empresaId: string | null, puntoVentaId: string, sucu
   const [mesas, setMesas] = useState<MesaEnMapa[]>([]);
   const [cobrados, setCobrados] = useState<Venta[]>([]);
   const [abiertas, setAbiertas] = useState<Venta[]>([]);
+  const [pos, setPos] = useState<PosTarjeta[]>([]);
   const [modalidad, setModalidad] = useState("mesa");
+
+  // Fuera del `if (!caja)` del resto: los terminales se verifican **al
+  // abrir** (RN-POS-010), así que tienen que estar cargados justo cuando
+  // todavía no hay caja.
+  useEffect(() => {
+    api.posDeSucursal(sucursalId).then(setPos).catch(() => setPos([]));
+  }, [sucursalId]);
 
   useEffect(() => {
     if (!empresaId) {
@@ -94,6 +103,7 @@ export function useDatosPdv(empresaId: string | null, puntoVentaId: string, sucu
     mesas,
     cobrados,
     abiertas,
+    pos,
     setModalidad,
     recargarMesas,
     recargarCobrados,

@@ -124,12 +124,28 @@ class EjecutarPagoIn(BaseModel):
 
 
 # --- Caja (PROC-CTB-001/002) -------------------------------------------------
+class PosVerificadoIn(BaseModel):
+    """Estado de un POS de tarjeta al abrir la caja (RN-POS-010/011)."""
+
+    pos_tarjeta_id: uuid.UUID
+    operativo: bool = True
+    observacion: str | None = Field(default=None, max_length=200)
+
+
 class AbrirCajaIn(BaseModel):
+    """`monto_declarado` es lo que el encargado dice entregar;
+    `detalle_denominaciones` es lo que el cajero cuenta. La diferencia la
+    calcula el servidor (RN-POS-011/012) — nunca se teclea.
+
+    `autorizacion` es el token de `POST /auth/autorizar` del encargado que
+    releva: sin su PIN no hay cadena de custodia (RN-MDP-002).
+    """
+
     punto_venta_id: uuid.UUID
-    relevo_encargado_id: uuid.UUID
-    monto_apertura: Decimal = Field(ge=0)
-    detalle_denominaciones: dict | None = None
-    diferencia_reportada: Decimal | None = None
+    monto_declarado: Decimal = Field(ge=0)
+    detalle_denominaciones: dict[str, int]
+    autorizacion: str
+    pos_verificados: list[PosVerificadoIn] | None = None
 
 
 class AperturaCajaOut(BaseModel):
@@ -139,14 +155,45 @@ class AperturaCajaOut(BaseModel):
     cajero_id: uuid.UUID
     relevo_encargado_id: uuid.UUID
     monto_apertura: Decimal
+    detalle_denominaciones: dict | None
     diferencia_reportada: Decimal | None
+    pos_verificados: list | None
     created_at: datetime
 
 
+class ReportePosIn(BaseModel):
+    """Cierre de lote de un POS de tarjeta: lo que el terminal dice haber
+    cobrado en el turno (RN-POS-004)."""
+
+    pos_tarjeta_id: uuid.UUID
+    monto_lote: Decimal = Field(ge=0)
+    referencia: str | None = Field(default=None, max_length=100)
+
+
 class CerrarCajaIn(BaseModel):
-    monto_real: Decimal = Field(ge=0)
-    custodia: str
-    descuadre_atribucion: str | None = None
+    """El monto real sale del conteo por denominación (RN-POS-007), y el
+    efectivo se entrega al encargado que firma con su PIN (RN-MDP-002).
+
+    `reportes_pos` trae el cierre de lote de cada terminal que abrió
+    operativo: sin ellos el cierre no cuadra las tarjetas y se rechaza
+    (RN-POS-004). Un local sin POS verificados no manda nada.
+    """
+
+    detalle_denominaciones: dict[str, int]
+    # A dónde va el efectivo, no quién lo recibe: a quién se le entregó ya lo
+    # prueba la firma de `autorizacion`. También es enum en la base, y sin el
+    # patrón un nombre tecleado dejaba el turno ilegible.
+    custodia: str = Field(pattern="^(local_caja_fuerte|traslado_contabilidad)$")
+    autorizacion: str
+    # La columna es un enum de tres valores (RN-MDP-005). Sin este patrón, un
+    # texto libre entraba, se guardaba, y el turno quedaba **ilegible**: la
+    # lectura reventaba después con `LookupError` al mapear la fila. Un 422 en
+    # el borde es infinitamente mejor que una fila que no se puede volver a
+    # leer.
+    descuadre_atribucion: str | None = Field(
+        default=None, pattern="^(cajero|tercero_reportado|encargado)$"
+    )
+    reportes_pos: list[ReportePosIn] | None = None
 
 
 class CierreCajaOut(BaseModel):
@@ -154,11 +201,61 @@ class CierreCajaOut(BaseModel):
     id: uuid.UUID
     apertura_caja_id: uuid.UUID
     cajero_id: uuid.UUID
+    montos_esperados: dict | None
     descuadre_monto: Decimal
     descuadre_atribucion: str | None
     custodia: str
     estado: str
+    correcciones: list | None
     created_at: datetime
+
+
+class ReabrirCierreIn(BaseModel):
+    motivo: str = Field(min_length=5, max_length=200)
+    autorizacion: str
+
+
+class CustodiaEfectivoOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    apertura_caja_id: uuid.UUID
+    monto: Decimal
+    responsable_actual_id: uuid.UUID
+    estado: str
+    timestamps_relevo: list | None
+
+
+class EntregarCustodiaIn(BaseModel):
+    estado_siguiente: str = Field(pattern="^(en_supervisor|en_contabilidad|disponible)$")
+    autorizacion: str
+
+
+class PosTarjetaIn(BaseModel):
+    serie: str = Field(min_length=2, max_length=50)
+    codigo_comercio: str = Field(min_length=2, max_length=50)
+    empresa_id: uuid.UUID | None = None
+    # NULL = terminal de emergencia del pool de contabilidad (RN-POS-009).
+    sucursal_id: uuid.UUID | None = None
+    operador: str | None = Field(default=None, max_length=50)
+    es_emergencia: bool = False
+
+
+class PosTarjetaPatch(BaseModel):
+    estado: str | None = Field(default=None, pattern="^(operativo|averiado|baja)$")
+    sucursal_id: uuid.UUID | None = None
+    es_emergencia: bool | None = None
+
+
+class PosTarjetaOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    empresa_id: uuid.UUID
+    sucursal_id: uuid.UUID | None
+    serie: str
+    codigo_comercio: str
+    operador: str | None
+    estado: str
+    es_emergencia: bool
 
 
 class MovimientoCajaIn(BaseModel):
@@ -211,6 +308,32 @@ class CajaAbiertaOut(BaseModel):
     cajero_id: uuid.UUID
     monto_apertura: Decimal
     abierta_desde: datetime
+    # Viaja acá porque es lo único que le dice al cierre qué terminales
+    # tienen que traer su reporte de lote (RN-POS-004): sin esto el cajero
+    # descubre cuáles faltan recién cuando el servidor le rechaza el cierre.
+    pos_verificados: list | None = None
+
+
+class TurnoCerradoOut(BaseModel):
+    """Un turno ya cerrado visto desde contabilidad: qué descuadró y dónde
+    está el efectivo. Es la fila sobre la que se reabre un cierre
+    (RN-MDP-005) o se recibe la custodia (RN-MDP-002)."""
+
+    cierre_id: uuid.UUID
+    apertura_caja_id: uuid.UUID
+    punto_venta_id: uuid.UUID
+    caja: str
+    cajero_id: uuid.UUID
+    abierta_desde: datetime
+    monto_apertura: Decimal
+    descuadre_monto: Decimal
+    descuadre_atribucion: str | None
+    estado: str
+    custodia_destino: str | None
+    custodia_id: uuid.UUID | None
+    custodia_estado: str | None
+    custodia_monto: Decimal | None
+    correcciones: list | None
 
 
 class MovimientoDineroOut(BaseModel):

@@ -1,0 +1,47 @@
+version: 2
+
+# Complementa a `pip-audit` en CI (`ci.yml`), que solo *avisa* de una CVE ya
+# publicada: Dependabot además abre el PR que la cierra. Agrupado por
+# ecosistema para no recibir veinte PRs sueltos cada lunes — las de
+# seguridad quedan fuera del grupo a propósito, para que lleguen solas y se
+# vean.
+updates:
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      backend-menores:
+        applies-to: version-updates
+        update-types: [minor, patch]
+    commit-message:
+      prefix: "chore(deps)"
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      frontend-menores:
+        applies-to: version-updates
+        update-types: [minor, patch]
+    commit-message:
+      prefix: "chore(deps)"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "chore(ci)"
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "chore(docker)"

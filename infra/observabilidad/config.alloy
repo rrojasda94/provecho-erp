@@ -1,0 +1,108 @@
+// Alloy: descubre los contenedores de Docker, lee sus logs y los empuja a
+// Loki. Reemplaza a Promtail, que Grafana dejó como legado.
+//
+// El ERP ya emite **una línea de JSON por evento** cuando LOG_JSON=true o
+// ENVIRONMENT=production (`src/core/logging_config.py`), con `nivel`,
+// `flujo`, `logger`, `request_id` y `usuario_id`. Acá esos campos se
+// convierten en etiquetas consultables — sin eso, buscar "los errores de
+// seguridad de ayer" sería un grep sobre texto plano.
+
+discovery.docker "contenedores" {
+  host             = "unix:///var/run/docker.sock"
+  refresh_interval = "15s"
+}
+
+// El nombre del contenedor viene como "/provecho-api-1": se limpia y se
+// guarda el nombre del servicio de compose, que es como uno piensa en ellos.
+discovery.relabel "contenedores" {
+  targets = discovery.docker.contenedores.targets
+
+  // **Solo los contenedores del ERP.** Alloy ve TODO el host, y en un VPS
+  // que además corre otros proyectos (chatwoot, odoo, una tienda) eso
+  // significaba tres cosas malas a la vez: los logs de aplicaciones ajenas
+  // terminaban en el Loki del ERP —accesibles a quien tenga Grafana—, el
+  // disco se llenaba con historia que nadie pidió, y Loki los rechazaba en
+  // masa por antiguos ("entry too far behind"), llenando el log de Alloy de
+  // errores que tapaban los de verdad.
+  //
+  // Para vigilar además otro proyecto: ALLOY_PROYECTOS="provecho-erp|otro".
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_project"]
+    regex         = coalesce(sys.env("ALLOY_PROYECTOS"), "provecho-erp")
+    action        = "keep"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    target_label  = "contenedor"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "servicio"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_project"]
+    target_label  = "proyecto"
+  }
+}
+
+loki.source.docker "contenedores" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = discovery.relabel.contenedores.output
+  labels     = { origen = "docker" }
+  forward_to = [loki.process.provecho.receiver]
+}
+
+loki.process "provecho" {
+  forward_to = [loki.write.loki.receiver]
+
+  // Los contenedores que no son del ERP (postgres, redis, el propio Loki)
+  // no emiten nuestro JSON: el `stage.json` los deja pasar sin campos y las
+  // etiquetas quedan vacías, que es exactamente lo que se quiere. No se
+  // descartan — cuando Postgres se queja, ese log es el que hace falta.
+  stage.json {
+    expressions = {
+      ts         = "ts",
+      nivel      = "nivel",
+      flujo      = "flujo",
+      logger     = "logger",
+      request_id = "request_id",
+      entorno    = "entorno",
+      app        = "app",
+    }
+  }
+
+  // Etiquetas = por dónde se busca. Deliberadamente POCAS y de cardinalidad
+  // baja: Loki crea un flujo por combinación de etiquetas, así que meter
+  // `request_id` o `usuario_id` acá haría explotar el índice. Esos quedan en
+  // el cuerpo del log y se filtran con LogQL (`| json | request_id="..."`).
+  stage.labels {
+    values = {
+      nivel   = "nivel",
+      flujo   = "flujo",
+      entorno = "entorno",
+    }
+  }
+
+  // El timestamp del evento, no el de la recolección: un hub de sucursal
+  // que estuvo offline sube sus logs tarde y hay que verlos en su hora.
+  // `ts` se emite en RFC3339 UTC desde `logging_config.FormateadorJson` —
+  // antes salía con offset `-0500` sin dos puntos, que no es RFC3339 y se
+  // descartaba en silencio dejando la hora de ingesta.
+  stage.timestamp {
+    source = "ts"
+    format = "RFC3339"
+    // Si falta (contenedores que no son del ERP) usa el de ingesta en vez
+    // de descartar la línea.
+    action_on_failure = "fudge"
+  }
+}
+
+loki.write "loki" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

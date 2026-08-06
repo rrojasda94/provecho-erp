@@ -14,6 +14,598 @@ Versionado: [SemVer](https://semver.org/lang/es/).
   la tabla de CI; ahora sí, junto con el chequeo del contrato OpenAPI del
   job `backend`.
 
+### Fixed
+
+- **Tres jobs de CI en rojo, destapados al integrar la rama a `main`**
+  (2026-08-06). Los tres pasaban desapercibidos porque la rama nunca había
+  corrido el pipeline completo contra `main`:
+  - `migraciones`: `alembic check` proponía borrar y recrear el mismo
+    `UNIQUE (empresa_id, serie, correlativo)` de `guia_remision` en cada
+    corrida. La convención de nombres de `database.py` rinde
+    `uq_<tabla>_<primera columna>` —o sea `uq_guia_remision_empresa_id`—
+    y la migración `a4c8f21e6b09` le había puesto el nombre con las tres
+    columnas. Nombre explícito en el modelo; sin migración nueva, porque el
+    nombre en la base ya era el correcto.
+  - `imagen`: el guard de deriva de esquema (`src/core/esquema.py`) mataba
+    el contenedor al arrancar cuando la base no responde. El job levanta la
+    imagen con un `DATABASE_URL` de juguete solo para ver si contesta
+    `/health`, así que nunca llegaba a servir. Una base inalcanzable ahora
+    es **alerta, no deriva**: no se pudo mirar no es lo mismo que faltan
+    tablas, y de la base caída avisa `/health/ready`, que es quien la mide.
+  - `frontend`: `npm test` moría con `ERR_UNKNOWN_FILE_EXTENSION` en los
+    tres `.test.ts` antes de ejecutar un solo caso. El job estaba fijado en
+    Node 20 y el stripping de tipos de `node --test` recién viene de fábrica
+    desde 22.18; pasa a Node 24, que es el de la máquina de desarrollo.
+
+- **Cinco desacuerdos de contrato en el PDV**, destapados al tipar los
+  cuerpos de request (2026-08-06). Ninguno había fallado todavía, y los
+  cinco son de la misma familia que el 422 de la caja:
+  - `modalidad` podía viajar `null` en `POST /sales/ventas`, que el
+    contrato exige. El guard de pantalla existía (RN-COM-005); el tipo no lo
+    sabía, así que nada impedía una llamada nueva sin él.
+  - `pos_verificados` estaba tipado con `PosVerificado` —lo que se **lee**,
+    que trae `serie`— cuando el request es `PosVerificadoIn`, que no la
+    tiene. Leer y escribir no son el mismo schema.
+  - `custodia` y `descuadre_atribucion` viajaban como `string` suelto sobre
+    dos columnas `Enum`. Es el mismo agujero que se cerró el 2026-08-05 en
+    el schema del servidor, que seguía abierto del lado del cliente: ahora
+    son uniones tipadas con su guard (`esCustodia`, `esAtribucion`).
+- **Las pruebas e2e del flujo del dinero pasan de rojo a verde y entran a
+  CI** (2026-08-06). Dos causas, ninguna de la pantalla:
+  1. **La prueba se saltaba el tipo de orden.** El PDV no deja cobrar sin él
+     (RN-COM-005), así que el primer "Cobrar" abría el diálogo de tipo y no
+     el de cobro. El test tomaba un atajo que el cajero no tiene; ahora pasa
+     por el candado ("Para llevar", el único que no pide dato extra).
+  2. **El `SyntaxError: Unexpected end of JSON input` que se venía
+     atribuyendo a inestabilidad de `next dev` era el timeout disfrazado.**
+     El presupuesto por test eran 90 s y el modo desarrollo compila cada
+     ruta la primera vez que se la pide; la corrida moría a mitad de camino
+     y el reporte señalaba el `expect` que quedó colgando. Como cada corrida
+     dejaba la caché más tibia, el punto de falla se movía solo — que es
+     justo lo que se lee como flakiness. Con 240 s el recorrido entra en
+     ~96 s. **No hizo falta pasar a `build`+`start`**, así que tampoco hace
+     falta tocar el origen de las Server Actions.
+  Se suma `test.describe.serial`: la segunda prueba necesita la caja que
+  cierra la primera, y en serie queda **saltada** en vez de fallar con un
+  síntoma que no dice nada.
+- **La apertura y el cierre de caja del PDV devolvían 422** (2026-08-05,
+  ADR-025 Addendum). Los diálogos existían desde antes de ADR-025 y seguían
+  mandando el contrato viejo (`monto_apertura` en vez de `monto_declarado`,
+  el id del encargado en vez del token de `autorizacion`, un monto tecleado
+  en vez del conteo por denominación). Estuvo roto un día entero sin que
+  nada lo detectara: ninguna prueba automatizada toca esas pantallas.
+- **`custodia` y `descuadre_atribucion` aceptaban texto libre sobre una
+  columna `Enum`** (2026-08-05). Lo escrito entraba sin protestar y la fila
+  quedaba **ilegible**: la lectura reventaba después con `LookupError` al
+  mapear el enum, sobre una fila que es evidencia contable. Ahora se validan
+  con `pattern` en el schema (422 en el borde) y la UI ofrece los valores
+  reales. `custodia` es *a dónde va el efectivo*
+  (`local_caja_fuerte`/`traslado_contabilidad`), no quién lo recibe — eso ya
+  lo prueba la firma del PIN.
+- **Las pestañas de cobrados y pedidos abiertos del PDV se dibujaban
+  vacías** (2026-08-05). Desde la paginación del 2026-08-04 `GET /ventas`
+  devuelve `{items, total, ...}` y `lib/pdv.ts` lo seguía leyendo como
+  array; el `vs.filter is not a function` lo tragaba un `.catch` y la
+  pantalla mostraba una jornada sin ventas. No había un solo test HTTP del
+  listado; ahora hay cuatro.
+
+### Added
+
+- **Contrato extendido al resto del frontend** (2026-08-06): de 58 a **162
+  casos**, en ~350 ms. Dos profundidades, y la diferencia importa:
+  - **Los cuatro módulos importables** (`pdv` 19 operaciones, `catalogo` 20,
+    `kds` 7, `reportes` 6) exponen la API como objeto llamable y se
+    ejercitan de verdad. Cada lista se compara contra el objeto real del
+    módulo: una operación nueva sin caso **hace fallar el test**. El arnés
+    además respeta el código de respuesta del contrato, así que un `204` se
+    responde vacío y ejercita la rama de `pedir` que existe porque pedirle
+    `.json()` a una respuesta sin cuerpo revienta.
+  - **Todo el resto** (Compras, Inventario, RRHH, Gerencia, Contabilidad,
+    Marketing, Usuarios) llama desde Server Components y Server Actions, que
+    piden `next/headers` y no se pueden importar en un `node --test`. Para
+    esos hay un escaneo del código fuente: **~170 llamadas**, toda ruta que
+    el frontend nombra tiene que existir en el contrato con ese método, en
+    14 ms. Caza lo que antes no cazaba nada: un endpoint renombrado en el
+    backend rompe veinte pantallas y el diff de `openapi.json` no sabe quién
+    lo llamaba.
+  El único caso irresoluble estáticamente —
+  `marketing/campanas/${id}/${paso}`, cuyo último segmento toma tres valores
+  literales— se declara con sus tres valores y se verifican todos, en vez de
+  quedar como agujero. Y el test exige un piso de llamadas encontradas: si
+  cambia la forma de llamar a la API, el escaneo daría cero y pasaría por
+  vacío. Cinco mutaciones, cinco rojos.
+- **Test de contrato cliente↔servidor** (2026-08-06,
+  `frontend/lib/contrato.test.ts`), el que la estrategia de pruebas
+  declaraba prioridad por encima de más e2e. 58 casos en ~250 ms, sin
+  servidores. Dos capas, y la primera pesa más:
+  1. **El tipo.** Los cinco cuerpos de request del PDV viajaban como
+     `Record<string, unknown>` — sin contrato del lado del cliente, que es
+     por donde entró el bug de ADR-025. Tipados desde `openapi.json`, `tsc`
+     los verifica en cada punto de llamada y ya corre en CI.
+  2. **El test.** Por cada operación de `lib/pdv.ts`, con `fetch`
+     intervenido: que la ruta y el método existan en el contrato, que el
+     cuerpo valide contra su `requestBody`, y —alimentando al cliente con
+     una respuesta **generada desde el contrato**— que la sepa leer. Eso
+     último caza ADR-026: el cliente recibe `{items, total, …}` de verdad y
+     tiene que devolver un array.
+  Verificado **por mutación**: reintroducidos los dos bugs históricos más un
+  endpoint renombrado, los tres fallan nombrando operación y campo. Un test
+  verde que nadie vio ponerse rojo no prueba nada.
+- **`npm test` entra a CI** (2026-08-06). Los 72 casos de unidad del
+  frontend **nunca habían corrido en CI**: el job hacía solo `lint` y
+  `build`.
+- **Pruebas de pantalla de sesión y del gate de módulo por permiso**
+  (2026-08-06, `frontend/e2e/sesion.spec.ts`). Con esto quedan cubiertos los
+  **tres** casos que `docs/engineering/testing-strategy.md` da por
+  justificados para un e2e; el documento es también el techo, no una lista
+  de deseos. Siete casos en total:
+  - Una ruta protegida sin sesión manda al login.
+  - El login deja el token en cookie **httpOnly** —el atributo se afirma
+    explícitamente porque no se ve en ninguna pantalla y se rompe en
+    silencio; un token legible por `document.cookie` lo roba cualquier XSS—
+    y el logout la mata de verdad: la ruta protegida vuelve a rebotar, no
+    solo cambia la pantalla.
+  - **El cajero no ve Catálogo ni entrando por `/catalogo/productos`**, y el
+    admin sí. Se prueba de a pares a propósito: un gate que esconde el
+    módulo para *todos* pasaría por bueno con la mitad de la prueba. Por URL
+    directa y no solo por el home, porque el filtro del home es UX — lo que
+    decide es el `layout.tsx` (ADR-013 + enmienda 2026-08-03).
+  - **Un rechazo del servidor deja el formulario de apertura abierto con lo
+    tecleado.** Recontar el cajón entero porque alguien erró seis dígitos
+    del PIN es la clase de fricción que termina en un conteo inventado, y
+    ese conteo es la evidencia sobre la que se calcula el descuadre del
+    turno.
+  Sigue faltando —y sigue siendo la prioridad— el test de contrato
+  cliente↔servidor: estos e2e cubren arranque y candados, no el desacuerdo
+  de forma que originó los dos bugs de ADR-025/026.
+- **`cajero_e2e` en el seeder de e2e** (2026-08-06): el usuario con menos
+  permisos que igual opera una pantalla. Existe para probar lo contrario que
+  el encargado — qué **no** se ve.
+- **Job `e2e` en `ci.yml`** (2026-08-06): corre `npm run test:e2e` sobre
+  chromium y sube `test-results/` como artefacto cuando falla — sin el trace
+  y las capturas, un rojo en CI es una línea de texto. Es el único job que
+  comprueba que cliente y servidor estén de acuerdo: los dos bugs que
+  motivaron la suite pasaban `pytest` y `npm run build` sin despeinarse.
+- **Seis diagramas BPMN de las áreas nuevas** (2026-08-05), con sus PROC
+  registrados en el maestro y su narrativa en `workflows.md`. El enfoque
+  vigente era *primero SOP, luego BPMN*; los SOPs ya estaban estables.
+  `PROC-RRH-001` incorporación de personal · `PROC-RRH-002` contingencia de
+  personal faltante (RN-RRHH-011) · `PROC-RRH-003` tardanza o falta del
+  encargado (RN-RRHH-010) · `PROC-CMP-001 v2.0` compras con sus tres
+  caminos · `PROC-COM-003` definición y revisión de precio ·
+  `PROC-INV-001 v0.2` abastecimiento de locales, que además pasa de
+  Borrador a **Vigente** porque el ciclo está implementado (ADR-020) y el
+  traslado ya emite guía (ADR-027).
+- **Entidades de Comercial-estrategia y RRHH-proceso en `data-model.md`**
+  (2026-08-05): `meta_venta` + `meta_venta_seguimiento`, `hallazgo_mercado`,
+  `entrevista`, `plan_induccion` + `plan_induccion_item`,
+  `evaluacion_periodo_prueba`, `evaluacion_desempeno` y `capacitacion` +
+  `capacitacion_asistente`. Especificadas, sin implementar.
+- **Valores propuestos para los 13 `parametro_empresa`** (2026-08-05) con
+  su sustento en `docs/gerencia/propuesta-parametros-operativos.md`,
+  cargados en estado `propuesto` a la espera de Gerencia
+  (`python -m src.seeders.parametros`).
+
+- **Guía de remisión de traslados** (2026-08-05, ADR-027, migración
+  `a4c8f21e6b09`). Charlie's Pizzas mueve mercadería entre el almacén
+  central, CH1 y CH2 todos los días y hasta hoy ese traslado viajaba sin el
+  documento que lo sustenta. `guia_remision` + `guia_remision_item` cuelgan
+  de `transferencia`, en `inventory` y no en un módulo `logistics` ni en
+  `sales`: lo que la guía declara es un traslado, y el traslado es un hecho
+  de inventario (RN-GDR-002, la emite el almacén).
+  Las líneas **se derivan** de `transferencia_item`, agrupadas por SKU:
+  RN-TRP-002 exige que lo transportado coincida exactamente con lo
+  declarado, y un formulario de ítems aparte es justamente la forma de que
+  no coincidan. Se teclea solo lo que el sistema no puede saber —chofer,
+  vehículo, peso bruto, fecha de inicio del viaje—. Un traslado, una guía
+  (emisión idempotente) y correlativo por `(empresa, serie)` calculado al
+  emitir, no reservado antes. Envío a SUNAT asíncrono vía Celery
+  (`POST /despatch/send`): la guía impresa es la que viaja, y un rechazo se
+  corrige y reemite en vez de detener el camión. Permiso nuevo
+  `inventory.emitir_guia` en el rol `almacenero`; 14 tests.
+- **Pantalla de caja en contabilidad** (2026-08-05): turnos cerrados con su
+  descuadre y el tramo de la cadena de custodia, entrega de custodia firmada
+  con PIN, reapertura de un cierre con motivo (RN-MDP-005) e inventario de
+  terminales de tarjeta. Nuevo `GET /accounting/cajas/turnos` (turno +
+  cierre + custodia en una consulta, no un N+1 por turno) y
+  `pos_verificados` en `CajaAbiertaOut`, que es lo que le dice al cierre a
+  qué terminales pedirles su reporte de lote.
+- **Campana de notificaciones en la barra superior** (2026-08-05): los
+  endpoints existían desde el 2026-08-04 sin ninguna pantalla que los
+  usara. Muestra solo lo no leído y marca leída al abrir la fila, no al
+  abrir el panel — mirar de reojo no es haberse enterado.
+- **`GET /sales/ventas` con rango de fechas** (2026-08-05): `desde`/`hasta`
+  inclusivos, sucursal opcional dentro del alcance del tenant y filtro por
+  punto de venta. Un solo endpoint para la jornada del PDV y el histórico
+  del back-office.
+
+### Changed
+
+- **Paginación real en los listados operativos** (2026-08-04, ADR-026).
+  Ningún endpoint paginaba: cada listado devolvía la tabla entera y la guía
+  de API lo documentaba honestamente como deuda. Ahora los **18 listados
+  que crecen con la operación** —ventas del día, artículos, stock,
+  movimientos, solicitudes, transferencias, proveedores, órdenes de compra,
+  asientos, pagos a proveedor, trabajadores, postulantes, campañas, leads,
+  personas, usuarios y notificaciones— devuelven
+  `{items, total, page, page_size}` con `page`/`page_size` (defecto 50,
+  máximo 200: sin techo, `page_size=1000000` es una forma cómoda de tumbar
+  la API con una sola petición autenticada).
+  **Los catálogos de configuración siguen devolviendo un array plano**
+  (roles, permisos, divisas, unidades de medida, medios de pago,
+  sucursales, mesas, plan de cuentas…). La frontera no es cuántas filas
+  tiene la tabla hoy sino qué las crea: si nacen de la operación, crecen
+  solas y se paginan; si las escribe alguien configurando el sistema, son
+  decenas y se consumen enteras para llenar un `<select>`.
+  El corte va **en la base** (`LIMIT`/`OFFSET` + `COUNT`), no trayendo todo
+  y cortando en Python: cada repositorio expone ahora `q_list()` —la
+  consulta sin ejecutar— junto a su `list()` de siempre, así que solo
+  cambia el router.
+  **Cambio de contrato, no compatible hacia atrás**: frontend migrado
+  (5 fetchers), `openapi.json` regenerado y `api-guidelines.md` actualizado
+  con los dos formatos. Todavía sin controles de paginación en pantalla —
+  las 4 tablas existentes muestran la primera página. 9 tests en
+  `tests/test_paginacion.py`.
+
+### Added
+
+- **El cierre de caja cuadra tarjetas** (2026-08-04, RN-POS-004). Hasta
+  ahora el cierre verificaba solo el cajón: la mitad del turno se cerraba a
+  ojo y un cobro mal pasado en el POS aparecía recién en la liquidación del
+  operador, semanas después. Ahora exige el **reporte de lote de cada
+  terminal que abrió operativo** —uno averiado no cobró nada, así que no se
+  le pide— y contrasta la suma contra lo cobrado con tarjeta en el turno.
+  `descuadre_monto` sigue siendo el del efectivo (es la plata que alguien
+  responde) y el de tarjetas viaja aparte; **cualquiera de los dos deja el
+  cierre irregular**, porque cuadrar el cajón no dice nada de lo que pasó
+  por los terminales. Un local sin POS verificados no tiene nada que cuadrar
+  y el cierre no le pide nada.
+
+- **Descarga de PDF, XML y CDR** (2026-08-04,
+  `GET /sales/comprobantes/{id}/descargar/{formato}`). El PDF que se entrega
+  al cliente, y el **XML firmado** y el **CDR** que son el respaldo ante
+  SUNAT y hay que poder recuperar años después. Se piden a Factiliza en el
+  momento y **no se archivan**: su copia es la buena mientras el proveedor
+  siga activo, y guardar una propia agregaría un archivo que puede quedar
+  desincronizado sin ganar nada. Los bytes vuelven sin tocar — reescribir un
+  XML firmado lo invalida. Solo de un comprobante aceptado: antes de eso no
+  hay XML ni CDR que bajar.
+
+- **Pantalla de nota de crédito** (2026-08-04, en la jornada de Ventas). El
+  diálogo pide el motivo del catálogo 09 y **avisa cuando el elegido corrige
+  el documento en vez de la operación**; permite acreditar todo o elegir
+  líneas con su cantidad (las líneas se piden al abrir, no al pintar la
+  jornada: traerlas por cada venta del día sería un viaje por fila para algo
+  que casi nunca se usa); y la casilla de devolver el insumo viene marcada
+  salvo en los motivos de corrección, que no tocan inventario. La fila
+  ofrece **anular o acreditar, nunca las dos**: antes de cobrar se anula,
+  después solo queda la nota.
+
+- **Nota de crédito** (2026-08-04, RN-CPP-009, migración `c2f7a91b4e08`).
+  Cierra el hueco funcional más grande que quedaba: **una venta ya cobrada
+  no tenía forma de corregirse**. `anular_venta` seguía cubriendo solo la
+  orden sin pagar y mandaba al resto a un slice que no existía.
+  Ahora `POST /sales/comprobantes/{id}/nota-credito` acredita un comprobante
+  aceptado, **total o parcial por ítem**, con motivo del catálogo 09 de
+  SUNAT y una sola vez por documento. Numera en **serie propia** por punto
+  de venta: mezclarla con la de la boleta o factura es rechazo seguro.
+  Tres decisiones quedaron explícitas porque no tienen respuesta universal:
+  **`repone_stock` lo declara quien acredita** —un plato devuelto en cocina
+  rara vez devuelve el insumo, y corregir el RUC de una factura no toca el
+  inventario—; **el motivo decide si la venta muere** —anulación (01) y
+  devolución (06/07) la dan de baja; error en el RUC (02) o en la
+  descripción (03) **no**, porque la operación ocurrió y solo el papel
+  estaba mal, así que el comprobante queda liberado para reemitir el
+  corregido—; y **una nota rechazada por SUNAT no corrige nada**: queda
+  registrada con su motivo y la venta sigue igual.
+  Las notas parciales sucesivas cuentan contra lo que queda por acreditar y
+  no contra lo vendido, que es lo que impide devolver dos veces el mismo
+  plato. Permiso propio `sales.emitir_nota_credito` (supervisor): acreditar
+  devuelve dinero y no es acto de cajero. 14 tests.
+
+- **Chequeo de deriva de esquema** (2026-08-04, `src/core/esquema.py`).
+  Nace de un fallo real: las dos bases de desarrollo tenían
+  `alembic_version` en una revisión **posterior** a la que crea
+  `decision_gerencial`, sin que la tabla existiera. `alembic current` decía
+  "al día", CI estaba verde —`alembic check` compara modelo contra
+  migraciones sobre una base **limpia**, no contra la base real— y
+  `GET /decisiones-gerenciales` respondía 500. Se descubrió abriendo la
+  pantalla.
+  Ahora `python -m src.core.esquema` responde dos preguntas que fallan
+  distinto: **qué tablas del modelo no están en la base** (mira el estado
+  real, atrapa la migración marcada y no corrida, la aplicada a medias y la
+  base restaurada de un backup viejo) y **si la revisión coincide con la
+  cabeza del repo** (mira el marcador, atrapa el despliegue sin `upgrade`
+  aunque todas las tablas existan). El mismo chequeo corre al arrancar el
+  servidor: en producción **aborta**, en desarrollo avisa — mismo criterio
+  que la validación de configuración.
+  Se compara solo existencia de tablas, no columnas ni tipos: el grueso del
+  daño con muy poco código y sin los falsos positivos que da comparar tipos
+  por dialecto. 8 tests.
+
+- **Pantallas de Gerencia y Ventas back-office** (2026-08-04). Con estas
+  **ningún tile del home queda en 404**: los doce módulos del shell tienen
+  pantalla.
+  **Gerencia**: bandeja de parámetros operativos con las tres salidas de
+  ADR-014 (aprobar, aprobar modificando el valor, rechazar con motivo), y el
+  formulario de propuesta obliga a declarar **qué clase de magnitud** es el
+  valor —monto con divisa, cantidad con unidad de medida, o adimensional—
+  que es justo lo que RN-GER-010 exige. Actas de decisión gerencial, donde
+  las condiciones aparecen y se vuelven obligatorias solo al elegir
+  "aprobado con condiciones", y firmar exige `gerencia.decidir`: el área
+  ejecutora lee pero no firma (RN-GER-005). Divisas con sus decimales.
+  **Ventas back-office**: la jornada de una sucursal por fecha y estado, con
+  totales y el comprobante de cada venta, más sus dos acciones reales —
+  reintentar la emisión que SUNAT rechazó (con el detalle del rechazo y los
+  intentos) y anular una orden que nunca se cobró. Los filtros viven en la
+  URL, no en estado del cliente: la jornada de una sucursal en una fecha es
+  una dirección que se comparte y se recarga.
+  El tile del home de Ventas pasó a apuntar al back-office y el PDV se abre
+  desde su sidebar; antes el tile iba directo al PDV y lo administrativo no
+  tenía puerta de entrada.
+
+- **Pantallas de Producción y Marketing** (2026-08-04). Otros dos tiles del
+  home que llevaban a un 404.
+  **Producción**: órdenes con su ciclo real (crear → registrar el consumo
+  que la cocina sacó de verdad → cerrar con el control de calidad). La
+  columna de acciones muestra **solo el paso que aplica** al estado de la
+  orden; ofrecer el otro solo invita al 409. El diálogo de cierre cambia
+  según el resultado: cantidad producida si es conforme, evidencia de
+  destrucción si se desecha.
+  **Marketing**: campañas con el ciclo brief → aprobada → en curso →
+  cerrada, donde la tabla dice **qué campo del brief falta** en vez de
+  fallar recién al aprobar, y el botón de aprobar aparece solo si el usuario
+  tiene el permiso — quien redacta el brief no lo aprueba (RN-MKT-003), así
+  que ofrecérselo a todos sería prometer un 403. Contenido con el calendario
+  de piezas y sus dos validaciones de marca como etiquetas que se tocan
+  (RN-MKT-001/002); publicar queda deshabilitado hasta tener las dos.
+  **Tres endpoints de lectura que no existían** y que estas pantallas
+  necesitaban: `GET /production/ordenes` (solo se podía ver una orden
+  sabiendo su id — la cocina no tenía forma de mirar su propia jornada),
+  `GET /marketing/piezas` (sin él no hay calendario de contenido) y
+  `GET /api/v1/marcas` en `users`, porque el de `sales` exige `sales.leer` y
+  pedirle eso a un usuario de marketing para llenar un `<select>` sería
+  abrirle la carta entera. Los dos primeros paginados (ADR-026); el tercero
+  plano, que es lo que corresponde a un catálogo de organización.
+
+- **Pantallas de Usuarios y Contabilidad** (2026-08-04). Dos de los siete
+  tiles del home que llevaban a un 404.
+  **Usuarios**: cuentas con sus roles editables en la misma fila (asignar y
+  quitar es lo que más se hace en esa pantalla; un modal por cambio sería un
+  clic de más cada vez), alta de cuenta, activar/desactivar y filtro por
+  rol. La subpantalla de **Roles** es un acordeón y no una tabla —un rol
+  tiene decenas de permisos y una celda con 30 etiquetas no se lee— con el
+  selector de permisos agrupado por módulo, porque el catálogo pasa los 90.
+  Requirió **dos endpoints de lectura que no existían**: `GET
+  /users/{id}/roles` (el token trae los nombres de rol pero no sus ids, así
+  que desde la UI no se podía desasignar nada) y `GET /roles/{id}/permisos`
+  (asignar un rol sin ver qué habilita es justo el error que se quiere
+  evitar).
+  **Contabilidad**: asientos (listado, alta manual con líneas dinámicas y
+  **cuadre debe/haber en vivo** —RN-CTB-001, el error típico es un monto de
+  más y verlo antes de enviar ahorra el viaje— y anulación por asiento
+  inverso), periodos contables (abrir y cerrar: sin un periodo abierto el
+  primer asiento falla, y abrirlo era exclusivamente por API — la pantalla
+  de asientos no se podía estrenar sin curl), plan de cuentas (listado y
+  alta), pagos a proveedor (cola
+  filtrada a pendientes, ejecutar con medio de pago y constancia, rechazar)
+  y caja (turnos abiertos con su efectivo esperado, leídos del reporte
+  `estado_caja` del catálogo en vez de recalcular el mismo número por
+  segunda vez).
+  De paso, `apiFetch` dejó de reventar con las respuestas **204 sin cuerpo**
+  (asignar/quitar rol, marcar notificación leída): pedirle `.json()` a un
+  204 falla sobre una llamada que salió bien.
+
+- **Ciclo de caja completo** (2026-08-04, ADR-025, migración
+  `f3a1c62d90b4`). El slice mínimo registraba el ciclo; ahora lo verifica.
+  Cuatro cambios que van juntos porque solos no sirven:
+  **(1) No se cobra sin caja abierta.** `POST /sales/ventas/{id}/pagos`
+  responde 409 si el punto de venta no tiene turno, preguntando por el
+  contrato público `accounting.hay_caja_abierta` (`sales` nunca ve
+  `AperturaCaja`). Vale para todo medio de pago, no solo efectivo. La plata
+  cobrada fuera de un turno no la espera ningún cierre: el faltante recién
+  aparecía en contabilidad, sin responsable posible. Única excepción, el
+  replay del push del hub (ADR-009): el cobro ya ocurrió en la sucursal con
+  su caja abierta.
+  **(2) El monto sale del conteo, no del teclado.** Apertura y cierre
+  reciben el desglose por billete y moneda (RN-POS-003/007) validado contra
+  las denominaciones de curso legal, y el servidor suma. En la apertura, la
+  diferencia entre lo que el encargado declara entregar y lo que el cajero
+  cuenta **se calcula** y no bloquea abrir (RN-POS-011): el local abre en
+  su horario y el problema queda reportado.
+  **(3) Cada relevo lo firma quien recibe, con su PIN** (RN-MDP-002),
+  reusando la elevación de `POST /auth/autorizar` con el permiso nuevo
+  `accounting.caja_relevar` — el identificador del encargado sale del
+  token, nunca del cuerpo, que sería una firma falsificable. Nadie se
+  releva a sí mismo. `custodia_efectivo` pasa a ser máquina de estados real
+  (`en_caja → en_supervisor → en_contabilidad → disponible`, con el atajo a
+  `disponible` de RN-MDP-006 cuando el efectivo se queda en la caja fuerte
+  del local).
+  **(4) Un cierre con faltante se corrige, no se reescribe.**
+  `POST /cajas/cierres/{id}/reabrir` lo devuelve a `en_proceso` guardando
+  motivo, autorizador y descuadre anterior en `cierre_caja.correcciones`
+  (RN-MDP-005); volver a cerrar recalcula **el mismo** registro. Solo
+  mientras el efectivo siga en el local: una vez en contabilidad, corregir
+  es un asiento, no un recuento.
+  Suma `pos_tarjeta` — inventario de terminales con serie y código de
+  comercio (RN-POS-010), donde el de emergencia es una fila con
+  `sucursal_id` en NULL (RN-POS-009) que el listado por sucursal siempre
+  incluye — y la verificación de POS al abrir, que marca el averiado y
+  publica `accounting.pos_averiado_reportado` sin bloquear la apertura.
+  De paso, `efectivo_esperado` del reporte de caja y el arqueo pasan a
+  descontar `movimiento_caja`: eran un techo, no un arqueo.
+  Permisos nuevos: `accounting.caja_relevar`, `accounting.caja_reabrir`,
+  `accounting.pos_administrar`. 17 tests en `tests/test_caja_ciclo.py`.
+
+- **Tablero de reportes con catálogo cerrado** (2026-08-04, ADR-024,
+  migración `998e335369a1`). El dashboard deja de ser tres tarjetas fijas:
+  ahora el usuario arma sus vistas, elige rango (preset o personalizado),
+  filtra sucursales por checkbox, ajusta ancho (1-4/4) y alto de cada
+  tarjeta, cambia entre tabla/barras/líneas y **guarda la disposición**
+  (`tablero`, personal por usuario). Cinco reportes iniciales:
+  `ventas_por_dia`, `ventas_por_sucursal`, `top_productos`,
+  `compras_por_proveedor` y `solicitudes_por_articulo`.
+  `GET /reportes`, `POST /reportes/{codigo}/datos`, CRUD de `/tableros`.
+  **No hay constructor de consultas a propósito**: el cliente manda un
+  `codigo` del catálogo y filtros tipados, nunca tablas ni columnas —
+  evita a la vez la superficie de inyección y la fuga de RBAC que un
+  armador genérico abriría sobre todo el ERP. Cada reporte declara el
+  permiso de su módulo dueño, así que un `comprador` ve compras y no
+  ventas. Frontend en `frontend/components/reportes/` con Tailwind y
+  gráficos sin librería (barras = divs con ancho porcentual, serie =
+  `<polyline>` SVG). 21 tests y verificación end-to-end en navegador.
+
+- **Stack de observabilidad: GlitchTip + Loki + Alloy + Grafana**
+  (2026-08-04, `docker-compose.observabilidad.yml`). Va en un compose
+  **aparte** a propósito: son ocho contenedores que no son el negocio, y
+  poder pararlos sin tocar el del ERP es justo lo que se quiere el día que el
+  VPS ande corto de memoria. GlitchTip habla el protocolo de Sentry, así que
+  `src/core/sentry.py` no cambió una línea (ADR-006). Guía de puesta en
+  marcha en `docs/engineering/observabilidad.md`.
+
+- **`worker` y `beat` quedaban `unhealthy` para siempre** (2026-08-04).
+  Heredaban el `HEALTHCHECK` del Dockerfile, que pega a
+  `http://127.0.0.1:8000/health` — correcto para la API, pero ninguno de los
+  dos levanta servidor HTTP. Más que cosmético: un
+  `depends_on: service_healthy` o una política de reinicio por salud los
+  habría reiniciado en bucle. Se deshabilita en ambos; la salud real del
+  worker la da su latido (`/health/ready`), que es el mecanismo que existe
+  para eso. Encontrado al levantar el stack de verdad.
+
+- **`beat` faltaba en docker-compose** (2026-08-04). Se agregaron las tareas
+  periódicas en el turno anterior pero no el servicio que las corre: sin él
+  ni el barrido de pedidos demorados ni el latido del worker se ejecutaban
+  nunca. Agregado en dev y en producción, con la advertencia de **una sola
+  instancia por despliegue** — dos programadores encolarían cada tarea dos
+  veces.
+
+- **La alerta de cocina le llega al encargado de turno** (2026-08-04,
+  migración `7fda1eb759f7`). Entidad `notificacion` (bandeja por usuario,
+  transversal) + listener de `users` sobre `sales.pedido_demorado`.
+  Quién es el encargado de turno **no necesitó una entidad nueva**: sale del
+  `relevo_encargado_id` de la caja abierta, que ya registra quién está a
+  cargo del local (RN-MDP-002). Sin caja abierta, el aviso cae en los
+  supervisores de la sucursal — un aviso sin destinatario es un aviso
+  perdido. La regla vive en **una sola función**
+  (`notificaciones.destinatarios_de_sucursal`) para que hacerla configurable
+  después no toque ni el listener ni la entidad ni la pantalla.
+  `GET /notificaciones`, `POST /notificaciones/{id}/leer`,
+  `POST /notificaciones/leer-todas`.
+
+- **Salud del worker: se pregunta en vez de inferirse** (2026-08-04). Una
+  tarea de beat escribe un latido en Redis con TTL y `/health/ready` lo lee.
+  Antes se deducía de la profundidad de la cola, que solo delata al worker
+  cuando hay trabajo: con la cola vacía —la mayor parte del día en un
+  restaurante— un worker muerto y uno ocioso se veían idénticos.
+
+- **El flujo `auditoria` del log estructurado dejó de estar vacío**
+  (2026-08-04): `AuditLogRepo.registrar` emite además al logger
+  `provecho.auditoria`, solo metadatos. La tabla sigue siendo el rastro
+  legal; el log es lo que un colector externo puede vigilar en vivo.
+
+- **Alerta de pedido demorado en cocina** (2026-08-04, migración
+  `d4e21b0c13d0`). Al confirmarse una venta, un listener agenda una revisión
+  para 15 minutos después; si el pedido sigue en cocina, se registra
+  `alerta_pedido` y se publica `sales.pedido_demorado`. Un barrido de Celery
+  beat cada 5 minutos repasa lo que siga abierto: la tarea puntual sola se
+  pierde si el worker estuvo caído, y para una alerta el fallo que importa
+  es no avisar. Los dos caminos convergen en la misma fila sin duplicar
+  (`UNIQUE (venta_id, minutos_umbral)` + pre-chequeo + SAVEPOINT). El umbral
+  lo fija Gerencia por empresa (`parametro_empresa`) y **queda congelado en
+  la alerta**: subirlo después no reescribe lo que ya fue demora.
+
+- **Dos reportes nuevos en el tablero**: `pedidos_demorados` y
+  `estado_caja` — este último con horas sin cerrar y efectivo esperado, no
+  solo el conteo que ya daba el KPI. Diez reportes en total.
+
+- **ADR-013 instalado, tres semanas después de decidirse** (2026-08-04):
+  shadcn/ui sobre **Base UI** (cero paquetes de Radix, como exigía la
+  decisión) más Recharts, dnd-kit, react-day-picker y sonner. Obligó a subir
+  a **Tailwind v4** — el registro de Base UI solo existe en shadcn v4, que
+  no corre sobre v3. `tailwind.config.ts` desaparece: el tema vive en
+  `globals.css`, con los roles semánticos de shadcn apuntando a la paleta
+  Provecho y no al gris del preset.
+
+- **El tablero se comparte, se exporta y se reordena** (2026-08-04,
+  ADR-024 Addendum, migración `5e1c7775f6ca`). Cierra la deuda declarada el
+  mismo día:
+  - **Compartir por rol** (`tablero.rol_id`): NULL = privado; con rol lo ve
+    en solo lectura quien lo tenga, lo edita el dueño. Por rol y no por
+    lista de personas porque se administra solo — quien cesa deja de verlo
+    al perder el rol, sin que nadie lo saque a mano de cada tablero.
+    Compartir **no expone datos**: cada tarjeta revalida el permiso de su
+    módulo, así que se comparte la disposición, no el contenido.
+  - **Exportación a CSV** por tarjeta, armada en el cliente (los datos ya
+    están ahí). RFC 4180, BOM UTF-8 para Excel y montos crudos —
+    `S/ 1,234.50` no lo suma ninguna hoja de cálculo.
+  - **Reordenar por arrastre** con HTML5 nativo, sin librería.
+  - **Caché de 30 s** por (reporte + filtros): reordenar dentro de la
+    ventana cuesta 0 peticiones.
+  - **Tres reportes más**: `ventas_por_hora` (en hora del negocio: se
+    agrupa en UTC y se reetiqueta con `fechas.desfase_horas()`),
+    `ventas_por_trabajador` (primer contrato público de `rrhh` — nombre y
+    cargo, nada más) y `margen_por_producto`, donde un producto **sin
+    receta muestra costo y margen vacíos, nunca cero**: cero se leería como
+    100 % de margen sobre un dato que falta.
+
+- **Contrato público `inventory` → `purchases`** (2026-08-04):
+  `solicitudes_resumen_para_negociacion` / `GET /inventory/solicitudes/resumen`
+  (permiso `inventory.leer_solicitudes_externas`, sembrado en `comprador`) —
+  qué artículo pide más cada almacén, para negociar volumen con
+  proveedores. Suma lo **solicitado** (no lo aprobado ni lo despachado: es
+  la demanda real) y excluye las canceladas.
+
+- **`GET /api/v1/sucursales`** (2026-08-04): catálogo de referencia con el
+  mismo criterio que `/almacenes` — cualquier autenticado que tenga que
+  elegir una sucursal lo necesita, escopado por tenant. Lo pedía el filtro
+  de sucursales del tablero y no existía.
+
+- **`.github/dependabot.yml`** (2026-08-04): pip, npm, github-actions y
+  docker. Complementa a `pip-audit`, que solo avisa de una CVE publicada —
+  Dependabot abre el PR que la cierra.
+
+### Fixed
+
+- **El timestamp del log no era RFC3339** (2026-08-04,
+  `src/core/logging_config.py`). `ts` salía como `2026-08-04T12:35:19-0500`:
+  offset **sin los dos puntos**, que es ISO 8601 pero no RFC3339. El
+  colector no lo parsea y lo descarta en silencio, estampando la hora de
+  ingesta — así que un hub de sucursal que sube sus logs atrasados tras un
+  corte los mostraría como recién ocurridos, que es justo cuando la hora
+  real importa. Ahora se emite en RFC3339 UTC, por la misma regla que ya
+  fijaba `shared/fechas.py`: un instante va en UTC. Test que congela el
+  contrato: `test_el_timestamp_es_rfc3339_en_utc`.
+
+- **Encolar una tarea podía colgar el request que la encola** (2026-08-04,
+  `src/core/celery_app.py`). Lo destapó el listener de alertas: al encolar
+  en cada venta confirmada, el suite de tests pasó de ~5 a **63 minutos**.
+  La causa no era el listener sino Celery: `apply_async` abre la conexión al
+  broker **dentro de la llamada** y con reintentos, así que con Redis
+  inalcanzable (el `.env` local apunta a `redis://redis:6379`, el hostname
+  de Docker) cada encolado pagaba segundos de DNS fallido. En producción eso
+  es un cajero mirando una pantalla congelada cuando Redis se cae. Ahora el
+  broker tiene timeouts de 1 s, no reintenta al arrancar, y el encolado de
+  la alerta usa `retry=False`: o entra al instante o no entra, y el barrido
+  periódico lo recupera. Los tests usan el transporte en memoria de kombu
+  (`memory://`), con el mismo criterio que ya se aplicaba al token de
+  Factiliza: ningún test habla con un servicio externo real.
+
+### Security
+
+- **Content-Security-Policy en la API y en el frontend** (2026-08-04). La
+  API devuelve JSON y no debe cargar nada, así que va la más restrictiva
+  posible (`default-src 'none'` + `frame-ancestors`/`base-uri`/`form-action`
+  en `'none'`), lo que además vuelve inerte cualquier respuesta que
+  llegara a interpretarse como HTML; `/docs` se exceptúa porque Swagger UI
+  carga de un CDN y en producción no existe. El frontend usa **nonce por
+  request** con `'strict-dynamic'` (`frontend/middleware.ts`): Next inyecta
+  scripts inline propios y sin nonce habría que admitir `'unsafe-inline'`
+  en `script-src`, que anularía la protección contra XSS. `style-src`
+  mantiene `'unsafe-inline'` — concesión conocida del patrón, no afecta al
+  vector de ejecución de script.
+
+### Changed
+
 - **Las colas de preparación ya no esconden el ítem recién tachado**
   (2026-08-03, `kds.cola_pantalla`): una pantalla de `preparacion`
   devolvía solo los ítems `pendiente`/`en_preparacion` de sus categorías,

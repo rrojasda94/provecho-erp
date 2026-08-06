@@ -28,8 +28,10 @@ Motivos:
   proveedor ni contrato nuevo.
 - Su API cubre en un mismo contrato lo que el ERP necesita por fases:
   `invoice/send` (boleta y factura), `note/send` (nota de crédito y débito),
-  `despatch-*` (guía de remisión — futuro módulo `logistics`) y recuperación
-  de PDF/XML/CDR.
+  `despatch-*` (guía de remisión) y recuperación de PDF/XML/CDR. *Nota
+  2026-08-05*: la guía va en `sales` junto al resto de comprobantes, no en
+  un módulo `logistics` — el despacho ya vive en `inventory` (ADR-020) y la
+  guía es el comprobante que lo acompaña, no un dominio aparte.
 - Autenticación por Bearer token estático, sin flujo OAuth que mantener.
 - Expone además APIs de consulta (RUC, DNI, tipo de cambio) que sirven al
   alta de proveedores y clientes sin integrar otro servicio.

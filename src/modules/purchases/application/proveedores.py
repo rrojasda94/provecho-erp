@@ -76,6 +76,11 @@ def listar_proveedores(session: Session, empresa_id: uuid.UUID | None = None) ->
     return ProveedorRepo(session).list(empresa_id)
 
 
+def q_proveedores(session: Session, empresa_id: uuid.UUID | None = None):
+    """La consulta sin ejecutar, para que el router la pagine (ADR-026)."""
+    return ProveedorRepo(session).q_list(empresa_id)
+
+
 def editar_proveedor(session: Session, proveedor_id: uuid.UUID, **campos) -> Proveedor:
     proveedor = ProveedorRepo(session).get(proveedor_id)
     if proveedor is None:

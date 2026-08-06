@@ -326,6 +326,9 @@ def register() -> None:
     # Anular líneas sueltas repone igual que anular la venta entera: el
     # payload trae solo las líneas quitadas.
     event_bus.subscribe("sales.lineas_anuladas", on_venta_anulada)
+    # La nota de crédito repone igual, cuando quien la emite lo pidió: si no,
+    # el evento viaja con `items` vacío y esto no mueve nada (RN-CPP-009).
+    event_bus.subscribe("sales.nota_credito_emitida", on_venta_anulada)
     event_bus.subscribe("purchases.compra_recibida", on_compra_recibida)
     event_bus.subscribe("production.consumo_registrado", on_consumo_registrado)
     event_bus.subscribe("production.orden_completada", on_orden_completada)

@@ -30,6 +30,28 @@ DOC_RUC = "6"
 DOC_PASAPORTE = "7"
 # Catálogo 52 — leyendas.
 LEYENDA_MONTO_EN_LETRAS = "1000"
+# Catálogo 01 — nota de crédito.
+TIPO_DOC_NOTA_CREDITO = "07"
+# Catálogo 09 — motivos de nota de crédito. Solo los que el negocio usa:
+# el catálogo completo tiene trece y los otros son de casos que este ERP no
+# produce (canje de vale, bonificación, ajuste de operaciones de exportación).
+MOTIVO_NC_ANULACION = "01"
+MOTIVO_NC_ANULACION_POR_ERROR_RUC = "02"
+MOTIVO_NC_CORRECCION_DESCRIPCION = "03"
+MOTIVO_NC_DEVOLUCION_TOTAL = "06"
+MOTIVO_NC_DEVOLUCION_POR_ITEM = "07"
+MOTIVOS_NC = {
+    MOTIVO_NC_ANULACION: "Anulación de la operación",
+    MOTIVO_NC_ANULACION_POR_ERROR_RUC: "Anulación por error en el RUC",
+    MOTIVO_NC_CORRECCION_DESCRIPCION: "Corrección por error en la descripción",
+    MOTIVO_NC_DEVOLUCION_TOTAL: "Devolución total",
+    MOTIVO_NC_DEVOLUCION_POR_ITEM: "Devolución por ítem",
+}
+# Los que corrigen un dato del documento y no la operación: la venta ocurrió,
+# el comprobante estaba mal. Habilitan reemitir el corregido.
+MOTIVOS_NC_DE_CORRECCION = frozenset(
+    {MOTIVO_NC_ANULACION_POR_ERROR_RUC, MOTIVO_NC_CORRECCION_DESCRIPCION}
+)
 
 _CENTIMOS = Decimal("0.01")
 
@@ -73,6 +95,19 @@ class Documento:
     moneda: str = "PEN"
     forma_pago: str = "Contado"
     metadatos: dict = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class DocumentoAfectado:
+    """El comprobante que la nota de crédito corrige (catálogo 01 + serie)."""
+
+    tipo_doc: str
+    serie: str
+    correlativo: int
+
+    @property
+    def serie_correlativo(self) -> str:
+        return f"{self.serie}-{self.correlativo}"
 
 
 def monto_en_letras(monto: Decimal, moneda: str = "PEN") -> str:
@@ -152,3 +187,33 @@ def construir_payload(doc: Documento) -> dict:
             }
         ],
     }
+
+
+def construir_payload_nota_credito(
+    doc: Documento,
+    afectado: DocumentoAfectado,
+    motivo_cod: str,
+    motivo_descripcion: str | None = None,
+) -> dict:
+    """Arma el cuerpo de `POST /note/send`.
+
+    Misma aritmética que el comprobante que corrige —la nota de crédito
+    también declara valor de venta, IGV y total— más los tres campos que la
+    vuelven una nota: qué documento afecta y por qué (catálogo 09).
+
+    Los ítems son los que se acreditan: la NC total lleva todos, la parcial
+    solo los devueltos con su cantidad. El monto sale de esas líneas, así
+    que no hay un total que pueda contradecir al detalle.
+    """
+    if motivo_cod not in MOTIVOS_NC:
+        raise ValueError(f"motivo de nota de crédito fuera del catálogo 09: {motivo_cod}")
+    payload = construir_payload(doc)
+    payload["tipo_Doc"] = TIPO_DOC_NOTA_CREDITO
+    payload["afectado_Tipo_Doc"] = afectado.tipo_doc
+    payload["afectado_Num_Doc"] = afectado.serie_correlativo
+    payload["motivo_Cod"] = motivo_cod
+    payload["motivo_Descripcion"] = motivo_descripcion or MOTIVOS_NC[motivo_cod]
+    # La forma de pago es del documento original: una nota de crédito no
+    # cobra nada, y mandarla confunde la lectura del XML.
+    payload.pop("forma_pago", None)
+    return payload
