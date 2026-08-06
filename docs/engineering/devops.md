@@ -119,16 +119,19 @@ GitHub Actions. Ver ADR-008 para el porqué de separar entrega de despliegue.
 
 | Job | Qué verifica |
 |-----|--------------|
-| `backend` | `ruff check`, `pytest`, y que Alembic tenga **una sola cabeza** |
+| `backend` | `ruff check`, `pytest`, que Alembic tenga **una sola cabeza** y que el contrato OpenAPI esté regenerado |
+| `migraciones` | contra un Postgres 16 real: `upgrade head` sobre base vacía, `downgrade base`, volver a subir, y `alembic check` |
 | `imagen` | que el `Dockerfile` construya **y que el contenedor arranque** y responda `/health` |
 | `seguridad` | `pip-audit` (informativo, no bloquea) |
 | `frontend` | `eslint` + `build` |
 
 El chequeo de cabeza única atrapa el caso en que dos ramas crean migraciones
 en paralelo: `alembic upgrade head` falla durante el despliegue, no en el
-merge que lo causó. El job `imagen` cubre lo que nadie comprobaba — que la
-imagen siquiera construyera — y de paso valida el `CMD`, el usuario sin
-privilegios y el `HEALTHCHECK`.
+merge que lo causó. El job `migraciones` existe porque los tests corren sobre
+SQLite con `create_all` y nunca ejecutan una migración: acá se ejecutan de
+verdad, ida y vuelta, contra Postgres. El job `imagen` cubre lo que nadie
+comprobaba — que la imagen siquiera construyera — y de paso valida el `CMD`,
+el usuario sin privilegios y el `HEALTHCHECK`.
 
 **`release.yml`** — entrega continua del artefacto: cada push a `main`
 publica la imagen en GHCR (`ghcr.io/<repo>:latest`); los tags `v*` publican
