@@ -59,7 +59,12 @@ async function abrirCaja(page: Page, { declarado }: { declarado: string }) {
   });
 }
 
-test.describe("Flujo del dinero", () => {
+// `serial`: la segunda prueba necesita la caja cerrada, y quien la cierra es
+// la primera. Sin esto, un fallo en la primera hace fallar a la segunda con
+// "no aparece el diálogo de apertura" — un síntoma que no dice nada del error
+// real. En serie, la segunda queda **saltada** y el reporte señala una sola
+// causa.
+test.describe.serial("Flujo del dinero", () => {
   test("abrir caja, vender, cobrar y cerrar", async ({ page }) => {
     await ingresar(page);
     await page.goto("/pdv");
@@ -79,10 +84,22 @@ test.describe("Flujo del dinero", () => {
     await dialogo(page).getByRole("button", { name: /Guardar/i }).click();
     await expect(page.getByText(/S\/ 25\.00/).first()).toBeVisible();
 
+    // --- Tipo de orden ---------------------------------------------------
+    // El PDV no deja salir del borrador sin tipo de orden (RN-COM-005), así
+    // que el primer "Cobrar" abre el diálogo de tipo, no el de cobro. Es el
+    // candado, no un rodeo: se prueba pasando por él.
+    await page.getByRole("button", { name: /^Cobrar$/i }).click();
+    await expect(dialogo(page).getByText("Tipo de orden")).toBeVisible();
+    // "Para llevar" es el único que no pide dato extra (mesa o dirección).
+    await dialogo(page).getByRole("button", { name: /Para llevar/i }).click();
+    await dialogo(page).getByRole("button", { name: /^Confirmar$/ }).click();
+
     // --- Cobro -----------------------------------------------------------
-    await page.getByRole("button", { name: /^COBRAR$/i }).click();
-    await expect(dialogo(page)).toContainText(/Cobro|Cobrar/i);
-    await dialogo(page).getByRole("button", { name: /Cobrar|Confirmar/i }).last().click();
+    await page.getByRole("button", { name: /^Cobrar$/i }).click();
+    await expect(dialogo(page).getByText("Cobrar", { exact: true })).toBeVisible();
+    // Sin tocar nada: el diálogo llega con el medio por defecto y el monto
+    // igual al total, y sin documento se emite boleta a Clientes varios.
+    await dialogo(page).getByRole("button", { name: /^Confirmar pago$/ }).click();
     // El comprobante emitido cierra el cobro; sin token de Factiliza queda
     // pendiente de envío, que es justo lo que debe pasar sin proveedor.
     await expect(page.getByTestId("estado-caja")).toContainText("Caja abierta");

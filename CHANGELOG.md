@@ -7,6 +7,24 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Fixed
 
+- **Las pruebas e2e del flujo del dinero pasan de rojo a verde y entran a
+  CI** (2026-08-06). Dos causas, ninguna de la pantalla:
+  1. **La prueba se saltaba el tipo de orden.** El PDV no deja cobrar sin él
+     (RN-COM-005), así que el primer "Cobrar" abría el diálogo de tipo y no
+     el de cobro. El test tomaba un atajo que el cajero no tiene; ahora pasa
+     por el candado ("Para llevar", el único que no pide dato extra).
+  2. **El `SyntaxError: Unexpected end of JSON input` que se venía
+     atribuyendo a inestabilidad de `next dev` era el timeout disfrazado.**
+     El presupuesto por test eran 90 s y el modo desarrollo compila cada
+     ruta la primera vez que se la pide; la corrida moría a mitad de camino
+     y el reporte señalaba el `expect` que quedó colgando. Como cada corrida
+     dejaba la caché más tibia, el punto de falla se movía solo — que es
+     justo lo que se lee como flakiness. Con 240 s el recorrido entra en
+     ~96 s. **No hizo falta pasar a `build`+`start`**, así que tampoco hace
+     falta tocar el origen de las Server Actions.
+  Se suma `test.describe.serial`: la segunda prueba necesita la caja que
+  cierra la primera, y en serie queda **saltada** en vez de fallar con un
+  síntoma que no dice nada.
 - **La apertura y el cierre de caja del PDV devolvían 422** (2026-08-05,
   ADR-025 Addendum). Los diálogos existían desde antes de ADR-025 y seguían
   mandando el contrato viejo (`monto_apertura` en vez de `monto_declarado`,
@@ -30,6 +48,11 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Added
 
+- **Job `e2e` en `ci.yml`** (2026-08-06): corre `npm run test:e2e` sobre
+  chromium y sube `test-results/` como artefacto cuando falla — sin el trace
+  y las capturas, un rojo en CI es una línea de texto. Es el único job que
+  comprueba que cliente y servidor estén de acuerdo: los dos bugs que
+  motivaron la suite pasaban `pytest` y `npm run build` sin despeinarse.
 - **Seis diagramas BPMN de las áreas nuevas** (2026-08-05), con sus PROC
   registrados en el maestro y su narrativa en `workflows.md`. El enfoque
   vigente era *primero SOP, luego BPMN*; los SOPs ya estaban estables.

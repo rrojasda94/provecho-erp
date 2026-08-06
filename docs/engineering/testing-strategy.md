@@ -81,14 +81,23 @@ Aprendidas a los golpes; cada una costó tiempo:
 - **Un `data-testid` es una decisión de diseño, no un parche**: se agrega
   donde el texto visible es ambiguo o cambia con el idioma, no en todos
   lados.
+- **La prueba pasa por los candados, no los rodea.** Si la pantalla exige un
+  paso antes de cobrar, el test lo da: saltárselo no prueba el flujo del
+  cajero, prueba uno que no existe.
+- **Presupuesto de tiempo generoso en modo desarrollo.** `next dev` compila
+  cada ruta la primera vez que se la pide. Un timeout corto no falla donde
+  está el problema: falla donde se acabó el reloj, y como cada corrida deja
+  la caché más tibia, el punto de falla se mueve solo. Eso se lee como
+  flakiness y no lo es.
 
-## Estado actual (2026-08-05)
+## Estado actual (2026-08-06)
 
 - Dominio y API: **887 casos**, en verde, en CI.
 - Unidad de frontend: 14 casos (`npm test`). **No corren en CI todavía** —
   el job de frontend solo hace `lint` y `build`.
 - Contrato cliente↔servidor: **no existe**. Es la prioridad.
-- e2e: andamiaje armado y **en rojo**, ver ROADMAP → Frontend.
+- e2e: **2 casos en verde y en CI** (job `e2e`), solo sobre el PDV. Ver
+  ROADMAP → Frontend.
 
 ## Nota de velocidad
 

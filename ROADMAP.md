@@ -46,7 +46,7 @@ Registro de lo construido y lo pendiente. Actualizar en cada cambio relevante.
 | Auditoría (audit_log) | ⬜ | Especificada en data-model |
 | Endurecimiento de producción (rate limit, secretos, HTTPS, cabeceras) | 🔶 base ✅ 2026-07-26 | Rate limit por IP en login/refresh (Redis, fail-open), validación de config que aborta el arranque en `production` con valores de desarrollo, CORS + `TrustedHost` + cabeceras de seguridad + HSTS, `/docs` cerrado en producción, uvicorn `--proxy-headers`. Runbook de rotación de credenciales y custodia de `.env` en `docs/engineering/devops.md`. Pendiente: ver Deuda técnica → Seguridad. |
 | App Android (15+) | ⬜ | **Decidido (ADR-013): PWA/responsive, no app nativa** — Next.js + Tailwind + Base UI es 100% web, sin base de código separada; debe hablar con el hub local de sucursal igual que web y PC, ver ADR-009 |
-| Arquitectura frontend (Tailwind, shadcn/ui, shell estilo Odoo) | ✅ spec 2026-07-27 | ADR-013 (revisado): Tailwind sobre los tokens de marca existentes (`tailwind.config.ts` → `var(--color-*)`, sin hex mágico); **shadcn/ui** (componentes copiados y editables, corre sobre Base UI, no Radix) para overlays/combobox/dialog y catálogo base — token set semántico + `--radius` único, mejor ajuste para editar color/forma por marca rápido que construir a mano; home de apps + sidebar por módulo estilo Odoo; grid y rutas filtrados por `permisos` de `GET /users/me` (ya existente, sin cambio de backend), guard real server-side en cada `layout.tsx` de módulo — el filtro del grid es solo UX. Sin librería de estado global (YAGNI). Playwright para e2e de flujos críticos, hoy en cero. `docs/prompts/frontend.md` actualizado con las reglas técnicas. Sin implementación de código todavía. |
+| Arquitectura frontend (Tailwind, shadcn/ui, shell estilo Odoo) | ✅ spec 2026-07-27 | ADR-013 (revisado): Tailwind sobre los tokens de marca existentes (`tailwind.config.ts` → `var(--color-*)`, sin hex mágico); **shadcn/ui** (componentes copiados y editables, corre sobre Base UI, no Radix) para overlays/combobox/dialog y catálogo base — token set semántico + `--radius` único, mejor ajuste para editar color/forma por marca rápido que construir a mano; home de apps + sidebar por módulo estilo Odoo; grid y rutas filtrados por `permisos` de `GET /users/me` (ya existente, sin cambio de backend), guard real server-side en cada `layout.tsx` de módulo — el filtro del grid es solo UX. Sin librería de estado global (YAGNI). Playwright para e2e de flujos críticos: **2 casos del flujo del dinero en verde y en CI desde 2026-08-06**, ver Deuda técnica → Frontend. `docs/prompts/frontend.md` actualizado con las reglas técnicas. Sin implementación de código todavía. |
 | Modo offline del PDV — hub local de sucursal | ✅ fase 1 2026-07-26 · fase 2 2026-07-27 | ADR-009: hub local dedicado por sucursal (misma imagen del backend, Postgres propio), los 3 clientes (web/Android/PC) le hablan siempre al hub por LAN. **Fase 1**: `DEPLOYMENT_MODE=hub` + validación de config, detector de conectividad, `GET /health/sync`, `docker-compose.hub.yml`. **Fase 2 — motor de sync**: ciclo que **empuja y después jala** (`src/core/sync/motor.py`, proceso `python -m src.core.sync.runner`); `id` client-generado en `crear_venta`/`registrar_pago`/`registrar_movimiento` (el cambio previo que pedía la fase 1, sin migración); endpoints dedicados `GET /sync/pull` + `POST /sync/push` (permisos `sync.leer`/`sync.empujar`, rol `hub_sucursal`) porque los públicos no alcanzaban (no traen `pin_hash` ni los campos del catálogo, no son incrementales, y el push necesita conservar quién vendió y el número de orden); contrato declarativo por módulo (`application/sincronizacion.py`, 28 recursos
 tras sumar precios y lote/FEFO) que el motor solo ensambla; tabla `sync_watermark` por recurso y dirección; `/health/sync` con avance y último error por recurso; alta de la cuenta de servicio con `python -m src.seeders.hub`. El hub NO empuja movimientos de inventario (el listener de la nube los regenera; duplicaría el consumo). 24 casos en `tests/test_sync_motor.py` sincronizando dos bases reales. Pendiente: ver Deuda técnica. |
 | Backups automáticos | ✅ 2026-07-26 | `python -m src.backups.backup`: dump `pg_dump --format=custom` → verificación del archivo (firma + tablas críticas) → restauración probada contra base desechable → copia a S3 (opcional) → purga con retención de 30 días que nunca borra la copia más reciente. **Diario** (antes se declaraba mensual e incremental). Cron del host, no Celery beat. Runbook en `docs/engineering/devops.md#backups`. Pendiente: alerta ante fallo, ver Deuda técnica. |
@@ -54,7 +54,7 @@ tras sumar precios y lote/FEFO) que el motor solo ensambla; tabla `sync_watermar
 | Dashboard gerencial mínimo | ✅ 2026-07-26 | `GET /api/v1/dashboard/resumen` (`src/core/dashboard_router.py`, permiso `dashboard.leer`): ventas del día (cantidad+total), stock bajo mínimo, cajas abiertas — agregador en `core`, nunca importa dominio de otro módulo (ADR-012). Requirió construir dos huecos que no existían: `sales` no tenía ningún listado de ventas, `accounting` tenía los modelos de caja (`apertura_caja`/`cierre_caja`/`arqueo`, migrados desde 2026-07-20) sin capa de aplicación. **Slice mínimo de caja** (`accounting.application.caja`): abrir/cerrar/arquear con **reconciliación real** (el cierre calcula `monto_esperado` desde los pagos en efectivo reales, vía contrato público de `sales`, no un número tipeado sin verificar). Primer frontend real: login por PIN + pantalla de dashboard en Next.js. Fuera de esta fase, a propósito: RN-POS-009..013 completas, relevo autenticado por PIN, máquina de estados de `custodia_efectivo` — ver Deuda técnica. |
 | Protección de datos personales (Ley 29733) | 🔶 ARCO técnico ✅ 2026-07-26 | `docs/security/proteccion-datos-personales.md`: qué datos trata el ERP y dónde viven (casi todo en `persona`, fuente única — RN-GEN-007; la excepción deliberada es `postulante`, ver 2026-08-01), derechos ARCO, plazos de conservación, medidas de seguridad ya vigentes (referenciadas, no reconstruidas), proceso de brecha. Cancelación implementada como **anonimización irreversible** de `persona`, no `DELETE` — `POST /api/v1/personas/{id}/anonimizar`, permiso dedicado `personas.anonimizar`, migración `dad43729501d` (RN-PER-007, ADR-011). Acceso/Rectificación ya existían (`GET`/`PATCH /personas/{id}`). Pendiente de **acción del usuario, no de código**: registro del banco de datos ante la ANPD, aviso de privacidad público, confirmar plazos de retención con el contador/abogado, jurisdicción de transferencia internacional. Pendiente técnico: ver Deuda técnica. |
 | Contrato OpenAPI de la API | ✅ 2026-07-26 | `docs/architecture/openapi.json` exportado (`python -m src.core.openapi_export`) y verificado en CI — un endpoint que cambia sin regenerar el contrato falla el PR (ADR-010). `TAGS_METADATA` en `src/core/app.py` describe los 15 tags de la API; un tag nuevo sin descripción falla un test. De paso, corregidas dos afirmaciones falsas en `api-guidelines.md`: `idempotency_key` es campo del body, no header; las colecciones devuelven array plano, no `{items,total,page,page_size}` (nunca se implementó paginación). |
-| CI/CD | 🔶 CI + entrega ✅ 2026-07-26 | `ci.yml` gana tres verificaciones que no existían: cabeza única de Alembic (una doble falla en el despliegue, no en el merge que la crea), construcción de la imagen **y arranque real del contenedor** contra `/health`, y `pip-audit` informativo. `release.yml` publica la imagen en GHCR en cada push a `main` (tags `v*` → versión exacta). `docker-compose.prod.yml` nuevo: el compose existente es solo desarrollo y desplegarlo publicaría esa configuración. Dockerfile con usuario sin privilegios y `HEALTHCHECK`. El **despliegue sigue manual** y documentado hasta que exista el VPS (ADR-008). |
+| CI/CD | 🔶 CI + entrega ✅ 2026-07-26 · e2e en CI 2026-08-06 | **Job `e2e`** (2026-08-06): el flujo del dinero de punta a punta sobre chromium, con `test-results/` como artefacto cuando falla — el único job que comprueba que cliente y servidor estén de acuerdo. `ci.yml` gana tres verificaciones que no existían: cabeza única de Alembic (una doble falla en el despliegue, no en el merge que la crea), construcción de la imagen **y arranque real del contenedor** contra `/health`, y `pip-audit` informativo. `release.yml` publica la imagen en GHCR en cada push a `main` (tags `v*` → versión exacta). `docker-compose.prod.yml` nuevo: el compose existente es solo desarrollo y desplegarlo publicaría esa configuración. Dockerfile con usuario sin privilegios y `HEALTHCHECK`. El **despliegue sigue manual** y documentado hasta que exista el VPS (ADR-008). |
 | Chequeos de salud y alertas | ✅ 2026-07-26 | `src/core/health.py` + `health_router.py`: `/health` (liveness, sin dependencias), `/health/ready` (base de datos crítica → 503; Redis y cola degradan sin sacar de rotación) y `/health/backups` (503 pasadas 26 h — cubre el backup que nunca corrió, que no genera evento de error). El ERP expone estado; **un monitor externo alerta** (ADR-007): construir alertas dentro del servidor que se monitorea deja de avisar justo cuando ese servidor cae. Pendiente: contratar el monitor y dar de alta las sondas. |
 | Observabilidad (métricas, trazas, logs centralizados) | 🔶 logs + errores ✅ 2026-07-26 | `src/core/logging_config.py`: JSON en producción, tres flujos (`app`/`seguridad`/`auditoria`) derivados del nombre del logger, `request_id` por request (respeta `X-Request-ID` entrante, sale en la cabecera y en el cuerpo del error 500), redacción de PIN/tokens/`Authorization`. `src/core/sentry.py`: reporte de errores en `api`, `worker` (señal `celeryd_init`) y `backups`; sirve para Sentry o GlitchTip autoalojado, no-op sin DSN. Pendiente: métricas, trazas y colector de logs — ver Deuda técnica. |
 | UX: menús, buscadores, breadcrumbs, atajos, sidebars, dashboards | ⬜ | Definición pendiente con el usuario |
@@ -1814,15 +1814,13 @@ errores de consola.
   orden ad-hoc, que es lo único que el backend implementa hoy
   (`plan_produccion` y `checklist_inocuidad_turno` siguen en deuda del
   módulo).
-- 🔶 **Pruebas e2e del flujo del dinero — armadas, todavía en rojo**
-  (2026-08-05). Playwright instalado, `frontend/playwright.config.ts`,
-  `frontend/e2e/caja.spec.ts` (abrir caja → vender → cobrar → cerrar, más
-  RN-POS-011) y `src/seeders/e2e.py` con los datos que el PDV necesita.
-  Corre con `npm run test:e2e` desde `frontend`.
-  **Lo que ya funciona, verificado**: login, home, PDV, apertura de caja con
-  conteo por denominación y verificación de POS, y la ficha de producto.
-  **Lo que falta**: la suite no llega verde de punta a punta. Tres cosas
-  encontradas en el camino, dos ya resueltas y una no:
+- ✅ 2026-08-06 **Pruebas e2e del flujo del dinero — verdes y en CI.**
+  `frontend/e2e/caja.spec.ts` recorre abrir caja → vender → cobrar → cerrar
+  contra la API real (SQLite desechable sembrado por `src/seeders/e2e.py`),
+  más RN-POS-011. Corre con `npm run test:e2e` desde `frontend` y como job
+  `e2e` de `ci.yml`, con `test-results/` subido como artefacto cuando falla.
+  Cuatro corridas seguidas en verde, una de ellas con `.next` borrado.
+  Lo que estaba roto y por qué, que es lo que vale del episodio:
   1. ✅ El `env` del `webServer` de Playwright **no llega** al proceso hijo
      en este entorno. La API corría contra el `.env` del repo —o sea contra
      **Supabase**— y Next se iba al `localhost:8000` por defecto, donde en
@@ -1832,14 +1830,23 @@ errores de consola.
   2. ✅ `waitForURL` no sirve tras una Server Action: el `redirect` lo
      resuelve el cliente y nunca dispara el evento `load`. Se espera el
      contenido del destino.
-  3. ⬜ **Queda inestable**: Next en modo desarrollo tira
-     `SyntaxError: Unexpected end of JSON input` de forma intermitente y la
-     corrida falla en el login. Con `build`+`start` no sirve como está: en
-     producción Next valida el origen de las Server Actions y las rechaza.
-     Ese es el nudo a desatar antes de meterlo en CI.
-  Hasta que esté verde, **sigue siendo cierto que ninguna pantalla tiene
-  prueba automatizada** — y el precio ya se pagó: la caja del PDV estuvo
-  rota un día entero sin que nada fallara en CI.
+  3. ✅ **La prueba se saltaba el tipo de orden.** El PDV no deja cobrar sin
+     él (RN-COM-005), así que el primer "Cobrar" abría el diálogo de tipo y
+     no el de cobro. No era un bug de la pantalla: era la prueba tomando un
+     atajo que el cajero no tiene. Ahora pasa por el candado —"Para llevar",
+     el único que no pide dato extra— y recién después cobra.
+  4. ✅ **El `SyntaxError: Unexpected end of JSON input` era el timeout
+     disfrazado.** El presupuesto del test eran 90 s y `next dev` compila
+     cada ruta la primera vez que alguien la pide —login, home, PDV, la ruta
+     de proxy—; la corrida moría a mitad de camino y el `expect` que quedaba
+     colgando era el que aparecía en el reporte. Como cada corrida dejaba la
+     caché más tibia, el fallo se movía de paso en paso, que es exactamente
+     lo que hace pensar en flakiness. Con 240 s el recorrido completo entra
+     en ~96 s. **No hizo falta pasar a `build`+`start`**, y con eso queda sin
+     efecto lo que decía este punto sobre el origen de las Server Actions.
+  Deuda que deja: son **dos** casos sobre una sola pantalla. El resto del
+  ERP sigue sin prueba de pantalla, y el job tarda ~4 min porque levanta
+  Next en modo desarrollo.
 - ⬜ **Los enums de la base no tienen una sola fuente en el frontend**: la
   pantalla de caja repite los valores de `custodia`, `descuadre_atribucion`
   y los estados en constantes propias. Mientras el `pattern` del schema los

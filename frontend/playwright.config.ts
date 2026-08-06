@@ -29,11 +29,18 @@ export default defineConfig({
   workers: 1,
   fullyParallel: false,
   // 30 s (el defecto) no alcanzan: `next dev` compila cada ruta la primera
-  // vez que alguien la pide, y este recorrido toca login, home, PDV y sus
-  // diálogos. El login solo tarda ~5 s en frío. No es lentitud del código
-  // sino del modo desarrollo — se compensa con tiempo en vez de montar un
-  // build de producción para el suite.
-  timeout: 90_000,
+  // vez que alguien la pide, y este recorrido toca login, home, PDV, la ruta
+  // de proxy y sus diálogos. El login solo tarda ~5 s en frío. No es lentitud
+  // del código sino del modo desarrollo — se compensa con tiempo en vez de
+  // montar un build de producción para el suite.
+  //
+  // 90 s tampoco alcanzaban **en frío**: con `.next` vacío la corrida moría
+  // sobre el cierre de caja, y el síntoma —"esperaba Caja cerrada"— hacía
+  // pensar en un bug del cierre. Lo que se agotaba era el presupuesto del
+  // test, no el `expect`. El recorrido completo tarda ~96 s en esta máquina;
+  // el resto del margen es para el runner de CI, que tiene dos núcleos y
+  // siempre compila en frío.
+  timeout: 240_000,
   expect: { timeout: 15_000 },
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,

@@ -135,3 +135,43 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run build
+
+  # El flujo del dinero de punta a punta contra la API real. Es el único job
+  # que prueba que cliente y servidor estén de acuerdo: los dos bugs que
+  # motivaron la suite (apertura de caja mandando el contrato pre-ADR-025,
+  # listado de ventas leído como array tras la paginación) pasaban `pytest` y
+  # `npm run build` sin despeinarse.
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - run: pip install -e ".[dev]"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      # Solo chromium: el PDV corre sobre hardware que el grupo compra, no
+      # sobre el navegador que cada cliente elija. Sumar navegadores acá
+      # triplica el job sin cubrir un riesgo real.
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      # La suite levanta la API contra un SQLite desechable y el frontend en
+      # modo desarrollo; no necesita servicios ni base externa.
+      - run: npm run test:e2e
+        working-directory: frontend
+      # Sin esto, un rojo en CI es una línea de texto: el trace y las
+      # capturas son lo que dice en qué diálogo se cayó.
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-playwright
+          path: frontend/test-results/
+          retention-days: 7
