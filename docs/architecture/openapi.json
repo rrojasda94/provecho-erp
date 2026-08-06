@@ -5904,6 +5904,30 @@
         "title": "LoteSyncIn",
         "type": "object"
       },
+      "MarcaOut": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "tipo": {
+            "title": "Tipo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "nombre",
+          "tipo"
+        ],
+        "title": "MarcaOut",
+        "type": "object"
+      },
       "MeOut": {
         "properties": {
           "empresa_id": {
