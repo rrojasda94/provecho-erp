@@ -13,8 +13,10 @@ from src.core.tenant import Tenant
 from src.modules.inventory.api import schemas
 from src.modules.inventory.application import ajustes, catalogo, queries_publicas
 from src.modules.inventory.application import conteos as conteos_uc
+from src.modules.inventory.application import devoluciones as devoluciones_uc
 from src.modules.inventory.application import guias as guias_uc
 from src.modules.inventory.application import lotes as lotes_uc
+from src.modules.inventory.application import merma as merma_uc
 from src.modules.inventory.application import recetas as recetas_uc
 from src.modules.inventory.application import reservas as reservas_uc
 from src.modules.inventory.application import solicitudes as solicitudes_uc
@@ -27,7 +29,9 @@ from src.modules.inventory.application.scope import (
     exigir_articulo,
     exigir_categoria,
     exigir_conteo,
+    exigir_devolucion,
     exigir_lote,
+    exigir_receta,
     exigir_reserva,
     exigir_solicitud,
     exigir_transferencia,
@@ -180,6 +184,7 @@ def crear_articulo(
         categoria_id=body.categoria_id,
         costo_promedio=body.costo_promedio,
         controla_lote=body.controla_lote,
+        dias_alerta_vencimiento=body.dias_alerta_vencimiento,
     )
     session.commit()
     return art
@@ -269,6 +274,7 @@ def registrar_movimiento(
             usuario_id=actor.id,
             referencia=body.referencia,
             lote_id=body.lote_id,
+            motivo_lote=body.motivo_lote,
         )
     else:
         mov, _ = stock_uc.registrar_movimiento(
@@ -606,13 +612,17 @@ def recibir_transferencia(
     session: Session = Depends(get_db),
 ):
     """Ingresa al destino lo que llegó, lote por lote. Una diferencia
-    contra lo enviado no se corrige sola: queda auditable (RN-INV-002)."""
+    contra lo enviado no se corrige sola: queda auditable (RN-INV-002).
+
+    Con `parcial: true` entra solo lo declarado y el resto sigue en
+    tránsito: el camión que trae la mitad hoy y la otra mitad mañana."""
     exigir_transferencia(session, transferencia_id, tenant)
     transferencias_uc.recibir(
         session,
         transferencia_id,
         actor.id,
         {i.item_id: i.cantidad for i in body.items},
+        parcial=body.parcial,
     )
     transferencia, items = transferencias_uc.detalle(session, transferencia_id)
     session.commit()
@@ -818,6 +828,22 @@ def cerrar_conteo(
     return schemas.ConteoCierreOut(conteo=conteo, ajustes=generados)
 
 
+@router.post("/conteos/{conteo_id}/anular", response_model=schemas.ConteoOut)
+def anular_conteo(
+    conteo_id: uuid.UUID,
+    body: schemas.ConteoAnulacion,
+    actor: Usuario = Depends(require_permission(CONTAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Descarta un conteo abierto por error, sin generar ajustes ni poner al
+    día el calendario de la categoría. Exige motivo."""
+    exigir_conteo(session, conteo_id, tenant)
+    conteo = conteos_uc.anular_conteo(session, conteo_id, actor.id, body.motivo)
+    session.commit()
+    return conteo
+
+
 # --- Ajustes (segregación solicitar/aprobar) --------------------------------
 @router.post("/ajustes", response_model=schemas.AjusteOut, status_code=201)
 def solicitar_ajuste(
@@ -834,7 +860,6 @@ def solicitar_ajuste(
         cantidad=body.cantidad,
         motivo=body.motivo,
         solicitado_por=actor.id,
-        dentro_margen=body.dentro_margen,
     )
     session.commit()
     return aj
@@ -871,9 +896,13 @@ def rechazar_ajuste(
 def crear_receta(
     body: schemas.RecetaCreate,
     _: Usuario = Depends(require_permission(CATALOGO)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    receta = recetas_uc.crear_receta(session, **body.model_dump())
+    datos = body.model_dump()
+    receta = recetas_uc.crear_receta(
+        session, empresa_id=tenant.empresa(datos.pop("empresa_id")), **datos
+    )
     session.commit()
     return recetas_uc.detalle_receta(session, receta.id)
 
@@ -881,17 +910,20 @@ def crear_receta(
 @router.get("/recetas", response_model=list[schemas.RecetaOut])
 def listar_recetas(
     _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    return recetas_uc.listar_recetas(session)
+    return recetas_uc.listar_recetas(session, tenant.filtro_empresa())
 
 
 @router.get("/recetas/{receta_id}", response_model=schemas.RecetaDetalleOut)
 def ver_receta(
     receta_id: uuid.UUID,
     _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
+    exigir_receta(session, receta_id, tenant)
     return recetas_uc.detalle_receta(session, receta_id)
 
 
@@ -900,8 +932,10 @@ def editar_receta(
     receta_id: uuid.UUID,
     body: schemas.RecetaUpdate,
     _: Usuario = Depends(require_permission(CATALOGO)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
+    exigir_receta(session, receta_id, tenant)
     recetas_uc.editar_receta(session, receta_id, **body.model_dump())
     session.commit()
     return recetas_uc.detalle_receta(session, receta_id)
@@ -911,10 +945,12 @@ def editar_receta(
 def eliminar_receta(
     receta_id: uuid.UUID,
     _: Usuario = Depends(require_permission(CATALOGO)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
     """Borra la receta y sus líneas. Responde 409 si algún producto comercial
     la usa, nombrándolo: sin receta ese producto no se podría preparar."""
+    exigir_receta(session, receta_id, tenant)
     recetas_uc.eliminar_receta(session, receta_id)
     session.commit()
 
@@ -924,10 +960,12 @@ def eliminar_receta(
 def duplicar_receta(
     receta_id: uuid.UUID,
     _: Usuario = Depends(require_permission(CATALOGO)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
     """Clona la receta con sufijo "(copy)" para editarla desde ahí en vez de
     volver a teclear 15 insumos."""
+    exigir_receta(session, receta_id, tenant)
     copia = recetas_uc.duplicar_receta(session, receta_id)
     session.commit()
     return recetas_uc.detalle_receta(session, copia.id)
@@ -938,10 +976,12 @@ def escalar_receta(
     receta_id: uuid.UUID,
     body: schemas.RecetaEscalarIn,
     _: Usuario = Depends(require_permission(CATALOGO)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
     """Multiplica todas las cantidades por un factor, redondeando cada línea
     con los decimales de su propia unidad."""
+    exigir_receta(session, receta_id, tenant)
     recetas_uc.escalar_receta(session, receta_id, body.factor)
     session.commit()
     return recetas_uc.detalle_receta(session, receta_id)
@@ -953,8 +993,10 @@ def agregar_item_receta(
     receta_id: uuid.UUID,
     body: schemas.RecetaItemCreate,
     _: Usuario = Depends(require_permission(CATALOGO)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
+    exigir_receta(session, receta_id, tenant)
     recetas_uc.agregar_item(session, receta_id, **body.model_dump())
     session.commit()
     return recetas_uc.detalle_receta(session, receta_id)
@@ -967,8 +1009,10 @@ def editar_item_receta(
     item_id: uuid.UUID,
     body: schemas.RecetaItemUpdate,
     _: Usuario = Depends(require_permission(CATALOGO)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
+    exigir_receta(session, receta_id, tenant)
     recetas_uc.editar_item(session, item_id, **body.model_dump())
     session.commit()
     return recetas_uc.detalle_receta(session, receta_id)
@@ -980,8 +1024,173 @@ def eliminar_item_receta(
     receta_id: uuid.UUID,
     item_id: uuid.UUID,
     _: Usuario = Depends(require_permission(CATALOGO)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
+    exigir_receta(session, receta_id, tenant)
     recetas_uc.eliminar_item(session, item_id)
     session.commit()
     return recetas_uc.detalle_receta(session, receta_id)
+
+
+# --- Merma (RN-INV-012/017) ---------------------------------------------------
+# Sin permisos nuevos: registrar merma es `solicitar_ajuste` y resolverla es
+# `aprobar_ajuste`. La segregación que importa es la misma —quien declara que
+# algo no sirve no firma su baja— y ya vive en los roles sembrados.
+@router.post("/mermas", response_model=schemas.MermaOut, status_code=201)
+def registrar_merma(
+    body: schemas.MermaCreate,
+    actor: Usuario = Depends(require_permission(SOLICITAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Aparta stock inservible. No lo saca del almacén: lo saca de la venta
+    (RN-INV-012). El destino lo decide otro usuario al resolverla."""
+    exigir_almacen(session, body.almacen_id, tenant)
+    if body.lote_id is not None:
+        exigir_lote(session, body.lote_id, tenant)
+    reserva = merma_uc.registrar_merma(
+        session,
+        almacen_id=body.almacen_id,
+        sku_id=body.sku_id,
+        cantidad=body.cantidad,
+        motivo=body.motivo,
+        creado_por=actor.id,
+        lote_id=body.lote_id,
+    )
+    session.commit()
+    return reserva
+
+
+@router.get("/mermas", response_model=list[schemas.MermaOut])
+def listar_mermas(
+    almacen_id: uuid.UUID | None = None,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Las pendientes de resolver: es la bandeja de la auditoría."""
+    if almacen_id is not None:
+        exigir_almacen(session, almacen_id, tenant)
+    return merma_uc.listar_mermas(
+        session, almacen_id=almacen_id, empresa_id=tenant.filtro_empresa()
+    )
+
+
+@router.post("/mermas/{reserva_id}/resolver", response_model=schemas.MermaOut)
+def resolver_merma(
+    reserva_id: uuid.UUID,
+    body: schemas.MermaResolver,
+    actor: Usuario = Depends(require_permission(APROBAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """`desecho` saca el stock y publica `inventory.merma_registrada` (que
+    `accounting` asienta); `reintegro` lo devuelve a disponible."""
+    exigir_reserva(session, reserva_id, tenant)
+    reserva = merma_uc.resolver_merma(
+        session, reserva_id, destino=body.destino, resuelto_por=actor.id
+    )
+    session.commit()
+    return reserva
+
+
+# --- Devoluciones (RN-INV-019/020) --------------------------------------------
+@router.post("/devoluciones", response_model=schemas.DevolucionDetalleOut,
+             status_code=201)
+def registrar_devolucion(
+    body: schemas.DevolucionCreate,
+    actor: Usuario = Depends(require_permission(MOVIMIENTO)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """A proveedor la mercadería sale; de cliente entra y `destino` decide
+    si vuelve al estante o se aparta como merma."""
+    exigir_almacen(session, body.almacen_id, tenant)
+    devolucion = devoluciones_uc.registrar_devolucion(
+        session,
+        almacen_id=body.almacen_id,
+        origen=body.origen,
+        motivo=body.motivo,
+        registrado_por=actor.id,
+        items=[i.model_dump() for i in body.items],
+        referencia_id=body.referencia_id,
+        destino=body.destino,
+        observacion=body.observacion,
+    )
+    devolucion, items = devoluciones_uc.detalle(session, devolucion.id)
+    session.commit()
+    return schemas.DevolucionDetalleOut(
+        **schemas.DevolucionOut.model_validate(devolucion).model_dump(),
+        items=[schemas.DevolucionItemOut.model_validate(i) for i in items],
+    )
+
+
+@router.get("/devoluciones", response_model=list[schemas.DevolucionOut])
+def listar_devoluciones(
+    almacen_id: uuid.UUID | None = None,
+    origen: str | None = None,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    if almacen_id is not None:
+        exigir_almacen(session, almacen_id, tenant)
+    return devoluciones_uc.listar(
+        session,
+        almacen_id=almacen_id,
+        origen=origen,
+        empresa_id=tenant.filtro_empresa(),
+    )
+
+
+@router.get("/devoluciones/{devolucion_id}",
+            response_model=schemas.DevolucionDetalleOut)
+def ver_devolucion(
+    devolucion_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    exigir_devolucion(session, devolucion_id, tenant)
+    devolucion, items = devoluciones_uc.detalle(session, devolucion_id)
+    return schemas.DevolucionDetalleOut(
+        **schemas.DevolucionOut.model_validate(devolucion).model_dump(),
+        items=[schemas.DevolucionItemOut.model_validate(i) for i in items],
+    )
+
+
+@router.post("/devoluciones/{devolucion_id}/anular",
+             response_model=schemas.DevolucionOut)
+def anular_devolucion(
+    devolucion_id: uuid.UUID,
+    actor: Usuario = Depends(require_permission(MOVIMIENTO)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Repone lo que movió con movimientos contrarios. No borra la fila: que
+    alguien se equivocó también es parte del rastro."""
+    exigir_devolucion(session, devolucion_id, tenant)
+    devolucion = devoluciones_uc.anular_devolucion(session, devolucion_id, actor.id)
+    session.commit()
+    return devolucion
+
+
+@router.post("/devoluciones/{devolucion_id}/guia-remision",
+             response_model=schemas.GuiaRemisionOut, status_code=201)
+def emitir_guia_de_devolucion(
+    devolucion_id: uuid.UUID,
+    body: schemas.GuiaDevolucionCreate,
+    actor: Usuario = Depends(require_permission(EMITIR_GUIA)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """La mercadería que se le devuelve al proveedor viaja por la vía
+    pública: SUNAT no distingue el motivo para exigir la guía."""
+    exigir_devolucion(session, devolucion_id, tenant)
+    guia = guias_uc.emitir_guia_de_devolucion(
+        session, devolucion_id, emitida_por=actor.id, **body.model_dump()
+    )
+    session.commit()
+    inventory_tasks.encolar(guia.id)
+    return guia

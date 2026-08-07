@@ -177,8 +177,10 @@ resuelve tenant y permisos → endpoint autoriza acción → auditoría registra
 ## Relaciones
 
 - Publica: `users.usuario_creado`, `users.sesion_iniciada`.
-- Escucha: `sales.pedido_demorado` → crea la `notificacion` para el
-  encargado de turno (`application/listeners.py`).
+- Escucha (`application/listeners.py`): `sales.pedido_demorado` → avisa al
+  encargado de turno; y desde 2026-08-06 los tres avisos de inventario —
+  `inventory.stock_bajo_minimo`, `inventory.lote_vencido_detectado` y
+  `inventory.conteo_vencido` → avisan al almacén.
 - Todos los módulos dependen de este para autorización y auditoría (vía core, no import directo).
 
 ## Notificaciones
@@ -195,8 +197,11 @@ Empujarla a un teléfono es una capa que todavía no existe, y cuando exista
 leerá de esta tabla en vez de reemplazarla — un aviso que solo viajó por
 push no deja rastro de si alguien lo vio.
 
-**A quién le llega** lo decide `notificaciones.destinatarios_de_sucursal`, y
-ese es el único punto a tocar cuando haya que hacerlo configurable:
+**A quién le llega** lo deciden `destinatarios_de_sucursal` (hechos de un
+local) y `destinatarios_de_almacen` (hechos de un almacén), y esos son los
+únicos puntos a tocar cuando haya que hacerlo configurable.
+
+Por sucursal:
 
 1. El **encargado de turno**, derivado del `relevo_encargado_id` de la caja
    abierta (contrato público de `accounting`). No hizo falta una entidad
@@ -207,3 +212,14 @@ ese es el único punto a tocar cuando haya que hacerlo configurable:
    es un aviso perdido: prefiere avisarle a alguien de más que a nadie.
 3. Si no hay nadie, se registra en el log y se sigue — no poder avisar nunca
    tumba la operación que originó el aviso.
+
+Por almacén, que **no** puede reusar lo anterior: el central y el de
+producción no cuelgan de ninguna sucursal (`almacen.sucursal_id` NULL) y
+ahí no existe encargado de turno. La regla es por rol
+(`almacenero`/`supervisor`/`admin`):
+
+1. Almacén **de sucursal**: los roles de almacén asignados a esa sucursal,
+   más el encargado de turno — es quien está parado ahí ahora.
+2. Almacén **de empresa**: los roles de almacén asignados a cualquier
+   sucursal de esa empresa. Es más gente de la necesaria y es a propósito;
+   un aviso del central sin destinatario es un aviso perdido.

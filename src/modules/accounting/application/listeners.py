@@ -8,12 +8,14 @@ para la empresa+evento, o sin periodo contable abierto, el asiento se omite
 `movimiento_dinero` pendiente (`application/pagos.registrar_pago`); el asiento
 se genera recién al ejecutar el pago (`application/pagos.ejecutar_pago`).
 
-Cubre hoy los 4 eventos operativos que ya se publican en el código
-(`purchases.oc_emitida`, `purchases.compra_recibida`, `sales.venta_confirmada`,
-`purchases.comprobante_conforme`). El resto de eventos documentados en
-`events.md` (pago registrado, comprobante emitido de venta, ajuste,
-transferencia, caja chica...) no se generan aún porque los módulos de origen
-todavía no los publican — ver ROADMAP, deuda técnica de accounting.
+Cubre hoy 5 eventos operativos: `purchases.oc_emitida`,
+`purchases.compra_recibida`, `sales.venta_confirmada`,
+`purchases.comprobante_conforme` y —desde 2026-08-06—
+`inventory.transferencia_recibida`, que solo asienta cuando el traslado
+llegó con faltante. El resto de los documentados en `events.md` (pago
+registrado, comprobante emitido de venta, ajuste, caja chica...) no se
+generan aún porque los módulos de origen todavía no los publican — ver
+ROADMAP, deuda técnica de accounting.
 """
 
 import logging
@@ -153,6 +155,79 @@ def on_comprobante_conforme(payload: dict) -> None:
         )
 
 
+def on_transferencia_recibida(payload: dict) -> None:
+    """Un traslado entre almacenes de la misma empresa **no mueve
+    resultado**: la mercadería cambia de sitio, no de dueño. Lo que sí es un
+    hecho contable es la **diferencia**: lo que salió del origen y no llegó
+    al destino se perdió en el camino, y eso es gasto.
+
+    Por eso el asiento se genera solo cuando hay faltante. Sin diferencias
+    no hay nada que registrar, y un asiento por cada transferencia llenaría
+    el libro de movimientos que se cancelan entre sí.
+    """
+    try:
+        diferencias = payload.get("diferencias") or []
+        monto = Decimal(payload.get("monto_diferencia") or 0)
+        if not diferencias or monto <= 0:
+            return
+        with session_factory() as session:
+            empresa_id = _empresa_de_almacen(session, payload["origen_almacen_id"])
+            if empresa_id is None:
+                log.warning(
+                    "transferencia %s: almacén sin empresa, asiento omitido",
+                    payload.get("transferencia_id"),
+                )
+            else:
+                _generar(
+                    session,
+                    empresa_id=empresa_id,
+                    evento="inventory.transferencia_recibida",
+                    referencia_origen=payload["transferencia_id"],
+                    monto=monto,
+                    glosa=(
+                        f"Faltante en traslado {payload['transferencia_id']} "
+                        f"({len(diferencias)} ítem/s)"
+                    ),
+                )
+            session.commit()
+    except Exception:
+        log.exception(
+            "fallo generando asiento de traslado %s", payload.get("transferencia_id")
+        )
+
+
+def on_merma_registrada(payload: dict) -> None:
+    """La merma desechada **sí** es pérdida: mercadería que se compró y que
+    no va a vender nada (RN-INV-017).
+
+    Llega recién al desechar, no al apartar: mientras la auditoría no
+    decide, la mercadería sigue ahí y puede volver al estante — asentarla
+    antes obligaría a reversar la mitad de los asientos.
+    """
+    try:
+        monto = Decimal(payload.get("monto") or 0)
+        if monto <= 0:
+            # Sin costo promedio cargado no hay importe que asentar. El
+            # movimiento de stock ya quedó; esto solo evita un asiento en 0.
+            return
+        with session_factory() as session:
+            empresa_id = _empresa_de_almacen(session, payload["almacen_id"])
+            if empresa_id is None:
+                log.warning("merma en almacén sin empresa, asiento omitido")
+            else:
+                _generar(
+                    session,
+                    empresa_id=empresa_id,
+                    evento="inventory.merma_registrada",
+                    referencia_origen=payload["sku_id"],
+                    monto=monto,
+                    glosa=f"Merma desechada por {payload['motivo']}",
+                )
+            session.commit()
+    except Exception:
+        log.exception("fallo generando asiento de merma de %s", payload.get("sku_id"))
+
+
 _registrado = False
 
 
@@ -166,3 +241,7 @@ def register() -> None:
     event_bus.subscribe("purchases.compra_recibida", on_compra_recibida)
     event_bus.subscribe("sales.venta_confirmada", on_venta_confirmada)
     event_bus.subscribe("purchases.comprobante_conforme", on_comprobante_conforme)
+    event_bus.subscribe(
+        "inventory.transferencia_recibida", on_transferencia_recibida
+    )
+    event_bus.subscribe("inventory.merma_registrada", on_merma_registrada)

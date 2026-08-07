@@ -21,6 +21,7 @@ from src.modules.accounting.application.queries_publicas import encargado_de_tur
 from src.modules.sales.infrastructure.models import PuntoVenta
 from src.modules.users.application import notificaciones
 from src.modules.users.infrastructure.models import (
+    Almacen,
     Empresa,
     Grupo,
     Marca,
@@ -63,16 +64,34 @@ def env():
         s.add_all([pv, rol_sup])
         s.flush()
 
+        rol_alm = Rol(nombre="almacenero")
+        # Dos almacenes: el de la sucursal y el central, que no cuelga de
+        # ninguna — es el caso que `destinatarios_de_sucursal` no cubre.
+        alm_sucursal = Almacen(
+            empresa_id=empresa.id, sucursal_id=sucursal.id,
+            nombre="Almacén CH1", tipo="sucursal",
+        )
+        alm_central = Almacen(
+            empresa_id=empresa.id, nombre="Central", tipo="central",
+        )
+        s.add_all([rol_alm, alm_sucursal, alm_central])
+        s.flush()
+
         usuarios = {}
-        for nombre in ("cajero", "encargado", "supervisor1"):
+        for nombre in ("cajero", "encargado", "supervisor1", "almacenero1"):
             u = Usuario(username=nombre, pin_hash=hash_pin("654321"), tipo="humano")
             s.add(u)
             s.flush()
             s.add(UsuarioSucursal(usuario_id=u.id, sucursal_id=sucursal.id))
             usuarios[nombre] = u
         s.add(UsuarioRol(usuario_id=usuarios["supervisor1"].id, rol_id=rol_sup.id))
+        s.add(UsuarioRol(usuario_id=usuarios["almacenero1"].id, rol_id=rol_alm.id))
         s.commit()
-        yield s, {"sucursal": sucursal, "pv": pv, **usuarios}
+        yield s, {
+            "sucursal": sucursal, "pv": pv,
+            "alm_sucursal": alm_sucursal, "alm_central": alm_central,
+            **usuarios,
+        }
 
 
 def _abrir_caja(s, ids):
@@ -237,6 +256,102 @@ def test_un_pedido_en_preparacion_avisa_sin_urgencia(env, monkeypatch):
     )
     (aviso,) = notificaciones.bandeja(s, ids["encargado"].id)
     assert aviso.nivel == "aviso"
+
+
+# --- Avisos de inventario ---------------------------------------------------
+def test_el_almacen_central_no_tiene_encargado_de_turno_y_avisa_por_rol(env):
+    """El caso que `destinatarios_de_sucursal` no cubre: el central no
+    cuelga de ninguna sucursal, así que no hay caja abierta que diga quién
+    está a cargo. Se resuelve por rol dentro de la empresa."""
+    s, ids = env
+    destinatarios = notificaciones.destinatarios_de_almacen(
+        s, ids["alm_central"].id
+    )
+    assert set(destinatarios) == {ids["almacenero1"].id, ids["supervisor1"].id}
+
+
+def test_el_almacen_de_sucursal_suma_al_encargado_de_turno(env):
+    s, ids = env
+    _abrir_caja(s, ids)
+    s.flush()
+    destinatarios = notificaciones.destinatarios_de_almacen(
+        s, ids["alm_sucursal"].id
+    )
+    # Los roles de almacén de ESA sucursal, más quien está parado ahí ahora.
+    assert set(destinatarios) == {
+        ids["almacenero1"].id, ids["supervisor1"].id, ids["encargado"].id
+    }
+
+
+def test_stock_bajo_minimo_avisa_al_almacen(env, monkeypatch):
+    s, ids = env
+    from src.modules.users.application import listeners
+
+    monkeypatch.setattr(listeners, "SessionLocal", lambda: _SesionQueNoCierra(s))
+    sku_id = uuid.uuid4()
+    listeners.on_stock_bajo_minimo(
+        {
+            "almacen_id": str(ids["alm_central"].id),
+            "sku_id": str(sku_id),
+            "cantidad": "4.0000",
+            "stock_minimo": "5.0000",
+        }
+    )
+
+    avisos = notificaciones.bandeja(s, ids["almacenero1"].id)
+    assert len(avisos) == 1
+    # Todavía hay stock: lo que falta es reponer, no correr.
+    assert avisos[0].nivel == "aviso"
+    assert avisos[0].referencia_id == sku_id
+    # El central no cuelga de una sucursal: la bandeja no puede inventarle una.
+    assert avisos[0].sucursal_id is None
+
+
+def test_lote_vencido_avisa_con_urgencia(env, monkeypatch):
+    """Urgente porque el stock ya se contaba como vendible: alguien pudo
+    haberlo servido."""
+    s, ids = env
+    from src.modules.users.application import listeners
+
+    monkeypatch.setattr(listeners, "SessionLocal", lambda: _SesionQueNoCierra(s))
+    lote_id = uuid.uuid4()
+    listeners.on_lote_vencido_detectado(
+        {
+            "lote_id": str(lote_id),
+            "almacen_id": str(ids["alm_sucursal"].id),
+            "sku_id": str(uuid.uuid4()),
+            "fecha_vencimiento": "2026-08-01",
+            "cantidad": "3.0000",
+        }
+    )
+
+    (aviso,) = notificaciones.bandeja(s, ids["almacenero1"].id)
+    assert aviso.nivel == "urgente"
+    assert aviso.referencia_tipo == "lote"
+    assert aviso.sucursal_id == ids["sucursal"].id
+
+
+def test_conteo_vencido_avisa_al_almacen(env, monkeypatch):
+    s, ids = env
+    from src.modules.users.application import listeners
+
+    monkeypatch.setattr(listeners, "SessionLocal", lambda: _SesionQueNoCierra(s))
+    categoria_id = uuid.uuid4()
+    listeners.on_conteo_vencido(
+        {
+            "almacen_id": str(ids["alm_central"].id),
+            "categoria_id": str(categoria_id),
+            "categoria": "Perecibles",
+            "frecuencia": "diario",
+            "fecha_programada": "2026-08-01",
+            "dias_atraso": 5,
+            "dirigido_a": ["almacen", "gerencia"],
+        }
+    )
+
+    (aviso,) = notificaciones.bandeja(s, ids["supervisor1"].id)
+    assert "Perecibles" in aviso.titulo
+    assert aviso.referencia_id == categoria_id
 
 
 class _SesionQueNoCierra:

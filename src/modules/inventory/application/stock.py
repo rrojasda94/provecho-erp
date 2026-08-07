@@ -11,6 +11,7 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from src.core.events import event_bus
 from src.modules.inventory.application import lotes as lotes_uc
 from src.modules.inventory.application.errors import ReglaNegocio, StockInsuficiente
 from src.modules.inventory.domain import rules
@@ -58,6 +59,7 @@ def registrar_movimiento(
     referencia: str | None = None,
     motivo_ajuste: str | None = None,
     lote_id: uuid.UUID | None = None,
+    motivo_lote: str | None = None,
     permitir_sin_lote: bool = False,
     id: uuid.UUID | None = None,
 ) -> tuple[MovimientoInventario, Stock]:
@@ -99,6 +101,7 @@ def registrar_movimiento(
             )
 
     stock = aplicar_a_stock(session, almacen_id, sku_id, cantidad)
+    _avisar_si_cruza_el_minimo(session, stock, cantidad)
     if lote_id is not None:
         lotes_uc.aplicar_a_lote(session, almacen_id, sku_id, lote_id, cantidad)
     mov = MovimientoRepo(session).add(
@@ -112,9 +115,63 @@ def registrar_movimiento(
             referencia=referencia,
             usuario_id=usuario_id,
             lote_id=lote_id,
+            motivo_lote=motivo_lote,
         )
     )
     return mov, stock
+
+
+def _exigir_motivo_del_override(
+    session: Session,
+    almacen_id: uuid.UUID,
+    sku_id: uuid.UUID,
+    lote_id: uuid.UUID,
+    motivo_lote: str | None,
+    hoy: date | None,
+) -> None:
+    """Tomar el lote que FEFO ya sugería no es un override; tomar otro sí.
+
+    Pedir motivo en los dos casos convertiría el campo en un trámite que se
+    llena con cualquier cosa, y un motivo que nadie escribe en serio es peor
+    que ninguno: da la apariencia de control.
+    """
+    if motivo_lote:
+        return
+    disponibles = lotes_uc.disponibles_fefo(session, almacen_id, sku_id, hoy)
+    sugerido = disponibles[0].lote_id if disponibles else None
+    if sugerido is not None and sugerido != lote_id:
+        raise ReglaNegocio(
+            "tomar un lote distinto del que sugiere FEFO exige motivo_lote"
+        )
+
+
+def _avisar_si_cruza_el_minimo(
+    session: Session, stock: Stock, delta: Decimal
+) -> None:
+    """Publica `inventory.stock_bajo_minimo` al **cruzar** el mínimo, no cada
+    vez que se está por debajo.
+
+    La diferencia es la que hace útil al aviso: un SKU bajo mínimo toda la
+    semana dispararía un evento por cada venta hasta que nadie lo mire —el
+    mismo modo de falla que el margen de ajuste sin piso—. Reponer y volver
+    a caer sí avisa de nuevo, que es exactamente cuando hay que comprar.
+    """
+    if stock.stock_minimo is None or delta >= 0:
+        return
+    previa = stock.cantidad - delta
+    if rules.stock_bajo(stock.cantidad, stock.stock_minimo) and not rules.stock_bajo(
+        previa, stock.stock_minimo
+    ):
+        event_bus.publish(
+            "inventory.stock_bajo_minimo",
+            {
+                "almacen_id": str(stock.almacen_id),
+                "sku_id": str(stock.sku_id),
+                "cantidad": str(stock.cantidad),
+                "stock_minimo": str(stock.stock_minimo),
+            },
+            session=session,
+        )
 
 
 def _articulo_del_lote(session: Session, lote_id: uuid.UUID) -> uuid.UUID:
@@ -135,18 +192,21 @@ def registrar_salida(
     referencia: str | None = None,
     motivo_ajuste: str | None = None,
     lote_id: uuid.UUID | None = None,
+    motivo_lote: str | None = None,
     hoy: date | None = None,
 ) -> list[MovimientoInventario]:
     """Salida con `cantidad` POSITIVA; genera un movimiento por lote tomado.
 
     FEFO: vence antes, sale antes. Un `lote_id` explícito es el override
-    del lote sugerido. Si el artículo no controla lote, es un movimiento
-    único como siempre.
+    del lote sugerido, y saltearse FEFO exige `motivo_lote` (RN-LOT-004). Si
+    el artículo no controla lote, es un movimiento único como siempre.
     """
     if cantidad <= 0:
         raise ReglaNegocio(f"la salida exige cantidad positiva, llegó {cantidad}")
     articulo = lotes_uc.articulo_de_sku(session, sku_id)
     if lote_id is not None or not articulo.controla_lote:
+        if lote_id is not None and articulo.controla_lote:
+            _exigir_motivo_del_override(session, almacen_id, sku_id, lote_id, motivo_lote, hoy)
         mov, _ = registrar_movimiento(
             session,
             almacen_id=almacen_id,
@@ -157,6 +217,7 @@ def registrar_salida(
             referencia=referencia,
             motivo_ajuste=motivo_ajuste,
             lote_id=lote_id,
+            motivo_lote=motivo_lote,
         )
         return [mov]
 

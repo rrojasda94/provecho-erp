@@ -54,6 +54,7 @@ LARGO_EXPRESION = 60
 def crear_receta(
     session: Session,
     *,
+    empresa_id: uuid.UUID,
     nombre: str,
     rendimiento_cantidad: Decimal,
     rendimiento_unidad_medida_id: uuid.UUID,
@@ -63,16 +64,17 @@ def crear_receta(
 ) -> Receta:
     nombre = a_titulo(nombre)
     repo = RecetaRepo(session)
-    if repo.get_by_nombre(nombre):
+    if repo.get_by_nombre(nombre, empresa_id):
         raise Conflicto(f"ya existe una receta '{nombre}'")
     if session.get(UnidadMedida, rendimiento_unidad_medida_id) is None:
         raise NoEncontrado("unidad de medida no encontrada")
-    if articulo_id is not None and session.get(Articulo, articulo_id) is None:
-        raise NoEncontrado("artículo no encontrado")
+    if articulo_id is not None:
+        _exigir_articulo_de_la_empresa(session, articulo_id, empresa_id)
     if rendimiento_cantidad <= 0:
         raise ReglaNegocio("el rendimiento debe ser > 0")
     return repo.add(
         Receta(
+            empresa_id=empresa_id,
             nombre=nombre,
             rendimiento_cantidad=rendimiento_cantidad,
             rendimiento_unidad_medida_id=rendimiento_unidad_medida_id,
@@ -83,11 +85,23 @@ def crear_receta(
     )
 
 
+def _exigir_articulo_de_la_empresa(
+    session: Session, articulo_id: uuid.UUID, empresa_id: uuid.UUID
+) -> Articulo:
+    """Una receta no puede referirse a un artículo de otra empresa — ni como
+    insumo ni como lo que produce. El 404 (y no un 403) es a propósito: para
+    esta empresa ese artículo sencillamente no existe."""
+    articulo = session.get(Articulo, articulo_id)
+    if articulo is None or articulo.empresa_id != empresa_id:
+        raise NoEncontrado("artículo no encontrado")
+    return articulo
+
+
 def editar_receta(session: Session, receta_id: uuid.UUID, **campos) -> Receta:
     receta = _exigir(session, receta_id)
     if campos.get("nombre") is not None:
         nombre = a_titulo(campos["nombre"])
-        otra = RecetaRepo(session).get_by_nombre(nombre)
+        otra = RecetaRepo(session).get_by_nombre(nombre, receta.empresa_id)
         if otra is not None and otra.id != receta.id:
             raise Conflicto(f"ya existe una receta '{nombre}'")
         receta.nombre = nombre
@@ -106,8 +120,10 @@ def editar_receta(session: Session, receta_id: uuid.UUID, **campos) -> Receta:
     return receta
 
 
-def listar_recetas(session: Session) -> list[dict]:
-    return [_resumen(session, r) for r in RecetaRepo(session).list()]
+def listar_recetas(
+    session: Session, empresa_id: uuid.UUID | None = None
+) -> list[dict]:
+    return [_resumen(session, r) for r in RecetaRepo(session).list(empresa_id)]
 
 
 def detalle_receta(session: Session, receta_id: uuid.UUID) -> dict:
@@ -149,6 +165,7 @@ def agregar_item(
     merma_pct: Decimal = Decimal(0),
 ) -> RecetaItem:
     receta = _exigir(session, receta_id)
+    _exigir_articulo_de_la_empresa(session, articulo_id, receta.empresa_id)
     articulo, udm = _articulo_y_udm(session, articulo_id)
     if receta.articulo_id is not None and receta.articulo_id == articulo_id:
         raise ReglaNegocio(
@@ -210,7 +227,8 @@ def duplicar_receta(session: Session, receta_id: uuid.UUID) -> Receta:
     repo = RecetaRepo(session)
     copia = repo.add(
         Receta(
-            nombre=_nombre_libre(repo, original.nombre),
+            empresa_id=original.empresa_id,
+            nombre=_nombre_libre(repo, original.nombre, original.empresa_id),
             rendimiento_cantidad=original.rendimiento_cantidad,
             rendimiento_unidad_medida_id=original.rendimiento_unidad_medida_id,
             flexible=original.flexible,
@@ -291,9 +309,11 @@ def _articulo_producido(
     saber cuál explotar, así que la relación es exclusiva. Y un artículo no
     puede ser insumo de la receta que lo produce.
     """
-    articulo, _ = _articulo_y_udm(session, articulo_id)
+    articulo = _exigir_articulo_de_la_empresa(session, articulo_id, receta.empresa_id)
     repo = RecetaRepo(session)
-    for otra in repo.list():
+    # El choque se busca dentro de la empresa: la exclusividad es de su
+    # catálogo, no del grupo.
+    for otra in repo.list(receta.empresa_id):
         if otra.articulo_id == articulo_id and otra.id != receta.id:
             raise Conflicto(
                 f"'{otra.nombre}' ya produce '{articulo.nombre}': un artículo lo "
@@ -361,6 +381,7 @@ def _resumen(session: Session, receta: Receta) -> dict:
     udm = session.get(UnidadMedida, receta.rendimiento_unidad_medida_id)
     return {
         "id": receta.id,
+        "empresa_id": receta.empresa_id,
         "nombre": receta.nombre,
         "rendimiento_cantidad": receta.rendimiento_cantidad,
         "rendimiento_unidad_medida_id": receta.rendimiento_unidad_medida_id,
@@ -371,17 +392,18 @@ def _resumen(session: Session, receta: Receta) -> dict:
     }
 
 
-def _nombre_libre(repo: RecetaRepo, nombre: str) -> str:
+def _nombre_libre(repo: RecetaRepo, nombre: str, empresa_id: uuid.UUID) -> str:
     """"Pizza" → "Pizza (copy)" → "Pizza (copy) 2" → ...
 
     El sufijo no se apila: duplicar una copia da "Pizza (copy) 2", no
-    "Pizza (copy) (copy)". El nombre es único (`crear_receta`), así que
-    duplicar dos veces tiene que dar dos nombres distintos igual.
+    "Pizza (copy) (copy)". El nombre es único **por empresa**
+    (`crear_receta`), así que duplicar dos veces tiene que dar dos nombres
+    distintos igual — y el choque solo se busca dentro de la misma empresa.
     """
     base = _SUFIJO_AL_FINAL.sub("", nombre).strip() or nombre
     candidato = f"{base} {SUFIJO_COPIA}"
     intento = 1
-    while repo.get_by_nombre(candidato) is not None:
+    while repo.get_by_nombre(candidato, empresa_id) is not None:
         intento += 1
         candidato = f"{base} {SUFIJO_COPIA} {intento}"
     return candidato

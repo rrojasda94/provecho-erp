@@ -1,11 +1,17 @@
-"""Guía de remisión de un traslado entre almacenes (RN-GDR-001..003,
-RN-TRP-002).
+"""Guía de remisión: mercadería propia que viaja por la vía pública
+(RN-GDR-001..003, RN-TRP-002).
+
+Dos emisores, un solo documento: un **traslado entre almacenes** y —desde
+2026-08-06— una **devolución a proveedor**. SUNAT no distingue el motivo
+para exigir la guía; lo que cambia es a dónde va la carga y quién la
+recibe.
 
 Lo que hace que la guía signifique algo es que **no se teclea lo que
-declara**: las líneas salen de `transferencia_item`, que es el registro de
-lo que de verdad se descontó del origen. RN-TRP-002 exige que lo
-transportado coincida exactamente con lo declarado, y un formulario aparte
-es justamente la forma de que no coincidan.
+declara**: las líneas salen del documento que movió el stock
+(`transferencia_item` o `devolucion_item`), que es el registro de lo que de
+verdad se descontó del origen. RN-TRP-002 exige que lo transportado
+coincida exactamente con lo declarado, y un formulario aparte es justamente
+la forma de que no coincidan.
 
 Lo que sí se teclea es lo que el sistema no puede saber: quién maneja, en
 qué vehículo, cuánto pesa la carga y qué día arranca el viaje.
@@ -32,9 +38,11 @@ from src.modules.inventory.infrastructure.models import (
     UnidadMedida,
 )
 from src.modules.inventory.infrastructure.repositories import (
+    DevolucionRepo,
     GuiaRemisionRepo,
     TransferenciaRepo,
 )
+from src.modules.purchases.application.queries_publicas import proveedor_para_guia
 from src.modules.users.infrastructure.models import Almacen, Empresa
 from src.shared import fechas
 from src.shared.integrations.factiliza import (
@@ -75,23 +83,122 @@ def _lineas_de_transferencia(
     por_sku: dict[uuid.UUID, Decimal] = defaultdict(Decimal)
     for item in items:
         por_sku[item.sku_id] += item.cantidad_enviada
+    return [_linea(session, sku_id, cantidad) for sku_id, cantidad in por_sku.items()]
 
-    lineas = []
-    for sku_id, cantidad in por_sku.items():
-        sku = session.get(Sku, sku_id)
-        articulo = session.get(Articulo, sku.articulo_id) if sku else None
-        if articulo is None:
-            raise NoEncontrado(f"artículo del SKU {sku_id} no encontrado")
-        udm = session.get(UnidadMedida, articulo.unidad_medida_id)
-        lineas.append(
-            (
-                sku_id,
-                cantidad,
-                articulo.nombre,
-                guias_mapper.codigo_unidad(udm.nombre if udm else ""),
-            )
+
+def _linea(
+    session: Session, sku_id: uuid.UUID, cantidad: Decimal
+) -> tuple[uuid.UUID, Decimal, str, str]:
+    sku = session.get(Sku, sku_id)
+    articulo = session.get(Articulo, sku.articulo_id) if sku else None
+    if articulo is None:
+        raise NoEncontrado(f"artículo del SKU {sku_id} no encontrado")
+    udm = session.get(UnidadMedida, articulo.unidad_medida_id)
+    return (
+        sku_id,
+        cantidad,
+        articulo.nombre,
+        guias_mapper.codigo_unidad(udm.nombre if udm else ""),
+    )
+
+
+def _lineas_de_devolucion(
+    session: Session, devolucion_id: uuid.UUID
+) -> list[tuple[uuid.UUID, Decimal, str, str]]:
+    """Mismo criterio que el traslado: agrupado por SKU, sin el lote.
+
+    El lote sigue en `devolucion_item` —y ahí es donde el proveedor lo
+    necesita para el reclamo—; la guía declara producto y cantidad.
+    """
+    items = DevolucionRepo(session).items(devolucion_id)
+    if not items:
+        raise ReglaNegocio("la devolución no tiene ítems que declarar")
+    por_sku: dict[uuid.UUID, Decimal] = defaultdict(Decimal)
+    for item in items:
+        por_sku[item.sku_id] += item.cantidad
+    return [_linea(session, sku_id, cantidad) for sku_id, cantidad in por_sku.items()]
+
+
+def emitir_guia_de_devolucion(
+    session: Session,
+    devolucion_id: uuid.UUID,
+    *,
+    emitida_por: uuid.UUID,
+    lugar_destino: str,
+    chofer_nombres: str,
+    chofer_apellidos: str,
+    chofer_num_doc: str,
+    chofer_licencia: str,
+    vehiculo_placa: str,
+    peso_bruto_kg: Decimal,
+    fecha_inicio_traslado: datetime.date | None = None,
+    modalidad_traslado: str = "02",
+    observacion: str | None = None,
+) -> GuiaRemision:
+    """Guía de una devolución a proveedor.
+
+    Motivo `13` (otros) del catálogo 20: SUNAT no tiene código propio para
+    "devolución al proveedor", y usar `04` —traslado entre establecimientos
+    de la misma empresa— sería declarar algo falso, porque el destino es de
+    otro contribuyente.
+
+    `lugar_destino` se teclea: `proveedor` no tiene dirección modelada, y
+    esto cae en la misma categoría que el chofer y la placa —lo que el
+    sistema no puede saber—. El RUC del receptor sí sale del proveedor, por
+    el contrato público de `purchases`.
+    """
+    repo = GuiaRemisionRepo(session)
+    existente = repo.de_devolucion(devolucion_id)
+    if existente is not None:
+        return existente
+
+    devolucion = DevolucionRepo(session).get(devolucion_id)
+    if devolucion is None:
+        raise NoEncontrado("devolución no encontrada")
+    if devolucion.origen != "proveedor":
+        raise ReglaNegocio(
+            "solo la devolución a proveedor emite guía: lo que devuelve un "
+            "cliente no sale del almacén"
         )
-    return lineas
+    if devolucion.estado != "registrada":
+        raise ReglaNegocio(f"la devolución está {devolucion.estado}")
+
+    origen = session.get(Almacen, devolucion.almacen_id)
+    if origen is None:
+        raise NoEncontrado("almacén de origen no encontrado")
+    empresa = session.get(Empresa, origen.empresa_id)
+    if empresa is None:
+        raise NoEncontrado("empresa del almacén no encontrada")
+    if peso_bruto_kg <= 0:
+        raise ReglaNegocio("el peso bruto declarado debe ser mayor que cero")
+
+    proveedor = (
+        proveedor_para_guia(session, devolucion.referencia_id)
+        if devolucion.referencia_id
+        else None
+    )
+    return _crear_guia(
+        session,
+        repo,
+        empresa=empresa,
+        lineas=_lineas_de_devolucion(session, devolucion_id),
+        transferencia_id=None,
+        devolucion_id=devolucion_id,
+        ruc_receptor=(proveedor or {}).get("ruc") or empresa.ruc,
+        lugar_origen=origen.direccion or origen.nombre,
+        lugar_destino=lugar_destino.strip(),
+        motivo_traslado="13",
+        modalidad_traslado=modalidad_traslado,
+        fecha_inicio_traslado=fecha_inicio_traslado,
+        peso_bruto_kg=peso_bruto_kg,
+        chofer_nombres=chofer_nombres,
+        chofer_apellidos=chofer_apellidos,
+        chofer_num_doc=chofer_num_doc,
+        chofer_licencia=chofer_licencia,
+        vehiculo_placa=vehiculo_placa,
+        emitida_por=emitida_por,
+        observacion=observacion,
+    )
 
 
 def emitir_guia(
@@ -134,24 +241,73 @@ def emitir_guia(
     if peso_bruto_kg <= 0:
         raise ReglaNegocio("el peso bruto declarado debe ser mayor que cero")
 
-    lineas = _lineas_de_transferencia(session, transferencia_id)
+    return _crear_guia(
+        session,
+        repo,
+        empresa=empresa,
+        lineas=_lineas_de_transferencia(session, transferencia_id),
+        transferencia_id=transferencia_id,
+        devolucion_id=None,
+        # Traslado entre establecimientos propios: emisor y receptor son la
+        # misma empresa, y que coincidan es lo que sustenta el motivo `04`.
+        ruc_receptor=empresa.ruc,
+        lugar_origen=origen.direccion or origen.nombre,
+        lugar_destino=destino.direccion or destino.nombre,
+        motivo_traslado=motivo_traslado,
+        modalidad_traslado=modalidad_traslado,
+        fecha_inicio_traslado=fecha_inicio_traslado,
+        peso_bruto_kg=peso_bruto_kg,
+        chofer_nombres=chofer_nombres,
+        chofer_apellidos=chofer_apellidos,
+        chofer_num_doc=chofer_num_doc,
+        chofer_licencia=chofer_licencia,
+        vehiculo_placa=vehiculo_placa,
+        emitida_por=emitida_por,
+        observacion=observacion,
+    )
+
+
+def _crear_guia(
+    session: Session,
+    repo: GuiaRemisionRepo,
+    *,
+    empresa,
+    lineas,
+    transferencia_id,
+    devolucion_id,
+    ruc_receptor,
+    lugar_origen,
+    lugar_destino,
+    motivo_traslado,
+    modalidad_traslado,
+    fecha_inicio_traslado,
+    peso_bruto_kg,
+    chofer_nombres,
+    chofer_apellidos,
+    chofer_num_doc,
+    chofer_licencia,
+    vehiculo_placa,
+    emitida_por,
+    observacion,
+) -> GuiaRemision:
+    """Numera, arma las líneas y avisa. Lo común a los dos emisores: lo que
+    cambia entre un traslado y una devolución es a dónde va y quién recibe,
+    no cómo se emite el documento."""
     guia = repo.add(
         GuiaRemision(
             empresa_id=empresa.id,
             transferencia_id=transferencia_id,
+            devolucion_id=devolucion_id,
             serie=SERIE_GUIA,
             correlativo=repo.siguiente_correlativo(empresa.id, SERIE_GUIA),
             fecha_inicio_traslado=fecha_inicio_traslado or fechas.hoy(),
             motivo_traslado=motivo_traslado,
             modalidad_traslado=modalidad_traslado,
             peso_bruto_kg=peso_bruto_kg,
-            # Traslado entre establecimientos propios: emisor y receptor son
-            # la misma empresa, y que coincidan es lo que sustenta el
-            # motivo `04`.
             ruc_emisor=empresa.ruc,
-            ruc_receptor=empresa.ruc,
-            lugar_origen=origen.direccion or origen.nombre,
-            lugar_destino=destino.direccion or destino.nombre,
+            ruc_receptor=ruc_receptor,
+            lugar_origen=lugar_origen,
+            lugar_destino=lugar_destino,
             chofer_nombres=chofer_nombres.strip(),
             chofer_apellidos=chofer_apellidos.strip(),
             chofer_num_doc=chofer_num_doc.strip(),
@@ -177,7 +333,8 @@ def emitir_guia(
         "inventory.guia_remision_emitida",
         {
             "guia_remision_id": str(guia.id),
-            "transferencia_id": str(transferencia_id),
+            "transferencia_id": str(transferencia_id) if transferencia_id else None,
+            "devolucion_id": str(devolucion_id) if devolucion_id else None,
             "serie": guia.serie,
             "correlativo": guia.correlativo,
         },

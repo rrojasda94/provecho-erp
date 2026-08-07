@@ -275,12 +275,13 @@ dentro de eso:
   descontaría cualquier lote y la nube, al reprocesar el evento, elegiría
   otro. `stock_lote` lo escriben ambos lados y gana la nube en el pull,
   igual que `stock` y por la misma razón: el ciclo empuja antes de jalar.
-- **`receta` y `receta_item` viajan completas, sin filtro de tenant**:
-  `receta` no tiene columna de empresa en el modelo de datos y acotarla
-  exigiría cruzar `producto_comercial` (dominio de `sales`) desde
-  `inventory`. Son recetas del propio grupo sobre hardware del propio
-  grupo. Si alguna vez el grupo opera empresas que no deban verse entre
-  sí, `receta` necesita su columna de tenant antes que este sync.
+- ~~**`receta` y `receta_item` viajan completas, sin filtro de tenant.**~~
+  **Resuelto 2026-08-06** (migración `d5b81e0c37a4`): `receta` ganó su
+  `empresa_id` y el hub recibe solo las de su empresa; `receta_item` se
+  acota por su receta. La salida que este punto anticipaba —"cruzar
+  `producto_comercial`, dominio de `sales`, desde `inventory`"— era la
+  equivocada: el dueño del dato no era `sales`, era que a `receta` le
+  faltaba la columna.
 - **`cliente` no viaja**: una venta offline es anónima o con datos
   escritos a mano. Venta a cliente registrado exige estar en línea.
 - **`venta_item.id` no se conserva** entre hub y nube (sí el de la venta):

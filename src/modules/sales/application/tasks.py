@@ -81,6 +81,26 @@ def revisar_demora_pedido(venta_id: str) -> bool:
         session.close()
 
 
+@celery_app.task(name="sales.barrer_comprobantes_pendientes")
+def barrer_comprobantes_pendientes() -> int:
+    """Reencola los comprobantes que nunca llegaron a la cola.
+
+    No emite acá: encola uno por comprobante para que cada uno conserve su
+    propio backoff y su cuenta de intentos. Un barrido que emitiera en línea
+    convertiría una caída de Factiliza en un ciclo de 100 timeouts.
+    """
+    if not comprobantes.emision_habilitada():
+        return 0
+    session = SessionLocal()
+    try:
+        ids = comprobantes.pendientes_de_emitir(session)
+    finally:
+        session.close()
+    for comprobante_id in ids:
+        emitir_comprobante.apply_async(args=[str(comprobante_id)], retry=False)
+    return len(ids)
+
+
 @celery_app.task(name="sales.barrer_pedidos_demorados")
 def barrer_pedidos_demorados() -> int:
     """Barrido periódico (Celery beat). Red de seguridad de la revisión

@@ -108,6 +108,7 @@ def base(session):
     session.add(articulo)
     session.flush()
     receta = Receta(
+        empresa_id=empresa.id,
         nombre="Pizza",
         rendimiento_cantidad=Decimal(1),
         rendimiento_unidad_medida_id=unidad.id,

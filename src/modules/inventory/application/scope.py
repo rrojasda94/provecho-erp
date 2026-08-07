@@ -15,7 +15,9 @@ from src.modules.inventory.infrastructure.models import (
     Articulo,
     Categoria,
     Conteo,
+    Devolucion,
     Lote,
+    Receta,
     ReservaStock,
     SolicitudInsumos,
     Transferencia,
@@ -57,6 +59,24 @@ def exigir_categoria(
         raise NoEncontrado("categoría no encontrada")
     tenant.exigir_empresa(categoria.empresa_id)
     return categoria
+
+
+def exigir_devolucion(
+    session: Session, devolucion_id: uuid.UUID, tenant: Tenant
+) -> Devolucion:
+    devolucion = session.get(Devolucion, devolucion_id)
+    if devolucion is None:
+        raise NoEncontrado("devolución no encontrada")
+    exigir_almacen(session, devolucion.almacen_id, tenant)
+    return devolucion
+
+
+def exigir_receta(session: Session, receta_id: uuid.UUID, tenant: Tenant) -> Receta:
+    receta = session.get(Receta, receta_id)
+    if receta is None:
+        raise NoEncontrado("receta no encontrada")
+    tenant.exigir_empresa(receta.empresa_id)
+    return receta
 
 
 def exigir_conteo(session: Session, conteo_id: uuid.UUID, tenant: Tenant) -> Conteo:

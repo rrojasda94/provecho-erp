@@ -72,14 +72,24 @@ class GuiaRemision(Base, UuidPkMixin, TimestampMixin):
             "correlativo",
             name="uq_guia_remision_empresa_id_serie_correlativo",
         ),
-        # Un traslado, una guía: reemitir sobre la misma transferencia
-        # produciría dos documentos que declaran la misma mercadería.
+        # Un traslado, una guía: reemitir sobre el mismo documento
+        # produciría dos que declaran la misma mercadería. Estas dos sí
+        # siguen la convención (una sola columna), así que no llevan nombre.
         UniqueConstraint("transferencia_id"),
+        UniqueConstraint("devolucion_id"),
     )
 
     empresa_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("empresa.id"))
-    transferencia_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("transferencia.id")
+    # Exactamente uno de los dos. `transferencia_id` dejó de ser obligatorio
+    # el 2026-08-06: una devolución a proveedor también es mercadería que
+    # sale del almacén y viaja por la vía pública, y SUNAT no distingue el
+    # motivo para exigir la guía. La migración es aditiva —de NOT NULL a
+    # nullable—; el camino contrario no lo sería, y por eso arrancó estricta.
+    transferencia_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("transferencia.id"), nullable=True
+    )
+    devolucion_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("devolucion.id"), nullable=True
     )
     serie: Mapped[str] = mapped_column(String(10))
     correlativo: Mapped[int] = mapped_column(Integer)

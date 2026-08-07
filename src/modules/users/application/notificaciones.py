@@ -16,8 +16,10 @@ from sqlalchemy.orm import Session
 
 from src.modules.accounting.application.queries_publicas import encargado_de_turno
 from src.modules.users.infrastructure.models import (
+    Almacen,
     Notificacion,
     Rol,
+    Sucursal,
     UsuarioRol,
     UsuarioSucursal,
 )
@@ -27,6 +29,10 @@ log = logging.getLogger("provecho.app")
 # Roles que cubren el local cuando no hay caja abierta que diga quién está
 # de turno. En orden de cercanía a la operación.
 ROLES_RESPALDO = ("supervisor", "admin")
+
+# Quién responde por lo que pasa dentro de un almacén. `almacenero` primero
+# porque es quien puede actuar; los otros dos porque tienen que enterarse.
+ROLES_ALMACEN = ("almacenero", "supervisor", "admin")
 
 
 def destinatarios_de_sucursal(
@@ -67,6 +73,58 @@ def destinatarios_de_sucursal(
             extra={"sucursal_id": str(sucursal_id)},
         )
     return respaldo
+
+
+def destinatarios_de_almacen(
+    session: Session,
+    almacen_id: uuid.UUID,
+    roles: tuple[str, ...] = ROLES_ALMACEN,
+) -> list[uuid.UUID]:
+    """A quién se le avisa de algo que pasa en un **almacén**.
+
+    No alcanza con `destinatarios_de_sucursal`: el almacén central y el de
+    producción no cuelgan de ninguna sucursal (`almacen.sucursal_id` NULL),
+    y ahí no hay encargado de turno que valga. La regla es por rol:
+
+    - Almacén **de sucursal**: los roles de almacén asignados a esa
+      sucursal, más el encargado de turno — es quien está parado ahí ahora.
+    - Almacén **de empresa** (central, producción): los roles de almacén
+      asignados a cualquier sucursal de esa empresa. Es más gente de la
+      necesaria, y es a propósito: un aviso de stock del central sin
+      destinatario es un aviso perdido.
+
+    Como `destinatarios_de_sucursal`, esta función es el punto de
+    configuración futuro: cambiarla no toca listeners, entidad ni pantalla.
+    """
+    almacen = session.get(Almacen, almacen_id)
+    if almacen is None:
+        return []
+
+    q = (
+        select(UsuarioSucursal.usuario_id)
+        .join(Sucursal, Sucursal.id == UsuarioSucursal.sucursal_id)
+        .join(UsuarioRol, UsuarioRol.usuario_id == UsuarioSucursal.usuario_id)
+        .join(Rol, Rol.id == UsuarioRol.rol_id)
+        .where(Rol.nombre.in_(roles))
+        .distinct()
+    )
+    if almacen.sucursal_id is not None:
+        q = q.where(UsuarioSucursal.sucursal_id == almacen.sucursal_id)
+    else:
+        q = q.where(Sucursal.empresa_id == almacen.empresa_id)
+
+    destinatarios = list(session.scalars(q))
+    if almacen.sucursal_id is not None:
+        encargado = encargado_de_turno(session, almacen.sucursal_id)
+        if encargado is not None and encargado not in destinatarios:
+            destinatarios.append(encargado)
+    if not destinatarios:
+        log.warning(
+            "Aviso sin destinatario: el almacén no tiene roles de almacén "
+            "asignados en su empresa",
+            extra={"almacen_id": str(almacen_id)},
+        )
+    return destinatarios
 
 
 def notificar(

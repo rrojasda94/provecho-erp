@@ -10,11 +10,13 @@ from decimal import Decimal
 from sqlalchemy.orm import Session
 
 from src.core.events import event_bus
+from src.modules.inventory.application import margenes
 from src.modules.inventory.application import stock as stock_uc
 from src.modules.inventory.application.errors import NoEncontrado, ReglaNegocio
 from src.modules.inventory.domain import rules
 from src.modules.inventory.infrastructure.models import Ajuste
-from src.modules.inventory.infrastructure.repositories import AjusteRepo
+from src.modules.inventory.infrastructure.repositories import AjusteRepo, StockRepo
+from src.modules.users.infrastructure.models import Almacen
 
 
 def solicitar_ajuste(
@@ -25,7 +27,6 @@ def solicitar_ajuste(
     cantidad: Decimal,
     motivo: str,
     solicitado_por: uuid.UUID,
-    dentro_margen: bool = True,
 ) -> Ajuste:
     if motivo not in rules.MOTIVOS_AJUSTE:
         raise ReglaNegocio(f"motivo de ajuste inválido: {motivo}")
@@ -33,6 +34,19 @@ def solicitar_ajuste(
         raise ReglaNegocio(
             f"signo de cantidad ({cantidad}) inválido para motivo '{motivo}'"
         )
+    almacen = session.get(Almacen, almacen_id)
+    if almacen is None:
+        raise NoEncontrado("almacén no encontrado")
+    margen, piso = margenes.margen_de_empresa(session, almacen.empresa_id)
+    fila = StockRepo(session).get(almacen_id, sku_id)
+    costo = margenes.costos_por_sku(session, [sku_id]).get(sku_id, Decimal(0))
+    dentro_margen = rules.diferencia_dentro_margen(
+        fila.cantidad if fila else Decimal(0),
+        cantidad,
+        margen,
+        valor_diferencia=cantidad * costo,
+        piso=piso,
+    )
     return AjusteRepo(session).add(
         Ajuste(
             almacen_id=almacen_id,

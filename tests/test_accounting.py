@@ -443,6 +443,117 @@ def test_venta_confirmada_con_regla_configurada_genera_asiento_automatico(env):
     assert generado[0]["evento_origen"] == "sales.venta_confirmada"
 
 
+def _payload_traslado(ids, transferencia_id, diferencias, monto):
+    return {
+        "transferencia_id": transferencia_id,
+        "origen_almacen_id": ids["almacen_id"],
+        "destino_almacen_id": ids["almacen_id"],
+        "solicitud_id": None,
+        "diferencias": diferencias,
+        "monto_diferencia": monto,
+    }
+
+
+def _asientos_de(client, h, ids, referencia):
+    asientos = client.get(
+        f"/api/v1/accounting/asientos?empresa_id={ids['empresa_id']}", headers=h
+    ).json()["items"]
+    return [a for a in asientos if a["referencia_origen"] == referencia]
+
+
+def test_traslado_con_faltante_asienta_la_perdida(env):
+    """Mover mercadería entre almacenes de la misma empresa no mueve
+    resultado. Lo que sí es un hecho contable es lo que salió y no llegó."""
+    client, ids, _ = env
+    h = _token(client)
+    _abrir_periodo_actual(client, h, ids)
+    perdida_id = _crear_cuenta(client, h, ids, "65", "Pérdidas", "gasto").json()["id"]
+    existencias_id = _crear_cuenta(
+        client, h, ids, "20", "Existencias", "activo"
+    ).json()["id"]
+    _crear_regla_asiento(
+        client, h, ids, "inventory.transferencia_recibida", perdida_id, existencias_id
+    )
+
+    transferencia_id = str(uuid.uuid4())
+    accounting_listeners.on_transferencia_recibida(
+        _payload_traslado(
+            ids,
+            transferencia_id,
+            [{"sku_id": str(uuid.uuid4()), "lote_id": None,
+              "enviada": "10", "recibida": "8"}],
+            "24.00",
+        )
+    )
+
+    (generado,) = _asientos_de(client, h, ids, transferencia_id)
+    assert generado["evento_origen"] == "inventory.transferencia_recibida"
+
+
+def test_traslado_sin_faltante_no_asienta_nada(env):
+    """Un asiento por cada traslado llenaría el libro de movimientos que se
+    cancelan entre sí."""
+    client, ids, _ = env
+    h = _token(client)
+    _abrir_periodo_actual(client, h, ids)
+    perdida_id = _crear_cuenta(client, h, ids, "65", "Pérdidas", "gasto").json()["id"]
+    existencias_id = _crear_cuenta(
+        client, h, ids, "20", "Existencias", "activo"
+    ).json()["id"]
+    _crear_regla_asiento(
+        client, h, ids, "inventory.transferencia_recibida", perdida_id, existencias_id
+    )
+
+    transferencia_id = str(uuid.uuid4())
+    accounting_listeners.on_transferencia_recibida(
+        _payload_traslado(ids, transferencia_id, [], "0")
+    )
+
+    assert _asientos_de(client, h, ids, transferencia_id) == []
+
+
+def test_la_merma_desechada_se_asienta_como_perdida(env):
+    client, ids, _ = env
+    h = _token(client)
+    _abrir_periodo_actual(client, h, ids)
+    perdida_id = _crear_cuenta(client, h, ids, "65", "Mermas", "gasto").json()["id"]
+    existencias_id = _crear_cuenta(
+        client, h, ids, "20", "Existencias", "activo"
+    ).json()["id"]
+    _crear_regla_asiento(
+        client, h, ids, "inventory.merma_registrada", perdida_id, existencias_id
+    )
+
+    sku_id = str(uuid.uuid4())
+    accounting_listeners.on_merma_registrada({
+        "almacen_id": ids["almacen_id"], "sku_id": sku_id, "lote_id": None,
+        "cantidad": "3", "motivo": "auditoria", "monto": "60.00",
+    })
+
+    (generado,) = _asientos_de(client, h, ids, sku_id)
+    assert generado["evento_origen"] == "inventory.merma_registrada"
+
+
+def test_una_merma_sin_costo_cargado_no_asienta_un_cero(env):
+    client, ids, _ = env
+    h = _token(client)
+    _abrir_periodo_actual(client, h, ids)
+    perdida_id = _crear_cuenta(client, h, ids, "65", "Mermas", "gasto").json()["id"]
+    existencias_id = _crear_cuenta(
+        client, h, ids, "20", "Existencias", "activo"
+    ).json()["id"]
+    _crear_regla_asiento(
+        client, h, ids, "inventory.merma_registrada", perdida_id, existencias_id
+    )
+
+    sku_id = str(uuid.uuid4())
+    accounting_listeners.on_merma_registrada({
+        "almacen_id": ids["almacen_id"], "sku_id": sku_id, "lote_id": None,
+        "cantidad": "3", "motivo": "auditoria", "monto": "0",
+    })
+    assert _asientos_de(client, h, ids, sku_id) == []
+
+
 # --- Pago a proveedor (PROC-CTB-003) ------------------------------------------
 
 def _dar_conformidad(client, h, oc_id, idempotency_key="conf-key-1"):

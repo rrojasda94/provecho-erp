@@ -370,6 +370,45 @@ toca a un postulante contratado, cuya retención es laboral y no la del aviso
 de privacidad. **Pendiente: darlo de alta en el servidor** — hasta entonces
 el plazo no se aplica en la práctica.
 
+## Tareas periódicas (Celery beat)
+
+Todo lo que corre solo **dentro** de la aplicación vive en
+`src/core/celery_app.py::beat_schedule`, no en el cron del host: necesita la
+sesión de base y los casos de uso del ERP. El cron del host queda para lo
+que debe correr aunque la aplicación esté caída (backups) o tan espaciado
+que un servicio permanente no se justifica (purga de postulantes).
+
+| Tarea | Cadencia | Para qué |
+|---|---|---|
+| `core.latido_worker` | 1 min | Marca de vida que lee `/health/ready` |
+| `sales.barrer_pedidos_demorados` | 5 min | Red de seguridad de la revisión puntual de cada pedido |
+| `sales.barrer_comprobantes_pendientes` | 15 min | Reencola lo que nunca llegó a la cola (emitido sin token, broker caído, worker muerto) |
+| `inventory.bloquear_lotes_vencidos` | 06:00 diario | Bloquea lotes vencidos con saldo antes del turno |
+| `inventory.reportar_conteos_vencidos` | 06:15 diario | Publica `inventory.conteo_vencido` por categoría atrasada |
+
+Los dos diarios corren **antes del turno** a propósito: el vencimiento
+cambia al pasar la medianoche del negocio (hora Perú, `timezone` de
+`celery_app`), y bloquear el lote a media mañana deja que la primera salida
+del día se lo lleve.
+
+**Un solo `beat` por despliegue** (ya está así en los compose): dos
+programadores encolan cada tarea dos veces. El worker puede escalar; beat
+no.
+
+```bash
+celery -A src.core.celery_app beat --loglevel=info
+```
+
+Verificar qué tiene programado un despliegue:
+
+```bash
+celery -A src.core.celery_app inspect scheduled
+```
+
+Un nombre mal escrito en `beat_schedule` **no falla en ningún lado**: beat
+encola, el worker descarta la tarea desconocida y el barrido no ocurre
+nunca. `tests/test_celery_beat.py` lo cubre en CI.
+
 ## Modo offline del PDV — hub local de sucursal
 
 Fase 1 (diseño + plumbing) 2026-07-26; fase 2 (motor de sync) 2026-07-27.

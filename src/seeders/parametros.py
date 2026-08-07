@@ -66,8 +66,8 @@ PROPUESTAS: list[tuple[str, str, dict, str | None, str]] = [
         "Confirma el 2 % semilla y le agrega un piso absoluto. Un margen solo "
         "porcentual castiga a las categorías baratas: 2 % de S/ 30 en "
         "servilletas son 60 céntimos y cualquier diferencia escala, hasta que "
-        "la alerta se vuelve ruido que nadie mira. El piso exige un cambio en "
-        "`conteos.py`, hoy solo evalúa el porcentaje.",
+        "la alerta se vuelve ruido que nadie mira. El piso se evalúa contra la "
+        "diferencia valorizada al costo promedio del artículo.",
     ),
     (
         "purchases",

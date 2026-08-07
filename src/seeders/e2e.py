@@ -187,6 +187,7 @@ def _crear_producto_vendible(session, empresa, marca) -> ProductoComercial:
     session.flush()
     sku = Sku(articulo_id=harina.id, codigo="SKU-E2E-HARINA")
     receta = Receta(
+        empresa_id=empresa.id,
         nombre="Base E2E",
         rendimiento_cantidad=Decimal(1),
         rendimiento_unidad_medida_id=udm.id,

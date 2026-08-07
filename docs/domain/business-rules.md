@@ -775,6 +775,11 @@ producción se hace en cocinas de sucursal. Ver
 - **RN-VNC-003** Un producto abierto/en uso en sucursal tiene vida útil
   adicional desde su apertura: hasta 7 días en refrigeración (~4°C
   promedio), o hasta 2 meses si está congelado a -18°C.
+- **RN-VNC-004** Con cuánta anticipación se avisa que un lote está por
+  vencer lo declara **cada artículo** (`articulo.dias_alerta_vencimiento`),
+  no un número único para todo el almacén: la leche útil avisa con días y
+  una conserva con meses, y un solo valor deja a uno de los dos avisando
+  cuando ya no sirve. Un artículo sin ventana declarada no avisa.
 
 ## Código de barras / QR
 
@@ -794,6 +799,15 @@ producción se hace en cocinas de sucursal. Ver
 - **RN-LOT-003** El lote registra todas las variables documentadas durante
   el proceso de producción (incluyendo ajustes de receta flexible), para
   trazabilidad completa.
+- **RN-LOT-004** Sacar un lote distinto del que FEFO sugiere exige un
+  **motivo registrado** en el movimiento. Tomar el lote sugerido no es un
+  override y no pide motivo: exigirlo siempre convierte el campo en un
+  trámite que se llena con cualquier cosa, y un motivo que nadie escribe en
+  serio da apariencia de control sin darlo.
+- **RN-LOT-005** Una salida que el reparto FEFO no puede respaldar con
+  ningún lote se registra igual —la operación ya ocurrió— y queda como
+  movimiento sin lote, visible en el reporte de excepciones. Frenarla
+  significaría negar una venta por un dato de trazabilidad que ya está mal.
 
 ## Unidad de medida
 
@@ -1004,7 +1018,14 @@ producción se hace en cocinas de sucursal. Ver
   atraso; el reporte sale a partir del día siguiente.
 - **RN-INV-015** Un ajuste es válido, sin generar alarma, solo si está
   dentro de un margen de error definido por las áreas de almacén y
-  contabilidad; fuera de ese margen dispara alarma/auditoría.
+  contabilidad; fuera de ese margen dispara alarma/auditoría. El margen son
+  **dos tolerancias que conviven** y basta cumplir una: un **porcentaje**
+  sobre la cantidad esperada y un **piso en dinero** sobre la diferencia
+  valorizada. El piso existe porque el porcentaje solo castiga a las
+  categorías baratas, y una alerta que siempre suena es una alerta que
+  nadie mira. Ambos valores viven en `inventory/margen_error_ajuste`
+  (`parametro_empresa`, aprobado por Gerencia — RN-GER-009); el sistema los
+  calcula, nunca los declara quien solicita el ajuste.
 - **RN-INV-016** Un ajuste se origina por sobrante, faltante, merma/daño,
   o error de registro.
 - **RN-INV-017** Toda merma se reporta en el módulo de producción o en el
@@ -1016,7 +1037,10 @@ producción se hace en cocinas de sucursal. Ver
 - **RN-INV-019** Toda devolución retorna el producto a su almacén de
   origen por una razón justificada (vencido, dañado, incumplimiento de
   plazo, ya no requerido, error al solicitar, duplicidad) y lo dirige a
-  desecho, auditoría o reintegro a stock disponible.
+  desecho, auditoría o reintegro a stock disponible. El destino solo aplica
+  a lo que **vuelve** al almacén: lo que se le devuelve al proveedor se va,
+  y su destino deja de ser problema nuestro. La devolución sucursal→central
+  se ejecuta como transferencia, no como entidad aparte (ADR-028).
 - **RN-INV-020** Toda devolución genera un reporte, dirigido al área de
   almacén (empresa→proveedor o sucursal→central) o al área comercial (si
   devuelve un cliente).
@@ -1037,7 +1061,11 @@ producción se hace en cocinas de sucursal. Ver
 - **RN-INV-012** El stock de merma o dañado es un subtipo de stock
   reservado: no apto para la actividad económica, pendiente de auditoría
   y desecho; se genera por devolución, rechazo de un almacén de sucursal,
-  o auditoría de almacén.
+  o auditoría de almacén. Apartarlo **no lo saca del almacén** —sigue en el
+  estante y el conteo físico lo va a encontrar—; recién el desecho descuenta
+  el stock y lo asienta como pérdida, y la auditoría puede reintegrarlo. Lo
+  aparta quien lo detecta y lo resuelve otro (misma segregación que el
+  ajuste, RN-INV-006).
 
 ## Compras
 

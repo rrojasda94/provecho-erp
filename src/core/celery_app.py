@@ -1,11 +1,15 @@
 """Cola de tareas en segundo plano (Celery sobre Redis).
 
-Hoy solo la usa la emisión de comprobantes electrónicos: la venta se cobra
-al instante y el envío a SUNAT viaja aparte, con reintentos — una caída de
-Factiliza nunca frena una caja.
+Nació para la emisión de comprobantes electrónicos —la venta se cobra al
+instante y el envío a SUNAT viaja aparte, con reintentos: una caída de
+Factiliza nunca frena una caja— y hoy carga además los **barridos
+periódicos** de `beat_schedule`, que son la red de seguridad de todo lo que
+depende de que alguien mire a tiempo: pedidos demorados, lotes vencidos,
+conteos vencidos y comprobantes que nunca llegaron a la cola.
 """
 
 from celery import Celery
+from celery.schedules import crontab
 from celery.signals import celeryd_init
 
 from src.config.settings import settings
@@ -63,6 +67,26 @@ celery_app.conf.beat_schedule = {
     "latido-worker": {
         "task": "core.latido_worker",
         "schedule": 60.0,
+    },
+    # Los dos barridos del vencimiento corren **antes del turno** y no a
+    # cualquier hora: el vencimiento cambia al pasar la medianoche del
+    # negocio (hora Perú, no UTC — `timezone` arriba), y bloquear el lote
+    # recién a media mañana deja que la primera salida del día se lo lleve.
+    "bloquear-lotes-vencidos": {
+        "task": "inventory.bloquear_lotes_vencidos",
+        "schedule": crontab(hour=6, minute=0),
+    },
+    "reportar-conteos-vencidos": {
+        "task": "inventory.reportar_conteos_vencidos",
+        "schedule": crontab(hour=6, minute=15),
+    },
+    # Red de seguridad de la emisión electrónica: recoge lo que nunca llegó
+    # a la cola (emitido sin `FACTILIZA_TOKEN`, con el broker caído o con el
+    # worker muerto). Cada 15 min alcanza — el reintento por comprobante ya
+    # cubre la caída pasajera de Factiliza, y esto cubre la ausencia total.
+    "barrer-comprobantes-pendientes": {
+        "task": "sales.barrer_comprobantes_pendientes",
+        "schedule": 900.0,
     },
 }
 

@@ -115,9 +115,10 @@ porcentual castiga a las categorías baratas: 2 % de un conteo de S/ 30 en
 servilletas son 60 céntimos, así que cualquier diferencia real escala a
 Gerencia y el evento se vuelve ruido que nadie mira. Un piso absoluto de
 S/ 20 dice: por debajo de eso no vale la pena la atención de nadie,
-independientemente del porcentaje. **Requiere un cambio de código** —hoy
-`conteos.py` solo evalúa el porcentaje— y por eso va declarado como deuda,
-no como si ya funcionara.
+independientemente del porcentaje. **El código ya lo lee** (2026-08-06): la
+diferencia se valoriza al `costo_promedio` del artículo y basta cumplir una
+de las dos tolerancias —el porcentaje o el piso— para no escalar. Hasta que
+Gerencia apruebe esta fila sigue rigiendo el 2 % sin piso.
 
 **Revisar cuando** haya 2 meses de conteos cíclicos cerrados: si más del
 20 % de los conteos dispara el evento, el margen está apretado o hay un
@@ -276,7 +277,7 @@ claro.
 |---|---|---|
 | `purchases/oc_umbral` | S/ 2,000.00 | **Baja** — sin histórico propio |
 | `sales/margen_minimo` | 60 % | Media-alta — referencia sólida + Amazonía |
-| `inventory/margen_error_ajuste` | 2 % + piso S/ 20.00 | Media-alta — el piso requiere código |
+| `inventory/margen_error_ajuste` | 2 % + piso S/ 20.00 | Media-alta — el piso ya está en código |
 | `purchases/monto_caja_chica` | S/ 500.00 | Media |
 | `accounting/plazo_envio_comprobante` | 5 días hábiles | Alta — el plazo es interno |
 | `rrhh/rango_salarial_*` (7) | 1.00 – 2.80 RMV según perfil | **Baja** — falta contraste de mercado local |

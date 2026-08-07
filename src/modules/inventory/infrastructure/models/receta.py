@@ -20,6 +20,12 @@ from src.core.model_base import TimestampMixin, UuidPkMixin
 class Receta(Base, UuidPkMixin, TimestampMixin):
     __tablename__ = "receta"
 
+    # La ficha técnica es de la empresa que la usa, no del grupo: dos
+    # empresas del mismo grupo pueden vender la misma pizza con recetas
+    # distintas, y una no tiene por qué ver la de la otra. Sin esta columna
+    # el CRUD listaba todas y el hub replicaba todas (deuda cerrada
+    # 2026-08-06).
+    empresa_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("empresa.id"), index=True)
     nombre: Mapped[str] = mapped_column(String(150))
     rendimiento_cantidad: Mapped[Decimal] = mapped_column(Numeric(12, 4))
     rendimiento_unidad_medida_id: Mapped[uuid.UUID] = mapped_column(

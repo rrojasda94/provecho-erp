@@ -89,6 +89,8 @@ class ArticuloCreate(BaseModel):
     costo_promedio: Decimal = Decimal(0)
     # Perecible o trazable → su stock se mueve por lote y respeta FEFO.
     controla_lote: bool = False
+    # Con cuántos días de anticipación este artículo se avisa "por vencer".
+    dias_alerta_vencimiento: int | None = Field(default=None, ge=0, le=3650)
 
 
 class ArticuloUpdate(BaseModel):
@@ -98,6 +100,7 @@ class ArticuloUpdate(BaseModel):
     costo_promedio: Decimal | None = None
     archivado: bool | None = None
     controla_lote: bool | None = None
+    dias_alerta_vencimiento: int | None = Field(default=None, ge=0, le=3650)
 
 
 class ArticuloOut(BaseModel):
@@ -112,6 +115,7 @@ class ArticuloOut(BaseModel):
     costo_promedio: Decimal
     archivado: bool
     controla_lote: bool
+    dias_alerta_vencimiento: int | None
 
 
 # --- SKU ---
@@ -139,6 +143,8 @@ class MovimientoCreate(BaseModel):
     referencia: str | None = None
     # Override del lote sugerido por FEFO; NULL deja que el ERP lo elija.
     lote_id: uuid.UUID | None = None
+    # Obligatorio si `lote_id` no es el que FEFO sugería (RN-LOT-004).
+    motivo_lote: str | None = Field(default=None, max_length=200)
     # Identificador generado por el cliente: permite que un dispositivo que
     # ya creó el movimiento sin conexión conserve su id (ADR-009).
     id: uuid.UUID | None = None
@@ -247,8 +253,12 @@ class TransferenciaRecibirItem(BaseModel):
 
 
 class TransferenciaRecibir(BaseModel):
-    """Lo que no se menciona se recibe completo."""
+    """Lo que no se menciona se recibe completo — salvo en una parcial."""
     items: list[TransferenciaRecibirItem] = []
+    # `True` = llegó parte del envío y el resto sigue en tránsito. Explícito
+    # a propósito: deducirlo de que falten ítems haría que un olvido cierre
+    # la transferencia dando por perdido lo que todavía viene en camino.
+    parcial: bool = False
 
 
 class TransferenciaItemOut(BaseModel):
@@ -313,6 +323,9 @@ class StockLoteOut(BaseModel):
     estado: str
     fecha_vencimiento: date | None
     vencido: bool
+    # Dentro de la ventana de alerta: la del artículo
+    # (`dias_alerta_vencimiento`) o la que impuso la consulta.
+    por_vencer: bool = False
 
 
 # --- Ajustes ---
@@ -321,7 +334,9 @@ class AjusteCreate(BaseModel):
     sku_id: uuid.UUID
     cantidad: Decimal  # delta con signo
     motivo: str
-    dentro_margen: bool = True
+    # `dentro_margen` no se recibe: lo calcula el servidor contra el margen
+    # aprobado para la empresa. Que lo declarara el cliente permitía silenciar
+    # `inventory.ajuste_fuera_margen` desde el mismo request que lo provoca.
 
 
 class AjusteOut(BaseModel):
@@ -354,6 +369,12 @@ class ConteoCantidad(BaseModel):
 
 class ConteoCantidades(BaseModel):
     items: list[ConteoCantidad] = Field(min_length=1)
+
+
+class ConteoAnulacion(BaseModel):
+    # Obligatorio: anular es la salida para hacer desaparecer un conteo, así
+    # que el porqué queda escrito en el propio conteo.
+    motivo: str = Field(min_length=3, max_length=500)
 
 
 class ConteoItemOut(BaseModel):
@@ -402,6 +423,9 @@ class ProgramaConteoOut(BaseModel):
 
 # --- Recetas ---
 class RecetaCreate(BaseModel):
+    # Como en `ArticuloCreate`: el tenant manda y esto solo puede
+    # confirmarlo. Un superusuario sin empresa asignada sí lo necesita.
+    empresa_id: uuid.UUID | None = None
     nombre: str = Field(min_length=1, max_length=150)
     rendimiento_cantidad: Decimal = Field(gt=0)
     rendimiento_unidad_medida_id: uuid.UUID
@@ -461,6 +485,7 @@ class RecetaItemOut(BaseModel):
 
 class RecetaOut(BaseModel):
     id: uuid.UUID
+    empresa_id: uuid.UUID
     nombre: str
     rendimiento_cantidad: Decimal
     rendimiento_unidad_medida_id: uuid.UUID
@@ -516,11 +541,104 @@ class GuiaRemisionItemOut(BaseModel):
     unidad: str
 
 
+class GuiaDevolucionCreate(BaseModel):
+    """Igual que la del traslado, más el lugar de destino: `proveedor` no
+    tiene dirección modelada, así que se teclea como el chofer y la placa."""
+
+    lugar_destino: str = Field(min_length=3, max_length=255)
+    chofer_nombres: str = Field(min_length=2, max_length=120)
+    chofer_apellidos: str = Field(min_length=2, max_length=120)
+    chofer_num_doc: str = Field(min_length=8, max_length=15)
+    chofer_licencia: str = Field(min_length=6, max_length=20)
+    vehiculo_placa: str = Field(min_length=6, max_length=10)
+    peso_bruto_kg: Decimal = Field(gt=0)
+    fecha_inicio_traslado: date | None = None
+    modalidad_traslado: str = Field(default="02", pattern="^(01|02)$")
+    observacion: str | None = Field(default=None, max_length=500)
+
+
+# --- Devoluciones -----------------------------------------------------------
+class DevolucionItemIn(BaseModel):
+    sku_id: uuid.UUID
+    cantidad: Decimal = Field(gt=0)
+    # Obligatorio al devolver a un proveedor un artículo con control de
+    # lote: el reclamo tiene que decir qué mercadería se rechaza.
+    lote_id: uuid.UUID | None = None
+
+
+class DevolucionCreate(BaseModel):
+    almacen_id: uuid.UUID
+    origen: str = Field(pattern="^(proveedor|cliente)$")
+    motivo: str
+    # `proveedor_id` o `cliente_id`, según el origen.
+    referencia_id: uuid.UUID | None = None
+    # Solo en la devolución de un cliente: qué se hace con lo que volvió.
+    destino: str | None = None
+    observacion: str | None = Field(default=None, max_length=500)
+    items: list[DevolucionItemIn] = Field(min_length=1)
+
+
+class DevolucionItemOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    sku_id: uuid.UUID
+    cantidad: Decimal
+    lote_id: uuid.UUID | None
+
+
+class DevolucionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    almacen_id: uuid.UUID
+    origen: str
+    referencia_id: uuid.UUID | None
+    motivo: str
+    destino: str | None
+    estado: str
+    reporte_dirigido_a: str
+    observacion: str | None
+
+
+class DevolucionDetalleOut(DevolucionOut):
+    items: list[DevolucionItemOut]
+
+
+# --- Merma ------------------------------------------------------------------
+class MermaCreate(BaseModel):
+    almacen_id: uuid.UUID
+    sku_id: uuid.UUID
+    cantidad: Decimal = Field(gt=0)
+    # RN-INV-012: qué la originó.
+    motivo: str = Field(pattern="^(devolucion|rechazo_sucursal|auditoria)$")
+    lote_id: uuid.UUID | None = None
+
+
+class MermaResolver(BaseModel):
+    # `desecho` saca el stock y lo asienta como pérdida; `reintegro` lo
+    # devuelve a disponible (RN-INV-019).
+    destino: str = Field(pattern="^(desecho|reintegro)$")
+
+
+class MermaOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    almacen_id: uuid.UUID
+    sku_id: uuid.UUID
+    lote_id: uuid.UUID | None
+    cantidad: Decimal
+    motivo: str | None
+    estado: str
+    referencia_id: uuid.UUID | None
+
+
 class GuiaRemisionOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     empresa_id: uuid.UUID
-    transferencia_id: uuid.UUID
+    # Exactamente uno de los dos: la guía la emite un traslado o una
+    # devolución a proveedor.
+    transferencia_id: uuid.UUID | None
+    devolucion_id: uuid.UUID | None
     serie: str
     correlativo: int
     fecha_inicio_traslado: date

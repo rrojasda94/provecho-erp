@@ -16,11 +16,15 @@ from sqlalchemy.orm import Session
 from src.modules.inventory.application import recetas as recetas_uc
 from src.modules.inventory.infrastructure.models import (
     Articulo,
+    IncidenciaInventario,
+    MovimientoInventario,
     Receta,
     RecetaItem,
+    ReservaStock,
     Sku,
     SolicitudInsumos,
     SolicitudItem,
+    Stock,
     UnidadMedida,
 )
 from src.modules.users.infrastructure.models import Almacen
@@ -145,6 +149,181 @@ def solicitudes_resumen_para_negociacion(
             "sucursal_id": fila.sucursal_id,
             "cantidad_total": fila.cantidad_total,
             "num_solicitudes": fila.num_solicitudes,
+        }
+        for fila in session.execute(stmt)
+    ]
+
+
+# --- Excepciones: lo que el sistema hizo (o dejó de hacer) en silencio ------
+# Las tres consultas de abajo existen por la misma razón: hay decisiones que
+# el ERP toma correctamente sin frenar la operación —no descontar, dejar el
+# disponible negativo, sacar sin lote— y que hasta ahora no tenían dónde
+# verse. Una excepción que nadie mira deja de ser una excepción.
+
+MOTIVO_INCIDENCIA = {
+    "sin_almacen": "Sucursal sin almacén",
+    "sin_sku": "Artículo sin SKU activo",
+    "stock_insuficiente": "Stock teórico insuficiente",
+}
+
+
+def consumos_omitidos(
+    session: Session,
+    empresa_id: uuid.UUID | None,
+    *,
+    desde: datetime.date | None = None,
+    hasta: datetime.date | None = None,
+    limite: int = 50,
+) -> list[dict]:
+    """Movimientos que no se hicieron y por qué (`incidencia_inventario`).
+
+    Cada fila es stock que quedó distinto de la realidad sin que nadie lo
+    haya pedido. El motivo es lo accionable: dice si hay que configurar la
+    sucursal, dar de alta un SKU, o mirar por qué el stock ya venía mal.
+    """
+    stmt = (
+        select(IncidenciaInventario, Articulo.nombre)
+        .outerjoin(Articulo, Articulo.id == IncidenciaInventario.articulo_id)
+        .order_by(IncidenciaInventario.created_at.desc())
+        .limit(limite)
+    )
+    if empresa_id is not None:
+        stmt = stmt.where(IncidenciaInventario.empresa_id == empresa_id)
+    if desde is not None:
+        stmt = stmt.where(
+            IncidenciaInventario.created_at >= fechas.inicio_dia_utc(desde)
+        )
+    if hasta is not None:
+        stmt = stmt.where(IncidenciaInventario.created_at <= fechas.fin_dia_utc(hasta))
+
+    return [
+        {
+            "fecha": fechas.a_fecha_local(incidencia.created_at),
+            "origen": incidencia.origen,
+            "referencia": incidencia.referencia,
+            "motivo": MOTIVO_INCIDENCIA.get(incidencia.tipo, incidencia.tipo),
+            "articulo": nombre or "—",
+            "cantidad": incidencia.cantidad,
+            "detalle": incidencia.detalle,
+        }
+        for incidencia, nombre in session.execute(stmt)
+    ]
+
+
+def disponible_negativo(
+    session: Session,
+    empresa_id: uuid.UUID | None,
+    *,
+    limite: int = 50,
+) -> list[dict]:
+    """SKUs comprometidos por encima de lo que hay físicamente (RN-INV-009).
+
+    Es un estado alcanzable a propósito: reservar exige disponible, pero
+    consumir no se bloquea nunca —una venta ya ocurrida no se niega—, así
+    que una reserva puede quedar sin respaldo. Cada fila es una promesa que
+    el almacén no puede cumplir hoy.
+
+    Foto del presente: el rango de fechas del tablero no aplica.
+    """
+    reservas = (
+        select(
+            ReservaStock.almacen_id,
+            ReservaStock.sku_id,
+            func.sum(ReservaStock.cantidad).label("reservado"),
+        )
+        .where(ReservaStock.estado == "activa")
+        .group_by(ReservaStock.almacen_id, ReservaStock.sku_id)
+        .subquery()
+    )
+    stmt = (
+        select(
+            Almacen.nombre.label("almacen"),
+            Articulo.nombre.label("articulo"),
+            Stock.cantidad,
+            reservas.c.reservado,
+        )
+        .select_from(Stock)
+        .join(
+            reservas,
+            (reservas.c.almacen_id == Stock.almacen_id)
+            & (reservas.c.sku_id == Stock.sku_id),
+        )
+        .join(Almacen, Almacen.id == Stock.almacen_id)
+        .join(Sku, Sku.id == Stock.sku_id)
+        .join(Articulo, Articulo.id == Sku.articulo_id)
+        .where(reservas.c.reservado > Stock.cantidad)
+        .order_by((Stock.cantidad - reservas.c.reservado).asc())
+        .limit(limite)
+    )
+    if empresa_id is not None:
+        stmt = stmt.where(Almacen.empresa_id == empresa_id)
+
+    return [
+        {
+            "almacen": fila.almacen,
+            "articulo": fila.articulo,
+            "cantidad": fila.cantidad,
+            "reservado": fila.reservado,
+            "disponible": fila.cantidad - fila.reservado,
+        }
+        for fila in session.execute(stmt)
+    ]
+
+
+def salidas_sin_lote(
+    session: Session,
+    empresa_id: uuid.UUID | None,
+    *,
+    desde: datetime.date | None = None,
+    hasta: datetime.date | None = None,
+    limite: int = 50,
+) -> list[dict]:
+    """Salidas de artículos con control de lote que ningún lote respalda.
+
+    Pasa cuando el total alcanza pero el reparto FEFO no encuentra de dónde
+    tomarlo: stock cargado antes de activar el control de lote, o el resto
+    bloqueado por vencimiento. Es deliberado (ADR-015) —la operación ya
+    ocurrió y no se frena— y rompe la trazabilidad de ese movimiento, que es
+    justo lo que el control de lote existe para dar.
+    """
+    stmt = (
+        select(
+            MovimientoInventario.ts,
+            Almacen.nombre.label("almacen"),
+            Articulo.nombre.label("articulo"),
+            MovimientoInventario.tipo,
+            MovimientoInventario.cantidad,
+            MovimientoInventario.referencia,
+        )
+        .select_from(MovimientoInventario)
+        .join(Almacen, Almacen.id == MovimientoInventario.almacen_id)
+        .join(Sku, Sku.id == MovimientoInventario.sku_id)
+        .join(Articulo, Articulo.id == Sku.articulo_id)
+        .where(
+            MovimientoInventario.lote_id.is_(None),
+            MovimientoInventario.cantidad < 0,
+            Articulo.controla_lote.is_(True),
+        )
+        .order_by(MovimientoInventario.ts.desc())
+        .limit(limite)
+    )
+    if empresa_id is not None:
+        stmt = stmt.where(Almacen.empresa_id == empresa_id)
+    if desde is not None:
+        stmt = stmt.where(
+            MovimientoInventario.ts >= fechas.inicio_dia_utc(desde)
+        )
+    if hasta is not None:
+        stmt = stmt.where(MovimientoInventario.ts <= fechas.fin_dia_utc(hasta))
+
+    return [
+        {
+            "fecha": fechas.a_fecha_local(fila.ts),
+            "almacen": fila.almacen,
+            "articulo": fila.articulo,
+            "tipo": fila.tipo,
+            "cantidad": -fila.cantidad,
+            "referencia": fila.referencia,
         }
         for fila in session.execute(stmt)
     ]

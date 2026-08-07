@@ -40,6 +40,23 @@ def emision_habilitada() -> bool:
     return bool(settings.factiliza_token)
 
 
+def pendientes_de_emitir(session, limite: int = 100) -> list[uuid.UUID]:
+    """Comprobantes que quedaron sin llegar a SUNAT y todavía pueden llegar.
+
+    El reintento por comprobante (backoff de la cola) cubre la caída pasajera
+    de Factiliza. Esto cubre lo que la cola nunca supo: el comprobante
+    emitido cuando no había `FACTILIZA_TOKEN`, el que nació con el broker
+    caído (`retry=False` a propósito, para no colgar la caja), o el que se
+    perdió con el worker muerto.
+    """
+    return [
+        c.id
+        for c in ComprobanteRepo(session).pendientes(
+            limite=limite, max_intentos=MAX_INTENTOS_EMISION
+        )
+    ]
+
+
 def clave_idempotencia(venta_id, grupo_cobro: int) -> str:
     """El grupo 1 conserva la clave histórica `venta:{id}`: los comprobantes
     emitidos antes del cobro dividido siguen resolviendo idempotentes."""

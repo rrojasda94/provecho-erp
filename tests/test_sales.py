@@ -94,6 +94,7 @@ def env(monkeypatch):
         s.flush()
         sku = Sku(articulo_id=harina.id, codigo="SKU-HARINA")
         receta = Receta(
+            empresa_id=empresa.id,
             nombre="Pizza base", rendimiento_cantidad=Decimal(1),
             rendimiento_unidad_medida_id=udm.id,
         )
@@ -176,6 +177,30 @@ def test_venta_descuenta_stock_por_receta(env):
     assert body["numero_orden"] == 1
     # 2 pizzas × 0.25 kg = 0.5 kg consumidos → 9.5.
     assert _stock(ids, TestSession) == Decimal("9.5")
+
+
+def test_consumo_omitido_queda_reportado(env):
+    """La venta nunca se frena por inventario, pero el stock que quedó sin
+    descontar deja de ser invisible: antes solo salía por `log.warning`."""
+    client, ids, TestSession = env
+    h = _token(client)
+    # 100 pizzas × 0.25 kg = 25 kg contra 10 kg de stock.
+    r = client.post(
+        "/api/v1/sales/ventas", headers=h, json=_venta_body(ids, cantidad="100")
+    )
+    assert r.status_code == 201  # la venta se hace igual
+    assert _stock(ids, TestSession) == Decimal("10")  # nada se descontó
+
+    datos = client.post(
+        "/api/v1/reportes/consumos_omitidos/datos", headers=h, json={}
+    )
+    assert datos.status_code == 200, datos.text
+    filas = datos.json()["filas"]
+    assert len(filas) == 1
+    assert filas[0]["motivo"] == "Stock teórico insuficiente"
+    assert filas[0]["origen"] == "venta"
+    assert filas[0]["referencia"] == r.json()["id"]
+    assert Decimal(filas[0]["cantidad"]) == Decimal("25")
 
 
 def test_venta_idempotente(env):

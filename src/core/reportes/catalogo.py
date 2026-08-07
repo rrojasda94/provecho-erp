@@ -108,6 +108,28 @@ def _solicitudes_por_articulo(
     )
 
 
+def _consumos_omitidos(
+    session: Session, empresa_id, *, desde, hasta, sucursal_ids, limite
+):
+    return inventory_q.consumos_omitidos(
+        session, empresa_id, desde=desde, hasta=hasta, limite=limite
+    )
+
+
+def _disponible_negativo(
+    session: Session, empresa_id, *, desde, hasta, sucursal_ids, limite
+):
+    return inventory_q.disponible_negativo(session, empresa_id, limite=limite)
+
+
+def _salidas_sin_lote(
+    session: Session, empresa_id, *, desde, hasta, sucursal_ids, limite
+):
+    return inventory_q.salidas_sin_lote(
+        session, empresa_id, desde=desde, hasta=hasta, limite=limite
+    )
+
+
 def _ventas_por_hora(session: Session, empresa_id, *, desde, hasta, sucursal_ids, limite):
     return sales_q.ventas_por_hora(
         session, empresa_id, desde=desde, hasta=hasta, sucursal_ids=sucursal_ids
@@ -396,6 +418,79 @@ CATALOGO: tuple[Reporte, ...] = (
             Columna("num_solicitudes", "Solicitudes", "numero"),
         ),
         consulta=_solicitudes_por_articulo,
+    ),
+    Reporte(
+        codigo="consumos_omitidos",
+        nombre="Consumos omitidos",
+        descripcion=(
+            "Movimientos que el sistema no hizo y por qué. Una venta nunca "
+            "se frena por inventario, así que acá queda el stock que se fue "
+            "de la realidad sin que nadie lo pidiera. El motivo dice dónde "
+            "se arregla: configuración de la sucursal, catálogo, o stock."
+        ),
+        permiso="inventory.leer",
+        visual="tabla",
+        etiqueta="articulo",
+        valor="cantidad",
+        # La incidencia cuelga del almacén (o de ninguno, que es el caso
+        # `sin_almacen`), no de una sucursal.
+        filtra_sucursal=False,
+        columnas=(
+            Columna("fecha", "Fecha", "fecha"),
+            Columna("origen", "Origen"),
+            Columna("referencia", "Documento"),
+            Columna("motivo", "Motivo"),
+            Columna("articulo", "Artículo"),
+            Columna("cantidad", "Cantidad", "cantidad"),
+            Columna("detalle", "Detalle"),
+        ),
+        consulta=_consumos_omitidos,
+    ),
+    Reporte(
+        codigo="disponible_negativo",
+        nombre="Disponible negativo",
+        descripcion=(
+            "SKUs con más stock reservado que físico: promesas que el "
+            "almacén no puede cumplir hoy (RN-INV-009). Es una foto del "
+            "presente — el rango de fechas no aplica."
+        ),
+        permiso="inventory.leer",
+        visual="tabla",
+        etiqueta="articulo",
+        valor="disponible",
+        filtra_sucursal=False,
+        columnas=(
+            Columna("almacen", "Almacén"),
+            Columna("articulo", "Artículo"),
+            Columna("cantidad", "Físico", "cantidad"),
+            Columna("reservado", "Reservado", "cantidad"),
+            Columna("disponible", "Disponible", "cantidad"),
+        ),
+        consulta=_disponible_negativo,
+    ),
+    Reporte(
+        codigo="salidas_sin_lote",
+        nombre="Salidas sin lote",
+        descripcion=(
+            "Salidas de artículos con control de lote que ningún lote "
+            "respalda: stock anterior al control, o el resto bloqueado por "
+            "vencimiento. La salida es correcta; la trazabilidad de ese "
+            "movimiento es la que se pierde."
+        ),
+        permiso="inventory.leer",
+        visual="tabla",
+        etiqueta="articulo",
+        valor="cantidad",
+        filtra_sucursal=False,
+        columnas=(
+            Columna("fecha", "Fecha", "fecha"),
+            Columna("almacen", "Almacén"),
+            Columna("articulo", "Artículo"),
+            Columna("tipo", "Tipo"),
+            Columna("cantidad", "Cantidad", "cantidad"),
+            Columna("referencia", "Documento"),
+        ),
+        consulta=_salidas_sin_lote,
     ),
 )
 

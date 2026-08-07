@@ -80,6 +80,7 @@ def env(monkeypatch):
         s.add(articulo)
         s.flush()
         receta = Receta(
+            empresa_id=empresa.id,
             nombre="Pizza (BOM)",
             rendimiento_cantidad=Decimal(1),
             rendimiento_unidad_medida_id=udm.id,

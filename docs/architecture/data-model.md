@@ -273,14 +273,18 @@ erDiagram
   activo (baja lógica — nunca se elimina, es historial). Un artículo puede
   tener varios SKU (una marca/proveedor cada uno); el consumo usa el de
   mayor prioridad disponible.
-- **receta**: nombre, rendimiento (cantidad + unidad), flexible (bool),
-  criterio_ajuste (texto — solo si flexible, lo asigna Producción,
-  RN-PRD-010). BOM de un producto comercial o de una subreceta; su
-  artículo resultante (si es subreceta) puede encadenarse como ingrediente
-  de otra receta/subreceta. Creación y modificación a cargo de Producción/
-  I+D; toda modificación genera reporte, recalcula costos, solicita
-  actualizar manuales y notifica a los involucrados en fabricación
-  (RN-PRD-008/009).
+- **receta**: **empresa_id** (desde 2026-08-06, migración `d5b81e0c37a4`),
+  nombre, rendimiento (cantidad + unidad), flexible (bool), criterio_ajuste
+  (texto — solo si flexible, lo asigna Producción, RN-PRD-010). BOM de un
+  producto comercial o de una subreceta; su artículo resultante (si es
+  subreceta) puede encadenarse como ingrediente de otra receta/subreceta.
+  Creación y modificación a cargo de Producción/I+D; toda modificación
+  genera reporte, recalcula costos, solicita actualizar manuales y notifica
+  a los involucrados en fabricación (RN-PRD-008/009).
+  El **nombre es único por empresa**, no por grupo: dos empresas del mismo
+  grupo pueden vender la misma pizza con recetas distintas y ninguna tiene
+  por qué ver la de la otra. `receta_item` no lleva columna de tenant — se
+  acota por su receta, que es de quien manda.
 - **lote** (implementada 2026-07-27, migración `c9a2f4e18b60`, ADR-015):
   código (asignado por el ERP, nomenclatura de Producción),
   articulo_id, orden_produccion_id, fecha_elaboracion, manipulador_id,
@@ -403,8 +407,9 @@ descuenta stock vía la receta (ver [../domain/domain-model.md](../domain/domain
   rotación de inventarios (RN-VNC-001..003).
   El control es **opcional por artículo** (`articulo.controla_lote`, nuevo):
   un artículo sin control mueve solo `stock`, como antes. La ventana de
-  alerta de vencimiento se pasa hoy por consulta (`por_vencer_dias`) y no
-  está configurada por artículo todavía. El evento se publica sin
+  alerta la declara cada artículo en **`articulo.dias_alerta_vencimiento`**
+  (2026-08-06, RN-VNC-004); `por_vencer_dias` en la consulta la sobrescribe
+  y un artículo sin ventana no avisa. El evento se publica sin
   `responsable_id`: `almacen` no tiene responsable modelado.
 - **reserva_stock**: almacen_id, sku_id, cantidad, tipo (`solicitud` |
   `produccion` | `merma` | `carrito`), referencia_id (solicitud_id/
@@ -419,8 +424,18 @@ descuenta stock vía la receta (ver [../domain/domain-model.md](../domain/domain
   suficiente; consumir **no** se bloquea nunca por una reserva —una venta
   ya ocurrida no se niega—, así que el disponible puede quedar negativo, y
   eso es la señal de una promesa sin respaldo, no un error. De los cuatro
-  tipos solo `solicitud` tiene productor hoy: `produccion` y `carrito`
-  esperan a sus módulos y `merma` a `stock_merma` (RN-INV-012).
+  tipos, `solicitud` y `merma` tienen productor; `produccion` y `carrito`
+  esperan a sus módulos.
+  **La merma es una reserva de este tipo, no una tabla `stock_merma`**
+  (ADR-028): lo que RN-INV-012 pide —presente en el almacén, no apto para
+  la venta, pendiente de auditoría— es exactamente lo que una reserva
+  significa, y una tabla aparte partiría el cálculo del disponible en dos
+  restas. Por eso `reserva_stock` gana **`lote_id`** (nullable, 2026-08-06):
+  lo que se aparta por vencido o dañado es un lote concreto y el desecho
+  tiene que sacar ese, no el que FEFO elegiría. El ciclo es
+  registrar → resolver (`desecho` saca el stock y publica
+  `inventory.merma_registrada`; `reintegro` lo devuelve a disponible), y lo
+  resuelve un usuario distinto del que lo registró.
 - **conteo**: almacen_id, categoria_id (nullable — NULL es conteo general
   de todo el almacén), tipo (`rutina` | `ajuste` | `auditoria`), estado
   (`abierto` | `cerrado` | `anulado`), fecha_programada (nullable — la que
@@ -436,6 +451,9 @@ descuenta stock vía la receta (ver [../domain/domain-model.md](../domain/domain
   contar se ignoran. Sin categoría configurada con `frecuencia_conteo` no
   hay programa: el calendario se deriva del último conteo cerrado más la
   frecuencia, no existe tabla `programa_conteo` (ADR-019).
+  El estado `anulado` tiene endpoint desde 2026-08-06 y **exige motivo**
+  (queda en `observacion`): no genera ajustes y no pone al día el
+  calendario, porque `ultimo_cerrado` solo mira los `cerrado`.
 - **ajuste**: almacen_id, conteo_id (opcional — origen), motivo
   (`sobrante` | `faltante` | `merma` | `error_registro`), solicitado_por,
   aprobado_por (permisos separados `inventory.solicitar_ajuste` /
@@ -443,19 +461,47 @@ descuenta stock vía la receta (ver [../domain/domain-model.md](../domain/domain
   (bool — fuera del margen de error exige investigación documentada y
   dispara `inventory.ajuste_fuera_margen`, RN-INV-015), estado. Al
   aprobarse genera el `movimiento_inventario` tipo `ajuste`.
+  `dentro_margen` **lo calcula el servidor** en los dos productores de
+  ajustes (cierre de conteo y ajuste ad-hoc) contra el parámetro
+  `inventory/margen_error_ajuste`: recibirlo del cliente permitía apagar la
+  alerta desde el request que la provoca.
+- **incidencia_inventario** (implementada 2026-08-06): empresa_id, origen
+  (`venta` | `orden_compra` | `orden_produccion`), referencia (id del
+  documento, sin FK — los tres orígenes viven en módulos distintos), tipo
+  (`sin_almacen` | `sin_sku` | `stock_insuficiente`), almacen_id,
+  articulo_id, sku_id y cantidad (nullables según el tipo), detalle. El
+  movimiento que el listener decidió **no** hacer: la venta nunca se frena
+  por inventario, y esta tabla es el único lugar donde ese stock que se fue
+  de la realidad queda consultable (reporte `consumos_omitidos`). Sin
+  cierre/`atendida_at`: el reporte va por rango y una configuración rota
+  reaparece mañana, que es la señal correcta.
 - **movimiento_inventario**: almacen_id, sku_id, cantidad (+/-), tipo
   (`recepcion_compra` | `transferencia_salida` | `transferencia_entrada` |
   `consumo_venta` | `consumo_produccion` | `produccion_entrada` | `ajuste` |
   `devolucion`), motivo_ajuste (`sobrante` | `faltante` | `merma` |
   `error_registro` — solo si tipo=`ajuste`, dentro del margen de error de
-  almacén/contabilidad, RN-INV-015), referencia (doc origen), usuario_id,
-  timestamp. Solo inserción — el stock es derivable y auditable.
-- **devolucion**: origen (`proveedor` | `sucursal` | `cliente`),
-  referencia_id, almacen_origen_id, motivo (`vencido` | `dañado` |
-  `incumplimiento_plazo` | `no_requerido` | `error_solicitud` |
-  `duplicidad`), destino (`desecho` | `auditoria` | `reintegro`), items
-  (sku, cantidad), reporte_dirigido_a (`almacen` | `comercial`, RN-INV-020).
-  Genera el `movimiento_inventario` tipo `devolucion` correspondiente.
+  almacén/contabilidad, RN-INV-015), lote_id (nullable), **motivo_lote**
+  (nullable; obligatorio al tomar un lote distinto del que sugiere FEFO,
+  RN-LOT-004), referencia (doc origen), usuario_id, timestamp. Solo
+  inserción — el stock es derivable y auditable. Una salida sin lote sobre
+  un artículo que sí lo controla es legítima y deliberada (RN-LOT-005), y
+  se lista en el reporte `salidas_sin_lote`.
+- **devolucion** (implementada 2026-08-06, migración `e7c390a5b41f`,
+  ADR-028): almacen_id, origen (`proveedor` | `cliente`), referencia_id
+  (proveedor o cliente, sin FK — son dos módulos distintos), motivo
+  (`vencido` | `dañado` | `incumplimiento_plazo` | `no_requerido` |
+  `error_solicitud` | `duplicidad`), destino (`desecho` | `auditoria` |
+  `reintegro`, NULL al devolver a proveedor: nada vuelve al estante),
+  estado (`registrada` | `anulada`), reporte_dirigido_a (`almacen` |
+  `comercial`, **derivado del origen** y guardado, RN-INV-020),
+  registrado_por / anulado_por. Ítems en **devolucion_item** (sku_id,
+  cantidad, lote_id nullable). Genera el `movimiento_inventario` tipo
+  `devolucion`, con signo según la dirección.
+  **`sucursal` no está entre los orígenes**: la devolución sucursal→central
+  es una `transferencia` (ADR-020), que ya tiene despacho, tránsito y
+  recepción con diferencias. La de proveedor emite su propia
+  `guia_remision`; la de cliente con destino `desecho`/`auditoria` entra al
+  almacén y se aparta como merma en el mismo acto.
 - **solicitud_insumos**: almacen_solicitante_id, almacen_abastecedor_id,
   estado (`pendiente` | `aprobada` | `rechazada` | `cancelada` |
   `despachada` | `recibida`), solicitado_por, aprobado_por, observacion.

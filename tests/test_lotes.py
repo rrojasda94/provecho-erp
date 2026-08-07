@@ -3,6 +3,7 @@ vencidos y convivencia con los artículos que no controlan lote.
 SQLite en memoria + override de get_db, igual que `test_inventory.py`.
 """
 
+import uuid
 from datetime import timedelta
 from decimal import Decimal
 
@@ -112,13 +113,15 @@ def _ingresar(client, h, ids, lote_id, cantidad, sku=None):
     return r.json()
 
 
-def _salir(client, h, ids, cantidad, sku=None, lote_id=None):
+def _salir(client, h, ids, cantidad, sku=None, lote_id=None, motivo_lote=None):
     body = {
         "almacen_id": ids["almacen_id"], "sku_id": sku or ids["sku_queso"],
         "cantidad": str(-cantidad), "tipo": "consumo_venta",
     }
     if lote_id:
         body["lote_id"] = lote_id
+    if motivo_lote:
+        body["motivo_lote"] = motivo_lote
     return client.post("/api/v1/inventory/movimientos", headers=h, json=body)
 
 
@@ -238,8 +241,28 @@ def test_override_de_lote_explicito(env):
     _ingresar(client, h, ids, cercano, 5)
     _ingresar(client, h, ids, lejano, 5)
 
-    movs = _salir(client, h, ids, 2, lote_id=lejano).json()
+    movs = _salir(
+        client, h, ids, 2, lote_id=lejano, motivo_lote="el cercano se abrió y se dañó"
+    ).json()
     assert [m["lote_id"] for m in movs] == [lejano]  # gana el override
+
+
+def test_override_sin_motivo_se_rechaza(env):
+    """Saltearse FEFO es una decisión de una persona; sin el motivo la traza
+    dice qué salió pero no por qué salió eso (RN-LOT-004)."""
+    client, ids, _ = env
+    h = _token(client)
+    cercano = _crear_lote(client, h, ids, "L-CERCANO", 1)
+    lejano = _crear_lote(client, h, ids, "L-LEJANO", 40)
+    _ingresar(client, h, ids, cercano, 5)
+    _ingresar(client, h, ids, lejano, 5)
+
+    r = _salir(client, h, ids, 2, lote_id=lejano)
+    assert r.status_code == 409
+    assert "motivo_lote" in r.json()["detail"]
+
+    # El lote que FEFO ya sugería no es un override: no pide motivo.
+    assert _salir(client, h, ids, 2, lote_id=cercano).status_code == 201
 
 
 def test_salida_mayor_que_stock_no_toca_lotes(env):
@@ -274,6 +297,81 @@ def test_lote_de_otro_articulo_rechazado(env):
         "cantidad": "5", "tipo": "recepcion_compra", "lote_id": lote,
     })
     assert r.status_code == 409
+
+
+def test_ventana_de_alerta_la_declara_el_articulo(env):
+    """Sin ventana no hay aviso; con la del artículo el mismo lote pasa a
+    `por_vencer` sin que la consulta tenga que saber el número."""
+    client, ids, TestSession = env
+    h = _token(client)
+    lote = _crear_lote(client, h, ids, "L-PRONTO", 5)
+    _ingresar(client, h, ids, lote, 3)
+
+    fila = client.get("/api/v1/inventory/lotes", headers=h).json()[0]
+    assert fila["por_vencer"] is False
+
+    r = client.patch(f"/api/v1/inventory/articulos/{ids['queso_id']}", headers=h, json={
+        "dias_alerta_vencimiento": 7,
+    })
+    assert r.status_code == 200, r.text
+    assert r.json()["dias_alerta_vencimiento"] == 7
+
+    fila = client.get("/api/v1/inventory/lotes", headers=h).json()[0]
+    assert fila["por_vencer"] is True
+    assert fila["vencido"] is False  # avisar no es haber vencido
+
+
+def test_salida_sin_lote_queda_reportada(env):
+    """El total alcanza pero ningún lote lo respalda (stock previo al control
+    de lote): la salida se hace igual y el reporte la deja visible."""
+    client, ids, TestSession = env
+    h = _token(client)
+    # Stock cargado sin lote: se fuerza en la base, que es como llega el
+    # stock anterior a activar `controla_lote`.
+    with TestSession() as s:
+        from src.modules.inventory.infrastructure.models import Stock
+
+        s.add(
+            Stock(
+                almacen_id=uuid.UUID(ids["almacen_id"]),
+                sku_id=uuid.UUID(ids["sku_queso"]),
+                cantidad=Decimal("10"),
+            )
+        )
+        s.commit()
+
+    assert _salir(client, h, ids, 4).status_code == 201
+    r = client.post("/api/v1/reportes/salidas_sin_lote/datos", headers=h, json={})
+    assert r.status_code == 200, r.text
+    filas = r.json()["filas"]
+    assert len(filas) == 1
+    assert filas[0]["articulo"] == "Queso"
+    assert Decimal(filas[0]["cantidad"]) == Decimal("4")
+
+
+def test_el_barrido_diario_bloquea_lotes_vencidos(env, monkeypatch):
+    """El picking bloquea el lote vencido que se topa, pero solo cuando
+    alguien lo toca. En un almacén de baja rotación el vencido se cuenta
+    como disponible hasta que a alguien se le ocurre pedirlo."""
+    from src.modules.inventory.application import tasks
+
+    client, ids, TestSession = env
+    h = _token(client)
+    vencido = _crear_lote(client, h, ids, "L-VENCIDO", -1)
+    vigente = _crear_lote(client, h, ids, "L-VIGENTE", 30)
+    _ingresar(client, h, ids, vencido, 5)
+    _ingresar(client, h, ids, vigente, 5)
+
+    sesion = TestSession()
+    monkeypatch.setattr(tasks, "SessionLocal", lambda: sesion)
+    monkeypatch.setattr(sesion, "close", lambda: None)
+    assert tasks.bloquear_lotes_vencidos() == 1
+
+    estados = {
+        f["codigo"]: f["estado"]
+        for f in client.get("/api/v1/inventory/lotes", headers=h).json()
+    }
+    assert estados == {"L-VENCIDO": "bloqueado", "L-VIGENTE": "disponible"}
 
 
 def test_movimientos_quedan_trazados_por_lote(env):

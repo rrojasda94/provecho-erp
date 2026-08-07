@@ -177,6 +177,7 @@ def env():
         s.add(queso)
         s.flush()
         receta = Receta(
+            empresa_id=principal.empresa_id,
             nombre="Masa de pizza",
             rendimiento_cantidad=Decimal(2),
             rendimiento_unidad_medida_id=udm.id,

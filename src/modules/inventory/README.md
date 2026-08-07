@@ -14,18 +14,20 @@ productos (`articulo`, `sku`, `receta`, `receta_item`), `stock`,
 `conteo` + `conteo_item` (conteo cíclico) y el ciclo de abastecimiento
 interno (`reserva_stock`, `solicitud_insumos` + `solicitud_item`,
 `transferencia` + `transferencia_item`) con su `guia_remision` +
-`guia_remision_item`. `stock_merma` y `devolucion` siguen pendientes de
-sus slices.
+`guia_remision_item`, más `incidencia_inventario`, `devolucion` y
+`devolucion_item` (2026-08-06). **`stock_merma` no se implementa**: la
+merma es una `reserva_stock` de tipo `merma` (ADR-028).
 
 `articulo` (tipos `insumo` | `subreceta` | `mercaderia` | `empaque` |
 `repuesto` | `suministro` — enum extensible), `categoria`, `stock`,
-`stock_lote` (detalle por lote — base de FEFO/FIFO), `stock_merma`
-(subtipo de stock reservado), `movimiento_inventario` (inmutable, solo
-inserción), `solicitud_insumos`, `solicitud_item`, `transferencia`,
-`transferencia_item`, `lote` (código, fecha_vencimiento, condiciones de
-almacenamiento), `conteo`, `ajuste` (motivo, solicitante, aprobador),
-`devolucion` (origen `proveedor` | `sucursal`). Detalle en
-`docs/architecture/data-model.md` §3–§4.
+`stock_lote` (detalle por lote — base de FEFO/FIFO),
+`movimiento_inventario` (inmutable, solo inserción), `reserva_stock` (que
+es también donde vive la **merma**, ADR-028), `solicitud_insumos`,
+`solicitud_item`, `transferencia`, `transferencia_item`, `lote` (código,
+fecha_vencimiento, condiciones de almacenamiento), `conteo`, `ajuste`
+(motivo, solicitante, aprobador), `devolucion` + `devolucion_item` (origen
+`proveedor` | `cliente`). Detalle en `docs/architecture/data-model.md`
+§3–§4.
 
 ## Casos de uso
 
@@ -56,12 +58,16 @@ almacenamiento), `conteo`, `ajuste` (motivo, solicitante, aprobador),
 - FEFO/FIFO: picking sugiere el lote a tomar según `lote.fecha_vencimiento`
   (o fecha de ingreso si no aplica vencimiento); alerta de próximos a
   vencer con ventana configurable por artículo.
-- Registro de merma/desperdicio con motivo (vencimiento, daño, error de
-  recepción, plaga, otro) → mueve el stock a `stock_merma` (subtipo
-  reservado, no disponible) y expone reporte consolidado a `accounting`.
-- Devolución a proveedor: genera evento consumido por `purchases` para
-  gestionar reclamo/nota de crédito; devolución sucursal→central usa el
-  mismo flujo de `transferencia` con motivo `devolucion`.
+- **Merma** (RN-INV-012, ADR-028): registrar aparta el stock sin sacarlo
+  del almacén —sigue en el estante y el conteo lo va a encontrar— y
+  resolver decide su destino: `desecho` lo saca y lo asienta como pérdida
+  en `accounting`, `reintegro` lo devuelve a disponible. Lo resuelve otro
+  usuario, igual que un ajuste.
+- **Devolución a proveedor**: la mercadería sale con el lote declarado,
+  emite su guía de remisión y publica `inventory.devolucion_a_proveedor`
+  para que `purchases` gestione el reclamo o la nota de crédito.
+  **De cliente**: entra, y `destino` decide si vuelve al estante o se
+  aparta como merma. Sucursal→central sigue siendo una `transferencia`.
 
 ## Estado (slice 5 — recetas editables, 2026-08-03)
 
@@ -82,6 +88,14 @@ Contrato público nuevo: `queries_publicas.receta_resumen`, con el que
 `sales` valida la receta que asigna a un producto comercial sin importar el
 ORM de `inventory`.
 
+**Tenant (2026-08-06, migración `d5b81e0c37a4`):** `receta` era la única
+entidad del catálogo sin `empresa_id` — su CRUD listaba las de todas las
+empresas y el hub las replicaba completas. Ahora el listado filtra, cada
+ruta por id pasa por `exigir_receta`, el **nombre es único por empresa** (no
+por grupo) y un ítem no puede apuntar a un artículo de otra empresa: eso
+devuelve **404, no 403**, porque para esa empresa el artículo no existe.
+`receta_item` no lleva columna propia — se acota por su receta.
+
 ## Reglas
 
 - El stock nunca se edita directo: todo cambio pasa por `movimiento_inventario`.
@@ -92,7 +106,35 @@ ORM de `inventory`.
   no dispara alarma; fuera de margen sí, y exige investigación documentada
   antes de aprobar.
 - Movimiento de salida siempre respeta FEFO/FIFO — el picking no permite
-  tomar un lote distinto al sugerido sin override explícito y motivo.
+  tomar un lote distinto al sugerido sin override explícito y motivo
+  (`movimiento_inventario.motivo_lote`, RN-LOT-004; tomar el lote que FEFO
+  ya sugería no es override y no pide motivo).
+
+## Excepciones: lo que el módulo hace en silencio (2026-08-06)
+
+Tres decisiones deliberadas dejan el stock distinto de lo ideal sin frenar
+la operación. Las tres son correctas y ninguna tenía dónde verse — un
+`log.warning` no es una superficie. Ahora cada una tiene su reporte en el
+catálogo (`src/core/reportes/`, ADR-024), alimentado por
+`application/queries_publicas.py`:
+
+| Reporte | Qué muestra | Por qué existe la excepción |
+|---|---|---|
+| `consumos_omitidos` | Movimientos que el listener no hizo, con su motivo | Una venta nunca se bloquea por inventario (`incidencia_inventario`) |
+| `disponible_negativo` | SKUs con más reservado que físico | Reservar exige disponible; consumir no (RN-INV-009) |
+| `salidas_sin_lote` | Salidas de artículos con lote que ningún lote respalda | Stock anterior al control de lote, o el resto bloqueado (RN-LOT-005) |
+
+Además, `inventory.stock_bajo_minimo` se publica **al cruzar** el mínimo,
+no cada vez que se está por debajo: con el stock ya bajo, un evento por
+venta convierte la alerta en ruido y deja de mirarse justo cuando importa.
+
+Desde 2026-08-06 los tres avisos de este módulo tienen consumidor en
+`users` (`destinatarios_de_almacen` → bandeja de notificaciones):
+`stock_bajo_minimo` como `aviso`, `lote_vencido_detectado` como `urgente`
+—el stock ya se contaba como vendible— y `conteo_vencido` como recordatorio
+diario. El almacén central no cuelga de ninguna sucursal, así que ahí no hay
+encargado de turno y el destinatario se resuelve por rol dentro de la
+empresa.
 
 ## Estado (slice 4 — reserva, solicitud y transferencia, 2026-08-01)
 
@@ -166,9 +208,14 @@ NULL deja la categoría fuera del ciclo.
 - **Cerrar solicita, no corrige**: cada diferencia genera un `ajuste`
   `pendiente` con `ajuste.conteo_id`, que aprueba otro usuario
   (RN-INV-006). Los ítems no contados se ignoran: un conteo parcial no
-  declara faltante lo que nadie miró. `dentro_margen` sale de
-  `INVENTORY_MARGEN_AJUSTE_PCT` (2% por defecto, RN-INV-015); con sistema
-  en 0 cualquier diferencia queda fuera de margen.
+  declara faltante lo que nadie miró. `dentro_margen` **lo calcula el
+  servidor**, nunca el cliente: sale del parámetro `inventory/
+  margen_error_ajuste` aprobado por Gerencia (ADR-014) y son dos
+  tolerancias que conviven —**porcentaje** sobre la cantidad y **piso en
+  dinero** sobre la diferencia valorizada al `costo_promedio`—, basta
+  cumplir una (RN-INV-015). Sin parámetro vigente rige
+  `INVENTORY_MARGEN_AJUSTE_PCT` (2 %, sin piso). Con sistema en 0 no hay
+  base para el porcentaje, pero el piso sigue aplicando.
 - **Lo no contado en su fecha se reporta a almacén y gerencia**
   (RN-INV-021): `inventory.conteo_vencido`. El día de vencimiento aún no
   es atraso.
@@ -182,6 +229,7 @@ NULL deja la categoría fuera del ciclo.
 | GET | `/conteos/{id}` | `contar` (+ `ver_stock_esperado` para el esperado) |
 | POST | `/conteos/{id}/cantidades` | `contar` |
 | POST | `/conteos/{id}/cerrar` | `contar` |
+| POST | `/conteos/{id}/anular` | `contar` |
 
 Cerrar un conteo crea los ajustes con `inventory.contar`, sin exigir
 además `solicitar_ajuste`: cerrar el conteo **es** solicitar esos ajustes,
@@ -191,7 +239,15 @@ y ninguno mueve stock sin la firma de un aprobador distinto.
 categoría del ciclo — mandar `frecuencia_conteo: null` significa "no la
 toques", no "bórrala".
 
-Tests: `tests/test_conteos.py` (22 casos). Migración `c4e70a91d5b8`.
+**Anular** (2026-08-06) descarta un conteo abierto por error con motivo
+obligatorio: no genera ajustes y no pone al día el calendario, porque el
+programa solo mira los conteos `cerrado`. Antes la única salida era
+cerrarlo vacío, y un conteo cerrado en cero afirma "se contó y no había
+diferencias" —lo contrario de lo que pasó— además de correr la fecha de la
+categoría.
+
+Tests: `tests/test_conteos.py` (29 casos). Migraciones `c4e70a91d5b8` y
+`c2f6a94b13de`.
 
 ## Estado (slice 2 — lote/FEFO, 2026-07-27)
 
@@ -205,10 +261,12 @@ lote.
   cantidad entre los lotes con saldo, del vencimiento más próximo al más
   lejano (sin vencimiento va al final → FIFO por fecha de ingreso), y
   genera **un movimiento por lote tomado**. Un `lote_id` explícito es el
-  override del lote sugerido.
+  override del lote sugerido y **exige `motivo_lote`** cuando no coincide
+  con el que FEFO ya iba a tomar (RN-LOT-004).
 - **Vencidos**: el picking bloquea el lote vencido que encuentra todavía
   disponible y publica `inventory.lote_vencido_detectado`;
-  `POST /lotes/bloquear-vencidos` hace el mismo barrido a demanda.
+  `POST /lotes/bloquear-vencidos` hace el mismo barrido a demanda, y
+  desde 2026-08-06 lo dispara además un periódico diario (ver más abajo).
 - **Ingresos**: la recepción de compra crea el lote con el código y
   vencimiento declarados por el proveedor (RN-VNC-002) y producción con
   `origen=produccion`. Un ingreso sin lote de un artículo que lo controla
@@ -221,9 +279,13 @@ lote.
 | POST | `/lotes/bloquear-vencidos` | `registrar_movimiento` |
 
 `POST /movimientos` devuelve ahora una **lista** de movimientos (una salida
-FEFO puede repartirse entre varios lotes) y acepta `lote_id` opcional.
+FEFO puede repartirse entre varios lotes) y acepta `lote_id` + `motivo_lote`
+opcionales. `GET /lotes` marca cada fila con `por_vencer`, calculado contra
+`articulo.dias_alerta_vencimiento` (RN-VNC-004) o contra el
+`por_vencer_dias` de la consulta, que manda si viene.
 
-Tests: `tests/test_lotes.py`. Migración `c9a2f4e18b60`.
+Tests: `tests/test_lotes.py` (14 casos). Migraciones `c9a2f4e18b60` y
+`c2f6a94b13de`.
 
 ## Estado (slice 1 implementado 2026-07-25)
 
@@ -271,17 +333,30 @@ vehículo, peso bruto y fecha de inicio del viaje. Un traslado, una guía
 a SUNAT es asíncrono (`POST /despatch/send` vía Celery): la guía impresa
 es la que viaja y un rechazo se corrige y reemite, no detiene el camión.
 
-**Diferido (deuda del módulo):** devolución, `stock_merma`. Del slice de abastecimiento: el disponible negativo no
-tiene alerta, `reserva_stock` nace con tres tipos sin productor
-(`produccion`, `carrito`, `merma`), la transferencia no lleva vehículo ni
-tracking (`vehiculo` no existe), la recepción es de una sola pasada (sin
-parcial) y el ciclo no se replica al hub. Del slice de lote: la reposición por venta anulada entra al
-lote del día y no al lote del que salió, y la ventana de alerta de
-vencimiento se pasa por request (`por_vencer_dias`) en vez de configurarse
-por artículo. Del slice de conteo: el barrido de vencidos es a demanda
-(no hay periódico), `inventory.conteo_vencido` no tiene consumidor,
-`conteo` no se replica al hub y el margen de ajuste vive en `settings` y
-no en `parametro_empresa`. Ver ROADMAP → Deuda técnica → Módulo inventory.
+**Diferido (deuda del módulo):** del slice de abastecimiento,
+`reserva_stock` sigue con dos tipos sin productor (`produccion` y
+`carrito`, que esperan a sus módulos), la transferencia no lleva vehículo
+ni tracking (`vehiculo` no existe) y el ciclo no se replica al hub. Del
+slice de lote: la reposición por venta anulada entra al lote del día y no
+al lote del que salió. Del slice de conteo: `conteo` no se replica al hub.
+Ver ROADMAP → Deuda técnica → Módulo inventory.
+
+## Barridos periódicos (Celery beat, 2026-08-06)
+
+Los dos endpoints de vencimiento ya no dependen de que alguien los llame:
+
+| Tarea | Cuándo | Qué hace |
+|---|---|---|
+| `inventory.bloquear_lotes_vencidos` | 06:00 hora Perú | Bloquea todo lote vencido con saldo disponible |
+| `inventory.reportar_conteos_vencidos` | 06:15 hora Perú | Publica `inventory.conteo_vencido` por categoría atrasada |
+
+**Antes del turno y no a cualquier hora**: el vencimiento cambia al pasar
+la medianoche del negocio (`src/shared/fechas.py`, no UTC), y bloquear el
+lote a media mañana deja que la primera salida del día se lo lleve. Sin
+tenant: un periódico no tiene empresa, y un lote vencido lo está para
+todas. Que el conteo vencido se reporte **todos los días** hasta que se
+haga es deliberado —es un recordatorio— a diferencia de
+`stock_bajo_minimo`, que avisa al cruzar justamente para no repetirse.
 
 ## Sincronización con el hub de sucursal (implementado 2026-07-27)
 
@@ -344,3 +419,31 @@ entre `aprobada` y `despachada` no cambia qué se puede hacer (ADR-020).
   números distintos para lo mismo— y **omite** del resultado la receta sin
   insumos o sin rendimiento válido: nunca devuelve costo cero, que se leería
   como "gratis" en lugar de "desconocido".
+
+
+## Merma y devolución (2026-08-06, ADR-028)
+
+| Método | Ruta | Permiso |
+|--------|------|---------|
+| POST | `/mermas` | `solicitar_ajuste` |
+| GET | `/mermas?almacen_id` | `leer` |
+| POST | `/mermas/{id}/resolver` | `aprobar_ajuste` |
+| POST | `/devoluciones` | `registrar_movimiento` |
+| GET | `/devoluciones?almacen_id&origen` | `leer` |
+| GET | `/devoluciones/{id}` | `leer` |
+| POST | `/devoluciones/{id}/anular` | `registrar_movimiento` |
+| POST | `/devoluciones/{id}/guia-remision` | `emitir_guia` |
+
+Sin permisos nuevos: la merma reusa los del ajuste porque la segregación es
+la misma —quien declara que algo no sirve no firma su baja— y un permiso
+nuevo para la misma idea sería una segunda matriz que mantener.
+
+**La recepción de transferencia admite parcial** desde el mismo día:
+`{"parcial": true}` ingresa lo declarado y deja el resto **en tránsito**.
+Se declara explícito y no se deduce de que falten ítems: deducirlo haría
+que un olvido cierre la transferencia dando por perdido lo que todavía
+viene en camino. El evento `inventory.transferencia_recibida` sale **una
+sola vez**, al cerrar — si no, `accounting` asentaría el faltante de cada
+entrega por separado.
+
+Tests: `tests/test_merma_devolucion.py` (12 casos).

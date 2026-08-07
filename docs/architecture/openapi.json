@@ -158,11 +158,6 @@
             ],
             "title": "Cantidad"
           },
-          "dentro_margen": {
-            "default": true,
-            "title": "Dentro Margen",
-            "type": "boolean"
-          },
           "motivo": {
             "title": "Motivo",
             "type": "string"
@@ -671,6 +666,19 @@
             "default": "0",
             "title": "Costo Promedio"
           },
+          "dias_alerta_vencimiento": {
+            "anyOf": [
+              {
+                "maximum": 3650.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dias Alerta Vencimiento"
+          },
           "empresa_id": {
             "anyOf": [
               {
@@ -742,6 +750,17 @@
             "title": "Costo Promedio",
             "type": "string"
           },
+          "dias_alerta_vencimiento": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dias Alerta Vencimiento"
+          },
           "empresa_id": {
             "format": "uuid",
             "title": "Empresa Id",
@@ -780,7 +799,8 @@
           "categoria_id",
           "costo_promedio",
           "archivado",
-          "controla_lote"
+          "controla_lote",
+          "dias_alerta_vencimiento"
         ],
         "title": "ArticuloOut",
         "type": "object"
@@ -835,6 +855,19 @@
               }
             ],
             "title": "Costo Promedio"
+          },
+          "dias_alerta_vencimiento": {
+            "anyOf": [
+              {
+                "maximum": 3650.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dias Alerta Vencimiento"
           },
           "nombre": {
             "anyOf": [
@@ -2713,6 +2746,21 @@
         "title": "ConsumoItemIn",
         "type": "object"
       },
+      "ConteoAnulacion": {
+        "properties": {
+          "motivo": {
+            "maxLength": 500,
+            "minLength": 3,
+            "title": "Motivo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "motivo"
+        ],
+        "title": "ConteoAnulacion",
+        "type": "object"
+      },
       "ConteoCantidad": {
         "properties": {
           "cantidad": {
@@ -4013,6 +4061,316 @@
         "title": "DescuentoCreate",
         "type": "object"
       },
+      "DevolucionCreate": {
+        "properties": {
+          "almacen_id": {
+            "format": "uuid",
+            "title": "Almacen Id",
+            "type": "string"
+          },
+          "destino": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destino"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DevolucionItemIn"
+            },
+            "minItems": 1,
+            "title": "Items",
+            "type": "array"
+          },
+          "motivo": {
+            "title": "Motivo",
+            "type": "string"
+          },
+          "observacion": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observacion"
+          },
+          "origen": {
+            "pattern": "^(proveedor|cliente)$",
+            "title": "Origen",
+            "type": "string"
+          },
+          "referencia_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referencia Id"
+          }
+        },
+        "required": [
+          "almacen_id",
+          "origen",
+          "motivo",
+          "items"
+        ],
+        "title": "DevolucionCreate",
+        "type": "object"
+      },
+      "DevolucionDetalleOut": {
+        "properties": {
+          "almacen_id": {
+            "format": "uuid",
+            "title": "Almacen Id",
+            "type": "string"
+          },
+          "destino": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destino"
+          },
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DevolucionItemOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "motivo": {
+            "title": "Motivo",
+            "type": "string"
+          },
+          "observacion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observacion"
+          },
+          "origen": {
+            "title": "Origen",
+            "type": "string"
+          },
+          "referencia_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referencia Id"
+          },
+          "reporte_dirigido_a": {
+            "title": "Reporte Dirigido A",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "almacen_id",
+          "origen",
+          "referencia_id",
+          "motivo",
+          "destino",
+          "estado",
+          "reporte_dirigido_a",
+          "observacion",
+          "items"
+        ],
+        "title": "DevolucionDetalleOut",
+        "type": "object"
+      },
+      "DevolucionItemIn": {
+        "properties": {
+          "cantidad": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Cantidad"
+          },
+          "lote_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lote Id"
+          },
+          "sku_id": {
+            "format": "uuid",
+            "title": "Sku Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sku_id",
+          "cantidad"
+        ],
+        "title": "DevolucionItemIn",
+        "type": "object"
+      },
+      "DevolucionItemOut": {
+        "properties": {
+          "cantidad": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Cantidad",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "lote_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lote Id"
+          },
+          "sku_id": {
+            "format": "uuid",
+            "title": "Sku Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "sku_id",
+          "cantidad",
+          "lote_id"
+        ],
+        "title": "DevolucionItemOut",
+        "type": "object"
+      },
+      "DevolucionOut": {
+        "properties": {
+          "almacen_id": {
+            "format": "uuid",
+            "title": "Almacen Id",
+            "type": "string"
+          },
+          "destino": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destino"
+          },
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "motivo": {
+            "title": "Motivo",
+            "type": "string"
+          },
+          "observacion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observacion"
+          },
+          "origen": {
+            "title": "Origen",
+            "type": "string"
+          },
+          "referencia_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referencia Id"
+          },
+          "reporte_dirigido_a": {
+            "title": "Reporte Dirigido A",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "almacen_id",
+          "origen",
+          "referencia_id",
+          "motivo",
+          "destino",
+          "estado",
+          "reporte_dirigido_a",
+          "observacion"
+        ],
+        "title": "DevolucionOut",
+        "type": "object"
+      },
       "DivisaCreate": {
         "properties": {
           "codigo": {
@@ -4656,6 +5014,101 @@
         "title": "GrupoOpcionOut",
         "type": "object"
       },
+      "GuiaDevolucionCreate": {
+        "description": "Igual que la del traslado, más el lugar de destino: `proveedor` no\ntiene dirección modelada, así que se teclea como el chofer y la placa.",
+        "properties": {
+          "chofer_apellidos": {
+            "maxLength": 120,
+            "minLength": 2,
+            "title": "Chofer Apellidos",
+            "type": "string"
+          },
+          "chofer_licencia": {
+            "maxLength": 20,
+            "minLength": 6,
+            "title": "Chofer Licencia",
+            "type": "string"
+          },
+          "chofer_nombres": {
+            "maxLength": 120,
+            "minLength": 2,
+            "title": "Chofer Nombres",
+            "type": "string"
+          },
+          "chofer_num_doc": {
+            "maxLength": 15,
+            "minLength": 8,
+            "title": "Chofer Num Doc",
+            "type": "string"
+          },
+          "fecha_inicio_traslado": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Inicio Traslado"
+          },
+          "lugar_destino": {
+            "maxLength": 255,
+            "minLength": 3,
+            "title": "Lugar Destino",
+            "type": "string"
+          },
+          "modalidad_traslado": {
+            "default": "02",
+            "pattern": "^(01|02)$",
+            "title": "Modalidad Traslado",
+            "type": "string"
+          },
+          "observacion": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observacion"
+          },
+          "peso_bruto_kg": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Peso Bruto Kg"
+          },
+          "vehiculo_placa": {
+            "maxLength": 10,
+            "minLength": 6,
+            "title": "Vehiculo Placa",
+            "type": "string"
+          }
+        },
+        "required": [
+          "lugar_destino",
+          "chofer_nombres",
+          "chofer_apellidos",
+          "chofer_num_doc",
+          "chofer_licencia",
+          "vehiculo_placa",
+          "peso_bruto_kg"
+        ],
+        "title": "GuiaDevolucionCreate",
+        "type": "object"
+      },
       "GuiaRemisionCreate": {
         "description": "Lo que el sistema **no** puede saber del traslado: quién maneja, en\nqué vehículo, cuánto pesa la carga y qué día arranca el viaje.\n\nLos bienes no se piden: salen de `transferencia_item`, que es el\nregistro de lo que de verdad se descontó del origen (RN-TRP-002).",
         "properties": {
@@ -4783,6 +5236,18 @@
             ],
             "title": "Detalle Emision"
           },
+          "devolucion_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Devolucion Id"
+          },
           "empresa_id": {
             "format": "uuid",
             "title": "Empresa Id",
@@ -4854,9 +5319,16 @@
             "type": "string"
           },
           "transferencia_id": {
-            "format": "uuid",
-            "title": "Transferencia Id",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transferencia Id"
           },
           "vehiculo_placa": {
             "title": "Vehiculo Placa",
@@ -4867,6 +5339,7 @@
           "id",
           "empresa_id",
           "transferencia_id",
+          "devolucion_id",
           "serie",
           "correlativo",
           "fecha_inicio_traslado",
@@ -4959,6 +5432,18 @@
             ],
             "title": "Detalle Emision"
           },
+          "devolucion_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Devolucion Id"
+          },
           "empresa_id": {
             "format": "uuid",
             "title": "Empresa Id",
@@ -5023,9 +5508,16 @@
             "type": "string"
           },
           "transferencia_id": {
-            "format": "uuid",
-            "title": "Transferencia Id",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transferencia Id"
           },
           "vehiculo_placa": {
             "title": "Vehiculo Placa",
@@ -5036,6 +5528,7 @@
           "id",
           "empresa_id",
           "transferencia_id",
+          "devolucion_id",
           "serie",
           "correlativo",
           "fecha_inicio_traslado",
@@ -6155,6 +6648,147 @@
         "title": "MemorandumOut",
         "type": "object"
       },
+      "MermaCreate": {
+        "properties": {
+          "almacen_id": {
+            "format": "uuid",
+            "title": "Almacen Id",
+            "type": "string"
+          },
+          "cantidad": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Cantidad"
+          },
+          "lote_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lote Id"
+          },
+          "motivo": {
+            "pattern": "^(devolucion|rechazo_sucursal|auditoria)$",
+            "title": "Motivo",
+            "type": "string"
+          },
+          "sku_id": {
+            "format": "uuid",
+            "title": "Sku Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "almacen_id",
+          "sku_id",
+          "cantidad",
+          "motivo"
+        ],
+        "title": "MermaCreate",
+        "type": "object"
+      },
+      "MermaOut": {
+        "properties": {
+          "almacen_id": {
+            "format": "uuid",
+            "title": "Almacen Id",
+            "type": "string"
+          },
+          "cantidad": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Cantidad",
+            "type": "string"
+          },
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "lote_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lote Id"
+          },
+          "motivo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Motivo"
+          },
+          "referencia_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referencia Id"
+          },
+          "sku_id": {
+            "format": "uuid",
+            "title": "Sku Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "almacen_id",
+          "sku_id",
+          "lote_id",
+          "cantidad",
+          "motivo",
+          "estado",
+          "referencia_id"
+        ],
+        "title": "MermaOut",
+        "type": "object"
+      },
+      "MermaResolver": {
+        "properties": {
+          "destino": {
+            "pattern": "^(desecho|reintegro)$",
+            "title": "Destino",
+            "type": "string"
+          }
+        },
+        "required": [
+          "destino"
+        ],
+        "title": "MermaResolver",
+        "type": "object"
+      },
       "MesaCreate": {
         "properties": {
           "capacidad": {
@@ -6491,6 +7125,18 @@
               }
             ],
             "title": "Lote Id"
+          },
+          "motivo_lote": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Motivo Lote"
           },
           "referencia": {
             "anyOf": [
@@ -11244,6 +11890,18 @@
             ],
             "title": "Criterio Ajuste"
           },
+          "empresa_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Empresa Id"
+          },
           "flexible": {
             "default": false,
             "title": "Flexible",
@@ -11312,6 +11970,11 @@
             ],
             "title": "Criterio Ajuste"
           },
+          "empresa_id": {
+            "format": "uuid",
+            "title": "Empresa Id",
+            "type": "string"
+          },
           "flexible": {
             "title": "Flexible",
             "type": "boolean"
@@ -11356,6 +12019,7 @@
         },
         "required": [
           "id",
+          "empresa_id",
           "nombre",
           "rendimiento_cantidad",
           "rendimiento_unidad_medida_id",
@@ -11600,6 +12264,11 @@
             ],
             "title": "Criterio Ajuste"
           },
+          "empresa_id": {
+            "format": "uuid",
+            "title": "Empresa Id",
+            "type": "string"
+          },
           "flexible": {
             "title": "Flexible",
             "type": "boolean"
@@ -11637,6 +12306,7 @@
         },
         "required": [
           "id",
+          "empresa_id",
           "nombre",
           "rendimiento_cantidad",
           "rendimiento_unidad_medida_id",
@@ -12808,6 +13478,11 @@
             "title": "Lote Id",
             "type": "string"
           },
+          "por_vencer": {
+            "default": false,
+            "title": "Por Vencer",
+            "type": "boolean"
+          },
           "sku_id": {
             "format": "uuid",
             "title": "Sku Id",
@@ -13740,7 +14415,7 @@
         "type": "object"
       },
       "TransferenciaRecibir": {
-        "description": "Lo que no se menciona se recibe completo.",
+        "description": "Lo que no se menciona se recibe completo — salvo en una parcial.",
         "properties": {
           "items": {
             "default": [],
@@ -13749,6 +14424,11 @@
             },
             "title": "Items",
             "type": "array"
+          },
+          "parcial": {
+            "default": false,
+            "title": "Parcial",
+            "type": "boolean"
           }
         },
         "title": "TransferenciaRecibir",
@@ -18431,6 +19111,65 @@
         ]
       }
     },
+    "/api/v1/inventory/conteos/{conteo_id}/anular": {
+      "post": {
+        "description": "Descarta un conteo abierto por error, sin generar ajustes ni poner al\ndía el calendario de la categoría. Exige motivo.",
+        "operationId": "anular_conteo_api_v1_inventory_conteos__conteo_id__anular_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conteo_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Conteo Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConteoAnulacion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConteoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Anular Conteo",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
     "/api/v1/inventory/conteos/{conteo_id}/cantidades": {
       "post": {
         "operationId": "registrar_cantidades_api_v1_inventory_conteos__conteo_id__cantidades_post",
@@ -18533,6 +19272,282 @@
           }
         ],
         "summary": "Cerrar Conteo",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/devoluciones": {
+      "get": {
+        "operationId": "listar_devoluciones_api_v1_inventory_devoluciones_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "almacen_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Almacen Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "origen",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Origen"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DevolucionOut"
+                  },
+                  "title": "Response Listar Devoluciones Api V1 Inventory Devoluciones Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Devoluciones",
+        "tags": [
+          "inventory"
+        ]
+      },
+      "post": {
+        "description": "A proveedor la mercadería sale; de cliente entra y `destino` decide\nsi vuelve al estante o se aparta como merma.",
+        "operationId": "registrar_devolucion_api_v1_inventory_devoluciones_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DevolucionCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DevolucionDetalleOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Registrar Devolucion",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/devoluciones/{devolucion_id}": {
+      "get": {
+        "operationId": "ver_devolucion_api_v1_inventory_devoluciones__devolucion_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "devolucion_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Devolucion Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DevolucionDetalleOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Ver Devolucion",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/devoluciones/{devolucion_id}/anular": {
+      "post": {
+        "description": "Repone lo que movió con movimientos contrarios. No borra la fila: que\nalguien se equivocó también es parte del rastro.",
+        "operationId": "anular_devolucion_api_v1_inventory_devoluciones__devolucion_id__anular_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "devolucion_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Devolucion Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DevolucionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Anular Devolucion",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/devoluciones/{devolucion_id}/guia-remision": {
+      "post": {
+        "description": "La mercadería que se le devuelve al proveedor viaja por la vía\npública: SUNAT no distingue el motivo para exigir la guía.",
+        "operationId": "emitir_guia_de_devolucion_api_v1_inventory_devoluciones__devolucion_id__guia_remision_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "devolucion_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Devolucion Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GuiaDevolucionCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuiaRemisionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Emitir Guia De Devolucion",
         "tags": [
           "inventory"
         ]
@@ -18812,6 +19827,170 @@
           }
         ],
         "summary": "Bloquear Vencidos",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/mermas": {
+      "get": {
+        "description": "Las pendientes de resolver: es la bandeja de la auditoría.",
+        "operationId": "listar_mermas_api_v1_inventory_mermas_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "almacen_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Almacen Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MermaOut"
+                  },
+                  "title": "Response Listar Mermas Api V1 Inventory Mermas Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Mermas",
+        "tags": [
+          "inventory"
+        ]
+      },
+      "post": {
+        "description": "Aparta stock inservible. No lo saca del almacén: lo saca de la venta\n(RN-INV-012). El destino lo decide otro usuario al resolverla.",
+        "operationId": "registrar_merma_api_v1_inventory_mermas_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MermaCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MermaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Registrar Merma",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/mermas/{reserva_id}/resolver": {
+      "post": {
+        "description": "`desecho` saca el stock y publica `inventory.merma_registrada` (que\n`accounting` asienta); `reintegro` lo devuelve a disponible.",
+        "operationId": "resolver_merma_api_v1_inventory_mermas__reserva_id__resolver_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "reserva_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Reserva Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MermaResolver"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MermaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Resolver Merma",
         "tags": [
           "inventory"
         ]
@@ -20362,7 +21541,7 @@
     },
     "/api/v1/inventory/transferencias/{transferencia_id}/recibir": {
       "post": {
-        "description": "Ingresa al destino lo que llegó, lote por lote. Una diferencia\ncontra lo enviado no se corrige sola: queda auditable (RN-INV-002).",
+        "description": "Ingresa al destino lo que llegó, lote por lote. Una diferencia\ncontra lo enviado no se corrige sola: queda auditable (RN-INV-002).\n\nCon `parcial: true` entra solo lo declarado y el resto sigue en\ntránsito: el camión que trae la mitad hoy y la otra mitad mañana.",
         "operationId": "recibir_transferencia_api_v1_inventory_transferencias__transferencia_id__recibir_post",
         "parameters": [
           {

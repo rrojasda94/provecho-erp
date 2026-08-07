@@ -152,6 +152,7 @@ def crear_articulo(
     categoria_id: uuid.UUID | None = None,
     costo_promedio: Decimal = Decimal(0),
     controla_lote: bool = False,
+    dias_alerta_vencimiento: int | None = None,
 ) -> Articulo:
     _existe(session, UnidadMedida, unidad_medida_id, "unidad de medida")
     _existe(session, Categoria, categoria_id, "categoría")
@@ -168,6 +169,7 @@ def crear_articulo(
             categoria_id=categoria_id,
             costo_promedio=costo_promedio,
             controla_lote=controla_lote,
+            dias_alerta_vencimiento=dias_alerta_vencimiento,
         )
     )
 
@@ -180,6 +182,7 @@ def editar_articulo(session: Session, articulo_id: uuid.UUID, **campos) -> Artic
         articulo.nombre = a_titulo(campos["nombre"])
     for campo in (
         "categoria_id", "tipo", "costo_promedio", "archivado", "controla_lote",
+        "dias_alerta_vencimiento",
     ):
         if campo in campos and campos[campo] is not None:
             setattr(articulo, campo, campos[campo])
