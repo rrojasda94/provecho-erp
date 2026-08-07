@@ -16,6 +16,15 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Fixed
 
+- **`release.yml` no publicaba ninguna imagen** (2026-08-06). El job
+  `publicar` moría en `docker/build-push-action` con `Cache export is not
+  supported for the docker driver`: usa `cache-to: type=gha` pero nunca
+  llamaba a `docker/setup-buildx-action`, y el driver por defecto no sabe
+  exportar caché. Fallaba en **cada** push a `main` desde que existe el
+  workflow, así que GHCR nunca recibió una imagen y la entrega continua
+  del artefacto (ADR-008) era nominal. El job `imagen` de `ci.yml` ya
+  traía el paso; ahora `release.yml` también.
+
 - **Tres jobs de CI en rojo, destapados al integrar la rama a `main`**
   (2026-08-06). Los tres pasaban desapercibidos porque la rama nunca había
   corrido el pipeline completo contra `main`:

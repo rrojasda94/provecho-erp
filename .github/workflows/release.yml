@@ -38,6 +38,11 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=sha,format=long
 
+      # El driver `docker` por defecto no sabe exportar caché: sin buildx,
+      # el `cache-to: type=gha` de abajo aborta el build entero y no se
+      # publica ninguna imagen. El job `imagen` de `ci.yml` ya lo tenía.
+      - uses: docker/setup-buildx-action@v3
+
       - uses: docker/build-push-action@v6
         with:
           context: .
