@@ -29,7 +29,7 @@ jobs:
       # `latest` solo en main; los tags v* producen además la versión exacta,
       # que es la que debe fijarse en producción para poder volver atrás.
       - id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ env.REGISTRO }}/${{ github.repository }}
           tags: |
