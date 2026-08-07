@@ -30,6 +30,7 @@ renumera nada). Este archivo define el orden de lectura recomendado.
 | **foundation/** | [business-philosophy.md](foundation/business-philosophy.md) | Principios invariantes ("constitución") |
 | | [vision.md](foundation/vision.md) | Visión y modelo de negocio |
 | | [glossary.md](foundation/glossary.md) | Lenguaje ubicuo — terminología oficial |
+| | [F1.docx](foundation/F1.docx) | Brief original del ERP dictado por el usuario — material fuente del que salieron los tres documentos de arriba. Se conserva por trazabilidad; **no es normativo**: ante una diferencia mandan `glossary.md` y `vision.md` |
 | **domain/** | [domain-model.md](domain/domain-model.md) | Entidades y relaciones |
 | | [business-rules.md](domain/business-rules.md) | Validaciones, cálculos, políticas |
 | | [workflows.md](domain/workflows.md) | Flujos operativos |
