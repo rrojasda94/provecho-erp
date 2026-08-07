@@ -1660,6 +1660,36 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
 
 ### Frontend (F2 — arquitectura y UX, documento 2026-07-27, actualizado tras ADR-013)
 
+- **34 hallazgos del React Compiler quedaron en `warn`** (2026-08-07). Al
+  subir a Next 16 entra `eslint-plugin-react-hooks` 7, que trae las reglas
+  del React Compiler. Son dos patrones repartidos en 30 archivos:
+  - `react-hooks/error-boundaries` (18): Server Components que arman el JSX
+    de retorno **dentro** del `try`. React no renderiza el componente en ese
+    momento, así que el `catch` no atrapa nada de lo que falle al renderizar
+    — el error de red sí se atrapa, el de render no. El arreglo es mover el
+    `return` fuera del `try` y dejar en el `catch` solo el estado de error.
+  - `react-hooks/set-state-in-effect` (16): `setState` en el cuerpo de un
+    `useEffect`, que provoca un render en cascada.
+  No se arreglaron en el mismo cambio a propósito: es refactor de cómo el
+  frontend carga datos, no parte de subir de major, y mezclarlo dejaba un
+  diff imposible de revisar. Están en `warn` (visibles en cada corrida, no
+  bloquean) en `frontend/eslint.config.mjs`. Pasarlas a `error` al cerrarlas.
+- **`middleware.ts` quedó deprecado** (2026-08-07). Next 16 renombró la
+  convención a `proxy`; el archivo sigue funcionando y solo avisa. No se
+  migró junto con el major porque ahí vive el nonce de la CSP y el cambio
+  merece su propia verificación. `npx @next/codemod@canary
+  middleware-to-proxy .` cuando se haga. Se vuelve obligatorio en Next 17.
+- **ESLint 10 y TypeScript 7 quedan fuera hasta que su cadena publique**
+  (2026-08-07). No es estar atrasado: ninguna versión publicada de
+  `eslint-plugin-react` (7.37.5, peer `^9.7`), `eslint-plugin-jsx-a11y`
+  (6.10.2) ni `eslint-plugin-import` (2.32.0) acepta ESLint 10, y con él el
+  lint muere con un `TypeError` en `react/display-name` — ESLint 10 quitó
+  `context.getFilename()`. TypeScript 7 choca con `typescript-eslint`
+  (`>=4.8.4 <6.1.0`): npm resuelve el conflicto **sacando**
+  `@typescript-eslint/eslint-plugin` del árbol, con lo que el lint sigue en
+  verde habiendo dejado de revisar TypeScript. Los dos majors están en
+  `ignore` en `.github/dependabot.yml` — quitar cada entrada cuando su
+  bloqueante publique soporte.
 - ✅ 2026-08-04 **ADR-013 por fin instalado.** La decisión era de
   2026-07-27 y **nunca se había ejecutado**: `package.json` no tenía ni
   shadcn ni Base UI, así que cada pantalla venía resolviendo con `<dialog>`
