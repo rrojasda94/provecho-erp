@@ -52,6 +52,12 @@ class MovimientoInventario(Base, UuidPkMixin):
     lote_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("lote.id"), nullable=True
     )
+    # Por qué se tomó un lote distinto del que FEFO sugería. Obligatorio al
+    # hacer el override y NULL en todo lo demás: saltearse FEFO es una
+    # decisión de una persona (un lote dañado, una promoción, un pedido que
+    # exige otro vencimiento) y sin el motivo la traza dice qué salió pero no
+    # por qué salió eso.
+    motivo_lote: Mapped[str | None] = mapped_column(String(200), nullable=True)
     # Documento origen (id de compra, venta, ajuste, transferencia...).
     referencia: Mapped[str | None] = mapped_column(String(100), nullable=True)
     usuario_id: Mapped[uuid.UUID | None] = mapped_column(

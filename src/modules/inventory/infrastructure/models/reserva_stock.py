@@ -50,6 +50,13 @@ class ReservaStock(Base, UuidPkMixin, TimestampMixin):
     sku_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("sku.id"))
     cantidad: Mapped[Decimal] = mapped_column(Numeric(12, 4))
     tipo: Mapped[str] = mapped_column(TIPO_RESERVA)
+    # Solo la merma necesita apuntar a un lote: lo que se aparta por vencido
+    # o dañado **es** un lote concreto, y el desecho tiene que sacar ese y no
+    # el que FEFO elegiría. Una reserva de solicitud no lo usa — el lote lo
+    # decide el picking recién al despachar.
+    lote_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("lote.id"), nullable=True
+    )
     # Documento que la originó (solicitud_id / orden_produccion_id /
     # carrito_id). Sin FK: apunta a tablas distintas según `tipo`.
     referencia_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True)

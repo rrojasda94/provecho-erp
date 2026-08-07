@@ -12,6 +12,8 @@ from src.modules.inventory.infrastructure.models import (
     CategoriaUdm,
     Conteo,
     ConteoItem,
+    Devolucion,
+    DevolucionItem,
     GuiaRemision,
     GuiaRemisionItem,
     Lote,
@@ -64,11 +66,21 @@ class RecetaRepo:
     def get(self, receta_id: uuid.UUID) -> Receta | None:
         return self.s.get(Receta, receta_id)
 
-    def get_by_nombre(self, nombre: str) -> Receta | None:
-        return self.s.scalar(select(Receta).where(Receta.nombre == nombre))
+    def get_by_nombre(self, nombre: str, empresa_id: uuid.UUID) -> Receta | None:
+        """El nombre es único **por empresa**: que Majambo tenga una "Pizza
+        Margarita" no puede impedirle a otra empresa del grupo tener la
+        suya."""
+        return self.s.scalar(
+            select(Receta).where(
+                Receta.nombre == nombre, Receta.empresa_id == empresa_id
+            )
+        )
 
-    def list(self) -> list[Receta]:
-        return list(self.s.scalars(select(Receta).order_by(Receta.nombre)))
+    def list(self, empresa_id: uuid.UUID | None = None) -> list[Receta]:
+        q = select(Receta).order_by(Receta.nombre)
+        if empresa_id is not None:
+            q = q.where(Receta.empresa_id == empresa_id)
+        return list(self.s.scalars(q))
 
     def add(self, receta: Receta) -> Receta:
         self.s.add(receta)
@@ -530,6 +542,11 @@ class GuiaRemisionRepo:
             )
         )
 
+    def de_devolucion(self, devolucion_id: uuid.UUID) -> GuiaRemision | None:
+        return self.s.scalar(
+            select(GuiaRemision).where(GuiaRemision.devolucion_id == devolucion_id)
+        )
+
     def items(self, guia_id: uuid.UUID) -> list[GuiaRemisionItem]:
         return list(
             self.s.scalars(
@@ -656,6 +673,56 @@ class ConteoRepo:
         return conteo
 
     def add_item(self, item: ConteoItem) -> ConteoItem:
+        self.s.add(item)
+        self.s.flush()
+        return item
+
+
+class DevolucionRepo:
+    def __init__(self, session: Session) -> None:
+        self.s = session
+
+    def get(self, devolucion_id: uuid.UUID) -> Devolucion | None:
+        return self.s.get(Devolucion, devolucion_id)
+
+    def items(self, devolucion_id: uuid.UUID) -> list[DevolucionItem]:
+        return list(
+            self.s.scalars(
+                select(DevolucionItem).where(
+                    DevolucionItem.devolucion_id == devolucion_id
+                )
+            )
+        )
+
+    def guia(self, devolucion_id: uuid.UUID) -> GuiaRemision | None:
+        return self.s.scalar(
+            select(GuiaRemision).where(GuiaRemision.devolucion_id == devolucion_id)
+        )
+
+    def listar(
+        self,
+        almacen_id: uuid.UUID | None = None,
+        origen: str | None = None,
+        empresa_id: uuid.UUID | None = None,
+    ) -> list[Devolucion]:
+        q = select(Devolucion).order_by(Devolucion.created_at.desc())
+        if almacen_id is not None:
+            q = q.where(Devolucion.almacen_id == almacen_id)
+        if origen is not None:
+            q = q.where(Devolucion.origen == origen)
+        if empresa_id is not None:
+            # La devolución no lleva empresa: la hereda del almacén (ADR-004).
+            q = q.join(Almacen, Almacen.id == Devolucion.almacen_id).where(
+                Almacen.empresa_id == empresa_id
+            )
+        return list(self.s.scalars(q))
+
+    def add(self, devolucion: Devolucion) -> Devolucion:
+        self.s.add(devolucion)
+        self.s.flush()
+        return devolucion
+
+    def add_item(self, item: DevolucionItem) -> DevolucionItem:
         self.s.add(item)
         self.s.flush()
         return item

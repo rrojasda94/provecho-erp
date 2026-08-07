@@ -269,6 +269,33 @@ def test_intentos_agotados_frenan_el_reenvio(session) -> None:
         )
 
 
+def test_el_barrido_solo_recoge_lo_que_todavia_puede_emitirse(session) -> None:
+    """La red de seguridad del beat: recoge lo que nunca llegó a la cola,
+    pero no reintenta lo que SUNAT ya rechazó (datos malos: el reenvío da el
+    mismo rechazo) ni lo que agotó sus intentos (daría `Conflicto` cada
+    ciclo, para siempre)."""
+    _empresa, _venta, comprobante = _venta_pagada(session)
+
+    def _recogidos():
+        session.flush()
+        return comprobantes.pendientes_de_emitir(session)
+
+    assert _recogidos() == [comprobante.id]  # nació pendiente, nunca se encoló
+
+    comprobante.estado_emision = "error"  # fallo de transporte: reintentable
+    assert _recogidos() == [comprobante.id]
+
+    comprobante.intentos_emision = comprobantes.MAX_INTENTOS_EMISION
+    assert _recogidos() == []
+
+    comprobante.intentos_emision = 0
+    comprobante.estado_emision = "rechazado"  # veredicto de SUNAT, no error
+    assert _recogidos() == []
+
+    comprobante.estado_emision = "aceptado"
+    assert _recogidos() == []
+
+
 def _cliente_juridico(session, empresa) -> Cliente:
     cliente = Cliente(
         grupo_id=empresa.grupo_id,

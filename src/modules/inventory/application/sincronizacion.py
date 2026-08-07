@@ -83,6 +83,7 @@ RECURSOS = (
             "costo_promedio",
             "archivado",
             "controla_lote",
+            "dias_alerta_vencimiento",
             "deleted_at",
             "updated_at",
         ),
@@ -109,6 +110,7 @@ RECURSOS = (
         modelo=Receta,
         campos=(
             "id",
+            "empresa_id",
             "nombre",
             "rendimiento_cantidad",
             "rendimiento_unidad_medida_id",
@@ -117,13 +119,10 @@ RECURSOS = (
             "articulo_id",
             "updated_at",
         ),
-        # Sin filtro de tenant a propósito: `receta` no tiene columna de
-        # empresa en el modelo de datos, y acotarla exigiría cruzar
-        # `producto_comercial` (dominio de sales) desde inventory. Se
-        # replica completa — son recetas del propio grupo, en hardware del
-        # propio grupo. Si el grupo llega a operar empresas que no deban
-        # verse entre sí, `receta` necesita su columna de tenant primero.
-        filtro=lambda q, a: q,
+        # Desde 2026-08-06 `receta` tiene columna de empresa, así que el hub
+        # de una sucursal recibe solo las de su empresa. Antes se replicaba
+        # completa por falta de esa columna.
+        filtro=lambda q, a: q.where(Receta.empresa_id == a.empresa_id),
         motivo="Sin la receta, la venta offline no sabe qué insumos descontar.",
     ),
     RecursoSync(
@@ -138,7 +137,13 @@ RECURSOS = (
             "expresion",
             "updated_at",
         ),
-        filtro=lambda q, a: q,
+        # Cuelga de la receta: se acota por las de la empresa, no por sí
+        # mismo — `receta_item` no tiene ni necesita columna de tenant.
+        filtro=lambda q, a: q.where(
+            RecetaItem.receta_id.in_(
+                select(Receta.id).where(Receta.empresa_id == a.empresa_id)
+            )
+        ),
         motivo="El detalle de la receta: qué y cuánto se descuenta.",
     ),
     RecursoSync(

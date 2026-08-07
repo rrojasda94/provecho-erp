@@ -37,7 +37,7 @@ Registro de lo construido y lo pendiente. Actualizar en cada cambio relevante.
 | Módulo `marketing` | 🔶 slice core ✅ 2026-08-01 | Primer código del módulo: `campana` con brief obligatorio (RN-MKT-003 — sin objetivo, público, presupuesto y KPI no se aprueba, y sin aprobación no sale a canal; quien redacta el brief no lo aprueba: `marketing.campana_aprobar` vive en `supervisor`, no en el rol `marketing`), `pieza_contenido` que solo se publica si es pertinente a la marca y su uso de marca está validado (RN-MKT-001/002), `lead` medido por conversión real y no por volumen, `implementacion_material_sucursal` (verificación en sitio, RN-MKT-005) y `encuesta_satisfaccion` (RN-COM-007), que la migración saca de §6 y le da dueño. La **atribución lead→venta** es automática solo cuando no hay ambigüedad —un único lead abierto del cliente en campaña en curso—; con dos o más queda manual, porque adivinar qué campaña convirtió falsea justo la métrica que la campaña existe para medir. Marketing lee el estado de entrega por el contrato público `sales::venta_para_encuesta`, nunca importando `Venta`. Migración `e9c3b7412a68`, 17 endpoints, 13 tests. Diferido: ver Deuda técnica. |
 | Contabilidad: procesos y plantillas | ✅ 2026-07-24 | `docs/contabilidad/` (política + marco legal + perfil contador/tesorero), 3 SOPs nuevos (pago a proveedor PROC-CTB-003, conciliación bancaria PROC-CTB-004, arqueo sorpresa PROC-CTB-005), 4 plantillas — ver detalle abajo. Área = tesorería + finanzas + registro + auditoría interna en un solo responsable, supervisada por Gerencia (RN-CTB-004..009; control en dos niveles: Contabilidad audita a las operativas, Gerencia audita a Contabilidad). Quedan propuestos PROC-CTB-006..013 |
 | Mantenimiento, Sistemas/TI como áreas propias | ⬜ | Definidas como áreas del negocio (posible tercerización); documentación pendiente, desactivadas por ahora |
-| Supervisión, CRM, tesorería, activos, proyectos, BI/reportes | 🔶 revisada 2026-08-05 | **Cuatro de los siete ya no son futuros y dos no van a ser módulos.** **BI/reportes** ✅ 2026-08-04: `src/core/reportes/` (ADR-024) con catálogo cerrado de 10 reportes, tableros guardados por usuario y compartidos por rol, filtros y exportación a CSV. **Tesorería** ✅ 2026-07-25: vive **dentro de `accounting`** por decisión explícita del usuario —pago a proveedor, `movimiento_dinero`, caja y custodia— y separarla al salir de REMYPE es un pendiente de organización, no de código. **Supervisión** no es módulo: es el rol RBAC `supervisor` más la matriz de aprobaciones de Gerencia (`parametro_empresa` + `decision_gerencial`); un módulo "supervisión" sería un permiso disfrazado de dominio. **CRM** parcial: `sales.cliente` (con contrato público de lectura) y `marketing.lead`/`campana`/`encuesta_satisfaccion` con atribución lead→venta ya cubren captar y medir; falta historial de interacciones y segmentación, sin caso hasta que haya campañas reales corriendo. **Activos** ⬜ pero **ya tiene dueño**: se compran en `purchases` (OC tipo `activo` + `requerimiento_activo`, deuda declarada) y se deprecian en `accounting` (activo fijo/depreciación, PROC-CTB-007/010) — partirlos en un tercer módulo cortaría el ciclo de compra en dos. **Proyectos** ⬜ sin caso: el grupo no ejecuta obra ni proyectos facturables hoy. |
+| Supervisión, CRM, tesorería, activos, proyectos, BI/reportes | 🔶 revisada 2026-08-05 | **Cuatro de los siete ya no son futuros y dos no van a ser módulos.** **BI/reportes** ✅ 2026-08-04: `src/core/reportes/` (ADR-024) con catálogo cerrado de 13 reportes, tableros guardados por usuario y compartidos por rol, filtros y exportación a CSV. **Tesorería** ✅ 2026-07-25: vive **dentro de `accounting`** por decisión explícita del usuario —pago a proveedor, `movimiento_dinero`, caja y custodia— y separarla al salir de REMYPE es un pendiente de organización, no de código. **Supervisión** no es módulo: es el rol RBAC `supervisor` más la matriz de aprobaciones de Gerencia (`parametro_empresa` + `decision_gerencial`); un módulo "supervisión" sería un permiso disfrazado de dominio. **CRM** parcial: `sales.cliente` (con contrato público de lectura) y `marketing.lead`/`campana`/`encuesta_satisfaccion` con atribución lead→venta ya cubren captar y medir; falta historial de interacciones y segmentación, sin caso hasta que haya campañas reales corriendo. **Activos** ⬜ pero **ya tiene dueño**: se compran en `purchases` (OC tipo `activo` + `requerimiento_activo`, deuda declarada) y se deprecian en `accounting` (activo fijo/depreciación, PROC-CTB-007/010) — partirlos en un tercer módulo cortaría el ciclo de compra en dos. **Proyectos** ⬜ sin caso: el grupo no ejecuta obra ni proyectos facturables hoy. |
 | Integración de facturación electrónica (**Factiliza**) | 🔶 boleta/factura ✅ 2026-07-26 | **Reemplaza a Nubefact** (decisión del usuario). Adaptador en `src/shared/integrations/factiliza/`; cola Celery + servicio `worker`; migración `b3d7f21ac094`. Emite boleta/factura con IGV desglosado y exoneración de Amazonía (RN-IMP-001). Nota de crédito, PDF/XML/CDR ✅ 2026-08-04. **Guía de remisión ✅ 2026-08-05** (ADR-027) — construida en `inventory`, no en `sales`: declara un traslado entre almacenes, no una venta. |
 | Integración Izipay | ⬜ | Proveedor decidido (ADR-003) |
 | Integraciones Google / Meta | ⬜ | |
@@ -626,7 +626,8 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   usuarios, invalidada por evento) iría del lado del servidor con Redis, y
   eso sigue sin caso real.
 - ✅ 2026-08-04 **Alerta de KDS demorado y estado de caja como reporte**
-  (migración `d4e21b0c13d0`). 10 reportes en el catálogo.
+  (migración `d4e21b0c13d0`). 13 reportes en el catálogo (10 + los tres de
+  excepciones de inventario sumados el 2026-08-06).
   **`alerta_pedido`** (`sales`) con dos disparadores que convergen: el
   listener de `sales.venta_confirmada` agenda una revisión puntual a 15 min
   (`countdown` de Celery) y un **barrido de Celery beat cada 5 min** repasa
@@ -934,19 +935,36 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   "contrato público de inventory para `Articulo`/`Receta`" de la auditoría
   2026-08-01; `Articulo` sigue pendiente (`purchases` y `production` aún
   importan su ORM).
-- ⬜ **Recetas sin tenant**: `receta` no tiene columna de empresa (por eso el
-  hub la replica completa) y su CRUD no filtra por tenant. Con un solo
-  grupo operando no se nota; con dos empresas que no deban verse entre sí,
-  la columna va antes que cualquier otra cosa.
+- ✅ 2026-08-06 **Recetas con tenant** (`receta.empresa_id`, migración
+  `d5b81e0c37a4`). Era la última entidad del catálogo sin columna de
+  empresa: el CRUD listaba las de todas y el hub las replicaba completas.
+  Ahora el listado filtra, cada ruta por id pasa por `exigir_receta`, el
+  **nombre es único por empresa y no por grupo** —dos empresas del grupo
+  pueden vender la misma pizza con recetas distintas— y un ítem no puede
+  tomar un artículo ajeno: eso devuelve **404 y no 403**, porque para esa
+  empresa el artículo no existe. `receta_item` no lleva columna propia, se
+  acota por su receta.
+  La salida que ADR-009 anticipaba —cruzar `producto_comercial` (dominio de
+  `sales`) desde `inventory`— era la equivocada: el dueño del dato no era
+  `sales`, era que a `receta` le faltaba la columna.
+  El relleno de la migración atribuye a la única empresa operativa lo que no
+  puede derivar de `articulo.empresa_id`; correcto hoy y a revisar a mano el
+  día que la base tenga dos. 4 casos nuevos en
+  `tests/test_tenant_aislamiento.py` y 1 en `tests/test_sync_motor.py`.
 - ✅ 2026-07-25 **Listener `sales.venta_confirmada`** → consumo por receta
   (+merma % + empaque por modalidad) y `sales.venta_anulada` → reposición.
 - ✅ 2026-07-25 **Listener `purchases.compra_recibida`** → suma stock en el
   almacén destino y recalcula `articulo.costo_promedio` (promedio
   ponderado solo contra el stock del almacén que recibe — deuda si
   `compra_directa` multi-almacén se vuelve frecuente, ver módulo purchases).
-- ⬜ **Consumo omitido por configuración**: si falta almacén/SKU o el stock
-  teórico no alcanza, el listener loguea y omite (la venta nunca se
-  bloquea) — falta superficie de alerta/reporte de esas omisiones.
+- ✅ 2026-08-06 **Consumo omitido con superficie propia**: nueva entidad
+  `incidencia_inventario` (migración `c2f6a94b13de`) escrita por los **seis**
+  puntos de omisión del listener (venta, OC, producción × sin almacén / sin
+  SKU / stock insuficiente) y reporte `consumos_omitidos`. La venta sigue sin
+  bloquearse nunca; lo que cambia es que el stock que se fue de la realidad
+  deja de vivir solo en un `log.warning` que nadie lee. El motivo es lo
+  accionable: dice si hay que configurar la sucursal, dar de alta un SKU o
+  mirar por qué el stock ya venía mal.
 - ✅ 2026-08-01 **`reserva_stock` + `solicitud_insumos` + transferencias**
   (ADR-020, migración `d8b35f1ca207`): ciclo completo local pide →
   supervisor aprueba y reserva → central despacha → local recibe. La
@@ -959,20 +977,37 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   entidad. Permisos nuevos `solicitar_insumos`/`aprobar_solicitud`/
   `liberar_reserva`; estrena `transferir` y `recepcion`. 23 casos en
   `tests/test_transferencias.py`. Deuda que deja abierta:
-  - ⬜ **Disponible negativo sin alerta**: es un estado alcanzable a
-    propósito (promesa sin respaldo), pero hoy solo se ve consultando el
-    stock. Falta que alguien lo mire.
-  - ⬜ **Tipos de reserva sin productor**: `produccion` y `carrito` esperan
-    a sus módulos; `merma` a `stock_merma` (RN-INV-012).
+  - ✅ 2026-08-06 **Disponible negativo con reporte**
+    (`disponible_negativo` en el catálogo, ADR-024). Sigue siendo un estado
+    alcanzable a propósito; lo que faltaba era dónde verlo sin saber de
+    antemano qué SKU mirar.
+  - 🔶 **Tipos de reserva sin productor**: `merma` ya lo tiene
+    (2026-08-06, ADR-028). Quedan `produccion` y `carrito`, que esperan a
+    sus módulos, y eso **no es un pendiente de este módulo**: construirle un
+    productor a un tipo cuyo caso de uso todavía no existe es inventar el
+    caso de uso.
   - ⬜ **Transferencia sin vehículo ni tracking**: `vehiculo` no existe
     como entidad; quedó solo `transportista_id`. Faltan tracking GPS y
     tiempos de ruta/entrega que declara `data-model.md`.
-  - ⬜ **Recepción de una sola pasada**: no hay recepción parcial que deje
-    la transferencia en tránsito por el resto.
+  - ✅ 2026-08-06 **Recepción parcial**: `{"parcial": true}` ingresa lo
+    declarado y deja el resto **en tránsito**. Explícito y no deducido de
+    que falten ítems: deducirlo haría que un olvido cierre la transferencia
+    dando por perdido lo que todavía viene en camino. El evento
+    `transferencia_recibida` sale **una sola vez**, al cerrar — si no,
+    `accounting` asentaría el faltante de cada entrega por separado.
   - ⬜ **El ciclo no se replica al hub** (ADR-009): un local sin conexión
     no puede pedir ni recibir.
-  - ⬜ **`inventory.transferencia_recibida` sin consumidor** en
-    `accounting`.
+  - ✅ 2026-08-06 **`inventory.transferencia_recibida` con consumidor en
+    `accounting`**: asiento **solo si hubo faltante**. Un traslado entre
+    almacenes de la misma empresa no mueve resultado —la mercadería cambia
+    de sitio, no de dueño— y un asiento por cada uno llenaría el libro de
+    movimientos que se cancelan entre sí; lo que sí es hecho contable es lo
+    que salió y no llegó. El evento pasa a llevar `monto_diferencia`,
+    valorizado por **el emisor** al `costo_promedio`: el costo es dato de
+    `inventory` y hacerlo buscar por `accounting` sería importarle dominio
+    ajeno. De paso, `recibir` pasa a publicar con `session=` — se despachaba
+    en medio de la transacción, y con consumidor un rollback dejaba el
+    asiento de una recepción que nunca ocurrió (ADR-016).
   - ⬜ **Estado `en_picking` omitido** a propósito (no gobierna ninguna
     regla): si el negocio pide ver "el central ya empezó a armarlo",
     entra entonces.
@@ -984,22 +1019,31 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
     lote del que salió: `sales.venta_anulada` no transporta los
     movimientos originales. Con volumen bajo la diferencia es contable,
     no física; si importa, el evento tiene que llevar el detalle.
-  - ⬜ **Ventana de alerta de vencimiento por artículo**: hoy
-    `por_vencer_dias` se pasa en cada consulta; el modelo de datos la
-    quiere configurable por artículo.
-  - ⬜ **`inventory.lote_vencido_detectado` sin consumidor y sin
-    `responsable_id`**: `almacen` no tiene responsable modelado, así que
-    el memorándum a RRHH (RN-VNC) no puede dirigirse a nadie.
-  - ⬜ **Motivo del override de lote**: el README del módulo exige motivo
-    al no tomar el lote sugerido; hoy el override es solo el `lote_id`
-    explícito, sin motivo registrado.
-  - ⬜ **`recepcion_item` no guarda el lote recibido**: el dato viaja en
-    el evento hacia `inventory` pero el documento de recepción no lo
-    conserva; si el listener falla, se pierde.
-  - ⬜ **Salida sin lote que lo respalde**: si el total alcanza pero
-    ningún lote cubre (stock previo al control de lote, o resto
-    bloqueado), se registra un movimiento sin lote. Es deliberado
-    (ADR-015) pero nadie revisa esos movimientos — falta reporte.
+  - ✅ 2026-08-06 **Ventana de alerta por artículo**
+    (`articulo.dias_alerta_vencimiento`, RN-VNC-004 nueva). `GET /lotes`
+    marca `por_vencer` con la ventana del artículo; `por_vencer_dias` en la
+    consulta la sobrescribe. Un artículo sin ventana no avisa —`False`, no
+    `True`: sin política de vencimiento no hay nada que avisar.
+  - 🔶 **`inventory.lote_vencido_detectado`: consumidor ✅ 2026-08-06,
+    `responsable_id` sigue pendiente.** `users` lo pone en la bandeja del
+    almacén con nivel `urgente` —el stock ya se contaba como vendible—.
+    Lo que queda es el memorándum a RRHH (RN-VNC), bloqueado no por falta
+    de aviso sino porque `almacen` no tiene responsable modelado: se avisa
+    al rol, no a una persona.
+  - ✅ 2026-08-06 **Motivo del override de lote**
+    (`movimiento_inventario.motivo_lote`, RN-LOT-004 nueva). Se exige solo
+    cuando el lote elegido **no** es el que FEFO sugería: pedirlo también
+    cuando coinciden convierte el campo en un trámite que se llena con
+    cualquier cosa, y un motivo que nadie escribe en serio da apariencia de
+    control sin darlo.
+  - ✅ 2026-08-06 **`recepcion_item` conserva el lote recibido**
+    (`lote_codigo` + `fecha_vencimiento`). Lo que declaró el proveedor
+    (RN-VNC-002) queda en el documento además de viajar en el evento: si el
+    listener falla, ahora hay de dónde reprocesarlo.
+  - ✅ 2026-08-06 **Salida sin lote con reporte** (`salidas_sin_lote`).
+    Sigue siendo deliberada (RN-LOT-005, nueva): la operación ya ocurrió y
+    frenarla sería negar una venta por un dato de trazabilidad que ya está
+    mal. Ahora se lista.
 - ✅ 2026-08-01 **Conteo cíclico** (ADR-019, migración `c4e70a91d5b8`):
   `conteo` + `conteo_item`, con la periodicidad configurada **en la
   categoría** (`categoria.frecuencia_conteo`: diario/semanal/quincenal/
@@ -1012,24 +1056,51 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   mover stock, y `inventory.conteo_vencido` a almacén y gerencia por lo
   que no se contó en su fecha (RN-INV-021). 22 casos en
   `tests/test_conteos.py`. Deuda que deja abierta:
-  - ⬜ **Barrido de vencidos a demanda**: `POST /conteos/verificar-vencidos`
-    no lo dispara nadie — el proyecto no tiene Celery beat, solo el worker
-    de comprobantes. Mismo pendiente que `/lotes/bloquear-vencidos` y que
-    `ComprobanteRepo.pendientes` (ver módulo sales).
-  - ⬜ **`inventory.conteo_vencido` sin consumidor**: se publica, pero el
-    "reporte a almacén y gerencia" hoy es leer
-    `GET /conteos/programa`. Falta el adaptador de notificaciones — mismo
-    bloqueo que `inventory.lote_vencido_detectado`.
-  - ⬜ **Margen de error en `settings`**, no en `parametro_empresa`:
-    `INVENTORY_MARGEN_AJUSTE_PCT` (2%) es global al deploy y debería ser
-    por empresa (ADR-014). Mismo patrón provisional que
-    `purchases_umbral_aprobacion_oc`.
+  - ✅ 2026-08-06 **Los tres barridos entran a Celery beat**
+    (`inventory.reportar_conteos_vencidos` y
+    `inventory.bloquear_lotes_vencidos` diarios a las 06:00 y 06:15 hora
+    Perú, `sales.barrer_comprobantes_pendientes` cada 15 min). Beat ya
+    existía —la deuda decía que no, y estaba desactualizada: corre desde el
+    2026-08-04 con el barrido de pedidos demorados y el latido del worker—,
+    así que esto fueron tres entradas de `beat_schedule` y las tareas que
+    envuelven casos de uso ya escritos, no infraestructura nueva.
+    **Antes del turno y no a cualquier hora**: el vencimiento cambia al
+    pasar la medianoche del negocio, y bloquear el lote a media mañana deja
+    que la primera salida del día se lo lleve.
+    `tests/test_celery_beat.py` congela el cableado — un nombre mal escrito
+    en el schedule no falla en ningún lado (beat encola, el worker descarta,
+    el barrido no ocurre nunca), que es el modo de falla más silencioso del
+    ERP y justo en las tareas que existen para que algo no pase
+    inadvertido.
+  - ✅ 2026-08-06 **`inventory.conteo_vencido` con consumidor**: va a la
+    bandeja del almacén y de gerencia. Se repite cada día hasta que se
+    cuente, y eso es deliberado: es un recordatorio, no la noticia de un
+    hecho puntual.
+  - ✅ 2026-08-06 **Margen de error por empresa, con piso en dinero**
+    (`inventory/margen_error_ajuste`, ADR-014/ADR-019): cierra de una vez
+    esta deuda y la del piso absoluto. `settings.inventory_margen_ajuste_pct`
+    (2 %) deja de ser la regla y queda como default de arranque hasta que
+    Gerencia apruebe el suyo. El valor lleva **porcentaje y piso** y basta
+    cumplir uno: la diferencia se valoriza al `costo_promedio` del artículo,
+    porque el porcentaje solo castiga a las categorías baratas —2 % de S/ 30
+    en servilletas son 60 céntimos— y una alerta que siempre suena no la mira
+    nadie. Primer parámetro **compuesto** del ERP: se lee con `valor_vigente`,
+    no con el envoltorio escalar `umbral_vigente`.
+    En el camino se cerró un agujero de control: `POST /inventory/ajustes`
+    recibía **`dentro_margen` del cliente**, con default `True` — o sea que
+    el mismo request que provoca el descuadre podía declararlo tolerable y
+    silenciar `inventory.ajuste_fuera_margen`. Ahora lo calcula el servidor
+    contra el stock del almacén, igual que en el cierre de conteo; el campo
+    salió de `AjusteCreate` y del contrato. Lógica compartida en
+    `application/margenes.py`. 4 casos nuevos en `tests/test_conteos.py`.
   - ⬜ **El conteo no se replica al hub de sucursal** (ADR-009): contar sin
     conexión no está cubierto; el hub replica stock para vender, no para
     auditar el almacén.
-  - ⬜ **`conteo` no tiene anulación expuesta**: el estado `anulado` existe
-    en el modelo pero ningún endpoint lo usa, así que un conteo abierto
-    por error bloquea la categoría hasta cerrarlo vacío.
+  - ✅ 2026-08-06 **Anulación de conteo expuesta**
+    (`POST /conteos/{id}/anular`, motivo obligatorio). No genera ajustes ni
+    pone al día el calendario —el programa solo mira los `cerrado`—, que era
+    el daño real de la salida anterior: cerrar en cero afirma "se contó y no
+    había diferencias".
   - ⬜ **Frecuencias en días fijos** (mensual = 30 días desde el último
     conteo, no el mismo día del mes). Si el negocio pide anclar al día del
     mes, cambia `rules.proxima_fecha_conteo` y nada más.
@@ -1053,12 +1124,22 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   (`tests/test_guia_remision.py`). **Sin entidad `vehiculo`**: sin flota, una
   tabla de vehículos sería un formulario que hay que llenar antes de emitir
   la primera guía.
-- ⬜ **Devolución** (`devolucion`). Se cruza con la guía ya construida: una
-  devolución al proveedor viaja con su propia guía de remisión.
-- ⬜ **Guía de una venta con reparto**: hoy `guia_remision.transferencia_id`
-  es obligatorio porque el único emisor es un traslado entre almacenes.
-  Cuando exista reparto propio pasa a nullable — la migración es aditiva y
-  el camino contrario no lo sería, por eso arranca estricta.
+- ✅ 2026-08-06 **Devolución** (`devolucion` + `devolucion_item`, ADR-028,
+  migración `e7c390a5b41f`). Cubre los dos casos sin camino: **a proveedor**
+  la mercadería sale con el lote declarado —obligatorio si el artículo
+  controla lote: el reclamo tiene que decir qué se rechaza—, emite **su
+  propia guía de remisión** y publica `inventory.devolucion_a_proveedor`;
+  **de cliente** entra y `destino` decide si vuelve al estante o se aparta
+  como merma en el mismo acto. `reporte_dirigido_a` se deriva del origen
+  (RN-INV-020). Anular repone con movimientos contrarios y suelta las
+  mermas que había apartado; no borra la fila.
+  **Sucursal→central no se modeló acá**: es una `transferencia` (ADR-020) y
+  duplicarla sería un segundo camino para el mismo movimiento.
+- 🔶 **Guía de una venta con reparto**: `guia_remision.transferencia_id`
+  **ya es nullable** desde 2026-08-06 —la devolución a proveedor fue el
+  segundo emisor y forzó el cambio, tal como este punto anticipaba—, así
+  que el reparto propio solo tendría que sumar su `venta_id`. Sigue abierto
+  porque no hay reparto propio todavía.
 - ⬜ **Descarga de PDF/XML/CDR de la guía y anulación por comunicación de
   baja**: `FactilizaClient.descargar` apunta a `/invoice/...`; la guía
   necesita su ruta `/despatch/...`, y el payload de `/despatch/send` sigue
@@ -1072,17 +1153,29 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
 - ⬜ **La guía no se replica al hub**: la emite el almacén central, que
   está en la nube. Una sucursal offline que despache una transferencia
   lateral no puede emitir su guía hasta reconectar.
-- ⬜ **Piso absoluto en el margen de ajuste** (deuda nueva 2026-08-05, de
-  la propuesta de parámetros): `conteos.py` solo evalúa el porcentaje
-  (`INVENTORY_MARGEN_AJUSTE_PCT`). Un 2 % sobre un conteo de S/ 30 en
-  servilletas son 60 céntimos, así que cualquier diferencia real dispara
-  `inventory.ajuste_fuera_margen` y la alerta se vuelve ruido que nadie
-  mira — la peor falla posible en un control. El valor propuesto ya trae el
-  piso (`{"porcentaje": 2, "piso": "20.00"}`); falta que el código lo lea.
-- ⬜ **`stock_merma`** (subtipo reservado, no disponible) + reporte
-  consolidado a `accounting`.
-- ⬜ **Alerta `inventory.stock_bajo_minimo`** como evento (hoy solo flag
-  `bajo_minimo` derivado en la consulta de stock).
+- ✅ 2026-08-06 **Piso absoluto en el margen de ajuste** — resuelto junto
+  con el margen por empresa, ver arriba.
+- ✅ 2026-08-06 **Merma** — y **sin tabla `stock_merma`** (ADR-028): lo que
+  el modelo de datos anticipaba como "subtipo de stock reservado" es
+  exactamente lo que `reserva_stock` ya hacía, así que la merma es una
+  reserva de tipo `merma` y la migración fue una columna (`lote_id`: lo que
+  se aparta por vencido **es** un lote concreto y el desecho tiene que sacar
+  ese, no el que FEFO elegiría). Una tabla aparte habría partido el cálculo
+  del disponible en dos restas, y dos restas es una que alguien se olvida.
+  Ciclo de dos pasos: **registrar** aparta sin descontar —sigue en el
+  estante y el conteo lo va a encontrar— y **resolver** decide
+  (`desecho` saca el stock y publica `inventory.merma_registrada`, que
+  `accounting` asienta como pérdida; `reintegro` lo devuelve a disponible).
+  El asiento va al desechar y no al apartar: mientras la auditoría no
+  decide, asentar obligaría a reversar la mitad de los casos. Sin permisos
+  nuevos —reusa `solicitar_ajuste`/`aprobar_ajuste`, misma segregación—.
+  Esto cierra también el `merma` de "tipos de reserva sin productor".
+- ✅ 2026-08-06 **`inventory.stock_bajo_minimo` como evento**, publicado
+  **al cruzar** el mínimo y no cada vez que se está por debajo: con el stock
+  ya bajo, un evento por venta vuelve ruido la alerta —la misma falla que el
+  margen de ajuste sin piso—. Reponer y volver a caer avisa de nuevo, que es
+  cuando hay que comprar. Sin consumidor todavía (mismo bloqueo de
+  notificaciones que `conteo_vencido` y `lote_vencido_detectado`).
 
 ### Módulo sales (slices siguientes)
 - ✅ 2026-08-03 **Variantes y grupos de opciones** (ADR-023, migración
@@ -1261,10 +1354,14 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
 - ⬜ **Comprobante sin correlativo reservado**: si Factiliza rechaza, el
   correlativo queda consumido por una fila `rechazado`. SUNAT admite
   huecos, pero conviene revisar si el negocio quiere reusarlo.
-- ⬜ **Barrido de comprobantes pendientes**: `ComprobanteRepo.pendientes`
-  ya existe pero nadie la llama — falta el periódico (Celery beat) que
-  recoja los que quedaron sin encolar (ej. emitidos cuando aún no había
-  `FACTILIZA_TOKEN`).
+- ✅ 2026-08-06 **Barrido de comprobantes pendientes**
+  (`sales.barrer_comprobantes_pendientes`, cada 15 min). Encola **uno por
+  comprobante** en vez de emitir en línea: cada uno conserva su backoff y su
+  cuenta de intentos, y un barrido que emitiera en serie convertiría una
+  caída de Factiliza en un ciclo de 100 timeouts. `pendientes` gana filtro
+  por intentos: un `rechazado` es un veredicto de SUNAT sobre datos malos
+  —reenviarlo da el mismo rechazo— y uno que agotó sus 5 intentos daría
+  `Conflicto` cada ciclo, para siempre.
 - ⬜ **Webhook de pasarela** (Izipay): hoy el pago nace `confirmado`
   (PDV presencial); pago online requiere estado `pendiente` + confirmación.
 - ✅ 2026-08-04 **Enlace con caja** (ADR-025): `registrar_pago` rechaza el

@@ -19,8 +19,8 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from src.config.settings import settings
 from src.core.events import event_bus
+from src.modules.inventory.application import margenes
 from src.modules.inventory.application.errors import (
     Conflicto,
     NoEncontrado,
@@ -187,7 +187,6 @@ def cerrar_conteo(
     session: Session,
     conteo_id: uuid.UUID,
     cerrado_por: uuid.UUID,
-    margen_pct: Decimal | None = None,
 ) -> tuple[Conteo, list[Ajuste]]:
     """Cierra el conteo y solicita un ajuste por cada diferencia.
 
@@ -202,15 +201,17 @@ def cerrar_conteo(
     if conteo.estado != "abierto":
         raise ReglaNegocio(f"el conteo ya está {conteo.estado}")
 
-    margen = (
-        margen_pct if margen_pct is not None else settings.inventory_margen_ajuste_pct
-    )
+    almacen = session.get(Almacen, conteo.almacen_id)
+    margen, piso = margenes.margen_de_empresa(session, almacen.empresa_id)
+    items = repo.items(conteo_id)
+    costos = margenes.costos_por_sku(session, [i.sku_id for i in items])
     ajuste_repo = AjusteRepo(session)
     generados: list[Ajuste] = []
-    for item in repo.items(conteo_id):
+    for item in items:
         diferencia = item.diferencia
         if diferencia is None or diferencia == 0:
             continue
+        costo = costos.get(item.sku_id, Decimal(0))
         generados.append(
             ajuste_repo.add(
                 Ajuste(
@@ -221,7 +222,11 @@ def cerrar_conteo(
                     conteo_id=conteo.id,
                     solicitado_por=cerrado_por,
                     dentro_margen=rules.diferencia_dentro_margen(
-                        item.cantidad_sistema, diferencia, margen
+                        item.cantidad_sistema,
+                        diferencia,
+                        margen,
+                        valor_diferencia=diferencia * costo,
+                        piso=piso,
                     ),
                     estado="pendiente",
                 )
@@ -232,6 +237,36 @@ def cerrar_conteo(
     conteo.cerrado_por = cerrado_por
     conteo.cerrado_at = datetime.datetime.now(datetime.UTC)
     return conteo, generados
+
+
+def anular_conteo(
+    session: Session,
+    conteo_id: uuid.UUID,
+    anulado_por: uuid.UUID,
+    motivo: str,
+) -> Conteo:
+    """Cierra sin ajustes un conteo abierto por error.
+
+    Existe porque sin esto la única salida era cerrarlo vacío, y un conteo
+    cerrado en cero dice "se contó y no había diferencias" —lo contrario de
+    lo que pasó— además de poner al día el calendario de una categoría que
+    nadie contó. El motivo es obligatorio: anular es la forma de hacer
+    desaparecer un conteo incómodo, así que tiene que quedar dicho por qué.
+    """
+    repo = ConteoRepo(session)
+    conteo = repo.get(conteo_id)
+    if conteo is None:
+        raise NoEncontrado("conteo no encontrado")
+    if conteo.estado != "abierto":
+        raise ReglaNegocio(f"el conteo ya está {conteo.estado}")
+    if not motivo.strip():
+        raise ReglaNegocio("anular un conteo exige motivo")
+
+    conteo.estado = "anulado"
+    conteo.cerrado_por = anulado_por
+    conteo.cerrado_at = datetime.datetime.now(datetime.UTC)
+    conteo.observacion = motivo.strip()
+    return conteo
 
 
 def programa(
@@ -291,8 +326,10 @@ def reportar_vencidos(
     """Reporta a almacén y gerencia los conteos que no se hicieron en su
     fecha (RN-INV-021). Publica `inventory.conteo_vencido` por cada uno.
 
-    ponytail: barrido a demanda, sin periódico que lo dispare — mismo
-    patrón que `/lotes/bloquear-vencidos`. Ver ROADMAP → Deuda técnica.
+    Lo dispara `inventory.reportar_conteos_vencidos` (Celery beat, diario
+    06:15 hora Perú) y también el endpoint, a demanda. Diario y no más
+    seguido porque el dato cambia una vez por día: el calendario se deriva
+    de fechas, no de horas.
     """
     vencidos = [
         fila

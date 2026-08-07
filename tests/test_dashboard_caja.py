@@ -100,6 +100,7 @@ def env(monkeypatch):
         s.flush()
         sku = Sku(articulo_id=harina.id, codigo="SKU-HARINA")
         receta = Receta(
+            empresa_id=empresa.id,
             nombre="Pizza base", rendimiento_cantidad=Decimal(1),
             rendimiento_unidad_medida_id=udm.id,
         )

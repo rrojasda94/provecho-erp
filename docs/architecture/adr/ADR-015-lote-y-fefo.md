@@ -61,11 +61,28 @@ de movimientos, y `ajuste.movimiento_id` apunta al primero (todos comparten
 **5. El vencido se bloquea cuando el picking lo toca, más un barrido a demanda.**
 `disponibles_fefo` bloquea el lote vencido que encuentra todavía disponible
 y publica `inventory.lote_vencido_detectado`; `POST /inventory/lotes/bloquear-vencidos`
-hace lo mismo sin esperar a que haya una salida. Alternativa descartada:
-una tarea Celery beat diaria — infraestructura periódica nueva para un caso
-que el momento del picking ya cubre, y que además no alertaría a nadie
-mientras el consumidor del evento (notificación a `users`, memorándum vía
-`rrhh`) no exista.
+hace lo mismo sin esperar a que haya una salida.
+
+**Revertido el 2026-08-06: el barrido diario sí se implementó**
+(`inventory.bloquear_lotes_vencidos`, Celery beat, 06:00 hora Perú). Las
+tres razones para descartarlo envejecieron mal:
+
+- *"Infraestructura periódica nueva"* — beat ya corre desde el 2026-08-04
+  (pedidos demorados, latido del worker). Sumarlo fue una entrada de
+  `beat_schedule`.
+- *"El picking ya lo cubre"* — solo **cuando alguien toca el lote**. En un
+  almacén de baja rotación el vencido se sigue contando como disponible
+  hasta que a alguien se le ocurre pedirlo, que es justo el caso donde el
+  control de lote tenía que servir.
+- *"No alertaría a nadie sin consumidor del evento"* — dejó de ser cierto el
+  mismo día: `users` consume `inventory.lote_vencido_detectado` y lo pone en
+  la bandeja del almacén, con nivel `urgente`. Y aparte: bloquear el lote
+  **es** el efecto útil exista o no la notificación — un lote bloqueado no
+  sale en la próxima venta.
+
+Corre antes del turno a propósito: el vencimiento cambia al pasar la
+medianoche del negocio, y bloquear a media mañana deja que la primera
+salida del día se lo lleve.
 
 **6. Nada entra sin lote si el artículo lo controla.**
 Un ingreso sin `lote_id` de un artículo con control crea (o reusa) el lote

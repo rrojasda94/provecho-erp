@@ -36,7 +36,20 @@ Versionado: [SemVer](https://semver.org/lang/es/).
     tres `.test.ts` antes de ejecutar un solo caso. El job estaba fijado en
     Node 20 y el stripping de tipos de `node --test` recién viene de fábrica
     desde 22.18; pasa a Node 24, que es el de la máquina de desarrollo.
-
+- **`inventory.transferencia_recibida` se despachaba antes del commit**
+  (2026-08-06). Era el único `publish` de escritura del módulo sin
+  `session=`, así que el handler corría en medio de la transacción y un
+  rollback posterior dejaba al consumidor actuando sobre una recepción que
+  nunca ocurrió (ADR-016). Inofensivo mientras el evento no tenía
+  consumidor; dejó de serlo el mismo día que ganó dos.
+- **El cliente declaraba si su propio ajuste de inventario estaba dentro de
+  margen** (2026-08-06). `POST /inventory/ajustes` recibía `dentro_margen` en
+  el body, con default `True`, y ese campo es el único que decide si al
+  aprobar se publica `inventory.ajuste_fuera_margen`: el mismo request que
+  provoca el descuadre podía declararlo tolerable y apagar la alerta. Ahora
+  lo calcula el servidor contra el stock del almacén y el margen aprobado
+  para la empresa, igual que el cierre de conteo. El campo salió de
+  `AjusteCreate` y del contrato OpenAPI; ningún cliente lo enviaba.
 - **Cinco desacuerdos de contrato en el PDV**, destapados al tipar los
   cuerpos de request (2026-08-06). Ninguno había fallado todavía, y los
   cinco son de la misma familia que el 422 de la caja:
@@ -91,6 +104,173 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Added
 
+- **Merma y devolución** (2026-08-06, ADR-028, migración `e7c390a5b41f`).
+  Los dos slices grandes que le faltaban a `inventory`:
+  - **La merma no es una tabla nueva.** El modelo de datos anticipaba
+    `stock_merma` como "subtipo de stock reservado", y eso es exactamente
+    lo que `reserva_stock` ya hacía: presente en el almacén, no disponible.
+    Una tabla aparte habría duplicado almacén/SKU/cantidad/estado y —peor—
+    partido el cálculo del disponible en **dos restas**, que es una que
+    alguien se olvida. Lo único que faltaba era `reserva_stock.lote_id`: lo
+    que se aparta por vencido o dañado **es** un lote concreto, y el desecho
+    tiene que sacar ese y no el que FEFO elegiría (que puede ser el bueno).
+  - **El ciclo de la merma tiene dos pasos y eso es la regla.** Registrar
+    aparta **sin descontar stock** —el producto sigue en el estante hasta
+    que alguien lo tire, y descontarlo antes haría que el conteo cíclico lo
+    declarara sobrante al día siguiente—; resolver decide: `desecho` saca el
+    stock y publica `inventory.merma_registrada` (que `accounting` asienta
+    como pérdida), `reintegro` lo devuelve a disponible. El asiento va al
+    desechar y no al apartar: mientras la auditoría no decide, asentar
+    obligaría a reversar la mitad de los casos. Lo resuelve otro usuario,
+    con los permisos del ajuste — la segregación es la misma y un permiso
+    nuevo para la misma idea sería una segunda matriz que mantener.
+  - **`devolucion` + `devolucion_item`** cubren los dos casos que no tenían
+    camino. **A proveedor**: sale con el lote declarado (obligatorio si el
+    artículo controla lote — el reclamo tiene que decir qué se rechaza),
+    emite **su propia guía de remisión** y avisa a `purchases`. **De
+    cliente**: entra, y `destino` decide si vuelve al estante o se aparta
+    como merma en el mismo acto — sin ese segundo paso la próxima venta se
+    la lleva. Sucursal→central **no se modeló**: es una `transferencia`
+    (ADR-020) y duplicarla sería un segundo camino para el mismo movimiento.
+  - **La guía de remisión gana un segundo emisor**:
+    `guia_remision.transferencia_id` pasa a nullable y aparece
+    `devolucion_id`. Motivo de traslado `13` y no `04`, porque `04` es
+    "entre establecimientos de la misma empresa" y el destino es otro
+    contribuyente. `lugar_destino` se teclea: `proveedor` no tiene dirección
+    modelada, y eso cae en la misma categoría que el chofer y la placa.
+- **Recepción parcial de transferencia** (2026-08-06): `{"parcial": true}`
+  ingresa lo declarado y deja el resto **en tránsito** — el camión que trae
+  la mitad hoy. Explícito y no deducido de que falten ítems: deducirlo haría
+  que un olvido cierre la transferencia dando por perdido lo que todavía
+  viene en camino. El evento `inventory.transferencia_recibida` sale **una
+  sola vez**, al cerrar; si no, `accounting` asentaría el faltante de cada
+  entrega por separado.
+- **`recepcion_item` conserva el lote que declaró el proveedor**
+  (`lote_codigo` + `fecha_vencimiento`, RN-VNC-002). El dato viajaba solo en
+  el evento hacia `inventory`: si el listener fallaba, no quedaba dónde
+  leerlo para reprocesar.
+- **`receta` gana su columna de empresa** (2026-08-06, migración
+  `d5b81e0c37a4`). Era la última entidad del catálogo sin tenant: el CRUD
+  listaba las recetas de todas las empresas del grupo y el hub de cada
+  sucursal las replicaba completas. Ahora el listado filtra, cada ruta por
+  id pasa por `exigir_receta`, el **nombre es único por empresa y no por
+  grupo** —dos empresas pueden vender la misma pizza con recetas
+  distintas— y un ítem no puede tomar un artículo ajeno: eso responde
+  **404, no 403**, porque para esa empresa el artículo no existe.
+  `receta_item` no lleva columna propia; se acota por su receta.
+  La salida que ADR-009 anticipaba —cruzar `producto_comercial`, dominio de
+  `sales`, desde `inventory`— era la equivocada: el dueño del dato no era
+  `sales`, era que a `receta` le faltaba la columna. El relleno de la
+  migración atribuye a la única empresa operativa lo que no puede derivar de
+  `articulo.empresa_id`; correcto hoy y a revisar a mano el día que la base
+  tenga dos.
+- **Los avisos de inventario llegan a alguien** (2026-08-06). Tres eventos
+  se publicaban desde sus slices y nadie los escuchaba, así que enterarse
+  seguía dependiendo de que alguien abriera la pantalla correcta:
+  `inventory.stock_bajo_minimo` (nivel `aviso` — todavía hay stock, falta
+  reponer), `inventory.lote_vencido_detectado` (`urgente`: ese stock ya se
+  contaba como vendible y alguien pudo haberlo servido) e
+  `inventory.conteo_vencido` (recordatorio que se repite cada día hasta que
+  se cuente). Los tres van a la bandeja de `users`, que es el dueño del
+  destinatario.
+  Requirió `notificaciones.destinatarios_de_almacen`, porque
+  `destinatarios_de_sucursal` no alcanzaba: **el central y el de producción
+  no cuelgan de ninguna sucursal** y ahí no hay encargado de turno que
+  valga. La regla es por rol (`almacenero`/`supervisor`/`admin`): en un
+  almacén de sucursal, los de esa sucursal más quien está de turno; en uno
+  de empresa, los de cualquier sucursal de la empresa — más gente de la
+  necesaria, y a propósito, porque un aviso sin destinatario es un aviso
+  perdido.
+- **`inventory.transferencia_recibida` con consumidor en `accounting`**
+  (2026-08-06): asiento **solo si el traslado llegó con faltante**. Mover
+  mercadería entre almacenes de la misma empresa no mueve resultado —cambia
+  de sitio, no de dueño— y un asiento por cada traslado llenaría el libro de
+  movimientos que se cancelan entre sí; lo que sí es hecho contable es lo
+  que salió y no llegó. El evento suma `monto_diferencia`, valorizado por
+  **el emisor** al `costo_promedio`: el costo es dato de `inventory`, y
+  hacerlo buscar por `accounting` sería importarle dominio ajeno.
+- **Los tres barridos que nadie disparaba entran a Celery beat**
+  (2026-08-06). `POST /conteos/verificar-vencidos` y
+  `POST /lotes/bloquear-vencidos` existían desde sus slices y solo corrían
+  si alguien los llamaba a mano — o sea, si alguien ya sospechaba; y
+  `ComprobanteRepo.pendientes` no la llamaba nadie. Ahora:
+  - `inventory.bloquear_lotes_vencidos` (06:00 hora Perú) y
+    `inventory.reportar_conteos_vencidos` (06:15). **Antes del turno y no a
+    cualquier hora**: el vencimiento cambia al pasar la medianoche del
+    negocio, y bloquear el lote a media mañana deja que la primera salida
+    del día se lo lleve. El picking ya bloquea el vencido que se topa, pero
+    solo cuando alguien lo toca: en un almacén de baja rotación el vencido
+    se cuenta como disponible hasta que a alguien se le ocurre pedirlo.
+  - `sales.barrer_comprobantes_pendientes` (cada 15 min), que **encola uno
+    por comprobante** en vez de emitir en línea — así cada uno conserva su
+    backoff, y una caída de Factiliza no se convierte en un ciclo de 100
+    timeouts. Filtra por intentos: un `rechazado` es un veredicto sobre
+    datos malos y reenviarlo da el mismo rechazo; uno que agotó sus 5
+    intentos daría `Conflicto` cada ciclo, para siempre.
+  `tests/test_celery_beat.py` congela el cableado: un nombre mal escrito en
+  `beat_schedule` no falla en ningún lado —beat encola, el worker descarta,
+  el barrido no ocurre nunca—, el modo de falla más silencioso del ERP y
+  justo en las tareas que existen para que algo no pase inadvertido. El test
+  carga `include` como lo hace el worker, así que cubre también el módulo de
+  tareas que nadie agregó a la lista.
+- **Las excepciones de inventario dejan de ser invisibles** (2026-08-06,
+  migración `c2f6a94b13de`). El módulo toma tres decisiones deliberadas que
+  dejan el stock distinto de lo ideal **sin frenar la operación** —y las
+  tres son correctas—, pero ninguna tenía dónde verse: un `log.warning` no
+  es una superficie, nadie lee los logs buscando por qué el queso no cuadra.
+  Ahora cada una tiene su reporte en el catálogo (ADR-024, que pasa de 10 a
+  13):
+  - `consumos_omitidos` ← **`incidencia_inventario`**, entidad nueva escrita
+    por los **seis** puntos de omisión del listener (venta, OC y producción,
+    por sucursal sin almacén / artículo sin SKU / stock insuficiente). El
+    motivo es lo accionable: dice si hay que configurar la sucursal, dar de
+    alta un SKU o mirar por qué el stock ya venía mal. Sin `atendida_at` a
+    propósito: el reporte va por rango y una configuración rota reaparece
+    mañana, que es la señal correcta.
+  - `disponible_negativo` — SKUs con más reservado que físico. Reservar
+    exige disponible, consumir no se bloquea nunca (RN-INV-009), así que el
+    estado es alcanzable a propósito; lo que faltaba era verlo sin saber de
+    antemano qué SKU mirar.
+  - `salidas_sin_lote` — salidas de artículos con control de lote que ningún
+    lote respalda (**RN-LOT-005**, nueva).
+- **`inventory.stock_bajo_minimo` se publica de verdad** (2026-08-06), y
+  **al cruzar** el mínimo, no cada vez que se está por debajo: con el stock
+  ya bajo, un evento por venta convierte la alerta en ruido y deja de
+  mirarse justo cuando importa —la misma falla que el margen sin piso—.
+  Reponer y volver a caer avisa de nuevo. Sin consumidor todavía.
+- **Motivo obligatorio al saltearse FEFO** (`movimiento_inventario.motivo_lote`,
+  **RN-LOT-004** nueva). Se exige solo cuando el lote elegido no es el que
+  FEFO sugería: pedirlo también cuando coinciden convierte el campo en un
+  trámite que se llena con cualquier cosa, y un motivo que nadie escribe en
+  serio da apariencia de control sin darlo.
+- **Ventana de alerta de vencimiento por artículo**
+  (`articulo.dias_alerta_vencimiento`, **RN-VNC-004** nueva): la leche avisa
+  con días y una conserva con meses, y un número único dejaba a uno de los
+  dos avisando cuando ya no sirve. `GET /lotes` marca `por_vencer` con la
+  ventana del artículo; el `por_vencer_dias` de la consulta la sobrescribe.
+- **Anulación de conteo** (`POST /inventory/conteos/{id}/anular`, motivo
+  obligatorio). La única salida anterior era cerrarlo vacío, y un conteo
+  cerrado en cero afirma "se contó y no había diferencias" —lo contrario de
+  lo que pasó— además de correr el calendario de una categoría que nadie
+  contó. Anular no genera ajustes ni mueve el programa.
+- **Margen de error del ajuste por empresa, con piso en dinero**
+  (2026-08-06, `inventory/margen_error_ajuste`, ADR-014/ADR-019). El margen
+  deja de ser una constante del deploy: se lee del parámetro que Gerencia
+  aprueba, y `INVENTORY_MARGEN_AJUSTE_PCT` (2 %) queda como default de
+  arranque mientras no haya valor vigente. El valor lleva **dos tolerancias
+  que conviven** y basta cumplir una: el **porcentaje** sobre la cantidad
+  esperada y un **piso en dinero** sobre la diferencia valorizada al
+  `costo_promedio` del artículo. El piso es lo que faltaba: 2 % de un conteo
+  de S/ 30 en servilletas son 60 céntimos, así que cualquier diferencia real
+  escalaba a Gerencia y la alerta se volvía ruido que nadie mira — la peor
+  falla posible en un control. Con sistema en 0 sigue sin haber base para el
+  porcentaje, pero el piso aplica igual.
+  Primer parámetro **compuesto** del ERP: se lee con `valor_vigente`, no con
+  el envoltorio escalar `umbral_vigente` que usan `purchases/oc_umbral` y
+  `accounting/pago_umbral`. Lógica compartida por los dos productores de
+  ajustes en `src/modules/inventory/application/margenes.py`.
+  4 casos nuevos en `tests/test_conteos.py` (26 en total), incluido el que
+  comprueba que una propuesta **sin aprobar** no rige.
 - **Contrato extendido al resto del frontend** (2026-08-06): de 58 a **162
   casos**, en ~350 ms. Dos profundidades, y la diferencia importa:
   - **Los cuatro módulos importables** (`pdv` 19 operaciones, `catalogo` 20,

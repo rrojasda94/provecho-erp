@@ -11,9 +11,14 @@ from src.modules.inventory.infrastructure.models.categoria import Categoria
 from src.modules.inventory.infrastructure.models.categoria_udm import CategoriaUdm
 from src.modules.inventory.infrastructure.models.conteo import Conteo
 from src.modules.inventory.infrastructure.models.conteo_item import ConteoItem
+from src.modules.inventory.infrastructure.models.devolucion import Devolucion
+from src.modules.inventory.infrastructure.models.devolucion_item import DevolucionItem
 from src.modules.inventory.infrastructure.models.guia_remision import GuiaRemision
 from src.modules.inventory.infrastructure.models.guia_remision_item import (
     GuiaRemisionItem,
+)
+from src.modules.inventory.infrastructure.models.incidencia_inventario import (
+    IncidenciaInventario,
 )
 from src.modules.inventory.infrastructure.models.lote import Lote
 from src.modules.inventory.infrastructure.models.movimiento_inventario import (
@@ -42,8 +47,11 @@ __all__ = [
     "CategoriaUdm",
     "Conteo",
     "ConteoItem",
+    "Devolucion",
+    "DevolucionItem",
     "GuiaRemision",
     "GuiaRemisionItem",
+    "IncidenciaInventario",
     "Lote",
     "MovimientoInventario",
     "Receta",

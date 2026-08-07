@@ -19,6 +19,7 @@ from src.core.app import create_app
 from src.core.database import Base
 from src.core.events import event_bus
 from src.modules.inventory.infrastructure.models import (
+    Ajuste,
     Articulo,
     Categoria,
     CategoriaUdm,
@@ -39,6 +40,7 @@ from src.modules.users.infrastructure.models import (
 )
 from src.modules.users.infrastructure.security import hash_pin
 from src.shared import fechas
+from src.shared.models import ParametroEmpresa
 
 HOY = fechas.hoy()
 
@@ -441,6 +443,83 @@ def test_sku_fuera_del_snapshot_entra_como_sobrante(env):
     assert ajustes[0]["dentro_margen"] is False
 
 
+def test_anular_conteo_no_genera_ajustes_ni_pone_al_dia_el_programa(env):
+    """Antes la única salida a un conteo abierto por error era cerrarlo
+    vacío, y eso dice "se contó y no había diferencias" —lo contrario de lo
+    que pasó— además de correr el calendario de la categoría."""
+    client, ids, TestSession = env
+    h = _token(client)
+    _ingresar(client, h, ids, ids["sku_queso"], 10)
+
+    def _perecibles():
+        programa = client.get(
+            f"/api/v1/inventory/conteos/programa?almacen_id={ids['almacen_id']}",
+            headers=h,
+        ).json()
+        return next(p for p in programa if p["categoria_id"] == ids["perecibles_id"])
+
+    antes = _perecibles()
+    conteo = _abrir(client, h, ids, ids["perecibles_id"]).json()
+
+    r = client.post(f"/api/v1/inventory/conteos/{conteo['id']}/anular", headers=h, json={
+        "motivo": "se abrió sobre el almacén equivocado",
+    })
+    assert r.status_code == 200, r.text
+    assert r.json()["estado"] == "anulado"
+    assert r.json()["observacion"] == "se abrió sobre el almacén equivocado"
+
+    # Ni ajustes ni calendario movido: es como si el conteo no hubiera pasado.
+    with TestSession() as s:
+        assert list(s.scalars(select(Ajuste))) == []
+    assert _perecibles() == antes
+
+    # Y la categoría queda libre para volver a contarse.
+    assert _abrir(client, h, ids, ids["perecibles_id"]).status_code == 201
+
+
+def test_el_barrido_diario_reporta_los_conteos_vencidos(env, monkeypatch):
+    """Sin periódico, `inventory.conteo_vencido` solo salía si alguien
+    llamaba al endpoint a mano — o sea, si alguien ya sospechaba."""
+    from src.modules.inventory.application import tasks
+
+    client, ids, TestSession = env
+    h = _token(client)
+    conteo = _abrir(client, h, ids, ids["perecibles_id"]).json()
+    client.post(f"/api/v1/inventory/conteos/{conteo['id']}/cerrar", headers=h)
+    _atrasar_conteo(TestSession, conteo["id"], 5)  # frecuencia diaria
+
+    avisos = []
+    event_bus.subscribe("inventory.conteo_vencido", avisos.append)
+    sesion = TestSession()
+    monkeypatch.setattr(tasks, "SessionLocal", lambda: sesion)
+    monkeypatch.setattr(sesion, "close", lambda: None)
+
+    assert tasks.reportar_conteos_vencidos() == 1
+    assert avisos[0]["categoria"] == "Perecibles"
+    assert avisos[0]["dirigido_a"] == ["almacen", "gerencia"]
+
+
+def test_anular_exige_motivo(env):
+    client, ids, _ = env
+    h = _token(client)
+    conteo = _abrir(client, h, ids, ids["perecibles_id"]).json()
+    r = client.post(
+        f"/api/v1/inventory/conteos/{conteo['id']}/anular", headers=h, json={"motivo": ""}
+    )
+    assert r.status_code == 422
+
+
+def test_no_se_anula_un_conteo_cerrado(env):
+    client, ids, _ = env
+    h = _token(client)
+    conteo = _abrir(client, h, ids, ids["perecibles_id"]).json()
+    client.post(f"/api/v1/inventory/conteos/{conteo['id']}/cerrar", headers=h)
+    r = client.post(f"/api/v1/inventory/conteos/{conteo['id']}/anular", headers=h, json={
+        "motivo": "me arrepentí",
+    })
+    assert r.status_code == 409
+
+
 def test_no_se_registra_sobre_un_conteo_cerrado(env):
     client, ids, _ = env
     h = _token(client)
@@ -465,6 +544,118 @@ def test_cantidad_negativa_rechazada(env):
         json={"items": [{"sku_id": ids["sku_queso"], "cantidad": "-1"}]},
     )
     assert r.status_code == 422
+
+
+# --- Margen de ajuste: porcentaje + piso en dinero (ADR-014) ----------------
+def _aprobar_margen(TestSession, ids, valor):
+    """Deja vigente el margen de la empresa, como si Gerencia lo hubiera
+    aprobado. Sin fila vigente rige el default de `settings` (2 %, sin piso)."""
+    with TestSession() as s:
+        admin = s.scalar(select(Usuario).where(Usuario.username == "admin"))
+        s.add(
+            ParametroEmpresa(
+                empresa_id=uuid.UUID(ids["empresa_id"]),
+                modulo="inventory",
+                codigo="margen_error_ajuste",
+                valor=valor,
+                estado="vigente",
+                propuesto_por_id=admin.id,
+            )
+        )
+        s.commit()
+
+
+def _costear(TestSession, sku_id, costo):
+    with TestSession() as s:
+        sku = s.get(Sku, uuid.UUID(sku_id))
+        s.get(Articulo, sku.articulo_id).costo_promedio = Decimal(costo)
+        s.commit()
+
+
+def test_piso_en_dinero_tolera_la_diferencia_barata(env):
+    """2 % de 30 servilletas es 0.6: cualquier diferencia real escala y la
+    alerta se vuelve ruido. Con piso de S/ 20, S/ 10 de diferencia no alarma."""
+    client, ids, TestSession = env
+    h = _token(client)
+    _aprobar_margen(TestSession, ids, {"porcentaje": 2, "piso": "20.00", "divisa": "PEN"})
+    _costear(TestSession, ids["sku_queso"], "2.00")
+    _ingresar(client, h, ids, ids["sku_queso"], 30)
+
+    conteo = _abrir(client, h, ids, ids["perecibles_id"]).json()
+    client.post(
+        f"/api/v1/inventory/conteos/{conteo['id']}/cantidades", headers=h,
+        json={"items": [{"sku_id": ids["sku_queso"], "cantidad": "25"}]},
+    )
+    ajustes = client.post(
+        f"/api/v1/inventory/conteos/{conteo['id']}/cerrar", headers=h).json()["ajustes"]
+    # 5 sobre 30 es 16 % (fuera del 2 %), pero son S/ 10 ≤ S/ 20.
+    assert ajustes[0]["dentro_margen"] is True
+
+
+def test_piso_no_tapa_la_diferencia_cara(env):
+    client, ids, TestSession = env
+    h = _token(client)
+    _aprobar_margen(TestSession, ids, {"porcentaje": 2, "piso": "20.00", "divisa": "PEN"})
+    _costear(TestSession, ids["sku_queso"], "50.00")
+    _ingresar(client, h, ids, ids["sku_queso"], 30)
+
+    conteo = _abrir(client, h, ids, ids["perecibles_id"]).json()
+    client.post(
+        f"/api/v1/inventory/conteos/{conteo['id']}/cantidades", headers=h,
+        json={"items": [{"sku_id": ids["sku_queso"], "cantidad": "25"}]},
+    )
+    ajustes = client.post(
+        f"/api/v1/inventory/conteos/{conteo['id']}/cerrar", headers=h).json()["ajustes"]
+    # Los mismos 5 kilos, a S/ 50: S/ 250 pasa el piso y el 16 % pasa el margen.
+    assert ajustes[0]["dentro_margen"] is False
+
+
+def test_parametro_propuesto_todavia_no_rige(env):
+    """El mecanismo de ADR-014 completo: una propuesta sin aprobar es
+    invisible para el módulo, así que sigue rigiendo el 2 % sin piso."""
+    client, ids, TestSession = env
+    h = _token(client)
+    with TestSession() as s:
+        admin = s.scalar(select(Usuario).where(Usuario.username == "admin"))
+        s.add(
+            ParametroEmpresa(
+                empresa_id=uuid.UUID(ids["empresa_id"]), modulo="inventory",
+                codigo="margen_error_ajuste", estado="propuesto",
+                valor={"porcentaje": 2, "piso": "20.00", "divisa": "PEN"},
+                propuesto_por_id=admin.id,
+            )
+        )
+        s.commit()
+    _costear(TestSession, ids["sku_queso"], "2.00")
+    _ingresar(client, h, ids, ids["sku_queso"], 30)
+
+    conteo = _abrir(client, h, ids, ids["perecibles_id"]).json()
+    client.post(
+        f"/api/v1/inventory/conteos/{conteo['id']}/cantidades", headers=h,
+        json={"items": [{"sku_id": ids["sku_queso"], "cantidad": "25"}]},
+    )
+    ajustes = client.post(
+        f"/api/v1/inventory/conteos/{conteo['id']}/cerrar", headers=h).json()["ajustes"]
+    assert ajustes[0]["dentro_margen"] is False
+
+
+def test_ajuste_adhoc_no_declara_su_propio_margen(env):
+    """`dentro_margen` decide si se publica `inventory.ajuste_fuera_margen`.
+    Que lo mandara el cliente permitía silenciar la alerta desde el mismo
+    request que la provoca."""
+    client, ids, TestSession = env
+    h = _token(client)
+    _costear(TestSession, ids["sku_queso"], "50.00")
+    _ingresar(client, h, ids, ids["sku_queso"], 30)
+
+    r = client.post("/api/v1/inventory/ajustes", headers=h, json={
+        "almacen_id": ids["almacen_id"], "sku_id": ids["sku_queso"],
+        "cantidad": "-5", "motivo": "faltante",
+        # El cliente insiste en que está todo bien; el servidor no le cree.
+        "dentro_margen": True,
+    })
+    assert r.status_code == 201, r.text
+    assert r.json()["dentro_margen"] is False
 
 
 # --- Ajuste del conteo y segregación de funciones ---------------------------

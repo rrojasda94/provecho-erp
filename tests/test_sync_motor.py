@@ -116,6 +116,7 @@ def _poblar_nube(Session) -> dict:
         s.flush()
         sku = Sku(articulo_id=harina.id, codigo="SKU-HARINA")
         receta = Receta(
+            empresa_id=empresa.id,
             nombre="Pizza base", rendimiento_cantidad=Decimal(1),
             rendimiento_unidad_medida_id=udm.id,
         )
@@ -383,6 +384,23 @@ def test_el_pull_no_vuelve_a_traer_lo_viejo(entorno):
         desde_nuevo = exportador.exportar(s, recurso, alcance, nuevo, 500)
         assert [f["codigo"] for f in desde_nuevo] == [permisos[0].codigo]
         assert len(exportador.exportar(s, recurso, alcance, viejo, 500)) == len(permisos)
+
+
+def test_la_receta_se_replica_solo_a_los_hubs_de_su_empresa(entorno):
+    """Antes se replicaba completa —`receta` no tenía columna de empresa— y
+    el hub de una sucursal recibía las fichas técnicas de todo el grupo."""
+    from src.core.sync import exportador, registro
+    from src.core.sync.contratos import AlcanceHub
+
+    viejo = datetime(2020, 1, 1, tzinfo=UTC)
+    propio = AlcanceHub(entorno.ids["empresa_id"], entorno.ids["sucursal_id"])
+    ajeno = AlcanceHub(uuid.uuid4(), entorno.ids["sucursal_id"])
+
+    with entorno.NubeSession() as s:
+        for nombre in ("receta", "receta_item"):
+            recurso = registro.obtener(nombre)
+            assert exportador.exportar(s, recurso, propio, viejo, 500)
+            assert exportador.exportar(s, recurso, ajeno, viejo, 500) == []
 
 
 def test_recurso_desconocido_no_se_puede_pedir(entorno):

@@ -67,6 +67,7 @@ def env(monkeypatch):
         s.flush()
 
         receta = Receta(
+            empresa_id=empresa.id,
             nombre="Masa madre (BOM)", rendimiento_cantidad=Decimal(10),
             rendimiento_unidad_medida_id=udm.id, articulo_id=masa.id,
         )

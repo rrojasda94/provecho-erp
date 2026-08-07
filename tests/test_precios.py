@@ -69,7 +69,8 @@ def env(monkeypatch):
         udm = UnidadMedida(categoria_udm_id=udm_cat.id, nombre="Kilo")
         s.add_all([pv, udm])
         s.flush()
-        receta = Receta(nombre="Pizza", rendimiento_cantidad=Decimal(1),
+        receta = Receta(empresa_id=empresa.id, nombre="Pizza",
+                        rendimiento_cantidad=Decimal(1),
                         rendimiento_unidad_medida_id=udm.id)
         s.add(receta)
         s.flush()

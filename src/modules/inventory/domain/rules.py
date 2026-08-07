@@ -153,16 +153,29 @@ def estado_programa_conteo(proxima: date, hoy: date) -> tuple[str, int]:
 
 
 def diferencia_dentro_margen(
-    cantidad_sistema: Decimal, diferencia: Decimal, margen_pct: Decimal
+    cantidad_sistema: Decimal,
+    diferencia: Decimal,
+    margen_pct: Decimal,
+    valor_diferencia: Decimal | None = None,
+    piso: Decimal | None = None,
 ) -> bool:
     """Margen de error tolerado al ajustar por conteo (RN-INV-015).
 
+    Dos tolerancias que conviven: el **porcentaje** sobre la cantidad y
+    un **piso absoluto en dinero**. Basta cumplir una. El porcentaje solo
+    castiga a las categorías baratas —2 % de S/ 30 en servilletas son 60
+    céntimos, así que cualquier diferencia real escala— y una alerta que
+    siempre suena es una alerta que nadie mira.
+
     Con stock de sistema en 0 no hay base contra la cual medir un
-    porcentaje: cualquier diferencia queda fuera de margen y exige
-    investigación.
+    porcentaje, pero el piso sí aplica: un sobrante de S/ 5 sobre stock 0 es
+    ruido igual.
     """
     if diferencia == 0:
         return True
+    if piso is not None and valor_diferencia is not None:
+        if abs(valor_diferencia) <= abs(piso):
+            return True
     if cantidad_sistema == 0:
         return False
     return abs(diferencia) <= abs(cantidad_sistema) * margen_pct / Decimal(100)

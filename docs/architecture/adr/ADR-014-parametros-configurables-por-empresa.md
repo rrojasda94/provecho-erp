@@ -188,6 +188,16 @@ Consecuencias del addendum:
   `GET /api/v1/parametros?estado=propuesto`. El frontend de cada módulo
   usa el mismo endpoint filtrando por `modulo` para mostrar el estado de
   lo que esa área propuso.
+- **Un parámetro compuesto se lee con `valor_vigente`, no con
+  `umbral_vigente`** (2026-08-06, primer caso): `inventory/
+  margen_error_ajuste` es `{"porcentaje": 2, "piso": "20.00", "divisa":
+  "PEN"}` — dos tolerancias en una fila, no un monto contra el cual
+  comparar. `umbral_vigente` sigue siendo el atajo tipado para el caso
+  escalar (`purchases/oc_umbral`, `accounting/pago_umbral`); el módulo que
+  necesita más de un número desarma el dict él mismo y deja el default de
+  `settings` como valor de arranque. No hace falta un envoltorio por forma:
+  el contrato de la forma ya vive en `magnitudes.py` y en el seeder que
+  propone el valor.
 
 ## Addendum 2026-08-02 (b) — toda magnitud lleva su unidad
 

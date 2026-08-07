@@ -7,7 +7,7 @@ deuda técnica, ver ROADMAP).
 """
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy.orm import Session
@@ -206,15 +206,24 @@ def recibir_orden_compra(
             else oc_item.costo_unitario
         )
         oc_item.cantidad_recibida += cantidad_recibida
+        vencimiento = it.get("fecha_vencimiento")
         session.add(
             RecepcionItem(
                 recepcion_compra_id=recepcion.id,
                 orden_compra_item_id=oc_item.id,
                 cantidad_recibida=cantidad_recibida,
                 costo_unitario=costo_unitario,
+                # El documento conserva lo que declaró el proveedor, no solo
+                # el evento: si el listener de inventory falla, esto es lo
+                # único que queda para reprocesar (RN-VNC-002).
+                lote_codigo=it.get("lote_codigo"),
+                fecha_vencimiento=(
+                    date.fromisoformat(vencimiento)
+                    if isinstance(vencimiento, str)
+                    else vencimiento
+                ),
             )
         )
-        vencimiento = it.get("fecha_vencimiento")
         evento_items.append(
             {
                 "articulo_id": str(oc_item.articulo_id),

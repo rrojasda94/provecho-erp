@@ -188,6 +188,10 @@ def listar(
             for sl, lote in filas
             if rules.por_vencer(lote.fecha_vencimiento, hoy, por_vencer_dias)
         ]
+    # Cada artículo declara con cuánta anticipación quiere el aviso: la leche
+    # no avisa igual que una conserva. El parámetro de la consulta, si vino,
+    # manda sobre esa ventana — es un filtro explícito de quien pregunta.
+    ventanas = _ventanas_de_alerta(session, {lote.articulo_id for _, lote in filas})
     return [
         {
             "lote_id": lote.id,
@@ -199,9 +203,35 @@ def listar(
             "estado": sl.estado,
             "fecha_vencimiento": lote.fecha_vencimiento,
             "vencido": rules.lote_vencido(lote.fecha_vencimiento, hoy),
+            "por_vencer": _por_vencer(
+                lote.fecha_vencimiento,
+                hoy,
+                por_vencer_dias
+                if por_vencer_dias is not None
+                else ventanas.get(lote.articulo_id),
+            ),
         }
         for sl, lote in filas
     ]
+
+
+def _ventanas_de_alerta(session: Session, articulo_ids: set) -> dict:
+    if not articulo_ids:
+        return {}
+    return {
+        articulo_id: dias
+        for articulo_id, dias in session.execute(
+            select(Articulo.id, Articulo.dias_alerta_vencimiento).where(
+                Articulo.id.in_(articulo_ids)
+            )
+        )
+    }
+
+
+def _por_vencer(vence: date | None, hoy: date, dias: int | None) -> bool:
+    """Sin ventana configurada no hay nada que avisar — `False`, no `True`:
+    un artículo sin política de vencimiento no debe llenar la alerta."""
+    return False if dias is None else rules.por_vencer(vence, hoy, dias)
 
 
 def lotes_del_articulo(session: Session, articulo_id: uuid.UUID) -> list[Lote]:

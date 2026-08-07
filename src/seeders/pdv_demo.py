@@ -111,6 +111,7 @@ def _receta_base(session: Session, empresa: Empresa) -> Receta:
     receta = session.scalar(select(Receta).where(Receta.nombre == "Receta de demo"))
     if receta is None:
         receta = Receta(
+            empresa_id=empresa.id,
             nombre="Receta de demo",
             rendimiento_cantidad=Decimal(1),
             rendimiento_unidad_medida_id=unidad.id,

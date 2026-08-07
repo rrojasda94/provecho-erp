@@ -3,7 +3,7 @@
 import uuid
 from decimal import Decimal
 
-from sqlalchemy import Boolean, ForeignKey, Numeric, String, UniqueConstraint
+from sqlalchemy import Boolean, ForeignKey, Integer, Numeric, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -30,3 +30,11 @@ class Articulo(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin):
     # Solo los artículos que lo declaran mueven stock por lote y respetan
     # FEFO (ADR-015). Perecibles y trazables sí; servilletas no.
     controla_lote: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Con cuánta anticipación este artículo se considera "por vencer". Va acá
+    # y no en un número global porque la ventana útil depende del artículo:
+    # la leche avisa con 3 días y una conserva con 60, y un solo número deja
+    # a uno de los dos avisando tarde. NULL = sin ventana; la consulta puede
+    # imponer la suya.
+    dias_alerta_vencimiento: Mapped[int | None] = mapped_column(
+        Integer, nullable=True
+    )

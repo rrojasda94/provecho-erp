@@ -13,6 +13,7 @@ from sqlalchemy.pool import StaticPool
 import src.core.models_registry  # noqa: F401
 from src.core.app import create_app
 from src.core.database import Base
+from src.core.events import event_bus
 from src.modules.inventory.infrastructure.models import (
     Articulo,
     CategoriaUdm,
@@ -207,6 +208,38 @@ def test_stock_bajo_minimo_flag(env):
         s.commit()
     stock = client.get("/api/v1/inventory/stock", headers=h).json()["items"]
     assert stock[0]["bajo_minimo"] is True
+
+
+def test_stock_bajo_minimo_avisa_al_cruzar_una_sola_vez(env):
+    """El evento marca el cruce, no el estado: si sonara en cada venta con
+    el stock ya bajo, nadie lo miraría cuando importa."""
+    client, ids, TestSession = env
+    h = _token(client)
+    client.post("/api/v1/inventory/movimientos", headers=h, json={
+        "almacen_id": ids["almacen_id"], "sku_id": ids["sku_id"],
+        "cantidad": "10", "tipo": "recepcion_compra",
+    })
+    from src.modules.inventory.infrastructure.models import Stock
+    with TestSession() as s:
+        s.scalar(select(Stock)).stock_minimo = Decimal("5")
+        s.commit()
+
+    avisos = []
+    event_bus.subscribe("inventory.stock_bajo_minimo", avisos.append)
+
+    def _consumir(cantidad):
+        return client.post("/api/v1/inventory/movimientos", headers=h, json={
+            "almacen_id": ids["almacen_id"], "sku_id": ids["sku_id"],
+            "cantidad": str(-cantidad), "tipo": "consumo_venta",
+        })
+
+    assert _consumir(3).status_code == 201  # 10 → 7: sigue sobre el mínimo
+    assert avisos == []
+    assert _consumir(3).status_code == 201  # 7 → 4: cruza
+    assert len(avisos) == 1
+    assert avisos[0]["cantidad"] == "4.0000"
+    assert _consumir(1).status_code == 201  # 4 → 3: ya estaba abajo
+    assert len(avisos) == 1
 
 
 def test_movimiento_signo_invalido_409(env):

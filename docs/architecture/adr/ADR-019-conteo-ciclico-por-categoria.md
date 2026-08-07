@@ -41,10 +41,13 @@ protege, y se edita donde se administra la categoría
 
 `parametro_empresa` sigue siendo el mecanismo correcto para lo que sí es
 un valor único por empresa. El **margen de error del ajuste** (RN-INV-015)
-es de esa clase, y hoy vive en `settings.inventory_margen_ajuste_pct`
-(2% por defecto) — mismo patrón provisional que
-`purchases_umbral_aprobacion_oc`, y misma deuda: pasa a
-`parametro_empresa` cuando esa entidad se implemente.
+es de esa clase. **Resuelto el 2026-08-06**: se lee de
+`inventory/margen_error_ajuste` y `settings.inventory_margen_ajuste_pct`
+(2 %) queda como default de arranque, no como la regla. El valor aprobado
+lleva **porcentaje y piso en dinero** —la diferencia se valoriza al
+`costo_promedio` del artículo y basta cumplir una de las dos tolerancias—,
+y `dentro_margen` pasó a calcularse en el servidor también para el ajuste
+ad-hoc, que hasta entonces lo recibía del cliente.
 
 **2. El calendario se deriva, no se almacena.** No hay tabla
 `programa_conteo`. La próxima fecha de una categoría en un almacén es el
@@ -106,13 +109,17 @@ todavía no es falta — recién al día siguiente hay atraso.
   existentes quedan en NULL, es decir fuera del ciclo. Un valor por
   defecto inventado habría hecho aparecer conteos vencidos de la nada el
   día del despliegue.
-- `inventory.conteo_vencido` se publica pero **nadie lo consume todavía**
-  — mismo estado que `inventory.lote_vencido_detectado` (ADR-015). El
-  reporte real hoy es el endpoint del programa.
-- El barrido de vencidos es **a demanda**, sin periódico que lo dispare.
-  El proyecto no tiene Celery beat (solo el worker de comprobantes), y
-  montarlo es trabajo de infraestructura, no de este slice. Queda en
-  ROADMAP → Deuda técnica → Módulo inventory.
+- ~~`inventory.conteo_vencido` se publica pero **nadie lo consume
+  todavía**.~~ **Resuelto 2026-08-06**: `users` lo pone en la bandeja del
+  almacén y de gerencia (`destinatarios_de_almacen`), igual que
+  `inventory.lote_vencido_detectado` (ADR-015). El endpoint del programa
+  sigue siendo la vista completa; la notificación es el empujón.
+- ~~El barrido de vencidos es **a demanda**, sin periódico que lo
+  dispare.~~ **Resuelto 2026-08-06**: `inventory.reportar_conteos_vencidos`
+  corre en Celery beat, diario a las 06:15 hora Perú. La premisa de este
+  punto —"el proyecto no tiene Celery beat"— quedó falsa el 2026-08-04, con
+  el barrido de pedidos demorados; sumarlo fueron dos entradas de
+  `beat_schedule`, no infraestructura.
 - El conteo no se replica al hub de sucursal (ADR-009): contar sin
   conexión no está cubierto. El hub replica stock para poder vender
   offline, no para auditar el almacén.

@@ -20,12 +20,17 @@ from src.core.events import event_bus
 from src.modules.inventory.application import lotes as lotes_uc
 from src.modules.inventory.application import stock as stock_uc
 from src.modules.inventory.application.errors import StockInsuficiente
-from src.modules.inventory.infrastructure.models import Articulo, RecetaItem, Sku
+from src.modules.inventory.infrastructure.models import (
+    Articulo,
+    IncidenciaInventario,
+    RecetaItem,
+    Sku,
+)
 from src.modules.inventory.infrastructure.repositories import StockRepo
 
 # Almacén/Sucursal son organización transversal (data-model §1); viven en
 # users/infrastructure por historia. Import de modelo (no dominio) permitido.
-from src.modules.users.infrastructure.models import Almacen
+from src.modules.users.infrastructure.models import Almacen, Sucursal
 
 log = logging.getLogger(__name__)
 
@@ -43,6 +48,48 @@ def _almacen_de_sucursal(session: Session, sucursal_id: uuid.UUID) -> uuid.UUID 
             Almacen.sucursal_id == sucursal_id, Almacen.deleted_at.is_(None)
         )
     )
+
+
+def _omitir(
+    session: Session,
+    *,
+    empresa_id: uuid.UUID | None,
+    origen: str,
+    referencia: str,
+    tipo: str,
+    detalle: str,
+    almacen_id: uuid.UUID | None = None,
+    articulo_id: uuid.UUID | None = None,
+    sku_id: uuid.UUID | None = None,
+    cantidad: Decimal | None = None,
+) -> None:
+    """Deja constancia consultable de un movimiento que no se hizo.
+
+    Sigue logueando: el log sirve para depurar en el momento, la fila sirve
+    para que alguien lo vea la semana que viene. Sin `empresa_id` no se
+    puede guardar sin romper el filtro de tenant, así que en ese caso —que
+    solo pasa con datos de organización incoherentes— queda el log solo.
+    """
+    log.warning("%s %s: %s", origen, referencia, detalle)
+    if empresa_id is None:
+        return
+    session.add(
+        IncidenciaInventario(
+            empresa_id=empresa_id,
+            origen=origen,
+            referencia=referencia,
+            tipo=tipo,
+            almacen_id=almacen_id,
+            articulo_id=articulo_id,
+            sku_id=sku_id,
+            cantidad=cantidad,
+            detalle=detalle,
+        )
+    )
+
+
+def _empresa_de_almacen(session: Session, almacen_id: uuid.UUID) -> uuid.UUID | None:
+    return session.scalar(select(Almacen.empresa_id).where(Almacen.id == almacen_id))
 
 
 def _sku_de_articulo(session: Session, articulo_id: uuid.UUID) -> uuid.UUID | None:
@@ -80,21 +127,34 @@ def _mover(payload: dict, tipo: str, signo: int) -> None:
     # se llevaría también lo ya movido en esta misma sesión.
     movio = False
     with session_factory() as session:
-        almacen_id = _almacen_de_sucursal(
-            session, uuid.UUID(payload["sucursal_id"])
+        sucursal_id = uuid.UUID(payload["sucursal_id"])
+        almacen_id = _almacen_de_sucursal(session, sucursal_id)
+        empresa_id = session.scalar(
+            select(Sucursal.empresa_id).where(Sucursal.id == sucursal_id)
         )
         if almacen_id is None:
-            log.warning(
-                "venta %s: sucursal sin almacén, consumo omitido",
-                payload["venta_id"],
+            _omitir(
+                session,
+                empresa_id=empresa_id,
+                origen="venta",
+                referencia=payload["venta_id"],
+                tipo="sin_almacen",
+                detalle="la sucursal no tiene almacén: no se descontó nada",
             )
         else:
             for articulo_id, cantidad in _consumos_de_items(session, payload["items"]):
                 sku_id = _sku_de_articulo(session, articulo_id)
                 if sku_id is None:
-                    log.warning(
-                        "venta %s: artículo %s sin SKU activo, ítem omitido",
-                        payload["venta_id"], articulo_id,
+                    _omitir(
+                        session,
+                        empresa_id=empresa_id,
+                        origen="venta",
+                        referencia=payload["venta_id"],
+                        tipo="sin_sku",
+                        detalle="el artículo no tiene SKU activo",
+                        almacen_id=almacen_id,
+                        articulo_id=articulo_id,
+                        cantidad=cantidad,
                     )
                     continue
                 try:
@@ -124,9 +184,17 @@ def _mover(payload: dict, tipo: str, signo: int) -> None:
                 except StockInsuficiente:
                     # ponytail: la venta ya ocurrió — el stock teórico no la
                     # bloquea; queda la discrepancia para conteo/ajuste.
-                    log.warning(
-                        "venta %s: stock insuficiente de sku %s, consumo omitido",
-                        payload["venta_id"], sku_id,
+                    _omitir(
+                        session,
+                        empresa_id=empresa_id,
+                        origen="venta",
+                        referencia=payload["venta_id"],
+                        tipo="stock_insuficiente",
+                        detalle="el stock teórico no alcanzaba para el consumo",
+                        almacen_id=almacen_id,
+                        articulo_id=articulo_id,
+                        sku_id=sku_id,
+                        cantidad=cantidad,
                     )
         if movio:
             event_bus.publish(
@@ -207,13 +275,21 @@ def on_compra_recibida(payload: dict) -> None:
     try:
         with session_factory() as session:
             almacen_id = uuid.UUID(payload["almacen_destino_id"])
+            empresa_id = _empresa_de_almacen(session, almacen_id)
             for it in payload["items"]:
                 articulo_id = uuid.UUID(it["articulo_id"])
                 sku_id = _sku_de_articulo(session, articulo_id)
                 if sku_id is None:
-                    log.warning(
-                        "OC %s: artículo %s sin SKU activo, ítem omitido",
-                        payload["orden_compra_id"], it["articulo_id"],
+                    _omitir(
+                        session,
+                        empresa_id=empresa_id,
+                        origen="orden_compra",
+                        referencia=payload["orden_compra_id"],
+                        tipo="sin_sku",
+                        detalle="el artículo recibido no tiene SKU activo",
+                        almacen_id=almacen_id,
+                        articulo_id=articulo_id,
+                        cantidad=Decimal(it["cantidad"]),
                     )
                     continue
                 cantidad = Decimal(it["cantidad"])
@@ -244,12 +320,22 @@ def on_consumo_registrado(payload: dict) -> None:
     try:
         with session_factory() as session:
             almacen_id = uuid.UUID(payload["almacen_id"])
+            empresa_id = _empresa_de_almacen(session, almacen_id)
             for it in payload["items"]:
-                sku_id = _sku_de_articulo(session, uuid.UUID(it["articulo_id"]))
+                articulo_id = uuid.UUID(it["articulo_id"])
+                cantidad = Decimal(it["cantidad"])
+                sku_id = _sku_de_articulo(session, articulo_id)
                 if sku_id is None:
-                    log.warning(
-                        "orden %s: artículo %s sin SKU activo, consumo omitido",
-                        payload["orden_produccion_id"], it["articulo_id"],
+                    _omitir(
+                        session,
+                        empresa_id=empresa_id,
+                        origen="orden_produccion",
+                        referencia=payload["orden_produccion_id"],
+                        tipo="sin_sku",
+                        detalle="el insumo no tiene SKU activo",
+                        almacen_id=almacen_id,
+                        articulo_id=articulo_id,
+                        cantidad=cantidad,
                     )
                     continue
                 try:
@@ -257,16 +343,24 @@ def on_consumo_registrado(payload: dict) -> None:
                         session,
                         almacen_id=almacen_id,
                         sku_id=sku_id,
-                        cantidad=Decimal(it["cantidad"]),
+                        cantidad=cantidad,
                         tipo="consumo_produccion",
                         referencia=payload["orden_produccion_id"],
                     )
                 except StockInsuficiente:
                     # ponytail: mismo criterio que venta — el consumo real ya
                     # ocurrió en cocina, el stock teórico no lo bloquea.
-                    log.warning(
-                        "orden %s: stock insuficiente de sku %s, consumo omitido",
-                        payload["orden_produccion_id"], sku_id,
+                    _omitir(
+                        session,
+                        empresa_id=empresa_id,
+                        origen="orden_produccion",
+                        referencia=payload["orden_produccion_id"],
+                        tipo="stock_insuficiente",
+                        detalle="el stock teórico no alcanzaba para el consumo",
+                        almacen_id=almacen_id,
+                        articulo_id=articulo_id,
+                        sku_id=sku_id,
+                        cantidad=cantidad,
                     )
             session.commit()
     except Exception:
@@ -281,9 +375,16 @@ def on_orden_completada(payload: dict) -> None:
             almacen_id = uuid.UUID(payload["almacen_id"])
             sku_id = _sku_de_articulo(session, uuid.UUID(payload["articulo_id"]))
             if sku_id is None:
-                log.warning(
-                    "orden %s: artículo %s sin SKU activo, ingreso omitido",
-                    payload["orden_produccion_id"], payload["articulo_id"],
+                _omitir(
+                    session,
+                    empresa_id=_empresa_de_almacen(session, almacen_id),
+                    origen="orden_produccion",
+                    referencia=payload["orden_produccion_id"],
+                    tipo="sin_sku",
+                    detalle="el producto terminado no tiene SKU activo: no ingresó",
+                    almacen_id=almacen_id,
+                    articulo_id=uuid.UUID(payload["articulo_id"]),
+                    cantidad=Decimal(payload["cantidad_producida"]),
                 )
                 session.commit()
                 return

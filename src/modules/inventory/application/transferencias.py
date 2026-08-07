@@ -22,6 +22,7 @@ from decimal import Decimal
 from sqlalchemy.orm import Session
 
 from src.core.events import event_bus
+from src.modules.inventory.application import margenes
 from src.modules.inventory.application import reservas as reservas_uc
 from src.modules.inventory.application import stock as stock_uc
 from src.modules.inventory.application.errors import (
@@ -189,18 +190,65 @@ def _resolver_lineas(
     return lineas
 
 
+def _recibir_item(
+    session: Session,
+    transferencia: Transferencia,
+    item: TransferenciaItem,
+    recibidas: dict[uuid.UUID, Decimal],
+    parcial: bool,
+    recibido_por: uuid.UUID,
+) -> None:
+    """Ingresa una línea. No hace nada si esa línea todavía viaja."""
+    if item.id not in recibidas:
+        # Parcial: lo no mencionado sigue en la carretera, no llegó en cero.
+        # Completa: llegó entero, salvo que ya se recibiera en una entrega
+        # anterior.
+        if parcial or item.cantidad_recibida is not None:
+            return
+    elif item.cantidad_recibida is not None:
+        raise ReglaNegocio(f"el ítem {item.id} ya se recibió en una entrega anterior")
+
+    cantidad = recibidas.get(item.id, item.cantidad_enviada)
+    if cantidad < 0:
+        raise ReglaNegocio("la cantidad recibida no puede ser negativa")
+    if cantidad > item.cantidad_enviada:
+        raise ReglaNegocio(
+            "no se recibe más de lo enviado: enviado "
+            f"{item.cantidad_enviada}, se declara recibido {cantidad}"
+        )
+    item.cantidad_recibida = cantidad
+    if cantidad > 0:
+        stock_uc.registrar_movimiento(
+            session,
+            almacen_id=transferencia.destino_almacen_id,
+            sku_id=item.sku_id,
+            cantidad=cantidad,
+            tipo="transferencia_entrada",
+            usuario_id=recibido_por,
+            referencia=str(transferencia.id),
+            lote_id=item.lote_id,
+        )
+
+
 def recibir(
     session: Session,
     transferencia_id: uuid.UUID,
     recibido_por: uuid.UUID,
     recibidas: dict[uuid.UUID, Decimal] | None = None,
+    parcial: bool = False,
 ) -> Transferencia:
     """Ingresa al destino lo que llegó, lote por lote.
 
-    `recibidas` mapea `transferencia_item.id` → cantidad; lo que no se
-    menciona se recibe completo. Una diferencia contra lo enviado no se
-    corrige sola: entra al stock lo que de verdad llegó y la diferencia
-    queda registrada para auditarse (RN-INV-002).
+    `recibidas` mapea `transferencia_item.id` → cantidad. En una recepción
+    **completa** (por defecto) lo que no se menciona se recibe entero y la
+    transferencia se cierra. Con `parcial=True` solo entra lo mencionado y
+    el resto **sigue en tránsito**: es el camión que trae la mitad hoy y la
+    otra mitad mañana. Declararlo explícito y no deducirlo de que falten
+    ítems evita el error caro —cerrar la transferencia dando por perdido lo
+    que todavía viene en camino—.
+
+    Una diferencia contra lo enviado no se corrige sola: entra al stock lo
+    que de verdad llegó y la diferencia queda registrada (RN-INV-002).
     """
     repo = TransferenciaRepo(session)
     transferencia = repo.get(transferencia_id)
@@ -210,37 +258,32 @@ def recibir(
         raise ReglaNegocio(f"la transferencia ya está {transferencia.estado}")
 
     recibidas = recibidas or {}
-    diferencias = []
-    for item in repo.items(transferencia_id):
-        cantidad = recibidas.get(item.id, item.cantidad_enviada)
-        if cantidad < 0:
-            raise ReglaNegocio("la cantidad recibida no puede ser negativa")
-        if cantidad > item.cantidad_enviada:
-            raise ReglaNegocio(
-                "no se recibe más de lo enviado: enviado "
-                f"{item.cantidad_enviada}, se declara recibido {cantidad}"
-            )
-        item.cantidad_recibida = cantidad
-        if cantidad > 0:
-            stock_uc.registrar_movimiento(
-                session,
-                almacen_id=transferencia.destino_almacen_id,
-                sku_id=item.sku_id,
-                cantidad=cantidad,
-                tipo="transferencia_entrada",
-                usuario_id=recibido_por,
-                referencia=str(transferencia.id),
-                lote_id=item.lote_id,
-            )
-        if item.diferencia:
-            diferencias.append(
-                {
-                    "sku_id": str(item.sku_id),
-                    "lote_id": str(item.lote_id) if item.lote_id else None,
-                    "enviada": str(item.cantidad_enviada),
-                    "recibida": str(cantidad),
-                }
-            )
+    if parcial and not recibidas:
+        raise ReglaNegocio("una recepción parcial tiene que declarar qué llegó")
+    items = repo.items(transferencia_id)
+    ajenos = set(recibidas) - {i.id for i in items}
+    if ajenos:
+        raise NoEncontrado("hay ítems que no pertenecen a esta transferencia")
+
+    for item in items:
+        _recibir_item(session, transferencia, item, recibidas, parcial, recibido_por)
+
+    if any(i.cantidad_recibida is None for i in items):
+        # Queda mercadería en la carretera: ni se cierra la transferencia ni
+        # se avisa a nadie. El evento vale una sola vez, al final, o
+        # `accounting` asentaría el faltante de cada entrega por separado.
+        return transferencia
+
+    diferencias = [
+        {
+            "sku_id": str(item.sku_id),
+            "lote_id": str(item.lote_id) if item.lote_id else None,
+            "enviada": str(item.cantidad_enviada),
+            "recibida": str(item.cantidad_recibida),
+        }
+        for item in items
+        if item.diferencia
+    ]
 
     transferencia.estado = "recibida"
     transferencia.recibido_por = recibido_por
@@ -262,9 +305,37 @@ def recibir(
                 else None
             ),
             "diferencias": diferencias,
+            # Valorizado acá y no por el consumidor: el costo es dato de
+            # `inventory` (`articulo.costo_promedio`), y hacer que
+            # `accounting` lo busque sería importarle el dominio ajeno.
+            # Positivo = lo que se perdió en el traslado.
+            "monto_diferencia": str(_valorizar(session, diferencias)),
         },
+        # Post-commit (ADR-016): antes se despachaba en medio de la
+        # transacción, y con consumidores un rollback dejaba el asiento y el
+        # aviso de una recepción que nunca ocurrió.
+        session=session,
     )
     return transferencia
+
+
+def _valorizar(session: Session, diferencias: list[dict]) -> Decimal:
+    """Cuánto dinero falta, al costo promedio del artículo.
+
+    Solo el faltante: recibir **más** de lo enviado no puede pasar
+    (`recibir` lo rechaza), así que toda diferencia es negativa y el monto
+    sale positivo.
+    """
+    if not diferencias:
+        return Decimal(0)
+    costos = margenes.costos_por_sku(
+        session, [uuid.UUID(d["sku_id"]) for d in diferencias]
+    )
+    return sum(
+        (Decimal(d["enviada"]) - Decimal(d["recibida"]))
+        * costos.get(uuid.UUID(d["sku_id"]), Decimal(0))
+        for d in diferencias
+    )
 
 
 def detalle(

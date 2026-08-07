@@ -434,14 +434,23 @@ class ComprobanteRepo:
         )
         return (actual or 0) + 1
 
-    def pendientes(self, limite: int = 100) -> list[Comprobante]:
+    def pendientes(
+        self, limite: int = 100, max_intentos: int | None = None
+    ) -> list[Comprobante]:
+        """Comprobantes que todavía se pueden emitir.
+
+        `rechazado` queda fuera: es un veredicto de SUNAT sobre datos malos,
+        no un fallo de transporte, y reintentarlo produce el mismo rechazo.
+        Con `max_intentos`, también quedan fuera los que ya lo agotaron —
+        reencolarlos cada ciclo solo produce el mismo `Conflicto`.
+        """
+        q = select(Comprobante).where(
+            Comprobante.estado_emision.in_(("pendiente", "error"))
+        )
+        if max_intentos is not None:
+            q = q.where(Comprobante.intentos_emision < max_intentos)
         return list(
-            self.s.scalars(
-                select(Comprobante)
-                .where(Comprobante.estado_emision.in_(("pendiente", "error")))
-                .order_by(Comprobante.created_at)
-                .limit(limite)
-            )
+            self.s.scalars(q.order_by(Comprobante.created_at).limit(limite))
         )
 
     def empresa(self, empresa_id: uuid.UUID) -> Empresa | None:

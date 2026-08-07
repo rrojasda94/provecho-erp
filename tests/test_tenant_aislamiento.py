@@ -110,7 +110,8 @@ def env(monkeypatch):
         s.flush()
         art_b = Articulo(empresa_id=empresa_b.id, id_interno="B001",
                          nombre="Insumo B", unidad_medida_id=udm.id, tipo="insumo")
-        receta = Receta(nombre="Pizza", rendimiento_cantidad=Decimal(1),
+        receta = Receta(empresa_id=empresa_a.id, nombre="Pizza",
+                        rendimiento_cantidad=Decimal(1),
                         rendimiento_unidad_medida_id=udm.id)
         s.add_all([art_b, receta])
         s.flush()
@@ -129,6 +130,10 @@ def env(monkeypatch):
             return s.scalar(select(Rol).where(Rol.nombre == nombre))
 
         cajero_a = _usuario(s, "cajero_a", suc_a, _rol("cajero"))
+        # Con `inventory.gestionar_catalogo` en cada empresa, para probar que
+        # el permiso no alcanza a cruzar el tenant.
+        _usuario(s, "supervisor_a", suc_a, _rol("supervisor"))
+        _usuario(s, "supervisor_b", suc_b, _rol("supervisor"))
         _usuario(s, "almacenero_a", suc_a, _rol("almacenero"))
         _usuario(s, "comprador_a", suc_a, _rol("comprador"))
         _usuario(s, "jefe_cocina_a", suc_a, _rol("jefe_cocina"))
@@ -149,6 +154,7 @@ def env(monkeypatch):
             producto=str(producto.id), marca=str(marca.id),
             empresa_a=str(empresa_a.id), empresa_b=str(empresa_b.id),
             art_b=str(art_b.id), persona=str(persona.id),
+            receta_a=str(receta.id), udm=str(udm.id),
             cajero_a=str(cajero_a.id),
         )
         s.commit()
@@ -225,6 +231,66 @@ def test_listado_de_articulos_solo_ve_su_empresa(env):
     nombres = [a["nombre"] for a in
                client.get("/api/v1/inventory/articulos", headers=h).json()["items"]]
     assert "Insumo B" not in nombres
+
+
+def test_receta_de_otra_empresa_no_se_lee_ni_se_edita(env):
+    """`receta` era la única entidad del catálogo sin columna de tenant: su
+    CRUD listaba las de todas las empresas."""
+    client, ids = env
+    h_b = _token(client, "supervisor_b")
+
+    assert client.get(
+        f"/api/v1/inventory/recetas/{ids['receta_a']}", headers=h_b
+    ).status_code == 403
+    assert client.patch(
+        f"/api/v1/inventory/recetas/{ids['receta_a']}", headers=h_b,
+        json={"nombre": "Secuestrada"},
+    ).status_code == 403
+    assert client.post(
+        f"/api/v1/inventory/recetas/{ids['receta_a']}/duplicar", headers=h_b
+    ).status_code == 403
+    assert client.delete(
+        f"/api/v1/inventory/recetas/{ids['receta_a']}", headers=h_b
+    ).status_code == 403
+
+
+def test_listado_de_recetas_solo_ve_su_empresa(env):
+    client, ids = env
+    assert client.get(
+        "/api/v1/inventory/recetas", headers=_token(client, "supervisor_b")
+    ).json() == []
+    nombres = [
+        r["nombre"] for r in client.get(
+            "/api/v1/inventory/recetas", headers=_token(client, "supervisor_a")
+        ).json()
+    ]
+    assert nombres == ["Pizza"]
+
+
+def test_una_receta_no_toma_insumos_de_otra_empresa(env):
+    """El aislamiento tiene que valer también hacia adentro de la receta: un
+    ítem que apunta a un artículo ajeno filtraría su costo y su nombre."""
+    client, ids = env
+    h_a = _token(client, "supervisor_a")
+    r = client.post(
+        f"/api/v1/inventory/recetas/{ids['receta_a']}/items", headers=h_a,
+        json={"articulo_id": ids["art_b"], "cantidad": "1"},
+    )
+    # 404 y no 403: para esta empresa ese artículo no existe.
+    assert r.status_code == 404
+
+
+def test_el_nombre_de_receta_es_unico_por_empresa_no_por_grupo(env):
+    """Que Majambo tenga una "Pizza" no puede impedirle a otra empresa del
+    grupo tener la suya."""
+    client, ids = env
+    r = client.post("/api/v1/inventory/recetas", headers=_token(client, "supervisor_b"),
+                    json={
+                        "nombre": "Pizza", "rendimiento_cantidad": "1",
+                        "rendimiento_unidad_medida_id": ids["udm"],
+                    })
+    assert r.status_code == 201, r.text
+    assert r.json()["empresa_id"] == ids["empresa_b"]
 
 
 def test_empresa_explicita_ajena_403(env):

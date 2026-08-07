@@ -101,6 +101,7 @@ def _crear_cadena_base(session):
     session.add(Sku(articulo_id=articulo.id, codigo="PZA-FAM-001"))
 
     receta = Receta(
+        empresa_id=empresa.id,
         nombre="Pizza Familiar (venta directa)",
         rendimiento_cantidad=Decimal(1),
         rendimiento_unidad_medida_id=unidad.id,

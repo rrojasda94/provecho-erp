@@ -25,12 +25,15 @@ presupuesto).
 `asiento`/`asiento_linea` (manual con permiso `accounting.asiento_manual`,
 cuadre RN-CTB-001, anulación por asiento inverso RN-CTB-002) y
 `regla_asiento` (mapeo configurable evento→cuentas que alimenta la
-generación automática, `application/listeners.py`). Cubre hoy los 4 eventos
-operativos que sus módulos de origen ya publican en código
-(`purchases.oc_emitida`, `purchases.compra_recibida`,
-`sales.venta_confirmada`, `purchases.comprobante_conforme`); el resto de
-eventos listados abajo quedan pendientes de que esos módulos los publiquen
-(deuda técnica, ver ROADMAP).
+generación automática, `application/listeners.py`). Cubre hoy 5 eventos
+operativos: `purchases.oc_emitida`, `purchases.compra_recibida`,
+`sales.venta_confirmada`, `purchases.comprobante_conforme` y —desde
+2026-08-06— `inventory.transferencia_recibida`, que **solo asienta cuando
+el traslado llegó con faltante**: mover mercadería entre almacenes de la
+misma empresa no mueve resultado, lo que sí es hecho contable es lo que
+salió y no llegó. El monto viene valorizado en el evento (el costo es dato
+de `inventory`). El resto de eventos listados abajo quedan pendientes de
+que esos módulos los publiquen (deuda técnica, ver ROADMAP).
 
 **Pago a proveedor (PROC-CTB-003, mismo día):** `movimiento_dinero`
 (tesorería, genérico egreso/ingreso) — `purchases.comprobante_conforme`

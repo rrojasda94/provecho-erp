@@ -82,9 +82,11 @@ def env(monkeypatch):
         s.add(udm)
         s.flush()
         # Recetas sin insumos: KDS no necesita stock para este test.
-        receta_p = Receta(nombre="Pizza", rendimiento_cantidad=Decimal(1),
+        receta_p = Receta(empresa_id=empresa.id, nombre="Pizza",
+                          rendimiento_cantidad=Decimal(1),
                           rendimiento_unidad_medida_id=udm.id)
-        receta_b = Receta(nombre="Gaseosa", rendimiento_cantidad=Decimal(1),
+        receta_b = Receta(empresa_id=empresa.id, nombre="Gaseosa",
+                          rendimiento_cantidad=Decimal(1),
                           rendimiento_unidad_medida_id=udm.id)
         s.add_all([receta_p, receta_b])
         s.flush()

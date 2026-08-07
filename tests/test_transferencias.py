@@ -34,6 +34,10 @@ from src.modules.users.infrastructure.models import (
 )
 from src.modules.users.infrastructure.security import hash_pin
 
+# Costo del insumo con el que se prueba el traslado: sin costo, el faltante
+# valorizado siempre daría 0 y el test pasaría por vacío.
+COSTO_SERVILLETA = Decimal("1.5000")
+
 
 @pytest.fixture()
 def env():
@@ -83,6 +87,7 @@ def env():
         servilleta = Articulo(
             empresa_id=empresa.id, id_interno="S001", nombre="Servilleta",
             unidad_medida_id=udm.id, tipo="suministro",
+            costo_promedio=COSTO_SERVILLETA,
         )
         s.add_all([queso, servilleta])
         s.flush()
@@ -260,6 +265,29 @@ def test_una_venta_no_se_bloquea_por_una_reserva(env):
     fila = _stock(client, h, ids["central_id"], ids["sku_servilleta"])
     assert Decimal(fila["cantidad"]) == Decimal("30")
     assert Decimal(fila["disponible"]) == Decimal("-20")
+
+    # Y alguien lo mira: hasta ahora el único modo de enterarse era consultar
+    # el stock del SKU exacto, sabiendo de antemano cuál mirar.
+    datos = client.post(
+        "/api/v1/reportes/disponible_negativo/datos", headers=h, json={}
+    )
+    assert datos.status_code == 200, datos.text
+    filas = datos.json()["filas"]
+    assert len(filas) == 1
+    assert filas[0]["articulo"] == "Servilleta"
+    assert Decimal(filas[0]["disponible"]) == Decimal("-20")
+
+
+def test_disponible_sano_no_aparece_en_el_reporte(env):
+    client, ids, _ = env
+    h = _token(client)
+    _ingresar(client, h, ids["central_id"], ids["sku_servilleta"], 100)
+    _ciclo_hasta_aprobada(client, ids, "50")  # reservado, pero con respaldo
+
+    datos = client.post(
+        "/api/v1/reportes/disponible_negativo/datos", headers=h, json={}
+    )
+    assert datos.json()["filas"] == []
 
 
 # --- Solicitud de insumos ---------------------------------------------------
@@ -458,6 +486,95 @@ def test_recepcion_con_faltante_queda_auditable(env):
         _stock(client, h, ids["local_id"], ids["sku_servilleta"])["cantidad"]
     ) == Decimal("28")
     assert eventos[-1]["diferencias"][0]["recibida"] == "28"
+    # El faltante viaja **valorizado**: el costo es dato de inventory, y
+    # `accounting` no puede ir a buscarlo sin importar su dominio.
+    assert Decimal(eventos[-1]["monto_diferencia"]) == Decimal("2") * COSTO_SERVILLETA
+
+
+def test_traslado_completo_no_deja_faltante_que_valorizar(env):
+    client, ids, _ = env
+    h = _token(client)
+    _ingresar(client, h, ids["central_id"], ids["sku_servilleta"], 100)
+    sol, _, h_admin = _ciclo_hasta_aprobada(client, ids, "30")
+    transferencia = client.post(
+        "/api/v1/inventory/transferencias", headers=h_admin, json={
+            "origen_almacen_id": ids["central_id"],
+            "destino_almacen_id": ids["local_id"],
+            "solicitud_id": sol["id"],
+        }).json()
+
+    eventos = []
+    event_bus.subscribe("inventory.transferencia_recibida", eventos.append)
+    r = client.post(
+        f"/api/v1/inventory/transferencias/{transferencia['id']}/recibir",
+        headers=h_admin, json={"items": []},
+    )
+    assert r.status_code == 200, r.text
+    assert eventos[-1]["diferencias"] == []
+    assert Decimal(eventos[-1]["monto_diferencia"]) == 0
+
+
+def test_recepcion_parcial_deja_el_resto_en_transito(env):
+    """El camión que trae la mitad hoy: lo que llegó entra al stock, lo que
+    falta sigue viajando y la transferencia no se cierra."""
+    client, ids, _ = env
+    h = _token(client)
+    h_admin = h
+    _ingresar(client, h, ids["central_id"], ids["sku_servilleta"], 100)
+    _ingresar(client, h, ids["central_id"], ids["sku_queso"], 50)
+    # Lateral con dos líneas: una llega hoy y la otra queda en la carretera.
+    transferencia = client.post(
+        "/api/v1/inventory/transferencias", headers=h_admin, json={
+            "origen_almacen_id": ids["central_id"],
+            "destino_almacen_id": ids["local_id"],
+            "items": [
+                {"sku_id": ids["sku_servilleta"], "cantidad": "20"},
+                {"sku_id": ids["sku_queso"], "cantidad": "10"},
+            ],
+        }).json()
+    detalle = client.get(
+        f"/api/v1/inventory/transferencias/{transferencia['id']}", headers=h
+    ).json()
+    item_id = next(
+        i["id"] for i in detalle["items"] if i["sku_id"] == ids["sku_servilleta"]
+    )
+
+    eventos = []
+    event_bus.subscribe("inventory.transferencia_recibida", eventos.append)
+
+    # Una parcial sin decir qué llegó no tiene sentido.
+    assert client.post(
+        f"/api/v1/inventory/transferencias/{transferencia['id']}/recibir",
+        headers=h_admin, json={"items": [], "parcial": True},
+    ).status_code == 409
+
+    r = client.post(
+        f"/api/v1/inventory/transferencias/{transferencia['id']}/recibir",
+        headers=h_admin,
+        json={"items": [{"item_id": item_id, "cantidad": "20"}], "parcial": True},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["estado"] == "en_transito"  # sigue abierta
+    # Nadie avisa todavía: el evento vale una sola vez, al cerrar.
+    assert eventos == []
+    assert Decimal(
+        _stock(client, h, ids["local_id"], ids["sku_servilleta"])["cantidad"]
+    ) == Decimal("20")
+
+    # La segunda entrega la cierra... y el ítem ya recibido no se recibe otra vez.
+    assert client.post(
+        f"/api/v1/inventory/transferencias/{transferencia['id']}/recibir",
+        headers=h_admin,
+        json={"items": [{"item_id": item_id, "cantidad": "5"}], "parcial": True},
+    ).status_code == 409
+
+    r = client.post(
+        f"/api/v1/inventory/transferencias/{transferencia['id']}/recibir",
+        headers=h_admin, json={"items": []},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["estado"] == "recibida"
+    assert len(eventos) == 1
 
 
 def test_no_se_recibe_mas_de_lo_enviado(env):

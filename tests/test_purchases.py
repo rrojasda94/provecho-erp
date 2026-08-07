@@ -238,6 +238,47 @@ def test_flujo_oc_completo_actualiza_stock_y_costo(env):
         assert art.costo_promedio == Decimal("10.0000")
 
 
+def test_la_recepcion_conserva_el_lote_que_declaro_el_proveedor(env):
+    """El dato viajaba solo en el evento: si el listener de `inventory`
+    fallaba, no quedaba dónde leerlo para reprocesar (RN-VNC-002)."""
+    client, ids, TestSession = env
+    h = _token(client)
+    proveedor_id = _crear_proveedor(client, h, ids).json()["id"]
+    oc_id = _crear_oc(
+        client, h, ids, proveedor_id, idempotency_key="oc-key-lote"
+    ).json()["id"]
+    client.post(f"/api/v1/purchases/ordenes-compra/{oc_id}/emitir", headers=h)
+
+    from src.modules.purchases.infrastructure.models import (
+        OrdenCompraItem,
+        RecepcionItem,
+    )
+    with TestSession() as s:
+        item_id = str(
+            s.scalar(
+                select(OrdenCompraItem).where(
+                    OrdenCompraItem.orden_compra_id == uuid.UUID(oc_id)
+                )
+            ).id
+        )
+
+    r = client.post(
+        f"/api/v1/purchases/ordenes-compra/{oc_id}/recepciones", headers=h, json={
+            "idempotency_key": "recep-key-lote",
+            "items": [{
+                "orden_compra_item_id": item_id, "cantidad_recibida": "100",
+                "lote_codigo": "LT-2026-08", "fecha_vencimiento": "2026-12-31",
+            }],
+        },
+    )
+    assert r.status_code == 201, r.text
+
+    with TestSession() as s:
+        linea = s.scalar(select(RecepcionItem))
+    assert linea.lote_codigo == "LT-2026-08"
+    assert linea.fecha_vencimiento.isoformat() == "2026-12-31"
+
+
 def test_recibir_mas_de_lo_ordenado_409(env):
     client, ids, TestSession = env
     h = _token(client)

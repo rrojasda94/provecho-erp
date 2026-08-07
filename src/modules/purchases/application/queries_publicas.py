@@ -23,6 +23,29 @@ from src.shared import fechas
 _ESTADOS_CON_COMPROMISO = ("emitida", "recibida_parcial", "recibida")
 
 
+def proveedor_para_guia(session: Session, proveedor_id: uuid.UUID) -> dict | None:
+    """Razón social y RUC de un proveedor, para que `inventory` emita la
+    guía de una devolución sin importar el ORM de `purchases`.
+
+    **No devuelve dirección**: `proveedor` no la tiene modelada, y el lugar
+    de destino de la guía se teclea igual que el chofer y la placa — es de
+    lo que el sistema no puede saber. `None` si no existe.
+    """
+    proveedor = session.get(Proveedor, proveedor_id)
+    if proveedor is None:
+        return None
+    nombre = proveedor.razon_social
+    if nombre is None and proveedor.persona_id is not None:
+        persona = session.get(Persona, proveedor.persona_id)
+        nombre = f"{persona.nombres} {persona.apellidos}" if persona else None
+    return {
+        "id": proveedor.id,
+        "empresa_id": proveedor.empresa_id,
+        "nombre": nombre,
+        "ruc": proveedor.ruc,
+    }
+
+
 def compras_por_proveedor(
     session: Session,
     empresa_id: uuid.UUID | None,
