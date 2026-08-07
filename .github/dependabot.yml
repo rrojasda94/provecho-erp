@@ -29,6 +29,25 @@ updates:
       frontend-menores:
         applies-to: version-updates
         update-types: [minor, patch]
+    # Dos majors que hoy no tienen dónde aterrizar. No es estar atrasado: no
+    # existe versión publicada de la cadena de `eslint-config-next` que los
+    # acepte. Cada uno se destraba solo cuando su bloqueante publique.
+    ignore:
+      # `typescript-eslint` pide `typescript >=4.8.4 <6.1.0` y
+      # `eslint-config-next` depende de él. Al instalar TS7 npm resuelve el
+      # conflicto de peer sacando `@typescript-eslint/eslint-plugin` del
+      # árbol: el lint queda en verde habiendo dejado de revisar TypeScript.
+      # Esa fue la causa real del PR #30, no la versión de Next.
+      - dependency-name: typescript
+        versions: ["7.x"]
+      # ESLint 10 quitó `context.getFilename()`. Las últimas versiones
+      # publicadas de los tres plugins que trae `eslint-config-next` topan en
+      # ESLint 9: eslint-plugin-react 7.37.5 (`^9.7`), eslint-plugin-jsx-a11y
+      # 6.10.2 (`^9`), eslint-plugin-import 2.32.0 (`^9`). Con ESLint 10 el
+      # lint no reporta hallazgos: se cae con un TypeError en la regla
+      # `react/display-name` antes de terminar el primer archivo (PR #27).
+      - dependency-name: eslint
+        versions: ["10.x"]
     commit-message:
       prefix: "chore(deps)"
 
