@@ -131,7 +131,7 @@ jobs:
       # transpilar nada, y el stripping de tipos recién viene de fábrica
       # desde 22.18. En Node 20 la suite entera moría con
       # `ERR_UNKNOWN_FILE_EXTENSION` antes de ejecutar un solo caso.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "24"
           cache: npm
@@ -165,7 +165,7 @@ jobs:
       # Misma versión que el job `frontend` a propósito: dos Node distintos
       # en el mismo repo significan que `npm ci` resuelve un árbol acá y otro
       # allá, y que `@types/node` describe un runtime que este job no corre.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "24"
           cache: npm
