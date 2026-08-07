@@ -155,8 +155,9 @@ supervisor aprueba y reserva, el central despacha, el local recibe.
   copia a la fila.
 - **Estados**: `pendiente` → `aprobada` | `rechazada` | `cancelada`, y el
   despacho la lleva a `despachada` → `recibida`. Cancelar libera las
-  reservas (RN-INV-010). `en_picking` no se implementó: no gobierna
-  ninguna regla.
+  reservas (RN-INV-010). `en_picking` **no existe y no va a existir**
+  (descartado 2026-08-07): no gobierna ninguna regla y sería un estado que
+  alguien tiene que marcar a mano.
 - **`transferencia_item` va por SKU y lote**: el despacho reparte por FEFO
   y el destino recibe los mismos lotes que salieron (ADR-015).
 - **Las diferencias se registran, no se corrigen**: no se despacha más de

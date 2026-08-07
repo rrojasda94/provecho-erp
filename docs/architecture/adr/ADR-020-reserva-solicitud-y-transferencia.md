@@ -74,8 +74,12 @@ se cancela — eso movió stock y se corrige recibiendo o devolviendo.
 **7. Se omite el estado `en_picking`** que el borrador listaba. No
 gobierna ninguna regla: entre `aprobada` y `despachada` no cambia qué se
 puede hacer, y habría exigido un endpoint de transición que nadie
-consume. Si el negocio pide ver "el central ya empezó a armarlo", entra
-entonces.
+consume. **Cerrado como descartado el 2026-08-07** (decidido con el
+usuario): un estado que no gobierna nada no es un estado, es un
+comentario, y encima obliga a que alguien lo marque a mano — un estado que
+depende de que alguien se acuerde miente la mitad del tiempo. Si el
+negocio pide ver "el central ya empezó a armarlo", entra entonces, y con
+quien lo marca definido.
 
 **8. Aprobar y solicitar son permisos distintos** (`inventory.solicitar_insumos`
 / `inventory.aprobar_solicitud`) y el aprobador no puede ser quien pidió —
@@ -89,19 +93,31 @@ operativa documentada, no un modelo aparte.
 
 ## Consecuencias
 
-- El disponible negativo es un estado alcanzable y visible. Falta una
-  alerta que lo mire: hoy solo se ve consultando el stock.
+- El disponible negativo es un estado alcanzable y visible. ~~Falta una
+  alerta que lo mire.~~ **Resuelto 2026-08-06**: reporte
+  `disponible_negativo` en el catálogo (ADR-024).
 - `reserva_stock` nace con dos tipos sin productor: `produccion` (lo
   emitirá el módulo cuando reserve insumos de una orden) y `carrito` (PDV).
-  El tipo `merma` es la base de `stock_merma` (RN-INV-012), que sigue
-  pendiente de su slice.
-- `transferencia` no lleva vehículo ni tracking: `vehiculo` no existe como
-  entidad. Queda `transportista_id` (FK a `usuario`) y el resto en ROADMAP.
-- La recepción es de una sola pasada: no hay recepción parcial que deje la
-  transferencia en tránsito por el resto. Con un solo viaje por
-  transferencia alcanza; si aparece el caso, es un estado más.
-- El ciclo no se replica al hub de sucursal (ADR-009): un local sin
-  conexión no puede pedir ni recibir. El hub existe para vender offline.
+  El tipo `merma` ya tiene productor desde 2026-08-06: **es** la merma
+  (ADR-028 — no hay tabla `stock_merma`, la merma es una reserva de este
+  tipo). Siguen sin productor `produccion` y `carrito`, que esperan a sus
+  módulos.
+- `transferencia` no lleva vehículo ni tracking, y **eso quedó cerrado como
+  descartado el 2026-08-07**: no hay flota —el traslado lo hace alguien del
+  grupo en su propio vehículo— y la placa se teclea en la guía, que es el
+  único documento que la necesita (mismo criterio que ADR-027 al descartar
+  `vehiculo`). El tracking GPS mediría una ruta de veinte minutos entre dos
+  locales de la misma ciudad. `transportista_id` responde la pregunta que sí
+  se hace cuando algo no llega: quién lo llevó. Vuelve a la mesa si aparece
+  reparto propio con flota.
+- ~~La recepción es de una sola pasada.~~ **Resuelto 2026-08-06**:
+  `recibir(..., parcial=True)` ingresa lo declarado y deja el resto en
+  tránsito. Se declara explícito y no se deduce de que falten ítems —
+  deducirlo haría que un olvido cierre la transferencia dando por perdido lo
+  que todavía viene en camino.
+- ~~El ciclo no se replica al hub de sucursal (ADR-009).~~ **Resuelto
+  2026-08-07** (fase 3): el hub existía para vender offline; ahora el local
+  también pide, ve lo que viene y recibe sin conexión.
 - `guia_remision` sigue pendiente y ahora tiene de dónde colgarse: una
   transferencia entre almacenes de distinta dirección la necesita
   (RN-GDR-002).

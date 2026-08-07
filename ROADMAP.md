@@ -986,9 +986,15 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
     sus módulos, y eso **no es un pendiente de este módulo**: construirle un
     productor a un tipo cuyo caso de uso todavía no existe es inventar el
     caso de uso.
-  - ⬜ **Transferencia sin vehículo ni tracking**: `vehiculo` no existe
-    como entidad; quedó solo `transportista_id`. Faltan tracking GPS y
-    tiempos de ruta/entrega que declara `data-model.md`.
+  - ✅ 2026-08-07 **Transferencia sin vehículo ni tracking — descartado**
+    (decidido con el usuario). No hay flota: el traslado lo hace alguien del
+    grupo en su propio vehículo, y la placa se teclea en la guía, que es el
+    único documento que la necesita (ADR-027 ya descartó `vehiculo` por lo
+    mismo). Una tabla de vehículos sería un formulario que hay que llenar
+    antes de poder despachar, y el tracking GPS mide una ruta de veinte
+    minutos entre dos locales de la misma ciudad. `transportista_id` alcanza
+    para saber quién lo llevó, que es la pregunta que sí se hace cuando algo
+    no llega. Vuelve a la mesa si aparece reparto propio con flota.
   - ✅ 2026-08-06 **Recepción parcial**: `{"parcial": true}` ingresa lo
     declarado y deja el resto **en tránsito**. Explícito y no deducido de
     que falten ítems: deducirlo haría que un olvido cierre la transferencia
@@ -1018,9 +1024,13 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
     ajeno. De paso, `recibir` pasa a publicar con `session=` — se despachaba
     en medio de la transacción, y con consumidor un rollback dejaba el
     asiento de una recepción que nunca ocurrió (ADR-016).
-  - ⬜ **Estado `en_picking` omitido** a propósito (no gobierna ninguna
-    regla): si el negocio pide ver "el central ya empezó a armarlo",
-    entra entonces.
+  - ✅ 2026-08-07 **Estado `en_picking` — descartado** (decidido con el
+    usuario). Un estado que no gobierna ninguna regla no es un estado, es un
+    comentario: entre `aprobada` y `despachada` nada cambia de permiso, de
+    validación ni de qué se puede hacer. Agregarlo obliga a que alguien lo
+    marque a mano, y un estado que depende de que alguien se acuerde miente
+    la mitad del tiempo. Si el negocio pide ver "el central ya empezó a
+    armarlo", entra entonces — y con quien lo marca definido.
 - ✅ 2026-07-27 **Lote / FEFO** (ADR-015): `lote` + `stock_lote`, control
   opcional por artículo, reparto FEFO al registrar la salida, bloqueo de
   vencidos + `inventory.lote_vencido_detectado`, lote generado por
@@ -1113,9 +1123,13 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
     pone al día el calendario —el programa solo mira los `cerrado`—, que era
     el daño real de la salida anterior: cerrar en cero afirma "se contó y no
     había diferencias".
-  - ⬜ **Frecuencias en días fijos** (mensual = 30 días desde el último
-    conteo, no el mismo día del mes). Si el negocio pide anclar al día del
-    mes, cambia `rules.proxima_fecha_conteo` y nada más.
+  - ✅ 2026-08-07 **Frecuencias en días fijos — descartado** (decidido con
+    el usuario). "Mensual" en el almacén significa *cada mes más o menos*,
+    no *el día 3 de cada mes*: el conteo se hace cuando el local puede, y
+    anclarlo al día del mes haría aparecer un atraso cada febrero por una
+    diferencia que a nadie le importa. El día que se pida, es una línea en
+    `rules.proxima_fecha_conteo` (`dateutil.relativedelta`) y nada más — el
+    resto del cálculo no cambia.
 - ✅ 2026-08-05 **Guía de remisión** (ADR-027, migración `a4c8f21e6b09`,
   **aplicada a Supabase el 2026-08-05** junto con el seeder que suma
   `inventory.emitir_guia` al rol `almacenero`):

@@ -32,6 +32,27 @@ Versionado: [SemVer](https://semver.org/lang/es/).
   `8100` fijo en tres archivos; en una máquina con ese puerto tomado por otro
   proyecto la suite no arrancaba y el error —"already used"— no decía cuál de
   los dos servidores era. El default sigue siendo `8100`.
+- **Tres pendientes de `inventory` cerrados como descartados** (2026-08-07,
+  decididos con el usuario). No se difieren: se cierran con su razón escrita,
+  para que no vuelvan a la lista cada vez que alguien la relea.
+  - **`en_picking`**: un estado que no gobierna ninguna regla no es un
+    estado, es un comentario. Entre `aprobada` y `despachada` no cambia
+    ningún permiso ni validación, y habría que marcarlo a mano — un estado
+    que depende de que alguien se acuerde miente la mitad del tiempo.
+  - **Vehículo y tracking en la transferencia**: no hay flota. El traslado
+    lo hace alguien del grupo en su propio vehículo y la placa se teclea en
+    la guía, que es el único documento que la necesita (mismo criterio que
+    ADR-027). El GPS mediría una ruta de veinte minutos entre dos locales de
+    la misma ciudad; `transportista_id` ya responde quién lo llevó.
+  - **Frecuencias de conteo ancladas al día del mes**: "mensual" en el
+    almacén significa *cada mes más o menos*, no *el día 3*. Anclarlo haría
+    aparecer un atraso cada febrero por una diferencia que a nadie le
+    importa.
+  De paso se barrieron las contradicciones que dejaban: el diagrama de
+  estados de la solicitud todavía dibujaba `en_picking` —y le faltaba
+  `cancelada`—, y ADR-020 seguía listando como pendientes la recepción
+  parcial, el ciclo offline, el disponible negativo y `stock_merma`, los
+  cuatro ya resueltos.
 
 ### Added
 

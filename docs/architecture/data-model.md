@@ -514,8 +514,10 @@ descuenta stock vía la receta (ver [../domain/domain-model.md](../domain/domain
   `almacen.almacen_abastecedor_id` al crearla, para que cambiarlo después
   no reescriba la historia de lo ya pedido. Las tres cantidades son tres
   momentos: lo pedido, lo aprobado (nunca se despacha más, RN-INV-001) y
-  lo que el central llegó a despachar. `en_picking` **no se implementó**:
-  no gobierna ninguna regla entre `aprobada` y `despachada`.
+  lo que el central llegó a despachar. `en_picking` **no se implementó y
+  quedó descartado** (2026-08-07, ADR-020): no gobierna ninguna regla entre
+  `aprobada` y `despachada`, y un estado que alguien tiene que marcar a mano
+  sin que cambie nada miente la mitad del tiempo.
   Aprobar reserva el stock en el abastecedor; cancelar o rechazar lo
   suelta (RN-INV-010).
 - **transferencia**: origen_almacen_id, destino_almacen_id, solicitud_id
