@@ -218,7 +218,7 @@ export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props)
       parchar({ ventaId: venta.id, numeroOrden: venta.numero_orden });
       setSeleccion(new Set());
       notificar(`Orden #${venta.numero_orden} enviada a cocina`);
-      datos.recargarMesas();
+      datos.mesas.recargar();
     } catch (e) {
       notificar(mensajeDe(e, "No se pudo enviar el pedido"));
     } finally {
@@ -245,9 +245,9 @@ export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props)
       );
       setDialogo(null);
       cerrarPedido(activo.id);
-      datos.recargarMesas();
-      datos.recargarCobrados();
-      datos.recargarAbiertas();
+      datos.mesas.recargar();
+      datos.cobrados.recargar();
+      datos.abiertas.recargar();
     } catch (e) {
       notificar(mensajeDe(e, "No se pudo completar el cobro"));
     } finally {
@@ -377,8 +377,8 @@ export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props)
       await api.anularVenta(activo.ventaId);
       cerrarPedido(activo.id);
       notificar(`Orden #${activo.numeroOrden} anulada`);
-      datos.recargarMesas();
-      datos.recargarAbiertas();
+      datos.mesas.recargar();
+      datos.abiertas.recargar();
     } catch (e) {
       notificar(mensajeDe(e, "No se pudo anular el pedido"));
     } finally {
@@ -414,7 +414,7 @@ export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props)
         parchar({ lineas: activo.lineas.filter((l) => l.id !== lineaId) });
         notificar("Línea anulada");
       }
-      datos.recargarMesas();
+      datos.mesas.recargar();
     } catch (e) {
       notificar(mensajeDe(e, "No se pudo anular la línea"));
     } finally {
@@ -541,7 +541,7 @@ export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props)
       <DialogoTipo
         abierto={dialogo === "tipo"}
         borrador={activo}
-        mesas={datos.mesas}
+        mesas={datos.mesas.datos}
         onCerrar={() => setDialogo(null)}
         onConfirmar={(cambios) => {
           parchar(cambios);

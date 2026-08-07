@@ -204,13 +204,48 @@ sube de prioridad.
 
 ## F2.10 Manejo de errores
 
-🔶 **Parcial**. `ApiError` ya distingue status HTTP; `dashboard/page.tsx`
-ya diferencia 401 (redirect a login) de 403 (mensaje de permiso) de otros
-(mensaje genérico "no se pudo cargar"). Patrón a repetir, no a rediseñar.
+🔶 **Parcial**. `ApiError` ya distingue status HTTP; `obtenerSesion` maneja
+el 401 (redirect a login).
+
+✅ **Error ≠ vacío (2026-08-07)**. La regla, y es innegociable en pantallas
+nuevas: **un fetch que falló nunca se dibuja como lista vacía**. El estado
+vacío queda reservado para respuestas exitosas sin filas.
+
+`lib/carga.ts` es el clasificador compartido —sin dependencias, probado con
+`node --test` en `lib/carga.test.ts`—:
+
+- `Falla = { mensaje, detalle, status }`. `mensaje` lo pone el llamador (lo
+  lee el usuario), `detalle` es lo que dijo el servidor o la excepción (se
+  muestra en letra chica, para poder diagnosticar sin abrir DevTools) y
+  `status` es `null` cuando ni hubo respuesta — red caída, proxy, DNS.
+- `fallaDe(e, mensaje)` lee el `status` por forma, no por `instanceof`: a un
+  Server Component pueden llegarle tanto `ApiError` (`lib/api.ts`) como
+  `ErrorApi` (`lib/cliente-api.ts`).
+- `esSinPermiso(falla)` es **solo 403**. Un 403 se traga (el bloque no es
+  del usuario); red, 5xx y 401 se muestran, porque "no se pudo preguntar" no
+  es "no te toca".
+- `Lista<T> = { datos, falla, recargar }` se pasa **entera** a los
+  componentes: así ninguno puede renderizar las filas sin haber mirado la
+  falla.
+
+Aplicado en los dos lugares donde el patrón viejo (`.catch(() => setLista([]))`)
+había hecho daño:
+
+- **PDV** (`app/pdv/use-datos-pdv.ts` → `catalogo.tsx`): mesas, cobrados y
+  órdenes en cocina muestran un panel `.pdv-fallo` con "Reintentar", que
+  llama a la misma función que hace la carga inicial. Reintentar sin recargar
+  la página importa acá: recargar el PDV pierde los borradores abiertos.
+- **Dashboard** (`app/(app)/dashboard/page.tsx`): cada bloque sigue fallando
+  por su cuenta, pero ahora `bloque()` separa 403 de fallo real y
+  `components/shell/aviso-fallo.tsx` lista lo que no se pudo traer con un
+  reintento (`router.refresh()` en `useTransition` — la pantalla se arma en
+  el servidor).
 
 ⬜ **Falta**: página de error global de Next.js (`error.tsx`/`not-found.tsx`
-no existen todavía), componente `EmptyState`/`ErrorState` reutilizable
-(F2.4), estrategia de retry visible al usuario (hoy es "recargar" implícito).
+no existen todavía) y unificar `.pdv-fallo` con `AvisoFallo` en un
+`ErrorState` reutilizable (F2.4) — hoy son dos porque el PDV corre sobre su
+paleta oscura propia y el shell sobre Tailwind. Quedan cargas del PDV con el
+patrón viejo (carta, medios de pago, POS, caja): ver ROADMAP → Frontend.
 
 ## F2.11 Tablas
 

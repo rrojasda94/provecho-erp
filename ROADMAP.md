@@ -1816,6 +1816,35 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
 
 ### Frontend (F2 — arquitectura y UX, documento 2026-07-27, actualizado tras ADR-013)
 
+- ✅ 2026-08-07 **Un fetch caído se dibujaba igual que "no hay datos".** El
+  patrón `.catch(() => setLista([]))` estaba en cuatro lugares y dejó sin
+  diagnóstico posible un fallo real: una venta con pago dividido no salía en
+  la pestaña "Cobrados" del PDV, la venta **sí** estaba en la base, y lo
+  único que la pantalla mostraba era una lista vacía — idéntica a la de un
+  día sin ventas. Ahora hay un clasificador compartido
+  (`frontend/lib/carga.ts`, sin dependencias, 7 casos en `lib/carga.test.ts`)
+  y la regla queda escrita en `docs/product/frontend-architecture.md` §F2.10:
+  **el vacío es solo para la respuesta exitosa sin filas**. El status se lee
+  por forma y no por `instanceof` porque hay dos clases de error de API en el
+  proyecto (`ApiError` servidor / `ErrorApi` navegador) y a un Server
+  Component pueden llegarle las dos; `Falla` guarda el mensaje del servidor
+  como `detalle` para no obligar a abrir DevTools. En el PDV el reintento es
+  en sitio y no "recargá la página": recargar el PDV pierde los borradores
+  abiertos. En el dashboard **solo el 403** sigue tragándose —ahí el catch es
+  deliberado: que falte un permiso no puede dejar el tablero en blanco—; red,
+  5xx y 401 se muestran con reintento (`router.refresh()`), que además tapa
+  el agujero de que un error de red tumbara la página entera por no existir
+  `error.tsx`.
+- ⬜ **Cuatro cargas del PDV siguen con el patrón viejo**: carta, medios de
+  pago, POS y caja abierta (`frontend/app/pdv/use-datos-pdv.ts`). La de la
+  carta es la que más incomoda — un error de red se lee como "ningún producto
+  tiene precio vigente para esta sucursal", que manda a revisar precios en
+  vez de la red. No se tocaron en el cambio de 2026-08-07 por alcance; se
+  migran a `Lista<T>` cuando se toque cada una.
+- ⬜ **`.pdv-fallo` y `AvisoFallo` son dos componentes para lo mismo**: el
+  PDV corre sobre su paleta oscura propia y el shell sobre Tailwind. Se
+  unifican cuando el PDV migre a shadcn (ver punto de abajo), no antes.
+
 - ⬜ **Migrar a `@tanstack/react-table` v9** (2026-08-08). La v9 renombró la
   API pública: `useReactTable` pasa a `ReactTable` + `createCoreRowModel`,
   `VisibilityState` deja de exportarse y `ColumnDef` toma dos genéricos. Toca

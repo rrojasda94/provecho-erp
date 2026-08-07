@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 
+import type { Falla, Lista } from "@/lib/carga";
 import { soles, type ItemDeCarta, type MesaEnMapa, type Venta } from "@/lib/pdv";
 
 type Vista = "catalogo" | "mesas" | "cobrados";
@@ -9,9 +10,9 @@ const TODAS = "__todas__";
 
 type Props = {
   carta: ItemDeCarta[];
-  mesas: MesaEnMapa[];
-  cobrados: Venta[];
-  abiertas: Venta[];
+  mesas: Lista<MesaEnMapa>;
+  cobrados: Lista<Venta>;
+  abiertas: Lista<Venta>;
   vista: Vista;
   onVista: (v: Vista) => void;
   onProducto: (item: ItemDeCarta) => void;
@@ -159,27 +160,53 @@ function ProductosGrid({
   );
 }
 
+/**
+ * Lo que se muestra cuando una lista no se pudo traer.
+ *
+ * Un fetch caído no es un día sin ventas: dibujarlo como lista vacía fue lo
+ * que dejó indiagnosticable, desde la pantalla, una venta que sí estaba en
+ * la base. Por eso se dice qué falló, se deja el detalle técnico a la vista
+ * y se ofrece reintentar sin recargar la página — recargar el PDV significa
+ * perder los borradores abiertos en las pestañas del ticket.
+ */
+function Fallo({ falla, onReintentar }: { falla: Falla; onReintentar: () => void }) {
+  return (
+    <div className="pdv-fallo" role="alert">
+      <strong>{falla.mensaje}</strong>
+      <span>
+        {falla.status ? `Error ${falla.status}` : "Sin respuesta del servidor"}
+        {falla.detalle ? ` · ${falla.detalle}` : ""}
+      </span>
+      <button type="button" className="pdv-boton-sec" onClick={onReintentar}>
+        Reintentar
+      </button>
+    </div>
+  );
+}
+
 function MapaMesas({
   mesas,
   abiertas,
   onMesa,
   onOrdenAbierta,
 }: {
-  mesas: MesaEnMapa[];
-  abiertas: Venta[];
+  mesas: Lista<MesaEnMapa>;
+  abiertas: Lista<Venta>;
   onMesa: (m: MesaEnMapa) => void;
   onOrdenAbierta: (v: Venta) => void;
 }) {
-  const ocupadas = mesas.filter((m) => m.venta_id).length;
+  const ocupadas = mesas.datos.filter((m) => m.venta_id).length;
   return (
     <div className="pdv-mesas">
-      {mesas.length > 0 ? (
+      {mesas.falla ? (
+        <Fallo falla={mesas.falla} onReintentar={mesas.recargar} />
+      ) : mesas.datos.length > 0 ? (
         <>
           <p className="pdv-mesas-resumen">
-            {ocupadas} de {mesas.length} ocupadas
+            {ocupadas} de {mesas.datos.length} ocupadas
           </p>
           <div className="pdv-mesas-grid">
-            {mesas.map((m) => (
+            {mesas.datos.map((m) => (
               <button
                 key={m.id}
                 type="button"
@@ -207,13 +234,17 @@ function MapaMesas({
         </p>
       )}
 
-      {abiertas.length > 0 && (
+      {abiertas.falla && (
+        <Fallo falla={abiertas.falla} onReintentar={abiertas.recargar} />
+      )}
+
+      {!abiertas.falla && abiertas.datos.length > 0 && (
         <>
           <p className="pdv-mesas-resumen">
-            {abiertas.length} para llevar/delivery en cocina
+            {abiertas.datos.length} para llevar/delivery en cocina
           </p>
           <ul className="pdv-abiertas">
-            {abiertas.map((v) => (
+            {abiertas.datos.map((v) => (
               <li key={v.id}>
                 <button type="button" onClick={() => onOrdenAbierta(v)}>
                   <span className="pdv-cobrado-orden">#{v.numero_orden}</span>
@@ -236,23 +267,34 @@ function Cobrados({
   ventas,
   onVer,
 }: {
-  ventas: Venta[];
+  ventas: Lista<Venta>;
   onVer: (v: Venta) => void;
 }) {
-  if (!ventas.length) {
+  // El vacío queda reservado para la respuesta exitosa sin filas: si la
+  // petición se cayó, "todavía no hay pedidos cobrados" sería mentira, y es
+  // exactamente la mentira que hay que poder descartar cuando un cobro no
+  // aparece acá.
+  if (ventas.falla) {
+    return (
+      <div className="pdv-cobrados">
+        <Fallo falla={ventas.falla} onReintentar={ventas.recargar} />
+      </div>
+    );
+  }
+  if (!ventas.datos.length) {
     return <p className="pdv-nada">Todavía no hay pedidos cobrados hoy.</p>;
   }
-  const total = ventas.reduce((a, v) => a + Number(v.total), 0);
+  const total = ventas.datos.reduce((a, v) => a + Number(v.total), 0);
   return (
     <div className="pdv-cobrados">
       <div className="pdv-cobrados-cab">
         <span>
-          {ventas.length} {ventas.length === 1 ? "pedido" : "pedidos"}
+          {ventas.datos.length} {ventas.datos.length === 1 ? "pedido" : "pedidos"}
         </span>
         <strong>{soles(total)}</strong>
       </div>
       <ul>
-        {ventas.map((v) => (
+        {ventas.datos.map((v) => (
           <li key={v.id}>
             <button type="button" onClick={() => onVer(v)}>
               <span className="pdv-cobrado-orden">#{v.numero_orden}</span>
