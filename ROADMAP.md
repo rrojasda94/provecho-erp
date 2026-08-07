@@ -830,6 +830,23 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   todavía por sucursal.
 
 ### CI/CD (tras la implementación de 2026-07-26)
+- 🔴 **El job `frontend` está en rojo y bloquea todo merge** (2026-08-07).
+  `npm run lint` muere con "Converting circular structure to JSON"
+  resolviendo el `.eslintrc.json` legacy bajo ESLint 9. **Empezó solo, sin
+  que nadie tocara `frontend/`**: el PR #31 pasó verde unas horas antes con
+  el mismo árbol, el mismo `package-lock.json` y el mismo `npm ci`.
+  **Causa no identificada.** Se descartó la versión de Node: se fijó el
+  runner en 24.16.0 —el patch exacto que pasa en local— y **falló igual**,
+  así que el pin se revirtió en vez de dejarlo congelando una versión por
+  una teoría refutada. Lo que queda en pie: falla en el runner Linux y pasa
+  en Windows con todo lo demás idéntico (mismo commit, mismo lockfile,
+  `npm ci` desde cero, mismo Node), así que apunta al entorno y no al
+  código.
+  El arreglo que **no depende de encontrar la causa** es migrar a la CLI de
+  ESLint con flat config (`npx @next/codemod@canary
+  next-lint-to-eslint-cli .`): saca del medio el puente legacy que revienta,
+  y hay que hacerlo igual porque `next lint` está deprecado y **desaparece
+  en Next 16**.
 - ⬜ **Job de despliegue** (ver *Cuando haya servidor*, punto 7): hoy el despliegue es manual y documentado. Se
   escribe cuando exista el VPS — automatizar por SSH contra una máquina que
   no existe da automatización no probada (ADR-008).
