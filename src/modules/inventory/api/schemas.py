@@ -661,3 +661,57 @@ class GuiaRemisionOut(BaseModel):
 
 class GuiaRemisionDetalleOut(GuiaRemisionOut):
     items: list[GuiaRemisionItemOut]
+
+
+# --- Lote ascendente del hub (ADR-009) ---------------------------------------
+class SolicitudSyncIn(BaseModel):
+    """Solicitud creada en el local durante un corte. Viaja con su `id`
+    client-generado: reproducirla dos veces no la duplica."""
+
+    id: uuid.UUID
+    almacen_solicitante_id: uuid.UUID
+    almacen_abastecedor_id: uuid.UUID
+    solicitado_por: uuid.UUID
+    observacion: str | None = None
+    items: list[SolicitudItemIn] = Field(min_length=1)
+
+
+class RecepcionSyncItemIn(BaseModel):
+    item_id: uuid.UUID
+    cantidad: Decimal = Field(ge=0)
+
+
+class RecepcionSyncIn(BaseModel):
+    """El local recibió el camión sin conexión. La transferencia ya existe
+    en la nube —la creó el central—, así que lo que sube es el hecho de
+    haberla recibido, no la fila."""
+
+    id: uuid.UUID
+    recibido_por: uuid.UUID
+    recibidas: list[RecepcionSyncItemIn] = []
+
+
+class ConteoSyncItemIn(BaseModel):
+    sku_id: uuid.UUID
+    cantidad: Decimal = Field(ge=0)
+
+
+class ConteoSyncIn(BaseModel):
+    """Conteo cerrado (o anulado) en el local. Se reproduce en tres pasos
+    porque el cierre es el que genera los ajustes en la nube."""
+
+    id: uuid.UUID
+    almacen_id: uuid.UUID
+    categoria_id: uuid.UUID | None = None
+    tipo: str = "rutina"
+    estado: str = Field(pattern="^(cerrado|anulado)$")
+    abierto_por: uuid.UUID
+    cerrado_por: uuid.UUID | None = None
+    observacion: str | None = None
+    items: list[ConteoSyncItemIn] = []
+
+
+class LoteInventorySyncIn(BaseModel):
+    solicitudes: list[SolicitudSyncIn] = []
+    recepciones: list[RecepcionSyncIn] = []
+    conteos: list[ConteoSyncIn] = []

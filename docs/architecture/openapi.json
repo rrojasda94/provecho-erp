@@ -3102,6 +3102,115 @@
         "title": "ConteoOut",
         "type": "object"
       },
+      "ConteoSyncIn": {
+        "description": "Conteo cerrado (o anulado) en el local. Se reproduce en tres pasos\nporque el cierre es el que genera los ajustes en la nube.",
+        "properties": {
+          "abierto_por": {
+            "format": "uuid",
+            "title": "Abierto Por",
+            "type": "string"
+          },
+          "almacen_id": {
+            "format": "uuid",
+            "title": "Almacen Id",
+            "type": "string"
+          },
+          "categoria_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Categoria Id"
+          },
+          "cerrado_por": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cerrado Por"
+          },
+          "estado": {
+            "pattern": "^(cerrado|anulado)$",
+            "title": "Estado",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "items": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ConteoSyncItemIn"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "observacion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observacion"
+          },
+          "tipo": {
+            "default": "rutina",
+            "title": "Tipo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "almacen_id",
+          "estado",
+          "abierto_por"
+        ],
+        "title": "ConteoSyncIn",
+        "type": "object"
+      },
+      "ConteoSyncItemIn": {
+        "properties": {
+          "cantidad": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Cantidad"
+          },
+          "sku_id": {
+            "format": "uuid",
+            "title": "Sku Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sku_id",
+          "cantidad"
+        ],
+        "title": "ConteoSyncItemIn",
+        "type": "object"
+      },
       "ContratoLaboralCreate": {
         "properties": {
           "fecha_fin": {
@@ -6293,6 +6402,36 @@
           "articulo_id"
         ],
         "title": "LoteCreate",
+        "type": "object"
+      },
+      "LoteInventorySyncIn": {
+        "properties": {
+          "conteos": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ConteoSyncIn"
+            },
+            "title": "Conteos",
+            "type": "array"
+          },
+          "recepciones": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/RecepcionSyncIn"
+            },
+            "title": "Recepciones",
+            "type": "array"
+          },
+          "solicitudes": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/SolicitudSyncIn"
+            },
+            "title": "Solicitudes",
+            "type": "array"
+          }
+        },
+        "title": "LoteInventorySyncIn",
         "type": "object"
       },
       "LoteOut": {
@@ -11683,24 +11822,46 @@
         "type": "object"
       },
       "PushIn": {
+        "description": "Un lote por módulo, los dos opcionales.\n\nEl motor empuja **un módulo por ciclo de watermark**, así que en la\npráctica llega uno solo — pero el contrato admite los dos para que un\nhub que acumuló de todo no tenga que hacer dos requests.",
         "properties": {
+          "inventory": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LoteInventorySyncIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "sales": {
-            "$ref": "#/components/schemas/LoteSyncIn"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LoteSyncIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
-        "required": [
-          "sales"
-        ],
         "title": "PushIn",
         "type": "object"
       },
       "PushOut": {
         "properties": {
           "anuladas": {
+            "default": 0,
             "title": "Anuladas",
             "type": "integer"
           },
+          "conteos": {
+            "default": 0,
+            "title": "Conteos",
+            "type": "integer"
+          },
           "errores": {
+            "default": [],
             "items": {
               "$ref": "#/components/schemas/ErrorSyncOut"
             },
@@ -11708,21 +11869,29 @@
             "type": "array"
           },
           "pagos": {
+            "default": 0,
             "title": "Pagos",
             "type": "integer"
           },
+          "recepciones": {
+            "default": 0,
+            "description": "Transferencias recibidas",
+            "title": "Recepciones",
+            "type": "integer"
+          },
+          "solicitudes": {
+            "default": 0,
+            "description": "Solicitudes de insumos",
+            "title": "Solicitudes",
+            "type": "integer"
+          },
           "ventas": {
+            "default": 0,
             "description": "Ventas creadas o ya existentes",
             "title": "Ventas",
             "type": "integer"
           }
         },
-        "required": [
-          "ventas",
-          "pagos",
-          "anuladas",
-          "errores"
-        ],
         "title": "PushOut",
         "type": "object"
       },
@@ -11862,6 +12031,63 @@
           "recibido_por"
         ],
         "title": "RecepcionOut",
+        "type": "object"
+      },
+      "RecepcionSyncIn": {
+        "description": "El local recibió el camión sin conexión. La transferencia ya existe\nen la nube —la creó el central—, así que lo que sube es el hecho de\nhaberla recibido, no la fila.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "recibidas": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/RecepcionSyncItemIn"
+            },
+            "title": "Recibidas",
+            "type": "array"
+          },
+          "recibido_por": {
+            "format": "uuid",
+            "title": "Recibido Por",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "recibido_por"
+        ],
+        "title": "RecepcionSyncIn",
+        "type": "object"
+      },
+      "RecepcionSyncItemIn": {
+        "properties": {
+          "cantidad": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Cantidad"
+          },
+          "item_id": {
+            "format": "uuid",
+            "title": "Item Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "item_id",
+          "cantidad"
+        ],
+        "title": "RecepcionSyncItemIn",
         "type": "object"
       },
       "RecetaCreate": {
@@ -13433,6 +13659,59 @@
           "num_solicitudes"
         ],
         "title": "SolicitudResumenOut",
+        "type": "object"
+      },
+      "SolicitudSyncIn": {
+        "description": "Solicitud creada en el local durante un corte. Viaja con su `id`\nclient-generado: reproducirla dos veces no la duplica.",
+        "properties": {
+          "almacen_abastecedor_id": {
+            "format": "uuid",
+            "title": "Almacen Abastecedor Id",
+            "type": "string"
+          },
+          "almacen_solicitante_id": {
+            "format": "uuid",
+            "title": "Almacen Solicitante Id",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SolicitudItemIn"
+            },
+            "minItems": 1,
+            "title": "Items",
+            "type": "array"
+          },
+          "observacion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observacion"
+          },
+          "solicitado_por": {
+            "format": "uuid",
+            "title": "Solicitado Por",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "almacen_solicitante_id",
+          "almacen_abastecedor_id",
+          "solicitado_por",
+          "items"
+        ],
+        "title": "SolicitudSyncIn",
         "type": "object"
       },
       "StockLoteOut": {
@@ -30132,7 +30411,7 @@
     },
     "/api/v1/sync/push": {
       "post": {
-        "description": "Reproduce en la nube el lote que el hub acumuló durante el corte.\n\nNo escribe filas crudas: cada ítem pasa por el caso de uso de `sales`,\ncon sus validaciones, su idempotencia y sus eventos (por eso la nube\ndescuenta su propio stock y prepara los comprobantes). Un ítem\nrechazado se informa y no arrastra al resto del lote.",
+        "description": "Reproduce en la nube el lote que el hub acumuló durante el corte.\n\nNo escribe filas crudas: cada ítem pasa por el caso de uso de su módulo,\ncon sus validaciones, su idempotencia y sus eventos (por eso la nube\ndescuenta su propio stock y prepara los comprobantes). Un ítem rechazado\nse informa y no arrastra al resto del lote.\n\nEl cuerpo trae un lote por módulo y los dos son opcionales: el motor\nempuja de a un módulo por ciclo de watermark, así que en la práctica\nllega uno solo.",
         "operationId": "push_api_v1_sync_push_post",
         "requestBody": {
           "content": {

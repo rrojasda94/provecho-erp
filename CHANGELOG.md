@@ -5,6 +5,83 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Los campos de apertura y cierre de caja no tenían nombre accesible**
+  (2026-08-07). Usuario, PIN, destino de custodia, atribución del descuadre y
+  el monto declarado eran `<input>`/`<select>` con solo `placeholder`. Un
+  `placeholder` no es un nombre: desaparece al escribir y ningún lector de
+  pantalla lo anuncia como el nombre del campo. Se agregó `aria-label` a los
+  seis. Se usó `aria-label` y no un `<label>` envolvente porque los pares
+  usuario/PIN son celdas de la grilla `.pdv-dos` y envolverlos la rompe.
+  - Salió de una corrida de pruebas por navegador: el agente no encontraba el
+    PIN de quien recibe y no podía cerrar la caja. El `e2e` existente no lo
+    vio nunca porque maneja los diálogos por `data-testid`, un atributo
+    nuestro que existe aunque el campo esté mudo para asistencia técnica. La
+    prueba nueva busca por etiqueta a propósito.
+- **El nombre del tablero se pedía con `window.prompt`** (2026-08-07). El
+  prompt nativo no se puede etiquetar ni estilar, y ningún automatismo de
+  navegador lo alcanza: guardar un tablero no tenía forma de probarse de
+  punta a punta. Ahora es un diálogo con campo etiquetado. Guardar sobre un
+  tablero propio existente ya no pregunta nada — conserva su nombre; solo el
+  alta y "Guardar como…" piden uno.
+
+### Changed
+
+- **El puerto de la API del `e2e` sale de `E2E_PUERTO_API`** (2026-08-07). Era
+  `8100` fijo en tres archivos; en una máquina con ese puerto tomado por otro
+  proyecto la suite no arrancaba y el error —"already used"— no decía cuál de
+  los dos servidores era. El default sigue siendo `8100`.
+- **Tres pendientes de `inventory` cerrados como descartados** (2026-08-07,
+  decididos con el usuario). No se difieren: se cierran con su razón escrita,
+  para que no vuelvan a la lista cada vez que alguien la relea.
+  - **`en_picking`**: un estado que no gobierna ninguna regla no es un
+    estado, es un comentario. Entre `aprobada` y `despachada` no cambia
+    ningún permiso ni validación, y habría que marcarlo a mano — un estado
+    que depende de que alguien se acuerde miente la mitad del tiempo.
+  - **Vehículo y tracking en la transferencia**: no hay flota. El traslado
+    lo hace alguien del grupo en su propio vehículo y la placa se teclea en
+    la guía, que es el único documento que la necesita (mismo criterio que
+    ADR-027). El GPS mediría una ruta de veinte minutos entre dos locales de
+    la misma ciudad; `transportista_id` ya responde quién lo llevó.
+  - **Frecuencias de conteo ancladas al día del mes**: "mensual" en el
+    almacén significa *cada mes más o menos*, no *el día 3*. Anclarlo haría
+    aparecer un atraso cada febrero por una diferencia que a nadie le
+    importa.
+  De paso se barrieron las contradicciones que dejaban: el diagrama de
+  estados de la solicitud todavía dibujaba `en_picking` —y le faltaba
+  `cancelada`—, y ADR-020 seguía listando como pendientes la recepción
+  parcial, el ciclo offline, el disponible negativo y `stock_merma`, los
+  cuatro ya resueltos.
+
+### Added
+
+- **El ciclo de abastecimiento funciona sin conexión** (2026-08-07, ADR-009
+  fase 3). El hub replicaba catálogo y stock para poder **vender** offline;
+  ahora el local también **pide, ve lo que viene y recibe**, que es lo que
+  pasa cuando el internet no está — el camión no espera.
+  - **Baja**: `solicitud_insumos`/`solicitud_item` (las que pidió),
+    `transferencia`/`transferencia_item` (las que **entran** a su almacén) y
+    `reserva_stock` —sin las reservas su `disponible` offline sería el
+    físico entero y comprometería stock ya prometido—. De 28 a 35 recursos.
+  - **Sube**: la solicitud creada, la recepción hecha y el conteo cerrado.
+  - **El motor deja de estar cableado a `sales`.** El push era de un solo
+    módulo; ahora hay un registro (`MODULOS_PUSH`) y **cada uno lleva su
+    propio watermark**: si `inventory` se traba con una recepción que la
+    nube rechaza, las ventas siguen subiendo. Que un conteo bloquee el
+    dinero sería exactamente al revés de lo que importa.
+  - Tres decisiones que valen más que las tablas: **la recepción no es una
+    fila que sube, es un hecho** —la transferencia la creó el central, así
+    que reproducirla dos veces tiene que ser inocuo o un error ajeno traba
+    el recurso para siempre—; **el conteo sube cerrado, nunca a medias**
+    —uno abierto generaría arriba ajustes por ítems que nadie miró—; y el
+    orden del push es `sales` y después `inventory`, para que el conteo mida
+    contra un stock que ya incluye lo vendido durante el corte.
+  - En el camino se descubrió que **el hub no replicaba su almacén
+    abastecedor**: `crear_solicitud` exige que exista, así que pedir offline
+    fallaba con "abastecedor no encontrado". Ahora viaja la **ficha** del
+    central; su stock sigue sin replicarse.
+
 ### Changed
 
 - **Next.js 15.5.22 → 16.3.0, TypeScript 5.5 → 6.0.3 y ESLint pasado a flat

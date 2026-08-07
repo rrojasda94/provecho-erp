@@ -28,18 +28,13 @@ from src.modules.inventory.infrastructure.repositories import SolicitudRepo
 from src.modules.users.infrastructure.models import Almacen
 
 
-def crear_solicitud(
+def _abastecedor_valido(
     session: Session,
-    *,
     almacen_solicitante_id: uuid.UUID,
-    items: list[tuple[uuid.UUID, Decimal]],
-    solicitado_por: uuid.UUID,
-    almacen_abastecedor_id: uuid.UUID | None = None,
-    observacion: str | None = None,
-) -> SolicitudInsumos:
-    """Sin abastecedor explícito se usa el configurado en el almacén."""
-    if not items:
-        raise ReglaNegocio("la solicitud necesita al menos un ítem")
+    almacen_abastecedor_id: uuid.UUID | None,
+) -> uuid.UUID:
+    """De qué almacén se abastece este, con las cuatro cosas que tienen que
+    ser ciertas para que el pedido signifique algo."""
     solicitante = session.get(Almacen, almacen_solicitante_id)
     if solicitante is None or solicitante.deleted_at is not None:
         raise NoEncontrado("almacén solicitante no encontrado")
@@ -57,10 +52,39 @@ def crear_solicitud(
         raise NoEncontrado("almacén abastecedor no encontrado")
     if abastecedor.empresa_id != solicitante.empresa_id:
         raise ReglaNegocio("los dos almacenes deben ser de la misma empresa")
+    return abastecedor_id
 
+
+def crear_solicitud(
+    session: Session,
+    *,
+    almacen_solicitante_id: uuid.UUID,
+    items: list[tuple[uuid.UUID, Decimal]],
+    solicitado_por: uuid.UUID,
+    almacen_abastecedor_id: uuid.UUID | None = None,
+    observacion: str | None = None,
+    id: uuid.UUID | None = None,
+) -> SolicitudInsumos:
+    """Sin abastecedor explícito se usa el configurado en el almacén.
+
+    `id` explícito lo usa el hub que ya creó la solicitud sin conexión
+    (ADR-009): al reproducirla en la nube conserva su identidad, así que
+    reenviar el mismo lote no la duplica y el local sigue viendo el mismo
+    número que anotó en el papel.
+    """
+    if not items:
+        raise ReglaNegocio("la solicitud necesita al menos un ítem")
+    abastecedor_id = _abastecedor_valido(
+        session, almacen_solicitante_id, almacen_abastecedor_id
+    )
     repo = SolicitudRepo(session)
+    if id is not None and repo.get(id) is not None:
+        # Reproducción idempotente: el hub reenvía el lote entero cuando un
+        # ítem falla, así que la solicitud que ya entró no se crea dos veces.
+        return repo.get(id)
     solicitud = repo.add(
         SolicitudInsumos(
+            id=id or uuid.uuid4(),
             almacen_solicitante_id=almacen_solicitante_id,
             almacen_abastecedor_id=abastecedor_id,
             estado="pendiente",

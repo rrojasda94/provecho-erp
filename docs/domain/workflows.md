@@ -584,8 +584,10 @@ y queda registrada como excepción. Diagrama BPMN completo:
 
 ## Estados clave
 
-- Solicitud: `pendiente → aprobada|rechazada → en_picking → despachada → recibida`
-- Transferencia: `en_transito → recibida` (diferencias registradas y auditadas)
+- Solicitud: `pendiente → aprobada|rechazada|cancelada → despachada → recibida`
+  (`en_picking` se descartó: no gobierna ninguna regla — ADR-020)
+- Transferencia: `en_transito → recibida` (diferencias registradas y auditadas).
+  La recepción puede ser **parcial**: lo que no llegó sigue en tránsito.
 - OC: `borrador → emitida → recibida_parcial → recibida | anulada`
 - Venta: confirmación exige stock de receta; anulación genera contramovimientos.
 - Cumplimiento de pedido (por ítem): `pendiente → en_preparacion → listo → entregado`,

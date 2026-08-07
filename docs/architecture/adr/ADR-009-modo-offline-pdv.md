@@ -254,12 +254,13 @@ decida.
 
 ### Lo que viaja y lo que no
 
-Se replican 28 recursos: organización (grupo, empresa, marca, sucursal,
+Se replican 35 recursos: organización (grupo, empresa, marca, sucursal,
 almacén), RBAC completo (persona, usuario, rol, permiso y sus
 asignaciones), catálogo de inventario (unidades, categorías, artículos,
-SKU, recetas, stock, lote y stock por lote) y catálogo comercial
-(producto, medio de pago, punto de venta, pantallas KDS). Decisiones finas
-dentro de eso:
+SKU, recetas, stock, lote y stock por lote), catálogo comercial (producto,
+medio de pago, punto de venta, pantallas KDS) y —desde la **fase 3**
+(2026-08-07)— el ciclo de abastecimiento (reservas, solicitudes y
+transferencias que entran al local). Decisiones finas dentro de eso:
 
 - **`usuario.pin_hash` sí; `intentos_fallidos`/`bloqueado_hasta` no.** El
   hash es indispensable para autenticar offline. El lockout, en cambio, es
@@ -269,7 +270,10 @@ dentro de eso:
   domicilio, teléfono, email ni fecha de nacimiento. El PDV muestra un
   nombre, no una ficha — minimización de datos (Ley 29733) sobre hardware
   que vive en un local, no en un datacenter.
-- **Solo el almacén de la sucursal**, no el central de la empresa.
+- **El almacén de la sucursal y su abastecedor** (el central se sumó en la
+  fase 3). Viaja la **ficha** del central, no su stock: sin la fila, el
+  local no puede ni pedirle insumos offline —`crear_solicitud` exige que el
+  abastecedor exista— ni saber de dónde viene el camión que recibe.
 - **`lote` y `stock_lote` viajan** (agregados 2026-07-27 con FEFO,
   ADR-015): sin la fecha de vencimiento en el hub, la venta offline
   descontaría cualquier lote y la nube, al reprocesar el evento, elegiría
@@ -284,6 +288,17 @@ dentro de eso:
   faltaba la columna.
 - **`cliente` no viaja**: una venta offline es anónima o con datos
   escritos a mano. Venta a cliente registrado exige estar en línea.
+- **La guía de remisión no se emite offline** (fase 3, decidido con el
+  usuario 2026-08-07). No es una limitación pendiente de resolver: el
+  correlativo es único por `(empresa, serie)` y dos hubs numerando a la vez
+  colisionarían **con la guía ya impresa y viajando en el camión** — el
+  conflicto aparecería recién al sincronizar, cuando ya no hay nada que
+  corregir. Las dos salidas conocidas se descartaron por costo: una serie
+  por almacén emisor (lo que SUNAT espera) obliga a registrar cada serie
+  antes de usarla, y un rango de correlativos por hub deja huecos que hay
+  que justificar en una fiscalización. Hoy el único emisor es el almacén
+  central, que está en la nube; el despacho lateral offline se registra y su
+  guía sale al reconectar.
 - **`venta_item.id` no se conserva** entre hub y nube (sí el de la venta):
   nada fuera del hub referencia un ítem, y el avance de KDS es local al
   local.

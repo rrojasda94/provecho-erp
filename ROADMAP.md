@@ -18,7 +18,7 @@ Registro de lo construido y lo pendiente. Actualizar en cada cambio relevante.
 | Módulo `users` (auth JWT + PIN + RBAC) | ✅ 2026-07-25 | Slice auth+CRUD implementado: 7 tablas RBAC (`rol`, `permiso`, `usuario_rol`, `rol_permiso`, `usuario_sucursal`, `refresh_token`, `audit_log`) + lockout en `usuario`. Login/refresh(rotativo+detección de reuso)/logout/me + CRUD admin de usuarios/roles/permisos/asignaciones. Argon2id, JWT, `require_permission` deny por defecto. `docs/security/authorization.md`. Restricciones JSONB por permiso: aplicadas desde 2026-08-02 (ADR-022, ver Deuda técnica). |
 | Migraciones Alembic | 🔶 al día 2026-08-05 | La BD dev de Supabase está en la cabeza del repo (`a4c8f21e6b09`, guía de remisión) y `python -m src.core.esquema` reporta **cero deriva**. Las primeras seis fueron transversal+org, slice Venta, cobro/caja, cliente opcional, slice auth/RBAC e inventory core; el detalle de cada slice posterior va en su fila. Tras aplicar una migración que suma permisos hay que correr `python -m src.seeders.seed` (idempotente): la migración crea tablas, no filas de RBAC. |
 | Seeders (admin / PIN 123456, org base) | ✅ 2026-07-27 | `src/seeders/seed.py` (idempotente, prohibido en prod): matriz de roles/permisos semilla, `admin`/PIN `123456` y la **organización real** del grupo — empresa Majambo EIRL (RUC 20450311520, Jr. Ramón Castilla 248 - Tarapoto, zona `amazonia_ley27037`), marca Charlie's Pizzas **licenciada** a la empresa (`licencia_marca`), sucursales `CH1` (Jr. Ramón Castilla 248) y `CH2` (Jr. Lamas 299) activas y alquiladas (RN-IMP-004), almacén central `WH1` (`sucursal_id` NULL). Requirió `almacen.direccion` (migración `e5a1c93b7d40`): el central no cuelga de ninguna sucursal y no había dónde guardar su ubicación. Correr: `python -m src.seeders.seed`. Diferido: almacenes de sucursal de CH1/CH2 (no pedidos; su mín./máx. por SKU depende de datos de operación inexistentes) y CRUD de organización por API — hoy empresa/sucursal/almacén solo se crean por seeder. |
-| Módulo `inventory` | 🔶 slices 1-4 ✅ 2026-08-01 | **Slice 1**: catálogo (CRUD artículos/categorías/SKUs), stock por almacén (vía `movimiento_inventario` inmutable) y ajuste con segregación (`solicitar_ajuste` ≠ `aprobar_ajuste`, aprobador ≠ solicitante). Migración `be914c92a94b`. **Slice 2 — lote/FEFO** (2026-07-27, ADR-015): `lote` + `stock_lote`, control **opcional por artículo** (`articulo.controla_lote` — el queso sí, las servilletas no). La salida reparte por FEFO (vence antes, sale antes; sin vencimiento va al final → FIFO) y genera **un movimiento por lote tomado**, con `lote_id` explícito como override. El lote vencido se bloquea cuando el picking lo toca y publica `inventory.lote_vencido_detectado`; `POST /lotes/bloquear-vencidos` hace el barrido a demanda. La recepción de compra transporta el lote y vencimiento del proveedor (RN-VNC-002) y producción crea el suyo. Nada entra sin lote si el artículo lo controla: un ingreso sin lote cae en el lote del día. `POST /movimientos` pasa a devolver **lista** de movimientos. El hub replica `lote`/`stock_lote` (ADR-009, 28 recursos). Migración `c9a2f4e18b60`. Tests: `tests/test_lotes.py`. **Slice 3 — conteo cíclico** (2026-08-01, ADR-019): `conteo` + `conteo_item` con la periodicidad configurada **en la categoría** (`categoria.frecuencia_conteo`, RN-INV-007) — no hay número universal. Calendario derivado del último conteo cerrado + frecuencia, sin tabla de programación; conteo general que pone al día a todas las categorías del almacén; stock esperado congelado al abrir; conteo **a ciegas** por defecto (`inventory.ver_stock_esperado`); el cierre genera un `ajuste` pendiente por diferencia (`ajuste.conteo_id`) sin mover stock, con margen `INVENTORY_MARGEN_AJUSTE_PCT`; `inventory.conteo_vencido` reporta a almacén y gerencia lo no contado en su fecha (RN-INV-021). Permisos nuevos `inventory.contar` y `inventory.ver_stock_esperado`. Migración `c4e70a91d5b8`. Tests: `tests/test_conteos.py`. **Slice 4 — abastecimiento interno** (2026-08-01, ADR-020): `reserva_stock` + `solicitud_insumos`/`solicitud_item` + `transferencia`/`transferencia_item`. El local pide, el supervisor aprueba **y reserva** el stock en el abastecedor, el central despacha (FEFO, un `transferencia_item` por lote) y el local recibe. `GET /stock` expone `cantidad`/`reservado`/`disponible` (RN-INV-009): reservar exige disponible, pero consumir nunca se bloquea por una reserva —una venta ya ocurrida no se niega— y por eso el disponible puede quedar negativo. Diferencias registradas, no corregidas: no se despacha más de lo aprobado ni se recibe más de lo enviado, menos sí (RN-INV-001/002). Cancelar libera reservas (RN-INV-010) y hay liberación manual (RN-INV-011). Transferencia lateral sucursal↔sucursal con la misma entidad. Migración `d8b35f1ca207`. Tests: `tests/test_transferencias.py`. **Slice 5 — recetas editables** (2026-08-03, ADR-023): CRUD de receta e ítems, duplicar con "(copy)", escalar por factor y **aritmética tecleada** en la cantidad ("1000/3"), evaluada en el servidor con `ast` y lista blanca —nunca `eval`— y redondeada a los decimales de la UdM del insumo (RN-COM-024); `receta_item.expresion` guarda lo tecleado para reeditarlo. `GET /inventory/unidades-medida` y contrato público `receta_resumen`. Migración `b6d1e83f47ac`. Tests: `tests/test_recetas_variantes.py`. Diferido: devolución, guía remisión, `stock_merma`. |
+| Módulo `inventory` | 🔶 slices 1-4 ✅ 2026-08-01 | **Slice 1**: catálogo (CRUD artículos/categorías/SKUs), stock por almacén (vía `movimiento_inventario` inmutable) y ajuste con segregación (`solicitar_ajuste` ≠ `aprobar_ajuste`, aprobador ≠ solicitante). Migración `be914c92a94b`. **Slice 2 — lote/FEFO** (2026-07-27, ADR-015): `lote` + `stock_lote`, control **opcional por artículo** (`articulo.controla_lote` — el queso sí, las servilletas no). La salida reparte por FEFO (vence antes, sale antes; sin vencimiento va al final → FIFO) y genera **un movimiento por lote tomado**, con `lote_id` explícito como override. El lote vencido se bloquea cuando el picking lo toca y publica `inventory.lote_vencido_detectado`; `POST /lotes/bloquear-vencidos` hace el barrido a demanda. La recepción de compra transporta el lote y vencimiento del proveedor (RN-VNC-002) y producción crea el suyo. Nada entra sin lote si el artículo lo controla: un ingreso sin lote cae en el lote del día. `POST /movimientos` pasa a devolver **lista** de movimientos. El hub replica `lote`/`stock_lote` (ADR-009). Migración `c9a2f4e18b60`. Tests: `tests/test_lotes.py`. **Slice 3 — conteo cíclico** (2026-08-01, ADR-019): `conteo` + `conteo_item` con la periodicidad configurada **en la categoría** (`categoria.frecuencia_conteo`, RN-INV-007) — no hay número universal. Calendario derivado del último conteo cerrado + frecuencia, sin tabla de programación; conteo general que pone al día a todas las categorías del almacén; stock esperado congelado al abrir; conteo **a ciegas** por defecto (`inventory.ver_stock_esperado`); el cierre genera un `ajuste` pendiente por diferencia (`ajuste.conteo_id`) sin mover stock, con margen `INVENTORY_MARGEN_AJUSTE_PCT`; `inventory.conteo_vencido` reporta a almacén y gerencia lo no contado en su fecha (RN-INV-021). Permisos nuevos `inventory.contar` y `inventory.ver_stock_esperado`. Migración `c4e70a91d5b8`. Tests: `tests/test_conteos.py`. **Slice 4 — abastecimiento interno** (2026-08-01, ADR-020): `reserva_stock` + `solicitud_insumos`/`solicitud_item` + `transferencia`/`transferencia_item`. El local pide, el supervisor aprueba **y reserva** el stock en el abastecedor, el central despacha (FEFO, un `transferencia_item` por lote) y el local recibe. `GET /stock` expone `cantidad`/`reservado`/`disponible` (RN-INV-009): reservar exige disponible, pero consumir nunca se bloquea por una reserva —una venta ya ocurrida no se niega— y por eso el disponible puede quedar negativo. Diferencias registradas, no corregidas: no se despacha más de lo aprobado ni se recibe más de lo enviado, menos sí (RN-INV-001/002). Cancelar libera reservas (RN-INV-010) y hay liberación manual (RN-INV-011). Transferencia lateral sucursal↔sucursal con la misma entidad. Migración `d8b35f1ca207`. Tests: `tests/test_transferencias.py`. **Slice 5 — recetas editables** (2026-08-03, ADR-023): CRUD de receta e ítems, duplicar con "(copy)", escalar por factor y **aritmética tecleada** en la cantidad ("1000/3"), evaluada en el servidor con `ast` y lista blanca —nunca `eval`— y redondeada a los decimales de la UdM del insumo (RN-COM-024); `receta_item.expresion` guarda lo tecleado para reeditarlo. `GET /inventory/unidades-medida` y contrato público `receta_resumen`. Migración `b6d1e83f47ac`. Tests: `tests/test_recetas_variantes.py`. Diferido: devolución, guía remisión, `stock_merma`. |
 | Módulo `purchases` | 🔶 slice core ✅ 2026-07-25 | CRUD de proveedores (natural liga a `persona`, jurídico con RUC propio) y ciclo de OC tipo `insumo` (crear → emitir → recibir → anular), con idempotencia y umbral de aprobación configurable. `purchases.compra_recibida` → inventory suma stock y recalcula `costo_promedio`. Conformidad de comprobante (`purchases.dar_conformidad`) registra el `comprobante` recibido y dispara `purchases.comprobante_conforme` → cola de pago en `accounting`. Migración `4ff85f833b29` aplicada. Diferido: ver Deuda técnica. |
 | Módulo `sales` (PDV) | 🔶 slices 1-3 ✅ 2026-07-27 | Venta con correlativo+idempotencia → `sales.venta_confirmada` → inventory descuenta por receta (+merma+empaque); cobro con pagos parciales → `pagada`; anulación pre-pago repone stock; CRUD productos/medios de pago. **KDS** (slice 2): pantallas configurables por sucursal y categorías (`kds_pantalla`, migración `7672566bf189`), avance por ítem en `venta_item.estado_preparacion` (fuente única → todas las pantallas ven el avance real), tipos preparación/despacho, comanda imprimible con contador de reimpresiones, evento `sales.pedido_listo`, rol `cocinero`. Kiosk/Central de Pedidos = clientes del mismo contrato, no módulos. **Cumplimiento de pedido** (slice 3, 2026-07-27): `PROC-OPE-002` definido como UN proceso (área Operaciones) y su etapa de entrega implementada — `POST /sales/ventas/{id}/entrega` con permiso propio `sales.entregar_pedido` y rol `despachador`, idempotente, publica `sales.venta_entregada` (disparador de la encuesta de marketing, RN-COM-007). **Slice PDV** (slice 4, 2026-07-28, ADR-018, migración `d7e3b8c14f52`): `mesa` tipada por sucursal + mapa de salón derivado; `grupo_cobro` para dividir la cuenta y emitir un comprobante por pagador (RN-COM-018); receptor tecleado en caja que decide boleta/factura sin cliente registrado (RN-CPP-003); descuento manual de orden con motivo y autorizador (RN-COM-017, permiso propio). Suma `POST /sales/clientes` y `GET /sales/ventas`. **Variantes y opciones** (slice 5, 2026-08-03, ADR-023, migración `b6d1e83f47ac`): Personal/Mediana/Familiar son productos hijos con receta y precio completo propios (RN-COM-022) — no un recargo sobre un precio base; el padre agrupa y no se vende. `producto_opcion_grupo` declara cuántos extras hay que elegir (RN-COM-023): `minimo >= 1` **es** ser obligatorio, sin flag aparte, y la regla se hace cumplir al confirmar la venta porque el kiosko entra por el mismo endpoint. Nombres normalizados a formato título en el servidor. Frontend: **Catálogo como módulo propio** (`/catalogo/productos`, no `/ventas`), con gate por permiso exacto `sales.gestionar_catalogo` — un cajero tiene `sales.crear` y con el filtro por prefijo veía y leía toda la carta; ahora el módulo no le aparece ni entrando por URL (enmienda a ADR-013). Ficha de producto que **elige** recetas ya creadas (el editor vive en Catálogo → Recetas; tenerlo en los dos lados hacía pensar que eran dos recetas distintas) y selector obligatorio de presentación + extras en el PDV. Diferido: ver Deuda técnica. |
 | Módulo `sales` (PDV) | 🔶 slices 1-3 ✅ 2026-07-27 | Venta con correlativo+idempotencia → `sales.venta_confirmada` → inventory descuenta por receta (+merma+empaque); cobro con pagos parciales → `pagada`; anulación pre-pago repone stock; CRUD productos/medios de pago. **KDS** (slice 2): pantallas configurables por sucursal y categorías (`kds_pantalla`, migración `7672566bf189`), avance por ítem en `venta_item.estado_preparacion` (fuente única → todas las pantallas ven el avance real), tipos preparación/despacho, comanda imprimible con contador de reimpresiones, evento `sales.pedido_listo`, rol `cocinero`; **pantalla KDS** en `frontend/app/kds/` (2026-08-03, tarjeta por pedido con tachado por ítem, polling 3 s). Kiosk/Central de Pedidos = clientes del mismo contrato, no módulos. **Cumplimiento de pedido** (slice 3, 2026-07-27): `PROC-OPE-002` definido como UN proceso (área Operaciones) y su etapa de entrega implementada — `POST /sales/ventas/{id}/entrega` con permiso propio `sales.entregar_pedido` y rol `despachador`, idempotente, publica `sales.venta_entregada` (disparador de la encuesta de marketing, RN-COM-007). **Slice PDV** (slice 4, 2026-07-28, ADR-018, migración `d7e3b8c14f52`): `mesa` tipada por sucursal + mapa de salón derivado; `grupo_cobro` para dividir la cuenta y emitir un comprobante por pagador (RN-COM-018); receptor tecleado en caja que decide boleta/factura sin cliente registrado (RN-CPP-003); descuento manual de orden con motivo y autorizador (RN-COM-017, permiso propio). Suma `POST /sales/clientes` y `GET /sales/ventas`. Diferido: ver Deuda técnica. |
@@ -47,8 +47,8 @@ Registro de lo construido y lo pendiente. Actualizar en cada cambio relevante.
 | Endurecimiento de producción (rate limit, secretos, HTTPS, cabeceras) | 🔶 base ✅ 2026-07-26 | Rate limit por IP en login/refresh (Redis, fail-open), validación de config que aborta el arranque en `production` con valores de desarrollo, CORS + `TrustedHost` + cabeceras de seguridad + HSTS, `/docs` cerrado en producción, uvicorn `--proxy-headers`. Runbook de rotación de credenciales y custodia de `.env` en `docs/engineering/devops.md`. Pendiente: ver Deuda técnica → Seguridad. |
 | App Android (15+) | ⬜ | **Decidido (ADR-013): PWA/responsive, no app nativa** — Next.js + Tailwind + Base UI es 100% web, sin base de código separada; debe hablar con el hub local de sucursal igual que web y PC, ver ADR-009 |
 | Arquitectura frontend (Tailwind, shadcn/ui, shell estilo Odoo) | ✅ spec 2026-07-27 | ADR-013 (revisado): Tailwind sobre los tokens de marca existentes (`tailwind.config.ts` → `var(--color-*)`, sin hex mágico); **shadcn/ui** (componentes copiados y editables, corre sobre Base UI, no Radix) para overlays/combobox/dialog y catálogo base — token set semántico + `--radius` único, mejor ajuste para editar color/forma por marca rápido que construir a mano; home de apps + sidebar por módulo estilo Odoo; grid y rutas filtrados por `permisos` de `GET /users/me` (ya existente, sin cambio de backend), guard real server-side en cada `layout.tsx` de módulo — el filtro del grid es solo UX. Sin librería de estado global (YAGNI). Playwright para e2e de flujos críticos: **7 casos en verde y en CI desde 2026-08-06** (flujo del dinero, sesión y gate de módulo por permiso), ver Deuda técnica → Frontend. `docs/prompts/frontend.md` actualizado con las reglas técnicas. Sin implementación de código todavía. |
-| Modo offline del PDV — hub local de sucursal | ✅ fase 1 2026-07-26 · fase 2 2026-07-27 | ADR-009: hub local dedicado por sucursal (misma imagen del backend, Postgres propio), los 3 clientes (web/Android/PC) le hablan siempre al hub por LAN. **Fase 1**: `DEPLOYMENT_MODE=hub` + validación de config, detector de conectividad, `GET /health/sync`, `docker-compose.hub.yml`. **Fase 2 — motor de sync**: ciclo que **empuja y después jala** (`src/core/sync/motor.py`, proceso `python -m src.core.sync.runner`); `id` client-generado en `crear_venta`/`registrar_pago`/`registrar_movimiento` (el cambio previo que pedía la fase 1, sin migración); endpoints dedicados `GET /sync/pull` + `POST /sync/push` (permisos `sync.leer`/`sync.empujar`, rol `hub_sucursal`) porque los públicos no alcanzaban (no traen `pin_hash` ni los campos del catálogo, no son incrementales, y el push necesita conservar quién vendió y el número de orden); contrato declarativo por módulo (`application/sincronizacion.py`, 28 recursos
-tras sumar precios y lote/FEFO) que el motor solo ensambla; tabla `sync_watermark` por recurso y dirección; `/health/sync` con avance y último error por recurso; alta de la cuenta de servicio con `python -m src.seeders.hub`. El hub NO empuja movimientos de inventario (el listener de la nube los regenera; duplicaría el consumo). 24 casos en `tests/test_sync_motor.py` sincronizando dos bases reales. Pendiente: ver Deuda técnica. |
+| Modo offline del PDV — hub local de sucursal | ✅ fase 1 2026-07-26 · fase 2 2026-07-27 · fase 3 2026-08-07 | ADR-009: hub local dedicado por sucursal (misma imagen del backend, Postgres propio), los 3 clientes (web/Android/PC) le hablan siempre al hub por LAN. **Fase 1**: `DEPLOYMENT_MODE=hub` + validación de config, detector de conectividad, `GET /health/sync`, `docker-compose.hub.yml`. **Fase 2 — motor de sync**: ciclo que **empuja y después jala** (`src/core/sync/motor.py`, proceso `python -m src.core.sync.runner`); `id` client-generado en `crear_venta`/`registrar_pago`/`registrar_movimiento` (el cambio previo que pedía la fase 1, sin migración); endpoints dedicados `GET /sync/pull` + `POST /sync/push` (permisos `sync.leer`/`sync.empujar`, rol `hub_sucursal`) porque los públicos no alcanzaban (no traen `pin_hash` ni los campos del catálogo, no son incrementales, y el push necesita conservar quién vendió y el número de orden); contrato declarativo por módulo (`application/sincronizacion.py`, 35 recursos
+tras sumar precios y lote/FEFO) que el motor solo ensambla; tabla `sync_watermark` por recurso y dirección; `/health/sync` con avance y último error por recurso; alta de la cuenta de servicio con `python -m src.seeders.hub`. El hub NO empuja movimientos de inventario (el listener de la nube los regenera; duplicaría el consumo). 33 casos en `tests/test_sync_motor.py` sincronizando dos bases reales. **Fase 3 (2026-08-07)**: el ciclo de abastecimiento offline — el local pide, ve lo que viene y recibe, y cuenta su almacén. El motor deja de estar cableado a `sales`: hay un registro `MODULOS_PUSH` y **cada módulo lleva su propio watermark**, así un conteo trabado no frena el dinero. La guía de remisión **no se emite offline** y eso es decisión tomada, no deuda (ADR-009). Pendiente: ver Deuda técnica. |
 | Backups automáticos | ✅ 2026-07-26 | `python -m src.backups.backup`: dump `pg_dump --format=custom` → verificación del archivo (firma + tablas críticas) → restauración probada contra base desechable → copia a S3 (opcional) → purga con retención de 30 días que nunca borra la copia más reciente. **Diario** (antes se declaraba mensual e incremental). Cron del host, no Celery beat. Runbook en `docs/engineering/devops.md#backups`. Pendiente: alerta ante fallo, ver Deuda técnica. |
 | Ciclo de caja completo | ✅ 2026-08-04 | ADR-025, migración `f3a1c62d90b4`. **No se cobra sin caja abierta** (contrato público `accounting.hay_caja_abierta`; el replay del hub es la única excepción); el monto de apertura y cierre **sale del conteo por denominación** (RN-POS-003/007) y la diferencia contra lo declarado se calcula sin bloquear la apertura (RN-POS-011); **cada relevo lo firma quien recibe con su PIN** (RN-MDP-002, permiso `accounting.caja_relevar`) y `custodia_efectivo` es máquina de estados real hasta `disponible`; **un cierre con faltante se reabre y se recuenta** dejando motivo y autorizador en `cierre_caja.correcciones` (RN-MDP-005), solo mientras el efectivo siga en el local. Nueva entidad `pos_tarjeta` (serie + código de comercio, RN-POS-010; emergencia = `sucursal_id` NULL, RN-POS-009) verificada al abrir. `tests/test_caja_ciclo.py` (17 casos). **Pantallas (2026-08-05)**: los diálogos del PDV se pusieron al día con este contrato —hablaban el anterior y devolvían 422 desde el día que se implementó— y contabilidad gana `/contabilidad/caja` con turnos cerrados, cadena de custodia firmada con PIN, reapertura e inventario de POS (`GET /accounting/cajas/turnos`). En el camino se cerró un agujero de integridad: `custodia` y `descuadre_atribucion` son enums y el schema los aceptaba como texto libre, dejando la fila ilegible al leerla. 24 casos. |
 | Dashboard gerencial mínimo | ✅ 2026-07-26 | `GET /api/v1/dashboard/resumen` (`src/core/dashboard_router.py`, permiso `dashboard.leer`): ventas del día (cantidad+total), stock bajo mínimo, cajas abiertas — agregador en `core`, nunca importa dominio de otro módulo (ADR-012). Requirió construir dos huecos que no existían: `sales` no tenía ningún listado de ventas, `accounting` tenía los modelos de caja (`apertura_caja`/`cierre_caja`/`arqueo`, migrados desde 2026-07-20) sin capa de aplicación. **Slice mínimo de caja** (`accounting.application.caja`): abrir/cerrar/arquear con **reconciliación real** (el cierre calcula `monto_esperado` desde los pagos en efectivo reales, vía contrato público de `sales`, no un número tipeado sin verificar). Primer frontend real: login por PIN + pantalla de dashboard en Next.js. Fuera de esta fase, a propósito: RN-POS-009..013 completas, relevo autenticado por PIN, máquina de estados de `custodia_efectivo` — ver Deuda técnica. |
@@ -830,6 +830,23 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   todavía por sucursal.
 
 ### CI/CD (tras la implementación de 2026-07-26)
+- 🔴 **El job `frontend` está en rojo y bloquea todo merge** (2026-08-07).
+  `npm run lint` muere con "Converting circular structure to JSON"
+  resolviendo el `.eslintrc.json` legacy bajo ESLint 9. **Empezó solo, sin
+  que nadie tocara `frontend/`**: el PR #31 pasó verde unas horas antes con
+  el mismo árbol, el mismo `package-lock.json` y el mismo `npm ci`.
+  **Causa no identificada.** Se descartó la versión de Node: se fijó el
+  runner en 24.16.0 —el patch exacto que pasa en local— y **falló igual**,
+  así que el pin se revirtió en vez de dejarlo congelando una versión por
+  una teoría refutada. Lo que queda en pie: falla en el runner Linux y pasa
+  en Windows con todo lo demás idéntico (mismo commit, mismo lockfile,
+  `npm ci` desde cero, mismo Node), así que apunta al entorno y no al
+  código.
+  El arreglo que **no depende de encontrar la causa** es migrar a la CLI de
+  ESLint con flat config (`npx @next/codemod@canary
+  next-lint-to-eslint-cli .`): saca del medio el puente legacy que revienta,
+  y hay que hacerlo igual porque `next lint` está deprecado y **desaparece
+  en Next 16**.
 - ⬜ **Job de despliegue** (ver *Cuando haya servidor*, punto 7): hoy el despliegue es manual y documentado. Se
   escribe cuando exista el VPS — automatizar por SSH contra una máquina que
   no existe da automatización no probada (ADR-008).
@@ -986,17 +1003,33 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
     sus módulos, y eso **no es un pendiente de este módulo**: construirle un
     productor a un tipo cuyo caso de uso todavía no existe es inventar el
     caso de uso.
-  - ⬜ **Transferencia sin vehículo ni tracking**: `vehiculo` no existe
-    como entidad; quedó solo `transportista_id`. Faltan tracking GPS y
-    tiempos de ruta/entrega que declara `data-model.md`.
+  - ✅ 2026-08-07 **Transferencia sin vehículo ni tracking — descartado**
+    (decidido con el usuario). No hay flota: el traslado lo hace alguien del
+    grupo en su propio vehículo, y la placa se teclea en la guía, que es el
+    único documento que la necesita (ADR-027 ya descartó `vehiculo` por lo
+    mismo). Una tabla de vehículos sería un formulario que hay que llenar
+    antes de poder despachar, y el tracking GPS mide una ruta de veinte
+    minutos entre dos locales de la misma ciudad. `transportista_id` alcanza
+    para saber quién lo llevó, que es la pregunta que sí se hace cuando algo
+    no llega. Vuelve a la mesa si aparece reparto propio con flota.
   - ✅ 2026-08-06 **Recepción parcial**: `{"parcial": true}` ingresa lo
     declarado y deja el resto **en tránsito**. Explícito y no deducido de
     que falten ítems: deducirlo haría que un olvido cierre la transferencia
     dando por perdido lo que todavía viene en camino. El evento
     `transferencia_recibida` sale **una sola vez**, al cerrar — si no,
     `accounting` asentaría el faltante de cada entrega por separado.
-  - ⬜ **El ciclo no se replica al hub** (ADR-009): un local sin conexión
-    no puede pedir ni recibir.
+  - ✅ 2026-08-07 **El ciclo se replica al hub** (ADR-009 fase 3). El
+    local **pide, ve lo que viene y recibe** durante un corte, que es
+    justo cuando más falta hace: el camión no espera a que vuelva el
+    internet. Bajan `solicitud_insumos`/`solicitud_item` (las que pidió),
+    `transferencia`/`transferencia_item` (las que **entran** a su almacén) y
+    `reserva_stock` —sin las reservas su `disponible` offline sería el
+    físico entero—; suben la solicitud creada y la recepción hecha.
+    En el camino se descubrió que el hub **no replicaba su almacén
+    abastecedor** (el filtro de `almacen` traía solo los de la sucursal),
+    así que `crear_solicitud` fallaba offline con "abastecedor no
+    encontrado". Ahora viaja la ficha del central; su *stock* sigue sin
+    replicarse.
   - ✅ 2026-08-06 **`inventory.transferencia_recibida` con consumidor en
     `accounting`**: asiento **solo si hubo faltante**. Un traslado entre
     almacenes de la misma empresa no mueve resultado —la mercadería cambia
@@ -1008,9 +1041,13 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
     ajeno. De paso, `recibir` pasa a publicar con `session=` — se despachaba
     en medio de la transacción, y con consumidor un rollback dejaba el
     asiento de una recepción que nunca ocurrió (ADR-016).
-  - ⬜ **Estado `en_picking` omitido** a propósito (no gobierna ninguna
-    regla): si el negocio pide ver "el central ya empezó a armarlo",
-    entra entonces.
+  - ✅ 2026-08-07 **Estado `en_picking` — descartado** (decidido con el
+    usuario). Un estado que no gobierna ninguna regla no es un estado, es un
+    comentario: entre `aprobada` y `despachada` nada cambia de permiso, de
+    validación ni de qué se puede hacer. Agregarlo obliga a que alguien lo
+    marque a mano, y un estado que depende de que alguien se acuerde miente
+    la mitad del tiempo. Si el negocio pide ver "el central ya empezó a
+    armarlo", entra entonces — y con quien lo marca definido.
 - ✅ 2026-07-27 **Lote / FEFO** (ADR-015): `lote` + `stock_lote`, control
   opcional por artículo, reparto FEFO al registrar la salida, bloqueo de
   vencidos + `inventory.lote_vencido_detectado`, lote generado por
@@ -1093,17 +1130,23 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
     contra el stock del almacén, igual que en el cierre de conteo; el campo
     salió de `AjusteCreate` y del contrato. Lógica compartida en
     `application/margenes.py`. 4 casos nuevos en `tests/test_conteos.py`.
-  - ⬜ **El conteo no se replica al hub de sucursal** (ADR-009): contar sin
-    conexión no está cubierto; el hub replica stock para vender, no para
-    auditar el almacén.
+  - ✅ 2026-08-07 **El conteo se replica al hub**: se cuenta offline y el
+    conteo sube **cerrado**, nunca a medias —reproducir uno abierto en la
+    nube generaría ajustes por ítems que nadie llegó a mirar—. El cierre
+    genera el `ajuste` pendiente arriba, con su aprobador distinto
+    (RN-INV-006), igual que si se hubiera contado en línea.
   - ✅ 2026-08-06 **Anulación de conteo expuesta**
     (`POST /conteos/{id}/anular`, motivo obligatorio). No genera ajustes ni
     pone al día el calendario —el programa solo mira los `cerrado`—, que era
     el daño real de la salida anterior: cerrar en cero afirma "se contó y no
     había diferencias".
-  - ⬜ **Frecuencias en días fijos** (mensual = 30 días desde el último
-    conteo, no el mismo día del mes). Si el negocio pide anclar al día del
-    mes, cambia `rules.proxima_fecha_conteo` y nada más.
+  - ✅ 2026-08-07 **Frecuencias en días fijos — descartado** (decidido con
+    el usuario). "Mensual" en el almacén significa *cada mes más o menos*,
+    no *el día 3 de cada mes*: el conteo se hace cuando el local puede, y
+    anclarlo al día del mes haría aparecer un atraso cada febrero por una
+    diferencia que a nadie le importa. El día que se pida, es una línea en
+    `rules.proxima_fecha_conteo` (`dateutil.relativedelta`) y nada más — el
+    resto del cálculo no cambia.
 - ✅ 2026-08-05 **Guía de remisión** (ADR-027, migración `a4c8f21e6b09`,
   **aplicada a Supabase el 2026-08-05** junto con el seeder que suma
   `inventory.emitir_guia` al rol `almacenero`):
@@ -1150,9 +1193,21 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   correcto es una columna en `unidad_medida` editable desde Catálogo;
   mientras solo la guía lo necesite, una columna que alguien tiene que
   llenar a mano es más trabajo que el diccionario.
-- ⬜ **La guía no se replica al hub**: la emite el almacén central, que
-  está en la nube. Una sucursal offline que despache una transferencia
-  lateral no puede emitir su guía hasta reconectar.
+- ✅ 2026-08-07 **La guía no se emite offline — decisión, no deuda**
+  (decidido con el usuario). El correlativo es único por `(empresa, serie)`
+  y dos hubs numerando a la vez colisionarían **con la guía ya impresa y
+  viajando en el camión**: el conflicto aparecería recién al sincronizar,
+  cuando ya no hay nada que corregir.
+  Se evaluaron las dos salidas y se descartaron las dos: una **serie por
+  almacén emisor** (lo que SUNAT espera) obliga a registrar cada serie ante
+  SUNAT antes de usarla, y un **rango de correlativos por hub** deja huecos
+  en la numeración que hay que justificar en una fiscalización. Ninguna de
+  las dos se paga con lo que resuelve: hoy el único emisor es el almacén
+  central, que está en la nube, y el despacho lateral offline es un caso
+  que todavía no ocurre.
+  Queda así: el despacho lateral offline **se registra** y su guía se emite
+  al reconectar. Si alguna vez el reparto lateral se vuelve rutina, la
+  salida es la serie por almacén y este párrafo es el punto de partida.
 - ✅ 2026-08-06 **Piso absoluto en el margen de ajuste** — resuelto junto
   con el margen por empresa, ver arriba.
 - ✅ 2026-08-06 **Merma** — y **sin tabla `stock_merma`** (ADR-028): lo que

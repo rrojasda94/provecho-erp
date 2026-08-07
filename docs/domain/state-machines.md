@@ -29,10 +29,15 @@ stateDiagram-v2
     [*] --> pendiente
     pendiente --> aprobada: supervisor aprueba
     pendiente --> rechazada: supervisor rechaza
-    aprobada --> en_picking: central inicia picking
-    en_picking --> despachada: salida (RN-INV-001)
+    pendiente --> cancelada: el local la da de baja (RN-INV-010)
+    aprobada --> cancelada: libera las reservas (RN-INV-010)
+    aprobada --> despachada: salida (RN-INV-001)
     despachada --> recibida: local recibe
 ```
+
+`en_picking` **no existe** (ADR-020, cerrado como descartado 2026-08-07):
+entre `aprobada` y `despachada` no cambia qué se puede hacer, así que sería
+un estado que alguien tiene que marcar a mano sin que gobierne nada.
 
 ## Transferencia
 
