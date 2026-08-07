@@ -131,19 +131,9 @@ jobs:
       # transpilar nada, y el stripping de tipos recién viene de fábrica
       # desde 22.18. En Node 20 la suite entera moría con
       # `ERR_UNKNOWN_FILE_EXTENSION` antes de ejecutar un solo caso.
-      #
-      # **Patch fijo, no `"24"` flotante** (2026-08-07): el runner pasó a
-      # 24.18.0 y `next lint` empezó a morir con "Converting circular
-      # structure to JSON" al resolver el `.eslintrc.json` legacy bajo
-      # ESLint 9. Mismo commit y mismo lockfile pasan en 24.16.0 — el PR
-      # anterior estaba verde con ese Node hace unas horas.
-      # ponytail: esto es un tapón, no el arreglo. `next lint` está
-      # deprecado y desaparece en Next 16; la salida real es migrar a la
-      # CLI de ESLint con flat config, y ahí el patch vuelve a flotar. Ver
-      # ROADMAP → Deuda técnica → CI/CD.
       - uses: actions/setup-node@v4
         with:
-          node-version: "24.16.0"
+          node-version: "24"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
