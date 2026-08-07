@@ -34,7 +34,11 @@ from src.modules.inventory.infrastructure.models import (
     Receta,
     RecetaItem,
     Sku,
+    SolicitudInsumos,
+    SolicitudItem,
     Stock,
+    Transferencia,
+    TransferenciaItem,
     UnidadMedida,
 )
 from src.modules.sales.application import sincronizacion as sales_sync
@@ -184,11 +188,13 @@ class ClienteDeTest:
             raise ErrorNube(f"pull {recurso} → {r.status_code}: {r.text}")
         return r.json()
 
-    def push(self, lote):
-        self.llamadas.append(("push", len(lote["ventas"]), len(lote["pagos"])))
-        r = self.client.post(
-            "/api/v1/sync/push", json={"sales": lote}, headers=self.headers
+    def push(self, cuerpo):
+        # El cuerpo ya viene con la clave del módulo: el motor empuja de a uno.
+        (modulo, lote), = cuerpo.items()
+        self.llamadas.append(
+            ("push", modulo, sum(len(v) for k, v in lote.items() if isinstance(v, list)))
         )
+        r = self.client.post("/api/v1/sync/push", json=cuerpo, headers=self.headers)
         if r.is_error:
             raise ErrorNube(f"push → {r.status_code}: {r.text}")
         return r.json()
@@ -608,7 +614,7 @@ def test_el_hub_no_puede_empujar_ventas_de_otra_sucursal(entorno):
         }],
         "pagos": [],
     }
-    respuesta = entorno.cliente.push(lote)
+    respuesta = entorno.cliente.push({"sales": lote})
     assert respuesta["ventas"] == 0
     assert respuesta["errores"][0]["detalle"] == "fuera de la sucursal del hub"
 
@@ -777,3 +783,190 @@ def test_el_cliente_convierte_una_caida_de_red_en_error_de_sync():
     )
     with pytest.raises(ErrorNube):
         cliente.pull("rol", None, 10)
+
+
+# --- El ciclo de abastecimiento durante un corte (ADR-009, fase 3) -----------
+def _almacen_central(entorno) -> uuid.UUID:
+    """El central existe solo en la nube: el hub replica el suyo, no este."""
+    with entorno.NubeSession() as s:
+        central = Almacen(
+            empresa_id=entorno.ids["empresa_id"], nombre="Central", tipo="central"
+        )
+        s.add(central)
+        s.flush()
+        local = s.get(Almacen, entorno.ids["almacen_id"])
+        local.almacen_abastecedor_id = central.id
+        s.add(Stock(
+            almacen_id=central.id, sku_id=entorno.ids["sku_id"], cantidad=Decimal(100)
+        ))
+        s.commit()
+        return central.id
+
+
+def test_el_local_pide_insumos_sin_conexion_y_el_pedido_llega_a_la_nube(entorno):
+    """Pedir es lo primero que se hace cuando falta algo, y el corte no
+    espera. La solicitud nace en el hub con su id y sube tal cual."""
+    from src.modules.inventory.application import solicitudes as solicitudes_uc
+
+    central_id = _almacen_central(entorno)
+    entorno.ciclo()  # el hub baja el central y su abastecedor
+
+    with entorno.HubSession() as s:
+        solicitud = solicitudes_uc.crear_solicitud(
+            s,
+            almacen_solicitante_id=entorno.ids["almacen_id"],
+            almacen_abastecedor_id=central_id,
+            solicitado_por=entorno.ids["cajero_id"],
+            items=[(entorno.ids["sku_id"], Decimal("5"))],
+            observacion="se acabó la harina",
+        )
+        solicitud_id = solicitud.id
+        s.commit()
+
+    resumen = entorno.ciclo()
+    assert resumen["push"]["errores"] == []
+
+    with entorno.NubeSession() as s:
+        subida = s.get(SolicitudInsumos, solicitud_id)
+        assert subida is not None, "conserva su id: el local ve el mismo número"
+        assert subida.estado == "pendiente"
+        assert subida.observacion == "se acabó la harina"
+        assert s.scalar(select(func.count()).select_from(SolicitudItem)) == 1
+
+    # Reenviar el lote no la duplica.
+    entorno.ciclo()
+    with entorno.NubeSession() as s:
+        assert s.scalar(select(func.count()).select_from(SolicitudInsumos)) == 1
+
+
+def test_el_local_recibe_el_camion_sin_conexion_y_la_nube_se_entera(entorno):
+    """La transferencia la creó el central en la nube; el hub solo la
+    recibe. Lo que sube es el hecho, no la fila."""
+    from src.modules.inventory.application import transferencias as transferencias_uc
+
+    central_id = _almacen_central(entorno)
+    with entorno.NubeSession() as s:
+        transferencia = transferencias_uc.despachar(
+            s,
+            origen_almacen_id=central_id,
+            destino_almacen_id=entorno.ids["almacen_id"],
+            despachado_por=entorno.ids["cajero_id"],
+            items=[(entorno.ids["sku_id"], Decimal("8"))],
+        )
+        transferencia_id = transferencia.id
+        s.commit()
+
+    entorno.ciclo()  # el hub baja la transferencia en tránsito
+
+    with entorno.HubSession() as s:
+        local = s.get(Transferencia, transferencia_id)
+        assert local is not None, "el local ve lo que viene en camino"
+        assert local.estado == "en_transito"
+        item = s.scalar(
+            select(TransferenciaItem).where(
+                TransferenciaItem.transferencia_id == transferencia_id
+            )
+        )
+        transferencias_uc.recibir(
+            s, transferencia_id, entorno.ids["cajero_id"], {item.id: Decimal("7")}
+        )
+        s.commit()
+
+    resumen = entorno.ciclo()
+    assert resumen["push"]["errores"] == []
+
+    with entorno.NubeSession() as s:
+        arriba = s.get(Transferencia, transferencia_id)
+        assert arriba.estado == "recibida"
+        item = s.scalar(
+            select(TransferenciaItem).where(
+                TransferenciaItem.transferencia_id == transferencia_id
+            )
+        )
+        # Entró lo que de verdad llegó, no lo que decía el papel (RN-INV-002).
+        assert item.cantidad_recibida == Decimal("7")
+
+    # Reproducirla otra vez es inocuo: si no, un error ajeno trabaría el
+    # recurso para siempre.
+    resumen = entorno.ciclo()
+    assert resumen["push"]["errores"] == []
+
+
+def test_el_conteo_offline_sube_cerrado_y_genera_su_ajuste_en_la_nube(entorno):
+    from src.modules.inventory.application import conteos as conteos_uc
+    from src.modules.inventory.infrastructure.models import Ajuste, Conteo
+
+    entorno.ciclo()
+    with entorno.HubSession() as s:
+        conteo = conteos_uc.abrir_conteo(
+            s,
+            almacen_id=entorno.ids["almacen_id"],
+            abierto_por=entorno.ids["cajero_id"],
+        )
+        conteo_id = conteo.id
+        # Hay 10 en el sistema y aparecen 8: faltan 2.
+        conteos_uc.registrar_cantidades(
+            s, conteo_id, [(entorno.ids["sku_id"], Decimal("8"))]
+        )
+        conteos_uc.cerrar_conteo(s, conteo_id, entorno.ids["cajero_id"])
+        s.commit()
+
+    resumen = entorno.ciclo()
+    assert resumen["push"]["errores"] == []
+
+    with entorno.NubeSession() as s:
+        arriba = s.get(Conteo, conteo_id)
+        assert arriba is not None and arriba.estado == "cerrado"
+        ajuste = s.scalar(select(Ajuste).where(Ajuste.conteo_id == conteo_id))
+        assert ajuste is not None, "el cierre genera el ajuste en la nube"
+        assert ajuste.cantidad == Decimal("-2")
+        # Pendiente: el conteo no aprueba su propio ajuste (RN-INV-006).
+        assert ajuste.estado == "pendiente"
+
+
+def test_un_conteo_abierto_no_sube(entorno):
+    """A medio contar no hay nada que reproducir: cerrarlo arriba generaría
+    ajustes por ítems que nadie llegó a mirar."""
+    from src.modules.inventory.application import conteos as conteos_uc
+    from src.modules.inventory.infrastructure.models import Conteo
+
+    entorno.ciclo()
+    with entorno.HubSession() as s:
+        conteos_uc.abrir_conteo(
+            s,
+            almacen_id=entorno.ids["almacen_id"],
+            abierto_por=entorno.ids["cajero_id"],
+        )
+        s.commit()
+
+    entorno.ciclo()
+    with entorno.NubeSession() as s:
+        assert s.scalar(select(func.count()).select_from(Conteo)) == 0
+
+
+def test_inventory_trabado_no_frena_las_ventas(entorno):
+    """Cada módulo tiene su watermark: que un conteo no entre no puede dejar
+    de subir el dinero."""
+    from src.modules.inventory.application import solicitudes as solicitudes_uc
+
+    central_id = _almacen_central(entorno)
+    entorno.ciclo()
+    with entorno.HubSession() as s:
+        solicitud = solicitudes_uc.crear_solicitud(
+            s,
+            almacen_solicitante_id=entorno.ids["almacen_id"],
+            almacen_abastecedor_id=central_id,
+            solicitado_por=entorno.ids["cajero_id"],
+            items=[(entorno.ids["sku_id"], Decimal("5"))],
+        )
+        # Un abastecedor que la nube no conoce: la solicitud va a rebotar.
+        solicitud.almacen_abastecedor_id = uuid.uuid4()
+        s.commit()
+
+    venta_id = _venta_offline(entorno)
+    resumen = entorno.ciclo()
+
+    assert resumen["push"]["por_modulo"]["inventory"]["errores"], "el conteo falla"
+    assert resumen["push"]["por_modulo"]["sales"]["errores"] == []
+    with entorno.NubeSession() as s:
+        assert s.get(Venta, venta_id) is not None, "la venta subió igual"

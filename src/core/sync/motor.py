@@ -24,11 +24,6 @@ from src.core.sync import estado_conexion, importador, registro, watermark
 from src.core.sync.cliente_nube import ClienteNube, ErrorNube
 from src.core.sync.contratos import PULL, PUSH, AlcanceHub
 
-# Hoy `sales` es el único módulo que empuja (el alcance offline del ADR es
-# vender y cobrar). Cuando otro lo necesite, esto se vuelve un registro
-# como `RECURSOS` — no antes.
-from src.modules.sales.application import sincronizacion as sales_sync
-
 log = logging.getLogger("provecho.sync")
 
 # Techo de páginas por recurso en un ciclo: una carga inicial grande
@@ -52,20 +47,19 @@ def alcance_del_hub() -> AlcanceHub:
         ) from e
 
 
-def empujar(
-    session: Session, cliente: ClienteNube, alcance: AlcanceHub, limite: int
+def _empujar_modulo(
+    session: Session, cliente: ClienteNube, modulo, alcance: AlcanceHub, limite: int
 ) -> dict:
-    """Reproduce en la nube lo que se vendió y cobró en el local."""
-    recurso = sales_sync.RECURSO_PUSH
+    recurso = modulo.RECURSO_PUSH
     desde = watermark.leer(session, PUSH, recurso)
-    lote = sales_sync.pendientes(session, alcance, desde, limite)
-    enviados = len(lote["ventas"]) + len(lote["pagos"])
+    lote = modulo.pendientes(session, alcance, desde, limite)
+    enviados = modulo.hay_pendientes(lote)
     if enviados == 0:
         watermark.registrar_ok(session, PUSH, recurso, None)
         return {"enviados": 0, "errores": []}
 
     try:
-        respuesta = cliente.push(lote)
+        respuesta = cliente.push({recurso: lote})
     except ErrorNube as e:
         watermark.registrar_error(session, PUSH, recurso, str(e))
         return {"enviados": 0, "error": str(e)}
@@ -83,8 +77,26 @@ def empujar(
         watermark.registrar_ok(
             session, PUSH, recurso, datetime.fromisoformat(lote["marca"])
         )
-    log.info("sync push: %s ítems, %s rechazados", enviados, len(errores))
+    log.info("sync push %s: %s ítems, %s rechazados", recurso, enviados, len(errores))
     return {"enviados": enviados, "errores": errores, "aplicado": respuesta}
+
+
+def empujar(
+    session: Session, cliente: ClienteNube, alcance: AlcanceHub, limite: int
+) -> dict:
+    """Reproduce en la nube lo que el local hizo durante el corte.
+
+    Un módulo por vez y con su propio watermark: si `inventory` se traba con
+    una recepción que la nube rechaza, las ventas siguen subiendo. Que un
+    conteo bloquee el cobro sería exactamente al revés de lo que importa.
+    """
+    total = {"enviados": 0, "errores": [], "por_modulo": {}}
+    for modulo in registro.MODULOS_PUSH:
+        resultado = _empujar_modulo(session, cliente, modulo, alcance, limite)
+        total["enviados"] += resultado.get("enviados", 0)
+        total["errores"].extend(resultado.get("errores", []))
+        total["por_modulo"][modulo.RECURSO_PUSH] = resultado
+    return total
 
 
 def _jalar_recurso(

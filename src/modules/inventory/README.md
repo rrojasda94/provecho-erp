@@ -335,11 +335,10 @@ es la que viaja y un rechazo se corrige y reemite, no detiene el camión.
 
 **Diferido (deuda del módulo):** del slice de abastecimiento,
 `reserva_stock` sigue con dos tipos sin productor (`produccion` y
-`carrito`, que esperan a sus módulos), la transferencia no lleva vehículo
-ni tracking (`vehiculo` no existe) y el ciclo no se replica al hub. Del
-slice de lote: la reposición por venta anulada entra al lote del día y no
-al lote del que salió. Del slice de conteo: `conteo` no se replica al hub.
-Ver ROADMAP → Deuda técnica → Módulo inventory.
+`carrito`, que esperan a sus módulos) y la transferencia no lleva vehículo
+ni tracking (`vehiculo` no existe). Del slice de lote: la reposición por
+venta anulada entra al lote del día y no al lote del que salió. Ver
+ROADMAP → Deuda técnica → Módulo inventory.
 
 ## Barridos periódicos (Celery beat, 2026-08-06)
 
@@ -447,3 +446,39 @@ sola vez**, al cerrar — si no, `accounting` asentaría el faltante de cada
 entrega por separado.
 
 Tests: `tests/test_merma_devolucion.py` (12 casos).
+
+## Offline: el ciclo de abastecimiento en el hub (2026-08-07, ADR-009 fase 3)
+
+Pedir, ver lo que viene y recibir son las tres cosas que el local hace con
+el almacén, y las tres pasan cuando el internet no está — el camión no
+espera. Lo que viaja:
+
+| Recurso | Dirección | Por qué |
+|---|---|---|
+| `solicitud_insumos` + `solicitud_item` | ambas | El local pide offline y ve en qué estado va lo que pidió |
+| `transferencia` + `transferencia_item` | ambas | Baja lo que **entra** a su almacén; sube el hecho de haberlo recibido |
+| `reserva_stock` | baja | Sin ellas su `disponible` offline sería el físico entero |
+| `conteo` + `conteo_item` | sube | Se cuenta offline y sube **cerrado** |
+| `almacen` del abastecedor | baja | Sin la ficha del central no se le puede pedir nada |
+
+**La guía de remisión no se emite offline, y es decisión tomada** (no
+deuda). El correlativo es único por `(empresa, serie)`: dos hubs numerando
+a la vez colisionarían con la guía **ya impresa y viajando en el camión**,
+y el conflicto aparecería recién al sincronizar, cuando ya no hay nada que
+corregir. Las dos salidas —una serie por almacén emisor, o un rango de
+correlativos por hub— cuestan un trámite ante SUNAT o huecos de numeración
+que hay que justificar, y hoy el único emisor es el almacén central, que
+está en la nube. El despacho lateral offline se registra igual; su guía
+sale al reconectar.
+
+Tres decisiones que valen más que la tabla:
+
+- **La recepción no es una fila que sube, es un hecho.** La transferencia la
+  creó el central en la nube; el hub solo la recibe. Por eso reproducirla
+  dos veces tiene que ser inocuo —y lo es— o un error ajeno trabaría el
+  recurso para siempre.
+- **El conteo sube cerrado, nunca a medias.** Uno abierto todavía se está
+  contando: reproducirlo arriba generaría ajustes por ítems que nadie miró.
+- **Cada módulo tiene su watermark.** Si `inventory` se traba con una
+  recepción que la nube rechaza, las ventas siguen subiendo. Que un conteo
+  bloquee el dinero sería exactamente al revés de lo que importa.

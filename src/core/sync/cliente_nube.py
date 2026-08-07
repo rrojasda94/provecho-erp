@@ -84,8 +84,11 @@ class ClienteNube:
             params["desde"] = desde.isoformat()
         return self._pedir("GET", "/sync/pull", params=params)
 
-    def push(self, lote: dict) -> dict:
-        return self._pedir("POST", "/sync/push", json={"sales": lote})
+    def push(self, cuerpo: dict) -> dict:
+        """`cuerpo` ya viene con la clave del módulo (`{"sales": {...}}`):
+        quién arma el lote es el motor, que sabe de qué módulo es. Envolverlo
+        acá obligaría a este cliente a conocerlos a todos."""
+        return self._pedir("POST", "/sync/push", json=cuerpo)
 
     def cerrar(self) -> None:
         self._http.close()

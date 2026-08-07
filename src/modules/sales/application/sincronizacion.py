@@ -341,6 +341,12 @@ def pendientes(
     }
 
 
+def hay_pendientes(lote: dict) -> int:
+    """Cuántos ítems trae el lote. Parte del contrato de push: el motor no
+    sabe qué contiene el lote de cada módulo, solo si vale la pena mandarlo."""
+    return len(lote["ventas"]) + len(lote["pagos"])
+
+
 _FALLO = object()
 
 

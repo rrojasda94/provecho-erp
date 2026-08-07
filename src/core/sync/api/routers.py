@@ -20,6 +20,7 @@ from src.core.sync import exportador, registro
 from src.core.sync.api import schemas
 from src.core.sync.contratos import AlcanceHub
 from src.core.sync.tiempo import a_utc
+from src.modules.inventory.application import sincronizacion as inventory_sync
 from src.modules.sales.application import sincronizacion as sales_sync
 from src.modules.sales.application import tasks
 from src.modules.users.api.deps import get_db, require_permission
@@ -97,17 +98,31 @@ def push(
 ):
     """Reproduce en la nube el lote que el hub acumuló durante el corte.
 
-    No escribe filas crudas: cada ítem pasa por el caso de uso de `sales`,
+    No escribe filas crudas: cada ítem pasa por el caso de uso de su módulo,
     con sus validaciones, su idempotencia y sus eventos (por eso la nube
-    descuenta su propio stock y prepara los comprobantes). Un ítem
-    rechazado se informa y no arrastra al resto del lote.
+    descuenta su propio stock y prepara los comprobantes). Un ítem rechazado
+    se informa y no arrastra al resto del lote.
+
+    El cuerpo trae un lote por módulo y los dos son opcionales: el motor
+    empuja de a un módulo por ciclo de watermark, así que en la práctica
+    llega uno solo.
     """
-    resumen, comprobantes = sales_sync.aplicar(
-        session, body.sales.model_dump(mode="json"), _alcance(session, actor)
-    )
+    alcance = _alcance(session, actor)
+    resumen: dict = {"errores": []}
+    a_encolar: list = []
+    for nombre, modulo in (("sales", sales_sync), ("inventory", inventory_sync)):
+        lote = getattr(body, nombre)
+        if lote is None:
+            continue
+        parcial, pendientes = modulo.aplicar(
+            session, lote.model_dump(mode="json"), alcance
+        )
+        resumen["errores"].extend(parcial.pop("errores", []))
+        resumen.update(parcial)
+        a_encolar.extend(pendientes)
     session.commit()
     # Después del commit: el worker corre en otro proceso y solo ve filas
     # confirmadas. La emisión a SUNAT es siempre de la nube, nunca del hub.
-    for comprobante_id in comprobantes:
+    for comprobante_id in a_encolar:
         tasks.encolar(comprobante_id)
     return resumen

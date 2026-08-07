@@ -75,12 +75,16 @@ def abrir_conteo(
     abierto_por: uuid.UUID,
     observacion: str | None = None,
     hoy: datetime.date | None = None,
+    id: uuid.UUID | None = None,
 ) -> Conteo:
     """Abre el conteo y congela el stock esperado de cada SKU.
 
     El snapshot es del momento de abrir, no del de cerrar: el almacén sigue
     operando mientras se cuenta, y medir contra un stock que se movió
     durante el conteo inventa diferencias que nadie provocó.
+
+    `id` explícito lo usa el hub que contó sin conexión (ADR-009): el conteo
+    conserva su identidad al reproducirse en la nube.
     """
     if tipo not in rules.TIPOS_CONTEO:
         raise ReglaNegocio(f"tipo de conteo inválido: {tipo}")
@@ -88,11 +92,16 @@ def abrir_conteo(
         raise NoEncontrado("categoría no encontrada")
 
     repo = ConteoRepo(session)
+    if id is not None and repo.get(id) is not None:
+        # Reproducción idempotente del hub (ADR-009): reenviar el lote no
+        # abre el conteo dos veces.
+        return repo.get(id)
     if repo.abierto_en(almacen_id, categoria_id) is not None:
         raise Conflicto("ya hay un conteo abierto que cubre esa categoría")
 
     conteo = repo.add(
         Conteo(
+            id=id or uuid.uuid4(),
             almacen_id=almacen_id,
             categoria_id=categoria_id,
             tipo=tipo,

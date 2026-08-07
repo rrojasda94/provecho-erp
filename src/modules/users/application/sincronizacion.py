@@ -12,7 +12,7 @@ de integridad referencial: sin esas filas, `venta` y `stock` no tienen a
 qué apuntar en la base local del hub.
 """
 
-from sqlalchemy import Select, select
+from sqlalchemy import Select, or_, select
 
 from src.core.sync.contratos import AlcanceHub, RecursoSync
 from src.modules.users.infrastructure.models import (
@@ -105,12 +105,27 @@ RECURSOS = (
             "almacen_abastecedor_id",
             "updated_at",
         ),
-        # Solo el almacén del local: el central de la empresa no se opera
-        # desde el PDV y su stock no interesa durante un corte.
+        # El almacén del local **y su abastecedor**. El central se agregó el
+        # 2026-08-07: sin él, el local no puede ni pedirle insumos durante un
+        # corte —`crear_solicitud` exige que el abastecedor exista— ni saber
+        # de dónde viene el camión que está recibiendo. Su *stock* sigue sin
+        # replicarse (`stock` filtra por almacenes de la sucursal): lo que
+        # viaja es la ficha del almacén, no cuánto tiene.
         filtro=lambda q, a: q.where(
-            Almacen.sucursal_id == a.sucursal_id, Almacen.deleted_at.is_(None)
+            or_(
+                Almacen.sucursal_id == a.sucursal_id,
+                Almacen.id.in_(
+                    select(Almacen.almacen_abastecedor_id).where(
+                        Almacen.sucursal_id == a.sucursal_id
+                    )
+                ),
+            ),
+            Almacen.deleted_at.is_(None),
         ),
-        motivo="El listener de venta descuenta stock contra el almacén del local.",
+        motivo=(
+            "El listener de venta descuenta stock contra el almacén del "
+            "local; el abastecedor viaja para poder pedirle sin conexión."
+        ),
     ),
     RecursoSync(
         nombre="persona",
