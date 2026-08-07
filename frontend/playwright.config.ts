@@ -16,8 +16,6 @@ import { defineConfig, devices } from "@playwright/test";
  * una prueba que abre y cierra caja deja rastro, y ese rastro no puede caer
  * en los datos con los que alguien está trabajando.
  */
-const PYTHON = process.env.PYTHON ?? "python";
-const RAIZ = "..";
 // Escape para iterar en local contra servidores ya levantados a mano.
 const REUSAR = !!process.env.E2E_REUSAR;
 

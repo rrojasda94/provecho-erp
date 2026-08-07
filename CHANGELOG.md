@@ -7,6 +7,36 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Changed
 
+- **Next.js 15.5.22 → 16.3.0, TypeScript 5.5 → 6.0.3 y ESLint pasado a flat
+  config** (2026-08-07). Sale de tener `main` en rojo: el PR #28 subió
+  `eslint-config-next` a 16.3.0, que solo publica configuración plana,
+  mientras el repo seguía con `.eslintrc.json` y `next lint`. `npm run lint`
+  moría con `Converting circular structure to JSON` y, como
+  `next.config.mjs` no desactiva el lint del build, `npm run build` se caía
+  detrás. Los cuatro PR de Dependabot abiertos fallaban por herencia de eso,
+  no por lo suyo.
+  - `frontend/.eslintrc.json` → `frontend/eslint.config.mjs`, y el script
+    `lint` pasa de `next lint` (que Next 16 eliminó) a `eslint .`. El CLI de
+    ESLint no descarta `.next/` ni `out/` por su cuenta: van explícitos en
+    `ignores`.
+  - `eslint .` analiza además archivos que `next lint` nunca miró. Eso
+    destapó dos variables muertas en `playwright.config.ts` (`PYTHON` y
+    `RAIZ`, que quedaron sin uso cuando los servidores se movieron a
+    `e2e/servidor-*.mjs`). Se borraron.
+  - `agentRules: false` en `next.config.mjs`. Next 16 escribe `AGENTS.md` y
+    un `CLAUDE.md` en `frontend/` cada vez que corre `next dev`. `CLAUDE.md`
+    es el archivo de reglas del proyecto y lo carga Claude Code como
+    instrucciones: que una dependencia lo genere sola convierte un `npm
+    update` en un cambio de las reglas de trabajo sin revisión, y además
+    ensucia el árbol en cada arranque.
+  - `tsconfig.json` lo reescribe Next 16 al arrancar (`jsx` pasa de
+    `preserve` a `react-jsx`, entra `.next/dev/types` en `include`). Se
+    commitea como Next lo deja, para que `next dev` no deje el árbol sucio.
+  - Verificado en local: `npm run lint` sin errores, 176/176 de `npm test`,
+    `npm run build` con las 31 rutas.
+  - Queda deuda declarada en ROADMAP → Deuda técnica → Frontend: 34
+    hallazgos nuevos del React Compiler en `warn`, y `middleware.ts`
+    deprecado a favor de `proxy`.
 - **Deuda "migraciones con vuelta atrás probada" cerrada en el ROADMAP**
   (2026-08-06): seguía abierta pese a que el job `migraciones` de
   `.github/workflows/ci.yml` corre `alembic downgrade base` y vuelve a subir
