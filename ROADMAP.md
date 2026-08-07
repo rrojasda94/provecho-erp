@@ -830,6 +830,17 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   todavía por sucursal.
 
 ### CI/CD (tras la implementación de 2026-07-26)
+- ⬜ **Migrar el lint del frontend de `next lint` a la CLI de ESLint**
+  (deuda nueva 2026-08-07, y con fecha de vencimiento puesta). El job
+  `frontend` se rompió solo: el runner pasó de Node 24.16 a 24.18 y
+  `next lint` empezó a morir con "Converting circular structure to JSON" al
+  resolver el `.eslintrc.json` legacy bajo ESLint 9 — mismo commit y mismo
+  lockfile pasan en 24.16. El tapón fue **fijar el patch de Node** en el
+  job, que funciona pero congela una versión que va a envejecer.
+  El arreglo real es migrar a flat config (`npx @next/codemod@canary
+  next-lint-to-eslint-cli .`): `next lint` está deprecado y **desaparece en
+  Next 16**, así que esto se paga sí o sí. Al migrar, el `node-version`
+  vuelve a `"24"` flotante.
 - ⬜ **Job de despliegue** (ver *Cuando haya servidor*, punto 7): hoy el despliegue es manual y documentado. Se
   escribe cuando exista el VPS — automatizar por SSH contra una máquina que
   no existe da automatización no probada (ADR-008).
