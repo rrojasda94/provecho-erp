@@ -38,6 +38,12 @@ docs/capacitacion/*-shotlist.html
 Thumbs.db
 .DS_Store
 
+# Temporales de Microsoft Word: `~$doc.docx` es el archivo de bloqueo que crea
+# al abrir un .docx y `~WRLnnnn.tmp` el respaldo de autoguardado. Ambos son
+# basura de sesión y no describen nada del proyecto.
+~$*
+~WRL*.tmp
+
 # Tooling local de Claude Code (config y skills personales)
 .claude/
 

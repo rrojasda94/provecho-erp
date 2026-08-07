@@ -7,6 +7,14 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Fixed
 
+- **Dos temporales de Word estaban versionados en la raíz** (2026-08-07).
+  `~$F1.docx` (el archivo de bloqueo que Word crea al abrir un documento) y
+  `~WRL0908.tmp` (su respaldo de autoguardado) entraron en el import inicial
+  del repositorio. Son basura de sesión: no describen nada del proyecto y el
+  `.tmp` es una copia parcial de un documento que ya está versionado. Se
+  sacaron del índice y del disco, y `.gitignore` ahora tapa `~$*` y
+  `~WRL*.tmp` para que no vuelvan. El `.dockerignore` ya los excluía del
+  contexto de build, pero eso no impedía que se versionaran.
 - **Los campos de apertura y cierre de caja no tenían nombre accesible**
   (2026-08-07). Usuario, PIN, destino de custodia, atribución del descuadre y
   el monto declarado eran `<input>`/`<select>` con solo `placeholder`. Un
@@ -28,6 +36,12 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Changed
 
+- **`F1.docx` pasó de la raíz a `docs/foundation/`** (2026-08-07). Es el brief
+  original del ERP —el dictado del que salieron `vision.md`, `glossary.md` y
+  `business-philosophy.md`— y estaba suelto en la raíz sin que ningún
+  documento lo referenciara. Ahora vive junto a lo que originó y aparece en
+  el índice `docs/00_PROJECT.md` marcado como material fuente **no
+  normativo**: ante una diferencia mandan el glosario y la visión.
 - **El puerto de la API del `e2e` sale de `E2E_PUERTO_API`** (2026-08-07). Era
   `8100` fijo en tres archivos; en una máquina con ese puerto tomado por otro
   proyecto la suite no arrancaba y el error —"already used"— no decía cuál de
