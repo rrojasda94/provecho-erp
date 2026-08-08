@@ -10,12 +10,19 @@ sin caja abierta** (RN-MDP-002) cualquier test que registre un pago necesita
 un turno abierto.
 """
 
+import importlib
 import uuid
 from decimal import Decimal
 
 import pytest
+from argon2 import PasswordHasher
 
 from src.config.settings import settings
+from src.modules.users.infrastructure import security
+
+#: Los parámetros reales del hasher, antes de abaratarlos para el suite.
+#: `test_security.py` verifica que sigan por encima del piso recomendado.
+HASHER_PRODUCCION = security._hasher
 
 DENOMINACIONES = (
     "200", "100", "50", "20", "10", "5", "2", "1", "0.50", "0.20", "0.10",
@@ -91,30 +98,85 @@ def auth_headers(session, username: str = "admin") -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-class _RedisSinLimite:
-    """Contador que nunca llega al tope (el `incr` real es de Redis)."""
+class RedisFalso:
+    """Contador en memoria con la superficie que usa el limiter."""
+
+    def __init__(self) -> None:
+        self.claves: dict[str, int] = {}
 
     def incr(self, clave: str) -> int:
-        return 1
+        self.claves[clave] = self.claves.get(clave, 0) + 1
+        return self.claves[clave]
 
-    def expire(self, clave: str, segundos: int) -> bool:
-        return True
+    def expire(self, clave: str, segundos: int) -> None:
+        pass
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _argon2_barato():
+    """Argon2id calibrado para producción cuesta ~55 ms por hash.
+
+    El seeder hashea el PIN del admin y casi todo test de API hace un login,
+    así que el suite pagaba ~25% de su tiempo en KDF. Acá solo importa que
+    un hash verifique contra su PIN, no que sea caro de romper: los
+    parámetros de verdad viven en `security._hasher` y los cuida
+    `test_seguridad_del_hasher_de_produccion`.
+    """
+    security._hasher = PasswordHasher(time_cost=1, memory_cost=8, parallelism=1)
+    yield
+    security._hasher = HASHER_PRODUCCION
 
 
 @pytest.fixture(autouse=True)
-def _sin_rate_limit_de_login(monkeypatch):
-    """El límite de login es por IP, y para `TestClient` todo el suite es la
-    misma IP: sin esto, el test número 11 que hace login recibe 429 y falla
-    por una razón que no tiene que ver con lo que prueba.
+def _rate_limit_en_memoria(monkeypatch):
+    """Mismo criterio que el broker: el limiter no habla con un Redis real.
 
-    No desactiva el mecanismo, lo alimenta con un contador que no crece:
-    `test_security.py` sigue probando el rate limit de verdad, porque
-    monkeypatchea `_client` dentro del test y eso pisa esta fixture.
+    Sin esto cada login pagaba un intento de conexión rechazado (~17 ms) y el
+    límite quedaba fail-open, o sea nunca se ejercitaba. El contador es nuevo
+    en cada test para que las cuotas (10 logins/min) no se arrastren de uno
+    a otro.
     """
     from src.core import rate_limit
 
-    monkeypatch.setattr(rate_limit, "_client", _RedisSinLimite())
+    monkeypatch.setattr(rate_limit, "_client", RedisFalso())
     monkeypatch.setattr(rate_limit, "_reintentar_desde", 0.0)
+
+
+#: Los tres módulos de listeners que abren su propia sesión: reaccionan a un
+#: evento **después** del commit, cuando la sesión del request ya se cerró.
+MODULOS_CON_SESSION_FACTORY = (
+    "src.modules.accounting.application.listeners",
+    "src.modules.inventory.application.listeners",
+    "src.modules.marketing.application.listeners",
+)
+
+
+@pytest.fixture(autouse=True)
+def _listeners_sin_base_real(monkeypatch):
+    """Ningún listener puede abrir la sesión de producción durante un test.
+
+    Cada `env` parchea el `session_factory` de los listeners que su test
+    ejercita, pero **solo esos**. Los demás quedaban apuntando al Postgres
+    real: confirmar una venta despertaba `accounting.on_venta_confirmada`, que
+    abría su propia sesión y se quedaba en `psycopg.wait_conn` — sin timeout,
+    o sea para siempre. Así se colgaba el suite entero, y con la base de
+    desarrollo levantada era peor: el test escribía asientos en ella.
+
+    Reemplazarlo por algo que revienta es seguro: `EventBus._despachar` ya
+    atrapa y registra lo que falle en un handler (un fallo de inventario nunca
+    cancela la venta). El test que sí necesite el listener lo parchea, como
+    hasta ahora; el que no, ve el error en el log en vez de colgarse.
+    """
+
+    def _sin_base_real():
+        raise RuntimeError(
+            "El listener abrió la sesión de producción. El `env` de este test "
+            "tiene que parchear su `session_factory` — ver "
+            "MODULOS_CON_SESSION_FACTORY en tests/conftest.py."
+        )
+
+    for nombre in MODULOS_CON_SESSION_FACTORY:
+        monkeypatch.setattr(importlib.import_module(nombre), "session_factory", _sin_base_real)
 
 
 @pytest.fixture(autouse=True)

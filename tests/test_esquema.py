@@ -8,6 +8,7 @@ día", el endpoint respondía 500 y nada en el sistema lo notaba.
 import pytest
 from sqlalchemy import Column, Integer, MetaData, Table, create_engine, text
 
+from src.core.database import connect_args
 from src.core.esquema import diagnosticar, head_del_repo, verificar_al_arrancar
 
 
@@ -114,8 +115,15 @@ def test_sin_deriva_el_arranque_estricto_pasa(engine):
 
 # --- Base inalcanzable: no se pudo mirar, que no es lo mismo que deriva ------
 def _engine_muerto():
-    """Puerto 1 de loopback: la conexión se rechaza en el acto, sin esperas."""
-    return create_engine("postgresql+psycopg://x:x@127.0.0.1:1/x")
+    """Puerto 1 de loopback, con el mismo `connect_timeout` que producción.
+
+    Linux rechaza el puerto en el acto, pero **Windows descarta el SYN en
+    silencio**: sin el timeout estos dos casos tardaban 130 s cada uno, el
+    tope del stack TCP. Reusar `connect_args` no es cosmético — es el motivo
+    de que exista (ver CHANGELOG 2026-08-08).
+    """
+    url = "postgresql+psycopg://x:x@127.0.0.1:1/x"
+    return create_engine(url, connect_args=connect_args(url))
 
 
 def test_base_inalcanzable_no_reporta_tablas_faltantes():
