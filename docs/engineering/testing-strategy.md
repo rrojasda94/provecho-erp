@@ -157,8 +157,12 @@ lo son, no escribiendo otro tipo de test.
 
 ## Nota de velocidad
 
-La base de desarrollo vive en **Supabase, no en la máquina**: cada consulta
-cuesta ~130 ms de ida y vuelta, y toda prueba que pase por HTTP los paga.
-Las pruebas automatizadas usan SQLite en memoria o un archivo desechable
-justamente por eso — y es también la razón por la que las pantallas se
-sienten lentas en desarrollo (ver ROADMAP → Deuda técnica → Transversal).
+Desde **2026-08-08** la base de desarrollo es el contenedor `db` del
+docker-compose, en la máquina. Antes vivía en Supabase y cada consulta
+costaba ~130 ms de ida y vuelta: lo pagaba toda prueba que pasara por HTTP
+y también las pantallas, que se sentían lentas en desarrollo. En local esa
+latencia baja al orden del milisegundo.
+
+Las pruebas automatizadas siguen usando SQLite en memoria o un archivo
+desechable: no dependen de que Postgres esté levantado. El cambio le pega
+sobre todo a e2e y al trabajo manual contra la API.
