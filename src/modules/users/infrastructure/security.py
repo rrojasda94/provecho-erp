@@ -57,5 +57,31 @@ def hash_refresh_token(raw: str) -> str:
     return hashlib.sha256(raw.encode()).hexdigest()
 
 
+# Marca de "esto no es un JWT": lo que le permite a `api/deps` elegir el
+# camino de verificación sin intentar decodificar a ciegas.
+PREFIJO_TOKEN_AGENTE = "prv_"
+LARGO_PREFIJO_VISIBLE = 12  # "prv_" + 8 caracteres
+
+
+def new_api_token() -> tuple[str, str, str]:
+    """Devuelve (token_en_claro, prefijo_visible, token_hash).
+
+    SHA-256 y no Argon2 como el PIN: un PIN de 6 dígitos necesita un hash
+    lento porque tiene un millón de combinaciones; esto son 256 bits de
+    `secrets`, que no se rompen por fuerza bruta, y se verifica en **cada**
+    request — un Argon2 ahí costaría ~50 ms por llamada.
+    """
+    raw = PREFIJO_TOKEN_AGENTE + secrets.token_urlsafe(32)
+    return raw, raw[:LARGO_PREFIJO_VISIBLE], hash_api_token(raw)
+
+
+def hash_api_token(raw: str) -> str:
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+
+def es_token_agente(credencial: str) -> bool:
+    return credencial.startswith(PREFIJO_TOKEN_AGENTE)
+
+
 def refresh_expira_en() -> datetime:
     return datetime.now(UTC) + timedelta(days=settings.refresh_token_days)

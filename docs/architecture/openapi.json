@@ -330,8 +330,90 @@
         "title": "AjusteOut",
         "type": "object"
       },
+      "AlmacenCreate": {
+        "properties": {
+          "almacen_abastecedor_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Almacen Abastecedor Id"
+          },
+          "direccion": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direccion"
+          },
+          "empresa_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Empresa Id"
+          },
+          "nombre": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Nombre",
+            "type": "string"
+          },
+          "sucursal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sucursal Id"
+          },
+          "tipo": {
+            "maxLength": 30,
+            "minLength": 1,
+            "title": "Tipo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "nombre",
+          "tipo"
+        ],
+        "title": "AlmacenCreate",
+        "type": "object"
+      },
       "AlmacenOut": {
         "properties": {
+          "almacen_abastecedor_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Almacen Abastecedor Id"
+          },
           "direccion": {
             "anyOf": [
               {
@@ -383,6 +465,74 @@
           "direccion"
         ],
         "title": "AlmacenOut",
+        "type": "object"
+      },
+      "AlmacenUpdate": {
+        "properties": {
+          "almacen_abastecedor_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Almacen Abastecedor Id"
+          },
+          "direccion": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direccion"
+          },
+          "nombre": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nombre"
+          },
+          "sucursal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sucursal Id"
+          },
+          "tipo": {
+            "anyOf": [
+              {
+                "maxLength": 30,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tipo"
+          }
+        },
+        "title": "AlmacenUpdate",
         "type": "object"
       },
       "AmonestacionCreate": {
@@ -4940,6 +5090,256 @@
         "title": "EjecutarPagoIn",
         "type": "object"
       },
+      "EmpresaCreate": {
+        "properties": {
+          "config_fiscal": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Fiscal"
+          },
+          "contacto": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contacto"
+          },
+          "domicilio_fiscal": {
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Domicilio Fiscal",
+            "type": "string"
+          },
+          "grupo_id": {
+            "format": "uuid",
+            "title": "Grupo Id",
+            "type": "string"
+          },
+          "razon_social": {
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Razon Social",
+            "type": "string"
+          },
+          "ruc": {
+            "pattern": "^\\d{11}$",
+            "title": "Ruc",
+            "type": "string"
+          },
+          "tipo": {
+            "enum": [
+              "operativa",
+              "logistica",
+              "servicios",
+              "asesoria",
+              "transporte"
+            ],
+            "title": "Tipo",
+            "type": "string"
+          },
+          "zona_tributaria": {
+            "default": "general",
+            "enum": [
+              "amazonia_ley27037",
+              "general"
+            ],
+            "title": "Zona Tributaria",
+            "type": "string"
+          }
+        },
+        "required": [
+          "grupo_id",
+          "razon_social",
+          "ruc",
+          "domicilio_fiscal",
+          "tipo"
+        ],
+        "title": "EmpresaCreate",
+        "type": "object"
+      },
+      "EmpresaOut": {
+        "properties": {
+          "config_fiscal": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Fiscal"
+          },
+          "contacto": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contacto"
+          },
+          "domicilio_fiscal": {
+            "title": "Domicilio Fiscal",
+            "type": "string"
+          },
+          "grupo_id": {
+            "format": "uuid",
+            "title": "Grupo Id",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "razon_social": {
+            "title": "Razon Social",
+            "type": "string"
+          },
+          "ruc": {
+            "title": "Ruc",
+            "type": "string"
+          },
+          "tipo": {
+            "title": "Tipo",
+            "type": "string"
+          },
+          "zona_tributaria": {
+            "title": "Zona Tributaria",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "grupo_id",
+          "razon_social",
+          "ruc",
+          "domicilio_fiscal",
+          "contacto",
+          "tipo",
+          "zona_tributaria",
+          "config_fiscal"
+        ],
+        "title": "EmpresaOut",
+        "type": "object"
+      },
+      "EmpresaUpdate": {
+        "properties": {
+          "config_fiscal": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Fiscal"
+          },
+          "contacto": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contacto"
+          },
+          "domicilio_fiscal": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domicilio Fiscal"
+          },
+          "razon_social": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Razon Social"
+          },
+          "ruc": {
+            "anyOf": [
+              {
+                "pattern": "^\\d{11}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ruc"
+          },
+          "tipo": {
+            "anyOf": [
+              {
+                "enum": [
+                  "operativa",
+                  "logistica",
+                  "servicios",
+                  "asesoria",
+                  "transporte"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tipo"
+          },
+          "zona_tributaria": {
+            "anyOf": [
+              {
+                "enum": [
+                  "amazonia_ley27037",
+                  "general"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zona Tributaria"
+          }
+        },
+        "title": "EmpresaUpdate",
+        "type": "object"
+      },
       "EncuestaConNodoOut": {
         "description": "La encuesta y en qué nodo quedó: quien la envía o la contesta necesita\nver la pregunta pendiente sin pedirla aparte.",
         "properties": {
@@ -5581,6 +5981,21 @@
         "title": "FiltrosIn",
         "type": "object"
       },
+      "GrupoCreate": {
+        "properties": {
+          "nombre": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Nombre",
+            "type": "string"
+          }
+        },
+        "required": [
+          "nombre"
+        ],
+        "title": "GrupoCreate",
+        "type": "object"
+      },
       "GrupoOpcionCreate": {
         "description": "Grupo de extras del producto. `minimo >= 1` lo vuelve obligatorio: el\nPDV no deja agregar la línea hasta elegir (RN-COM-023).",
         "properties": {
@@ -5667,6 +6082,44 @@
           "orden"
         ],
         "title": "GrupoOpcionOut",
+        "type": "object"
+      },
+      "GrupoOut": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "nombre"
+        ],
+        "title": "GrupoOut",
+        "type": "object"
+      },
+      "GrupoUpdate": {
+        "properties": {
+          "nombre": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nombre"
+          }
+        },
+        "title": "GrupoUpdate",
         "type": "object"
       },
       "GuiaDevolucionCreate": {
@@ -6566,6 +7019,46 @@
         "title": "LegajoOut",
         "type": "object"
       },
+      "LicenciaMarcaIn": {
+        "properties": {
+          "marca_id": {
+            "format": "uuid",
+            "title": "Marca Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "marca_id"
+        ],
+        "title": "LicenciaMarcaIn",
+        "type": "object"
+      },
+      "LicenciaMarcaOut": {
+        "properties": {
+          "empresa_id": {
+            "format": "uuid",
+            "title": "Empresa Id",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "marca_id": {
+            "format": "uuid",
+            "title": "Marca Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "empresa_id",
+          "marca_id"
+        ],
+        "title": "LicenciaMarcaOut",
+        "type": "object"
+      },
       "LiquidacionBssCreate": {
         "properties": {
           "cts_pendiente": {
@@ -7080,6 +7573,96 @@
           }
         },
         "title": "LoteSyncIn",
+        "type": "object"
+      },
+      "MarcaCreate": {
+        "properties": {
+          "grupo_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grupo Id"
+          },
+          "nombre": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Nombre",
+            "type": "string"
+          },
+          "skins": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skins"
+          },
+          "tipo": {
+            "maxLength": 50,
+            "minLength": 1,
+            "title": "Tipo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "nombre",
+          "tipo"
+        ],
+        "title": "MarcaCreate",
+        "type": "object"
+      },
+      "MarcaUpdate": {
+        "properties": {
+          "nombre": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nombre"
+          },
+          "skins": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skins"
+          },
+          "tipo": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tipo"
+          }
+        },
+        "title": "MarcaUpdate",
         "type": "object"
       },
       "MeOut": {
@@ -15267,6 +15850,77 @@
         "title": "StockOut",
         "type": "object"
       },
+      "SucursalCreate": {
+        "properties": {
+          "direccion": {
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Direccion",
+            "type": "string"
+          },
+          "empresa_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Empresa Id"
+          },
+          "estado": {
+            "default": "activa",
+            "enum": [
+              "activa",
+              "inactiva"
+            ],
+            "title": "Estado",
+            "type": "string"
+          },
+          "horario_atencion": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Horario Atencion"
+          },
+          "marca_id": {
+            "format": "uuid",
+            "title": "Marca Id",
+            "type": "string"
+          },
+          "nombre": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Nombre",
+            "type": "string"
+          },
+          "tenencia": {
+            "enum": [
+              "propia",
+              "alquilada",
+              "del_grupo"
+            ],
+            "title": "Tenencia",
+            "type": "string"
+          }
+        },
+        "required": [
+          "marca_id",
+          "nombre",
+          "direccion",
+          "tenencia"
+        ],
+        "title": "SucursalCreate",
+        "type": "object"
+      },
       "SucursalIdIn": {
         "properties": {
           "sucursal_id": {
@@ -15283,6 +15937,17 @@
       },
       "SucursalOut": {
         "properties": {
+          "direccion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direccion"
+          },
           "empresa_id": {
             "format": "uuid",
             "title": "Empresa Id",
@@ -15305,6 +15970,17 @@
           "nombre": {
             "title": "Nombre",
             "type": "string"
+          },
+          "tenencia": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tenencia"
           }
         },
         "required": [
@@ -15315,6 +15991,94 @@
           "estado"
         ],
         "title": "SucursalOut",
+        "type": "object"
+      },
+      "SucursalUpdate": {
+        "description": "Cerrar un local es `estado=\"inactiva\"`; no hay DELETE de sucursal —\nsigue siendo el ancla de sus ventas, cajas y trabajadores.",
+        "properties": {
+          "direccion": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direccion"
+          },
+          "estado": {
+            "anyOf": [
+              {
+                "enum": [
+                  "activa",
+                  "inactiva"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estado"
+          },
+          "horario_atencion": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Horario Atencion"
+          },
+          "marca_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marca Id"
+          },
+          "nombre": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nombre"
+          },
+          "tenencia": {
+            "anyOf": [
+              {
+                "enum": [
+                  "propia",
+                  "alquilada",
+                  "del_grupo"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tenencia"
+          }
+        },
+        "title": "SucursalUpdate",
         "type": "object"
       },
       "TableroColumna": {
@@ -15495,6 +16259,174 @@
           "codigo"
         ],
         "title": "TarjetaIn",
+        "type": "object"
+      },
+      "TokenAgenteCreado": {
+        "description": "El único momento en que el token en claro existe fuera de quien lo\nusa: después solo queda su SHA-256, y perderlo obliga a emitir otro.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "expira_en": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expira En"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "prefijo": {
+            "title": "Prefijo",
+            "type": "string"
+          },
+          "revocado": {
+            "title": "Revocado",
+            "type": "boolean"
+          },
+          "token": {
+            "title": "Token",
+            "type": "string"
+          },
+          "ultimo_uso_en": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ultimo Uso En"
+          },
+          "usuario_id": {
+            "format": "uuid",
+            "title": "Usuario Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "usuario_id",
+          "nombre",
+          "prefijo",
+          "expira_en",
+          "revocado",
+          "ultimo_uso_en",
+          "created_at",
+          "token"
+        ],
+        "title": "TokenAgenteCreado",
+        "type": "object"
+      },
+      "TokenAgenteCreate": {
+        "properties": {
+          "dias_validez": {
+            "anyOf": [
+              {
+                "maximum": 3650.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dias Validez"
+          },
+          "nombre": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Nombre",
+            "type": "string"
+          }
+        },
+        "required": [
+          "nombre"
+        ],
+        "title": "TokenAgenteCreate",
+        "type": "object"
+      },
+      "TokenAgenteOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "expira_en": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expira En"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "prefijo": {
+            "title": "Prefijo",
+            "type": "string"
+          },
+          "revocado": {
+            "title": "Revocado",
+            "type": "boolean"
+          },
+          "ultimo_uso_en": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ultimo Uso En"
+          },
+          "usuario_id": {
+            "format": "uuid",
+            "title": "Usuario Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "usuario_id",
+          "nombre",
+          "prefijo",
+          "expira_en",
+          "revocado",
+          "ultimo_uso_en",
+          "created_at"
+        ],
+        "title": "TokenAgenteOut",
         "type": "object"
       },
       "TokenPair": {
@@ -19489,6 +20421,194 @@
         "tags": [
           "users"
         ]
+      },
+      "post": {
+        "operationId": "crear_almacen_api_v1_almacenes_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AlmacenCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlmacenOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Almacen",
+        "tags": [
+          "organizacion"
+        ]
+      }
+    },
+    "/api/v1/almacenes/{almacen_id}": {
+      "delete": {
+        "description": "Baja lógica. No mira el stock: vive en `inventory` y `users` no\nimporta el dominio de otro módulo. Sí niega la baja si otros almacenes\nse abastecen de este.",
+        "operationId": "dar_de_baja_almacen_api_v1_almacenes__almacen_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "almacen_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Almacen Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Dar De Baja Almacen",
+        "tags": [
+          "organizacion"
+        ]
+      },
+      "get": {
+        "operationId": "obtener_almacen_api_v1_almacenes__almacen_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "almacen_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Almacen Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlmacenOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Obtener Almacen",
+        "tags": [
+          "organizacion"
+        ]
+      },
+      "patch": {
+        "operationId": "editar_almacen_api_v1_almacenes__almacen_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "almacen_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Almacen Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AlmacenUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlmacenOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Editar Almacen",
+        "tags": [
+          "organizacion"
+        ]
       }
     },
     "/api/v1/auditoria": {
@@ -20205,6 +21325,564 @@
         "summary": "Editar Divisa",
         "tags": [
           "gerencia"
+        ]
+      }
+    },
+    "/api/v1/empresas": {
+      "get": {
+        "description": "Quien no es superusuario ve solo la empresa de su token: el listado\ndel grupo no es dato de un admin de local.",
+        "operationId": "listar_empresas_api_v1_empresas_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/EmpresaOut"
+                  },
+                  "title": "Response Listar Empresas Api V1 Empresas Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Empresas",
+        "tags": [
+          "organizacion"
+        ]
+      },
+      "post": {
+        "operationId": "crear_empresa_api_v1_empresas_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmpresaCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmpresaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Empresa",
+        "tags": [
+          "organizacion"
+        ]
+      }
+    },
+    "/api/v1/empresas/{empresa_id}": {
+      "delete": {
+        "description": "Baja **lógica**: la fila queda con `deleted_at` porque sus ventas,\ncompras y comprobantes siguen existiendo. Se niega si todavía tiene\nsucursales o almacenes activos.",
+        "operationId": "dar_de_baja_empresa_api_v1_empresas__empresa_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "empresa_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Empresa Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Dar De Baja Empresa",
+        "tags": [
+          "organizacion"
+        ]
+      },
+      "get": {
+        "operationId": "obtener_empresa_api_v1_empresas__empresa_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "empresa_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Empresa Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmpresaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Obtener Empresa",
+        "tags": [
+          "organizacion"
+        ]
+      },
+      "patch": {
+        "operationId": "editar_empresa_api_v1_empresas__empresa_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "empresa_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Empresa Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmpresaUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmpresaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Editar Empresa",
+        "tags": [
+          "organizacion"
+        ]
+      }
+    },
+    "/api/v1/empresas/{empresa_id}/marcas": {
+      "get": {
+        "operationId": "listar_licencias_marca_api_v1_empresas__empresa_id__marcas_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "empresa_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Empresa Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LicenciaMarcaOut"
+                  },
+                  "title": "Response Listar Licencias Marca Api V1 Empresas  Empresa Id  Marcas Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Licencias Marca",
+        "tags": [
+          "organizacion"
+        ]
+      },
+      "post": {
+        "description": "Licencia la marca a la empresa (N:N, franquicia interna). Sin esto una\nsucursal de esa marca no puede existir.",
+        "operationId": "otorgar_licencia_marca_api_v1_empresas__empresa_id__marcas_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "empresa_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Empresa Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LicenciaMarcaIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LicenciaMarcaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Otorgar Licencia Marca",
+        "tags": [
+          "organizacion"
+        ]
+      }
+    },
+    "/api/v1/empresas/{empresa_id}/marcas/{marca_id}": {
+      "delete": {
+        "operationId": "revocar_licencia_marca_api_v1_empresas__empresa_id__marcas__marca_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "empresa_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Empresa Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "marca_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Marca Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Revocar Licencia Marca",
+        "tags": [
+          "organizacion"
+        ]
+      }
+    },
+    "/api/v1/grupos": {
+      "get": {
+        "description": "Quien no es superusuario ve solo el suyo. Hoy hay un único grupo y\ndaría igual; el día que el ERP aloje a otro, el listado no puede ser la\npuerta por la que se entera.",
+        "operationId": "listar_grupos_api_v1_grupos_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/GrupoOut"
+                  },
+                  "title": "Response Listar Grupos Api V1 Grupos Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Grupos",
+        "tags": [
+          "organizacion"
+        ]
+      },
+      "post": {
+        "operationId": "crear_grupo_api_v1_grupos_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GrupoCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GrupoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Grupo",
+        "tags": [
+          "organizacion"
+        ]
+      }
+    },
+    "/api/v1/grupos/{grupo_id}": {
+      "get": {
+        "operationId": "obtener_grupo_api_v1_grupos__grupo_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "grupo_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Grupo Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GrupoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Obtener Grupo",
+        "tags": [
+          "organizacion"
+        ]
+      },
+      "patch": {
+        "operationId": "editar_grupo_api_v1_grupos__grupo_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "grupo_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Grupo Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GrupoUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GrupoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Editar Grupo",
+        "tags": [
+          "organizacion"
         ]
       }
     },
@@ -24029,6 +25707,193 @@
         "summary": "Listar Marcas Organizacion",
         "tags": [
           "users"
+        ]
+      },
+      "post": {
+        "operationId": "crear_marca_api_v1_marcas_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarcaCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/src__modules__users__api__schemas__MarcaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Marca",
+        "tags": [
+          "organizacion"
+        ]
+      }
+    },
+    "/api/v1/marcas/{marca_id}": {
+      "delete": {
+        "operationId": "dar_de_baja_marca_api_v1_marcas__marca_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "marca_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Marca Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Dar De Baja Marca",
+        "tags": [
+          "organizacion"
+        ]
+      },
+      "get": {
+        "operationId": "obtener_marca_api_v1_marcas__marca_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "marca_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Marca Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/src__modules__users__api__schemas__MarcaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Obtener Marca",
+        "tags": [
+          "organizacion"
+        ]
+      },
+      "patch": {
+        "operationId": "editar_marca_api_v1_marcas__marca_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "marca_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Marca Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarcaUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/src__modules__users__api__schemas__MarcaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Editar Marca",
+        "tags": [
+          "organizacion"
         ]
       }
     },
@@ -32984,6 +34849,156 @@
         "tags": [
           "users"
         ]
+      },
+      "post": {
+        "operationId": "crear_sucursal_api_v1_sucursales_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SucursalCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SucursalOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Sucursal",
+        "tags": [
+          "organizacion"
+        ]
+      }
+    },
+    "/api/v1/sucursales/{sucursal_id}": {
+      "get": {
+        "description": "Lectura con el mismo criterio que `GET /sucursales`: catálogo de\nreferencia para cualquier autenticado, escopado por tenant.",
+        "operationId": "obtener_sucursal_api_v1_sucursales__sucursal_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sucursal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sucursal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SucursalOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Obtener Sucursal",
+        "tags": [
+          "organizacion"
+        ]
+      },
+      "patch": {
+        "description": "Cerrar un local es `estado=\"inactiva\"` — no hay DELETE de sucursal:\nsigue siendo el ancla de sus ventas, cajas y trabajadores.",
+        "operationId": "editar_sucursal_api_v1_sucursales__sucursal_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sucursal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sucursal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SucursalUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SucursalOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Editar Sucursal",
+        "tags": [
+          "organizacion"
+        ]
       }
     },
     "/api/v1/sync/pull": {
@@ -33842,6 +35857,166 @@
         ]
       }
     },
+    "/api/v1/users/{usuario_id}/tokens": {
+      "get": {
+        "operationId": "listar_tokens_agente_api_v1_users__usuario_id__tokens_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "usuario_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Usuario Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TokenAgenteOut"
+                  },
+                  "title": "Response Listar Tokens Agente Api V1 Users  Usuario Id  Tokens Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Tokens Agente",
+        "tags": [
+          "users-admin"
+        ]
+      },
+      "post": {
+        "description": "Emite la credencial de larga vida de una cuenta de agente. El token en\nclaro sale **una sola vez**: acá se guarda su SHA-256.",
+        "operationId": "crear_token_agente_api_v1_users__usuario_id__tokens_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "usuario_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Usuario Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TokenAgenteCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenAgenteCreado"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Token Agente",
+        "tags": [
+          "users-admin"
+        ]
+      }
+    },
+    "/api/v1/users/{usuario_id}/tokens/{token_id}": {
+      "delete": {
+        "operationId": "revocar_token_agente_api_v1_users__usuario_id__tokens__token_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "usuario_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Usuario Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "token_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Token Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Revocar Token Agente",
+        "tags": [
+          "users-admin"
+        ]
+      }
+    },
     "/api/v1/webhooks/whatsapp": {
       "get": {
         "description": "Handshake de alta de la URL en Meta.",
@@ -34068,8 +36243,12 @@
       "name": "personas"
     },
     {
-      "description": "CRUD de usuarios, roles, permisos y asignaciones (`users.gestionar`).",
+      "description": "CRUD de usuarios, roles, permisos, asignaciones y tokens de API de agentes (`users.gestionar`).",
       "name": "users-admin"
+    },
+    {
+      "description": "Grupo, empresas, marcas, licencias de marca, sucursales y almacenes (`organizacion.gestionar`).",
+      "name": "organizacion"
     },
     {
       "description": "Matriz de aprobaciones por empresa, en vez de umbrales fijos por módulo.",
