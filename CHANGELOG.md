@@ -7,6 +7,21 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Fixed
 
+- **`main` estaba en rojo: el build del frontend no compilaba** (2026-08-08).
+  Dependabot subió `@tanstack/react-table` de 8.21.3 a **9.0.0** (PR #37) y el
+  merge entró sin que nadie migrara el código. La v9 renombró los
+  constructores de row model —`getCoreRowModel` pasó a `createCoreRowModel`, y
+  lo mismo los de sorting, filtering y pagination—, así que
+  `components/tabla/tabla-datos.tsx` importaba exports que ya no existen y
+  `next build` moría con 10 errores. Toda la CI de `main` y de cada PR abierto
+  desde el 2026-08-07 arrastraba el fallo.
+  Se revierte a `^8.21.3`, la versión contra la que el componente está
+  escrito. La migración a la v9 queda anotada en el ROADMAP → Deuda técnica →
+  Transversal: es un archivo, pero exige leer la guía de la mayor, no solo
+  renombrar importaciones.
+  - Lo notable es que `eslint` y los 176 tests de frontend pasaban igual: el
+    error solo aparece al compilar. El job ya corría `build`, que es lo que lo
+    atrapó — la falla fue mergear un PR de dependencias con la CI en rojo.
 - **Dos temporales de Word estaban versionados en la raíz** (2026-08-07).
   `~$F1.docx` (el archivo de bloqueo que Word crea al abrir un documento) y
   `~WRL0908.tmp` (su respaldo de autoguardado) entraron en el import inicial
