@@ -252,6 +252,15 @@ def test_anular_repone_stock(env):
     assert r.json()["estado"] == "anulada"
     assert _stock(ids, TestSession) == Decimal("10")
 
+    # Anular es acto de autoridad: deja rastro consultable (ADR-031).
+    from src.shared.models import AuditLog
+    with TestSession() as s:
+        rastro = s.scalar(
+            select(AuditLog).where(AuditLog.entidad_id == uuid.UUID(venta["id"]))
+        )
+    assert rastro.accion == "anular"
+    assert rastro.datos_despues == {"estado": "anulada"}
+
 
 def test_anular_pagada_409(env):
     client, ids, _ = env

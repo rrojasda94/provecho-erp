@@ -2,7 +2,6 @@
 (data-model §1, §2)."""
 
 from src.modules.users.infrastructure.models.almacen import Almacen
-from src.modules.users.infrastructure.models.audit_log import AuditLog
 from src.modules.users.infrastructure.models.empresa import Empresa
 from src.modules.users.infrastructure.models.grupo import Grupo
 from src.modules.users.infrastructure.models.licencia_marca import LicenciaMarca
@@ -21,7 +20,6 @@ from src.modules.users.infrastructure.models.usuario_sucursal import UsuarioSucu
 
 __all__ = [
     "Almacen",
-    "AuditLog",
     "Empresa",
     "Grupo",
     "LicenciaMarca",

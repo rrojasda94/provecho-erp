@@ -24,11 +24,11 @@ from src.modules.users.application.errors import (
 )
 from src.modules.users.infrastructure.models import TokenAgente, Usuario
 from src.modules.users.infrastructure.repositories import (
-    AuditLogRepo,
     TokenAgenteRepo,
     UsuarioRepo,
 )
 from src.modules.users.infrastructure.security import hash_api_token, new_api_token
+from src.shared import auditoria
 
 log_seguridad = logger_seguridad()
 
@@ -75,7 +75,8 @@ def crear(
             ),
         )
     )
-    AuditLogRepo(session).registrar(
+    auditoria.registrar(
+        session,
         usuario_id=actor_id, entidad="token_agente", entidad_id=fila.id,
         accion="crear", datos_despues={"usuario_id": str(usuario_id), "prefijo": prefijo},
     )
@@ -103,7 +104,8 @@ def revocar(
     if fila.revocado:
         return
     fila.revocado = True
-    AuditLogRepo(session).registrar(
+    auditoria.registrar(
+        session,
         usuario_id=actor_id, entidad="token_agente", entidad_id=fila.id,
         accion="revocar", datos_despues={"prefijo": fila.prefijo},
     )

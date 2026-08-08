@@ -28,7 +28,7 @@ from src.modules.sales.infrastructure.repositories import (
     ProductoComercialRepo,
     VentaRepo,
 )
-from src.shared import fechas
+from src.shared import auditoria, fechas
 from src.shared.models import Comprobante
 
 
@@ -414,6 +414,19 @@ def aplicar_descuento(
         raise Conflicto(f"la venta está {venta.estado}; no admite cambios de descuento")
 
     if modo is None:
+        auditoria.registrar(
+            session,
+            usuario_id=autorizado_por,
+            entidad="venta",
+            entidad_id=venta.id,
+            accion="descuento_quitado",
+            datos_antes={
+                "modo": venta.descuento_modo,
+                "valor": str(venta.descuento_valor or ""),
+                "motivo": venta.descuento_motivo,
+            },
+            sucursal_id=venta.sucursal_id,
+        )
         venta.descuento_modo = None
         venta.descuento_valor = None
         venta.descuento_motivo = None
@@ -430,6 +443,16 @@ def aplicar_descuento(
     if motivo not in rules.MOTIVOS_DESCUENTO:
         raise ReglaNegocio(f"motivo de descuento inválido: {motivo}")
 
+    auditoria.registrar(
+        session,
+        usuario_id=autorizado_por,
+        entidad="venta",
+        entidad_id=venta.id,
+        accion="descuento_aplicado",
+        datos_antes={"total": str(venta.total)},
+        datos_despues={"modo": modo, "valor": str(valor), "motivo": motivo},
+        sucursal_id=venta.sucursal_id,
+    )
     venta.descuento_modo = modo
     venta.descuento_valor = valor
     venta.descuento_motivo = motivo
@@ -713,7 +736,18 @@ def anular_venta(session: Session, venta_id: uuid.UUID, usuario_id: uuid.UUID) -
         raise Conflicto(
             f"venta {venta.estado}: anulación post-pago requiere nota de crédito"
         )
+    estado_previo = venta.estado
     venta.estado = "anulada"
+    auditoria.registrar(
+        session,
+        usuario_id=usuario_id,
+        entidad="venta",
+        entidad_id=venta.id,
+        accion="anular",
+        datos_antes={"estado": estado_previo, "total": str(venta.total)},
+        datos_despues={"estado": "anulada"},
+        sucursal_id=venta.sucursal_id,
+    )
     productos = ProductoComercialRepo(session)
     items = []
     for it in VentaRepo(session).items(venta_id):

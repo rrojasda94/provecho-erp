@@ -19,7 +19,7 @@ Autenticación, endurecimiento, auditoría y backups. El control de acceso
   caída de Redis no puede dejar sin operar al restaurante.
 - Agentes de IA: usuarios `tipo=agente_ia` con permisos mínimos y
   **credencial propia** — un token de API de larga vida (`token_agente`,
-  ADR-031), no un PIN. `Authorization: Bearer prv_...`; se guarda solo su
+  ADR-032), no un PIN. `Authorization: Bearer prv_...`; se guarda solo su
   SHA-256 y el valor en claro sale una única vez, al emitirlo. Se revoca de
   a uno (`DELETE /users/{id}/tokens/{token_id}`), sin apagar la cuenta ni
   las demás integraciones. Un usuario `humano` no puede tener token.
@@ -30,7 +30,19 @@ Autenticación, endurecimiento, auditoría y backups. El control de acceso
 ## Auditoría y logs
 
 - `audit_log` inmutable: quién, qué entidad, qué acción, cuándo, dónde
-  (sucursal, IP), valor anterior y nuevo (JSONB).
+  (empresa, sucursal, IP), valor anterior y nuevo (JSONB).
+- **Transversal** (ADR-031): escribe cualquier módulo por
+  `src.shared.auditoria.registrar`, en la misma transacción que el cambio
+  auditado. Hoy dejan rastro: login y login fallido, elevación de PIN de
+  supervisor, alta de usuario y asignación de rol/permiso, anonimización de
+  persona y de postulante, anulación de venta y descuento manual, aprobación
+  de ajuste de inventario, emisión de OC, ejecución de pago a proveedor e
+  ingreso/retiro de efectivo del cajón.
+- Se lee por `GET /api/v1/auditoria` (permiso `auditoria.leer`, del rol
+  `contador` — Contabilidad audita a Compras, Almacén y cajas, RN-CTB-009).
+  **No hay endpoint de escritura**: el auditado no puede dictar lo que dice
+  su auditoría. El alcance sale del JWT (ADR-004); las filas sin empresa ni
+  sucursal solo las ve el superusuario.
 - Tres flujos de logs: aplicación, seguridad y auditoría — formato uniforme
   (JSON en producción), correlacionados por `request_id`. Implementado
   2026-07-26; ver

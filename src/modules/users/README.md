@@ -4,14 +4,16 @@
 
 Autenticar personas y agentes de IA, y autorizar cada acción según la cadena:
 Usuario → Rol → Permisos → Acciones → Restricciones → Sucursales → Empresa → Datos.
-Provee el contexto de tenant a todos los demás módulos y la auditoría central.
+Provee el contexto de tenant a todos los demás módulos. La auditoría
+dejó de ser suya: `audit_log` es transversal y vive en `src/shared`
+(ADR-031), aunque `users` siga siendo su mayor escritor.
 
 ## Entidades
 
 `usuario` (username, pin_hash Argon2id, tipo humano|agente_ia), `token_agente`
-(credencial de API de un agente, ADR-031), `rol`, `permiso`
+(credencial de API de un agente, ADR-032), `rol`, `permiso`
 (código `modulo.accion` + restricciones), `usuario_rol`, `rol_permiso`,
-`usuario_sucursal`, `refresh_token`, `audit_log`. `persona` (party model,
+`usuario_sucursal`, `refresh_token`. `persona` (party model,
 `version` para lock optimista — ver Estado abajo).
 Incluye además la organización: `grupo`, `empresa`, `marca`, `sucursal`, `almacen`.
 Detalle en `docs/architecture/data-model.md` (§1, §2).
@@ -23,7 +25,7 @@ Detalle en `docs/architecture/data-model.md` (§1, §2).
 - CRUD de usuarios, roles y permisos (solo admin).
 - CRUD de la organización: grupo, empresa, marca, licencia de marca,
   sucursal y almacén (permiso `organizacion.gestionar`).
-- Emitir, listar y revocar tokens de API de cuentas `agente_ia` (ADR-031).
+- Emitir, listar y revocar tokens de API de cuentas `agente_ia` (ADR-032).
 - CRUD de `persona` (Create/Read/Update — sin Delete, el ciclo de vida real
   se maneja en la entidad que la referencia). `PATCH` exige la `version`
   vigente (lock optimista): `version` desactualizada → 409, en vez de
@@ -43,7 +45,9 @@ Detalle en `docs/architecture/data-model.md` (§1, §2).
   parámetro sea de `users`.
 - Asignar usuario a sucursales (alcance).
 - Consultar permisos efectivos de un usuario.
-- Registrar entrada en `audit_log` (consumido por todos los módulos).
+- Dejar rastro de los actos de autoridad (login fallido, alta de usuario,
+  asignación de rol/permiso, elevación de PIN, anonimización) llamando a
+  `src.shared.auditoria.registrar` — la tabla ya no es de este módulo.
 
 ## Contrato API (v1)
 
@@ -56,7 +60,7 @@ Detalle en `docs/architecture/data-model.md` (§1, §2).
 
 Claims del JWT: `sub` (usuario_id), `tipo`, `roles`, `sucursales`, `empresa_id`, `iat`, `exp`, `jti`.
 
-### Autenticación de agentes (ADR-031, implementado 2026-08-08)
+### Autenticación de agentes (ADR-032, implementado 2026-08-08)
 
 Una cuenta `tipo=agente_ia` (n8n, el bot de pedidos, una integración) **no
 se autentica con PIN**: usa un token de API de larga vida. El PIN de 6
@@ -245,7 +249,7 @@ autenticarse en el hub durante un corte.
 - Bloqueo tras 5 intentos fallidos consecutivos (ventana 15 min).
 - Refresh tokens rotativos: usar uno viejo revoca toda la cadena.
 - Agentes de IA son usuarios tipo `agente_ia` con permisos restringidos (ej. solo
-  `sales.crear_pedido`) y se autentican con token de API, no con PIN (ADR-031).
+  `sales.crear_pedido`) y se autentican con token de API, no con PIN (ADR-032).
 - Seeder de desarrollo: usuario `admin` / PIN `123456` con rol admin. Prohibido en producción.
 - El seeder deja montada la organización real del grupo: empresa
   Majambo EIRL (RUC 20450311520, zona `amazonia_ley27037`), marca

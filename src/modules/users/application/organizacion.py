@@ -37,13 +37,13 @@ from src.modules.users.infrastructure.models import (
 )
 from src.modules.users.infrastructure.repositories import (
     AlmacenRepo,
-    AuditLogRepo,
     EmpresaRepo,
     GrupoRepo,
     LicenciaMarcaRepo,
     MarcaRepo,
     SucursalRepo,
 )
+from src.shared import auditoria
 
 # Tipo de almacén que sí cuelga de un local; el resto (central, producción,
 # activos) no tiene sucursal. Ver data-model §1.
@@ -65,7 +65,8 @@ def _auditar(
     antes: dict | None = None,
     despues: dict | None = None,
 ) -> None:
-    AuditLogRepo(session).registrar(
+    auditoria.registrar(
+        session,
         usuario_id=actor_id, entidad=entidad, entidad_id=entidad_id,
         accion=accion, datos_antes=antes, datos_despues=despues,
     )

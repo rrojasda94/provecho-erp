@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session
 from src.modules.rrhh.application.errors import Conflicto, NoEncontrado
 from src.modules.rrhh.infrastructure.models import Postulante
 from src.modules.rrhh.infrastructure.repositories import PostulanteRepo
-from src.modules.users.infrastructure.repositories import AuditLogRepo
+from src.shared import auditoria
 
 MARCADOR_ANONIMO = "ANONIMIZADO"
 CAMPOS_ANONIMIZADOS = ("nombres", "apellidos", "telefono", "email", "respuestas")
@@ -57,7 +57,8 @@ def anonimizar_postulante(
     # Igual que en `users`: se registra QUÉ se borró y por qué, nunca el
     # valor — guardarlo en el audit_log dejaría la PII accesible ahí para
     # siempre y vaciaría de sentido la anonimización.
-    AuditLogRepo(session).registrar(
+    auditoria.registrar(
+        session,
         usuario_id=solicitado_por,
         entidad="postulante",
         entidad_id=postulante.id,

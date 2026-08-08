@@ -54,7 +54,7 @@ from src.modules.sales.application.queries_publicas import (
     total_efectivo_cobrado,
     total_tarjeta_cobrado,
 )
-from src.shared import fechas
+from src.shared import auditoria, fechas
 
 
 def _contar(detalle: dict | None, que: str) -> Decimal:
@@ -238,6 +238,21 @@ def registrar_movimiento_caja(
             autorizado_por=autorizado_por,
             idempotency_key=idempotency_key,
         )
+    )
+    # Plata que entra o sale del cajón fuera de la venta: al rastro con
+    # quién lo registró y quién lo autorizó (RN-MDP-007).
+    auditoria.registrar(
+        session,
+        usuario_id=registrado_por,
+        entidad="movimiento_caja",
+        entidad_id=movimiento.id,
+        accion=f"{tipo}_efectivo",
+        datos_despues={
+            "monto": str(monto),
+            "motivo": movimiento.motivo,
+            "autorizado_por": str(autorizado_por) if autorizado_por else None,
+            "apertura_caja_id": str(apertura_caja_id),
+        },
     )
     event_bus.publish(
         "accounting.movimiento_caja_registrado",

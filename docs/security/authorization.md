@@ -79,7 +79,7 @@ distinto y valen la pena tenerlas presentes:
 Alta: `python -m src.seeders.hub --sucursal <uuid> --username hub_<local>`
 (ver `docs/engineering/devops.md`).
 
-### Cuentas de agente: token de API, no PIN (ADR-031)
+### Cuentas de agente: token de API, no PIN (ADR-032)
 
 Un `usuario` con `tipo=agente_ia` se autentica con un **token de API de
 larga vida** (`token_agente`), emitido y revocado con `users.gestionar`
