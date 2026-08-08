@@ -29,9 +29,11 @@ updates:
       frontend-menores:
         applies-to: version-updates
         update-types: [minor, patch]
-    # Dos majors que hoy no tienen dónde aterrizar. No es estar atrasado: no
-    # existe versión publicada de la cadena de `eslint-config-next` que los
-    # acepte. Cada uno se destraba solo cuando su bloqueante publique.
+    # Majors que hoy no tienen dónde aterrizar. Los dos primeros no es que
+    # estemos atrasados: no existe versión publicada de la cadena de
+    # `eslint-config-next` que los acepte, y cada uno se destraba solo cuando
+    # su bloqueante publique. El tercero es distinto: la versión existe y
+    # funciona, lo que falta es migrar código nuestro.
     ignore:
       # `typescript-eslint` pide `typescript >=4.8.4 <6.1.0` y
       # `eslint-config-next` depende de él. Al instalar TS7 npm resuelve el
@@ -48,6 +50,15 @@ updates:
       # `react/display-name` antes de terminar el primer archivo (PR #27).
       - dependency-name: eslint
         versions: ["10.x"]
+      # `@tanstack/react-table` 9 renombró la API: `useReactTable` pasó a
+      # `useTable` y desaparecieron `getCoreRowModel`/`getFilteredRowModel`/
+      # `getPaginationRowModel`/`getSortedRowModel`. El PR #37 la mergeó sin
+      # migrar `components/tabla/tabla-datos.tsx`, que las importa las cinco:
+      # `npm run build` dejó de compilar y con él cayeron `frontend` y `e2e`
+      # en `main`. El bloqueo es nuestro, no del ecosistema — se saca cuando
+      # se migre el componente, con sus 14 pantallas revisadas.
+      - dependency-name: "@tanstack/react-table"
+        versions: ["9.x"]
     commit-message:
       prefix: "chore(deps)"
 

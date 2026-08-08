@@ -7,6 +7,28 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Fixed
 
+- **`main` no compilaba desde el 2026-08-07: `@tanstack/react-table` 9 entró
+  sin migrar el código** (2026-08-08). El PR #37 de Dependabot subió la
+  librería de `8.21.3` a `^9.0.0` — un **major**, con la API renombrada:
+  `useReactTable` pasó a `useTable` y desaparecieron `getCoreRowModel`,
+  `getFilteredRowModel`, `getPaginationRowModel` y `getSortedRowModel`.
+  `components/tabla/tabla-datos.tsx` importa las cinco, así que
+  `npm run build` cortaba con *"Export useReactTable doesn't exist in target
+  module"* y con él caían los jobs `frontend` y `e2e` de CI — en `main` y en
+  cada PR abierto después, que heredaba un rojo ajeno.
+  - Se revierte el bump a `^8.21.3` (revert de `dc33e98`, `package.json` +
+    `package-lock.json`) y se agrega `@tanstack/react-table` 9.x a los
+    `ignore` de `dependabot.yml`. La diferencia con los otros dos ignore está
+    escrita ahí: aquellos esperan que publique un tercero, este espera
+    trabajo nuestro.
+  - **No se migra a v9 en este cambio a propósito.** La API rota vive en un
+    solo archivo (132 líneas), pero `tabla-datos.tsx` es el componente de
+    tabla de 14 pantallas —usuarios, proveedores, órdenes de compra,
+    artículos, trabajadores, asientos…— y reescribirlo pide revisarlas.
+    Destrabar CI hoy y migrar cuando haya motivo son dos cambios distintos;
+    mezclarlos deja el arreglo urgente esperando a la revisión visual.
+  - Lo que el episodio deja: `npm run build` sí estaba en CI y sí lo atrapó.
+    Lo que faltó fue mirar el rojo antes de mergear un major.
 - **Dos temporales de Word estaban versionados en la raíz** (2026-08-07).
   `~$F1.docx` (el archivo de bloqueo que Word crea al abrir un documento) y
   `~WRL0908.tmp` (su respaldo de autoguardado) entraron en el import inicial
