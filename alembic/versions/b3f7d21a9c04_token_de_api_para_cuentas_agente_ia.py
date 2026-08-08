@@ -1,7 +1,7 @@
 """token de API para cuentas agente_ia
 
 Revision ID: b3f7d21a9c04
-Revises: e7c390a5b41f
+Revises: c1f80b6a2d34
 Create Date: 2026-08-08 10:00:00.000000
 
 Un agente (n8n, el bot de pedidos, el hub de sucursal) no teclea un PIN de
@@ -23,7 +23,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = 'b3f7d21a9c04'
-down_revision: str | None = 'e7c390a5b41f'
+down_revision: str | None = 'c1f80b6a2d34'
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

@@ -19,7 +19,7 @@ Autenticación, endurecimiento, auditoría y backups. El control de acceso
   caída de Redis no puede dejar sin operar al restaurante.
 - Agentes de IA: usuarios `tipo=agente_ia` con permisos mínimos y
   **credencial propia** — un token de API de larga vida (`token_agente`,
-  ADR-029), no un PIN. `Authorization: Bearer prv_...`; se guarda solo su
+  ADR-031), no un PIN. `Authorization: Bearer prv_...`; se guarda solo su
   SHA-256 y el valor en claro sale una única vez, al emitirlo. Se revoca de
   a uno (`DELETE /users/{id}/tokens/{token_id}`), sin apagar la cuenta ni
   las demás integraciones. Un usuario `humano` no puede tener token.

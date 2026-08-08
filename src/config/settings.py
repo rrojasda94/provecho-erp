@@ -63,6 +63,29 @@ class Settings(BaseSettings):
     factiliza_token: str = ""
     factiliza_timeout_segundos: float = 30.0
     igv_porcentaje: Decimal = Decimal("18")
+    # --- WhatsApp Cloud API (Meta) — encuesta de satisfacción ---------------
+    whatsapp_base_url: str = "https://graph.facebook.com/v21.0"
+    whatsapp_phone_number_id: str = ""
+    whatsapp_token: str = ""
+    # Token que Meta devuelve en el handshake `GET` del webhook.
+    whatsapp_verify_token: str = ""
+    # Secreto de la app: firma HMAC de cada webhook entrante. Sin él, el
+    # webhook rechaza todo (fail-closed) — es la única prueba de que el
+    # mensaje viene de Meta y no de alguien que descubrió la URL.
+    whatsapp_app_secret: str = ""
+    whatsapp_timeout_segundos: float = 15.0
+    # Plantilla aprobada con la que se abre la conversación: fuera de la
+    # ventana de 24 h, Meta no acepta otra cosa.
+    whatsapp_plantilla_encuesta: str = "encuesta_satisfaccion"
+    whatsapp_plantilla_idioma: str = "es"
+    # --- Encuesta de satisfacción (marketing) --------------------------------
+    # Vigencia de la encuesta enviada. Pasado el plazo, el barrido la expira:
+    # una respuesta de dos semanas después no mide la experiencia de ese
+    # pedido (RN-COM-007).
+    marketing_encuesta_vigencia_horas: int = 72
+    # Base pública del formulario de encuesta (canal `link` y el enlace que
+    # viaja en el WhatsApp). Vacío = se envía solo el texto, sin enlace.
+    marketing_url_publica: str = ""
     # Cola de emisión de comprobantes (Celery). Por defecto reusa Redis.
     celery_broker_url: str = ""
     # --- Observabilidad -----------------------------------------------------
@@ -158,6 +181,11 @@ class Settings(BaseSettings):
             fallas.append("ALLOWED_HOSTS no puede ser '*'")
         if "*" in self.cors_origins:
             fallas.append("CORS_ORIGINS no puede ser '*'")
+        if self.whatsapp_token and not self.whatsapp_app_secret:
+            # El webhook es público: sin secreto no hay forma de distinguir a
+            # Meta de cualquiera que descubra la URL. Con WhatsApp apagado no
+            # aplica, por eso la condición y no un requisito suelto.
+            fallas.append("WHATSAPP_APP_SECRET es obligatorio si hay WHATSAPP_TOKEN")
         if fallas:
             raise ValueError(
                 "Configuración insegura para ENVIRONMENT=production: " + "; ".join(fallas)

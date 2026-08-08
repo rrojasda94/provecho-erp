@@ -8,6 +8,7 @@ from datetime import date
 
 from sqlalchemy.orm import Session
 
+from src.core.events import event_bus
 from src.modules.marketing.application.errors import Conflicto, NoEncontrado, ReglaNegocio
 from src.modules.marketing.domain import rules
 from src.modules.marketing.infrastructure.models import Campana, PiezaContenido
@@ -80,6 +81,16 @@ def publicar_pieza(
     if metricas is not None:
         pieza.metricas = metricas
     session.flush()
+    event_bus.publish(
+        "marketing.pieza_publicada",
+        {
+            "pieza_id": str(pieza.id),
+            "campana_id": str(pieza.campana_id) if pieza.campana_id else None,
+            "marca_id": str(pieza.marca_id),
+            "canal": pieza.canal,
+        },
+        session=session,
+    )
     return pieza
 
 

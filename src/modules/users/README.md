@@ -9,7 +9,7 @@ Provee el contexto de tenant a todos los demás módulos y la auditoría central
 ## Entidades
 
 `usuario` (username, pin_hash Argon2id, tipo humano|agente_ia), `token_agente`
-(credencial de API de un agente, ADR-029), `rol`, `permiso`
+(credencial de API de un agente, ADR-031), `rol`, `permiso`
 (código `modulo.accion` + restricciones), `usuario_rol`, `rol_permiso`,
 `usuario_sucursal`, `refresh_token`, `audit_log`. `persona` (party model,
 `version` para lock optimista — ver Estado abajo).
@@ -23,7 +23,7 @@ Detalle en `docs/architecture/data-model.md` (§1, §2).
 - CRUD de usuarios, roles y permisos (solo admin).
 - CRUD de la organización: grupo, empresa, marca, licencia de marca,
   sucursal y almacén (permiso `organizacion.gestionar`).
-- Emitir, listar y revocar tokens de API de cuentas `agente_ia` (ADR-029).
+- Emitir, listar y revocar tokens de API de cuentas `agente_ia` (ADR-031).
 - CRUD de `persona` (Create/Read/Update — sin Delete, el ciclo de vida real
   se maneja en la entidad que la referencia). `PATCH` exige la `version`
   vigente (lock optimista): `version` desactualizada → 409, en vez de
@@ -56,7 +56,7 @@ Detalle en `docs/architecture/data-model.md` (§1, §2).
 
 Claims del JWT: `sub` (usuario_id), `tipo`, `roles`, `sucursales`, `empresa_id`, `iat`, `exp`, `jti`.
 
-### Autenticación de agentes (ADR-029, implementado 2026-08-08)
+### Autenticación de agentes (ADR-031, implementado 2026-08-08)
 
 Una cuenta `tipo=agente_ia` (n8n, el bot de pedidos, una integración) **no
 se autentica con PIN**: usa un token de API de larga vida. El PIN de 6
@@ -245,7 +245,7 @@ autenticarse en el hub durante un corte.
 - Bloqueo tras 5 intentos fallidos consecutivos (ventana 15 min).
 - Refresh tokens rotativos: usar uno viejo revoca toda la cadena.
 - Agentes de IA son usuarios tipo `agente_ia` con permisos restringidos (ej. solo
-  `sales.crear_pedido`) y se autentican con token de API, no con PIN (ADR-029).
+  `sales.crear_pedido`) y se autentican con token de API, no con PIN (ADR-031).
 - Seeder de desarrollo: usuario `admin` / PIN `123456` con rol admin. Prohibido en producción.
 - El seeder deja montada la organización real del grupo: empresa
   Majambo EIRL (RUC 20450311520, zona `amazonia_ley27037`), marca

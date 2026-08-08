@@ -139,6 +139,80 @@
         "title": "ActaOut",
         "type": "object"
       },
+      "AdjuntoCreate": {
+        "properties": {
+          "mime_type": {
+            "maxLength": 100,
+            "minLength": 3,
+            "title": "Mime Type",
+            "type": "string"
+          },
+          "nombre": {
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Nombre",
+            "type": "string"
+          },
+          "tamano_bytes": {
+            "exclusiveMinimum": 0.0,
+            "title": "Tamano Bytes",
+            "type": "integer"
+          },
+          "url_storage": {
+            "maxLength": 500,
+            "minLength": 3,
+            "title": "Url Storage",
+            "type": "string"
+          }
+        },
+        "required": [
+          "nombre",
+          "mime_type",
+          "tamano_bytes",
+          "url_storage"
+        ],
+        "title": "AdjuntoCreate",
+        "type": "object"
+      },
+      "AdjuntoOut": {
+        "properties": {
+          "extension": {
+            "title": "Extension",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "mime_type": {
+            "title": "Mime Type",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "tamano_bytes": {
+            "title": "Tamano Bytes",
+            "type": "integer"
+          },
+          "url_storage": {
+            "title": "Url Storage",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "nombre",
+          "extension",
+          "mime_type",
+          "tamano_bytes",
+          "url_storage"
+        ],
+        "title": "AdjuntoOut",
+        "type": "object"
+      },
       "AjusteCreate": {
         "properties": {
           "almacen_id": {
@@ -1660,6 +1734,34 @@
           }
         },
         "title": "BriefUpdate",
+        "type": "object"
+      },
+      "CalendarioOut": {
+        "properties": {
+          "desde": {
+            "format": "date",
+            "title": "Desde",
+            "type": "string"
+          },
+          "dias": {
+            "items": {
+              "$ref": "#/components/schemas/DiaCalendarioOut"
+            },
+            "title": "Dias",
+            "type": "array"
+          },
+          "hasta": {
+            "format": "date",
+            "title": "Hasta",
+            "type": "string"
+          }
+        },
+        "required": [
+          "desde",
+          "hasta",
+          "dias"
+        ],
+        "title": "CalendarioOut",
         "type": "object"
       },
       "CampanaCreate": {
@@ -3811,6 +3913,44 @@
         "title": "ConvocatoriaPublicar",
         "type": "object"
       },
+      "CriterioIn": {
+        "properties": {
+          "codigo": {
+            "maxLength": 30,
+            "minLength": 1,
+            "pattern": "^[a-z0-9_]+$",
+            "title": "Codigo",
+            "type": "string"
+          },
+          "etiqueta": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Etiqueta",
+            "type": "string"
+          },
+          "peso": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 100.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Peso"
+          }
+        },
+        "required": [
+          "codigo",
+          "etiqueta",
+          "peso"
+        ],
+        "title": "CriterioIn",
+        "type": "object"
+      },
       "CuentaContableCreate": {
         "properties": {
           "codigo": {
@@ -4058,6 +4198,32 @@
           "filas"
         ],
         "title": "DatosOut",
+        "type": "object"
+      },
+      "DecisionAgencia": {
+        "properties": {
+          "motivo": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Motivo"
+          },
+          "opcion_id": {
+            "format": "uuid",
+            "title": "Opcion Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "opcion_id"
+        ],
+        "title": "DecisionAgencia",
         "type": "object"
       },
       "DecisionGerencialCreate": {
@@ -4630,6 +4796,28 @@
         "title": "DevolucionOut",
         "type": "object"
       },
+      "DiaCalendarioOut": {
+        "properties": {
+          "fecha": {
+            "format": "date",
+            "title": "Fecha",
+            "type": "string"
+          },
+          "piezas": {
+            "items": {
+              "$ref": "#/components/schemas/PiezaCalendarioOut"
+            },
+            "title": "Piezas",
+            "type": "array"
+          }
+        },
+        "required": [
+          "fecha",
+          "piezas"
+        ],
+        "title": "DiaCalendarioOut",
+        "type": "object"
+      },
       "DivisaCreate": {
         "properties": {
           "codigo": {
@@ -5032,6 +5220,35 @@
         "title": "EmpresaUpdate",
         "type": "object"
       },
+      "EncuestaConNodoOut": {
+        "description": "La encuesta y en qué nodo quedó: quien la envía o la contesta necesita\nver la pregunta pendiente sin pedirla aparte.",
+        "properties": {
+          "encuesta": {
+            "$ref": "#/components/schemas/EncuestaOut"
+          },
+          "pregunta_actual": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PreguntaOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "url_publica": {
+            "title": "Url Publica",
+            "type": "string"
+          }
+        },
+        "required": [
+          "encuesta",
+          "pregunta_actual",
+          "url_publica"
+        ],
+        "title": "EncuestaConNodoOut",
+        "type": "object"
+      },
       "EncuestaCreate": {
         "properties": {
           "canal": {
@@ -5042,6 +5259,18 @@
             ],
             "title": "Canal",
             "type": "string"
+          },
+          "plantilla_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plantilla Id"
           },
           "venta_id": {
             "format": "uuid",
@@ -5078,6 +5307,17 @@
             ],
             "title": "Comentario"
           },
+          "error_envio": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Envio"
+          },
           "estado": {
             "title": "Estado",
             "type": "string"
@@ -5085,6 +5325,11 @@
           "fecha_envio": {
             "format": "date-time",
             "title": "Fecha Envio",
+            "type": "string"
+          },
+          "fecha_expiracion": {
+            "format": "date-time",
+            "title": "Fecha Expiracion",
             "type": "string"
           },
           "fecha_respuesta": {
@@ -5103,6 +5348,30 @@
             "format": "uuid",
             "title": "Id",
             "type": "string"
+          },
+          "plantilla_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plantilla Id"
+          },
+          "pregunta_actual_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pregunta Actual Id"
           },
           "puntaje": {
             "anyOf": [
@@ -5128,36 +5397,29 @@
           "canal",
           "fecha_envio",
           "fecha_respuesta",
+          "fecha_expiracion",
           "puntaje",
           "comentario",
-          "estado"
+          "estado",
+          "plantilla_id",
+          "pregunta_actual_id",
+          "error_envio"
         ],
         "title": "EncuestaOut",
         "type": "object"
       },
       "EncuestaRespuesta": {
+        "description": "Respuesta a **un nodo**, no a la encuesta entera: el guion decide cuál\nes la siguiente pregunta a partir de este valor.",
         "properties": {
-          "comentario": {
-            "anyOf": [
-              {
-                "maxLength": 500,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Comentario"
-          },
-          "puntaje": {
-            "maximum": 5.0,
-            "minimum": 1.0,
-            "title": "Puntaje",
-            "type": "integer"
+          "valor": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Valor",
+            "type": "string"
           }
         },
         "required": [
-          "puntaje"
+          "valor"
         ],
         "title": "EncuestaRespuesta",
         "type": "object"
@@ -5235,6 +5497,170 @@
           "detalle"
         ],
         "title": "ErrorSyncOut",
+        "type": "object"
+      },
+      "EvaluacionConSugerenciaOut": {
+        "properties": {
+          "evaluacion": {
+            "$ref": "#/components/schemas/EvaluacionOut"
+          },
+          "opcion_recomendada_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opcion Recomendada Id"
+          }
+        },
+        "required": [
+          "evaluacion",
+          "opcion_recomendada_id"
+        ],
+        "title": "EvaluacionConSugerenciaOut",
+        "type": "object"
+      },
+      "EvaluacionCreate": {
+        "properties": {
+          "criterios": {
+            "items": {
+              "$ref": "#/components/schemas/CriterioIn"
+            },
+            "minItems": 1,
+            "title": "Criterios",
+            "type": "array"
+          },
+          "objetivo": {
+            "maxLength": 255,
+            "minLength": 3,
+            "title": "Objetivo",
+            "type": "string"
+          },
+          "presupuesto_referencia": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Presupuesto Referencia"
+          }
+        },
+        "required": [
+          "objetivo",
+          "presupuesto_referencia",
+          "criterios"
+        ],
+        "title": "EvaluacionCreate",
+        "type": "object"
+      },
+      "EvaluacionOut": {
+        "properties": {
+          "campana_id": {
+            "format": "uuid",
+            "title": "Campana Id",
+            "type": "string"
+          },
+          "criterios": {
+            "items": {},
+            "title": "Criterios",
+            "type": "array"
+          },
+          "decidida_por": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decidida Por"
+          },
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          },
+          "fecha_decision": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Decision"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "motivo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Motivo"
+          },
+          "objetivo": {
+            "title": "Objetivo",
+            "type": "string"
+          },
+          "opcion_elegida_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opcion Elegida Id"
+          },
+          "opciones": {
+            "items": {
+              "$ref": "#/components/schemas/OpcionOut"
+            },
+            "title": "Opciones",
+            "type": "array"
+          },
+          "presupuesto_referencia": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Presupuesto Referencia",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "campana_id",
+          "objetivo",
+          "presupuesto_referencia",
+          "criterios",
+          "estado",
+          "opcion_elegida_id",
+          "decidida_por",
+          "fecha_decision",
+          "motivo",
+          "opciones"
+        ],
+        "title": "EvaluacionOut",
         "type": "object"
       },
       "ExtraDeCartaOut": {
@@ -7696,6 +8122,82 @@
         "title": "MesaOut",
         "type": "object"
       },
+      "MetricaCampanaOut": {
+        "properties": {
+          "campana_id": {
+            "format": "uuid",
+            "title": "Campana Id",
+            "type": "string"
+          },
+          "encuestas_enviadas": {
+            "title": "Encuestas Enviadas",
+            "type": "integer"
+          },
+          "encuestas_respondidas": {
+            "title": "Encuestas Respondidas",
+            "type": "integer"
+          },
+          "fecha_lanzamiento": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Lanzamiento"
+          },
+          "leads_convertidos": {
+            "title": "Leads Convertidos",
+            "type": "integer"
+          },
+          "leads_generados": {
+            "title": "Leads Generados",
+            "type": "integer"
+          },
+          "piezas_publicadas": {
+            "title": "Piezas Publicadas",
+            "type": "integer"
+          },
+          "puntaje_promedio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Puntaje Promedio"
+          },
+          "tasa_conversion": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tasa Conversion"
+          }
+        },
+        "required": [
+          "campana_id",
+          "fecha_lanzamiento",
+          "leads_generados",
+          "leads_convertidos",
+          "piezas_publicadas",
+          "encuestas_enviadas",
+          "encuestas_respondidas",
+          "tasa_conversion",
+          "puntaje_promedio"
+        ],
+        "title": "MetricaCampanaOut",
+        "type": "object"
+      },
       "MovimientoCajaIn": {
         "description": "Ingreso o retiro de efectivo del cajón durante el turno (RN-MDP-007).\n\n`autorizacion` es el token de `POST /auth/autorizar` y solo hace falta\npara retirar: meter plata al cajón no es la operación de la que hay que\ndesconfiar.",
         "properties": {
@@ -8083,6 +8585,46 @@
         "title": "MovimientoOut",
         "type": "object"
       },
+      "NodoPublicoOut": {
+        "description": "Lo mínimo para pintar la pregunta al cliente. Nunca incluye la venta,\nel cliente ni el puntaje ya dado: el token es una credencial anónima y\nlo que devuelve no puede filtrar datos del pedido.",
+        "properties": {
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          },
+          "mensaje": {
+            "title": "Mensaje",
+            "type": "string"
+          },
+          "pregunta": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PreguntaPublicaOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "saludo": {
+            "title": "Saludo",
+            "type": "string"
+          },
+          "terminada": {
+            "title": "Terminada",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "estado",
+          "saludo",
+          "terminada",
+          "mensaje",
+          "pregunta"
+        ],
+        "title": "NodoPublicoOut",
+        "type": "object"
+      },
       "NotaCreditoCreate": {
         "description": "Acredita un comprobante ya aceptado (RN-CPP-009).\n\n`motivo` es del catálogo 09 de SUNAT: 01 anulación de la operación, 02\nanulación por error en el RUC, 03 corrección por error en la\ndescripción, 06 devolución total, 07 devolución por ítem.\n\nSin `detalle` la nota es **total**. Con `detalle`, acredita solo esas\nlíneas y esas cantidades.\n\n`repone_stock` es explícito porque no hay respuesta universal: un plato\ndevuelto en cocina rara vez devuelve el insumo, y corregir el RUC de una\nfactura no toca el inventario.",
         "properties": {
@@ -8253,6 +8795,182 @@
           "created_at"
         ],
         "title": "NotificacionOut",
+        "type": "object"
+      },
+      "OpcionCreate": {
+        "properties": {
+          "costo": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Costo"
+          },
+          "nombre": {
+            "maxLength": 150,
+            "minLength": 2,
+            "title": "Nombre",
+            "type": "string"
+          },
+          "observacion": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observacion"
+          },
+          "plazo_dias": {
+            "exclusiveMinimum": 0.0,
+            "title": "Plazo Dias",
+            "type": "integer"
+          },
+          "proveedor_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proveedor Id"
+          },
+          "puntajes": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Puntajes",
+            "type": "object"
+          },
+          "tipo": {
+            "enum": [
+              "agencia",
+              "interna"
+            ],
+            "title": "Tipo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tipo",
+          "nombre",
+          "costo",
+          "plazo_dias",
+          "puntajes"
+        ],
+        "title": "OpcionCreate",
+        "type": "object"
+      },
+      "OpcionOut": {
+        "properties": {
+          "costo": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Costo",
+            "type": "string"
+          },
+          "evaluacion_id": {
+            "format": "uuid",
+            "title": "Evaluacion Id",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "observacion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observacion"
+          },
+          "plazo_dias": {
+            "title": "Plazo Dias",
+            "type": "integer"
+          },
+          "proveedor_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proveedor Id"
+          },
+          "puntaje_total": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Puntaje Total",
+            "type": "string"
+          },
+          "puntajes": {
+            "additionalProperties": true,
+            "title": "Puntajes",
+            "type": "object"
+          },
+          "tipo": {
+            "title": "Tipo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "evaluacion_id",
+          "tipo",
+          "nombre",
+          "proveedor_id",
+          "costo",
+          "plazo_dias",
+          "puntajes",
+          "puntaje_total",
+          "observacion"
+        ],
+        "title": "OpcionOut",
+        "type": "object"
+      },
+      "OpcionPregunta": {
+        "properties": {
+          "etiqueta": {
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Etiqueta",
+            "type": "string"
+          },
+          "valor": {
+            "maxLength": 30,
+            "minLength": 1,
+            "title": "Valor",
+            "type": "string"
+          }
+        },
+        "required": [
+          "valor",
+          "etiqueta"
+        ],
+        "title": "OpcionPregunta",
         "type": "object"
       },
       "OrdenCompraCreate": {
@@ -8747,6 +9465,37 @@
         "title": "Pagina[CampanaOut]",
         "type": "object"
       },
+      "Pagina_EvaluacionOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/EvaluacionOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "Pagina[EvaluacionOut]",
+        "type": "object"
+      },
       "Pagina_GuiaRemisionOut_": {
         "properties": {
           "items": {
@@ -8993,6 +9742,37 @@
           "page_size"
         ],
         "title": "Pagina[PiezaOut]",
+        "type": "object"
+      },
+      "Pagina_PlantillaOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PlantillaOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "Pagina[PlantillaOut]",
         "type": "object"
       },
       "Pagina_PostulanteOut_": {
@@ -10436,6 +11216,88 @@
         "title": "PersonaUpdate",
         "type": "object"
       },
+      "PiezaCalendarioOut": {
+        "properties": {
+          "adjuntos": {
+            "title": "Adjuntos",
+            "type": "integer"
+          },
+          "campana_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Campana Id"
+          },
+          "canal": {
+            "title": "Canal",
+            "type": "string"
+          },
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          },
+          "fecha_publicacion": {
+            "format": "date",
+            "title": "Fecha Publicacion",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "marca_id": {
+            "format": "uuid",
+            "title": "Marca Id",
+            "type": "string"
+          },
+          "metricas": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metricas"
+          },
+          "pertinente_marca": {
+            "title": "Pertinente Marca",
+            "type": "boolean"
+          },
+          "titulo": {
+            "title": "Titulo",
+            "type": "string"
+          },
+          "uso_marca_validado": {
+            "title": "Uso Marca Validado",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "campana_id",
+          "marca_id",
+          "titulo",
+          "canal",
+          "fecha_publicacion",
+          "pertinente_marca",
+          "uso_marca_validado",
+          "estado",
+          "metricas",
+          "adjuntos"
+        ],
+        "title": "PiezaCalendarioOut",
+        "type": "object"
+      },
       "PiezaCreate": {
         "properties": {
           "campana_id": {
@@ -10626,6 +11488,186 @@
           "pin"
         ],
         "title": "PinChange",
+        "type": "object"
+      },
+      "PlantillaCreate": {
+        "properties": {
+          "activa": {
+            "default": false,
+            "title": "Activa",
+            "type": "boolean"
+          },
+          "despedida": {
+            "default": "¡Gracias por responder!",
+            "maxLength": 300,
+            "title": "Despedida",
+            "type": "string"
+          },
+          "empresa_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Empresa Id"
+          },
+          "marca_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marca Id"
+          },
+          "nombre": {
+            "maxLength": 120,
+            "minLength": 3,
+            "title": "Nombre",
+            "type": "string"
+          },
+          "preguntas": {
+            "items": {
+              "$ref": "#/components/schemas/PreguntaCreate"
+            },
+            "minItems": 1,
+            "title": "Preguntas",
+            "type": "array"
+          },
+          "saludo": {
+            "maxLength": 300,
+            "minLength": 3,
+            "title": "Saludo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "nombre",
+          "saludo",
+          "preguntas"
+        ],
+        "title": "PlantillaCreate",
+        "type": "object"
+      },
+      "PlantillaDetalleOut": {
+        "properties": {
+          "activa": {
+            "title": "Activa",
+            "type": "boolean"
+          },
+          "despedida": {
+            "title": "Despedida",
+            "type": "string"
+          },
+          "empresa_id": {
+            "format": "uuid",
+            "title": "Empresa Id",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "marca_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marca Id"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "preguntas": {
+            "items": {
+              "$ref": "#/components/schemas/PreguntaOut"
+            },
+            "title": "Preguntas",
+            "type": "array"
+          },
+          "saludo": {
+            "title": "Saludo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "empresa_id",
+          "marca_id",
+          "nombre",
+          "saludo",
+          "despedida",
+          "activa",
+          "preguntas"
+        ],
+        "title": "PlantillaDetalleOut",
+        "type": "object"
+      },
+      "PlantillaOut": {
+        "properties": {
+          "activa": {
+            "title": "Activa",
+            "type": "boolean"
+          },
+          "despedida": {
+            "title": "Despedida",
+            "type": "string"
+          },
+          "empresa_id": {
+            "format": "uuid",
+            "title": "Empresa Id",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "marca_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marca Id"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "saludo": {
+            "title": "Saludo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "empresa_id",
+          "marca_id",
+          "nombre",
+          "saludo",
+          "despedida",
+          "activa"
+        ],
+        "title": "PlantillaOut",
         "type": "object"
       },
       "PosTarjetaIn": {
@@ -11562,6 +12604,223 @@
           "texto"
         ],
         "title": "PrecuentaOut",
+        "type": "object"
+      },
+      "PreguntaCreate": {
+        "properties": {
+          "codigo": {
+            "maxLength": 30,
+            "minLength": 1,
+            "pattern": "^[a-z0-9_]+$",
+            "title": "Codigo",
+            "type": "string"
+          },
+          "es_puntaje": {
+            "default": false,
+            "title": "Es Puntaje",
+            "type": "boolean"
+          },
+          "obligatoria": {
+            "default": true,
+            "title": "Obligatoria",
+            "type": "boolean"
+          },
+          "opciones": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/OpcionPregunta"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opciones"
+          },
+          "saltos": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Saltos"
+          },
+          "siguiente_codigo": {
+            "anyOf": [
+              {
+                "maxLength": 30,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Siguiente Codigo"
+          },
+          "texto": {
+            "maxLength": 300,
+            "minLength": 3,
+            "title": "Texto",
+            "type": "string"
+          },
+          "tipo": {
+            "enum": [
+              "escala",
+              "opcion",
+              "si_no",
+              "texto"
+            ],
+            "title": "Tipo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "codigo",
+          "texto",
+          "tipo"
+        ],
+        "title": "PreguntaCreate",
+        "type": "object"
+      },
+      "PreguntaOut": {
+        "properties": {
+          "codigo": {
+            "title": "Codigo",
+            "type": "string"
+          },
+          "es_puntaje": {
+            "title": "Es Puntaje",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "obligatoria": {
+            "title": "Obligatoria",
+            "type": "boolean"
+          },
+          "opciones": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opciones"
+          },
+          "orden": {
+            "title": "Orden",
+            "type": "integer"
+          },
+          "saltos": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Saltos"
+          },
+          "siguiente_codigo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Siguiente Codigo"
+          },
+          "texto": {
+            "title": "Texto",
+            "type": "string"
+          },
+          "tipo": {
+            "enum": [
+              "escala",
+              "opcion",
+              "si_no",
+              "texto"
+            ],
+            "title": "Tipo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "codigo",
+          "orden",
+          "texto",
+          "tipo",
+          "opciones",
+          "siguiente_codigo",
+          "saltos",
+          "es_puntaje",
+          "obligatoria"
+        ],
+        "title": "PreguntaOut",
+        "type": "object"
+      },
+      "PreguntaPublicaOut": {
+        "properties": {
+          "codigo": {
+            "title": "Codigo",
+            "type": "string"
+          },
+          "obligatoria": {
+            "title": "Obligatoria",
+            "type": "boolean"
+          },
+          "opciones": {
+            "items": {
+              "$ref": "#/components/schemas/OpcionPregunta"
+            },
+            "title": "Opciones",
+            "type": "array"
+          },
+          "texto": {
+            "title": "Texto",
+            "type": "string"
+          },
+          "tipo": {
+            "enum": [
+              "escala",
+              "opcion",
+              "si_no",
+              "texto"
+            ],
+            "title": "Tipo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "codigo",
+          "texto",
+          "tipo",
+          "opciones",
+          "obligatoria"
+        ],
+        "title": "PreguntaPublicaOut",
         "type": "object"
       },
       "ProductoCreate": {
@@ -13499,6 +14758,21 @@
           "estado"
         ],
         "title": "ReservaOut",
+        "type": "object"
+      },
+      "RespuestaPublicaIn": {
+        "properties": {
+          "valor": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Valor",
+            "type": "string"
+          }
+        },
+        "required": [
+          "valor"
+        ],
+        "title": "RespuestaPublicaIn",
         "type": "object"
       },
       "RolCreate": {
@@ -24629,6 +25903,137 @@
         ]
       }
     },
+    "/api/v1/marketing/campanas/{campana_id}/evaluaciones-agencia": {
+      "get": {
+        "operationId": "listar_evaluaciones_agencia_api_v1_marketing_campanas__campana_id__evaluaciones_agencia_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "campana_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Campana Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Página, empezando en 1",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "description": "Página, empezando en 1",
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Filas por página (máx. 200)",
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Filas por página (máx. 200)",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pagina_EvaluacionOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Evaluaciones Agencia",
+        "tags": [
+          "marketing"
+        ]
+      },
+      "post": {
+        "operationId": "crear_evaluacion_agencia_api_v1_marketing_campanas__campana_id__evaluaciones_agencia_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "campana_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Campana Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvaluacionCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvaluacionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Evaluacion Agencia",
+        "tags": [
+          "marketing"
+        ]
+      }
+    },
     "/api/v1/marketing/campanas/{campana_id}/implementaciones": {
       "post": {
         "operationId": "registrar_implementacion_api_v1_marketing_campanas__campana_id__implementaciones_post",
@@ -24810,8 +26215,107 @@
         ]
       }
     },
+    "/api/v1/marketing/campanas/{campana_id}/metricas": {
+      "get": {
+        "description": "Acumulado que mantienen los listeners del propio módulo. Un cero acá\nno es \"no hay datos\": es que todavía no pasó nada de eso.",
+        "operationId": "ver_metricas_api_v1_marketing_campanas__campana_id__metricas_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "campana_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Campana Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetricaCampanaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Ver Metricas",
+        "tags": [
+          "marketing"
+        ]
+      }
+    },
+    "/api/v1/marketing/campanas/{campana_id}/metricas/recalculo": {
+      "post": {
+        "description": "Rehace el acumulado desde las tablas. Existe porque el acumulado se\nmantiene por eventos: un worker caído deja el contador corto y sin esto\nno habría forma de corregirlo.",
+        "operationId": "recalcular_metricas_api_v1_marketing_campanas__campana_id__metricas_recalculo_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "campana_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Campana Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetricaCampanaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Recalcular Metricas",
+        "tags": [
+          "marketing"
+        ]
+      }
+    },
     "/api/v1/marketing/encuestas": {
       "post": {
+        "description": "Crea la encuesta y la deja en su primer nodo. El envío real sale por\nel listener de `marketing.encuesta_enviada`, ya commiteada (ADR-016).",
         "operationId": "enviar_encuesta_api_v1_marketing_encuestas_post",
         "requestBody": {
           "content": {
@@ -24828,7 +26332,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EncuestaOut"
+                  "$ref": "#/components/schemas/EncuestaConNodoOut"
                 }
               }
             },
@@ -24851,6 +26355,259 @@
           }
         ],
         "summary": "Enviar Encuesta",
+        "tags": [
+          "marketing"
+        ]
+      }
+    },
+    "/api/v1/marketing/encuestas/plantillas": {
+      "get": {
+        "operationId": "listar_plantillas_api_v1_marketing_encuestas_plantillas_get",
+        "parameters": [
+          {
+            "description": "Página, empezando en 1",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "description": "Página, empezando en 1",
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Filas por página (máx. 200)",
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Filas por página (máx. 200)",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pagina_PlantillaOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Plantillas",
+        "tags": [
+          "marketing"
+        ]
+      },
+      "post": {
+        "operationId": "crear_plantilla_api_v1_marketing_encuestas_plantillas_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlantillaCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlantillaDetalleOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Plantilla",
+        "tags": [
+          "marketing"
+        ]
+      }
+    },
+    "/api/v1/marketing/encuestas/plantillas/{plantilla_id}": {
+      "get": {
+        "operationId": "ver_plantilla_api_v1_marketing_encuestas_plantillas__plantilla_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plantilla_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Plantilla Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlantillaDetalleOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Ver Plantilla",
+        "tags": [
+          "marketing"
+        ]
+      }
+    },
+    "/api/v1/marketing/encuestas/plantillas/{plantilla_id}/activacion": {
+      "post": {
+        "operationId": "activar_plantilla_api_v1_marketing_encuestas_plantillas__plantilla_id__activacion_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plantilla_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Plantilla Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlantillaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Activar Plantilla",
+        "tags": [
+          "marketing"
+        ]
+      }
+    },
+    "/api/v1/marketing/encuestas/{encuesta_id}": {
+      "get": {
+        "operationId": "ver_encuesta_api_v1_marketing_encuestas__encuesta_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "encuesta_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Encuesta Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EncuestaConNodoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Ver Encuesta",
         "tags": [
           "marketing"
         ]
@@ -24906,6 +26663,7 @@
     },
     "/api/v1/marketing/encuestas/{encuesta_id}/respuesta": {
       "post": {
+        "description": "Contesta el nodo pendiente. Es la vía del canal `pos` —la tablet del\nlocal— y la de corregir a mano; WhatsApp entra por su webhook y el\nenlace público por `/marketing/publico`.",
         "operationId": "responder_encuesta_api_v1_marketing_encuestas__encuesta_id__respuesta_post",
         "parameters": [
           {
@@ -24934,7 +26692,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EncuestaOut"
+                  "$ref": "#/components/schemas/EncuestaConNodoOut"
                 }
               }
             },
@@ -24957,6 +26715,219 @@
           }
         ],
         "summary": "Responder Encuesta",
+        "tags": [
+          "marketing"
+        ]
+      }
+    },
+    "/api/v1/marketing/evaluaciones-agencia/{evaluacion_id}": {
+      "get": {
+        "operationId": "ver_evaluacion_agencia_api_v1_marketing_evaluaciones_agencia__evaluacion_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "evaluacion_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Evaluacion Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvaluacionConSugerenciaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Ver Evaluacion Agencia",
+        "tags": [
+          "marketing"
+        ]
+      }
+    },
+    "/api/v1/marketing/evaluaciones-agencia/{evaluacion_id}/cierre": {
+      "post": {
+        "operationId": "cerrar_evaluacion_agencia_api_v1_marketing_evaluaciones_agencia__evaluacion_id__cierre_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "evaluacion_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Evaluacion Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvaluacionConSugerenciaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Cerrar Evaluacion Agencia",
+        "tags": [
+          "marketing"
+        ]
+      }
+    },
+    "/api/v1/marketing/evaluaciones-agencia/{evaluacion_id}/decision": {
+      "post": {
+        "description": "Gerencia valida: permiso distinto del de evaluar a propósito — quien\narma la comparación no la firma (RN-MKT-006, RN-GER-007).",
+        "operationId": "decidir_agencia_api_v1_marketing_evaluaciones_agencia__evaluacion_id__decision_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "evaluacion_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Evaluacion Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecisionAgencia"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvaluacionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Decidir Agencia",
+        "tags": [
+          "marketing"
+        ]
+      }
+    },
+    "/api/v1/marketing/evaluaciones-agencia/{evaluacion_id}/opciones": {
+      "post": {
+        "operationId": "agregar_opcion_agencia_api_v1_marketing_evaluaciones_agencia__evaluacion_id__opciones_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "evaluacion_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Evaluacion Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OpcionCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpcionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Agregar Opcion Agencia",
         "tags": [
           "marketing"
         ]
@@ -25068,7 +27039,7 @@
     },
     "/api/v1/marketing/piezas": {
       "get": {
-        "description": "Calendario de contenido del tenant. No existía: una pieza solo se\npodía consultar sabiendo su id, así que no había forma de ver qué está\nplanificado esta semana.",
+        "description": "Listado plano del calendario de contenido del tenant.",
         "operationId": "listar_piezas_api_v1_marketing_piezas_get",
         "parameters": [
           {
@@ -25085,6 +27056,40 @@
                 }
               ],
               "title": "Estado"
+            }
+          },
+          {
+            "in": "query",
+            "name": "desde",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Desde"
+            }
+          },
+          {
+            "in": "query",
+            "name": "hasta",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Hasta"
             }
           },
           {
@@ -25187,6 +27192,239 @@
           }
         ],
         "summary": "Planificar Pieza",
+        "tags": [
+          "marketing"
+        ]
+      }
+    },
+    "/api/v1/marketing/piezas/calendario": {
+      "get": {
+        "description": "El calendario de contenido: qué se publica cada día y con qué arte.\n\nAgrupado por fecha y no paginado a propósito — un calendario partido en\npáginas deja de ser un calendario. El rango lo acota (30 días por\ndefecto), que es el límite real de lo que alguien mira de una vez.",
+        "operationId": "calendario_contenido_api_v1_marketing_piezas_calendario_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "desde",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Desde"
+            }
+          },
+          {
+            "in": "query",
+            "name": "hasta",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Hasta"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarioOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Calendario Contenido",
+        "tags": [
+          "marketing"
+        ]
+      }
+    },
+    "/api/v1/marketing/piezas/{pieza_id}/adjuntos": {
+      "get": {
+        "operationId": "listar_adjuntos_api_v1_marketing_piezas__pieza_id__adjuntos_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pieza_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Pieza Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AdjuntoOut"
+                  },
+                  "title": "Response Listar Adjuntos Api V1 Marketing Piezas  Pieza Id  Adjuntos Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Adjuntos",
+        "tags": [
+          "marketing"
+        ]
+      },
+      "post": {
+        "description": "Registra el arte ya subido al storage. El ERP guarda el vínculo y los\nmetadatos; el binario viaja directo a S3 y nunca pasa por la API.",
+        "operationId": "adjuntar_a_pieza_api_v1_marketing_piezas__pieza_id__adjuntos_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pieza_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Pieza Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdjuntoCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdjuntoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Adjuntar A Pieza",
+        "tags": [
+          "marketing"
+        ]
+      }
+    },
+    "/api/v1/marketing/piezas/{pieza_id}/adjuntos/{archivo_id}": {
+      "delete": {
+        "operationId": "quitar_adjunto_api_v1_marketing_piezas__pieza_id__adjuntos__archivo_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pieza_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Pieza Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "archivo_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Archivo Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Quitar Adjunto",
         "tags": [
           "marketing"
         ]
@@ -25351,6 +27589,100 @@
           }
         ],
         "summary": "Validar Pieza",
+        "tags": [
+          "marketing"
+        ]
+      }
+    },
+    "/api/v1/marketing/publico/encuestas/{token}": {
+      "get": {
+        "operationId": "ver_nodo_api_v1_marketing_publico_encuestas__token__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NodoPublicoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Ver Nodo",
+        "tags": [
+          "marketing"
+        ]
+      }
+    },
+    "/api/v1/marketing/publico/encuestas/{token}/respuesta": {
+      "post": {
+        "operationId": "responder_api_v1_marketing_publico_encuestas__token__respuesta_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RespuestaPublicaIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NodoPublicoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Responder",
         "tags": [
           "marketing"
         ]
@@ -33364,6 +35696,115 @@
         ]
       }
     },
+    "/api/v1/webhooks/whatsapp": {
+      "get": {
+        "description": "Handshake de alta de la URL en Meta.",
+        "operationId": "verificar_webhook_api_v1_webhooks_whatsapp_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "hub.mode",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Hub.Mode",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "hub.verify_token",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Hub.Verify Token",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "hub.challenge",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Hub.Challenge",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Verificar Webhook",
+        "tags": [
+          "marketing"
+        ]
+      },
+      "post": {
+        "operationId": "recibir_webhook_api_v1_webhooks_whatsapp_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Hub-Signature-256",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Hub-Signature-256"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Recibir Webhook",
+        "tags": [
+          "marketing"
+        ]
+      }
+    },
     "/health": {
       "get": {
         "description": "Liveness: ¿el proceso responde? No toca dependencias — si fallara por\nla base de datos, el orquestador reiniciaría en bucle un proceso sano.",
@@ -33521,7 +35962,7 @@
       "name": "rrhh"
     },
     {
-      "description": "Campañas, calendario de contenido, leads con atribución a la venta y encuesta de satisfacción.",
+      "description": "Campañas, calendario de contenido con adjuntos, leads con atribución a la venta, evaluación de agencia y encuesta de satisfacción por nodos (WhatsApp / enlace público).",
       "name": "marketing"
     },
     {
