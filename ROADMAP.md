@@ -246,6 +246,17 @@ Registro vivo de deuda técnica declarada al cerrar cada slice — para que no
 se olvide. Marcar ✅ al resolverse en el slice indicado.
 
 ### Transversal
+- ⬜ **Migrar `@tanstack/react-table` a la v9** (2026-08-08). Dependabot subió
+  la mayor 8→9 en el PR #37 y el merge dejó `main` en rojo dos días: la v9
+  renombró los constructores de row model (`getCoreRowModel` →
+  `createCoreRowModel`, igual los de sorting/filtering/pagination) y
+  `frontend/components/tabla/tabla-datos.tsx` seguía en la API vieja, así que
+  `next build` fallaba con 10 errores de export inexistente. Se revirtió a
+  `^8.21.3`, que es la versión con la que el código está escrito. Migrar de
+  verdad es tocar un solo archivo, pero hay que leer la guía de la v9 antes:
+  no es solo renombrar importaciones. Aparte, **Dependabot puede volver a
+  proponer la 9.x**; si se acepta, el PR tiene que traer la migración del
+  componente en el mismo cambio.
 - **Un módulo se activa a mano en siete lugares** (2026-08-03). La estructura
   interna es replicable —los 8 módulos tienen la misma forma— pero no hay
   manifiesto por módulo ni autodescubrimiento: router y tag OpenAPI y
