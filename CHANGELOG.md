@@ -70,6 +70,39 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Added
 
+- **`audit_log` transversal, y usado** (2026-08-08, ADR-029, migración
+  `b3d9f1c2a077`). La tabla decía en su docstring "consumido por todos los
+  módulos" y el código decía otra cosa: el único escritor era
+  `AuditLogRepo` en `users`, `rrhh` lo alcanzaba importando repositorios
+  ajenos (excepción declarada en `test_arquitectura.py`), y anular una
+  venta, aprobar un ajuste, emitir una OC o sacar plata del cajón no dejaban
+  rastro alguno. Tampoco había forma de *leerlo*.
+  - **Un solo punto de escritura**: `src.shared.auditoria.registrar(session,
+    …)`, con el modelo mudado a `src/shared/models/audit_log.py`. Escribe en
+    la misma transacción que el cambio auditado — si el cambio se revierte,
+    el rastro también; auditar algo que no pasó es peor que no auditarlo.
+  - **Escritura explícita, no captura automática por ORM**: el actor y la IP
+    no están en la sesión, y un rastro que registra cada `UPDATE` no lo lee
+    nadie. Se audita el acto de autoridad. El razonamiento completo y la
+    alternativa descartada están en el ADR.
+  - **Cinco módulos nuevos dejan rastro**: anulación de venta y descuento
+    manual (`sales`), aprobación de ajuste de inventario (`inventory`),
+    emisión de OC (`purchases`), ejecución de pago a proveedor e
+    ingreso/retiro de efectivo del cajón (`accounting`), además de lo que ya
+    auditaban `users` y `rrhh`.
+  - **`GET /api/v1/auditoria`** (permiso `auditoria.leer`, rol `contador` —
+    Contabilidad audita a Compras, Almacén y cajas, RN-CTB-009), paginado
+    (ADR-026) y filtrable por entidad, acción, usuario y rango de fechas.
+    **Sin `POST`**: el auditado no dicta lo que dice su auditoría.
+  - **`empresa_id` nuevo (nullable) + índices** `(entidad, entidad_id)` y
+    `(ts)`. Sin `empresa_id` la lectura no se puede escopar por tenant y un
+    contador vería el rastro de otra empresa; nullable porque un login o un
+    alta de rol no tienen empresa, y esas filas solo las ve el superusuario.
+  - `rrhh` sale de las excepciones de acoplamiento cruzado: la lista de
+    `test_arquitectura.py` encogió, que es la única dirección permitida.
+  - **Sigue pendiente** la purga por antigüedad (deuda ya declarada): la
+    tabla crece por inserción pura y no tiene retención automática.
+
 - **El ciclo de abastecimiento funciona sin conexión** (2026-08-07, ADR-009
   fase 3). El hub replicaba catálogo y stock para poder **vender** offline;
   ahora el local también **pide, ve lo que viene y recibe**, que es lo que

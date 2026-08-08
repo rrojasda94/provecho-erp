@@ -30,8 +30,9 @@ from src.config.settings import settings
 from src.core.logging_config import logger_seguridad
 from src.modules.users.application.errors import CredencialesInvalidas, TokenInvalido
 from src.modules.users.domain import rules
-from src.modules.users.infrastructure.repositories import AuditLogRepo, UsuarioRepo
+from src.modules.users.infrastructure.repositories import UsuarioRepo
 from src.modules.users.infrastructure.security import verify_pin
+from src.shared import auditoria
 
 log_seguridad = logger_seguridad()
 
@@ -74,7 +75,8 @@ def emitir(
         )
         raise CredencialesInvalidas("Credenciales o permiso inválidos")
 
-    AuditLogRepo(session).registrar(
+    auditoria.registrar(
+        session,
         usuario_id=usuario.id,
         entidad="usuario",
         entidad_id=usuario.id,

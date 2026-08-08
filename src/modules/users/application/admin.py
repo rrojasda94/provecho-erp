@@ -25,7 +25,6 @@ from src.modules.users.infrastructure.models import (
 )
 from src.modules.users.infrastructure.repositories import (
     AlmacenRepo,
-    AuditLogRepo,
     MarcaRepo,
     PermisoRepo,
     PersonaRepo,
@@ -34,6 +33,7 @@ from src.modules.users.infrastructure.repositories import (
     UsuarioRepo,
 )
 from src.modules.users.infrastructure.security import hash_pin
+from src.shared import auditoria
 
 
 # --- Usuarios ---------------------------------------------------------------
@@ -64,8 +64,8 @@ def crear_usuario(
             email=email,
         )
     )
-    AuditLogRepo(session).registrar(
-        usuario_id=actor_id, entidad="usuario", entidad_id=usuario.id,
+    auditoria.registrar(
+        session, usuario_id=actor_id, entidad="usuario", entidad_id=usuario.id,
         accion="crear", datos_despues={"username": username, "tipo": tipo},
     )
     return usuario
@@ -231,8 +231,8 @@ def asignar_rol(
     _get(RolRepo(session).get(rol_id), "rol")
     if session.get(UsuarioRol, (usuario_id, rol_id)) is None:
         session.add(UsuarioRol(usuario_id=usuario_id, rol_id=rol_id))
-        AuditLogRepo(session).registrar(
-            usuario_id=actor_id, entidad="usuario_rol", entidad_id=usuario_id,
+        auditoria.registrar(
+            session, usuario_id=actor_id, entidad="usuario_rol", entidad_id=usuario_id,
             accion="asignar_rol", datos_despues={"rol_id": str(rol_id)},
         )
 
@@ -253,8 +253,8 @@ def asignar_permiso(
     _get(PermisoRepo(session).get(permiso_id), "permiso")
     if session.get(RolPermiso, (rol_id, permiso_id)) is None:
         session.add(RolPermiso(rol_id=rol_id, permiso_id=permiso_id))
-        AuditLogRepo(session).registrar(
-            usuario_id=actor_id, entidad="rol_permiso", entidad_id=rol_id,
+        auditoria.registrar(
+            session, usuario_id=actor_id, entidad="rol_permiso", entidad_id=rol_id,
             accion="asignar_permiso", datos_despues={"permiso_id": str(permiso_id)},
         )
 

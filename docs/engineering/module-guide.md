@@ -92,7 +92,13 @@ en el `layout.tsx` del módulo. El grid no es control de acceso.
   [`src/core/tenant.py`](../../src/core/tenant.py)). Pedir datos de otro
   tenant es 403 y se resuelve en `core`, no en cada router.
 - Operaciones con dinero: idempotencia por clave del cliente.
-- Cambios sensibles: auditoría (quién, qué, cuándo, valor anterior/nuevo).
+- Cambios sensibles: auditoría con
+  [`src.shared.auditoria.registrar`](../../src/shared/auditoria.py) (quién,
+  qué, cuándo, dónde, valor anterior/nuevo; ADR-029). Se audita el acto de
+  autoridad —aprobar, autorizar, anular, descontar, pagar, anonimizar—, no
+  cada `UPDATE`. Va en la misma sesión que el cambio, y con `empresa_id`/
+  `sucursal_id` si el caso de uso los tiene a mano: sin ellos la fila solo
+  la puede leer un superusuario.
 
 ## 4. Pruebas y cierre
 

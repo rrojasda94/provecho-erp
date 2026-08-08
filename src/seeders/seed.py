@@ -167,6 +167,10 @@ PERMISOS = [
     ),
     ("dashboard.leer", "Consultar el dashboard gerencial (ventas, stock, caja)"),
     (
+        "auditoria.leer",
+        "Consultar el rastro de cambios (`audit_log`) — quién tocó qué y cuándo",
+    ),
+    (
         "gerencia.gestionar_parametros_empresa",
         "Aprobar, rechazar o modificar parámetros operativos por empresa (ADR-014)",
     ),
@@ -329,6 +333,9 @@ ROLES = {
         "accounting.caja_reabrir",
         "accounting.pos_administrar",
         "dashboard.leer",
+        # Contabilidad audita a Compras, Almacén y las cajas de sucursal
+        # (RN-CTB-009): sin el rastro, auditar es preguntar de buena fe.
+        "auditoria.leer",
     ],
     "rrhh_admin": [
         "rrhh.leer",
