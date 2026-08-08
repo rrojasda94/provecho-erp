@@ -9,6 +9,8 @@ from fastapi.testclient import TestClient
 from src.config.settings import Settings
 from src.core import rate_limit as rl
 from src.core.app import create_app
+from src.core.database import CONNECT_TIMEOUT_SEGUNDOS, connect_args
+from tests.conftest import HASHER_PRODUCCION, RedisFalso
 
 _PROD_OK = {
     "environment": "production",
@@ -59,20 +61,6 @@ def test_listas_aceptan_texto_separado_por_comas() -> None:
     assert s.cors_origins == ["https://a.pe"]
 
 
-class _RedisFalso:
-    """Contador en memoria con la superficie que usa el limiter."""
-
-    def __init__(self) -> None:
-        self.claves: dict[str, int] = {}
-
-    def incr(self, clave: str) -> int:
-        self.claves[clave] = self.claves.get(clave, 0) + 1
-        return self.claves[clave]
-
-    def expire(self, clave: str, segundos: int) -> None:
-        pass
-
-
 class _RedisCaido:
     def __init__(self) -> None:
         self.intentos = 0
@@ -83,12 +71,6 @@ class _RedisCaido:
 
     def expire(self, clave: str, segundos: int) -> None:
         raise redis.RedisError("sin conexión")
-
-
-@pytest.fixture(autouse=True)
-def _corta_circuito_en_reposo(monkeypatch: pytest.MonkeyPatch) -> None:
-    """El corta-circuito es estado de módulo: se resetea entre tests."""
-    monkeypatch.setattr(rl, "_reintentar_desde", 0.0)
 
 
 def _app_con_limite(intentos: int) -> TestClient:
@@ -102,8 +84,36 @@ def _app_con_limite(intentos: int) -> TestClient:
     return TestClient(app)
 
 
+@pytest.mark.parametrize(
+    ("url", "esperado"),
+    [
+        (
+            "postgresql+psycopg://provecho:s3cr3t@db:5432/provecho",
+            {"connect_timeout": CONNECT_TIMEOUT_SEGUNDOS},
+        ),
+        ("postgresql://provecho:s3cr3t@db:5432/provecho", {"connect_timeout": 5}),
+        # El `e2e` arranca la API contra un SQLite desechable y su driver no
+        # entiende `connect_timeout`: pasárselo mata el arranque.
+        ("sqlite:///./e2e.db", {}),
+    ],
+)
+def test_solo_postgres_recibe_connect_timeout(url: str, esperado: dict) -> None:
+    """Sin timeout, un Postgres que acepta el TCP y se calla clava el request
+    para siempre (ver CHANGELOG 2026-08-08)."""
+    assert connect_args(url) == esperado
+
+
+def test_seguridad_del_hasher_de_produccion() -> None:
+    """El suite corre con Argon2id abaratado (`_argon2_barato` en conftest);
+    este es el único lugar que mira los parámetros reales. Piso: perfil de
+    baja memoria de la RFC 9106 (t=3, m=64 MiB)."""
+    assert HASHER_PRODUCCION.time_cost >= 3
+    assert HASHER_PRODUCCION.memory_cost >= 64 * 1024
+    assert HASHER_PRODUCCION.parallelism >= 1
+
+
 def test_rate_limit_bloquea_tras_el_maximo(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(rl, "_client", _RedisFalso())
+    monkeypatch.setattr(rl, "_client", RedisFalso())
     client = _app_con_limite(3)
     assert [client.get("/ping").status_code for _ in range(3)] == [200, 200, 200]
     respuesta = client.get("/ping")
