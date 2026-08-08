@@ -163,26 +163,6 @@ def _sin_token_factiliza_por_defecto(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
-def _sin_rate_limit(monkeypatch):
-    """El límite por IP no aplica al suite: todos los tests entran desde la
-    misma "IP" del `TestClient`.
-
-    Con `REDIS_URL` apuntando al hostname de Docker, el limitador falla
-    abierto y nadie lo notaba. Con Redis alcanzable en `localhost` —como
-    corre en máquina de desarrollo— el suite empieza a compartir el contador:
-    a partir del undécimo login del minuto, `POST /auth/login` devuelve 429 y
-    los tests fallan con un `KeyError: 'access_token'` que no dice nada del
-    problema real. Se apaga por el corta-circuito del propio módulo.
-
-    `test_security.py` lo vuelve a encender con su propia fixture autouse
-    (más local, se aplica después): ahí el límite **es** lo que se prueba.
-    """
-    from src.core import rate_limit
-
-    monkeypatch.setattr(rate_limit, "_reintentar_desde", float("inf"))
-
-
-@pytest.fixture(autouse=True)
 def _cola_en_memoria(monkeypatch):
     """Mismo criterio que el token: ningún test habla con un broker real.
 

@@ -74,6 +74,14 @@ Versionado: [SemVer](https://semver.org/lang/es/).
   `raise _http(e)`. Ahora hereda de `src/shared/errors.py` y el mapeo lo hace
   `src/core/error_handlers.py`, una sola vez para todo el ERP. Mismos códigos
   de respuesta, 60 líneas menos.
+- **La imagen y el CI corren el mismo Python: 3.14** (2026-08-08). El bump
+  del `Dockerfile` a `python:3.14-slim` venía solo: los cuatro jobs que usan
+  `actions/setup-python` seguían en 3.12, así que `pytest` nunca tocaba el
+  intérprete que la imagen ejecuta. El job `imagen` solo comprueba que el
+  contenedor construya y conteste `/health`; una incompatibilidad de una
+  dependencia con 3.14 se habría descubierto en producción con `main` en
+  verde. `requires-python` ya decía `>=3.12`, así que no hay nada que
+  relajar.
 
 ### Fixed
 
@@ -87,15 +95,6 @@ Versionado: [SemVer](https://semver.org/lang/es/).
   contacto tecleado en caja como `(051) 987-654-321` quedaba en
   `051987654321`, que Meta rechaza. Los ceros de la izquierda son prefijo de
   marcado, nunca parte del número: E.164 no empieza con cero.
-- **El suite compartía el contador del rate limit de login** (2026-08-08).
-  Todos los tests entran desde la misma "IP" del `TestClient`, así que a
-  partir del undécimo login del minuto `POST /auth/login` devolvía 429 y el
-  test fallaba con `KeyError: 'access_token'`, que no dice nada del problema
-  real. No se notaba porque con `REDIS_URL` apuntando al hostname de Docker
-  el limitador falla abierto; con Redis alcanzable en `localhost` —como corre
-  en máquina de desarrollo— aparecía. Se apaga por fixture autouse en
-  `conftest.py`; `test_security.py` lo vuelve a encender, que es donde el
-  límite se prueba de verdad.
 - **`main` estaba en rojo desde el bump a `@tanstack/react-table` 9**
   (2026-08-08). El PR #37 (2026-08-07, dependabot) subió la librería de
   8.21.3 a 9.0.0 sin migrar una línea. En v9 no existe `useReactTable` —es
@@ -191,6 +190,25 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Changed
 
+- **La base de desarrollo pasó de Supabase al Postgres del `docker-compose`**
+  (2026-08-08). Cada consulta a Supabase costaba ~130 ms de ida y vuelta —
+  distancia, no trabajo de base: `SELECT 1` tardaba lo mismo que contar
+  usuarios. Como todo request autenticado consulta permisos, una pantalla
+  típica se iba a 2-3 segundos de puro viaje de red. En local esa latencia
+  baja al orden del milisegundo.
+  - `.env` guarda ahora la URL vista **desde el host** (`localhost:5433`,
+    porque el 5432 lo ocupa Charlie's), que es la que usan alembic, pytest y
+    un uvicorn suelto. Los contenedores ven otros nombres (`db:5432`,
+    `redis:6379`), así que `docker-compose.yml` se los inyecta con el bloque
+    `x-conexiones-internas` — `environment` gana sobre `env_file`. Un solo
+    `.env` sirve a los dos y no hay que editarlo al alternar.
+  - Costo aceptado: los datos de desarrollo dejan de ser compartidos y de
+    verse en el Table Editor de Supabase. Se regeneran con
+    `alembic upgrade head` + `python -m src.seeders.seed` (idempotente).
+    Volver a Supabase son dos pasos, documentados en
+    `docs/engineering/devops.md`.
+  - Producción no cambia: `docker-compose.prod.yml` sigue sin servicio de
+    base de datos y espera una gestionada por `DATABASE_URL`.
 - **El suite del backend se paralelizó y dejó de pagar Argon2id de
   producción** (2026-08-08). **956 casos en 1 min 1 s**, contra los más de 10
   minutos de antes —cuando terminaba— y ningún test por encima de 6 s.
