@@ -29,9 +29,11 @@ updates:
       frontend-menores:
         applies-to: version-updates
         update-types: [minor, patch]
-    # Dos majors que hoy no tienen dónde aterrizar. No es estar atrasado: no
-    # existe versión publicada de la cadena de `eslint-config-next` que los
-    # acepte. Cada uno se destraba solo cuando su bloqueante publique.
+    # Majors que hoy no tienen dónde aterrizar. Los dos primeros no son estar
+    # atrasado: no existe versión publicada de la cadena de
+    # `eslint-config-next` que los acepte, y cada uno se destraba solo cuando
+    # su bloqueante publique. El tercero espera trabajo nuestro, no de
+    # terceros.
     ignore:
       # `typescript-eslint` pide `typescript >=4.8.4 <6.1.0` y
       # `eslint-config-next` depende de él. Al instalar TS7 npm resuelve el
@@ -48,6 +50,15 @@ updates:
       # `react/display-name` antes de terminar el primer archivo (PR #27).
       - dependency-name: eslint
         versions: ["10.x"]
+      # `@tanstack/react-table` v9 renombró la API pública: `useReactTable` es
+      # `ReactTable` + `createCoreRowModel`, `VisibilityState` ya no se
+      # exporta y `ColumnDef` toma dos genéricos. Migrar toca
+      # `components/tabla/tabla-datos.tsx` y las 13 pantallas que lo usan: es
+      # trabajo propio, no un bump. El PR #37 lo subió sin migrar nada, dejó
+      # el CI en rojo y se mergeó igual (ver ROADMAP → Deuda técnica →
+      # Frontend). Quitar esta entrada al hacer la migración.
+      - dependency-name: "@tanstack/react-table"
+        update-types: ["version-update:semver-major"]
     commit-message:
       prefix: "chore(deps)"
 

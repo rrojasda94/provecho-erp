@@ -138,6 +138,14 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npm run lint
+      # ESLint no resuelve tipos: el bump de `@tanstack/react-table` a v9
+      # (PR #37) pasó el lint con 13 pantallas rotas —en v9 no existe
+      # `useReactTable`—. `next build` sí typechequea (Next 16 corre el `tsc`
+      # del proyecto), pero recién al final y después de empaquetar: acá el
+      # build ni llegó a esa etapa, murió antes con un error de Turbopack.
+      # Este paso da la misma verdad en 6 s y diciendo "tipos", y sigue en pie
+      # si alguna vez se toca `typescript.ignoreBuildErrors`.
+      - run: npm run typecheck
       # 176 casos en menos de un segundo, sin framework ni servidores. Entre
       # ellos el de contrato (`lib/contrato.test.ts`), que compara lo que el
       # PDV manda contra `docs/architecture/openapi.json` — el mismo archivo
