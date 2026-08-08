@@ -123,6 +123,7 @@ def lanzar_campana(session: Session, campana_id: uuid.UUID) -> Campana:
             "tipo": campana.tipo,
             "presupuesto": str(campana.presupuesto),
         },
+        session=session,
     )
     return campana
 

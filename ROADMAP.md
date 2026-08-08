@@ -34,7 +34,7 @@ Registro de lo construido y lo pendiente. Actualizar en cada cambio relevante.
 | Producción: procesos y plantillas (cronograma, calidad/no conformidad, inocuidad, inventario de cocina, soporte a I+D+i) | ✅ 2026-07-20 | `docs/produccion/`, 4 SOPs, 5 plantillas — ver detalle abajo. Spec a futuro: primera cocina de producción planeada 2027, hoy sin operación real. Módulo backend `production` — slice core implementado 2026-07-25 |
 | Gerencia: gobierno + matriz de aprobaciones + presupuesto anual | ✅ 2026-07-22 | `docs/gerencia/`, política + perfil + 3 plantillas + 1 SOP (definición de presupuesto anual, PROC-GER-001) — ver detalle abajo. Área de autoridad/estrategia/control; sin módulo backend (RBAC + documentos) |
 | Marketing: procesos y plantillas (marca/naming, contenido, campañas, material en sucursal, agencias) | ✅ 2026-07-22 | `docs/marketing/`, 6 SOPs, 4 plantillas — ver detalle abajo. PROC-MKT-001 registrado. Resuelve el pendiente "módulo marketing README/contrato propio" |
-| Módulo `marketing` | 🔶 slice core ✅ 2026-08-01 | Primer código del módulo: `campana` con brief obligatorio (RN-MKT-003 — sin objetivo, público, presupuesto y KPI no se aprueba, y sin aprobación no sale a canal; quien redacta el brief no lo aprueba: `marketing.campana_aprobar` vive en `supervisor`, no en el rol `marketing`), `pieza_contenido` que solo se publica si es pertinente a la marca y su uso de marca está validado (RN-MKT-001/002), `lead` medido por conversión real y no por volumen, `implementacion_material_sucursal` (verificación en sitio, RN-MKT-005) y `encuesta_satisfaccion` (RN-COM-007), que la migración saca de §6 y le da dueño. La **atribución lead→venta** es automática solo cuando no hay ambigüedad —un único lead abierto del cliente en campaña en curso—; con dos o más queda manual, porque adivinar qué campaña convirtió falsea justo la métrica que la campaña existe para medir. Marketing lee el estado de entrega por el contrato público `sales::venta_para_encuesta`, nunca importando `Venta`. Migración `e9c3b7412a68`, 17 endpoints, 13 tests. Diferido: ver Deuda técnica. |
+| Módulo `marketing` | 🔶 slices 1-2 ✅ 2026-08-08 | Primer código del módulo: `campana` con brief obligatorio (RN-MKT-003 — sin objetivo, público, presupuesto y KPI no se aprueba, y sin aprobación no sale a canal; quien redacta el brief no lo aprueba: `marketing.campana_aprobar` vive en `supervisor`, no en el rol `marketing`), `pieza_contenido` que solo se publica si es pertinente a la marca y su uso de marca está validado (RN-MKT-001/002), `lead` medido por conversión real y no por volumen, `implementacion_material_sucursal` (verificación en sitio, RN-MKT-005) y `encuesta_satisfaccion` (RN-COM-007), que la migración saca de §6 y le da dueño. La **atribución lead→venta** es automática solo cuando no hay ambigüedad —un único lead abierto del cliente en campaña en curso—; con dos o más queda manual, porque adivinar qué campaña convirtió falsea justo la métrica que la campaña existe para medir. Marketing lee el estado de entrega por el contrato público `sales::venta_para_encuesta`, nunca importando `Venta`. Migración `e9c3b7412a68`, 17 endpoints, 13 tests. **Slice 2** (2026-08-08, ADR-029/030, migración `c1f80b6a2d34`): la encuesta **sale de verdad** y deja de ser un formulario — el guion vive en `encuesta_plantilla`/`encuesta_pregunta` como un grafo de nodos donde cada respuesta elige la siguiente pregunta (un 2 de 5 pregunta qué falló, un 5 pregunta si nos recomendaría), y `encuesta_satisfaccion` recuerda en qué nodo está el cliente porque en WhatsApp no hay formulario, hay mensajes de a uno. Adaptador nuevo `src/shared/integrations/whatsapp/` (Cloud API de Meta), webhook público con firma HMAC, enlace público con token, y expiración automática por barrido horario. El primer mensaje del cliente **no** se cuenta como respuesta: solo abre la ventana de 24 h que Meta exige. Suma calendario de contenido con adjuntos (`GET /piezas/calendario`, arte colgado de `archivo`), evaluación agencia-vs-interna con criterios ponderados congelados antes de ver las propuestas y permisos separados para evaluar y decidir (RN-MKT-006), y `campana_metrica` — que convierte en consumidores reales a los eventos que el módulo publicaba al vacío. Diferido: ver Deuda técnica. |
 | Contabilidad: procesos y plantillas | ✅ 2026-07-24 | `docs/contabilidad/` (política + marco legal + perfil contador/tesorero), 3 SOPs nuevos (pago a proveedor PROC-CTB-003, conciliación bancaria PROC-CTB-004, arqueo sorpresa PROC-CTB-005), 4 plantillas — ver detalle abajo. Área = tesorería + finanzas + registro + auditoría interna en un solo responsable, supervisada por Gerencia (RN-CTB-004..009; control en dos niveles: Contabilidad audita a las operativas, Gerencia audita a Contabilidad). Quedan propuestos PROC-CTB-006..013 |
 | Mantenimiento, Sistemas/TI como áreas propias | ⬜ | Definidas como áreas del negocio (posible tercerización); documentación pendiente, desactivadas por ahora |
 | Supervisión, CRM, tesorería, activos, proyectos, BI/reportes | 🔶 revisada 2026-08-05 | **Cuatro de los siete ya no son futuros y dos no van a ser módulos.** **BI/reportes** ✅ 2026-08-04: `src/core/reportes/` (ADR-024) con catálogo cerrado de 13 reportes, tableros guardados por usuario y compartidos por rol, filtros y exportación a CSV. **Tesorería** ✅ 2026-07-25: vive **dentro de `accounting`** por decisión explícita del usuario —pago a proveedor, `movimiento_dinero`, caja y custodia— y separarla al salir de REMYPE es un pendiente de organización, no de código. **Supervisión** no es módulo: es el rol RBAC `supervisor` más la matriz de aprobaciones de Gerencia (`parametro_empresa` + `decision_gerencial`); un módulo "supervisión" sería un permiso disfrazado de dominio. **CRM** parcial: `sales.cliente` (con contrato público de lectura) y `marketing.lead`/`campana`/`encuesta_satisfaccion` con atribución lead→venta ya cubren captar y medir; falta historial de interacciones y segmentación, sin caso hasta que haya campañas reales corriendo. **Activos** ⬜ pero **ya tiene dueño**: se compran en `purchases` (OC tipo `activo` + `requerimiento_activo`, deuda declarada) y se deprecian en `accounting` (activo fijo/depreciación, PROC-CTB-007/010) — partirlos en un tercer módulo cortaría el ciclo de compra en dos. **Proyectos** ⬜ sin caso: el grupo no ejecuta obra ni proyectos facturables hoy. |
@@ -1760,19 +1760,44 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
 - ⬜ **`campana.objetivo_comercial_id` diferido**: enlaza campaña de impulso
   de venta con la meta comercial; `objetivo_comercial`/`meta_venta` no
   existen todavía (deuda del área Comercial).
-- ⬜ **Contenido sin archivo adjunto ni calendario visual**: `pieza_contenido`
-  guarda título/canal/fecha y métricas, no el arte. Cuando haga falta,
-  colgar de `archivo` (`src/shared/`, ya existe) en vez de crear storage
-  propio.
-- ⬜ **`marketing.campana_lanzada` y `marketing.lead_generado` sin
-  consumidor**: se publican pero nadie escucha (candidato natural: BI).
-- ⬜ **Encuesta sin envío real ni expiración automática**: `POST /encuestas`
-  crea la fila y publica el evento; mandar el WhatsApp/link es trabajo de un
-  adaptador en `src/shared/integrations/` que todavía no existe, y
-  `expirar_encuesta` es un endpoint manual, no un barrido programado.
-- ⬜ **Evaluación de agencia (RN-MKT-006) sin modelo**: la decisión
-  agencia-vs-interna se documenta fuera del ERP; formalizarla exige
-  `contrato` transversal (misma deuda que `rrhh`).
+- ✅ 2026-08-08 **Slice encuesta / agencia / métricas** (migración
+  `c1f80b6a2d34`, ADR-029 y ADR-030). Cierra cuatro de las deudas de abajo:
+  - **Envío real de la encuesta, con guion por nodos.** `encuesta_plantilla`
+    + `encuesta_pregunta` convierten el cuestionario en dato: cada pregunta
+    declara a dónde sigue la conversación (`siguiente_codigo`) y por dónde se
+    desvía según la respuesta (`saltos`), así un 2 de 5 pregunta **qué**
+    falló y un 5 pregunta si nos recomendaría. `encuesta_satisfaccion` pasa a
+    recordar en qué nodo está el cliente, y `encuesta_respuesta` guarda el
+    detalle. Nuevo adaptador `src/shared/integrations/whatsapp/` (Cloud API
+    de Meta) + webhook público con firma HMAC + enlace público con token.
+    Saltos rotos y **ciclos** se rechazan al guardar la plantilla, no a mitad
+    de conversación. **Expiración automática** por Celery beat cada hora.
+  - **Calendario de contenido con adjuntos.** `GET /piezas/calendario`
+    agrupa por día y cuenta el arte; los adjuntos cuelgan de `archivo`
+    (`src/shared/`, polimórfico) en vez de un storage propio.
+  - **Evaluación de agencia (RN-MKT-006).** `evaluacion_agencia` +
+    `opcion_agencia` con criterios ponderados congelados **antes** de ver las
+    propuestas, la opción interna obligada a competir, y dos permisos
+    distintos para evaluar y decidir.
+  - **Los eventos de marketing ya tienen consumidor: marketing.**
+    `campana_metrica` acumula leads, conversiones, piezas y satisfacción; la
+    satisfacción se acredita por la cadena lead → venta → encuesta.
+  - Efecto colateral saneado: los tres `event_bus.publish` del módulo iban
+    sin `session=`, o sea despachaban **antes** del commit (contra ADR-016);
+    y `errors.py` dejó su jerarquía propia para heredar de
+    `src/shared/errors.py`, lo que borró el `try/except … raise _http(e)`
+    repetido en 17 endpoints.
+- ⬜ **Frontend de lo nuevo**: el backend expone calendario con adjuntos,
+  guion de encuesta, evaluación de agencia y métricas; `frontend/app/(app)/
+  marketing/` sigue mostrando solo campañas y el listado plano de contenido.
+- ⬜ **La plantilla de encuesta no se edita, se reemplaza**: hay
+  `POST /encuestas/plantillas` y activación, no `PATCH`. Editar un guion con
+  encuestas en curso obligaría a versionarlo (una conversación a mitad de
+  camino apunta a nodos que podrían desaparecer); mientras tanto, se crea
+  una plantilla nueva y se activa.
+- ⬜ **El acuse de entrega de WhatsApp se ignora**: el webhook descarta los
+  `statuses` (enviado/entregado/leído). Guardarlos permitiría distinguir "no
+  contestó" de "nunca le llegó" mejor que `error_envio`.
 
 ### Frontend (F2 — arquitectura y UX, documento 2026-07-27, actualizado tras ADR-013)
 
