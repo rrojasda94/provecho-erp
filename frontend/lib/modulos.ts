@@ -34,6 +34,17 @@ export const MODULOS: Modulo[] = [
     icono: "📊",
   },
   {
+    clave: "reportes",
+    nombre: "Reportes",
+    // No confundir con el Dashboard: allá se *consultan* reportes bajo
+    // demanda (ADR-024), acá se ve lo que el ERP *emite* solo y a quién le
+    // llega (ADR-033).
+    descripcion: "Qué reporta el ERP, a quién le llega y qué se entregó",
+    href: "/reportes",
+    prefijoPermiso: "reports.",
+    icono: "📮",
+  },
+  {
     clave: "compras",
     nombre: "Compras",
     descripcion: "Proveedores y órdenes de compra",

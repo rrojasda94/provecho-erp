@@ -96,8 +96,12 @@ def ejecutar_pago(
     if requiere_aprobacion and not puede_aprobar_monto:
         event_bus.publish(
             "accounting.pago_requiere_aprobacion",
+            # `empresa_id` desde 2026-08-08: `reports` lo necesita para
+            # escopar el reporte por tenant. Un pago es de la empresa, no de
+            # una sucursal.
             {
                 "movimiento_dinero_id": str(movimiento.id),
+                "empresa_id": str(movimiento.empresa_id),
                 "proveedor_id": str(movimiento.proveedor_id) if movimiento.proveedor_id else None,
                 "monto": str(movimiento.monto),
                 "umbral": str(umbral_efectivo),

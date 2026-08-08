@@ -770,6 +770,106 @@
         "title": "AperturaCajaOut",
         "type": "object"
       },
+      "AreaCreate": {
+        "properties": {
+          "codigo": {
+            "maxLength": 30,
+            "minLength": 1,
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "title": "Codigo",
+            "type": "string"
+          },
+          "empresa_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Empresa Id"
+          },
+          "nombre": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Nombre",
+            "type": "string"
+          }
+        },
+        "required": [
+          "codigo",
+          "nombre"
+        ],
+        "title": "AreaCreate",
+        "type": "object"
+      },
+      "AreaOut": {
+        "properties": {
+          "activa": {
+            "title": "Activa",
+            "type": "boolean"
+          },
+          "codigo": {
+            "title": "Codigo",
+            "type": "string"
+          },
+          "empresa_id": {
+            "format": "uuid",
+            "title": "Empresa Id",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "empresa_id",
+          "codigo",
+          "nombre",
+          "activa"
+        ],
+        "title": "AreaOut",
+        "type": "object"
+      },
+      "AreaUpdate": {
+        "properties": {
+          "activa": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activa"
+          },
+          "nombre": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nombre"
+          }
+        },
+        "title": "AreaUpdate",
+        "type": "object"
+      },
       "ArqueoIn": {
         "properties": {
           "monto_contado": {
@@ -2171,6 +2271,38 @@
           "precio_unitario"
         ],
         "title": "CartaItemOut",
+        "type": "object"
+      },
+      "CatalogoEmisionesOut": {
+        "properties": {
+          "dinamicos": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Dinamicos",
+            "type": "array"
+          },
+          "emisiones": {
+            "items": {
+              "$ref": "#/components/schemas/EmisionOut"
+            },
+            "title": "Emisiones",
+            "type": "array"
+          },
+          "niveles": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Niveles",
+            "type": "array"
+          }
+        },
+        "required": [
+          "emisiones",
+          "niveles",
+          "dinamicos"
+        ],
+        "title": "CatalogoEmisionesOut",
         "type": "object"
       },
       "CatalogoOut": {
@@ -4606,6 +4738,143 @@
         "title": "DescuentoCreate",
         "type": "object"
       },
+      "DestinatarioIn": {
+        "properties": {
+          "area_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Area Id"
+          },
+          "dinamico": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dinamico"
+          },
+          "rol_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rol Id"
+          },
+          "tipo": {
+            "enum": [
+              "area",
+              "rol",
+              "usuario",
+              "dinamico"
+            ],
+            "title": "Tipo",
+            "type": "string"
+          },
+          "usuario_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usuario Id"
+          }
+        },
+        "required": [
+          "tipo"
+        ],
+        "title": "DestinatarioIn",
+        "type": "object"
+      },
+      "DestinatarioOut": {
+        "properties": {
+          "area_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Area Id"
+          },
+          "dinamico": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dinamico"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "rol_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rol Id"
+          },
+          "tipo": {
+            "title": "Tipo",
+            "type": "string"
+          },
+          "usuario_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usuario Id"
+          }
+        },
+        "required": [
+          "id",
+          "tipo",
+          "area_id",
+          "rol_id",
+          "usuario_id",
+          "dinamico"
+        ],
+        "title": "DestinatarioOut",
+        "type": "object"
+      },
       "DevolucionCreate": {
         "properties": {
           "almacen_id": {
@@ -5088,6 +5357,73 @@
           "medio_pago"
         ],
         "title": "EjecutarPagoIn",
+        "type": "object"
+      },
+      "EmisionOut": {
+        "properties": {
+          "ambito": {
+            "title": "Ambito",
+            "type": "string"
+          },
+          "areas_sugeridas": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Areas Sugeridas",
+            "type": "array"
+          },
+          "campos": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Campos",
+            "type": "array"
+          },
+          "codigo": {
+            "title": "Codigo",
+            "type": "string"
+          },
+          "descripcion": {
+            "title": "Descripcion",
+            "type": "string"
+          },
+          "dinamicos_sugeridos": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Dinamicos Sugeridos",
+            "type": "array"
+          },
+          "nivel": {
+            "title": "Nivel",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "permiso": {
+            "title": "Permiso",
+            "type": "string"
+          },
+          "referencia_tipo": {
+            "title": "Referencia Tipo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "codigo",
+          "nombre",
+          "descripcion",
+          "permiso",
+          "nivel",
+          "ambito",
+          "campos",
+          "areas_sugeridas",
+          "dinamicos_sugeridos",
+          "referencia_tipo"
+        ],
+        "title": "EmisionOut",
         "type": "object"
       },
       "EmpresaCreate": {
@@ -5575,6 +5911,35 @@
           "ya_entregado"
         ],
         "title": "EntregaOut",
+        "type": "object"
+      },
+      "EntregaReporteOut": {
+        "properties": {
+          "canal": {
+            "title": "Canal",
+            "type": "string"
+          },
+          "motivo": {
+            "title": "Motivo",
+            "type": "string"
+          },
+          "usuario": {
+            "title": "Usuario",
+            "type": "string"
+          },
+          "usuario_id": {
+            "format": "uuid",
+            "title": "Usuario Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "usuario_id",
+          "usuario",
+          "motivo",
+          "canal"
+        ],
+        "title": "EntregaReporteOut",
         "type": "object"
       },
       "EntregarCustodiaIn": {
@@ -7665,6 +8030,158 @@
         "title": "MarcaUpdate",
         "type": "object"
       },
+      "MatrizDestinatarioOut": {
+        "properties": {
+          "etiqueta": {
+            "title": "Etiqueta",
+            "type": "string"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "tipo": {
+            "title": "Tipo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tipo",
+          "id",
+          "etiqueta"
+        ],
+        "title": "MatrizDestinatarioOut",
+        "type": "object"
+      },
+      "MatrizFilaOut": {
+        "properties": {
+          "ambito": {
+            "title": "Ambito",
+            "type": "string"
+          },
+          "areas_sugeridas": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Areas Sugeridas",
+            "type": "array"
+          },
+          "codigo": {
+            "title": "Codigo",
+            "type": "string"
+          },
+          "descripcion": {
+            "title": "Descripcion",
+            "type": "string"
+          },
+          "hueco": {
+            "title": "Hueco",
+            "type": "boolean"
+          },
+          "nivel": {
+            "title": "Nivel",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "permiso": {
+            "title": "Permiso",
+            "type": "string"
+          },
+          "reglas": {
+            "items": {
+              "$ref": "#/components/schemas/MatrizReglaOut"
+            },
+            "title": "Reglas",
+            "type": "array"
+          }
+        },
+        "required": [
+          "codigo",
+          "nombre",
+          "descripcion",
+          "permiso",
+          "nivel",
+          "ambito",
+          "areas_sugeridas",
+          "reglas",
+          "hueco"
+        ],
+        "title": "MatrizFilaOut",
+        "type": "object"
+      },
+      "MatrizReglaOut": {
+        "properties": {
+          "activa": {
+            "title": "Activa",
+            "type": "boolean"
+          },
+          "alcance": {
+            "title": "Alcance",
+            "type": "integer"
+          },
+          "canal": {
+            "title": "Canal",
+            "type": "string"
+          },
+          "destinatarios": {
+            "items": {
+              "$ref": "#/components/schemas/MatrizDestinatarioOut"
+            },
+            "title": "Destinatarios",
+            "type": "array"
+          },
+          "fuga": {
+            "title": "Fuga",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "nivel": {
+            "title": "Nivel",
+            "type": "string"
+          },
+          "sucursal": {
+            "title": "Sucursal",
+            "type": "string"
+          },
+          "sucursal_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sucursal Id"
+          }
+        },
+        "required": [
+          "id",
+          "sucursal_id",
+          "sucursal",
+          "activa",
+          "nivel",
+          "canal",
+          "destinatarios",
+          "alcance",
+          "fuga"
+        ],
+        "title": "MatrizReglaOut",
+        "type": "object"
+      },
       "MeOut": {
         "properties": {
           "empresa_id": {
@@ -8316,6 +8833,107 @@
           "puntaje_promedio"
         ],
         "title": "MetricaCampanaOut",
+        "type": "object"
+      },
+      "MiembroCreate": {
+        "properties": {
+          "rol_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rol Id"
+          },
+          "sucursal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sucursal Id"
+          },
+          "usuario_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usuario Id"
+          }
+        },
+        "title": "MiembroCreate",
+        "type": "object"
+      },
+      "MiembroOut": {
+        "properties": {
+          "area_id": {
+            "format": "uuid",
+            "title": "Area Id",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "rol_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rol Id"
+          },
+          "sucursal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sucursal Id"
+          },
+          "usuario_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usuario Id"
+          }
+        },
+        "required": [
+          "id",
+          "area_id",
+          "rol_id",
+          "usuario_id",
+          "sucursal_id"
+        ],
+        "title": "MiembroOut",
         "type": "object"
       },
       "MovimientoCajaIn": {
@@ -9986,6 +10604,37 @@
           "page_size"
         ],
         "title": "Pagina[ProveedorOut]",
+        "type": "object"
+      },
+      "Pagina_ReporteEmitidoOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ReporteEmitidoOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "Pagina[ReporteEmitidoOut]",
         "type": "object"
       },
       "Pagina_SolicitudOut_": {
@@ -14742,6 +15391,416 @@
           "activa"
         ],
         "title": "ReglaAsientoOut",
+        "type": "object"
+      },
+      "ReglaCreate": {
+        "properties": {
+          "activa": {
+            "default": true,
+            "title": "Activa",
+            "type": "boolean"
+          },
+          "canal": {
+            "const": "bandeja",
+            "default": "bandeja",
+            "title": "Canal",
+            "type": "string"
+          },
+          "codigo_emision": {
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Codigo Emision",
+            "type": "string"
+          },
+          "destinatarios": {
+            "items": {
+              "$ref": "#/components/schemas/DestinatarioIn"
+            },
+            "maxItems": 50,
+            "title": "Destinatarios",
+            "type": "array"
+          },
+          "empresa_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Empresa Id"
+          },
+          "nivel": {
+            "default": "aviso",
+            "enum": [
+              "info",
+              "aviso",
+              "urgente"
+            ],
+            "title": "Nivel",
+            "type": "string"
+          },
+          "sucursal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sucursal Id"
+          }
+        },
+        "required": [
+          "codigo_emision"
+        ],
+        "title": "ReglaCreate",
+        "type": "object"
+      },
+      "ReglaOut": {
+        "properties": {
+          "activa": {
+            "title": "Activa",
+            "type": "boolean"
+          },
+          "canal": {
+            "title": "Canal",
+            "type": "string"
+          },
+          "codigo_emision": {
+            "title": "Codigo Emision",
+            "type": "string"
+          },
+          "destinatarios": {
+            "items": {
+              "$ref": "#/components/schemas/DestinatarioOut"
+            },
+            "title": "Destinatarios",
+            "type": "array"
+          },
+          "empresa_id": {
+            "format": "uuid",
+            "title": "Empresa Id",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nivel": {
+            "title": "Nivel",
+            "type": "string"
+          },
+          "sucursal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sucursal Id"
+          }
+        },
+        "required": [
+          "id",
+          "empresa_id",
+          "codigo_emision",
+          "sucursal_id",
+          "activa",
+          "nivel",
+          "canal"
+        ],
+        "title": "ReglaOut",
+        "type": "object"
+      },
+      "ReglaUpdate": {
+        "properties": {
+          "activa": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activa"
+          },
+          "canal": {
+            "anyOf": [
+              {
+                "const": "bandeja",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canal"
+          },
+          "destinatarios": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/DestinatarioIn"
+                },
+                "maxItems": 50,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destinatarios"
+          },
+          "nivel": {
+            "anyOf": [
+              {
+                "enum": [
+                  "info",
+                  "aviso",
+                  "urgente"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nivel"
+          }
+        },
+        "title": "ReglaUpdate",
+        "type": "object"
+      },
+      "ReporteEmitidoDetalleOut": {
+        "properties": {
+          "codigo_emision": {
+            "title": "Codigo Emision",
+            "type": "string"
+          },
+          "cuerpo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cuerpo"
+          },
+          "datos": {
+            "additionalProperties": true,
+            "title": "Datos",
+            "type": "object"
+          },
+          "emitido_at": {
+            "format": "date-time",
+            "title": "Emitido At",
+            "type": "string"
+          },
+          "empresa_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Empresa Id"
+          },
+          "entregas": {
+            "items": {
+              "$ref": "#/components/schemas/EntregaReporteOut"
+            },
+            "title": "Entregas",
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nivel": {
+            "title": "Nivel",
+            "type": "string"
+          },
+          "referencia_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referencia Id"
+          },
+          "referencia_tipo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referencia Tipo"
+          },
+          "regla_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Regla Id"
+          },
+          "sucursal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sucursal Id"
+          },
+          "titulo": {
+            "title": "Titulo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "empresa_id",
+          "sucursal_id",
+          "codigo_emision",
+          "titulo",
+          "cuerpo",
+          "nivel",
+          "referencia_tipo",
+          "referencia_id",
+          "emitido_at",
+          "datos",
+          "regla_id"
+        ],
+        "title": "ReporteEmitidoDetalleOut",
+        "type": "object"
+      },
+      "ReporteEmitidoOut": {
+        "properties": {
+          "codigo_emision": {
+            "title": "Codigo Emision",
+            "type": "string"
+          },
+          "cuerpo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cuerpo"
+          },
+          "emitido_at": {
+            "format": "date-time",
+            "title": "Emitido At",
+            "type": "string"
+          },
+          "empresa_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Empresa Id"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nivel": {
+            "title": "Nivel",
+            "type": "string"
+          },
+          "referencia_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referencia Id"
+          },
+          "referencia_tipo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referencia Tipo"
+          },
+          "sucursal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sucursal Id"
+          },
+          "titulo": {
+            "title": "Titulo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "empresa_id",
+          "sucursal_id",
+          "codigo_emision",
+          "titulo",
+          "cuerpo",
+          "nivel",
+          "referencia_tipo",
+          "referencia_id",
+          "emitido_at"
+        ],
+        "title": "ReporteEmitidoOut",
         "type": "object"
       },
       "ReporteOut": {
@@ -29791,6 +30850,789 @@
         ]
       }
     },
+    "/api/v1/reports/areas": {
+      "get": {
+        "operationId": "listar_areas_api_v1_reports_areas_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AreaOut"
+                  },
+                  "title": "Response Listar Areas Api V1 Reports Areas Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Areas",
+        "tags": [
+          "reports"
+        ]
+      },
+      "post": {
+        "operationId": "crear_area_api_v1_reports_areas_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AreaCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AreaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Area",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/areas/{area_id}": {
+      "delete": {
+        "operationId": "borrar_area_api_v1_reports_areas__area_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "area_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Area Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Borrar Area",
+        "tags": [
+          "reports"
+        ]
+      },
+      "patch": {
+        "operationId": "editar_area_api_v1_reports_areas__area_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "area_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Area Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AreaUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AreaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Editar Area",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/areas/{area_id}/miembros": {
+      "get": {
+        "operationId": "listar_miembros_api_v1_reports_areas__area_id__miembros_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "area_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Area Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MiembroOut"
+                  },
+                  "title": "Response Listar Miembros Api V1 Reports Areas  Area Id  Miembros Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Miembros",
+        "tags": [
+          "reports"
+        ]
+      },
+      "post": {
+        "operationId": "agregar_miembro_api_v1_reports_areas__area_id__miembros_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "area_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Area Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MiembroCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MiembroOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Agregar Miembro",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/areas/{area_id}/miembros/{miembro_id}": {
+      "delete": {
+        "operationId": "quitar_miembro_api_v1_reports_areas__area_id__miembros__miembro_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "area_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Area Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "miembro_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Miembro Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Quitar Miembro",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/emisiones": {
+      "get": {
+        "description": "Solo lo que este usuario puede ver: el catálogo es una lista de\ncapacidades y mostrar lo que después daría 403 solo confunde.",
+        "operationId": "listar_emisiones_api_v1_reports_emisiones_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogoEmisionesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Emisiones",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/emitidos": {
+      "get": {
+        "operationId": "listar_emitidos_api_v1_reports_emitidos_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "codigo_emision",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Codigo Emision"
+            }
+          },
+          {
+            "description": "Página, empezando en 1",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "description": "Página, empezando en 1",
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Filas por página (máx. 200)",
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Filas por página (máx. 200)",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pagina_ReporteEmitidoOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Emitidos",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/emitidos/{reporte_id}": {
+      "get": {
+        "description": "Doble puerta (RN-REP-002).\n\n1. **Alcance**: ser destinatario, o tener `reports.leer_todo`.\n2. **Contenido**: el permiso que la emisión declara, que es el de su\n   módulo dueño. Estar en la lista de distribución no otorga acceso al\n   dato — mismo criterio que el addendum de ADR-024 para los tableros\n   compartidos.",
+        "operationId": "detalle_emitido_api_v1_reports_emitidos__reporte_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "reporte_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Reporte Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReporteEmitidoDetalleOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Detalle Emitido",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/matriz": {
+      "get": {
+        "description": "El mapa completo de distribución, con sus huecos y sus fugas.\n\nPermiso propio y no `reports.leer`: la matriz revela la estructura\norganizacional —quién responde por qué local, quién compone Gerencia— y\neso es más de lo que necesita quien solo viene a leer sus reportes.",
+        "operationId": "matriz_api_v1_reports_matriz_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MatrizFilaOut"
+                  },
+                  "title": "Response Matriz Api V1 Reports Matriz Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Matriz",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/mios": {
+      "get": {
+        "description": "Lo que me fue entregado. Sin filtro de tenant explícito: la entrega ya\nes a mi `usuario_id`, y nadie me entrega reportes de otra empresa.",
+        "operationId": "mis_reportes_api_v1_reports_mios_get",
+        "parameters": [
+          {
+            "description": "Página, empezando en 1",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "description": "Página, empezando en 1",
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Filas por página (máx. 200)",
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Filas por página (máx. 200)",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pagina_ReporteEmitidoOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Mis Reportes",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/reglas": {
+      "get": {
+        "operationId": "listar_reglas_api_v1_reports_reglas_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "codigo_emision",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Codigo Emision"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ReglaOut"
+                  },
+                  "title": "Response Listar Reglas Api V1 Reports Reglas Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Reglas",
+        "tags": [
+          "reports"
+        ]
+      },
+      "post": {
+        "operationId": "crear_regla_api_v1_reports_reglas_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReglaCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReglaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Regla",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/reglas/{regla_id}": {
+      "delete": {
+        "operationId": "borrar_regla_api_v1_reports_reglas__regla_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "regla_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Regla Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Borrar Regla",
+        "tags": [
+          "reports"
+        ]
+      },
+      "patch": {
+        "operationId": "editar_regla_api_v1_reports_reglas__regla_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "regla_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Regla Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReglaUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReglaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Editar Regla",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
     "/api/v1/roles": {
       "get": {
         "operationId": "listar_roles_api_v1_roles_get",
@@ -36269,6 +38111,10 @@
     {
       "description": "Proveedores y ciclo de orden de compra.",
       "name": "purchases"
+    },
+    {
+      "description": "Emisión y distribución: qué hechos del ERP generan un reporte, a qué áreas y usuarios llega cada uno, y qué se entregó. No confundir con `reportes`, que es la consulta bajo demanda.",
+      "name": "reports"
     },
     {
       "description": "Órdenes de producción (fabricación) y costeo.",

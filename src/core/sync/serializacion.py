@@ -16,6 +16,7 @@ from typing import Any
 from sqlalchemy import Column
 
 from src.core.sync.contratos import RecursoSync
+from src.core.sync.tiempo import a_utc
 
 
 def _a_json(valor: Any) -> Any:
@@ -73,5 +74,20 @@ def clave_primaria(datos: dict, recurso: RecursoSync) -> tuple:
 
 
 def marca_de(datos: dict, recurso: RecursoSync) -> datetime | None:
+    """La marca de una fila entrante, siempre **UTC aware**.
+
+    Sin `a_utc` la marca sale naive cuando el otro lado la serializó desde
+    SQLite (que guarda `updated_at` sin zona), y el motor la termina
+    comparando contra el watermark —que sí es aware— con un
+    `TypeError: can't compare offset-naive and offset-aware datetimes`.
+
+    El `>` solo se ejecuta cuando un recurso devuelve una página entera y
+    hay que pedir la siguiente (`motor._jalar_recurso`), así que el error se
+    escondía detrás del umbral de paginación: apareció recién cuando
+    `rol_permiso` pasó de 97 a 109 filas sembradas. Este archivo es el único
+    borde donde un texto entrante se vuelve `datetime`, así que normalizar
+    acá lo cubre para todo el motor — que trabaja en UTC aware por diseño
+    (ver `tiempo.py`).
+    """
     valor = datos.get(recurso.campo_marca)
-    return None if valor is None else datetime.fromisoformat(valor)
+    return None if valor is None else a_utc(datetime.fromisoformat(valor))

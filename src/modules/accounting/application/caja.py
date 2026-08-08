@@ -51,6 +51,7 @@ from src.modules.accounting.infrastructure.repositories import (
 from src.modules.sales.application.queries_publicas import (
     puntos_venta_de_empresa,
     puntos_venta_rotulados,
+    sucursal_de_punto_venta,
     total_efectivo_cobrado,
     total_tarjeta_cobrado,
 )
@@ -402,8 +403,14 @@ def cerrar_caja(
     if estado == "con_irregularidad":
         event_bus.publish(
             "accounting.cierre_caja_irregular",
+            # `sucursal_id` desde 2026-08-08: la caja cuelga del punto de
+            # venta, no de la sucursal, y `reports` necesita el local para
+            # escopar el reporte y elegir la regla de distribución.
             {
                 "cierre_caja_id": str(cierre.id),
+                "sucursal_id": str(
+                    sucursal_de_punto_venta(session, apertura.punto_venta_id)
+                ),
                 "descuadre_monto": str(descuadre),
                 "descuadre_tarjeta": str(tarjetas["descuadre"]),
                 "descuadre_atribucion": descuadre_atribucion,

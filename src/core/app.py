@@ -28,6 +28,8 @@ from src.modules.marketing.api.webhook_routers import router as marketing_webhoo
 from src.modules.marketing.application import listeners as marketing_listeners
 from src.modules.production.api.routers import router as production_router
 from src.modules.purchases.api.routers import router as purchases_router
+from src.modules.reports.api.routers import router as reports_router
+from src.modules.reports.application import listeners as reports_listeners
 from src.modules.rrhh.api.routers import router as rrhh_router
 from src.modules.sales.api.kds_routers import router as kds_router
 from src.modules.sales.api.routers import router as sales_router
@@ -90,6 +92,14 @@ TAGS_METADATA = [
         "description": "Catálogo de artículos, stock por almacén, movimientos y ajustes.",
     },
     {"name": "purchases", "description": "Proveedores y ciclo de orden de compra."},
+    {
+        "name": "reports",
+        "description": (
+            "Emisión y distribución: qué hechos del ERP generan un reporte, a "
+            "qué áreas y usuarios llega cada uno, y qué se entregó. No "
+            "confundir con `reportes`, que es la consulta bajo demanda."
+        ),
+    },
     {
         "name": "production",
         "description": "Órdenes de producción (fabricación) y costeo.",
@@ -277,9 +287,15 @@ def create_app() -> FastAPI:
     app.include_router(marketing_publico_router, prefix="/api/v1")
     app.include_router(marketing_webhook_router, prefix="/api/v1")
     app.include_router(sync_router, prefix="/api/v1")
+    app.include_router(reports_router, prefix="/api/v1")
     inventory_listeners.register()
     accounting_listeners.register()
     marketing_listeners.register()
     sales_listeners.register()
+    # `reports` antes que `users`: el primero convierte hechos en reportes y
+    # el segundo convierte reportes en bandeja. El orden de `subscribe` no
+    # decide el de despacho entre eventos distintos, pero leerlo en este
+    # orden es leer la cadena.
+    reports_listeners.register()
     users_listeners.register()
     return app
