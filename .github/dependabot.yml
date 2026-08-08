@@ -43,7 +43,7 @@ updates:
     # atrasado: no existe versión publicada de la cadena de
     # `eslint-config-next` que los acepte, y cada uno se destraba solo cuando
     # su bloqueante publique. El tercero espera trabajo nuestro, no de
-    # terceros.
+    # terceros. El cuarto espera que el CI suba de runtime.
     ignore:
       # `typescript-eslint` pide `typescript >=4.8.4 <6.1.0` y
       # `eslint-config-next` depende de él. Al instalar TS7 npm resuelve el
@@ -68,6 +68,16 @@ updates:
       # el CI en rojo y se mergeó igual (ver ROADMAP → Deuda técnica →
       # Frontend). Quitar esta entrada al hacer la migración.
       - dependency-name: "@tanstack/react-table"
+        update-types: ["version-update:semver-major"]
+      # `@types/node` describe el runtime que el código va a encontrar, así
+      # que subirlo por delante del runtime es peor que quedarse atrás: los
+      # tipos de Node 26 aprueban APIs que Node 24 —el que corren los jobs
+      # `frontend` y `e2e`— no tiene, y `tsc` daría verde sobre código que
+      # muere en ejecución. Se cerró dos veces por esto (PR #29 y #55) y
+      # volvía cada semana. Quitar esta entrada cuando el CI suba a Node 26,
+      # en el mismo cambio: el número de acá y el `node-version:` de
+      # `ci.yml` son el mismo número.
+      - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
     commit-message:
       prefix: "chore(deps)"
