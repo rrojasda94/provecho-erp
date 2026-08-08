@@ -872,6 +872,24 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
 - ⬜ **Escaneo de la imagen** (Trivy/Grype) y firma del artefacto: el
   contenido de la imagen base no se audita todavía.
 - ⬜ **Entorno de staging** (ver *Cuando haya servidor*, punto 7): hoy se saltaría de CI a producción directo.
+- ✅ 2026-08-08 **`tsc --noEmit` bloqueante en el job `frontend`**, y
+  `main` de vuelta en verde. El PR #37 (dependabot subiendo
+  `@tanstack/react-table` de 8 a 9 sin migrar nada) rompió las 13 pantallas
+  que usan `tabla-datos.tsx` —en v9 no existe `useReactTable`— y **se
+  mergeó con el CI en rojo**: falló en el PR (run `31202169287`) y volvió a
+  fallar en `main` (`31210826670`), jobs `frontend` y `e2e`. `main` quedó
+  rojo desde el 2026-08-07. Se repinea en `^8.21.3` (ver Frontend).
+  Lo que el CI sí tenía y no tenía:
+  - `npm run lint` pasó. ESLint no resuelve tipos: revisa el árbol
+    sintáctico, no si el símbolo importado existe.
+  - `npm run build` **sí** typechequea —Next 16 corre el `tsc` del proyecto,
+    "Running TypeScript…", con el mismo `tsconfig.json`—, pero acá ni llegó:
+    murió antes empaquetando, con `Export useReactTable doesn't exist in
+    target module` de Turbopack, y arrastró al `e2e` detrás.
+  - `npm run typecheck` no agrega cobertura sobre el build: agrega momento y
+    claridad. Corre antes de `npm test` y del build, tarda 6 s contra ~40 s,
+    y falla diciendo "tipos" en vez de un stack del bundler. Y queda de red
+    si alguna vez se toca `typescript.ignoreBuildErrors`.
 - ✅ 2026-07-28 **Migraciones con vuelta atrás probada**: el job `migraciones`
   de `.github/workflows/ci.yml` corre `alembic downgrade base` y vuelve a
   subir contra un Postgres 16 real en cada push y PR, así que el camino de
@@ -1728,6 +1746,15 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
 
 ### Frontend (F2 — arquitectura y UX, documento 2026-07-27, actualizado tras ADR-013)
 
+- ⬜ **Migrar a `@tanstack/react-table` v9** (2026-08-08). La v9 renombró la
+  API pública: `useReactTable` pasa a `ReactTable` + `createCoreRowModel`,
+  `VisibilityState` deja de exportarse y `ColumnDef` toma dos genéricos. Toca
+  `components/tabla/tabla-datos.tsx` y las 13 pantallas que lo usan, así
+  que es trabajo propio y no un bump — se hace solo, con su verificación. El
+  PR #37 la subió sin migrar nada; el CI la atrapó (jobs `frontend` y `e2e`
+  en rojo) y el PR se mergeó igual, dejando `main` roto un día (ver CI/CD,
+  2026-08-08). Se volvió a pinear en `^8.21.3` y el major quedó en `ignore`
+  en `.github/dependabot.yml`: quitar esa entrada al hacer la migración.
 - **34 hallazgos del React Compiler quedaron en `warn`** (2026-08-07). Al
   subir a Next 16 entra `eslint-plugin-react-hooks` 7, que trae las reglas
   del React Compiler. Son dos patrones repartidos en 30 archivos:

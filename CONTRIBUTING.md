@@ -7,7 +7,9 @@ Lee primero [CLAUDE.md](CLAUDE.md) — contiene las reglas obligatorias.
 1. Rama desde `main`: `feat/<módulo>-<descripción>` o `fix/...`.
 2. Especificar antes de implementar: actualizar README del módulo y docs.
 3. Implementar con pruebas (unitarias + integración cuando aplique).
-4. `ruff check .` y `pytest` deben pasar. Frontend: `npm run lint`.
+4. `ruff check .` y `pytest` deben pasar. Frontend: `npm run lint` y
+   `npm run typecheck` (ESLint no resuelve tipos; `tsc` es lo que atrapa un
+   import que ya no existe).
 5. Actualizar `CHANGELOG.md`, `ROADMAP.md` y documentación afectada en el mismo cambio.
 6. Commits en formato [Conventional Commits](https://www.conventionalcommits.org/es/):
    `feat(inventory): agregar transferencias entre almacenes`.
