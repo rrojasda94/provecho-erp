@@ -21,6 +21,9 @@ from sqlalchemy.orm import Session
 from src.modules.users.infrastructure.models import (
     Almacen,
     AuditLog,
+    Empresa,
+    Grupo,
+    LicenciaMarca,
     Marca,
     Permiso,
     Persona,
@@ -28,6 +31,7 @@ from src.modules.users.infrastructure.models import (
     Rol,
     RolPermiso,
     Sucursal,
+    TokenAgente,
     Usuario,
     UsuarioRol,
     UsuarioSucursal,
@@ -209,6 +213,33 @@ class RefreshTokenRepo:
             tok.revocado = True
 
 
+class TokenAgenteRepo:
+    def __init__(self, session: Session) -> None:
+        self.s = session
+
+    def get(self, token_id: uuid.UUID) -> TokenAgente | None:
+        return self.s.get(TokenAgente, token_id)
+
+    def get_by_hash(self, token_hash: str) -> TokenAgente | None:
+        return self.s.scalar(
+            select(TokenAgente).where(TokenAgente.token_hash == token_hash)
+        )
+
+    def list(self, usuario_id: uuid.UUID) -> list[TokenAgente]:
+        return list(
+            self.s.scalars(
+                select(TokenAgente)
+                .where(TokenAgente.usuario_id == usuario_id)
+                .order_by(TokenAgente.created_at.desc())
+            )
+        )
+
+    def add(self, token: TokenAgente) -> TokenAgente:
+        self.s.add(token)
+        self.s.flush()
+        return token
+
+
 class PersonaRepo:
     def __init__(self, session: Session) -> None:
         self.s = session
@@ -266,9 +297,99 @@ class PersonaRepo:
         return self.get(persona_id)
 
 
+class GrupoRepo:
+    def __init__(self, session: Session) -> None:
+        self.s = session
+
+    def get(self, grupo_id: uuid.UUID) -> Grupo | None:
+        return self.s.get(Grupo, grupo_id)
+
+    def get_by_nombre(self, nombre: str) -> Grupo | None:
+        return self.s.scalar(select(Grupo).where(Grupo.nombre == nombre))
+
+    def list(self) -> list[Grupo]:
+        return list(self.s.scalars(select(Grupo).order_by(Grupo.nombre)))
+
+    def add(self, grupo: Grupo) -> Grupo:
+        self.s.add(grupo)
+        self.s.flush()
+        return grupo
+
+
+class EmpresaRepo:
+    def __init__(self, session: Session) -> None:
+        self.s = session
+
+    def get(self, empresa_id: uuid.UUID) -> Empresa | None:
+        return self.s.scalar(
+            select(Empresa).where(
+                Empresa.id == empresa_id, Empresa.deleted_at.is_(None)
+            )
+        )
+
+    def get_by_ruc(self, ruc: str) -> Empresa | None:
+        return self.s.scalar(
+            select(Empresa).where(Empresa.ruc == ruc, Empresa.deleted_at.is_(None))
+        )
+
+    def list(self, empresa_id: uuid.UUID | None = None) -> list[Empresa]:
+        """Con `empresa_id` devuelve solo esa: quien no es superusuario ve
+        únicamente la empresa de su tenant, no el listado del grupo."""
+        stmt = select(Empresa).where(Empresa.deleted_at.is_(None))
+        if empresa_id is not None:
+            stmt = stmt.where(Empresa.id == empresa_id)
+        return list(self.s.scalars(stmt.order_by(Empresa.razon_social)))
+
+    def add(self, empresa: Empresa) -> Empresa:
+        self.s.add(empresa)
+        self.s.flush()
+        return empresa
+
+
+class LicenciaMarcaRepo:
+    def __init__(self, session: Session) -> None:
+        self.s = session
+
+    def get(self, empresa_id: uuid.UUID, marca_id: uuid.UUID) -> LicenciaMarca | None:
+        return self.s.scalar(
+            select(LicenciaMarca).where(
+                LicenciaMarca.empresa_id == empresa_id,
+                LicenciaMarca.marca_id == marca_id,
+            )
+        )
+
+    def list(self, empresa_id: uuid.UUID | None = None) -> list[LicenciaMarca]:
+        stmt = select(LicenciaMarca)
+        if empresa_id is not None:
+            stmt = stmt.where(LicenciaMarca.empresa_id == empresa_id)
+        return list(self.s.scalars(stmt))
+
+    def de_marca(self, marca_id: uuid.UUID) -> list[LicenciaMarca]:
+        return list(
+            self.s.scalars(
+                select(LicenciaMarca).where(LicenciaMarca.marca_id == marca_id)
+            )
+        )
+
+    def add(self, licencia: LicenciaMarca) -> LicenciaMarca:
+        self.s.add(licencia)
+        self.s.flush()
+        return licencia
+
+    def delete(self, licencia: LicenciaMarca) -> None:
+        self.s.delete(licencia)
+
+
 class AlmacenRepo:
     def __init__(self, session: Session) -> None:
         self.s = session
+
+    def get(self, almacen_id: uuid.UUID) -> Almacen | None:
+        return self.s.scalar(
+            select(Almacen).where(
+                Almacen.id == almacen_id, Almacen.deleted_at.is_(None)
+            )
+        )
 
     def list(self, empresa_id: uuid.UUID | None = None) -> list[Almacen]:
         stmt = select(Almacen).where(Almacen.deleted_at.is_(None))
@@ -276,10 +397,46 @@ class AlmacenRepo:
             stmt = stmt.where(Almacen.empresa_id == empresa_id)
         return list(self.s.scalars(stmt.order_by(Almacen.nombre)))
 
+    def abastecidos_por(self, almacen_id: uuid.UUID) -> list[Almacen]:
+        """Los que se abastecen de este. Dar de baja al central sin mirarlos
+        dejaría a media empresa apuntando a un almacén que ya no existe."""
+        return list(
+            self.s.scalars(
+                select(Almacen).where(
+                    Almacen.almacen_abastecedor_id == almacen_id,
+                    Almacen.deleted_at.is_(None),
+                )
+            )
+        )
+
+    def add(self, almacen: Almacen) -> Almacen:
+        self.s.add(almacen)
+        self.s.flush()
+        return almacen
+
 
 class MarcaRepo:
     def __init__(self, session: Session) -> None:
         self.s = session
+
+    def get(self, marca_id: uuid.UUID) -> Marca | None:
+        return self.s.scalar(
+            select(Marca).where(Marca.id == marca_id, Marca.deleted_at.is_(None))
+        )
+
+    def get_by_nombre(self, grupo_id: uuid.UUID, nombre: str) -> Marca | None:
+        return self.s.scalar(
+            select(Marca).where(
+                Marca.grupo_id == grupo_id,
+                Marca.nombre == nombre,
+                Marca.deleted_at.is_(None),
+            )
+        )
+
+    def add(self, marca: Marca) -> Marca:
+        self.s.add(marca)
+        self.s.flush()
+        return marca
 
     def list(self, empresa_id: uuid.UUID | None = None) -> list[Marca]:
         """Marcas que la empresa opera, vía sus sucursales.
@@ -302,11 +459,29 @@ class SucursalRepo:
     def __init__(self, session: Session) -> None:
         self.s = session
 
-    def list(self, empresa_id: uuid.UUID | None = None) -> list[Sucursal]:
+    def get(self, sucursal_id: uuid.UUID) -> Sucursal | None:
+        return self.s.scalar(
+            select(Sucursal).where(
+                Sucursal.id == sucursal_id, Sucursal.deleted_at.is_(None)
+            )
+        )
+
+    def list(
+        self,
+        empresa_id: uuid.UUID | None = None,
+        marca_id: uuid.UUID | None = None,
+    ) -> list[Sucursal]:
         stmt = select(Sucursal).where(Sucursal.deleted_at.is_(None))
         if empresa_id is not None:
             stmt = stmt.where(Sucursal.empresa_id == empresa_id)
+        if marca_id is not None:
+            stmt = stmt.where(Sucursal.marca_id == marca_id)
         return list(self.s.scalars(stmt.order_by(Sucursal.nombre)))
+
+    def add(self, sucursal: Sucursal) -> Sucursal:
+        self.s.add(sucursal)
+        self.s.flush()
+        return sucursal
 
 
 # Logger propio: el flujo `auditoria` que `logging_config` declaraba y

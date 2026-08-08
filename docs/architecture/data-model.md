@@ -36,6 +36,15 @@ una vez emitido (RN-GEN-002).
 
 ## 1. Organización (transversal)
 
+**CRUD por API desde 2026-08-08** (`/api/v1/grupos`, `/empresas`, `/marcas`,
+`/empresas/{id}/marcas`, `/sucursales`, `/almacenes` — permiso
+`organizacion.gestionar`, detalle en `src/modules/users/README.md`). Antes
+solo lo escribía el seeder. La API valida lo que el seeder tipeaba a mano:
+la licencia como requisito de una sucursal, la coherencia de empresa en los
+almacenes, y la baja lógica negada con dependientes vivos. Cerrar un local
+es `sucursal.estado="inactiva"`, no una baja: sigue siendo el ancla de sus
+ventas, cajas y trabajadores (mismo criterio que RN-GEN-006).
+
 ```mermaid
 erDiagram
     grupo ||--o{ empresa : tiene
@@ -139,6 +148,7 @@ erDiagram
     usuario ||--o{ usuario_sucursal : ""
     sucursal ||--o{ usuario_sucursal : ""
     usuario ||--o{ refresh_token : ""
+    usuario ||--o{ token_agente : ""
     usuario ||--o{ audit_log : genera
 ```
 
@@ -175,6 +185,17 @@ erDiagram
 - **usuario**: username, pin_hash (Argon2id), persona_id (nullable — NULL
   si `agente_ia`), nombre_display (fallback para agente_ia), email, tipo
   (`humano` | `agente_ia`), activo.
+- **token_agente** (2026-08-08, ADR-029): usuario_id, nombre ("n8n
+  producción"), prefijo (los primeros 12 caracteres del token, único dato
+  mostrable después de crearlo), token_hash (SHA-256; el claro sale una sola
+  vez), expira_en (nullable — NULL = sin vencimiento), revocado,
+  ultimo_uso_en. **Credencial de larga vida de una cuenta `agente_ia`**: un
+  proceso desatendido no teclea un PIN de 6 dígitos ni rota un refresh cada
+  7 días. SHA-256 y no Argon2 como el PIN porque son 256 bits de `secrets`
+  —no se rompen por fuerza bruta— y esto se verifica en cada request.
+  `api/deps.get_claims` distingue por el prefijo `prv_` y arma los mismos
+  claims que un login: **el RBAC no cambia**. Solo `tipo=agente_ia` puede
+  tener token, y el tipo se revalida en cada request.
 - **rol**: nombre (admin, supervisor, cajero, almacenero, ...).
 - **permiso**: código `modulo.accion` (ej. `inventory.contar` |
   `inventory.requerir` | `inventory.ajustar` | `inventory.autorizar_ajuste`

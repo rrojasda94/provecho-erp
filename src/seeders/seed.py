@@ -59,6 +59,12 @@ PERMISOS = [
     ("*", "Acceso total (solo entornos internos)"),
     ("users.gestionar", "Administrar usuarios, roles y permisos"),
     (
+        "organizacion.gestionar",
+        "Administrar grupo, empresas, marcas, licencias de marca, sucursales y "
+        "almacenes — separado de `users.gestionar`: dar de alta un local no es "
+        "administrar usuarios",
+    ),
+    (
         "personas.anonimizar",
         "Anonimizar datos de una persona — derecho de cancelación (Ley 29733)",
     ),

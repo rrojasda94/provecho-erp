@@ -11,11 +11,16 @@ from sqlalchemy.orm import Session
 
 from src.core.database import SessionLocal
 from src.core.tenant import Tenant
+from src.modules.users.application import auth, tokens
+from src.modules.users.application.errors import TokenInvalido
 from src.modules.users.domain import rules
 from src.modules.users.domain.rules import ContextoPermiso  # noqa: F401 — reexport
 from src.modules.users.infrastructure.models import Usuario
 from src.modules.users.infrastructure.repositories import UsuarioRepo
-from src.modules.users.infrastructure.security import decode_access_token
+from src.modules.users.infrastructure.security import (
+    decode_access_token,
+    es_token_agente,
+)
 
 # `ContextoPermiso` queda re-exportado acá: `api.deps` es la única superficie
 # de `users` que otro módulo puede importar (tests/test_arquitectura.py), así
@@ -37,9 +42,26 @@ def get_db() -> Iterator[Session]:
         session.close()
 
 
-def get_claims(creds: HTTPAuthorizationCredentials = Depends(_bearer)) -> dict:
-    """Claims validados del access token. FastAPI cachea la dependencia, así
-    que el token se decodifica una sola vez por request."""
+def get_claims(
+    creds: HTTPAuthorizationCredentials = Depends(_bearer),
+    session: Session = Depends(get_db),
+) -> dict:
+    """Claims validados de la credencial del request. FastAPI cachea la
+    dependencia, así que se resuelve una sola vez por request.
+
+    Dos credenciales, un solo juego de claims: el JWT del login humano se
+    verifica por firma, y el token de una cuenta `agente_ia` (prefijo
+    `prv_`) se busca en BD y se le arman los mismos claims. De acá para
+    abajo —tenant, permisos, auditoría— nada distingue una de la otra.
+    """
+    if es_token_agente(creds.credentials):
+        try:
+            usuario = tokens.autenticar(session, creds.credentials)
+        except TokenInvalido:
+            raise HTTPException(
+                status.HTTP_401_UNAUTHORIZED, "Token inválido o expirado"
+            ) from None
+        return auth.build_claims(session, usuario)
     try:
         return decode_access_token(creds.credentials)
     except jwt.PyJWTError:

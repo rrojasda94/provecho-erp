@@ -58,7 +58,17 @@ TAGS_METADATA = [
     },
     {
         "name": "users-admin",
-        "description": "CRUD de usuarios, roles, permisos y asignaciones (`users.gestionar`).",
+        "description": (
+            "CRUD de usuarios, roles, permisos, asignaciones y tokens de API de "
+            "agentes (`users.gestionar`)."
+        ),
+    },
+    {
+        "name": "organizacion",
+        "description": (
+            "Grupo, empresas, marcas, licencias de marca, sucursales y almacenes "
+            "(`organizacion.gestionar`)."
+        ),
     },
     {
         "name": "gerencia",

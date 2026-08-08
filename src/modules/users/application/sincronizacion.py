@@ -10,6 +10,11 @@ permiso (`sync.leer`), acotada a los usuarios de esa sucursal, y sale
 La organización (grupo/empresa/marca/sucursal/almacén) viaja por necesidad
 de integridad referencial: sin esas filas, `venta` y `stock` no tienen a
 qué apuntar en la base local del hub.
+
+`token_agente` (ADR-029) **no** viaja: es la credencial de un agente contra
+la nube, y quien se autentica en el hub durante un corte es el personal del
+local. Replicarla multiplicaría por sucursal las copias de un secreto que
+solo sirve del otro lado.
 """
 
 from sqlalchemy import Select, or_, select
