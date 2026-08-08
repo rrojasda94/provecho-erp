@@ -48,6 +48,17 @@ updates:
       # `react/display-name` antes de terminar el primer archivo (PR #27).
       - dependency-name: eslint
         versions: ["10.x"]
+      # TanStack Table 9 dejó de exportar `getCoreRowModel` y los otros
+      # `get*RowModel`. El bump entró solo (PR #37) y dejó `main` en rojo un
+      # día: `npm run lint` y `npm test` pasan —los 13 archivos que la usan
+      # importan `type ColumnDef`, que sigue existiendo— y el único que se
+      # cae es `next build`. A diferencia de los dos de arriba, este sí se
+      # puede migrar cuando alguien quiera: es un archivo,
+      # `components/tabla/tabla-datos.tsx`. Se ignora para que no vuelva a
+      # entrar sin que nadie lo haya decidido, no porque no haya dónde
+      # aterrizar.
+      - dependency-name: "@tanstack/react-table"
+        versions: ["9.x"]
     commit-message:
       prefix: "chore(deps)"
 

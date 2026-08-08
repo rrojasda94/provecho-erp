@@ -7,7 +7,20 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Fixed
 
-- **Dos temporales de Word estaban versionados en la raíz** (2026-08-07).
+- **`main` llevaba un día en rojo: TanStack Table 9 entró solo y rompió el
+  build** (2026-08-08). El PR #37 de Dependabot subió `@tanstack/react-table`
+  de `^8.21.3` a `^9.0.0`; la 9 dejó de exportar `getCoreRowModel` y los otros
+  `get*RowModel`, y `next build` se cae con 10 errores en
+  `components/tabla/tabla-datos.tsx`. Se vuelve a `^8.21.3` — `package.json` y
+  `package-lock.json` restaurados exactos al estado previo al bump, sin
+  reinstalar— y se ignora la 9.x en `dependabot.yml`, junto a los otros dos
+  majors que ya estaban ignorados con su razón escrita.
+  - **Lo que asusta no es el bump, es que pasó dos filtros.** `npm run lint`
+    y `npm test` (176 casos) siguen en verde: los 13 archivos que usan la
+    librería importan solo `type ColumnDef`, que en la 9 sigue existiendo.
+    Todo el daño está en un archivo y solo lo ve `next build`.
+  - La migración a la 9 no se descarta, se posterga: es un archivo, y toca
+    hacerla a propósito y no porque un bot la haya mergeado un viernes.
   `~$F1.docx` (el archivo de bloqueo que Word crea al abrir un documento) y
   `~WRL0908.tmp` (su respaldo de autoguardado) entraron en el import inicial
   del repositorio. Son basura de sesión: no describen nada del proyecto y el
