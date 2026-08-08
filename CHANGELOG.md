@@ -5,7 +5,6 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
-<<<<<<< HEAD
 ### Added
 
 - **Token de API para cuentas de agente** (2026-08-08, ADR-029, migración
@@ -62,9 +61,6 @@ Versionado: [SemVer](https://semver.org/lang/es/).
   - Deliberadamente **no** se usa el token de agente para autenticar los
     tests: haría que el suite ejerciera un camino de autenticación que
     ningún humano usa, y obligaría a sembrar un token en cada fixture.
-=======
-### Changed
-
 - **La imagen y el CI corren el mismo Python: 3.14** (2026-08-08). El bump
   del `Dockerfile` a `python:3.14-slim` venía solo: los cuatro jobs que usan
   `actions/setup-python` seguían en 3.12, así que `pytest` nunca tocaba el
@@ -73,7 +69,6 @@ Versionado: [SemVer](https://semver.org/lang/es/).
   dependencia con 3.14 se habría descubierto en producción con `main` en
   verde. `requires-python` ya decía `>=3.12`, así que no hay nada que
   relajar.
->>>>>>> origin/main
 
 ### Fixed
 
