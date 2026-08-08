@@ -10,10 +10,16 @@ Lee primero [CLAUDE.md](CLAUDE.md) — contiene las reglas obligatorias.
 4. `ruff check .` y `pytest` deben pasar. Frontend: `npm run lint` y
    `npm run typecheck` (ESLint no resuelve tipos; `tsc` es lo que atrapa un
    import que ya no existe).
-5. Actualizar `CHANGELOG.md`, `ROADMAP.md` y documentación afectada en el mismo cambio.
+5. Dejar un fragmento en [`changelog.d/`](changelog.d/) —**no** editar
+   `CHANGELOG.md` a mano—, y actualizar `ROADMAP.md` y la documentación
+   afectada en el mismo cambio.
 6. Commits en formato [Conventional Commits](https://www.conventionalcommits.org/es/):
    `feat(inventory): agregar transferencias entre almacenes`.
 7. Pull request; CI debe estar en verde. No se aceptan cambios importantes sin documentación.
+
+`main` está protegida: los seis jobs del CI son obligatorios y la rama tiene
+que estar al día con `main` antes de mergear. No hay "merge igual" — el
+2026-08-07 un PR entró en rojo y dejó `main` rota un día.
 
 ## Reglas de código
 

@@ -51,8 +51,12 @@ su dominio. Bajo acoplamiento, alta cohesión.
 2. Todo cambio lleva **pruebas** y **documentación actualizada** en el mismo cambio.
 3. Explicar decisiones arquitectónicas cuando haya alternativas (ADR en `docs/architecture/adr/`).
 4. El código pasa `ruff` (backend) y `eslint` (frontend) antes de commit.
-5. Commits: **Conventional Commits**. Versionado: **SemVer**. Actualizar `CHANGELOG.md`.
+5. Commits: **Conventional Commits**. Versionado: **SemVer**. El changelog se
+   escribe como fragmento en `changelog.d/` (`<tipo>-<slug>.md`), nunca
+   editando `CHANGELOG.md` a mano — ver `changelog.d/README.md`.
 6. Actualizar `ROADMAP.md` al construir algo nuevo.
+7. `main` está protegida por ruleset: PR obligatorio, los seis jobs del CI en
+   verde y la rama al día con `main`. No existe el merge en rojo.
 
 ## Formato
 

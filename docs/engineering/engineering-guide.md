@@ -84,4 +84,6 @@ infraestructura contra DB. Detalle: [testing.md](testing.md).
 ## Reglas para documentar
 
 Doc y tests se actualizan en el mismo cambio que el comportamiento. Docstrings
-en todo público. `CHANGELOG.md` y `ROADMAP.md` al día. Conventional Commits.
+en todo público. `ROADMAP.md` al día y un fragmento en `changelog.d/` por
+cambio (`CHANGELOG.md` no se edita a mano: lo arma
+`scripts/cortar_version.py` al cortar la versión). Conventional Commits.
