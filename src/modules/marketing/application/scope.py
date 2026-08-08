@@ -13,7 +13,9 @@ from src.core.tenant import Tenant
 from src.modules.marketing.application.errors import NoEncontrado
 from src.modules.marketing.infrastructure.models import (
     Campana,
+    EncuestaPlantilla,
     EncuestaSatisfaccion,
+    EvaluacionAgencia,
     Lead,
     PiezaContenido,
 )
@@ -53,6 +55,26 @@ def exigir_sucursal(session: Session, sucursal_id: uuid.UUID, tenant: Tenant) ->
     tenant.exigir_empresa(sucursal.empresa_id)
     tenant.exigir_sucursal(sucursal.id)
     return sucursal
+
+
+def exigir_plantilla(
+    session: Session, plantilla_id: uuid.UUID, tenant: Tenant
+) -> EncuestaPlantilla:
+    plantilla = session.get(EncuestaPlantilla, plantilla_id)
+    if plantilla is None or plantilla.deleted_at is not None:
+        raise NoEncontrado("plantilla de encuesta no encontrada")
+    tenant.exigir_empresa(plantilla.empresa_id)
+    return plantilla
+
+
+def exigir_evaluacion(
+    session: Session, evaluacion_id: uuid.UUID, tenant: Tenant
+) -> EvaluacionAgencia:
+    evaluacion = session.get(EvaluacionAgencia, evaluacion_id)
+    if evaluacion is None:
+        raise NoEncontrado("evaluación de agencia no encontrada")
+    exigir_campana(session, evaluacion.campana_id, tenant)
+    return evaluacion
 
 
 def exigir_encuesta(

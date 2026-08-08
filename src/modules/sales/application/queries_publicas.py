@@ -464,6 +464,33 @@ def venta_para_encuesta(session: Session, venta_id: uuid.UUID) -> dict | None:
     }
 
 
+def contacto_de_cliente(session: Session, cliente_id: uuid.UUID) -> dict | None:
+    """Nombre y teléfono del cliente, para mandarle algo (hoy: la encuesta de
+    satisfacción de `marketing` por WhatsApp).
+
+    El teléfono sale de `persona` si el cliente es natural y, si no, de
+    `cliente.contacto` — que es el campo tecleado en caja y donde termina el
+    número de un cliente jurídico. Devuelve `None` si el cliente no existe;
+    `telefono` vacío si existe pero no hay a dónde escribirle, que es una
+    respuesta distinta y el llamador la trata distinto.
+    """
+    fila = session.execute(
+        select(Cliente, Persona)
+        .outerjoin(Persona, Persona.id == Cliente.persona_id)
+        .where(Cliente.id == cliente_id, Cliente.deleted_at.is_(None))
+    ).first()
+    if fila is None:
+        return None
+    cliente, persona = fila
+    nombre = (
+        f"{persona.nombres} {persona.apellidos}".strip()
+        if persona is not None
+        else (cliente.razon_social or "")
+    )
+    telefono = (persona.telefono if persona is not None else None) or cliente.contacto
+    return {"id": cliente.id, "nombre": nombre, "telefono": telefono or ""}
+
+
 def total_efectivo_cobrado(
     session: Session, punto_venta_id: uuid.UUID, desde: datetime
 ) -> Decimal:

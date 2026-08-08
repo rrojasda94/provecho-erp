@@ -57,6 +57,7 @@ def registrar_lead(
             "canal": canal,
             "cliente_id": str(cliente_id) if cliente_id else None,
         },
+        session=session,
     )
     return lead
 
@@ -72,4 +73,14 @@ def atribuir_venta(session: Session, lead_id: uuid.UUID, *, venta_id: uuid.UUID)
         raise ReglaNegocio("el lead ya está atribuido a una venta")
     lead.venta_id = venta_id
     session.flush()
+    event_bus.publish(
+        "marketing.lead_atribuido",
+        {
+            "lead_id": str(lead.id),
+            "campana_id": str(lead.campana_id),
+            "venta_id": str(venta_id),
+            "automatica": False,
+        },
+        session=session,
+    )
     return lead
