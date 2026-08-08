@@ -139,6 +139,35 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Fixed
 
+- **Un fetch caído se dibujaba igual que "no hay datos"** (2026-08-07). El
+  patrón `.catch(() => setLista([]))` estaba en cuatro lugares y convirtió un
+  fallo real en algo indiagnosticable desde la pantalla: una venta con pago
+  dividido no aparecía en la pestaña "Cobrados" del PDV, la venta **sí**
+  estaba en la base, y la única pista que daba la UI era una lista vacía —
+  exactamente lo mismo que se ve un día sin ventas.
+  - Clasificador nuevo en `frontend/lib/carga.ts`, sin dependencias y
+    probado con `node --test` (`lib/carga.test.ts`, 7 casos). Lee el status
+    **por forma** y no por `instanceof`, porque el proyecto tiene dos clases
+    de error de API (`ApiError` en el servidor, `ErrorApi` en el navegador) y
+    a un Server Component pueden llegarle las dos. `Falla` guarda además el
+    mensaje del servidor como `detalle`: sin eso, saber qué pasó exigía abrir
+    las herramientas de desarrollo.
+  - **PDV**: mesas, pedidos cobrados y pedidos en cocina muestran un panel de
+    error con el detalle y un botón "Reintentar" que llama a la misma función
+    que hace la carga inicial. El reintento es en sitio a propósito: recargar
+    la página del PDV pierde los borradores abiertos en las pestañas del
+    ticket. El estado vacío ("Todavía no hay pedidos cobrados hoy") queda
+    reservado para respuestas exitosas sin filas.
+  - **Dashboard**: el `opcional()` que devolvía `null` ante cualquier
+    `ApiError` trataba igual "no tienes permiso" y "no se pudo preguntar", y
+    de paso dejaba que un error de red tumbara la página entera (no hay
+    `error.tsx`). Ahora solo el **403** se traga —el servidor contestó y dijo
+    que no—; red, 5xx y 401 salen en `components/shell/aviso-fallo.tsx`, con
+    reintento vía `router.refresh()`. El tablero sigue armándose con los
+    bloques que sí cargaron.
+  - Cuatro cargas del PDV conservan el patrón viejo (carta, medios de pago,
+    POS y caja abierta) — quedan anotadas en ROADMAP → Deuda técnica →
+    Frontend, no se tocaron en este cambio.
 - **Los eventos de `marketing` se despachaban antes del commit**
   (2026-08-08). `campana_lanzada`, `lead_generado` y `encuesta_enviada` se
   publicaban sin `session=`, o sea en el acto, en medio de una transacción

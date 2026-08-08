@@ -141,9 +141,11 @@ Aprendidas a los golpes; cada una costó tiempo:
 ## Estado actual (2026-08-06)
 
 - Dominio y API: **895 casos**, en verde, en CI.
-- Unidad de frontend + contrato: **176 casos** (`npm test`), en CI desde
+- Unidad de frontend + contrato: **183 casos** (`npm test`), en CI desde
   2026-08-06 — el job de frontend hacía solo `lint` y `build`. De esos, 162
-  son de contrato.
+  son de contrato y 7 (2026-08-07, `lib/carga.test.ts`) cubren la
+  clasificación de fallos de carga: que una red caída no se confunda con un
+  403 ni se dibuje como lista vacía.
 - e2e: **7 casos en verde y en CI** (job `e2e`), sobre PDV, sesión y el gate
   de módulo. Los tres puntos de "qué sí justifica un e2e" quedan cubiertos.
   Ver ROADMAP → Frontend.
