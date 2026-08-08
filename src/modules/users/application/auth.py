@@ -17,7 +17,6 @@ from src.modules.users.application.errors import (
 from src.modules.users.domain import rules
 from src.modules.users.infrastructure.models import RefreshToken, Sucursal, Usuario
 from src.modules.users.infrastructure.repositories import (
-    AuditLogRepo,
     RefreshTokenRepo,
     UsuarioRepo,
 )
@@ -28,6 +27,7 @@ from src.modules.users.infrastructure.security import (
     refresh_expira_en,
     verify_pin,
 )
+from src.shared import auditoria
 
 log_seguridad = logger_seguridad()
 
@@ -89,7 +89,6 @@ def _emitir_tokens(session: Session, usuario: Usuario, sesion_id: uuid.UUID) -> 
 
 def login(session: Session, username: str, pin: str, ip: str | None = None) -> dict:
     repo = UsuarioRepo(session)
-    audit = AuditLogRepo(session)
     usuario = repo.get_by_username(username)
 
     # Usuario inexistente: mismo error, sin filtrar existencia (anti-enumeración).
@@ -106,8 +105,8 @@ def login(session: Session, username: str, pin: str, ip: str | None = None) -> d
         if recien_bloqueado:
             usuario.bloqueado_hasta = ahora + rules.DURACION_BLOQUEO
             usuario.intentos_fallidos = 0
-        audit.registrar(
-            usuario_id=usuario.id, entidad="usuario", entidad_id=usuario.id,
+        auditoria.registrar(
+            session, usuario_id=usuario.id, entidad="usuario", entidad_id=usuario.id,
             accion="login_fallido", ip=ip,
         )
         # El `audit_log` deja el rastro legal; el log de seguridad es lo que
@@ -130,8 +129,8 @@ def login(session: Session, username: str, pin: str, ip: str | None = None) -> d
     usuario.intentos_fallidos = 0
     usuario.bloqueado_hasta = None
     tokens = _emitir_tokens(session, usuario, uuid.uuid4())
-    audit.registrar(
-        usuario_id=usuario.id, entidad="usuario", entidad_id=usuario.id,
+    auditoria.registrar(
+        session, usuario_id=usuario.id, entidad="usuario", entidad_id=usuario.id,
         accion="login", ip=ip,
     )
     event_bus.publish("users.sesion_iniciada", {"usuario_id": str(usuario.id)}, session=session)

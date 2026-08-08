@@ -188,11 +188,23 @@ erDiagram
 - **usuario_rol**, **rol_permiso**, **usuario_sucursal** (alcance por sucursal).
 - **refresh_token**: hash, expiración, revocado.
 - **audit_log**: usuario_id, entidad, entidad_id, acción, datos_antes (JSONB),
-  datos_despues (JSONB), sucursal_id, ip, timestamp. Solo inserción.
+  datos_despues (JSONB), **empresa_id** (2026-08-08, nullable), sucursal_id,
+  ip, timestamp. Solo inserción.
   Desde 2026-08-04 cada inserción emite además una línea al logger
   `provecho.auditoria` **con solo metadatos**: la tabla es el rastro legal,
   el log es lo que un colector externo vigila en vivo, y `datos_antes`/
   `datos_despues` pueden traer PII (Ley 29733) que no debe salir del proceso.
+
+  **Transversal desde 2026-08-08** (ADR-031, migración `b3d9f1c2a077`): el
+  modelo se mudó de `users` a `src/shared/models/` y se escribe **solo** por
+  `src.shared.auditoria.registrar`, para que cualquier módulo deje rastro
+  sin importar `users`. Se audita el acto de autoridad —aprobar, autorizar,
+  anular, descontar, pagar, retirar efectivo, anonimizar—, no cada `UPDATE`.
+  `empresa_id`/`sucursal_id` son el alcance de lectura (ADR-004): ambos
+  nullable porque un login o un alta de rol no tienen tenant, y esas filas
+  solo las ve el superusuario. Se lee por `GET /api/v1/auditoria`
+  (`auditoria.leer`, paginado); no hay endpoint de escritura. Índices
+  `ix_audit_log_entidad` (entidad, entidad_id) e `ix_audit_log_ts`.
 - **notificacion** (2026-08-04): usuario_id (destinatario), tipo (código del
   hecho, ej. `sales.pedido_demorado`), nivel (`info` | `aviso` | `urgente` —
   cuánto interrumpe, no qué pasó), titulo, cuerpo, **referencia_tipo /
@@ -917,7 +929,7 @@ Evento `sales.venta_confirmada` → inventory descuenta insumos según receta.
   enviada_por, y desde 2026-08-08 el **estado de la conversación**:
   plantilla_id, pregunta_actual_id, destino (teléfono E.164),
   conversacion_abierta, token_publico (único), fecha_expiracion,
-  mensaje_externo_id, error_envio (ADR-029, §8d). Selectiva — no toda venta
+  mensaje_externo_id, error_envio (ADR-031, §8d). Selectiva — no toda venta
   genera una fila (RN-COM-007); requiere `cliente_id` no nulo y el pedido ya
   entregado. Su disparador es `sales.venta_entregada` (`PROC-OPE-002`);
   Marketing elige a qué venta entregada enviarle encuesta, y al enviarla
@@ -1411,7 +1423,7 @@ Ver [docs/marketing/README.md](../marketing/README.md) y
 pertenece a este módulo.
 
 Implementado 2026-08-01 (migración `e9c3b7412a68`): las 5 primeras
-entidades. Ampliado 2026-08-08 (migración `c1f80b6a2d34`, ADR-029/030) con
+entidades. Ampliado 2026-08-08 (migración `c1f80b6a2d34`, ADR-031/030) con
 el guion de la encuesta, la evaluación de agencia y el acumulado de campaña.
 
 - **campana**: empresa_id, marca_id, nombre (naming, RN-MKT-007), tipo
@@ -1444,7 +1456,7 @@ el guion de la encuesta, la evaluación de agencia y el acumulado de campaña.
   `(campana_id, sucursal_id, fecha)`: reverificar el mismo día corrige la
   fila, no acumula otra.
 
-### Guion de la encuesta (ADR-029)
+### Guion de la encuesta (ADR-031)
 
 - **encuesta_plantilla**: empresa_id, marca_id (opcional), nombre, saludo,
   despedida, activa, creado_por. Única por `(empresa_id, nombre)` y **una

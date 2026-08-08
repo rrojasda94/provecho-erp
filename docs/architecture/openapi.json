@@ -1292,6 +1292,126 @@
         "title": "AsistenciaOut",
         "type": "object"
       },
+      "AuditLogOut": {
+        "properties": {
+          "accion": {
+            "title": "Accion",
+            "type": "string"
+          },
+          "datos_antes": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Datos Antes"
+          },
+          "datos_despues": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Datos Despues"
+          },
+          "empresa_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Empresa Id"
+          },
+          "entidad": {
+            "title": "Entidad",
+            "type": "string"
+          },
+          "entidad_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entidad Id"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "ip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ip"
+          },
+          "sucursal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sucursal Id"
+          },
+          "ts": {
+            "format": "date-time",
+            "title": "Ts",
+            "type": "string"
+          },
+          "usuario_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usuario Id"
+          }
+        },
+        "required": [
+          "id",
+          "ts",
+          "usuario_id",
+          "entidad",
+          "entidad_id",
+          "accion",
+          "datos_antes",
+          "datos_despues",
+          "empresa_id",
+          "sucursal_id",
+          "ip"
+        ],
+        "title": "AuditLogOut",
+        "type": "object"
+      },
       "AutorizacionIn": {
         "description": "El supervisor se identifica en el terminal del cajero para autorizar\nUNA acción (RN-AUD-005). No abre sesión: no sirve para llamar a\ncualquier endpoint ni se refresca.",
         "properties": {
@@ -8849,6 +8969,37 @@
           "page_size"
         ],
         "title": "Pagina[AsistenciaOut]",
+        "type": "object"
+      },
+      "Pagina_AuditLogOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AuditLogOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "Pagina[AuditLogOut]",
         "type": "object"
       },
       "Pagina_CampanaOut_": {
@@ -19337,6 +19488,176 @@
         "summary": "Listar Almacenes",
         "tags": [
           "users"
+        ]
+      }
+    },
+    "/api/v1/auditoria": {
+      "get": {
+        "description": "Rastro de cambios, del más reciente al más viejo.\n\nEl alcance sale del JWT (ADR-004): se ven las filas de la empresa del\nusuario y las de sus sucursales. Las filas sin tenant —login, alta de\nrol, cambios globales— solo las ve el superusuario (permiso `*`): no hay\nforma de atribuirlas a una empresa sin adivinar, y adivinar acá es\nmostrarle a una empresa lo que pasó en otra. El superusuario ve todo\naunque tenga sucursales asignadas: si no, el rastro de RBAC y de logins\nno lo podría leer nadie.",
+        "operationId": "listar_api_v1_auditoria_get",
+        "parameters": [
+          {
+            "description": "Tabla auditada, ej. `venta`",
+            "in": "query",
+            "name": "entidad",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Tabla auditada, ej. `venta`",
+              "title": "Entidad"
+            }
+          },
+          {
+            "in": "query",
+            "name": "entidad_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Entidad Id"
+            }
+          },
+          {
+            "description": "Quién hizo el cambio",
+            "in": "query",
+            "name": "usuario_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Quién hizo el cambio",
+              "title": "Usuario Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "accion",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Accion"
+            }
+          },
+          {
+            "in": "query",
+            "name": "desde",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Desde"
+            }
+          },
+          {
+            "in": "query",
+            "name": "hasta",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Hasta"
+            }
+          },
+          {
+            "description": "Página, empezando en 1",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "description": "Página, empezando en 1",
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Filas por página (máx. 200)",
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Filas por página (máx. 200)",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pagina_AuditLogOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar",
+        "tags": [
+          "auditoria"
         ]
       }
     },
@@ -33785,6 +34106,10 @@
     {
       "description": "Campañas, calendario de contenido con adjuntos, leads con atribución a la venta, evaluación de agencia y encuesta de satisfacción por nodos (WhatsApp / enlace público).",
       "name": "marketing"
+    },
+    {
+      "description": "Rastro inmutable de cambios (`audit_log`, ADR-031): quién, qué, cuándo, dónde y valor anterior/nuevo. Solo lectura.",
+      "name": "auditoria"
     },
     {
       "description": "Agregado gerencial de solo lectura: ventas del día, stock crítico, caja.",

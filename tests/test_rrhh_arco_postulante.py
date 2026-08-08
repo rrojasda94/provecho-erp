@@ -17,7 +17,8 @@ from src.core.database import Base
 from src.modules.rrhh.application.privacidad import purgar_postulantes_vencidos
 from src.modules.rrhh.infrastructure.models import Postulante
 from src.modules.users.api.deps import get_db
-from src.modules.users.infrastructure.models import AuditLog, Empresa
+from src.modules.users.infrastructure.models import Empresa
+from src.shared.models import AuditLog
 
 
 @pytest.fixture()

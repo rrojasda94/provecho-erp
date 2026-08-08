@@ -207,6 +207,15 @@ def test_flujo_oc_completo_actualiza_stock_y_costo(env):
     assert emit.status_code == 200
     assert emit.json()["estado"] == "emitida"
 
+    # Comprometer plata con un proveedor deja rastro (ADR-031).
+    from src.shared.models import AuditLog
+    with TestSession() as s:
+        rastro = s.scalar(
+            select(AuditLog).where(AuditLog.entidad_id == uuid.UUID(oc_id))
+        )
+    assert rastro.accion == "emitir"
+    assert rastro.datos_despues["total"] == "1000.00"
+
     # ítem id: solo hay uno, lo leemos de la BD directo (no hay GET de items).
     from src.modules.purchases.infrastructure.models import OrdenCompraItem
     with TestSession() as s:
