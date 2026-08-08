@@ -16,6 +16,13 @@ updates:
       backend-menores:
         applies-to: version-updates
         update-types: [minor, patch]
+      # Los majors van juntos y aparte de los menores: un major no es un bump,
+      # es trabajo propio (ver CONTRIBUTING → Dependencias). Mezclado con los
+      # menores se revisa con la misma vara que ellos, que es como el PR #37
+      # entró sin migrar nada.
+      backend-majores:
+        applies-to: version-updates
+        update-types: [major]
     commit-message:
       prefix: "chore(deps)"
 
@@ -29,6 +36,9 @@ updates:
       frontend-menores:
         applies-to: version-updates
         update-types: [minor, patch]
+      frontend-majores:
+        applies-to: version-updates
+        update-types: [major]
     # Majors que hoy no tienen dónde aterrizar. Los dos primeros no son estar
     # atrasado: no existe versión publicada de la cadena de
     # `eslint-config-next` que los acepte, y cada uno se destraba solo cuando
@@ -62,16 +72,30 @@ updates:
     commit-message:
       prefix: "chore(deps)"
 
+  # Agrupadas por la misma razón que las de código: sin grupo, cada action
+  # llega en su propio PR (los #21, #22, #24, #25, #35, #36 y #38 fueron siete
+  # PRs para siete líneas de YAML). El ruido hace que se mergeen sin mirar.
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: monthly
+    groups:
+      actions:
+        applies-to: version-updates
+        patterns: ["*"]
     commit-message:
       prefix: "chore(ci)"
 
+  # La versión de la imagen la vigila `tests/test_repo_coherencia.py`: subirla
+  # sin subir los `python-version:` de `ci.yml` deja al suite probando un
+  # intérprete que la imagen no ejecuta (pasó en el PR #49).
   - package-ecosystem: docker
     directory: /
     schedule:
       interval: monthly
+    groups:
+      imagenes:
+        applies-to: version-updates
+        patterns: ["*"]
     commit-message:
       prefix: "chore(docker)"
