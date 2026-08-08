@@ -20,13 +20,37 @@ Server Components, dentro del contenedor `web`) — usa el nombre del
 servicio (`http://api:8000`), porque `web` y `api` son contenedores
 distintos sin ningún `localhost` en común.
 
-## Base de datos: Postgres en Supabase (desarrollo)
+## Base de datos: contenedor `db` del docker-compose (desarrollo)
 
-Desde 2026-07-20 el `DATABASE_URL` de desarrollo apunta a un proyecto
-**Supabase** (Postgres gestionado) en vez del contenedor `db` local —
-decisión del usuario para tener la BD visualizable (Table Editor) y
-disponible en línea de cara al despliegue futuro. Nada del código cambia:
-Supabase es Postgres real, Alembic corre igual.
+Desde **2026-08-08** el `DATABASE_URL` de desarrollo apunta al Postgres del
+`docker-compose.yml`. Entre 2026-07-20 y esa fecha apuntaba a un proyecto
+**Supabase** (Postgres gestionado, elegido por su Table Editor y por estar
+en línea); se revirtió por **latencia**: cada consulta salía a internet y
+tanto el suite de pruebas como el trabajo diario iban lentos. Nada del
+código cambia — ambos son Postgres real y Alembic corre igual.
+
+**Dos vistas de la misma base, y por eso dos URLs:**
+
+| Quién se conecta | Host:puerto |
+|---|---|
+| Host — alembic, pytest, uvicorn suelto | `localhost:5433` |
+| Contenedores — api, worker, beat | `db:5432` |
+
+El `.env` guarda **la del host**; `docker-compose.yml` inyecta la interna a
+los contenedores con el bloque `x-conexiones-internas` (`environment` gana
+sobre `env_file`). Así un solo `.env` sirve para las dos y no hay que
+editarlo al alternar entre correr en Docker y correr suelto. Mismo criterio
+para Redis (`localhost:6379` vs `redis:6379`).
+
+Puerto de host **5433** y no 5432: el 5432 lo ocupa la plataforma de
+Charlie's Pizzas.
+
+### Volver a Supabase (o a cualquier Postgres externo)
+
+1. Poner su connection string en `DATABASE_URL` del `.env` (plantilla en
+   `.env.example`; la contraseña real nunca se commitea).
+2. Comentar el bloque `x-conexiones-internas` de `docker-compose.yml`, o los
+   contenedores seguirán yendo al `db` local.
 
 **Límite explícito — no usar Supabase Auth ni RLS todavía:**
 `users` (JWT + PIN + Argon2id + RBAC) sigue siendo la única fuente de
@@ -37,17 +61,20 @@ permisos compitiendo. Si en el futuro se evalúa RLS como refuerzo, es una
 decisión aparte que actualiza ADR-004, no una consecuencia automática de
 usar Supabase como hosting.
 
-Connection string vive solo en `.env` (nunca en el repo — ver
-`.env.example` para el formato, con el contenedor `db` local como
-default documentado).
+Connection string de cualquier BD externa vive solo en `.env`, nunca en el
+repo (ver `.env.example` para el formato).
 
-## Docker local (contenedor `db`) — sigue disponible
+### Levantar la base local desde cero
 
-El servicio `db` de `docker-compose.yml` sigue existiendo para trabajar
-sin conexión a internet o en CI; puerto de host **5433** (el 5432 local
-lo ocupa la plataforma de Charlie's Pizzas — ver comentario en
-`docker-compose.yml`). Cambiar `DATABASE_URL` en `.env` alterna entre
-Supabase y el contenedor local.
+```bash
+docker compose up -d db redis
+alembic upgrade head
+python -m src.seeders.seed
+```
+
+El seeder es idempotente y deja la organización del Grupo Majambo más el
+usuario `admin` / PIN `123456`. Los datos de desarrollo se regeneran así:
+no se migran a mano entre bases.
 
 ## Entornos
 

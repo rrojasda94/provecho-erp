@@ -23,7 +23,15 @@ y soporta agentes de IA y humanos para toma de pedidos.
 ```bash
 cp .env.example .env
 docker compose up --build
+docker compose exec api alembic upgrade head
+docker compose exec api python -m src.seeders.seed
 ```
+
+> La base de desarrollo es el contenedor `db` (Postgres 16). El `.env` guarda
+> la URL vista desde el **host** (`localhost:5433`) para alembic, pytest y un
+> uvicorn suelto; a los contenedores el compose les inyecta `db:5432`. Detalle
+> y cómo apuntar a un Postgres externo en
+> [devops.md](docs/engineering/devops.md).
 
 > `docker-compose.yml` es **solo desarrollo** (monta el código, `--reload`,
 > Postgres con contraseña de juguete). Para servidor:

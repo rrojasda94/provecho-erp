@@ -36,6 +36,25 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Changed
 
+- **La base de desarrollo pasó de Supabase al Postgres del `docker-compose`**
+  (2026-08-08). Cada consulta a Supabase costaba ~130 ms de ida y vuelta —
+  distancia, no trabajo de base: `SELECT 1` tardaba lo mismo que contar
+  usuarios. Como todo request autenticado consulta permisos, una pantalla
+  típica se iba a 2-3 segundos de puro viaje de red. En local esa latencia
+  baja al orden del milisegundo.
+  - `.env` guarda ahora la URL vista **desde el host** (`localhost:5433`,
+    porque el 5432 lo ocupa Charlie's), que es la que usan alembic, pytest y
+    un uvicorn suelto. Los contenedores ven otros nombres (`db:5432`,
+    `redis:6379`), así que `docker-compose.yml` se los inyecta con el bloque
+    `x-conexiones-internas` — `environment` gana sobre `env_file`. Un solo
+    `.env` sirve a los dos y no hay que editarlo al alternar.
+  - Costo aceptado: los datos de desarrollo dejan de ser compartidos y de
+    verse en el Table Editor de Supabase. Se regeneran con
+    `alembic upgrade head` + `python -m src.seeders.seed` (idempotente).
+    Volver a Supabase son dos pasos, documentados en
+    `docs/engineering/devops.md`.
+  - Producción no cambia: `docker-compose.prod.yml` sigue sin servicio de
+    base de datos y espera una gestionada por `DATABASE_URL`.
 - **`F1.docx` pasó de la raíz a `docs/foundation/`** (2026-08-07). Es el brief
   original del ERP —el dictado del que salieron `vision.md`, `glossary.md` y
   `business-philosophy.md`— y estaba suelto en la raíz sin que ningún
