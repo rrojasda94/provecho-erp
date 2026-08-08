@@ -16,6 +16,9 @@ import { defineConfig, devices } from "@playwright/test";
  * una prueba que abre y cierra caja deja rastro, y ese rastro no puede caer
  * en los datos con los que alguien está trabajando.
  */
+// El puerto de la API del suite. Fijo salvo que la máquina ya lo tenga
+// tomado por otro proyecto — `E2E_PUERTO_API` lo mueve sin tocar el código.
+const PUERTO_API = process.env.E2E_PUERTO_API ?? "8100";
 // Escape para iterar en local contra servidores ya levantados a mano.
 const REUSAR = !!process.env.E2E_REUSAR;
 
@@ -60,7 +63,7 @@ export default defineConfig({
   webServer: [
     {
       command: "node e2e/servidor-api.mjs",
-      url: "http://127.0.0.1:8100/health",
+      url: `http://127.0.0.1:${PUERTO_API}/health`,
       // **Nunca reusar**: una API viva de la corrida anterior apunta a la
       // base que `globalSetup` acaba de borrar, y la suite corre contra un
       // esquema vacío dando errores que no tienen nada que ver con el

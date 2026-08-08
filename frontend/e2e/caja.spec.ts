@@ -140,4 +140,54 @@ test.describe.serial("Flujo del dinero", () => {
       timeout: 15_000,
     });
   });
+
+  test("los campos de caja se encuentran por su nombre accesible", async ({
+    page,
+  }) => {
+    // El resto de este archivo maneja los diálogos por `data-testid`, que es
+    // un atributo nuestro: existe aunque el campo no tenga nombre para un
+    // lector de pantalla. Por eso nadie vio que estos `<input>` tenían solo
+    // `placeholder` —que desaparece al escribir y no es nombre accesible—
+    // hasta que un agente que navega por el árbol de accesibilidad no
+    // encontró el PIN y no pudo cerrar la caja. Esta prueba busca por
+    // etiqueta a propósito: falla si el nombre se pierde otra vez.
+    //
+    // Entra con la caja **abierta** —la dejó así la prueba anterior— y la
+    // cierra, que es el orden en que este archivo se pasa el estado.
+    await ingresar(page);
+    await page.goto("/pdv");
+
+    await page.getByTestId("estado-caja").click();
+    await expect(dialogo(page).getByText("Cierre de caja")).toBeVisible();
+
+    await expect(dialogo(page).getByLabel("A dónde va el efectivo")).toBeVisible();
+    await expect(dialogo(page).getByLabel("Usuario de quien recibe")).toBeVisible();
+    await expect(dialogo(page).getByLabel("PIN de quien recibe")).toBeVisible();
+    await expect(
+      dialogo(page).getByLabel("Si hay descuadre, a quién se le atribuye"),
+    ).toBeVisible();
+
+    // Cerrar por etiqueta y no por `data-testid`: así la prueba no solo mira
+    // que el nombre exista, sino que alcanza para operar la caja con él.
+    await dialogo(page).getByTestId(/^lote-/).first().fill("0");
+    await dialogo(page)
+      .getByLabel("A dónde va el efectivo")
+      .selectOption("local_caja_fuerte");
+    await dialogo(page).getByLabel("Usuario de quien recibe").fill(ENCARGADO.usuario);
+    await dialogo(page).getByLabel("PIN de quien recibe").fill(ENCARGADO.pin);
+    await dialogo(page).getByRole("button", { name: "Cerrar caja" }).click();
+    await expect(page.getByTestId("estado-caja")).toContainText("Caja cerrada", {
+      timeout: 15_000,
+    });
+
+    // Con la caja cerrada el PDV vuelve a exigir apertura: es el único
+    // momento en que ese diálogo se puede inspeccionar.
+    await page.reload();
+    await expect(dialogo(page).getByText("Apertura de caja")).toBeVisible();
+    await expect(
+      dialogo(page).getByLabel("El encargado declara entregar"),
+    ).toBeVisible();
+    await expect(dialogo(page).getByLabel("Usuario del encargado")).toBeVisible();
+    await expect(dialogo(page).getByLabel("PIN del encargado")).toBeVisible();
+  });
 });
