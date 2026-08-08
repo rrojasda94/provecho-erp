@@ -3,7 +3,22 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.1.0/).
 Versionado: [SemVer](https://semver.org/lang/es/).
 
+Lo que todavía no se publicó **no se escribe acá**: cada cambio deja su
+archivo en [`changelog.d/`](changelog.d/) y `python scripts/cortar_version.py`
+los junta en una sección nueva al cortar la versión. Dos ramas en paralelo
+editando este archivo chocaban siempre — escribían en la misma línea.
+
 ## [Unreleased]
+
+Ver [`changelog.d/`](changelog.d/).
+
+## [0.2.0] - 2026-08-08
+
+Primera versión **etiquetada** (el `0.1.0` de abajo se escribió al arrancar y
+nunca se llegó a taggear). Recoge todo lo construido sobre el scaffold: los
+ocho módulos, el PDV, el ciclo de caja, la facturación electrónica, el modo
+offline, el frontend y la infraestructura de despliegue. El ERP todavía no
+opera en producción, de ahí el `0.x`.
 
 ### Added
 

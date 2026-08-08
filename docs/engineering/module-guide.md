@@ -105,7 +105,7 @@ en el `layout.tsx` del módulo. El grid no es control de acceso.
 - `tests/test_<modulo>.py` en el mismo commit que el comportamiento.
   Dominio aislado; infraestructura contra base.
 - `ruff check src tests` y `eslint` en verde.
-- `CHANGELOG.md` (Unreleased) y `ROADMAP.md` (fila del módulo + lo diferido
+- Fragmento en `changelog.d/` y `ROADMAP.md` (fila del módulo + lo diferido
   en Deuda técnica) actualizados en el mismo cambio.
 - `docs/product/modules.md` apunta al README del módulo nuevo.
 
