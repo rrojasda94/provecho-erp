@@ -188,11 +188,23 @@ erDiagram
 - **usuario_rol**, **rol_permiso**, **usuario_sucursal** (alcance por sucursal).
 - **refresh_token**: hash, expiración, revocado.
 - **audit_log**: usuario_id, entidad, entidad_id, acción, datos_antes (JSONB),
-  datos_despues (JSONB), sucursal_id, ip, timestamp. Solo inserción.
+  datos_despues (JSONB), **empresa_id** (2026-08-08, nullable), sucursal_id,
+  ip, timestamp. Solo inserción.
   Desde 2026-08-04 cada inserción emite además una línea al logger
   `provecho.auditoria` **con solo metadatos**: la tabla es el rastro legal,
   el log es lo que un colector externo vigila en vivo, y `datos_antes`/
   `datos_despues` pueden traer PII (Ley 29733) que no debe salir del proceso.
+
+  **Transversal desde 2026-08-08** (ADR-029, migración `b3d9f1c2a077`): el
+  modelo se mudó de `users` a `src/shared/models/` y se escribe **solo** por
+  `src.shared.auditoria.registrar`, para que cualquier módulo deje rastro
+  sin importar `users`. Se audita el acto de autoridad —aprobar, autorizar,
+  anular, descontar, pagar, retirar efectivo, anonimizar—, no cada `UPDATE`.
+  `empresa_id`/`sucursal_id` son el alcance de lectura (ADR-004): ambos
+  nullable porque un login o un alta de rol no tienen tenant, y esas filas
+  solo las ve el superusuario. Se lee por `GET /api/v1/auditoria`
+  (`auditoria.leer`, paginado); no hay endpoint de escritura. Índices
+  `ix_audit_log_entidad` (entidad, entidad_id) e `ix_audit_log_ts`.
 - **notificacion** (2026-08-04): usuario_id (destinatario), tipo (código del
   hecho, ej. `sales.pedido_demorado`), nivel (`info` | `aviso` | `urgente` —
   cuánto interrumpe, no qué pasó), titulo, cuerpo, **referencia_tipo /

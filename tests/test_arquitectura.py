@@ -48,10 +48,9 @@ _EXCEPCIONES_CRUZADAS = {
     # `precios.py` lee `Categoria` de inventory para resolver la carta por
     # categoría (deuda anterior a este test, no introducida acá).
     "sales": ("users.application", "inventory.infrastructure.models.categoria"),
-    # `privacidad.anonimizar_postulante` reusa el mismo candado de PIN que
-    # `personas.anonimizar` (ADR-011): mismo custodio, misma verificación,
-    # otra tabla. Pide el mismo contrato público que falta arriba.
-    "rrhh": ("users.infrastructure.repositories",),
+    # `rrhh` salió de esta lista el 2026-08-08: entraba a
+    # `users.infrastructure.repositories` solo por `AuditLogRepo`, que ahora
+    # es `src.shared.auditoria` (ADR-029).
 }
 
 

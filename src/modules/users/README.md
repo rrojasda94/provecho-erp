@@ -4,13 +4,15 @@
 
 Autenticar personas y agentes de IA, y autorizar cada acción según la cadena:
 Usuario → Rol → Permisos → Acciones → Restricciones → Sucursales → Empresa → Datos.
-Provee el contexto de tenant a todos los demás módulos y la auditoría central.
+Provee el contexto de tenant a todos los demás módulos. La auditoría
+dejó de ser suya: `audit_log` es transversal y vive en `src/shared`
+(ADR-029), aunque `users` siga siendo su mayor escritor.
 
 ## Entidades
 
 `usuario` (username, pin_hash Argon2id, tipo humano|agente_ia), `rol`, `permiso`
 (código `modulo.accion` + restricciones), `usuario_rol`, `rol_permiso`,
-`usuario_sucursal`, `refresh_token`, `audit_log`. `persona` (party model,
+`usuario_sucursal`, `refresh_token`. `persona` (party model,
 `version` para lock optimista — ver Estado abajo).
 Incluye además la organización: `grupo`, `empresa`, `marca`, `sucursal`, `almacen`.
 Detalle en `docs/architecture/data-model.md` (§1, §2).
@@ -39,7 +41,9 @@ Detalle en `docs/architecture/data-model.md` (§1, §2).
   parámetro sea de `users`.
 - Asignar usuario a sucursales (alcance).
 - Consultar permisos efectivos de un usuario.
-- Registrar entrada en `audit_log` (consumido por todos los módulos).
+- Dejar rastro de los actos de autoridad (login fallido, alta de usuario,
+  asignación de rol/permiso, elevación de PIN, anonimización) llamando a
+  `src.shared.auditoria.registrar` — la tabla ya no es de este módulo.
 
 ## Contrato API (v1)
 

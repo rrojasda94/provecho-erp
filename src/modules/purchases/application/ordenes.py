@@ -32,7 +32,7 @@ from src.modules.purchases.infrastructure.repositories import (
     RecepcionCompraRepo,
 )
 from src.modules.users.infrastructure.models import Almacen
-from src.shared import aprobaciones
+from src.shared import aprobaciones, auditoria
 
 
 def _construir_items(session: Session, items: list[dict]) -> tuple[list[OrdenCompraItem], Decimal]:
@@ -138,9 +138,25 @@ def emitir_orden_compra(
             f"total {orden.total} supera el umbral {umbral}; "
             "requiere permiso purchases.aprobar"
         )
+    estado_previo = orden.estado
     orden.estado = "emitida"
     orden.emitido_por = actor_id
     orden.fecha_emision = datetime.now()
+    auditoria.registrar(
+        session,
+        usuario_id=actor_id,
+        entidad="orden_compra",
+        entidad_id=orden.id,
+        accion="emitir",
+        datos_antes={"estado": estado_previo},
+        datos_despues={
+            "estado": "emitida",
+            "total": str(orden.total),
+            "umbral": str(umbral),
+            "proveedor_id": str(orden.proveedor_id),
+        },
+        empresa_id=proveedor.empresa_id,
+    )
     event_bus.publish(
         "purchases.oc_emitida",
         {

@@ -43,7 +43,7 @@ Registro de lo construido y lo pendiente. Actualizar en cada cambio relevante.
 | Integraciones Google / Meta | ⬜ | |
 | Agentes IA para pedidos | ⬜ | |
 | Notificaciones | ⬜ | Celery + canales por definir |
-| Auditoría (audit_log) | ⬜ | Especificada en data-model |
+| Auditoría (audit_log) | ✅ 2026-08-08 | Transversal (ADR-029): `src/shared/auditoria.py` es el único escritor, `GET /api/v1/auditoria` (permiso `auditoria.leer`) el lector. Cinco módulos nuevos dejan rastro; `empresa_id` + índices en migración `b3d9f1c2a077`. Pendiente la purga por antigüedad (ver Deuda técnica → Protección de datos) |
 | Endurecimiento de producción (rate limit, secretos, HTTPS, cabeceras) | 🔶 base ✅ 2026-07-26 | Rate limit por IP en login/refresh (Redis, fail-open), validación de config que aborta el arranque en `production` con valores de desarrollo, CORS + `TrustedHost` + cabeceras de seguridad + HSTS, `/docs` cerrado en producción, uvicorn `--proxy-headers`. Runbook de rotación de credenciales y custodia de `.env` en `docs/engineering/devops.md`. Pendiente: ver Deuda técnica → Seguridad. |
 | App Android (15+) | ⬜ | **Decidido (ADR-013): PWA/responsive, no app nativa** — Next.js + Tailwind + Base UI es 100% web, sin base de código separada; debe hablar con el hub local de sucursal igual que web y PC, ver ADR-009 |
 | Arquitectura frontend (Tailwind, shadcn/ui, shell estilo Odoo) | ✅ spec 2026-07-27 | ADR-013 (revisado): Tailwind sobre los tokens de marca existentes (`tailwind.config.ts` → `var(--color-*)`, sin hex mágico); **shadcn/ui** (componentes copiados y editables, corre sobre Base UI, no Radix) para overlays/combobox/dialog y catálogo base — token set semántico + `--radius` único, mejor ajuste para editar color/forma por marca rápido que construir a mano; home de apps + sidebar por módulo estilo Odoo; grid y rutas filtrados por `permisos` de `GET /users/me` (ya existente, sin cambio de backend), guard real server-side en cada `layout.tsx` de módulo — el filtro del grid es solo UX. Sin librería de estado global (YAGNI). Playwright para e2e de flujos críticos: **7 casos en verde y en CI desde 2026-08-06** (flujo del dinero, sesión y gate de módulo por permiso), ver Deuda técnica → Frontend. `docs/prompts/frontend.md` actualizado con las reglas técnicas. Sin implementación de código todavía. |
@@ -246,6 +246,20 @@ Registro vivo de deuda técnica declarada al cerrar cada slice — para que no
 se olvide. Marcar ✅ al resolverse en el slice indicado.
 
 ### Transversal
+- ✅ 2026-08-08 **`audit_log` transversal de verdad** (ADR-029). La tabla
+  declaraba "consumido por todos los módulos" y el código decía otra cosa:
+  el único escritor era `AuditLogRepo` en `users`, `rrhh` lo alcanzaba
+  importando repositorios ajenos —una excepción declarada en
+  `test_arquitectura.py`— y los actos que un auditor viene a revisar
+  (anular una venta, aprobar un ajuste, emitir una OC, ejecutar un pago,
+  sacar efectivo del cajón) no dejaban rastro. Ahora el modelo vive en
+  `src/shared/models/`, se escribe solo por `src.shared.auditoria.registrar`
+  —en la misma transacción que el cambio auditado— y se lee por
+  `GET /api/v1/auditoria` (paginado, filtrable, sin `POST`). Se descartó la
+  captura automática por evento de SQLAlchemy: el actor y la IP no están en
+  la sesión y un rastro de cada `UPDATE` no lo lee nadie (ADR-029 → punto 2).
+  `rrhh` salió de `_EXCEPCIONES_CRUZADAS`: la lista encogió, que es la única
+  dirección permitida.
 - **Un módulo se activa a mano en siete lugares** (2026-08-03). La estructura
   interna es replicable —los 8 módulos tienen la misma forma— pero no hay
   manifiesto por módulo ni autodescubrimiento: router y tag OpenAPI y
@@ -915,9 +929,10 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
   arrastra al publicador ni impide que corran los demás. Se agregó el test
   que faltaba para congelarlo
   (`test_un_listener_que_revienta_no_arrastra_al_publicador`).
-- ✅ 2026-08-04 **Flujo `auditoria` con contenido**: `AuditLogRepo.registrar`
-  emite además al logger `provecho.auditoria`. No es duplicar por gusto: la
-  tabla es el rastro legal (consultable, con su retención) y el log es lo
+- ✅ 2026-08-04 **Flujo `auditoria` con contenido**: cada registro de
+  auditoría emite además al logger `provecho.auditoria` (desde 2026-08-08
+  lo hace `src.shared.auditoria.registrar`, antes `AuditLogRepo`). No es
+  duplicar por gusto: la tabla es el rastro legal (consultable, con su retención) y el log es lo
   que un colector externo puede vigilar en vivo — si alguien borrara la
   fila, la línea ya salió del proceso. **Solo metadatos**: `datos_antes`/
   `datos_despues` pueden traer PII (Ley 29733) y ese detalle se queda en la
