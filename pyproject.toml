@@ -28,6 +28,9 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",
+    # El suite es CPU-bound (cada test arma su esquema, su seed y su app) y
+    # los tests no comparten estado: reparte entre núcleos.
+    "pytest-xdist>=3.6",
     "ruff>=0.6",
 ]
 # Solo el servidor que corre el cron de backups necesita esto — la imagen
@@ -69,3 +72,7 @@ max-complexity = 10
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+# `loadfile` y no el reparto por test: varios archivos tocan estado de módulo
+# (el corta-circuito del rate limit, la config de Celery) y así cada archivo
+# vive entero en un proceso. Para depurar en serie: `pytest -n0`.
+addopts = "-n auto --dist loadfile"

@@ -20,5 +20,25 @@ class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=NAMING_CONVENTION)
 
 
-engine = create_engine(settings.database_url, pool_pre_ping=True)
+#: Segundos que se espera a que Postgres acepte la conexión. Sin límite, un
+#: servidor que deja de responder —que no rechaza: acepta el TCP y se queda
+#: callado— clava el request para siempre en `psycopg.wait_conn`, y el ERP no
+#: da error sino que se queda mudo. En caja, mudo es peor que roto.
+CONNECT_TIMEOUT_SEGUNDOS = 5
+
+
+def connect_args(url: str) -> dict:
+    """`connect_timeout` es parámetro de libpq: solo va en Postgres.
+
+    El `e2e` levanta la API contra un SQLite desechable y su driver no
+    entiende la opción — pasársela revienta el arranque.
+    """
+    return {"connect_timeout": CONNECT_TIMEOUT_SEGUNDOS} if url.startswith("postgresql") else {}
+
+
+engine = create_engine(
+    settings.database_url,
+    pool_pre_ping=True,
+    connect_args=connect_args(settings.database_url),
+)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
