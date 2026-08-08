@@ -246,6 +246,45 @@ Registro vivo de deuda técnica declarada al cerrar cada slice — para que no
 se olvide. Marcar ✅ al resolverse en el slice indicado.
 
 ### Transversal
+- **Falta `statement_timeout`: el timeout de conexión no cubre la consulta**
+  (2026-08-08). `connect_timeout: 5` ya está (CHANGELOG 2026-08-08) y tapa el
+  caso de no poder conectar, pero un Postgres que **acepta la conexión y
+  después se traba** —lock ajeno, consulta pesada, disco al límite— sigue
+  clavando el request sin límite: `pool_pre_ping` solo hace un `SELECT 1` al
+  sacar la conexión del pool, no vigila la consulta real. Arreglo:
+  `connect_args={"options": "-c statement_timeout=…"}` en el mismo
+  `connect_args()` de `src/core/database.py`, con el número decidido a
+  conciencia — un reporte gerencial legítimamente tarda más que un cobro, así
+  que probablemente sean dos engines o un `SET LOCAL` por caso. No se hizo
+  junto con `connect_timeout` porque ese era una cota obvia y este exige
+  elegir un número que puede cortar consultas buenas.
+- **Los barridos de Celery abren la sesión de producción en los tests**
+  (2026-08-08). `inventory/application/tasks.py`, `sales/application/tasks.py`
+  y `rrhh/purga.py` llaman `SessionLocal()` directo, y `test_lotes`,
+  `test_conteos`, `test_inventory` y `test_offline_hub` los ejercitan sin
+  parchearlo siempre: cada uno intenta una conexión real. Ya no cuelga
+  —`connect_timeout` lo corta en 5 s— pero son 5 s regalados por test y, con
+  la base de desarrollo levantada, el barrido corre **contra ella**. El
+  arreglo es el mismo que se le hizo a los listeners (`_listeners_sin_base_real`
+  en `tests/conftest.py`): sumar estos módulos a la lista y que cada test
+  parchee el suyo. No se hizo en el mismo cambio porque son cuatro archivos de
+  test a revisar uno por uno, no una línea de conftest.
+- **Cada test rearma el esquema, el seeder y la app desde cero** (2026-08-08).
+  44 de los 58 archivos de test copiaron el mismo fixture `env` —
+  `create_engine("sqlite://")` + `create_all` de las 99 tablas + `seed(s)` +
+  `create_app()`— y **ninguno declara `scope=`**. Costo medido por test: 65 ms
+  el esquema, ~112 ms el seeder y ~200 ms `create_app()`, que hace a FastAPI
+  reanalizar la firma de todas las rutas (49.005 llamadas a `get_dependant` en
+  un solo archivo de 22 tests). Es la mayor parte de lo que queda: el trabajo
+  real del test es la minoría. Ya se atacó lo barato (Argon2id de prueba,
+  Redis en memoria, `pytest-xdist`, ver CHANGELOG 2026-08-08) y con eso
+  alcanza por ahora. Cuando vuelva a molestar, en este orden: **(a)**
+  `create_app()` una sola vez por sesión con `dependency_overrides[get_db]`
+  por test —quita el ~30% y es un fixture compartido, no un rediseño—; **(b)**
+  esquema + seed una sola vez y cada test dentro de una transacción con
+  `SAVEPOINT` que se revierte al terminar, que es el cambio grande porque
+  obliga a revisar los tests que hacen `commit()` a mano. No hacer (b) antes
+  de (a): puede que con (a) ya no haga falta.
 - **Un módulo se activa a mano en siete lugares** (2026-08-03). La estructura
   interna es replicable —los 8 módulos tienen la misma forma— pero no hay
   manifiesto por módulo ni autodescubrimiento: router y tag OpenAPI y

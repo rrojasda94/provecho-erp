@@ -61,8 +61,69 @@ Versionado: [SemVer](https://semver.org/lang/es/).
   tablero propio existente ya no pregunta nada — conserva su nombre; solo el
   alta y "Guardar como…" piden uno.
 
+### Fixed
+
+- **El engine no tenía timeout de conexión: un Postgres mudo colgaba el
+  request para siempre** (2026-08-08). `create_engine(settings.database_url,
+  pool_pre_ping=True)`, sin `connect_args`. Un servidor que **no rechaza** —
+  acepta el TCP y se queda callado, o se le cae la red de por medio— dejaba a
+  psycopg en `wait_conn` sin límite: el ERP no daba error, se quedaba mudo, y
+  en caja mudo es peor que roto. Ahora `connect_timeout: 5`, aplicado solo
+  cuando la URL es Postgres (`connect_args()` en `src/core/database.py`): es
+  parámetro de libpq y el `e2e`, que levanta la API contra un SQLite
+  desechable, revienta al arrancar si se lo pasan.
+  - Se descubrió midiendo el suite: diez tests tardaban **130 s cada uno**,
+    el tope del stack TCP de Windows. Ocho de ellos son barridos de Celery
+    (`inventory`, `sales`) que usan `SessionLocal` directo, más `/health/sync`
+    del hub. Con el timeout bajan a **5.2 s**.
+  - Los otros dos son `test_esquema.py::test_base_inalcanzable_*`, que arman
+    su propio engine contra `127.0.0.1:1`. La docstring decía que el puerto
+    "se rechaza en el acto, sin esperas" — cierto en Linux, falso en Windows,
+    que descarta el SYN en silencio. Ahora reusan el mismo `connect_args()`:
+    130 s → 5.1 s.
+- **El suite del backend no tardaba: se colgaba, y de paso escribía en la base
+  de desarrollo** (2026-08-08). Cada `env` de test parchea el
+  `session_factory` de los listeners que su test ejercita, y **solo esos**.
+  Los otros dos módulos de listeners quedaban apuntando al Postgres real, así
+  que confirmar una venta despertaba `accounting.on_venta_confirmada`, que
+  abre su propia sesión —el evento se despacha después del commit, cuando la
+  del request ya no existe— y se quedaba en `psycopg.wait_conn`. Sin timeout:
+  para siempre. Se encontró con `py-spy dump` sobre cinco corridas trabadas
+  hacía entre 30 y 90 minutos, todas en el mismo `POST /sales/ventas`.
+  - Con el Postgres de desarrollo levantado no se colgaba, que es lo peor de
+    todo: el listener conectaba **de verdad** y sembraba asientos de prueba en
+    la base real, mientras el test miraba su SQLite y no veía nada.
+  - Arreglo: `_listeners_sin_base_real` (conftest, autouse) apunta los tres
+    `session_factory` a algo que revienta. Es seguro porque
+    `EventBus._despachar` ya atrapa y registra lo que falle en un handler; el
+    test que necesita el listener lo parchea como siempre, y el que no, ve una
+    línea en el log en vez de un cuelgue. `tests/test_kds.py` pasó de colgarse
+    a 12 casos en 16 s.
+
 ### Changed
 
+- **El suite del backend se paralelizó y dejó de pagar Argon2id de
+  producción** (2026-08-08). **956 casos en 1 min 1 s**, contra los más de 10
+  minutos de antes —cuando terminaba— y ningún test por encima de 6 s.
+  Corría en serie y **ninguna fixture tenía `scope=`**, así que cada uno rearma su
+  motor SQLite, sus 99 tablas, el seeder completo y la app FastAPI entera.
+  Medido con `cProfile` sobre `tests/test_accounting.py` (22 tests, 16 s): el
+  KDF se llevaba 3.9 s —46 hash de 55 ms del seeder más 24 verify de los
+  logins—, y 24 intentos de conexión a un Redis que no está corriendo se
+  colaban por los endpoints con rate limit.
+  - `_argon2_barato` (conftest, sesión) baja Argon2id a `t=1, m=8 KiB, p=1`:
+    de 55 ms a 0.1 ms por hash. Los parámetros reales quedan guardados en
+    `HASHER_PRODUCCION` y ahora **sí** los vigila un test
+    (`test_seguridad_del_hasher_de_produccion`, piso RFC 9106); antes ningún
+    test los miraba.
+  - `_rate_limit_en_memoria` (conftest, por test) reemplaza el cliente Redis
+    por un contador en memoria, mismo criterio que el token de Factiliza y el
+    broker de Celery que ya vivían ahí. De paso el límite deja de estar
+    fail-open en pruebas: antes nunca se ejercitaba de verdad.
+  - `pytest-xdist` con `addopts = "-n auto --dist loadfile"`. `loadfile` y no
+    el reparto por test porque varios archivos tocan estado de módulo (el
+    corta-circuito del limiter, la config de Celery) y así cada archivo vive
+    entero en un proceso. Para depurar en serie: `pytest -n0`.
 - **`F1.docx` pasó de la raíz a `docs/foundation/`** (2026-08-07). Es el brief
   original del ERP —el dictado del que salieron `vision.md`, `glossary.md` y
   `business-philosophy.md`— y estaba suelto en la raíz sin que ningún
