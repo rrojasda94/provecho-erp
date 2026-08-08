@@ -82,6 +82,8 @@ renumera nada). Este archivo define el orden de lectura recomendado.
 - [`/CLAUDE.md`](../CLAUDE.md) — contrato operativo que la IA carga cada sesión
   (resume y apunta a `engineering/engineering-guide.md`).
 - [`/ROADMAP.md`](../ROADMAP.md) — bitácora viva de lo construido y pendiente.
+  La deuda técnica cuelga de [`roadmap/deuda/`](roadmap/deuda/), un archivo
+  por área.
 - [`/CHANGELOG.md`](../CHANGELOG.md) — historial de cambios (SemVer).
 
 ## Arranque rápido
