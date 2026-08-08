@@ -23,7 +23,10 @@ al día falla el PR que lo causó (ADR-010).
 - **Autenticación**: `Authorization: Bearer <JWT>` en todo endpoint salvo
   login/refresh y `/health` y sus variantes (`/health/ready`,
   `/health/backups`, `/health/sync`) — deliberadamente públicos para que un
-  monitor externo los sondee sin credenciales (ver ADR-007).
+  monitor externo los sondee sin credenciales (ver ADR-007). La misma
+  cabecera acepta el **token de API de una cuenta `agente_ia`** (prefijo
+  `prv_`, ADR-029): no es un JWT y no se refresca, pero produce los mismos
+  claims y pasa por el mismo RBAC.
 - **Tenant**: el contexto (empresa/marca/sucursal) sale de los claims del
   JWT + parámetros validados contra las asignaciones del usuario — nunca
   del body sin verificar.
