@@ -1,17 +1,14 @@
-"""Errores de la capa de aplicación de marketing (la API los mapea a HTTP)."""
+"""Errores de aplicación de marketing. La tripleta común (`NoEncontrado`,
+`Conflicto`, `ReglaNegocio`) y su mapeo a HTTP viven en
+`src/shared/errors.py`; el módulo no especializa ninguno todavía.
 
+Hasta 2026-08-08 marketing tenía su propia jerarquía sobre `Exception` y
+cada endpoint repetía el `try/except … raise _http(e)` — el patrón que
+`src/core/error_handlers.py` ya había centralizado para los otros siete
+módulos. Al heredar de la base compartida, el handler global responde con
+los mismos códigos y los routers dejan de traducir nada.
+"""
 
-class MarketingError(Exception):
-    """Base."""
+from src.shared.errors import AppError, Conflicto, NoEncontrado, ReglaNegocio
 
-
-class NoEncontrado(MarketingError):
-    """Entidad inexistente."""
-
-
-class Conflicto(MarketingError):
-    """Estado que no admite la operación."""
-
-
-class ReglaNegocio(MarketingError):
-    """Violación de una regla (brief incompleto, contenido no pertinente, etc.)."""
+__all__ = ["AppError", "Conflicto", "NoEncontrado", "ReglaNegocio"]

@@ -23,6 +23,7 @@ celery_app = Celery(
     include=[
         "src.core.tasks_salud",
         "src.modules.inventory.application.tasks",
+        "src.modules.marketing.application.tasks",
         "src.modules.sales.application.tasks",
     ],
 )
@@ -87,6 +88,14 @@ celery_app.conf.beat_schedule = {
     "barrer-comprobantes-pendientes": {
         "task": "sales.barrer_comprobantes_pendientes",
         "schedule": 900.0,
+    },
+    # Expiración de encuestas sin responder. Una vez por hora alcanza: la
+    # vigencia se mide en días (72 h por defecto) y expirar 40 minutos tarde
+    # no cambia ninguna decisión — lo que importa es que expiren, porque una
+    # encuesta `enviada` para siempre deja el % de respuesta sin cerrar.
+    "barrer-encuestas-vencidas": {
+        "task": "marketing.barrer_encuestas_vencidas",
+        "schedule": 3600.0,
     },
 }
 
