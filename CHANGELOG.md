@@ -87,6 +87,15 @@ Versionado: [SemVer](https://semver.org/lang/es/).
   contacto tecleado en caja como `(051) 987-654-321` quedaba en
   `051987654321`, que Meta rechaza. Los ceros de la izquierda son prefijo de
   marcado, nunca parte del número: E.164 no empieza con cero.
+- **`main` estaba con el build del frontend roto desde el 2026-08-07**
+  (2026-08-08). El bump automático de `@tanstack/react-table` a 9.0.0 (#37)
+  pasó CI —`lint` y `test` no lo tocan— y rompió `next build`:
+  `Export getCoreRowModel doesn't exist in target module`. La v9 es una
+  reescritura y `components/tabla/tabla-datos.tsx` está escrito contra la v8.
+  Se vuelve a `^8.21.3`, que es la versión que el código usa. Migrar a la v9
+  es un cambio propio, no un bump — queda anotado en Deuda técnica. Los ~15
+  archivos que solo importan `type ColumnDef` no se ven afectados por ninguna
+  de las dos.
 - **El suite compartía el contador del rate limit de login** (2026-08-08).
   Todos los tests entran desde la misma "IP" del `TestClient`, así que a
   partir del undécimo login del minuto `POST /auth/login` devolvía 429 y el

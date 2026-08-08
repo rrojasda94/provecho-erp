@@ -1740,6 +1740,16 @@ se olvide. Marcar ✅ al resolverse en el slice indicado.
 
 ### Frontend (F2 — arquitectura y UX, documento 2026-07-27, actualizado tras ADR-013)
 
+- ⬜ **`@tanstack/react-table` pinneado en v8** (2026-08-08). El bump
+  automático a 9.0.0 (#37) rompió `next build` y dejó `main` en rojo: la v9
+  es una reescritura y sacó `getCoreRowModel`/`getFilteredRowModel`/
+  `getPaginationRowModel`/`getSortedRowModel` del módulo raíz. Se volvió a
+  `^8.21.3`. Migrar toca **un solo archivo**
+  (`components/tabla/tabla-datos.tsx`) — los ~15 restantes solo importan
+  `type ColumnDef`, que sobrevive en las dos versiones —, pero es un cambio
+  de API con su propia verificación, no un bump. Dependabot lo va a volver a
+  proponer: la respuesta correcta es migrar el archivo en ese mismo PR, no
+  volver a aceptar el bump pelado.
 - **34 hallazgos del React Compiler quedaron en `warn`** (2026-08-07). Al
   subir a Next 16 entra `eslint-plugin-react-hooks` 7, que trae las reglas
   del React Compiler. Son dos patrones repartidos en 30 archivos:
