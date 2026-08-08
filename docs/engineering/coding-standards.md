@@ -23,7 +23,11 @@ alta cohesión.
 - **Ruff**: `E, F, I, UP, B, C901` — sin variables sin usar, sin código
   muerto, complejidad ciclomática ≤ 10, imports ordenados. Config en `pyproject.toml`.
 - **ESLint**: `next/core-web-vitals` + `next/typescript`, `no-unused-vars`,
-  `complexity ≤ 10`. Config en `frontend/.eslintrc.json`.
+  `complexity ≤ 10`. Config en `frontend/eslint.config.mjs` (flat config).
+- **`tsc --noEmit`** (`npm run typecheck`): ESLint no resuelve tipos, así que
+  un import que la librería ya no exporta le pasa por al lado. `next build`
+  sí typechequea, pero recién al final y después de empaquetar; este paso da
+  la misma verdad en segundos. Bloqueante en CI.
 - Formatter: ejecutar al guardar (IDE), antes de commit y en CI.
 
 ## Versionado y commits

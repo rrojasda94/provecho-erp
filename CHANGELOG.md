@@ -7,6 +7,33 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Fixed
 
+- **`main` estaba en rojo desde el bump a `@tanstack/react-table` 9**
+  (2026-08-08). El PR #37 (2026-08-07, dependabot) subió la librería de
+  8.21.3 a 9.0.0 sin migrar una línea. En v9 no existe `useReactTable` —es
+  `ReactTable` + `createCoreRowModel`—, `VisibilityState` no se exporta y
+  `ColumnDef` toma dos genéricos: las 13 pantallas que usan
+  `components/tabla/tabla-datos.tsx` quedaron rotas. Vuelve a `^8.21.3` y su
+  major queda en `ignore` en `.github/dependabot.yml`; la migración a v9 es
+  trabajo aparte (ver ROADMAP → Deuda técnica → Frontend).
+  - **El CI lo atrapó y el PR se mergeó igual, en rojo**: fallaron los jobs
+    `frontend` y `e2e`, primero en el PR (run `31202169287`) y otra vez en
+    `main` tras el merge (`31210826670`). No fue un agujero de cobertura: fue
+    un merge sobre CI rojo.
+- **El job `frontend` no corría un chequeo de tipos propio** (2026-08-08).
+  Ahora corre `npm run typecheck` (`tsc --noEmit`, script nuevo en
+  `frontend/package.json`) junto a `npm run lint`, bloqueante. No es
+  cobertura nueva —`next build` ya typechequea: Next 16 corre el `tsc` del
+  proyecto con el mismo `tsconfig.json`— sino momento y claridad: 6 s contra
+  ~40 s, antes de los tests y del build, y falla diciendo "tipos". En el caso
+  de #37 el build ni llegó a esa etapa: murió antes empaquetando, con
+  `Export useReactTable doesn't exist in target module` de Turbopack.
+  `npm run lint` pasó igual, porque ESLint revisa el árbol sintáctico y no si
+  el símbolo importado existe.
+- **`frontend/package-lock.json` fijado a LF** (2026-08-08, `.gitattributes`
+  nuevo). npm lo reescribe con los saltos de línea del sistema: el
+  `npm install` de este mismo cambio, en Windows, lo pasó entero a CRLF y
+  convirtió un cambio de tres entradas en un diff de 10 000 líneas. Un
+  lockfile ilegible es un lockfile que nadie revisa.
 - **Dos temporales de Word estaban versionados en la raíz** (2026-08-07).
   `~$F1.docx` (el archivo de bloqueo que Word crea al abrir un documento) y
   `~WRL0908.tmp` (su respaldo de autoguardado) entraron en el import inicial
