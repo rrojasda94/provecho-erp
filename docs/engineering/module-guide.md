@@ -114,5 +114,5 @@ en el `layout.tsx` del módulo. El grid no es control de acceso.
 No hay `scaffold` ni manifiesto por módulo: el registro de los siete puntos
 es manual, y por eso un módulo **no es removible borrando su carpeta** — deja
 imports rotos en `core`. Está declarado como deuda técnica en
-`ROADMAP.md` → Deuda técnica → Transversal. Mientras tanto, esta lista es el
-contrato.
+[`docs/roadmap/deuda/transversal.md`](../roadmap/deuda/transversal.md).
+Mientras tanto, esta lista es el contrato.

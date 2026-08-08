@@ -12,7 +12,8 @@ Estas reglas son obligatorias durante todo el desarrollo.
   (`src/core/events.py`) o contratos públicos. Nunca importar el dominio de otro módulo.
 - Cada módulo es independiente y extensible. Removerlo no toca el dominio de
   los demás, pero sí obliga a deshacer sus registros en `core`/seeder/frontend
-  (no hay manifiesto ni autodescubrimiento — ver `ROADMAP.md` → Deuda técnica).
+  (no hay manifiesto ni autodescubrimiento — ver
+  `docs/roadmap/deuda/transversal.md`).
 - Estructura por módulo (crear capas solo al implementarlas):
   `domain/` (entidades, reglas), `application/` (casos de uso), `infrastructure/`
   (repositorios SQLAlchemy), `api/` (routers FastAPI).
