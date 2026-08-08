@@ -67,7 +67,7 @@ uvicorn src.main:app --reload
 ```bash
 pytest
 ruff check .
-cd frontend && npm run lint
+cd frontend && npm run lint && npm run typecheck
 ```
 
 ## Documentación
