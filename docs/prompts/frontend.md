@@ -43,7 +43,7 @@ Leer antes: `/CLAUDE.md`, [product/ui-ux.md](../product/ui-ux.md) y
 
 ## Checklist
 
-- [ ] `npm run lint` y `npm run build` limpios.
+- [ ] `npm run lint`, `npm run typecheck` y `npm run build` limpios.
 - [ ] Probado en viewport móvil y desktop.
 - [ ] Sin colores/tamaños mágicos fuera de tokens/`tailwind.config.ts`.
 - [ ] Si el módulo es nuevo: agregado a `apps.config.ts` con su prefijo de
