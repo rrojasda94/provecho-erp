@@ -76,6 +76,30 @@ def abrir_caja_directa(
     return apertura
 
 
+def auth_headers(session, username: str = "admin") -> dict[str, str]:
+    """Cabecera `Authorization` sin pasar por `POST /auth/login`.
+
+    El token que emite es el mismo que emitiría el login —mismos claims,
+    misma firma—; lo que se saltea es la verificación del PIN, que ya tiene
+    sus propios tests en `test_users_auth.py`.
+
+    Existe para los tests que necesitan **varias identidades distintas** (el
+    CRUD de organización compara lo que ve un superusuario con lo que ve un
+    admin de una sola empresa): cada login gasta cuota del limiter, que
+    desde `_rate_limit_en_memoria` se ejercita de verdad y son 10 por
+    ventana. El costo del KDF ya no es el problema —lo resolvió
+    `_argon2_barato`—, la cuota sí.
+    """
+    from src.modules.users.application.auth import build_claims
+    from src.modules.users.infrastructure.repositories import UsuarioRepo
+    from src.modules.users.infrastructure.security import create_access_token
+
+    usuario = UsuarioRepo(session).get_by_username(username)
+    assert usuario is not None, f"usuario '{username}' no existe en la base de prueba"
+    token = create_access_token(build_claims(session, usuario))
+    return {"Authorization": f"Bearer {token}"}
+
+
 class RedisFalso:
     """Contador en memoria con la superficie que usa el limiter."""
 

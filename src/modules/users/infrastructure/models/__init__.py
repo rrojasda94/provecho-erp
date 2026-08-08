@@ -13,6 +13,7 @@ from src.modules.users.infrastructure.models.refresh_token import RefreshToken
 from src.modules.users.infrastructure.models.rol import Rol
 from src.modules.users.infrastructure.models.rol_permiso import RolPermiso
 from src.modules.users.infrastructure.models.sucursal import Sucursal
+from src.modules.users.infrastructure.models.token_agente import TokenAgente
 from src.modules.users.infrastructure.models.usuario import Usuario
 from src.modules.users.infrastructure.models.usuario_rol import UsuarioRol
 from src.modules.users.infrastructure.models.usuario_sucursal import UsuarioSucursal
@@ -30,6 +31,7 @@ __all__ = [
     "Rol",
     "RolPermiso",
     "Sucursal",
+    "TokenAgente",
     "Usuario",
     "UsuarioRol",
     "UsuarioSucursal",

@@ -126,6 +126,7 @@ class AlmacenOut(BaseModel):
     nombre: str
     tipo: str
     direccion: str | None
+    almacen_abastecedor_id: uuid.UUID | None = None
 
 
 class MarcaOut(BaseModel):
@@ -143,6 +144,167 @@ class SucursalOut(BaseModel):
     marca_id: uuid.UUID
     nombre: str
     estado: str
+    direccion: str | None = None
+    tenencia: str | None = None
+
+
+# --- Organización (CRUD, permiso `organizacion.gestionar`) ---
+# En todos los `Update`: un campo ausente o `null` = "no tocar". No hay
+# forma de vaciar un opcional desde el PATCH; el día que haga falta, será
+# un `Field` con centinela y no un `None` ambiguo.
+class GrupoCreate(BaseModel):
+    nombre: str = Field(min_length=1, max_length=100)
+
+
+class GrupoUpdate(BaseModel):
+    nombre: str | None = Field(default=None, min_length=1, max_length=100)
+
+
+class GrupoOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    nombre: str
+
+
+TipoEmpresa = Literal[
+    "operativa", "logistica", "servicios", "asesoria", "transporte"
+]
+ZonaTributaria = Literal["amazonia_ley27037", "general"]
+
+
+class EmpresaCreate(BaseModel):
+    grupo_id: uuid.UUID
+    razon_social: str = Field(min_length=1, max_length=255)
+    # 11 dígitos: el RUC peruano no admite otra forma, y un RUC mal formado
+    # llega hasta la factura electrónica antes de que alguien lo note.
+    ruc: str = Field(pattern=r"^\d{11}$")
+    domicilio_fiscal: str = Field(min_length=1, max_length=255)
+    tipo: TipoEmpresa
+    zona_tributaria: ZonaTributaria = "general"
+    contacto: str | None = Field(default=None, max_length=255)
+    config_fiscal: dict | None = None
+
+
+class EmpresaUpdate(BaseModel):
+    razon_social: str | None = Field(default=None, min_length=1, max_length=255)
+    ruc: str | None = Field(default=None, pattern=r"^\d{11}$")
+    domicilio_fiscal: str | None = Field(default=None, min_length=1, max_length=255)
+    tipo: TipoEmpresa | None = None
+    zona_tributaria: ZonaTributaria | None = None
+    contacto: str | None = Field(default=None, max_length=255)
+    config_fiscal: dict | None = None
+
+
+class EmpresaOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    grupo_id: uuid.UUID
+    razon_social: str
+    ruc: str
+    domicilio_fiscal: str
+    contacto: str | None
+    tipo: str
+    zona_tributaria: str
+    config_fiscal: dict | None
+
+
+class MarcaCreate(BaseModel):
+    # Opcional: sale del grupo de la empresa del tenant. Solo el
+    # superusuario sin empresa asignada necesita indicarlo.
+    grupo_id: uuid.UUID | None = None
+    nombre: str = Field(min_length=1, max_length=100)
+    tipo: str = Field(min_length=1, max_length=50)
+    skins: dict | None = None
+
+
+class MarcaUpdate(BaseModel):
+    nombre: str | None = Field(default=None, min_length=1, max_length=100)
+    tipo: str | None = Field(default=None, min_length=1, max_length=50)
+    skins: dict | None = None
+
+
+class LicenciaMarcaIn(BaseModel):
+    marca_id: uuid.UUID
+
+
+class LicenciaMarcaOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    empresa_id: uuid.UUID
+    marca_id: uuid.UUID
+
+
+TenenciaSucursal = Literal["propia", "alquilada", "del_grupo"]
+EstadoSucursal = Literal["activa", "inactiva"]
+
+
+class SucursalCreate(BaseModel):
+    marca_id: uuid.UUID
+    # Igual que el resto del ERP: sale del tenant (ADR-004); informarla
+    # ajena es 403.
+    empresa_id: uuid.UUID | None = None
+    nombre: str = Field(min_length=1, max_length=100)
+    direccion: str = Field(min_length=1, max_length=255)
+    tenencia: TenenciaSucursal
+    estado: EstadoSucursal = "activa"
+    horario_atencion: dict | None = None
+
+
+class SucursalUpdate(BaseModel):
+    """Cerrar un local es `estado="inactiva"`; no hay DELETE de sucursal —
+    sigue siendo el ancla de sus ventas, cajas y trabajadores."""
+
+    marca_id: uuid.UUID | None = None
+    nombre: str | None = Field(default=None, min_length=1, max_length=100)
+    direccion: str | None = Field(default=None, min_length=1, max_length=255)
+    tenencia: TenenciaSucursal | None = None
+    estado: EstadoSucursal | None = None
+    horario_atencion: dict | None = None
+
+
+class AlmacenCreate(BaseModel):
+    empresa_id: uuid.UUID | None = None
+    sucursal_id: uuid.UUID | None = None
+    nombre: str = Field(min_length=1, max_length=100)
+    # Enum extensible por diseño (data-model §1): `str`, no `Literal`.
+    tipo: str = Field(min_length=1, max_length=30)
+    direccion: str | None = Field(default=None, max_length=255)
+    almacen_abastecedor_id: uuid.UUID | None = None
+
+
+class AlmacenUpdate(BaseModel):
+    nombre: str | None = Field(default=None, min_length=1, max_length=100)
+    tipo: str | None = Field(default=None, min_length=1, max_length=30)
+    direccion: str | None = Field(default=None, max_length=255)
+    sucursal_id: uuid.UUID | None = None
+    almacen_abastecedor_id: uuid.UUID | None = None
+
+
+# --- Tokens de API de agentes (`tipo=agente_ia`) ---
+class TokenAgenteCreate(BaseModel):
+    nombre: str = Field(min_length=1, max_length=100)
+    # NULL = sin vencimiento: una integración que corre sola no puede
+    # quedarse tirada porque venció un token un domingo.
+    dias_validez: int | None = Field(default=None, ge=1, le=3650)
+
+
+class TokenAgenteOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    usuario_id: uuid.UUID
+    nombre: str
+    prefijo: str
+    expira_en: datetime | None
+    revocado: bool
+    ultimo_uso_en: datetime | None
+    created_at: datetime
+
+
+class TokenAgenteCreado(TokenAgenteOut):
+    """El único momento en que el token en claro existe fuera de quien lo
+    usa: después solo queda su SHA-256, y perderlo obliga a emitir otro."""
+
+    token: str
 
 
 class AnonimizarPersonaIn(BaseModel):

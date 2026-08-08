@@ -74,6 +74,60 @@ Versionado: [SemVer](https://semver.org/lang/es/).
   `raise _http(e)`. Ahora hereda de `src/shared/errors.py` y el mapeo lo hace
   `src/core/error_handlers.py`, una sola vez para todo el ERP. Mismos códigos
   de respuesta, 60 líneas menos.
+- **Token de API para cuentas de agente** (2026-08-08, ADR-032, migración
+  `b3f7d21a9c04`). Un `usuario` con `tipo=agente_ia` —n8n, el bot de
+  pedidos, el hub de sucursal— se autenticaba con username + PIN de 6
+  dígitos, o sea con un secreto de 20 bits guardado en un `.env`, sujeto a
+  un lockout de 5 intentos que apaga la integración y a un refresh que hay
+  que rotar cada 7 días desde un proceso desatendido. Ahora tiene su propia
+  credencial: `token_agente`, 256 bits de `secrets`, del que se persiste
+  solo el SHA-256 (el claro sale una única vez, al emitirlo).
+  - `POST/GET/DELETE /api/v1/users/{id}/tokens[/{token_id}]` con
+    `users.gestionar`. Se revoca de a uno, sin apagar la cuenta ni las
+    demás integraciones. `expira_en` opcional (NULL = sin vencimiento) y
+    `ultimo_uso_en` con granularidad de una hora, para poder apagar lo que
+    ya nadie usa.
+  - **El RBAC no cambia**: `api/deps.get_claims` distingue por el prefijo
+    `prv_`, resuelve el usuario contra la tabla y arma los mismos claims que
+    armaría un login. De ahí para abajo —tenant, permisos, restricciones,
+    auditoría— nada distingue una credencial de la otra. Un usuario `humano`
+    no puede tener token (409) y el `tipo` se revalida en cada request.
+  - SHA-256 y no Argon2 como el PIN: 256 bits aleatorios no se rompen por
+    fuerza bruta, y esto se verifica en **cada** request.
+  - El hub sigue con username + PIN: migrarlo obliga a rotar el secreto de
+    cada local y es un cambio de operación (ROADMAP → Deuda técnica).
+- **CRUD de organización por API** (2026-08-08). Grupo, empresa, marca,
+  licencia de marca, sucursal y almacén solo los escribía el seeder: dar de
+  alta un local obligaba a correr un script contra la base. Sin cambios de
+  esquema — las seis tablas ya existían.
+  - Permiso propio `organizacion.gestionar`, separado de `users.gestionar`:
+    quien crea cajeros no tiene por qué poder fundar sucursales ni cambiar
+    el RUC de la empresa. Fundar un grupo o una empresa exige además `*`.
+  - La API valida lo que el seeder tipeaba a mano: una sucursal solo opera
+    una marca **licenciada** a su empresa (409 si no), la licencia liga
+    marca y empresa del mismo grupo, un almacén de tipo `sucursal` exige
+    `sucursal_id` de su misma empresa, y ninguno se abastece de sí mismo.
+  - La baja es **lógica** y se niega con dependientes vivos: una empresa con
+    sucursales o almacenes activos, una marca con locales abiertos o
+    licencias vigentes, un central del que otros se abastecen. Cerrar un
+    local es `estado="inactiva"` y no hay DELETE de sucursal: sigue siendo el
+    ancla de sus ventas, cajas y trabajadores.
+  - `DELETE /almacenes/{id}` no mira el stock: vive en `inventory` y `users`
+    no importa el dominio de otro módulo (ROADMAP → Deuda técnica).
+
+### Changed
+
+- **`auth_headers(session, username)` en `tests/conftest.py`** (2026-08-08):
+  emite el mismo JWT que emitiría `/auth/login` —mismos claims, misma
+  firma— sin verificar el PIN, que ya tiene sus propios tests en
+  `test_users_auth.py`. Lo usan los tests que necesitan **varias identidades
+  distintas** en la misma corrida: el CRUD de organización compara lo que ve
+  un superusuario con lo que ve un admin de una sola empresa, y cada login
+  gasta cuota del limiter, que desde `_rate_limit_en_memoria` se ejercita de
+  verdad y son 10 por ventana.
+  - Deliberadamente **no** se usa el token de agente para autenticar los
+    tests: haría que el suite ejerciera un camino de autenticación que
+    ningún humano usa, y obligaría a sembrar un token en cada fixture.
 - **La imagen y el CI corren el mismo Python: 3.14** (2026-08-08). El bump
   del `Dockerfile` a `python:3.14-slim` venía solo: los cuatro jobs que usan
   `actions/setup-python` seguían en 3.12, así que `pytest` nunca tocaba el
