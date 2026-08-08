@@ -5,6 +5,17 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
+### Changed
+
+- **La imagen y el CI corren el mismo Python: 3.14** (2026-08-08). El bump
+  del `Dockerfile` a `python:3.14-slim` venía solo: los cuatro jobs que usan
+  `actions/setup-python` seguían en 3.12, así que `pytest` nunca tocaba el
+  intérprete que la imagen ejecuta. El job `imagen` solo comprueba que el
+  contenedor construya y conteste `/health`; una incompatibilidad de una
+  dependencia con 3.14 se habría descubierto en producción con `main` en
+  verde. `requires-python` ya decía `>=3.12`, así que no hay nada que
+  relajar.
+
 ### Fixed
 
 - **`main` estaba en rojo desde el bump a `@tanstack/react-table` 9**
