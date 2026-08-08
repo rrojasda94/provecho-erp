@@ -79,14 +79,16 @@ def abrir_caja_directa(
 def auth_headers(session, username: str = "admin") -> dict[str, str]:
     """Cabecera `Authorization` sin pasar por `POST /auth/login`.
 
-    El suite entero se autentica llamando al endpoint real, y eso arrastra
-    dos costos que no prueban nada: un Argon2 completo por login (~50 ms,
-    multiplicado por cientos de llamadas) y el rate limit por IP, que desde
-    "testclient" ve *todos* los tests como un solo cliente.
-
-    El token que emite es el mismo que emitiría el login — mismos claims,
-    misma firma. Lo que se saltea es la verificación del PIN, que ya tiene
+    El token que emite es el mismo que emitiría el login —mismos claims,
+    misma firma—; lo que se saltea es la verificación del PIN, que ya tiene
     sus propios tests en `test_users_auth.py`.
+
+    Existe para los tests que necesitan **varias identidades distintas** (el
+    CRUD de organización compara lo que ve un superusuario con lo que ve un
+    admin de una sola empresa): cada login gasta cuota del limiter, que
+    desde `_rate_limit_en_memoria` se ejercita de verdad y son 10 por
+    ventana. El costo del KDF ya no es el problema —lo resolvió
+    `_argon2_barato`—, la cuota sí.
     """
     from src.modules.users.application.auth import build_claims
     from src.modules.users.infrastructure.repositories import UsuarioRepo

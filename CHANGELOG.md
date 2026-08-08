@@ -50,16 +50,17 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Changed
 
-- **Los tests dejan de pagar el login por HTTP** (2026-08-08).
-  `tests/conftest.py` expone `auth_headers(session, username)`, que emite el
-  mismo JWT que emitiría `/auth/login` sin verificar el PIN, y una fixture
-  autouse alimenta el rate limit con un contador que no crece. El límite es
-  por IP y para `TestClient` todo el suite es la misma IP: el test número 11
-  que hacía login recibía 429 y fallaba por una razón ajena a lo que
-  probaba. Cada login además costaba un Argon2 completo (~50 ms) para
-  verificar un PIN que ya tiene sus propios tests. `test_security.py` sigue
-  probando el rate limit de verdad: monkeypatchea `_client` dentro del test
-  y eso pisa la fixture.
+- **`auth_headers(session, username)` en `tests/conftest.py`** (2026-08-08):
+  emite el mismo JWT que emitiría `/auth/login` —mismos claims, misma
+  firma— sin verificar el PIN, que ya tiene sus propios tests en
+  `test_users_auth.py`. Lo usan los tests que necesitan **varias identidades
+  distintas** en la misma corrida: el CRUD de organización compara lo que ve
+  un superusuario con lo que ve un admin de una sola empresa, y cada login
+  gasta cuota del limiter, que desde `_rate_limit_en_memoria` se ejercita de
+  verdad y son 10 por ventana.
+  - Deliberadamente **no** se usa el token de agente para autenticar los
+    tests: haría que el suite ejerciera un camino de autenticación que
+    ningún humano usa, y obligaría a sembrar un token en cada fixture.
 
 ### Fixed
 

@@ -91,10 +91,12 @@ de la otra. El token dice *quién*; los roles siguen diciendo *qué puede*
   migrarlo al token es un cambio de despliegue —hay que rotar el secreto de
   cada local— y va aparte, anotado en ROADMAP → Deuda técnica. La
   credencial nueva ya está lista para cuando se haga.
-- Los **tests siguen autenticándose como humanos**, no con este token. El
-  costo que pagaban (Argon2 por login y rate limit por IP) se resolvió
-  donde estaba: `tests/conftest.py` emite el JWT en proceso
-  (`auth_headers`) y neutraliza el contador de rate limit. Usar la
-  credencial de agente en los tests habría hecho que el suite ejerciera un
+- Los **tests siguen autenticándose como humanos**, no con este token. Lo
+  que hacía caro el login en el suite —el KDF y el limiter contra un Redis
+  real— ya se resolvió donde estaba (`_argon2_barato` y
+  `_rate_limit_en_memoria` en `tests/conftest.py`); lo que suma este cambio
+  es `auth_headers`, que emite el JWT en proceso para los tests que
+  necesitan varias identidades y no quieren gastar la cuota del limiter.
+  Usar la credencial de agente ahí habría hecho que el suite ejerciera un
   camino de autenticación que ningún humano usa, además de obligar a
   sembrar un token en cada fixture.
