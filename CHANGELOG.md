@@ -5,8 +5,75 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
+### Added
+
+- **La encuesta de satisfacción sale de verdad, y es una conversación**
+  (2026-08-08, ADR-031, migración `c1f80b6a2d34`). Hasta ahora `POST
+  /marketing/encuestas` creaba una fila y publicaba un evento: **nada salía
+  del ERP**. Ahora hay un adaptador de la WhatsApp Cloud API
+  (`src/shared/integrations/whatsapp/`) y un guion de preguntas que es dato,
+  no código.
+  - **Nodos, no formulario.** WhatsApp no tiene formulario: tiene mensajes,
+    uno a la vez. Cada `encuesta_pregunta` declara a dónde sigue la
+    conversación (`siguiente_codigo`) y por dónde se desvía según lo que el
+    cliente contestó (`saltos`). Un 2 de 5 pregunta **qué** falló; un 5
+    pregunta si nos recomendaría. Preguntarles las dos cosas a todos alarga
+    la encuesta y baja la tasa de respuesta, que es la métrica que hace que
+    el resto sirva.
+  - **El primer "ok" del cliente no es el puntaje.** Meta solo acepta
+    plantillas aprobadas fuera de la ventana de 24 h, así que la encuesta se
+    abre con una plantilla y la ventana la abre la respuesta del cliente.
+    Contar ese "ok" como respuesta dejaría a media base con la nota de haber
+    dicho que sí; `conversacion_abierta` lo distingue.
+  - **Los ciclos se rechazan al guardar el guion**, no al enviarlo: A → B → A
+    no rompe nada al crear la plantilla y convierte la encuesta en un bucle
+    que le escribe al cliente para siempre.
+  - Tres puertas de entrada —webhook de Meta, enlace público con token, y la
+    tablet del local— con **un solo caso de uso** detrás.
+  - Expiración automática por barrido horario (Celery beat); antes
+    `expirar_encuesta` era un endpoint que alguien tenía que acordarse de
+    llamar.
+- **Calendario de contenido con el arte** (2026-08-08). `pieza_contenido`
+  guardaba título, canal, fecha y métricas: todo menos la pieza. Un
+  calendario sin el arte obliga a abrir otra carpeta para saber qué se
+  publica el jueves, y ahí es donde se publica la versión vieja del banner.
+  `GET /marketing/piezas/calendario` agrupa por día y cuenta los adjuntos;
+  los archivos cuelgan de `archivo` (`src/shared/`, ya polimórfico) en vez de
+  un storage propio de marketing.
+- **Evaluación de agencia vs. interna** (2026-08-08, RN-MKT-006, ADR-030).
+  La decisión se documentaba fuera del ERP; seis meses después nadie podía
+  mostrar por qué se pagó lo que se pagó. `evaluacion_agencia` +
+  `opcion_agencia` congelan los criterios ponderados **antes** de ver las
+  propuestas, obligan a que la opción interna compita (comparar tres agencias
+  entre sí no contesta si hace falta una agencia), y separan evaluar de
+  decidir en dos permisos. Apartarse de la recomendada o del presupuesto se
+  puede, en silencio no: el motivo pasa a ser obligatorio.
+- **Los eventos de marketing ya tienen quién los escuche** (2026-08-08,
+  ADR-030). `marketing.campana_lanzada` y `marketing.lead_generado` se
+  publicaban al vacío. Ahora el propio módulo los consume en
+  `campana_metrica`, junto con tres eventos nuevos (`lead_atribuido`,
+  `pieza_publicada`, `encuesta_respondida`). La satisfacción se le acredita a
+  la campaña por la cadena lead → venta → encuesta: una encuesta de un
+  cliente que llegó solo no le suma a ninguna campaña, que es lo correcto. El
+  acumulado es derivado y se puede reconstruir
+  (`POST /campanas/{id}/metricas/recalculo`).
+
 ### Changed
 
+- **`POST /marketing/encuestas/{id}/respuesta` cambia de contrato**
+  (2026-08-08). Recibe `{"valor": "..."}` —la respuesta a **un** nodo— en vez
+  de `{"puntaje": n, "comentario": "..."}`, y devuelve
+  `{encuesta, pregunta_actual, url_publica}` en vez de la encuesta pelada.
+  `POST /marketing/encuestas` devuelve la misma envoltura. No hay datos
+  productivos afectados: el módulo se creó el 2026-08-01 y no hay campañas
+  cargadas. Las encuestas anteriores al guion (`plantilla_id` NULL) se siguen
+  contestando con un puntaje suelto.
+- **`marketing` dejó su jerarquía de errores propia** (2026-08-08). Era el
+  único de los ocho módulos que declaraba `MarketingError(Exception)` y
+  traducía a HTTP en cada endpoint: 17 `try/except` cuyo único cuerpo era
+  `raise _http(e)`. Ahora hereda de `src/shared/errors.py` y el mapeo lo hace
+  `src/core/error_handlers.py`, una sola vez para todo el ERP. Mismos códigos
+  de respuesta, 60 líneas menos.
 - **La imagen y el CI corren el mismo Python: 3.14** (2026-08-08). El bump
   del `Dockerfile` a `python:3.14-slim` venía solo: los cuatro jobs que usan
   `actions/setup-python` seguían en 3.12, así que `pytest` nunca tocaba el
@@ -18,6 +85,16 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Fixed
 
+- **Los eventos de `marketing` se despachaban antes del commit**
+  (2026-08-08). `campana_lanzada`, `lead_generado` y `encuesta_enviada` se
+  publicaban sin `session=`, o sea en el acto, en medio de una transacción
+  que todavía podía fallar — justo lo que ADR-016 existe para evitar. Con el
+  envío real de la encuesta el bug dejaba de ser teórico: el worker abre su
+  propia sesión y habría buscado una fila que aún no estaba escrita.
+- **`normalizar_telefono` no sacaba el prefijo troncal** (2026-08-08). Un
+  contacto tecleado en caja como `(051) 987-654-321` quedaba en
+  `051987654321`, que Meta rechaza. Los ceros de la izquierda son prefijo de
+  marcado, nunca parte del número: E.164 no empieza con cero.
 - **`main` estaba en rojo desde el bump a `@tanstack/react-table` 9**
   (2026-08-08). El PR #37 (2026-08-07, dependabot) subió la librería de
   8.21.3 a 9.0.0 sin migrar una línea. En v9 no existe `useReactTable` —es
@@ -188,7 +265,7 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ### Added
 
-- **`audit_log` transversal, y usado** (2026-08-08, ADR-029, migración
+- **`audit_log` transversal, y usado** (2026-08-08, ADR-031, migración
   `b3d9f1c2a077`). La tabla decía en su docstring "consumido por todos los
   módulos" y el código decía otra cosa: el único escritor era
   `AuditLogRepo` en `users`, `rrhh` lo alcanzaba importando repositorios

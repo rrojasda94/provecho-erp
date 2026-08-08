@@ -94,7 +94,7 @@ en el `layout.tsx` del módulo. El grid no es control de acceso.
 - Operaciones con dinero: idempotencia por clave del cliente.
 - Cambios sensibles: auditoría con
   [`src.shared.auditoria.registrar`](../../src/shared/auditoria.py) (quién,
-  qué, cuándo, dónde, valor anterior/nuevo; ADR-029). Se audita el acto de
+  qué, cuándo, dónde, valor anterior/nuevo; ADR-031). Se audita el acto de
   autoridad —aprobar, autorizar, anular, descontar, pagar, anonimizar—, no
   cada `UPDATE`. Va en la misma sesión que el cambio, y con `empresa_id`/
   `sucursal_id` si el caso de uso los tiene a mano: sin ellos la fila solo

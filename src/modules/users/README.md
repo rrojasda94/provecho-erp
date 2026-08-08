@@ -6,7 +6,7 @@ Autenticar personas y agentes de IA, y autorizar cada acción según la cadena:
 Usuario → Rol → Permisos → Acciones → Restricciones → Sucursales → Empresa → Datos.
 Provee el contexto de tenant a todos los demás módulos. La auditoría
 dejó de ser suya: `audit_log` es transversal y vive en `src/shared`
-(ADR-029), aunque `users` siga siendo su mayor escritor.
+(ADR-031), aunque `users` siga siendo su mayor escritor.
 
 ## Entidades
 

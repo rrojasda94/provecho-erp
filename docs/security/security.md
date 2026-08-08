@@ -24,7 +24,7 @@ Autenticación, endurecimiento, auditoría y backups. El control de acceso
 
 - `audit_log` inmutable: quién, qué entidad, qué acción, cuándo, dónde
   (empresa, sucursal, IP), valor anterior y nuevo (JSONB).
-- **Transversal** (ADR-029): escribe cualquier módulo por
+- **Transversal** (ADR-031): escribe cualquier módulo por
   `src.shared.auditoria.registrar`, en la misma transacción que el cambio
   auditado. Hoy dejan rastro: login y login fallido, elevación de PIN de
   supervisor, alta de usuario y asignación de rol/permiso, anonimización de

@@ -353,6 +353,10 @@ delivery, pedido no recogido en takeout, producto rechazado en la entrega
 **Después de la entrega**: `sales.venta_entregada` habilita a Marketing a
 seleccionar al cliente para la encuesta de satisfacción — selectiva, nunca
 automática para toda venta (RN-COM-007) — que emite `marketing.encuesta_enviada`.
+Desde 2026-08-08 ese evento **manda el mensaje**: la encuesta sale por
+WhatsApp como una conversación de 2-3 preguntas donde cada respuesta elige la
+siguiente (ADR-029), o por un enlace público si el cliente no tiene WhatsApp.
+Sin responder en 72 h, expira sola.
 
 ## Apertura de sucursal
 

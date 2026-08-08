@@ -1,4 +1,4 @@
-"""Lectura del `audit_log` (ADR-029).
+"""Lectura del `audit_log` (ADR-031).
 
 Vive en `core` por lo mismo que el dashboard: la tabla es transversal y no
 tiene dueño de módulo — el rastro de una venta, de un ajuste y de un pago

@@ -1,7 +1,7 @@
 """Auditoría transversal: el único punto de escritura de `audit_log`.
 
 Cualquier módulo llama `registrar(...)` sin importar nada de otro módulo
-(ADR-029). Antes esto era `users.infrastructure.repositories.AuditLogRepo`,
+(ADR-031). Antes esto era `users.infrastructure.repositories.AuditLogRepo`,
 lo que obligaba a `rrhh` —y a todo el que quisiera dejar rastro— a entrar
 por los repositorios de `users`.
 

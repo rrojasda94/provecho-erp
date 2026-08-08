@@ -1,4 +1,4 @@
-# ADR-029 — `audit_log` transversal: un solo punto de escritura, escritura explícita
+# ADR-031 — `audit_log` transversal: un solo punto de escritura, escritura explícita
 
 - Estado: aceptado
 - Fecha: 2026-08-08

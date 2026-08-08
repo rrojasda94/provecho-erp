@@ -50,7 +50,7 @@ _EXCEPCIONES_CRUZADAS = {
     "sales": ("users.application", "inventory.infrastructure.models.categoria"),
     # `rrhh` salió de esta lista el 2026-08-08: entraba a
     # `users.infrastructure.repositories` solo por `AuditLogRepo`, que ahora
-    # es `src.shared.auditoria` (ADR-029).
+    # es `src.shared.auditoria` (ADR-031).
 }
 
 

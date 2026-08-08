@@ -15,6 +15,8 @@ from sqlalchemy.orm import Session
 
 from src.config.settings import settings
 from src.core.database import SessionLocal
+from src.modules.marketing.application.plantillas import crear_plantilla
+from src.modules.marketing.infrastructure.models import EncuestaPlantilla
 from src.modules.users.infrastructure.models import (
     Almacen,
     Empresa,
@@ -163,7 +165,18 @@ PERMISOS = [
     ("marketing.lead_gestionar", "Registrar leads y atribuirlos a la venta real"),
     (
         "marketing.encuesta_gestionar",
-        "Enviar la encuesta de satisfacción y registrar su respuesta (RN-COM-007)",
+        "Enviar la encuesta de satisfacción, escribir su guion de preguntas y "
+        "registrar respuestas (RN-COM-007)",
+    ),
+    (
+        "marketing.agencia_evaluar",
+        "Comparar propuestas de agencia contra hacerlo interno, con criterios "
+        "ponderados (RN-MKT-006)",
+    ),
+    (
+        "marketing.agencia_decidir",
+        "Validar con cuál se va la campaña: agencia o interna. Quien evalúa no "
+        "decide (RN-MKT-006, RN-GER-007)",
     ),
     ("dashboard.leer", "Consultar el dashboard gerencial (ventas, stock, caja)"),
     (
@@ -263,8 +276,10 @@ ROLES = {
         "accounting.caja_relevar",
         "accounting.caja_reabrir",
         # Marketing arma el brief; quien lo aprueba nunca es quien lo escribe.
+        # Misma lógica con la agencia: Marketing evalúa, acá se firma.
         "marketing.leer",
         "marketing.campana_aprobar",
+        "marketing.agencia_decidir",
         "dashboard.leer",
         "rrhh.leer",
         "rrhh.permiso_aprobar",
@@ -361,6 +376,7 @@ ROLES = {
         "marketing.contenido_gestionar",
         "marketing.lead_gestionar",
         "marketing.encuesta_gestionar",
+        "marketing.agencia_evaluar",
         "sales.leer_clientes_externos",
     ],
 }
@@ -429,6 +445,80 @@ def _seed_organizacion(session: Session) -> None:
     )
 
 
+# Guion de la encuesta de satisfacción que trae el ERP de fábrica
+# (RN-COM-007). Ramifica a propósito: quien puntúa bajo dice **qué** falló y
+# quien puntúa alto dice si recomendaría. Preguntarles las dos cosas a todos
+# alarga la encuesta y baja la tasa de respuesta, que es la única métrica que
+# hace que el resto sirva.
+ENCUESTA_SEMILLA = "Satisfacción post-entrega"
+ENCUESTA_SALUDO = "¿Cómo te fue con tu pedido? Son 2 preguntas rápidas."
+ENCUESTA_PREGUNTAS = [
+    {
+        "codigo": "puntaje",
+        "texto": "Del 1 al 5, ¿qué tal estuvo tu pedido?",
+        "tipo": "escala",
+        "opciones": [
+            {"valor": "1", "etiqueta": "Muy malo"},
+            {"valor": "2", "etiqueta": "Malo"},
+            {"valor": "3", "etiqueta": "Regular"},
+            {"valor": "4", "etiqueta": "Bueno"},
+            {"valor": "5", "etiqueta": "Excelente"},
+        ],
+        "es_puntaje": True,
+        "siguiente_codigo": "recomendaria",
+        "saltos": {"1": "que_fallo", "2": "que_fallo", "3": "que_fallo"},
+    },
+    {
+        "codigo": "que_fallo",
+        "texto": "¿Qué fue lo que no salió bien?",
+        "tipo": "opcion",
+        "opciones": [
+            {"valor": "comida", "etiqueta": "La comida"},
+            {"valor": "atencion", "etiqueta": "La atención"},
+            {"valor": "tiempo", "etiqueta": "La demora"},
+            {"valor": "otro", "etiqueta": "Otra cosa"},
+        ],
+        "siguiente_codigo": "comentario",
+    },
+    {
+        "codigo": "recomendaria",
+        "texto": "¿Nos recomendarías a un amigo?",
+        "tipo": "si_no",
+        "siguiente_codigo": "comentario",
+    },
+    {
+        "codigo": "comentario",
+        "texto": "¿Quieres contarnos algo más? (o escribe '-' para terminar)",
+        "tipo": "texto",
+        "obligatoria": False,
+    },
+]
+
+
+def _seed_encuesta(session: Session, creado_por) -> None:
+    """Plantilla de encuesta activa por empresa. Sin una activa, `POST
+    /marketing/encuestas` responde 409 y el módulo llega inutilizable a la
+    primera instalación."""
+    for empresa in session.scalars(select(Empresa)):
+        existente = session.scalar(
+            select(EncuestaPlantilla).where(
+                EncuestaPlantilla.empresa_id == empresa.id,
+                EncuestaPlantilla.nombre == ENCUESTA_SEMILLA,
+            )
+        )
+        if existente is not None:
+            continue
+        crear_plantilla(
+            session,
+            empresa_id=empresa.id,
+            nombre=ENCUESTA_SEMILLA,
+            saludo=ENCUESTA_SALUDO,
+            preguntas=ENCUESTA_PREGUNTAS,
+            creado_por=creado_por,
+            activa=True,
+        )
+
+
 def seed(session: Session) -> None:
     _seed_organizacion(session)
 
@@ -476,6 +566,8 @@ def seed(session: Session) -> None:
     for sucursal in session.scalars(select(Sucursal)):
         if session.get(UsuarioSucursal, (admin.id, sucursal.id)) is None:
             session.add(UsuarioSucursal(usuario_id=admin.id, sucursal_id=sucursal.id))
+
+    _seed_encuesta(session, admin.id)
 
     session.commit()
     print("Seed OK. admin/123456 con rol admin. Usuario nuevo:" if creado else

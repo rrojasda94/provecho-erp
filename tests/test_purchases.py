@@ -207,7 +207,7 @@ def test_flujo_oc_completo_actualiza_stock_y_costo(env):
     assert emit.status_code == 200
     assert emit.json()["estado"] == "emitida"
 
-    # Comprometer plata con un proveedor deja rastro (ADR-029).
+    # Comprometer plata con un proveedor deja rastro (ADR-031).
     from src.shared.models import AuditLog
     with TestSession() as s:
         rastro = s.scalar(

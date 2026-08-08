@@ -1,4 +1,4 @@
-"""Auditoría transversal (ADR-029): escritura desde `shared`, lectura por
+"""Auditoría transversal (ADR-031): escritura desde `shared`, lectura por
 `/api/v1/auditoria` con alcance de tenant.
 
 Lo que se congela acá es lo que hace útil al rastro: que cualquier módulo

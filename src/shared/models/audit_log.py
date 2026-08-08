@@ -1,7 +1,7 @@
 """audit_log: rastro inmutable de cambios (quién, qué, cuándo, dónde,
 valor antes/después). Solo inserción — no se actualiza ni se borra.
 
-Transversal por definición: la tabla no es de ningún módulo (ADR-029).
+Transversal por definición: la tabla no es de ningún módulo (ADR-031).
 Vivía en `users` por historia —ahí nació el primer registro auditado—, y
 eso obligaba a `rrhh` (y a cualquier otro módulo que quisiera dejar rastro)
 a importar los repositorios de `users`. Se escribe siempre por

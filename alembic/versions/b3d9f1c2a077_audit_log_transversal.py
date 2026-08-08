@@ -1,10 +1,10 @@
 """audit_log transversal: empresa_id e índices de consulta
 
 Revision ID: b3d9f1c2a077
-Revises: e7c390a5b41f
+Revises: c1f80b6a2d34
 Create Date: 2026-08-08 10:00:00.000000
 
-El `audit_log` deja de ser una tabla de `users` y pasa a `shared` (ADR-029).
+El `audit_log` deja de ser una tabla de `users` y pasa a `shared` (ADR-031).
 La tabla es la misma; lo que cambia acá es lo que hacía falta para que
 *todos* los módulos escriban y alguien pueda leer:
 
@@ -26,7 +26,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = 'b3d9f1c2a077'
-down_revision: str | None = 'e7c390a5b41f'
+down_revision: str | None = 'c1f80b6a2d34'
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

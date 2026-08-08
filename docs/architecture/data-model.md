@@ -195,7 +195,7 @@ erDiagram
   el log es lo que un colector externo vigila en vivo, y `datos_antes`/
   `datos_despues` pueden traer PII (Ley 29733) que no debe salir del proceso.
 
-  **Transversal desde 2026-08-08** (ADR-029, migración `b3d9f1c2a077`): el
+  **Transversal desde 2026-08-08** (ADR-031, migración `b3d9f1c2a077`): el
   modelo se mudó de `users` a `src/shared/models/` y se escribe **solo** por
   `src.shared.auditoria.registrar`, para que cualquier módulo deje rastro
   sin importar `users`. Se audita el acto de autoridad —aprobar, autorizar,
@@ -926,13 +926,17 @@ Evento `sales.venta_confirmada` → inventory descuenta insumos según receta.
   cliente_id, canal (`pos` | `whatsapp` | `link`), fecha_envio,
   fecha_respuesta (opcional), puntaje 1-5 (opcional hasta responder),
   comentario (opcional), estado (`enviada` | `respondida` | `expirada`),
-  enviada_por. Selectiva — no toda venta genera una fila (RN-COM-007);
-  requiere `cliente_id` no nulo y el pedido ya entregado. Su disparador es
-  `sales.venta_entregada` (`PROC-OPE-002`); Marketing elige a qué venta
-  entregada enviarle encuesta, y al enviarla emite
-  `marketing.encuesta_enviada`. El estado de entrega lo lee del contrato
-  público `sales/application/queries_publicas.py::venta_para_encuesta` —
-  marketing no importa `Venta`.
+  enviada_por, y desde 2026-08-08 el **estado de la conversación**:
+  plantilla_id, pregunta_actual_id, destino (teléfono E.164),
+  conversacion_abierta, token_publico (único), fecha_expiracion,
+  mensaje_externo_id, error_envio (ADR-031, §8d). Selectiva — no toda venta
+  genera una fila (RN-COM-007); requiere `cliente_id` no nulo y el pedido ya
+  entregado. Su disparador es `sales.venta_entregada` (`PROC-OPE-002`);
+  Marketing elige a qué venta entregada enviarle encuesta, y al enviarla
+  emite `marketing.encuesta_enviada`. El estado de entrega lo lee del
+  contrato público
+  `sales/application/queries_publicas.py::venta_para_encuesta` y el teléfono
+  de `::contacto_de_cliente` — marketing no importa `Venta` ni `Cliente`.
 
 ### Comercial-estrategia (spec 2026-08-05, sin implementar)
 
@@ -1418,8 +1422,9 @@ Ver [docs/marketing/README.md](../marketing/README.md) y
 `encuesta_satisfaccion` (descrita también en §6, donde nace su disparador)
 pertenece a este módulo.
 
-Implementado 2026-08-01 (migración `e9c3b7412a68`): las 5 entidades de
-abajo existen como tablas.
+Implementado 2026-08-01 (migración `e9c3b7412a68`): las 5 primeras
+entidades. Ampliado 2026-08-08 (migración `c1f80b6a2d34`, ADR-031/030) con
+el guion de la encuesta, la evaluación de agencia y el acumulado de campaña.
 
 - **campana**: empresa_id, marca_id, nombre (naming, RN-MKT-007), tipo
   (`notoriedad` | `impulso_venta` | `lanzamiento` | `medios` | `evento`),
@@ -1451,9 +1456,68 @@ abajo existen como tablas.
   `(campana_id, sucursal_id, fecha)`: reverificar el mismo día corrige la
   fila, no acumula otra.
 
-La adquisición de material y la contratación de agencia **no** son
-entidades de marketing: usan el flujo de `purchases` (OC/caja chica) y
-`contrato` (transversal), RN-MKT-004/006.
+### Guion de la encuesta (ADR-031)
+
+- **encuesta_plantilla**: empresa_id, marca_id (opcional), nombre, saludo,
+  despedida, activa, creado_por. Única por `(empresa_id, nombre)` y **una
+  sola activa por empresa**: dos guiones vivos parten la serie histórica en
+  dos mitades que no se pueden comparar. El seeder trae una activa de
+  fábrica.
+- **encuesta_pregunta**: plantilla_id, codigo, orden, texto, tipo
+  (`escala` | `opcion` | `si_no` | `texto`), opciones (JSONB
+  `[{valor, etiqueta}]`), **siguiente_codigo** (camino normal; NULL =
+  termina), **saltos** (JSONB `{respuesta: codigo}` — el desvío por lo que
+  contestó el cliente), es_puntaje (una sola por plantilla, alimenta
+  `encuesta_satisfaccion.puntaje`), obligatoria. Única por
+  `(plantilla_id, codigo)` y por `(plantilla_id, orden)`. El destino se
+  guarda por `codigo` y no por id: agregar un nodo en medio no obliga a
+  conocer UUID que todavía no existen. Saltos rotos y **ciclos** se rechazan
+  al guardar la plantilla, no al enviarla.
+- **encuesta_respuesta**: encuesta_id, pregunta_id, valor. Única por
+  `(encuesta_id, pregunta_id)` — WhatsApp reentrega el webhook y un doble
+  toque en el botón es lo normal. Es el detalle que permite reconstruir por
+  qué la conversación tomó una rama y no la otra;
+  `encuesta_satisfaccion.puntaje`/`comentario` siguen siendo el resumen que
+  consume el negocio.
+
+### Evaluación de agencia (RN-MKT-006, ADR-030)
+
+- **evaluacion_agencia**: campana_id, objetivo, presupuesto_referencia,
+  criterios (JSONB `[{codigo, etiqueta, peso}]`, los pesos suman 100),
+  estado (`borrador` | `evaluada` | `decidida`), opcion_elegida_id,
+  decidida_por, fecha_decision, motivo, creado_por. Los criterios se
+  congelan al crear, antes de ver las propuestas. Solo se evalúa una campaña
+  `aprobada` o `en_curso`: sin brief aprobado no hay objetivo ni presupuesto
+  contra los cuales comparar.
+- **opcion_agencia**: evaluacion_id, tipo (`agencia` | `interna`), nombre,
+  proveedor_id (**sin FK** — `proveedor` es dominio de `purchases`), costo,
+  plazo_dias, puntajes (JSONB `{criterio: 1-5}`), puntaje_total (ponderado,
+  persistido para que el ranking histórico no cambie si cambia la fórmula),
+  observacion. Cerrar la evaluación exige **≥2 propuestas y una `interna`**:
+  elegir entre tres agencias no contesta si hace falta una agencia.
+
+Decidir es un permiso distinto de evaluar (`marketing.agencia_decidir` vs.
+`marketing.agencia_evaluar`), y apartarse de la recomendada o del
+presupuesto exige `motivo`.
+
+### Acumulado de campaña (ADR-030)
+
+- **campana_metrica** (una fila por campaña): fecha_lanzamiento,
+  leads_generados, leads_convertidos, piezas_publicadas,
+  encuestas_enviadas, encuestas_respondidas, puntaje_suma. **Derivada y
+  reconstruible** (`POST /campanas/{id}/metricas/recalculo`): la mantienen
+  los listeners del propio módulo sobre sus eventos, que hasta 2026-08-08 no
+  tenían consumidor. Conversión y puntaje promedio se calculan al leer. La
+  satisfacción se acredita por la cadena lead → venta → encuesta: una
+  encuesta de un cliente que llegó solo no le suma a ninguna campaña.
+
+El **arte** de una pieza no agrega tabla: cuelga de `archivo` (§1,
+polimórfico) con `entidad_tipo = 'pieza_contenido'`.
+
+La adquisición de material **no** es entidad de marketing: usa el flujo de
+`purchases` (OC/caja chica), RN-MKT-004. La contratación de la agencia se
+formaliza por `contrato` (transversal, todavía sin tabla) — lo que vive acá
+es la **evaluación** que la precede, RN-MKT-006.
 
 ## 8e. Sincronización del hub de sucursal (core, ADR-009)
 

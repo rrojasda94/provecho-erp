@@ -122,7 +122,7 @@ organizativas":
   (`send_default_pii=False`) — ADR-006.
 - **Auditoría**: `audit_log` inmutable (quién, qué, cuándo, valor
   anterior/nuevo) en toda acción administrativa y en los actos de autoridad
-  de cada módulo (ADR-029). Leerlo exige el permiso `auditoria.leer` y el
+  de cada módulo (ADR-031). Leerlo exige el permiso `auditoria.leer` y el
   alcance del JWT: la tabla puede contener datos personales en
   `datos_antes`/`datos_despues`, así que no es una lectura abierta. Al log
   estructurado solo salen metadatos, nunca ese detalle.
