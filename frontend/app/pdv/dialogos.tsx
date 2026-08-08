@@ -136,6 +136,7 @@ export function DialogoApertura({
         min={0}
         step="0.10"
         inputMode="decimal"
+        aria-label="El encargado declara entregar"
         placeholder="0.00"
         data-testid="apertura-declarado"
         value={declarado}
@@ -198,6 +199,7 @@ export function DialogoApertura({
       <div className="pdv-dos">
         <input
           className="pdv-campo"
+          aria-label="Usuario del encargado"
           placeholder="Usuario del encargado"
           autoComplete="off"
           data-testid="apertura-usuario"
@@ -208,6 +210,7 @@ export function DialogoApertura({
           className="pdv-campo"
           type="password"
           inputMode="numeric"
+          aria-label="PIN del encargado"
           placeholder="PIN"
           autoComplete="off"
           data-testid="apertura-pin"
@@ -389,6 +392,7 @@ export function DialogoCierre({
           suelto que no coincidía con nadie. */}
       <select
         className="pdv-campo"
+        aria-label="A dónde va el efectivo"
         data-testid="cierre-custodia"
         value={custodia}
         onChange={(e) => setCustodia(esCustodia(e.target.value) ? e.target.value : "")}
@@ -399,8 +403,14 @@ export function DialogoCierre({
       </select>
       <p className="pdv-etiqueta">Recibe</p>
       <div className="pdv-dos">
+        {/* `aria-label` y no un `<label>` envolvente: los dos campos son celdas
+            de `.pdv-dos` y meterlos dentro de una etiqueta rompe la grilla. Sin
+            esto el `placeholder` era el único nombre —y no lo es: desaparece al
+            escribir y ningún lector de pantalla lo anuncia como nombre del
+            campo. */}
         <input
           className="pdv-campo"
+          aria-label="Usuario de quien recibe"
           placeholder="Usuario de quien recibe"
           autoComplete="off"
           data-testid="cierre-usuario"
@@ -411,6 +421,7 @@ export function DialogoCierre({
           className="pdv-campo"
           type="password"
           inputMode="numeric"
+          aria-label="PIN de quien recibe"
           placeholder="PIN"
           autoComplete="off"
           data-testid="cierre-pin"
@@ -425,6 +436,7 @@ export function DialogoCierre({
           escrito de veinte maneras distintas no se puede sumar después. */}
       <select
         className="pdv-campo"
+        aria-label="Si hay descuadre, a quién se le atribuye"
         value={atribucion}
         onChange={(e) =>
           setAtribucion(esAtribucion(e.target.value) ? e.target.value : "")

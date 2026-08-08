@@ -14,7 +14,7 @@
  */
 import { spawn } from "node:child_process";
 
-process.env.API_INTERNAL_URL ??= "http://127.0.0.1:8100";
+process.env.API_INTERNAL_URL ??= `http://127.0.0.1:${process.env.E2E_PUERTO_API ?? "8100"}`;
 
 // `shell: true` en Windows: sin eso, spawn de un `.cmd` falla con EINVAL
 // desde Node 20 (endurecimiento contra inyección de comandos). Los

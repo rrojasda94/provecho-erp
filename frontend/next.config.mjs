@@ -25,4 +25,15 @@ const nextConfig = {
   },
 };
 
+// Server Actions rechaza toda request cuyo Origin no coincida con el Host.
+// Detrás de un túnel público (probar el dev server desde afuera, por ejemplo
+// en un celular real) los dos difieren y el login muere con "Invalid Server
+// Actions request". Inerte mientras `TUNNEL_HOST` no esté definido, así que
+// nunca se activa en producción.
+if (process.env.TUNNEL_HOST) {
+  nextConfig.experimental = {
+    serverActions: { allowedOrigins: [process.env.TUNNEL_HOST] },
+  };
+}
+
 export default nextConfig;
