@@ -76,6 +76,7 @@ class VentaRepo:
         hasta: date,
         estados: tuple[str, ...] | None = None,
         punto_venta_id: uuid.UUID | None = None,
+        tipo: str | None = None,
     ):
         """Ventas de un rango de fechas, sin ejecutar: el router la pagina
         (ADR-026). Base de la pestaña de cobrados del PDV, del cierre de caja
@@ -99,6 +100,11 @@ class VentaRepo:
             q = q.where(Venta.estado.in_(estados))
         if punto_venta_id is not None:
             q = q.where(Venta.punto_venta_id == punto_venta_id)
+        # Sin filtro salen los dos tipos: el consumo de personal es parte de
+        # la jornada, solo no es plata. `tipo="consumo_personal"` es la base
+        # de la regularización del gasto (RN-COM-025).
+        if tipo is not None:
+            q = q.where(Venta.tipo == tipo)
         return q.order_by(Venta.fecha_orden, Venta.numero_orden)
 
     def del_dia(

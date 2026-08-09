@@ -11,6 +11,10 @@ TIPOS_MOVIMIENTO = {
     "transferencia_entrada",
     "consumo_venta",
     "consumo_produccion",
+    # Salida que el negocio se consume a sí mismo: hoy la comida del
+    # personal (RN-COM-025). Separada de `consumo_venta` porque no tiene
+    # ingreso detrás y su costo es gasto, no costo de ventas.
+    "consumo_interno",
     "produccion_entrada",
     "ajuste",
     "devolucion",
@@ -45,7 +49,12 @@ FRECUENCIAS_CONTEO: dict[str, int] = {
 
 # Dirección esperada del signo de la cantidad según el tipo de movimiento.
 TIPOS_INGRESO = {"recepcion_compra", "transferencia_entrada", "produccion_entrada"}
-TIPOS_SALIDA = {"transferencia_salida", "consumo_venta", "consumo_produccion"}
+TIPOS_SALIDA = {
+    "transferencia_salida",
+    "consumo_venta",
+    "consumo_produccion",
+    "consumo_interno",
+}
 # `ajuste` y `devolucion` admiten signo variable (lo fija el motivo/flujo).
 
 

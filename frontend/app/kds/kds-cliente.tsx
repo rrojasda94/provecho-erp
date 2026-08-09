@@ -162,6 +162,9 @@ export default function KdsCliente({ pantalla, puedeEntregar }: Props) {
               <small className="kds-canal">
                 {pedido.modalidad} · {pedido.canal}
               </small>
+              {pedido.tipo === "consumo_personal" && (
+                <small className="kds-consumo">Consumo de personal</small>
+              )}
               <ul className="kds-items">
                 {pedido.items.map((item) => {
                   const hecho = item.estado === "listo" || item.estado === "entregado";

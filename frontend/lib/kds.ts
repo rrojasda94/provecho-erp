@@ -34,6 +34,10 @@ export type PedidoCola = {
   referencia_atencion: string | null;
   modalidad: string;
   canal: string;
+  /** `venta` | `consumo_personal` (RN-COM-025): la cocina prioriza distinto
+   * un pedido de cliente que la comida del turno. */
+  tipo: string;
+  consumo_motivo: string | null;
   estado_pedido: EstadoItem;
   items: ItemCola[];
 };

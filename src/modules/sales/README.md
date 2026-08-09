@@ -410,6 +410,30 @@ ninguna entidad de negocio.
   comisión de canal) expuesto a Comercial para su evaluación de precio —
   el módulo calcula, Comercial decide y aprueba el precio final.
 
+## Consumo de personal (implementado 2026-08-09, ADR-034)
+
+La comida que el negocio da a su personal (fines de semana, feriados, días
+de alta actividad) es una orden de `tipo="consumo_personal"`, **no una venta
+con 100% de descuento**:
+
+- `crear_venta` la arma con **todas las líneas en cero** — no consulta lista
+  de precios ni acepta el precio que mande el cliente.
+- Exige `consumo_motivo` (`fin_semana` | `feriado` | `alta_actividad` |
+  `capacitacion` | `otro`) y la **firma de un encargado** con su PIN
+  (`sales.registrar_consumo_personal`, elevación de `POST /auth/autorizar`).
+  Queda en `audit_log`.
+- Publica `sales.consumo_personal_registrado` — **no** `venta_confirmada`,
+  que `accounting` asienta como ingreso y `marketing` atribuye como venta.
+- **No se cobra ni se factura**: `registrar_pago` y `aplicar_descuento`
+  responden 409 antes de llegar al comprobante.
+- Se prepara y despacha como cualquier pedido (KDS con distintivo, comanda
+  con `** CONSUMO PERSONAL **`), y **la entrega lo cierra**: pasa a
+  `estado="cerrada"`, su único cierre posible porque nunca pasa por caja.
+- El costo sale de `inventory` como `consumo_interno` y llega a
+  `accounting` como gasto de alimentación de personal (RN-COM-027).
+  Anularlo repone el insumo y reversa el asiento.
+- Se lee con `GET /sales/ventas?tipo=consumo_personal`.
+
 ## Reglas
 
 - Confirmar venta exige stock suficiente de los insumos de la receta (o política
@@ -435,7 +459,8 @@ Producto comercial → receta → confirmar venta → evento `sales.venta_confir
   descuentos), `sales.lineas_anuladas` (RN-COM-020 — inventory repone lo
   que ya no se prepara), `sales.carrito_abandonado` (analítica de embudo,
   RN-COM-013), `sales.pedido_demorado` (el pedido superó su tiempo en
-  cocina — ver abajo).
+  cocina — ver abajo), `sales.consumo_personal_registrado` (comida del
+  personal, RN-COM-025 — inventory descuenta como `consumo_interno`).
 - Escucha: **`sales.venta_confirmada`, de sí mismo**
   (`application/listeners.py`). Es el único listener del módulo y no hace
   trabajo: encola la revisión de demora y vuelve. El bus es síncrono y en

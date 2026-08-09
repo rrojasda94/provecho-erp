@@ -18664,6 +18664,17 @@
       },
       "VentaCreate": {
         "properties": {
+          "autorizacion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Autorizacion"
+          },
           "canal": {
             "title": "Canal",
             "type": "string"
@@ -18691,6 +18702,17 @@
               }
             ],
             "title": "Comensales"
+          },
+          "consumo_motivo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consumo Motivo"
           },
           "id": {
             "anyOf": [
@@ -18754,6 +18776,11 @@
           "sucursal_id": {
             "format": "uuid",
             "title": "Sucursal Id",
+            "type": "string"
+          },
+          "tipo": {
+            "default": "venta",
+            "title": "Tipo",
             "type": "string"
           }
         },
@@ -18985,6 +19012,17 @@
             ],
             "title": "Comensales"
           },
+          "consumo_motivo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consumo Motivo"
+          },
           "descuento_modo": {
             "anyOf": [
               {
@@ -19069,6 +19107,11 @@
             "title": "Sucursal Id",
             "type": "string"
           },
+          "tipo": {
+            "default": "venta",
+            "title": "Tipo",
+            "type": "string"
+          },
           "total": {
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Total",
@@ -19119,6 +19162,29 @@
               }
             ],
             "title": "Comensales"
+          },
+          "consumo_autorizado_por": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consumo Autorizado Por"
+          },
+          "consumo_motivo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consumo Motivo"
           },
           "descuento_autorizado_por": {
             "anyOf": [
@@ -19238,6 +19304,11 @@
           "sucursal_id": {
             "format": "uuid",
             "title": "Sucursal Id",
+            "type": "string"
+          },
+          "tipo": {
+            "default": "venta",
+            "title": "Tipo",
             "type": "string"
           },
           "usuario_id": {
@@ -36042,6 +36113,22 @@
             }
           },
           {
+            "in": "query",
+            "name": "tipo",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tipo"
+            }
+          },
+          {
             "description": "Página, empezando en 1",
             "in": "query",
             "name": "page",
@@ -36102,6 +36189,7 @@
         ]
       },
       "post": {
+        "description": "Confirma la orden y la manda a cocina.\n\n`tipo=\"consumo_personal\"` (RN-COM-025) es la comida del personal: el\ncajero la arma con su permiso `sales.crear`, pero la **autoriza un\nencargado** con su PIN en el mismo terminal — el id de quien firma sale\ndel token de `POST /auth/autorizar`, nunca del cuerpo (RN-AUD-005).",
         "operationId": "crear_venta_api_v1_sales_ventas_post",
         "requestBody": {
           "content": {

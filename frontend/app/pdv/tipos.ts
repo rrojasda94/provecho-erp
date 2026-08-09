@@ -39,14 +39,32 @@ export type Borrador = {
   ventaId: string | null;
   numeroOrden: number | null;
   hora: string;
+  /** Comida del personal (RN-COM-025): el pedido vale cero, no se cobra y su
+   * costo va a gasto. Se marca antes de enviar, con PIN del encargado. */
+  consumoMotivo: string | null;
+  consumoAutorizacion: string | null;
 };
+
+/** Motivos de consumo de personal, como los nombra el backend. */
+export const MOTIVOS_CONSUMO: { valor: string; etiqueta: string }[] = [
+  { valor: "fin_semana", etiqueta: "Fin de semana" },
+  { valor: "feriado", etiqueta: "Feriado" },
+  { valor: "alta_actividad", etiqueta: "Día de alta actividad" },
+  { valor: "capacitacion", etiqueta: "Capacitación" },
+  { valor: "otro", etiqueta: "Otro" },
+];
+
+export const esConsumoPersonal = (b: Borrador): boolean =>
+  b.consumoMotivo !== null;
 
 export const totalLinea = (l: LineaBorrador): number =>
   l.cantidad * l.precio +
   l.extras.reduce((a, e) => a + e.precio * e.cantidad * l.cantidad, 0);
 
+/** El consumo de personal no tiene precio: mostrar el de la carta haría
+ * creer que hay algo que cobrar (RN-COM-025). */
 export const totalBorrador = (b: Borrador): number =>
-  b.lineas.reduce((a, l) => a + totalLinea(l), 0);
+  esConsumoPersonal(b) ? 0 : b.lineas.reduce((a, l) => a + totalLinea(l), 0);
 
 export const etiquetaTipo = (b: Borrador): string => {
   if (b.tipo === "mesa") return `Mesa ${b.mesaNumero ?? "?"}`;

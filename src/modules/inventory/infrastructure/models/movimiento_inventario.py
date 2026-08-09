@@ -20,6 +20,8 @@ TIPO_MOVIMIENTO = Enum(
     "transferencia_entrada",
     "consumo_venta",
     "consumo_produccion",
+    # Consumo de personal (RN-COM-025): salió del almacén y nadie lo pagó.
+    "consumo_interno",
     "produccion_entrada",
     "ajuste",
     "devolucion",

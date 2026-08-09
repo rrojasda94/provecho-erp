@@ -20,6 +20,23 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   Cierran el hueco que hacía inusable el catálogo: no había forma de crear un
   insumo propio ni de ver una receta que no colgara de un producto. Con esto
   `/inventario` deja de ser un ícono que lleva a 404.
+- ⬜ **Quitar líneas de un consumo de personal no reajusta el gasto**
+  (ADR-034): el insumo se repone, pero el asiento —que es de la orden
+  entera— queda por el monto original. Solo la anulación **completa** lo
+  reversa; reversarlo por una línea borraría el gasto de las que sí se
+  comieron, y reasentar la diferencia exige valorizar solo lo quitado. Es la
+  misma limitación que la nota de crédito parcial.
+- ⬜ **Reporte de consumo de personal** (ADR-034): el gasto se registra y se
+  asienta, pero no hay reporte propio en el catálogo cerrado (ADR-024). Hoy
+  se lee con `GET /sales/ventas?tipo=consumo_personal` y con los movimientos
+  `consumo_interno` de inventario — sirve para revisar, no para que gerencia
+  compare sucursales por mes. Falta también el consumo por **motivo**, que
+  es la razón por la que el motivo es un enum cerrado.
+  `inventory.consumo_personal_valorizado` tampoco tiene **emisión** en el
+  catálogo de `reports` (ADR-033): nadie se entera del gasto salvo que lo
+  vaya a buscar. Es una entrada en `reports/domain/catalogo.py` más su fila
+  en `events.md`, pero primero hay que decidir a qué área se dirige —
+  gerencia, contabilidad, o el encargado del local.
 - ⬜ **7 íconos del home siguen llevando a 404** (`/produccion`, `/rrhh`,
   `/marketing`, `/gerencia`, `/usuarios`, `/contabilidad`, y el resto de
   `/inventario`): el grid lista los módulos que tienen **backend**, no los que

@@ -1,8 +1,11 @@
 """Listeners de eventos de otros módulos → movimientos de inventario.
 
 `sales.venta_confirmada` descuenta insumos según receta (+ merma % +
-empaque por modalidad); `sales.venta_anulada` repone. La comunicación es
-solo vía event bus — nunca imports del dominio de sales.
+empaque por modalidad); `sales.venta_anulada` repone.
+`sales.consumo_personal_registrado` descuenta igual pero con tipo
+`consumo_interno` y valoriza lo consumido, para que contabilidad lo lleve a
+gasto de alimentación de personal (RN-COM-025). La comunicación es solo vía
+event bus — nunca imports del dominio de sales.
 
 Un fallo de inventario NUNCA rompe la venta: el handler atrapa y loguea.
 """
@@ -121,11 +124,19 @@ def _consumos_de_items(session: Session, items: list[dict]) -> list[tuple[uuid.U
     return consumos
 
 
-def _mover(payload: dict, tipo: str, signo: int) -> None:
+def _mover(payload: dict, tipo: str, signo: int, valorizar: bool = False) -> None:
+    """Descuenta (o repone) el insumo de una venta.
+
+    `valorizar=True` suma además cuánto costó lo que salió, a costo promedio
+    del artículo, y lo publica: es el único punto del ERP que conoce las
+    líneas de consumo reales, así que valorizar en otro lado daría un número
+    distinto al que movió el stock (mismo criterio que `merma`).
+    """
     # Un solo exit con commit SIEMPRE: un return temprano cerraría la sesión
     # con rollback, y con conexión compartida (SQLite en tests) ese rollback
     # se llevaría también lo ya movido en esta misma sesión.
     movio = False
+    monto = Decimal(0)
     with session_factory() as session:
         sucursal_id = uuid.UUID(payload["sucursal_id"])
         almacen_id = _almacen_de_sucursal(session, sucursal_id)
@@ -181,6 +192,10 @@ def _mover(payload: dict, tipo: str, signo: int) -> None:
                             referencia=payload["venta_id"],
                         )
                     movio = True
+                    if valorizar:
+                        articulo = session.get(Articulo, articulo_id)
+                        if articulo is not None:
+                            monto += cantidad * articulo.costo_promedio
                 except StockInsuficiente:
                     # ponytail: la venta ya ocurrió — el stock teórico no la
                     # bloquea; queda la discrepancia para conteo/ajuste.
@@ -204,6 +219,18 @@ def _mover(payload: dict, tipo: str, signo: int) -> None:
                 {"venta_id": payload["venta_id"]},
                 session=session,
             )
+        if valorizar and monto > 0:
+            event_bus.publish(
+                "inventory.consumo_personal_valorizado",
+                {
+                    "venta_id": payload["venta_id"],
+                    "sucursal_id": payload["sucursal_id"],
+                    "empresa_id": str(empresa_id) if empresa_id else None,
+                    "motivo": payload.get("consumo_motivo"),
+                    "monto": str(monto),
+                },
+                session=session,
+            )
         session.commit()
 
 
@@ -214,11 +241,51 @@ def on_venta_confirmada(payload: dict) -> None:
         log.exception("fallo consumiendo stock de venta %s", payload.get("venta_id"))
 
 
+def on_consumo_personal(payload: dict) -> None:
+    """La comida del personal sale del almacén como cualquier pedido, pero
+    con su propio tipo de movimiento y valorizada: su costo es gasto de
+    alimentación de personal, no costo de ventas (RN-COM-025)."""
+    try:
+        _mover(payload, tipo="consumo_interno", signo=-1, valorizar=True)
+    except Exception:
+        log.exception(
+            "fallo consumiendo stock de consumo de personal %s",
+            payload.get("venta_id"),
+        )
+
+
 def on_venta_anulada(payload: dict) -> None:
     try:
         _mover(payload, tipo="devolucion", signo=+1)
+        # Solo la anulación completa reversa el gasto: quitar una línea de un
+        # consumo de personal devuelve su insumo, pero el asiento cubre la
+        # orden entera y reversarlo dejaría sin gasto a las líneas que sí se
+        # comieron (RN-COM-027).
+        if payload.get("tipo") == "consumo_personal" and payload.get("venta_anulada"):
+            _reversar_consumo_personal(payload)
     except Exception:
         log.exception("fallo reponiendo stock de venta %s", payload.get("venta_id"))
+
+
+def _reversar_consumo_personal(payload: dict) -> None:
+    """Avisa que el gasto de ese consumo ya no existe. Sin esto la reposición
+    del insumo dejaría el gasto de alimentación de personal inflado por algo
+    que nadie comió."""
+    with session_factory() as session:
+        empresa_id = session.scalar(
+            select(Sucursal.empresa_id).where(
+                Sucursal.id == uuid.UUID(payload["sucursal_id"])
+            )
+        )
+        event_bus.publish(
+            "inventory.consumo_personal_reversado",
+            {
+                "venta_id": payload["venta_id"],
+                "empresa_id": str(empresa_id) if empresa_id else None,
+            },
+            session=session,
+        )
+        session.commit()
 
 
 def _actualizar_costo_promedio(
@@ -423,6 +490,7 @@ def register() -> None:
         return
     _registrado = True
     event_bus.subscribe("sales.venta_confirmada", on_venta_confirmada)
+    event_bus.subscribe("sales.consumo_personal_registrado", on_consumo_personal)
     event_bus.subscribe("sales.venta_anulada", on_venta_anulada)
     # Anular líneas sueltas repone igual que anular la venta entera: el
     # payload trae solo las líneas quitadas.

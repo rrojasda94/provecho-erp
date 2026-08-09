@@ -43,6 +43,13 @@ class VentaCreate(BaseModel):
     # conexión y conservar su id al llegar al servidor (ADR-009); si no lo
     # manda, lo genera el servidor como siempre.
     id: uuid.UUID | None = None
+    # --- Consumo de personal (RN-COM-025) ------------------------------------
+    # `tipo="consumo_personal"` arma el pedido con todas sus líneas en cero.
+    # `autorizacion` es el token de `POST /auth/autorizar`: la comida
+    # regalada la firma un encargado con su PIN, nunca el cajero que la pide.
+    tipo: str = "venta"
+    consumo_motivo: str | None = None
+    autorizacion: str | None = None
 
 
 class VentaOut(BaseModel):
@@ -61,6 +68,8 @@ class VentaOut(BaseModel):
     descuento_modo: str | None = None
     descuento_valor: Decimal | None = None
     descuento_motivo: str | None = None
+    tipo: str = "venta"
+    consumo_motivo: str | None = None
 
 
 class DescuentoCreate(BaseModel):
@@ -259,6 +268,13 @@ class VentaSyncIn(BaseModel):
     descuento_valor: Decimal | None = None
     descuento_motivo: str | None = None
     descuento_autorizado_por: uuid.UUID | None = None
+    # Consumo de personal (RN-COM-025), por el mismo motivo: sin el tipo la
+    # nube reproduciría la comida del turno como una venta de S/ 0.00 —con
+    # asiento de ingreso y lead atribuido—, y el encargado ya firmó en la
+    # sucursal. Con default para los lotes emitidos antes de que existiera.
+    tipo: str = "venta"
+    consumo_motivo: str | None = None
+    consumo_autorizado_por: uuid.UUID | None = None
 
 
 class PagoSyncIn(BaseModel):

@@ -134,6 +134,28 @@ def anular_asiento(session: Session, asiento_id: uuid.UUID, *, actor_id: uuid.UU
     return reversa
 
 
+def anular_asiento_por_origen(
+    session: Session,
+    *,
+    empresa_id: uuid.UUID,
+    evento: str,
+    referencia_origen: str,
+    actor_id: uuid.UUID | None = None,
+) -> Asiento | None:
+    """Reversa el asiento automático de un hecho que se deshizo.
+
+    `None` si nunca se generó (sin regla configurada, o ya anulado): igual
+    que el resto de la generación automática, deshacer algo que no existe no
+    es un error que deba romper el proceso de origen.
+    """
+    original = AsientoRepo(session).get_por_origen(
+        empresa_id, evento, referencia_origen
+    )
+    if original is None or original.estado != "registrado":
+        return None
+    return anular_asiento(session, original.id, actor_id=actor_id)
+
+
 def crear_asiento_automatico(
     session: Session,
     *,

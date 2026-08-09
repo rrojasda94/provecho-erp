@@ -389,7 +389,9 @@ entre `aprobada` y `despachada` no cambia qué se puede hacer (ADR-020).
 ## Relaciones
 
 - Escucha: `sales.venta_confirmada` (descuenta insumos según receta),
-  `purchases.compra_recibida` (suma stock central),
+  `sales.consumo_personal_registrado` (misma expansión de receta, pero con
+  `tipo_movimiento=consumo_interno` y **valorizando** lo consumido —
+  RN-COM-027, ADR-034), `purchases.compra_recibida` (suma stock central),
   `production.orden_completada` (consume insumos, produce subrecetas).
 - Publica: `inventory.stock_consumido` (auditoría del descuento por venta/
   producción), `inventory.stock_bajo_minimo`, `inventory.transferencia_recibida`,
@@ -400,7 +402,12 @@ entre `aprobada` y `despachada` no cambia qué se puede hacer (ADR-020).
   `inventory.lote_vencido_detectado` (notifica y dispara memorándum al
   responsable si el lote vencido seguía disponible),
   `inventory.conteo_vencido` (reporte a almacén y gerencia de la categoría
-  que no se contó en su fecha, RN-INV-021).
+  que no se contó en su fecha, RN-INV-021),
+  `inventory.consumo_personal_valorizado` (comida del personal ya
+  descontada, con su monto al `costo_promedio` — accounting la asienta como
+  gasto de alimentación de personal) y
+  `inventory.consumo_personal_reversado` (el consumo se anuló: el insumo
+  volvió y el asiento se reversa).
 - Contrato público de lectura: `application/queries_publicas.py` — hoy
   `unidad_medida_para_magnitud` (nombre y `decimales` de una UdM, para que
   otro módulo exprese una cantidad con su unidad, RN-GER-010),
