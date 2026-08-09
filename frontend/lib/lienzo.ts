@@ -72,6 +72,20 @@ export function recetasDe(
   return [...new Set(ids.filter((id): id is string => Boolean(id)))];
 }
 
+/** Las recetas que el lienzo necesita traer: las del plato que se está
+ * armando, más la del nodo que se está inspeccionando —que puede no estar en
+ * el plato, porque se abre para editarla, no para sumarla—. */
+export function recetasDelLienzo(
+  activo: ProductoDetalle,
+  elegidos: Elegido[],
+  inspeccionada: string | null,
+): string[] {
+  const ids = recetasDe(activo, elegidos);
+  return inspeccionada && !ids.includes(inspeccionada)
+    ? [...ids, inspeccionada]
+    : ids;
+}
+
 export function armarPartes(
   activo: ProductoDetalle,
   nombrePadre: string,
@@ -134,7 +148,15 @@ export const MEDIDAS = {
   porColumna: 7,
 };
 
-export type TipoNodo = "producto" | "tamano" | "opcion" | "empaque" | "resta" | "plato";
+export type TipoNodo =
+  | "producto"
+  | "tamano"
+  | "grupo"
+  | "opcion"
+  | "disponible"
+  | "empaque"
+  | "resta"
+  | "plato";
 
 export type NodoLienzo = {
   id: string;
@@ -191,6 +213,13 @@ export function apilarColumna(
 
 const columnaX = (indice: number) => indice * MEDIDAS.separacionColumna;
 
+/** Cuántos lugares de columna ocupa una lista que se envuelve. Sin esto, una
+ * columna de 18 chips se parte en tres y se monta encima de la siguiente:
+ * la envoltura ensancha la columna y el índice tiene que enterarse. */
+export function subcolumnas(cuantos: number, porColumna = MEDIDAS.porColumna): number {
+  return Math.max(1, Math.ceil(cuantos / porColumna));
+}
+
 function nodoProducto(padre: ProductoDetalle): NodoLienzo {
   return {
     id: "producto",
@@ -239,6 +268,14 @@ function columnaTamanos(
   };
 }
 
+/**
+ * Una columna de opciones, encabezada por **el nodo del grupo**.
+ *
+ * El grupo es un nodo y no un rótulo porque es el destino de una conexión:
+ * arrastrar un extra disponible hasta él es lo que lo cuelga *en ese grupo*
+ * (`vincular_extra` con `grupo_id`). Sin nodo de grupo, colgar algo en
+ * "Sabor" y colgarlo suelto serían el mismo gesto.
+ */
 function columnaDeOpciones(
   extras: ExtraDeProducto[],
   grupo: GrupoOpcion | null,
@@ -247,15 +284,14 @@ function columnaDeOpciones(
   camino: Camino,
   recetas: Receta[],
 ): Grafo {
-  const elegidas = grupo
-    ? (camino.elegidas[grupo.id] ?? [])
-    : camino.sueltos;
+  const elegidas = grupo ? (camino.elegidas[grupo.id] ?? []) : camino.sueltos;
+  const cabeza = grupo ? `grupo:${grupo.id}` : `tamano:${activo.id}`;
   const posiciones = apilarColumna(
     extras.length,
     columnaX(indice),
     MEDIDAS.altoNodo,
   );
-  const nodos = extras.map((e, i) => ({
+  const nodos: NodoLienzo[] = extras.map((e, i) => ({
     id: `opcion:${grupo?.id ?? "sueltos"}:${e.extra_id}`,
     tipo: "opcion" as const,
     ...posiciones[i],
@@ -269,15 +305,73 @@ function columnaDeOpciones(
       columna: grupo?.nombre ?? "Extras",
     },
   }));
-  const origen = `tamano:${activo.id}`;
+  const aristas: AristaLienzo[] = nodos.map((n) => ({
+    id: `${cabeza}→${n.id}`,
+    desde: cabeza,
+    hasta: n.id,
+    clase: n.datos.activo ? ("camino" as const) : ("posible" as const),
+  }));
+
+  if (grupo) {
+    // El nodo del grupo se apoya arriba de su columna, no en el centro: así
+    // se lee como cabecera y no como una opción más.
+    const arriba = Math.min(...posiciones.map((p) => p.y), 0);
+    nodos.push({
+      id: `grupo:${grupo.id}`,
+      tipo: "grupo",
+      x: columnaX(indice),
+      y: arriba - (MEDIDAS.altoNodo + MEDIDAS.separacionFila),
+      datos: {
+        titulo: grupo.nombre,
+        pie: reglaDeGrupo(grupo),
+        activo: (camino.elegidas[grupo.id] ?? []).length >= grupo.minimo,
+        refId: grupo.id,
+        grupoId: grupo.id,
+        columna: "Grupo",
+      },
+    });
+    aristas.push({
+      id: `tamano:${activo.id}→grupo:${grupo.id}`,
+      desde: `tamano:${activo.id}`,
+      hasta: `grupo:${grupo.id}`,
+      clase: "posible",
+    });
+  }
+  return { nodos, aristas };
+}
+
+/**
+ * Los extras que existen y este producto todavía NO ofrece.
+ *
+ * Están en el lienzo justamente para poder conectarlos: se arrastra de un
+ * grupo (o del tamaño, para dejarlo suelto) hasta uno de estos y eso lo
+ * cuelga. Es la versión de "agregar un nodo y cablearlo" que el dominio
+ * admite — la topología entre tamaño, sabor y plato la sigue dictando
+ * RN-PRD-004 y no se cablea a mano.
+ */
+function columnaDisponibles(
+  disponibles: { id: string; nombre: string }[],
+  indice: number,
+): Grafo {
+  const posiciones = apilarColumna(
+    disponibles.length,
+    columnaX(indice),
+    MEDIDAS.altoChip,
+  );
   return {
-    nodos,
-    aristas: nodos.map((n) => ({
-      id: `${origen}→${n.id}`,
-      desde: origen,
-      hasta: n.id,
-      clase: n.datos.activo ? ("camino" as const) : ("posible" as const),
+    nodos: disponibles.map((d, i) => ({
+      id: `disponible:${d.id}`,
+      tipo: "disponible" as const,
+      ...posiciones[i],
+      datos: {
+        titulo: d.nombre,
+        aria: `${d.nombre} — sin vincular`,
+        activo: false,
+        refId: d.id,
+        columna: "Disponibles",
+      },
     })),
+    aristas: [],
   };
 }
 
@@ -371,6 +465,8 @@ export function armarGrafo(params: {
   quitables: { articuloId: string; articulo: string }[];
   empaques: Articulo[];
   modalidad: string;
+  /** Extras que existen y este producto todavía no ofrece. */
+  disponibles?: { id: string; nombre: string }[];
 }): Grafo {
   const { padre, variantes, activo, camino, recetas, quitables } = params;
   // Un producto sin tamaños es su propio nodo: "simple" es el árbol de un
@@ -386,7 +482,7 @@ export function armarGrafo(params: {
     partes.push(
       columnaDeOpciones(grupo.extras, grupo, columna, activo, camino, recetas),
     );
-    columna += 1;
+    columna += subcolumnas(grupo.extras.length);
   }
   partes.push(
     columnaDeOpciones(
@@ -398,9 +494,12 @@ export function armarGrafo(params: {
       recetas,
     ),
   );
-  columna += 1;
+  columna += subcolumnas(activo.extras_sueltos.length);
+  const disponibles = params.disponibles ?? [];
+  partes.push(columnaDisponibles(disponibles, columna));
+  columna += subcolumnas(disponibles.length);
   partes.push(columnaRestas(quitables, columna, camino));
-  columna += 1;
+  columna += subcolumnas(quitables.length);
   partes.push(nodoEmpaque(activo, params.empaques, params.modalidad, columna));
   columna += 1;
 

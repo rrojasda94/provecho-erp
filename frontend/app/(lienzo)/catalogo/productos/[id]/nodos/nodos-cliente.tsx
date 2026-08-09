@@ -32,8 +32,9 @@ import {
   elegidosDelCamino,
   elegirEnGrupo,
   faltantesDeGrupos,
-  recetasDe,
+  recetasDelLienzo,
   resolverEmpaque,
+  sinVincular,
   tituloDelPlato,
   type Camino,
   type Grafo,
@@ -43,6 +44,8 @@ import { fusionar, soles } from "@/lib/nodos";
 import { Barra } from "./barra";
 import { Inspector } from "./inspector";
 import { TIPOS_NODO, type DatosNodo } from "./nodo";
+import { RecetaDelNodo } from "./receta-nodo";
+import { conectar, desconectar } from "./conexiones";
 
 import "@xyflow/react/dist/base.css";
 
@@ -116,6 +119,11 @@ function Lienzo({
   });
   const [precio, setPrecio] = useState("");
   const [modalidad, setModalidad] = useState("mesa");
+  // Qué nodo se está inspeccionando. Es distinto de "qué nodo está en el
+  // plato": tocar un sabor lo mete al plato Y abre su receta, que es lo que
+  // uno quiere al estar armando la carta.
+  const [seleccion, setSeleccion] = useState<DatosNodo | null>(null);
+  const [verEditor, setVerEditor] = useState(false);
 
   const activo =
     [padre, ...variantes].find((n) => n.id === camino.activoId) ?? padre;
@@ -154,10 +162,12 @@ function Lienzo({
     () => elegidosDelCamino(activo, camino.elegidas, camino.sueltos),
     [activo, camino.elegidas, camino.sueltos],
   );
-  const cache = useCacheDeRecetas(
-    useMemo(() => recetasDe(activo, elegidos), [activo, elegidos]),
-    setError,
+  const inspeccionada = seleccion?.recetaId ?? null;
+  const idsDeRecetas = useMemo(
+    () => recetasDelLienzo(activo, elegidos, inspeccionada),
+    [activo, elegidos, inspeccionada],
   );
+  const [cache, setCache] = useCacheDeRecetas(idsDeRecetas, setError);
 
   const partes = useMemo(
     () => armarPartes(activo, padre.nombre, elegidos, cache),
@@ -188,6 +198,11 @@ function Lienzo({
     [activo.id, correr],
   );
 
+  const disponibles = useMemo(
+    () => sinVincular(extrasDisponibles, activo),
+    [extrasDisponibles, activo],
+  );
+
   const grafo = useMemo(
     () =>
       armarGrafo({
@@ -199,8 +214,10 @@ function Lienzo({
         quitables: fusion.quitables,
         empaques,
         modalidad,
+        disponibles,
       }),
-    [padre, variantes, activo, camino, recetas, fusion.quitables, empaques, modalidad],
+    [padre, variantes, activo, camino, recetas, fusion.quitables, empaques,
+     modalidad, disponibles],
   );
 
   const { nodos, aristas } = useMemo(
@@ -221,7 +238,21 @@ function Lienzo({
         onCorrer={correr}
       />
 
-      <Canvas nodos={nodos} aristas={aristas} ocupado={ocupado} />
+      <Canvas
+        nodos={nodos}
+        aristas={aristas}
+        ocupado={ocupado}
+        onSeleccion={(d) => {
+          setSeleccion(d);
+          if (d?.recetaId) setVerEditor(true);
+        }}
+        onConectar={(desde, hasta) =>
+          correr(() => conectar(activo.id, desde, hasta))
+        }
+        onDesconectar={(desde, hasta) =>
+          correr(() => desconectar(activo.id, desde, hasta))
+        }
+      />
 
       <Inspector
         titulo={tituloDelPlato(activo, padre, partes)}
@@ -236,8 +267,49 @@ function Lienzo({
         faltantes={faltantesDeGrupos(activo, camino.elegidas)}
         plegado={plegado}
         onPlegar={() => setPlegado((p) => !p)}
+        nodoTitulo={seleccion?.titulo ?? null}
+        verEditor={verEditor}
+        onVerEditor={setVerEditor}
+        editor={
+          <EditorDeNodo
+            seleccion={seleccion}
+            cache={cache}
+            articulos={empaques}
+            onActualizada={setCache}
+            onError={setError}
+          />
+        }
       />
     </div>
+  );
+}
+
+/** La receta del nodo inspeccionado. Devuelve `null` sin nodo: el inspector
+ * usa eso para no mostrar la pestaña. */
+function EditorDeNodo({
+  seleccion,
+  cache,
+  articulos,
+  onActualizada,
+  onError,
+}: {
+  seleccion: DatosNodo | null;
+  cache: Record<string, RecetaDetalle>;
+  articulos: Articulo[];
+  onActualizada: React.Dispatch<
+    React.SetStateAction<Record<string, RecetaDetalle>>
+  >;
+  onError: (mensaje: string) => void;
+}) {
+  if (!seleccion) return null;
+  return (
+    <RecetaDelNodo
+      titulo={seleccion.titulo}
+      receta={seleccion.recetaId ? (cache[seleccion.recetaId] ?? null) : null}
+      articulos={articulos}
+      onActualizada={(r) => onActualizada((p) => ({ ...p, [r.id]: r }))}
+      onError={onError}
+    />
   );
 }
 
@@ -256,10 +328,16 @@ function Canvas({
   nodos,
   aristas,
   ocupado,
+  onSeleccion,
+  onConectar,
+  onDesconectar,
 }: {
   nodos: Node[];
   aristas: Edge[];
   ocupado: boolean;
+  onSeleccion: (d: DatosNodo | null) => void;
+  onConectar: (desde: string, hasta: string) => void;
+  onDesconectar: (desde: string, hasta: string) => void;
 }) {
   const [pintados, setPintados, onNodesChange] = useNodesState(nodos);
   const { fitView, getZoom } = useReactFlow();
@@ -316,8 +394,19 @@ function Canvas({
         maxZoom={1.75}
         // La topología la dicta RN-PRD-004: se pueden mover los nodos, pero
         // no cablearlos a mano.
-        nodesConnectable={false}
-        edgesFocusable={false}
+        // Se cablea, pero solo lo que el dominio admite: `conexiones.ts`
+        // rechaza cualquier par que no sea colgar un extra.
+        nodesConnectable
+        onConnect={(c) => onConectar(c.source, c.target)}
+        onEdgesDelete={(ids) =>
+          ids.forEach((e) => onDesconectar(e.source, e.target))
+        }
+        // `onNodeClick` y no `onSelectionChange`: la selección de react-flow
+        // vive DENTRO de cada nodo del array, y este lienzo reemplaza el
+        // array entero cada vez que cambia el camino — la marca se perdía en
+        // el mismo click que la ponía.
+        onNodeClick={(_, n) => onSeleccion(n.data as DatosNodo)}
+        onPaneClick={() => onSeleccion(null)}
         proOptions={{ hideAttribution: false }}
       >
         <Background variant={BackgroundVariant.Dots} gap={22} size={1} />
@@ -396,7 +485,10 @@ function aReactFlow(
 function useCacheDeRecetas(
   ids: string[],
   onError: (mensaje: string) => void,
-): Record<string, RecetaDetalle> {
+): [
+  Record<string, RecetaDetalle>,
+  React.Dispatch<React.SetStateAction<Record<string, RecetaDetalle>>>,
+] {
   const [cache, setCache] = useState<Record<string, RecetaDetalle>>({});
   const clave = ids.join(",");
 
@@ -425,5 +517,8 @@ function useCacheDeRecetas(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clave, onError]);
 
-  return cache;
+  // Se devuelve el `set` porque editar una receta desde un nodo la actualiza
+  // en el acto: el endpoint responde la receta completa, así que refrescar el
+  // cache con eso evita una segunda vuelta a la red.
+  return [cache, setCache];
 }

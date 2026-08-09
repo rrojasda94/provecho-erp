@@ -243,3 +243,59 @@ prueba de que el rediseño no movió un centavo.
 **Costo asumido:** una dependencia más en el frontend, y una pantalla del
 back-office que ya no vive dentro del shell (pierde barra superior, campana y
 menú del módulo; se compensa con enlaces de vuelta en su propia barra).
+
+## Segunda enmienda (2026-08-09) — el nodo se edita, no solo se toca
+
+La §4 original —y la enmienda de arriba, que la conservó— mandaba editar las
+cantidades **solo** en Catálogo → Recetas, citando la corrección de ADR-023
+§4. También eso se revierte, y conviene decir por qué no es una contradicción.
+
+Lo que ADR-023 §4 corrigió fue **duplicación**: el mismo editor de receta
+puesto en la ficha del producto *y* en el módulo de recetas hacía pensar que
+eran dos recetas distintas. El problema era tener el mismo trabajo en dos
+lugares que no se sabían relacionados.
+
+Acá no es eso. El lienzo **es** el lugar de trabajo del catálogo, y un nodo
+del que no se puede abrir lo que contiene es un dibujo, no una herramienta —
+que fue, palabra por palabra, lo que el usuario dijo: *"no es solo una
+interfaz visual, es una forma de trabajar"*. Catálogo → Recetas sigue siendo
+el dueño de lo que esta vista no hace: crear, duplicar, escalar por factor,
+renombrar, asignar la subreceta que produce. El enlace desde cada nodo se
+conserva.
+
+**Qué se agrega:**
+
+1. **La receta se edita en el inspector del nodo tocado.** Cambiar una
+   cantidad, cambiar la merma, quitar un insumo, agregar uno. La cantidad
+   acepta aritmética y **la evalúa el servidor** (`shared/aritmetica`,
+   RN-COM-024): el navegador manda `"1000/3"`, nunca el resultado. Cada
+   endpoint devuelve la receta completa, así que el lienzo refresca su cache
+   sin una segunda vuelta a la red.
+2. **El grupo pasa a ser un nodo.** No por simetría: es el **destino de una
+   conexión**. Sin nodo de grupo, colgar un extra "en Sabor" y colgarlo
+   "suelto" serían el mismo gesto.
+3. **Los extras que el producto todavía no ofrece son nodos**, en su propia
+   columna y apagados. Existen para poder cablearlos.
+4. **Se conecta y se desconecta de verdad**, pero solo lo que el dominio
+   admite (`conexiones.ts`):
+
+   | Conexión | Significa |
+   |---|---|
+   | `grupo → disponible` | vincular el extra **dentro** de ese grupo |
+   | `tamaño → disponible` | vincularlo suelto (siempre opcional) |
+   | cortar `grupo → opción` | desvincular (el extra **no** se borra) |
+
+   Cualquier otro par se rechaza **con un mensaje que dice qué sí se puede**:
+   un cable que no engancha y no explica por qué es peor que uno que no se
+   deja tirar. La topología tamaño → sabor → plato la sigue dictando
+   RN-PRD-004 y no se negocia con el mouse.
+
+**Lo que sigue sin cambiar:** el modelo, las restas, la fusión calculada en
+el cliente que no se guarda, y que las posiciones de los nodos no se
+persisten.
+
+**Costo asumido:** el inspector tiene dos vistas en vez de una, y la columna
+de "disponibles" puede ser larga —los sabores de los otros tamaños aparecen
+ahí, porque para *este* tamaño efectivamente no están vinculados—. Se
+envuelve en subcolumnas y el lienzo reserva el ancho; si molesta, el filtro
+del popover "+ opción" sigue siendo el camino corto.

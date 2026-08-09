@@ -29,6 +29,7 @@ import {
   reglaDeGrupo,
   resolverEmpaque,
   sinVincular,
+  subcolumnas,
   tituloDelPlato,
   type Camino,
 } from "./lienzo.ts";
@@ -93,25 +94,77 @@ const grafo = (over: any = {}) =>
     quitables: [{ articuloId: "a1", articulo: "Orégano" }],
     empaques: [],
     modalidad: "mesa",
+    disponibles: [{ id: "e7", nombre: "Extra Tocino" }],
     ...over,
   });
 
 test("las columnas salen en el orden de RN-PRD-004", () => {
   const { nodos } = grafo();
-  const porX = [...nodos].sort((a, b) => a.x - b.x);
-  const orden: string[] = [];
-  for (const n of porX) {
-    if (orden.at(-1) !== n.datos.columna) orden.push(n.datos.columna);
+  // Se agrupa por X y no por orden del array: el nodo del grupo comparte
+  // columna con sus opciones, así que "primero Sabor y después Grupo" sería
+  // una diferencia sin significado.
+  const porX = new Map<number, Set<string>>();
+  for (const n of nodos) {
+    porX.set(n.x, (porX.get(n.x) ?? new Set()).add(n.datos.columna));
   }
+  const orden = [...porX.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([, cols]) => [...cols].sort().join("+"));
   assert.deepEqual(orden, [
     "Producto",
     "Tamaño",
-    "Sabor",
+    "Grupo+Sabor",
     "Extras",
+    "Disponibles",
     "Restas",
     "Empaque",
     "Plato",
   ]);
+});
+
+test("el grupo es un nodo, y sus opciones cuelgan de él y no del tamaño", () => {
+  const { nodos, aristas } = grafo();
+  const cabeza = nodos.find((n) => n.tipo === "grupo");
+  assert.equal(cabeza?.id, "grupo:g1");
+  assert.equal(cabeza?.datos.pie, "elige 1 · hasta 1");
+
+  // Existe para poder colgarle cosas: es el destino de la conexión que
+  // vincula un extra DENTRO del grupo.
+  assert.ok(
+    aristas.some((a) => a.desde === "tamano:fam" && a.hasta === "grupo:g1"),
+    "el grupo cuelga del tamaño",
+  );
+  assert.ok(
+    aristas.some((a) => a.desde === "grupo:g1" && a.hasta === "opcion:g1:e1"),
+    "las opciones del grupo cuelgan del grupo",
+  );
+  assert.ok(
+    !aristas.some((a) => a.desde === "tamano:fam" && a.hasta === "opcion:g1:e1"),
+    "y NO del tamaño: si colgaran de los dos, borrar la arista sería ambiguo",
+  );
+});
+
+test("el grupo obligatorio sin cumplir no se marca activo", () => {
+  assert.equal(
+    grafo({ camino: { ...CAMINO, elegidas: {} } })
+      .nodos.find((n) => n.id === "grupo:g1")?.datos.activo,
+    false,
+  );
+  assert.equal(
+    grafo().nodos.find((n) => n.id === "grupo:g1")?.datos.activo,
+    true,
+  );
+});
+
+test("los extras sin vincular son nodos sueltos, sin aristas", () => {
+  const { nodos, aristas } = grafo();
+  const libre = nodos.find((n) => n.tipo === "disponible");
+  assert.equal(libre?.id, "disponible:e7");
+  assert.equal(libre?.datos.refId, "e7");
+  assert.ok(
+    !aristas.some((a) => a.desde === libre!.id || a.hasta === libre!.id),
+    "no cuelga de nada todavía: conectarlo es lo que lo vincula",
+  );
 });
 
 test("solo lo elegido alimenta el plato", () => {
@@ -171,6 +224,26 @@ test("un producto sin tamaños es su propio nodo de tamaño", () => {
   const tamanos = nodos.filter((n) => n.tipo === "tamano");
   assert.equal(tamanos.length, 1);
   assert.equal(tamanos[0].datos.titulo, "Único");
+});
+
+test("una columna que se envuelve no se monta sobre la siguiente", () => {
+  // 18 disponibles se parten en 3 subcolumnas; si el índice de columna no lo
+  // contempla, las restas quedan encima.
+  const muchos = Array.from({ length: 18 }, (_, i) => ({
+    id: `d${i}`,
+    nombre: `Extra ${i}`,
+  }));
+  const { nodos } = grafo({ disponibles: muchos });
+  const xDe = (col: string) =>
+    nodos.filter((n) => n.datos.columna === col).map((n) => n.x);
+  const maxDisponible = Math.max(...xDe("Disponibles"));
+  const minResta = Math.min(...xDe("Restas"));
+  assert.ok(
+    maxDisponible < minResta,
+    `disponibles llega a ${maxDisponible} y restas arranca en ${minResta}`,
+  );
+  assert.equal(subcolumnas(18), 3);
+  assert.equal(subcolumnas(0), 1, "una columna vacía igual ocupa su lugar");
 });
 
 test("apilarColumna centra y envuelve al pasar del tope", () => {

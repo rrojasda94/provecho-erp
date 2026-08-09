@@ -186,6 +186,11 @@ es un grupo obligatorio de una sola opción con receta propia (RN-COM-021/023).
   la calcula el cliente y **no se guarda**: lo que se descuenta de verdad
   sale del servidor al confirmar la venta. Vive fuera del shell del módulo
   (como PDV y KDS) y por eso hace su propio guard de `sales.gestionar_catalogo`.
+  **Se edita desde ahí**: la receta del nodo tocado (cantidades, merma,
+  agregar/quitar insumo) y la estructura por cableado — arrastrar de un grupo
+  a un extra disponible lo vincula en ese grupo, cortar la arista lo
+  desvincula. La topología tamaño → sabor → plato la sigue dictando
+  RN-PRD-004 y no se cablea a mano.
 
 Diferido a un slice posterior: `combo`, `promocion`, `carrito`,
 `central_pedidos`, `cuenta_puntos`/`puntos_movimiento`,
