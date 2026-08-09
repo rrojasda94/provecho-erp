@@ -6,9 +6,34 @@ import type {
   Receta,
   UnidadMedida,
 } from "@/lib/catalogo";
+import { MODULOS } from "@/lib/modulos";
+import { puedeVerModulo } from "@/lib/permisos";
 import { obtenerSesion } from "@/lib/sesion";
 
 import { LienzoNodos } from "./nodos-cliente";
+import "./lienzo.css";
+
+/**
+ * El lienzo vive **fuera** del shell del módulo, como el PDV y el KDS: un
+ * grafo necesita los 100dvh y una superficie oscura, y un rectángulo negro
+ * encajonado en la columna crema del ERP se lee como un error de render.
+ *
+ * El costo de salir del shell es que se pierde el guard de `ModuloShell`, así
+ * que la pantalla lo hace ella. `puedeVerModulo()` y no un string a mano: es
+ * el único lugar que resuelve prefijo-vs-permiso-exacto (enmienda de ADR-013,
+ * 2026-08-03), y duplicar la comprobación es cómo un módulo termina visible
+ * en una pantalla y bloqueado en otra.
+ */
+const CATALOGO = MODULOS.find((m) => m.clave === "catalogo")!;
+
+function Bloqueo({ titulo, detalle }: { titulo: string; detalle: string }) {
+  return (
+    <main className="lienzo-vacio">
+      <h1>{titulo}</h1>
+      <p>{detalle}</p>
+    </main>
+  );
+}
 
 export default async function NodosPage({
   params,
@@ -16,7 +41,16 @@ export default async function NodosPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const { token } = await obtenerSesion();
+  const { token, usuario } = await obtenerSesion();
+
+  if (!puedeVerModulo(usuario.permisos, CATALOGO)) {
+    return (
+      <Bloqueo
+        titulo="Sin permiso"
+        detalle="Tu usuario no tiene acceso al catálogo. Pídele a un administrador el permiso `sales.gestionar_catalogo`."
+      />
+    );
+  }
 
   try {
     const [producto, recetas, unidades, productos, articulos] = await Promise.all([
@@ -50,7 +84,7 @@ export default async function NodosPage({
     const mensaje =
       e instanceof ApiError && e.status === 403
         ? "Tu usuario no tiene permiso para ver este producto."
-        : "No se pudo cargar el producto.";
-    return <p className="text-secondary">{mensaje}</p>;
+        : "No se pudo cargar el producto. Revisa la conexión con la API.";
+    return <Bloqueo titulo="No se pudo abrir el lienzo" detalle={mensaje} />;
   }
 }

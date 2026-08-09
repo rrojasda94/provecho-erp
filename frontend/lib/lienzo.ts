@@ -127,7 +127,7 @@ export const MEDIDAS = {
   anchoNodo: 200,
   altoNodo: 76,
   altoChip: 44,
-  separacionColumna: 300,
+  separacionColumna: 250,
   separacionFila: 24,
   /** Restas: son una por insumo y pueden ser muchas; se apilan en
    * subcolumnas para que la fila no se vuelva un muro vertical. */
@@ -146,6 +146,10 @@ export type NodoLienzo = {
     pie?: string;
     /** Está dentro del plato que se está armando. */
     activo: boolean;
+    /** Nombre accesible cuando el texto visible no alcanza: el chip de una
+     * resta dice "Orégano" y el lector de pantalla tiene que oír "sin
+     * Orégano", que es lo que el plato realmente pide. */
+    aria?: string;
     /** Id del producto/artículo real detrás del nodo, para las acciones. */
     refId?: string;
     recetaId?: string | null;
@@ -293,6 +297,7 @@ function columnaRestas(
     ...posiciones[i],
     datos: {
       titulo: q.articulo,
+      aria: `sin ${q.articulo}`,
       activo: camino.restas.includes(q.articuloId),
       refId: q.articuloId,
       columna: "Restas",
