@@ -6,7 +6,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   catalogoApi,
   type Articulo,
-  type ExtraDeProducto,
   type GrupoOpcion,
   type Producto,
   type ProductoDetalle,
@@ -16,12 +15,21 @@ import {
 } from "@/lib/catalogo";
 import { ErrorApi } from "@/lib/cliente-api";
 import {
-  cantidadCorta,
-  fusionar,
-  margen,
-  soles,
-  type ParteDeReceta,
-} from "@/lib/nodos";
+  alternar,
+  armarPartes,
+  elegidosDelCamino,
+  elegirEnGrupo,
+  etiquetaCorta,
+  faltantesDeGrupos,
+  nombreReceta,
+  recetasDe,
+  reglaDeGrupo,
+  resolverEmpaque,
+  sinVincular,
+  tituloDelPlato,
+  type Camino,
+} from "@/lib/lienzo";
+import { cantidadCorta, fusionar, margen, soles } from "@/lib/nodos";
 import { aTitulo } from "@/lib/texto";
 
 /**
@@ -134,22 +142,8 @@ export function LienzoNodos({
     resolverEmpaque(activo, empaques, modalidad);
   const costoTotal = fusion.costo + costoEmpaque;
 
-  function elegirEnGrupo(grupo: GrupoOpcion, extraId: string) {
-    setCamino((previo) => {
-      const actual = previo.elegidas[grupo.id] ?? [];
-      // Un grupo de un solo cupo se comporta como radio: elegir Peperoni
-      // reemplaza Hawaiana en vez de sumarla. Mismo tope que valida el
-      // servidor al confirmar la venta (RN-COM-023).
-      const nuevas =
-        grupo.maximo === 1 && !actual.includes(extraId)
-          ? [extraId]
-          : alternar(actual, extraId);
-      return {
-        ...previo,
-        elegidas: { ...previo.elegidas, [grupo.id]: nuevas },
-      };
-    });
-  }
+  const enGrupo = (grupo: GrupoOpcion, extraId: string) =>
+    setCamino((previo) => elegirEnGrupo(previo, grupo, extraId));
 
   const alternarSuelto = (id: string) =>
     setCamino((p) => ({ ...p, sueltos: alternar(p.sueltos, id) }));
@@ -207,7 +201,7 @@ export function LienzoNodos({
             elegidas={elegidas}
             sueltos={sueltos}
             extrasDisponibles={extrasDisponibles}
-            onElegirEnGrupo={elegirEnGrupo}
+            onElegirEnGrupo={enGrupo}
             onAlternarSuelto={alternarSuelto}
             onCorrer={correr}
           />
@@ -1002,140 +996,4 @@ function Fila({
       <dd className={fuerte ? "font-bold text-dark" : "text-dark"}>{valor}</dd>
     </div>
   );
-}
-
-// --- El camino: qué nodos están elegidos y qué receta aporta cada uno -------
-/** Tamaño activo + lo elegido bajo él. Un solo estado porque cambian juntos:
- * la selección de un tamaño no significa nada bajo otro. */
-type Camino = {
-  activoId: string;
-  /** `grupo_id` → ids de las opciones elegidas en ese grupo. */
-  elegidas: Record<string, string[]>;
-  sueltos: string[];
-  /** `articulo_id` de lo que el plato NO lleva. */
-  restas: string[];
-};
-
-/** Un nodo elegido, ya resuelto contra la ficha: el extra y de qué grupo
- * salió (o ninguno, si es suelto). */
-type Elegido = { extra: ExtraDeProducto; grupo: GrupoOpcion | null };
-
-function elegidosDelCamino(
-  activo: ProductoDetalle,
-  elegidas: Record<string, string[]>,
-  sueltos: string[],
-): Elegido[] {
-  const salida: Elegido[] = [];
-  for (const grupo of activo.grupos) {
-    for (const id of elegidas[grupo.id] ?? []) {
-      const extra = grupo.extras.find((e) => e.extra_id === id);
-      if (extra) salida.push({ extra, grupo });
-    }
-  }
-  for (const id of sueltos) {
-    const extra = activo.extras_sueltos.find((e) => e.extra_id === id);
-    if (extra) salida.push({ extra, grupo: null });
-  }
-  return salida;
-}
-
-function recetasDe(activo: ProductoDetalle, elegidos: Elegido[]): string[] {
-  const ids = [activo.receta_id, ...elegidos.map((e) => e.extra.receta_id)];
-  return [...new Set(ids.filter((id): id is string => Boolean(id)))];
-}
-
-function armarPartes(
-  activo: ProductoDetalle,
-  nombrePadre: string,
-  elegidos: Elegido[],
-  cache: Record<string, RecetaDetalle>,
-): ParteDeReceta[] {
-  const receta = (id: string | null) => (id ? cache[id] ?? null : null);
-  return [
-    {
-      titulo: etiquetaCorta(activo.nombre, nombrePadre),
-      tipo: "tamano",
-      receta: receta(activo.receta_id),
-    },
-    ...elegidos.map(({ extra, grupo }) => ({
-      titulo: extra.nombre,
-      // Un grupo obligatorio es la combinación (el sabor); uno opcional son
-      // extras. La diferencia es el mínimo, no una columna aparte.
-      tipo: ((grupo?.minimo ?? 0) >= 1 ? "sabor" : "extra") as ParteDeReceta["tipo"],
-      receta: receta(extra.receta_id),
-    })),
-  ];
-}
-
-/** El empaque del nodo y si esta modalidad lo consume (RN-EMP-003). No va
- * por `fusionar`: el empaque no es una receta, es una unidad por plato. */
-function resolverEmpaque(
-  nodo: ProductoDetalle,
-  empaques: Articulo[],
-  modalidad: string,
-): { empaque: Articulo | null; aplica: boolean; costo: number } {
-  const empaque = empaques.find((a) => a.id === nodo.empaque_id) ?? null;
-  const aplica =
-    empaque !== null && (nodo.modalidades_empaque ?? []).includes(modalidad);
-  return {
-    empaque,
-    aplica,
-    costo: aplica ? Number(empaque.costo_promedio) : 0,
-  };
-}
-
-// --- Auxiliares -------------------------------------------------------------
-function alternar(lista: string[], id: string): string[] {
-  return lista.includes(id) ? lista.filter((x) => x !== id) : [...lista, id];
-}
-
-/** "Pizza Peperoni Familiar" dentro de "Pizza Peperoni" → "Familiar". */
-function etiquetaCorta(nombre: string, nombrePadre: string): string {
-  return nombre.toLowerCase().startsWith(nombrePadre.toLowerCase())
-    ? nombre.slice(nombrePadre.length).trim() || nombre
-    : nombre;
-}
-
-function nombreReceta(recetas: Receta[], recetaId: string | null): string {
-  if (!recetaId) return "sin receta";
-  return recetas.find((r) => r.id === recetaId)?.nombre ?? "receta";
-}
-
-function reglaDeGrupo(grupo: GrupoOpcion): string {
-  const minimo = grupo.minimo >= 1 ? `elige ${grupo.minimo}` : "opcional";
-  const maximo = grupo.maximo ? `hasta ${grupo.maximo}` : "sin tope";
-  return `${minimo} · ${maximo}`;
-}
-
-function sinVincular(
-  disponibles: Producto[],
-  nodo: ProductoDetalle,
-): Producto[] {
-  const yaEstan = new Set<string>([
-    ...nodo.extras_sueltos.map((e: ExtraDeProducto) => e.extra_id),
-    ...nodo.grupos.flatMap((g) => g.extras.map((e) => e.extra_id)),
-  ]);
-  return disponibles.filter((p) => !yaEstan.has(p.id));
-}
-
-/** Los grupos obligatorios que el camino todavía no cumple — la misma regla
- * que el servidor valida al confirmar la venta (RN-COM-023). */
-function faltantesDeGrupos(
-  nodo: ProductoDetalle,
-  elegidas: Record<string, string[]>,
-): string[] {
-  return nodo.grupos
-    .filter((g) => (elegidas[g.id] ?? []).length < g.minimo)
-    .map((g) => g.nombre);
-}
-
-function tituloDelPlato(
-  nodo: ProductoDetalle,
-  padre: ProductoDetalle,
-  partes: ParteDeReceta[],
-): string {
-  const extras = partes.filter((p) => p.tipo !== "tamano").map((p) => p.titulo);
-  const base =
-    nodo.id === padre.id ? padre.nombre : `${padre.nombre} ${etiquetaCorta(nodo.nombre, padre.nombre)}`;
-  return extras.length ? `${base} · ${extras.join(", ")}` : base;
 }
