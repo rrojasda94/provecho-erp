@@ -55,3 +55,33 @@ test("el admin arma un plato y la resta sale del costo", async ({ page }) => {
   await expect(page.getByText(/No se descuenta \(restas\)/)).toBeVisible();
   await expect(costo).toHaveText("S/ 0.00");
 });
+
+test("el admin edita la receta desde el nodo y el costo se mueve", async ({
+  page,
+}) => {
+  // Lo que hace del lienzo una forma de trabajar y no un dibujo: abrir el
+  // nodo y cambiarle la receta ahí mismo. La cantidad acepta aritmética y la
+  // evalúa el SERVIDOR (RN-COM-024): el navegador manda "0.5*2", no 1.
+  await ingresar(page, ADMIN);
+
+  await page.goto("/catalogo/productos");
+  await page.getByText(/Pizza E2E/).first().click();
+  await page.getByRole("link", { name: /Ver nodos/i }).click();
+
+  const unico = page.locator("button.nodo", { hasText: "Único" });
+  await expect(unico).toBeVisible({ timeout: 30_000 });
+  await unico.click();
+
+  const cantidad = page.locator(".lienzo-cantidad").first();
+  await expect(cantidad).toBeVisible();
+  const costo = page.getByText(/Costo del plato/).locator("xpath=following-sibling::dd");
+
+  await page.locator('[role="tab"]', { hasText: "Plato" }).click();
+  const antes = await costo.innerText();
+
+  await page.locator('[role="tab"]').last().click();
+  await cantidad.fill("0.25*4");
+  await cantidad.blur();
+  await page.locator('[role="tab"]', { hasText: "Plato" }).click();
+  await expect(costo).not.toHaveText(antes);
+});

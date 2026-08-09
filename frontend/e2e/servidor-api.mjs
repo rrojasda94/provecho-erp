@@ -33,6 +33,11 @@ const hijo = spawn(
       // Sin token no se encola nada a Factiliza: la prueba cobra de verdad
       // pero no le habla a SUNAT.
       FACTILIZA_TOKEN: "",
+      // El rate limit de login es 10 por IP y por minuto (RN-SEG), y toda la
+      // suite entra desde 127.0.0.1: con once pruebas, las últimas reciben
+      // 429 y fallan con "no aparece el inicio", que no dice nada del rate
+      // limit. Se sube solo para la suite; el límite real no se toca.
+      RATE_LIMIT_LOGIN_INTENTOS: "100000",
     },
   },
 );

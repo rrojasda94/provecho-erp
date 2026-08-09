@@ -228,6 +228,45 @@
     text-decoration: line-through;
 }
 
+/* Cabecera de columna: es un nodo (para poder cablearle opciones) pero no
+   compite con ellas — más chato, sin relleno y con el nombre en versalitas. */
+.nodo.grupo {
+    min-height: 56px;
+    background: transparent;
+    border-style: dashed;
+    border-color: var(--lienzo-borde-fuerte);
+    box-shadow: none;
+}
+
+.nodo.grupo .nodo-titulo {
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+}
+
+.nodo.grupo.activo {
+    border-style: solid;
+    box-shadow: none;
+}
+
+/* Extra que existe y este producto todavía no ofrece: apagado, esperando que
+   lo cableen a un grupo. */
+.nodo.disponible {
+    width: 176px;
+    min-height: 44px;
+    justify-content: center;
+    border-radius: 999px;
+    border-style: dotted;
+    background: transparent;
+    box-shadow: none;
+    color: var(--lienzo-muted);
+}
+
+.nodo.disponible:hover {
+    color: var(--lienzo-texto);
+    border-color: var(--lienzo-foco);
+}
+
 /* El plato: el nodo terminal al que llega todo lo elegido. */
 .nodo.plato {
     width: 176px;
@@ -441,6 +480,82 @@
 .lienzo-nota {
     font-size: 0.625rem;
     color: var(--lienzo-muted);
+}
+
+/* --- Pestañas y editor de receta del inspector --------------------------- */
+.lienzo-pestanas {
+    display: flex;
+    gap: 0.25rem;
+    border-bottom: 1px solid var(--lienzo-borde);
+}
+
+.lienzo-pestanas button {
+    background: none;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    color: var(--lienzo-muted);
+    padding: 0.3125rem 0.5rem;
+    font: inherit;
+    font-size: 0.75rem;
+    font-weight: 600;
+    max-width: 11rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.lienzo-pestanas button.sel {
+    color: var(--lienzo-texto);
+    border-bottom-color: var(--lienzo-acento);
+}
+
+.lienzo-receta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.lienzo-receta.ocupado {
+    opacity: 0.6;
+}
+
+.lienzo-cantidad {
+    width: 5rem;
+    text-align: right;
+    background: var(--lienzo-superficie-alta);
+    border: 1px solid var(--lienzo-borde);
+    border-radius: 6px;
+    color: var(--lienzo-texto);
+    padding: 0.125rem 0.375rem;
+    font: inherit;
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.lienzo-agregar-insumo {
+    display: flex;
+    gap: 0.375rem;
+    align-items: center;
+}
+
+.lienzo-agregar-insumo select {
+    flex: 1;
+    min-width: 0;
+}
+
+.lienzo-agregar-insumo input {
+    width: 4.5rem;
+}
+
+.lienzo-agregar-insumo select,
+.lienzo-agregar-insumo input {
+    background: var(--lienzo-superficie-alta);
+    border: 1px solid var(--lienzo-borde);
+    border-radius: 6px;
+    color: var(--lienzo-texto);
+    padding: 0.25rem 0.375rem;
+    font: inherit;
+    font-size: 0.75rem;
 }
 
 /* --- Editores (popovers) ------------------------------------------------- */

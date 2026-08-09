@@ -119,6 +119,18 @@ export function NodoResta({ data }: NodeProps) {
   );
 }
 
+/** Cabecera de una columna de opciones. Existe como nodo para ser el destino
+ * de una conexión: colgar un extra ahí es colgarlo DENTRO de ese grupo. */
+export function NodoGrupo({ data }: NodeProps) {
+  return <Tarjeta datos={data as DatosNodo} clase="grupo" />;
+}
+
+/** Un extra que existe y este producto todavía no ofrece. Se cablea a un
+ * grupo (o al tamaño) para vincularlo. */
+export function NodoDisponible({ data }: NodeProps) {
+  return <Tarjeta datos={data as DatosNodo} clase="disponible" />;
+}
+
 export function NodoPlato({ data }: NodeProps) {
   const datos = data as DatosNodo;
   return (
@@ -137,7 +149,9 @@ export function NodoPlato({ data }: NodeProps) {
 export const TIPOS_NODO: Record<TipoNodo, typeof NodoTarjeta> = {
   producto: NodoTarjeta,
   tamano: NodoTarjeta,
+  grupo: NodoGrupo,
   opcion: NodoTarjeta,
+  disponible: NodoDisponible,
   empaque: NodoTarjeta,
   resta: NodoResta,
   plato: NodoPlato,

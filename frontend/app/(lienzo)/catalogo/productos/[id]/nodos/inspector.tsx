@@ -75,6 +75,10 @@ export function Inspector({
   faltantes,
   plegado,
   onPlegar,
+  editor,
+  nodoTitulo,
+  verEditor,
+  onVerEditor,
 }: {
   titulo: string;
   fusion: ReturnType<typeof fusionar>;
@@ -88,6 +92,11 @@ export function Inspector({
   faltantes: string[];
   plegado: boolean;
   onPlegar: () => void;
+  /** La receta del nodo seleccionado, si hay uno. */
+  editor?: React.ReactNode;
+  nodoTitulo?: string | null;
+  verEditor: boolean;
+  onVerEditor: (v: boolean) => void;
 }) {
   const valorPrecio = Number(precio) || 0;
   const { monto, pct } = margen(valorPrecio, costoTotal);
@@ -109,6 +118,106 @@ export function Inspector({
           ›
         </button>
       </div>
+      {editor && nodoTitulo ? (
+        <Pestanas
+          nodoTitulo={nodoTitulo}
+          verEditor={verEditor}
+          onVerEditor={onVerEditor}
+        />
+      ) : null}
+
+      {editor && verEditor ? (
+        editor
+      ) : (
+        <DetalleDelPlato
+          titulo={titulo}
+          fusion={fusion}
+          empaque={empaque}
+          empaqueAplica={empaqueAplica}
+          costoTotal={costoTotal}
+          modalidad={modalidad}
+          onModalidad={onModalidad}
+          precio={precio}
+          onPrecio={onPrecio}
+          faltantes={faltantes}
+          monto={monto}
+          pct={pct}
+        />
+      )}
+    </aside>
+  );
+}
+
+/** Dos vistas del mismo panel: el plato que se está armando, o la receta del
+ * nodo que se tocó. Se separa en su propio componente para que el inspector
+ * no cruce el límite de complejidad del repo. */
+function Pestanas({
+  nodoTitulo,
+  verEditor,
+  onVerEditor,
+}: {
+  nodoTitulo: string;
+  verEditor: boolean;
+  onVerEditor: (v: boolean) => void;
+}) {
+  return (
+    <div className="lienzo-pestanas" role="tablist">
+      <button
+        type="button"
+        role="tab"
+        aria-selected={!verEditor}
+        className={!verEditor ? "sel" : ""}
+        onClick={() => onVerEditor(false)}
+      >
+        Plato
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={verEditor}
+        className={verEditor ? "sel" : ""}
+        onClick={() => onVerEditor(true)}
+      >
+        {nodoTitulo}
+      </button>
+    </div>
+  );
+}
+
+
+/** El plato que se está armando: qué lleva, qué cuesta y qué deja. Vive
+ * aparte del inspector para que este quede en lo suyo —elegir qué se mira— y
+ * no cruce el límite de complejidad del repo. */
+function DetalleDelPlato({
+  titulo,
+  fusion,
+  empaque,
+  empaqueAplica,
+  costoTotal,
+  modalidad,
+  onModalidad,
+  precio,
+  onPrecio,
+  faltantes,
+  monto,
+  pct,
+}: {
+  titulo: string;
+  fusion: ReturnType<typeof fusionar>;
+  empaque: Articulo | null;
+  empaqueAplica: boolean;
+  costoTotal: number;
+  modalidad: string;
+  onModalidad: (m: string) => void;
+  precio: string;
+  onPrecio: (p: string) => void;
+  faltantes: string[];
+  monto: number;
+  pct: number | null;
+}) {
+  const valorPrecio = Number(precio) || 0;
+  return (
+    <>
       <p className="lienzo-nota">{titulo}</p>
 
       {faltantes.length > 0 && (
@@ -196,6 +305,6 @@ export function Inspector({
           />
         </dl>
       )}
-    </aside>
+    </>
   );
 }

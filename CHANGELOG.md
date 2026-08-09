@@ -12,6 +12,333 @@ editando este archivo chocaban siempre — escribían en la misma línea.
 
 Ver [`changelog.d/`](changelog.d/).
 
+## [0.3.0] - 2026-08-09
+
+### Added
+
+- **La comida del personal ya se registra: precio cero, costo a gasto**
+  (2026-08-09, ADR-034, RN-COM-025/026/027). El grupo alimenta a su gente en
+  fines de semana, feriados y días de alta actividad, y eso no existía en
+  ningún lado: el costo desaparecía dentro del costo de ventas.
+  - Una orden de `tipo="consumo_personal"` se prepara y despacha como
+    cualquier pedido —comanda con `** CONSUMO PERSONAL **`, distintivo en el
+    KDS, entrega— pero **nace con todas sus líneas en cero**: no se consulta
+    lista de precios y **tampoco se acepta el precio que mande el cliente**.
+    No se cobra (409), no admite descuento (409) y no emite comprobante.
+  - **Por qué no fue un descuento del 100% con motivo `colaborador`**, que ya
+    existía y habría sido una línea: esa venta publica
+    `sales.venta_confirmada`, que `accounting` asienta como ingreso y
+    `marketing` atribuye a una campaña; además no se puede cerrar
+    (`registrar_pago` exige `monto > 0` e igualdad exacta) y al cobrarse
+    emitiría una boleta de S/ 0.00 a SUNAT. Por eso hay evento propio
+    (`sales.consumo_personal_registrado`) y un estado terminal nuevo,
+    `cerrada`, que pone la entrega: es el único cierre posible de algo que
+    nunca pasa por caja.
+  - **El costo sí llega**: sale del almacén con `tipo_movimiento` nuevo
+    `consumo_interno` —separado de `consumo_venta` porque no tiene ingreso
+    detrás—, `inventory` lo valoriza al `costo_promedio` sobre las mismas
+    líneas que movieron el stock (mismo criterio que la merma: valoriza quien
+    conoce el movimiento) y `accounting` lo asienta por `regla_asiento` como
+    gasto de alimentación de personal. Anular el consumo repone el insumo
+    **y reversa el asiento**, o el gasto quedaría inflado por comida que
+    nadie comió.
+  - Lo **autoriza un encargado con su PIN** (permiso propio
+    `sales.registrar_consumo_personal`, separado de `sales.crear`) y exige
+    motivo de un enum cerrado (`fin_semana`, `feriado`, `alta_actividad`,
+    `capacitacion`, `otro`) — es comida gratis: sin firma cualquiera se
+    sirve, y un motivo de texto libre no agrupa el gasto por causa.
+  - **No se registra quién comió**, por decisión del negocio: se alimenta al
+    turno. La columna nullable puede agregarse después sin romper nada.
+  - Costo aceptado: el asiento depende de que la empresa configure sus dos
+    cuentas y la regla; sin ella el consumo queda en el movimiento de
+    inventario y en el log, como todo el resto de la generación automática.
+    El reporte formal por sucursal/mes queda como deuda — hoy se lee por
+    `GET /sales/ventas?tipo=consumo_personal`.
+
+- Módulo `reports`: emisión y distribución de reportes (ADR-033). El ERP
+  publicaba 52 eventos y solo **cuatro** llegaban a una persona, cableados en
+  `users/application/listeners.py`; a quién le llegaban lo decidían dos
+  funciones fijas cuyo propio docstring declaraba el hueco («el punto de
+  configuración futuro está en `destinatarios_de_sucursal`»). No había forma
+  de ver el mapa ni de cambiarlo sin un deploy, y varias reglas de negocio que
+  exigen reportes dirigidos (RN-CTP-004, RN-INV-020, RN-INV-021, RN-PRD-009)
+  seguían sin implementar — `inventory.conteo_vencido` ya publicaba
+  `dirigido_a: ["almacen","gerencia"]` y no había nadie del otro lado. Ahora
+  hay áreas, reglas por (empresa, emisión, sucursal) y una **matriz** que
+  además marca lo que falta: **huecos** (el hecho ocurre y no se entera nadie)
+  y **fugas** (regla activa que no llega a nadie). Trece emisiones cableadas,
+  incluidas las cuatro migradas. Migración `9a1c4e7b2d30`.
+- El catálogo de emisiones es **cerrado y en código**, no una tabla: la regla
+  configura *a quién* llega un reporte, nunca *qué datos* lee. Si fuera
+  administrable por API, quien puede crear reglas podría hacerse enviar
+  cualquier payload del bus. Costo aceptado: una emisión nueva es un cambio de
+  código, no de configuración.
+- Leer un reporte exige **dos** puertas: ser destinatario y tener el permiso
+  del módulo dueño del hecho. Estar en la lista de distribución no da acceso
+  al dato — un cocinero puede enterarse de que hubo un descuadre de caja sin
+  ver el detalle de la caja. `reports.leer_matriz` es un permiso aparte
+  porque el mapa revela la estructura organizacional; `reports.administrar`
+  queda solo en `admin`.
+- Las entregas **no son retroactivas**: `regla_id` y el motivo de cada entrega
+  (`area:almacen`, `dinamico:encargado_de_turno`) se congelan al emitir, así
+  que cambiar la distribución mañana no reescribe a quién le llegó ayer. Todo
+  cambio de área o regla queda en `audit_log`, que es la respuesta a «¿alguien
+  tocó los flujos?» sin mantener un historial en paralelo.
+- Una emisión sin destinatarios ahora **se guarda igual**, con cero entregas.
+  Antes era un `log.warning` que nadie leía; un aviso que no llegó a nadie es
+  información de gestión, no un no-evento.
+
+- **Restas: "sin cebolla" ya mueve el inventario** (2026-08-09, ADR-035,
+  RN-COM-028/RN-PRD-019, migración `a4f1d0c8b573`). `RN-PRD-004` manda aplicar
+  los modificadores en el orden **tamaño → combinación → extras → restas**, y
+  las restas eran el único tramo sin implementar: se escribían en la nota
+  libre a cocina, el plato salía bien y **el inventario descontaba la cebolla
+  igual**. Esa cebolla que se quedó en la cámara aparecía como faltante en el
+  conteo del mes sin que nadie pudiera explicarlo.
+  - `venta_item.sin_articulo_ids` (JSONB, nullable) guarda qué insumos no
+    lleva la línea. Guarda `articulo_id` y **no** `receta_item_id` porque la
+    línea de receta se edita y se borra, el artículo no: guardando la línea,
+    una receta corregida mañana dejaría restas históricas apuntando a nada y
+    la comanda reimpresa de una venta vieja diría "sin —". NULL = no quitó
+    nada, que es lo que vale para todo lo ya vendido, sin backfill.
+  - **Lo quitable es la receta**: `GET /sales/productos/{id}/quitables`
+    devuelve los insumos del producto. No hay tabla ni flag de "quitables"
+    que mantener — sería la misma verdad escrita dos veces, y dos datos que
+    dicen lo mismo terminan diciendo cosas distintas. Pedir quitar algo que
+    la receta no pone devuelve 409; el replay del hub se exceptúa (ADR-009),
+    porque esa venta ya se preparó y la receta pudo cambiar durante el corte.
+  - **No cambia el precio; sí el consumo.** Quitar cebolla no abarata la
+    pizza, pero el insumo deja de descontarse, y la reposición por anulación
+    o nota de crédito devuelve **solo lo que se consumió** — reponer lo que
+    nunca salió dejaría stock de más en el conteo.
+  - Cocina las ve: KDS en ámbar y comanda impresa (`SIN CEBOLLA`, sangrada).
+    En el PDV son chips rojos y tachados junto a los extras; la nota libre
+    sigue existiendo para lo que no es un insumo ("bien cocida").
+- **Lienzo de nodos del producto comercial**
+  (`/catalogo/productos/{id}/nodos`, 2026-08-09, ADR-035). El árbol completo
+  de lo que se puede pedir, sobre un canvas oscuro a pantalla completa con
+  pan, zoom, minimapa y aristas curvas (`@xyflow/react`): producto → tamaños
+  → grupos (el sabor es uno) → extras → restas → empaque → **PLATO**. Al
+  tocar los nodos se arma un plato y el inspector recalcula en vivo la receta
+  fusionada, el costo y el margen de esa combinación exacta. Antes había que
+  abrir cinco pantallas y sumar a mano.
+  - Las columnas de izquierda a derecha **son** RN-PRD-004: hasta ahora la
+    regla vivía implícita en el orden vertical de unas filas; ahora es la
+    espina visible de la pantalla. Cada nodo elegido tira una arista al
+    plato, que es la suma de la receta dibujada; las restas llegan punteadas
+    en ámbar y el empaque llega punteado cuando la modalidad no lo consume,
+    con lo que RN-EMP-003 deja de ser una nota al pie.
+  - La primera versión eran filas de `<div>` con líneas de 1px en CSS y se
+    descartó por lo que era: *"parece más HTML que elementos interactivos"*.
+    El cambio de decisión está en la enmienda de ADR-035.
+  - Vive fuera del shell del módulo, como el PDV y el KDS, para poder tomar
+    los 100dvh; a cambio hace **su propio guard de permiso**, con prueba
+    Playwright que verifica que un cajero no entra ni por URL directa.
+  - Los nodos se arrastran y **no se guarda dónde quedaron**: el orden lo
+    dicta RN-PRD-004 y persistirlo sería columna, migración y contrato para
+    algo cosmético.
+  - Eso **no es un modelo nuevo**: el tamaño ya era un producto hijo
+    (RN-COM-022) y el sabor ya era una opción de grupo con receta propia
+    (RN-COM-021/023). Lo que faltaba era verlo junto.
+  - La fusión se calcula en el cliente y **no se guarda**: es un simulador.
+    Lo que se descuenta de verdad sale del servidor al confirmar la venta.
+  - Las cantidades de cada receta se siguen editando en Catálogo → Recetas,
+    con enlace desde cada nodo (ADR-023 §4: el editor duplicado ya se reportó
+    como confuso una vez).
+- **Quitar un extra de un producto y borrar un grupo de opciones**
+  (`DELETE /sales/productos/{id}/extras/{extra_id}` y
+  `DELETE /sales/productos/{id}/grupos/{grupo_id}`). Cierra la deuda que
+  ADR-023 dejó anotada. Borrar un grupo **suelta** sus extras en vez de
+  borrarlos: el extra es un producto comercial con su receta y su precio, y
+  existe con o sin grupo.
+
+- **Tres coherencias entre archivos que no se importan pasan a ser tests**
+  (2026-08-08, `tests/test_repo_coherencia.py`). Las tres fallaron de verdad
+  el mismo día y las tres se detectaron a mano, después de mergear.
+  - **Números de ADR repetidos.** Tres ramas en paralelo eligieron "el
+    siguiente" contra el `main` que cada una veía; hubo que renumerar dos
+    veces (029 → 031 → 032). El número lo sigue eligiendo una persona —no hay
+    forma de reservarlo—, así que lo que cambia es que el choque se ve en el
+    PR y no después. También se exige numeración sin huecos: un hueco casi
+    siempre es un ADR renumerado a medias.
+  - **ADR ausente del índice.** `docs/00_PROJECT.md` es por donde entra
+    cualquiera, persona o agente; un ADR que no está listado ahí existe solo
+    para quien ya sabía que existía.
+  - **El Python del CI contra el de la imagen.** El PR #49 subió el
+    `Dockerfile` a 3.14 y dejó los cuatro jobs de `setup-python` en 3.12: el
+    job `imagen` solo comprueba que el contenedor construya y conteste
+    `/health`, así que una dependencia incompatible con el intérprete nuevo
+    habría llegado a producción con `main` en verde.
+  - La cadena de Alembic no entra acá: el job `backend` ya falla con más de
+    una cabeza.
+- **Dependabot agrupa los majors aparte y deja de mandar un PR por action**
+  (2026-08-08). Los majors de pip y npm van juntos y separados de los
+  menores: un major es trabajo propio, no un bump, y mezclado con los menores
+  se revisa con la misma vara que ellos — que es como el #37 entró sin migrar
+  nada. Las actions y las imágenes pasan a grupo único: sin agrupar, los #21,
+  #22, #24, #25, #35, #36 y #38 fueron siete PRs para siete líneas de YAML, y
+  ese ruido es lo que hace que se mergeen sin mirar.
+- **`docs/engineering/trabajo-en-paralelo.md`** (2026-08-08): cómo trabajar
+  con varias ramas o sesiones a la vez sin duplicar trabajo — PR en borrador
+  desde el primer commit, y quién renumera cuando dos ramas piden el mismo
+  ADR o la misma cabeza de Alembic. El 2026-08-08 salieron cuatro PRs
+  distintos arreglando el mismo bug (#40, #46, #47, #48) y tres se cerraron
+  sin mergear: no fue un problema de código, fue de visibilidad.
+
+### Changed
+
+- **El changelog se escribe por fragmentos y `main` quedó protegida**
+  (2026-08-08). Dos cosas que se rompían por la misma razón: nada obligaba a
+  que un cambio llegara sano a `main`, y todos los cambios se escribían en la
+  misma línea.
+  - `changelog.d/`: un archivo por cambio (`<tipo>-<slug>.md`), que
+    `scripts/cortar_version.py` junta en una sección nueva al cortar la
+    versión. `CHANGELOG.md` deja de editarse a mano. El punto de inserción
+    compartido —arriba de todo, bajo `## [Unreleased]`— era el conflicto: de
+    siete PRs mergeados el 2026-08-08, cinco chocaron ahí y dos como archivo
+    entero, sin que el contenido se contradijera en ninguno.
+  - Lo acumulado desde el scaffold pasa a `## [0.2.0] - 2026-08-08` y se
+    etiqueta `v0.2.0`, el primer tag del repositorio.
+    `.github/workflows/release.yml` ya escuchaba `tags: ["v*"]` y nunca se
+    había disparado. `[Unreleased]` arranca vacío.
+  - **Ruleset en `main`**: PR obligatorio, los seis jobs del CI en verde y la
+    rama al día antes de mergear, sin `bypass_actors`. El 2026-08-07 el PR
+    #37 se mergeó con `frontend` y `e2e` en rojo y dejó `main` rota 24 h; el
+    CI lo había atrapado y no había nada que impidiera el merge. Para
+    saltarlo hay que desactivar el ruleset desde Settings, que es un acto
+    deliberado y no un botón al lado del merge.
+
+- **La deuda técnica del ROADMAP se partió por área** (2026-08-08). Eran
+  2.044 líneas en una sola sección de `ROADMAP.md` con 17 subsecciones, y era
+  el otro punto donde chocaban las ramas paralelas: dos PRs de módulos
+  distintos conflictuaban por compartir archivo, no por contradecirse. Ahora
+  cada área vive en `docs/roadmap/deuda/<área>.md` y `ROADMAP.md` conserva un
+  índice con el conteo de ⬜ abiertos y ✅ cerrados. Las referencias en prosa
+  del tipo «ver ROADMAP → Deuda técnica → Frontend» siguen valiendo: el área
+  es el nombre del archivo.
+  - De paso se fusionó la fila **duplicada** `Módulo \`sales\` (PDV)` de la
+    tabla de estado F0. Eran dos versiones parciales de la misma fila —una
+    con la pantalla KDS, otra con variantes y opciones—, resultado de un
+    merge anterior; ninguna contenía a la otra, así que leer la tabla daba
+    una respuesta distinta según qué fila mirabas.
+
+- **Todo el repositorio pasa a LF, y `.gitattributes` lo hace cumplir**
+  (2026-08-08). `CLAUDE.md` → Formato exigía LF desde el principio, pero no
+  había nada que lo aplicara: convivían **789 archivos en LF con 116 en CRLF
+  y 2 mezclados**, según el sistema donde se hubiera editado cada uno.
+  - El costo no es estético. Cuando dos ramas tocan el mismo archivo y una lo
+    guardó en CRLF, git no ve tres líneas distintas: ve el archivo entero
+    distinto, y el merge se vuelve un conflicto de 3.000 líneas que nadie
+    puede revisar. Pasó dos veces el mismo 2026-08-08, con `ROADMAP.md` y con
+    `docs/security/security.md`, y ninguna de las dos veces el contenido se
+    contradecía.
+  - `* text=auto eol=lf` normaliza el índice y el checkout en cualquier
+    sistema operativo. `text=auto` deja que git detecte qué es texto, y los
+    tres binarios del repositorio (dos `.docx` y el `.bpm` de Bizagi) quedan
+    además pinneados explícitos: son formatos comprimidos y una sola
+    conversión los corrompe sin aviso.
+  - El commit toca 118 archivos y **no cambia una sola línea de contenido**:
+    `git diff --ignore-cr-at-eol` sobre el cambio devuelve solo el propio
+    `.gitattributes`.
+
+- **El major de `@types/node` queda en `ignore`** (2026-08-08). Los tipos
+  describen el runtime que el código va a encontrar, así que subirlos por
+  delante del runtime es peor que quedarse atrás: los de Node 26 aprueban
+  APIs que Node 24 —el que corren los jobs `frontend` y `e2e`— no tiene, y
+  `tsc` daría verde sobre código que muere en ejecución. Se cerró dos veces
+  por el mismo motivo (PR #29 y #55) y volvía cada semana; ahora el motivo
+  está escrito donde se toma la decisión. Se quita al subir el CI a Node 26,
+  en el mismo cambio: el número del `ignore` y el `node-version:` de `ci.yml`
+  son el mismo número.
+
+- `users` deja de decidir a quién le llega cada aviso y se queda con lo que
+  siempre dijo ser: la bandeja. `destinatarios_de_sucursal` y
+  `destinatarios_de_almacen` se mudaron tal cual a
+  `reports/application/destinatarios.py`, donde pasan de ser *la* regla a ser
+  dos resolutores dinámicos entre cuatro tipos de destinatario. Los cuatro
+  handlers de `users/application/listeners.py` se reemplazan por uno solo, que
+  consume `reports.reporte_emitido` con la lista ya resuelta. El usuario sigue
+  teniendo **una sola campana**: `reports` publica un evento en vez de escribir
+  en `notificacion`, que sigue siendo de `users`.
+- `users.application.queries_publicas` expone `permisos_de(session,
+  usuario_id)`: todos los códigos en una consulta, para **filtrar listas** por
+  permiso (negar un acceso sigue siendo `require_permission`). Sin él, recortar
+  un catálogo de 13 entradas costaba una consulta por entrada.
+- Tres eventos ganan un campo, aditivo y compatible:
+  `accounting.cierre_caja_irregular` += `sucursal_id`,
+  `accounting.pago_requiere_aprobacion` += `empresa_id`,
+  `production.no_conformidad_detectada` += `almacen_id`. Sin ellos el hecho no
+  se puede atribuir a un tenant y su reporte no se puede escopar.
+
+### Fixed
+
+- Copiar `.env.example` a `.env` —el primer paso del README— dejaba la API en
+  bucle de reinicio: `ALLOWED_HOSTS=*` reventaba el arranque con
+  `SettingsError`. El `.env.example` documenta «listas separadas por coma» y
+  `settings.py` tenía el validador para eso, pero pydantic-settings decodifica
+  como JSON todo campo de tipo complejo **antes** de que corra ningún
+  validador, así que `_lista_por_comas` no se ejecutaba nunca. Se marcan
+  `allowed_hosts` y `cors_origins` con `NoDecode` para que el valor llegue
+  crudo al validador, que ahora también resuelve el JSON que antes resolvía
+  pydantic-settings — quien ya tenía su `.env` en ese formato no se entera.
+  Solo se veía al levantar `docker compose` desde un clon limpio: los tests
+  corren con los valores por defecto y nunca leían un `.env`. Van seis casos
+  en `tests/test_settings.py`, incluido el que congela que en producción el
+  comodín `*` siga abortando el arranque: arreglar el parseo no podía ablandar
+  el endurecimiento.
+
+- **La imagen del frontend no arrancaba, y nadie se enteraba hasta
+  reconstruirla** (2026-08-09). El `Dockerfile` de `frontend/` copiaba solo
+  `package.json` —sin el lock— y resolvía los rangos de nuevo en cada build;
+  después, el `COPY . .` metía el `node_modules` **del host** encima del que
+  acababa de instalar, porque no había `.dockerignore`. Con el árbol local
+  desactualizado (Next 15) sobre una instalación de Next 16, el contenedor
+  moría al arrancar:
+
+  ```
+  ⚠ Mismatching @next/swc version, detected: 16.3.0 while Next.js is on 15.5.22
+  [Error: Missing field `writeRoutesHashesManifest`]
+  ```
+
+  El contenedor parecía sano porque venía corriendo con una imagen vieja,
+  anterior a la deriva: el fallo aparecía recién al reconstruir.
+  Ahora `npm ci` sobre `package-lock.json` —las versiones exactas que probó
+  el CI— y un `.dockerignore` que deja fuera `node_modules`, `.next` y el
+  `.env`, que además se colaba en la imagen. De paso el contexto de build
+  baja de cientos de MB a lo que ocupa el código.
+
+- `core/sync/serializacion.marca_de` devolvía marcas *naive* mientras el resto
+  del motor de sync trabaja en UTC *aware*, así que el pull de un recurso con
+  más de una página reventaba con `TypeError: can't compare offset-naive and
+  offset-aware datetimes`. El bug estaba desde que existe la paginación y
+  nunca se había visto porque ningún recurso sembrado pasaba de 100 filas:
+  apareció al sumar los permisos de `reports` (`rol_permiso` pasó de 97 a
+  109). Se normaliza en `marca_de`, que es el único borde donde un texto
+  entrante se vuelve `datetime`, así que cubre a todo el motor de una vez.
+
+- **Guardar un tablero pedía el nombre con `window.prompt`** (2026-08-08).
+  El prompt nativo no se puede etiquetar ni estilar, y ningún automatismo de
+  navegador lo alcanza: el guardado de un tablero de reportes **no tenía forma
+  de probarse de punta a punta**. Ahora el nombre se pide en un diálogo de la
+  página, con su `<label>` y su `id`. De paso, guardar sobre un tablero propio
+  ya existente dejó de preguntar: conserva su nombre, y solo el alta y
+  "Guardar como…" piden uno.
+- **Cuatro campos del PDV no tenían nombre accesible** (2026-08-08). El monto
+  declarado y el usuario/PIN del encargado en la apertura, y el destino del
+  efectivo en el cierre, se apoyaban solo en su `placeholder`: un lector de
+  pantalla no anuncia nada y el campo es imposible de alcanzar por nombre. Se
+  les agregó `aria-label`.
+- **El puerto de la API del suite e2e se puede mover** (2026-08-08). Estaba
+  fijo en 8100 en tres archivos (`playwright.config.ts`, `e2e/servidor-api.mjs`
+  y `e2e/servidor-web.mjs`) y en una máquina donde ese puerto ya está tomado
+  —el `docker-compose` de otro proyecto, sin ir más lejos— la suite entera no
+  arranca. `E2E_PUERTO_API` lo mueve sin tocar código; el default no cambia.
+- **`TUNNEL_HOST` para probar el dev server desde afuera** (2026-08-08).
+  Server Actions rechaza toda request cuyo `Origin` no coincida con el `Host`,
+  así que detrás de un túnel público —probar el PDV en un celular real, por
+  ejemplo— el login moría con `Invalid Server Actions request`. La variable es
+  inerte si no está definida: nunca se activa en producción.
+
 ## [0.2.0] - 2026-08-08
 
 Primera versión **etiquetada** (el `0.1.0` de abajo se escribió al arrancar y

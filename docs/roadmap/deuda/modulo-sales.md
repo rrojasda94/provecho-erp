@@ -73,6 +73,16 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   `GET /ventas/{id}/items` no las devuelve— y las muestra vacías. Hoy
   corregir lo enviado es anular la línea y crear otra (RN-COM-020), así que
   no se pierde nada, pero el contrato debería devolverlas igual.
+- ⬜ **La columna de "disponibles" del lienzo lista los sabores de los otros
+  tamaños** (2026-08-09). Es correcto según el modelo —para *este* tamaño no
+  están vinculados— pero con seis sabores por tres tamaños son dieciocho
+  nodos apagados. Se envuelve en subcolumnas y no se monta sobre nada, pero
+  conviene filtrarlo (por ejemplo, esconder lo que ya está vinculado a otra
+  variante del mismo padre).
+- ⬜ **Reabrir una receta editada desde otro nodo no refresca el costo de los
+  demás nodos** hasta cambiar de camino: el cache se actualiza por receta, no
+  se recalcula el grafo entero. No da un número incorrecto —el nodo editado
+  sí se actualiza— pero el pie de otro nodo puede quedar viejo.
 - ⬜ **Confirmación al borrar un grupo de opciones**: `DELETE .../grupos/{id}`
   no pregunta nada. Es destructivo y hoy vive detrás de un menú `⋯`; agregar
   el diálogo es cambio de comportamiento, así que va aparte.
