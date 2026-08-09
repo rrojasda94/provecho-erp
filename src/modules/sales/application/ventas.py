@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from src.core.events import event_bus
 from src.modules.accounting.application.queries_publicas import hay_caja_abierta
+from src.modules.inventory.application.queries_publicas import insumos_de_receta
 from src.modules.sales.application import comprobantes, precios
 from src.modules.sales.application.errors import (
     Conflicto,
@@ -42,6 +43,7 @@ def _armar_item(
     modalidad: str,
     dia: date,
     gratis: bool = False,
+    exigir_opciones: bool = True,
 ) -> tuple[VentaItem, dict]:
     """Valida un ítem del request y le resuelve el precio. Devuelve la fila y
     el detalle que viaja en `sales.venta_confirmada` para que inventory
@@ -82,6 +84,9 @@ def _armar_item(
     grupo = int(it.get("grupo_cobro") or rules.GRUPO_COBRO_UNICO)
     if grupo < 1:
         raise ReglaNegocio("grupo_cobro debe ser >= 1")
+    restas = _resolver_restas(
+        session, prod, it.get("sin_articulo_ids"), exigir=exigir_opciones
+    )
     fila = VentaItem(
         producto_comercial_id=prod.id,
         cantidad=cantidad,
@@ -90,6 +95,7 @@ def _armar_item(
         # (RN-PRC-003); en replay viaja el que ya se aplicó.
         descuento=Decimal(0) if gratis else Decimal(str(it.get("descuento") or 0)),
         grupo_cobro=grupo,
+        sin_articulo_ids=restas,
     )
     # Empaque se descuenta solo en las modalidades configuradas (RN-EMP-003).
     con_empaque = bool(prod.empaque_id and modalidad in (prod.modalidades_empaque or []))
@@ -97,8 +103,44 @@ def _armar_item(
         "receta_id": str(prod.receta_id),
         "cantidad": str(cantidad),
         "empaque_articulo_id": str(prod.empaque_id) if con_empaque else None,
+        "sin_articulo_ids": restas,
     }
     return fila, detalle, prod
+
+
+def _resolver_restas(
+    session: Session, prod, pedidas, *, exigir: bool
+) -> list[str] | None:
+    """Qué insumos NO lleva esta línea ("sin cebolla", RN-PRD-004).
+
+    Solo se puede quitar lo que la receta pone: pedir "sin palta" en una
+    pizza que no lleva palta no es inocuo —el PDV mostraría una resta que
+    cocina no puede cumplir y el reporte contaría un ajuste que nunca
+    existió—, así que se rechaza en vez de ignorarse. La lista de quitables
+    no se configura: **es** la lista de insumos de la receta.
+
+    `exigir=False` en el replay del hub (ADR-009): esa venta ya se preparó y
+    se cobró, y la receta pudo cambiar durante el corte. Se guarda lo que
+    viene tal cual — rechazarla ahora perdería una venta real, y una resta
+    que ya no calza con la receta simplemente no descuenta nada de menos.
+    """
+    if not pedidas:
+        return None
+    # `dict.fromkeys` y no `set`: quita repetidos conservando el orden en que
+    # el mozo los tecleó, que es el orden en que cocina los va a leer.
+    ids = list(dict.fromkeys(str(a) for a in pedidas))
+    if not exigir:
+        return ids
+    insumos = {
+        str(i["articulo_id"]) for i in insumos_de_receta(session, prod.receta_id)
+    }
+    ajenos = [a for a in ids if a not in insumos]
+    if ajenos:
+        raise ReglaNegocio(
+            f"'{prod.nombre}' no lleva {len(ajenos)} de los insumos que se "
+            "piden quitar: solo se puede quitar lo que la receta pone"
+        )
+    return ids
 
 
 def _armar_extras(
@@ -220,6 +262,7 @@ def _armar_lineas(
         fila, det, prod = _armar_item(
             session, it, productos=productos, sucursal_id=sucursal_id,
             canal=canal, modalidad=modalidad, dia=dia, gratis=gratis,
+            exigir_opciones=exigir_opciones,
         )
         if exigir_opciones:
             _validar_grupos(productos, prod, it.get("extras") or [])
@@ -799,7 +842,13 @@ def anular_lineas(
     for fila in filas:
         prod = productos.get(fila.producto_comercial_id)
         devueltos.append(
-            {"receta_id": str(prod.receta_id), "cantidad": str(fila.cantidad)}
+            {
+                "receta_id": str(prod.receta_id),
+                "cantidad": str(fila.cantidad),
+                # Se repone exactamente lo que se consumió: lo que la línea
+                # no llevó tampoco vuelve al almacén.
+                "sin_articulo_ids": fila.sin_articulo_ids,
+            }
         )
         session.delete(fila)
     session.flush()
@@ -854,7 +903,13 @@ def anular_venta(session: Session, venta_id: uuid.UUID, usuario_id: uuid.UUID) -
     items = []
     for it in VentaRepo(session).items(venta_id):
         prod = productos.get(it.producto_comercial_id)
-        items.append({"receta_id": str(prod.receta_id), "cantidad": str(it.cantidad)})
+        items.append(
+            {
+                "receta_id": str(prod.receta_id),
+                "cantidad": str(it.cantidad),
+                "sin_articulo_ids": it.sin_articulo_ids,
+            }
+        )
     event_bus.publish(
         "sales.venta_anulada",
         {

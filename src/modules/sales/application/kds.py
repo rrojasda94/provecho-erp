@@ -13,6 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.core.events import event_bus
+from src.modules.inventory.application.queries_publicas import nombres_de_articulos
 from src.modules.sales.application.errors import (
     Conflicto,
     NoEncontrado,
@@ -94,6 +95,31 @@ def _items_de_venta(session: Session, venta_id: uuid.UUID) -> list[tuple]:
     )
 
 
+def _restas_por_item(session: Session, pares: list[tuple]) -> dict[uuid.UUID, list[str]]:
+    """`venta_item_id` → ["Cebolla", "Aceituna"]: lo que el plato NO lleva.
+
+    Cocina necesita el nombre, no el id. `sales` guarda ids de artículo y no
+    puede leer `articulo`, así que los nombres salen del contrato público de
+    `inventory`. Un artículo borrado deja "—": el pedido igual tiene que
+    poder imprimirse.
+
+    ponytail: una consulta por venta (la cola las recorre en bucle). Con una
+    cola de decenas de pedidos no se nota; si el KDS crece a cientos, esto
+    se agrupa en una sola consulta por cola.
+    """
+    ids = {
+        uuid.UUID(a) for it, _ in pares for a in (it.sin_articulo_ids or [])
+    }
+    if not ids:
+        return {}
+    nombres = nombres_de_articulos(session, ids)
+    return {
+        it.id: [nombres.get(uuid.UUID(a), "—") for a in it.sin_articulo_ids]
+        for it, _ in pares
+        if it.sin_articulo_ids
+    }
+
+
 def _pertenece(pantalla: KdsPantalla, producto: ProductoComercial) -> bool:
     """¿La pantalla atiende la categoría de este producto? NULL/[] = todas."""
     if not pantalla.categoria_ids:
@@ -125,12 +151,14 @@ def cola_pantalla(session: Session, pantalla_id: uuid.UUID) -> list[dict]:
         # Pedido cerrado en cocina: nada que mostrar.
         if estados_todos and all(e == "entregado" for e in estados_todos):
             continue
+        restas = _restas_por_item(session, pares)
         mios = [
             {
                 "venta_item_id": str(it.id),
                 "producto": prod.nombre,
                 "cantidad": str(it.cantidad),
                 "estado": it.estado_preparacion,
+                "sin": restas.get(it.id, []),
             }
             for it, prod in pares
             if _pertenece(pantalla, prod)
@@ -207,6 +235,7 @@ def avance_venta(session: Session, venta_id: uuid.UUID) -> dict:
         raise NoEncontrado("venta no encontrada")
     pares = _items_de_venta(session, venta_id)
     estados = [it.estado_preparacion for it, _ in pares]
+    restas = _restas_por_item(session, pares)
     return {
         "venta_id": str(venta_id),
         "numero_orden": venta.numero_orden,
@@ -218,6 +247,7 @@ def avance_venta(session: Session, venta_id: uuid.UUID) -> dict:
                 "producto": prod.nombre,
                 "cantidad": str(it.cantidad),
                 "estado": it.estado_preparacion,
+                "sin": restas.get(it.id, []),
             }
             for it, prod in pares
         ],
@@ -257,9 +287,14 @@ def comanda(session: Session, venta_id: uuid.UUID) -> dict:
     if reimpresion:
         lineas.append("** REIMPRESION **".center(ANCHO_COMANDA))
         lineas.append("-" * ANCHO_COMANDA)
+    restas = _restas_por_item(session, pares)
     for it, prod in pares:
         cant = f"{it.cantidad.normalize()}x"
         lineas.append(f"{cant} {prod.nombre}"[:ANCHO_COMANDA])
+        # Sangrada y en mayúsculas: en la cocina la comanda se lee de reojo,
+        # y una resta que pasa desapercibida sale como plato rehecho.
+        for nombre in restas.get(it.id, []):
+            lineas.append(f"   SIN {nombre.upper()}"[:ANCHO_COMANDA])
     lineas.append("*" * ANCHO_COMANDA)
     return {
         "venta_id": str(venta_id),

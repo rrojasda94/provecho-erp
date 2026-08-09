@@ -107,6 +107,15 @@ export function FichaProducto({
           <span className="rounded bg-cream px-2 py-1 text-xs font-semibold text-gray">
             {producto.id_interno}
           </span>
+          {!producto.es_extra && (
+            <Link
+              href={`/catalogo/productos/${producto.id}/nodos`}
+              className="rounded border border-primary px-2 py-1 text-xs font-semibold text-primary hover:bg-primary/10"
+              title="El árbol completo: tamaños, sabores, extras, restas y empaque, con el costo de cada combinación"
+            >
+              Ver nodos
+            </Link>
+          )}
           <label className="flex items-center gap-2 text-sm font-semibold">
             <input
               type="checkbox"

@@ -26,6 +26,13 @@ export type ExtraDeCarta = {
   grupo_maximo: number | null;
 };
 
+/** Un insumo que el plato admite quitar ("sin cebolla"). No cambia el
+ * precio; sí deja de descontarse del almacén (RN-PRD-004). */
+export type Quitable = {
+  articulo_id: string;
+  nombre: string;
+};
+
 /** Tamaño/presentación con precio propio y completo (RN-COM-022). Elegir
  * una es obligatorio: la tarjeta padre no se vende. */
 export type VarianteDeCarta = {
@@ -192,6 +199,9 @@ export type ItemDeVentaNueva = {
   cantidad: string;
   grupo_cobro?: number;
   extras?: ExtraDeVentaNueva[];
+  /** Insumos que esta línea NO lleva. El servidor rechaza los que la receta
+   * no pone: no se puede quitar lo que el plato nunca tuvo. */
+  sin_articulo_ids?: string[];
 };
 
 export type VentaNueva = {
@@ -288,6 +298,13 @@ export const api = {
     pedir<ItemDeCarta[]>(
       `/sales/carta?sucursal_id=${sucursalId}&canal=pdv&modalidad=${modalidad}`,
     ),
+
+  /** Qué se le puede pedir "sin" a este producto (RN-PRD-004). Sale de su
+   * receta, así que depende de la variante elegida —una Familiar y una
+   * Personal no llevan lo mismo— y se pide al abrir la línea, no con la
+   * carta entera. */
+  quitables: (productoId: string) =>
+    pedir<Quitable[]>(`/sales/productos/${productoId}/quitables`),
 
   mapaMesas: (sucursalId: string) =>
     pedir<MesaEnMapa[]>(`/sales/mesas/mapa?sucursal_id=${sucursalId}`),

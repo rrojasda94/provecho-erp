@@ -24,6 +24,10 @@ class VentaItemIn(BaseModel):
     # Extras agregados a ESTA línea. Cada uno se guarda como línea propia
     # colgada de ella y hereda su grupo de cobro (RN-COM-021).
     extras: list[ExtraIn] = []
+    # Restas: insumos de la receta que este plato NO lleva ("sin cebolla",
+    # RN-PRD-004). Solo admite artículos que la receta usa; no cambian el
+    # precio, sí el descuento de inventario.
+    sin_articulo_ids: list[uuid.UUID] = []
 
 
 class VentaCreate(BaseModel):
@@ -240,6 +244,10 @@ class VentaItemSyncIn(BaseModel):
     grupo_cobro: int = Field(default=1, ge=1)
     # Anidados bajo su línea padre para no perder de qué plato colgaban.
     extras: list["VentaItemSyncIn"] = []
+    # Restas de la línea. Ausentes en lotes emitidos antes de RN-PRD-004:
+    # esa venta no quitó nada. No se revalidan contra la receta —la venta ya
+    # se preparó y la receta pudo cambiar durante el corte (ADR-009).
+    sin_articulo_ids: list[uuid.UUID] = []
 
 
 class VentaSyncIn(BaseModel):
@@ -344,6 +352,14 @@ class GrupoOpcionOut(BaseModel):
     maximo: int | None
     orden: int
     extras: list[ExtraDeProductoOut] = []
+
+
+class QuitableOut(BaseModel):
+    """Un insumo que el plato admite quitar. Sale de la receta del producto,
+    no de una configuración aparte."""
+
+    articulo_id: uuid.UUID
+    nombre: str
 
 
 class VincularExtraCreate(BaseModel):

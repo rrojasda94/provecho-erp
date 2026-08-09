@@ -850,6 +850,16 @@
     color: #06210f;
 }
 
+/* Resta activa ("sin cebolla"): rojo y tachado. Distinto del verde de los
+   chips que agregan — en una pantalla táctil de cocina, quitar y agregar no
+   pueden verse igual. */
+.pdv-chip.quitado {
+    background: var(--pdv-rojo-tenue);
+    border-color: var(--pdv-rojo);
+    color: var(--pdv-rojo);
+    text-decoration: line-through;
+}
+
 .pdv-chip:disabled {
     opacity: 0.35;
 }

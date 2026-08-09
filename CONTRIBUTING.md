@@ -38,6 +38,15 @@ el mismo ADR o la misma cabeza de Alembic.
   `@tanstack/react-table` 9, cada uno con qué lo bloquea y qué lo destraba.
 - Subir la imagen base del `Dockerfile` obliga a subir los `python-version:`
   de `ci.yml`. Lo vigila `tests/test_repo_coherencia.py`.
+- **Una dependencia nueva se justifica por escrito en el PR que la trae.** Las
+  que hay hoy y por qué, cuando no es obvio:
+  - `@xyflow/react` (2026-08-09, ADR-035 enmienda): el lienzo de nodos de
+    receta necesita pan, zoom, minimapa y aristas bezier. Se sopesó hacerlo a
+    mano —serían ~350 líneas propias de matemática de viewport, sin peso extra
+    y con control total del aspecto— y se eligió la librería porque el pedido
+    era explícitamente que se sintiera como una herramienta conocida. Solo la
+    carga esa ruta; si algún día el lienzo deja de existir, la dependencia se
+    va con él.
 
 ## Reglas de código
 

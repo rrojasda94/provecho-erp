@@ -255,6 +255,7 @@ function caso<T>(nombre: string, llamar: () => Promise<T>, revisar?: (r: T) => v
  */
 const PDV: Caso[] = [
   caso("carta", () => api.carta(UUID, "mesa")),
+  caso("quitables", () => api.quitables(UUID)),
   caso("mapaMesas", () => api.mapaMesas(UUID)),
   caso("buscarClientes", () => api.buscarClientes("ana")),
   caso("crearCliente", () => api.crearCliente({ nombre: "Ana" })),
@@ -277,7 +278,16 @@ const PDV: Caso[] = [
       canal: "pdv",
       modalidad: "takeout",
       idempotency_key: "venta-abcdefgh",
-      items: [{ producto_comercial_id: UUID, cantidad: "1", grupo_cobro: 1, extras: [] }],
+      items: [
+        {
+          producto_comercial_id: UUID,
+          cantidad: "1",
+          grupo_cobro: 1,
+          extras: [],
+          // Restas de la línea (RN-PRD-004): viajan como ids de artículo.
+          sin_articulo_ids: [UUID],
+        },
+      ],
     }),
   ),
   caso("itemsDeVenta", () => api.itemsDeVenta(UUID)),
@@ -358,7 +368,9 @@ const CATALOGO: Caso[] = [
   caso("crearGrupo", () =>
     catalogoApi.crearGrupo(UUID, { nombre: "Tamaño", minimo: 1, maximo: 1, orden: 1 }),
   ),
+  caso("borrarGrupo", () => catalogoApi.borrarGrupo(UUID, UUID)),
   caso("vincularExtra", () => catalogoApi.vincularExtra(UUID, { extra_id: UUID, maximo: 2 })),
+  caso("desvincularExtra", () => catalogoApi.desvincularExtra(UUID, UUID)),
   caso("recetas", () => catalogoApi.recetas()),
   caso("receta", () => catalogoApi.receta(UUID)),
   caso("crearReceta", () =>

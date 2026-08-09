@@ -208,6 +208,7 @@ export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props)
           producto_comercial_id: e.productoId,
           cantidad: String(e.cantidad),
         })),
+        sin_articulo_ids: l.restas.map((r) => r.articuloId),
       })),
     };
   };
@@ -667,6 +668,7 @@ function lineaDesde(item: ItemDeCarta): LineaBorrador {
     cantidad: 1,
     nota: "",
     extras: [],
+    restas: [],
     grupoCobro: 1,
   };
 }
@@ -688,6 +690,11 @@ function lineaDesdeVentaItem(item: VentaItem): LineaBorrador {
       precio: Number(e.precio_unitario),
       cantidad: Number(e.cantidad),
     })),
+    // La venta ya existe: sus restas se guardaron con la línea y no viajan
+    // en este contrato. Reabrirla para editar cantidad no las pierde —
+    // `anular-lineas` + línea nueva es el camino de corregir lo enviado
+    // (RN-COM-020), no un PATCH de la línea original.
+    restas: [],
     grupoCobro: item.grupo_cobro,
   };
 }

@@ -9,6 +9,13 @@ export type ExtraEnLinea = {
   cantidad: number;
 };
 
+/** Insumo que la línea quita ("sin cebolla"). Se guarda el nombre además
+ * del id para poder dibujar el ticket sin volver a preguntar. */
+export type RestaEnLinea = {
+  articuloId: string;
+  nombre: string;
+};
+
 export type LineaBorrador = {
   /** Identificador local: la línea no existe en la base hasta enviar. */
   id: string;
@@ -18,6 +25,10 @@ export type LineaBorrador = {
   cantidad: number;
   nota: string;
   extras: ExtraEnLinea[];
+  /** Restas: no tocan el total —quitar cebolla no abarata la pizza— pero sí
+   * el descuento de inventario (RN-PRD-004). Por eso no entran en
+   * `totalLinea`. */
+  restas: RestaEnLinea[];
   grupoCobro: number;
 };
 

@@ -53,9 +53,29 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   la autorización es por permiso, no por módulo, así que mover 5 tablas y sus
   FKs no habría ganado nada de seguridad. Revisar si algún día el catálogo
   necesita reglas de dominio que hoy no tiene.
-- ⬜ **Ordenar y desarmar grupos de extras**: `orden` se teclea (ya editable
-  en la ficha), pero no hay endpoint para quitar un extra de un grupo ni
-  borrar un grupo. Alcanza para cargar el catálogo; molesta al mantenerlo.
+- 🔶 **Ordenar y desarmar grupos de extras**: desarmar ✅ 2026-08-09
+  (ADR-035) — `DELETE /productos/{id}/extras/{extra_id}` y
+  `DELETE /productos/{id}/grupos/{grupo_id}`; borrar un grupo suelta sus
+  extras en vez de borrarlos, porque el extra es un producto con su receta y
+  su precio. Queda ⬜ **reordenar por arrastre**: el campo de dominio `orden`
+  se sigue tecleando. `@dnd-kit` ya está instalado (se usa en el tablero de
+  reportes), así que es trabajo de pantalla, no de contrato. **No confundirlo
+  con arrastrar nodos en el lienzo**, que es posición visual y no se guarda.
+- ⬜ **`receta_item.quitable`** (2026-08-09, ADR-035 §2): hoy **todo** insumo
+  de la receta se puede pedir "sin". Se evaluó un flag para que Producción
+  vetara restas absurdas ("pizza sin masa") y se descartó por ser una segunda
+  fuente de la misma verdad, y porque el caso es inocuo — la resta no cambia
+  el precio y cocina ve el pedido antes de prepararlo. Revisar si aparece un
+  caso real donde quitar un insumo arruine el plato de forma cara; es una
+  columna y un checkbox.
+- ⬜ **Restas en una línea ya enviada a cocina**: al reabrir una línea que ya
+  existe como `venta_item`, el PDV no recupera sus restas —
+  `GET /ventas/{id}/items` no las devuelve— y las muestra vacías. Hoy
+  corregir lo enviado es anular la línea y crear otra (RN-COM-020), así que
+  no se pierde nada, pero el contrato debería devolverlas igual.
+- ⬜ **Confirmación al borrar un grupo de opciones**: `DELETE .../grupos/{id}`
+  no pregunta nada. Es destructivo y hoy vive detrás de un menú `⋯`; agregar
+  el diálogo es cambio de comportamiento, así que va aparte.
 - ✅ 2026-08-03 **Convertir un producto simple en uno con presentaciones**
   (`quitar_receta`) y **borrar presentaciones y recetas** con las dos
   negativas que importan: un producto ya vendido se descontinúa en vez de

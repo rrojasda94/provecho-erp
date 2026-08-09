@@ -764,6 +764,13 @@ producción se hace en cocinas de sucursal. Ver
   desperdicio de cada insumo (tipo y peso) se registra por orden contra
   el desperdicio esperado de la receta (`receta_item.merma_pct`) — toda
   desviación relevante queda visible, no oculta en el costo promedio.
+- **RN-PRD-019** Un insumo que el cliente pidió quitar (resta, RN-COM-028)
+  **no se descuenta** del almacén de la sucursal al confirmarse la venta, y
+  tampoco se repone al anularla: nunca salió. Cada tramo del producto
+  configurado —tamaño, combinación, extras— aporta **su propia receta** y el
+  consumo del plato es la suma de todas menos las restas; el empaque se
+  suma aparte, según la modalidad (RN-EMP-003), porque no es parte de la
+  receta.
 
 ## Fecha de vencimiento
 
@@ -1260,6 +1267,16 @@ producción se hace en cocinas de sucursal. Ver
   no como costo de ventas. La orden queda en estado `cerrada` al
   entregarse: es su único cierre posible, porque nunca pasa por caja.
   Anularla repone el insumo y **reversa el asiento**.
+- **RN-COM-028** Una línea de venta puede llevar **restas**: insumos de la
+  receta que ese plato NO lleva ("sin cebolla"). Es el último tramo del
+  orden de modificadores (RN-PRD-004). Lo que se puede quitar **es** lo que
+  la receta del producto pone —no hay una lista aparte que mantener— y
+  pedir quitar algo que la receta no usa se rechaza al confirmar la venta.
+  Una resta **no cambia el precio** de la línea, pero **sí** el consumo: el
+  insumo quitado no se descuenta del almacén (RN-PRD-019), y la reposición
+  por anulación o nota de crédito devuelve solo lo que se consumió. Las
+  restas viajan a cocina como parte del pedido (KDS y comanda), no como
+  texto libre en la nota.
 
 ## Cumplimiento de pedido
 

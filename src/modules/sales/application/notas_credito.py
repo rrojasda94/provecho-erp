@@ -115,7 +115,12 @@ def _items_para_reponer(session: Session, filas, cantidades: dict[str, Decimal])
         if prod is None or prod.receta_id is None:
             continue
         items.append(
-            {"receta_id": str(prod.receta_id), "cantidad": str(cantidades[str(fila.id)])}
+            {
+                "receta_id": str(prod.receta_id),
+                "cantidad": str(cantidades[str(fila.id)]),
+                # Lo que la línea no llevó tampoco vuelve al almacén.
+                "sin_articulo_ids": fila.sin_articulo_ids,
+            }
         )
     return items
 
