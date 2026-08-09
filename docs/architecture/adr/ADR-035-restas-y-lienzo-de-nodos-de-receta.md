@@ -176,3 +176,70 @@ sabores sin explicarle a nadie qué es un mínimo.
 - Queda pendiente: reordenar nodos por arrastre (hoy se teclea `orden`) y el
   flag `quitable` si aparece el caso que lo justifique — ver Deuda técnica en
   `ROADMAP.md`.
+
+## Enmienda (2026-08-09, mismo día, sesión distinta) — el lienzo es un canvas
+
+La §4 de arriba decidió **conectores en CSS, no SVG medido en JS**, y las
+alternativas descartadas rechazaron **react-flow** con este argumento: *"una
+dependencia nueva para un árbol de seis filas fijas; el layout no es libre —
+lo dicta RN-PRD-004— así que no hay nada que arrastrar ni que enrutar"*.
+
+Las dos se revierten. El argumento era correcto sobre el problema que se creía
+tener y equivocado sobre el que había: se leyó *"hay que dibujar un árbol"*
+cuando el requisito real era *"hay que poder operar un lienzo"*. La pantalla
+funcionaba y el usuario la rechazó en una frase — *"parece más HTML que
+elementos interactivos, se siente barato; buscaba algo como n8n o DaVinci
+Resolve"*. Un layout fijo no impide que la navegación sea libre: pan, zoom,
+encuadre y arrastre son de la **vista**, no de la topología.
+
+**Qué cambia:**
+
+1. **`@xyflow/react` (react-flow, MIT, v12)** aporta pan, zoom, minimapa,
+   controles y aristas bezier. Se sopesó contra hacerlo a mano —este repo
+   evita dependencias por comodidad, y una implementación propia habría dado
+   control total del aspecto sin peso extra—, pero eran ~350 líneas de
+   matemática de viewport propia para llegar al mismo lugar en algo que el
+   usuario pidió explícitamente que se sintiera como una herramienta conocida.
+   La marca de agua de xyflow **se deja visible**: la licencia permite
+   quitarla, pero ellos piden suscripción para eso y no es una decisión que
+   corresponda tomar en silencio.
+2. **De filas apiladas a columnas de izquierda a derecha**, con un nodo
+   terminal **PLATO**. Ese orden **es** RN-PRD-004 leído de izquierda a
+   derecha: la regla deja de estar implícita en el orden vertical y pasa a ser
+   la espina visible de la pantalla. Cada nodo elegido tira una arista al
+   plato — la suma de `fusionar`, dibujada. Las restas llegan punteadas en
+   ámbar con glifo `−`; el empaque llega punteado cuando la modalidad no lo
+   consume, con lo que RN-EMP-003 deja de ser una nota al pie.
+3. **Superficie oscura a pantalla completa**, fuera del grupo de rutas
+   `(app)`, como ya hacen el PDV y el KDS. Un grafo es un problema de
+   figura-fondo: atenuar lo que no está en el camino solo funciona si hay
+   margen por debajo de la luminancia del fondo, y sobre el crema del ERP un
+   nodo atenuado se lava en vez de alejarse. La paleta se declara sobre la
+   clase raíz —nada se escapa— y **remapea los roles semánticos de shadcn**,
+   así que `Popover`/`Select`/`Input` renderizan oscuros dentro del lienzo sin
+   tocar `components/ui/**`: es el mecanismo de theming que ADR-013 §1 ya
+   preveía. La clase `.lienzo-tema` acompaña al contenido portalizado, que
+   Base UI monta en `document.body`, fuera del contenedor.
+4. **El costo de salir del shell**: la pantalla pierde el guard de permiso de
+   `ModuloShell` y tiene que hacerlo ella, con `puedeVerModulo` y la entrada
+   `catalogo` de `lib/modulos.ts` —no un string a mano, que es cómo un módulo
+   termina visible en una pantalla y bloqueado en otra—. Es lo único de este
+   cambio que puede abrir un agujero en silencio, así que tiene prueba
+   Playwright propia (`e2e/nodos.spec.ts`).
+5. **Los nodos se arrastran y no se guarda dónde quedaron.** El orden lo dicta
+   RN-PRD-004: mover un nodo no dice nada del producto. Persistirlo sería
+   columna, migración y contrato para algo cosmético. Cualquier cambio de
+   estructura recoloca todo, y eso es consecuencia aceptada, no bug.
+6. **Las ediciones de estructura pasan a popovers** desde la barra. El
+   `<select>` de "+ opción" y los formularios inline eran la fuente más
+   ruidosa del "parece HTML".
+
+**Qué NO cambia, y es el punto:** el modelo de datos, las restas, la fusión
+calculada en el cliente que no se guarda, la carga perezosa de recetas, y que
+las cantidades se siguen editando en Catálogo → Recetas (§4 de arriba, que
+sigue en pie). `frontend/lib/nodos.ts` y sus pruebas quedaron intactas — es la
+prueba de que el rediseño no movió un centavo.
+
+**Costo asumido:** una dependencia más en el frontend, y una pantalla del
+back-office que ya no vive dentro del shell (pierde barra superior, campana y
+menú del módulo; se compensa con enlaces de vuelta en su propia barra).

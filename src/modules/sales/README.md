@@ -179,11 +179,13 @@ es un grupo obligatorio de una sola opción con receta propia (RN-COM-021/023).
   `DELETE /productos/{id}/grupos/{grupo_id}`, la deuda que ADR-023 dejó
   anotada. Borrar un grupo **suelta** sus extras (siguen ofreciéndose, ya
   sin mínimo): el extra es un producto con su receta y su precio.
-- **El árbol se ve en `/catalogo/productos/{id}/nodos`** (frontend): dibuja
-  producto → tamaños → grupos → extras → restas → empaque y simula en vivo
+- **El árbol se recorre en `/catalogo/productos/{id}/nodos`** (frontend):
+  un canvas oscuro a pantalla completa (`@xyflow/react`) con producto →
+  tamaños → grupos → extras → restas → empaque → PLATO, que simula en vivo
   la receta fusionada, el costo y el margen de una combinación. La fusión
   la calcula el cliente y **no se guarda**: lo que se descuenta de verdad
-  sale del servidor al confirmar la venta.
+  sale del servidor al confirmar la venta. Vive fuera del shell del módulo
+  (como PDV y KDS) y por eso hace su propio guard de `sales.gestionar_catalogo`.
 
 Diferido a un slice posterior: `combo`, `promocion`, `carrito`,
 `central_pedidos`, `cuenta_puntos`/`puntos_movimiento`,

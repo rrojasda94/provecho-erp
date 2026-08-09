@@ -26,11 +26,27 @@
     sigue existiendo para lo que no es un insumo ("bien cocida").
 - **Lienzo de nodos del producto comercial**
   (`/catalogo/productos/{id}/nodos`, 2026-08-09, ADR-035). El árbol completo
-  de lo que se puede pedir en una pantalla —producto → tamaños → grupos (el
-  sabor es uno) → extras → restas → empaque—, recorrible: al tocar los nodos
-  se arma un plato y un panel recalcula en vivo la receta fusionada, el costo
-  y el margen de esa combinación exacta. Antes había que abrir cinco
-  pantallas y sumar a mano.
+  de lo que se puede pedir, sobre un canvas oscuro a pantalla completa con
+  pan, zoom, minimapa y aristas curvas (`@xyflow/react`): producto → tamaños
+  → grupos (el sabor es uno) → extras → restas → empaque → **PLATO**. Al
+  tocar los nodos se arma un plato y el inspector recalcula en vivo la receta
+  fusionada, el costo y el margen de esa combinación exacta. Antes había que
+  abrir cinco pantallas y sumar a mano.
+  - Las columnas de izquierda a derecha **son** RN-PRD-004: hasta ahora la
+    regla vivía implícita en el orden vertical de unas filas; ahora es la
+    espina visible de la pantalla. Cada nodo elegido tira una arista al
+    plato, que es la suma de la receta dibujada; las restas llegan punteadas
+    en ámbar y el empaque llega punteado cuando la modalidad no lo consume,
+    con lo que RN-EMP-003 deja de ser una nota al pie.
+  - La primera versión eran filas de `<div>` con líneas de 1px en CSS y se
+    descartó por lo que era: *"parece más HTML que elementos interactivos"*.
+    El cambio de decisión está en la enmienda de ADR-035.
+  - Vive fuera del shell del módulo, como el PDV y el KDS, para poder tomar
+    los 100dvh; a cambio hace **su propio guard de permiso**, con prueba
+    Playwright que verifica que un cajero no entra ni por URL directa.
+  - Los nodos se arrastran y **no se guarda dónde quedaron**: el orden lo
+    dicta RN-PRD-004 y persistirlo sería columna, migración y contrato para
+    algo cosmético.
   - Eso **no es un modelo nuevo**: el tamaño ya era un producto hijo
     (RN-COM-022) y el sabor ya era una opción de grupo con receta propia
     (RN-COM-021/023). Lo que faltaba era verlo junto.
