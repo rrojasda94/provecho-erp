@@ -263,6 +263,24 @@ class ProductoComercialRepo:
     def get_grupo(self, grupo_id: uuid.UUID) -> ProductoOpcionGrupo | None:
         return self.s.get(ProductoOpcionGrupo, grupo_id)
 
+    def borrar_vinculo_extra(self, vinculo: ProductoComercialExtra) -> None:
+        self.s.delete(vinculo)
+        self.s.flush()
+
+    def borrar_grupo(self, grupo: ProductoOpcionGrupo) -> None:
+        """Borra el grupo y suelta sus extras en vez de borrarlos: el extra
+        es un producto comercial con su receta y su precio, y existe con o
+        sin grupo. Quedan como extras opcionales del mismo producto."""
+        for vinculo in self.s.scalars(
+            select(ProductoComercialExtra).where(
+                ProductoComercialExtra.grupo_id == grupo.id
+            )
+        ):
+            vinculo.grupo_id = None
+        self.s.flush()
+        self.s.delete(grupo)
+        self.s.flush()
+
     def add_grupo(self, grupo: ProductoOpcionGrupo) -> ProductoOpcionGrupo:
         self.s.add(grupo)
         self.s.flush()

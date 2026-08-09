@@ -149,6 +149,42 @@ ADR-023):**
   de producto y grupo en el servidor. El frontend hace lo mismo al salir
   del campo, pero la API tiene más clientes que esa pantalla.
 
+**Restas y lienzo de nodos (2026-08-08, migración `a4f1d0c8b573`,
+ADR-029):**
+
+Cierra el último tramo de `RN-PRD-004` —**tamaño → combinación → extras →
+restas**—, el único que nunca se había implementado. Los otros tres ya
+estaban: el tamaño es una variante (RN-COM-022), la combinación (el sabor)
+es un grupo obligatorio de una sola opción con receta propia (RN-COM-021/023).
+
+- **Restas** (RN-COM-025): `venta_item.sin_articulo_ids` (JSONB, nullable)
+  guarda qué insumos NO lleva la línea. Guarda `articulo_id` y no
+  `receta_item_id` porque la línea de receta se edita y se borra, el
+  artículo no. NULL = no quitó nada, que es lo que vale para todo lo
+  vendido antes. **No cambia el precio; sí el consumo**: el evento lleva
+  las restas y `inventory` salta ese insumo (RN-PRD-011). La reposición por
+  anulación y por nota de crédito devuelve solo lo consumido.
+- **Lo quitable es la receta**: `GET /productos/{id}/quitables` devuelve los
+  insumos de la receta del producto. No hay tabla ni flag de "quitables" —
+  sería la misma verdad escrita dos veces. Vender pidiendo quitar algo que
+  la receta no usa devuelve 409; el replay del hub se exceptúa (ADR-009).
+  Endpoint aparte y no un campo de `GET /carta`: la carta se pide entera y
+  esto costaría una consulta de receta por producto para un dato que el
+  cajero mira de a una línea.
+- **Cocina las ve**: KDS (`sin: [...]` en cada ítem) y comanda impresa
+  (`SIN CEBOLLA`, sangrada). `sales` resuelve los nombres por el contrato
+  público de `inventory` (`nombres_de_articulos`), sin tocar su ORM.
+- **Estructura editable desde el lienzo**: se agregan
+  `DELETE /productos/{id}/extras/{extra_id}` y
+  `DELETE /productos/{id}/grupos/{grupo_id}`, la deuda que ADR-023 dejó
+  anotada. Borrar un grupo **suelta** sus extras (siguen ofreciéndose, ya
+  sin mínimo): el extra es un producto con su receta y su precio.
+- **El árbol se ve en `/catalogo/productos/{id}/nodos`** (frontend): dibuja
+  producto → tamaños → grupos → extras → restas → empaque y simula en vivo
+  la receta fusionada, el costo y el margen de una combinación. La fusión
+  la calcula el cliente y **no se guarda**: lo que se descuenta de verdad
+  sale del servidor al confirmar la venta.
+
 Diferido a un slice posterior: `combo`, `promocion`, `carrito`,
 `central_pedidos`, `cuenta_puntos`/`puntos_movimiento`,
 `carta_disputa_pago`. `modificador`/`variante_producto` quedan **descartados**

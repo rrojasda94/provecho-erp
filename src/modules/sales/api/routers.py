@@ -469,6 +469,30 @@ def vincular_extra(
     }
 
 
+@router.get("/productos/{producto_id}/quitables", response_model=list[schemas.QuitableOut])
+def quitables(
+    producto_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(LEER)),
+    session: Session = Depends(get_db),
+):
+    """Insumos que este producto admite quitar ("sin cebolla", RN-PRD-004).
+    Es la receta del producto: no hay una lista aparte que mantener."""
+    return catalogo.quitables_de(session, producto_id)
+
+
+@router.delete("/productos/{producto_id}/extras/{extra_id}", status_code=204)
+def desvincular_extra(
+    producto_id: uuid.UUID,
+    extra_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(CATALOGO)),
+    session: Session = Depends(get_db),
+):
+    """Deja de ofrecer el extra en este producto. El extra sigue existiendo:
+    es un producto comercial con su receta y su precio."""
+    catalogo.desvincular_extra(session, producto_id=producto_id, extra_id=extra_id)
+    session.commit()
+
+
 @router.post("/productos/{producto_id}/grupos", response_model=schemas.GrupoOpcionOut,
              status_code=201)
 def crear_grupo_opcion(
@@ -489,6 +513,19 @@ def crear_grupo_opcion(
         "orden": grupo.orden,
         "extras": [],
     }
+
+
+@router.delete("/productos/{producto_id}/grupos/{grupo_id}", status_code=204)
+def borrar_grupo_opcion(
+    producto_id: uuid.UUID,
+    grupo_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(CATALOGO)),
+    session: Session = Depends(get_db),
+):
+    """Borra el grupo. Sus extras quedan sueltos (siguen ofreciéndose, ya
+    sin mínimo obligatorio)."""
+    catalogo.borrar_grupo_opcion(session, producto_id=producto_id, grupo_id=grupo_id)
+    session.commit()
 
 
 @router.get("/marcas", response_model=list[schemas.MarcaOut])

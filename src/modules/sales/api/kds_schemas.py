@@ -34,6 +34,9 @@ class ItemColaOut(BaseModel):
     producto: str
     cantidad: str
     estado: str
+    # Restas de la línea, ya resueltas a nombre: ["Cebolla"] → "SIN CEBOLLA"
+    # en pantalla (RN-COM-025). Lista vacía = el plato va completo.
+    sin: list[str] = []
 
 
 class PedidoColaOut(BaseModel):

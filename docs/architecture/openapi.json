@@ -5779,6 +5779,14 @@
             "title": "Producto",
             "type": "string"
           },
+          "sin": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Sin",
+            "type": "array"
+          },
           "venta_item_id": {
             "title": "Venta Item Id",
             "type": "string"
@@ -11895,6 +11903,26 @@
         "title": "PushOut",
         "type": "object"
       },
+      "QuitableOut": {
+        "description": "Un insumo que el plato admite quitar. Sale de la receta del producto,\nno de una configuración aparte.",
+        "properties": {
+          "articulo_id": {
+            "format": "uuid",
+            "title": "Articulo Id",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          }
+        },
+        "required": [
+          "articulo_id",
+          "nombre"
+        ],
+        "title": "QuitableOut",
+        "type": "object"
+      },
       "ReabrirCierreIn": {
         "properties": {
           "autorizacion": {
@@ -15422,6 +15450,15 @@
             "format": "uuid",
             "title": "Producto Comercial Id",
             "type": "string"
+          },
+          "sin_articulo_ids": {
+            "default": [],
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Sin Articulo Ids",
+            "type": "array"
           }
         },
         "required": [
@@ -15542,6 +15579,15 @@
             "format": "uuid",
             "title": "Producto Comercial Id",
             "type": "string"
+          },
+          "sin_articulo_ids": {
+            "default": [],
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Sin Articulo Ids",
+            "type": "array"
           }
         },
         "required": [
@@ -29480,6 +29526,58 @@
         ]
       }
     },
+    "/api/v1/sales/productos/{producto_id}/extras/{extra_id}": {
+      "delete": {
+        "description": "Deja de ofrecer el extra en este producto. El extra sigue existiendo:\nes un producto comercial con su receta y su precio.",
+        "operationId": "desvincular_extra_api_v1_sales_productos__producto_id__extras__extra_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "producto_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Producto Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "extra_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Extra Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Desvincular Extra",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
     "/api/v1/sales/productos/{producto_id}/grupos": {
       "post": {
         "description": "Agrupa extras y define cuántos hay que elegir. `minimo >= 1` hace el\ngrupo obligatorio en el PDV (RN-COM-023).",
@@ -29534,6 +29632,111 @@
           }
         ],
         "summary": "Crear Grupo Opcion",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/productos/{producto_id}/grupos/{grupo_id}": {
+      "delete": {
+        "description": "Borra el grupo. Sus extras quedan sueltos (siguen ofreciéndose, ya\nsin mínimo obligatorio).",
+        "operationId": "borrar_grupo_opcion_api_v1_sales_productos__producto_id__grupos__grupo_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "producto_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Producto Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "grupo_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Grupo Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Borrar Grupo Opcion",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/productos/{producto_id}/quitables": {
+      "get": {
+        "description": "Insumos que este producto admite quitar (\"sin cebolla\", RN-PRD-004).\nEs la receta del producto: no hay una lista aparte que mantener.",
+        "operationId": "quitables_api_v1_sales_productos__producto_id__quitables_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "producto_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Producto Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/QuitableOut"
+                  },
+                  "title": "Response Quitables Api V1 Sales Productos  Producto Id  Quitables Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Quitables",
         "tags": [
           "sales"
         ]

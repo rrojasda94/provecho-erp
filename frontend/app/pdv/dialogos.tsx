@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import {
+  api,
   esAtribucion,
   esCustodia,
   soles,
@@ -15,10 +16,11 @@ import {
   type MesaEnMapa,
   type PosTarjeta,
   type PosVerificado,
+  type Quitable,
   type VarianteDeCarta,
 } from "@/lib/pdv";
 
-import type { Borrador, LineaBorrador } from "./tipos";
+import type { Borrador, LineaBorrador, RestaEnLinea } from "./tipos";
 
 /** Envoltorio común: `<dialog>` nativo, que ya trae foco atrapado, cierre
  * con Escape y backdrop sin una línea de JS.
@@ -514,6 +516,7 @@ export function DialogoProducto({
   const [cantidad, setCantidad] = useState(1);
   const [nota, setNota] = useState("");
   const [extras, setExtras] = useState<Record<string, number>>({});
+  const [restas, setRestas] = useState<RestaEnLinea[]>([]);
   const [varianteId, setVarianteId] = useState("");
   const [pidiendoPin, setPidiendoPin] = useState(false);
   const [usuario, setUsuario] = useState("");
@@ -523,6 +526,7 @@ export function DialogoProducto({
     if (!linea) return;
     setCantidad(linea.cantidad);
     setNota(linea.nota);
+    setRestas(linea.restas);
     setExtras(
       Object.fromEntries(linea.extras.map((e) => [e.productoId, e.cantidad])),
     );
@@ -543,6 +547,7 @@ export function DialogoProducto({
   const variante = variantes.find((v) => v.producto_comercial_id === varianteId);
   const grupos = agruparExtras(item?.extras ?? []);
   const falta = queFalta(variantes, variante, grupos, extras);
+  const preparadoId = idDeLoQueSePrepara(linea, variantes, variante);
 
   const guardar = () => {
     if (falta) return;
@@ -564,6 +569,7 @@ export function DialogoProducto({
       cantidad,
       nota: nota.trim(),
       extras: elegidos,
+      restas,
     });
   };
 
@@ -588,6 +594,8 @@ export function DialogoProducto({
       </div>
 
       <GruposDeExtras grupos={grupos} elegidos={extras} onCambiar={setExtras} />
+
+      <Restas productoId={preparadoId} elegidas={restas} onCambiar={setRestas} />
 
       <p className="pdv-etiqueta">Nota para cocina</p>
       <input
@@ -717,6 +725,103 @@ function etiquetaCorta(nombre: string, nombreProducto: string): string {
   return nombre.toLowerCase().startsWith(nombreProducto.toLowerCase())
     ? nombre.slice(nombreProducto.length).trim() || nombre
     : nombre;
+}
+
+/** Qué producto se prepara realmente en esta línea: la variante elegida, o
+ * el producto mismo si no tiene variantes. `null` mientras falta elegirla —
+ * lo quitable sale de SU receta, y hasta que se elija no se sabe cuál es. */
+function idDeLoQueSePrepara(
+  linea: LineaBorrador,
+  variantes: VarianteDeCarta[],
+  variante: VarianteDeCarta | undefined,
+): string | null {
+  if (variante) return variante.producto_comercial_id;
+  return variantes.length === 0 ? linea.productoId : null;
+}
+
+/**
+ * Restas de la línea: "sin cebolla" (RN-PRD-004).
+ *
+ * Es la mitad estructurada de lo que hasta ahora se escribía en la nota a
+ * cocina. La nota sigue existiendo para lo que no es un insumo ("bien
+ * cocida"); esto es para lo que sí, porque un insumo que no se usó tiene
+ * que dejar de descontarse del almacén — si no, la cebolla que quedó en la
+ * cámara aparece como faltante en el conteo del mes.
+ *
+ * No cambia el precio. Se pide la lista al abrir la línea y no con la carta
+ * entera: depende de la receta de la variante elegida, y el cajero mira una
+ * línea a la vez.
+ */
+function Restas({
+  productoId,
+  elegidas,
+  onCambiar,
+}: {
+  productoId: string | null;
+  elegidas: RestaEnLinea[];
+  onCambiar: (r: RestaEnLinea[]) => void;
+}) {
+  const [quitables, setQuitables] = useState<Quitable[]>([]);
+
+  useEffect(() => {
+    if (!productoId) {
+      setQuitables([]);
+      return;
+    }
+    let vigente = true;
+    api
+      .quitables(productoId)
+      .then((lista) => {
+        if (!vigente) return;
+        setQuitables(lista);
+        // Cambiar de tamaño cambia la receta: una resta que la nueva no
+        // admite se cae sola. Dejarla marcada haría que el servidor
+        // rechazara la venta recién al enviar el pedido.
+        const admitidos = new Set(lista.map((q) => q.articulo_id));
+        onCambiar(elegidas.filter((r) => admitidos.has(r.articuloId)));
+      })
+      // Sin lista no hay restas que ofrecer: la línea se vende igual, que
+      // es mejor que bloquear el cobro por un insumo que nadie quitó.
+      .catch(() => vigente && setQuitables([]));
+    return () => {
+      vigente = false;
+    };
+    // `elegidas`/`onCambiar` fuera de las dependencias: el efecto reacciona
+    // al producto, no a la selección — listarlos lo volvería a disparar con
+    // cada toque de chip.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productoId]);
+
+  if (quitables.length === 0) return null;
+
+  const alternar = (q: Quitable) =>
+    onCambiar(
+      elegidas.some((r) => r.articuloId === q.articulo_id)
+        ? elegidas.filter((r) => r.articuloId !== q.articulo_id)
+        : [...elegidas, { articuloId: q.articulo_id, nombre: q.nombre }],
+    );
+
+  return (
+    <>
+      <p className="pdv-etiqueta">Sin… · no cambia el precio</p>
+      <div className="pdv-chips">
+        {quitables.map((q) => {
+          const marcado = elegidas.some((r) => r.articuloId === q.articulo_id);
+          return (
+            <button
+              key={q.articulo_id}
+              type="button"
+              className={`pdv-chip${marcado ? " quitado" : ""}`}
+              aria-pressed={marcado}
+              onClick={() => alternar(q)}
+            >
+              sin {q.nombre}
+            </button>
+          );
+        })}
+      </div>
+    </>
+  );
 }
 
 /** Extras agrupados, cada grupo diciendo si obliga a elegir y hasta

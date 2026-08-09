@@ -341,6 +341,9 @@ function Linea({
             {e.nombre}
           </em>
         ))}
+        {linea.restas.map((r) => (
+          <em key={r.articuloId}>− sin {r.nombre}</em>
+        ))}
       </span>
       <span className="pdv-linea-monto">{soles(totalLinea(linea))}</span>
     </button>

@@ -106,9 +106,17 @@ def _consumos_de_items(session: Session, items: list[dict]) -> list[tuple[uuid.U
     consumos: list[tuple[uuid.UUID, Decimal]] = []
     for it in items:
         cantidad_vendida = Decimal(it["cantidad"])
+        # Restas de la línea ("sin cebolla", RN-PRD-004): el insumo quitado
+        # no se descuenta. La resta actúa acá y no en el precio a propósito
+        # —quitar cebolla no abarata la pizza—, pero sí tiene que mover el
+        # inventario: si no, la cebolla que quedó en la cámara aparece como
+        # faltante en el conteo del mes.
+        sin = {str(a) for a in (it.get("sin_articulo_ids") or [])}
         for ri in session.scalars(
             select(RecetaItem).where(RecetaItem.receta_id == uuid.UUID(it["receta_id"]))
         ):
+            if str(ri.articulo_id) in sin:
+                continue
             # Consumo = cantidad de receta × vendido × (1 + merma%).
             consumo = (
                 ri.cantidad * cantidad_vendida * (1 + ri.merma_pct / 100)

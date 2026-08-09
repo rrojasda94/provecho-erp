@@ -49,6 +49,8 @@ Thumbs.db
 
 # Base desechable y artefactos de las pruebas e2e.
 e2e.db
+# La crea el perfil `provecho-api-smoke` de `.claude/launch.json`.
+pdv_smoke.db
 frontend/test-results/
 frontend/playwright-report/
 frontend/blob-report/

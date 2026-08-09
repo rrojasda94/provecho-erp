@@ -83,11 +83,11 @@ accounting.asiento_generado
 
 | Evento | Emisor | Consumidores | Payload (clave) | Cuándo | Reglas |
 |--------|--------|--------------|-----------------|--------|--------|
-| `sales.venta_confirmada` | sales | inventory, accounting, marketing (atribución lead→venta) | venta_id, sucursal_id, cliente_id (opcional), items[], total | Al confirmar la venta. `cliente_id` se agregó 2026-08-01 para la atribución de marketing | RN-COM-001, RN-PRD-002, RN-MKT-003 |
+| `sales.venta_confirmada` | sales | inventory, accounting, marketing (atribución lead→venta) | venta_id, sucursal_id, cliente_id (opcional), items[] (receta_id, cantidad, empaque_articulo_id, sin_articulo_ids), total | Al confirmar la venta. `cliente_id` se agregó 2026-08-01 para la atribución de marketing; `sin_articulo_ids` (restas de la línea) el 2026-08-08 — ausente = la línea no quitó nada | RN-COM-001, RN-PRD-002, RN-MKT-003 |
 | `sales.pago_registrado` | sales | accounting | venta_id, medio, monto, ref_externa | Al registrar pago | RN-COM-002 |
 | `sales.comprobante_emitido` | sales | accounting | venta_id, tipo, serie_numero | Comprobante aceptado por SUNAT (Factiliza) | RN-COM-003 |
 | `sales.nota_credito_emitida` | sales | inventory (repone stock **solo si quien acredita lo pidió**: sin reposición el evento viaja con `items` vacío), auditoría/BI | nota_credito_id, comprobante_id, venta_id, sucursal_id, motivo, total, repone_stock, emitido_por, items | Se acredita una venta ya cobrada, total o por ítem | RN-CPP-009 |
-| `sales.venta_anulada` | sales | inventory, accounting | venta_id, motivo | Al anular | RN-GEN-002 |
+| `sales.venta_anulada` | sales | inventory, accounting | venta_id, sucursal_id, usuario_id, items[] (receta_id, cantidad, sin_articulo_ids) | Al anular. Las restas viajan para que la reposición devuelva **solo lo que se consumió** (RN-PRD-011) | RN-GEN-002 |
 | `sales.descuento_aplicado` | sales | accounting, gerencia (reporte de descuentos) | venta_id, sucursal_id, modo, valor, motivo, autorizado_por | Un supervisor autoriza un descuento manual sobre el total de una orden | RN-COM-017 |
 | `sales.lineas_anuladas` | sales | inventory (repone stock), accounting | venta_id, sucursal_id, autorizado_por, motivo, items[] | Se quitan líneas de una orden YA enviada a cocina. Mismo payload que `venta_anulada` pero solo con lo quitado; inventory usa el mismo listener | RN-COM-020 |
 | `accounting.movimiento_caja_registrado` | accounting | — (auditoría, arqueo) | movimiento_caja_id, apertura_caja_id, tipo, monto, motivo | Ingreso o retiro de efectivo del cajón durante el turno | RN-MDP-007 |

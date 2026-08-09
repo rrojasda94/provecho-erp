@@ -21,7 +21,10 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from src.modules.inventory.application.queries_publicas import receta_resumen
+from src.modules.inventory.application.queries_publicas import (
+    insumos_de_receta,
+    receta_resumen,
+)
 from src.modules.sales.application.errors import Conflicto, NoEncontrado, ReglaNegocio
 from src.modules.sales.infrastructure.models import (
     MedioPago,
@@ -160,6 +163,60 @@ def vincular_extra(
         if grupo is None or grupo.producto_comercial_id != producto_id:
             raise NoEncontrado("grupo de opciones no encontrado en este producto")
     return repo.vincular_extra(producto_id, extra_id, maximo, grupo_id)
+
+
+def quitables_de(session: Session, producto_id: uuid.UUID) -> list[dict]:
+    """Qué se le puede pedir "sin" a este producto (RN-PRD-004).
+
+    Es la lista de insumos de su receta, sin nada que configurar aparte: una
+    tabla de "quitables" repetiría lo que la receta ya dice, y dos datos que
+    dicen lo mismo terminan diciendo cosas distintas.
+
+    Endpoint aparte y no un campo de `GET /carta` a propósito: la carta se
+    pide entera al abrir el PDV y esto haría una consulta de receta por
+    producto para algo que el cajero mira en una línea a la vez. Se pide
+    cuando abre el configurador de esa línea.
+    """
+    repo = ProductoComercialRepo(session)
+    producto = _exigir(repo, producto_id, "producto comercial")
+    if producto.receta_id is None:
+        # El padre de un grupo de variantes no se prepara: lo quitable sale
+        # de la variante elegida, y el PDV pregunta por esa.
+        return []
+    return [
+        {"articulo_id": i["articulo_id"], "nombre": i["nombre"]}
+        for i in insumos_de_receta(session, producto.receta_id)
+    ]
+
+
+def desvincular_extra(
+    session: Session, *, producto_id: uuid.UUID, extra_id: uuid.UUID
+) -> None:
+    """Deja de ofrecer un extra en un producto.
+
+    Borra el vínculo, no el extra: "extra queso" es un producto comercial
+    con su receta y su precio, y lo siguen ofreciendo otros platos. Las
+    ventas pasadas no se tocan — `venta_item` guarda su propio precio y su
+    propia línea, así que el histórico no depende de esta tabla.
+    """
+    repo = ProductoComercialRepo(session)
+    vinculo = repo.admite_extra(producto_id, extra_id)
+    if vinculo is None:
+        raise NoEncontrado("el producto no ofrece ese extra")
+    repo.borrar_vinculo_extra(vinculo)
+
+
+def borrar_grupo_opcion(
+    session: Session, *, producto_id: uuid.UUID, grupo_id: uuid.UUID
+) -> None:
+    """Borra un grupo de opciones y suelta sus extras (siguen ofreciéndose,
+    ahora sin obligatoriedad). Se exige que el grupo sea del producto de la
+    ruta: un id de grupo suelto no debe poder borrar el grupo de otro."""
+    repo = ProductoComercialRepo(session)
+    grupo = repo.get_grupo(grupo_id)
+    if grupo is None or grupo.producto_comercial_id != producto_id:
+        raise NoEncontrado("grupo de opciones no encontrado en este producto")
+    repo.borrar_grupo(grupo)
 
 
 def editar_producto(session: Session, producto_id: uuid.UUID, **campos) -> ProductoComercial:

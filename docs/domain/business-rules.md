@@ -705,6 +705,13 @@ de su módulo y se prueban de forma aislada.
 - **RN-PRD-010** Una receta puede marcarse flexible, permitiendo ajustar
   insumos por sabor o calidad; el criterio de ajuste lo asigna el área de
   Producción.
+- **RN-PRD-011** Un insumo que el cliente pidió quitar (resta, RN-COM-025)
+  **no se descuenta** del almacén de la sucursal al confirmarse la venta, y
+  tampoco se repone al anularla: nunca salió. Cada tramo del producto
+  configurado —tamaño, combinación, extras— aporta **su propia receta** y el
+  consumo del plato es la suma de todas menos las restas; el empaque se
+  suma aparte, según la modalidad (RN-EMP-003), porque no es parte de la
+  receta.
 
 ## Producción — cronograma, calidad y cocina
 
@@ -1241,6 +1248,16 @@ producción se hace en cocinas de sucursal. Ver
   guardada. Duplicar una receta la clona con el sufijo "(copy)" y sin
   destino asignado; escalarla por un factor redondea **cada línea con su
   propia unidad** (1.5 bollos de masa son 2, no 1.5).
+- **RN-COM-025** Una línea de venta puede llevar **restas**: insumos de la
+  receta que ese plato NO lleva ("sin cebolla"). Es el último tramo del
+  orden de modificadores (RN-PRD-004). Lo que se puede quitar **es** lo que
+  la receta del producto pone —no hay una lista aparte que mantener— y
+  pedir quitar algo que la receta no usa se rechaza al confirmar la venta.
+  Una resta **no cambia el precio** de la línea, pero **sí** el consumo: el
+  insumo quitado no se descuenta del almacén (RN-PRD-011), y la reposición
+  por anulación o nota de crédito devuelve solo lo que se consumió. Las
+  restas viajan a cocina como parte del pedido (KDS y comanda), no como
+  texto libre en la nota.
 
 ## Cumplimiento de pedido
 

@@ -26,6 +26,10 @@ export type ItemCola = {
   producto: string;
   cantidad: string;
   estado: EstadoItem;
+  /** Insumos que este plato NO lleva, ya con nombre (RN-COM-025). Vacío =
+   * va completo. Es lo que hasta ahora se escribía en la nota libre, y que
+   * ahora además deja de descontarse del almacén. */
+  sin: string[];
 };
 
 export type PedidoCola = {

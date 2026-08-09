@@ -379,6 +379,25 @@
     line-height: 1.25;
 }
 
+/* Resta: ámbar y en bloque propio bajo el plato. Un "sin cebolla" que se
+   confunde con el nombre sale como plato rehecho (RN-COM-025). */
+.kds-sin {
+    display: block;
+    margin-top: 0.125rem;
+    color: var(--kds-ambar);
+    font-size: 0.8125rem;
+    font-style: normal;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+/* Un plato ya tachado no tacha su resta dos veces: el tachado del nombre lo
+   arrastraría y "SIN CEBOLLA" tachado se lee como "lleva cebolla". */
+.kds-item.hecho .kds-sin {
+    text-decoration: none;
+    opacity: 0.6;
+}
+
 .kds-check {
     color: var(--kds-verde);
     font-weight: 700;

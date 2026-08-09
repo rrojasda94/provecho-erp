@@ -5,6 +5,46 @@ Versionado: [SemVer](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
+### Added
+
+- **Restas: "sin cebolla" mueve el inventario** (2026-08-08, ADR-029,
+  migración `a4f1d0c8b573`). `RN-PRD-004` manda aplicar los modificadores en
+  el orden **tamaño → combinación → extras → restas**, y las restas eran el
+  único tramo sin implementar: se escribían en la nota libre a cocina, el
+  plato salía bien y **el inventario descontaba la cebolla igual**. Esa
+  cebolla que se quedó en la cámara aparecía como faltante en el conteo del
+  mes sin que nadie pudiera explicarlo. Ahora `venta_item.sin_articulo_ids`
+  guarda qué insumos no lleva la línea; el consumo los salta y la reposición
+  por anulación o nota de crédito devuelve solo lo que se consumió
+  (RN-COM-025, RN-PRD-011).
+  - **Lo quitable es la receta**: `GET /sales/productos/{id}/quitables`
+    devuelve los insumos del producto. No hay tabla ni flag de "quitables"
+    que mantener — sería la misma verdad escrita dos veces. Pedir quitar algo
+    que la receta no pone devuelve 409; el replay del hub se exceptúa
+    (ADR-009), porque esa venta ya se preparó y la receta pudo cambiar
+    durante el corte.
+  - **No cambia el precio.** Quitar cebolla no abarata la pizza; lo que
+    cambia es el descuento de stock.
+  - Cocina las ve en el KDS y en la comanda impresa (`SIN CEBOLLA`,
+    sangrada). En el PDV son chips rojos y tachados junto a los extras — la
+    nota libre sigue existiendo para lo que no es un insumo ("bien cocida").
+- **Lienzo de nodos del producto** (`/catalogo/productos/{id}/nodos`,
+  2026-08-08). El árbol completo de lo que se puede pedir en una pantalla:
+  producto → tamaños → grupos (el sabor es uno) → extras → restas → empaque.
+  Al tocar los nodos se arma un plato y un panel recalcula en vivo la receta
+  fusionada, el costo y el margen de esa combinación exacta — antes había que
+  abrir cinco pantallas y sumar a mano. La estructura se edita desde el
+  lienzo; los gramos de cada receta siguen en Catálogo → Recetas, con enlace
+  desde cada nodo (ADR-023 §4: el editor duplicado ya se reportó como
+  confuso una vez). La fusión se calcula en el cliente y **no se guarda**: es
+  un simulador, lo que se descuenta de verdad sale del servidor.
+- **Quitar un extra de un producto y borrar un grupo de opciones**
+  (`DELETE /sales/productos/{id}/extras/{extra_id}` y
+  `DELETE /sales/productos/{id}/grupos/{grupo_id}`). Cierra la deuda que
+  ADR-023 dejó anotada. Borrar un grupo **suelta** sus extras en vez de
+  borrarlos: el extra es un producto comercial con su receta y su precio, y
+  existe con o sin grupo.
+
 ### Fixed
 
 - **Dos temporales de Word estaban versionados en la raíz** (2026-08-07).

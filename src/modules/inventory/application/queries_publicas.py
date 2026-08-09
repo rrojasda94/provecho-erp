@@ -56,6 +56,44 @@ def receta_resumen(session: Session, receta_id: uuid.UUID) -> dict | None:
     }
 
 
+def insumos_de_receta(session: Session, receta_id: uuid.UUID) -> list[dict]:
+    """Qué artículos usa una receta, con su nombre. `articulo_id` → nombre.
+
+    Es lo que `sales` necesita para las restas ("sin cebolla", RN-PRD-004):
+    la lista de lo que se puede quitar de un plato **es** la lista de
+    insumos de su receta, así que no hay nada que configurar aparte — una
+    tabla de "quitables" sería la misma información escrita dos veces, y
+    dos datos que dicen lo mismo terminan diciendo cosas distintas.
+
+    Devuelve el nombre además del id porque el KDS tiene que imprimir "SIN
+    CEBOLLA" y `sales` no puede leer `articulo` por su cuenta.
+    """
+    filas = session.execute(
+        select(Articulo.id, Articulo.nombre)
+        .join(RecetaItem, RecetaItem.articulo_id == Articulo.id)
+        .where(RecetaItem.receta_id == receta_id)
+        .order_by(Articulo.nombre)
+    )
+    return [{"articulo_id": fila.id, "nombre": fila.nombre} for fila in filas]
+
+
+def nombres_de_articulos(
+    session: Session, articulo_ids: Sequence[uuid.UUID]
+) -> dict[uuid.UUID, str]:
+    """`articulo_id` → nombre, para módulos que guardan ids de artículo y
+    tienen que imprimirlos (el KDS y su "SIN CEBOLLA"). Los ids que no
+    existen sencillamente no aparecen: quien los muestre decide qué poner en
+    su lugar."""
+    if not articulo_ids:
+        return {}
+    filas = session.execute(
+        select(Articulo.id, Articulo.nombre).where(
+            Articulo.id.in_(list(articulo_ids))
+        )
+    )
+    return {fila.id: fila.nombre for fila in filas}
+
+
 def costo_unitario_de_recetas(
     session: Session, receta_ids: Sequence[uuid.UUID]
 ) -> dict[uuid.UUID, Decimal]:

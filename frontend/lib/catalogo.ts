@@ -137,6 +137,9 @@ export const catalogoApi = {
       /** Único modo de dejarlo sin receta: `receta_id: null` sería
        * indistinguible de "no lo mandé". */
       quitar_receta: boolean;
+      /** Artículo de empaque y en qué modalidades se descuenta (RN-EMP-003). */
+      empaque_id: string | null;
+      modalidades_empaque: string[] | null;
     }>,
   ) => pedir<Producto>(`/sales/productos/${id}`, { metodo: "PATCH", cuerpo }),
 
@@ -148,10 +151,22 @@ export const catalogoApi = {
     cuerpo: { nombre: string; minimo: number; maximo: number | null; orden?: number },
   ) => pedir<GrupoOpcion>(`/sales/productos/${productoId}/grupos`, { metodo: "POST", cuerpo }),
 
+  borrarGrupo: (productoId: string, grupoId: string) =>
+    pedir<void>(`/sales/productos/${productoId}/grupos/${grupoId}`, {
+      metodo: "DELETE",
+    }),
+
   vincularExtra: (
     productoId: string,
     cuerpo: { extra_id: string; maximo?: number | null; grupo_id?: string | null },
   ) => pedir<unknown>(`/sales/productos/${productoId}/extras`, { metodo: "POST", cuerpo }),
+
+  /** Deja de ofrecer el extra en este producto. El extra sobrevive: es un
+   * producto comercial con su propia receta y su propio precio. */
+  desvincularExtra: (productoId: string, extraId: string) =>
+    pedir<void>(`/sales/productos/${productoId}/extras/${extraId}`, {
+      metodo: "DELETE",
+    }),
 
   recetas: () => pedir<Receta[]>("/inventory/recetas"),
   receta: (id: string) => pedir<RecetaDetalle>(`/inventory/recetas/${id}`),

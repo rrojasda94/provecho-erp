@@ -388,7 +388,10 @@ entre `aprobada` y `despachada` no cambia qué se puede hacer (ADR-020).
 
 ## Relaciones
 
-- Escucha: `sales.venta_confirmada` (descuenta insumos según receta),
+- Escucha: `sales.venta_confirmada` (descuenta insumos según receta, **menos
+  las restas de la línea**: el insumo que el cliente pidió quitar no se usó,
+  así que descontarlo lo haría aparecer como faltante en el conteo del mes —
+  RN-PRD-011, ADR-029),
   `purchases.compra_recibida` (suma stock central),
   `production.orden_completada` (consume insumos, produce subrecetas).
 - Publica: `inventory.stock_consumido` (auditoría del descuento por venta/
@@ -404,7 +407,11 @@ entre `aprobada` y `despachada` no cambia qué se puede hacer (ADR-020).
 - Contrato público de lectura: `application/queries_publicas.py` — hoy
   `unidad_medida_para_magnitud` (nombre y `decimales` de una UdM, para que
   otro módulo exprese una cantidad con su unidad, RN-GER-010),
-  `receta_resumen` (que `sales` valide la receta de un producto comercial) y
+  `receta_resumen` (que `sales` valide la receta de un producto comercial),
+  `insumos_de_receta` y `nombres_de_articulos` (las restas de `sales`:
+  qué se le puede pedir "sin" a un plato **es** la lista de insumos de su
+  receta, y el KDS necesita el nombre para imprimir "SIN CEBOLLA" —
+  RN-COM-025, ADR-029) y
   `solicitudes_resumen_para_negociacion` (`GET /solicitudes/resumen`, permiso
   `leer_solicitudes_externas`: qué artículo pide más cada sucursal, para que
   `purchases` negocie volumen — ver `docs/architecture/events.md`) y
