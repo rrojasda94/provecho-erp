@@ -1,3 +1,13 @@
+# `.env` guarda las URLs vistas desde el HOST (localhost:5433 / localhost:6379)
+# para que alembic, pytest y un uvicorn suelto funcionen sin editar nada. Dentro
+# de la red de compose los mismos servicios se llaman `db:5432` y `redis:6379`,
+# así que los contenedores las sobreescriben acá (`environment` gana sobre
+# `env_file`). Para apuntar los contenedores a una BD externa (Supabase),
+# comentar estas dos líneas y dejar que mande el `.env`.
+x-conexiones-internas: &conexiones-internas
+  DATABASE_URL: postgresql+psycopg://provecho:${POSTGRES_PASSWORD:-provecho}@db:5432/provecho
+  REDIS_URL: redis://redis:6379/0
+
 services:
   db:
     image: postgres:16-alpine
@@ -28,6 +38,7 @@ services:
     build: .
     command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
     env_file: .env
+    environment: *conexiones-internas
     ports:
       - "8000:8000"
     volumes:
@@ -44,6 +55,7 @@ services:
     # Envío de comprobantes a SUNAT vía Factiliza. Sin worker, los
     # comprobantes se acumulan en estado `pendiente` — la venta y el cobro
     # siguen funcionando.
+    environment: *conexiones-internas
     command: celery -A src.core.celery_app worker --loglevel=info
     # El HEALTHCHECK del Dockerfile pega a http://127.0.0.1:8000/health —
     # correcto para la API, pero este proceso no levanta servidor HTTP, así
@@ -72,6 +84,7 @@ services:
     #
     # Un solo beat por despliegue: dos programadores encolarían cada tarea
     # dos veces.
+    environment: *conexiones-internas
     command: celery -A src.core.celery_app beat --loglevel=info
     # El HEALTHCHECK del Dockerfile pega a http://127.0.0.1:8000/health —
     # correcto para la API, pero este proceso no levanta servidor HTTP, así

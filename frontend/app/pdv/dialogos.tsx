@@ -20,7 +20,12 @@ import {
   type VarianteDeCarta,
 } from "@/lib/pdv";
 
-import type { Borrador, LineaBorrador, RestaEnLinea } from "./tipos";
+import {
+  MOTIVOS_CONSUMO,
+  type Borrador,
+  type LineaBorrador,
+  type RestaEnLinea,
+} from "./tipos";
 
 /** Envoltorio común: `<dialog>` nativo, que ya trae foco atrapado, cierre
  * con Escape y backdrop sin una línea de JS.
@@ -138,6 +143,7 @@ export function DialogoApertura({
         min={0}
         step="0.10"
         inputMode="decimal"
+        aria-label="El encargado declara entregar"
         placeholder="0.00"
         data-testid="apertura-declarado"
         value={declarado}
@@ -200,6 +206,7 @@ export function DialogoApertura({
       <div className="pdv-dos">
         <input
           className="pdv-campo"
+          aria-label="Usuario del encargado"
           placeholder="Usuario del encargado"
           autoComplete="off"
           data-testid="apertura-usuario"
@@ -210,6 +217,7 @@ export function DialogoApertura({
           className="pdv-campo"
           type="password"
           inputMode="numeric"
+          aria-label="PIN del encargado"
           placeholder="PIN"
           autoComplete="off"
           data-testid="apertura-pin"
@@ -391,6 +399,7 @@ export function DialogoCierre({
           suelto que no coincidía con nadie. */}
       <select
         className="pdv-campo"
+        aria-label="A dónde va el efectivo"
         data-testid="cierre-custodia"
         value={custodia}
         onChange={(e) => setCustodia(esCustodia(e.target.value) ? e.target.value : "")}
@@ -401,8 +410,14 @@ export function DialogoCierre({
       </select>
       <p className="pdv-etiqueta">Recibe</p>
       <div className="pdv-dos">
+        {/* `aria-label` y no un `<label>` envolvente: los dos campos son celdas
+            de `.pdv-dos` y meterlos dentro de una etiqueta rompe la grilla. Sin
+            esto el `placeholder` era el único nombre —y no lo es: desaparece al
+            escribir y ningún lector de pantalla lo anuncia como nombre del
+            campo. */}
         <input
           className="pdv-campo"
+          aria-label="Usuario de quien recibe"
           placeholder="Usuario de quien recibe"
           autoComplete="off"
           data-testid="cierre-usuario"
@@ -413,6 +428,7 @@ export function DialogoCierre({
           className="pdv-campo"
           type="password"
           inputMode="numeric"
+          aria-label="PIN de quien recibe"
           placeholder="PIN"
           autoComplete="off"
           data-testid="cierre-pin"
@@ -427,6 +443,7 @@ export function DialogoCierre({
           escrito de veinte maneras distintas no se puede sumar después. */}
       <select
         className="pdv-campo"
+        aria-label="Si hay descuadre, a quién se le atribuye"
         value={atribucion}
         onChange={(e) =>
           setAtribucion(esAtribucion(e.target.value) ? e.target.value : "")
@@ -547,6 +564,8 @@ export function DialogoProducto({
   const variante = variantes.find((v) => v.producto_comercial_id === varianteId);
   const grupos = agruparExtras(item?.extras ?? []);
   const falta = queFalta(variantes, variante, grupos, extras);
+  // Lo quitable sale de la receta del producto que realmente se prepara: la
+  // variante si hay, el producto si no.
   const preparadoId = idDeLoQueSePrepara(linea, variantes, variante);
 
   const guardar = () => {
@@ -1077,6 +1096,104 @@ export function DialogoTipo({
           }
         >
           Confirmar
+        </button>
+      </footer>
+    </Dialogo>
+  );
+}
+
+/** Comida del personal (RN-COM-025): motivo + firma del encargado.
+ *
+ * El PIN no se guarda ni viaja con la venta: se canjea acá por una elevación
+ * acotada al permiso, y lo que viaja es ese token — mismo trato que la
+ * apertura de caja y el descuento manual. */
+export function DialogoConsumoPersonal({
+  abierto,
+  onCerrar,
+  onConfirmar,
+  ocupado,
+}: {
+  abierto: boolean;
+  onCerrar: () => void;
+  onConfirmar: (datos: {
+    motivo: string;
+    encargado: { username: string; pin: string };
+  }) => void;
+  ocupado: boolean;
+}) {
+  const [motivo, setMotivo] = useState("");
+  const [usuario, setUsuario] = useState("");
+  const [pin, setPin] = useState("");
+
+  useEffect(() => {
+    if (!abierto) {
+      setMotivo("");
+      setUsuario("");
+      setPin("");
+    }
+  }, [abierto]);
+
+  return (
+    <Dialogo titulo="Consumo de personal" abierto={abierto} onCerrar={onCerrar}>
+      <p className="pdv-nota">
+        El pedido se prepara y se despacha igual, pero no se cobra ni emite
+        comprobante. Su costo se registra como alimentación de personal.
+      </p>
+      <p className="pdv-etiqueta">Motivo</p>
+      <div className="pdv-lista">
+        {MOTIVOS_CONSUMO.map((m) => (
+          <button
+            key={m.valor}
+            type="button"
+            className={`pdv-opcion ${motivo === m.valor ? "on" : ""}`}
+            onClick={() => setMotivo(m.valor)}
+          >
+            <span>
+              <strong>{m.etiqueta}</strong>
+            </span>
+            {motivo === m.valor && <span aria-hidden>✓</span>}
+          </button>
+        ))}
+      </div>
+
+      <p className="pdv-etiqueta">Autoriza el encargado</p>
+      <div className="pdv-fila">
+        <input
+          className="pdv-campo"
+          aria-label="Usuario del encargado"
+          placeholder="Usuario"
+          autoComplete="off"
+          data-testid="consumo-usuario"
+          value={usuario}
+          onChange={(e) => setUsuario(e.target.value)}
+        />
+        <input
+          className="pdv-campo"
+          type="password"
+          inputMode="numeric"
+          aria-label="PIN del encargado"
+          placeholder="PIN"
+          autoComplete="off"
+          data-testid="consumo-pin"
+          value={pin}
+          onChange={(e) => setPin(e.target.value)}
+        />
+      </div>
+
+      <footer className="pdv-dialogo-pie">
+        <span />
+        <button
+          type="button"
+          className="pdv-boton-pri"
+          disabled={ocupado || !motivo || !usuario.trim() || !pin.trim()}
+          onClick={() =>
+            onConfirmar({
+              motivo,
+              encargado: { username: usuario.trim(), pin },
+            })
+          }
+        >
+          Marcar sin cobro
         </button>
       </footer>
     </Dialogo>

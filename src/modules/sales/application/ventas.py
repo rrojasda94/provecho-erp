@@ -29,7 +29,7 @@ from src.modules.sales.infrastructure.repositories import (
     ProductoComercialRepo,
     VentaRepo,
 )
-from src.shared import fechas
+from src.shared import auditoria, fechas
 from src.shared.models import Comprobante
 
 
@@ -42,11 +42,17 @@ def _armar_item(
     canal: str,
     modalidad: str,
     dia: date,
+    gratis: bool = False,
     exigir_opciones: bool = True,
 ) -> tuple[VentaItem, dict]:
     """Valida un ítem del request y le resuelve el precio. Devuelve la fila y
     el detalle que viaja en `sales.venta_confirmada` para que inventory
-    descuente."""
+    descuente.
+
+    `gratis=True` (consumo de personal, RN-COM-025) no consulta lista de
+    precios ni acepta el precio del cliente: la línea vale cero por
+    definición, y un precio que viaje en el request no puede convertirla en
+    venta."""
     prod = productos.get(it["producto_comercial_id"])
     if prod is None or not prod.activo:
         raise NoEncontrado(
@@ -62,7 +68,9 @@ def _armar_item(
     cantidad = Decimal(str(it["cantidad"]))
     if cantidad <= 0:
         raise ReglaNegocio("cantidad de ítem debe ser > 0")
-    if it.get("precio_unitario") is None:
+    if gratis:
+        precio_unitario = Decimal(0)
+    elif it.get("precio_unitario") is None:
         precio_unitario = precios.resolver_precio(
             session,
             producto=prod,
@@ -85,7 +93,7 @@ def _armar_item(
         precio_unitario=precio_unitario,
         # Los descuentos salen de listas promocionales, no del cliente
         # (RN-PRC-003); en replay viaja el que ya se aplicó.
-        descuento=Decimal(str(it.get("descuento") or 0)),
+        descuento=Decimal(0) if gratis else Decimal(str(it.get("descuento") or 0)),
         grupo_cobro=grupo,
         sin_articulo_ids=restas,
     )
@@ -124,8 +132,7 @@ def _resolver_restas(
     if not exigir:
         return ids
     insumos = {
-        str(i["articulo_id"]): i["nombre"]
-        for i in insumos_de_receta(session, prod.receta_id)
+        str(i["articulo_id"]) for i in insumos_de_receta(session, prod.receta_id)
     }
     ajenos = [a for a in ids if a not in insumos]
     if ajenos:
@@ -147,6 +154,7 @@ def _armar_extras(
     canal: str,
     modalidad: str,
     dia: date,
+    gratis: bool = False,
 ) -> tuple[list[VentaItem], list[dict]]:
     """Cada extra es una línea propia colgada del padre (RN-COM-021).
 
@@ -187,6 +195,7 @@ def _armar_extras(
             canal=canal,
             modalidad=modalidad,
             dia=dia,
+            gratis=gratis,
         )
         if not prod.es_extra:
             raise ReglaNegocio(f"{prod.nombre} no está marcado como extra")
@@ -234,6 +243,7 @@ def _armar_lineas(
     modalidad: str,
     dia: date,
     exigir_opciones: bool = True,
+    gratis: bool = False,
 ) -> tuple[list[VentaItem], list[list[VentaItem]], list[dict]]:
     """Líneas padre, sus extras y el detalle que viaja a inventory.
 
@@ -251,7 +261,7 @@ def _armar_lineas(
     for it in items:
         fila, det, prod = _armar_item(
             session, it, productos=productos, sucursal_id=sucursal_id,
-            canal=canal, modalidad=modalidad, dia=dia,
+            canal=canal, modalidad=modalidad, dia=dia, gratis=gratis,
             exigir_opciones=exigir_opciones,
         )
         if exigir_opciones:
@@ -259,7 +269,7 @@ def _armar_lineas(
         hijos, dets_hijos = _armar_extras(
             session, fila, prod, it.get("extras") or [],
             productos=productos, sucursal_id=sucursal_id,
-            canal=canal, modalidad=modalidad, dia=dia,
+            canal=canal, modalidad=modalidad, dia=dia, gratis=gratis,
         )
         filas.append(fila)
         extras_por_padre.append(hijos)
@@ -287,6 +297,31 @@ def _validar_mesa(
         raise ReglaNegocio("la mesa no pertenece a la sucursal de la venta")
 
 
+def _validar_tipo(
+    tipo: str, consumo_motivo: str | None, autorizado_por: uuid.UUID | None
+) -> bool:
+    """Devuelve si la orden es consumo de personal, validándolo (RN-COM-025).
+
+    Un motivo suelto en una venta normal no se ignora: quien lo mandó creía
+    estar registrando comida del personal y en realidad estaba cobrándola.
+    """
+    if tipo not in rules.TIPOS_VENTA:
+        raise ReglaNegocio(f"tipo de venta inválido: {tipo}")
+    if not rules.es_consumo_personal(tipo):
+        if consumo_motivo is not None:
+            raise ReglaNegocio("`consumo_motivo` solo aplica al consumo de personal")
+        return False
+    if consumo_motivo not in rules.MOTIVOS_CONSUMO_PERSONAL:
+        raise ReglaNegocio(
+            f"motivo de consumo de personal inválido: {consumo_motivo}"
+        )
+    if autorizado_por is None:
+        raise ReglaNegocio(
+            "el consumo de personal requiere autorización de un encargado"
+        )
+    return True
+
+
 def crear_venta(
     session: Session,
     *,
@@ -304,6 +339,9 @@ def crear_venta(
     id: uuid.UUID | None = None,
     fecha_orden: date | None = None,
     numero_orden: int | None = None,
+    tipo: str = "venta",
+    consumo_motivo: str | None = None,
+    consumo_autorizado_por: uuid.UUID | None = None,
 ) -> Venta:
     """`id`, `fecha_orden` y `numero_orden` los fija el cliente solo cuando
     la venta ya ocurrió en otro lado y se está reproduciendo acá: es el
@@ -317,11 +355,19 @@ def crear_venta(
     ítem solo lo acepta ese mismo camino de replay — una venta que ya se
     cobró conserva el precio al que se cobró, aunque la promoción haya
     vencido entre el corte y la sincronización.
+
+    `tipo="consumo_personal"` es la comida del personal (RN-COM-025): se
+    prepara y despacha igual, pero **todas sus líneas valen cero**, no se
+    cobra y no emite comprobante. Exige motivo y el encargado que lo
+    autorizó con su PIN, y publica su propio evento —no
+    `sales.venta_confirmada`— porque no es ingreso ni atribuible a una
+    campaña; su costo es gasto de alimentación de personal.
     """
     if canal not in rules.CANALES:
         raise ReglaNegocio(f"canal inválido: {canal}")
     if modalidad not in rules.MODALIDADES:
         raise ReglaNegocio(f"modalidad inválida: {modalidad}")
+    consumo = _validar_tipo(tipo, consumo_motivo, consumo_autorizado_por)
     if not items:
         raise ReglaNegocio("una venta requiere al menos un ítem")
     if comensales is not None and comensales <= 0:
@@ -343,6 +389,7 @@ def crear_venta(
         # Replay del hub: la venta ya ocurrió (trae su número de orden), no
         # se la vuelve a validar contra reglas que pudieron cambiar.
         exigir_opciones=numero_orden is None,
+        gratis=consumo,
     )
 
     venta = Venta(
@@ -366,6 +413,9 @@ def crear_venta(
         referencia_atencion=referencia_atencion,
         mesa_id=mesa_id,
         comensales=comensales,
+        tipo=tipo,
+        consumo_motivo=consumo_motivo,
+        consumo_autorizado_por=consumo_autorizado_por,
     )
     # ponytail: correlativo max+1; el UNIQUE (sucursal, fecha, numero) corta
     # la carrera — si dos cajas chocan, el cliente reintenta con la misma
@@ -384,18 +434,57 @@ def crear_venta(
             session.add(hijo)
     session.flush()
 
-    event_bus.publish(
-        "sales.venta_confirmada",
-        {
-            "venta_id": str(venta.id),
-            "sucursal_id": str(sucursal_id),
-            "cliente_id": str(venta.cliente_id) if venta.cliente_id else None,
-            "items": detalle_evento,
-            "total": str(venta.total),
-        },
-        session=session,
+    _confirmar(
+        session,
+        venta,
+        detalle_evento=detalle_evento,
+        consumo=consumo,
+        registrado_por=usuario_id,
     )
     return venta
+
+
+def _confirmar(
+    session: Session,
+    venta: Venta,
+    *,
+    detalle_evento: list[dict],
+    consumo: bool,
+    registrado_por: uuid.UUID,
+) -> None:
+    """Anuncia la orden confirmada. Un consumo de personal publica su propio
+    evento: no es ingreso para contabilidad ni venta atribuible para
+    marketing, y su costo va a gasto (RN-COM-025)."""
+    payload = {
+        "venta_id": str(venta.id),
+        "sucursal_id": str(venta.sucursal_id),
+        "cliente_id": str(venta.cliente_id) if venta.cliente_id else None,
+        "items": detalle_evento,
+        "total": str(venta.total),
+    }
+    if not consumo:
+        event_bus.publish("sales.venta_confirmada", payload, session=session)
+        return
+    # Comida regalada: quién la autorizó tiene que quedar escrito aunque
+    # nadie mire el evento (ADR-031).
+    auditoria.registrar(
+        session,
+        usuario_id=venta.consumo_autorizado_por,
+        entidad="venta",
+        entidad_id=venta.id,
+        accion="autorizar_consumo_personal",
+        datos_despues={
+            "motivo": venta.consumo_motivo,
+            "numero_orden": venta.numero_orden,
+            "registrado_por": str(registrado_por),
+        },
+        sucursal_id=venta.sucursal_id,
+    )
+    event_bus.publish(
+        "sales.consumo_personal_registrado",
+        {**payload, "tipo": venta.tipo, "consumo_motivo": venta.consumo_motivo},
+        session=session,
+    )
 
 
 def _subtotal(items: list[VentaItem]) -> Decimal:
@@ -456,8 +545,23 @@ def aplicar_descuento(
         raise NoEncontrado("venta no encontrada")
     if venta.estado != "orden":
         raise Conflicto(f"la venta está {venta.estado}; no admite cambios de descuento")
+    if not rules.admite_cobro(venta.tipo):
+        raise Conflicto("un consumo de personal ya vale cero: no admite descuento")
 
     if modo is None:
+        auditoria.registrar(
+            session,
+            usuario_id=autorizado_por,
+            entidad="venta",
+            entidad_id=venta.id,
+            accion="descuento_quitado",
+            datos_antes={
+                "modo": venta.descuento_modo,
+                "valor": str(venta.descuento_valor or ""),
+                "motivo": venta.descuento_motivo,
+            },
+            sucursal_id=venta.sucursal_id,
+        )
         venta.descuento_modo = None
         venta.descuento_valor = None
         venta.descuento_motivo = None
@@ -474,6 +578,16 @@ def aplicar_descuento(
     if motivo not in rules.MOTIVOS_DESCUENTO:
         raise ReglaNegocio(f"motivo de descuento inválido: {motivo}")
 
+    auditoria.registrar(
+        session,
+        usuario_id=autorizado_por,
+        entidad="venta",
+        entidad_id=venta.id,
+        accion="descuento_aplicado",
+        datos_antes={"total": str(venta.total)},
+        datos_despues={"modo": modo, "valor": str(valor), "motivo": motivo},
+        sucursal_id=venta.sucursal_id,
+    )
     venta.descuento_modo = modo
     venta.descuento_valor = valor
     venta.descuento_motivo = motivo
@@ -513,6 +627,10 @@ def _validar_cobro(
     """
     if venta.estado not in ("orden",):
         raise Conflicto(f"la venta está {venta.estado}; no admite pagos")
+    # Un consumo de personal no se cobra ni se factura (RN-COM-025): dejarlo
+    # pasar acá terminaría emitiendo un comprobante de S/ 0.00 a SUNAT.
+    if not rules.admite_cobro(venta.tipo):
+        raise Conflicto("un consumo de personal no se cobra")
     if exigir_caja_abierta and not hay_caja_abierta(session, venta.punto_venta_id):
         raise Conflicto(
             "no hay caja abierta en este punto de venta: abre el turno antes "
@@ -746,6 +864,12 @@ def anular_lineas(
         {
             "venta_id": str(venta.id),
             "sucursal_id": str(venta.sucursal_id),
+            # Los lee inventory para saber si además hay que reversar el
+            # gasto de alimentación de personal (RN-COM-025). Quitar algunas
+            # líneas NO lo reversa: el asiento es de la orden entera y
+            # reversarlo por una línea borraría el gasto de las demás.
+            "tipo": venta.tipo,
+            "venta_anulada": venta.estado == "anulada",
             "autorizado_por": str(autorizado_por),
             "motivo": motivo,
             "items": devueltos,
@@ -763,7 +887,18 @@ def anular_venta(session: Session, venta_id: uuid.UUID, usuario_id: uuid.UUID) -
         raise Conflicto(
             f"venta {venta.estado}: anulación post-pago requiere nota de crédito"
         )
+    estado_previo = venta.estado
     venta.estado = "anulada"
+    auditoria.registrar(
+        session,
+        usuario_id=usuario_id,
+        entidad="venta",
+        entidad_id=venta.id,
+        accion="anular",
+        datos_antes={"estado": estado_previo, "total": str(venta.total)},
+        datos_despues={"estado": "anulada"},
+        sucursal_id=venta.sucursal_id,
+    )
     productos = ProductoComercialRepo(session)
     items = []
     for it in VentaRepo(session).items(venta_id):
@@ -780,6 +915,8 @@ def anular_venta(session: Session, venta_id: uuid.UUID, usuario_id: uuid.UUID) -
         {
             "venta_id": str(venta.id),
             "sucursal_id": str(venta.sucursal_id),
+            "tipo": venta.tipo,
+            "venta_anulada": True,
             "usuario_id": str(usuario_id),
             "items": items,
         },

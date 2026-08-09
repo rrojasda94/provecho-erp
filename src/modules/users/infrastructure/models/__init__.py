@@ -2,7 +2,6 @@
 (data-model §1, §2)."""
 
 from src.modules.users.infrastructure.models.almacen import Almacen
-from src.modules.users.infrastructure.models.audit_log import AuditLog
 from src.modules.users.infrastructure.models.empresa import Empresa
 from src.modules.users.infrastructure.models.grupo import Grupo
 from src.modules.users.infrastructure.models.licencia_marca import LicenciaMarca
@@ -14,13 +13,13 @@ from src.modules.users.infrastructure.models.refresh_token import RefreshToken
 from src.modules.users.infrastructure.models.rol import Rol
 from src.modules.users.infrastructure.models.rol_permiso import RolPermiso
 from src.modules.users.infrastructure.models.sucursal import Sucursal
+from src.modules.users.infrastructure.models.token_agente import TokenAgente
 from src.modules.users.infrastructure.models.usuario import Usuario
 from src.modules.users.infrastructure.models.usuario_rol import UsuarioRol
 from src.modules.users.infrastructure.models.usuario_sucursal import UsuarioSucursal
 
 __all__ = [
     "Almacen",
-    "AuditLog",
     "Empresa",
     "Grupo",
     "LicenciaMarca",
@@ -32,6 +31,7 @@ __all__ = [
     "Rol",
     "RolPermiso",
     "Sucursal",
+    "TokenAgente",
     "Usuario",
     "UsuarioRol",
     "UsuarioSucursal",

@@ -5,6 +5,30 @@ from decimal import Decimal
 CANALES = {"pdv", "agente_ia", "delivery"}
 MODALIDADES = {"mesa", "takeout", "delivery"}
 
+# --- Tipo de venta (RN-COM-025) ----------------------------------------------
+# La comida que el negocio le da a su personal se prepara y despacha como
+# cualquier pedido, pero no es una venta: no tiene precio, no se cobra y no
+# emite comprobante. Su costo es gasto de alimentación de personal, no
+# ingreso; por eso viaja tipada y no como una venta con 100% de descuento.
+TIPOS_VENTA = {"venta", "consumo_personal"}
+MOTIVOS_CONSUMO_PERSONAL = {
+    "fin_semana",
+    "feriado",
+    "alta_actividad",
+    "capacitacion",
+    "otro",
+}
+
+
+def es_consumo_personal(tipo: str | None) -> bool:
+    return tipo == "consumo_personal"
+
+
+def admite_cobro(tipo: str | None) -> bool:
+    """Solo una venta se cobra. Un consumo de personal vale cero: dejarlo
+    entrar al cobro lo mandaría a emitir un comprobante de S/ 0.00."""
+    return not es_consumo_personal(tipo)
+
 
 def especificidad_lista(sucursal_id, canal: str | None, modalidad: str | None) -> int:
     """Cuántas dimensiones de ámbito acota una lista de precios. Una lista de

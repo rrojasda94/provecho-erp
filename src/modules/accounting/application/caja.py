@@ -51,10 +51,11 @@ from src.modules.accounting.infrastructure.repositories import (
 from src.modules.sales.application.queries_publicas import (
     puntos_venta_de_empresa,
     puntos_venta_rotulados,
+    sucursal_de_punto_venta,
     total_efectivo_cobrado,
     total_tarjeta_cobrado,
 )
-from src.shared import fechas
+from src.shared import auditoria, fechas
 
 
 def _contar(detalle: dict | None, que: str) -> Decimal:
@@ -239,6 +240,21 @@ def registrar_movimiento_caja(
             idempotency_key=idempotency_key,
         )
     )
+    # Plata que entra o sale del cajón fuera de la venta: al rastro con
+    # quién lo registró y quién lo autorizó (RN-MDP-007).
+    auditoria.registrar(
+        session,
+        usuario_id=registrado_por,
+        entidad="movimiento_caja",
+        entidad_id=movimiento.id,
+        accion=f"{tipo}_efectivo",
+        datos_despues={
+            "monto": str(monto),
+            "motivo": movimiento.motivo,
+            "autorizado_por": str(autorizado_por) if autorizado_por else None,
+            "apertura_caja_id": str(apertura_caja_id),
+        },
+    )
     event_bus.publish(
         "accounting.movimiento_caja_registrado",
         {
@@ -387,8 +403,14 @@ def cerrar_caja(
     if estado == "con_irregularidad":
         event_bus.publish(
             "accounting.cierre_caja_irregular",
+            # `sucursal_id` desde 2026-08-08: la caja cuelga del punto de
+            # venta, no de la sucursal, y `reports` necesita el local para
+            # escopar el reporte y elegir la regla de distribución.
             {
                 "cierre_caja_id": str(cierre.id),
+                "sucursal_id": str(
+                    sucursal_de_punto_venta(session, apertura.punto_venta_id)
+                ),
                 "descuadre_monto": str(descuadre),
                 "descuadre_tarjeta": str(tarjetas["descuadre"]),
                 "descuadre_atribucion": descuadre_atribucion,

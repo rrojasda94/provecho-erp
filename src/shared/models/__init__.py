@@ -1,6 +1,7 @@
 """Modelos transversales sin dueño de módulo (data-model, convenciones)."""
 
 from src.shared.models.archivo import Archivo
+from src.shared.models.audit_log import AuditLog
 from src.shared.models.comprobante import Comprobante
 from src.shared.models.decision_gerencial import DecisionGerencial
 from src.shared.models.divisa import Divisa
@@ -9,6 +10,7 @@ from src.shared.models.tablero import Tablero
 
 __all__ = [
     "Archivo",
+    "AuditLog",
     "Comprobante",
     "DecisionGerencial",
     "Divisa",

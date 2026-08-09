@@ -16,9 +16,13 @@ import { fileURLToPath } from "node:url";
 
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
+// 8100 salvo que el puerto ya esté ocupado por otra cosa en la máquina de
+// quien corre la suite. `E2E_PUERTO_API` lo mueve; el default no cambia.
+const PUERTO = process.env.E2E_PUERTO_API ?? "8100";
+
 const hijo = spawn(
   process.env.PYTHON ?? "python",
-  ["-m", "uvicorn", "src.main:app", "--host", "127.0.0.1", "--port", "8100"],
+  ["-m", "uvicorn", "src.main:app", "--host", "127.0.0.1", "--port", PUERTO],
   {
     cwd: RAIZ,
     stdio: "inherit",

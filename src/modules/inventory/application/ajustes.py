@@ -17,6 +17,7 @@ from src.modules.inventory.domain import rules
 from src.modules.inventory.infrastructure.models import Ajuste
 from src.modules.inventory.infrastructure.repositories import AjusteRepo, StockRepo
 from src.modules.users.infrastructure.models import Almacen
+from src.shared import auditoria
 
 
 def solicitar_ajuste(
@@ -93,6 +94,25 @@ def aprobar_ajuste(
     ajuste.aprobado_por = aprobado_por
     ajuste.estado = "aprobado"
     ajuste.movimiento_id = movs[0].id
+
+    almacen = session.get(Almacen, ajuste.almacen_id)
+    auditoria.registrar(
+        session,
+        usuario_id=aprobado_por,
+        entidad="ajuste",
+        entidad_id=ajuste.id,
+        accion="aprobar",
+        datos_antes={"estado": "pendiente"},
+        datos_despues={
+            "estado": "aprobado",
+            "cantidad": str(ajuste.cantidad),
+            "sku_id": str(ajuste.sku_id),
+            "motivo": ajuste.motivo,
+            "dentro_margen": ajuste.dentro_margen,
+        },
+        empresa_id=almacen.empresa_id if almacen else None,
+        sucursal_id=almacen.sucursal_id if almacen else None,
+    )
 
     if not ajuste.dentro_margen:
         event_bus.publish(

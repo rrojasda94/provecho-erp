@@ -35,7 +35,7 @@ class ItemColaOut(BaseModel):
     cantidad: str
     estado: str
     # Restas de la línea, ya resueltas a nombre: ["Cebolla"] → "SIN CEBOLLA"
-    # en pantalla (RN-COM-025). Lista vacía = el plato va completo.
+    # en pantalla (RN-COM-028). Lista vacía = el plato va completo.
     sin: list[str] = []
 
 

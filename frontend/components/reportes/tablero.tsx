@@ -22,6 +22,14 @@ import { FiltrosTablero } from "@/components/reportes/filtros-tablero";
 import { TarjetaReporte } from "@/components/reportes/tarjeta-reporte";
 import { useTablero } from "@/components/reportes/use-tablero";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -220,6 +228,10 @@ function Compartir({
 export function Tablero({ catalogo, sucursales, tableros, roles }: Props) {
   const t = useTablero(tableros);
   const [editando, setEditando] = useState(t.tarjetas.length === 0);
+  // `null` = nadie está pidiendo nombre; `true`/`false` = se está pidiendo, y
+  // el valor es el `comoNuevo` con el que hay que guardar cuando confirme.
+  const [pidiendoNombre, setPidiendoNombre] = useState<boolean | null>(null);
+  const [nombreBorrador, setNombreBorrador] = useState("");
 
   // Un puntero tiene que moverse 6 px antes de considerarse arrastre: sin
   // eso, un clic en el asa se interpretaría como un arrastre de 0 px y
@@ -249,11 +261,27 @@ export function Tablero({ catalogo, sucursales, tableros, roles }: Props) {
     }
   }
 
+  /** Guardar sobre un tablero propio ya existente no pregunta nada: conserva
+   * su nombre. Solo el alta y "Guardar como…" piden uno.
+   *
+   * El nombre se pide en un campo de la página y no con `window.prompt`: el
+   * prompt nativo no se puede etiquetar, no se puede estilar y ningún
+   * automatismo de navegador lo alcanza — el guardado quedaba sin forma de
+   * probarse de punta a punta. */
   async function pedirNombreYGuardar(comoNuevo: boolean) {
-    const sugerido = t.actual?.nombre ?? "Mi tablero";
-    const nombre =
-      comoNuevo || !t.actual ? window.prompt("Nombre del tablero", sugerido) : sugerido;
-    if (!nombre) return;
+    if (!comoNuevo && t.actual) {
+      if (await t.guardar(t.actual.nombre, false)) setEditando(false);
+      return;
+    }
+    setNombreBorrador(t.actual?.nombre ?? "Mi tablero");
+    setPidiendoNombre(comoNuevo);
+  }
+
+  async function confirmarNombre() {
+    const nombre = nombreBorrador.trim();
+    if (!nombre || pidiendoNombre === null) return;
+    const comoNuevo = pidiendoNombre;
+    setPidiendoNombre(null);
     if (await t.guardar(nombre, comoNuevo)) setEditando(false);
   }
 
@@ -283,6 +311,48 @@ export function Tablero({ catalogo, sucursales, tableros, roles }: Props) {
         onGuardar={(comoNuevo) => void pedirNombreYGuardar(comoNuevo)}
         onEliminar={confirmarEliminar}
       />
+
+      <Dialog
+        open={pidiendoNombre !== null}
+        onOpenChange={(abierto) => {
+          if (!abierto) setPidiendoNombre(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nombre del tablero</DialogTitle>
+          </DialogHeader>
+          <form
+            className="flex flex-col gap-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void confirmarNombre();
+            }}
+          >
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="nombre-tablero">Nombre</Label>
+              <Input
+                id="nombre-tablero"
+                autoFocus
+                value={nombreBorrador}
+                onChange={(e) => setNombreBorrador(e.target.value)}
+              />
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setPidiendoNombre(null)}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={!nombreBorrador.trim()}>
+                Guardar
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <FiltrosTablero
         filtros={t.filtros}

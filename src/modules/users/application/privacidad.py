@@ -21,7 +21,8 @@ from sqlalchemy.orm import Session
 
 from src.modules.users.application.errors import Conflicto, NoEncontrado
 from src.modules.users.infrastructure.models import Persona
-from src.modules.users.infrastructure.repositories import AuditLogRepo, PersonaRepo
+from src.modules.users.infrastructure.repositories import PersonaRepo
+from src.shared import auditoria
 
 MARCADOR_ANONIMO = "ANONIMIZADO"
 # Campos que se sobrescriben. numero_documento es UNIQUE: no puede quedar
@@ -71,7 +72,8 @@ def anonimizar_persona(
     # nombre/documento borrados en el audit_log dejaría la PII accesible
     # ahí para siempre, vaciando de sentido la anonimización. Se registra
     # el QUÉ se borró (campos) y el motivo, nunca el valor.
-    AuditLogRepo(session).registrar(
+    auditoria.registrar(
+        session,
         usuario_id=solicitado_por,
         entidad="persona",
         entidad_id=persona.id,

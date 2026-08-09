@@ -42,9 +42,10 @@ renumera nada). Este archivo define el orden de lectura recomendado.
 | | [data-model.md](architecture/data-model.md) | Modelo de datos (tablas, ERD) |
 | | [events.md](architecture/events.md) | Catálogo de eventos internos |
 | | [audit-2026-08-01.md](architecture/audit-2026-08-01.md) | Auditoría arquitectónica: riesgos priorizados, qué se aplicó y qué se descartó |
-| | [adr/](architecture/adr/) | Decisiones de arquitectura — 001 modular monolith, 002 stack, 003 Izipay, 004 tenant, 005 Factiliza, 006 observabilidad, 007 backups y salud, 008 entrega continua, 009 modo offline del PDV, 010 contrato OpenAPI, 011 derechos ARCO, 012 dashboard + caja, 013 arquitectura frontend, 014 parámetros configurables por empresa, 015 lote y FEFO, 016 eventos post-commit, 017 jerarquía de errores compartida, 018 cobro dividido/mesa/descuento de orden, 019 conteo cíclico por categoría, 020 reserva/solicitud/transferencia, 021 atribución lead→venta y dueño de la encuesta, 022 restricciones de permiso, 023 variantes de producto y recetas en la ficha, 024 catálogo cerrado de reportes, 025 ciclo de caja completo, 026 paginación de colecciones, 027 guía de remisión, 028 merma como reserva y devolución |
+| | [adr/](architecture/adr/) | Decisiones de arquitectura — 001 modular monolith, 002 stack, 003 Izipay, 004 tenant, 005 Factiliza, 006 observabilidad, 007 backups y salud, 008 entrega continua, 009 modo offline del PDV, 010 contrato OpenAPI, 011 derechos ARCO, 012 dashboard + caja, 013 arquitectura frontend, 014 parámetros configurables por empresa, 015 lote y FEFO, 016 eventos post-commit, 017 jerarquía de errores compartida, 018 cobro dividido/mesa/descuento de orden, 019 conteo cíclico por categoría, 020 reserva/solicitud/transferencia, 021 atribución lead→venta y dueño de la encuesta, 022 restricciones de permiso, 023 variantes de producto y recetas en la ficha, 024 catálogo cerrado de reportes, 025 ciclo de caja completo, 026 paginación de colecciones, 027 guía de remisión, 028 merma como reserva y devolución, 029 encuesta por nodos y canal WhatsApp, 030 evaluación de agencia y acumulado de campaña, 031 audit_log transversal, 032 token de API para agentes, 033 módulo reports (emisión y distribución), 034 consumo de personal, 035 restas y lienzo de nodos de receta |
 | **engineering/** | [engineering-guide.md](engineering/engineering-guide.md) | Guía principal para constructores (humano + IA) |
 | | [module-guide.md](engineering/module-guide.md) | Cómo crear un módulo: estructura, los 7 registros para activarlo, módulo de referencia |
+| | [trabajo-en-paralelo.md](engineering/trabajo-en-paralelo.md) | Varias ramas a la vez sin duplicar trabajo: PR en borrador desde el primer commit, y quién renumera cuando dos ramas piden el mismo ADR o la misma cabeza de Alembic |
 | | [coding-standards.md](engineering/coding-standards.md) | Convenciones, formato, linters |
 | | [api-guidelines.md](engineering/api-guidelines.md) | Convenciones de API REST |
 | | [testing-strategy.md](engineering/testing-strategy.md) | Qué se prueba y en qué nivel; por qué el hueco real era el contrato cliente↔servidor y no el e2e |
@@ -81,6 +82,8 @@ renumera nada). Este archivo define el orden de lectura recomendado.
 - [`/CLAUDE.md`](../CLAUDE.md) — contrato operativo que la IA carga cada sesión
   (resume y apunta a `engineering/engineering-guide.md`).
 - [`/ROADMAP.md`](../ROADMAP.md) — bitácora viva de lo construido y pendiente.
+  La deuda técnica cuelga de [`roadmap/deuda/`](roadmap/deuda/), un archivo
+  por área.
 - [`/CHANGELOG.md`](../CHANGELOG.md) — historial de cambios (SemVer).
 
 ## Arranque rápido

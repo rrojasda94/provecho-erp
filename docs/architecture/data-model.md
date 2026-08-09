@@ -36,6 +36,15 @@ una vez emitido (RN-GEN-002).
 
 ## 1. Organización (transversal)
 
+**CRUD por API desde 2026-08-08** (`/api/v1/grupos`, `/empresas`, `/marcas`,
+`/empresas/{id}/marcas`, `/sucursales`, `/almacenes` — permiso
+`organizacion.gestionar`, detalle en `src/modules/users/README.md`). Antes
+solo lo escribía el seeder. La API valida lo que el seeder tipeaba a mano:
+la licencia como requisito de una sucursal, la coherencia de empresa en los
+almacenes, y la baja lógica negada con dependientes vivos. Cerrar un local
+es `sucursal.estado="inactiva"`, no una baja: sigue siendo el ancla de sus
+ventas, cajas y trabajadores (mismo criterio que RN-GEN-006).
+
 ```mermaid
 erDiagram
     grupo ||--o{ empresa : tiene
@@ -139,6 +148,7 @@ erDiagram
     usuario ||--o{ usuario_sucursal : ""
     sucursal ||--o{ usuario_sucursal : ""
     usuario ||--o{ refresh_token : ""
+    usuario ||--o{ token_agente : ""
     usuario ||--o{ audit_log : genera
 ```
 
@@ -175,6 +185,17 @@ erDiagram
 - **usuario**: username, pin_hash (Argon2id), persona_id (nullable — NULL
   si `agente_ia`), nombre_display (fallback para agente_ia), email, tipo
   (`humano` | `agente_ia`), activo.
+- **token_agente** (2026-08-08, ADR-032): usuario_id, nombre ("n8n
+  producción"), prefijo (los primeros 12 caracteres del token, único dato
+  mostrable después de crearlo), token_hash (SHA-256; el claro sale una sola
+  vez), expira_en (nullable — NULL = sin vencimiento), revocado,
+  ultimo_uso_en. **Credencial de larga vida de una cuenta `agente_ia`**: un
+  proceso desatendido no teclea un PIN de 6 dígitos ni rota un refresh cada
+  7 días. SHA-256 y no Argon2 como el PIN porque son 256 bits de `secrets`
+  —no se rompen por fuerza bruta— y esto se verifica en cada request.
+  `api/deps.get_claims` distingue por el prefijo `prv_` y arma los mismos
+  claims que un login: **el RBAC no cambia**. Solo `tipo=agente_ia` puede
+  tener token, y el tipo se revalida en cada request.
 - **rol**: nombre (admin, supervisor, cajero, almacenero, ...).
 - **permiso**: código `modulo.accion` (ej. `inventory.contar` |
   `inventory.requerir` | `inventory.ajustar` | `inventory.autorizar_ajuste`
@@ -188,11 +209,23 @@ erDiagram
 - **usuario_rol**, **rol_permiso**, **usuario_sucursal** (alcance por sucursal).
 - **refresh_token**: hash, expiración, revocado.
 - **audit_log**: usuario_id, entidad, entidad_id, acción, datos_antes (JSONB),
-  datos_despues (JSONB), sucursal_id, ip, timestamp. Solo inserción.
+  datos_despues (JSONB), **empresa_id** (2026-08-08, nullable), sucursal_id,
+  ip, timestamp. Solo inserción.
   Desde 2026-08-04 cada inserción emite además una línea al logger
   `provecho.auditoria` **con solo metadatos**: la tabla es el rastro legal,
   el log es lo que un colector externo vigila en vivo, y `datos_antes`/
   `datos_despues` pueden traer PII (Ley 29733) que no debe salir del proceso.
+
+  **Transversal desde 2026-08-08** (ADR-031, migración `b3d9f1c2a077`): el
+  modelo se mudó de `users` a `src/shared/models/` y se escribe **solo** por
+  `src.shared.auditoria.registrar`, para que cualquier módulo deje rastro
+  sin importar `users`. Se audita el acto de autoridad —aprobar, autorizar,
+  anular, descontar, pagar, retirar efectivo, anonimizar—, no cada `UPDATE`.
+  `empresa_id`/`sucursal_id` son el alcance de lectura (ADR-004): ambos
+  nullable porque un login o un alta de rol no tienen tenant, y esas filas
+  solo las ve el superusuario. Se lee por `GET /api/v1/auditoria`
+  (`auditoria.leer`, paginado); no hay endpoint de escritura. Índices
+  `ix_audit_log_entidad` (entidad, entidad_id) e `ix_audit_log_ts`.
 - **notificacion** (2026-08-04): usuario_id (destinatario), tipo (código del
   hecho, ej. `sales.pedido_demorado`), nivel (`info` | `aviso` | `urgente` —
   cuánto interrumpe, no qué pasó), titulo, cuerpo, **referencia_tipo /
@@ -477,15 +510,18 @@ descuenta stock vía la receta (ver [../domain/domain-model.md](../domain/domain
   reaparece mañana, que es la señal correcta.
 - **movimiento_inventario**: almacen_id, sku_id, cantidad (+/-), tipo
   (`recepcion_compra` | `transferencia_salida` | `transferencia_entrada` |
-  `consumo_venta` | `consumo_produccion` | `produccion_entrada` | `ajuste` |
-  `devolucion`), motivo_ajuste (`sobrante` | `faltante` | `merma` |
+  `consumo_venta` | `consumo_produccion` | **`consumo_interno`** |
+  `produccion_entrada` | `ajuste` | `devolucion`), motivo_ajuste (`sobrante` | `faltante` | `merma` |
   `error_registro` — solo si tipo=`ajuste`, dentro del margen de error de
   almacén/contabilidad, RN-INV-015), lote_id (nullable), **motivo_lote**
   (nullable; obligatorio al tomar un lote distinto del que sugiere FEFO,
   RN-LOT-004), referencia (doc origen), usuario_id, timestamp. Solo
   inserción — el stock es derivable y auditable. Una salida sin lote sobre
   un artículo que sí lo controla es legítima y deliberada (RN-LOT-005), y
-  se lista en el reporte `salidas_sin_lote`.
+  se lista en el reporte `salidas_sin_lote`. `consumo_interno` es lo que el
+  negocio se consume a sí mismo —hoy la comida del personal (RN-COM-027)—:
+  separado de `consumo_venta` porque no tiene ingreso detrás y su costo es
+  gasto, no costo de ventas.
 - **devolucion** (implementada 2026-08-06, migración `e7c390a5b41f`,
   ADR-028): almacen_id, origen (`proveedor` | `cliente`), referencia_id
   (proveedor o cliente, sin FK — son dos módulos distintos), motivo
@@ -662,7 +698,9 @@ Solicitud.
   (opcional — venta de servicio o del área comercial originada en una
   cotización aceptada por el cliente, RN-COM-004), cliente_id (opcional),
   usuario_id (cajero o agente), estado (`orden` | `pagada` | `facturada` |
-  `anulada` — alcance de Venta corregido 2026-07-14: termina en envío a
+  `anulada` | `cerrada` — `cerrada` es lo que se preparó y entregó **sin
+  cobrarse**: hoy solo el consumo de personal, que nunca pasa por caja
+  (RN-COM-027); alcance de Venta corregido 2026-07-14: termina en envío a
   cocina + cobro, RN-COM-005; pago y comprobante en orden flexible,
   RN-COM-006; ver [state-machines.md](../domain/state-machines.md#venta).
   El avance de cumplimiento NO es estado de `venta`: vive por ítem en
@@ -682,6 +720,14 @@ Solicitud.
   `promocion` | `convenio`), **descuento_autorizado_por** (usuario_id del
   supervisor — RN-COM-017; el permiso `sales.aplicar_descuento` está
   separado de `sales.cobrar` para que el cajero no se autorice a sí mismo).
+  Y el consumo de personal (ADR-034): **tipo** (`venta` |
+  `consumo_personal`, default `venta`), **consumo_motivo** (`fin_semana` |
+  `feriado` | `alta_actividad` | `capacitacion` | `otro`; obligatorio
+  cuando el tipo lo es, prohibido si no), **consumo_autorizado_por**
+  (usuario_id del encargado que firmó con su PIN — permiso
+  `sales.registrar_consumo_personal`). Un `consumo_personal` nace con todas
+  sus líneas en cero y no admite cobro, comprobante ni descuento
+  (RN-COM-025/026/027).
 - **mesa** (ADR-018): sucursal_id, numero (único por sucursal), zona
   (`Salón`, `Terraza`, `Barra`... libre), capacidad (nullable), activa.
   Vive en `sales` y no en `users` porque quien le da sentido es la toma de
@@ -914,13 +960,17 @@ Evento `sales.venta_confirmada` → inventory descuenta insumos según receta.
   cliente_id, canal (`pos` | `whatsapp` | `link`), fecha_envio,
   fecha_respuesta (opcional), puntaje 1-5 (opcional hasta responder),
   comentario (opcional), estado (`enviada` | `respondida` | `expirada`),
-  enviada_por. Selectiva — no toda venta genera una fila (RN-COM-007);
-  requiere `cliente_id` no nulo y el pedido ya entregado. Su disparador es
-  `sales.venta_entregada` (`PROC-OPE-002`); Marketing elige a qué venta
-  entregada enviarle encuesta, y al enviarla emite
-  `marketing.encuesta_enviada`. El estado de entrega lo lee del contrato
-  público `sales/application/queries_publicas.py::venta_para_encuesta` —
-  marketing no importa `Venta`.
+  enviada_por, y desde 2026-08-08 el **estado de la conversación**:
+  plantilla_id, pregunta_actual_id, destino (teléfono E.164),
+  conversacion_abierta, token_publico (único), fecha_expiracion,
+  mensaje_externo_id, error_envio (ADR-031, §8d). Selectiva — no toda venta
+  genera una fila (RN-COM-007); requiere `cliente_id` no nulo y el pedido ya
+  entregado. Su disparador es `sales.venta_entregada` (`PROC-OPE-002`);
+  Marketing elige a qué venta entregada enviarle encuesta, y al enviarla
+  emite `marketing.encuesta_enviada`. El estado de entrega lo lee del
+  contrato público
+  `sales/application/queries_publicas.py::venta_para_encuesta` y el teléfono
+  de `::contacto_de_cliente` — marketing no importa `Venta` ni `Cliente`.
 
 ### Comercial-estrategia (spec 2026-08-05, sin implementar)
 
@@ -1406,8 +1456,9 @@ Ver [docs/marketing/README.md](../marketing/README.md) y
 `encuesta_satisfaccion` (descrita también en §6, donde nace su disparador)
 pertenece a este módulo.
 
-Implementado 2026-08-01 (migración `e9c3b7412a68`): las 5 entidades de
-abajo existen como tablas.
+Implementado 2026-08-01 (migración `e9c3b7412a68`): las 5 primeras
+entidades. Ampliado 2026-08-08 (migración `c1f80b6a2d34`, ADR-031/030) con
+el guion de la encuesta, la evaluación de agencia y el acumulado de campaña.
 
 - **campana**: empresa_id, marca_id, nombre (naming, RN-MKT-007), tipo
   (`notoriedad` | `impulso_venta` | `lanzamiento` | `medios` | `evento`),
@@ -1439,9 +1490,68 @@ abajo existen como tablas.
   `(campana_id, sucursal_id, fecha)`: reverificar el mismo día corrige la
   fila, no acumula otra.
 
-La adquisición de material y la contratación de agencia **no** son
-entidades de marketing: usan el flujo de `purchases` (OC/caja chica) y
-`contrato` (transversal), RN-MKT-004/006.
+### Guion de la encuesta (ADR-031)
+
+- **encuesta_plantilla**: empresa_id, marca_id (opcional), nombre, saludo,
+  despedida, activa, creado_por. Única por `(empresa_id, nombre)` y **una
+  sola activa por empresa**: dos guiones vivos parten la serie histórica en
+  dos mitades que no se pueden comparar. El seeder trae una activa de
+  fábrica.
+- **encuesta_pregunta**: plantilla_id, codigo, orden, texto, tipo
+  (`escala` | `opcion` | `si_no` | `texto`), opciones (JSONB
+  `[{valor, etiqueta}]`), **siguiente_codigo** (camino normal; NULL =
+  termina), **saltos** (JSONB `{respuesta: codigo}` — el desvío por lo que
+  contestó el cliente), es_puntaje (una sola por plantilla, alimenta
+  `encuesta_satisfaccion.puntaje`), obligatoria. Única por
+  `(plantilla_id, codigo)` y por `(plantilla_id, orden)`. El destino se
+  guarda por `codigo` y no por id: agregar un nodo en medio no obliga a
+  conocer UUID que todavía no existen. Saltos rotos y **ciclos** se rechazan
+  al guardar la plantilla, no al enviarla.
+- **encuesta_respuesta**: encuesta_id, pregunta_id, valor. Única por
+  `(encuesta_id, pregunta_id)` — WhatsApp reentrega el webhook y un doble
+  toque en el botón es lo normal. Es el detalle que permite reconstruir por
+  qué la conversación tomó una rama y no la otra;
+  `encuesta_satisfaccion.puntaje`/`comentario` siguen siendo el resumen que
+  consume el negocio.
+
+### Evaluación de agencia (RN-MKT-006, ADR-030)
+
+- **evaluacion_agencia**: campana_id, objetivo, presupuesto_referencia,
+  criterios (JSONB `[{codigo, etiqueta, peso}]`, los pesos suman 100),
+  estado (`borrador` | `evaluada` | `decidida`), opcion_elegida_id,
+  decidida_por, fecha_decision, motivo, creado_por. Los criterios se
+  congelan al crear, antes de ver las propuestas. Solo se evalúa una campaña
+  `aprobada` o `en_curso`: sin brief aprobado no hay objetivo ni presupuesto
+  contra los cuales comparar.
+- **opcion_agencia**: evaluacion_id, tipo (`agencia` | `interna`), nombre,
+  proveedor_id (**sin FK** — `proveedor` es dominio de `purchases`), costo,
+  plazo_dias, puntajes (JSONB `{criterio: 1-5}`), puntaje_total (ponderado,
+  persistido para que el ranking histórico no cambie si cambia la fórmula),
+  observacion. Cerrar la evaluación exige **≥2 propuestas y una `interna`**:
+  elegir entre tres agencias no contesta si hace falta una agencia.
+
+Decidir es un permiso distinto de evaluar (`marketing.agencia_decidir` vs.
+`marketing.agencia_evaluar`), y apartarse de la recomendada o del
+presupuesto exige `motivo`.
+
+### Acumulado de campaña (ADR-030)
+
+- **campana_metrica** (una fila por campaña): fecha_lanzamiento,
+  leads_generados, leads_convertidos, piezas_publicadas,
+  encuestas_enviadas, encuestas_respondidas, puntaje_suma. **Derivada y
+  reconstruible** (`POST /campanas/{id}/metricas/recalculo`): la mantienen
+  los listeners del propio módulo sobre sus eventos, que hasta 2026-08-08 no
+  tenían consumidor. Conversión y puntaje promedio se calculan al leer. La
+  satisfacción se acredita por la cadena lead → venta → encuesta: una
+  encuesta de un cliente que llegó solo no le suma a ninguna campaña.
+
+El **arte** de una pieza no agrega tabla: cuelga de `archivo` (§1,
+polimórfico) con `entidad_tipo = 'pieza_contenido'`.
+
+La adquisición de material **no** es entidad de marketing: usa el flujo de
+`purchases` (OC/caja chica), RN-MKT-004. La contratación de la agencia se
+formaliza por `contrato` (transversal, todavía sin tabla) — lo que vive acá
+es la **evaluación** que la precede, RN-MKT-006.
 
 ## 8e. Sincronización del hub de sucursal (core, ADR-009)
 
@@ -1460,6 +1570,63 @@ sola sucursal.
 No hay tabla de mapeo hub-id↔nube-id: `venta`, `pago` y
 `movimiento_inventario` conservan el mismo UUID en ambos lados porque el
 `id` se genera en la aplicación (`UuidPkMixin`) y viaja en el lote.
+
+## 16. Emisión y distribución de reportes (módulo reports, ADR-033)
+
+Seis tablas que responden «qué reporta el ERP, a quién le llega y qué se
+entregó». **No confundir con `core/reportes`** (ADR-024), que es el motor de
+*consulta*: acá no se calcula nada, se registra lo que ya pasó y se reparte.
+
+El **catálogo de emisiones no es una tabla**: es una lista cerrada en
+`src/modules/reports/domain/catalogo.py`. `codigo_emision` es texto validado
+contra ella al guardar, no una FK — si el conjunto de emisiones fuera
+administrable por API, quien puede crear reglas podría hacerse enviar
+cualquier payload del bus (RN-REP-001).
+
+- **area**: empresa_id, codigo (`almacen` | `gerencia` | `comercial` |
+  `cocina` | `caja` | `contabilidad`, único por empresa), nombre, activa.
+  Le da cuerpo a los destinos que el ERP ya nombraba sin poder resolver
+  (`inventory.conteo_vencido` publica `dirigido_a: ["almacen","gerencia"]`;
+  `devolucion.reporte_dirigido_a` guarda `almacen`|`comercial`). **No es un
+  rol**: el rol dice qué puede hacer alguien, el área de qué se entera.
+- **area_miembro**: area_id, y **uno de** rol_id | usuario_id (check
+  constraint: uno u otro, nunca los dos ni ninguno), sucursal_id nullable
+  (acota la membresía a un local). Se compone principalmente por rol porque
+  así se administra solo — quien cambia de puesto gana o pierde los reportes
+  sin que nadie actualice una lista.
+- **regla_distribucion**: empresa_id, codigo_emision, sucursal_id nullable
+  (NULL = la general de la empresa), activa, nivel (`info`|`aviso`|`urgente`,
+  pisa el de la emisión), canal (`bandeja`). **Dos índices únicos parciales**
+  en vez de un `UniqueConstraint` de tres columnas: en SQL los NULL son
+  distintos entre sí, así que la constraint simple dejaría convivir dos
+  reglas generales de la misma emisión y el hecho se entregaría dos veces
+  (RN-REP-008). La específica de la sucursal le gana a la general.
+- **regla_destinatario**: regla_id (cascade), tipo (`area`|`rol`|`usuario`|
+  `dinamico`), y la referencia que corresponda — con check constraint que
+  exige la del tipo declarado, porque una fila `tipo=area` con `area_id` nulo
+  resolvería a cero destinatarios en silencio. `dinamico` es
+  `encargado_de_turno` | `responsables_de_almacen`: destinatarios que no se
+  pueden listar de antemano porque dependen del momento.
+- **reporte_emitido**: empresa_id/sucursal_id (nullables — un hecho que no se
+  pudo atribuir se guarda igual y solo lo ve el superusuario, mismo criterio
+  que `audit_log`), codigo_emision, titulo, cuerpo, nivel, **datos** JSONB
+  (la foto: solo los campos que la emisión declara, RN-REP-003; puede traer
+  PII y por eso no sale al logger), referencia_tipo/referencia_id
+  (polimórficos sin FK, como `notificacion`), regla_id (la que lo produjo;
+  NULL = el hueco), emitido_at. Es una **foto, no un puntero**: un reporte de
+  «descuadre de S/ 40» sigue diciendo 40 aunque el cierre se corrija después.
+- **entrega_reporte**: reporte_emitido_id (cascade), usuario_id, **motivo**
+  (`area:almacen`, `rol:supervisor`, `dinamico:encargado_de_turno`), canal.
+  Único por (reporte, usuario): quien está en el área *y* es el encargado de
+  turno recibe una vez. **No lleva `leida_at`** — el estado de lectura vive
+  en `notificacion.leida_at`, que es la bandeja que el usuario abre;
+  duplicarlo daría dos verdades sobre lo mismo. Esta tabla registra la
+  *distribución*, y el `motivo` es lo que le dice al administrador qué tocar
+  para cambiarla.
+
+Una emisión sin destinatarios **se persiste igual**, con cero entregas, y sale
+como hueco en la matriz (RN-REP-005). Las entregas no son retroactivas:
+`regla_id` y `motivo` se congelan al emitir (RN-REP-004).
 
 ## 9. Módulos futuros
 

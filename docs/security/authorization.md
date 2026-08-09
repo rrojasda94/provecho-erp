@@ -46,6 +46,7 @@ alcance del usuario.
 | Rol | Permisos base |
 |-----|---------------|
 | admin | `*` (todo, solo entornos internos) |
+| — | `organizacion.gestionar`: CRUD de grupo, empresas, marcas, licencias, sucursales y almacenes. **Aparte de `users.gestionar`**: quien crea cajeros no funda sucursales. Fundar un grupo o una empresa exige además `*` — el recurso nuevo todavía no pertenece a la empresa de nadie |
 | supervisor | `inventory.*`, `purchases.aprobar`, `sales.leer`, aprueba solicitudes |
 | almacenero | `inventory.transferir`, `inventory.recepcion`, `inventory.ajustar` |
 | cajero | `sales.crear`, `sales.cobrar`, `sales.leer` (su sucursal) |
@@ -77,3 +78,21 @@ distinto y valen la pena tenerlas presentes:
 
 Alta: `python -m src.seeders.hub --sucursal <uuid> --username hub_<local>`
 (ver `docs/engineering/devops.md`).
+
+### Cuentas de agente: token de API, no PIN (ADR-032)
+
+Un `usuario` con `tipo=agente_ia` se autentica con un **token de API de
+larga vida** (`token_agente`), emitido y revocado con `users.gestionar`
+desde `/api/v1/users/{id}/tokens`. El PIN de 6 dígitos es un secreto de 20
+bits para un proceso desatendido, y su lockout de 5 intentos es un modo de
+falla que apaga integraciones.
+
+Lo que **no** cambia: el token identifica al usuario y de ahí salen sus
+roles, permisos, restricciones y sucursales igual que en cualquier login
+(RN-GEN-004). Un agente sigue pudiendo exactamente lo que su rol le da —
+`agente_ia` es `sales.crear_pedido` y nada más. Un usuario `humano` no
+puede tener token (409), y el `tipo` se revalida en cada request.
+
+El hub de sucursal todavía usa username + PIN (`cloud_sync_*`); migrarlo
+obliga a rotar el secreto en cada local y está anotado en ROADMAP → Deuda
+técnica.

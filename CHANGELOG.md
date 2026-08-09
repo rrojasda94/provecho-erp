@@ -3,50 +3,223 @@
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.1.0/).
 Versionado: [SemVer](https://semver.org/lang/es/).
 
+Lo que todavía no se publicó **no se escribe acá**: cada cambio deja su
+archivo en [`changelog.d/`](changelog.d/) y `python scripts/cortar_version.py`
+los junta en una sección nueva al cortar la versión. Dos ramas en paralelo
+editando este archivo chocaban siempre — escribían en la misma línea.
+
 ## [Unreleased]
+
+Ver [`changelog.d/`](changelog.d/).
+
+## [0.2.0] - 2026-08-08
+
+Primera versión **etiquetada** (el `0.1.0` de abajo se escribió al arrancar y
+nunca se llegó a taggear). Recoge todo lo construido sobre el scaffold: los
+ocho módulos, el PDV, el ciclo de caja, la facturación electrónica, el modo
+offline, el frontend y la infraestructura de despliegue. El ERP todavía no
+opera en producción, de ahí el `0.x`.
 
 ### Added
 
-- **Restas: "sin cebolla" mueve el inventario** (2026-08-08, ADR-029,
-  migración `a4f1d0c8b573`). `RN-PRD-004` manda aplicar los modificadores en
-  el orden **tamaño → combinación → extras → restas**, y las restas eran el
-  único tramo sin implementar: se escribían en la nota libre a cocina, el
-  plato salía bien y **el inventario descontaba la cebolla igual**. Esa
-  cebolla que se quedó en la cámara aparecía como faltante en el conteo del
-  mes sin que nadie pudiera explicarlo. Ahora `venta_item.sin_articulo_ids`
-  guarda qué insumos no lleva la línea; el consumo los salta y la reposición
-  por anulación o nota de crédito devuelve solo lo que se consumió
-  (RN-COM-025, RN-PRD-011).
-  - **Lo quitable es la receta**: `GET /sales/productos/{id}/quitables`
-    devuelve los insumos del producto. No hay tabla ni flag de "quitables"
-    que mantener — sería la misma verdad escrita dos veces. Pedir quitar algo
-    que la receta no pone devuelve 409; el replay del hub se exceptúa
-    (ADR-009), porque esa venta ya se preparó y la receta pudo cambiar
-    durante el corte.
-  - **No cambia el precio.** Quitar cebolla no abarata la pizza; lo que
-    cambia es el descuento de stock.
-  - Cocina las ve en el KDS y en la comanda impresa (`SIN CEBOLLA`,
-    sangrada). En el PDV son chips rojos y tachados junto a los extras — la
-    nota libre sigue existiendo para lo que no es un insumo ("bien cocida").
-- **Lienzo de nodos del producto** (`/catalogo/productos/{id}/nodos`,
-  2026-08-08). El árbol completo de lo que se puede pedir en una pantalla:
-  producto → tamaños → grupos (el sabor es uno) → extras → restas → empaque.
-  Al tocar los nodos se arma un plato y un panel recalcula en vivo la receta
-  fusionada, el costo y el margen de esa combinación exacta — antes había que
-  abrir cinco pantallas y sumar a mano. La estructura se edita desde el
-  lienzo; los gramos de cada receta siguen en Catálogo → Recetas, con enlace
-  desde cada nodo (ADR-023 §4: el editor duplicado ya se reportó como
-  confuso una vez). La fusión se calcula en el cliente y **no se guarda**: es
-  un simulador, lo que se descuenta de verdad sale del servidor.
-- **Quitar un extra de un producto y borrar un grupo de opciones**
-  (`DELETE /sales/productos/{id}/extras/{extra_id}` y
-  `DELETE /sales/productos/{id}/grupos/{grupo_id}`). Cierra la deuda que
-  ADR-023 dejó anotada. Borrar un grupo **suelta** sus extras en vez de
-  borrarlos: el extra es un producto comercial con su receta y su precio, y
-  existe con o sin grupo.
+- **La encuesta de satisfacción sale de verdad, y es una conversación**
+  (2026-08-08, ADR-031, migración `c1f80b6a2d34`). Hasta ahora `POST
+  /marketing/encuestas` creaba una fila y publicaba un evento: **nada salía
+  del ERP**. Ahora hay un adaptador de la WhatsApp Cloud API
+  (`src/shared/integrations/whatsapp/`) y un guion de preguntas que es dato,
+  no código.
+  - **Nodos, no formulario.** WhatsApp no tiene formulario: tiene mensajes,
+    uno a la vez. Cada `encuesta_pregunta` declara a dónde sigue la
+    conversación (`siguiente_codigo`) y por dónde se desvía según lo que el
+    cliente contestó (`saltos`). Un 2 de 5 pregunta **qué** falló; un 5
+    pregunta si nos recomendaría. Preguntarles las dos cosas a todos alarga
+    la encuesta y baja la tasa de respuesta, que es la métrica que hace que
+    el resto sirva.
+  - **El primer "ok" del cliente no es el puntaje.** Meta solo acepta
+    plantillas aprobadas fuera de la ventana de 24 h, así que la encuesta se
+    abre con una plantilla y la ventana la abre la respuesta del cliente.
+    Contar ese "ok" como respuesta dejaría a media base con la nota de haber
+    dicho que sí; `conversacion_abierta` lo distingue.
+  - **Los ciclos se rechazan al guardar el guion**, no al enviarlo: A → B → A
+    no rompe nada al crear la plantilla y convierte la encuesta en un bucle
+    que le escribe al cliente para siempre.
+  - Tres puertas de entrada —webhook de Meta, enlace público con token, y la
+    tablet del local— con **un solo caso de uso** detrás.
+  - Expiración automática por barrido horario (Celery beat); antes
+    `expirar_encuesta` era un endpoint que alguien tenía que acordarse de
+    llamar.
+- **Calendario de contenido con el arte** (2026-08-08). `pieza_contenido`
+  guardaba título, canal, fecha y métricas: todo menos la pieza. Un
+  calendario sin el arte obliga a abrir otra carpeta para saber qué se
+  publica el jueves, y ahí es donde se publica la versión vieja del banner.
+  `GET /marketing/piezas/calendario` agrupa por día y cuenta los adjuntos;
+  los archivos cuelgan de `archivo` (`src/shared/`, ya polimórfico) en vez de
+  un storage propio de marketing.
+- **Evaluación de agencia vs. interna** (2026-08-08, RN-MKT-006, ADR-030).
+  La decisión se documentaba fuera del ERP; seis meses después nadie podía
+  mostrar por qué se pagó lo que se pagó. `evaluacion_agencia` +
+  `opcion_agencia` congelan los criterios ponderados **antes** de ver las
+  propuestas, obligan a que la opción interna compita (comparar tres agencias
+  entre sí no contesta si hace falta una agencia), y separan evaluar de
+  decidir en dos permisos. Apartarse de la recomendada o del presupuesto se
+  puede, en silencio no: el motivo pasa a ser obligatorio.
+- **Los eventos de marketing ya tienen quién los escuche** (2026-08-08,
+  ADR-030). `marketing.campana_lanzada` y `marketing.lead_generado` se
+  publicaban al vacío. Ahora el propio módulo los consume en
+  `campana_metrica`, junto con tres eventos nuevos (`lead_atribuido`,
+  `pieza_publicada`, `encuesta_respondida`). La satisfacción se le acredita a
+  la campaña por la cadena lead → venta → encuesta: una encuesta de un
+  cliente que llegó solo no le suma a ninguna campaña, que es lo correcto. El
+  acumulado es derivado y se puede reconstruir
+  (`POST /campanas/{id}/metricas/recalculo`).
+
+### Changed
+
+- **`POST /marketing/encuestas/{id}/respuesta` cambia de contrato**
+  (2026-08-08). Recibe `{"valor": "..."}` —la respuesta a **un** nodo— en vez
+  de `{"puntaje": n, "comentario": "..."}`, y devuelve
+  `{encuesta, pregunta_actual, url_publica}` en vez de la encuesta pelada.
+  `POST /marketing/encuestas` devuelve la misma envoltura. No hay datos
+  productivos afectados: el módulo se creó el 2026-08-01 y no hay campañas
+  cargadas. Las encuestas anteriores al guion (`plantilla_id` NULL) se siguen
+  contestando con un puntaje suelto.
+- **`marketing` dejó su jerarquía de errores propia** (2026-08-08). Era el
+  único de los ocho módulos que declaraba `MarketingError(Exception)` y
+  traducía a HTTP en cada endpoint: 17 `try/except` cuyo único cuerpo era
+  `raise _http(e)`. Ahora hereda de `src/shared/errors.py` y el mapeo lo hace
+  `src/core/error_handlers.py`, una sola vez para todo el ERP. Mismos códigos
+  de respuesta, 60 líneas menos.
+- **Token de API para cuentas de agente** (2026-08-08, ADR-032, migración
+  `b3f7d21a9c04`). Un `usuario` con `tipo=agente_ia` —n8n, el bot de
+  pedidos, el hub de sucursal— se autenticaba con username + PIN de 6
+  dígitos, o sea con un secreto de 20 bits guardado en un `.env`, sujeto a
+  un lockout de 5 intentos que apaga la integración y a un refresh que hay
+  que rotar cada 7 días desde un proceso desatendido. Ahora tiene su propia
+  credencial: `token_agente`, 256 bits de `secrets`, del que se persiste
+  solo el SHA-256 (el claro sale una única vez, al emitirlo).
+  - `POST/GET/DELETE /api/v1/users/{id}/tokens[/{token_id}]` con
+    `users.gestionar`. Se revoca de a uno, sin apagar la cuenta ni las
+    demás integraciones. `expira_en` opcional (NULL = sin vencimiento) y
+    `ultimo_uso_en` con granularidad de una hora, para poder apagar lo que
+    ya nadie usa.
+  - **El RBAC no cambia**: `api/deps.get_claims` distingue por el prefijo
+    `prv_`, resuelve el usuario contra la tabla y arma los mismos claims que
+    armaría un login. De ahí para abajo —tenant, permisos, restricciones,
+    auditoría— nada distingue una credencial de la otra. Un usuario `humano`
+    no puede tener token (409) y el `tipo` se revalida en cada request.
+  - SHA-256 y no Argon2 como el PIN: 256 bits aleatorios no se rompen por
+    fuerza bruta, y esto se verifica en **cada** request.
+  - El hub sigue con username + PIN: migrarlo obliga a rotar el secreto de
+    cada local y es un cambio de operación (ROADMAP → Deuda técnica).
+- **CRUD de organización por API** (2026-08-08). Grupo, empresa, marca,
+  licencia de marca, sucursal y almacén solo los escribía el seeder: dar de
+  alta un local obligaba a correr un script contra la base. Sin cambios de
+  esquema — las seis tablas ya existían.
+  - Permiso propio `organizacion.gestionar`, separado de `users.gestionar`:
+    quien crea cajeros no tiene por qué poder fundar sucursales ni cambiar
+    el RUC de la empresa. Fundar un grupo o una empresa exige además `*`.
+  - La API valida lo que el seeder tipeaba a mano: una sucursal solo opera
+    una marca **licenciada** a su empresa (409 si no), la licencia liga
+    marca y empresa del mismo grupo, un almacén de tipo `sucursal` exige
+    `sucursal_id` de su misma empresa, y ninguno se abastece de sí mismo.
+  - La baja es **lógica** y se niega con dependientes vivos: una empresa con
+    sucursales o almacenes activos, una marca con locales abiertos o
+    licencias vigentes, un central del que otros se abastecen. Cerrar un
+    local es `estado="inactiva"` y no hay DELETE de sucursal: sigue siendo el
+    ancla de sus ventas, cajas y trabajadores.
+  - `DELETE /almacenes/{id}` no mira el stock: vive en `inventory` y `users`
+    no importa el dominio de otro módulo (ROADMAP → Deuda técnica).
+
+### Changed
+
+- **`auth_headers(session, username)` en `tests/conftest.py`** (2026-08-08):
+  emite el mismo JWT que emitiría `/auth/login` —mismos claims, misma
+  firma— sin verificar el PIN, que ya tiene sus propios tests en
+  `test_users_auth.py`. Lo usan los tests que necesitan **varias identidades
+  distintas** en la misma corrida: el CRUD de organización compara lo que ve
+  un superusuario con lo que ve un admin de una sola empresa, y cada login
+  gasta cuota del limiter, que desde `_rate_limit_en_memoria` se ejercita de
+  verdad y son 10 por ventana.
+  - Deliberadamente **no** se usa el token de agente para autenticar los
+    tests: haría que el suite ejerciera un camino de autenticación que
+    ningún humano usa, y obligaría a sembrar un token en cada fixture.
+- **La imagen y el CI corren el mismo Python: 3.14** (2026-08-08). El bump
+  del `Dockerfile` a `python:3.14-slim` venía solo: los cuatro jobs que usan
+  `actions/setup-python` seguían en 3.12, así que `pytest` nunca tocaba el
+  intérprete que la imagen ejecuta. El job `imagen` solo comprueba que el
+  contenedor construya y conteste `/health`; una incompatibilidad de una
+  dependencia con 3.14 se habría descubierto en producción con `main` en
+  verde. `requires-python` ya decía `>=3.12`, así que no hay nada que
+  relajar.
 
 ### Fixed
 
+- **Un fetch caído se dibujaba igual que "no hay datos"** (2026-08-07). El
+  patrón `.catch(() => setLista([]))` estaba en cuatro lugares y convirtió un
+  fallo real en algo indiagnosticable desde la pantalla: una venta con pago
+  dividido no aparecía en la pestaña "Cobrados" del PDV, la venta **sí**
+  estaba en la base, y la única pista que daba la UI era una lista vacía —
+  exactamente lo mismo que se ve un día sin ventas.
+  - Clasificador nuevo en `frontend/lib/carga.ts`, sin dependencias y
+    probado con `node --test` (`lib/carga.test.ts`, 7 casos). Lee el status
+    **por forma** y no por `instanceof`, porque el proyecto tiene dos clases
+    de error de API (`ApiError` en el servidor, `ErrorApi` en el navegador) y
+    a un Server Component pueden llegarle las dos. `Falla` guarda además el
+    mensaje del servidor como `detalle`: sin eso, saber qué pasó exigía abrir
+    las herramientas de desarrollo.
+  - **PDV**: mesas, pedidos cobrados y pedidos en cocina muestran un panel de
+    error con el detalle y un botón "Reintentar" que llama a la misma función
+    que hace la carga inicial. El reintento es en sitio a propósito: recargar
+    la página del PDV pierde los borradores abiertos en las pestañas del
+    ticket. El estado vacío ("Todavía no hay pedidos cobrados hoy") queda
+    reservado para respuestas exitosas sin filas.
+  - **Dashboard**: el `opcional()` que devolvía `null` ante cualquier
+    `ApiError` trataba igual "no tienes permiso" y "no se pudo preguntar", y
+    de paso dejaba que un error de red tumbara la página entera (no hay
+    `error.tsx`). Ahora solo el **403** se traga —el servidor contestó y dijo
+    que no—; red, 5xx y 401 salen en `components/shell/aviso-fallo.tsx`, con
+    reintento vía `router.refresh()`. El tablero sigue armándose con los
+    bloques que sí cargaron.
+  - Cuatro cargas del PDV conservan el patrón viejo (carta, medios de pago,
+    POS y caja abierta) — quedan anotadas en ROADMAP → Deuda técnica →
+    Frontend, no se tocaron en este cambio.
+- **Los eventos de `marketing` se despachaban antes del commit**
+  (2026-08-08). `campana_lanzada`, `lead_generado` y `encuesta_enviada` se
+  publicaban sin `session=`, o sea en el acto, en medio de una transacción
+  que todavía podía fallar — justo lo que ADR-016 existe para evitar. Con el
+  envío real de la encuesta el bug dejaba de ser teórico: el worker abre su
+  propia sesión y habría buscado una fila que aún no estaba escrita.
+- **`normalizar_telefono` no sacaba el prefijo troncal** (2026-08-08). Un
+  contacto tecleado en caja como `(051) 987-654-321` quedaba en
+  `051987654321`, que Meta rechaza. Los ceros de la izquierda son prefijo de
+  marcado, nunca parte del número: E.164 no empieza con cero.
+- **`main` estaba en rojo desde el bump a `@tanstack/react-table` 9**
+  (2026-08-08). El PR #37 (2026-08-07, dependabot) subió la librería de
+  8.21.3 a 9.0.0 sin migrar una línea. En v9 no existe `useReactTable` —es
+  `ReactTable` + `createCoreRowModel`—, `VisibilityState` no se exporta y
+  `ColumnDef` toma dos genéricos: las 13 pantallas que usan
+  `components/tabla/tabla-datos.tsx` quedaron rotas. Vuelve a `^8.21.3` y su
+  major queda en `ignore` en `.github/dependabot.yml`; la migración a v9 es
+  trabajo aparte (ver ROADMAP → Deuda técnica → Frontend).
+  - **El CI lo atrapó y el PR se mergeó igual, en rojo**: fallaron los jobs
+    `frontend` y `e2e`, primero en el PR (run `31202169287`) y otra vez en
+    `main` tras el merge (`31210826670`). No fue un agujero de cobertura: fue
+    un merge sobre CI rojo.
+- **El job `frontend` no corría un chequeo de tipos propio** (2026-08-08).
+  Ahora corre `npm run typecheck` (`tsc --noEmit`, script nuevo en
+  `frontend/package.json`) junto a `npm run lint`, bloqueante. No es
+  cobertura nueva —`next build` ya typechequea: Next 16 corre el `tsc` del
+  proyecto con el mismo `tsconfig.json`— sino momento y claridad: 6 s contra
+  ~40 s, antes de los tests y del build, y falla diciendo "tipos". En el caso
+  de #37 el build ni llegó a esa etapa: murió antes empaquetando, con
+  `Export useReactTable doesn't exist in target module` de Turbopack.
+  `npm run lint` pasó igual, porque ESLint revisa el árbol sintáctico y no si
+  el símbolo importado existe.
+- **`frontend/package-lock.json` fijado a LF** (2026-08-08, `.gitattributes`
+  nuevo). npm lo reescribe con los saltos de línea del sistema: el
+  `npm install` de este mismo cambio, en Windows, lo pasó entero a CRLF y
+  convirtió un cambio de tres entradas en un diff de 10 000 líneas. Un
+  lockfile ilegible es un lockfile que nadie revisa.
 - **Dos temporales de Word estaban versionados en la raíz** (2026-08-07).
   `~$F1.docx` (el archivo de bloqueo que Word crea al abrir un documento) y
   `~WRL0908.tmp` (su respaldo de autoguardado) entraron en el import inicial
@@ -74,8 +247,88 @@ Versionado: [SemVer](https://semver.org/lang/es/).
   tablero propio existente ya no pregunta nada — conserva su nombre; solo el
   alta y "Guardar como…" piden uno.
 
+### Fixed
+
+- **El engine no tenía timeout de conexión: un Postgres mudo colgaba el
+  request para siempre** (2026-08-08). `create_engine(settings.database_url,
+  pool_pre_ping=True)`, sin `connect_args`. Un servidor que **no rechaza** —
+  acepta el TCP y se queda callado, o se le cae la red de por medio— dejaba a
+  psycopg en `wait_conn` sin límite: el ERP no daba error, se quedaba mudo, y
+  en caja mudo es peor que roto. Ahora `connect_timeout: 5`, aplicado solo
+  cuando la URL es Postgres (`connect_args()` en `src/core/database.py`): es
+  parámetro de libpq y el `e2e`, que levanta la API contra un SQLite
+  desechable, revienta al arrancar si se lo pasan.
+  - Se descubrió midiendo el suite: diez tests tardaban **130 s cada uno**,
+    el tope del stack TCP de Windows. Ocho de ellos son barridos de Celery
+    (`inventory`, `sales`) que usan `SessionLocal` directo, más `/health/sync`
+    del hub. Con el timeout bajan a **5.2 s**.
+  - Los otros dos son `test_esquema.py::test_base_inalcanzable_*`, que arman
+    su propio engine contra `127.0.0.1:1`. La docstring decía que el puerto
+    "se rechaza en el acto, sin esperas" — cierto en Linux, falso en Windows,
+    que descarta el SYN en silencio. Ahora reusan el mismo `connect_args()`:
+    130 s → 5.1 s.
+- **El suite del backend no tardaba: se colgaba, y de paso escribía en la base
+  de desarrollo** (2026-08-08). Cada `env` de test parchea el
+  `session_factory` de los listeners que su test ejercita, y **solo esos**.
+  Los otros dos módulos de listeners quedaban apuntando al Postgres real, así
+  que confirmar una venta despertaba `accounting.on_venta_confirmada`, que
+  abre su propia sesión —el evento se despacha después del commit, cuando la
+  del request ya no existe— y se quedaba en `psycopg.wait_conn`. Sin timeout:
+  para siempre. Se encontró con `py-spy dump` sobre cinco corridas trabadas
+  hacía entre 30 y 90 minutos, todas en el mismo `POST /sales/ventas`.
+  - Con el Postgres de desarrollo levantado no se colgaba, que es lo peor de
+    todo: el listener conectaba **de verdad** y sembraba asientos de prueba en
+    la base real, mientras el test miraba su SQLite y no veía nada.
+  - Arreglo: `_listeners_sin_base_real` (conftest, autouse) apunta los tres
+    `session_factory` a algo que revienta. Es seguro porque
+    `EventBus._despachar` ya atrapa y registra lo que falle en un handler; el
+    test que necesita el listener lo parchea como siempre, y el que no, ve una
+    línea en el log en vez de un cuelgue. `tests/test_kds.py` pasó de colgarse
+    a 12 casos en 16 s.
+
 ### Changed
 
+- **La base de desarrollo pasó de Supabase al Postgres del `docker-compose`**
+  (2026-08-08). Cada consulta a Supabase costaba ~130 ms de ida y vuelta —
+  distancia, no trabajo de base: `SELECT 1` tardaba lo mismo que contar
+  usuarios. Como todo request autenticado consulta permisos, una pantalla
+  típica se iba a 2-3 segundos de puro viaje de red. En local esa latencia
+  baja al orden del milisegundo.
+  - `.env` guarda ahora la URL vista **desde el host** (`localhost:5433`,
+    porque el 5432 lo ocupa Charlie's), que es la que usan alembic, pytest y
+    un uvicorn suelto. Los contenedores ven otros nombres (`db:5432`,
+    `redis:6379`), así que `docker-compose.yml` se los inyecta con el bloque
+    `x-conexiones-internas` — `environment` gana sobre `env_file`. Un solo
+    `.env` sirve a los dos y no hay que editarlo al alternar.
+  - Costo aceptado: los datos de desarrollo dejan de ser compartidos y de
+    verse en el Table Editor de Supabase. Se regeneran con
+    `alembic upgrade head` + `python -m src.seeders.seed` (idempotente).
+    Volver a Supabase son dos pasos, documentados en
+    `docs/engineering/devops.md`.
+  - Producción no cambia: `docker-compose.prod.yml` sigue sin servicio de
+    base de datos y espera una gestionada por `DATABASE_URL`.
+- **El suite del backend se paralelizó y dejó de pagar Argon2id de
+  producción** (2026-08-08). **956 casos en 1 min 1 s**, contra los más de 10
+  minutos de antes —cuando terminaba— y ningún test por encima de 6 s.
+  Corría en serie y **ninguna fixture tenía `scope=`**, así que cada uno rearma su
+  motor SQLite, sus 99 tablas, el seeder completo y la app FastAPI entera.
+  Medido con `cProfile` sobre `tests/test_accounting.py` (22 tests, 16 s): el
+  KDF se llevaba 3.9 s —46 hash de 55 ms del seeder más 24 verify de los
+  logins—, y 24 intentos de conexión a un Redis que no está corriendo se
+  colaban por los endpoints con rate limit.
+  - `_argon2_barato` (conftest, sesión) baja Argon2id a `t=1, m=8 KiB, p=1`:
+    de 55 ms a 0.1 ms por hash. Los parámetros reales quedan guardados en
+    `HASHER_PRODUCCION` y ahora **sí** los vigila un test
+    (`test_seguridad_del_hasher_de_produccion`, piso RFC 9106); antes ningún
+    test los miraba.
+  - `_rate_limit_en_memoria` (conftest, por test) reemplaza el cliente Redis
+    por un contador en memoria, mismo criterio que el token de Factiliza y el
+    broker de Celery que ya vivían ahí. De paso el límite deja de estar
+    fail-open en pruebas: antes nunca se ejercitaba de verdad.
+  - `pytest-xdist` con `addopts = "-n auto --dist loadfile"`. `loadfile` y no
+    el reparto por test porque varios archivos tocan estado de módulo (el
+    corta-circuito del limiter, la config de Celery) y así cada archivo vive
+    entero en un proceso. Para depurar en serie: `pytest -n0`.
 - **`F1.docx` pasó de la raíz a `docs/foundation/`** (2026-08-07). Es el brief
   original del ERP —el dictado del que salieron `vision.md`, `glossary.md` y
   `business-philosophy.md`— y estaba suelto en la raíz sin que ningún
@@ -109,6 +362,39 @@ Versionado: [SemVer](https://semver.org/lang/es/).
   cuatro ya resueltos.
 
 ### Added
+
+- **`audit_log` transversal, y usado** (2026-08-08, ADR-031, migración
+  `b3d9f1c2a077`). La tabla decía en su docstring "consumido por todos los
+  módulos" y el código decía otra cosa: el único escritor era
+  `AuditLogRepo` en `users`, `rrhh` lo alcanzaba importando repositorios
+  ajenos (excepción declarada en `test_arquitectura.py`), y anular una
+  venta, aprobar un ajuste, emitir una OC o sacar plata del cajón no dejaban
+  rastro alguno. Tampoco había forma de *leerlo*.
+  - **Un solo punto de escritura**: `src.shared.auditoria.registrar(session,
+    …)`, con el modelo mudado a `src/shared/models/audit_log.py`. Escribe en
+    la misma transacción que el cambio auditado — si el cambio se revierte,
+    el rastro también; auditar algo que no pasó es peor que no auditarlo.
+  - **Escritura explícita, no captura automática por ORM**: el actor y la IP
+    no están en la sesión, y un rastro que registra cada `UPDATE` no lo lee
+    nadie. Se audita el acto de autoridad. El razonamiento completo y la
+    alternativa descartada están en el ADR.
+  - **Cinco módulos nuevos dejan rastro**: anulación de venta y descuento
+    manual (`sales`), aprobación de ajuste de inventario (`inventory`),
+    emisión de OC (`purchases`), ejecución de pago a proveedor e
+    ingreso/retiro de efectivo del cajón (`accounting`), además de lo que ya
+    auditaban `users` y `rrhh`.
+  - **`GET /api/v1/auditoria`** (permiso `auditoria.leer`, rol `contador` —
+    Contabilidad audita a Compras, Almacén y cajas, RN-CTB-009), paginado
+    (ADR-026) y filtrable por entidad, acción, usuario y rango de fechas.
+    **Sin `POST`**: el auditado no dicta lo que dice su auditoría.
+  - **`empresa_id` nuevo (nullable) + índices** `(entidad, entidad_id)` y
+    `(ts)`. Sin `empresa_id` la lectura no se puede escopar por tenant y un
+    contador vería el rastro de otra empresa; nullable porque un login o un
+    alta de rol no tienen empresa, y esas filas solo las ve el superusuario.
+  - `rrhh` sale de las excepciones de acoplamiento cruzado: la lista de
+    `test_arquitectura.py` encogió, que es la única dirección permitida.
+  - **Sigue pendiente** la purga por antigüedad (deuda ya declarada): la
+    tabla crece por inserción pura y no tiene retención automática.
 
 - **El ciclo de abastecimiento funciona sin conexión** (2026-08-07, ADR-009
   fase 3). El hub replicaba catálogo y stock para poder **vender** offline;

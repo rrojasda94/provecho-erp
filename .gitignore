@@ -54,3 +54,6 @@ pdv_smoke.db
 frontend/test-results/
 frontend/playwright-report/
 frontend/blob-report/
+
+# Scratch de TestSprite: credenciales del runner y salida de cada corrida.
+testsprite_tests/tmp/

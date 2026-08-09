@@ -25,14 +25,17 @@ presupuesto).
 `asiento`/`asiento_linea` (manual con permiso `accounting.asiento_manual`,
 cuadre RN-CTB-001, anulación por asiento inverso RN-CTB-002) y
 `regla_asiento` (mapeo configurable evento→cuentas que alimenta la
-generación automática, `application/listeners.py`). Cubre hoy 5 eventos
+generación automática, `application/listeners.py`). Cubre hoy 6 eventos
 operativos: `purchases.oc_emitida`, `purchases.compra_recibida`,
-`sales.venta_confirmada`, `purchases.comprobante_conforme` y —desde
-2026-08-06— `inventory.transferencia_recibida`, que **solo asienta cuando
-el traslado llegó con faltante**: mover mercadería entre almacenes de la
-misma empresa no mueve resultado, lo que sí es hecho contable es lo que
-salió y no llegó. El monto viene valorizado en el evento (el costo es dato
-de `inventory`). El resto de eventos listados abajo quedan pendientes de
+`sales.venta_confirmada`, `purchases.comprobante_conforme`,
+`inventory.transferencia_recibida` —que **solo asienta cuando el traslado
+llegó con faltante**: mover mercadería entre almacenes de la misma empresa
+no mueve resultado, lo que sí es hecho contable es lo que salió y no
+llegó— y —desde 2026-08-09— `inventory.consumo_personal_valorizado`, la
+comida del personal llevada a **gasto de alimentación de personal** y no a
+costo de ventas (ADR-034); `inventory.consumo_personal_reversado` anula ese
+asiento si el consumo se anula. El monto viene valorizado en el evento (el
+costo es dato de `inventory`). El resto de eventos listados abajo quedan pendientes de
 que esos módulos los publiquen (deuda técnica, ver ROADMAP).
 
 **Pago a proveedor (PROC-CTB-003, mismo día):** `movimiento_dinero`

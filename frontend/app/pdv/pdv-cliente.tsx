@@ -22,6 +22,7 @@ import {
   DialogoCierre,
   DialogoCliente,
   DialogoCobro,
+  DialogoConsumoPersonal,
   Dialogo,
   DialogoProducto,
   DialogoTipo,
@@ -64,6 +65,8 @@ function nuevoBorrador(mesa?: MesaEnMapa): Borrador {
     ventaId: null,
     numeroOrden: null,
     hora: hora(),
+    consumoMotivo: null,
+    consumoAutorizacion: null,
   };
 }
 
@@ -98,7 +101,7 @@ export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props)
   const [seleccion, setSeleccion] = useState<Set<string>>(new Set());
   const [vista, setVista] = useState<"catalogo" | "mesas" | "cobrados">("catalogo");
   const [dialogo, setDialogo] = useState<
-    "cliente" | "tipo" | "cobro" | "cierre" | null
+    "cliente" | "tipo" | "cobro" | "cierre" | "consumo" | null
   >(null);
   const [lineaEnEdicion, setLineaEnEdicion] = useState<LineaBorrador | null>(null);
   const [cobradoAVer, setCobradoAVer] = useState<Venta | null>(null);
@@ -188,6 +191,15 @@ export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props)
       mesa_id: b.mesaId,
       comensales: b.comensales,
       referencia_atencion: b.tipo === "mesa" ? null : (b.cliente?.nombre ?? null),
+      // Comida del personal: el servidor pone los precios en cero y exige la
+      // elevación del encargado (RN-COM-025).
+      ...(b.consumoMotivo
+        ? {
+            tipo: "consumo_personal",
+            consumo_motivo: b.consumoMotivo,
+            autorizacion: b.consumoAutorizacion ?? undefined,
+          }
+        : {}),
       items: b.lineas.map((l) => ({
         producto_comercial_id: l.productoId,
         cantidad: String(l.cantidad),
@@ -211,6 +223,34 @@ export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props)
     return false;
   };
 
+  /** Marca (o desmarca) el pedido como comida del personal. El PIN del
+   * encargado se canjea acá por la elevación: si el PIN no vale, el cajero
+   * se entera antes de mandar nada a cocina. */
+  const marcarConsumoPersonal = async (datosConsumo: {
+    motivo: string;
+    encargado: { username: string; pin: string };
+  }) => {
+    setOcupado(true);
+    try {
+      const { autorizacion } = await api.autorizar(
+        datosConsumo.encargado.username,
+        datosConsumo.encargado.pin,
+        "sales.registrar_consumo_personal",
+      );
+      parchar({
+        consumoMotivo: datosConsumo.motivo,
+        consumoAutorizacion: autorizacion,
+      });
+      setSeleccion(new Set());
+      setDialogo(null);
+      notificar("Pedido marcado como consumo de personal: no se cobra");
+    } catch (e) {
+      notificar(mensajeDe(e, "No se pudo autorizar el consumo de personal"));
+    } finally {
+      setOcupado(false);
+    }
+  };
+
   const enviar = async () => {
     if (!activo || !revisarAntesDeSalir(activo, "enviar")) return;
     setOcupado(true);
@@ -219,7 +259,7 @@ export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props)
       parchar({ ventaId: venta.id, numeroOrden: venta.numero_orden });
       setSeleccion(new Set());
       notificar(`Orden #${venta.numero_orden} enviada a cocina`);
-      datos.recargarMesas();
+      datos.mesas.recargar();
     } catch (e) {
       notificar(mensajeDe(e, "No se pudo enviar el pedido"));
     } finally {
@@ -246,9 +286,9 @@ export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props)
       );
       setDialogo(null);
       cerrarPedido(activo.id);
-      datos.recargarMesas();
-      datos.recargarCobrados();
-      datos.recargarAbiertas();
+      datos.mesas.recargar();
+      datos.cobrados.recargar();
+      datos.abiertas.recargar();
     } catch (e) {
       notificar(mensajeDe(e, "No se pudo completar el cobro"));
     } finally {
@@ -311,6 +351,10 @@ export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props)
         ventaId: info.ventaId,
         numeroOrden: info.numeroOrden,
         hora: hora(),
+        // Reabrir es para seguir cobrando una orden en curso; un consumo de
+        // personal ya no admite cambios de tipo ni cobro (RN-COM-025).
+        consumoMotivo: null,
+        consumoAutorizacion: null,
       };
       setBorradores((bs) => [...bs, b]);
       setActivoId(b.id);
@@ -378,8 +422,8 @@ export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props)
       await api.anularVenta(activo.ventaId);
       cerrarPedido(activo.id);
       notificar(`Orden #${activo.numeroOrden} anulada`);
-      datos.recargarMesas();
-      datos.recargarAbiertas();
+      datos.mesas.recargar();
+      datos.abiertas.recargar();
     } catch (e) {
       notificar(mensajeDe(e, "No se pudo anular el pedido"));
     } finally {
@@ -415,7 +459,7 @@ export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props)
         parchar({ lineas: activo.lineas.filter((l) => l.id !== lineaId) });
         notificar("Línea anulada");
       }
-      datos.recargarMesas();
+      datos.mesas.recargar();
     } catch (e) {
       notificar(mensajeDe(e, "No se pudo anular la línea"));
     } finally {
@@ -491,6 +535,16 @@ export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props)
           onCobrar={() => {
             if (activo && revisarAntesDeSalir(activo, "cobrar")) setDialogo("cobro");
           }}
+          onConsumoPersonal={() => {
+            // Quitar la marca no necesita firma: deja el pedido como venta
+            // normal, que es el camino que sí cobra.
+            if (activo?.consumoMotivo) {
+              parchar({ consumoMotivo: null, consumoAutorizacion: null });
+              notificar("Pedido vuelve a ser una venta normal");
+              return;
+            }
+            setDialogo("consumo");
+          }}
         />
       </div>
 
@@ -542,12 +596,18 @@ export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props)
       <DialogoTipo
         abierto={dialogo === "tipo"}
         borrador={activo}
-        mesas={datos.mesas}
+        mesas={datos.mesas.datos}
         onCerrar={() => setDialogo(null)}
         onConfirmar={(cambios) => {
           parchar(cambios);
           setDialogo(null);
         }}
+      />
+      <DialogoConsumoPersonal
+        abierto={dialogo === "consumo"}
+        ocupado={ocupado}
+        onCerrar={() => setDialogo(null)}
+        onConfirmar={marcarConsumoPersonal}
       />
       <DialogoCliente
         abierto={dialogo === "cliente"}

@@ -13,6 +13,7 @@ ESPERADAS = {
     "sales.barrer_comprobantes_pendientes",
     "inventory.bloquear_lotes_vencidos",
     "inventory.reportar_conteos_vencidos",
+    "marketing.barrer_encuestas_vencidas",
     "core.latido_worker",
 }
 

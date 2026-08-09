@@ -65,6 +65,14 @@ RN-GRP-006)— exceden a Marketing y las deciden los socios/holding.
 | [perfiles/jefe-marketing.md](perfiles/jefe-marketing.md) | Perfil del puesto |
 | [../templates/marketing/](../templates/marketing/) | Brief de campaña, calendario de contenido, evaluación de propuesta de agencia, checklist de material en sucursal |
 
+> **Desde 2026-08-08 tres de esas plantillas tienen respaldo en el ERP**
+> (ADR-029/030): el calendario de contenido admite el arte adjunto, la ficha
+> de evaluación de agencia es una entidad con criterios ponderados y decisión
+> firmada, y la encuesta de satisfacción se manda por WhatsApp con un guion
+> que ramifica según la respuesta. Las plantillas siguen valiendo para el
+> trabajo en papel y como referencia de qué campos importan; lo que se
+> registra queda en el sistema.
+
 ## Principios del área
 
 - **Pertinencia sobre viralidad** (RN-MKT-002): el contenido responde a la
@@ -84,4 +92,5 @@ RN-GRP-006)— exceden a Marketing y las deciden los socios/holding.
 - Reglas de negocio: RN-MKT-*, y las relacionadas (RN-MAR-003/004, RN-CML-002/003, RN-CMP-*, RN-GER-003) en [business-rules.md](../domain/business-rules.md)
 - Glosario: Marketing, Lead, Campaña, Naming, Marca en [glossary.md](../foundation/glossary.md)
 - Proceso: PROC-MKT-001 (Campaña de marketing) en [workflows.md](../domain/workflows.md#campaña-de-marketing)
-- Módulo backend (slice core desde 2026-08-01): [src/modules/marketing/README.md](../../src/modules/marketing/README.md)
+- Módulo backend (slice core 2026-08-01, encuesta/agencia/métricas 2026-08-08): [src/modules/marketing/README.md](../../src/modules/marketing/README.md)
+- Decisiones: [ADR-021](../architecture/adr/ADR-021-atribucion-lead-venta-y-dueno-de-la-encuesta.md) (atribución y dueño de la encuesta), [ADR-029](../architecture/adr/ADR-029-encuesta-por-nodos-y-canal-whatsapp.md) (encuesta por nodos y WhatsApp), [ADR-030](../architecture/adr/ADR-030-evaluacion-de-agencia-y-metricas-de-campana.md) (evaluación de agencia y acumulado de campaña)

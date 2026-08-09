@@ -19,7 +19,7 @@ from src.modules.accounting.application.errors import Conflicto, NoEncontrado, R
 from src.modules.accounting.domain import rules
 from src.modules.accounting.infrastructure.models import MovimientoDinero
 from src.modules.accounting.infrastructure.repositories import MovimientoDineroRepo
-from src.shared import aprobaciones, fechas
+from src.shared import aprobaciones, auditoria, fechas
 
 log = logging.getLogger(__name__)
 
@@ -96,8 +96,12 @@ def ejecutar_pago(
     if requiere_aprobacion and not puede_aprobar_monto:
         event_bus.publish(
             "accounting.pago_requiere_aprobacion",
+            # `empresa_id` desde 2026-08-08: `reports` lo necesita para
+            # escopar el reporte por tenant. Un pago es de la empresa, no de
+            # una sucursal.
             {
                 "movimiento_dinero_id": str(movimiento.id),
+                "empresa_id": str(movimiento.empresa_id),
                 "proveedor_id": str(movimiento.proveedor_id) if movimiento.proveedor_id else None,
                 "monto": str(movimiento.monto),
                 "umbral": str(umbral_efectivo),
@@ -109,11 +113,27 @@ def ejecutar_pago(
             "requiere permiso accounting.pago_aprobar"
         )
 
+    estado_previo = movimiento.estado
     movimiento.estado = "ejecutado"
     movimiento.medio_pago = medio_pago
     movimiento.constancia = constancia
     movimiento.aprobado_por = actor_id
     movimiento.fecha_ejecucion = datetime.now()
+    auditoria.registrar(
+        session,
+        usuario_id=actor_id,
+        entidad="movimiento_dinero",
+        entidad_id=movimiento.id,
+        accion="ejecutar_pago",
+        datos_antes={"estado": estado_previo},
+        datos_despues={
+            "estado": "ejecutado",
+            "monto": str(movimiento.monto),
+            "medio_pago": medio_pago,
+            "sobre_umbral": requiere_aprobacion,
+        },
+        empresa_id=movimiento.empresa_id,
+    )
 
     asiento = asientos_uc.crear_asiento_automatico_si_hay_regla(
         session,

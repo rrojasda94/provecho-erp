@@ -1,4 +1,4 @@
-# ADR-029 — Restas ("sin X") y lienzo de nodos de receta
+# ADR-035 — Restas ("sin X") y lienzo de nodos de receta
 
 - Estado: aceptado
 - Fecha: 2026-08-08

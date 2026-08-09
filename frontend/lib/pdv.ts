@@ -119,6 +119,8 @@ export type Venta = {
   referencia_atencion: string | null;
   mesa_id: string | null;
   comensales: number | null;
+  tipo: string;
+  consumo_motivo: string | null;
 };
 
 /** Terminal de tarjeta de la sucursal, más los de emergencia del pool
@@ -214,6 +216,11 @@ export type VentaNueva = {
   mesa_id?: string | null;
   comensales?: number | null;
   referencia_atencion?: string | null;
+  /** `consumo_personal` arma el pedido en cero y exige `consumo_motivo` +
+   * la elevación de PIN del encargado (RN-COM-025). */
+  tipo?: string;
+  consumo_motivo?: string | null;
+  autorizacion?: string;
 };
 
 export type PagoNuevo = {

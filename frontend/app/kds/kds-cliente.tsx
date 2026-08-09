@@ -162,6 +162,9 @@ export default function KdsCliente({ pantalla, puedeEntregar }: Props) {
               <small className="kds-canal">
                 {pedido.modalidad} · {pedido.canal}
               </small>
+              {pedido.tipo === "consumo_personal" && (
+                <small className="kds-consumo">Consumo de personal</small>
+              )}
               <ul className="kds-items">
                 {pedido.items.map((item) => {
                   const hecho = item.estado === "listo" || item.estado === "entregado";
@@ -179,7 +182,7 @@ export default function KdsCliente({ pantalla, puedeEntregar }: Props) {
                           {/* Las restas van DENTRO del nombre y en rojo: en
                               una pantalla que se lee de reojo, un "sin
                               cebolla" que pasa desapercibido sale como plato
-                              rehecho (RN-COM-025). */}
+                              rehecho (RN-COM-028). */}
                           {item.sin?.map((insumo) => (
                             <em key={insumo} className="kds-sin">
                               SIN {insumo.toUpperCase()}

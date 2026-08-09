@@ -1,8 +1,13 @@
-"""Notificaciones: a quién le llega el aviso y qué pasa cuando no hay nadie.
+"""La bandeja: qué guarda, quién la lee y qué la llena.
 
-Lo que importa acá no es la tabla: es que el aviso **llegue a la persona que
-está a cargo del local en ese momento**, y que no poder avisar nunca tumbe la
-operación que originó el aviso.
+**A quién le llega cada aviso ya no se decide acá.** Desde 2026-08-08 eso es
+`reports` (ADR-033) y sus tests viven en `tests/test_reports.py`: la
+resolución de destinatarios, los resolutores dinámicos y la emisión por
+evento se probaron acá mientras `users` era el dueño de esa regla.
+
+Lo que queda es lo que `users` sigue siendo dueño: la tabla `notificacion`,
+su lectura, y el único listener que la llena a partir de un
+`reports.reporte_emitido` ya resuelto.
 """
 
 import datetime
@@ -119,33 +124,8 @@ def test_sin_caja_abierta_no_hay_encargado_de_turno(env):
     assert encargado_de_turno(s, ids["sucursal"].id) is None
 
 
-def test_el_aviso_va_al_encargado_de_turno(env):
-    s, ids = env
-    _abrir_caja(s, ids)
-    assert notificaciones.destinatarios_de_sucursal(s, ids["sucursal"].id) == [
-        ids["encargado"].id
-    ]
-
-
-def test_sin_caja_abierta_el_aviso_cae_en_los_supervisores(env):
-    s, ids = env
-    # Local cerrado o caja sin registrar: avisarle a alguien de más es mejor
-    # que perder el aviso.
-    assert notificaciones.destinatarios_de_sucursal(s, ids["sucursal"].id) == [
-        ids["supervisor1"].id
-    ]
-
-
-def test_una_sucursal_sin_nadie_asignado_no_revienta(env):
-    s, ids = env
-    otra = Sucursal(
-        marca_id=ids["sucursal"].marca_id,
-        empresa_id=ids["sucursal"].empresa_id,
-        nombre="CH2", direccion="Jr. Y 456", tenencia="alquilada",
-    )
-    s.add(otra)
-    s.flush()
-    assert notificaciones.destinatarios_de_sucursal(s, otra.id) == []
+# A quién se le avisa a partir de ese encargado se prueba en
+# `tests/test_reports.py::test_el_aviso_va_al_encargado_de_turno` y vecinos.
 
 
 # --- Bandeja ----------------------------------------------------------------
@@ -205,153 +185,95 @@ def test_marcar_todas_leidas_solo_toca_las_propias(env):
 
 
 # --- El listener ------------------------------------------------------------
-def test_el_pedido_demorado_notifica_al_encargado(env, monkeypatch):
-    s, ids = env
-    _abrir_caja(s, ids)
-    s.commit()
+def test_un_reporte_emitido_llena_la_bandeja_de_cada_destinatario(env, monkeypatch):
+    """`reports` ya resolvió a quién: acá solo se reparte.
 
+    La notificación apunta al **reporte**, no al hecho original — el reporte
+    ya guarda esa referencia junto con su foto de datos, así que apuntar ahí
+    es apuntar a todo.
+    """
+    s, ids = env
     from src.modules.users.application import listeners
 
     # El listener abre su propia sesión (corre post-commit): se le da la del
     # test para poder inspeccionar el resultado.
     monkeypatch.setattr(
-        listeners, "SessionLocal", lambda: _SesionQueNoCierra(s)
+        listeners, "session_factory", lambda: _SesionQueNoCierra(s)
     )
-    listeners.on_pedido_demorado(
+    reporte_id = uuid.uuid4()
+    listeners.on_reporte_emitido(
         {
-            "venta_id": str(uuid.uuid4()),
+            "reporte_emitido_id": str(reporte_id),
+            "codigo": "sales.pedido_demorado",
+            "titulo": "Pedido demorado: 42 min (umbral 15)",
+            "cuerpo": "Estado pendiente, 2 ítem(s) pendiente(s).",
+            "nivel": "urgente",
             "sucursal_id": str(ids["sucursal"].id),
-            "minutos_umbral": 15,
-            "minutos_transcurridos": "42.00",
-            "estado": "pendiente",
-            "items_pendientes": 2,
+            "referencia_tipo": "venta",
+            "referencia_id": str(uuid.uuid4()),
+            "destinatarios": [
+                str(ids["encargado"].id),
+                str(ids["supervisor1"].id),
+            ],
         }
     )
 
     (aviso,) = notificaciones.bandeja(s, ids["encargado"].id)
+    # `tipo` sigue siendo el código de la emisión: es por lo que el frontend
+    # agrupa e iconiza, y eso no cambió al mudar la decisión de destinatario.
     assert aviso.tipo == "sales.pedido_demorado"
-    # `pendiente` = cocina ni lo empezó: alguien tiene que ir, no solo saber.
     assert aviso.nivel == "urgente"
     assert "42" in aviso.titulo
     assert aviso.sucursal_id == ids["sucursal"].id
-
-
-def test_un_pedido_en_preparacion_avisa_sin_urgencia(env, monkeypatch):
-    s, ids = env
-    _abrir_caja(s, ids)
-    s.commit()
-
-    from src.modules.users.application import listeners
-
-    monkeypatch.setattr(listeners, "SessionLocal", lambda: _SesionQueNoCierra(s))
-    listeners.on_pedido_demorado(
-        {
-            "venta_id": str(uuid.uuid4()),
-            "sucursal_id": str(ids["sucursal"].id),
-            "minutos_umbral": 15,
-            "minutos_transcurridos": "20.00",
-            "estado": "en_preparacion",
-            "items_pendientes": 1,
-        }
+    assert (aviso.referencia_tipo, aviso.referencia_id) == (
+        "reporte_emitido",
+        reporte_id,
     )
-    (aviso,) = notificaciones.bandeja(s, ids["encargado"].id)
-    assert aviso.nivel == "aviso"
+    assert len(notificaciones.bandeja(s, ids["supervisor1"].id)) == 1
 
 
-# --- Avisos de inventario ---------------------------------------------------
-def test_el_almacen_central_no_tiene_encargado_de_turno_y_avisa_por_rol(env):
-    """El caso que `destinatarios_de_sucursal` no cubre: el central no
-    cuelga de ninguna sucursal, así que no hay caja abierta que diga quién
-    está a cargo. Se resuelve por rol dentro de la empresa."""
-    s, ids = env
-    destinatarios = notificaciones.destinatarios_de_almacen(
-        s, ids["alm_central"].id
-    )
-    assert set(destinatarios) == {ids["almacenero1"].id, ids["supervisor1"].id}
-
-
-def test_el_almacen_de_sucursal_suma_al_encargado_de_turno(env):
-    s, ids = env
-    _abrir_caja(s, ids)
-    s.flush()
-    destinatarios = notificaciones.destinatarios_de_almacen(
-        s, ids["alm_sucursal"].id
-    )
-    # Los roles de almacén de ESA sucursal, más quien está parado ahí ahora.
-    assert set(destinatarios) == {
-        ids["almacenero1"].id, ids["supervisor1"].id, ids["encargado"].id
-    }
-
-
-def test_stock_bajo_minimo_avisa_al_almacen(env, monkeypatch):
+def test_un_reporte_sin_destinatarios_no_crea_bandeja(env, monkeypatch):
+    """El hueco se registra del lado de `reports` (RN-REP-005). Acá no hay
+    nada que repartir, y pedir la sesión para no escribir nada sería abrir
+    una transacción por cada hecho que no le llega a nadie."""
     s, ids = env
     from src.modules.users.application import listeners
 
-    monkeypatch.setattr(listeners, "SessionLocal", lambda: _SesionQueNoCierra(s))
-    sku_id = uuid.uuid4()
-    listeners.on_stock_bajo_minimo(
+    def _explota():
+        raise AssertionError("no debería abrir sesión sin destinatarios")
+
+    monkeypatch.setattr(listeners, "session_factory", _explota)
+    listeners.on_reporte_emitido(
         {
-            "almacen_id": str(ids["alm_central"].id),
-            "sku_id": str(sku_id),
-            "cantidad": "4.0000",
-            "stock_minimo": "5.0000",
+            "reporte_emitido_id": str(uuid.uuid4()),
+            "codigo": "sales.venta_anulada",
+            "titulo": "Venta anulada",
+            "nivel": "aviso",
+            "destinatarios": [],
         }
     )
-
-    avisos = notificaciones.bandeja(s, ids["almacenero1"].id)
-    assert len(avisos) == 1
-    # Todavía hay stock: lo que falta es reponer, no correr.
-    assert avisos[0].nivel == "aviso"
-    assert avisos[0].referencia_id == sku_id
-    # El central no cuelga de una sucursal: la bandeja no puede inventarle una.
-    assert avisos[0].sucursal_id is None
+    assert notificaciones.bandeja(s, ids["encargado"].id) == []
 
 
-def test_lote_vencido_avisa_con_urgencia(env, monkeypatch):
-    """Urgente porque el stock ya se contaba como vendible: alguien pudo
-    haberlo servido."""
+def test_un_reporte_de_ambito_empresa_no_inventa_sucursal(env, monkeypatch):
+    """Un pago sobre umbral es de la empresa: la bandeja no puede colgarlo
+    de un local que el hecho nunca tuvo."""
     s, ids = env
     from src.modules.users.application import listeners
 
-    monkeypatch.setattr(listeners, "SessionLocal", lambda: _SesionQueNoCierra(s))
-    lote_id = uuid.uuid4()
-    listeners.on_lote_vencido_detectado(
+    monkeypatch.setattr(listeners, "session_factory", lambda: _SesionQueNoCierra(s))
+    listeners.on_reporte_emitido(
         {
-            "lote_id": str(lote_id),
-            "almacen_id": str(ids["alm_sucursal"].id),
-            "sku_id": str(uuid.uuid4()),
-            "fecha_vencimiento": "2026-08-01",
-            "cantidad": "3.0000",
+            "reporte_emitido_id": str(uuid.uuid4()),
+            "codigo": "accounting.pago_requiere_aprobacion",
+            "titulo": "Pago de 5000 espera aprobación (umbral 2000)",
+            "nivel": "aviso",
+            "sucursal_id": None,
+            "destinatarios": [str(ids["supervisor1"].id)],
         }
     )
-
-    (aviso,) = notificaciones.bandeja(s, ids["almacenero1"].id)
-    assert aviso.nivel == "urgente"
-    assert aviso.referencia_tipo == "lote"
-    assert aviso.sucursal_id == ids["sucursal"].id
-
-
-def test_conteo_vencido_avisa_al_almacen(env, monkeypatch):
-    s, ids = env
-    from src.modules.users.application import listeners
-
-    monkeypatch.setattr(listeners, "SessionLocal", lambda: _SesionQueNoCierra(s))
-    categoria_id = uuid.uuid4()
-    listeners.on_conteo_vencido(
-        {
-            "almacen_id": str(ids["alm_central"].id),
-            "categoria_id": str(categoria_id),
-            "categoria": "Perecibles",
-            "frecuencia": "diario",
-            "fecha_programada": "2026-08-01",
-            "dias_atraso": 5,
-            "dirigido_a": ["almacen", "gerencia"],
-        }
-    )
-
     (aviso,) = notificaciones.bandeja(s, ids["supervisor1"].id)
-    assert "Perecibles" in aviso.titulo
-    assert aviso.referencia_id == categoria_id
+    assert aviso.sucursal_id is None
 
 
 class _SesionQueNoCierra:

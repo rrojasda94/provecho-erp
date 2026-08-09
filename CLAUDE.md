@@ -12,7 +12,8 @@ Estas reglas son obligatorias durante todo el desarrollo.
   (`src/core/events.py`) o contratos públicos. Nunca importar el dominio de otro módulo.
 - Cada módulo es independiente y extensible. Removerlo no toca el dominio de
   los demás, pero sí obliga a deshacer sus registros en `core`/seeder/frontend
-  (no hay manifiesto ni autodescubrimiento — ver `ROADMAP.md` → Deuda técnica).
+  (no hay manifiesto ni autodescubrimiento — ver
+  `docs/roadmap/deuda/transversal.md`).
 - Estructura por módulo (crear capas solo al implementarlas):
   `domain/` (entidades, reglas), `application/` (casos de uso), `infrastructure/`
   (repositorios SQLAlchemy), `api/` (routers FastAPI).
@@ -51,8 +52,12 @@ su dominio. Bajo acoplamiento, alta cohesión.
 2. Todo cambio lleva **pruebas** y **documentación actualizada** en el mismo cambio.
 3. Explicar decisiones arquitectónicas cuando haya alternativas (ADR en `docs/architecture/adr/`).
 4. El código pasa `ruff` (backend) y `eslint` (frontend) antes de commit.
-5. Commits: **Conventional Commits**. Versionado: **SemVer**. Actualizar `CHANGELOG.md`.
+5. Commits: **Conventional Commits**. Versionado: **SemVer**. El changelog se
+   escribe como fragmento en `changelog.d/` (`<tipo>-<slug>.md`), nunca
+   editando `CHANGELOG.md` a mano — ver `changelog.d/README.md`.
 6. Actualizar `ROADMAP.md` al construir algo nuevo.
+7. `main` está protegida por ruleset: PR obligatorio, los seis jobs del CI en
+   verde y la rama al día con `main`. No existe el merge en rojo.
 
 ## Formato
 

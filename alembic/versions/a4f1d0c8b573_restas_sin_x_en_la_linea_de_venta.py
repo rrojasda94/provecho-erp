@@ -12,7 +12,7 @@ Nullable sin default: NULL = la línea no quitó nada, que es lo que vale para
 todo lo ya vendido. Nada cambia de comportamiento con la migración aplicada.
 
 Revision ID: a4f1d0c8b573
-Revises: e7c390a5b41f
+Revises: d5c81a7f3b62
 """
 
 import sqlalchemy as sa
@@ -20,7 +20,7 @@ from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision = "a4f1d0c8b573"
-down_revision = "e7c390a5b41f"
+down_revision = "d5c81a7f3b62"
 branch_labels = None
 depends_on = None
 

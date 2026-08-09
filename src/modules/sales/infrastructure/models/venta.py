@@ -51,9 +51,44 @@ class Venta(Base, UuidPkMixin, TimestampMixin):
     # Cajero o agente_ia — quien atendió; base del ranking de venta por
     # trabajador (join usuario_id -> trabajador.usuario_id).
     usuario_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("usuario.id"))
+    # `cerrada` es el estado terminal de lo que se preparó y entregó sin
+    # cobrarse: hoy solo el consumo de personal (RN-COM-025). Sin él una
+    # orden sin precio quedaría `orden` para siempre, contada como cuenta
+    # abierta en el PDV y en el cierre de caja.
     estado: Mapped[str] = mapped_column(
-        Enum("orden", "pagada", "facturada", "anulada", name="estado_venta", native_enum=False),
+        Enum(
+            "orden",
+            "pagada",
+            "facturada",
+            "anulada",
+            "cerrada",
+            name="estado_venta",
+            native_enum=False,
+        ),
         default="orden",
+    )
+    # --- Consumo de personal (RN-COM-025) ------------------------------------
+    tipo: Mapped[str] = mapped_column(
+        Enum("venta", "consumo_personal", name="tipo_venta", native_enum=False),
+        default="venta",
+    )
+    # Por qué se alimentó al personal ese día. Enum cerrado a propósito: el
+    # dato existe para agrupar el gasto por causa, y un texto libre no agrupa.
+    consumo_motivo: Mapped[str | None] = mapped_column(
+        Enum(
+            "fin_semana",
+            "feriado",
+            "alta_actividad",
+            "capacitacion",
+            "otro",
+            name="motivo_consumo_personal",
+            native_enum=False,
+        ),
+        nullable=True,
+    )
+    # Encargado que lo autorizó con su PIN — nunca el mismo que lo registra.
+    consumo_autorizado_por: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("usuario.id"), nullable=True
     )
     total: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=Decimal(0))
     idempotency_key: Mapped[str] = mapped_column(String(100), unique=True)

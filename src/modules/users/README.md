@@ -4,13 +4,16 @@
 
 Autenticar personas y agentes de IA, y autorizar cada acción según la cadena:
 Usuario → Rol → Permisos → Acciones → Restricciones → Sucursales → Empresa → Datos.
-Provee el contexto de tenant a todos los demás módulos y la auditoría central.
+Provee el contexto de tenant a todos los demás módulos. La auditoría
+dejó de ser suya: `audit_log` es transversal y vive en `src/shared`
+(ADR-031), aunque `users` siga siendo su mayor escritor.
 
 ## Entidades
 
-`usuario` (username, pin_hash Argon2id, tipo humano|agente_ia), `rol`, `permiso`
+`usuario` (username, pin_hash Argon2id, tipo humano|agente_ia), `token_agente`
+(credencial de API de un agente, ADR-032), `rol`, `permiso`
 (código `modulo.accion` + restricciones), `usuario_rol`, `rol_permiso`,
-`usuario_sucursal`, `refresh_token`, `audit_log`. `persona` (party model,
+`usuario_sucursal`, `refresh_token`. `persona` (party model,
 `version` para lock optimista — ver Estado abajo).
 Incluye además la organización: `grupo`, `empresa`, `marca`, `sucursal`, `almacen`.
 Detalle en `docs/architecture/data-model.md` (§1, §2).
@@ -20,6 +23,9 @@ Detalle en `docs/architecture/data-model.md` (§1, §2).
 - Login con username + PIN (6 dígitos) → access token (15 min) + refresh (7 días, rotativo).
 - Refresh y logout (revocación de refresh token).
 - CRUD de usuarios, roles y permisos (solo admin).
+- CRUD de la organización: grupo, empresa, marca, licencia de marca,
+  sucursal y almacén (permiso `organizacion.gestionar`).
+- Emitir, listar y revocar tokens de API de cuentas `agente_ia` (ADR-032).
 - CRUD de `persona` (Create/Read/Update — sin Delete, el ciclo de vida real
   se maneja en la entidad que la referencia). `PATCH` exige la `version`
   vigente (lock optimista): `version` desactualizada → 409, en vez de
@@ -39,7 +45,9 @@ Detalle en `docs/architecture/data-model.md` (§1, §2).
   parámetro sea de `users`.
 - Asignar usuario a sucursales (alcance).
 - Consultar permisos efectivos de un usuario.
-- Registrar entrada en `audit_log` (consumido por todos los módulos).
+- Dejar rastro de los actos de autoridad (login fallido, alta de usuario,
+  asignación de rol/permiso, elevación de PIN, anonimización) llamando a
+  `src.shared.auditoria.registrar` — la tabla ya no es de este módulo.
 
 ## Contrato API (v1)
 
@@ -51,6 +59,38 @@ Detalle en `docs/architecture/data-model.md` (§1, §2).
 | GET | `/api/v1/users/me` | — | usuario + roles + sucursales + permisos |
 
 Claims del JWT: `sub` (usuario_id), `tipo`, `roles`, `sucursales`, `empresa_id`, `iat`, `exp`, `jti`.
+
+### Autenticación de agentes (ADR-032, implementado 2026-08-08)
+
+Una cuenta `tipo=agente_ia` (n8n, el bot de pedidos, una integración) **no
+se autentica con PIN**: usa un token de API de larga vida. El PIN de 6
+dígitos es un secreto de 20 bits para un proceso que se autentica solo, el
+lockout de 5 intentos es un modo de falla nuevo (un agente mal configurado
+apaga la cuenta) y rotar el refresh cada 7 días obliga a un proceso
+desatendido a persistir estado.
+
+| Método | Ruta | Acción |
+|--------|------|--------|
+| POST | `/api/v1/users/{id}/tokens` | Emite el token (`users.gestionar`). **El valor en claro sale una sola vez**; `{"nombre": "n8n producción", "dias_validez": null}` |
+| GET | `/api/v1/users/{id}/tokens` | Lista los tokens de la cuenta: prefijo, vencimiento, último uso, revocado — nunca el token |
+| DELETE | `/api/v1/users/{id}/tokens/{token_id}` | Revoca uno solo (idempotente) |
+
+Se usa como cualquier credencial: `Authorization: Bearer prv_...`.
+`api/deps.get_claims` mira el prefijo `prv_`, resuelve el usuario contra
+`token_agente` y arma **los mismos claims** que armaría un login — de ahí
+para abajo (tenant, permisos, restricciones, auditoría) nada distingue una
+credencial de la otra. **El RBAC no cambia**: el token dice *quién*, los
+roles siguen diciendo *qué puede* (RN-GEN-004).
+
+- Solo `agente_ia`: emitir sobre una cuenta `humano` es 409, y el `tipo` se
+  revalida en cada request (convertir la cuenta a humana apaga sus tokens).
+- `dias_validez` opcional; sin él el token no vence. Una integración
+  desatendida no puede quedarse tirada un domingo porque venció un token.
+- `ultimo_uso_en` se actualiza como mucho una vez por hora: sirve para
+  apagar lo que ya nadie usa, no para auditar llamada por llamada.
+- El **hub de sucursal sigue con username + PIN** (`cloud_sync_*`, ADR-009):
+  migrarlo obliga a rotar el secreto en cada local y va aparte (ROADMAP →
+  Deuda técnica).
 
 ### Administración (requiere permiso `users.gestionar` o comodín `*`)
 
@@ -73,11 +113,59 @@ Claims del JWT: `sub` (usuario_id), `tipo`, `roles`, `sucursales`, `empresa_id`,
 |--------|------|--------|
 | GET | `/api/v1/personas/buscar?q=` | Selector de "elegir persona existente" para otro módulo (RRHH al contratar, Compras al dar de alta un proveedor natural). Responde `PersonaBusquedaOut` (id, nombres, apellidos, numero_documento) — nunca domicilio/teléfono/email/fecha de nacimiento, así que puede abrirse sin exigir el permiso de administración completo. Ruta declarada antes de `/personas/{persona_id}` a propósito. |
 
-### Organización — solo lectura (`Almacen` vive en `users` por historia, ver data-model §1)
+### Organización — CRUD (implementado 2026-08-08, permiso `organizacion.gestionar`)
+
+Grupo, empresa, marca, licencia de marca, sucursal y almacén. Hasta ahora
+solo los escribía el seeder: dar de alta un local obligaba a correr un
+script contra la base.
+
+`organizacion.gestionar` es un permiso **aparte** de `users.gestionar`:
+quien crea cajeros no tiene por qué poder fundar sucursales ni cambiar el
+RUC de la empresa.
+
+| Método | Ruta | Acción |
+|--------|------|--------|
+| POST/GET | `/api/v1/grupos` | Crear / listar grupos — crear exige superusuario (`*`) |
+| GET/PATCH | `/api/v1/grupos/{id}` | Ver / renombrar |
+| POST/GET | `/api/v1/empresas` | Crear (superusuario) / listar. El listado muestra solo la empresa del token salvo superusuario |
+| GET/PATCH/DELETE | `/api/v1/empresas/{id}` | Ver / editar / **baja lógica** (409 con sucursales o almacenes activos). `grupo_id` no es editable |
+| POST | `/api/v1/marcas` | Crear marca en el grupo del tenant (la marca es del grupo, no de la empresa) |
+| GET/PATCH/DELETE | `/api/v1/marcas/{id}` | Ver / editar / baja (409 si tiene sucursales activas o sigue licenciada) |
+| POST/GET/DELETE | `/api/v1/empresas/{id}/marcas[/{marca_id}]` | Otorgar (idempotente) / listar / revocar la licencia de marca. Revocar es 409 si la empresa opera sucursales activas de esa marca |
+| POST | `/api/v1/sucursales` | Abrir un local; `empresa_id` sale del token (ADR-004) |
+| GET/PATCH | `/api/v1/sucursales/{id}` | Ver / editar. **Cerrar es `estado="inactiva"`, no hay DELETE**: la sucursal sigue siendo el ancla de sus ventas, cajas y trabajadores |
+| POST | `/api/v1/almacenes` | Crear almacén |
+| GET/PATCH/DELETE | `/api/v1/almacenes/{id}` | Ver / editar / baja lógica (409 si otros almacenes se abastecen de este) |
+
+Reglas que el seeder daba por buenas porque las tipeaba a mano y ahora
+valida la API:
+
+- Una **sucursal opera una marca licenciada a su empresa**
+  (`licencia_marca`); sin licencia, 409. Es el único requisito para abrir un
+  local, y cambiar la marca de una sucursal lo revalida.
+- Una **licencia liga marca y empresa del mismo grupo**: la identidad es del
+  grupo (data-model §1); licenciarla afuera sería otro contrato, no una fila.
+- Un **almacén de tipo `sucursal` exige `sucursal_id`**, y esa sucursal es de
+  la misma empresa. El abastecedor también, y ninguno se abastece de sí mismo.
+- La **baja es lógica** (`deleted_at`) y se niega con dependientes vivos.
+  `DELETE /almacenes/{id}` **no mira el stock**: vive en `inventory` y
+  `users` no importa el dominio de otro módulo. Anotado en ROADMAP → Deuda
+  técnica.
+- En los `PATCH`, un campo ausente o `null` significa "no tocar": no hay
+  forma de vaciar un opcional desde el PATCH.
+
+Alcance por tenant (ADR-004): el superusuario (permiso `*`) opera sobre toda
+la organización aunque tenga sucursales asignadas — el recurso administrado
+**es** la empresa, y el seeder ata la cuenta de administración a las
+sucursales justamente para que el resto del ERP le funcione. Quien tiene
+`organizacion.gestionar` sin `*` administra su empresa y no funda otras.
+
+### Organización — lectura abierta (`Almacen` vive en `users` por historia, ver data-model §1)
 
 | Método | Ruta | Acción |
 |--------|------|--------|
 | GET | `/api/v1/almacenes` | Lista de referencia (nombre/tipo), escopada por tenant — sin `require_permission`: no es dato sensible, lo necesita cualquiera que elija un destino (ej. `purchases` al crear una OC) |
+| GET | `/api/v1/marcas`, `/api/v1/sucursales` | Mismo criterio: catálogo de apoyo para llenar un `<select>` |
 
 ### Divisas (RN-GER-010) — lectura abierta, escritura de Gerencia
 
@@ -160,7 +248,8 @@ autenticarse en el hub durante un corte.
 - PIN: exactamente 6 dígitos, hasheado con Argon2id. Nunca en logs.
 - Bloqueo tras 5 intentos fallidos consecutivos (ventana 15 min).
 - Refresh tokens rotativos: usar uno viejo revoca toda la cadena.
-- Agentes de IA son usuarios tipo `agente_ia` con permisos restringidos (ej. solo `sales.crear_pedido`).
+- Agentes de IA son usuarios tipo `agente_ia` con permisos restringidos (ej. solo
+  `sales.crear_pedido`) y se autentican con token de API, no con PIN (ADR-032).
 - Seeder de desarrollo: usuario `admin` / PIN `123456` con rol admin. Prohibido en producción.
 - El seeder deja montada la organización real del grupo: empresa
   Majambo EIRL (RUC 20450311520, zona `amazonia_ley27037`), marca

@@ -446,30 +446,42 @@ def test_encuesta_se_envia_una_sola_vez_y_se_responde(env):
         json={"venta_id": venta_id, "canal": "whatsapp"},
     )
     assert enviada.status_code == 201
-    assert enviada.json()["estado"] == "enviada"
+    cuerpo = enviada.json()
+    assert cuerpo["encuesta"]["estado"] == "enviada"
+    # Nace parada en el primer nodo del guion, no esperando "un puntaje".
+    assert cuerpo["pregunta_actual"]["codigo"] == "puntaje"
 
     reenvio = client.post(
         "/api/v1/marketing/encuestas",
         headers=h,
         json={"venta_id": venta_id, "canal": "pos"},
     )
-    assert reenvio.json()["id"] == enviada.json()["id"]
+    assert reenvio.json()["encuesta"]["id"] == cuerpo["encuesta"]["id"]
 
-    encuesta_id = enviada.json()["id"]
-    respondida = client.post(
-        f"/api/v1/marketing/encuestas/{encuesta_id}/respuesta",
-        headers=h,
-        json={"puntaje": 5, "comentario": "Todo bien"},
-    )
-    assert respondida.status_code == 200
-    assert respondida.json()["estado"] == "respondida"
+    encuesta_id = cuerpo["encuesta"]["id"]
 
-    otra_vez = client.post(
-        f"/api/v1/marketing/encuestas/{encuesta_id}/respuesta",
-        headers=h,
-        json={"puntaje": 3},
-    )
-    assert otra_vez.status_code == 409
+    def responder(valor):
+        return client.post(
+            f"/api/v1/marketing/encuestas/{encuesta_id}/respuesta",
+            headers=h,
+            json={"valor": valor},
+        )
+
+    # 5 estrellas ⇒ rama "¿nos recomendarías?", no la de "¿qué falló?".
+    paso = responder("5")
+    assert paso.status_code == 200
+    assert paso.json()["pregunta_actual"]["codigo"] == "recomendaria"
+
+    paso = responder("Sí")  # se normaliza a "si"
+    assert paso.json()["pregunta_actual"]["codigo"] == "comentario"
+
+    respondida = responder("Todo bien")
+    assert respondida.json()["encuesta"]["estado"] == "respondida"
+    assert respondida.json()["encuesta"]["puntaje"] == 5
+    assert respondida.json()["encuesta"]["comentario"] == "Todo bien"
+    assert respondida.json()["pregunta_actual"] is None
+
+    assert responder("3").status_code == 409
 
 
 # --- Alcance de tenant (ADR-004) -------------------------------------------

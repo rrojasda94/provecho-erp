@@ -141,9 +141,11 @@ Aprendidas a los golpes; cada una costó tiempo:
 ## Estado actual (2026-08-06)
 
 - Dominio y API: **895 casos**, en verde, en CI.
-- Unidad de frontend + contrato: **176 casos** (`npm test`), en CI desde
+- Unidad de frontend + contrato: **183 casos** (`npm test`), en CI desde
   2026-08-06 — el job de frontend hacía solo `lint` y `build`. De esos, 162
-  son de contrato.
+  son de contrato y 7 (2026-08-07, `lib/carga.test.ts`) cubren la
+  clasificación de fallos de carga: que una red caída no se confunda con un
+  403 ni se dibuje como lista vacía.
 - e2e: **7 casos en verde y en CI** (job `e2e`), sobre PDV, sesión y el gate
   de módulo. Los tres puntos de "qué sí justifica un e2e" quedan cubiertos.
   Ver ROADMAP → Frontend.
@@ -157,8 +159,12 @@ lo son, no escribiendo otro tipo de test.
 
 ## Nota de velocidad
 
-La base de desarrollo vive en **Supabase, no en la máquina**: cada consulta
-cuesta ~130 ms de ida y vuelta, y toda prueba que pase por HTTP los paga.
-Las pruebas automatizadas usan SQLite en memoria o un archivo desechable
-justamente por eso — y es también la razón por la que las pantallas se
-sienten lentas en desarrollo (ver ROADMAP → Deuda técnica → Transversal).
+Desde **2026-08-08** la base de desarrollo es el contenedor `db` del
+docker-compose, en la máquina. Antes vivía en Supabase y cada consulta
+costaba ~130 ms de ida y vuelta: lo pagaba toda prueba que pasara por HTTP
+y también las pantallas, que se sentían lentas en desarrollo. En local esa
+latencia baja al orden del milisegundo.
+
+Las pruebas automatizadas siguen usando SQLite en memoria o un archivo
+desechable: no dependen de que Postgres esté levantado. El cambio le pega
+sobre todo a e2e y al trabajo manual contra la API.

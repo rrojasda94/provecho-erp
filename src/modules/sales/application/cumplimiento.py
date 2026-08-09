@@ -53,6 +53,12 @@ def registrar_entrega(
     for item in items:
         item.estado_preparacion = "entregado"
 
+    # Un consumo de personal no pasa por caja: la entrega es su único cierre
+    # posible (RN-COM-025). Sin esto quedaría `orden` para siempre y el PDV
+    # lo contaría como cuenta abierta en cada turno.
+    if rules.es_consumo_personal(venta.tipo):
+        venta.estado = "cerrada"
+
     event_bus.publish(
         "sales.venta_entregada",
         {

@@ -705,13 +705,6 @@ de su módulo y se prueban de forma aislada.
 - **RN-PRD-010** Una receta puede marcarse flexible, permitiendo ajustar
   insumos por sabor o calidad; el criterio de ajuste lo asigna el área de
   Producción.
-- **RN-PRD-011** Un insumo que el cliente pidió quitar (resta, RN-COM-025)
-  **no se descuenta** del almacén de la sucursal al confirmarse la venta, y
-  tampoco se repone al anularla: nunca salió. Cada tramo del producto
-  configurado —tamaño, combinación, extras— aporta **su propia receta** y el
-  consumo del plato es la suma de todas menos las restas; el empaque se
-  suma aparte, según la modalidad (RN-EMP-003), porque no es parte de la
-  receta.
 
 ## Producción — cronograma, calidad y cocina
 
@@ -771,6 +764,13 @@ producción se hace en cocinas de sucursal. Ver
   desperdicio de cada insumo (tipo y peso) se registra por orden contra
   el desperdicio esperado de la receta (`receta_item.merma_pct`) — toda
   desviación relevante queda visible, no oculta en el costo promedio.
+- **RN-PRD-019** Un insumo que el cliente pidió quitar (resta, RN-COM-028)
+  **no se descuenta** del almacén de la sucursal al confirmarse la venta, y
+  tampoco se repone al anularla: nunca salió. Cada tramo del producto
+  configurado —tamaño, combinación, extras— aporta **su propia receta** y el
+  consumo del plato es la suma de todas menos las restas; el empaque se
+  suma aparte, según la modalidad (RN-EMP-003), porque no es parte de la
+  receta.
 
 ## Fecha de vencimiento
 
@@ -1248,13 +1248,32 @@ producción se hace en cocinas de sucursal. Ver
   guardada. Duplicar una receta la clona con el sufijo "(copy)" y sin
   destino asignado; escalarla por un factor redondea **cada línea con su
   propia unidad** (1.5 bollos de masa son 2, no 1.5).
-- **RN-COM-025** Una línea de venta puede llevar **restas**: insumos de la
+- **RN-COM-025** La **comida del personal** —la que el negocio da en fines
+  de semana, feriados o días de alta actividad— se registra como una orden
+  de tipo `consumo_personal`: se prepara y se despacha como cualquier
+  pedido (comanda, KDS, entrega), pero **todas sus líneas valen cero**, no
+  se cobra y **no emite comprobante**. No es un descuento del 100% sobre
+  una venta: una venta de S/ 0.00 declararía un ingreso que no existe y
+  emitiría un comprobante que no corresponde (ADR-034).
+- **RN-COM-026** Cada consumo de personal lo **autoriza un encargado con su
+  PIN** —permiso `sales.registrar_consumo_personal`, separado de
+  `sales.crear`— y se registra con **motivo** (`fin_semana`, `feriado`,
+  `alta_actividad`, `capacitacion`, `otro`). Sin motivo no hay con qué
+  explicar el gasto, y sin firma cualquiera se sirve gratis. El acto queda
+  en `audit_log` (RN-AUD-005).
+- **RN-COM-027** El costo del consumo de personal **sale del inventario
+  como `consumo_interno`** —no como `consumo_venta`— y se reconoce
+  valorizado a costo promedio como **gasto de alimentación de personal**,
+  no como costo de ventas. La orden queda en estado `cerrada` al
+  entregarse: es su único cierre posible, porque nunca pasa por caja.
+  Anularla repone el insumo y **reversa el asiento**.
+- **RN-COM-028** Una línea de venta puede llevar **restas**: insumos de la
   receta que ese plato NO lleva ("sin cebolla"). Es el último tramo del
   orden de modificadores (RN-PRD-004). Lo que se puede quitar **es** lo que
   la receta del producto pone —no hay una lista aparte que mantener— y
   pedir quitar algo que la receta no usa se rechaza al confirmar la venta.
   Una resta **no cambia el precio** de la línea, pero **sí** el consumo: el
-  insumo quitado no se descuenta del almacén (RN-PRD-011), y la reposición
+  insumo quitado no se descuenta del almacén (RN-PRD-019), y la reposición
   por anulación o nota de crédito devuelve solo lo que se consumió. Las
   restas viajan a cocina como parte del pedido (KDS y comanda), no como
   texto libre en la nota.
@@ -1403,6 +1422,42 @@ preparación, despacho y entrega en las tres modalidades.
   configuró mapeo para un evento, el asiento se omite (se audita en el log)
   — nunca bloquea el proceso operativo que lo originó (mismo criterio de
   módulos operativos con dependencias sin configurar, ej. inventory).
+
+## Emisión y distribución de reportes (módulo reports, ADR-033)
+
+Reglas de **quién recibe qué**, no de qué dice cada reporte. Lo que un
+reporte contiene es del módulo dueño del hecho; lo que estas reglas gobiernan
+es a dónde va y quién puede abrirlo.
+
+- **RN-REP-001** El catálogo de emisiones es cerrado y vive en código. Una
+  regla de distribución solo puede referirse a un `codigo_emision` existente;
+  el cliente nunca aporta tablas, columnas ni filtros que compongan una
+  consulta. Mismo criterio que ADR-024 para la consulta, aplicado a la
+  emisión.
+- **RN-REP-002** Leer un reporte emitido exige **las dos** puertas: ser
+  destinatario (o tener `reports.leer_todo`) **y** tener el permiso que la
+  emisión declara, que es el de su módulo dueño. Estar en la lista de
+  distribución no otorga acceso al dato: un cocinero puede enterarse de que
+  hubo un descuadre de caja sin ver el detalle de la caja.
+- **RN-REP-003** Solo se persisten los campos que la emisión declara. Un
+  payload que traiga de más no se filtra al cliente por olvido de nadie.
+- **RN-REP-004** Las entregas no son retroactivas: `reporte_emitido.regla_id`
+  y `entrega_reporte.motivo` se congelan al emitir. Cambiar la regla mañana no
+  reescribe a quién le llegó ayer — mismo criterio que la alerta de pedido
+  demorado, que guarda el umbral vigente al alertar.
+- **RN-REP-005** Una emisión sin destinatarios **se persiste igual**, con cero
+  entregas, y aparece como hueco en la matriz de distribución. Un aviso que no
+  llegó a nadie es información de gestión, no un no-evento.
+- **RN-REP-006** Un área, una regla y sus destinatarios pertenecen a una
+  empresa. Un usuario destinatario debe pertenecer a la empresa de la regla.
+- **RN-REP-007** Toda alta, cambio o baja de área, miembro, regla o
+  destinatario deja rastro en `audit_log` (ADR-031). El gobierno de la
+  distribución es auditable por definición: cambiar a quién le llega un
+  descuadre es un acto de autoridad.
+- **RN-REP-008** Una regla por (empresa, emisión, sucursal). La regla sin
+  sucursal es la general de la empresa y **solo aplica donde no hay una
+  específica** — si aplicaran las dos, quien esté en ambas recibiría el mismo
+  hecho dos veces.
 
 > Nota: esta lista crece con cada módulo. Al implementar un módulo se agregan
 > aquí sus reglas antes de codificarlas.

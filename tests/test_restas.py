@@ -1,4 +1,4 @@
-"""Restas de una línea de venta: "sin cebolla" (RN-PRD-004, ADR-029).
+"""Restas de una línea de venta: "sin cebolla" (RN-PRD-004, ADR-035).
 
 El último tramo del orden de modificadores —tamaño → combinación → extras →
 **restas**— era el único sin implementar. Lo que se prueba acá es lo que

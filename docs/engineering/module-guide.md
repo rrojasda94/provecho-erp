@@ -92,14 +92,20 @@ en el `layout.tsx` del módulo. El grid no es control de acceso.
   [`src/core/tenant.py`](../../src/core/tenant.py)). Pedir datos de otro
   tenant es 403 y se resuelve en `core`, no en cada router.
 - Operaciones con dinero: idempotencia por clave del cliente.
-- Cambios sensibles: auditoría (quién, qué, cuándo, valor anterior/nuevo).
+- Cambios sensibles: auditoría con
+  [`src.shared.auditoria.registrar`](../../src/shared/auditoria.py) (quién,
+  qué, cuándo, dónde, valor anterior/nuevo; ADR-031). Se audita el acto de
+  autoridad —aprobar, autorizar, anular, descontar, pagar, anonimizar—, no
+  cada `UPDATE`. Va en la misma sesión que el cambio, y con `empresa_id`/
+  `sucursal_id` si el caso de uso los tiene a mano: sin ellos la fila solo
+  la puede leer un superusuario.
 
 ## 4. Pruebas y cierre
 
 - `tests/test_<modulo>.py` en el mismo commit que el comportamiento.
   Dominio aislado; infraestructura contra base.
 - `ruff check src tests` y `eslint` en verde.
-- `CHANGELOG.md` (Unreleased) y `ROADMAP.md` (fila del módulo + lo diferido
+- Fragmento en `changelog.d/` y `ROADMAP.md` (fila del módulo + lo diferido
   en Deuda técnica) actualizados en el mismo cambio.
 - `docs/product/modules.md` apunta al README del módulo nuevo.
 
@@ -108,5 +114,5 @@ en el `layout.tsx` del módulo. El grid no es control de acceso.
 No hay `scaffold` ni manifiesto por módulo: el registro de los siete puntos
 es manual, y por eso un módulo **no es removible borrando su carpeta** — deja
 imports rotos en `core`. Está declarado como deuda técnica en
-`ROADMAP.md` → Deuda técnica → Transversal. Mientras tanto, esta lista es el
-contrato.
+[`docs/roadmap/deuda/transversal.md`](../roadmap/deuda/transversal.md).
+Mientras tanto, esta lista es el contrato.

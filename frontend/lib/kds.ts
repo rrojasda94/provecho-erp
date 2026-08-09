@@ -26,7 +26,7 @@ export type ItemCola = {
   producto: string;
   cantidad: string;
   estado: EstadoItem;
-  /** Insumos que este plato NO lleva, ya con nombre (RN-COM-025). Vacío =
+  /** Insumos que este plato NO lleva, ya con nombre (RN-COM-028). Vacío =
    * va completo. Es lo que hasta ahora se escribía en la nota libre, y que
    * ahora además deja de descontarse del almacén. */
   sin: string[];
@@ -38,6 +38,10 @@ export type PedidoCola = {
   referencia_atencion: string | null;
   modalidad: string;
   canal: string;
+  /** `venta` | `consumo_personal` (RN-COM-025): la cocina prioriza distinto
+   * un pedido de cliente que la comida del turno. */
+  tipo: string;
+  consumo_motivo: string | null;
   estado_pedido: EstadoItem;
   items: ItemCola[];
 };

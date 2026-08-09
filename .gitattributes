@@ -1,0 +1,28 @@
+# Todo archivo de texto se guarda y se saca del repositorio en LF, en
+# cualquier sistema operativo. `CLAUDE.md` → Formato ya lo exigía, pero no
+# había nada que lo hiciera cumplir: convivían 789 archivos en LF con 116 en
+# CRLF y 2 mezclados, según el sistema donde se hubiera editado cada uno.
+#
+# El costo no es estético. Cuando dos ramas tocan el mismo archivo y una lo
+# guardó en CRLF, git no ve tres líneas distintas: ve el archivo entero
+# distinto, y el merge se vuelve un conflicto de 3.000 líneas que nadie puede
+# revisar. Pasó dos veces el 2026-08-08 (ROADMAP.md y docs/security/security.md).
+#
+# `text=auto` deja que git detecte qué es texto: los binarios no se tocan.
+* text=auto eol=lf
+
+# Explícitos por si la heurística duda: son formatos comprimidos y una sola
+# conversión los corrompe sin aviso.
+*.docx binary
+*.xlsx binary
+*.pptx binary
+*.pdf binary
+*.png binary
+*.jpg binary
+*.bpm binary
+
+# npm reescribe el lockfile con los saltos de línea del sistema: un
+# `npm install` en Windows lo pasa entero a CRLF y el diff son 10 000 líneas
+# en vez de las tres que cambiaron. Lo cubre la regla de arriba; se deja
+# explícito porque es el archivo donde más caro sale olvidarlo.
+frontend/package-lock.json text eol=lf

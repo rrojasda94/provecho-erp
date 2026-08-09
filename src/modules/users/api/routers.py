@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
 from src.core.rate_limit import rate_limit_login
-from src.core.tenant import Tenant
+from src.core.tenant import FueraDeAlcance, Tenant
 from src.modules.users.api import schemas
 from src.modules.users.api.deps import (
     check_permission,
@@ -23,7 +23,9 @@ from src.modules.users.application import (
     autorizacion,
     gerencia,
     notificaciones,
+    organizacion,
     privacidad,
+    tokens,
 )
 from src.modules.users.application.errors import (
     CredencialesInvalidas,
@@ -38,6 +40,10 @@ from src.shared.paginacion import Pagina, Paginacion, paginacion, paginar
 router = APIRouter()
 
 GESTIONAR = "users.gestionar"  # permiso para el CRUD administrativo
+# Separado de `users.gestionar` a propósito: dar de alta un local o cambiar
+# el RUC de la empresa no es administrar usuarios. Quien crea cajeros no
+# tiene por qué poder fundar sucursales.
+ORGANIZACION = "organizacion.gestionar"
 GESTIONAR_PARAMETROS = "gerencia.gestionar_parametros_empresa"  # aprobar/rechazar
 # Decidir es la facultad gerencial en sí (RN-GER-002), separada de configurar
 # parámetros: un gerente firma actas aunque no toque umbrales.
@@ -787,3 +793,534 @@ def ver_decision_gerencial(
     decision = gerencia.obtener_decision(session, decision_id)
     tenant.exigir_empresa(decision.empresa_id)
     return decision
+
+
+# --- Tokens de API de agentes (`tipo=agente_ia`) -----------------------------
+@router.post(
+    "/users/{usuario_id}/tokens",
+    response_model=schemas.TokenAgenteCreado,
+    status_code=status.HTTP_201_CREATED,
+    tags=["users-admin"],
+)
+def crear_token_agente(
+    usuario_id: uuid.UUID,
+    body: schemas.TokenAgenteCreate,
+    actor: Usuario = Depends(require_permission(GESTIONAR)),
+    session: Session = Depends(get_db),
+):
+    """Emite la credencial de larga vida de una cuenta de agente. El token en
+    claro sale **una sola vez**: acá se guarda su SHA-256."""
+    fila, raw = tokens.crear(
+        session,
+        usuario_id,
+        nombre=body.nombre,
+        dias_validez=body.dias_validez,
+        actor_id=actor.id,
+    )
+    session.commit()
+    return schemas.TokenAgenteCreado(
+        **schemas.TokenAgenteOut.model_validate(fila).model_dump(), token=raw
+    )
+
+
+@router.get(
+    "/users/{usuario_id}/tokens",
+    response_model=list[schemas.TokenAgenteOut],
+    tags=["users-admin"],
+)
+def listar_tokens_agente(
+    usuario_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(GESTIONAR)),
+    session: Session = Depends(get_db),
+):
+    return tokens.listar(session, usuario_id)
+
+
+@router.delete(
+    "/users/{usuario_id}/tokens/{token_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    tags=["users-admin"],
+)
+def revocar_token_agente(
+    usuario_id: uuid.UUID,
+    token_id: uuid.UUID,
+    actor: Usuario = Depends(require_permission(GESTIONAR)),
+    session: Session = Depends(get_db),
+):
+    tokens.revocar(session, usuario_id, token_id, actor_id=actor.id)
+    session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# --- Organización: grupo, empresa, marca, sucursal, almacén ------------------
+# En esta sección el superusuario (permiso `*`) opera sobre **toda** la
+# organización, aunque tenga sucursales asignadas. El resto del ERP le exige
+# el tenant igual que a cualquiera y está bien: una venta pertenece a una
+# empresa. Acá el recurso administrado ES la empresa, y el seeder ata la
+# cuenta de administración a las sucursales justamente para que el resto le
+# funcione — negarle por eso el alta de la segunda empresa del grupo sería
+# el mundo al revés.
+def _solo_superusuario(tenant: Tenant) -> None:
+    """Fundar un grupo o una empresa es un acto por encima de cualquier
+    tenant: el recurso nuevo todavía no pertenece a la empresa de nadie. Un
+    admin de empresa (con `organizacion.gestionar` pero sin `*`) administra
+    la suya y no funda otras."""
+    if not tenant.superusuario:
+        raise FueraDeAlcance("operación reservada a la cuenta de administración")
+
+
+def _exigir_empresa(tenant: Tenant, empresa_id: uuid.UUID) -> None:
+    if tenant.superusuario:
+        return
+    tenant.exigir_empresa(empresa_id)
+
+
+def _filtro_empresa(tenant: Tenant) -> uuid.UUID | None:
+    """`None` = sin filtro. El superusuario ve el grupo entero; el resto,
+    solo la empresa de su token."""
+    return None if tenant.superusuario else tenant.empresa()
+
+
+def _empresa_destino(tenant: Tenant, explicito: uuid.UUID | None) -> uuid.UUID:
+    """`empresa_id` de un alta. Sale del token (ADR-004); el superusuario es
+    el único que puede indicar una empresa distinta de la suya."""
+    if tenant.superusuario:
+        destino = explicito or tenant.empresa_id
+        if destino is None:
+            raise HTTPException(422, "empresa_id es obligatorio sin empresa en el token")
+        return destino
+    return tenant.empresa(explicito)
+
+
+def _grupo_del_tenant(
+    session: Session, tenant: Tenant, explicito: uuid.UUID | None
+) -> uuid.UUID:
+    """Grupo sobre el que opera quien pide. Sale de su empresa, igual que el
+    `empresa_id` sale del token: la marca es del grupo, no de la empresa."""
+    if explicito is not None:
+        if tenant.superusuario:
+            return explicito
+        if explicito != _grupo_propio(session, tenant):
+            raise FueraDeAlcance("grupo fuera del alcance del usuario")
+        return explicito
+    if tenant.empresa_id is not None:
+        return _grupo_propio(session, tenant)
+    _solo_superusuario(tenant)
+    raise HTTPException(422, "grupo_id es obligatorio sin empresa en el token")
+
+
+def _grupo_propio(session: Session, tenant: Tenant) -> uuid.UUID:
+    return organizacion.obtener_empresa(session, tenant.empresa()).grupo_id
+
+
+def _exigir_grupo(session: Session, tenant: Tenant, grupo_id: uuid.UUID) -> None:
+    if tenant.superusuario:
+        return
+    if grupo_id != _grupo_propio(session, tenant):
+        raise FueraDeAlcance("recurso fuera del alcance del usuario")
+
+
+@router.post(
+    "/grupos",
+    response_model=schemas.GrupoOut,
+    status_code=status.HTTP_201_CREATED,
+    tags=["organizacion"],
+)
+def crear_grupo(
+    body: schemas.GrupoCreate,
+    actor: Usuario = Depends(require_permission(ORGANIZACION)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    _solo_superusuario(tenant)
+    grupo = organizacion.crear_grupo(session, nombre=body.nombre, actor_id=actor.id)
+    session.commit()
+    return grupo
+
+
+@router.get("/grupos", response_model=list[schemas.GrupoOut], tags=["organizacion"])
+def listar_grupos(
+    _: Usuario = Depends(require_permission(ORGANIZACION)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Quien no es superusuario ve solo el suyo. Hoy hay un único grupo y
+    daría igual; el día que el ERP aloje a otro, el listado no puede ser la
+    puerta por la que se entera."""
+    if tenant.superusuario:
+        return organizacion.listar_grupos(session)
+    return [organizacion.obtener_grupo(session, _grupo_propio(session, tenant))]
+
+
+@router.get(
+    "/grupos/{grupo_id}", response_model=schemas.GrupoOut, tags=["organizacion"]
+)
+def obtener_grupo(
+    grupo_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(ORGANIZACION)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    grupo = organizacion.obtener_grupo(session, grupo_id)
+    _exigir_grupo(session, tenant, grupo.id)
+    return grupo
+
+
+@router.patch(
+    "/grupos/{grupo_id}", response_model=schemas.GrupoOut, tags=["organizacion"]
+)
+def editar_grupo(
+    grupo_id: uuid.UUID,
+    body: schemas.GrupoUpdate,
+    actor: Usuario = Depends(require_permission(ORGANIZACION)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    _solo_superusuario(tenant)
+    grupo = organizacion.editar_grupo(
+        session, grupo_id, nombre=body.nombre, actor_id=actor.id
+    )
+    session.commit()
+    return grupo
+
+
+@router.post(
+    "/empresas",
+    response_model=schemas.EmpresaOut,
+    status_code=status.HTTP_201_CREATED,
+    tags=["organizacion"],
+)
+def crear_empresa(
+    body: schemas.EmpresaCreate,
+    actor: Usuario = Depends(require_permission(ORGANIZACION)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    _solo_superusuario(tenant)
+    empresa = organizacion.crear_empresa(session, actor_id=actor.id, **body.model_dump())
+    session.commit()
+    return empresa
+
+
+@router.get("/empresas", response_model=list[schemas.EmpresaOut], tags=["organizacion"])
+def listar_empresas(
+    _: Usuario = Depends(require_permission(ORGANIZACION)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Quien no es superusuario ve solo la empresa de su token: el listado
+    del grupo no es dato de un admin de local."""
+    return organizacion.listar_empresas(session, _filtro_empresa(tenant))
+
+
+@router.get(
+    "/empresas/{empresa_id}", response_model=schemas.EmpresaOut, tags=["organizacion"]
+)
+def obtener_empresa(
+    empresa_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(ORGANIZACION)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    empresa = organizacion.obtener_empresa(session, empresa_id)
+    _exigir_empresa(tenant, empresa.id)
+    return empresa
+
+
+@router.patch(
+    "/empresas/{empresa_id}", response_model=schemas.EmpresaOut, tags=["organizacion"]
+)
+def editar_empresa(
+    empresa_id: uuid.UUID,
+    body: schemas.EmpresaUpdate,
+    actor: Usuario = Depends(require_permission(ORGANIZACION)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    _exigir_empresa(tenant, organizacion.obtener_empresa(session, empresa_id).id)
+    empresa = organizacion.editar_empresa(
+        session, empresa_id, actor_id=actor.id, **body.model_dump()
+    )
+    session.commit()
+    return empresa
+
+
+@router.delete(
+    "/empresas/{empresa_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    tags=["organizacion"],
+)
+def dar_de_baja_empresa(
+    empresa_id: uuid.UUID,
+    actor: Usuario = Depends(require_permission(ORGANIZACION)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Baja **lógica**: la fila queda con `deleted_at` porque sus ventas,
+    compras y comprobantes siguen existiendo. Se niega si todavía tiene
+    sucursales o almacenes activos."""
+    _solo_superusuario(tenant)
+    organizacion.dar_de_baja_empresa(session, empresa_id, actor_id=actor.id)
+    session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/marcas",
+    response_model=schemas.MarcaOut,
+    status_code=status.HTTP_201_CREATED,
+    tags=["organizacion"],
+)
+def crear_marca(
+    body: schemas.MarcaCreate,
+    actor: Usuario = Depends(require_permission(ORGANIZACION)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    grupo_id = _grupo_del_tenant(session, tenant, body.grupo_id)
+    marca = organizacion.crear_marca(
+        session,
+        grupo_id=grupo_id,
+        nombre=body.nombre,
+        tipo=body.tipo,
+        skins=body.skins,
+        actor_id=actor.id,
+    )
+    session.commit()
+    return marca
+
+
+@router.get(
+    "/marcas/{marca_id}", response_model=schemas.MarcaOut, tags=["organizacion"]
+)
+def obtener_marca(
+    marca_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(ORGANIZACION)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    marca = organizacion.obtener_marca(session, marca_id)
+    _exigir_grupo(session, tenant, marca.grupo_id)
+    return marca
+
+
+@router.patch(
+    "/marcas/{marca_id}", response_model=schemas.MarcaOut, tags=["organizacion"]
+)
+def editar_marca(
+    marca_id: uuid.UUID,
+    body: schemas.MarcaUpdate,
+    actor: Usuario = Depends(require_permission(ORGANIZACION)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    _exigir_grupo(session, tenant, organizacion.obtener_marca(session, marca_id).grupo_id)
+    marca = organizacion.editar_marca(
+        session, marca_id, actor_id=actor.id, **body.model_dump()
+    )
+    session.commit()
+    return marca
+
+
+@router.delete(
+    "/marcas/{marca_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["organizacion"]
+)
+def dar_de_baja_marca(
+    marca_id: uuid.UUID,
+    actor: Usuario = Depends(require_permission(ORGANIZACION)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    _exigir_grupo(session, tenant, organizacion.obtener_marca(session, marca_id).grupo_id)
+    organizacion.dar_de_baja_marca(session, marca_id, actor_id=actor.id)
+    session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/empresas/{empresa_id}/marcas",
+    response_model=schemas.LicenciaMarcaOut,
+    status_code=status.HTTP_201_CREATED,
+    tags=["organizacion"],
+)
+def otorgar_licencia_marca(
+    empresa_id: uuid.UUID,
+    body: schemas.LicenciaMarcaIn,
+    actor: Usuario = Depends(require_permission(ORGANIZACION)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Licencia la marca a la empresa (N:N, franquicia interna). Sin esto una
+    sucursal de esa marca no puede existir."""
+    _exigir_empresa(tenant, empresa_id)
+    licencia = organizacion.otorgar_licencia(
+        session, empresa_id, body.marca_id, actor_id=actor.id
+    )
+    session.commit()
+    return licencia
+
+
+@router.get(
+    "/empresas/{empresa_id}/marcas",
+    response_model=list[schemas.LicenciaMarcaOut],
+    tags=["organizacion"],
+)
+def listar_licencias_marca(
+    empresa_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(ORGANIZACION)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    _exigir_empresa(tenant, empresa_id)
+    return organizacion.listar_licencias(session, empresa_id)
+
+
+@router.delete(
+    "/empresas/{empresa_id}/marcas/{marca_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    tags=["organizacion"],
+)
+def revocar_licencia_marca(
+    empresa_id: uuid.UUID,
+    marca_id: uuid.UUID,
+    actor: Usuario = Depends(require_permission(ORGANIZACION)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    _exigir_empresa(tenant, empresa_id)
+    organizacion.revocar_licencia(session, empresa_id, marca_id, actor_id=actor.id)
+    session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/sucursales",
+    response_model=schemas.SucursalOut,
+    status_code=status.HTTP_201_CREATED,
+    tags=["organizacion"],
+)
+def crear_sucursal(
+    body: schemas.SucursalCreate,
+    actor: Usuario = Depends(require_permission(ORGANIZACION)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    campos = body.model_dump()
+    campos["empresa_id"] = _empresa_destino(tenant, campos.pop("empresa_id"))
+    sucursal = organizacion.crear_sucursal(session, actor_id=actor.id, **campos)
+    session.commit()
+    return sucursal
+
+
+@router.get(
+    "/sucursales/{sucursal_id}",
+    response_model=schemas.SucursalOut,
+    tags=["organizacion"],
+)
+def obtener_sucursal(
+    sucursal_id: uuid.UUID,
+    _: Usuario = Depends(get_current_user),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Lectura con el mismo criterio que `GET /sucursales`: catálogo de
+    referencia para cualquier autenticado, escopado por tenant."""
+    sucursal = organizacion.obtener_sucursal(session, sucursal_id)
+    _exigir_empresa(tenant, sucursal.empresa_id)
+    return sucursal
+
+
+@router.patch(
+    "/sucursales/{sucursal_id}",
+    response_model=schemas.SucursalOut,
+    tags=["organizacion"],
+)
+def editar_sucursal(
+    sucursal_id: uuid.UUID,
+    body: schemas.SucursalUpdate,
+    actor: Usuario = Depends(require_permission(ORGANIZACION)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Cerrar un local es `estado="inactiva"` — no hay DELETE de sucursal:
+    sigue siendo el ancla de sus ventas, cajas y trabajadores."""
+    actual = organizacion.obtener_sucursal(session, sucursal_id)
+    _exigir_empresa(tenant, actual.empresa_id)
+    sucursal = organizacion.editar_sucursal(
+        session, sucursal_id, actor_id=actor.id, **body.model_dump()
+    )
+    session.commit()
+    return sucursal
+
+
+@router.post(
+    "/almacenes",
+    response_model=schemas.AlmacenOut,
+    status_code=status.HTTP_201_CREATED,
+    tags=["organizacion"],
+)
+def crear_almacen(
+    body: schemas.AlmacenCreate,
+    actor: Usuario = Depends(require_permission(ORGANIZACION)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    campos = body.model_dump()
+    campos["empresa_id"] = _empresa_destino(tenant, campos.pop("empresa_id"))
+    almacen = organizacion.crear_almacen(session, actor_id=actor.id, **campos)
+    session.commit()
+    return almacen
+
+
+@router.get(
+    "/almacenes/{almacen_id}", response_model=schemas.AlmacenOut, tags=["organizacion"]
+)
+def obtener_almacen(
+    almacen_id: uuid.UUID,
+    _: Usuario = Depends(get_current_user),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    almacen = organizacion.obtener_almacen(session, almacen_id)
+    _exigir_empresa(tenant, almacen.empresa_id)
+    return almacen
+
+
+@router.patch(
+    "/almacenes/{almacen_id}",
+    response_model=schemas.AlmacenOut,
+    tags=["organizacion"],
+)
+def editar_almacen(
+    almacen_id: uuid.UUID,
+    body: schemas.AlmacenUpdate,
+    actor: Usuario = Depends(require_permission(ORGANIZACION)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    _exigir_empresa(tenant, organizacion.obtener_almacen(session, almacen_id).empresa_id)
+    almacen = organizacion.editar_almacen(
+        session, almacen_id, actor_id=actor.id, **body.model_dump()
+    )
+    session.commit()
+    return almacen
+
+
+@router.delete(
+    "/almacenes/{almacen_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    tags=["organizacion"],
+)
+def dar_de_baja_almacen(
+    almacen_id: uuid.UUID,
+    actor: Usuario = Depends(require_permission(ORGANIZACION)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Baja lógica. No mira el stock: vive en `inventory` y `users` no
+    importa el dominio de otro módulo. Sí niega la baja si otros almacenes
+    se abastecen de este."""
+    _exigir_empresa(tenant, organizacion.obtener_almacen(session, almacen_id).empresa_id)
+    organizacion.dar_de_baja_almacen(session, almacen_id, actor_id=actor.id)
+    session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

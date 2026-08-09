@@ -15,6 +15,15 @@ from sqlalchemy.orm import Session
 
 from src.config.settings import settings
 from src.core.database import SessionLocal
+from src.modules.marketing.application.plantillas import crear_plantilla
+from src.modules.marketing.infrastructure.models import EncuestaPlantilla
+from src.modules.reports.domain import catalogo as emisiones
+from src.modules.reports.infrastructure.models import (
+    Area,
+    AreaMiembro,
+    ReglaDestinatario,
+    ReglaDistribucion,
+)
 from src.modules.users.infrastructure.models import (
     Almacen,
     Empresa,
@@ -59,6 +68,12 @@ PERMISOS = [
     ("*", "Acceso total (solo entornos internos)"),
     ("users.gestionar", "Administrar usuarios, roles y permisos"),
     (
+        "organizacion.gestionar",
+        "Administrar grupo, empresas, marcas, licencias de marca, sucursales y "
+        "almacenes — separado de `users.gestionar`: dar de alta un local no es "
+        "administrar usuarios",
+    ),
+    (
         "personas.anonimizar",
         "Anonimizar datos de una persona — derecho de cancelación (Ley 29733)",
     ),
@@ -80,6 +95,10 @@ PERMISOS = [
     (
         "sales.aplicar_descuento",
         "Autorizar un descuento manual sobre una orden (RN-COM-017)",
+    ),
+    (
+        "sales.registrar_consumo_personal",
+        "Autorizar la comida del personal, sin precio ni cobro (RN-COM-025)",
     ),
     ("sales.gestionar_mesas", "Configurar las mesas del salón de una sucursal"),
     ("kds.configurar", "Crear y configurar pantallas KDS"),
@@ -163,9 +182,39 @@ PERMISOS = [
     ("marketing.lead_gestionar", "Registrar leads y atribuirlos a la venta real"),
     (
         "marketing.encuesta_gestionar",
-        "Enviar la encuesta de satisfacción y registrar su respuesta (RN-COM-007)",
+        "Enviar la encuesta de satisfacción, escribir su guion de preguntas y "
+        "registrar respuestas (RN-COM-007)",
+    ),
+    (
+        "marketing.agencia_evaluar",
+        "Comparar propuestas de agencia contra hacerlo interno, con criterios "
+        "ponderados (RN-MKT-006)",
+    ),
+    (
+        "marketing.agencia_decidir",
+        "Validar con cuál se va la campaña: agencia o interna. Quien evalúa no "
+        "decide (RN-MKT-006, RN-GER-007)",
     ),
     ("dashboard.leer", "Consultar el dashboard gerencial (ventas, stock, caja)"),
+    (
+        "auditoria.leer",
+        "Consultar el rastro de cambios (`audit_log`) — quién tocó qué y cuándo",
+    ),
+    ("reports.leer", "Ver los reportes que el ERP me entregó a mí"),
+    (
+        "reports.leer_todo",
+        "Ver todos los reportes emitidos de la empresa, no solo los propios",
+    ),
+    (
+        "reports.leer_matriz",
+        "Ver el mapa de distribución: qué hecho llega a qué área y a quién. "
+        "Permiso aparte de `reports.leer` porque revela la estructura "
+        "organizacional (ADR-033)",
+    ),
+    (
+        "reports.administrar",
+        "Editar áreas y reglas de distribución: decidir quién recibe qué",
+    ),
     (
         "gerencia.gestionar_parametros_empresa",
         "Aprobar, rechazar o modificar parámetros operativos por empresa (ADR-014)",
@@ -232,6 +281,9 @@ ROLES = {
         # El descuento y el salón los autoriza el supervisor, nunca el
         # cajero que lo pide (RN-COM-017).
         "sales.aplicar_descuento",
+        # La comida del personal sale del inventario sin cobro: la firma el
+        # encargado del turno, no quien la va a comer (RN-COM-025).
+        "sales.registrar_consumo_personal",
         "sales.gestionar_mesas",
         "kds.configurar",
         "kds.operar",
@@ -259,8 +311,10 @@ ROLES = {
         "accounting.caja_relevar",
         "accounting.caja_reabrir",
         # Marketing arma el brief; quien lo aprueba nunca es quien lo escribe.
+        # Misma lógica con la agencia: Marketing evalúa, acá se firma.
         "marketing.leer",
         "marketing.campana_aprobar",
+        "marketing.agencia_decidir",
         "dashboard.leer",
         "rrhh.leer",
         "rrhh.permiso_aprobar",
@@ -329,6 +383,9 @@ ROLES = {
         "accounting.caja_reabrir",
         "accounting.pos_administrar",
         "dashboard.leer",
+        # Contabilidad audita a Compras, Almacén y las cajas de sucursal
+        # (RN-CTB-009): sin el rastro, auditar es preguntar de buena fe.
+        "auditoria.leer",
     ],
     "rrhh_admin": [
         "rrhh.leer",
@@ -354,9 +411,119 @@ ROLES = {
         "marketing.contenido_gestionar",
         "marketing.lead_gestionar",
         "marketing.encuesta_gestionar",
+        "marketing.agencia_evaluar",
         "sales.leer_clientes_externos",
     ],
 }
+
+# Todo rol que puede ser destinatario de un reporte necesita `reports.leer`
+# para abrir su propia bandeja. Se agrega acá y no repitiendo la línea dentro
+# de cada lista porque olvidarla en uno deja a ese rol recibiendo reportes que
+# no puede abrir — y eso se descubre en producción, no en el diff.
+# Las cuentas de servicio (`agente_ia`, `hub_sucursal`) quedan fuera: no hay
+# nadie del otro lado que lea una bandeja.
+for _rol in (
+    "supervisor",
+    "cajero",
+    "cocinero",
+    "despachador",
+    "almacenero",
+    "comprador",
+    "jefe_cocina",
+    "contador",
+    "rrhh_admin",
+    "marketing",
+):
+    ROLES[_rol].append("reports.leer")
+
+# Ver el mapa completo de distribución es de quien supervisa la operación y de
+# quien la audita. **Administrarlo** —decidir quién recibe qué— queda solo en
+# `admin`, por lo mismo que `purchases.aprobar`: cambiar a quién le llega un
+# descuadre de caja es una decisión de gobierno, no de turno.
+ROLES["supervisor"].append("reports.leer_matriz")
+ROLES["contador"].append("reports.leer_matriz")
+
+# Qué roles componen cada área semilla. El área es «de qué me entero» y el rol
+# es «qué puedo hacer»: se parecen, y por eso hay que decir el mapeo en vez de
+# suponerlo. `comercial` cae en supervisión porque hoy no hay un rol comercial
+# —cuando lo haya, es una línea acá.
+ROLES_POR_AREA = {
+    "almacen": ("almacenero",),
+    "gerencia": ("admin", "supervisor"),
+    "comercial": ("supervisor",),
+    "cocina": ("jefe_cocina", "cocinero"),
+    "caja": ("cajero",),
+    "contabilidad": ("contador",),
+}
+
+
+def _seed_distribucion(session: Session, roles: dict) -> None:
+    """Áreas semilla y una regla por emisión, por empresa (ADR-033).
+
+    Sin esto el módulo arranca con la matriz llena de huecos: los trece hechos
+    del catálogo ocurrirían y no le llegarían a nadie. Se siembra lo que cada
+    emisión declara en `areas_sugeridas`/`dinamicos_sugeridos`, que es la
+    distribución que el ERP tenía cableada antes de este módulo — el punto es
+    que ahora se puede cambiar sin tocar código.
+
+    Todas las reglas se siembran **generales** (`sucursal_id` nulo): valen
+    para toda la empresa hasta que alguien escriba una específica de un local,
+    que le gana (RN-REP-008).
+
+    Idempotente, como todo el seeder.
+    """
+    for empresa in session.scalars(select(Empresa)):
+        areas = {}
+        for codigo, nombre in emisiones.AREAS_BASE:
+            area, _ = _get_or_create(
+                session,
+                Area,
+                empresa_id=empresa.id,
+                codigo=codigo,
+                defaults=dict(nombre=nombre),
+            )
+            areas[codigo] = area
+            for nombre_rol in ROLES_POR_AREA.get(codigo, ()):
+                rol = roles.get(nombre_rol)
+                if rol is None:
+                    continue
+                _get_or_create(
+                    session,
+                    AreaMiembro,
+                    area_id=area.id,
+                    rol_id=rol.id,
+                    usuario_id=None,
+                    sucursal_id=None,
+                )
+
+        for emision in emisiones.CATALOGO:
+            regla, creada = _get_or_create(
+                session,
+                ReglaDistribucion,
+                empresa_id=empresa.id,
+                codigo_emision=emision.codigo,
+                sucursal_id=None,
+                defaults=dict(nivel=emision.nivel, canal="bandeja", activa=True),
+            )
+            if not creada:
+                # No se reescriben los destinatarios de una regla que ya
+                # existe: el seeder corre sobre bases vivas y pisar lo que un
+                # administrador configuró sería deshacerle el trabajo.
+                continue
+            for codigo_area in emision.areas_sugeridas:
+                area = areas.get(codigo_area)
+                if area is not None:
+                    session.add(
+                        ReglaDestinatario(
+                            regla_id=regla.id, tipo="area", area_id=area.id
+                        )
+                    )
+            for dinamico in emision.dinamicos_sugeridos:
+                session.add(
+                    ReglaDestinatario(
+                        regla_id=regla.id, tipo="dinamico", dinamico=dinamico
+                    )
+                )
 
 
 def _get_or_create(session: Session, model, defaults=None, **filtros):
@@ -422,6 +589,80 @@ def _seed_organizacion(session: Session) -> None:
     )
 
 
+# Guion de la encuesta de satisfacción que trae el ERP de fábrica
+# (RN-COM-007). Ramifica a propósito: quien puntúa bajo dice **qué** falló y
+# quien puntúa alto dice si recomendaría. Preguntarles las dos cosas a todos
+# alarga la encuesta y baja la tasa de respuesta, que es la única métrica que
+# hace que el resto sirva.
+ENCUESTA_SEMILLA = "Satisfacción post-entrega"
+ENCUESTA_SALUDO = "¿Cómo te fue con tu pedido? Son 2 preguntas rápidas."
+ENCUESTA_PREGUNTAS = [
+    {
+        "codigo": "puntaje",
+        "texto": "Del 1 al 5, ¿qué tal estuvo tu pedido?",
+        "tipo": "escala",
+        "opciones": [
+            {"valor": "1", "etiqueta": "Muy malo"},
+            {"valor": "2", "etiqueta": "Malo"},
+            {"valor": "3", "etiqueta": "Regular"},
+            {"valor": "4", "etiqueta": "Bueno"},
+            {"valor": "5", "etiqueta": "Excelente"},
+        ],
+        "es_puntaje": True,
+        "siguiente_codigo": "recomendaria",
+        "saltos": {"1": "que_fallo", "2": "que_fallo", "3": "que_fallo"},
+    },
+    {
+        "codigo": "que_fallo",
+        "texto": "¿Qué fue lo que no salió bien?",
+        "tipo": "opcion",
+        "opciones": [
+            {"valor": "comida", "etiqueta": "La comida"},
+            {"valor": "atencion", "etiqueta": "La atención"},
+            {"valor": "tiempo", "etiqueta": "La demora"},
+            {"valor": "otro", "etiqueta": "Otra cosa"},
+        ],
+        "siguiente_codigo": "comentario",
+    },
+    {
+        "codigo": "recomendaria",
+        "texto": "¿Nos recomendarías a un amigo?",
+        "tipo": "si_no",
+        "siguiente_codigo": "comentario",
+    },
+    {
+        "codigo": "comentario",
+        "texto": "¿Quieres contarnos algo más? (o escribe '-' para terminar)",
+        "tipo": "texto",
+        "obligatoria": False,
+    },
+]
+
+
+def _seed_encuesta(session: Session, creado_por) -> None:
+    """Plantilla de encuesta activa por empresa. Sin una activa, `POST
+    /marketing/encuestas` responde 409 y el módulo llega inutilizable a la
+    primera instalación."""
+    for empresa in session.scalars(select(Empresa)):
+        existente = session.scalar(
+            select(EncuestaPlantilla).where(
+                EncuestaPlantilla.empresa_id == empresa.id,
+                EncuestaPlantilla.nombre == ENCUESTA_SEMILLA,
+            )
+        )
+        if existente is not None:
+            continue
+        crear_plantilla(
+            session,
+            empresa_id=empresa.id,
+            nombre=ENCUESTA_SEMILLA,
+            saludo=ENCUESTA_SALUDO,
+            preguntas=ENCUESTA_PREGUNTAS,
+            creado_por=creado_por,
+            activa=True,
+        )
+
+
 def seed(session: Session) -> None:
     _seed_organizacion(session)
 
@@ -469,6 +710,9 @@ def seed(session: Session) -> None:
     for sucursal in session.scalars(select(Sucursal)):
         if session.get(UsuarioSucursal, (admin.id, sucursal.id)) is None:
             session.add(UsuarioSucursal(usuario_id=admin.id, sucursal_id=sucursal.id))
+
+    _seed_encuesta(session, admin.id)
+    _seed_distribucion(session, roles)
 
     session.commit()
     print("Seed OK. admin/123456 con rol admin. Usuario nuevo:" if creado else

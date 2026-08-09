@@ -9,6 +9,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from src.config.settings import settings
 from src.core import error_handlers
+from src.core.auditoria_router import router as auditoria_router
 from src.core.dashboard_router import router as dashboard_router
 from src.core.health_router import router as health_router
 from src.core.logging_config import configurar_logging, request_id_var
@@ -21,10 +22,14 @@ from src.modules.accounting.api.routers import router as accounting_router
 from src.modules.accounting.application import listeners as accounting_listeners
 from src.modules.inventory.api.routers import router as inventory_router
 from src.modules.inventory.application import listeners as inventory_listeners
+from src.modules.marketing.api.publico_routers import router as marketing_publico_router
 from src.modules.marketing.api.routers import router as marketing_router
+from src.modules.marketing.api.webhook_routers import router as marketing_webhook_router
 from src.modules.marketing.application import listeners as marketing_listeners
 from src.modules.production.api.routers import router as production_router
 from src.modules.purchases.api.routers import router as purchases_router
+from src.modules.reports.api.routers import router as reports_router
+from src.modules.reports.application import listeners as reports_listeners
 from src.modules.rrhh.api.routers import router as rrhh_router
 from src.modules.sales.api.kds_routers import router as kds_router
 from src.modules.sales.api.routers import router as sales_router
@@ -58,7 +63,17 @@ TAGS_METADATA = [
     },
     {
         "name": "users-admin",
-        "description": "CRUD de usuarios, roles, permisos y asignaciones (`users.gestionar`).",
+        "description": (
+            "CRUD de usuarios, roles, permisos, asignaciones y tokens de API de "
+            "agentes (`users.gestionar`)."
+        ),
+    },
+    {
+        "name": "organizacion",
+        "description": (
+            "Grupo, empresas, marcas, licencias de marca, sucursales y almacenes "
+            "(`organizacion.gestionar`)."
+        ),
     },
     {
         "name": "gerencia",
@@ -78,6 +93,14 @@ TAGS_METADATA = [
     },
     {"name": "purchases", "description": "Proveedores y ciclo de orden de compra."},
     {
+        "name": "reports",
+        "description": (
+            "Emisión y distribución: qué hechos del ERP generan un reporte, a "
+            "qué áreas y usuarios llega cada uno, y qué se entregó. No "
+            "confundir con `reportes`, que es la consulta bajo demanda."
+        ),
+    },
+    {
         "name": "production",
         "description": "Órdenes de producción (fabricación) y costeo.",
     },
@@ -92,8 +115,16 @@ TAGS_METADATA = [
     {
         "name": "marketing",
         "description": (
-            "Campañas, calendario de contenido, leads con atribución a la venta "
-            "y encuesta de satisfacción."
+            "Campañas, calendario de contenido con adjuntos, leads con "
+            "atribución a la venta, evaluación de agencia y encuesta de "
+            "satisfacción por nodos (WhatsApp / enlace público)."
+        ),
+    },
+    {
+        "name": "auditoria",
+        "description": (
+            "Rastro inmutable de cambios (`audit_log`, ADR-031): quién, qué, "
+            "cuándo, dónde y valor anterior/nuevo. Solo lectura."
         ),
     },
     {
@@ -237,6 +268,7 @@ def create_app() -> FastAPI:
         return respuesta
 
     app.include_router(health_router)
+    app.include_router(auditoria_router, prefix="/api/v1")
     app.include_router(dashboard_router, prefix="/api/v1")
     app.include_router(reportes_router, prefix="/api/v1")
     app.include_router(router_tableros, prefix="/api/v1")
@@ -249,10 +281,21 @@ def create_app() -> FastAPI:
     app.include_router(accounting_router, prefix="/api/v1")
     app.include_router(rrhh_router, prefix="/api/v1")
     app.include_router(marketing_router, prefix="/api/v1")
+    # Sin JWT a propósito: el cliente que contesta la encuesta no es usuario
+    # del ERP, y Meta tampoco. Cada uno trae su propia credencial — el token
+    # del enlace y la firma HMAC del webhook.
+    app.include_router(marketing_publico_router, prefix="/api/v1")
+    app.include_router(marketing_webhook_router, prefix="/api/v1")
     app.include_router(sync_router, prefix="/api/v1")
+    app.include_router(reports_router, prefix="/api/v1")
     inventory_listeners.register()
     accounting_listeners.register()
     marketing_listeners.register()
     sales_listeners.register()
+    # `reports` antes que `users`: el primero convierte hechos en reportes y
+    # el segundo convierte reportes en bandeja. El orden de `subscribe` no
+    # decide el de despacho entre eventos distintos, pero leerlo en este
+    # orden es leer la cadena.
+    reports_listeners.register()
     users_listeners.register()
     return app

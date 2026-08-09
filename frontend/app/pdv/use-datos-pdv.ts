@@ -2,14 +2,13 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { fallaDe, type Falla, type Lista } from "@/lib/carga";
 import {
   api,
   type CajaAbierta,
   type ItemDeCarta,
   type MedioPago,
-  type MesaEnMapa,
   type PosTarjeta,
-  type Venta,
 } from "@/lib/pdv";
 
 /**
@@ -31,11 +30,20 @@ export function useDatosPdv(empresaId: string | null, puntoVentaId: string, sucu
   const [cajaResuelta, setCajaResuelta] = useState(false);
   const [carta, setCarta] = useState<ItemDeCarta[]>([]);
   const [medios, setMedios] = useState<MedioPago[]>([]);
-  const [mesas, setMesas] = useState<MesaEnMapa[]>([]);
-  const [cobrados, setCobrados] = useState<Venta[]>([]);
-  const [abiertas, setAbiertas] = useState<Venta[]>([]);
   const [pos, setPos] = useState<PosTarjeta[]>([]);
   const [modalidad, setModalidad] = useState("mesa");
+
+  const mesas = useLista(traerMesas, sucursalId, "No se pudo cargar el mapa de mesas");
+  const cobrados = useLista(
+    traerCobrados,
+    sucursalId,
+    "No se pudieron cargar los pedidos cobrados de hoy",
+  );
+  const abiertas = useLista(
+    traerAbiertas,
+    sucursalId,
+    "No se pudieron cargar los pedidos en cocina",
+  );
 
   // Fuera del `if (!caja)` del resto: los terminales se verifican **al
   // abrir** (RN-POS-010), así que tienen que estar cargados justo cuando
@@ -51,33 +59,12 @@ export function useDatosPdv(empresaId: string | null, puntoVentaId: string, sucu
     }
     api
       .cajasAbiertas(empresaId)
-      .then((abiertas) =>
-        setCaja(abiertas.find((c) => c.punto_venta_id === puntoVentaId) ?? null),
+      .then((abiertasDeEmpresa) =>
+        setCaja(abiertasDeEmpresa.find((c) => c.punto_venta_id === puntoVentaId) ?? null),
       )
       .catch(() => setCaja(null))
       .finally(() => setCajaResuelta(true));
   }, [empresaId, puntoVentaId]);
-
-  const recargarMesas = useCallback(() => {
-    api.mapaMesas(sucursalId).then(setMesas).catch(() => setMesas([]));
-  }, [sucursalId]);
-
-  const recargarCobrados = useCallback(() => {
-    api
-      .ventasDelDia(sucursalId, "pagada")
-      .then(setCobrados)
-      .catch(() => setCobrados([]));
-  }, [sucursalId]);
-
-  // Pedidos ya enviados a cocina pero sin cobrar: para llevar/delivery no
-  // se ven en el mapa de mesas, y sin esto se pierden si se recarga la
-  // página antes de cobrarlos.
-  const recargarAbiertas = useCallback(() => {
-    api
-      .ventasDelDia(sucursalId, "orden")
-      .then((vs) => setAbiertas(vs.filter((v) => !v.mesa_id)))
-      .catch(() => setAbiertas([]));
-  }, [sucursalId]);
 
   useEffect(() => {
     if (!caja) return;
@@ -85,6 +72,13 @@ export function useDatosPdv(empresaId: string | null, puntoVentaId: string, sucu
     // pedir al cambiar entre mesa, para llevar y delivery.
     api.carta(sucursalId, modalidad).then(setCarta).catch(() => setCarta([]));
   }, [caja, sucursalId, modalidad]);
+
+  // Sacadas del objeto para que `exhaustive-deps` pueda verlas: pedir
+  // `mesas` entero en las dependencias reejecutaría el efecto con cada fila
+  // que llega.
+  const { recargar: recargarMesas } = mesas;
+  const { recargar: recargarCobrados } = cobrados;
+  const { recargar: recargarAbiertas } = abiertas;
 
   useEffect(() => {
     if (!caja) return;
@@ -105,8 +99,50 @@ export function useDatosPdv(empresaId: string | null, puntoVentaId: string, sucu
     abiertas,
     pos,
     setModalidad,
-    recargarMesas,
-    recargarCobrados,
-    recargarAbiertas,
   };
+}
+
+const traerMesas = (sucursalId: string) => api.mapaMesas(sucursalId);
+
+const traerCobrados = (sucursalId: string) => api.ventasDelDia(sucursalId, "pagada");
+
+/** Pedidos ya enviados a cocina pero sin cobrar: para llevar/delivery no se
+ * ven en el mapa de mesas, y sin esto se pierden si se recarga la página
+ * antes de cobrarlos. */
+const traerAbiertas = async (sucursalId: string) =>
+  (await api.ventasDelDia(sucursalId, "orden")).filter((v) => !v.mesa_id);
+
+/**
+ * Una lista del servidor que recuerda **por qué** no se pudo traer.
+ *
+ * Antes cada carga era `.catch(() => setLista([]))`: ni la pantalla ni el
+ * cajero podían distinguir "hoy no se cobró nada" de "la petición se cayó".
+ * Guardar la falla aparte deja el estado vacío para lo que de verdad está
+ * vacío, y `recargar` es a la vez la carga inicial y el botón de reintento.
+ *
+ * Las filas viejas no se borran al fallar —la UI muestra la falla en su
+ * lugar, no filas rancias—, pero así el mapa de mesas sigue sirviendo al
+ * selector de mesa mientras el reintento va y vuelve.
+ *
+ * `cargar` se define a nivel de módulo justamente para que su identidad sea
+ * estable y `recargar` no se recree en cada render.
+ */
+function useLista<T>(
+  cargar: (sucursalId: string) => Promise<T[]>,
+  sucursalId: string,
+  mensaje: string,
+): Lista<T> {
+  const [datos, setDatos] = useState<T[]>([]);
+  const [falla, setFalla] = useState<Falla | null>(null);
+
+  const recargar = useCallback(() => {
+    cargar(sucursalId)
+      .then((filas) => {
+        setDatos(filas);
+        setFalla(null);
+      })
+      .catch((e) => setFalla(fallaDe(e, mensaje)));
+  }, [cargar, sucursalId, mensaje]);
+
+  return { datos, falla, recargar };
 }
