@@ -17,6 +17,13 @@ from src.config.settings import settings
 from src.core.database import SessionLocal
 from src.modules.marketing.application.plantillas import crear_plantilla
 from src.modules.marketing.infrastructure.models import EncuestaPlantilla
+from src.modules.reports.domain import catalogo as emisiones
+from src.modules.reports.infrastructure.models import (
+    Area,
+    AreaMiembro,
+    ReglaDestinatario,
+    ReglaDistribucion,
+)
 from src.modules.users.infrastructure.models import (
     Almacen,
     Empresa,
@@ -188,6 +195,21 @@ PERMISOS = [
     (
         "auditoria.leer",
         "Consultar el rastro de cambios (`audit_log`) — quién tocó qué y cuándo",
+    ),
+    ("reports.leer", "Ver los reportes que el ERP me entregó a mí"),
+    (
+        "reports.leer_todo",
+        "Ver todos los reportes emitidos de la empresa, no solo los propios",
+    ),
+    (
+        "reports.leer_matriz",
+        "Ver el mapa de distribución: qué hecho llega a qué área y a quién. "
+        "Permiso aparte de `reports.leer` porque revela la estructura "
+        "organizacional (ADR-033)",
+    ),
+    (
+        "reports.administrar",
+        "Editar áreas y reglas de distribución: decidir quién recibe qué",
     ),
     (
         "gerencia.gestionar_parametros_empresa",
@@ -387,6 +409,115 @@ ROLES = {
     ],
 }
 
+# Todo rol que puede ser destinatario de un reporte necesita `reports.leer`
+# para abrir su propia bandeja. Se agrega acá y no repitiendo la línea dentro
+# de cada lista porque olvidarla en uno deja a ese rol recibiendo reportes que
+# no puede abrir — y eso se descubre en producción, no en el diff.
+# Las cuentas de servicio (`agente_ia`, `hub_sucursal`) quedan fuera: no hay
+# nadie del otro lado que lea una bandeja.
+for _rol in (
+    "supervisor",
+    "cajero",
+    "cocinero",
+    "despachador",
+    "almacenero",
+    "comprador",
+    "jefe_cocina",
+    "contador",
+    "rrhh_admin",
+    "marketing",
+):
+    ROLES[_rol].append("reports.leer")
+
+# Ver el mapa completo de distribución es de quien supervisa la operación y de
+# quien la audita. **Administrarlo** —decidir quién recibe qué— queda solo en
+# `admin`, por lo mismo que `purchases.aprobar`: cambiar a quién le llega un
+# descuadre de caja es una decisión de gobierno, no de turno.
+ROLES["supervisor"].append("reports.leer_matriz")
+ROLES["contador"].append("reports.leer_matriz")
+
+# Qué roles componen cada área semilla. El área es «de qué me entero» y el rol
+# es «qué puedo hacer»: se parecen, y por eso hay que decir el mapeo en vez de
+# suponerlo. `comercial` cae en supervisión porque hoy no hay un rol comercial
+# —cuando lo haya, es una línea acá.
+ROLES_POR_AREA = {
+    "almacen": ("almacenero",),
+    "gerencia": ("admin", "supervisor"),
+    "comercial": ("supervisor",),
+    "cocina": ("jefe_cocina", "cocinero"),
+    "caja": ("cajero",),
+    "contabilidad": ("contador",),
+}
+
+
+def _seed_distribucion(session: Session, roles: dict) -> None:
+    """Áreas semilla y una regla por emisión, por empresa (ADR-033).
+
+    Sin esto el módulo arranca con la matriz llena de huecos: los trece hechos
+    del catálogo ocurrirían y no le llegarían a nadie. Se siembra lo que cada
+    emisión declara en `areas_sugeridas`/`dinamicos_sugeridos`, que es la
+    distribución que el ERP tenía cableada antes de este módulo — el punto es
+    que ahora se puede cambiar sin tocar código.
+
+    Todas las reglas se siembran **generales** (`sucursal_id` nulo): valen
+    para toda la empresa hasta que alguien escriba una específica de un local,
+    que le gana (RN-REP-008).
+
+    Idempotente, como todo el seeder.
+    """
+    for empresa in session.scalars(select(Empresa)):
+        areas = {}
+        for codigo, nombre in emisiones.AREAS_BASE:
+            area, _ = _get_or_create(
+                session,
+                Area,
+                empresa_id=empresa.id,
+                codigo=codigo,
+                defaults=dict(nombre=nombre),
+            )
+            areas[codigo] = area
+            for nombre_rol in ROLES_POR_AREA.get(codigo, ()):
+                rol = roles.get(nombre_rol)
+                if rol is None:
+                    continue
+                _get_or_create(
+                    session,
+                    AreaMiembro,
+                    area_id=area.id,
+                    rol_id=rol.id,
+                    usuario_id=None,
+                    sucursal_id=None,
+                )
+
+        for emision in emisiones.CATALOGO:
+            regla, creada = _get_or_create(
+                session,
+                ReglaDistribucion,
+                empresa_id=empresa.id,
+                codigo_emision=emision.codigo,
+                sucursal_id=None,
+                defaults=dict(nivel=emision.nivel, canal="bandeja", activa=True),
+            )
+            if not creada:
+                # No se reescriben los destinatarios de una regla que ya
+                # existe: el seeder corre sobre bases vivas y pisar lo que un
+                # administrador configuró sería deshacerle el trabajo.
+                continue
+            for codigo_area in emision.areas_sugeridas:
+                area = areas.get(codigo_area)
+                if area is not None:
+                    session.add(
+                        ReglaDestinatario(
+                            regla_id=regla.id, tipo="area", area_id=area.id
+                        )
+                    )
+            for dinamico in emision.dinamicos_sugeridos:
+                session.add(
+                    ReglaDestinatario(
+                        regla_id=regla.id, tipo="dinamico", dinamico=dinamico
+                    )
+                )
+
 
 def _get_or_create(session: Session, model, defaults=None, **filtros):
     inst = session.scalar(select(model).filter_by(**filtros))
@@ -574,6 +705,7 @@ def seed(session: Session) -> None:
             session.add(UsuarioSucursal(usuario_id=admin.id, sucursal_id=sucursal.id))
 
     _seed_encuesta(session, admin.id)
+    _seed_distribucion(session, roles)
 
     session.commit()
     print("Seed OK. admin/123456 con rol admin. Usuario nuevo:" if creado else

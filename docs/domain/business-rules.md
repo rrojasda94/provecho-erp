@@ -1387,5 +1387,41 @@ preparación, despacho y entrega en las tres modalidades.
   — nunca bloquea el proceso operativo que lo originó (mismo criterio de
   módulos operativos con dependencias sin configurar, ej. inventory).
 
+## Emisión y distribución de reportes (módulo reports, ADR-033)
+
+Reglas de **quién recibe qué**, no de qué dice cada reporte. Lo que un
+reporte contiene es del módulo dueño del hecho; lo que estas reglas gobiernan
+es a dónde va y quién puede abrirlo.
+
+- **RN-REP-001** El catálogo de emisiones es cerrado y vive en código. Una
+  regla de distribución solo puede referirse a un `codigo_emision` existente;
+  el cliente nunca aporta tablas, columnas ni filtros que compongan una
+  consulta. Mismo criterio que ADR-024 para la consulta, aplicado a la
+  emisión.
+- **RN-REP-002** Leer un reporte emitido exige **las dos** puertas: ser
+  destinatario (o tener `reports.leer_todo`) **y** tener el permiso que la
+  emisión declara, que es el de su módulo dueño. Estar en la lista de
+  distribución no otorga acceso al dato: un cocinero puede enterarse de que
+  hubo un descuadre de caja sin ver el detalle de la caja.
+- **RN-REP-003** Solo se persisten los campos que la emisión declara. Un
+  payload que traiga de más no se filtra al cliente por olvido de nadie.
+- **RN-REP-004** Las entregas no son retroactivas: `reporte_emitido.regla_id`
+  y `entrega_reporte.motivo` se congelan al emitir. Cambiar la regla mañana no
+  reescribe a quién le llegó ayer — mismo criterio que la alerta de pedido
+  demorado, que guarda el umbral vigente al alertar.
+- **RN-REP-005** Una emisión sin destinatarios **se persiste igual**, con cero
+  entregas, y aparece como hueco en la matriz de distribución. Un aviso que no
+  llegó a nadie es información de gestión, no un no-evento.
+- **RN-REP-006** Un área, una regla y sus destinatarios pertenecen a una
+  empresa. Un usuario destinatario debe pertenecer a la empresa de la regla.
+- **RN-REP-007** Toda alta, cambio o baja de área, miembro, regla o
+  destinatario deja rastro en `audit_log` (ADR-031). El gobierno de la
+  distribución es auditable por definición: cambiar a quién le llega un
+  descuadre es un acto de autoridad.
+- **RN-REP-008** Una regla por (empresa, emisión, sucursal). La regla sin
+  sucursal es la general de la empresa y **solo aplica donde no hay una
+  específica** — si aplicaran las dos, quien esté en ambas recibiría el mismo
+  hecho dos veces.
+
 > Nota: esta lista crece con cada módulo. Al implementar un módulo se agregan
 > aquí sus reglas antes de codificarlas.

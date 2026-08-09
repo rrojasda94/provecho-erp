@@ -189,7 +189,14 @@ def completar_orden_produccion(
         orden.estado = resultado
         event_bus.publish(
             "production.no_conformidad_detectada",
-            {"orden_produccion_id": str(orden.id), "resultado": resultado},
+            # `almacen_id` desde 2026-08-08: es de donde `reports` deduce la
+            # empresa y la sucursal del hecho para escopar y distribuir el
+            # reporte. Sin él la emisión no se puede atribuir a un tenant.
+            {
+                "orden_produccion_id": str(orden.id),
+                "almacen_id": str(orden.almacen_id),
+                "resultado": resultado,
+            },
             session=session,
         )
     return orden

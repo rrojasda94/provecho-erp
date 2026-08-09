@@ -1558,6 +1558,63 @@ No hay tabla de mapeo hub-id↔nube-id: `venta`, `pago` y
 `movimiento_inventario` conservan el mismo UUID en ambos lados porque el
 `id` se genera en la aplicación (`UuidPkMixin`) y viaja en el lote.
 
+## 16. Emisión y distribución de reportes (módulo reports, ADR-033)
+
+Seis tablas que responden «qué reporta el ERP, a quién le llega y qué se
+entregó». **No confundir con `core/reportes`** (ADR-024), que es el motor de
+*consulta*: acá no se calcula nada, se registra lo que ya pasó y se reparte.
+
+El **catálogo de emisiones no es una tabla**: es una lista cerrada en
+`src/modules/reports/domain/catalogo.py`. `codigo_emision` es texto validado
+contra ella al guardar, no una FK — si el conjunto de emisiones fuera
+administrable por API, quien puede crear reglas podría hacerse enviar
+cualquier payload del bus (RN-REP-001).
+
+- **area**: empresa_id, codigo (`almacen` | `gerencia` | `comercial` |
+  `cocina` | `caja` | `contabilidad`, único por empresa), nombre, activa.
+  Le da cuerpo a los destinos que el ERP ya nombraba sin poder resolver
+  (`inventory.conteo_vencido` publica `dirigido_a: ["almacen","gerencia"]`;
+  `devolucion.reporte_dirigido_a` guarda `almacen`|`comercial`). **No es un
+  rol**: el rol dice qué puede hacer alguien, el área de qué se entera.
+- **area_miembro**: area_id, y **uno de** rol_id | usuario_id (check
+  constraint: uno u otro, nunca los dos ni ninguno), sucursal_id nullable
+  (acota la membresía a un local). Se compone principalmente por rol porque
+  así se administra solo — quien cambia de puesto gana o pierde los reportes
+  sin que nadie actualice una lista.
+- **regla_distribucion**: empresa_id, codigo_emision, sucursal_id nullable
+  (NULL = la general de la empresa), activa, nivel (`info`|`aviso`|`urgente`,
+  pisa el de la emisión), canal (`bandeja`). **Dos índices únicos parciales**
+  en vez de un `UniqueConstraint` de tres columnas: en SQL los NULL son
+  distintos entre sí, así que la constraint simple dejaría convivir dos
+  reglas generales de la misma emisión y el hecho se entregaría dos veces
+  (RN-REP-008). La específica de la sucursal le gana a la general.
+- **regla_destinatario**: regla_id (cascade), tipo (`area`|`rol`|`usuario`|
+  `dinamico`), y la referencia que corresponda — con check constraint que
+  exige la del tipo declarado, porque una fila `tipo=area` con `area_id` nulo
+  resolvería a cero destinatarios en silencio. `dinamico` es
+  `encargado_de_turno` | `responsables_de_almacen`: destinatarios que no se
+  pueden listar de antemano porque dependen del momento.
+- **reporte_emitido**: empresa_id/sucursal_id (nullables — un hecho que no se
+  pudo atribuir se guarda igual y solo lo ve el superusuario, mismo criterio
+  que `audit_log`), codigo_emision, titulo, cuerpo, nivel, **datos** JSONB
+  (la foto: solo los campos que la emisión declara, RN-REP-003; puede traer
+  PII y por eso no sale al logger), referencia_tipo/referencia_id
+  (polimórficos sin FK, como `notificacion`), regla_id (la que lo produjo;
+  NULL = el hueco), emitido_at. Es una **foto, no un puntero**: un reporte de
+  «descuadre de S/ 40» sigue diciendo 40 aunque el cierre se corrija después.
+- **entrega_reporte**: reporte_emitido_id (cascade), usuario_id, **motivo**
+  (`area:almacen`, `rol:supervisor`, `dinamico:encargado_de_turno`), canal.
+  Único por (reporte, usuario): quien está en el área *y* es el encargado de
+  turno recibe una vez. **No lleva `leida_at`** — el estado de lectura vive
+  en `notificacion.leida_at`, que es la bandeja que el usuario abre;
+  duplicarlo daría dos verdades sobre lo mismo. Esta tabla registra la
+  *distribución*, y el `motivo` es lo que le dice al administrador qué tocar
+  para cambiarla.
+
+Una emisión sin destinatarios **se persiste igual**, con cero entregas, y sale
+como hueco en la matriz (RN-REP-005). Las entregas no son retroactivas:
+`regla_id` y `motivo` se congelan al emitir (RN-REP-004).
+
 ## 9. Módulos futuros
 
 Revisado 2026-08-05: de la lista original casi nada sigue siendo futuro, y
