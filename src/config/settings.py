@@ -1,7 +1,8 @@
 from decimal import Decimal
+from typing import Annotated
 
 from pydantic import field_validator, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 JWT_SECRET_MIN_LEN = 32
 _PLACEHOLDER_SECRETO = "change-me"
@@ -27,8 +28,16 @@ class Settings(BaseSettings):
     access_token_minutes: int = 15
     refresh_token_days: int = 7
     # Endurecimiento HTTP. Listas en .env separadas por coma.
-    allowed_hosts: list[str] = ["*"]
-    cors_origins: list[str] = ["http://localhost:3000"]
+    #
+    # `NoDecode` es lo que hace que esa promesa se cumpla: sin él,
+    # pydantic-settings intenta decodificar como JSON todo campo de tipo
+    # complejo **antes** de que corra ningún validador, así que
+    # `ALLOWED_HOSTS=*` —la línea que trae `.env.example`— reventaba el
+    # arranque con `SettingsError` y `_lista_por_comas` no llegaba a ejecutarse
+    # nunca. Con `NoDecode` el valor llega crudo al validador de abajo, que es
+    # donde siempre se pretendió resolver el formato.
+    allowed_hosts: Annotated[list[str], NoDecode] = ["*"]
+    cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:3000"]
     hsts_max_age_segundos: int = 31536000  # 1 año; solo se emite en producción
     # Rate limit por IP del login (el lockout de `usuario` es por cuenta y no
     # frena un ataque que rota usernames desde la misma IP).
@@ -157,10 +166,25 @@ class Settings(BaseSettings):
     @field_validator("allowed_hosts", "cors_origins", mode="before")
     @classmethod
     def _lista_por_comas(cls, valor: object) -> object:
-        """Acepta `a,b` en .env además de la lista JSON de pydantic."""
-        if isinstance(valor, str):
-            return [item.strip() for item in valor.split(",") if item.strip()]
-        return valor
+        """Acepta `a,b` en .env además de la lista JSON de pydantic.
+
+        Con `NoDecode` en el campo, este validador es el **único** que ve el
+        valor, así que también le toca el JSON que antes resolvía
+        pydantic-settings. Se prueba JSON solo si la cadena parece una lista:
+        un host que empiece con `[` no existe, y probar siempre dejaría un
+        `try` alrededor del caso normal.
+        """
+        if not isinstance(valor, str):
+            return valor
+        texto = valor.strip()
+        if texto.startswith("["):
+            import json
+
+            try:
+                return json.loads(texto)
+            except ValueError:
+                pass
+        return [item.strip() for item in texto.split(",") if item.strip()]
 
     @model_validator(mode="after")
     def _exigir_endurecimiento_en_produccion(self) -> "Settings":
