@@ -8,11 +8,14 @@ para la empresa+evento, o sin periodo contable abierto, el asiento se omite
 `movimiento_dinero` pendiente (`application/pagos.registrar_pago`); el asiento
 se genera recién al ejecutar el pago (`application/pagos.ejecutar_pago`).
 
-Cubre hoy 5 eventos operativos: `purchases.oc_emitida`,
+Cubre hoy 6 eventos operativos: `purchases.oc_emitida`,
 `purchases.compra_recibida`, `sales.venta_confirmada`,
-`purchases.comprobante_conforme` y —desde 2026-08-06—
-`inventory.transferencia_recibida`, que solo asienta cuando el traslado
-llegó con faltante. El resto de los documentados en `events.md` (pago
+`purchases.comprobante_conforme`, `inventory.transferencia_recibida` —que
+solo asienta cuando el traslado llegó con faltante— y
+`inventory.consumo_personal_valorizado`, la comida del personal llevada a
+gasto (RN-COM-025), que se reversa con
+`inventory.consumo_personal_reversado` si el consumo se anula. El resto de
+los documentados en `events.md` (pago
 registrado, comprobante emitido de venta, ajuste, caja chica...) no se
 generan aún porque los módulos de origen todavía no los publican — ver
 ROADMAP, deuda técnica de accounting.
@@ -131,6 +134,63 @@ def on_venta_confirmada(payload: dict) -> None:
         log.exception("fallo generando asiento de venta %s", payload.get("venta_id"))
 
 
+def on_consumo_personal_valorizado(payload: dict) -> None:
+    """Comida del personal → gasto de alimentación de personal (RN-COM-025).
+
+    El monto lo valoriza `inventory` a costo promedio, igual que la merma:
+    acá no se recalcula nada, o el gasto contable diría un número distinto
+    al que salió del almacén. La empresa mapea las cuentas (gasto / salida
+    de existencias) en su `regla_asiento`.
+    """
+    try:
+        with session_factory() as session:
+            empresa_id = payload.get("empresa_id") or _empresa_de_sucursal(
+                session, payload["sucursal_id"]
+            )
+            if empresa_id is None:
+                log.warning(
+                    "consumo de personal %s: sin empresa, asiento omitido",
+                    payload.get("venta_id"),
+                )
+            else:
+                motivo = payload.get("motivo") or "sin motivo"
+                _generar(
+                    session,
+                    empresa_id=uuid.UUID(str(empresa_id)),
+                    evento="inventory.consumo_personal_valorizado",
+                    referencia_origen=payload["venta_id"],
+                    monto=Decimal(payload["monto"]),
+                    glosa=f"Consumo de personal ({motivo}) {payload['venta_id']}",
+                )
+            session.commit()
+    except Exception:
+        log.exception(
+            "fallo generando asiento de consumo de personal %s",
+            payload.get("venta_id"),
+        )
+
+
+def on_consumo_personal_reversado(payload: dict) -> None:
+    """El consumo se anuló y el insumo volvió al almacén: el gasto también
+    tiene que volver, o queda inflado por algo que nadie comió."""
+    try:
+        with session_factory() as session:
+            empresa_id = payload.get("empresa_id")
+            if empresa_id is not None:
+                asientos_uc.anular_asiento_por_origen(
+                    session,
+                    empresa_id=uuid.UUID(str(empresa_id)),
+                    evento="inventory.consumo_personal_valorizado",
+                    referencia_origen=payload["venta_id"],
+                )
+            session.commit()
+    except Exception:
+        log.exception(
+            "fallo reversando el asiento de consumo de personal %s",
+            payload.get("venta_id"),
+        )
+
+
 def on_comprobante_conforme(payload: dict) -> None:
     try:
         with session_factory() as session:
@@ -245,3 +305,9 @@ def register() -> None:
         "inventory.transferencia_recibida", on_transferencia_recibida
     )
     event_bus.subscribe("inventory.merma_registrada", on_merma_registrada)
+    event_bus.subscribe(
+        "inventory.consumo_personal_valorizado", on_consumo_personal_valorizado
+    )
+    event_bus.subscribe(
+        "inventory.consumo_personal_reversado", on_consumo_personal_reversado
+    )

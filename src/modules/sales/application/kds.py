@@ -156,6 +156,10 @@ def cola_pantalla(session: Session, pantalla_id: uuid.UUID) -> list[dict]:
                 "referencia_atencion": venta.referencia_atencion,
                 "modalidad": venta.modalidad,
                 "canal": venta.canal,
+                # La cocina tiene que saber que está preparando comida del
+                # personal: cambia la prioridad frente a un pedido de cliente.
+                "tipo": venta.tipo,
+                "consumo_motivo": venta.consumo_motivo,
                 "estado_pedido": rules.estado_pedido(estados_todos),
                 "items": mios,
             }
@@ -246,6 +250,10 @@ def comanda(session: Session, venta_id: uuid.UUID) -> dict:
         f"{venta.created_at:%d/%m/%Y %H:%M}".center(ANCHO_COMANDA),
         "*" * ANCHO_COMANDA,
     ]
+    if rules.es_consumo_personal(venta.tipo):
+        lineas.append("** CONSUMO PERSONAL **".center(ANCHO_COMANDA))
+        lineas.append(f"({venta.consumo_motivo})".center(ANCHO_COMANDA))
+        lineas.append("-" * ANCHO_COMANDA)
     if reimpresion:
         lineas.append("** REIMPRESION **".center(ANCHO_COMANDA))
         lineas.append("-" * ANCHO_COMANDA)

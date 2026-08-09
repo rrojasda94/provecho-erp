@@ -18,7 +18,7 @@ import {
   type VarianteDeCarta,
 } from "@/lib/pdv";
 
-import type { Borrador, LineaBorrador } from "./tipos";
+import { MOTIVOS_CONSUMO, type Borrador, type LineaBorrador } from "./tipos";
 
 /** Envoltorio común: `<dialog>` nativo, que ya trae foco atrapado, cierre
  * con Escape y backdrop sin una línea de JS.
@@ -984,6 +984,104 @@ export function DialogoTipo({
           }
         >
           Confirmar
+        </button>
+      </footer>
+    </Dialogo>
+  );
+}
+
+/** Comida del personal (RN-COM-025): motivo + firma del encargado.
+ *
+ * El PIN no se guarda ni viaja con la venta: se canjea acá por una elevación
+ * acotada al permiso, y lo que viaja es ese token — mismo trato que la
+ * apertura de caja y el descuento manual. */
+export function DialogoConsumoPersonal({
+  abierto,
+  onCerrar,
+  onConfirmar,
+  ocupado,
+}: {
+  abierto: boolean;
+  onCerrar: () => void;
+  onConfirmar: (datos: {
+    motivo: string;
+    encargado: { username: string; pin: string };
+  }) => void;
+  ocupado: boolean;
+}) {
+  const [motivo, setMotivo] = useState("");
+  const [usuario, setUsuario] = useState("");
+  const [pin, setPin] = useState("");
+
+  useEffect(() => {
+    if (!abierto) {
+      setMotivo("");
+      setUsuario("");
+      setPin("");
+    }
+  }, [abierto]);
+
+  return (
+    <Dialogo titulo="Consumo de personal" abierto={abierto} onCerrar={onCerrar}>
+      <p className="pdv-nota">
+        El pedido se prepara y se despacha igual, pero no se cobra ni emite
+        comprobante. Su costo se registra como alimentación de personal.
+      </p>
+      <p className="pdv-etiqueta">Motivo</p>
+      <div className="pdv-lista">
+        {MOTIVOS_CONSUMO.map((m) => (
+          <button
+            key={m.valor}
+            type="button"
+            className={`pdv-opcion ${motivo === m.valor ? "on" : ""}`}
+            onClick={() => setMotivo(m.valor)}
+          >
+            <span>
+              <strong>{m.etiqueta}</strong>
+            </span>
+            {motivo === m.valor && <span aria-hidden>✓</span>}
+          </button>
+        ))}
+      </div>
+
+      <p className="pdv-etiqueta">Autoriza el encargado</p>
+      <div className="pdv-fila">
+        <input
+          className="pdv-campo"
+          aria-label="Usuario del encargado"
+          placeholder="Usuario"
+          autoComplete="off"
+          data-testid="consumo-usuario"
+          value={usuario}
+          onChange={(e) => setUsuario(e.target.value)}
+        />
+        <input
+          className="pdv-campo"
+          type="password"
+          inputMode="numeric"
+          aria-label="PIN del encargado"
+          placeholder="PIN"
+          autoComplete="off"
+          data-testid="consumo-pin"
+          value={pin}
+          onChange={(e) => setPin(e.target.value)}
+        />
+      </div>
+
+      <footer className="pdv-dialogo-pie">
+        <span />
+        <button
+          type="button"
+          className="pdv-boton-pri"
+          disabled={ocupado || !motivo || !usuario.trim() || !pin.trim()}
+          onClick={() =>
+            onConfirmar({
+              motivo,
+              encargado: { username: usuario.trim(), pin },
+            })
+          }
+        >
+          Marcar sin cobro
         </button>
       </footer>
     </Dialogo>

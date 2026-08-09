@@ -35,7 +35,9 @@ export type Comprobante = {
 };
 export type Sucursal = { id: string; nombre: string };
 
-const ESTADOS = ["orden", "pagada", "entregada", "anulada"];
+// `cerrada` es el consumo de personal ya entregado (RN-COM-027): no se
+// cobra, así que sin este filtro no habría forma de listarlo en la jornada.
+const ESTADOS = ["orden", "pagada", "entregada", "cerrada", "anulada"];
 
 function EstadoVenta({ estado }: { estado: string }) {
   const clase =

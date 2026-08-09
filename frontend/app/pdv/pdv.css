@@ -584,8 +584,26 @@
     flex: none;
     padding: 0 0.75rem;
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    /* Dos columnas desde que son cuatro botones: "Consumo de personal" no
+       entra legible en un tercio del panel. */
+    grid-template-columns: repeat(2, 1fr);
     gap: 0.375rem;
+}
+
+/* El pedido que no se cobra tiene que gritarlo antes de salir a cocina
+   (RN-COM-025). */
+.pdv-consumo-franja {
+    flex: none;
+    margin: 0 0.75rem 0.5rem;
+    padding: 0.5rem 0.625rem;
+    border-radius: 8px;
+    border: 1px solid var(--pdv-verde);
+    background: var(--pdv-verde-tenue);
+    color: var(--pdv-verde);
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
 }
 
 .pdv-acciones button {

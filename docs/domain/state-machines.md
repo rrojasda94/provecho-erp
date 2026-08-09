@@ -71,14 +71,22 @@ stateDiagram-v2
     orden --> facturada: comprobante antes de pago (RN-COM-006, no recomendable)
     facturada --> anulada: nota de crédito
     pagada --> anulada
+    orden --> cerrada: entrega de un consumo de personal (RN-COM-027)
 ```
 
 Pago y comprobante no siguen un orden único: el pago puede ser adelantado,
 y el comprobante puede emitirse antes del pago aunque no es recomendable
 (RN-COM-006).
 
-Eventos: `sales.venta_confirmada`, `sales.pago_registrado`,
-`sales.comprobante_emitido`, `sales.venta_anulada`.
+`cerrada` es la única salida de una orden que **no se cobra**: hoy solo el
+consumo de personal (`venta.tipo = consumo_personal`, ADR-033), que nunca
+pasa por caja y por eso no puede terminar en `pagada` ni en `facturada`.
+Llegar a `cerrada` desde `pagada` o `facturada` no existe: lo que se cobró
+se anula con nota de crédito.
+
+Eventos: `sales.venta_confirmada`, `sales.consumo_personal_registrado`,
+`sales.pago_registrado`, `sales.comprobante_emitido`,
+`sales.venta_anulada`.
 
 ## Cumplimiento de pedido
 

@@ -110,18 +110,22 @@ class AsientoRepo:
             self.s.scalars(select(AsientoLinea).where(AsientoLinea.asiento_id == asiento_id))
         )
 
+    def get_por_origen(
+        self, empresa_id: uuid.UUID, evento: str, referencia_origen: str
+    ) -> Asiento | None:
+        return self.s.scalar(
+            select(Asiento).where(
+                Asiento.empresa_id == empresa_id,
+                Asiento.evento_origen == evento,
+                Asiento.referencia_origen == referencia_origen,
+            )
+        )
+
     def existe_por_origen(
         self, empresa_id: uuid.UUID, evento: str, referencia_origen: str
     ) -> bool:
         return (
-            self.s.scalar(
-                select(Asiento.id).where(
-                    Asiento.empresa_id == empresa_id,
-                    Asiento.evento_origen == evento,
-                    Asiento.referencia_origen == referencia_origen,
-                )
-            )
-            is not None
+            self.get_por_origen(empresa_id, evento, referencia_origen) is not None
         )
 
     def add(self, asiento: Asiento) -> Asiento:

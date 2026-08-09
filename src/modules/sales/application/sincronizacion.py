@@ -236,6 +236,18 @@ def _venta_a_dict(session: Session, venta: Venta) -> dict:
             if venta.descuento_autorizado_por
             else None
         ),
+        # Mismo criterio para el consumo de personal (RN-COM-025): sin el
+        # tipo, la nube reproduciría la comida del turno como una venta de
+        # S/ 0.00 —con su asiento de ingreso y su lead atribuido— y sin el
+        # motivo el gasto quedaría sin explicación. El encargado ya firmó en
+        # la sucursal; su PIN no se vuelve a pedir en la nube.
+        "tipo": venta.tipo,
+        "consumo_motivo": venta.consumo_motivo,
+        "consumo_autorizado_por": (
+            str(venta.consumo_autorizado_por)
+            if venta.consumo_autorizado_por
+            else None
+        ),
         # Los extras viajan ANIDADOS bajo su línea padre, igual que en el
         # request de creación: aplanarlos haría que el replay los recreara
         # como líneas sueltas y se perdería de qué plato colgaban.
@@ -402,6 +414,15 @@ def _crear(session: Session, datos: dict) -> None:
         comensales=datos.get("comensales"),
         fecha_orden=date.fromisoformat(datos["fecha_orden"]),
         numero_orden=datos["numero_orden"],
+        # Los lotes emitidos antes del consumo de personal no traen la clave:
+        # esas ventas eran ventas.
+        tipo=datos.get("tipo", "venta"),
+        consumo_motivo=datos.get("consumo_motivo"),
+        consumo_autorizado_por=(
+            uuid.UUID(datos["consumo_autorizado_por"])
+            if datos.get("consumo_autorizado_por")
+            else None
+        ),
     )
     if datos.get("descuento_modo"):
         # Se reaplica tal cual se autorizó en el local; el motivo y el

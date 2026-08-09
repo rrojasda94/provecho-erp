@@ -96,6 +96,10 @@ PERMISOS = [
         "sales.aplicar_descuento",
         "Autorizar un descuento manual sobre una orden (RN-COM-017)",
     ),
+    (
+        "sales.registrar_consumo_personal",
+        "Autorizar la comida del personal, sin precio ni cobro (RN-COM-025)",
+    ),
     ("sales.gestionar_mesas", "Configurar las mesas del salón de una sucursal"),
     ("kds.configurar", "Crear y configurar pantallas KDS"),
     ("kds.operar", "Operar KDS: cola, avance de ítems, comanda"),
@@ -277,6 +281,9 @@ ROLES = {
         # El descuento y el salón los autoriza el supervisor, nunca el
         # cajero que lo pide (RN-COM-017).
         "sales.aplicar_descuento",
+        # La comida del personal sale del inventario sin cobro: la firma el
+        # encargado del turno, no quien la va a comer (RN-COM-025).
+        "sales.registrar_consumo_personal",
         "sales.gestionar_mesas",
         "kds.configurar",
         "kds.operar",

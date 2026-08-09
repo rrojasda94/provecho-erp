@@ -5,12 +5,17 @@ import { useRef } from "react";
 import { soles } from "@/lib/pdv";
 
 import {
+  esConsumoPersonal,
   etiquetaTipo,
+  MOTIVOS_CONSUMO,
   totalBorrador,
   totalLinea,
   type Borrador,
   type LineaBorrador,
 } from "./tipos";
+
+const etiquetaMotivo = (motivo: string): string =>
+  MOTIVOS_CONSUMO.find((m) => m.valor === motivo)?.etiqueta ?? motivo;
 
 type Props = {
   borradores: Borrador[];
@@ -27,6 +32,7 @@ type Props = {
   onAnular: () => void;
   onEnviar: () => void;
   onCobrar: () => void;
+  onConsumoPersonal: () => void;
 };
 
 /** Panel derecho: el pedido en curso. Es lo único que el cajero mira
@@ -48,6 +54,7 @@ export default function Ticket(props: Props) {
       ) : (
         <>
           <Cabecera borrador={activo} />
+          <FranjaConsumo borrador={activo} />
           <Lineas
             borrador={activo}
             seleccion={seleccion}
@@ -65,6 +72,7 @@ export default function Ticket(props: Props) {
             onCliente={props.onCliente}
             onTipo={props.onTipo}
             onAnular={props.onAnular}
+            onConsumoPersonal={props.onConsumoPersonal}
           />
           <Pago {...props} activo={activo} />
         </>
@@ -110,6 +118,17 @@ function Pestanas({
         +
       </button>
     </div>
+  );
+}
+
+/** Franja imposible de pasar por alto: el cajero tiene que ver que este
+ * pedido no se cobra antes de mandarlo a cocina (RN-COM-025). */
+function FranjaConsumo({ borrador }: { borrador: Borrador }) {
+  if (!borrador.consumoMotivo) return null;
+  return (
+    <p className="pdv-consumo-franja" data-testid="franja-consumo">
+      Consumo de personal · {etiquetaMotivo(borrador.consumoMotivo)} · sin cobro
+    </p>
   );
 }
 
@@ -162,6 +181,7 @@ function Lineas({
         <Linea
           key={l.id}
           linea={l}
+          gratis={esConsumoPersonal(borrador)}
           seleccionada={seleccion.has(l.id)}
           modoSeleccion={seleccion.size > 0}
           onClick={() =>
@@ -191,7 +211,10 @@ function BarraSeleccion({
     <div className="pdv-selbar">
       <span>
         {seleccion.size}{" "}
-        {seleccion.size === 1 ? "seleccionado" : "seleccionados"} · {soles(total)}
+        {seleccion.size === 1 ? "seleccionado" : "seleccionados"}
+        {/* En un consumo de personal no hay monto que mostrar: enseñarlo
+            contradiría las líneas, que ya salen sin precio. */}
+        {esConsumoPersonal(borrador) ? "" : ` · ${soles(total)}`}
       </span>
       <button type="button" onClick={onLimpiar}>
         Quitar selección
@@ -221,12 +244,15 @@ function Acciones({
   onCliente,
   onTipo,
   onAnular,
+  onConsumoPersonal,
 }: {
   borrador: Borrador;
   onCliente: () => void;
   onTipo: () => void;
   onAnular: () => void;
+  onConsumoPersonal: () => void;
 }) {
+  const consumo = esConsumoPersonal(borrador);
   return (
     <div className="pdv-acciones">
       <button
@@ -235,6 +261,16 @@ function Acciones({
         onClick={onCliente}
       >
         {borrador.cliente ? borrador.cliente.nombre.split(" ")[0] : "Cliente"}
+      </button>
+      <button
+        type="button"
+        className={consumo ? "puesto" : ""}
+        // Ya enviado no se cambia: el pedido salió a cocina con su tipo y el
+        // insumo ya se descontó como lo que fuera.
+        disabled={Boolean(borrador.ventaId)}
+        onClick={onConsumoPersonal}
+      >
+        {consumo ? "Quitar consumo" : "Consumo de personal"}
       </button>
       <button
         type="button"
@@ -264,24 +300,29 @@ function Pago({
 }: Props & { activo: Borrador }) {
   const enviado = Boolean(activo.ventaId);
   const vacio = activo.lineas.length === 0;
+  // Un consumo de personal no se cobra (RN-COM-025): el botón no se
+  // deshabilita, desaparece — y "Enviar" pasa a ser la acción principal.
+  const consumo = esConsumoPersonal(activo);
   return (
     <div className="pdv-pago">
       <button
         type="button"
-        className="pdv-boton-sec"
+        className={consumo ? "pdv-boton-pri" : "pdv-boton-sec"}
         disabled={ocupado || enviado || vacio}
         onClick={onEnviar}
       >
         {enviado ? "Enviado" : "Enviar"}
       </button>
-      <button
-        type="button"
-        className="pdv-boton-pri"
-        disabled={ocupado || vacio}
-        onClick={onCobrar}
-      >
-        {seleccion.size > 0 ? `Cobrar ${seleccion.size}` : "Cobrar"}
-      </button>
+      {!consumo && (
+        <button
+          type="button"
+          className="pdv-boton-pri"
+          disabled={ocupado || vacio}
+          onClick={onCobrar}
+        >
+          {seleccion.size > 0 ? `Cobrar ${seleccion.size}` : "Cobrar"}
+        </button>
+      )}
     </div>
   );
 }
@@ -291,12 +332,14 @@ function Pago({
  * aparte que el cajero tendría que acordarse de activar. */
 function Linea({
   linea,
+  gratis,
   seleccionada,
   modoSeleccion,
   onClick,
   onLargo,
 }: {
   linea: LineaBorrador;
+  gratis: boolean;
   seleccionada: boolean;
   modoSeleccion: boolean;
   onClick: () => void;
@@ -342,7 +385,9 @@ function Linea({
           </em>
         ))}
       </span>
-      <span className="pdv-linea-monto">{soles(totalLinea(linea))}</span>
+      <span className="pdv-linea-monto">
+        {gratis ? "—" : soles(totalLinea(linea))}
+      </span>
     </button>
   );
 }

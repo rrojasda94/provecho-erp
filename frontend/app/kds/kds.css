@@ -320,6 +320,19 @@
     letter-spacing: 0.05em;
 }
 
+/* Comida del personal (RN-COM-025): la cocina la prepara igual, pero saber
+   que no es de un cliente cambia a qué se le da prioridad. */
+.kds-consumo {
+    align-self: start;
+    padding: 0.125rem 0.5rem;
+    border-radius: 999px;
+    border: 1px solid var(--kds-muted);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
 .kds-items {
     list-style: none;
     display: grid;

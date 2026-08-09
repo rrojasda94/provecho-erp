@@ -556,6 +556,40 @@ def test_anulacion_offline_viaja_y_repone_stock_en_la_nube(entorno):
     assert _stock(entorno.NubeSession, entorno.ids["almacen_id"]) == Decimal("10")
 
 
+def test_consumo_de_personal_offline_llega_a_la_nube_como_consumo(entorno):
+    """Sin el tipo en el lote, la nube reproduciría la comida del turno como
+    una venta de S/ 0.00 — con su asiento de ingreso y su lead atribuido
+    (RN-COM-025)."""
+    entorno.ciclo()
+    with entorno.listeners_en("hub"), entorno.HubSession() as s:
+        venta = ventas_uc.crear_venta(
+            s,
+            sucursal_id=entorno.ids["sucursal_id"],
+            punto_venta_id=entorno.ids["pv_id"],
+            canal="pdv", modalidad="takeout",
+            usuario_id=entorno.ids["cajero_id"],
+            idempotency_key="consumo-offline",
+            items=[{
+                "producto_comercial_id": entorno.ids["producto_id"],
+                "cantidad": Decimal("2"),
+            }],
+            tipo="consumo_personal",
+            consumo_motivo="feriado",
+            consumo_autorizado_por=entorno.ids["cajero_id"],
+        )
+        s.commit()
+        venta_id = venta.id
+
+    resumen = entorno.ciclo()
+    assert resumen["push"]["errores"] == []
+    with entorno.NubeSession() as s:
+        replicada = s.get(Venta, venta_id)
+        assert replicada.tipo == "consumo_personal"
+        assert replicada.consumo_motivo == "feriado"
+        assert replicada.consumo_autorizado_por == entorno.ids["cajero_id"]
+        assert replicada.total == Decimal(0)
+
+
 def test_una_venta_rechazada_no_arrastra_al_resto_ni_avanza_la_marca(entorno):
     """La nube rechaza lo que no puede aceptar (acá: un producto que no
     existe de su lado) e informa el ítem, sin tumbar el lote ni perderlo."""

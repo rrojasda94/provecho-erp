@@ -54,6 +54,9 @@ CATALOGO = "sales.gestionar_catalogo"
 # Aplicar descuento es acto de supervisor: separado de `sales.cobrar` para
 # que el cajero no se autorice a sí mismo (RN-COM-017).
 DESCONTAR = "sales.aplicar_descuento"
+# La comida del personal es costo que sale del inventario sin cobro: la firma
+# un encargado, igual que un descuento (RN-COM-025).
+CONSUMO_PERSONAL = "sales.registrar_consumo_personal"
 GESTIONAR_MESAS = "sales.gestionar_mesas"
 LEER_CLIENTES_EXTERNOS = "sales.leer_clientes_externos"
 EMITIR = "sales.emitir_comprobante"
@@ -71,7 +74,25 @@ def crear_venta(
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
+    """Confirma la orden y la manda a cocina.
+
+    `tipo="consumo_personal"` (RN-COM-025) es la comida del personal: el
+    cajero la arma con su permiso `sales.crear`, pero la **autoriza un
+    encargado** con su PIN en el mismo terminal — el id de quien firma sale
+    del token de `POST /auth/autorizar`, nunca del cuerpo (RN-AUD-005).
+    """
     tenant.exigir_sucursal(body.sucursal_id)
+    autorizado_por = None
+    if rules.es_consumo_personal(body.tipo):
+        if not body.autorizacion:
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                "el consumo de personal requiere autorización de un encargado",
+            )
+        try:
+            autorizado_por = autorizacion.verificar(body.autorizacion, CONSUMO_PERSONAL)
+        except TokenInvalido as e:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, str(e)) from e
     venta = ventas.crear_venta(
         session,
         sucursal_id=body.sucursal_id,
@@ -86,6 +107,9 @@ def crear_venta(
         mesa_id=body.mesa_id,
         comensales=body.comensales,
         id=body.id,
+        tipo=body.tipo,
+        consumo_motivo=body.consumo_motivo,
+        consumo_autorizado_por=autorizado_por,
     )
     session.commit()
     return venta
@@ -98,6 +122,7 @@ def listar_ventas(
     hasta: date | None = None,
     estado: str | None = None,
     punto_venta_id: uuid.UUID | None = None,
+    tipo: str | None = None,
     _: Usuario = Depends(require_permission(LEER)),
     tenant: Tenant = Depends(get_tenant),
     p: Paginacion = Depends(paginacion),
@@ -136,6 +161,7 @@ def listar_ventas(
             hasta=hasta,
             estados=(estado,) if estado else None,
             punto_venta_id=punto_venta_id,
+            tipo=tipo,
         ),
         p,
     )

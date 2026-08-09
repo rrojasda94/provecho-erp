@@ -1241,6 +1241,25 @@ producción se hace en cocinas de sucursal. Ver
   guardada. Duplicar una receta la clona con el sufijo "(copy)" y sin
   destino asignado; escalarla por un factor redondea **cada línea con su
   propia unidad** (1.5 bollos de masa son 2, no 1.5).
+- **RN-COM-025** La **comida del personal** —la que el negocio da en fines
+  de semana, feriados o días de alta actividad— se registra como una orden
+  de tipo `consumo_personal`: se prepara y se despacha como cualquier
+  pedido (comanda, KDS, entrega), pero **todas sus líneas valen cero**, no
+  se cobra y **no emite comprobante**. No es un descuento del 100% sobre
+  una venta: una venta de S/ 0.00 declararía un ingreso que no existe y
+  emitiría un comprobante que no corresponde (ADR-034).
+- **RN-COM-026** Cada consumo de personal lo **autoriza un encargado con su
+  PIN** —permiso `sales.registrar_consumo_personal`, separado de
+  `sales.crear`— y se registra con **motivo** (`fin_semana`, `feriado`,
+  `alta_actividad`, `capacitacion`, `otro`). Sin motivo no hay con qué
+  explicar el gasto, y sin firma cualquiera se sirve gratis. El acto queda
+  en `audit_log` (RN-AUD-005).
+- **RN-COM-027** El costo del consumo de personal **sale del inventario
+  como `consumo_interno`** —no como `consumo_venta`— y se reconoce
+  valorizado a costo promedio como **gasto de alimentación de personal**,
+  no como costo de ventas. La orden queda en estado `cerrada` al
+  entregarse: es su único cierre posible, porque nunca pasa por caja.
+  Anularla repone el insumo y **reversa el asiento**.
 
 ## Cumplimiento de pedido
 

@@ -510,15 +510,18 @@ descuenta stock vía la receta (ver [../domain/domain-model.md](../domain/domain
   reaparece mañana, que es la señal correcta.
 - **movimiento_inventario**: almacen_id, sku_id, cantidad (+/-), tipo
   (`recepcion_compra` | `transferencia_salida` | `transferencia_entrada` |
-  `consumo_venta` | `consumo_produccion` | `produccion_entrada` | `ajuste` |
-  `devolucion`), motivo_ajuste (`sobrante` | `faltante` | `merma` |
+  `consumo_venta` | `consumo_produccion` | **`consumo_interno`** |
+  `produccion_entrada` | `ajuste` | `devolucion`), motivo_ajuste (`sobrante` | `faltante` | `merma` |
   `error_registro` — solo si tipo=`ajuste`, dentro del margen de error de
   almacén/contabilidad, RN-INV-015), lote_id (nullable), **motivo_lote**
   (nullable; obligatorio al tomar un lote distinto del que sugiere FEFO,
   RN-LOT-004), referencia (doc origen), usuario_id, timestamp. Solo
   inserción — el stock es derivable y auditable. Una salida sin lote sobre
   un artículo que sí lo controla es legítima y deliberada (RN-LOT-005), y
-  se lista en el reporte `salidas_sin_lote`.
+  se lista en el reporte `salidas_sin_lote`. `consumo_interno` es lo que el
+  negocio se consume a sí mismo —hoy la comida del personal (RN-COM-027)—:
+  separado de `consumo_venta` porque no tiene ingreso detrás y su costo es
+  gasto, no costo de ventas.
 - **devolucion** (implementada 2026-08-06, migración `e7c390a5b41f`,
   ADR-028): almacen_id, origen (`proveedor` | `cliente`), referencia_id
   (proveedor o cliente, sin FK — son dos módulos distintos), motivo
@@ -695,7 +698,9 @@ Solicitud.
   (opcional — venta de servicio o del área comercial originada en una
   cotización aceptada por el cliente, RN-COM-004), cliente_id (opcional),
   usuario_id (cajero o agente), estado (`orden` | `pagada` | `facturada` |
-  `anulada` — alcance de Venta corregido 2026-07-14: termina en envío a
+  `anulada` | `cerrada` — `cerrada` es lo que se preparó y entregó **sin
+  cobrarse**: hoy solo el consumo de personal, que nunca pasa por caja
+  (RN-COM-027); alcance de Venta corregido 2026-07-14: termina en envío a
   cocina + cobro, RN-COM-005; pago y comprobante en orden flexible,
   RN-COM-006; ver [state-machines.md](../domain/state-machines.md#venta).
   El avance de cumplimiento NO es estado de `venta`: vive por ítem en
@@ -715,6 +720,14 @@ Solicitud.
   `promocion` | `convenio`), **descuento_autorizado_por** (usuario_id del
   supervisor — RN-COM-017; el permiso `sales.aplicar_descuento` está
   separado de `sales.cobrar` para que el cajero no se autorice a sí mismo).
+  Y el consumo de personal (ADR-034): **tipo** (`venta` |
+  `consumo_personal`, default `venta`), **consumo_motivo** (`fin_semana` |
+  `feriado` | `alta_actividad` | `capacitacion` | `otro`; obligatorio
+  cuando el tipo lo es, prohibido si no), **consumo_autorizado_por**
+  (usuario_id del encargado que firmó con su PIN — permiso
+  `sales.registrar_consumo_personal`). Un `consumo_personal` nace con todas
+  sus líneas en cero y no admite cobro, comprobante ni descuento
+  (RN-COM-025/026/027).
 - **mesa** (ADR-018): sucursal_id, numero (único por sucursal), zona
   (`Salón`, `Terraza`, `Barra`... libre), capacidad (nullable), activa.
   Vive en `sales` y no en `users` porque quien le da sentido es la toma de
