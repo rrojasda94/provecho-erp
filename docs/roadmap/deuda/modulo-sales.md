@@ -32,6 +32,11 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   `consumo_interno` de inventario — sirve para revisar, no para que gerencia
   compare sucursales por mes. Falta también el consumo por **motivo**, que
   es la razón por la que el motivo es un enum cerrado.
+  `inventory.consumo_personal_valorizado` tampoco tiene **emisión** en el
+  catálogo de `reports` (ADR-033): nadie se entera del gasto salvo que lo
+  vaya a buscar. Es una entrada en `reports/domain/catalogo.py` más su fila
+  en `events.md`, pero primero hay que decidir a qué área se dirige —
+  gerencia, contabilidad, o el encargado del local.
 - ⬜ **7 íconos del home siguen llevando a 404** (`/produccion`, `/rrhh`,
   `/marketing`, `/gerencia`, `/usuarios`, `/contabilidad`, y el resto de
   `/inventario`): el grid lista los módulos que tienen **backend**, no los que
