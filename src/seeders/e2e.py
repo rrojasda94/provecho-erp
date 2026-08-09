@@ -182,6 +182,10 @@ def _crear_producto_vendible(session, empresa, marca) -> ProductoComercial:
         nombre="Harina E2E",
         unidad_medida_id=udm.id,
         tipo="insumo",
+        # Con costo 0 el lienzo de nodos simula un plato que cuesta S/ 0.00 y
+        # la prueba de que una resta baja el costo no puede distinguir "bajó"
+        # de "nunca hubo". Un costo cualquiera > 0 alcanza.
+        costo_promedio=Decimal("2.50"),
     )
     session.add(harina)
     session.flush()
