@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -12,10 +13,22 @@ export type Notificacion = {
   nivel: string;
   titulo: string;
   cuerpo: string | null;
+  referencia_tipo: string | null;
+  referencia_id: string | null;
   sucursal_id: string | null;
   leida_at: string | null;
   created_at: string;
 };
+
+/** A dónde lleva una notificación. Hoy todas las que produce `reports`
+ * apuntan al reporte emitido; el resto no lleva a ninguna parte y se
+ * comporta como antes (marcar leída y nada más). */
+function destinoDe(n: Notificacion): string | null {
+  if (n.referencia_tipo === "reporte_emitido" && n.referencia_id) {
+    return `/reportes/emitidos/${n.referencia_id}`;
+  }
+  return null;
+}
 
 /** Cada cuánto se vuelve a preguntar por la bandeja. Un minuto: la alerta de
  * pedido demorado nace de un barrido de Celery cada 5 min, así que refrescar
@@ -48,8 +61,13 @@ function haceCuanto(iso: string): string {
  * Marca leída al hacer click en la fila y no al abrir el panel: abrir para
  * mirar de reojo no es haberse enterado, y con lo segundo un aviso se pierde
  * por pasar el mouse.
+ *
+ * El click además **navega** al reporte cuando la notificación apunta a uno
+ * (ADR-036). Antes solo marcaba leída: el aviso decía que algo pasó y hacía
+ * falta salir a buscarlo a mano, que es justo lo que lo volvía inútil.
  */
 export function Campana() {
+  const router = useRouter();
   const [items, setItems] = useState<Notificacion[]>([]);
   const [error, setError] = useState(false);
 
@@ -73,10 +91,14 @@ export function Campana() {
     return () => clearInterval(id);
   }, [recargar]);
 
-  async function marcarLeida(notificacionId: string) {
-    setItems((previas) => previas.filter((n) => n.id !== notificacionId));
+  async function marcarLeida(notificacion: Notificacion) {
+    setItems((previas) => previas.filter((n) => n.id !== notificacion.id));
+    const destino = destinoDe(notificacion);
+    // Navegar primero: que la marca de leída falle no puede dejar al usuario
+    // sin ir a donde quiso ir.
+    if (destino) router.push(destino);
     try {
-      await pedir(`/notificaciones/${notificacionId}/leer`, { metodo: "POST" });
+      await pedir(`/notificaciones/${notificacion.id}/leer`, { metodo: "POST" });
     } catch {
       recargar();
     }
@@ -141,7 +163,7 @@ export function Campana() {
               <li key={n.id}>
                 <button
                   type="button"
-                  onClick={() => marcarLeida(n.id)}
+                  onClick={() => marcarLeida(n)}
                   className="flex w-full flex-col items-start gap-0.5 border-b border-gray/10 px-3 py-2 text-left hover:bg-cream"
                 >
                   <span

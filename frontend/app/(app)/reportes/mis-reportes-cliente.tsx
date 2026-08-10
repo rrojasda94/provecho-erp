@@ -1,6 +1,7 @@
 "use client";
 
 import type { ColumnDef } from "@tanstack/react-table";
+import Link from "next/link";
 import { useMemo } from "react";
 
 import { TablaDatos } from "@/components/tabla/tabla-datos";
@@ -27,13 +28,21 @@ export function MisReportesCliente({ reportes }: { reportes: ReporteEmitido[] })
         accessorKey: "titulo",
         cell: ({ row }) => (
           <div>
-            <p className="font-semibold">{row.original.titulo}</p>
+            <Link
+              href={`/reportes/emitidos/${row.original.id}`}
+              className="font-semibold text-primary hover:underline"
+            >
+              {row.original.titulo}
+            </Link>
             {row.original.cuerpo ? (
               <p className="text-sm text-secondary">{row.original.cuerpo}</p>
             ) : null}
           </div>
         ),
       },
+      // Quién lo provocó, en la lista y no solo en la ficha: es la columna
+      // por la que se ordena cuando algo se repite.
+      { header: "Quién", accessorKey: "actor" },
       { header: "Hecho", accessorKey: "codigo_emision" },
       {
         header: "Cuándo",

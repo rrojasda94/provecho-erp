@@ -7,10 +7,24 @@
  * ni simular un DOM. Lo que toca `Blob`/`document` se queda del otro lado.
  */
 
-export type TipoColumna = "texto" | "numero" | "dinero" | "cantidad" | "fecha";
+export type TipoColumna =
+  | "texto"
+  | "numero"
+  | "dinero"
+  | "cantidad"
+  | "fecha"
+  // El id de la entidad de la fila. No se dibuja como celda: es el ancla del
+  // enlace de la fila (ADR-036).
+  | "id";
 export type Visual = "tabla" | "barras" | "lineas";
 
-export type Columna = { clave: string; titulo: string; tipo: TipoColumna };
+export type Columna = {
+  clave: string;
+  titulo: string;
+  tipo: TipoColumna;
+  /** Tipo de entidad al que apunta esta columna, si es un id. */
+  enlace?: string;
+};
 
 export type Fila = Record<string, string | number | null>;
 

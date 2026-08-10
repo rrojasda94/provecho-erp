@@ -1,6 +1,7 @@
 "use client";
 
 import type { ColumnDef } from "@tanstack/react-table";
+import Link from "next/link";
 import { useMemo } from "react";
 
 import { TablaDatos } from "@/components/tabla/tabla-datos";
@@ -28,7 +29,19 @@ export function EmitidosCliente({ reportes }: { reportes: ReporteEmitido[] }) {
           </span>
         ),
       },
-      { header: "Reporte", accessorKey: "titulo" },
+      {
+        header: "Reporte",
+        accessorKey: "titulo",
+        cell: ({ row }) => (
+          <Link
+            href={`/reportes/emitidos/${row.original.id}`}
+            className="font-semibold text-primary hover:underline"
+          >
+            {row.original.titulo}
+          </Link>
+        ),
+      },
+      { header: "Quién", accessorKey: "actor" },
     ],
     [],
   );
