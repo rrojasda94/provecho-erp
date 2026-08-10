@@ -76,6 +76,24 @@ El seeder es idempotente y deja la organización del Grupo Majambo más el
 usuario `admin` / PIN `123456`. Los datos de desarrollo se regeneran así:
 no se migran a mano entre bases.
 
+### Datos de demo (solo desarrollo)
+
+Tres seeders más, en este orden. Ninguno corre con `ENVIRONMENT=production`.
+
+```bash
+python -m src.seeders.pdv_demo
+python -m src.seeders.pizzas_demo
+python -m src.seeders.reportes_demo
+```
+
+`pdv_demo` deja con qué vender (caja, carta, medios de pago, mesas).
+`reportes_demo` **borra los reportes que haya** y arma diez situaciones con
+su fila real detrás —un ajuste pendiente de aprobar, un lote vencido, una
+caja descuadrada— más tres cadenas de escalamiento en distinto estado, así
+que cada enlace de un reporte aterriza en un registro que existe. Imprime
+con qué usuario entrar y cuántos reportes va a ver cada uno; el equipo de
+demo usa el PIN `654321`.
+
 ## Entornos
 
 `local → development → testing → staging → production`, cada uno con su

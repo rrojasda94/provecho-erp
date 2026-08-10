@@ -419,7 +419,10 @@ CATALOGO: tuple[Emision, ...] = (
         ambito="almacen",
         campos=("orden_produccion_id", "almacen_id", "resultado"),
         titulo="No conformidad de producción: {resultado}",
-        areas_sugeridas=("gerencia", "almacen"),
+        # `cocina` desde 2026-08-10: RN-PRD-014 le pide al jefe de cocina que
+        # redacte el hallazgo y la acción tomada, y hasta ahora el aviso iba a
+        # Gerencia y Almacén — o sea, a todos menos a quien tiene que actuar.
+        areas_sugeridas=("gerencia", "almacen", "cocina"),
         referencia_tipo="orden_produccion",
         clave_referencia="orden_produccion_id",
         clave_actor="registrado_por",

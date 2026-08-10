@@ -460,7 +460,12 @@ ROLES["contador"].append("reports.leer_matriz")
 # que nadie más lo mire.
 for _rol in ("supervisor", "cajero", "jefe_cocina", "despachador", "almacenero"):
     ROLES[_rol].append("reports.escalar")
-for _rol in ("supervisor", "contador"):
+# `jefe_cocina` cierra los suyos porque RN-PRD-014 lo dice con todas las
+# letras: «el jefe de cocina redacta el hallazgo y la acción tomada». Sin
+# esto, una no conformidad solo la podía cerrar alguien sin `production.leer`
+# — o sea, nadie: la doble puerta de RN-REP-002 también aplica al
+# escalamiento, así que hace falta el permiso del módulo *y* el de resolver.
+for _rol in ("supervisor", "contador", "jefe_cocina"):
     ROLES[_rol].append("reports.escalamiento_resolver")
 
 # Qué roles componen cada área semilla. El área es «de qué me entero» y el rol

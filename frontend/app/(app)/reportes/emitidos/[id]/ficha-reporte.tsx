@@ -116,7 +116,14 @@ function Encabezado({
   destino: Destino | null;
   permisos: string[];
 }) {
-  const ruta = rutaDestino(reporte.referencia_tipo, reporte.referencia_id);
+  // Un reporte de la propia cadena no ofrece botón: el escalamiento ya se ve
+  // más abajo, en esta misma ficha. Además su permiso no se puede anticipar
+  // —la lectura se gatea contra el módulo del reporte de origen, no contra
+  // `reports.leer`— así que el botón sería el único enlace ciego que queda.
+  const ruta =
+    reporte.referencia_tipo === "escalamiento"
+      ? null
+      : rutaDestino(reporte.referencia_tipo, reporte.referencia_id);
   // Un botón visible para todos lleva a un 403: ser destinatario no da acceso
   // al dato del módulo dueño (RN-REP-002, ADR-033).
   const puedeIr = ruta !== null && (!destino || tienePermiso(permisos, destino.permiso));
