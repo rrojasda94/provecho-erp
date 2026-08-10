@@ -214,22 +214,66 @@ def actualizar_documento(
     return cliente
 
 
-def buscar(
-    session: Session, *, grupo_id: uuid.UUID, q: str, limite: int = 20
-) -> list[tuple[Cliente, Persona | None]]:
-    """Busca por teléfono, documento o nombre — en caja se pregunta lo que
-    el cliente recuerde. Devuelve el cliente junto a su persona para que el
-    llamador arme el nombre sin volver a consultar."""
-    q = (q or "").strip()
-    if not q:
-        return []
-    patron = f"%{q}%"
-    filas = session.execute(
-        select(Cliente, Persona)
+def editar_cliente(session: Session, cliente_id: uuid.UUID, **campos) -> Cliente:
+    """Corrige un cliente **jurídico**. Campo `None` = no tocar.
+
+    Solo jurídico porque es lo único que `cliente` guarda por su cuenta: en
+    uno natural el nombre, el teléfono, el documento y la dirección viven en
+    su `persona` (RN-GEN-007, fuente única) y se corrigen desde ahí. Duplicar
+    esos campos acá sería crear la segunda fuente que esa regla existe para
+    evitar.
+
+    El documento tiene su propio caso de uso (`actualizar_documento`), que
+    aplica las reglas de identificación; este no lo toca.
+    """
+    repo = ClienteRepo(session)
+    cliente = repo.get(cliente_id)
+    if cliente is None or cliente.deleted_at is not None:
+        raise NoEncontrado("cliente no encontrado")
+    if cliente.tipo != "juridico":
+        raise ReglaNegocio(
+            "los datos de un cliente natural viven en su persona "
+            "(RN-GEN-007): se corrigen desde Personas"
+        )
+
+    ruc = (campos.get("ruc") or "").strip()
+    if ruc:
+        if len(ruc) != rules.LARGO_RUC or not ruc.isdigit():
+            raise ReglaNegocio("un cliente jurídico se identifica con RUC (11 dígitos)")
+        ajeno = repo.por_ruc(cliente.grupo_id, ruc)
+        if ajeno is not None and ajeno.id != cliente.id:
+            raise Conflicto(f"ya existe un cliente con RUC {ruc}")
+        cliente.ruc = ruc
+
+    razon_social = (campos.get("razon_social") or "").strip()
+    if razon_social:
+        cliente.razon_social = razon_social
+    if campos.get("contacto") is not None:
+        cliente.contacto = campos["contacto"].strip() or None
+    # Mismo criterio que el alta: SUNAT manda sobre lo tecleado.
+    if ruc or razon_social:
+        cliente.razon_social = razon_social_desde_ruc(cliente.ruc, cliente.razon_social)
+    return cliente
+
+
+def q_listado(session: Session, *, grupo_id: uuid.UUID, q: str | None = None):
+    """La consulta sin ejecutar, para que el router la pagine (ADR-026).
+
+    Es la misma de `buscar` sin el `LIMIT`: la caja pide las primeras 20
+    coincidencias y el back-office pagina el padrón entero, pero *qué* es un
+    cliente del grupo y por qué campos se lo encuentra tiene que ser una sola
+    definición — si no, la pantalla y la caja terminan mostrando universos
+    distintos.
+    """
+    consulta = (
+        select(Cliente)
         .outerjoin(Persona, Persona.id == Cliente.persona_id)
-        .where(
-            Cliente.grupo_id == grupo_id,
-            Cliente.deleted_at.is_(None),
+        .where(Cliente.grupo_id == grupo_id, Cliente.deleted_at.is_(None))
+    )
+    q = (q or "").strip()
+    if q:
+        patron = f"%{q}%"
+        consulta = consulta.where(
             or_(
                 Persona.telefono.ilike(patron),
                 Persona.numero_documento.ilike(patron),
@@ -237,8 +281,38 @@ def buscar(
                 Persona.apellidos.ilike(patron),
                 Cliente.razon_social.ilike(patron),
                 Cliente.ruc.ilike(patron),
-            ),
+            )
         )
-        .limit(limite)
+    return consulta.order_by(Cliente.created_at.desc())
+
+
+def personas_de(
+    session: Session, clientes_: list[Cliente]
+) -> dict[uuid.UUID, Persona]:
+    """Las personas de una página de clientes, en una consulta.
+
+    `q_listado` devuelve `Cliente` a secas porque `paginar` sabe contar y
+    cortar un `Select` de una entidad, no de dos. Resolver la persona acá
+    cuesta una consulta por página; hacerlo fila por fila costaría N.
+    """
+    ids = {c.persona_id for c in clientes_ if c.persona_id is not None}
+    if not ids:
+        return {}
+    return {
+        p.id: p for p in session.scalars(select(Persona).where(Persona.id.in_(ids)))
+    }
+
+
+def buscar(
+    session: Session, *, grupo_id: uuid.UUID, q: str, limite: int = 20
+) -> list[tuple[Cliente, Persona | None]]:
+    """Busca por teléfono, documento o nombre — en caja se pregunta lo que
+    el cliente recuerde. Devuelve el cliente junto a su persona para que el
+    llamador arme el nombre sin volver a consultar."""
+    if not (q or "").strip():
+        return []
+    encontrados = list(
+        session.scalars(q_listado(session, grupo_id=grupo_id, q=q).limit(limite))
     )
-    return [(cliente, persona) for cliente, persona in filas]
+    personas = personas_de(session, encontrados)
+    return [(c, personas.get(c.persona_id)) for c in encontrados]

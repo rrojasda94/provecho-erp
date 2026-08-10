@@ -133,6 +133,75 @@ def test_id_interno_duplicado_409(env):
     assert client.post("/api/v1/inventory/articulos", headers=h, json=body).status_code == 409
 
 
+def test_editar_articulo_corrige_id_interno(env):
+    """El código de 4 caracteres es lo que el almacenero lee en el estante:
+    tecleado mal se arrastra por toda la operación, y era inmutable."""
+    client, ids, _ = env
+    h = _token(client)
+    art_id = client.post("/api/v1/inventory/articulos", headers=h, json={
+        "empresa_id": ids["empresa_id"], "id_interno": "Q001", "nombre": "Queso",
+        "unidad_medida_id": ids["udm_id"], "tipo": "insumo",
+    }).json()["id"]
+
+    r = client.patch(
+        f"/api/v1/inventory/articulos/{art_id}",
+        headers=h,
+        json={"id_interno": "Q010", "nombre": "queso edam"},
+    )
+    assert r.status_code == 200
+    assert r.json()["id_interno"] == "Q010"
+    # `a_titulo` sigue aplicándose al nombre, igual que en el alta.
+    assert r.json()["nombre"] == "Queso Edam"
+
+
+def test_editar_articulo_id_interno_duplicado_409(env):
+    client, ids, _ = env
+    h = _token(client)
+    art_id = client.post("/api/v1/inventory/articulos", headers=h, json={
+        "empresa_id": ids["empresa_id"], "id_interno": "Q001", "nombre": "Queso",
+        "unidad_medida_id": ids["udm_id"], "tipo": "insumo",
+    }).json()["id"]
+
+    r = client.patch(
+        f"/api/v1/inventory/articulos/{art_id}", headers=h, json={"id_interno": "H001"}
+    )
+    assert r.status_code == 409
+
+
+def test_editar_articulo_conserva_su_propio_id_interno(env):
+    """Reenviar el mismo código no puede chocar consigo mismo: el formulario
+    manda todos sus campos siempre, no solo los que cambiaron."""
+    client, ids, _ = env
+    h = _token(client)
+    art_id = client.post("/api/v1/inventory/articulos", headers=h, json={
+        "empresa_id": ids["empresa_id"], "id_interno": "Q001", "nombre": "Queso",
+        "unidad_medida_id": ids["udm_id"], "tipo": "insumo",
+    }).json()["id"]
+
+    r = client.patch(
+        f"/api/v1/inventory/articulos/{art_id}",
+        headers=h,
+        json={"id_interno": "Q001", "nombre": "Queso Fresco"},
+    )
+    assert r.status_code == 200
+
+
+def test_editar_articulo_categoria_inexistente_404(env):
+    client, ids, _ = env
+    h = _token(client)
+    art_id = client.post("/api/v1/inventory/articulos", headers=h, json={
+        "empresa_id": ids["empresa_id"], "id_interno": "Q001", "nombre": "Queso",
+        "unidad_medida_id": ids["udm_id"], "tipo": "insumo",
+    }).json()["id"]
+
+    r = client.patch(
+        f"/api/v1/inventory/articulos/{art_id}",
+        headers=h,
+        json={"categoria_id": "00000000-0000-0000-0000-000000000000"},
+    )
+    assert r.status_code == 404
+
+
 def test_movimiento_actualiza_stock(env):
     client, ids, _ = env
     h = _token(client)

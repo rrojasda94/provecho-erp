@@ -82,10 +82,37 @@ def q_proveedores(session: Session, empresa_id: uuid.UUID | None = None):
 
 
 def editar_proveedor(session: Session, proveedor_id: uuid.UUID, **campos) -> Proveedor:
+    """Corrige un proveedor ya dado de alta. Campo `None` = no tocar.
+
+    Las mismas reglas del alta valen acá: los datos de un natural viven en su
+    `persona` y la condición 'credito' no existe sin plazo. Antes era un
+    `setattr` ciego, con lo que un natural podía terminar con razón social
+    propia —dos fuentes para el mismo nombre, que es justo lo que
+    RN-GEN-007 prohíbe—.
+    """
     proveedor = ProveedorRepo(session).get(proveedor_id)
     if proveedor is None:
         raise NoEncontrado("proveedor no encontrado")
+
+    identificacion = campos.get("razon_social") or campos.get("ruc")
+    if identificacion and proveedor.tipo != "juridico":
+        raise ReglaNegocio(
+            "razón social y RUC son del proveedor jurídico; en uno natural "
+            "los datos viven en su persona (RN-GEN-007)"
+        )
+
     for campo, valor in campos.items():
         if valor is not None:
             setattr(proveedor, campo, valor)
+
+    if proveedor.condicion_pago == "credito" and not proveedor.plazo_dias_credito:
+        raise ReglaNegocio("condición 'credito' requiere plazo_dias_credito")
+
+    # Mismo criterio que el alta: SUNAT manda sobre lo tecleado. Corregir el
+    # RUC es justo el caso en que lo tecleado estaba mal, así que volver a
+    # consultar es el punto del cambio, no un efecto colateral.
+    if identificacion:
+        proveedor.razon_social = razon_social_desde_ruc(
+            proveedor.ruc, proveedor.razon_social
+        )
     return proveedor

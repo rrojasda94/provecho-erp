@@ -1130,6 +1130,7 @@
         "type": "object"
       },
       "ArticuloUpdate": {
+        "description": "Campo ausente o `null` = no tocar.\n\n`unidad_medida_id` no está y no va a estar: el stock y las recetas ya\ncargadas están expresados en la unidad actual (ver `editar_articulo`).",
         "properties": {
           "archivado": {
             "anyOf": [
@@ -1193,9 +1194,24 @@
             ],
             "title": "Dias Alerta Vencimiento"
           },
+          "id_interno": {
+            "anyOf": [
+              {
+                "maxLength": 4,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Interno"
+          },
           "nombre": {
             "anyOf": [
               {
+                "maxLength": 150,
+                "minLength": 1,
                 "type": "string"
               },
               {
@@ -1207,6 +1223,7 @@
           "tipo": {
             "anyOf": [
               {
+                "maxLength": 30,
                 "type": "string"
               },
               {
@@ -2761,6 +2778,18 @@
             ],
             "title": "Numero Documento"
           },
+          "persona_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Persona Id"
+          },
           "telefono": {
             "anyOf": [
               {
@@ -2988,6 +3017,50 @@
           "contacto"
         ],
         "title": "ClientePublicoOut",
+        "type": "object"
+      },
+      "ClienteUpdate": {
+        "description": "Corrección de un cliente **jurídico**. Campo ausente o `null` = no tocar.\n\nNo lleva nombre, teléfono ni dirección: en un cliente natural esos datos\nviven en su `persona` (RN-GEN-007) y se corrigen desde Personas. El\ndocumento tiene su propio endpoint (`PATCH /clientes/{id}/documento`),\nque aplica las reglas de identificación.",
+        "properties": {
+          "contacto": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contacto"
+          },
+          "razon_social": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Razon Social"
+          },
+          "ruc": {
+            "anyOf": [
+              {
+                "pattern": "^\\d{11}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ruc"
+          }
+        },
+        "title": "ClienteUpdate",
         "type": "object"
       },
       "ColumnaOut": {
@@ -10242,6 +10315,37 @@
         "title": "Pagina[CampanaOut]",
         "type": "object"
       },
+      "Pagina_ClienteBuscadoOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ClienteBuscadoOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "Pagina[ClienteBuscadoOut]",
+        "type": "object"
+      },
       "Pagina_EvaluacionOut_": {
         "properties": {
           "items": {
@@ -14262,6 +14366,17 @@
             "title": "Condicion Pago",
             "type": "string"
           },
+          "contacto": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contacto"
+          },
           "empresa_id": {
             "format": "uuid",
             "title": "Empresa Id",
@@ -14287,6 +14402,17 @@
               }
             ],
             "title": "Persona Id"
+          },
+          "plazo_dias_credito": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plazo Dias Credito"
           },
           "razon_social": {
             "anyOf": [
@@ -14322,6 +14448,8 @@
           "persona_id",
           "razon_social",
           "ruc",
+          "contacto",
+          "plazo_dias_credito",
           "formal",
           "clasificacion",
           "condicion_pago",
@@ -14331,6 +14459,7 @@
         "type": "object"
       },
       "ProveedorUpdate": {
+        "description": "Campo ausente o `null` = no tocar.\n\n`razon_social`/`ruc` se admiten porque un RUC mal tecleado llega hasta la\nfactura electrónica: sin esto la única corrección era tocar la base. Solo\nvalen sobre un proveedor **jurídico** — en uno natural esos datos viven\nen su `persona` (RN-GEN-007) y se corrigen allá.\n\n`tipo` y `persona_id` no son editables: cambiarlos convierte al proveedor\nen otro y deja sus órdenes de compra apuntando a algo que ya no es.",
         "properties": {
           "activo": {
             "anyOf": [
@@ -14346,6 +14475,10 @@
           "clasificacion": {
             "anyOf": [
               {
+                "enum": [
+                  "regular",
+                  "preferente"
+                ],
                 "type": "string"
               },
               {
@@ -14357,6 +14490,10 @@
           "condicion_pago": {
             "anyOf": [
               {
+                "enum": [
+                  "contado",
+                  "credito"
+                ],
                 "type": "string"
               },
               {
@@ -14368,6 +14505,7 @@
           "contacto": {
             "anyOf": [
               {
+                "maxLength": 255,
                 "type": "string"
               },
               {
@@ -14379,6 +14517,7 @@
           "plazo_dias_credito": {
             "anyOf": [
               {
+                "minimum": 1.0,
                 "type": "integer"
               },
               {
@@ -14386,6 +14525,31 @@
               }
             ],
             "title": "Plazo Dias Credito"
+          },
+          "razon_social": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Razon Social"
+          },
+          "ruc": {
+            "anyOf": [
+              {
+                "pattern": "^\\d{11}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ruc"
           }
         },
         "title": "ProveedorUpdate",
@@ -34914,6 +35078,147 @@
           }
         ],
         "summary": "Buscar Clientes",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/clientes/listado": {
+      "get": {
+        "description": "El padrón de clientes del grupo, para la pantalla de back-office.\n\nEndpoint propio y no `GET /clientes`: ese es el contrato público de\nanálisis (`sales.leer_clientes_externos`, `grupo_id` por query), pensado\npara que marketing lea desde afuera. Pedirle a quien administra el padrón\nde su propio grupo el permiso de lectura externa sería abrirle de paso\nlos clientes que no le tocan.\n\nTampoco es `/clientes/buscar`: aquella corta en 20 y exige `q` porque en\ncaja se busca a alguien concreto; acá se recorre el padrón entero.",
+        "operationId": "listar_clientes_backoffice_api_v1_sales_clientes_listado_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "description": "Página, empezando en 1",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "description": "Página, empezando en 1",
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Filas por página (máx. 200)",
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Filas por página (máx. 200)",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pagina_ClienteBuscadoOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Clientes Backoffice",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/clientes/{cliente_id}": {
+      "patch": {
+        "description": "Corrige razón social, RUC o contacto de un cliente **jurídico**. Un\nRUC mal tecleado llega hasta la factura electrónica y hasta ahora no\ntenía arreglo por API.\n\nUn cliente natural responde 422: sus datos viven en su `persona`\n(RN-GEN-007) y se corrigen desde `PATCH /personas/{id}`.",
+        "operationId": "editar_cliente_api_v1_sales_clientes__cliente_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "cliente_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Cliente Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClienteUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClienteOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Editar Cliente",
         "tags": [
           "sales"
         ]

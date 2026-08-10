@@ -94,9 +94,19 @@ class ArticuloCreate(BaseModel):
 
 
 class ArticuloUpdate(BaseModel):
-    nombre: str | None = None
+    """Campo ausente o `null` = no tocar.
+
+    `unidad_medida_id` no está y no va a estar: el stock y las recetas ya
+    cargadas están expresados en la unidad actual (ver `editar_articulo`).
+    """
+
+    # Un código de 4 caracteres mal tecleado se arrastra por toda la
+    # operación —es lo que el almacenero lee en el estante— y hasta ahora
+    # era inmutable.
+    id_interno: str | None = Field(default=None, min_length=1, max_length=4)
+    nombre: str | None = Field(default=None, min_length=1, max_length=150)
     categoria_id: uuid.UUID | None = None
-    tipo: str | None = None
+    tipo: str | None = Field(default=None, max_length=30)
     costo_promedio: Decimal | None = None
     archivado: bool | None = None
     controla_lote: bool | None = None
