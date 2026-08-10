@@ -1,10 +1,18 @@
 import { ApiError, apiFetch, type Pagina } from "@/lib/api";
+import { primeroElDe } from "@/lib/destinos";
 import { obtenerSesion } from "@/lib/sesion";
 
 import { OrdenesCliente, type Almacen, type Articulo, type Orden } from "./ordenes-cliente";
 
-export default async function ProduccionPage() {
+export default async function ProduccionPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ orden?: string }>;
+}) {
   const { token } = await obtenerSesion();
+  // `?orden=<id>` es a donde llega `production.no_conformidad_detectada`: la
+  // orden reportada sube al tope de la lista (ADR-036).
+  const { orden } = await searchParams;
 
   try {
     const [ordenes, articulos, almacenes] = await Promise.all([
@@ -16,7 +24,7 @@ export default async function ProduccionPage() {
     ]);
     return (
       <OrdenesCliente
-        ordenes={ordenes.items}
+        ordenes={primeroElDe(ordenes.items, orden ?? null, (o) => o.id)}
         articulos={articulos.items}
         almacenes={almacenes}
       />

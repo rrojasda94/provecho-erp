@@ -35,6 +35,9 @@ class ColumnaOut(BaseModel):
     clave: str
     titulo: str
     tipo: str
+    # A qué entidad apunta esta columna cuando es el id de la fila. Vacío en
+    # las columnas normales; con valor, el cliente enlaza la fila (ADR-036).
+    enlace: str = ""
 
 
 class ReporteOut(BaseModel):
@@ -85,7 +88,8 @@ def _a_salida(r: catalogo.Reporte) -> ReporteOut:
         valor=r.valor,
         filtra_sucursal=r.filtra_sucursal,
         columnas=[
-            ColumnaOut(clave=c.clave, titulo=c.titulo, tipo=c.tipo) for c in r.columnas
+            ColumnaOut(clave=c.clave, titulo=c.titulo, tipo=c.tipo, enlace=c.enlace)
+            for c in r.columnas
         ],
     )
 

@@ -5,6 +5,7 @@ import { useMemo } from "react";
 
 import { BOTON_FILA, DialogoFormulario } from "@/components/formulario/dialogo-formulario";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
+import { primeroElDe } from "@/lib/destinos";
 
 import { crearCategoriaAction, editarCategoriaAction } from "../actions";
 
@@ -13,6 +14,19 @@ export type Categoria = {
   nombre: string;
   frecuencia_conteo: string | null;
 };
+
+export type ProgramaConteo = {
+  almacen_id: string;
+  categoria_id: string;
+  categoria: string;
+  frecuencia: string;
+  ultimo_conteo: string | null;
+  proxima_fecha: string;
+  estado: string;
+  dias_atraso: number;
+};
+
+type Fila = Categoria & { estado: string; proxima: string; atraso: number };
 
 // Las seis de `rules.FRECUENCIAS_CONTEO`. Vacío = fuera del conteo cíclico.
 const FRECUENCIAS = [
@@ -81,14 +95,60 @@ function DialogoEditarCategoria({ categoria }: { categoria: Categoria }) {
   );
 }
 
-export function CategoriasCliente({ categorias }: { categorias: Categoria[] }) {
-  const columnas: ColumnDef<Categoria>[] = useMemo(
+/**
+ * Además de administrarlas, esta pantalla es a donde lleva
+ * `inventory.conteo_vencido` (ADR-036): el reporte dice que una categoría se
+ * pasó de su fecha, y acá se ve cuánto y se corrige su frecuencia.
+ */
+export function CategoriasCliente({
+  categorias,
+  programa,
+  resaltado,
+}: {
+  categorias: Categoria[];
+  programa: ProgramaConteo[];
+  resaltado: string | null;
+}) {
+  const filas = useMemo<Fila[]>(() => {
+    // Una categoría puede estar programada en varios almacenes: manda la más
+    // atrasada, que es la que hay que ir a contar.
+    const peor = new Map<string, ProgramaConteo>();
+    for (const p of programa) {
+      const actual = peor.get(p.categoria_id);
+      if (!actual || p.dias_atraso > actual.dias_atraso) peor.set(p.categoria_id, p);
+    }
+    const lista = categorias.map((c) => {
+      const p = peor.get(c.id);
+      return {
+        ...c,
+        estado: p?.estado ?? "sin programa",
+        proxima: p?.proxima_fecha ?? "—",
+        atraso: p?.dias_atraso ?? 0,
+      };
+    });
+    return primeroElDe(lista, resaltado, (c) => c.id);
+  }, [categorias, programa, resaltado]);
+
+  const columnas: ColumnDef<Fila>[] = useMemo(
     () => [
       { accessorKey: "nombre", header: "Categoría" },
       {
         id: "frecuencia",
         header: "Conteo cíclico",
         accessorFn: (c) => c.frecuencia_conteo ?? "—",
+      },
+      { accessorKey: "proxima", header: "Próximo conteo" },
+      {
+        accessorKey: "estado",
+        header: "Estado",
+        cell: ({ row }) =>
+          row.original.estado === "vencido" ? (
+            <span className="rounded bg-red-100 px-2 py-0.5 text-xs font-bold text-red-900">
+              Vencido · {row.original.atraso} día(s)
+            </span>
+          ) : (
+            <span className="text-sm text-gray">{row.original.estado}</span>
+          ),
       },
       {
         id: "acciones",
@@ -112,7 +172,7 @@ export function CategoriasCliente({ categorias }: { categorias: Categoria[] }) {
       </p>
       <TablaDatos
         columnas={columnas}
-        datos={categorias}
+        datos={filas}
         placeholderBusqueda="Buscar categoría..."
       />
     </div>

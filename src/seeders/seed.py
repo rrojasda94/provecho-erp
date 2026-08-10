@@ -216,6 +216,17 @@ PERMISOS = [
         "Editar áreas y reglas de distribución: decidir quién recibe qué",
     ),
     (
+        "reports.escalar",
+        "Elevar un reporte que no se pudo resolver en el propio nivel "
+        "(RN-CTP-004)",
+    ),
+    (
+        "reports.escalamiento_resolver",
+        "Registrar lo actuado en un escalamiento y darlo por resuelto. "
+        "Separado de `reports.escalar` por lo mismo que solicitar y aprobar "
+        "un ajuste: quien eleva no es quien cierra",
+    ),
+    (
         "gerencia.gestionar_parametros_empresa",
         "Aprobar, rechazar o modificar parámetros operativos por empresa (ADR-014)",
     ),
@@ -442,6 +453,15 @@ for _rol in (
 # descuadre de caja es una decisión de gobierno, no de turno.
 ROLES["supervisor"].append("reports.leer_matriz")
 ROLES["contador"].append("reports.leer_matriz")
+
+# Elevar lo puede hacer quien está en la operación y se topa con algo que no
+# le corresponde resolver; cerrarlo, quien responde por el nivel. Que sean dos
+# permisos evita que el mismo turno abra y cierre su propio escalamiento sin
+# que nadie más lo mire.
+for _rol in ("supervisor", "cajero", "jefe_cocina", "despachador", "almacenero"):
+    ROLES[_rol].append("reports.escalar")
+for _rol in ("supervisor", "contador"):
+    ROLES[_rol].append("reports.escalamiento_resolver")
 
 # Qué roles componen cada área semilla. El área es «de qué me entero» y el rol
 # es «qué puedo hacer»: se parecen, y por eso hay que decir el mapeo en vez de

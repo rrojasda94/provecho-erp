@@ -19,6 +19,7 @@ from src.modules.inventory.infrastructure.models import (
     Lote,
     Receta,
     ReservaStock,
+    Sku,
     SolicitudInsumos,
     Transferencia,
 )
@@ -41,6 +42,16 @@ def exigir_articulo(
         raise NoEncontrado("artículo no encontrado")
     tenant.exigir_empresa(articulo.empresa_id)
     return articulo
+
+
+def exigir_sku(session: Session, sku_id: uuid.UUID, tenant: Tenant) -> Sku:
+    """El SKU no lleva empresa: la hereda de su artículo, que es donde vive
+    el tenant. Mismo camino que `exigir_lote`."""
+    sku = session.get(Sku, sku_id)
+    if sku is None:
+        raise NoEncontrado("SKU no encontrado")
+    exigir_articulo(session, sku.articulo_id, tenant)
+    return sku
 
 
 def exigir_lote(session: Session, lote_id: uuid.UUID, tenant: Tenant) -> Lote:

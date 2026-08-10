@@ -307,6 +307,9 @@ def test_stock_bajo_minimo_avisa_al_cruzar_una_sola_vez(env):
     assert _consumir(3).status_code == 201  # 7 → 4: cruza
     assert len(avisos) == 1
     assert avisos[0]["cantidad"] == "4.0000"
+    # Quién hizo el movimiento que cruzó el mínimo: es a quien se le pregunta
+    # qué pasó antes de salir a comprar.
+    assert avisos[0]["usuario_id"] is not None
     assert _consumir(1).status_code == 201  # 4 → 3: ya estaba abajo
     assert len(avisos) == 1
 
@@ -341,6 +344,65 @@ def test_crear_articulo_udm_inexistente_404(env):
         "unidad_medida_id": "00000000-0000-0000-0000-000000000000", "tipo": "insumo",
     })
     assert r.status_code == 404
+
+
+def test_los_destinos_de_un_reporte_devuelven_el_dato_completo(env):
+    """Un reporte que enlaza a una pantalla que no existe sigue siendo una
+    línea de texto. Estos GET son el otro extremo del enlace."""
+    client, ids, _ = env
+    h = _token(client)
+    client.post("/api/v1/inventory/movimientos", headers=h, json={
+        "almacen_id": ids["almacen_id"], "sku_id": ids["sku_id"],
+        "cantidad": "12", "tipo": "recepcion_compra",
+    })
+
+    art = client.get(f"/api/v1/inventory/articulos/{ids['articulo_id']}", headers=h)
+    assert art.status_code == 200
+    assert art.json()["nombre"] == "Harina"
+
+    sku = client.get(f"/api/v1/inventory/skus/{ids['sku_id']}", headers=h)
+    assert sku.status_code == 200
+    cuerpo = sku.json()
+    # Artículo y saldo por almacén en una sola respuesta: la pantalla de
+    # "stock bajo mínimo" no puede necesitar tres viajes para decidir.
+    assert cuerpo["articulo"]["nombre"] == "Harina"
+    assert cuerpo["stock"][0]["almacen"] == "Central"
+    assert Decimal(cuerpo["stock"][0]["cantidad"]) == Decimal("12")
+
+
+def test_ajustes_se_pueden_listar_y_abrir(env):
+    """Antes solo se podían crear y aprobar: `inventory.ajuste_fuera_margen`
+    reportaba un hecho que no se podía ir a mirar."""
+    client, ids, _ = env
+    h = _token(client)
+    h_alm = _token(client, "almacenero1", "654321")
+    creado = client.post("/api/v1/inventory/ajustes", headers=h_alm, json={
+        "almacen_id": ids["almacen_id"], "sku_id": ids["sku_id"],
+        "cantidad": "-3", "motivo": "merma",
+    })
+    assert creado.status_code == 201, creado.text
+
+    lista = client.get("/api/v1/inventory/ajustes?estado=pendiente", headers=h)
+    assert lista.status_code == 200
+    assert [a["id"] for a in lista.json()["items"]] == [creado.json()["id"]]
+
+    detalle = client.get(
+        f"/api/v1/inventory/ajustes/{creado.json()['id']}", headers=h
+    ).json()
+    assert detalle["articulo"] == "Harina"
+    assert detalle["sku_codigo"] == "SKU-HARINA"
+    assert detalle["almacen"] == "Central"
+    assert detalle["solicitante"] == "almacenero1"
+    assert detalle["aprobador"] is None
+
+
+def test_un_destino_inexistente_responde_404(env):
+    client, _, _ = env
+    h = _token(client)
+    fantasma = "00000000-0000-0000-0000-000000000000"
+    for recurso in ("articulos", "skus", "lotes", "categorias", "ajustes"):
+        r = client.get(f"/api/v1/inventory/{recurso}/{fantasma}", headers=h)
+        assert r.status_code == 404, recurso
 
 
 def test_leer_sin_permiso_403(env):

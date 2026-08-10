@@ -1,4 +1,5 @@
 import { ApiError, apiFetch } from "@/lib/api";
+import { primeroElDe } from "@/lib/destinos";
 import { obtenerSesion } from "@/lib/sesion";
 
 import { CajaCliente, type Pos, type Sucursal, type Turno } from "./caja-cliente";
@@ -19,8 +20,15 @@ function Monto({ valor }: { valor: string | null }) {
   return <span className="tabular-nums">S/ {valor ?? "0.00"}</span>;
 }
 
-export default async function CajaPage() {
+export default async function CajaPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ cierre?: string }>;
+}) {
   const { token } = await obtenerSesion();
+  // `?cierre=<id>` es a donde llega `accounting.cierre_caja_irregular`: el
+  // turno con el descuadre sube al tope de los cerrados (ADR-036).
+  const { cierre } = await searchParams;
 
   let filas: FilaCaja[];
   try {
@@ -132,7 +140,11 @@ export default async function CajaPage() {
         está el cajón que se cuenta.
       </p>
 
-      <CajaCliente turnos={turnos} pos={pos} sucursales={sucursales} />
+      <CajaCliente
+        turnos={primeroElDe(turnos, cierre ?? null, (t) => t.cierre_id)}
+        pos={pos}
+        sucursales={sucursales}
+      />
     </div>
   );
 }

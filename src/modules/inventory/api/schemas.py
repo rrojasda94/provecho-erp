@@ -144,6 +144,27 @@ class SkuOut(BaseModel):
     activo: bool
 
 
+class SkuDetalleOut(SkuOut):
+    """El SKU con su artículo y su saldo por almacén.
+
+    Es el destino de `inventory.stock_bajo_minimo`: quien abre el reporte
+    quiere saber qué es, cuánto queda y dónde, sin encadenar tres pantallas.
+    """
+
+    articulo: ArticuloOut
+    stock: list["StockDeSkuOut"] = Field(default_factory=list)
+
+
+class StockDeSkuOut(BaseModel):
+    almacen_id: uuid.UUID
+    almacen: str
+    cantidad: Decimal
+    reservado: Decimal
+    disponible: Decimal
+    stock_minimo: Decimal | None
+    bajo_minimo: bool
+
+
 # --- Stock / movimientos ---
 class MovimientoCreate(BaseModel):
     almacen_id: uuid.UUID
@@ -322,6 +343,14 @@ class LoteOut(BaseModel):
     condicion_almacenamiento: str | None
 
 
+class LoteDetalleOut(LoteOut):
+    """El lote con sus saldos. Destino de `inventory.lote_vencido_detectado`:
+    el reporte dice que se bloqueó, esto dice cuánto quedó y en qué almacén."""
+
+    articulo: str
+    saldos: list["StockLoteOut"] = Field(default_factory=list)
+
+
 class StockLoteOut(BaseModel):
     """Saldo por lote — el listado que el picking lee en orden FEFO."""
     lote_id: uuid.UUID
@@ -361,6 +390,18 @@ class AjusteOut(BaseModel):
     solicitado_por: uuid.UUID
     aprobado_por: uuid.UUID | None
     dentro_margen: bool
+
+
+class AjusteDetalleOut(AjusteOut):
+    """Destino de `inventory.ajuste_fuera_margen`. Los nombres van resueltos:
+    la pantalla que aprueba o rechaza no puede pedir cuatro endpoints más
+    para saber qué artículo es y quién lo pidió."""
+
+    articulo: str
+    sku_codigo: str
+    almacen: str
+    solicitante: str
+    aprobador: str | None
 
 
 # --- Conteo cíclico ---

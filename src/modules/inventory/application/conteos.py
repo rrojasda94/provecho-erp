@@ -331,9 +331,13 @@ def reportar_vencidos(
     almacen_id: uuid.UUID | None = None,
     empresa_id: uuid.UUID | None = None,
     hoy: datetime.date | None = None,
+    usuario_id: uuid.UUID | None = None,
 ) -> list[dict]:
     """Reporta a almacén y gerencia los conteos que no se hicieron en su
     fecha (RN-INV-021). Publica `inventory.conteo_vencido` por cada uno.
+
+    `usuario_id` es quien pidió el barrido a demanda; nulo cuando lo corre el
+    beat, que es el caso normal.
 
     Lo dispara `inventory.reportar_conteos_vencidos` (Celery beat, diario
     06:15 hora Perú) y también el endpoint, a demanda. Diario y no más
@@ -360,6 +364,7 @@ def reportar_vencidos(
                 # El reporte va a las dos áreas: quien debía contar y quien
                 # responde por que se cuente.
                 "dirigido_a": ["almacen", "gerencia"],
+                "usuario_id": str(usuario_id) if usuario_id else None,
             },
         )
     return vencidos

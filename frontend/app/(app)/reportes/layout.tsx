@@ -4,6 +4,7 @@ import { MODULOS } from "@/lib/modulos";
 const modulo = MODULOS.find((m) => m.clave === "reportes")!;
 const submenu = [
   { label: "Mis reportes", href: "/reportes" },
+  { label: "Escalamientos", href: "/reportes/escalamientos" },
   { label: "Distribución", href: "/reportes/distribucion" },
   { label: "Emitidos", href: "/reportes/emitidos" },
 ];

@@ -133,7 +133,10 @@ contiene, buscando su `[[ COMPLETAR ]]`):
 - ✅ 2026-07-20 `reporte_escalamiento`: definido con el usuario — cadena
   atención al cliente → supervisor (redacta solución) → comercial/gerencia
   (acciones reportadas); se almacena para mejora continua
-  (`data-model.md` §6).
+  (`data-model.md` §6). **Implementado el 2026-08-09** (ADR-036) en
+  `src/modules/reports/`, no en `shared`: ancla al `reporte_emitido` y no a la
+  venta, y el escalón se resuelve con áreas + encargado de turno porque el ERP
+  no tiene jerarquía organizacional.
 - ✅ 2026-07-27 Cumplimiento de pedido: **UN** proceso — `PROC-OPE-002`
   (área Operaciones), con Preparación y Despacho/Entrega como etapas
   internas, no dos procesos. Razones: un solo resultado (entra Orden de

@@ -370,6 +370,9 @@ def pedidos_demorados(
     return [
         {
             "pedido": f"#{numero}",
+            # El id ancla el enlace de la fila (ADR-036): la demora se atiende
+            # en la venta, no en el tablero.
+            "venta_id": alerta.venta_id,
             "fecha": fecha_orden,
             "sucursal": sucursal,
             "minutos": alerta.minutos_transcurridos,

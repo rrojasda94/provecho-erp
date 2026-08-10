@@ -33,6 +33,7 @@ from src.modules.inventory.application.scope import (
     exigir_lote,
     exigir_receta,
     exigir_reserva,
+    exigir_sku,
     exigir_solicitud,
     exigir_transferencia,
 )
@@ -108,6 +109,18 @@ def listar_categorias(
     session: Session = Depends(get_db),
 ):
     return catalogo.listar_categorias(session, tenant.filtro_empresa(empresa_id))
+
+
+@router.get("/categorias/{categoria_id}", response_model=schemas.CategoriaOut)
+def obtener_categoria(
+    categoria_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Destino de `inventory.conteo_vencido`. Sin colisión con
+    `/categorias-udm`: el path param va tipado `uuid.UUID`."""
+    return exigir_categoria(session, categoria_id, tenant)
 
 
 @router.get("/unidades-medida", response_model=list[schemas.UnidadMedidaOut])
@@ -203,6 +216,16 @@ def listar_articulos(
     )
 
 
+@router.get("/articulos/{articulo_id}", response_model=schemas.ArticuloOut)
+def obtener_articulo(
+    articulo_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    return exigir_articulo(session, articulo_id, tenant)
+
+
 @router.patch("/articulos/{articulo_id}", response_model=schemas.ArticuloOut)
 def editar_articulo(
     articulo_id: uuid.UUID,
@@ -234,6 +257,19 @@ def crear_sku(
     )
     session.commit()
     return sku
+
+
+@router.get("/skus/{sku_id}", response_model=schemas.SkuDetalleOut)
+def obtener_sku(
+    sku_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Destino de `inventory.stock_bajo_minimo`: el SKU, su artículo y su
+    saldo en cada almacén, que es lo que hay que mirar para decidir reponer."""
+    exigir_sku(session, sku_id, tenant)
+    return stock_uc.detalle_sku(session, sku_id)
 
 
 # --- Stock / movimientos ----------------------------------------------------
@@ -332,7 +368,7 @@ def listar_lotes(
 @router.post("/lotes/bloquear-vencidos", response_model=list[schemas.StockLoteOut])
 def bloquear_vencidos(
     almacen_id: uuid.UUID | None = None,
-    _: Usuario = Depends(require_permission(MOVIMIENTO)),
+    actor: Usuario = Depends(require_permission(MOVIMIENTO)),
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
@@ -341,7 +377,7 @@ def bloquear_vencidos(
     if almacen_id is not None:
         exigir_almacen(session, almacen_id, tenant)
     bloqueados = lotes_uc.bloquear_vencidos(
-        session, almacen_id, tenant.filtro_empresa()
+        session, almacen_id, tenant.filtro_empresa(), usuario_id=actor.id
     )
     ids = [b.lote_id for b in bloqueados]
     session.commit()
@@ -352,6 +388,22 @@ def bloquear_vencidos(
         )
         if fila["lote_id"] in ids
     ]
+
+
+# Después de `/lotes/bloquear-vencidos`: FastAPI resuelve en orden de
+# declaración y un path param `uuid.UUID` declarado antes se quedaría con la
+# ruta literal y respondería 422 en vez de dejarla pasar.
+@router.get("/lotes/{lote_id}", response_model=schemas.LoteDetalleOut)
+def obtener_lote(
+    lote_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Destino de `inventory.lote_vencido_detectado`: el reporte dice que se
+    bloqueó, esto dice cuánto quedó bloqueado y en qué almacén."""
+    exigir_lote(session, lote_id, tenant)
+    return lotes_uc.detalle(session, lote_id, empresa_id=tenant.filtro_empresa())
 
 
 # --- Reservas ---------------------------------------------------------------
@@ -736,7 +788,7 @@ def programa_conteos(
 )
 def verificar_conteos_vencidos(
     almacen_id: uuid.UUID | None = None,
-    _: Usuario = Depends(require_permission(CONTAR)),
+    actor: Usuario = Depends(require_permission(CONTAR)),
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
@@ -745,7 +797,10 @@ def verificar_conteos_vencidos(
     if almacen_id is not None:
         exigir_almacen(session, almacen_id, tenant)
     return conteos_uc.reportar_vencidos(
-        session, almacen_id=almacen_id, empresa_id=tenant.filtro_empresa()
+        session,
+        almacen_id=almacen_id,
+        empresa_id=tenant.filtro_empresa(),
+        usuario_id=actor.id,
     )
 
 
@@ -845,6 +900,42 @@ def anular_conteo(
 
 
 # --- Ajustes (segregación solicitar/aprobar) --------------------------------
+@router.get("/ajustes", response_model=Pagina[schemas.AjusteOut])
+def listar_ajustes(
+    almacen_id: uuid.UUID | None = None,
+    estado: str | None = None,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    p: Paginacion = Depends(paginacion),
+    session: Session = Depends(get_db),
+):
+    """Los ajustes se solicitaban y se aprobaban a ciegas: no había forma de
+    listar los pendientes. `inventory.ajuste_fuera_margen` reportaba un hecho
+    que no se podía ir a mirar."""
+    if almacen_id is not None:
+        exigir_almacen(session, almacen_id, tenant)
+    return paginar(
+        session,
+        ajustes.q_ajustes(
+            session, tenant.filtro_empresa(), almacen_id=almacen_id, estado=estado
+        ),
+        p,
+    )
+
+
+@router.get("/ajustes/{ajuste_id}", response_model=schemas.AjusteDetalleOut)
+def obtener_ajuste(
+    ajuste_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Destino de `inventory.ajuste_fuera_margen`, y donde se decide si se
+    aprueba o se rechaza."""
+    exigir_ajuste(session, ajuste_id, tenant)
+    return ajustes.detalle_ajuste(session, ajuste_id)
+
+
 @router.post("/ajustes", response_model=schemas.AjusteOut, status_code=201)
 def solicitar_ajuste(
     body: schemas.AjusteCreate,

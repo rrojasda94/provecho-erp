@@ -32,7 +32,7 @@ from src.modules.sales.application import queries_publicas as sales_q
 # Cómo formatear la columna en la tabla y el gráfico. El backend no formatea
 # (el `Decimal` viaja como string exacto), pero sí dice qué es cada cosa —
 # el frontend no tiene por qué adivinar que "total" es dinero.
-TIPOS_COLUMNA = ("texto", "numero", "dinero", "cantidad", "fecha")
+TIPOS_COLUMNA = ("texto", "numero", "dinero", "cantidad", "fecha", "id")
 
 VISUALES = ("tabla", "barras", "lineas")
 
@@ -42,6 +42,12 @@ class Columna:
     clave: str
     titulo: str
     tipo: str = "texto"
+    # Si esta columna es el id de una entidad, a qué tipo de `src.core.destinos`
+    # apunta. Una columna `tipo="id"` no se dibuja como celda: es el ancla del
+    # enlace de la fila (ADR-036). Declararla como `Columna` y no como campo
+    # aparte la hace pasar por el mismo whitelist de `ejecutar()`, sin
+    # excepciones que después haya que recordar.
+    enlace: str = ""
 
 
 @dataclass(frozen=True)
@@ -343,6 +349,7 @@ CATALOGO: tuple[Reporte, ...] = (
         etiqueta="pedido",
         valor="minutos",
         columnas=(
+            Columna("venta_id", "", "id", enlace="venta"),
             Columna("pedido", "Pedido"),
             Columna("fecha", "Fecha", "fecha"),
             Columna("sucursal", "Sucursal"),
@@ -440,6 +447,7 @@ CATALOGO: tuple[Reporte, ...] = (
             Columna("origen", "Origen"),
             Columna("referencia", "Documento"),
             Columna("motivo", "Motivo"),
+            Columna("articulo_id", "", "id", enlace="articulo"),
             Columna("articulo", "Artículo"),
             Columna("cantidad", "Cantidad", "cantidad"),
             Columna("detalle", "Detalle"),
@@ -460,6 +468,7 @@ CATALOGO: tuple[Reporte, ...] = (
         valor="disponible",
         filtra_sucursal=False,
         columnas=(
+            Columna("sku_id", "", "id", enlace="sku"),
             Columna("almacen", "Almacén"),
             Columna("articulo", "Artículo"),
             Columna("cantidad", "Físico", "cantidad"),
@@ -484,6 +493,7 @@ CATALOGO: tuple[Reporte, ...] = (
         filtra_sucursal=False,
         columnas=(
             Columna("fecha", "Fecha", "fecha"),
+            Columna("sku_id", "", "id", enlace="sku"),
             Columna("almacen", "Almacén"),
             Columna("articulo", "Artículo"),
             Columna("tipo", "Tipo"),

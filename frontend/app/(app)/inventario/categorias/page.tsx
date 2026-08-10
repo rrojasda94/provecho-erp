@@ -1,10 +1,22 @@
 import { ApiError, apiFetch } from "@/lib/api";
 import { obtenerSesion } from "@/lib/sesion";
 
-import { CategoriasCliente, type Categoria } from "./categorias-cliente";
+import {
+  CategoriasCliente,
+  type Categoria,
+  type ProgramaConteo,
+} from "./categorias-cliente";
 
-export default async function CategoriasPage() {
+type Params = Promise<{ categoria?: string }>;
+
+export default async function CategoriasPage({
+  searchParams,
+}: {
+  searchParams: Params;
+}) {
   const { token } = await obtenerSesion();
+  // `?categoria=<id>` es a donde llega `inventory.conteo_vencido` (ADR-036).
+  const { categoria } = await searchParams;
 
   let categorias: Categoria[];
   try {
@@ -17,5 +29,18 @@ export default async function CategoriasPage() {
     return <p className="text-secondary">{mensaje}</p>;
   }
 
-  return <CategoriasCliente categorias={categorias} />;
+  // El programa de conteo es contexto: si falla, la pantalla sigue diciendo
+  // qué categorías hay y cada cuánto se cuentan.
+  const programa = await apiFetch<ProgramaConteo[]>(
+    "/api/v1/inventory/conteos/programa",
+    { token },
+  ).catch(() => []);
+
+  return (
+    <CategoriasCliente
+      categorias={categorias}
+      programa={programa}
+      resaltado={categoria ?? null}
+    />
+  );
 }

@@ -50,12 +50,21 @@ Operativo en `/api/v1/reports`. Migración `9a1c4e7b2d30`.
 | GET | `/emitidos` | `reports.leer_todo` — los de la empresa, paginado |
 | GET | `/emitidos/{id}` | doble puerta: destinatario (o `reports.leer_todo`) **y** el permiso que declara la emisión |
 | GET | `/mios` | `reports.leer` — lo que me fue entregado |
+| POST | `/emitidos/{id}/escalamientos` | `reports.escalar` + doble puerta — elevar un reporte (RN-CTP-004) |
+| GET | `/emitidos/{id}/escalamientos` | doble puerta — el historial completo, no solo la cadena viva |
+| GET | `/escalamientos` | `reports.leer_todo` — la bandeja del que responde, con filtros de nivel y estado |
+| GET | `/escalamientos/{id}` | doble puerta contra la emisión de origen |
+| POST | `/escalamientos/{id}/acciones` | `reports.escalamiento_resolver` — qué hizo este nivel, sin cerrar ni elevar |
+| POST | `/escalamientos/{id}/elevar` | `reports.escalar` — sube un escalón; devuelve `destinatarios` |
+| POST | `/escalamientos/{id}/resolver` | `reports.escalamiento_resolver` |
 
 **No hay `POST /emitidos`.** El reporte lo emite el evento, no un cliente —
 mismo criterio que ADR-031 para `audit_log`: un endpoint de escritura le
-permitiría al reportado dictar lo que dice su reporte.
+permitiría al reportado dictar lo que dice su reporte. Escalar sí es un acto
+del usuario y por eso sí tiene endpoint: no cambia lo que el reporte dice, dice
+qué se hizo con él.
 
-Emisiones cableadas en este slice (13): los cuatro avisos que existían
+Emisiones cableadas (16): los cuatro avisos que existían
 migrados desde `users` (`sales.pedido_demorado`,
 `inventory.stock_bajo_minimo`, `inventory.lote_vencido_detectado`,
 `inventory.conteo_vencido`) más `inventory.devolucion_a_proveedor`,
@@ -63,15 +72,40 @@ migrados desde `users` (`sales.pedido_demorado`,
 `sales.descuento_aplicado`, `sales.venta_anulada`, `sales.lineas_anuladas`
 (actos de autoridad, RN-AUD-005), `accounting.cierre_caja_irregular`,
 `accounting.pago_requiere_aprobacion` y
-`production.no_conformidad_detectada` (RN-PRD-015).
+`production.no_conformidad_detectada` (RN-PRD-015); y las tres de la propia
+cadena de escalamiento (`reports.escalamiento_abierto`, `_elevado`,
+`_resuelto`, ADR-036).
 
-Deuda del slice: `reporte_escalamiento` (RN-CTP-004, diseñado en
-`data-model.md` §6 y todavía sin modelar — la cadena supervisor → comercial
-→ gerencia necesita estado y acciones propias, no solo distribución);
-adjuntar un reporte del catálogo de `core/reportes` a una emisión
-(«al cerrar caja, manda la foto de `estado_caja` a Gerencia»); canales de
-transporte más allá de la bandeja (correo, WhatsApp — el campo `canal` ya
-está en el modelo); y digest/resumen en vez de una entrega por hecho.
+## Escalamiento (ADR-036)
+
+`reporte_escalamiento` es la séptima tabla del módulo. Vive acá y no en
+`shared` —contra lo que decía `data-model.md` §6, escrito antes de que el
+módulo existiera— porque tiene un solo escritor y un solo lector, y porque su
+lógica necesita `Area`, `AreaMiembro` y `destinatarios.*`.
+
+El ERP **no tiene jerarquía organizacional**. El escalón se resuelve con lo
+que sí existe (`catalogo.DESTINO_POR_NIVEL`):
+
+| `nivel_actual` | Quién responde |
+|---|---|
+| `supervisor` | encargado de turno; roles `supervisor`/`admin` si no hay caja abierta |
+| `comercial` | área `comercial` |
+| `gerencia` | área `gerencia` |
+
+**Ojo con un solapamiento real**: el seeder pone el rol `supervisor` dentro del
+área Comercial, así que elevar de supervisor a comercial puede caer en la misma
+persona. Es la organización de hoy, no un bug. Por eso `POST …/elevar` devuelve
+`destinatarios` y la ficha los muestra: quien eleva ve a quién le llegó — o que
+no le llegó a nadie.
+
+Deuda restante: **escalar sin reporte previo** (los motivos `queja`,
+`error_sistema` y `desistimiento_no_resuelto` de RN-CTP-004 se pueden elegir,
+pero ninguna emisión los produce: haría falta `sales.queja_registrada` con
+endpoint de alta, que choca con el «no hay `POST /emitidos`»); adjuntar un
+reporte del catálogo de `core/reportes` a una emisión («al cerrar caja, manda
+la foto de `estado_caja` a Gerencia»); canales de transporte más allá de la
+bandeja (correo, WhatsApp — el campo `canal` ya está en el modelo); y
+digest/resumen en vez de una entrega por hecho.
 
 ## Casos de uso
 
@@ -114,6 +148,15 @@ está en el modelo); y digest/resumen en vez de una entrega por hecho.
 - `RN-REP-008` — Una regla por `(empresa, emisión, sucursal)`. La regla con
   `sucursal_id` nula es la de la empresa entera y **solo aplica donde no hay
   una específica** — si no, un mismo hecho entregaría dos veces.
+- `RN-REP-009` — Todo reporte dice quién provocó el hecho; nulo se muestra
+  como «Sistema» y significa que lo detectó un barrido, no que se desconoce.
+- `RN-REP-010` — Toda emisión con `referencia_tipo` tiene un destino montado
+  (`src/core/destinos.py`), verificado contra las rutas reales.
+- `RN-REP-011` — Un escalamiento ancla a un reporte **con empresa**.
+- `RN-REP-012` — La cadena sube de a un escalón y `acciones` es append-only.
+- `RN-REP-013` — Un reporte, una cadena abierta a la vez. Una cadena
+  terminada lo libera para escalarlo de nuevo si el problema vuelve.
+- `RN-REP-014` — Abrir, accionar, elevar y resolver quedan en `audit_log`.
 
 ## Flujo
 

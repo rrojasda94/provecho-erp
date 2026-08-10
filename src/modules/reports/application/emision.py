@@ -93,6 +93,12 @@ def emitir(
         ReporteEmitido(
             empresa_id=empresa_id,
             sucursal_id=sucursal_id,
+            almacen_id=almacen_id,
+            # `_uuid()` devuelve `None` ante ausencia o basura: una emisión no
+            # puede perderse porque el publisher todavía no manda el actor.
+            actor_id=(
+                _uuid(payload.get(emision.clave_actor)) if emision.clave_actor else None
+            ),
             codigo_emision=codigo,
             titulo=titulo[:LARGO_TITULO],
             cuerpo=catalogo.render(emision.cuerpo, datos) or None,
@@ -120,6 +126,9 @@ def emitir(
         empresa_id=empresa_id,
         sucursal_id=sucursal_id,
         almacen_id=almacen_id,
+        # La proyección, no el payload crudo: un resolutor dinámico no puede
+        # ver más de lo que la emisión declaró (RN-REP-003).
+        contexto=datos,
     )
     for usuario_id, motivo in entregas:
         repo.add_entrega(

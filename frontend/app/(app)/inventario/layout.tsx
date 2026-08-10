@@ -6,6 +6,9 @@ const submenu = [
   { label: "Artículos", href: "/inventario/articulos" },
   { label: "Categorías", href: "/inventario/categorias" },
   { label: "Unidades de medida", href: "/inventario/unidades-medida" },
+  { label: "Lotes", href: "/inventario/lotes" },
+  { label: "Ajustes", href: "/inventario/ajustes" },
+  { label: "Devoluciones", href: "/inventario/devoluciones" },
 ];
 
 export default function InventarioLayout({ children }: { children: React.ReactNode }) {

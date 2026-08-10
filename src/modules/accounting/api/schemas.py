@@ -336,6 +336,17 @@ class TurnoCerradoOut(BaseModel):
     correcciones: list | None
 
 
+class CierreCajaDetalleOut(TurnoCerradoOut):
+    """El turno con el conteo a la vista. A donde lleva
+    `accounting.cierre_caja_irregular`: la fila dice cuánto descuadró, esto
+    dice contra qué, que es con lo único que se decide reclamar o corregir."""
+
+    montos_esperados: dict | None
+    montos_reales: dict | None
+    reportes_pos: list | None
+    relevos: list | None
+
+
 class MovimientoDineroOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID

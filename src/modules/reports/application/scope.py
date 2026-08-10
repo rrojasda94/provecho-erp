@@ -15,6 +15,7 @@ from src.modules.reports.infrastructure.models import (
     AreaMiembro,
     ReglaDistribucion,
     ReporteEmitido,
+    ReporteEscalamiento,
 )
 
 
@@ -44,6 +45,18 @@ def exigir_regla(
         raise NoEncontrado("regla no encontrada")
     tenant.exigir_empresa(regla.empresa_id)
     return regla
+
+
+def exigir_escalamiento(
+    session: Session, escalamiento_id: uuid.UUID, tenant: Tenant
+) -> ReporteEscalamiento:
+    escalamiento = session.get(ReporteEscalamiento, escalamiento_id)
+    if escalamiento is None:
+        raise NoEncontrado("escalamiento no encontrado")
+    # `empresa_id` es NOT NULL acá (RN-REP-011): un reporte que no se pudo
+    # atribuir no se escala, así que no hay caso de superusuario que resolver.
+    tenant.exigir_empresa(escalamiento.empresa_id)
+    return escalamiento
 
 
 def exigir_reporte(

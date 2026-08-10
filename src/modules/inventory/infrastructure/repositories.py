@@ -217,10 +217,13 @@ class StockRepo:
         self,
         almacen_id: uuid.UUID | None = None,
         empresa_id: uuid.UUID | None = None,
+        sku_id: uuid.UUID | None = None,
     ):
         q = select(Stock)
         if almacen_id is not None:
             q = q.where(Stock.almacen_id == almacen_id)
+        if sku_id is not None:
+            q = q.where(Stock.sku_id == sku_id)
         if empresa_id is not None:
             # El stock no lleva empresa: la hereda del almacén (ADR-004).
             q = q.join(Almacen, Almacen.id == Stock.almacen_id).where(
@@ -234,8 +237,9 @@ class StockRepo:
         self,
         almacen_id: uuid.UUID | None = None,
         empresa_id: uuid.UUID | None = None,
+        sku_id: uuid.UUID | None = None,
     ) -> list[Stock]:
-        return list(self.s.scalars(self.q_list(almacen_id, empresa_id)))
+        return list(self.s.scalars(self.q_list(almacen_id, empresa_id, sku_id)))
 
     def add(self, stock: Stock) -> Stock:
         self.s.add(stock)

@@ -136,6 +136,7 @@ def completar_orden_produccion(
     merma_cantidad: Decimal | None = None,
     merma_motivo: str | None = None,
     evidencia_destruccion_url: str | None = None,
+    registrado_por: uuid.UUID | None = None,
 ) -> OrdenProduccion:
     orden = OrdenProduccionRepo(session).get(orden_id)
     if orden is None:
@@ -196,6 +197,9 @@ def completar_orden_produccion(
                 "orden_produccion_id": str(orden.id),
                 "almacen_id": str(orden.almacen_id),
                 "resultado": resultado,
+                # Quien cerró la orden con el control de calidad en la mano:
+                # es a quien Gerencia le va a preguntar qué pasó.
+                "registrado_por": str(registrado_por) if registrado_por else None,
             },
             session=session,
         )

@@ -180,6 +180,9 @@ def test_lote_vencido_se_bloquea_y_publica_evento(env):
     assert [m["lote_id"] for m in movs] == [vigente]  # el vencido no se despacha
     assert len(recibidos) == 1
     assert recibidos[0]["lote_id"] == vencido
+    # Quién lo descubrió: el reporte tiene que decir a quién preguntarle, y
+    # acá lo descubre la salida que pidió una persona.
+    assert recibidos[0]["usuario_id"] is not None
 
     lotes = {x["codigo"]: x for x in client.get(
         "/api/v1/inventory/lotes", headers=h).json()}
@@ -191,6 +194,8 @@ def test_lote_vencido_se_bloquea_y_publica_evento(env):
 def test_barrido_bloquea_vencidos_sin_esperar_salida(env):
     client, ids, _ = env
     h = _token(client)
+    recibidos = []
+    event_bus.subscribe("inventory.lote_vencido_detectado", recibidos.append)
     vencido = _crear_lote(client, h, ids, "L-VENCIDO", -5)
     _ingresar(client, h, ids, vencido, 3)
 
@@ -201,6 +206,10 @@ def test_barrido_bloquea_vencidos_sin_esperar_salida(env):
     assert client.post(
         "/api/v1/inventory/lotes/bloquear-vencidos", headers=h
     ).json() == []
+    # El barrido a demanda sí tiene quién lo pidió; el beat de las 06:00 no
+    # y por eso el campo es opcional.
+    assert [e["usuario_id"] for e in recibidos] == [recibidos[0]["usuario_id"]]
+    assert recibidos[0]["usuario_id"] is not None
 
 
 def test_articulo_sin_control_de_lote_no_cambia(env):

@@ -113,6 +113,7 @@ def registrar_devolucion(
             "motivo": motivo,
             "destino": destino,
             "reporte_dirigido_a": devolucion.reporte_dirigido_a,
+            "registrado_por": str(registrado_por) if registrado_por else None,
             "items": [
                 {
                     "sku_id": str(i.sku_id),
