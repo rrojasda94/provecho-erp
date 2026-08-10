@@ -5,6 +5,7 @@ const modulo = MODULOS.find((m) => m.clave === "inventario")!;
 const submenu = [
   { label: "Artículos", href: "/inventario/articulos" },
   { label: "Categorías", href: "/inventario/categorias" },
+  { label: "Unidades de medida", href: "/inventario/unidades-medida" },
   { label: "Lotes", href: "/inventario/lotes" },
   { label: "Ajustes", href: "/inventario/ajustes" },
   { label: "Devoluciones", href: "/inventario/devoluciones" },

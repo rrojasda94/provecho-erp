@@ -8,13 +8,34 @@ import uuid
 
 from sqlalchemy.orm import Session
 
-from src.core.tenant import Tenant
+from src.core.tenant import FueraDeAlcance, Tenant
+from src.modules.sales.application import clientes
 from src.modules.sales.application.errors import NoEncontrado
 from src.modules.sales.infrastructure.models import (
+    Cliente,
     KdsPantalla,
     Venta,
     VentaItem,
 )
+
+
+def exigir_cliente(session: Session, cliente_id: uuid.UUID, tenant: Tenant) -> Cliente:
+    """El cliente es del **grupo**, no de la empresa (RN-PTS-001), así que el
+    alcance se valida contra el grupo de la empresa del token — no con
+    `tenant.exigir_empresa`, que aquí no aplica.
+
+    Un superusuario sin empresa asignada pasa: es el mismo criterio que el
+    resto del ERP para la cuenta de administración.
+    """
+    cliente = session.get(Cliente, cliente_id)
+    if cliente is None or cliente.deleted_at is not None:
+        raise NoEncontrado("cliente no encontrado")
+    if tenant.superusuario and tenant.empresa_id is None:
+        return cliente
+    grupo_id = clientes.grupo_de_empresa(session, tenant.empresa())
+    if cliente.grupo_id != grupo_id:
+        raise FueraDeAlcance("cliente fuera del alcance del usuario")
+    return cliente
 
 
 def exigir_venta(session: Session, venta_id: uuid.UUID, tenant: Tenant) -> Venta:

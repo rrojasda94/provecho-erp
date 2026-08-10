@@ -76,6 +76,35 @@ export async function cambiarActivoAction(
   return { error: "", ok: true };
 }
 
+/** Corrige los datos de la cuenta. El `username` no está: es la identidad
+ * con la que se firma cada acción del ERP y con la que quedó escrita en el
+ * `audit_log` — cambiarlo dejaría el rastro apuntando a un nombre que ya no
+ * existe. Una cuenta con el usuario equivocado se desactiva y se crea otra.
+ * El PIN tampoco: lo cambia su dueño con su propia sesión. */
+export async function editarUsuarioAction(
+  _previo: EstadoUsuario,
+  formData: FormData,
+): Promise<EstadoUsuario> {
+  const id = String(formData.get("id") ?? "");
+  if (!id) return { error: "Falta la cuenta a editar.", ok: false };
+
+  try {
+    await apiFetch(`/api/v1/users/${id}`, {
+      token: await token(),
+      metodo: "PATCH",
+      cuerpo: {
+        nombre_display: String(formData.get("nombre_display") ?? "").trim() || undefined,
+        email: String(formData.get("email") ?? "").trim() || undefined,
+        persona_id: String(formData.get("persona_id") ?? "") || undefined,
+      },
+    });
+  } catch (e) {
+    return { error: mensajeDe(e, "No se pudo guardar la cuenta."), ok: false };
+  }
+  revalidatePath("/usuarios");
+  return { error: "", ok: true };
+}
+
 export async function asignarRolAction(
   _previo: EstadoUsuario,
   formData: FormData,

@@ -261,11 +261,40 @@ El componente reusable vive en `frontend/components/tabla/`.
 
 ## F2.12 Formularios
 
-⬜ **Sin empezar** más allá del login (formulario simple, sin librería).
-Ya hay una regla de negocio que los afecta a todos: **tooltip de ayuda por
-campo** (`ui-ux.md`) — todo formulario nuevo debe nacer con esto, no
-agregarse después. Autoguardado/undo/redo/drafts: diferible hasta que un
-formulario largo (ej. orden de compra, ficha de producto) lo justifique.
+🔶 **Molde común desde el 2026-08-10**: `components/formulario/
+dialogo-formulario.tsx`. Toda alta y toda corrección del ERP pasan por él —
+`<dialog>` nativo, `useActionState`, el error del servidor en un
+`role="alert"`, Cancelar/Guardar, y cerrar al `ok`. Antes ese bloque estaba
+copiado en siete pantallas; con la edición encima habrían sido veinte
+copias, y la que se olvidara de cerrar al `ok` iba a ser un bug sin relación
+aparente con las otras diecinueve.
+
+Sigue siendo `<dialog>` nativo y no el `Dialog` de shadcn: el overlay, el
+foco atrapado y el cierre con Esc vienen del navegador, y ninguna pantalla
+pidió todavía algo que eso no cubra. ADR-013 dejó shadcn instalado para
+cuando haga falta, no para usarlo por defecto.
+
+**Dos reglas que el componente hace cumplir por todos:**
+
+1. **La acción se despacha a mano dentro de una transición, no por el prop
+   `action` de `<form>`.** React 19 resetea solo el formulario cuando la
+   acción va en `action`, y lo hace también cuando la acción devolvió error:
+   un rechazo del servidor borraba todo lo tecleado. Reteclear un formulario
+   entero porque un campo estaba mal es la fricción que termina en un dato
+   inventado — es el mismo candado que `e2e/caja.spec.ts` ya probaba para el
+   conteo de caja, ahora extendido a todo formulario.
+2. **El reset va al cerrar, no al enviar.** Cancelar limpia; un error deja
+   todo donde estaba.
+
+Cada diálogo de edición además **dice qué no se puede cambiar y por qué**
+(prop `ayuda`): la unidad de medida de un artículo, el `username` de una
+cuenta, el código de una cuenta contable. Un campo ausente sin explicación se
+lee como un olvido.
+
+Sigue pendiente el **tooltip de ayuda por campo** (`ui-ux.md`) —hoy la ayuda
+es a nivel de formulario, no de campo— y autoguardado/undo/redo/drafts,
+diferibles hasta que un formulario largo (orden de compra, ficha de
+producto) lo justifique.
 
 ## F2.13 Experiencia de usuario (UX)
 

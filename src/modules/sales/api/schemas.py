@@ -201,6 +201,20 @@ class ClienteDocumentoUpdate(BaseModel):
     tipo_documento: str = "dni"
 
 
+class ClienteUpdate(BaseModel):
+    """Corrección de un cliente **jurídico**. Campo ausente o `null` = no tocar.
+
+    No lleva nombre, teléfono ni dirección: en un cliente natural esos datos
+    viven en su `persona` (RN-GEN-007) y se corrigen desde Personas. El
+    documento tiene su propio endpoint (`PATCH /clientes/{id}/documento`),
+    que aplica las reglas de identificación.
+    """
+
+    razon_social: str | None = Field(default=None, min_length=1, max_length=255)
+    ruc: str | None = Field(default=None, pattern=r"^\d{11}$")
+    contacto: str | None = Field(default=None, max_length=255)
+
+
 class ClienteOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
@@ -222,6 +236,9 @@ class ClienteBuscadoOut(BaseModel):
     # False si no dio documento o dio el genérico: queda fuera de las
     # promociones para clientes registrados con documento (RN-PTS-002).
     identificado: bool
+    # El back-office lo usa para mandar a la ficha de la persona: los datos
+    # de un cliente natural se corrigen allá, no acá.
+    persona_id: uuid.UUID | None = None
 
 
 # --- Lote de sincronización del hub (ADR-009) -------------------------------

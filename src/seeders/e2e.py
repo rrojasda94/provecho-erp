@@ -178,7 +178,11 @@ def _crear_producto_vendible(session, empresa, marca) -> ProductoComercial:
 
     harina = Articulo(
         empresa_id=empresa.id,
-        id_interno="E2E-H001",
+        # `articulo.id_interno` es `String(4)`. Decía "E2E-H001" y entraba
+        # igual porque SQLite no aplica el largo de un VARCHAR; contra
+        # Postgres la siembra habría reventado, y en la pantalla el código no
+        # se podía ni reenviar sin recibir un 422 de su propio valor.
+        id_interno="EH01",
         nombre="Harina E2E",
         unidad_medida_id=udm.id,
         tipo="insumo",
@@ -206,7 +210,8 @@ def _crear_producto_vendible(session, empresa, marca) -> ProductoComercial:
     session.add(Stock(almacen_id=almacen.id, sku_id=sku.id, cantidad=Decimal(1000)))
 
     producto = ProductoComercial(
-        id_interno="E2E-P001",
+        # Mismo caso que `harina`: la columna es `String(4)`.
+        id_interno="EP01",
         marca_id=marca.id,
         nombre=PRODUCTO_NOMBRE,
         receta_id=receta.id,

@@ -1,12 +1,13 @@
 "use client";
 
 import type { ColumnDef } from "@tanstack/react-table";
-import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 
+import { BOTON_FILA, DialogoFormulario } from "@/components/formulario/dialogo-formulario";
 import { PersonaPicker } from "@/components/persona-picker/persona-picker";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
 
-import { crearProveedorAction, type EstadoProveedor } from "./actions";
+import { crearProveedorAction, editarProveedorAction } from "./actions";
 
 export type Proveedor = {
   id: string;
@@ -14,6 +15,8 @@ export type Proveedor = {
   persona_id: string | null;
   razon_social: string | null;
   ruc: string | null;
+  contacto: string | null;
+  plazo_dias_credito: number | null;
   formal: boolean;
   clasificacion: string;
   condicion_pago: string;
@@ -21,124 +24,161 @@ export type Proveedor = {
 };
 export type Persona = { id: string; nombres: string; apellidos: string };
 
-const ESTADO_INICIAL: EstadoProveedor = { error: "", ok: false };
+const CLASIFICACIONES = ["regular", "preferente"] as const;
 
-function CamposJuridico() {
+/** Condición de pago + plazo: van juntos porque 'credito' sin plazo lo
+ * rechaza el servidor (accounting no tendría vencimiento que calcular). */
+function CamposCondicionPago({ proveedor }: { proveedor?: Proveedor }) {
   return (
     <>
       <label className="flex flex-col gap-1 text-sm font-semibold">
-        Razón social
-        <input name="razon_social" required maxLength={255} />
+        Condición de pago
+        <select name="condicion_pago" defaultValue={proveedor?.condicion_pago ?? "contado"}>
+          <option value="contado">Contado</option>
+          <option value="credito">Crédito</option>
+        </select>
       </label>
       <label className="flex flex-col gap-1 text-sm font-semibold">
-        RUC
-        <input name="ruc" required maxLength={11} minLength={11} inputMode="numeric" />
+        Plazo de crédito (días)
+        <input
+          name="plazo_dias_credito"
+          type="number"
+          min={1}
+          defaultValue={proveedor?.plazo_dias_credito ?? ""}
+          placeholder="Solo si es crédito"
+        />
       </label>
     </>
   );
 }
 
 function DialogoNuevoProveedor() {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const formRef = useRef<HTMLFormElement>(null);
   const [tipo, setTipo] = useState<"juridico" | "natural">("juridico");
-  const [estado, formAction, pendiente] = useActionState(crearProveedorAction, ESTADO_INICIAL);
-
-  useEffect(() => {
-    if (estado.ok) {
-      formRef.current?.reset();
-      setTipo("juridico");
-      dialogRef.current?.close();
-    }
-  }, [estado.ok]);
 
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => dialogRef.current?.showModal()}
-        className="rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary"
-      >
-        + Nuevo proveedor
-      </button>
-      {/* `<dialog>` nativo: overlay, foco atrapado y cierre con Esc vienen
-          gratis del navegador — sin instalar shadcn/ui para el primer form
-          (YAGNI, se agrega cuando un caso lo pida de verdad). */}
-      <dialog
-        ref={dialogRef}
-        className="w-full max-w-md rounded-lg p-0 backdrop:bg-dark/40"
-        onClose={() => {
-          formRef.current?.reset();
-          setTipo("juridico");
-        }}
-      >
-        <form ref={formRef} action={formAction} className="flex flex-col gap-4 p-6">
-          <h2 className="font-heading text-lg italic uppercase text-dark">Nuevo proveedor</h2>
-          <div className="flex gap-4 text-sm font-semibold">
-            <label className="flex items-center gap-1.5">
-              <input
-                type="radio"
-                name="tipo"
-                value="juridico"
-                checked={tipo === "juridico"}
-                onChange={() => setTipo("juridico")}
-              />
-              Jurídico (RUC)
-            </label>
-            <label className="flex items-center gap-1.5">
-              <input
-                type="radio"
-                name="tipo"
-                value="natural"
-                checked={tipo === "natural"}
-                onChange={() => setTipo("natural")}
-              />
-              Natural (persona)
-            </label>
-          </div>
-          {tipo === "juridico" ? (
-            <CamposJuridico />
-          ) : (
-            <label className="flex flex-col gap-1 text-sm font-semibold">
-              Persona (debe existir de antes)
-              <PersonaPicker name="persona_id" />
-            </label>
-          )}
+    <DialogoFormulario
+      titulo="Nuevo proveedor"
+      disparador="+ Nuevo proveedor"
+      etiquetaEnvio="Crear"
+      etiquetaPendiente="Creando..."
+      accion={crearProveedorAction}
+      alCerrar={() => setTipo("juridico")}
+    >
+      <div className="flex gap-4 text-sm font-semibold">
+        <label className="flex items-center gap-1.5">
+          <input
+            type="radio"
+            name="tipo"
+            value="juridico"
+            checked={tipo === "juridico"}
+            onChange={() => setTipo("juridico")}
+          />
+          Jurídico (RUC)
+        </label>
+        <label className="flex items-center gap-1.5">
+          <input
+            type="radio"
+            name="tipo"
+            value="natural"
+            checked={tipo === "natural"}
+            onChange={() => setTipo("natural")}
+          />
+          Natural (persona)
+        </label>
+      </div>
+      {tipo === "juridico" ? (
+        <>
           <label className="flex flex-col gap-1 text-sm font-semibold">
-            Condición de pago
-            <select name="condicion_pago" defaultValue="contado">
-              <option value="contado">Contado</option>
-              <option value="credito">Crédito</option>
-            </select>
+            Razón social
+            <input name="razon_social" required maxLength={255} />
           </label>
           <label className="flex flex-col gap-1 text-sm font-semibold">
-            Plazo de crédito (días)
-            <input name="plazo_dias_credito" type="number" min={1} placeholder="Solo si es crédito" />
+            RUC
+            <input name="ruc" required maxLength={11} minLength={11} inputMode="numeric" />
           </label>
-          {estado.error && (
-            <p role="alert" className="text-sm font-semibold text-secondary">
-              {estado.error}
-            </p>
-          )}
-          <div className="mt-2 flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => dialogRef.current?.close()}
-              className="rounded border border-gray px-4 py-2 text-sm font-semibold text-dark"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={pendiente}
-              className="rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary"
-            >
-              {pendiente ? "Creando..." : "Crear"}
-            </button>
-          </div>
-        </form>
-      </dialog>
-    </>
+        </>
+      ) : (
+        <label className="flex flex-col gap-1 text-sm font-semibold">
+          Persona (debe existir de antes)
+          <PersonaPicker name="persona_id" />
+        </label>
+      )}
+      <CamposCondicionPago />
+    </DialogoFormulario>
+  );
+}
+
+/** Corrección de un proveedor ya dado de alta.
+ *
+ * El tipo no se ofrece: cambiarlo convertiría al proveedor en otro y dejaría
+ * sus órdenes de compra apuntando a algo que ya no es. En uno natural
+ * tampoco hay razón social ni RUC — esos datos viven en su persona
+ * (RN-GEN-007) y se corrigen desde Usuarios → Personas. */
+function DialogoEditarProveedor({ proveedor }: { proveedor: Proveedor }) {
+  const esJuridico = proveedor.tipo === "juridico";
+
+  return (
+    <DialogoFormulario
+      titulo="Editar proveedor"
+      disparador="Editar"
+      claseDisparador={BOTON_FILA}
+      accion={editarProveedorAction}
+      ayuda={
+        esJuridico
+          ? "SUNAT manda sobre la razón social tecleada cuando el RUC existe."
+          : "Nombre y documento viven en la persona: se corrigen en Usuarios → Personas."
+      }
+    >
+      <input type="hidden" name="id" value={proveedor.id} />
+      {esJuridico && (
+        <>
+          <label className="flex flex-col gap-1 text-sm font-semibold">
+            Razón social
+            <input
+              name="razon_social"
+              required
+              maxLength={255}
+              defaultValue={proveedor.razon_social ?? ""}
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-sm font-semibold">
+            RUC
+            <input
+              name="ruc"
+              required
+              maxLength={11}
+              minLength={11}
+              inputMode="numeric"
+              defaultValue={proveedor.ruc ?? ""}
+            />
+          </label>
+        </>
+      )}
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Contacto
+        <input
+          name="contacto"
+          maxLength={255}
+          defaultValue={proveedor.contacto ?? ""}
+          placeholder="Teléfono, correo o nombre de quien atiende"
+        />
+      </label>
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Clasificación
+        <select name="clasificacion" defaultValue={proveedor.clasificacion}>
+          {CLASIFICACIONES.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
+      </label>
+      <CamposCondicionPago proveedor={proveedor} />
+      <label className="flex items-center gap-2 text-sm font-semibold">
+        <input type="checkbox" name="activo" defaultChecked={proveedor.activo} />
+        Activo
+      </label>
+    </DialogoFormulario>
   );
 }
 
@@ -186,6 +226,13 @@ export function ProveedoresCliente({
             {getValue<boolean>() ? "Activo" : "Inactivo"}
           </span>
         ),
+      },
+      {
+        id: "acciones",
+        header: "",
+        // Sin `accessorFn`: el buscador de la tabla filtra por texto y esto
+        // es un control, no texto.
+        cell: ({ row }) => <DialogoEditarProveedor proveedor={row.original} />,
       },
     ],
     [nombrePersona],

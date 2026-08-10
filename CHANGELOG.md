@@ -12,6 +12,112 @@ editando este archivo chocaban siempre — escribían en la misma línea.
 
 Ver [`changelog.d/`](changelog.d/).
 
+## [0.4.0] - 2026-08-10
+
+### Added
+
+- **Los registros maestros por fin se editan desde la pantalla** (2026-08-10).
+  Hasta ahora el ERP sabía crear y listar, no corregir: un RUC mal tecleado, un
+  cargo que cambió o un código de estante equivocado solo se arreglaban con
+  `curl` o tocando la base. El diagnóstico no era el esperado — el backend ya
+  tenía `PATCH` para casi todo; lo que faltaba era la pantalla.
+  - **Botón "Editar" en la fila** de Proveedores, Artículos, Trabajadores,
+    Cuentas de usuario, Plan de cuentas y Divisas. Cada diálogo dice también
+    **qué no se puede cambiar y por qué**: la unidad de medida de un artículo
+    (el stock y las recetas ya están expresados en ella, cambiarla no convierte
+    nada, reinterpreta en silencio lo que ya existe), el `username` de una
+    cuenta (firma cada línea del `audit_log`), el código y el tipo de una
+    cuenta contable (los asientos registrados dependen de ellos), el tipo de un
+    proveedor (dejaría sus órdenes de compra apuntando a algo que ya no es).
+  - **Ocho pantallas nuevas**: Usuarios → Personas, Ventas → Clientes,
+    Inventario → Categorías y Unidades de medida, y el módulo **Organización**
+    completo (empresas, marcas, sucursales, almacenes). Ninguna existía: esos
+    registros solo se administraban por API.
+  - **Personas lleva bloqueo optimista** y es la única que lo necesita: la
+    `version` viaja con el formulario y un 409 se muestra con instrucción de
+    recargar. Sin eso, dos administradores editando la misma ficha se pisaban
+    en silencio — sobre datos personales eso significa "el domicilio corregido
+    volvió al viejo y nadie se enteró". Con esta pantalla el derecho de
+    **rectificación** de la Ley 29733 deja de ejercerse por `curl`.
+  - **De un cliente natural solo se completa el documento**: su nombre,
+    teléfono y dirección viven en su `persona` (RN-GEN-007) y el diálogo
+    enlaza allá. Ofrecer esos campos en la pantalla de clientes habría creado
+    justo la segunda fuente que esa regla existe para evitar.
+  - Tres huecos de API cerrados: `ProveedorUpdate` admite razón social y RUC,
+    `ArticuloUpdate` admite `id_interno`, y `sales` gana
+    `PATCH /clientes/{id}` más `GET /clientes/listado` paginado.
+  - **Costo aceptado**: desde un `PATCH` sigue sin poderse *vaciar* un campo
+    opcional (`null` significa "no tocar"). Solo `frecuencia_conteo` tiene su
+    centinela; el resto se cambia por otro valor, no se borra.
+
+- **Un formulario del ERP no se administraba solo** (2026-08-10). El shell del
+  `<dialog>` estaba copiado y pegado en siete pantallas; con la edición encima
+  habrían sido veinte copias del mismo bloque, y la que se olvidara de cerrar
+  al `ok` iba a ser un bug sin relación aparente con las otras diecinueve. Vive
+  en `components/formulario/dialogo-formulario.tsx` y lo usan tanto las altas
+  como las correcciones.
+
+- **Un rechazo del servidor ya no borra lo tecleado** (2026-08-10). React 19
+  **resetea solo** el formulario cuando la acción va en el prop `action` de
+  `<form>`, y lo hace también cuando la acción devolvió error. Encontrado
+  verificando en el navegador: corregir un RUC y errarle al plazo de crédito
+  dejaba el diálogo abierto con el RUC viejo de vuelta. Ahora la acción se
+  despacha a mano dentro de una transición — sin reset automático y con
+  `pendiente` funcionando igual. Es el mismo candado que el conteo de caja ya
+  tenía probado en e2e: reteclear un formulario entero porque un campo estaba
+  mal es la fricción que termina en un dato inventado.
+
+### Changed
+
+- **El lienzo de nodos deja de ser un visor y pasa a ser el lugar donde se
+  arma la carta** (2026-08-09, ADR-035 segunda enmienda). Antes se podía
+  recorrer y simular; ahora se edita.
+  - **La receta se edita dentro del nodo.** Tocar un tamaño, un sabor o un
+    extra abre su receta en el inspector: cambiar cantidades, quitar un
+    insumo, agregar otro. La cantidad acepta aritmética ("1000/3") y **la
+    evalúa el servidor**, no el navegador (RN-COM-024). Esto revierte la
+    regla de editar recetas solo en Catálogo → Recetas: lo que ADR-023 §4
+    había corregido era la *duplicación* del editor en dos pantallas que no
+    se sabían relacionadas, y el lienzo no es una segunda pantalla — es el
+    lugar de trabajo. Catálogo → Recetas sigue siendo el dueño de crear,
+    duplicar, escalar y renombrar, con enlace desde cada nodo.
+  - **Se conectan y desconectan nodos.** El grupo pasa a ser un nodo porque
+    es el destino de la conexión, y los extras que el producto todavía no
+    ofrece aparecen apagados en su propia columna para poder cablearlos:
+    arrastrar de un grupo a uno de ellos lo cuelga **dentro** de ese grupo;
+    del tamaño, lo deja suelto; cortar la arista lo desvincula sin borrar el
+    extra. Cualquier otro par se rechaza con un mensaje que dice qué sí se
+    puede — la topología tamaño → sabor → plato la dicta RN-PRD-004 y no se
+    negocia con el mouse.
+  - Una columna que se envuelve en subcolumnas ahora **reserva su ancho**:
+    con 18 extras disponibles, la columna de restas se le montaba encima.
+- **Carta de pizzas de demo armada con el modelo de nodos**
+  (`python -m src.seeders.pizzas_demo`). El catálogo de demo anterior
+  modelaba cada combinación como un producto plano —"Pizza pepperoni
+  familiar", "Pizza hawaiana mediana"—, que es justo lo que el lienzo vino a
+  reemplazar: seis sabores por tres tamaños serían dieciocho productos,
+  dieciocho precios y dieciocho recetas a mano. Ahora es **una** Pizza con
+  tres tamaños, un grupo Sabor obligatorio de seis opciones con receta
+  propia por tamaño, cuatro extras y empaque por modalidad. `--limpiar`
+  **desactiva** lo que no es pizza en vez de borrarlo: un producto vendido se
+  descontinúa (misma regla que `eliminar_producto`) y el catálogo anterior no
+  lo genera ningún seeder del repo, así que borrarlo sería destruir algo que
+  nadie puede recrear.
+- **El insumo de demo del e2e tiene costo** y **el servidor de e2e sube el
+  rate limit de login**: la suite entra once veces desde la misma IP y el
+  límite real son diez por minuto, así que las últimas pruebas fallaban con
+  "no aparece el inicio", que no menciona el rate limit por ningún lado.
+
+### Fixed
+
+- **El seeder de e2e sembraba códigos que no caben en su columna**
+  (2026-08-10). `articulo.id_interno` y `producto_comercial.id_interno` son
+  `String(4)` y la siembra escribía `"E2E-H001"` y `"E2E-P001"`, de ocho.
+  Entraban igual porque **SQLite no aplica el largo de un `VARCHAR`**; contra
+  Postgres la siembra habría reventado. Salió a la luz al estrenar la edición
+  de artículos: la pantalla no podía ni reenviar el código existente sin
+  recibir un 422 de su propio valor. Ahora son `EH01` y `EP01`.
+
 ## [0.3.0] - 2026-08-09
 
 ### Added
