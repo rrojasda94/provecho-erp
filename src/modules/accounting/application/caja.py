@@ -411,6 +411,11 @@ def cerrar_caja(
                 "sucursal_id": str(
                     sucursal_de_punto_venta(session, apertura.punto_venta_id)
                 ),
+                # Quien firma el relevo: el cierre es su acto (RN-AUD-005).
+                # `cajero_id` va aparte porque quien responde por el faltante
+                # y quien lo constata no tienen por qué ser la misma persona.
+                "cerrado_por": str(receptor_id),
+                "cajero_id": str(cajero_id),
                 "descuadre_monto": str(descuadre),
                 "descuadre_tarjeta": str(tarjetas["descuadre"]),
                 "descuadre_atribucion": descuadre_atribucion,
@@ -590,25 +595,50 @@ def turnos_cerrados(
     # de qué caja habla no sirve para ir a reclamar un faltante.
     rotulos = puntos_venta_rotulados(session, [a.punto_venta_id for _, a, _ in filas])
     return [
-        {
-            "cierre_id": cierre.id,
-            "apertura_caja_id": apertura.id,
-            "punto_venta_id": apertura.punto_venta_id,
-            "caja": rotulos.get(apertura.punto_venta_id, "(sin rótulo)"),
-            "cajero_id": apertura.cajero_id,
-            "abierta_desde": apertura.created_at,
-            "monto_apertura": apertura.monto_apertura,
-            "descuadre_monto": cierre.descuadre_monto,
-            "descuadre_atribucion": cierre.descuadre_atribucion,
-            "estado": cierre.estado,
-            "custodia_destino": cierre.custodia,
-            "custodia_id": custodia.id if custodia else None,
-            "custodia_estado": custodia.estado if custodia else None,
-            "custodia_monto": custodia.monto if custodia else None,
-            "correcciones": cierre.correcciones,
-        }
+        _fila_turno(cierre, apertura, custodia, rotulos)
         for cierre, apertura, custodia in filas
     ]
+
+
+def _fila_turno(cierre, apertura, custodia, rotulos: dict) -> dict:
+    return {
+        "cierre_id": cierre.id,
+        "apertura_caja_id": apertura.id,
+        "punto_venta_id": apertura.punto_venta_id,
+        "caja": rotulos.get(apertura.punto_venta_id, "(sin rótulo)"),
+        "cajero_id": apertura.cajero_id,
+        "abierta_desde": apertura.created_at,
+        "monto_apertura": apertura.monto_apertura,
+        "descuadre_monto": cierre.descuadre_monto,
+        "descuadre_atribucion": cierre.descuadre_atribucion,
+        "estado": cierre.estado,
+        "custodia_destino": cierre.custodia,
+        "custodia_id": custodia.id if custodia else None,
+        "custodia_estado": custodia.estado if custodia else None,
+        "custodia_monto": custodia.monto if custodia else None,
+        "correcciones": cierre.correcciones,
+    }
+
+
+def turno_cerrado(session: Session, cierre_id: uuid.UUID) -> dict:
+    """Un turno cerrado con el detalle del conteo.
+
+    A donde lleva `accounting.cierre_caja_irregular`. La fila del listado
+    dice *cuánto* descuadró; acá están los montos esperados contra los
+    contados y los reportes de POS, que es lo único con lo que se puede
+    decidir si el faltante se reclama o se corrige (RN-MDP-005).
+    """
+    cierre = CierreCajaRepo(session).get(cierre_id)
+    apertura = AperturaCajaRepo(session).get(cierre.apertura_caja_id)
+    rotulos = puntos_venta_rotulados(session, [apertura.punto_venta_id])
+    custodia = CustodiaEfectivoRepo(session).de_apertura(apertura.id)
+    return {
+        **_fila_turno(cierre, apertura, custodia, rotulos),
+        "montos_esperados": cierre.montos_esperados,
+        "montos_reales": cierre.montos_reales,
+        "reportes_pos": cierre.reportes_pos,
+        "relevos": cierre.relevos,
+    }
 
 
 def cajas_abiertas(session: Session, empresa_id: uuid.UUID | None = None) -> list[dict]:

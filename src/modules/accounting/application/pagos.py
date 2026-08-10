@@ -105,6 +105,9 @@ def ejecutar_pago(
                 "proveedor_id": str(movimiento.proveedor_id) if movimiento.proveedor_id else None,
                 "monto": str(movimiento.monto),
                 "umbral": str(umbral_efectivo),
+                # Quien intentó ejecutarlo y no alcanzó el umbral. Es a quien
+                # hay que volver una vez aprobado.
+                "solicitado_por": str(actor_id),
             },
             session=session,
         )

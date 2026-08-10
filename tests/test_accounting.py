@@ -622,6 +622,33 @@ def test_conformidad_comprobante_encola_pago_pendiente(env):
     assert Decimal(generado[0]["monto"]) == Decimal("50.00")
 
 
+def test_un_pago_se_puede_abrir_desde_su_reporte(env):
+    """Destino de `accounting.pago_requiere_aprobacion`: el aviso decía que
+    un pago espera aprobación y no había forma de ir a mirar cuál."""
+    client, ids, TestSession = env
+    h = _token(client)
+    oc = _flujo_oc_recibida(client, h, ids, TestSession)
+    _dar_conformidad(client, h, oc["id"])
+    pago_id = [
+        p
+        for p in client.get(
+            f"/api/v1/accounting/pagos-proveedor?empresa_id={ids['empresa_id']}",
+            headers=h,
+        ).json()["items"]
+        if p["orden_compra_id"] == oc["id"]
+    ][0]["id"]
+
+    r = client.get(f"/api/v1/accounting/pagos-proveedor/{pago_id}", headers=h)
+    assert r.status_code == 200, r.text
+    assert r.json()["id"] == pago_id
+    assert r.json()["estado"] == "pendiente"
+
+    fantasma = "00000000-0000-0000-0000-000000000000"
+    assert client.get(
+        f"/api/v1/accounting/pagos-proveedor/{fantasma}", headers=h
+    ).status_code == 404
+
+
 def test_conformidad_comprobante_reintento_no_duplica_pago(env):
     client, ids, TestSession = env
     h = _token(client)

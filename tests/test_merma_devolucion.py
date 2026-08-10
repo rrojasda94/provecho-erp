@@ -289,6 +289,8 @@ def test_devolver_al_proveedor_saca_el_lote_declarado_y_avisa_a_compras(env):
     ) == Decimal("6")
     assert len(avisos) == 1
     assert avisos[0]["items"][0]["lote_id"] == lote
+    # Quién la registró: el reclamo al proveedor tiene dueño (RN-INV-020).
+    assert avisos[0]["registrado_por"] is not None
 
 
 def test_devolver_un_articulo_con_lote_sin_decir_cual_se_rechaza(env):

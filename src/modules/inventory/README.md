@@ -278,6 +278,7 @@ lote.
 | POST | `/lotes` | `registrar_movimiento` |
 | GET | `/lotes?almacen_id&sku_id&por_vencer_dias` | `leer` |
 | POST | `/lotes/bloquear-vencidos` | `registrar_movimiento` |
+| GET | `/lotes/{id}` | `leer` — el lote con su saldo por almacén (ADR-036) |
 
 `POST /movimientos` devuelve ahora una **lista** de movimientos (una salida
 FEFO puede repartirse entre varios lotes) y acepta `lote_id` + `motivo_lote`
@@ -301,6 +302,11 @@ Endpoints `/api/v1/inventory`:
 | Método | Ruta | Permiso |
 |--------|------|---------|
 | POST/GET | `/categorias` | `gestionar_catalogo` / `leer` |
+| GET | `/categorias/{id}` | `leer` |
+| GET | `/articulos/{id}` | `leer` |
+| GET | `/skus/{id}` | `leer` — el SKU con su artículo y su saldo por almacén |
+| GET | `/ajustes?almacen_id&estado` | `leer` — no existía: `ajuste_fuera_margen` reportaba un hecho que no se podía ir a mirar (ADR-036) |
+| GET | `/ajustes/{id}` | `leer` — con artículo, almacén, solicitante y aprobador resueltos |
 | GET | `/unidades-medida` | `leer` — catálogo global, sin filtro de tenant (`data-model.md` §3) |
 | POST | `/unidades-medida` | `gestionar_catalogo` — CRUD antes diferido (ADR-014 Addendum b); requiere `categoria_udm_id` existente |
 | PATCH | `/unidades-medida/{id}` | `gestionar_catalogo` — corrige `decimales` (RN-GER-010) sin recrear la unidad |

@@ -161,6 +161,8 @@ finanzas documentados en el área:
 | POST | `/accounting/cajas/cierres/{id}/reabrir` | `accounting.caja_operar` + PIN `caja_reabrir` |
 | GET | `/accounting/cajas/abiertas?empresa_id=` | `accounting.leer` |
 | GET | `/accounting/cajas/turnos?desde=&hasta=` | `accounting.leer` |
+| GET | `/accounting/cajas/cierres/{id}` | `accounting.leer` — el turno con montos esperados vs. contados y reportes de POS; a donde lleva `cierre_caja_irregular` (ADR-036) |
+| GET | `/accounting/pagos-proveedor/{id}` | `accounting.leer` — a donde lleva `pago_requiere_aprobacion` |
 | POST | `/accounting/arqueos` | `accounting.arqueo_registrar` |
 | POST | `/accounting/pos-tarjeta` | `accounting.pos_administrar` |
 | GET | `/accounting/pos-tarjeta?sucursal_id=` | `accounting.leer` |

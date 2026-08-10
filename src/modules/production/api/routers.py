@@ -99,7 +99,7 @@ def registrar_consumo(
 def completar_orden(
     orden_id: uuid.UUID,
     body: schemas.CompletarOrdenIn,
-    _: Usuario = Depends(require_permission(COMPLETAR)),
+    actor: Usuario = Depends(require_permission(COMPLETAR)),
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
@@ -114,6 +114,7 @@ def completar_orden(
         merma_cantidad=body.merma_cantidad,
         merma_motivo=body.merma_motivo,
         evidencia_destruccion_url=body.evidencia_destruccion_url,
+        registrado_por=actor.id,
     )
     session.commit()
     return orden

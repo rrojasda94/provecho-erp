@@ -273,6 +273,20 @@ def listar_pagos(
     )
 
 
+@router.get(
+    "/pagos-proveedor/{movimiento_id}", response_model=schemas.MovimientoDineroOut
+)
+def obtener_pago(
+    movimiento_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Destino de `accounting.pago_requiere_aprobacion`: el aviso decía que
+    un pago espera aprobación y no había forma de ir a mirar cuál."""
+    return exigir_pago(session, movimiento_id, tenant)
+
+
 @router.post(
     "/pagos-proveedor/{movimiento_id}/ejecutar", response_model=schemas.MovimientoDineroOut
 )
@@ -520,6 +534,20 @@ def listar_turnos_cerrados(
     return caja.turnos_cerrados(
         session, tenant.filtro_empresa(empresa_id), desde=desde, hasta=hasta
     )
+
+
+@router.get(
+    "/cajas/cierres/{cierre_caja_id}", response_model=schemas.CierreCajaDetalleOut
+)
+def obtener_cierre_caja(
+    cierre_caja_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Destino de `accounting.cierre_caja_irregular`."""
+    exigir_cierre_caja(session, cierre_caja_id, tenant)
+    return caja.turno_cerrado(session, cierre_caja_id)
 
 
 @router.get("/cajas/abiertas", response_model=list[schemas.CajaAbiertaOut])

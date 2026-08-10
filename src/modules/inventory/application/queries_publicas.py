@@ -240,6 +240,9 @@ def consumos_omitidos(
             "origen": incidencia.origen,
             "referencia": incidencia.referencia,
             "motivo": MOTIVO_INCIDENCIA.get(incidencia.tipo, incidencia.tipo),
+            # El id ancla el enlace de la fila (ADR-036): sin él, la lista de
+            # problemas dice qué pasó y no a dónde ir a resolverlo.
+            "articulo_id": incidencia.articulo_id,
             "articulo": nombre or "—",
             "cantidad": incidencia.cantidad,
             "detalle": incidencia.detalle,
@@ -275,6 +278,7 @@ def disponible_negativo(
     )
     stmt = (
         select(
+            Stock.sku_id,
             Almacen.nombre.label("almacen"),
             Articulo.nombre.label("articulo"),
             Stock.cantidad,
@@ -298,6 +302,7 @@ def disponible_negativo(
 
     return [
         {
+            "sku_id": fila.sku_id,
             "almacen": fila.almacen,
             "articulo": fila.articulo,
             "cantidad": fila.cantidad,
@@ -327,6 +332,7 @@ def salidas_sin_lote(
     stmt = (
         select(
             MovimientoInventario.ts,
+            MovimientoInventario.sku_id,
             Almacen.nombre.label("almacen"),
             Articulo.nombre.label("articulo"),
             MovimientoInventario.tipo,
@@ -357,6 +363,7 @@ def salidas_sin_lote(
     return [
         {
             "fecha": fechas.a_fecha_local(fila.ts),
+            "sku_id": fila.sku_id,
             "almacen": fila.almacen,
             "articulo": fila.articulo,
             "tipo": fila.tipo,

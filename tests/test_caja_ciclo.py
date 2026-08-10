@@ -497,6 +497,35 @@ def test_turnos_cerrados_traen_descuadre_y_tramo_de_custodia(env):
     assert turno["caja"]
 
 
+def test_el_cierre_irregular_se_puede_abrir_desde_su_reporte(env):
+    """Destino de `accounting.cierre_caja_irregular`. La fila del listado
+    dice cuánto descuadró; el detalle dice contra qué, que es lo único con
+    lo que se decide reclamar o corregir (RN-MDP-005)."""
+    client, ids, _ = env
+    h = _token(client)
+    apertura = _abrir_caja(client, h, ids, monto="100.00").json()
+    _cerrar_caja(client, h, apertura["id"], "90.00")
+    cierre_id = client.get(
+        "/api/v1/accounting/cajas/turnos", headers=h
+    ).json()[0]["cierre_id"]
+
+    r = client.get(f"/api/v1/accounting/cajas/cierres/{cierre_id}", headers=h)
+    assert r.status_code == 200, r.text
+    detalle = r.json()
+    assert detalle["cierre_id"] == cierre_id
+    assert Decimal(detalle["descuadre_monto"]) == Decimal("-10.00")
+    assert detalle["montos_esperados"] is not None
+    assert detalle["montos_reales"] is not None
+    # Quién firmó cada tramo: el reporte acusa un faltante y esto dice a
+    # quién preguntarle.
+    assert detalle["relevos"]
+
+    fantasma = "00000000-0000-0000-0000-000000000000"
+    assert client.get(
+        f"/api/v1/accounting/cajas/cierres/{fantasma}", headers=h
+    ).status_code == 404
+
+
 def test_un_turno_abierto_no_aparece_entre_los_cerrados(env):
     client, ids, _ = env
     h = _token(client)

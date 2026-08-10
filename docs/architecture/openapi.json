@@ -57,6 +57,21 @@
         "title": "AbrirCajaIn",
         "type": "object"
       },
+      "AccionEscalamientoIn": {
+        "properties": {
+          "descripcion": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Descripcion",
+            "type": "string"
+          }
+        },
+        "required": [
+          "descripcion"
+        ],
+        "title": "AccionEscalamientoIn",
+        "type": "object"
+      },
       "ActaCreate": {
         "properties": {
           "empresa_id": {
@@ -249,6 +264,118 @@
           "motivo"
         ],
         "title": "AjusteCreate",
+        "type": "object"
+      },
+      "AjusteDetalleOut": {
+        "description": "Destino de `inventory.ajuste_fuera_margen`. Los nombres van resueltos:\nla pantalla que aprueba o rechaza no puede pedir cuatro endpoints más\npara saber qué artículo es y quién lo pidió.",
+        "properties": {
+          "almacen": {
+            "title": "Almacen",
+            "type": "string"
+          },
+          "almacen_id": {
+            "format": "uuid",
+            "title": "Almacen Id",
+            "type": "string"
+          },
+          "aprobado_por": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Aprobado Por"
+          },
+          "aprobador": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Aprobador"
+          },
+          "articulo": {
+            "title": "Articulo",
+            "type": "string"
+          },
+          "cantidad": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Cantidad",
+            "type": "string"
+          },
+          "conteo_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conteo Id"
+          },
+          "dentro_margen": {
+            "title": "Dentro Margen",
+            "type": "boolean"
+          },
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "motivo": {
+            "title": "Motivo",
+            "type": "string"
+          },
+          "sku_codigo": {
+            "title": "Sku Codigo",
+            "type": "string"
+          },
+          "sku_id": {
+            "format": "uuid",
+            "title": "Sku Id",
+            "type": "string"
+          },
+          "solicitado_por": {
+            "format": "uuid",
+            "title": "Solicitado Por",
+            "type": "string"
+          },
+          "solicitante": {
+            "title": "Solicitante",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "almacen_id",
+          "sku_id",
+          "cantidad",
+          "motivo",
+          "estado",
+          "conteo_id",
+          "solicitado_por",
+          "aprobado_por",
+          "dentro_margen",
+          "articulo",
+          "sku_codigo",
+          "almacen",
+          "solicitante",
+          "aprobador"
+        ],
+        "title": "AjusteDetalleOut",
         "type": "object"
       },
       "AjusteOut": {
@@ -2275,6 +2402,13 @@
       },
       "CatalogoEmisionesOut": {
         "properties": {
+          "destinos": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/DestinoOut"
+            },
+            "title": "Destinos",
+            "type": "object"
+          },
           "dinamicos": {
             "items": {
               "type": "string"
@@ -2637,6 +2771,194 @@
         "title": "CertificadoTrabajoOut",
         "type": "object"
       },
+      "CierreCajaDetalleOut": {
+        "description": "El turno con el conteo a la vista. A donde lleva\n`accounting.cierre_caja_irregular`: la fila dice cuánto descuadró, esto\ndice contra qué, que es con lo único que se decide reclamar o corregir.",
+        "properties": {
+          "abierta_desde": {
+            "format": "date-time",
+            "title": "Abierta Desde",
+            "type": "string"
+          },
+          "apertura_caja_id": {
+            "format": "uuid",
+            "title": "Apertura Caja Id",
+            "type": "string"
+          },
+          "caja": {
+            "title": "Caja",
+            "type": "string"
+          },
+          "cajero_id": {
+            "format": "uuid",
+            "title": "Cajero Id",
+            "type": "string"
+          },
+          "cierre_id": {
+            "format": "uuid",
+            "title": "Cierre Id",
+            "type": "string"
+          },
+          "correcciones": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correcciones"
+          },
+          "custodia_destino": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Custodia Destino"
+          },
+          "custodia_estado": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Custodia Estado"
+          },
+          "custodia_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Custodia Id"
+          },
+          "custodia_monto": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Custodia Monto"
+          },
+          "descuadre_atribucion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descuadre Atribucion"
+          },
+          "descuadre_monto": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Descuadre Monto",
+            "type": "string"
+          },
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          },
+          "monto_apertura": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Monto Apertura",
+            "type": "string"
+          },
+          "montos_esperados": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Montos Esperados"
+          },
+          "montos_reales": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Montos Reales"
+          },
+          "punto_venta_id": {
+            "format": "uuid",
+            "title": "Punto Venta Id",
+            "type": "string"
+          },
+          "relevos": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relevos"
+          },
+          "reportes_pos": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reportes Pos"
+          }
+        },
+        "required": [
+          "cierre_id",
+          "apertura_caja_id",
+          "punto_venta_id",
+          "caja",
+          "cajero_id",
+          "abierta_desde",
+          "monto_apertura",
+          "descuadre_monto",
+          "descuadre_atribucion",
+          "estado",
+          "custodia_destino",
+          "custodia_id",
+          "custodia_estado",
+          "custodia_monto",
+          "correcciones",
+          "montos_esperados",
+          "montos_reales",
+          "reportes_pos",
+          "relevos"
+        ],
+        "title": "CierreCajaDetalleOut",
+        "type": "object"
+      },
       "CierreCajaOut": {
         "properties": {
           "apertura_caja_id": {
@@ -2994,6 +3316,11 @@
         "properties": {
           "clave": {
             "title": "Clave",
+            "type": "string"
+          },
+          "enlace": {
+            "default": "",
+            "title": "Enlace",
             "type": "string"
           },
           "tipo": {
@@ -4875,6 +5202,30 @@
         "title": "DestinatarioOut",
         "type": "object"
       },
+      "DestinoOut": {
+        "description": "A dónde lleva un `referencia_tipo` y con qué permiso (ADR-036).",
+        "properties": {
+          "etiqueta": {
+            "title": "Etiqueta",
+            "type": "string"
+          },
+          "permiso": {
+            "title": "Permiso",
+            "type": "string"
+          },
+          "ruta": {
+            "title": "Ruta",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ruta",
+          "permiso",
+          "etiqueta"
+        ],
+        "title": "DestinoOut",
+        "type": "object"
+      },
       "DevolucionCreate": {
         "properties": {
           "almacen_id": {
@@ -5982,6 +6333,264 @@
           "detalle"
         ],
         "title": "ErrorSyncOut",
+        "type": "object"
+      },
+      "EscalamientoCreate": {
+        "properties": {
+          "descripcion": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Descripcion",
+            "type": "string"
+          },
+          "evidencia_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidencia Id"
+          },
+          "motivo": {
+            "enum": [
+              "queja",
+              "demora",
+              "error_sistema",
+              "desistimiento_no_resuelto",
+              "no_conformidad_calidad"
+            ],
+            "title": "Motivo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "motivo",
+          "descripcion"
+        ],
+        "title": "EscalamientoCreate",
+        "type": "object"
+      },
+      "EscalamientoDetalleOut": {
+        "properties": {
+          "acciones": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Acciones",
+            "type": "array"
+          },
+          "cerrado_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cerrado At"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "descripcion": {
+            "title": "Descripcion",
+            "type": "string"
+          },
+          "destinatarios": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Destinatarios",
+            "type": "array"
+          },
+          "empresa_id": {
+            "format": "uuid",
+            "title": "Empresa Id",
+            "type": "string"
+          },
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          },
+          "evidencia_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidencia Id"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "motivo": {
+            "title": "Motivo",
+            "type": "string"
+          },
+          "nivel_actual": {
+            "title": "Nivel Actual",
+            "type": "string"
+          },
+          "origen": {
+            "title": "Origen",
+            "type": "string"
+          },
+          "reportado_por_id": {
+            "format": "uuid",
+            "title": "Reportado Por Id",
+            "type": "string"
+          },
+          "reporte_emitido_id": {
+            "format": "uuid",
+            "title": "Reporte Emitido Id",
+            "type": "string"
+          },
+          "sucursal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sucursal Id"
+          }
+        },
+        "required": [
+          "id",
+          "empresa_id",
+          "sucursal_id",
+          "reporte_emitido_id",
+          "origen",
+          "motivo",
+          "descripcion",
+          "reportado_por_id",
+          "evidencia_id",
+          "nivel_actual",
+          "estado",
+          "cerrado_at",
+          "created_at"
+        ],
+        "title": "EscalamientoDetalleOut",
+        "type": "object"
+      },
+      "EscalamientoOut": {
+        "properties": {
+          "cerrado_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cerrado At"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "descripcion": {
+            "title": "Descripcion",
+            "type": "string"
+          },
+          "empresa_id": {
+            "format": "uuid",
+            "title": "Empresa Id",
+            "type": "string"
+          },
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          },
+          "evidencia_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidencia Id"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "motivo": {
+            "title": "Motivo",
+            "type": "string"
+          },
+          "nivel_actual": {
+            "title": "Nivel Actual",
+            "type": "string"
+          },
+          "origen": {
+            "title": "Origen",
+            "type": "string"
+          },
+          "reportado_por_id": {
+            "format": "uuid",
+            "title": "Reportado Por Id",
+            "type": "string"
+          },
+          "reporte_emitido_id": {
+            "format": "uuid",
+            "title": "Reporte Emitido Id",
+            "type": "string"
+          },
+          "sucursal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sucursal Id"
+          }
+        },
+        "required": [
+          "id",
+          "empresa_id",
+          "sucursal_id",
+          "reporte_emitido_id",
+          "origen",
+          "motivo",
+          "descripcion",
+          "reportado_por_id",
+          "evidencia_id",
+          "nivel_actual",
+          "estado",
+          "cerrado_at",
+          "created_at"
+        ],
+        "title": "EscalamientoOut",
         "type": "object"
       },
       "EvaluacionConSugerenciaOut": {
@@ -7814,6 +8423,99 @@
           "articulo_id"
         ],
         "title": "LoteCreate",
+        "type": "object"
+      },
+      "LoteDetalleOut": {
+        "description": "El lote con sus saldos. Destino de `inventory.lote_vencido_detectado`:\nel reporte dice que se bloqueó, esto dice cuánto quedó y en qué almacén.",
+        "properties": {
+          "articulo": {
+            "title": "Articulo",
+            "type": "string"
+          },
+          "articulo_id": {
+            "format": "uuid",
+            "title": "Articulo Id",
+            "type": "string"
+          },
+          "codigo": {
+            "title": "Codigo",
+            "type": "string"
+          },
+          "condicion_almacenamiento": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Condicion Almacenamiento"
+          },
+          "fecha_elaboracion": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Elaboracion"
+          },
+          "fecha_vencimiento": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Vencimiento"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "origen": {
+            "title": "Origen",
+            "type": "string"
+          },
+          "referencia": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referencia"
+          },
+          "saldos": {
+            "items": {
+              "$ref": "#/components/schemas/StockLoteOut"
+            },
+            "title": "Saldos",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "articulo_id",
+          "codigo",
+          "fecha_vencimiento",
+          "fecha_elaboracion",
+          "origen",
+          "referencia",
+          "condicion_almacenamiento",
+          "articulo"
+        ],
+        "title": "LoteDetalleOut",
         "type": "object"
       },
       "LoteInventorySyncIn": {
@@ -10087,6 +10789,37 @@
         "title": "PactoPermanenciaOut",
         "type": "object"
       },
+      "Pagina_AjusteOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AjusteOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "Pagina[AjusteOut]",
+        "type": "object"
+      },
       "Pagina_ArticuloOut_": {
         "properties": {
           "items": {
@@ -10240,6 +10973,37 @@
           "page_size"
         ],
         "title": "Pagina[CampanaOut]",
+        "type": "object"
+      },
+      "Pagina_EscalamientoOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/EscalamientoOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "Pagina[EscalamientoOut]",
         "type": "object"
       },
       "Pagina_EvaluacionOut_": {
@@ -15611,6 +16375,35 @@
       },
       "ReporteEmitidoDetalleOut": {
         "properties": {
+          "actor": {
+            "default": "Sistema",
+            "title": "Actor",
+            "type": "string"
+          },
+          "actor_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Id"
+          },
+          "almacen_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Almacen Id"
+          },
           "codigo_emision": {
             "title": "Codigo Emision",
             "type": "string"
@@ -15687,6 +16480,17 @@
             ],
             "title": "Referencia Tipo"
           },
+          "referencia_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referencia Url"
+          },
           "regla_id": {
             "anyOf": [
               {
@@ -15720,6 +16524,7 @@
           "id",
           "empresa_id",
           "sucursal_id",
+          "almacen_id",
           "codigo_emision",
           "titulo",
           "cuerpo",
@@ -15735,6 +16540,35 @@
       },
       "ReporteEmitidoOut": {
         "properties": {
+          "actor": {
+            "default": "Sistema",
+            "title": "Actor",
+            "type": "string"
+          },
+          "actor_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Id"
+          },
+          "almacen_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Almacen Id"
+          },
           "codigo_emision": {
             "title": "Codigo Emision",
             "type": "string"
@@ -15799,6 +16633,17 @@
             ],
             "title": "Referencia Tipo"
           },
+          "referencia_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referencia Url"
+          },
           "sucursal_id": {
             "anyOf": [
               {
@@ -15820,6 +16665,7 @@
           "id",
           "empresa_id",
           "sucursal_id",
+          "almacen_id",
           "codigo_emision",
           "titulo",
           "cuerpo",
@@ -16081,6 +16927,60 @@
           "codigo"
         ],
         "title": "SkuCreate",
+        "type": "object"
+      },
+      "SkuDetalleOut": {
+        "description": "El SKU con su artículo y su saldo por almacén.\n\nEs el destino de `inventory.stock_bajo_minimo`: quien abre el reporte\nquiere saber qué es, cuánto queda y dónde, sin encadenar tres pantallas.",
+        "properties": {
+          "activo": {
+            "title": "Activo",
+            "type": "boolean"
+          },
+          "articulo": {
+            "$ref": "#/components/schemas/ArticuloOut"
+          },
+          "articulo_id": {
+            "format": "uuid",
+            "title": "Articulo Id",
+            "type": "string"
+          },
+          "codigo": {
+            "title": "Codigo",
+            "type": "string"
+          },
+          "codigo_barras": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Codigo Barras"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "stock": {
+            "items": {
+              "$ref": "#/components/schemas/StockDeSkuOut"
+            },
+            "title": "Stock",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "articulo_id",
+          "codigo",
+          "codigo_barras",
+          "activo",
+          "articulo"
+        ],
+        "title": "SkuDetalleOut",
         "type": "object"
       },
       "SkuOut": {
@@ -16807,6 +17707,61 @@
           "items"
         ],
         "title": "SolicitudSyncIn",
+        "type": "object"
+      },
+      "StockDeSkuOut": {
+        "properties": {
+          "almacen": {
+            "title": "Almacen",
+            "type": "string"
+          },
+          "almacen_id": {
+            "format": "uuid",
+            "title": "Almacen Id",
+            "type": "string"
+          },
+          "bajo_minimo": {
+            "title": "Bajo Minimo",
+            "type": "boolean"
+          },
+          "cantidad": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Cantidad",
+            "type": "string"
+          },
+          "disponible": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Disponible",
+            "type": "string"
+          },
+          "reservado": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Reservado",
+            "type": "string"
+          },
+          "stock_minimo": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stock Minimo"
+          }
+        },
+        "required": [
+          "almacen_id",
+          "almacen",
+          "cantidad",
+          "reservado",
+          "disponible",
+          "stock_minimo",
+          "bajo_minimo"
+        ],
+        "title": "StockDeSkuOut",
         "type": "object"
       },
       "StockLoteOut": {
@@ -20501,6 +21456,55 @@
         ]
       }
     },
+    "/api/v1/accounting/cajas/cierres/{cierre_caja_id}": {
+      "get": {
+        "description": "Destino de `accounting.cierre_caja_irregular`.",
+        "operationId": "obtener_cierre_caja_api_v1_accounting_cajas_cierres__cierre_caja_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "cierre_caja_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Cierre Caja Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CierreCajaDetalleOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Obtener Cierre Caja",
+        "tags": [
+          "accounting"
+        ]
+      }
+    },
     "/api/v1/accounting/cajas/cierres/{cierre_id}/reabrir": {
       "post": {
         "description": "Devuelve un cierre a `en_proceso` para recontar (RN-MDP-005).\n\nSolo mientras el efectivo siga en el local: una vez que llegó a\ncontabilidad, corregir es un asiento, no un recuento.",
@@ -20995,6 +21999,55 @@
           }
         ],
         "summary": "Registrar Pago",
+        "tags": [
+          "accounting"
+        ]
+      }
+    },
+    "/api/v1/accounting/pagos-proveedor/{movimiento_id}": {
+      "get": {
+        "description": "Destino de `accounting.pago_requiere_aprobacion`: el aviso decía que\nun pago espera aprobación y no había forma de ir a mirar cuál.",
+        "operationId": "obtener_pago_api_v1_accounting_pagos_proveedor__movimiento_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "movimiento_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Movimiento Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MovimientoDineroOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Obtener Pago",
         "tags": [
           "accounting"
         ]
@@ -23063,6 +24116,103 @@
       }
     },
     "/api/v1/inventory/ajustes": {
+      "get": {
+        "description": "Los ajustes se solicitaban y se aprobaban a ciegas: no había forma de\nlistar los pendientes. `inventory.ajuste_fuera_margen` reportaba un hecho\nque no se podía ir a mirar.",
+        "operationId": "listar_ajustes_api_v1_inventory_ajustes_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "almacen_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Almacen Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "estado",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Estado"
+            }
+          },
+          {
+            "description": "Página, empezando en 1",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "description": "Página, empezando en 1",
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Filas por página (máx. 200)",
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Filas por página (máx. 200)",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pagina_AjusteOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Ajustes",
+        "tags": [
+          "inventory"
+        ]
+      },
       "post": {
         "operationId": "solicitar_ajuste_api_v1_inventory_ajustes_post",
         "requestBody": {
@@ -23103,6 +24253,55 @@
           }
         ],
         "summary": "Solicitar Ajuste",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/ajustes/{ajuste_id}": {
+      "get": {
+        "description": "Destino de `inventory.ajuste_fuera_margen`, y donde se decide si se\naprueba o se rechaza.",
+        "operationId": "obtener_ajuste_api_v1_inventory_ajustes__ajuste_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ajuste_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Ajuste Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AjusteDetalleOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Obtener Ajuste",
         "tags": [
           "inventory"
         ]
@@ -23331,6 +24530,52 @@
       }
     },
     "/api/v1/inventory/articulos/{articulo_id}": {
+      "get": {
+        "operationId": "obtener_articulo_api_v1_inventory_articulos__articulo_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "articulo_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Articulo Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArticuloOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Obtener Articulo",
+        "tags": [
+          "inventory"
+        ]
+      },
       "patch": {
         "operationId": "editar_articulo_api_v1_inventory_articulos__articulo_id__patch",
         "parameters": [
@@ -23566,6 +24811,53 @@
       }
     },
     "/api/v1/inventory/categorias/{categoria_id}": {
+      "get": {
+        "description": "Destino de `inventory.conteo_vencido`. Sin colisión con\n`/categorias-udm`: el path param va tipado `uuid.UUID`.",
+        "operationId": "obtener_categoria_api_v1_inventory_categorias__categoria_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "categoria_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Categoria Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoriaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Obtener Categoria",
+        "tags": [
+          "inventory"
+        ]
+      },
       "patch": {
         "description": "Acá se configura cada cuánto se cuenta la categoría (RN-INV-007).",
         "operationId": "editar_categoria_api_v1_inventory_categorias__categoria_id__patch",
@@ -24560,6 +25852,55 @@
         ]
       }
     },
+    "/api/v1/inventory/lotes/{lote_id}": {
+      "get": {
+        "description": "Destino de `inventory.lote_vencido_detectado`: el reporte dice que se\nbloqueó, esto dice cuánto quedó bloqueado y en qué almacén.",
+        "operationId": "obtener_lote_api_v1_inventory_lotes__lote_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lote_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Lote Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoteDetalleOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Obtener Lote",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
     "/api/v1/inventory/mermas": {
       "get": {
         "description": "Las pendientes de resolver: es la bandeja de la auditoría.",
@@ -25450,6 +26791,55 @@
           }
         ],
         "summary": "Crear Sku",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/skus/{sku_id}": {
+      "get": {
+        "description": "Destino de `inventory.stock_bajo_minimo`: el SKU, su artículo y su\nsaldo en cada almacén, que es lo que hay que mirar para decidir reponer.",
+        "operationId": "obtener_sku_api_v1_inventory_skus__sku_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sku_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sku Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkuDetalleOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Obtener Sku",
         "tags": [
           "inventory"
         ]
@@ -31407,7 +32797,7 @@
     },
     "/api/v1/reports/emitidos/{reporte_id}": {
       "get": {
-        "description": "Doble puerta (RN-REP-002).\n\n1. **Alcance**: ser destinatario, o tener `reports.leer_todo`.\n2. **Contenido**: el permiso que la emisión declara, que es el de su\n   módulo dueño. Estar en la lista de distribución no otorga acceso al\n   dato — mismo criterio que el addendum de ADR-024 para los tableros\n   compartidos.",
+        "description": "Doble puerta (RN-REP-002), en `_exigir_puerta_doble`: alcance —ser\ndestinatario o tener `reports.leer_todo`— y contenido —el permiso del\nmódulo dueño de la emisión—. Estar en la lista de distribución no otorga\nacceso al dato, mismo criterio que el addendum de ADR-024 para los\ntableros compartidos.",
         "operationId": "detalle_emitido_api_v1_reports_emitidos__reporte_id__get",
         "parameters": [
           {
@@ -31449,6 +32839,470 @@
           }
         ],
         "summary": "Detalle Emitido",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/emitidos/{reporte_id}/escalamientos": {
+      "get": {
+        "description": "El historial completo, no solo la cadena viva: un problema que vuelve\na pasar es exactamente lo que la mejora continua viene a mirar.",
+        "operationId": "escalamientos_del_reporte_api_v1_reports_emitidos__reporte_id__escalamientos_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "reporte_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Reporte Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/EscalamientoDetalleOut"
+                  },
+                  "title": "Response Escalamientos Del Reporte Api V1 Reports Emitidos  Reporte Id  Escalamientos Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Escalamientos Del Reporte",
+        "tags": [
+          "reports"
+        ]
+      },
+      "post": {
+        "description": "Elevar un reporte que no se pudo resolver donde llegó (RN-CTP-004).\n\nArranca siempre en `supervisor`: la cadena sube de a un escalón para que\nquede registrado quién intentó qué.",
+        "operationId": "abrir_escalamiento_api_v1_reports_emitidos__reporte_id__escalamientos_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "reporte_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Reporte Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EscalamientoCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EscalamientoDetalleOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Abrir Escalamiento",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/escalamientos": {
+      "get": {
+        "description": "La bandeja del que responde: qué está abierto y en qué nivel.",
+        "operationId": "listar_escalamientos_api_v1_reports_escalamientos_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "estado",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Estado"
+            }
+          },
+          {
+            "in": "query",
+            "name": "nivel_actual",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Nivel Actual"
+            }
+          },
+          {
+            "in": "query",
+            "name": "motivo",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Motivo"
+            }
+          },
+          {
+            "in": "query",
+            "name": "origen",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Origen"
+            }
+          },
+          {
+            "description": "Página, empezando en 1",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "description": "Página, empezando en 1",
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Filas por página (máx. 200)",
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Filas por página (máx. 200)",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pagina_EscalamientoOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Escalamientos",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/escalamientos/{escalamiento_id}": {
+      "get": {
+        "operationId": "detalle_escalamiento_api_v1_reports_escalamientos__escalamiento_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "escalamiento_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Escalamiento Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EscalamientoDetalleOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Detalle Escalamiento",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/escalamientos/{escalamiento_id}/acciones": {
+      "post": {
+        "description": "Qué hizo este nivel, sin cerrar ni elevar.",
+        "operationId": "registrar_accion_api_v1_reports_escalamientos__escalamiento_id__acciones_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "escalamiento_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Escalamiento Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccionEscalamientoIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EscalamientoDetalleOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Registrar Accion",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/escalamientos/{escalamiento_id}/elevar": {
+      "post": {
+        "description": "Sube un escalón. La respuesta trae `destinatarios`: si va vacía, el\nnivel de destino no tiene a nadie y quien eleva tiene que saberlo en vez\nde suponer que llegó (RN-REP-005).",
+        "operationId": "elevar_escalamiento_api_v1_reports_escalamientos__escalamiento_id__elevar_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "escalamiento_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Escalamiento Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccionEscalamientoIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EscalamientoDetalleOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Elevar Escalamiento",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/escalamientos/{escalamiento_id}/resolver": {
+      "post": {
+        "operationId": "resolver_escalamiento_api_v1_reports_escalamientos__escalamiento_id__resolver_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "escalamiento_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Escalamiento Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccionEscalamientoIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EscalamientoDetalleOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Resolver Escalamiento",
         "tags": [
           "reports"
         ]

@@ -274,6 +274,8 @@ def test_conteo_vencido_reporta_a_almacen_y_gerencia(env):
     assert len(recibidos) == 1
     assert recibidos[0]["dirigido_a"] == ["almacen", "gerencia"]
     assert recibidos[0]["frecuencia"] == "diario"
+    # Quién pidió la verificación. Nulo cuando la corre el beat de las 06:15.
+    assert recibidos[0]["usuario_id"] is not None
 
 
 def test_al_dia_no_genera_reporte(env):
