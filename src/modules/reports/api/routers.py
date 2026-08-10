@@ -11,19 +11,27 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from src.core import destinos
 from src.core.tenant import Tenant
 from src.modules.reports.api import schemas
 from src.modules.reports.application import areas as areas_uc
+from src.modules.reports.application import destinatarios as resolucion
+from src.modules.reports.application import escalamientos
 from src.modules.reports.application import matriz as matriz_uc
 from src.modules.reports.application import reglas as reglas_uc
 from src.modules.reports.application.scope import (
     exigir_area,
+    exigir_escalamiento,
     exigir_miembro,
     exigir_regla,
     exigir_reporte,
 )
 from src.modules.reports.domain import catalogo
-from src.modules.reports.infrastructure.repositories import ReglaRepo, ReporteEmitidoRepo
+from src.modules.reports.infrastructure.repositories import (
+    EscalamientoRepo,
+    ReglaRepo,
+    ReporteEmitidoRepo,
+)
 from src.modules.users.api.deps import (
     client_ip,
     get_db,
@@ -40,10 +48,52 @@ LEER = "reports.leer"
 LEER_TODO = "reports.leer_todo"
 LEER_MATRIZ = "reports.leer_matriz"
 ADMINISTRAR = "reports.administrar"
+# Elevar y resolver son permisos distintos a propósito: quien atiende puede
+# escalar lo que no le corresponde, y quien responde por el nivel es el que
+# cierra. Mismo criterio de segregación que solicitar/aprobar un ajuste.
+ESCALAR = "reports.escalar"
+RESOLVER = "reports.escalamiento_resolver"
 
 
 def _permisos(session: Session, usuario: Usuario) -> set[str]:
     return permisos_de(session, usuario.id)
+
+
+def _nombres_de(session: Session, ids) -> dict[uuid.UUID, str]:
+    """`{usuario_id: username}` en una consulta. Los ids que ya no existen
+    quedan fuera y cada llamador decide cómo los nombra."""
+    ids = {i for i in ids if i is not None}
+    if not ids:
+        return {}
+    return dict(
+        session.execute(
+            select(Usuario.id, Usuario.username).where(Usuario.id.in_(ids))
+        ).all()
+    )
+
+
+def _a_salida_reporte(reporte, nombres: dict[uuid.UUID, str]):
+    salida = schemas.ReporteEmitidoOut.model_validate(reporte, from_attributes=True)
+    salida.actor = _nombre_actor(reporte.actor_id, nombres)
+    salida.referencia_url = destinos.url(
+        reporte.referencia_tipo, reporte.referencia_id
+    )
+    return salida
+
+
+def _nombre_actor(actor_id, nombres: dict[uuid.UUID, str]) -> str:
+    """Nulo es «Sistema» (RN-REP-009); un id que ya no resuelve es un usuario
+    borrado, y decir «Sistema» ahí borraría al responsable del hecho."""
+    if actor_id is None:
+        return schemas.ACTOR_SISTEMA
+    return nombres.get(actor_id, "(borrado)")
+
+
+def _pagina_con_actores(session: Session, pagina: dict) -> dict:
+    """Resuelve el nombre del actor de toda la página en una sola consulta."""
+    nombres = _nombres_de(session, (r.actor_id for r in pagina["items"]))
+    pagina["items"] = [_a_salida_reporte(r, nombres) for r in pagina["items"]]
+    return pagina
 
 
 def _emision_visible(session: Session, usuario: Usuario, codigo: str) -> bool:
@@ -84,6 +134,14 @@ def listar_emisiones(
         ],
         niveles=list(catalogo.NIVELES),
         dinamicos=list(catalogo.DINAMICOS),
+        destinos={
+            tipo: schemas.DestinoOut(
+                ruta=destinos.PREFIJO_API + d.ruta,
+                permiso=d.permiso,
+                etiqueta=d.etiqueta,
+            )
+            for tipo, d in destinos.DESTINOS.items()
+        },
     )
 
 
@@ -331,7 +389,9 @@ def mis_reportes(
 ):
     """Lo que me fue entregado. Sin filtro de tenant explícito: la entrega ya
     es a mi `usuario_id`, y nadie me entrega reportes de otra empresa."""
-    return paginar(session, ReporteEmitidoRepo(session).q_mios(usuario.id), p)
+    return _pagina_con_actores(
+        session, paginar(session, ReporteEmitidoRepo(session).q_mios(usuario.id), p)
+    )
 
 
 @router.get("/emitidos", response_model=Pagina[schemas.ReporteEmitidoOut])
@@ -342,13 +402,231 @@ def listar_emitidos(
     p: Paginacion = Depends(paginacion),
     session: Session = Depends(get_db),
 ):
+    return _pagina_con_actores(
+        session,
+        paginar(
+            session,
+            ReporteEmitidoRepo(session).q_list(
+                tenant.filtro_empresa(), codigo_emision=codigo_emision
+            ),
+            p,
+        ),
+    )
+
+
+def _exigir_puerta_doble(
+    session: Session, reporte_id: uuid.UUID, usuario: Usuario, tenant: Tenant
+):
+    """RN-REP-002 en una sola función: alcance y contenido.
+
+    1. **Alcance**: ser destinatario, o tener `reports.leer_todo`. Si no, el
+       mismo 404 que si no existiera — la respuesta no confirma un reporte
+       ajeno.
+    2. **Contenido**: el permiso que la emisión declara, que es el de su
+       módulo dueño. Estar en la lista de distribución no otorga acceso al
+       dato.
+    """
+    reporte = exigir_reporte(session, reporte_id, tenant)
+    permisos = _permisos(session, usuario)
+    alcanza = "*" in permisos or LEER_TODO in permisos
+    if not alcanza and not ReporteEmitidoRepo(session).es_destinatario(
+        reporte_id, usuario.id
+    ):
+        raise HTTPException(404, "Reporte no encontrado")
+    if not _emision_visible(session, usuario, reporte.codigo_emision):
+        raise HTTPException(403, "Permiso denegado")
+    return reporte
+
+
+def _a_salida_escalamiento(
+    session: Session, fila, *, con_destinatarios: bool = False
+) -> schemas.EscalamientoDetalleOut:
+    salida = schemas.EscalamientoDetalleOut.model_validate(fila, from_attributes=True)
+    salida.acciones = list(fila.acciones or [])
+    if con_destinatarios:
+        ids = resolucion.del_nivel(
+            session,
+            fila.nivel_actual,
+            empresa_id=fila.empresa_id,
+            sucursal_id=fila.sucursal_id,
+        )
+        nombres = _nombres_de(session, ids)
+        salida.destinatarios = [nombres.get(i, "(borrado)") for i in ids]
+    return salida
+
+
+@router.get("/escalamientos", response_model=Pagina[schemas.EscalamientoOut])
+def listar_escalamientos(
+    estado: str | None = None,
+    nivel_actual: str | None = None,
+    motivo: str | None = None,
+    origen: str | None = None,
+    _: Usuario = Depends(require_permission(LEER_TODO)),
+    tenant: Tenant = Depends(get_tenant),
+    p: Paginacion = Depends(paginacion),
+    session: Session = Depends(get_db),
+):
+    """La bandeja del que responde: qué está abierto y en qué nivel."""
     return paginar(
         session,
-        ReporteEmitidoRepo(session).q_list(
-            tenant.filtro_empresa(), codigo_emision=codigo_emision
+        EscalamientoRepo(session).q_list(
+            tenant.filtro_empresa(),
+            estado=estado,
+            nivel_actual=nivel_actual,
+            motivo=motivo,
+            origen=origen,
         ),
         p,
     )
+
+
+@router.get(
+    "/escalamientos/{escalamiento_id}",
+    response_model=schemas.EscalamientoDetalleOut,
+)
+def detalle_escalamiento(
+    escalamiento_id: uuid.UUID,
+    usuario: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    fila = exigir_escalamiento(session, escalamiento_id, tenant)
+    # La misma doble puerta que el reporte de origen: el escalamiento cuenta
+    # lo mismo que el hecho que lo provocó.
+    _exigir_puerta_doble(session, fila.reporte_emitido_id, usuario, tenant)
+    return _a_salida_escalamiento(session, fila, con_destinatarios=True)
+
+
+@router.post(
+    "/emitidos/{reporte_id}/escalamientos",
+    response_model=schemas.EscalamientoDetalleOut,
+    status_code=201,
+)
+def abrir_escalamiento(
+    reporte_id: uuid.UUID,
+    body: schemas.EscalamientoCreate,
+    actor: Usuario = Depends(require_permission(ESCALAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+    ip: str | None = Depends(client_ip),
+):
+    """Elevar un reporte que no se pudo resolver donde llegó (RN-CTP-004).
+
+    Arranca siempre en `supervisor`: la cadena sube de a un escalón para que
+    quede registrado quién intentó qué.
+    """
+    reporte = _exigir_puerta_doble(session, reporte_id, actor, tenant)
+    fila = escalamientos.abrir(
+        session,
+        reporte,
+        motivo=body.motivo,
+        descripcion=body.descripcion,
+        reportado_por=actor.id,
+        evidencia_id=body.evidencia_id,
+        ip=ip,
+    )
+    salida = _a_salida_escalamiento(session, fila, con_destinatarios=True)
+    session.commit()
+    return salida
+
+
+@router.get(
+    "/emitidos/{reporte_id}/escalamientos",
+    response_model=list[schemas.EscalamientoDetalleOut],
+)
+def escalamientos_del_reporte(
+    reporte_id: uuid.UUID,
+    usuario: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """El historial completo, no solo la cadena viva: un problema que vuelve
+    a pasar es exactamente lo que la mejora continua viene a mirar."""
+    _exigir_puerta_doble(session, reporte_id, usuario, tenant)
+    return [
+        _a_salida_escalamiento(session, fila)
+        for fila in EscalamientoRepo(session).de_reporte(reporte_id)
+    ]
+
+
+@router.post(
+    "/escalamientos/{escalamiento_id}/acciones",
+    response_model=schemas.EscalamientoDetalleOut,
+)
+def registrar_accion(
+    escalamiento_id: uuid.UUID,
+    body: schemas.AccionEscalamientoIn,
+    actor: Usuario = Depends(require_permission(RESOLVER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+    ip: str | None = Depends(client_ip),
+):
+    """Qué hizo este nivel, sin cerrar ni elevar."""
+    fila = exigir_escalamiento(session, escalamiento_id, tenant)
+    _exigir_puerta_doble(session, fila.reporte_emitido_id, actor, tenant)
+    escalamientos.registrar_accion(
+        session, fila, descripcion=body.descripcion, usuario_id=actor.id, ip=ip
+    )
+    salida = _a_salida_escalamiento(session, fila, con_destinatarios=True)
+    session.commit()
+    return salida
+
+
+@router.post(
+    "/escalamientos/{escalamiento_id}/elevar",
+    response_model=schemas.EscalamientoDetalleOut,
+)
+def elevar_escalamiento(
+    escalamiento_id: uuid.UUID,
+    body: schemas.AccionEscalamientoIn,
+    actor: Usuario = Depends(require_permission(ESCALAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+    ip: str | None = Depends(client_ip),
+):
+    """Sube un escalón. La respuesta trae `destinatarios`: si va vacía, el
+    nivel de destino no tiene a nadie y quien eleva tiene que saberlo en vez
+    de suponer que llegó (RN-REP-005)."""
+    fila = exigir_escalamiento(session, escalamiento_id, tenant)
+    reporte = _exigir_puerta_doble(session, fila.reporte_emitido_id, actor, tenant)
+    escalamientos.elevar(
+        session,
+        fila,
+        reporte,
+        descripcion=body.descripcion,
+        usuario_id=actor.id,
+        ip=ip,
+    )
+    salida = _a_salida_escalamiento(session, fila, con_destinatarios=True)
+    session.commit()
+    return salida
+
+
+@router.post(
+    "/escalamientos/{escalamiento_id}/resolver",
+    response_model=schemas.EscalamientoDetalleOut,
+)
+def resolver_escalamiento(
+    escalamiento_id: uuid.UUID,
+    body: schemas.AccionEscalamientoIn,
+    actor: Usuario = Depends(require_permission(RESOLVER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+    ip: str | None = Depends(client_ip),
+):
+    fila = exigir_escalamiento(session, escalamiento_id, tenant)
+    reporte = _exigir_puerta_doble(session, fila.reporte_emitido_id, actor, tenant)
+    escalamientos.resolver(
+        session,
+        fila,
+        reporte,
+        descripcion=body.descripcion,
+        usuario_id=actor.id,
+        ip=ip,
+    )
+    salida = _a_salida_escalamiento(session, fila)
+    session.commit()
+    return salida
 
 
 @router.get("/emitidos/{reporte_id}", response_model=schemas.ReporteEmitidoDetalleOut)
@@ -358,37 +636,23 @@ def detalle_emitido(
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    """Doble puerta (RN-REP-002).
-
-    1. **Alcance**: ser destinatario, o tener `reports.leer_todo`.
-    2. **Contenido**: el permiso que la emisión declara, que es el de su
-       módulo dueño. Estar en la lista de distribución no otorga acceso al
-       dato — mismo criterio que el addendum de ADR-024 para los tableros
-       compartidos.
-    """
-    reporte = exigir_reporte(session, reporte_id, tenant)
-    repo = ReporteEmitidoRepo(session)
-
-    permisos = _permisos(session, usuario)
-    alcanza = "*" in permisos or LEER_TODO in permisos
-    if not alcanza and not repo.es_destinatario(reporte_id, usuario.id):
-        # Mismo 404 que si no existiera: la respuesta no confirma la
-        # existencia de un reporte ajeno.
-        raise HTTPException(404, "Reporte no encontrado")
-    if not _emision_visible(session, usuario, reporte.codigo_emision):
-        raise HTTPException(403, "Permiso denegado")
-
-    entregas = repo.entregas(reporte_id)
-    nombres = dict(
-        session.execute(
-            select(Usuario.id, Usuario.username).where(
-                Usuario.id.in_([e.usuario_id for e in entregas])
-            )
-        ).all()
-    ) if entregas else {}
+    """Doble puerta (RN-REP-002), en `_exigir_puerta_doble`: alcance —ser
+    destinatario o tener `reports.leer_todo`— y contenido —el permiso del
+    módulo dueño de la emisión—. Estar en la lista de distribución no otorga
+    acceso al dato, mismo criterio que el addendum de ADR-024 para los
+    tableros compartidos."""
+    reporte = _exigir_puerta_doble(session, reporte_id, usuario, tenant)
+    entregas = ReporteEmitidoRepo(session).entregas(reporte_id)
+    nombres = _nombres_de(
+        session, [e.usuario_id for e in entregas] + [reporte.actor_id]
+    )
 
     salida = schemas.ReporteEmitidoDetalleOut.model_validate(
         reporte, from_attributes=True
+    )
+    salida.actor = _nombre_actor(reporte.actor_id, nombres)
+    salida.referencia_url = destinos.url(
+        reporte.referencia_tipo, reporte.referencia_id
     )
     salida.entregas = [
         schemas.EntregaReporteOut(

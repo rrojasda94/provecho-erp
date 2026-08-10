@@ -12,6 +12,7 @@ import uuid
 from sqlalchemy import Select, select
 from sqlalchemy.orm import Session
 
+from src.modules.reports.domain import escalamiento
 from src.modules.reports.infrastructure.models import (
     Area,
     AreaMiembro,
@@ -19,6 +20,7 @@ from src.modules.reports.infrastructure.models import (
     ReglaDestinatario,
     ReglaDistribucion,
     ReporteEmitido,
+    ReporteEscalamiento,
 )
 
 
@@ -193,3 +195,58 @@ class ReporteEmitidoRepo:
         self.s.add(entrega)
         self.s.flush()
         return entrega
+
+
+class EscalamientoRepo:
+    def __init__(self, session: Session) -> None:
+        self.s = session
+
+    def get(self, escalamiento_id: uuid.UUID) -> ReporteEscalamiento | None:
+        return self.s.get(ReporteEscalamiento, escalamiento_id)
+
+    def abierto_de(self, reporte_id: uuid.UUID) -> ReporteEscalamiento | None:
+        """La cadena viva de ese reporte. Lo respalda el índice parcial
+        `uq_escalamiento_abierto_por_reporte`; esto lo detecta antes para
+        devolver un 409 con mensaje en vez de un error de integridad."""
+        return self.s.scalar(
+            select(ReporteEscalamiento).where(
+                ReporteEscalamiento.reporte_emitido_id == reporte_id,
+                ReporteEscalamiento.estado.not_in(escalamiento.ESTADOS_TERMINADOS),
+            )
+        )
+
+    def de_reporte(self, reporte_id: uuid.UUID) -> list[ReporteEscalamiento]:
+        return list(
+            self.s.scalars(
+                select(ReporteEscalamiento)
+                .where(ReporteEscalamiento.reporte_emitido_id == reporte_id)
+                .order_by(ReporteEscalamiento.created_at.desc())
+            )
+        )
+
+    def q_list(
+        self,
+        empresa_id: uuid.UUID | None = None,
+        *,
+        estado: str | None = None,
+        nivel_actual: str | None = None,
+        motivo: str | None = None,
+        origen: str | None = None,
+    ) -> Select:
+        q = select(ReporteEscalamiento)
+        if empresa_id is not None:
+            q = q.where(ReporteEscalamiento.empresa_id == empresa_id)
+        if estado is not None:
+            q = q.where(ReporteEscalamiento.estado == estado)
+        if nivel_actual is not None:
+            q = q.where(ReporteEscalamiento.nivel_actual == nivel_actual)
+        if motivo is not None:
+            q = q.where(ReporteEscalamiento.motivo == motivo)
+        if origen is not None:
+            q = q.where(ReporteEscalamiento.origen == origen)
+        return q.order_by(ReporteEscalamiento.created_at.desc())
+
+    def add(self, fila: ReporteEscalamiento) -> ReporteEscalamiento:
+        self.s.add(fila)
+        self.s.flush()
+        return fila
