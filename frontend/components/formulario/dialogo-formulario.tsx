@@ -124,3 +124,14 @@ export function DialogoFormulario({
 /** Clase del botón "Editar" de una fila: discreto, no compite con el alta. */
 export const BOTON_FILA =
   "rounded border border-gray/40 px-2 py-1 text-xs font-semibold text-dark hover:bg-cream";
+
+/**
+ * `defaultValue` de un `<input>` no admite `null`: React lo lee como "campo
+ * no controlado" y avisa por consola. Un opcional vacío de la API llega
+ * `null`, así que este paso está en cada formulario de edición del ERP —
+ * escrito inline eran dos ramas por campo, y un formulario de ocho campos
+ * no pasaba el límite de complejidad del lint por puro ruido de sintaxis.
+ */
+export function valor(v: string | number | null | undefined): string | number {
+  return v ?? "";
+}

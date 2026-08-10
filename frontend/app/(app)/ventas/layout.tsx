@@ -4,6 +4,7 @@ import { MODULOS } from "@/lib/modulos";
 const modulo = MODULOS.find((m) => m.clave === "ventas")!;
 const submenu = [
   { label: "Jornada", href: "/ventas" },
+  { label: "Clientes", href: "/ventas/clientes" },
   { label: "Abrir el PDV", href: "/pdv" },
 ];
 

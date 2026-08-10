@@ -135,9 +135,20 @@ export const MODULOS: Modulo[] = [
   {
     clave: "usuarios",
     nombre: "Usuarios",
-    descripcion: "Cuentas, roles y permisos",
+    descripcion: "Cuentas, roles, permisos y personas",
     href: "/usuarios",
     prefijoPermiso: "users.",
     icono: "🔐",
+  },
+  {
+    clave: "organizacion",
+    nombre: "Organización",
+    descripcion: "Empresas, marcas, sucursales y almacenes",
+    href: "/organizacion/empresas",
+    // Módulo propio y no una sección de Gerencia o Usuarios: el permiso real
+    // es `organizacion.gestionar`, y colgarlo de otro prefijo se lo
+    // escondería justo a quien sí lo tiene.
+    prefijoPermiso: "organizacion.",
+    icono: "🏢",
   },
 ];
