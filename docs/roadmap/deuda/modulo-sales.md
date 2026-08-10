@@ -290,3 +290,12 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   puede registrar: solo se marca el pedido entregado o no se marca nada.
 - ⬜ **Plazo de espera de takeout no recogido** (RN-CUP-011): la regla
   existe, el plazo por sucursal no está configurado ni modelado.
+- ⬜ **Escalar un problema sin reporte previo** (RN-CTP-004, deuda declarada
+  en ADR-036): la cadena de escalamiento ya existe, pero solo se puede abrir
+  sobre un `reporte_emitido`, y el catálogo cerrado no produce ninguno para
+  `queja`, `error_sistema` ni `desistimiento_no_resuelto`. Un cliente que se
+  queja en el mostrador no genera ningún hecho en el bus. Haría falta una
+  emisión `sales.queja_registrada` con endpoint de alta — que choca de frente
+  con el «no hay `POST /emitidos`» de ADR-033, así que la decisión de fondo es
+  **dónde nace una queja**: como venta anotada, como nodo de encuesta, o como
+  la primera emisión del ERP que sí admite alta manual.

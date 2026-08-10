@@ -81,7 +81,12 @@ de su módulo y se prueban de forma aislada.
   elige la sucursal.
 - **RN-CTP-004** Todo escalamiento de un pedido (tiempos, calidad,
   problema) genera un reporte de escalamiento y se dirige a un supervisor o
-  encargado de sucursal.
+  encargado de sucursal. **Implementado desde ADR-036**: la cadena es
+  `reporte_escalamiento` y el nivel `supervisor` resuelve al encargado de
+  turno (con roles `supervisor`/`admin` de respaldo si no hay caja abierta).
+  Alcance de hoy: solo se escala lo que el catálogo cerrado emite, así que los
+  motivos `queja`, `error_sistema` y `desistimiento_no_resuelto` se pueden
+  elegir pero ninguna emisión los produce todavía.
 
 ## Canal de venta
 
@@ -738,13 +743,19 @@ producción se hace en cocinas de sucursal. Ver
   escalamiento del ERP. Un solo asiento contable posible por hallazgo,
   según el estadio final: si se desecha, el registro de merma (RN-INV-017)
   es ese asiento; si se reprocesa, no hay merma ni asiento — el reporte
-  solo detalla cómo se corrigió.
+  solo detalla cómo se corrigió. **Implementado desde ADR-036**: el hallazgo
+  emite `production.no_conformidad_detectada` y el escalamiento se abre sobre
+  ese reporte, no sobre la orden — así conserva la foto, el actor y la doble
+  puerta de RN-REP-002.
 - **RN-PRD-015** La destrucción de un lote no conforme se realiza dentro
   del establecimiento, en zona cubierta por cámaras de videovigilancia
   (nunca fuera del local) y dentro del horario laboral. El video de la
   destrucción y el desecho final a la basura son la evidencia adjunta al
   reporte de escalamiento — previene sustracción del producto declarado
-  como merma.
+  como merma. Lo exige `reporte_escalamiento.evidencia_id` cuando el motivo es
+  `no_conformidad_calidad` y la orden terminó en desecho; la validación vive en
+  la capa de aplicación y no en un CHECK porque «terminó en desecho» es un
+  campo de `orden_produccion`, otra tabla de otro módulo (ADR-036).
 - **RN-PRD-016** El inventario de la cocina de producción (insumos,
   subrecetas en elaboración, producto terminado) sigue el mismo esquema
   de conteo cíclico y margen de error que Almacén Central (RN-INV-007/
@@ -1458,6 +1469,32 @@ es a dónde va y quién puede abrirlo.
   sucursal es la general de la empresa y **solo aplica donde no hay una
   específica** — si aplicaran las dos, quien esté en ambas recibiría el mismo
   hecho dos veces.
+- **RN-REP-009** Todo reporte dice **quién provocó el hecho**. Cuando lo
+  detecta el sistema —un barrido, un cruce de umbral— el actor queda nulo y se
+  muestra como «Sistema»: inventarle una persona a un hecho que nadie provocó
+  convierte un aviso de proceso en una acusación. Los reportes anteriores a
+  ADR-036 dicen «Sistema» porque el dato nunca se guardó; no se rellenan hacia
+  atrás.
+- **RN-REP-010** Toda emisión que declara `referencia_tipo` tiene un destino
+  montado: un endpoint real donde se mira —y se resuelve— el hecho. Un reporte
+  que informa y no lleva a ninguna parte deja al lector saliendo a buscar el
+  registro a mano, que es lo que el reporte venía a evitar. Lo congela
+  `tests/test_destinos.py` contra las rutas realmente montadas.
+- **RN-REP-011** Un escalamiento ancla a un `reporte_emitido` **con empresa**.
+  Un hecho que no se pudo atribuir a una empresa no tiene área a la que
+  elevarse ni permiso de módulo que lo cubra.
+- **RN-REP-012** La cadena sube **de a un escalón** (supervisor → comercial →
+  gerencia) y su historial es **append-only**: cada nivel agrega qué hizo, y
+  ninguno reescribe lo que dijo el anterior. Saltarse un nivel o pisar su
+  entrada deja el registro como la versión del último que pasó, y ese registro
+  es el insumo de la mejora continua.
+- **RN-REP-013** Un reporte tiene **una sola cadena abierta** a la vez. Dos
+  cadenas sobre el mismo hecho dan dos verdades y dos responsables. Una cadena
+  terminada libera el reporte: un problema que vuelve a pasar se escala de
+  nuevo, y que aparezca dos veces es justamente lo que hay que poder ver.
+- **RN-REP-014** Abrir, accionar, elevar y resolver un escalamiento dejan
+  rastro en `audit_log` (ADR-031), por lo mismo que RN-REP-007: decidir que
+  algo sube de nivel —o que se da por resuelto— es un acto de autoridad.
 
 > Nota: esta lista crece con cada módulo. Al implementar un módulo se agregan
 > aquí sus reglas antes de codificarlas.

@@ -858,25 +858,38 @@ Solicitud.
 - **arqueo**: punto_venta_id, tipo (`sorpresa` | `programado`),
   realizado_por, monto_esperado, monto_contado, diferencia, acta_id.
   Verificación puntual de caja fuera del ciclo apertura/cierre.
-- **reporte_escalamiento** (entidad transversal — el escalamiento es
-  parte de la naturaleza de todo reporte del ERP, no un concepto propio
-  de `sales`; vive en `shared`, no en un módulo dueño único, mismo patrón
-  que `comprobante`): origen (`central_pedidos` | `punto_venta` |
-  `produccion`), sucursal_id, venta_id o carrito_id (opcional; nulo si
-  origen=`produccion`, usa orden_produccion_id en su lugar), reportado_por
-  (personal de atención al cliente, o jefe de cocina si origen=
-  `produccion`), motivo (`queja` | `demora` | `error_sistema` |
-  `desistimiento_no_resuelto` | `no_conformidad_calidad` | ...),
-  descripcion del problema; evidencia_id (FK `archivo`, obligatorio si
-  motivo=`no_conformidad_calidad` y termina en desecho, RN-PRD-015). Flujo de
-  escalamiento en cadena: alerta al **supervisor**, que intenta
-  resolverlo y redacta su solución en el reporte; si no puede, escala al
-  **área comercial o gerencia**, que realiza acciones y las reporta en el
-  mismo documento. Campos: nivel_actual (`supervisor` | `comercial` |
-  `gerencia`), acciones (historial por nivel: quién, qué, cuándo),
-  estado (`abierto` | `resuelto_supervisor` | `escalado` | `resuelto` |
-  `cerrado`). Se almacena en el ERP para **mejora continua** (insumo del
-  SOP de mejora continua de experiencia de cliente, área Comercial).
+- **reporte_escalamiento** — **implementado en `src/modules/reports/`
+  (ADR-036), no en `shared`**. Esta entrada se escribió el 2026-07-20, cuatro
+  meses antes de que existiera el módulo, y decía `shared` porque entonces el
+  escalamiento no tenía dueño. Hoy lo tiene: un solo escritor y un solo lector.
+  La definición vigente está en §16.
+
+  Dos diferencias con lo que este párrafo pedía originalmente, argumentadas en
+  ADR-036:
+
+  1. **Ancla a `reporte_emitido`, no a la venta.** Los `venta_id` /
+     `carrito_id` / `orden_produccion_id` de la idea original son exactamente
+     lo que `reporte_emitido.referencia_tipo` + `referencia_id` ya guardan,
+     para los nueve tipos y no para tres — y `carrito` ni siquiera existe como
+     tabla. Anclar a la venta perdería la foto `datos`, el `nivel`, el
+     `actor_id` y la doble puerta de RN-REP-002.
+  2. **`origen` se deriva del reporte**, no se pide: quien eleva ya dijo qué
+     reporte eleva.
+
+  Lo demás se mantiene: motivo (`queja` | `demora` | `error_sistema` |
+  `desistimiento_no_resuelto` | `no_conformidad_calidad`), evidencia_id
+  obligatoria si motivo=`no_conformidad_calidad` y termina en desecho
+  (RN-PRD-015, validado en la capa de aplicación porque «termina en desecho»
+  vive en otra tabla de otro módulo), y el flujo en cadena: alerta al
+  **supervisor**, que intenta resolverlo y redacta su solución; si no puede,
+  escala al **área comercial** y de ahí a **gerencia**, cada nivel dejando su
+  entrada en `acciones`. Se almacena para **mejora continua** (insumo del SOP
+  de experiencia de cliente, área Comercial).
+
+  Caveat de alcance: hoy solo se escala lo que el catálogo cerrado emite. Los
+  motivos `queja`, `error_sistema` y `desistimiento_no_resuelto` se pueden
+  elegir, pero ninguna emisión los produce todavía — ver la deuda declarada en
+  ADR-036.
 - **carta_disputa_pago**: operacion_id (venta/pago), fecha, hora,
   cliente_id, referencia_pago, lote, monto, procedencia (o motivo de
   ausencia), emitida_por (área contable, RN-MDP-004).
@@ -1606,15 +1619,35 @@ cualquier payload del bus (RN-REP-001).
   exige la del tipo declarado, porque una fila `tipo=area` con `area_id` nulo
   resolvería a cero destinatarios en silencio. `dinamico` es
   `encargado_de_turno` | `responsables_de_almacen`: destinatarios que no se
-  pueden listar de antemano porque dependen del momento.
-- **reporte_emitido**: empresa_id/sucursal_id (nullables — un hecho que no se
-  pudo atribuir se guarda igual y solo lo ve el superusuario, mismo criterio
-  que `audit_log`), codigo_emision, titulo, cuerpo, nivel, **datos** JSONB
+  pueden listar de antemano porque dependen del momento. Desde ADR-036 hay un
+  tercero, `responsables_del_nivel`, que resuelve el escalón de una cadena de
+  escalamiento.
+- **reporte_emitido**: empresa_id/sucursal_id/**almacen_id** (nullables — un
+  hecho que no se pudo atribuir se guarda igual y solo lo ve el superusuario,
+  mismo criterio que `audit_log`), **actor_id** (quién provocó el hecho; NULL =
+  lo detectó el sistema y la API lo muestra como «Sistema», RN-REP-009),
+  codigo_emision, titulo, cuerpo, nivel, **datos** JSONB
   (la foto: solo los campos que la emisión declara, RN-REP-003; puede traer
   PII y por eso no sale al logger), referencia_tipo/referencia_id
   (polimórficos sin FK, como `notificacion`), regla_id (la que lo produjo;
   NULL = el hueco), emitido_at. Es una **foto, no un puntero**: un reporte de
   «descuadre de S/ 40» sigue diciendo 40 aunque el cierre se corrija después.
+  `referencia_tipo` se traduce a un endpoint en `src/core/destinos.py`
+  (ADR-036): es lo que convierte al reporte en un enlace al lugar donde se
+  actúa. `actor_id` y `almacen_id` son de ADR-036 y **no tienen backfill**: un
+  reporte anterior dice «Sistema» porque el dato nunca se guardó.
+- **reporte_escalamiento** (ADR-036, vive en `reports` y **no** en `shared` —
+  ver §6 y el ADR): empresa_id NOT NULL, sucursal_id nullable,
+  reporte_emitido_id NOT NULL (`ondelete=RESTRICT`: el reporte es la evidencia
+  de la cadena, distinto del CASCADE de `entrega_reporte`), origen, motivo,
+  descripcion, reportado_por_id, evidencia_id (FK `archivo`), nivel_actual
+  (`supervisor`|`comercial`|`gerencia`), estado, **acciones** JSONB append-only
+  (`[{nivel, usuario_id, accion, descripcion, ts}]`, RN-REP-012), cerrado_at.
+  **Un índice único parcial** —no un `UniqueConstraint`— para «una cadena
+  abierta por reporte» (RN-REP-013): las terminadas tienen que poder convivir,
+  y dos UNIQUE que empiezan por la misma columna colisionan de nombre con la
+  convención de `core/database.py`. El CHECK exige `cerrado_at` en los tres
+  estados terminados.
 - **entrega_reporte**: reporte_emitido_id (cascade), usuario_id, **motivo**
   (`area:almacen`, `rol:supervisor`, `dinamico:encargado_de_turno`), canal.
   Único por (reporte, usuario): quien está en el área *y* es el encargado de
