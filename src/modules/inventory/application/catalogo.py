@@ -175,11 +175,27 @@ def crear_articulo(
 
 
 def editar_articulo(session: Session, articulo_id: uuid.UUID, **campos) -> Articulo:
-    articulo = ArticuloRepo(session).get(articulo_id)
+    """Campo `None` = no tocar.
+
+    `unidad_medida_id` **no** es editable a propósito: el stock, los
+    movimientos y las recetas ya cargadas están expresados en la unidad
+    actual, así que cambiarla no convierte nada — reinterpreta en silencio
+    todo lo que ya existe. Un artículo con la unidad equivocada se archiva y
+    se crea de nuevo.
+    """
+    repo = ArticuloRepo(session)
+    articulo = repo.get(articulo_id)
     if articulo is None:
         raise NoEncontrado("artículo no encontrado")
+    if campos.get("id_interno") is not None:
+        otro = repo.get_by_id_interno(campos["id_interno"])
+        if otro is not None and otro.id != articulo_id:
+            raise Conflicto(f"id_interno '{campos['id_interno']}' ya existe")
+        articulo.id_interno = campos["id_interno"]
     if campos.get("nombre") is not None:
         articulo.nombre = a_titulo(campos["nombre"])
+    if campos.get("categoria_id") is not None:
+        _existe(session, Categoria, campos["categoria_id"], "categoría")
     for campo in (
         "categoria_id", "tipo", "costo_promedio", "archivado", "controla_lote",
         "dias_alerta_vencimiento",

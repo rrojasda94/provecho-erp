@@ -1,11 +1,12 @@
 "use client";
 
 import type { ColumnDef } from "@tanstack/react-table";
-import { useActionState, useEffect, useMemo, useRef } from "react";
+import { useMemo } from "react";
 
+import { BOTON_FILA, DialogoFormulario } from "@/components/formulario/dialogo-formulario";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
 
-import { crearArticuloAction, type EstadoArticulo } from "./actions";
+import { crearArticuloAction, editarArticuloAction } from "./actions";
 
 export type Articulo = {
   id: string;
@@ -17,6 +18,7 @@ export type Articulo = {
   costo_promedio: string;
   archivado: boolean;
   controla_lote: boolean;
+  dias_alerta_vencimiento: number | null;
 };
 
 export type Categoria = { id: string; nombre: string };
@@ -32,7 +34,42 @@ const TIPOS_ARTICULO = [
   "suministro",
 ] as const;
 
-const ESTADO_INICIAL: EstadoArticulo = { error: "", ok: false };
+function SelectorTipo({ valor }: { valor?: string }) {
+  return (
+    <label className="flex flex-col gap-1 text-sm font-semibold">
+      Tipo
+      <select name="tipo" defaultValue={valor ?? "insumo"}>
+        {TIPOS_ARTICULO.map((tipo) => (
+          <option key={tipo} value={tipo}>
+            {tipo}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function SelectorCategoria({
+  categorias,
+  valor,
+}: {
+  categorias: Categoria[];
+  valor?: string | null;
+}) {
+  return (
+    <label className="flex flex-col gap-1 text-sm font-semibold">
+      Categoría (opcional)
+      <select name="categoria_id" defaultValue={valor ?? ""}>
+        <option value="">Sin categoría</option>
+        {categorias.map((cat) => (
+          <option key={cat.id} value={cat.id}>
+            {cat.nombre}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
 
 function DialogoNuevoArticulo({
   categorias,
@@ -41,109 +78,119 @@ function DialogoNuevoArticulo({
   categorias: Categoria[];
   unidadesMedida: UnidadMedida[];
 }) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const formRef = useRef<HTMLFormElement>(null);
-  const [estado, formAction, pendiente] = useActionState(crearArticuloAction, ESTADO_INICIAL);
-
-  useEffect(() => {
-    if (estado.ok) {
-      formRef.current?.reset();
-      dialogRef.current?.close();
-    }
-  }, [estado.ok]);
+  const sinUnidades = unidadesMedida.length === 0;
 
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => dialogRef.current?.showModal()}
-        className="rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary"
-      >
-        + Nuevo artículo
-      </button>
-      <dialog
-        ref={dialogRef}
-        className="w-full max-w-md rounded-lg p-0 backdrop:bg-dark/40"
-        onClose={() => formRef.current?.reset()}
-      >
-        <form ref={formRef} action={formAction} className="flex flex-col gap-4 p-6">
-          <h2 className="font-heading text-lg italic uppercase text-dark">Nuevo artículo</h2>
-          <label className="flex flex-col gap-1 text-sm font-semibold">
-            Código interno (máx. 4)
-            <input name="id_interno" required maxLength={4} placeholder="H001" />
-          </label>
-          <label className="flex flex-col gap-1 text-sm font-semibold">
-            Nombre
-            <input name="nombre" required maxLength={150} />
-          </label>
-          <label className="flex flex-col gap-1 text-sm font-semibold">
-            Tipo
-            <select name="tipo" defaultValue="insumo">
-              {TIPOS_ARTICULO.map((tipo) => (
-                <option key={tipo} value={tipo}>
-                  {tipo}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex flex-col gap-1 text-sm font-semibold">
-            Unidad de medida
-            {unidadesMedida.length === 0 ? (
-              <span className="text-xs font-normal text-secondary">
-                No hay unidades de medida cargadas — no se puede crear un artículo todavía.
-              </span>
-            ) : (
-              <select name="unidad_medida_id" required defaultValue="">
-                <option value="" disabled>
-                  Elegir...
-                </option>
-                {unidadesMedida.map((udm) => (
-                  <option key={udm.id} value={udm.id}>
-                    {udm.nombre}
-                  </option>
-                ))}
-              </select>
-            )}
-          </label>
-          <label className="flex flex-col gap-1 text-sm font-semibold">
-            Categoría (opcional)
-            <select name="categoria_id" defaultValue="">
-              <option value="">Sin categoría</option>
-              {categorias.map((cat) => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.nombre}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex flex-col gap-1 text-sm font-semibold">
-            Costo promedio inicial
-            <input name="costo_promedio" type="number" min={0} step="0.01" defaultValue="0" />
-          </label>
-          {estado.error && (
-            <p role="alert" className="text-sm font-semibold text-secondary">
-              {estado.error}
-            </p>
-          )}
-          <div className="mt-2 flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => dialogRef.current?.close()}
-              className="rounded border border-gray px-4 py-2 text-sm font-semibold text-dark"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={pendiente || unidadesMedida.length === 0}
-              className="rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary disabled:opacity-50"
-            >
-              {pendiente ? "Creando..." : "Crear"}
-            </button>
-          </div>
-        </form>
-      </dialog>
-    </>
+    <DialogoFormulario
+      titulo="Nuevo artículo"
+      disparador="+ Nuevo artículo"
+      etiquetaEnvio="Crear"
+      etiquetaPendiente="Creando..."
+      accion={crearArticuloAction}
+      envioDeshabilitado={sinUnidades}
+    >
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Código interno (máx. 4)
+        <input name="id_interno" required maxLength={4} placeholder="H001" />
+      </label>
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Nombre
+        <input name="nombre" required maxLength={150} />
+      </label>
+      <SelectorTipo />
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Unidad de medida
+        {sinUnidades ? (
+          <span className="text-xs font-normal text-secondary">
+            No hay unidades de medida cargadas — no se puede crear un artículo todavía.
+          </span>
+        ) : (
+          <select name="unidad_medida_id" required defaultValue="">
+            <option value="" disabled>
+              Elegir...
+            </option>
+            {unidadesMedida.map((udm) => (
+              <option key={udm.id} value={udm.id}>
+                {udm.nombre}
+              </option>
+            ))}
+          </select>
+        )}
+      </label>
+      <SelectorCategoria categorias={categorias} />
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Costo promedio inicial
+        <input name="costo_promedio" type="number" min={0} step="0.01" defaultValue="0" />
+      </label>
+    </DialogoFormulario>
+  );
+}
+
+/** Corrección de un artículo ya creado.
+ *
+ * La unidad de medida no se ofrece y no es un olvido: el stock, los
+ * movimientos y las recetas ya cargadas están expresados en la unidad
+ * actual, así que cambiarla no convierte nada — reinterpreta en silencio
+ * todo lo que ya existe. Un artículo con la unidad equivocada se archiva y
+ * se crea de nuevo. */
+function DialogoEditarArticulo({
+  articulo,
+  categorias,
+  nombreUdm,
+}: {
+  articulo: Articulo;
+  categorias: Categoria[];
+  nombreUdm: string;
+}) {
+  return (
+    <DialogoFormulario
+      titulo="Editar artículo"
+      disparador="Editar"
+      claseDisparador={BOTON_FILA}
+      accion={editarArticuloAction}
+      ayuda={`Unidad de medida: ${nombreUdm} — no se cambia, el stock y las recetas ya están expresados en ella.`}
+    >
+      <input type="hidden" name="id" value={articulo.id} />
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Código interno (máx. 4)
+        <input name="id_interno" required maxLength={4} defaultValue={articulo.id_interno} />
+      </label>
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Nombre
+        <input name="nombre" required maxLength={150} defaultValue={articulo.nombre} />
+      </label>
+      <SelectorTipo valor={articulo.tipo} />
+      <SelectorCategoria categorias={categorias} valor={articulo.categoria_id} />
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Costo promedio
+        <input
+          name="costo_promedio"
+          type="number"
+          min={0}
+          step="0.01"
+          defaultValue={articulo.costo_promedio}
+        />
+      </label>
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Días de alerta de vencimiento (opcional)
+        <input
+          name="dias_alerta_vencimiento"
+          type="number"
+          min={0}
+          max={3650}
+          defaultValue={articulo.dias_alerta_vencimiento ?? ""}
+          placeholder="Con cuánta anticipación se avisa 'por vencer'"
+        />
+      </label>
+      <label className="flex items-center gap-2 text-sm font-semibold">
+        <input type="checkbox" name="controla_lote" defaultChecked={articulo.controla_lote} />
+        Controla lote (perecible o trazable → FEFO)
+      </label>
+      <label className="flex items-center gap-2 text-sm font-semibold">
+        <input type="checkbox" name="archivado" defaultChecked={articulo.archivado} />
+        Archivado
+      </label>
+    </DialogoFormulario>
   );
 }
 
@@ -196,8 +243,19 @@ export function ArticulosCliente({
           </span>
         ),
       },
+      {
+        id: "acciones",
+        header: "",
+        cell: ({ row }) => (
+          <DialogoEditarArticulo
+            articulo={row.original}
+            categorias={categorias}
+            nombreUdm={nombreUdm.get(row.original.unidad_medida_id) ?? "—"}
+          />
+        ),
+      },
     ],
-    [nombreCategoria, nombreUdm],
+    [nombreCategoria, nombreUdm, categorias],
   );
 
   return (

@@ -94,6 +94,22 @@ cuatro huecos que el punto de venta necesitaba y el modelo no daba.
   teléfono, documento o nombre en `GET /sales/clientes/buscar?q=`
   (RN-PTS-006). **Trabajador y usuario siguen exigiendo documento**: esa
   validación vive en `users.application.admin`, no en el esquema.
+
+  **Qué se corrige de un cliente** (2026-08-10): `PATCH /clientes/{id}` toca
+  razón social, RUC y contacto, y **solo de un jurídico** (409 si no). Es lo
+  único que `cliente` guarda por su cuenta: el nombre, el teléfono, el
+  documento y la dirección de un natural viven en su `persona` (RN-GEN-007,
+  fuente única) y se corrigen desde `PATCH /personas/{id}`. Duplicar esos
+  campos acá sería crear la segunda fuente que esa regla evita, y por eso la
+  pantalla de Clientes enlaza a Personas en vez de ofrecerlos.
+
+  `GET /clientes/listado` es el padrón del grupo para el back-office —
+  paginado (ADR-026), con `q` opcional. Endpoint propio y **no** `GET
+  /clientes`: aquel es el contrato público de análisis, con otro permiso
+  (`sales.leer_clientes_externos`) y `grupo_id` por query. `buscar` y
+  `listado` comparten `clientes.q_listado`: qué es un cliente del grupo y por
+  qué campos se lo encuentra tiene que ser **una sola definición**, o la caja
+  y la pantalla terminan mostrando universos distintos.
 - **Nombre/razón social vía Factiliza en alta nueva** (2026-08-02):
   documento (DNI/RUC) que la persona todavía no tiene registrado consulta
   `FactilizaClient.consultar_dni`/`consultar_ruc` (RENIEC/SUNAT,
@@ -224,7 +240,9 @@ CRUD de productos comerciales y medios de pago. Capas `domain/rules.py`,
 | POST | `/ventas/{id}/anular` | `sales.anular` |
 | POST/GET/PATCH | `/productos[/{id}]` | `gestionar_catalogo` / `leer` |
 | POST/GET | `/medios-pago` | `gestionar_catalogo` / `leer` |
-| GET | `/clientes?grupo_id=` | `sales.leer_clientes_externos` |
+| GET | `/clientes?grupo_id=` | `sales.leer_clientes_externos` — contrato **público** de análisis, no el padrón del back-office |
+| GET | `/clientes/listado` | `sales.leer` — el padrón del grupo, paginado, con `q` opcional |
+| PATCH | `/clientes/{id}` | `sales.crear` — razón social, RUC y contacto de un **jurídico** |
 
 `GET /ventas` es **uno solo** para el PDV y el back-office (paginado,
 ADR-026): sin parámetros da la jornada de hoy en las sucursales del usuario

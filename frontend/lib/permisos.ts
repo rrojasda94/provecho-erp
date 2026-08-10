@@ -32,3 +32,19 @@ export function puedeVerModulo(permisos: string[], modulo: Modulo): boolean {
     ? tienePermiso(permisos, modulo.permiso)
     : tieneAccesoModulo(permisos, modulo.prefijoPermiso);
 }
+
+/**
+ * ¿Es la cuenta de administración? Misma condición que `_solo_superusuario`
+ * aplica en el backend: comodín **y** sin empresa asignada. Es lo que
+ * distingue "administra su empresa" de "funda empresas", y decide si la
+ * pantalla ofrece esas acciones o no — ofrecerlas a un admin de empresa
+ * sería prometer un 403.
+ *
+ * Sigue siendo UX: la autorización real la hace la API en cada request.
+ */
+export function esCuentaDeAdministracion(usuario: {
+  permisos: string[];
+  empresa_id: string | null;
+}): boolean {
+  return usuario.permisos.includes(COMODIN) && usuario.empresa_id === null;
+}

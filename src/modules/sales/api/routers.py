@@ -22,7 +22,7 @@ from src.modules.sales.application import (
     tasks,
     ventas,
 )
-from src.modules.sales.application.scope import exigir_venta
+from src.modules.sales.application.scope import exigir_cliente, exigir_venta
 from src.modules.sales.domain import rules
 from src.modules.sales.infrastructure.repositories import (
     ComprobanteRepo,
@@ -811,6 +811,38 @@ def crear_cliente(
     return cliente
 
 
+def _cliente_buscado(cliente, persona) -> schemas.ClienteBuscadoOut:
+    """Arma la vista de un cliente juntando lo suyo con lo de su persona.
+
+    Vive acá y no duplicado en cada endpoint porque la caja y el back-office
+    tienen que leer al mismo cliente igual: dos armados distintos es cómo un
+    natural termina mostrándose con un nombre en una pantalla y con otro en
+    la de al lado.
+    """
+    es_juridico = cliente.tipo == "juridico"
+    doc = cliente.ruc if es_juridico else (persona.numero_documento if persona else None)
+    return schemas.ClienteBuscadoOut(
+        id=cliente.id,
+        tipo=cliente.tipo,
+        nombre=(
+            cliente.razon_social
+            if es_juridico
+            else f"{persona.nombres} {persona.apellidos}".strip()
+            if persona
+            else "—"
+        ),
+        telefono=persona.telefono if persona else None,
+        numero_documento=doc,
+        direccion=(
+            cliente.contacto if es_juridico else (persona.domicilio if persona else None)
+        ),
+        identificado=(
+            bool(cliente.ruc) if es_juridico else rules.cliente_identificado(doc)
+        ),
+        persona_id=cliente.persona_id,
+    )
+
+
 @router.get("/clientes/buscar", response_model=list[schemas.ClienteBuscadoOut])
 def buscar_clientes(
     q: str,
@@ -822,32 +854,61 @@ def buscar_clientes(
     cliente recuerde. Distinta de `GET /clientes`, que es el listado para
     análisis externo y usa otro permiso."""
     grupo_id = clientes.grupo_de_empresa(session, tenant.empresa())
-    salida = []
-    for cliente, persona in clientes.buscar(session, grupo_id=grupo_id, q=q):
-        es_juridico = cliente.tipo == "juridico"
-        doc = cliente.ruc if es_juridico else (persona.numero_documento if persona else None)
-        salida.append(
-            schemas.ClienteBuscadoOut(
-                id=cliente.id,
-                tipo=cliente.tipo,
-                nombre=(
-                    cliente.razon_social
-                    if es_juridico
-                    else f"{persona.nombres} {persona.apellidos}".strip()
-                    if persona
-                    else "—"
-                ),
-                telefono=persona.telefono if persona else None,
-                numero_documento=doc,
-                direccion=(
-                    cliente.contacto if es_juridico else (persona.domicilio if persona else None)
-                ),
-                identificado=(
-                    bool(cliente.ruc) if es_juridico else rules.cliente_identificado(doc)
-                ),
-            )
-        )
-    return salida
+    return [
+        _cliente_buscado(cliente, persona)
+        for cliente, persona in clientes.buscar(session, grupo_id=grupo_id, q=q)
+    ]
+
+
+@router.get("/clientes/listado", response_model=Pagina[schemas.ClienteBuscadoOut])
+def listar_clientes_backoffice(
+    q: str | None = None,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    p: Paginacion = Depends(paginacion),
+    session: Session = Depends(get_db),
+):
+    """El padrón de clientes del grupo, para la pantalla de back-office.
+
+    Endpoint propio y no `GET /clientes`: ese es el contrato público de
+    análisis (`sales.leer_clientes_externos`, `grupo_id` por query), pensado
+    para que marketing lea desde afuera. Pedirle a quien administra el padrón
+    de su propio grupo el permiso de lectura externa sería abrirle de paso
+    los clientes que no le tocan.
+
+    Tampoco es `/clientes/buscar`: aquella corta en 20 y exige `q` porque en
+    caja se busca a alguien concreto; acá se recorre el padrón entero.
+    """
+    grupo_id = clientes.grupo_de_empresa(session, tenant.empresa())
+    pagina = paginar(session, clientes.q_listado(session, grupo_id=grupo_id, q=q), p)
+    personas = clientes.personas_de(session, pagina["items"])
+    return {
+        **pagina,
+        "items": [
+            _cliente_buscado(c, personas.get(c.persona_id)) for c in pagina["items"]
+        ],
+    }
+
+
+@router.patch("/clientes/{cliente_id}", response_model=schemas.ClienteOut)
+def editar_cliente(
+    cliente_id: uuid.UUID,
+    body: schemas.ClienteUpdate,
+    _: Usuario = Depends(require_permission(CREAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Corrige razón social, RUC o contacto de un cliente **jurídico**. Un
+    RUC mal tecleado llega hasta la factura electrónica y hasta ahora no
+    tenía arreglo por API.
+
+    Un cliente natural responde 422: sus datos viven en su `persona`
+    (RN-GEN-007) y se corrigen desde `PATCH /personas/{id}`.
+    """
+    exigir_cliente(session, cliente_id, tenant)
+    cliente = clientes.editar_cliente(session, cliente_id, **body.model_dump())
+    session.commit()
+    return cliente
 
 
 @router.patch("/clientes/{cliente_id}/documento", response_model=schemas.ClienteOut)
@@ -855,11 +916,15 @@ def actualizar_documento_cliente(
     cliente_id: uuid.UUID,
     body: schemas.ClienteDocumentoUpdate,
     _: Usuario = Depends(require_permission(CREAR)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
     """Completa el documento de un cliente que se registró solo por
     teléfono. Desde ese momento cuenta como identificado para promociones
     (RN-PTS-002)."""
+    # Faltaba el alcance de tenant: con el `cliente_id` de otro grupo, este
+    # endpoint le escribía el documento igual (ADR-004).
+    exigir_cliente(session, cliente_id, tenant)
     cliente = clientes.actualizar_documento(
         session,
         cliente_id=cliente_id,
