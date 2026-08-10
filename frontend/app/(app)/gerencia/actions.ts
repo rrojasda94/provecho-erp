@@ -192,7 +192,7 @@ export async function crearDivisaAction(
 
 export async function editarDivisaAction(
   divisaId: string,
-  campos: { decimales?: number; activa?: boolean },
+  campos: { nombre?: string; simbolo?: string; decimales?: number; activa?: boolean },
 ): Promise<EstadoGerencia> {
   try {
     await apiFetch(`/api/v1/divisas/${divisaId}`, {
@@ -205,4 +205,23 @@ export async function editarDivisaAction(
   }
   revalidatePath("/gerencia/divisas");
   return { error: "", ok: true };
+}
+
+/** Versión de formulario de lo mismo: el toggle de la tabla cambia un campo
+ * de un clic, este corrige nombre, símbolo y decimales de una vez. */
+export async function guardarDivisaAction(
+  _previo: EstadoGerencia,
+  formData: FormData,
+): Promise<EstadoGerencia> {
+  const id = String(formData.get("id") ?? "");
+  const nombre = String(formData.get("nombre") ?? "").trim();
+  const simbolo = String(formData.get("simbolo") ?? "").trim();
+  if (!id) return { error: "Falta la divisa a editar.", ok: false };
+  if (!nombre || !simbolo) return { error: "Nombre y símbolo son obligatorios.", ok: false };
+
+  return editarDivisaAction(id, {
+    nombre,
+    simbolo,
+    decimales: Number(formData.get("decimales") ?? 2),
+  });
 }

@@ -17901,6 +17901,18 @@
             "title": "Registra Asistencia",
             "type": "boolean"
           },
+          "remuneracion_base": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remuneracion Base"
+          },
           "tipo_vinculo": {
             "title": "Tipo Vinculo",
             "type": "string"
@@ -17928,6 +17940,7 @@
           "tipo_vinculo",
           "fecha_ingreso",
           "fecha_cese",
+          "remuneracion_base",
           "registra_asistencia",
           "estado"
         ],
@@ -17935,10 +17948,13 @@
         "type": "object"
       },
       "TrabajadorUpdate": {
+        "description": "Campo ausente o `null` = no tocar.\n\n`estado` no admite `\"cesado\"`: el cese tiene su propio endpoint\n(`POST /trabajadores/{id}/cesar`) porque además de cambiar el estado\nfija la fecha de cese y publica el evento del que cuelga la liquidación.\nLlegar a `cesado` por este PATCH dejaba un trabajador cesado sin fecha\ny sin que nadie se enterara.",
         "properties": {
           "area": {
             "anyOf": [
               {
+                "maxLength": 100,
+                "minLength": 1,
                 "type": "string"
               },
               {
@@ -17950,6 +17966,8 @@
           "cargo": {
             "anyOf": [
               {
+                "maxLength": 100,
+                "minLength": 1,
                 "type": "string"
               },
               {
@@ -17961,6 +17979,10 @@
           "estado": {
             "anyOf": [
               {
+                "enum": [
+                  "activo",
+                  "suspendido"
+                ],
                 "type": "string"
               },
               {
@@ -17972,6 +17994,7 @@
           "remuneracion_base": {
             "anyOf": [
               {
+                "minimum": 0.0,
                 "type": "number"
               },
               {

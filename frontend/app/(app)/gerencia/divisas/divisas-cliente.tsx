@@ -1,8 +1,10 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useTransition } from "react";
+import { useTransition } from "react";
 
-import { crearDivisaAction, editarDivisaAction, type EstadoGerencia } from "../actions";
+import { BOTON_FILA, DialogoFormulario } from "@/components/formulario/dialogo-formulario";
+
+import { crearDivisaAction, editarDivisaAction, guardarDivisaAction } from "../actions";
 
 export type DivisaCompleta = {
   id: string;
@@ -13,76 +15,72 @@ export type DivisaCompleta = {
   activa: boolean;
 };
 
-const ESTADO_INICIAL: EstadoGerencia = { error: "", ok: false };
-
 function DialogoNuevaDivisa() {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const formRef = useRef<HTMLFormElement>(null);
-  const [estado, formAction, pendiente] = useActionState(crearDivisaAction, ESTADO_INICIAL);
-
-  useEffect(() => {
-    if (estado.ok) {
-      formRef.current?.reset();
-      dialogRef.current?.close();
-    }
-  }, [estado.ok]);
-
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => dialogRef.current?.showModal()}
-        className="rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary"
-      >
-        + Nueva divisa
-      </button>
-      <dialog ref={dialogRef} className="w-full max-w-sm rounded-lg p-0 backdrop:bg-dark/40">
-        <form ref={formRef} action={formAction} className="flex flex-col gap-4 p-6">
-          <h2 className="font-heading text-lg italic uppercase text-dark">Nueva divisa</h2>
-          <div className="flex gap-2">
-            <label className="flex w-24 flex-col gap-1 text-sm font-semibold">
-              Código
-              <input name="codigo" required maxLength={3} minLength={3} placeholder="USD" />
-            </label>
-            <label className="flex flex-1 flex-col gap-1 text-sm font-semibold">
-              Nombre
-              <input name="nombre" required maxLength={50} placeholder="Dólar americano" />
-            </label>
-          </div>
-          <div className="flex gap-2">
-            <label className="flex w-24 flex-col gap-1 text-sm font-semibold">
-              Símbolo
-              <input name="simbolo" required maxLength={5} placeholder="$" />
-            </label>
-            <label className="flex w-32 flex-col gap-1 text-sm font-semibold">
-              Decimales
-              <input name="decimales" type="number" min={0} max={6} defaultValue={2} />
-            </label>
-          </div>
-          {estado.error && (
-            <p role="alert" className="text-sm font-semibold text-secondary">
-              {estado.error}
-            </p>
-          )}
-          <div className="mt-2 flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => dialogRef.current?.close()}
-              className="rounded border border-gray px-4 py-2 text-sm font-semibold text-dark"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={pendiente}
-              className="rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary"
-            >
-              {pendiente ? "Creando..." : "Crear"}
-            </button>
-          </div>
-        </form>
-      </dialog>
-    </>
+    <DialogoFormulario
+      titulo="Nueva divisa"
+      disparador="+ Nueva divisa"
+      etiquetaEnvio="Crear"
+      etiquetaPendiente="Creando..."
+      accion={crearDivisaAction}
+    >
+      <div className="flex gap-2">
+        <label className="flex w-24 flex-col gap-1 text-sm font-semibold">
+          Código
+          <input name="codigo" required maxLength={3} minLength={3} placeholder="USD" />
+        </label>
+        <label className="flex flex-1 flex-col gap-1 text-sm font-semibold">
+          Nombre
+          <input name="nombre" required maxLength={50} placeholder="Dólar americano" />
+        </label>
+      </div>
+      <div className="flex gap-2">
+        <label className="flex w-24 flex-col gap-1 text-sm font-semibold">
+          Símbolo
+          <input name="simbolo" required maxLength={5} placeholder="$" />
+        </label>
+        <label className="flex w-32 flex-col gap-1 text-sm font-semibold">
+          Decimales
+          <input name="decimales" type="number" min={0} max={6} defaultValue={2} />
+        </label>
+      </div>
+    </DialogoFormulario>
+  );
+}
+
+/** El código ISO no se edita: es la identidad de la moneda y lo que otros
+ * módulos guardaron junto a cada importe. Corregirlo sería crear otra. */
+function DialogoEditarDivisa({ divisa }: { divisa: DivisaCompleta }) {
+  return (
+    <DialogoFormulario
+      titulo={`Editar ${divisa.codigo}`}
+      disparador="Editar"
+      claseDisparador={BOTON_FILA}
+      accion={guardarDivisaAction}
+      ayuda="Cambiar los decimales cambia el redondeo de todo importe que venga después en esta moneda — no reescribe los ya registrados."
+    >
+      <input type="hidden" name="id" value={divisa.id} />
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Nombre
+        <input name="nombre" required maxLength={50} defaultValue={divisa.nombre} />
+      </label>
+      <div className="flex gap-2">
+        <label className="flex w-24 flex-col gap-1 text-sm font-semibold">
+          Símbolo
+          <input name="simbolo" required maxLength={5} defaultValue={divisa.simbolo} />
+        </label>
+        <label className="flex w-32 flex-col gap-1 text-sm font-semibold">
+          Decimales
+          <input
+            name="decimales"
+            type="number"
+            min={0}
+            max={6}
+            defaultValue={divisa.decimales}
+          />
+        </label>
+      </div>
+    </DialogoFormulario>
   );
 }
 
@@ -123,7 +121,8 @@ export function DivisasCliente({ divisas }: { divisas: DivisaCompleta[] }) {
             <th className="py-2 pr-4 font-semibold">Nombre</th>
             <th className="py-2 pr-4 font-semibold">Símbolo</th>
             <th className="py-2 pr-4 font-semibold">Decimales</th>
-            <th className="py-2 font-semibold">Estado</th>
+            <th className="py-2 pr-4 font-semibold">Estado</th>
+            <th className="py-2" />
           </tr>
         </thead>
         <tbody>
@@ -133,8 +132,11 @@ export function DivisasCliente({ divisas }: { divisas: DivisaCompleta[] }) {
               <td className="py-2 pr-4">{d.nombre}</td>
               <td className="py-2 pr-4">{d.simbolo}</td>
               <td className="py-2 pr-4 tabular-nums">{d.decimales}</td>
-              <td className="py-2">
+              <td className="py-2 pr-4">
                 <BotonActiva divisa={d} />
+              </td>
+              <td className="py-2">
+                <DialogoEditarDivisa divisa={d} />
               </td>
             </tr>
           ))}
