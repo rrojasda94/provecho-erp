@@ -238,7 +238,21 @@ y ninguno mueve stock sin la firma de un aprobador distinto.
 
 `PATCH /categorias/{id}` acepta `quitar_frecuencia: true` para sacar una
 categoría del ciclo — mandar `frecuencia_conteo: null` significa "no la
-toques", no "bórrala".
+toques", no "bórrala". Es el **único campo del módulo que se puede vaciar**
+desde un PATCH; el resto se cambia por otro valor.
+
+### Qué se corrige de un artículo (y qué no)
+
+`PATCH /articulos/{id}` acepta `id_interno` desde el 2026-08-10, con la misma
+unicidad del alta (reenviar el propio código no choca consigo mismo). Es el
+código de cuatro caracteres que el almacenero lee en el estante: tecleado mal
+se arrastra por toda la operación y hasta ahora era inmutable.
+
+**`unidad_medida_id` no está en `ArticuloUpdate` y no va a estar.** El stock,
+los movimientos y las recetas ya cargadas están expresados en la unidad
+actual: cambiarla no convierte nada, **reinterpreta en silencio** todo lo que
+ya existe — 10 pasa de 10 kilos a 10 gramos sin que se mueva una fila. Un
+artículo con la unidad equivocada se archiva y se crea de nuevo.
 
 **Anular** (2026-08-06) descarta un conteo abierto por error con motivo
 obligatorio: no genera ajustes y no pone al día el calendario, porque el
@@ -305,7 +319,7 @@ Endpoints `/api/v1/inventory`:
 | POST | `/unidades-medida` | `gestionar_catalogo` — CRUD antes diferido (ADR-014 Addendum b); requiere `categoria_udm_id` existente |
 | PATCH | `/unidades-medida/{id}` | `gestionar_catalogo` — corrige `decimales` (RN-GER-010) sin recrear la unidad |
 | GET/POST | `/categorias-udm` | `leer` / `gestionar_catalogo` |
-| POST/GET/PATCH | `/articulos[/{id}]` | `gestionar_catalogo` / `leer` |
+| POST/GET/PATCH | `/articulos[/{id}]` | `gestionar_catalogo` / `leer` — el PATCH corrige `id_interno`, **nunca** `unidad_medida_id` (ver abajo) |
 | POST | `/skus` | `gestionar_catalogo` |
 | GET | `/stock` | `leer` |
 | POST | `/movimientos` | `registrar_movimiento` |

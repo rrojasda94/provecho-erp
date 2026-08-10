@@ -39,11 +39,34 @@ cualquier recepción). Capas `domain/rules.py`,
 
 | Método | Ruta | Permiso |
 |--------|------|---------|
-| POST/GET/PATCH | `/proveedores[/{id}]` | `purchases.crear` / `leer` |
+| POST/GET/PATCH | `/proveedores[/{id}]` | `purchases.crear` / `leer` — ver *Qué se corrige de un proveedor* |
 | POST | `/ordenes-compra` | `purchases.crear` |
 | GET | `/ordenes-compra` | `purchases.leer` — listado; tenant vía join a `almacen` (la orden no tiene `empresa_id` propio) |
 | GET | `/ordenes-compra/{id}` | `purchases.leer` |
 | POST | `/ordenes-compra/{id}/emitir` | `purchases.crear` (+ `aprobar` sobre umbral) |
+
+### Qué se corrige de un proveedor (y qué no)
+
+`PATCH /proveedores/{id}` acepta **razón social y RUC** desde el 2026-08-10.
+Antes no: un RUC mal tecleado llega hasta la factura electrónica y la única
+salida era tocar la base. La corrección **vuelve a consultar SUNAT**, igual
+que el alta — corregir el RUC es justo el caso en que lo tecleado estaba mal,
+así que reconsultar es el punto del cambio y no un efecto colateral.
+
+Los dos campos valen **solo sobre un proveedor jurídico** (409 si no): en uno
+natural el nombre y el documento viven en su `persona` (RN-GEN-007) y se
+corrigen desde `PATCH /personas/{id}`. Darle razón social propia a un natural
+crearía la segunda fuente que esa regla existe para evitar.
+
+**`tipo` y `persona_id` no son editables.** Cambiarlos convierte al proveedor
+en otro y deja sus órdenes de compra apuntando a algo que ya no es; el camino
+correcto es darlo de baja y crear el que corresponde.
+
+La condición de pago mantiene su regla del alta: pasar a `credito` sin
+`plazo_dias_credito` es 409, porque `accounting` no tendría vencimiento que
+calcular. `clasificacion` y `condicion_pago` son `Literal` en el schema — las
+columnas son `Enum` con CHECK, así que sin eso un valor inválido moría en el
+flush con un 500 en vez de un 422 legible.
 | POST | `/ordenes-compra/{id}/recepciones` | `purchases.recepcionar` |
 | POST | `/ordenes-compra/{id}/anular` | `purchases.anular` |
 | POST | `/ordenes-compra/{id}/conformidad-comprobante` | `purchases.dar_conformidad` |

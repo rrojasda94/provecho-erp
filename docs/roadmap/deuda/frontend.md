@@ -3,6 +3,55 @@
 Parte del backlog de deuda técnica del proyecto. El índice y las reglas
 de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 
+- ✅ 2026-08-10 **El ERP no sabía corregir nada.** Sabía crear y listar; un
+  RUC mal tecleado o un cargo que cambió solo se arreglaban por `curl`. El
+  diagnóstico no era el que parecía: **el backend ya tenía `PATCH` para casi
+  todo** —personas, usuarios, proveedores, artículos, categorías, unidades de
+  medida, trabajadores, cuentas contables, divisas y los cinco de
+  organización—; lo que faltaba era la pantalla. Cada listado se había
+  construido con el mismo molde (`TablaDatos` + un `<dialog>` de alta) y ahí
+  se detuvo.
+  - **Botón "Editar" en la fila** de seis pantallas existentes y **ocho rutas
+    nuevas** (Personas, Clientes, Categorías, Unidades de medida, y el módulo
+    Organización con sus cuatro). Detalle en `CHANGELOG.md`.
+  - **`components/formulario/dialogo-formulario.tsx`**: el shell del diálogo
+    estaba copiado en siete pantallas y con la edición encima habrían sido
+    veinte. Las altas ya existentes se migraron en el mismo cambio — dejar dos
+    formas de hacer lo mismo es peor que la duplicación que se venía a sacar.
+  - **Módulo `organizacion` nuevo en `lib/modulos.ts`**, con
+    `prefijoPermiso: "organizacion."`. No es una sección de Gerencia ni de
+    Usuarios porque el permiso real es `organizacion.gestionar`: colgarlo de
+    otro prefijo se lo escondería justo a quien sí lo tiene. Fundar empresa y
+    renombrar grupo aparecen solo para la cuenta de administración
+    (`esCuentaDeAdministracion`, misma condición que `_solo_superusuario`).
+  - **Dos bugs encontrados al verificar en el navegador**, que es para lo que
+    sirve verificar en el navegador:
+    1. **React 19 resetea solo el formulario** cuando la acción va en el prop
+       `action` de `<form>`, también cuando la acción devolvió error: corregir
+       un RUC y errarle al plazo de crédito dejaba el diálogo abierto con el
+       RUC viejo de vuelta. La acción se despacha ahora a mano dentro de una
+       transición. Es el mismo candado que `e2e/caja.spec.ts` ya probaba para
+       el conteo de caja, y que el resto de los formularios no tenía.
+    2. El **seeder de e2e** sembraba `id_interno` de ocho caracteres en una
+       columna `String(4)` (ver Deuda → CI/CD y el fragmento de changelog):
+       SQLite no aplica el largo, Postgres sí.
+  - **Verificado end-to-end** (API + Next contra la SQLite desechable de e2e,
+    por navegador): alta y corrección de persona con el 409 de versión
+    desactualizada mostrado y el formulario intacto; sucursal a `inactiva`;
+    documento completado a un cliente natural con `identificado` pasando a
+    "Sí" y el botón desapareciendo; `id_interno` duplicado devolviendo un 409
+    legible dentro del diálogo; nombre visible de una cuenta persistido. Sin
+    errores de consola.
+  - **Deuda que deja**: desde un `PATCH` sigue sin poderse *vaciar* un campo
+    opcional (`null` = "no tocar"); solo `frecuencia_conteo` tiene centinela
+    (`quitar_frecuencia`). El resto se cambia por otro valor, no se borra. El
+    día que una pantalla lo pida de verdad, es un centinela por campo o un
+    `Field` con valor especial — no un `None` ambiguo.
+  - **Fuera de alcance a propósito**: las licencias de marca a empresa
+    (N:N) siguen otorgándose por API; `asiento_contable_config` de una
+    categoría también (es un `dict` de configuración contable, no un campo de
+    formulario).
+
 - ✅ 2026-08-07 **Un fetch caído se dibujaba igual que "no hay datos".** El
   patrón `.catch(() => setLista([]))` estaba en cuatro lugares y dejó sin
   diagnóstico posible un fallo real: una venta con pago dividido no salía en
@@ -171,8 +220,9 @@ complejo):
   `GET /api/v1/inventory/unidades-medida`, que tampoco existía — sin
   eso el selector de `unidad_medida_id` (obligatorio para crear) queda
   vacío. CRUD de escritura de `unidad_medida`/`categoria_udm` agregado el
-  mismo día (ver Deuda técnica → Transversal) — sigue sin pantalla propia,
-  se gestiona por API.
+  mismo día (ver Deuda técnica → Transversal) — ✅ **ya tiene pantalla
+  propia** desde el 2026-08-10 (`/inventario/categorias` y
+  `/inventario/unidades-medida`).
 - **RRHH → Trabajadores** (2026-08-02): alta usa `PersonaPicker` (mismo
   componente que Proveedores). El gap de RBAC que esta pantalla encontró
   (`GET /personas` exigía `users.gestionar`) se cerró el mismo día con

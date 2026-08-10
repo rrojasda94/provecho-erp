@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { startTransition, useActionState, useEffect, useRef } from "react";
 
 /**
  * Diálogo con formulario: el molde de toda alta y toda corrección del ERP.
@@ -82,15 +82,30 @@ export function DialogoFormulario({
         ref={dialogRef}
         className="w-full max-w-md rounded-lg p-0 backdrop:bg-dark/40"
         onClose={() => {
-          // El reset va al cerrar y no al enviar: si el servidor rechazó, lo
-          // tecleado tiene que seguir ahí. Recontar un formulario entero
-          // porque un campo estaba mal es la fricción que termina en un dato
-          // inventado (mismo criterio que el conteo de caja).
+          // El reset va al cerrar, no al enviar (ver `onSubmit`).
           formRef.current?.reset();
           alCerrar?.();
         }}
       >
-        <form ref={formRef} action={formAction} className="flex flex-col gap-4 p-6">
+        {/* `onSubmit` y no `action={formAction}`: React 19 **resetea solo** el
+            formulario cuando la acción va en el prop `action`, y lo hace
+            también cuando la acción devolvió error. El efecto es que un
+            rechazo del servidor borra todo lo tecleado — verificado en el
+            navegador: corregir un RUC y errarle al plazo de crédito dejaba
+            el diálogo abierto con el RUC viejo de vuelta. Recontar un
+            formulario entero porque un campo estaba mal es la fricción que
+            termina en un dato inventado (mismo criterio que el conteo de
+            caja). Despachando la acción a mano dentro de una transición no
+            hay reset automático y `pendiente` sigue funcionando igual. */}
+        <form
+          ref={formRef}
+          onSubmit={(e) => {
+            e.preventDefault();
+            const datos = new FormData(e.currentTarget);
+            startTransition(() => formAction(datos));
+          }}
+          className="flex flex-col gap-4 p-6"
+        >
           <h2 className="font-heading text-lg italic uppercase text-dark">{titulo}</h2>
           {ayuda && <p className="-mt-2 text-xs text-gray">{ayuda}</p>}
           {children}
