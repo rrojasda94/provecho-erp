@@ -1,5 +1,5 @@
-import { MODULOS } from "@/lib/modulos";
-import { puedeVerModulo } from "@/lib/permisos";
+import { MODULOS } from "./modulos.ts";
+import { puedeVerModulo } from "./permisos.ts";
 
 /**
  * Segundo nivel de navegación: las pantallas de cada módulo.

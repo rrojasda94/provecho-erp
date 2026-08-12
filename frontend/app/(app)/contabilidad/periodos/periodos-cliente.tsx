@@ -2,6 +2,8 @@
 
 import { useActionState, useTransition } from "react";
 
+import { Insignia } from "@/components/estado/insignia";
+
 import { abrirPeriodoAction, cerrarPeriodoAction, type EstadoAsiento } from "../actions";
 
 export type Periodo = {
@@ -116,15 +118,7 @@ export function PeriodosCliente({ periodos }: { periodos: Periodo[] }) {
                 {MESES[p.mes - 1]} {p.anio}
               </td>
               <td className="py-2 pr-4">
-                <span
-                  className={
-                    p.estado === "abierto"
-                      ? "rounded-full bg-accent/30 px-2 py-0.5 text-xs font-semibold text-dark"
-                      : "rounded-full bg-gray/20 px-2 py-0.5 text-xs font-semibold text-gray"
-                  }
-                >
-                  {p.estado}
-                </span>
+                <Insignia tono={p.estado === "abierto" ? "exito" : "neutro"}>{p.estado}</Insignia>
               </td>
               <td className="py-2">
                 <BotonCerrar periodo={p} />

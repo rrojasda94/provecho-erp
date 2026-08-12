@@ -3,6 +3,7 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
 
+import { Insignia } from "@/components/estado/insignia";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
 
 import { ejecutarPagoAction, rechazarPagoAction, type EstadoAsiento } from "../actions";
@@ -157,17 +158,12 @@ export function PagosCliente({
         header: "Estado",
         cell: ({ getValue }) => {
           const estado = getValue<string>();
-          const clase =
-            estado === "ejecutado"
-              ? "bg-accent/30 text-dark"
-              : estado === "rechazado"
-                ? "bg-gray/20 text-gray"
-                : "bg-secondary/15 text-secondary";
-          return (
-            <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${clase}`}>
-              {estado}
-            </span>
-          );
+          // Pendiente NO es un error: es plata que todavía se puede detener.
+          // Tenía el rojo de lo destructivo y un pago aprobado se leía igual
+          // que uno rechazado.
+          const tono =
+            estado === "ejecutado" ? "exito" : estado === "rechazado" ? "neutro" : "alerta";
+          return <Insignia tono={tono}>{estado}</Insignia>;
         },
       },
       {

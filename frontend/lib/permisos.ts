@@ -7,7 +7,7 @@
  * nada (F2.7/F2.28, ADR-013).
  */
 
-import type { Modulo } from "@/lib/modulos";
+import type { Modulo } from "./modulos.ts";
 
 const COMODIN = "*";
 
