@@ -1649,3 +1649,74 @@ export function DialogoCobro({
     </Dialogo>
   );
 }
+
+/**
+ * Firma de un supervisor en el terminal del cajero.
+ *
+ * Aparece **solo cuando hace falta**: quien ya tiene el permiso anula sin que
+ * nadie le pida nada, y recién si el servidor responde 403 se abre esto. Al
+ * revés —pedir el PIN siempre— haría que un encargado tuviera que teclear el
+ * suyo para anular su propio pedido.
+ */
+export function DialogoAutorizacion({
+  abierto,
+  titulo,
+  detalle,
+  ocupado,
+  onCerrar,
+  onFirmar,
+}: {
+  abierto: boolean;
+  titulo: string;
+  detalle: string;
+  ocupado: boolean;
+  onCerrar: () => void;
+  onFirmar: (encargado: { username: string; pin: string }) => void;
+}) {
+  const [usuario, setUsuario] = useState("");
+  const [pin, setPin] = useState("");
+
+  useEffect(() => {
+    if (!abierto) {
+      setUsuario("");
+      setPin("");
+    }
+  }, [abierto]);
+
+  return (
+    <Dialogo titulo={titulo} abierto={abierto} onCerrar={onCerrar}>
+      <p className="pdv-nota">{detalle}</p>
+      <div className="pdv-dos">
+        <input
+          className="pdv-campo"
+          placeholder="Usuario del supervisor"
+          autoComplete="off"
+          value={usuario}
+          onChange={(e) => setUsuario(e.target.value)}
+        />
+        <input
+          className="pdv-campo"
+          type="password"
+          inputMode="numeric"
+          placeholder="PIN"
+          autoComplete="off"
+          value={pin}
+          onChange={(e) => setPin(e.target.value)}
+        />
+      </div>
+      <footer className="pdv-dialogo-pie">
+        <button type="button" className="pdv-boton-plano" onClick={onCerrar}>
+          Cancelar
+        </button>
+        <button
+          type="button"
+          className="pdv-boton-riesgo"
+          disabled={ocupado || !usuario.trim() || !pin.trim()}
+          onClick={() => onFirmar({ username: usuario.trim(), pin })}
+        >
+          Autorizar
+        </button>
+      </footer>
+    </Dialogo>
+  );
+}

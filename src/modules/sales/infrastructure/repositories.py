@@ -269,6 +269,58 @@ class ProductoComercialRepo:
     def get_grupo(self, grupo_id: uuid.UUID) -> ProductoOpcionGrupo | None:
         return self.s.get(ProductoOpcionGrupo, grupo_id)
 
+    # --- Lo que ofrece de verdad un producto (ADR-042) ------------------------
+    #
+    # Una variante **hereda** los grupos y extras de su padre. Sin esto, dónde
+    # quedó colgado el grupo decide si la carta lo muestra, y eso depende del
+    # orden en que alguien armó el producto: el lienzo cuelga "+ grupo" del
+    # nodo activo, que es el padre mientras el producto no tiene tamaños, así
+    # que un catálogo armado a mano termina con los sabores en el padre y las
+    # variantes sin nada que ofrecer.
+    #
+    # Los métodos crudos de arriba (`grupos_de`, `extras_de`, `admite_extra`)
+    # siguen siendo por producto: los usa la ficha de catálogo, que edita lo
+    # que cuelga de **este** producto y no lo que hereda.
+
+    def grupos_efectivos(
+        self, producto: ProductoComercial
+    ) -> "list[ProductoOpcionGrupo]":
+        """Los del producto más los de su padre. Un grupo obligatorio del
+        padre lo es en todos sus tamaños: "elige un sabor" no deja de valer
+        porque el cliente pidió la familiar."""
+        propios = self.grupos_de(producto.id)
+        if producto.producto_padre_id is None:
+            return propios
+        return [*self.grupos_de(producto.producto_padre_id), *propios]
+
+    def extras_efectivos(
+        self, producto: ProductoComercial
+    ) -> "list[ProductoComercialExtra]":
+        """Igual, y **el vínculo propio gana** sobre el heredado: si el tamaño
+        familiar declara su propio "extra queso", su `maximo` y su grupo son
+        más específicos que los del padre."""
+        propios = self.extras_de(producto.id)
+        if producto.producto_padre_id is None:
+            return propios
+        mios = {v.extra_id for v in propios}
+        heredados = [
+            v
+            for v in self.extras_de(producto.producto_padre_id)
+            if v.extra_id not in mios
+        ]
+        return [*heredados, *propios]
+
+    def admite_extra_efectivo(
+        self, producto: ProductoComercial, extra_id: uuid.UUID
+    ) -> ProductoComercialExtra | None:
+        """La versión de `admite_extra` que respeta la herencia. Es la que
+        tiene que usar la venta: rechazar un extra que la carta ofreció es
+        mandar al cajero a un error que no puede corregir."""
+        propio = self.admite_extra(producto.id, extra_id)
+        if propio is not None or producto.producto_padre_id is None:
+            return propio
+        return self.admite_extra(producto.producto_padre_id, extra_id)
+
     def borrar_vinculo_extra(self, vinculo: ProductoComercialExtra) -> None:
         self.s.delete(vinculo)
         self.s.flush()

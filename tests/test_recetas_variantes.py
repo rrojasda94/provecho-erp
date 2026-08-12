@@ -665,3 +665,108 @@ def test_la_carta_trae_los_grupos_de_cada_variante(env):
         [{"producto_comercial_id": sabor_id, "cantidad": "1"}], "variante-02"
     )
     assert con_sabor.status_code == 201, con_sabor.text
+
+
+def test_la_variante_hereda_los_grupos_del_padre(env):
+    """El caso que rompía en la operación real (ADR-042).
+
+    El seeder cuelga el grupo de la variante; el lienzo lo cuelga del **padre**
+    —"+ grupo" va al nodo activo, que es el padre mientras el producto no
+    tiene tamaños—. Con la herencia, de dónde quedó colgado deja de decidir si
+    la carta lo muestra y si la venta lo acepta.
+    """
+    client, ids = env
+    h = _token(client)
+    padre_id = _producto(client, h, ids, id_interno="PZHE", nombre="Pizza").json()["id"]
+    sabor_id = _producto(
+        client, h, ids, id_interno="SHAW", nombre="Hawaiana",
+        receta_id=_receta(client, h, ids, nombre="Sabor Hawaiana"), es_extra=True,
+    ).json()["id"]
+
+    # El grupo y el extra cuelgan del PADRE, como los deja el lienzo.
+    grupo_id = client.post(
+        f"/api/v1/sales/productos/{padre_id}/grupos", headers=h,
+        json={"nombre": "Sabor", "minimo": 1, "maximo": 1},
+    ).json()["id"]
+    assert client.post(
+        f"/api/v1/sales/productos/{padre_id}/extras", headers=h,
+        json={"extra_id": sabor_id, "grupo_id": grupo_id},
+    ).status_code == 201
+
+    # Y recién después se agrega el tamaño.
+    variante_id = _producto(
+        client, h, ids, id_interno="PZHP", nombre="Pizza Personal",
+        receta_id=_receta(client, h, ids, nombre="Base Personal"),
+        producto_padre_id=padre_id,
+    ).json()["id"]
+    lista_id = _precio(client, h, ids, variante_id, "25.00")
+    _precio(client, h, ids, sabor_id, "0.00", lista_id)
+
+    carta = client.get(
+        f"/api/v1/sales/carta?sucursal_id={ids['sucursal_id']}"
+        "&canal=pdv&modalidad=takeout",
+        headers=h,
+    ).json()
+    variante = next(
+        i for i in carta if i["producto_comercial_id"] == padre_id
+    )["variantes"][0]
+    assert [e["nombre"] for e in variante["extras"]] == ["Hawaiana"]
+    assert variante["extras"][0]["grupo_minimo"] == 1
+
+    def vender(extras, key):
+        return client.post("/api/v1/sales/ventas", headers=h, json={
+            "sucursal_id": ids["sucursal_id"], "punto_venta_id": ids["pv_id"],
+            "canal": "pdv", "modalidad": "takeout", "idempotency_key": key,
+            "items": [{
+                "producto_comercial_id": variante_id, "cantidad": "1",
+                "extras": extras,
+            }],
+        })
+
+    # El grupo heredado obliga igual...
+    sin_sabor = vender([], "hered-01")
+    assert sin_sabor.status_code == 409, sin_sabor.text
+    assert "Sabor" in sin_sabor.json()["detail"]
+    # ...y el extra heredado se acepta: es el que la carta acaba de ofrecer.
+    con_sabor = vender(
+        [{"producto_comercial_id": sabor_id, "cantidad": "1"}], "hered-02"
+    )
+    assert con_sabor.status_code == 201, con_sabor.text
+
+
+def test_lo_propio_de_la_variante_gana_sobre_lo_heredado(env):
+    """Un tamaño puede acotar lo que el padre ofrece: si la familiar declara
+    su propio vínculo, manda el suyo — es el más específico."""
+    client, ids = env
+    h = _token(client)
+    padre_id = _producto(client, h, ids, id_interno="PZG2", nombre="Pizza Dos").json()["id"]
+    extra_id = _producto(
+        client, h, ids, id_interno="EXQ2", nombre="Extra Queso",
+        receta_id=_receta(client, h, ids, nombre="Queso Extra"), es_extra=True,
+    ).json()["id"]
+    variante_id = _producto(
+        client, h, ids, id_interno="PZ2F", nombre="Pizza Dos Familiar",
+        receta_id=_receta(client, h, ids, nombre="Base Familiar Dos"),
+        producto_padre_id=padre_id,
+    ).json()["id"]
+
+    # El padre lo ofrece sin tope; la familiar lo acota a 1.
+    client.post(f"/api/v1/sales/productos/{padre_id}/extras", headers=h,
+                json={"extra_id": extra_id, "maximo": 5})
+    client.post(f"/api/v1/sales/productos/{variante_id}/extras", headers=h,
+                json={"extra_id": extra_id, "maximo": 1})
+
+    lista_id = _precio(client, h, ids, variante_id, "45.00")
+    _precio(client, h, ids, extra_id, "6.00", lista_id)
+
+    carta = client.get(
+        f"/api/v1/sales/carta?sucursal_id={ids['sucursal_id']}"
+        "&canal=pdv&modalidad=takeout",
+        headers=h,
+    ).json()
+    variante = next(
+        i for i in carta if i["producto_comercial_id"] == padre_id
+    )["variantes"][0]
+    # Una sola vez y con el tope de la variante, no dos filas del mismo extra.
+    assert len(variante["extras"]) == 1
+    assert variante["extras"][0]["maximo"] == 1

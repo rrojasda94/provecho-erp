@@ -102,6 +102,16 @@ class AnularLineasCreate(BaseModel):
     autorizacion: str
 
 
+class AnularVentaIn(BaseModel):
+    """Anular una orden entera. `autorizacion` es el token de
+    `POST /auth/autorizar` y solo hace falta cuando quien la pide no tiene
+    `sales.anular` — el cajero, típicamente: la pide él y la firma un
+    supervisor con su PIN, igual que quitar una línea ya enviada
+    (RN-COM-020)."""
+
+    autorizacion: str | None = None
+
+
 class PrecuentaOut(BaseModel):
     venta_id: uuid.UUID
     grupo_cobro: int | None

@@ -169,7 +169,10 @@ def _armar_extras(
     filas, detalles = [], []
     for ex in extras:
         extra_id = ex["producto_comercial_id"]
-        vinculo = productos.admite_extra(padre_prod.id, extra_id)
+        # Efectivo: incluye lo heredado del padre (ADR-042). Rechazar un
+        # extra que la carta acaba de ofrecer manda al cajero a un error
+        # que no puede corregir desde la pantalla que se lo ofreció.
+        vinculo = productos.admite_extra_efectivo(padre_prod, extra_id)
         if vinculo is None:
             raise ReglaNegocio(
                 f"{padre_prod.nombre} no admite el extra {extra_id}"
@@ -213,12 +216,12 @@ def _validar_grupos(
     central de pedidos y cualquier integración futura entran por el mismo
     endpoint: una regla que solo vive en una pantalla no es una regla.
     """
-    grupos = productos.grupos_de(prod.id)
+    grupos = productos.grupos_efectivos(prod)
     if not grupos:
         return
     elegidos: dict[uuid.UUID, int] = {}
     for ex in extras:
-        vinculo = productos.admite_extra(prod.id, ex["producto_comercial_id"])
+        vinculo = productos.admite_extra_efectivo(prod, ex["producto_comercial_id"])
         if vinculo is not None and vinculo.grupo_id is not None:
             elegidos[vinculo.grupo_id] = elegidos.get(vinculo.grupo_id, 0) + 1
     for grupo in grupos:

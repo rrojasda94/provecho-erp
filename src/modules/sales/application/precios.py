@@ -143,18 +143,18 @@ def resolver_precio(
     return montos[elegida.id]
 
 
-def _extras_de(repo, producto_id, por_id: dict, precio_de: dict) -> list[dict]:
-    """Los extras que admite **este** producto, con el grupo de cada uno.
+def _extras_de(repo, producto, por_id: dict, precio_de: dict) -> list[dict]:
+    """Los extras que ofrece **este** producto, con el grupo de cada uno.
 
-    Se llama una vez por el padre y una vez por cada variante: los grupos
-    cuelgan del producto que se prepara, y en un producto con presentaciones
-    ese es la variante, no el padre (RN-COM-022/023). Leerlos solo del padre
-    devolvía una carta sin el grupo de sabores y el PDV dejaba confirmar una
-    pizza sin elegir ninguno.
+    Se llama una vez por el padre y una vez por cada variante, y usa los
+    **efectivos**: lo propio más lo heredado del padre (ADR-042). Los grupos
+    pueden estar colgados de cualquiera de los dos —el seeder los pone en la
+    variante, el lienzo en el padre— y de dónde quedaron no debería decidir
+    si la carta los muestra.
     """
-    grupos_por_id = {g.id: g for g in repo.grupos_de(producto_id)}
+    grupos_por_id = {g.id: g for g in repo.grupos_efectivos(producto)}
     extras = []
-    for vinculo in repo.extras_de(producto_id):
+    for vinculo in repo.extras_efectivos(producto):
         extra = por_id.get(vinculo.extra_id)
         # Un extra sin precio vigente en este ámbito no se ofrece,
         # mismo criterio que un producto sin precio.
@@ -231,7 +231,7 @@ def carta(
                 "nombre": v.nombre,
                 "precio_unitario": precio_de[v.id],
                 "orden": v.orden,
-                "extras": _extras_de(repo, v.id, por_id, precio_de),
+                "extras": _extras_de(repo, v, por_id, precio_de),
             }
             for v in repo.variantes_de(producto.id)
             if v.id in precio_de
@@ -243,7 +243,7 @@ def carta(
             precio = precio_de.get(producto.id)
         if precio is None:
             continue
-        extras = _extras_de(repo, producto.id, por_id, precio_de)
+        extras = _extras_de(repo, producto, por_id, precio_de)
         items.append(
             {
                 "producto_comercial_id": producto.id,

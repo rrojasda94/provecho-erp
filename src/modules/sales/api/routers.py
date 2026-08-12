@@ -32,6 +32,7 @@ from src.modules.sales.infrastructure.repositories import (
 from src.modules.users.api.deps import (
     ContextoPermiso,
     check_permission,
+    get_current_user,
     get_db,
     get_tenant,
     require_permission,
@@ -305,12 +306,43 @@ def ver_precuenta(
 @router.post("/ventas/{venta_id}/anular", response_model=schemas.VentaOut)
 def anular_venta(
     venta_id: uuid.UUID,
-    actor: Usuario = Depends(require_permission(ANULAR)),
+    body: schemas.AnularVentaIn | None = None,
+    actor: Usuario = Depends(get_current_user),
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
+    """Anula una orden no pagada. Post-pago es nota de crédito.
+
+    Entra quien opera la caja (`sales.cobrar`) **o** quien puede anular
+    (`sales.anular`) — son dos roles distintos y ninguno es subconjunto del
+    otro: el `cajero` cobra y no anula, el `supervisor` anula y no cobra.
+    Exigir los dos habría dejado afuera a los dos.
+
+    Al que solo cobra le hace falta además la firma de alguien que sí pueda,
+    igual que para quitar una línea ya enviada (RN-COM-020): el cajero pide y
+    el supervisor autoriza con su PIN en el mismo terminal.
+
+    Antes exigía `sales.anular` a secas, que el rol `cajero` no tiene: el
+    botón "Anular pedido" del PDV devolvía 403 sin decir qué hacer, y el
+    pedido quedaba en cocina.
+    """
+    check_permission(session, actor, COBRAR, ANULAR)
+    quien_autoriza = actor.id
+    if not usuarios_queries.tiene_permiso(session, actor.id, ANULAR):
+        if body is None or not body.autorizacion:
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                "Anular una orden enviada lo autoriza un supervisor con su PIN",
+            )
+        try:
+            quien_autoriza = autorizacion.verificar(body.autorizacion, ANULAR)
+        except TokenInvalido as e:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, str(e)) from e
     exigir_venta(session, venta_id, tenant)
-    venta = ventas.anular_venta(session, venta_id, actor.id)
+    # Queda firmada por quien la autorizó, no por quien la tecleó: es lo que
+    # el `audit_log` tiene que poder responder cuando alguien pregunta quién
+    # dejó sin cobrar esa orden.
+    venta = ventas.anular_venta(session, venta_id, quien_autoriza)
     session.commit()
     return venta
 

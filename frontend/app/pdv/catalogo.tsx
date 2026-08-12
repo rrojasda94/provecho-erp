@@ -5,8 +5,15 @@ import { useMemo, useState } from "react";
 import type { Falla, Lista } from "@/lib/carga";
 import { soles, type ItemDeCarta, type MesaEnMapa, type Venta } from "@/lib/pdv";
 
-type Vista = "catalogo" | "mesas" | "cobrados";
+type Vista = "catalogo" | "mesas" | "abiertas" | "cobrados";
 const TODAS = "__todas__";
+
+const ETIQUETA_VISTA: Record<Vista, string> = {
+  catalogo: "Catálogo",
+  mesas: "Mesas",
+  abiertas: "Cuentas",
+  cobrados: "Cobrados",
+};
 
 type Props = {
   carta: ItemDeCarta[];
@@ -55,14 +62,17 @@ export default function Catalogo(props: Props) {
           onChange={(e) => setBusqueda(e.target.value)}
         />
         <div className="pdv-seg" role="group" aria-label="Vista">
-          {(["catalogo", "mesas", "cobrados"] as const).map((v) => (
+          {(["catalogo", "mesas", "abiertas", "cobrados"] as const).map((v) => (
             <button
               key={v}
               type="button"
               aria-pressed={vista === v}
               onClick={() => onVista(v)}
             >
-              {v === "catalogo" ? "Catálogo" : v === "mesas" ? "Mesas" : "Cobrados"}
+              {ETIQUETA_VISTA[v]}
+              {v === "abiertas" && abiertas.datos.length > 0
+                ? ` (${abiertas.datos.length})`
+                : ""}
             </button>
           ))}
         </div>
@@ -100,6 +110,9 @@ export default function Catalogo(props: Props) {
           onMesa={onMesa}
           onOrdenAbierta={props.onOrdenAbierta}
         />
+      )}
+      {vista === "abiertas" && (
+        <Abiertas ventas={abiertas} onVer={props.onOrdenAbierta} />
       )}
       {vista === "cobrados" && (
         <Cobrados ventas={cobrados} onVer={props.onVerCobrado} />
@@ -267,6 +280,58 @@ function MapaMesas({
           </ul>
         </>
       )}
+    </div>
+  );
+}
+
+/** Todo lo enviado a cocina y sin cobrar: mesa, para llevar y delivery en la
+ * misma lista.
+ *
+ * Existía como una nota al pie del mapa de mesas —y filtrando fuera las de
+ * mesa—, así que un pedido para llevar solo se encontraba entrando a Mesas y
+ * bajando, y uno de mesa había que reconocerlo por el color de la mesa. Lo
+ * que la caja pregunta es "¿qué falta cobrar?", y eso no es una pregunta
+ * sobre el salón. */
+function Abiertas({
+  ventas,
+  onVer,
+}: {
+  ventas: Lista<Venta>;
+  onVer: (v: Venta) => void;
+}) {
+  if (ventas.falla) {
+    return (
+      <div className="pdv-cobrados">
+        <Fallo falla={ventas.falla} onReintentar={ventas.recargar} />
+      </div>
+    );
+  }
+  if (!ventas.datos.length) {
+    return <p className="pdv-nada">No hay cuentas abiertas: todo lo enviado está cobrado.</p>;
+  }
+  const total = ventas.datos.reduce((a, v) => a + Number(v.total), 0);
+  return (
+    <div className="pdv-cobrados">
+      <div className="pdv-cobrados-cab">
+        <span>
+          {ventas.datos.length} sin cobrar
+        </span>
+        <strong>{soles(total)}</strong>
+      </div>
+      <ul>
+        {ventas.datos.map((v) => (
+          <li key={v.id}>
+            <button type="button" onClick={() => onVer(v)}>
+              <span className="pdv-cobrado-orden">#{v.numero_orden}</span>
+              <span className="pdv-cobrado-modalidad">
+                {v.mesa_id ? "Mesa" : v.modalidad === "delivery" ? "Delivery" : "Para llevar"}
+                {v.referencia_atencion ? ` · ${v.referencia_atencion}` : ""}
+              </span>
+              <strong>{soles(v.total)}</strong>
+            </button>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

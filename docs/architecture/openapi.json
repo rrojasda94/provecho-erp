@@ -850,6 +850,24 @@
         "title": "AnularLineasCreate",
         "type": "object"
       },
+      "AnularVentaIn": {
+        "description": "Anular una orden entera. `autorizacion` es el token de\n`POST /auth/autorizar` y solo hace falta cuando quien la pide no tiene\n`sales.anular` — el cajero, típicamente: la pide él y la firma un\nsupervisor con su PIN, igual que quitar una línea ya enviada\n(RN-COM-020).",
+        "properties": {
+          "autorizacion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Autorizacion"
+          }
+        },
+        "title": "AnularVentaIn",
+        "type": "object"
+      },
       "AperturaCajaOut": {
         "properties": {
           "cajero_id": {
@@ -39107,6 +39125,7 @@
     },
     "/api/v1/sales/ventas/{venta_id}/anular": {
       "post": {
+        "description": "Anula una orden no pagada. Post-pago es nota de crédito.\n\nEntra quien opera la caja (`sales.cobrar`) **o** quien puede anular\n(`sales.anular`) — son dos roles distintos y ninguno es subconjunto del\notro: el `cajero` cobra y no anula, el `supervisor` anula y no cobra.\nExigir los dos habría dejado afuera a los dos.\n\nAl que solo cobra le hace falta además la firma de alguien que sí pueda,\nigual que para quitar una línea ya enviada (RN-COM-020): el cajero pide y\nel supervisor autoriza con su PIN en el mismo terminal.\n\nAntes exigía `sales.anular` a secas, que el rol `cajero` no tiene: el\nbotón \"Anular pedido\" del PDV devolvía 403 sin decir qué hacer, y el\npedido quedaba en cocina.",
         "operationId": "anular_venta_api_v1_sales_ventas__venta_id__anular_post",
         "parameters": [
           {
@@ -39120,6 +39139,23 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/AnularVentaIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "content": {

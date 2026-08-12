@@ -560,3 +560,69 @@ def test_no_se_ve_la_caja_de_una_sucursal_ajena(env):
         f"/api/v1/accounting/cajas/abiertas?sucursal_id={ajena_id}", headers=cajero
     )
     assert r.status_code == 403, r.text
+
+
+def test_el_cajero_anula_una_orden_enviada_con_firma_del_supervisor(env):
+    """El botón "Anular pedido" del PDV devolvía 403 al cajero y el pedido
+    quedaba en cocina.
+
+    `sales.anular` es de supervisor y así queda; lo que cambia es el camino:
+    el cajero pide y el supervisor firma con su PIN en el mismo terminal,
+    igual que para quitar una línea ya enviada (RN-COM-020). Sin esa firma el
+    servidor sigue diciendo que no.
+    """
+    client, ids, _ = env
+    cajero = _token(client, "cajero1", "111111")
+    venta = client.post(
+        "/api/v1/sales/ventas",
+        headers=cajero,
+        json={
+            "sucursal_id": ids["sucursal_id"], "punto_venta_id": ids["pv_id"],
+            "canal": "pdv", "modalidad": "takeout", "idempotency_key": "anu-0001",
+            "items": [{"producto_comercial_id": ids["producto_id"], "cantidad": "1"}],
+        },
+    )
+    assert venta.status_code == 201, venta.text
+    venta_id = venta.json()["id"]
+
+    # Sin firma: 403, y el mensaje dice qué falta.
+    sin_firma = client.post(f"/api/v1/sales/ventas/{venta_id}/anular", headers=cajero)
+    assert sin_firma.status_code == 403, sin_firma.text
+    assert "supervisor" in sin_firma.json()["detail"]
+
+    firma = client.post(
+        "/api/v1/auth/autorizar",
+        json={"username": "encargado1", "pin": "222222", "permiso": "sales.anular"},
+    )
+    assert firma.status_code == 200, firma.text
+    con_firma = client.post(
+        f"/api/v1/sales/ventas/{venta_id}/anular",
+        headers=cajero,
+        json={"autorizacion": firma.json()["autorizacion"]},
+    )
+    assert con_firma.status_code == 200, con_firma.text
+    assert con_firma.json()["estado"] == "anulada"
+
+
+def test_el_supervisor_anula_sin_tener_que_firmarse_a_si_mismo(env):
+    """Quien ya tiene el permiso no teclea su propio PIN: pedirle la firma
+    para anular su propio pedido sería trabajo sin ninguna garantía extra."""
+    client, ids, _ = env
+    # La venta la crea el cajero: `supervisor` no tiene `sales.crear` ni
+    # `sales.cobrar`. Que los dos roles sean disjuntos es justamente por qué
+    # el endpoint acepta uno **u** otro y no los dos.
+    cajero = _token(client, "cajero1", "111111")
+    supervisor = _token(client, "encargado1", "222222")
+    venta = client.post(
+        "/api/v1/sales/ventas",
+        headers=cajero,
+        json={
+            "sucursal_id": ids["sucursal_id"], "punto_venta_id": ids["pv_id"],
+            "canal": "pdv", "modalidad": "takeout", "idempotency_key": "anu-0002",
+            "items": [{"producto_comercial_id": ids["producto_id"], "cantidad": "1"}],
+        },
+    ).json()
+
+    r = client.post(f"/api/v1/sales/ventas/{venta['id']}/anular", headers=supervisor)
+    assert r.status_code == 200, r.text
+    assert r.json()["estado"] == "anulada"

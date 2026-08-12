@@ -352,8 +352,14 @@ export const api = {
       cuerpo,
     }),
 
-  anularVenta: (ventaId: string) =>
-    pedir<Venta>(`/sales/ventas/${ventaId}/anular`, { metodo: "POST" }),
+  /** `autorizacion` solo hace falta cuando quien anula no tiene
+   * `sales.anular` — el cajero, típicamente: la pide él y la firma un
+   * supervisor con su PIN, igual que quitar una línea enviada. */
+  anularVenta: (ventaId: string, autorizacion?: string) =>
+    pedir<Venta>(`/sales/ventas/${ventaId}/anular`, {
+      metodo: "POST",
+      cuerpo: { autorizacion: autorizacion ?? null },
+    }),
 
   registrarPago: (ventaId: string, cuerpo: PagoNuevo) =>
     pedir<{ id: string }>(`/sales/ventas/${ventaId}/pagos`, {

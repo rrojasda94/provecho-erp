@@ -20,6 +20,7 @@ import {
 import Catalogo from "./catalogo";
 import {
   DialogoApertura,
+  DialogoAutorizacion,
   DialogoCierre,
   DialogoCliente,
   DialogoCobro,
@@ -120,7 +121,9 @@ export default function PdvCliente({ sucursalId, puntoVenta }: Props) {
   const [borradores, setBorradores] = useState<Borrador[]>([nuevoBorrador()]);
   const [activoId, setActivoId] = useState<string | null>(null);
   const [seleccion, setSeleccion] = useState<Set<string>>(new Set());
-  const [vista, setVista] = useState<"catalogo" | "mesas" | "cobrados">("catalogo");
+  const [vista, setVista] = useState<"catalogo" | "mesas" | "abiertas" | "cobrados">(
+    "catalogo",
+  );
   const [dialogo, setDialogo] = useState<
     "cliente" | "tipo" | "cobro" | "cierre" | "consumo" | null
   >(null);
@@ -129,6 +132,8 @@ export default function PdvCliente({ sucursalId, puntoVenta }: Props) {
   const [precuentaAVer, setPrecuentaAVer] = useState("");
   const [aviso, setAviso] = useState("");
   const [ocupado, setOcupado] = useState(false);
+  // Solo se enciende si el servidor dijo que a este usuario no le alcanza.
+  const [firmandoAnulacion, setFirmandoAnulacion] = useState(false);
 
   const activo = borradores.find((b) => b.id === activoId) ?? borradores[0] ?? null;
 
@@ -431,6 +436,29 @@ export default function PdvCliente({ sucursalId, puntoVenta }: Props) {
 
   /** Sin línea alguna es un pedido vacío: no hay nada que anular en el
    * servidor, así que descartar la pestaña alcanza. */
+  /** Anula la orden. Sin firma primero: quien tiene `sales.anular` —un
+   * encargado— no debería teclear su propio PIN para anular su pedido. Si el
+   * servidor dice que no le alcanza, recién ahí se pide la del supervisor. */
+  const anularVenta = async (ventaId: string, autorizacion?: string) => {
+    setOcupado(true);
+    try {
+      await api.anularVenta(ventaId, autorizacion);
+      setFirmandoAnulacion(false);
+      cerrarPedido(activo!.id);
+      notificar(`Orden #${activo!.numeroOrden} anulada`);
+      datos.mesas.recargar();
+      datos.abiertas.recargar();
+    } catch (e) {
+      if (e instanceof ErrorApi && e.status === 403 && !autorizacion) {
+        setFirmandoAnulacion(true);
+        return;
+      }
+      notificar(mensajeDe(e, "No se pudo anular el pedido"));
+    } finally {
+      setOcupado(false);
+    }
+  };
+
   const anularPedido = async () => {
     if (!activo || activo.lineas.length === 0) return;
     if (!activo.ventaId) {
@@ -438,15 +466,21 @@ export default function PdvCliente({ sucursalId, puntoVenta }: Props) {
       notificar("Pedido descartado");
       return;
     }
+    await anularVenta(activo.ventaId);
+  };
+
+  const firmarAnulacion = async (encargado: { username: string; pin: string }) => {
+    if (!activo?.ventaId) return;
     setOcupado(true);
     try {
-      await api.anularVenta(activo.ventaId);
-      cerrarPedido(activo.id);
-      notificar(`Orden #${activo.numeroOrden} anulada`);
-      datos.mesas.recargar();
-      datos.abiertas.recargar();
+      const elevacion = await api.autorizar(
+        encargado.username,
+        encargado.pin,
+        "sales.anular",
+      );
+      await anularVenta(activo.ventaId, elevacion.autorizacion);
     } catch (e) {
-      notificar(mensajeDe(e, "No se pudo anular el pedido"));
+      notificar(mensajeDe(e, "No se pudo autorizar la anulación"));
     } finally {
       setOcupado(false);
     }
@@ -575,6 +609,14 @@ export default function PdvCliente({ sucursalId, puntoVenta }: Props) {
         pos={datos.pos}
         onAbrir={abrirCaja}
         ocupado={ocupado}
+      />
+      <DialogoAutorizacion
+        abierto={firmandoAnulacion}
+        titulo="Anular el pedido"
+        detalle="Ya salió a cocina y el insumo se descontó: anularlo lo repone, y lo firma un supervisor (RN-COM-020)."
+        ocupado={ocupado}
+        onCerrar={() => setFirmandoAnulacion(false)}
+        onFirmar={firmarAnulacion}
       />
       <DialogoCierre
         abierto={dialogo === "cierre"}

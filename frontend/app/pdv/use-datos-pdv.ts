@@ -117,11 +117,13 @@ const traerMesas = (sucursalId: string) => api.mapaMesas(sucursalId);
 
 const traerCobrados = (sucursalId: string) => api.ventasDelDia(sucursalId, "pagada");
 
-/** Pedidos ya enviados a cocina pero sin cobrar: para llevar/delivery no se
- * ven en el mapa de mesas, y sin esto se pierden si se recarga la página
- * antes de cobrarlos. */
-const traerAbiertas = async (sucursalId: string) =>
-  (await api.ventasDelDia(sucursalId, "orden")).filter((v) => !v.mesa_id);
+/** Todo lo enviado a cocina y sin cobrar, **incluidas las mesas**.
+ *
+ * Antes filtraba las de mesa porque su única vista era el pie del mapa de
+ * salón. Con pestaña propia el filtro sobraba y además mentía: la pregunta
+ * de la caja es "¿qué falta cobrar?", y una mesa ocupada falta cobrar igual
+ * que un delivery. El mapa de mesas sigue mostrándolas como mesas. */
+const traerAbiertas = (sucursalId: string) => api.ventasDelDia(sucursalId, "orden");
 
 /**
  * Una lista del servidor que recuerda **por qué** no se pudo traer.

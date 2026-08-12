@@ -158,13 +158,17 @@ ADR-023):**
   el kiosko entra por el mismo endpoint. El replay del hub se exceptúa
   (ADR-009): una venta que ya se cobró no se rechaza por una regla que
   cambió durante el corte.
-  Los grupos cuelgan del producto **que se prepara**: con presentaciones eso
-  es la variante, no el padre (ADR-038). Por eso `GET /carta` devuelve
-  `variantes[].extras[]` además del `extras[]` de nivel producto, y por eso
-  `_armar_extras` rechaza un extra que no esté vinculado a la variante que se
-  vende — ofrecer los del padre sobre una variante arma líneas que el
-  servidor no acepta. El `extras[]` del producto sigue siendo el de los
-  productos simples.
+  Los grupos pueden colgar del padre **o** de la variante, y una variante
+  **hereda los del padre** (ADR-042): el seeder los deja en la variante y el
+  lienzo en el padre —cuelga "+ grupo" del nodo activo, que es el padre
+  mientras no hay tamaños— y de dónde quedaron no debería decidir si se
+  ofrecen. `grupos_efectivos`/`extras_efectivos`/`admite_extra_efectivo` lo
+  dicen una sola vez, y **el vínculo propio gana** sobre el heredado. La
+  venta usa los mismos, para aceptar exactamente lo que la carta ofreció.
+  Los crudos (`grupos_de`, `extras_de`, `admite_extra`) siguen siendo por
+  producto: los usa la ficha, que edita lo propio y no lo heredado.
+  `GET /carta` devuelve `variantes[].extras[]` además del `extras[]` de
+  nivel producto, que es el de los productos simples.
 - **Ficha del producto**: `GET /productos/{id}` devuelve producto +
   variantes + grupos en una lectura, para editar todo en la misma pantalla
   (patrón Odoo). `GET /marcas` acompaña al alta.

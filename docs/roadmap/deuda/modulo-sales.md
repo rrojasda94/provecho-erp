@@ -3,6 +3,18 @@
 Parte del backlog de deuda técnica del proyecto. El índice y las reglas
 de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 
+- ✅ 2026-08-12 **La variante hereda del padre** (ADR-042): ADR-038 arregló el
+  catálogo del seeder (grupos en la variante) y dejó roto el armado a mano
+  (grupos en el padre, que es donde el lienzo los cuelga mientras el producto
+  no tiene tamaños). Ahora el lugar donde quedó colgado el grupo no decide
+  nada.
+- ✅ 2026-08-12 **El cajero puede anular una orden enviada** con firma de
+  supervisor, igual que para quitar una línea (RN-COM-020). `sales.anular` es
+  de supervisor y sigue siéndolo; lo que faltaba era el camino del cajero.
+- ✅ 2026-08-12 **Pestaña de cuentas abiertas** en el PDV: estaba como nota al
+  pie del mapa de mesas y filtraba fuera las de mesa, así que "¿qué falta
+  cobrar?" no se podía responder de un vistazo.
+
 - ✅ 2026-08-12 **La carta lleva los grupos de cada variante** (ADR-038):
   `precios.carta` los leía del producto **padre**, que no tiene ninguno, así
   que el PDV no dibujaba "Sabor" y el servidor rechazaba la venta con 409 por
@@ -18,13 +30,14 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   hizo ahora para no mezclar una optimización con el arreglo de un bug que
   impedía vender. Medir antes con un catálogo real: si el número no molesta,
   no vale el cambio.
-- ⬜ **La ficha de producto muestra solo los grupos del padre**
-  (`/catalogo/productos/{id}`, `catalogo.detalle_producto`). En un producto
-  con presentaciones eso es una lista vacía, aunque los grupos existan en cada
-  variante. `detalle_producto` **no** está mal —es por producto a propósito, y
-  el lienzo ya pide la ficha de cada variante por separado—; lo que falta es
-  que esa pantalla haga lo mismo, o que diga "los grupos viven en cada
-  presentación" y mande al lienzo, que es el lugar de trabajo de esa
+- ⬜ **La ficha de producto solo muestra lo que cuelga de ese producto**
+  (`/catalogo/productos/{id}`, `catalogo.detalle_producto`). No está mal —es
+  por producto a propósito: se edita lo propio, y editar lo heredado desde el
+  hijo es cómo se termina con dos copias del mismo grupo (ADR-042)— pero deja
+  la pantalla mintiendo por omisión en los dos sentidos: el padre no muestra
+  los grupos que viven en sus variantes, y la variante no muestra los que
+  hereda, aunque el PDV se los ofrezca. Lo que falta es que lo diga: "hereda 1
+  grupo de Pizza" con enlace al lienzo, que es el lugar de trabajo de esa
   estructura (ADR-035).
 - ⬜ **Los seeders de demo corridos fuera de orden no avisan nada**
   (encontrado 2026-08-12 al verificar la carta). `pizzas_demo._precio` hace
