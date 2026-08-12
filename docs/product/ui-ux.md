@@ -48,23 +48,27 @@ Los hex se movieron por contraste medido, no por gusto:
 - Tinta y humo pasaron de neutro cálido a neutro frío: es lo que hace que el
   fondo lea como acero de cocina y no como cartón.
 
-### Color por área de negocio
+### Un acento, no una paleta por área (revisión 2026-08-12, ADR-037)
 
-Cuatro colores, uno por área, **no uno por módulo** — doce colores serían un
-arcoíris; cuatro son la división con la que el grupo ya trabaja.
+Se probó un color por **área de negocio** (`--area-operacion`,
+`--area-comercial`, `--area-abastecimiento`, `--area-administracion`) y se
+descartó: ADR-013 §8 ya había rechazado el color por módulo o por tarjeta
+—"la identidad de marca queda en tipografía y un acento consistente, no en
+variedad de color de fondo"— y cuatro tintes son el mismo arcoíris con menos
+pasos. La ficha del home con el ícono coloreado era, literalmente, el mockup
+que ese ADR rechazó.
 
-| Token | Hex | Área | Módulos |
-|-------|-----|------|---------|
-| `--area-operacion` | `#C6390F` | Operación | Dashboard, Cocina (KDS), Producción |
-| `--area-comercial` | `#3730A3` | Comercial | Ventas, Catálogo, Marketing |
-| `--area-abastecimiento` | `#0F766E` | Abastecimiento | Compras, Inventario |
-| `--area-administracion` | `#3F4A5A` | Administración | Contabilidad, RRHH, Gerencia, Usuarios |
+Queda **un acento** (`--hue`, que cuelga de `--marca-primary`), y aparece en
+reposo solo donde marca **estado**: el ítem activo del sidebar y el filo del
+rótulo de área. Todo lo demás arranca neutro y se enciende al apuntarlo.
 
-Aparece en tres lugares y en ninguno más: el filo del ítem activo del
-sidebar, la ficha del ícono, y el borde de la tarjeta al apuntarla. Nunca
-como relleno de un área grande. Sirve para orientarse —se sabe en qué
-estación se está antes de leer el título— y por eso no puede ser el único
-indicador de nada (ver Accesibilidad).
+Las **áreas de negocio siguen existiendo** como agrupación del home
+(`AREAS` en `frontend/lib/modulos.ts`): Operación, Comercial,
+Abastecimiento, Administración. Ordenan la grilla en el orden en que
+transcurre el día. Ordenar no necesita pintar.
+
+`--hue` existe como indirección —y no se usa `--primary` directo— para que el
+PDV pueda recolorearlo por marca sin reescribir las cinco reglas que lo leen.
 
 ### Tipografías
 
@@ -104,10 +108,16 @@ entra rápido y frena suave, como un cajón bien montado. Cuatro usos y no más:
    navegación (`components/shell/revelar.tsx`).
 2. **Escalonado de grilla** — 25 ms entre fichas, hasta la sexta; más allá se
    percibe como lentitud (`.revelar-lista`).
-3. **Filos de área** — crecen de arriba abajo al apuntar una ficha o al
+3. **Filo del acento** — crece de arriba abajo al apuntar una ficha o al
    marcar el ítem activo del sidebar.
 4. **Estados** — fondo, borde y sombra en hover/foco; 1 px de hundimiento al
    presionar.
+5. **Diálogo** — `::backdrop` con desenfoque de 3 px y panel que entra con
+   escala (200 ms). Solo la entrada: animar la salida de un `<dialog>` nativo
+   exige `@starting-style` y `transition-behavior: allow-discrete` para no
+   dejarlo colgado, y no compensa.
+6. **Esqueletos** — `animate-pulse` mientras el servidor resuelve la
+   pantalla (un `loading.tsx` por módulo).
 
 Sin parallax, sin animación por scroll, sin nada que retrase una acción. Y
 `prefers-reduced-motion: reduce` apaga todo: para parte del personal el
@@ -144,7 +154,7 @@ desplazamiento en pantalla produce mareo, no es una cortesía.
   tema por marca — deben poder combinarse sin conflicto (ej. tema Charlie's
   + modo daltonismo + fuente grande, a la vez).
 
-### Catálogo de paletas y tamaños de fuente (propuesta técnica, 2026-07-27)
+### Catálogo de paletas y tamaños de fuente (propuesta 2026-07-27, ✅ implementado 2026-08-12)
 
 Resuelve el pendiente de catálogo exacto. Es una propuesta de partida —
 válida para empezar a construir; se ajusta si una validación real con
@@ -184,10 +194,52 @@ dimensionado en `rem` escale junto:
 | Muy grande | `1.3` | ~20.8px |
 | Máximo | `1.5` | 24px |
 
-Ambas preferencias viven en `usuario` (ej.
-`preferencia_paleta: estandar\|alto_contraste`,
-`preferencia_tamano_fuente: estandar\|grande\|muy_grande\|maximo`) — sin
-implementar todavía, ver `docs/product/frontend-architecture.md` F2.14.
+Ambas preferencias viven en `usuario`
+(`preferencia_paleta: estandar|alto_contraste`,
+`preferencia_tamano_fuente: estandar|grande|muy_grande|maximo`), junto con
+`preferencia_tema: claro|oscuro`. Se leen en `GET /users/me` y se cambian con
+`PATCH /users/me/preferencias`, que **no exige permiso**: no hay privilegio
+que otorgar en elegir el tamaño de la propia letra, y pedir uno dejaría la
+accesibilidad fuera del alcance de quien más la necesita.
+
+**Se resuelven en el servidor** (ADR-037): el layout raíz escribe
+`class="dark"`, `data-escala` y `data-paleta` en `<html>`. No se usa
+`next-themes` —aunque esté instalado para `sonner`— porque guarda en
+`localStorage` y necesita un script inline antes del primer pintado, y la CSP
+de `middleware.ts` firma cada script con un nonce por request. Por lo mismo
+el tema no ofrece "seguir al sistema": detectarlo exige leer
+`prefers-color-scheme` en el navegador.
+
+Los dos ejes se combinan, como pide la sección anterior. El bloque
+`[data-paleta="alto-contraste"]` se declara **después** de `.dark` —misma
+especificidad, gana el último— y existe un
+`.dark[data-paleta="alto-contraste"]` con la paleta Okabe-Ito aclarada: sus
+valores están medidos contra blanco y sobre el fondo oscuro (`#101216`) el
+azul cae a 3.6:1. Conserva el tono, que es lo que distingue los estados, y
+sube la luminosidad, que es lo que los hace legibles.
+
+| Token | Estándar | Alto contraste | Oscuro | Oscuro + alto contraste |
+|---|---|---|---|---|
+| `--status-success` | `#17864B` | `#0072B2` | `#2EA86A` | `#3D9EE0` |
+| `--status-danger` | `#7A1414` | `#D55E00` | `#E5484D` | `#EF7D1A` |
+| `--status-warning` | `#FFB300` | `#E69F00` | `#FFB300` | `#F0B429` |
+| `--status-info` | `#1976D2` | `#56B4E9` | `#4D94FF` | `#56B4E9` |
+
+La regla de "ningún estado depende solo del color" no queda como convención:
+el ícono viaja **atado al tono** en `components/estado/insignia.tsx`. Si
+fuera una prop opcional, la pantalla número treinta y uno lo olvidaría y
+nadie lo notaría en la revisión.
+
+### Modo oscuro (nuevo 2026-08-12, ADR-037)
+
+El brandboard nunca contempló pantallas oscuras fuera del PDV, el KDS y el
+lienzo. Se agrega para el resto del ERP: la oficina a las 3 p.m. y la cocina
+a las 6 a.m. no son la misma luz, y el turno de cierre trabaja de noche.
+
+Remapea **roles**, nunca los `--marca-*`. Dos colores se recalculan por
+contraste medido: `--primary` vuelve al naranja original `#F4511E` (la brasa
+`#C6390F` cae a 3.6:1 sobre fondo oscuro; el naranja de origen sube a 5.4:1)
+y `--secondary` pasa de rescoldo a `#E5484D`.
 
 ## Responsive y plataformas
 

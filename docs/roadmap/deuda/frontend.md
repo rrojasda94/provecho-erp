@@ -3,6 +3,30 @@
 Parte del backlog de deuda técnica del proyecto. El índice y las reglas
 de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 
+- ✅ 2026-08-12 **El sistema visual, cerrado (ADR-037).** Lo que se salda y lo
+  que queda:
+  - **Tokens que faltaban** (F2.3): elevación (`--sombra-1..3`), estados
+    semánticos (`--status-*` con su `-surface`), escala de letra
+    (`--font-scale`), y el bloque de modo oscuro. Sigue sin tokenizarse el
+    espaciado —la escala de Tailwind alcanza— y los estados hover/focus, que
+    viven como clases de componente.
+  - **`@custom-variant dark` faltaba en `globals.css`.** Tailwind v4 no
+    declara la variante `dark` por estrategia de clase: las decenas de clases
+    `dark:` que `shadcn add` ya había dejado escritas en `components/ui/**`
+    **no compilaban a nada**. No fallaban ni avisaban. Solo se descubre
+    mirando el navegador.
+  - **Preferencias de accesibilidad en el perfil** (F2.14): implementadas, con
+    tres columnas nuevas en `usuario` y `PATCH /users/me/preferencias`.
+  - **Paleta de comandos** (F2.29) y **esqueletos por módulo** (F2.31).
+  - **Ayuda contextual por campo** (`CampoFormulario`), pendiente de ui-ux.md
+    desde julio.
+  - **Sigue abierto**: el breadcrumb por ruta recorrida (especificado, sin
+    construir), los `<dialog>` a mano de trece pantallas —hoy vestidos por
+    descendencia desde `.erp`, que es un parche con fecha de vencimiento—, y
+    la auditoría de contraste par por par sobre las pantallas ya construidas.
+    Los tokens cumplen AA; las combinaciones concretas de cada pantalla no se
+    verificaron una por una.
+
 - ✅ 2026-08-10 **El ERP no sabía corregir nada.** Sabía crear y listar; un
   RUC mal tecleado o un cargo que cambió solo se arreglaban por `curl`. El
   diagnóstico no era el que parecía: **el backend ya tenía `PATCH` para casi

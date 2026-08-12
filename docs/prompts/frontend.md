@@ -27,19 +27,39 @@ Leer antes: `/CLAUDE.md`, [product/ui-ux.md](../product/ui-ux.md) y
   tarjetas, crema **solo** en PDV/KDS/login. El color de marca
   (`--color-primary`) se reserva para acción primaria y alertas. Nada de un
   color por tarjeta o por módulo.
-- **El color que sí codifica algo es el área de negocio**: cuatro tonos
-  (`--area-operacion/comercial/abastecimiento/administracion`) que la pantalla
-  fija una vez en `--hue`, y que aparecen solo en el filo del ítem activo, la
-  ficha del ícono y el borde al apuntar. Nunca como relleno grande, y nunca
-  como único indicador de un estado.
+- **Un acento, no una paleta por área** (revisado 2026-08-12, ADR-037): `--hue`
+  aparece en reposo solo donde marca **estado** — el ítem activo del sidebar y
+  el filo del rótulo de área. Todo lo demás arranca neutro y se enciende al
+  apuntarlo. Se probó un color por área de negocio y se descartó: es el mismo
+  arcoíris que ADR-013 §8 rechazó, con menos pasos.
+- **Un estado nunca se comunica solo por color**: usar `Insignia` de
+  `components/estado/insignia.tsx`, que ata el ícono al tono. Los colores
+  salen de `--status-success/danger/warning/info`, nunca de `bg-accent/30` a
+  mano — esos no tienen variante de alto contraste ni de modo oscuro.
+- **Modo oscuro y accesibilidad**: los tokens ya están; una pantalla nueva no
+  hace nada especial mientras use roles (`bg-card`, `text-muted-foreground`) y
+  no colores de marca directos. No usar `next-themes` ni `localStorage` para
+  preferencias: viven en el perfil y las escribe el layout raíz.
 - **Tipografía**: Archivo para títulos y texto (los `h1`–`h4` ya heredan ancho
   92% y peso 600 — no agregar `italic` ni `uppercase`), `.cifra` (IBM Plex
   Mono) para importes, cantidades, códigos e IDs, `.logotipo` (Anton) solo
   para el wordmark.
 - **Movimiento**: una sola curva, `var(--transicion)`. Entrada de pantalla,
-  escalonado de grilla (`.revelar-lista`), filos de área y estados. Nada que
+  escalonado de grilla (`.revelar-lista`), filo del acento y estados. Nada que
   retrase una acción; `prefers-reduced-motion` ya está resuelto globalmente en
-  `globals.css`, no reimplementarlo por componente.
+  `globals.css`, no reimplementarlo por componente. Sin librería de animación:
+  si algo no sale con keyframes CSS o con los `data-starting-style` /
+  `data-ending-style` de Base UI, discutirlo antes de instalar nada.
+- **Moldes antes que pantallas**: una lista va con `TablaDatos` (28 pantallas
+  la usan) y un alta o edición con `DialogoFormulario` (17). Marcar
+  `meta.numero` en toda columna de importes o cantidades. Una pantalla nueva
+  con su propia tabla o su propio `<dialog>` es deuda desde el primer día.
+- **Registrar la pantalla en `lib/navegacion.ts`**, no en su `layout.tsx`: de
+  ahí salen el sidebar y la paleta de comandos. Una pantalla sin registrar
+  existe pero no se puede buscar.
+- **Un `loading.tsx` por módulo**. Sin él el clic en el sidebar no acusa
+  recibo hasta que el servidor termina, y se lee como que la aplicación se
+  colgó.
 - **Íconos**: `lucide-react`, tamaño 15–18 y `strokeWidth` 1.75, siempre
   `aria-hidden` con una etiqueta de texto al lado. Sin emoji en la UI: cada
   sistema los dibuja distinto.
