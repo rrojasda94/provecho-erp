@@ -170,6 +170,19 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   accesible por teclado), **react-day-picker** (calendario del rango
   personalizado) y **sonner** (los avisos del tablero pasaron de un `<span>`
   gris a toasts).
+- ✅ 2026-08-12 **Rastro de navegación y "volver" histórico** (ADR-039):
+  `<Rastro>` en las nueve fichas que cableaban su propio `← Sección`. El
+  rastro se deriva de la ruta contra `MODULOS`/`SUBMENUS` y el `←` usa el
+  historial propio, con el padre como fallback.
+- ⬜ **Las fichas de artículo y de SKU no están enlazadas desde ninguna
+  pantalla** (encontrado 2026-08-12 al probar el rastro):
+  `/inventario/articulos/{id}` y `/inventario/skus/{id}` existen, tienen su
+  ficha construida y solo se alcanzan tecleando la URL o desde el botón de
+  destino de un reporte. El listado de artículos no abre la ficha de ninguna
+  de sus filas.
+- ⬜ **El rastro no llega al PDV, al KDS ni al lienzo**: viven fuera de
+  `(app)` y tienen su propia barra. Es decisión tomada (ADR-039), no olvido;
+  se revisa si alguna de las tres deja de ser una pantalla de una sola tarea.
 - ⬜ **Login y PDV siguen sin migrar a shadcn**: el login conserva sus
   clases `.login-*` en `@layer components` y el PDV su CSS propio. Funcionan;
   se migran cuando se los toque, no antes.

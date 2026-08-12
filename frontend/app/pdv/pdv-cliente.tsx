@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { esSinPermiso, type Falla } from "@/lib/carga";
 import {
   api,
   claveIdempotencia,
@@ -39,7 +40,6 @@ import { useCajaPdv } from "./use-caja-pdv";
 import { useDatosPdv } from "./use-datos-pdv";
 
 type Props = {
-  empresaId: string | null;
   sucursalId: string;
   puntoVenta: {
     id: string;
@@ -94,8 +94,29 @@ function tituloComprobante(venta: Venta | null): string {
   return venta ? `Orden #${venta.numero_orden}` : "Comprobante";
 }
 
-export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props) {
-  const datos = useDatosPdv(empresaId, puntoVenta.id, sucursalId);
+/** Qué mostrar en lugar del PDV mientras no se sabe si hay caja abierta, o
+ * `null` para dejar pasar.
+ *
+ * Que no se pueda **preguntar** por la caja no es lo mismo que no haberla:
+ * ofrecer la apertura ahí lleva a pedir la de una caja que quizá ya está
+ * abierta, que el servidor rechaza por duplicada, y el cajero queda sin poder
+ * vender ni entender por qué. */
+function bloqueoDeCaja(resuelta: boolean, falla: Falla | null) {
+  if (!resuelta) return <main className="pdv-vacio">Cargando el punto de venta…</main>;
+  if (!falla) return null;
+  const detalle = esSinPermiso(falla)
+    ? "Tu usuario no puede consultar la caja de esta sucursal. Pídele a un administrador el permiso `accounting.caja_operar`."
+    : "No se pudo consultar el estado de la caja. Reintenta en unos segundos; si sigue, avisa a soporte.";
+  return (
+    <main className="pdv-vacio">
+      <h1>{falla.mensaje}</h1>
+      <p>{detalle}</p>
+    </main>
+  );
+}
+
+export default function PdvCliente({ sucursalId, puntoVenta }: Props) {
+  const datos = useDatosPdv(puntoVenta.id, sucursalId);
   const [borradores, setBorradores] = useState<Borrador[]>([nuevoBorrador()]);
   const [activoId, setActivoId] = useState<string | null>(null);
   const [seleccion, setSeleccion] = useState<Set<string>>(new Set());
@@ -489,9 +510,8 @@ export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props)
     }
   };
 
-  if (!datos.cajaResuelta) {
-    return <main className="pdv-vacio">Cargando el punto de venta…</main>;
-  }
+  const bloqueo = bloqueoDeCaja(datos.cajaResuelta, datos.fallaCaja);
+  if (bloqueo) return bloqueo;
 
   return (
     <main className="pdv">

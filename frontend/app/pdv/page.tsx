@@ -89,7 +89,6 @@ export default async function PaginaPdv() {
 
   return (
     <PdvCliente
-      empresaId={ctx.empresaId}
       sucursalId={ctx.sucursalId}
       puntoVenta={{
         id: ctx.punto.id,

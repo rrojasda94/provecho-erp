@@ -21400,6 +21400,7 @@
     },
     "/api/v1/accounting/cajas/abiertas": {
       "get": {
+        "description": "Con `sucursal_id`, **quien opera una caja** puede preguntar si la de su\nlocal ya está abierta; sin él hace falta `accounting.leer`, porque son las\nde toda la empresa.\n\nAntes exigía `accounting.leer` siempre, y un cajero —que tiene\n`caja_operar` y no `leer`— recibía 403. El PDV lo trataba como \"no hay\ncaja abierta\" y le pedía abrir una que ya estaba abierta, para después\nnegarle la apertura por duplicada: un callejón sin salida que empezaba\ncomo un permiso mal elegido.",
         "operationId": "listar_cajas_abiertas_api_v1_accounting_cajas_abiertas_get",
         "parameters": [
           {
@@ -21417,6 +21418,23 @@
                 }
               ],
               "title": "Empresa Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sucursal_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sucursal Id"
             }
           }
         ],

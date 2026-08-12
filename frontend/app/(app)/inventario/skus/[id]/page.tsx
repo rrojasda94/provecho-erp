@@ -1,5 +1,4 @@
-import Link from "next/link";
-
+import { Rastro } from "@/components/shell/rastro";
 import { ApiError, apiFetch } from "@/lib/api";
 import { obtenerSesion } from "@/lib/sesion";
 
@@ -49,12 +48,9 @@ export default async function SkuPage({
 
   return (
     <section className="flex flex-col gap-6">
-      <Link
-        href="/inventario/articulos"
-        className="text-sm font-semibold text-primary hover:underline"
-      >
-        ← Artículos
-      </Link>
+      {/* La hoja nombra el SKU y el rastro dice de qué artículo cuelga: desde
+          acá, "volver" es al artículo del que uno vino, no al listado. */}
+      <Rastro hoja={`${sku.articulo.nombre} · ${sku.codigo}`} />
       <header className="flex flex-col gap-1">
         <h1 className="font-heading text-xl italic uppercase text-dark">
           {sku.articulo.nombre}

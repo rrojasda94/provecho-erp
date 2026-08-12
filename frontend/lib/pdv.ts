@@ -367,8 +367,11 @@ export const api = {
   comprobante: (ventaId: string) =>
     pedir<Record<string, unknown>>(`/sales/ventas/${ventaId}/comprobante`),
 
-  cajasAbiertas: (empresaId: string) =>
-    pedir<CajaAbierta[]>(`/accounting/cajas/abiertas?empresa_id=${empresaId}`),
+  /** Por **sucursal** y no por empresa: es lo que el PDV necesita saber (¿mi
+   * caja está abierta?) y lo único que el servidor le deja ver a quien opera
+   * una caja sin darle de paso el efectivo de los demás locales. */
+  cajasAbiertas: (sucursalId: string) =>
+    pedir<CajaAbierta[]>(`/accounting/cajas/abiertas?sucursal_id=${sucursalId}`),
 
   /** Terminales que le toca verificar a esta sucursal al abrir: los suyos
    * más los de emergencia del pool, que es lo que devuelve el endpoint

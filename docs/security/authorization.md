@@ -49,7 +49,8 @@ alcance del usuario.
 | — | `organizacion.gestionar`: CRUD de grupo, empresas, marcas, licencias, sucursales y almacenes. **Aparte de `users.gestionar`**: quien crea cajeros no funda sucursales. Fundar un grupo o una empresa exige además `*` — el recurso nuevo todavía no pertenece a la empresa de nadie |
 | supervisor | `inventory.*`, `purchases.aprobar`, `sales.leer`, aprueba solicitudes |
 | almacenero | `inventory.transferir`, `inventory.recepcion`, `inventory.ajustar` |
-| cajero | `sales.crear`, `sales.cobrar`, `sales.leer` (su sucursal) |
+| cajero | `sales.crear`, `sales.cobrar`, `sales.leer`, `sales.entregar_pedido`, `kds.operar`, `accounting.caja_operar` (su sucursal) |
+| — | `accounting.caja_operar` alcanza para **preguntar** por la caja de la sucursal propia (`GET /accounting/cajas/abiertas?sucursal_id=`), no solo para abrirla y cerrarla: el PDV tiene que saber si el turno ya está abierto antes de ofrecer abrirlo. Sin el `sucursal_id` la consulta es de toda la empresa y sigue exigiendo `accounting.leer` — quien opera una caja no tiene por qué ver el efectivo de los demás locales |
 | agente_ia | `sales.crear_pedido` (canal agente_ia, su marca) |
 | hub_sucursal | `sync.leer`, `sync.empujar` (una sola sucursal, ADR-009) |
 

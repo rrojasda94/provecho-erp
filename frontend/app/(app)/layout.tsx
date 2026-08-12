@@ -1,3 +1,4 @@
+import { RastreoDeNavegacion } from "@/components/shell/rastro";
 import { Revelar } from "@/components/shell/revelar";
 import { TopBar } from "@/components/shell/top-bar";
 import { obtenerSesion } from "@/lib/sesion";
@@ -15,6 +16,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     // sin que esos estilos alcancen al PDV, al KDS ni al lienzo — que viven
     // fuera de este layout y tienen su propia paleta oscura.
     <div className="erp flex min-h-screen flex-col bg-background">
+      {/* Acá y no en cada ficha: cuenta las navegaciones del shell desde que
+          se entra, que es lo que decide si el `←` puede volver o tiene que
+          subir al padre. */}
+      <RastreoDeNavegacion />
       <TopBar usuario={usuario} />
       {/* flex-1, no un cálculo con la altura de TopBar en píxeles: el alto
           real de la barra (fuentes custom, line-height) no es una constante

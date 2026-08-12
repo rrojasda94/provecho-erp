@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+
+import { Rastro } from "@/components/shell/rastro";
 import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
 
@@ -87,9 +89,7 @@ export function FichaProducto({
   return (
     <div className="flex max-w-4xl flex-col gap-6">
       <div>
-        <Link href="/catalogo/productos" className="text-sm text-gray hover:text-primary">
-          ← Productos
-        </Link>
+        <Rastro hoja={producto.nombre} />
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <input
             defaultValue={producto.nombre}

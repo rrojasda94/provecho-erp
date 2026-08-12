@@ -507,3 +507,56 @@ def test_total_efectivo_cobrado_usa_hora_de_apertura_no_desde_siempre(env):
         corte = AperturaCajaRepo(s).get(UUID(apertura["id"])).created_at
         total = total_efectivo_cobrado(s, UUID(ids["pv_id"]), corte)
     assert total == Decimal("10.00")
+
+
+def test_el_cajero_ve_la_caja_abierta_de_su_sucursal(env):
+    """El PDV pregunta "¿mi caja ya está abierta?" antes de ofrecer abrirla.
+
+    `GET /cajas/abiertas` exigía `accounting.leer`, que el rol `cajero` no
+    tiene ni le corresponde —es el permiso de todo el módulo contable—, así
+    que recibía 403. El PDV lo leía como "no hay caja", pedía la apertura, y
+    la apertura rebotaba con "ya hay una caja abierta": el cajero quedaba sin
+    poder vender ni entender por qué.
+
+    Acotado a **su** sucursal: quien opera una caja no tiene por qué ver el
+    efectivo de los demás locales.
+    """
+    client, ids, _ = env
+    admin = _token(client)
+    abierta = _abrir_caja(client, admin, ids).json()
+
+    cajero = _token(client, "cajero1", "111111")
+    suya = client.get(
+        f"/api/v1/accounting/cajas/abiertas?sucursal_id={ids['sucursal_id']}",
+        headers=cajero,
+    )
+    assert suya.status_code == 200, suya.text
+    assert [c["apertura_caja_id"] for c in suya.json()] == [abierta["id"]]
+
+    # Sin acotar es la empresa entera, y eso sí es `accounting.leer`.
+    assert client.get("/api/v1/accounting/cajas/abiertas", headers=cajero).status_code == 403
+    assert client.get("/api/v1/accounting/cajas/abiertas", headers=admin).status_code == 200
+
+
+def test_no_se_ve_la_caja_de_una_sucursal_ajena(env):
+    """El alcance lo pone el tenant, no la confianza en el parámetro: pedir
+    otra sucursal no es "ver menos", es un 403 (ADR-004)."""
+    client, ids, TestSession = env
+    with TestSession() as s:
+        otra = Sucursal(
+            empresa_id=uuid.UUID(ids["empresa_id"]),
+            marca_id=uuid.UUID(ids["marca_id"]),
+            nombre="Ajena",
+            direccion="Otro distrito 123",
+            estado="activa",
+            tenencia="propia",
+        )
+        s.add(otra)
+        s.commit()
+        ajena_id = str(otra.id)
+
+    cajero = _token(client, "cajero1", "111111")
+    r = client.get(
+        f"/api/v1/accounting/cajas/abiertas?sucursal_id={ajena_id}", headers=cajero
+    )
+    assert r.status_code == 403, r.text
