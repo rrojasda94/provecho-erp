@@ -3,10 +3,9 @@ import Link from "next/link";
 
 import { NavModulo } from "@/components/shell/nav-modulo";
 import type { Modulo } from "@/lib/modulos";
+import { SUBMENUS, type ItemSubmenu } from "@/lib/navegacion";
 import { puedeVerModulo } from "@/lib/permisos";
 import { obtenerSesion } from "@/lib/sesion";
-
-type ItemSubmenu = { label: string; href: string };
 
 /** Nivel 2 del shell Odoo (F2.6b): sidebar del módulo activo + guard real
  * server-side. Cada `[modulo]/layout.tsx` es un archivo real (Next.js lo
@@ -22,11 +21,13 @@ export async function ModuloShell({
   children,
 }: {
   modulo: Modulo;
+  /** Solo para un módulo que necesite un submenú distinto del registrado. */
   submenu?: ItemSubmenu[];
   children: React.ReactNode;
 }) {
   const { usuario } = await obtenerSesion();
   const { Icono } = modulo;
+  const items = submenu ?? SUBMENUS[modulo.clave] ?? [];
 
   if (!puedeVerModulo(usuario.permisos, modulo)) {
     return (
@@ -71,9 +72,9 @@ export async function ModuloShell({
           <h2 className="text-base leading-tight">{modulo.nombre}</h2>
         </div>
 
-        {submenu && submenu.length > 0 && (
+        {items.length > 0 && (
           <nav className="flex gap-0.5 overflow-x-auto md:flex-col md:overflow-visible">
-            {submenu.map((item) => (
+            {items.map((item) => (
               <NavModulo key={item.href} href={item.href} label={item.label} />
             ))}
           </nav>

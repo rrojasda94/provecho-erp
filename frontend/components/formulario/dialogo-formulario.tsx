@@ -48,10 +48,7 @@ export function DialogoFormulario({
   titulo: string;
   /** Contenido del botón que abre el diálogo. */
   disparador: React.ReactNode;
-  accion: (
-    estado: EstadoFormulario,
-    formData: FormData,
-  ) => Promise<EstadoFormulario>;
+  accion: (estado: EstadoFormulario, formData: FormData) => Promise<EstadoFormulario>;
   children: React.ReactNode;
   etiquetaEnvio?: string;
   etiquetaPendiente?: string;

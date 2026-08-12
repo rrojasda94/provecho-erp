@@ -2,6 +2,8 @@ import Link from "next/link";
 
 import { Campana } from "@/components/shell/campana";
 import { MenuUsuario } from "@/components/shell/menu-usuario";
+import { PaletaComandos } from "@/components/shell/paleta-comandos";
+import { destinos } from "@/lib/navegacion";
 import type { Usuario } from "@/lib/sesion";
 
 /** Barra superior del shell (F2.6): siempre visible, home de apps a un
@@ -33,6 +35,11 @@ export function TopBar({ usuario }: { usuario: Usuario }) {
       </Link>
 
       <div className="flex items-center gap-3">
+        {/* Los destinos se resuelven en el servidor y ya vienen filtrados por
+            permiso: la paleta no puede ofrecer una pantalla a la que su
+            usuario recibiría un 403. */}
+        <PaletaComandos destinos={destinos(usuario.permisos)} />
+
         <Campana />
 
         <span aria-hidden className="h-5 w-px bg-border" />
