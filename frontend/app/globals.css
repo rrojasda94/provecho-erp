@@ -167,21 +167,6 @@
     --status-info-surface: color-mix(in srgb, var(--status-info) 12%, transparent);
 }
 
-/* Modo alto contraste / daltonismo. Una sola paleta alternativa y no una por
-   tipo: la regla del ícono ya cubre el grueso del riesgo, y especializar por
-   protanopía, deuteranopía y tritanopía triplica el sistema de diseño para un
-   beneficio marginal. Esta cubre el par rojo-verde (~95% de los casos).
-   Valores de Okabe-Ito, fijados en docs/product/ui-ux.md.
-
-   La marca NO cambia: el riesgo de accesibilidad está en los estados, no en
-   la identidad. */
-[data-paleta="alto-contraste"] {
-    --status-success: #0072b2;
-    --status-danger: #d55e00;
-    --status-warning: #e69f00;
-    --status-info: #56b4e9;
-}
-
 /* Tamaño de fuente. `100%` y no `1rem`: dentro de la regla que fija el
    `font-size` de la raíz, `rem` se referencia a sí mismo. `100%` es el
    tamaño que el navegador ya traía —el que la persona configuró en su
@@ -262,6 +247,38 @@ html {
     --hue: var(--primary);
 
     color-scheme: dark;
+}
+
+/* Modo alto contraste / daltonismo. Una sola paleta alternativa y no una por
+   tipo: la regla del ícono ya cubre el grueso del riesgo, y especializar por
+   protanopía, deuteranopía y tritanopía triplica el sistema de diseño para un
+   beneficio marginal. Esta cubre el par rojo-verde (~95% de los casos).
+   Valores de Okabe-Ito, fijados en docs/product/ui-ux.md.
+
+   La marca NO cambia: el riesgo de accesibilidad está en los estados, no en
+   la identidad.
+
+   Va DESPUÉS del bloque oscuro y no antes. Los dos viven en `<html>` con la
+   misma especificidad, así que gana el último que se declara — puesto arriba,
+   el tema apagaba la paleta accesible y quien la había activado veía los
+   colores de siempre. ui-ux.md pide justo lo contrario: los dos ejes se
+   combinan (tema oscuro + daltonismo + letra grande, a la vez). */
+[data-paleta="alto-contraste"] {
+    --status-success: #0072b2;
+    --status-danger: #d55e00;
+    --status-warning: #e69f00;
+    --status-info: #56b4e9;
+}
+
+/* La misma paleta, aclarada para fondo oscuro: los valores de Okabe-Ito están
+   medidos contra blanco y sobre `#101216` el azul cae a 3.6:1. Se conserva el
+   tono —azul, bermellón, ocre, celeste— que es lo que hace distinguibles los
+   estados; sube la luminosidad, que es lo que los hace legibles. */
+.dark[data-paleta="alto-contraste"] {
+    --status-success: #3d9ee0;
+    --status-danger: #ef7d1a;
+    --status-warning: #f0b429;
+    --status-info: #56b4e9;
 }
 
 /* En oscuro la crema del login apagaría toda la pantalla. La marca se

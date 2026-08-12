@@ -15,7 +15,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     // sin que esos estilos alcancen al PDV, al KDS ni al lienzo — que viven
     // fuera de este layout y tienen su propia paleta oscura.
     <div className="erp flex min-h-screen flex-col bg-background">
-      <TopBar username={usuario.username} />
+      <TopBar usuario={usuario} />
       {/* flex-1, no un cálculo con la altura de TopBar en píxeles: el alto
           real de la barra (fuentes custom, line-height) no es una constante
           que valga la pena asumir. */}

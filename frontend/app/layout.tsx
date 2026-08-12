@@ -3,6 +3,7 @@ import { Anton, Archivo, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { obtenerPreferencias } from "@/lib/sesion";
 
 // Los nombres de variable NO coinciden con los tokens de Tailwind
 // (`--font-heading`/`--font-body`) a propósito: si coincidieran, el token se
@@ -37,11 +38,30 @@ export const metadata: Metadata = {
     description: "ERP modular para grupo de restaurantes",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+// `data-escala` y `data-paleta` van en `<html>` y no en un contenedor más
+// adentro: `--font-scale` multiplica el `font-size` de la raíz, que es lo que
+// hace que TODO lo dimensionado en `rem` escale junto. La clase `dark` va en
+// el mismo lugar porque es la que activa la variante `dark:` de Tailwind.
+const ESCALA = {
+    estandar: undefined,
+    grande: "grande",
+    muy_grande: "muy-grande",
+    maximo: "maximo",
+} as const;
+
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+    const prefs = await obtenerPreferencias();
+
     return (
         <html
             lang="es"
-            className={`${archivo.variable} ${plexMono.variable} ${anton.variable}`}
+            className={`${archivo.variable} ${plexMono.variable} ${anton.variable} ${
+                prefs.preferencia_tema === "oscuro" ? "dark" : ""
+            }`}
+            data-escala={ESCALA[prefs.preferencia_tamano_fuente]}
+            data-paleta={
+                prefs.preferencia_paleta === "alto_contraste" ? "alto-contraste" : undefined
+            }
         >
             <body>
                 {/* Un solo proveedor de tooltips para todo el ERP: con

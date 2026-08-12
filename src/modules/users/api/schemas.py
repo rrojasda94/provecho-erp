@@ -50,6 +50,25 @@ class MeOut(BaseModel):
     sucursales: list[uuid.UUID]
     empresa_id: uuid.UUID | None
     permisos: list[str]
+    # El frontend las escribe como atributos de `<html>` durante el render en
+    # servidor. Van en `/users/me` y no en un endpoint propio para que no haya
+    # un instante en el que la pantalla ya se dibujó con la paleta equivocada.
+    preferencia_paleta: str
+    preferencia_tamano_fuente: str
+    preferencia_tema: str
+
+
+class PreferenciasIn(BaseModel):
+    """Preferencias de presentación del usuario autenticado.
+
+    Todas opcionales: la barra superior cambia una sola a la vez y mandar las
+    otras dos obligaría al cliente a conocer el estado completo para tocar un
+    campo.
+    """
+
+    paleta: Literal["estandar", "alto_contraste"] | None = None
+    tamano_fuente: Literal["estandar", "grande", "muy_grande", "maximo"] | None = None
+    tema: Literal["claro", "oscuro"] | None = None
 
 
 # --- Persona (party model) ---

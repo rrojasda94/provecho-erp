@@ -1,8 +1,8 @@
-import { LogOut } from "lucide-react";
 import Link from "next/link";
 
-import { logoutAction } from "@/app/(app)/actions";
 import { Campana } from "@/components/shell/campana";
+import { MenuUsuario } from "@/components/shell/menu-usuario";
+import type { Usuario } from "@/lib/sesion";
 
 /** Barra superior del shell (F2.6): siempre visible, home de apps a un
  * click, usuario + logout en un solo lugar — antes cada pantalla repetía su
@@ -16,7 +16,7 @@ import { Campana } from "@/components/shell/campana";
  * altura la barra parecía el encabezado de un afiche. Lo que separa la barra
  * del contenido ahora es el cambio de superficie —blanco sobre acero—, que no
  * necesita subrayarse. */
-export function TopBar({ username }: { username: string }) {
+export function TopBar({ usuario }: { usuario: Usuario }) {
   return (
     <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-border bg-card px-4 md:px-6">
       <Link
@@ -37,29 +37,15 @@ export function TopBar({ username }: { username: string }) {
 
         <span aria-hidden className="h-5 w-px bg-border" />
 
-        <span className="flex items-center gap-2">
-          {/* Monograma: identifica la sesión de un vistazo en un turno donde
-              varias personas comparten la misma máquina. */}
-          <span
-            aria-hidden
-            className="grid size-7 place-items-center rounded-full bg-muted text-xs font-semibold text-gray uppercase"
-          >
-            {username.slice(0, 2)}
-          </span>
-          {/* En móvil manda el monograma: el nombre completo empujaba el
-              botón de cerrar sesión fuera de la barra. */}
-          <span className="hidden text-sm font-medium text-dark sm:inline">{username}</span>
-        </span>
-
-        <form action={logoutAction}>
-          <button
-            type="submit"
-            className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium text-gray transition-colors hover:bg-muted hover:text-dark"
-          >
-            <LogOut size={15} strokeWidth={1.75} aria-hidden />
-            Cerrar sesión
-          </button>
-        </form>
+        {/* Monograma, nombre, preferencias y salida en un solo control: eran
+            tres elementos sueltos, y «Cerrar sesión» en texto competía en peso
+            con el logotipo por algo que se usa una vez al día. */}
+        <MenuUsuario
+          username={usuario.username}
+          tema={usuario.preferencia_tema}
+          tamano={usuario.preferencia_tamano_fuente}
+          paleta={usuario.preferencia_paleta}
+        />
       </div>
     </header>
   );

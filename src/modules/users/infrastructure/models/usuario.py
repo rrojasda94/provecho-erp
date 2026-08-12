@@ -37,3 +37,41 @@ class Usuario(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin):
     bloqueado_hasta: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # Preferencias de presentación. Viven en el usuario y no en el navegador
+    # (docs/product/ui-ux.md): en un local la misma tablet la usan tres turnos
+    # distintos y la misma persona pasa de la caja a la oficina. Guardarlas en
+    # el dispositivo obligaría a reconfigurarlas en cada máquina, que en la
+    # práctica significa no usarlas.
+    #
+    # `alto_contraste` no es "otro tema": es la paleta de estados alternativa
+    # para daltonismo rojo-verde. `tema` es preferencia de entorno (la luz de
+    # la sala: la oficina y la cocina a las 6 a.m. no son lo mismo).
+    #
+    # Sin opción "seguir al sistema": detectarla exige leer `prefers-color-
+    # scheme` en el navegador, y hacerlo antes del primer pintado pide un
+    # script inline que la CSP de `middleware.ts` firma con nonce por request.
+    # Abrirle una excepción al único control que frena XSS, para ahorrar un
+    # clic en una preferencia que ya viaja con la persona entre máquinas, no
+    # es un intercambio que convenga.
+    preferencia_paleta: Mapped[str] = mapped_column(
+        Enum("estandar", "alto_contraste", name="preferencia_paleta", native_enum=False),
+        default="estandar",
+        server_default="estandar",
+    )
+    preferencia_tamano_fuente: Mapped[str] = mapped_column(
+        Enum(
+            "estandar",
+            "grande",
+            "muy_grande",
+            "maximo",
+            name="preferencia_tamano_fuente",
+            native_enum=False,
+        ),
+        default="estandar",
+        server_default="estandar",
+    )
+    preferencia_tema: Mapped[str] = mapped_column(
+        Enum("claro", "oscuro", name="preferencia_tema", native_enum=False),
+        default="claro",
+        server_default="claro",
+    )

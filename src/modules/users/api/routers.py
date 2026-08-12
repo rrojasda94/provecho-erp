@@ -143,6 +143,46 @@ def me(
         sucursales=claims["sucursales"],
         empresa_id=claims["empresa_id"],
         permisos=sorted(UsuarioRepo(session).permiso_codigos(usuario.id)),
+        preferencia_paleta=usuario.preferencia_paleta,
+        preferencia_tamano_fuente=usuario.preferencia_tamano_fuente,
+        preferencia_tema=usuario.preferencia_tema,
+    )
+
+
+@router.patch("/users/me/preferencias", response_model=schemas.MeOut, tags=["users"])
+def actualizar_preferencias(
+    datos: schemas.PreferenciasIn,
+    usuario: Usuario = Depends(get_current_user),
+    session: Session = Depends(get_db),
+):
+    """Cambia cómo se le presenta el ERP a quien está autenticado.
+
+    Sin permiso: no hay privilegio que otorgar en elegir el tamaño de la
+    propia letra, y exigir uno dejaría la accesibilidad fuera del alcance de
+    justamente quien más la necesita. Solo puede tocar su propio perfil —el
+    usuario sale del token, no del cuerpo.
+    """
+    if datos.paleta is not None:
+        usuario.preferencia_paleta = datos.paleta
+    if datos.tamano_fuente is not None:
+        usuario.preferencia_tamano_fuente = datos.tamano_fuente
+    if datos.tema is not None:
+        usuario.preferencia_tema = datos.tema
+    session.commit()
+    session.refresh(usuario)
+
+    claims = auth.build_claims(session, usuario)
+    return schemas.MeOut(
+        id=usuario.id,
+        username=usuario.username,
+        tipo=usuario.tipo,
+        roles=claims["roles"],
+        sucursales=claims["sucursales"],
+        empresa_id=claims["empresa_id"],
+        permisos=sorted(UsuarioRepo(session).permiso_codigos(usuario.id)),
+        preferencia_paleta=usuario.preferencia_paleta,
+        preferencia_tamano_fuente=usuario.preferencia_tamano_fuente,
+        preferencia_tema=usuario.preferencia_tema,
     )
 
 
