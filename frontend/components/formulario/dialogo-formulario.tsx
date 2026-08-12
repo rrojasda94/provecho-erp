@@ -1,6 +1,9 @@
 "use client";
 
+import { AlertCircle, HelpCircle, X } from "lucide-react";
 import { startTransition, useActionState, useEffect, useRef } from "react";
+
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 /**
  * Diálogo con formulario: el molde de toda alta y toda corrección del ERP.
@@ -10,12 +13,15 @@ import { startTransition, useActionState, useEffect, useRef } from "react";
  * pantalla nueva lo volvía a escribir. Con la edición encima habrían sido
  * veinte copias del mismo bloque; la que se olvidara de cerrar al `ok` o de
  * resetear al cancelar iba a ser un bug que nadie relaciona con las otras
- * diecinueve.
+ * diecinueve. Hoy lo usan diecisiete pantallas.
  *
  * Sigue siendo `<dialog>` nativo, no el `Dialog` de shadcn: el overlay, el
  * foco atrapado y el cierre con Esc ya vienen del navegador, y ninguna
  * pantalla pidió todavía algo que eso no cubra (ADR-013 dejó shadcn
- * instalado para cuando haga falta, no para usarlo por defecto).
+ * instalado para cuando haga falta, no para usarlo por defecto). Lo que sí
+ * cambió es cómo se ve: fondo desenfocado, panel que entra con escala,
+ * encabezado y pie fijos con el cuerpo scrolleable — un formulario de doce
+ * campos empujaba los botones fuera de la pantalla.
  */
 
 /** Lo que devuelve toda Server Action de formulario del ERP. */
@@ -24,7 +30,7 @@ export type EstadoFormulario = { error: string; ok: boolean };
 export const ESTADO_INICIAL: EstadoFormulario = { error: "", ok: false };
 
 const CLASE_PRIMARIO =
-  "rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary disabled:opacity-50";
+  "inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/85 disabled:pointer-events-none disabled:opacity-50";
 
 export function DialogoFormulario({
   titulo,
@@ -42,10 +48,7 @@ export function DialogoFormulario({
   titulo: string;
   /** Contenido del botón que abre el diálogo. */
   disparador: React.ReactNode;
-  accion: (
-    estado: EstadoFormulario,
-    formData: FormData,
-  ) => Promise<EstadoFormulario>;
+  accion: (estado: EstadoFormulario, formData: FormData) => Promise<EstadoFormulario>;
   children: React.ReactNode;
   etiquetaEnvio?: string;
   etiquetaPendiente?: string;
@@ -80,7 +83,7 @@ export function DialogoFormulario({
       </button>
       <dialog
         ref={dialogRef}
-        className="w-full max-w-md rounded-lg p-0 backdrop:bg-dark/40"
+        className="dialogo w-full max-w-md rounded-xl border border-border bg-card p-0 text-card-foreground shadow-[var(--sombra-3)]"
         onClose={() => {
           // El reset va al cerrar, no al enviar (ver `onSubmit`).
           formRef.current?.reset();
@@ -99,46 +102,125 @@ export function DialogoFormulario({
             hay reset automático y `pendiente` sigue funcionando igual. */}
         <form
           ref={formRef}
+          aria-busy={pendiente}
           onSubmit={(e) => {
             e.preventDefault();
             const datos = new FormData(e.currentTarget);
             startTransition(() => formAction(datos));
           }}
-          className="flex flex-col gap-4 p-6"
+          className="flex max-h-[85vh] flex-col"
         >
-          <h2 className="font-heading text-lg italic uppercase text-dark">{titulo}</h2>
-          {ayuda && <p className="-mt-2 text-xs text-gray">{ayuda}</p>}
-          {children}
-          {estado.error && (
-            <p role="alert" className="text-sm font-semibold text-secondary">
-              {estado.error}
-            </p>
-          )}
-          <div className="mt-2 flex justify-end gap-2">
+          <header className="flex items-start justify-between gap-4 border-b border-border px-5 py-3.5">
+            <div>
+              <h2 className="text-base leading-tight">{titulo}</h2>
+              {ayuda && <p className="mt-1 text-xs text-muted-foreground">{ayuda}</p>}
+            </div>
             <button
               type="button"
+              aria-label="Cerrar"
               onClick={() => dialogRef.current?.close()}
-              className="rounded border border-gray px-4 py-2 text-sm font-semibold text-dark"
+              className="-mt-0.5 -mr-1 rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
-              Cancelar
+              <X size={16} strokeWidth={2} aria-hidden />
             </button>
-            <button
-              type="submit"
-              disabled={pendiente || envioDeshabilitado}
-              className={CLASE_PRIMARIO}
-            >
-              {pendiente ? etiquetaPendiente : etiquetaEnvio}
-            </button>
-          </div>
+          </header>
+
+          {/* El cuerpo scrollea; encabezado y pie no. Un formulario largo
+              dejaba «Guardar» fuera de la pantalla y la única salida visible
+              era Esc. */}
+          <div className="flex flex-col gap-3.5 overflow-y-auto px-5 py-4">{children}</div>
+
+          <footer className="flex items-center justify-between gap-3 border-t border-border px-5 py-3">
+            {estado.error ? (
+              <p
+                role="alert"
+                className="flex items-start gap-1.5 text-sm font-medium text-status-danger"
+              >
+                <AlertCircle size={14} strokeWidth={2.25} aria-hidden className="mt-0.5 shrink-0" />
+                {estado.error}
+              </p>
+            ) : (
+              <span />
+            )}
+            <div className="flex shrink-0 gap-2">
+              <button
+                type="button"
+                onClick={() => dialogRef.current?.close()}
+                className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={pendiente || envioDeshabilitado}
+                className={CLASE_PRIMARIO}
+              >
+                {pendiente ? etiquetaPendiente : etiquetaEnvio}
+              </button>
+            </div>
+          </footer>
         </form>
       </dialog>
     </>
   );
 }
 
+/**
+ * Campo de formulario con su etiqueta y, opcionalmente, su ayuda contextual.
+ *
+ * La ayuda por campo es un pendiente escrito desde julio
+ * (docs/product/ui-ux.md): quien carga un proveedor no tiene por qué saber
+ * que "condición de pago" se cuenta en días desde la recepción, y hoy esa
+ * explicación no está en ningún lado de la pantalla. Va como tooltip sobre un
+ * ícono y no como texto permanente para no engordar un formulario de doce
+ * campos con doce párrafos.
+ *
+ * `pista` es lo contrario: formato esperado ("11 dígitos"), siempre visible,
+ * porque saberlo DESPUÉS de que el servidor rechace es tarde.
+ */
+export function CampoFormulario({
+  etiqueta,
+  ayuda,
+  pista,
+  children,
+}: {
+  etiqueta: string;
+  /** Qué significa este campo en el negocio. Aparece al apuntar el ícono. */
+  ayuda?: string;
+  /** Formato esperado. Siempre visible, bajo el campo. */
+  pista?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="flex flex-col gap-1.5">
+      <span className="flex items-center gap-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+        {etiqueta}
+        {ayuda && (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <button
+                  type="button"
+                  aria-label={`Qué es ${etiqueta}`}
+                  className="text-muted-foreground transition-colors hover:text-foreground"
+                />
+              }
+            >
+              <HelpCircle size={13} strokeWidth={2} aria-hidden />
+            </TooltipTrigger>
+            <TooltipContent>{ayuda}</TooltipContent>
+          </Tooltip>
+        )}
+      </span>
+      {children}
+      {pista && <span className="text-xs text-muted-foreground">{pista}</span>}
+    </label>
+  );
+}
+
 /** Clase del botón "Editar" de una fila: discreto, no compite con el alta. */
 export const BOTON_FILA =
-  "rounded border border-gray/40 px-2 py-1 text-xs font-semibold text-dark hover:bg-cream";
+  "inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs font-medium text-foreground transition-colors hover:bg-muted";
 
 /**
  * `defaultValue` de un `<input>` no admite `null`: React lo lee como "campo

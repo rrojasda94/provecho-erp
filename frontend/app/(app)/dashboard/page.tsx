@@ -46,6 +46,14 @@ async function bloque<T>(promesa: Promise<T>, que: string): Promise<Bloque<T>> {
   }
 }
 
+/** Tarjeta de indicador. La cifra va en monoespaciada y a peso alto: es lo
+ * único que se mira desde lejos, y tres tarjetas en fila solo se comparan si
+ * los dígitos ocupan el mismo ancho.
+ *
+ * `alerta` pinta con `secondary` (el rojo profundo), no con `accent`: el
+ * acento significa "activo/conforme" en las 30 insignias de estado del ERP.
+ * Un stock bajo mínimo pintado del mismo color que "recibida" decía justo lo
+ * contrario de lo que pasaba. */
 function Kpi({
   titulo,
   valor,
@@ -58,14 +66,12 @@ function Kpi({
   alerta?: boolean;
 }) {
   return (
-    <article className="rounded border border-foreground/10 bg-background p-4 shadow-sm">
-      <h2 className="text-xs font-medium uppercase tracking-wide text-gray">{titulo}</h2>
-      <p
-        className={`mt-1 font-heading text-3xl font-semibold ${alerta ? "text-accent" : ""}`}
-      >
+    <article className="rounded-lg border border-border bg-card p-4 transition-shadow hover:shadow-sm">
+      <h2 className="rotulo">{titulo}</h2>
+      <p className={`cifra mt-2 text-3xl font-semibold ${alerta ? "text-secondary" : ""}`}>
         {valor}
       </p>
-      {detalle && <p className="text-sm text-gray">{detalle}</p>}
+      {detalle && <p className="cifra mt-0.5 text-sm text-gray">{detalle}</p>}
     </article>
   );
 }
@@ -76,7 +82,7 @@ export default async function DashboardPage() {
   const { token, usuario } = await obtenerSesion();
   if (!usuario.empresa_id) {
     return (
-      <p className="rounded border border-accent/40 bg-accent/5 p-4 text-sm text-accent">
+      <p className="rounded-lg border border-secondary/30 bg-secondary/5 p-4 text-sm text-secondary">
         Tu usuario no tiene una empresa asignada — no se puede cargar el dashboard.
       </p>
     );

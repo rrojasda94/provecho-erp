@@ -64,7 +64,7 @@ function DialogoNuevaActa() {
       </button>
       <dialog ref={dialogRef} className="w-full max-w-lg rounded-lg p-0 backdrop:bg-dark/40">
         <form ref={formRef} action={formAction} className="flex flex-col gap-4 p-6">
-          <h2 className="font-heading text-lg italic uppercase text-dark">
+          <h2 className="font-heading text-lg text-dark">
             Acta de decisión
           </h2>
           <div className="flex gap-2">
@@ -185,7 +185,7 @@ export function DecisionesCliente({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h1 className="font-heading text-xl italic uppercase text-dark">
+        <h1 className="font-heading text-xl text-dark">
           Decisiones gerenciales
         </h1>
         {puedeDecidir && <DialogoNuevaActa />}

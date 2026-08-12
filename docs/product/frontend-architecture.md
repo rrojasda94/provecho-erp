@@ -93,17 +93,41 @@ solo `app/` + `lib/`).
 
 ## F2.3 Sistema de diseño (tokens)
 
-🔶 **Parcial**. Ya en código (`frontend/app/globals.css`): paleta de color
-(`--color-primary/secondary/dark/cream/accent/gray`) y tipografías (Anton
-Italic para títulos, Inter para cuerpo). Regla ya vigente: colores/fuentes
-**solo** vía tokens CSS, nunca hex hardcodeado en componentes
-(`prompts/frontend.md`).
+🔶 **Parcial**. Ya en código (`frontend/app/globals.css`):
 
-⬜ **Falta tokenizar**: spacing, radius (hoy `8px`/`16px` sueltos en
-`globals.css`), sombras/elevación, duración/easing de animaciones,
-iconografía (sin librería de íconos elegida todavía), ilustraciones,
-estados (hover/focus/disabled ya existen ad-hoc por selector CSS, no como
-tokens nombrados).
+- Paleta de color (`--color-primary/secondary/dark/cream/accent/gray/steel`),
+  revisada el 2026-08-07 por contraste medido (ver `ui-ux.md`).
+- Un **acento único** (`--hue`, sobre `--marca-primary`). El color por área de
+  negocio se probó y se descartó el 2026-08-12 (ADR-037): ADR-013 §8 ya había
+  rechazado el color por módulo o tarjeta. Las áreas siguen agrupando el home,
+  sin pintar.
+- **Estados semánticos**: `--status-success/danger/warning/info`, cada uno con
+  su `-surface` para el relleno de insignia, y su variante de alto contraste y
+  de modo oscuro.
+- Tipografías: Archivo (variable, títulos y cuerpo), IBM Plex Mono (cifras,
+  clase `.cifra`), Anton (solo logotipo, clase `.logotipo`).
+- `--radius` (6px, un solo valor para todos los componentes) y `--transicion`
+  (una curva para todo el ERP).
+- Iconografía: `lucide-react`, ya usada por calendario, diálogos, reportes y
+  el registro de módulos.
+
+Regla ya vigente: colores/fuentes **solo** vía tokens CSS, nunca hex
+hardcodeado en componentes (`prompts/frontend.md`).
+
+- **Elevación**: `--sombra-1/2/3` (apoyada, flotante, interrumpe), teñidas con
+  la tinta de marca y no con negro puro, con su juego para modo oscuro.
+- **Escala tipográfica accesible**: `--font-scale` con sus cuatro niveles en
+  `[data-escala]`.
+- `@custom-variant dark (&:is(.dark *))` — **obligatorio**. Tailwind v4 no
+  declara la variante `dark` por estrategia de clase: sin esa línea las
+  decenas de clases `dark:` que `shadcn add` deja escritas en
+  `components/ui/**` no compilan a nada, y el síntoma solo se ve en el
+  navegador.
+
+⬜ **Falta tokenizar**: spacing (la escala de Tailwind alcanza por ahora),
+ilustraciones, y los estados hover/focus/disabled, que existen como clases de
+componente (`.ficha`, `.nav-modulo`) y utilidades de Tailwind, no como tokens
+nombrados.
 
 ## F2.4 Componentes base
 
@@ -306,14 +330,30 @@ alfa no debería diseñar pantallas de PDV sin releer esas tres secciones.
 
 ## F2.14 Accesibilidad
 
-🔶 **Decidido, sin implementar** (`ui-ux.md`): paleta alternativa
-(daltonismo) + tamaño de fuente ajustable, ambos guardados en el **perfil
-del usuario** (no en el dispositivo), combinables con el tema de marca
-activo. Catálogo ya definido (2026-07-27): dos paletas (Provecho estándar
-+ un modo alto contraste/daltonismo inspirado en Okabe-Ito, tokens
-`--status-success/danger/warning/info`) y 4 niveles de tamaño de fuente
-vía `--font-scale` (1.0/1.15/1.3/1.5) — ver `ui-ux.md#accesibilidad`. Ya
-no bloquea implementar; sigue sin construirse.
+✅ **Implementado 2026-08-12 (ADR-037)**. Paleta alternativa (daltonismo
+rojo-verde, Okabe-Ito), tamaño de fuente en cuatro niveles y modo oscuro, las
+tres guardadas en el **perfil del usuario** (`preferencia_paleta`,
+`preferencia_tamano_fuente`, `preferencia_tema`) y no en el dispositivo — en
+un local la misma tablet la usan tres turnos.
+
+Se resuelven en el servidor: el layout raíz lee `/users/me` y escribe
+`class="dark"`, `data-escala` y `data-paleta` en `<html>`. No se usa
+`next-themes` (instalado, pero solo alimenta a `sonner`): guarda en
+`localStorage` y necesita un script inline antes del primer pintado, que la
+CSP con nonce de `middleware.ts` tendría que autorizar. Sin parpadeo y sin
+tocar la CSP.
+
+Paleta y tema **se combinan**: `[data-paleta="alto-contraste"]` va declarado
+después de `.dark` (misma especificidad, gana el último) y hay un
+`.dark[data-paleta="alto-contraste"]` con los valores aclarados.
+
+El ícono obligatorio por estado vive en `components/estado/insignia.tsx`,
+atado al tono. `PATCH /users/me/preferencias` no exige permiso.
+
+⬜ **Falta**: auditoría de contraste sobre las pantallas ya construidas
+(los tokens cumplen AA; los pares que cada pantalla combina no se
+verificaron uno por uno), navegación por teclado en el PDV y el KDS, y
+lectores de pantalla.
 
 ## F2.15 Internacionalización
 
@@ -453,11 +493,21 @@ el de botón/acción no.
 
 ## F2.29 Sistema de productividad *(agregado local)*
 
-⬜ **Sin decidir.** Atajos de teclado, Command Palette, navegación rápida:
-nada construido. Razonable de diferir — valioso para el usuario de 8-10h
-(cajero, cocinero) pero no bloquea que el alfa funcione. Revisar cuando el
-POS tenga su primer flujo real (ahí es donde más se nota la fricción de
-clics).
+🔶 **Paleta de comandos construida 2026-08-12 (ADR-037)**.
+`components/shell/paleta-comandos.tsx`: `Ctrl+K` / `⌘K` abre un buscador de
+pantallas sobre `@base-ui/react` Autocomplete + Dialog — sin `cmdk`, que
+traería un motor de coincidencia difusa para ~50 entradas estáticas y el
+árbol de Radix que ADR-013 descartó. Los destinos salen de
+`lib/navegacion.ts`, se arman en el servidor y llegan **filtrados por
+permiso**. Cada resultado es un `<Link>` de verdad: Enter, clic, clic central
+y "abrir en pestaña nueva" funcionan sin programarlos.
+
+La tabla suma `/` para enfocar su buscador.
+
+⬜ **Falta**: atajos por acción dentro de una pantalla (guardar, nuevo,
+siguiente fila) y comandos que ejecuten en vez de navegar. Se revisan cuando
+el PDV tenga su primer flujo real — ahí es donde más se nota la fricción de
+clics.
 
 ## F2.30 Gestión de ventanas y multitarea *(agregado local)*
 
@@ -467,10 +517,21 @@ F2.8. Diferible hasta que el PDV real exponga el problema concreto.
 
 ## F2.31 Microinteracciones y feedback *(agregado local)*
 
-⬜ **Sin empezar.** Indicadores de guardado/sincronización/estados de
-carga: ninguno construido (el dashboard hoy no tiene ni loading skeleton).
-Entra naturalmente con F2.4 (Skeleton, Toast) — no es una sección aparte
-que requiera su propia decisión previa.
+✅ **Resuelto 2026-08-12 (ADR-037)**. Un `loading.tsx` por módulo
+(`components/estado/esqueleto-pantalla.tsx`): sin él Next espera a que el
+`page.tsx` resuelva y recién ahí pinta, así que el clic en el sidebar no
+acusa recibo. La silueta imita la pantalla real —título, acciones, tabla— en
+vez de un spinner: un rectángulo donde va a ir la tabla prepara la vista, un
+spinner solo informa que hay que esperar.
+
+También: transición de entrada por navegación (`revelar.tsx`), escalonado en
+la grilla del home, filas fantasma en la tabla mientras carga, `aria-busy` en
+el formulario mientras se envía, y toasts de `sonner` ya montados. Todo el
+movimiento cuelga de `--transicion` y se apaga entero con
+`prefers-reduced-motion: reduce`.
+
+⬜ **Falta**: indicador de sincronización para el PDV offline (ADR-009), que
+depende del motor de sync y no de esta capa.
 
 ## Resumen — qué cerrar antes de los diseños finales del alfa
 

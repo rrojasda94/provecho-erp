@@ -40,7 +40,10 @@ test("el login deja el token en una cookie httpOnly y el logout la borra", async
   // en ninguna pantalla — se rompe en silencio.
   expect(token?.httpOnly).toBe(true);
 
-  await page.getByRole("button", { name: /Cerrar sesión/i }).click();
+  // Salir dejó de ser un botón suelto en la barra: vive en el menú de la
+  // sesión, junto a las preferencias de presentación.
+  await page.getByRole("button", { name: new RegExp(`Sesión de ${ADMIN.usuario}`, "i") }).click();
+  await page.getByRole("menuitem", { name: /Cerrar sesión/i }).click();
   await expect(page).toHaveURL(/\/login/);
 
   // Y la sesión quedó realmente muerta, no solo la pantalla cambiada.

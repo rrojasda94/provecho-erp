@@ -112,7 +112,7 @@ function DialogoFormulario({
           {Object.entries(ocultos ?? {}).map(([nombre, valor]) => (
             <input key={nombre} type="hidden" name={nombre} value={valor} />
           ))}
-          <h2 className="font-heading text-lg italic uppercase text-dark">{titulo}</h2>
+          <h2 className="font-heading text-lg text-dark">{titulo}</h2>
           {descripcion && <p className="text-sm text-gray">{descripcion}</p>}
           {children}
           {estado.error && (
@@ -311,7 +311,7 @@ function Convocatorias({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <h2 className="font-heading text-lg italic uppercase text-dark">Convocatorias</h2>
+        <h2 className="font-heading text-lg text-dark">Convocatorias</h2>
         <DialogoFormulario
           etiqueta="+ Nueva convocatoria"
           titulo="Nueva convocatoria"
@@ -483,7 +483,7 @@ export function TableroCliente({
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="font-heading text-xl italic uppercase text-dark">Contratación</h1>
+        <h1 className="font-heading text-xl text-dark">Contratación</h1>
         <p className="text-sm text-gray">
           Un solo tablero para los 13 pasos del proceso: de la postulación recibida
           hasta el fin del periodo de prueba. Se avanza de a una columna — el

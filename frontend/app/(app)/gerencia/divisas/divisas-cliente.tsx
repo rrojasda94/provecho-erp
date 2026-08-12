@@ -106,7 +106,7 @@ export function DivisasCliente({ divisas }: { divisas: DivisaCompleta[] }) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h1 className="font-heading text-xl italic uppercase text-dark">Divisas</h1>
+        <h1 className="font-heading text-xl text-dark">Divisas</h1>
         <DialogoNuevaDivisa />
       </div>
       <p className="text-sm text-gray">

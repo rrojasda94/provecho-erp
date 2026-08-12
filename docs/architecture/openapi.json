@@ -8991,6 +8991,18 @@
             "title": "Permisos",
             "type": "array"
           },
+          "preferencia_paleta": {
+            "title": "Preferencia Paleta",
+            "type": "string"
+          },
+          "preferencia_tamano_fuente": {
+            "title": "Preferencia Tamano Fuente",
+            "type": "string"
+          },
+          "preferencia_tema": {
+            "title": "Preferencia Tema",
+            "type": "string"
+          },
           "roles": {
             "items": {
               "type": "string"
@@ -9022,7 +9034,10 @@
           "roles",
           "sucursales",
           "empresa_id",
-          "permisos"
+          "permisos",
+          "preferencia_paleta",
+          "preferencia_tamano_fuente",
+          "preferencia_tema"
         ],
         "title": "MeOut",
         "type": "object"
@@ -14280,6 +14295,60 @@
           "texto"
         ],
         "title": "PrecuentaOut",
+        "type": "object"
+      },
+      "PreferenciasIn": {
+        "description": "Preferencias de presentación del usuario autenticado.\n\nTodas opcionales: la barra superior cambia una sola a la vez y mandar las\notras dos obligaría al cliente a conocer el estado completo para tocar un\ncampo.",
+        "properties": {
+          "paleta": {
+            "anyOf": [
+              {
+                "enum": [
+                  "estandar",
+                  "alto_contraste"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paleta"
+          },
+          "tamano_fuente": {
+            "anyOf": [
+              {
+                "enum": [
+                  "estandar",
+                  "grande",
+                  "muy_grande",
+                  "maximo"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tamano Fuente"
+          },
+          "tema": {
+            "anyOf": [
+              {
+                "enum": [
+                  "claro",
+                  "oscuro"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tema"
+          }
+        },
+        "title": "PreferenciasIn",
         "type": "object"
       },
       "PreguntaCreate": {
@@ -39803,6 +39872,53 @@
           }
         ],
         "summary": "Me",
+        "tags": [
+          "users"
+        ]
+      }
+    },
+    "/api/v1/users/me/preferencias": {
+      "patch": {
+        "description": "Cambia cómo se le presenta el ERP a quien está autenticado.\n\nSin permiso: no hay privilegio que otorgar en elegir el tamaño de la\npropia letra, y exigir uno dejaría la accesibilidad fuera del alcance de\njustamente quien más la necesita. Solo puede tocar su propio perfil —el\nusuario sale del token, no del cuerpo.",
+        "operationId": "actualizar_preferencias_api_v1_users_me_preferencias_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreferenciasIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Actualizar Preferencias",
         "tags": [
           "users"
         ]

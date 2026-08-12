@@ -2,71 +2,296 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-/* Tailwind v4 es CSS-first: no hay `tailwind.config.ts`, el tema vive acá.
-   Tres capas, en este orden y por este motivo:
+/* Tailwind v4 no trae la variante `dark` por estrategia de clase: hay que
+   declararla. Sin esta línea, las decenas de clases `dark:` que `shadcn add`
+   ya dejó escritas en `components/ui/**` no compilan a nada — no fallan, no
+   avisan, simplemente no existen. Se descubre mirando el navegador, nunca
+   leyendo el código. */
+@custom-variant dark (&:is(.dark *));
 
-   1. `--marca-*`: los 6 colores de Provecho (docs/product/ui-ux.md). Única
+/* Tailwind v4 es CSS-first: no hay `tailwind.config.ts`, el tema vive acá.
+   Cuatro capas, en este orden y por este motivo:
+
+   1. `--marca-*`: los colores de Provecho (docs/product/ui-ux.md). Única
       fuente de verdad del color. El PDV los sobreescribe por marca.
-   2. Roles semánticos de shadcn (`--primary`, `--background`, `--radius`…)
+   2. `--hue`: el acento único del ERP. Ver el bloque de abajo.
+   3. Roles semánticos de shadcn (`--primary`, `--background`, `--radius`…)
       **mapeados a los de marca**. ADR-013 es explícito: el preset de shadcn
-      aporta forma y espaciado, nunca los colores — por eso ninguno queda
-      con el gris neutro que trae de fábrica.
-   3. `@theme`: expone lo anterior como utilidades (`bg-primary`,
+      aporta forma y espaciado, nunca los colores.
+   4. `@theme`: expone lo anterior como utilidades (`bg-primary`,
       `text-foreground`, `font-heading`…).
 
    Cambiar de marca = tocar el bloque 1. Cambiar la forma de todos los
-   componentes = tocar `--radius`. */
+   componentes = tocar `--radius`.
+
+   ---------------------------------------------------------------------------
+   Rediseño 2026-08-07 — «mise en place»
+
+   El back office venía vestido de afiche de pizzería: fondo crema en toda la
+   pantalla, y cada `h1`–`h4` en Anton itálica y VERSALES. Es la voz correcta
+   para el PDV y la carta —donde la marca habla con el cliente— y la peor
+   posible para una pantalla de trabajo: la itálica en versales es el ajuste
+   menos escaneable que existe, y sobre crema las tarjetas blancas pierden
+   contraste justo donde están los números.
+
+   La referencia ahora es la mesa de trabajo de una cocina: superficie de
+   acero (gris frío), tinta negra, y la brasa de la marca reservada para lo
+   que es acción o es marca. La calidez no se pierde: se muda al PDV y al
+   KDS, que es donde el negocio se ve a sí mismo. */
 
 :root {
-    /* 1. Marca */
-    --marca-primary: #f4511e;
-    --marca-secondary: #b71c1c;
-    --marca-dark: #161616;
-    --marca-cream: #fff1dc;
-    --marca-accent: #aeea00;
-    --marca-gray: #757575;
+    /* 1. Marca ------------------------------------------------------------ */
 
-    /* 2. Roles de shadcn sobre la marca */
-    --background: var(--marca-cream);
+    /* Brasa. Más profunda que el naranja anterior (#f4511e) por una razón
+       medible: aquel daba 3.4:1 sobre blanco y `text-primary` aparece 41
+       veces en enlaces y títulos — no llegaba a AA. Esta da 5.3:1. */
+    --marca-primary: #c6390f;
+    /* Rescoldo: lo crítico y lo destructivo. 10.9:1 sobre blanco. */
+    --marca-secondary: #7a1414;
+    /* Tinta: negro con desviación fría, no el negro cálido de antes. Es lo
+       que hace que el gris de fondo lea como acero y no como cartón. */
+    --marca-dark: #15171c;
+    /* Crema: sobrevive, pero degradada a superficie de marca — PDV, KDS,
+       login. En el back office ya no es el fondo de todo. */
+    --marca-cream: #fff4e6;
+    /* Verde operación = «activo / conforme». Reemplaza al lima #aeea00, que
+       en `bg-accent/30` (su uso real: 30 insignias de estado) quedaba
+       amarillento y enfermizo, y en texto era ilegible. */
+    --marca-accent: #17864b;
+    /* Humo: texto secundario. Frío, 4.5:1 sobre blanco. */
+    --marca-gray: #5f6b7a;
+    /* Acero: la superficie de trabajo. */
+    --marca-steel: #f2f4f7;
+
+    /* 2. Acento --------------------------------------------------------------
+       UN color de acento para todo el ERP, no uno por módulo ni uno por área
+       de negocio. Se probó lo segundo (cuatro `--area-*`: operación,
+       comercial, abastecimiento, administración) y se descartó: ADR-013 §8
+       ya había rechazado exactamente eso —"nada de un color de marca distinto
+       por tarjeta/módulo […] la identidad de marca queda en tipografía y un
+       acento consistente, no en variedad de color de fondo"— y cuatro tintes
+       son el mismo arcoíris con menos pasos.
+
+       Las áreas siguen existiendo como **agrupación** en el home (`AREAS` en
+       `lib/modulos.ts`): ordenan, y ordenar no necesita pintar.
+
+       `--hue` es el nombre por el que lo leen las piezas de abajo. Existe la
+       indirección para que el PDV pueda recolorearlo por marca sin reescribir
+       cinco reglas. */
+    --hue: var(--marca-primary);
+
+    /* Movimiento. Una sola curva para todo el ERP: entra rápido y frena
+       suave, que es como se siente un cajón bien montado. */
+    --transicion: 180ms cubic-bezier(0.2, 0.7, 0.2, 1);
+
+    /* Elevación. Tres pasos y ninguno más: superficie apoyada (tarjeta),
+       superficie flotante (popover, menú) y superficie que interrumpe
+       (diálogo). Teñidas con la tinta de marca, no con negro puro — el negro
+       sobre acero frío da un gris sucio. */
+    --sombra-1: 0 1px 2px rgb(21 23 28 / 0.06);
+    --sombra-2:
+        0 2px 4px -1px rgb(21 23 28 / 0.08), 0 6px 16px -6px rgb(21 23 28 / 0.12);
+    --sombra-3: 0 16px 40px -16px rgb(21 23 28 / 0.32);
+
+    /* Escala tipográfica accesible (docs/product/ui-ux.md). Multiplicador
+       sobre el tamaño base; los 4 niveles viven en `[data-escala]` más abajo.
+       Todo lo que el ERP dimensiona en `rem` escala con esto. */
+    --font-scale: 1;
+
+    /* Estados semánticos. Existían como colores sueltos repartidos por las
+       pantallas (`bg-accent/30` para "conforme", `text-secondary` para
+       "error"): ahora tienen nombre. `-surface` es el relleno de insignia,
+       `-foreground` el texto que va encima y que sí llega a contraste.
+
+       Regla que los acompaña y que el token solo no puede imponer: ningún
+       estado se comunica SOLO por color (ui-ux.md). El ícono obligatorio
+       viaja junto al token en `lib/estados.tsx`. */
+    --status-success: var(--marca-accent);
+    --status-danger: var(--marca-secondary);
+    --status-warning: #ffb300;
+    --status-info: #1976d2;
+
+    /* 3. Roles de shadcn sobre la marca */
+    --background: var(--marca-steel);
     --foreground: var(--marca-dark);
     --card: #ffffff;
     --card-foreground: var(--marca-dark);
     --popover: #ffffff;
     --popover-foreground: var(--marca-dark);
     --primary: var(--marca-primary);
-    --primary-foreground: var(--marca-cream);
+    --primary-foreground: #ffffff;
     --secondary: var(--marca-secondary);
     --secondary-foreground: var(--marca-cream);
-    --muted: #f2ece2;
+    --muted: #eef1f5;
     --muted-foreground: var(--marca-gray);
     --accent: var(--marca-accent);
     --accent-foreground: var(--marca-dark);
     --destructive: var(--marca-secondary);
     --destructive-foreground: var(--marca-cream);
-    --border: color-mix(in srgb, var(--marca-dark) 12%, transparent);
-    --input: color-mix(in srgb, var(--marca-dark) 20%, transparent);
+    /* Bordes opacos, no `color-mix` con transparencia: una línea de 1px
+       traslúcida sobre dos fondos distintos da dos grises distintos, y el
+       ERP apila tarjeta sobre superficie todo el tiempo. */
+    --border: #e2e7ee;
+    --input: #c8d0da;
     --ring: var(--marca-primary);
-    --radius: 8px;
+    /* 6px, no 8: más cerca del instrumento que del botón de app. */
+    --radius: 6px;
 
     /* Series de gráficos: la marca primero, después tonos que contrastan
-       entre sí y con el fondo crema. */
+       entre sí y con el fondo de acero. */
     --chart-1: var(--marca-primary);
-    --chart-2: #1e88a8;
+    --chart-2: #0e7490;
     --chart-3: var(--marca-secondary);
-    --chart-4: #6a1b9a;
-    --chart-5: #2e7d32;
+    --chart-4: #3730a3;
+    --chart-5: #15803d;
 
     --sidebar: #ffffff;
     --sidebar-foreground: var(--marca-dark);
     --sidebar-primary: var(--marca-primary);
-    --sidebar-primary-foreground: var(--marca-cream);
-    --sidebar-accent: var(--marca-cream);
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: var(--muted);
     --sidebar-accent-foreground: var(--marca-dark);
-    --sidebar-border: color-mix(in srgb, var(--marca-dark) 12%, transparent);
+    --sidebar-border: var(--border);
     --sidebar-ring: var(--marca-primary);
 }
 
-/* 3. Utilidades de Tailwind. `inline` = la utilidad referencia la variable
+/* Superficie y texto de cada estado, derivados en un solo lugar. Se calculan
+   y no se escriben a mano para que cambiar la paleta (modo alto contraste,
+   modo oscuro) no obligue a redefinir doce valores más. */
+:root,
+.dark,
+[data-paleta] {
+    --status-success-surface: color-mix(in srgb, var(--status-success) 12%, transparent);
+    --status-danger-surface: color-mix(in srgb, var(--status-danger) 12%, transparent);
+    --status-warning-surface: color-mix(in srgb, var(--status-warning) 18%, transparent);
+    --status-info-surface: color-mix(in srgb, var(--status-info) 12%, transparent);
+}
+
+/* Tamaño de fuente. `100%` y no `1rem`: dentro de la regla que fija el
+   `font-size` de la raíz, `rem` se referencia a sí mismo. `100%` es el
+   tamaño que el navegador ya traía —el que la persona configuró en su
+   sistema— y multiplicarlo lo respeta en vez de pisarlo. */
+html {
+    font-size: calc(100% * var(--font-scale));
+}
+
+[data-escala="grande"] {
+    --font-scale: 1.15;
+}
+
+[data-escala="muy-grande"] {
+    --font-scale: 1.3;
+}
+
+[data-escala="maximo"] {
+    --font-scale: 1.5;
+}
+
+/* Modo oscuro. Remapea los roles, nunca los `--marca-*`: la marca es una
+   sola y el tema es cómo se la ilumina.
+
+   Dos colores sí se recalculan, y por contraste medido, no por gusto:
+   - `--primary` vuelve al naranja original #f4511e. Sobre acero claro daba
+     3.4:1 y por eso se oscureció a brasa; sobre fondo oscuro la brasa cae a
+     3.6:1 y el naranja de origen sube a 5.4:1. Es el mismo criterio de
+     siempre aplicado al fondo contrario.
+   - `--secondary` sube de rescoldo (#7a1414, invisible en oscuro) a un rojo
+     que se lee: 4.8:1.
+
+   No está en docs/product/ui-ux.md porque el brandboard nunca contempló
+   pantallas oscuras fuera del PDV/KDS. Ver ADR-037. */
+.dark {
+    --background: #101216;
+    --foreground: #e6e9ee;
+    --card: #191c22;
+    --card-foreground: var(--foreground);
+    --popover: #1e2128;
+    --popover-foreground: var(--foreground);
+    --primary: #f4511e;
+    --primary-foreground: #16181d;
+    --secondary: #e5484d;
+    --secondary-foreground: #16181d;
+    --muted: #22262e;
+    --muted-foreground: #98a2b3;
+    --accent: #2ea86a;
+    --accent-foreground: #10141a;
+    --destructive: #e5484d;
+    --destructive-foreground: #16181d;
+    --border: #2a2f38;
+    --input: #3a4150;
+    --ring: var(--primary);
+
+    --status-success: #2ea86a;
+    --status-danger: #e5484d;
+    --status-warning: #ffb300;
+    --status-info: #4d94ff;
+
+    /* En oscuro la elevación no se lee por sombra —negro sobre negro no
+       proyecta— sino porque la superficie aclara. Las sombras quedan para
+       separar de los bordes, no para dar altura. */
+    --sombra-1: 0 1px 2px rgb(0 0 0 / 0.4);
+    --sombra-2: 0 2px 4px -1px rgb(0 0 0 / 0.5), 0 6px 16px -6px rgb(0 0 0 / 0.6);
+    --sombra-3: 0 16px 40px -16px rgb(0 0 0 / 0.7);
+
+    --sidebar: var(--card);
+    --sidebar-foreground: var(--foreground);
+    --sidebar-primary: var(--primary);
+    --sidebar-primary-foreground: var(--primary-foreground);
+    --sidebar-accent: var(--muted);
+    --sidebar-accent-foreground: var(--foreground);
+    --sidebar-border: var(--border);
+    --sidebar-ring: var(--ring);
+
+    /* `--hue` cuelga de `--marca-primary`, que no cambia: sin esto el acento
+       del ítem activo se quedaría en la brasa oscura sobre fondo oscuro. */
+    --hue: var(--primary);
+
+    color-scheme: dark;
+}
+
+/* Modo alto contraste / daltonismo. Una sola paleta alternativa y no una por
+   tipo: la regla del ícono ya cubre el grueso del riesgo, y especializar por
+   protanopía, deuteranopía y tritanopía triplica el sistema de diseño para un
+   beneficio marginal. Esta cubre el par rojo-verde (~95% de los casos).
+   Valores de Okabe-Ito, fijados en docs/product/ui-ux.md.
+
+   La marca NO cambia: el riesgo de accesibilidad está en los estados, no en
+   la identidad.
+
+   Va DESPUÉS del bloque oscuro y no antes. Los dos viven en `<html>` con la
+   misma especificidad, así que gana el último que se declara — puesto arriba,
+   el tema apagaba la paleta accesible y quien la había activado veía los
+   colores de siempre. ui-ux.md pide justo lo contrario: los dos ejes se
+   combinan (tema oscuro + daltonismo + letra grande, a la vez). */
+[data-paleta="alto-contraste"] {
+    --status-success: #0072b2;
+    --status-danger: #d55e00;
+    --status-warning: #e69f00;
+    --status-info: #56b4e9;
+}
+
+/* La misma paleta, aclarada para fondo oscuro: los valores de Okabe-Ito están
+   medidos contra blanco y sobre `#101216` el azul cae a 3.6:1. Se conserva el
+   tono —azul, bermellón, ocre, celeste— que es lo que hace distinguibles los
+   estados; sube la luminosidad, que es lo que los hace legibles. */
+.dark[data-paleta="alto-contraste"] {
+    --status-success: #3d9ee0;
+    --status-danger: #ef7d1a;
+    --status-warning: #f0b429;
+    --status-info: #56b4e9;
+}
+
+/* En oscuro la crema del login apagaría toda la pantalla. La marca se
+   mantiene con el degradado hacia la superficie oscura. */
+.dark .login-page {
+    background: radial-gradient(
+        120% 90% at 50% 0%,
+        color-mix(in srgb, var(--marca-primary) 12%, var(--background)) 0%,
+        var(--background) 60%
+    );
+}
+
+/* 4. Utilidades de Tailwind. `inline` = la utilidad referencia la variable
    viva, así el PDV puede recolorear la marca sin recompilar. */
 @theme inline {
     --color-primary: var(--primary);
@@ -93,6 +318,22 @@
     --color-dark: var(--marca-dark);
     --color-cream: var(--marca-cream);
     --color-gray: var(--marca-gray);
+    --color-steel: var(--marca-steel);
+
+    /* Estados como utilidades: `bg-status-danger-surface text-status-danger`
+       es la insignia completa, sin un hex a la vista. */
+    --color-status-success: var(--status-success);
+    --color-status-success-surface: var(--status-success-surface);
+    --color-status-danger: var(--status-danger);
+    --color-status-danger-surface: var(--status-danger-surface);
+    --color-status-warning: var(--status-warning);
+    --color-status-warning-surface: var(--status-warning-surface);
+    --color-status-info: var(--status-info);
+    --color-status-info-surface: var(--status-info-surface);
+
+    --shadow-1: var(--sombra-1);
+    --shadow-2: var(--sombra-2);
+    --shadow-3: var(--sombra-3);
 
     --color-chart-1: var(--chart-1);
     --color-chart-2: var(--chart-2);
@@ -111,10 +352,17 @@
 
     /* `next/font` inyecta `--fuente-*`; el nombre difiere del token de
        Tailwind a propósito — si coincidieran, la variable se referenciaría a
-       sí misma y la fuente no cargaría. */
-    --font-heading: var(--fuente-titulo), sans-serif;
+       sí misma y la fuente no cargaría.
+
+       Una sola familia de texto (Archivo, variable en peso y ancho) en vez
+       de dos grotescas neutras mezcladas: el contraste lo dan el ancho y el
+       peso, no un segundo tipo que se le parece. Anton queda para el
+       logotipo, que es donde la marca firma. */
+    --font-heading: var(--fuente-texto), system-ui, sans-serif;
     --font-body: var(--fuente-texto), system-ui, sans-serif;
     --font-sans: var(--fuente-texto), system-ui, sans-serif;
+    --font-logo: var(--fuente-logo), sans-serif;
+    --font-mono: var(--fuente-cifra), ui-monospace, monospace;
 }
 
 @layer base {
@@ -131,15 +379,25 @@
         font-family: var(--fuente-texto), system-ui, sans-serif;
         background: var(--background);
         color: var(--foreground);
+        /* Un ERP es una pantalla de números en columnas: las cifras alineadas
+           por defecto valen más que el ancho proporcional. */
+        font-variant-numeric: tabular-nums;
+        -webkit-font-smoothing: antialiased;
     }
 
+    /* Sin `italic uppercase`. Lo que distingue un título ahora es el ancho
+       condensado y el peso — legible a cualquier tamaño, y sigue sin
+       parecerse a la tipografía de sistema. */
     h1,
     h2,
     h3,
     h4 {
-        font-family: var(--fuente-titulo), sans-serif;
-        font-style: italic;
-        text-transform: uppercase;
+        font-family: var(--fuente-texto), system-ui, sans-serif;
+        font-stretch: 92%;
+        font-weight: 600;
+        letter-spacing: -0.012em;
+        line-height: 1.15;
+        text-wrap: balance;
     }
 
     button {
@@ -151,42 +409,419 @@
         cursor: not-allowed;
     }
 
-    input:focus-visible,
-    select:focus-visible {
+    /* Un solo anillo de foco para todo, teclado incluido: el ERP se opera
+       con Tab en caja y en almacén. */
+    :where(a, button, input, select, textarea, [tabindex]):focus-visible {
         outline: 2px solid var(--ring);
-        outline-offset: 1px;
+        outline-offset: 2px;
+        border-radius: calc(var(--radius) / 2);
     }
 }
 
-/* Clases heredadas del login, anteriores a Tailwind. Se conservan porque esa
-   pantalla todavía no se migró; el resto del ERP ya usa utilidades. */
+@layer components {
+    /* Cifra: dinero, cantidades, códigos y IDs. Monoespaciada y tabular para
+       que una columna de importes se lea de arriba abajo sin saltos. Es el
+       detalle que más se nota en un ERP y el que nadie agrega. */
+    .cifra {
+        font-family: var(--fuente-cifra), ui-monospace, monospace;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: -0.01em;
+    }
+
+    /* Logotipo. Único lugar donde sobrevive Anton. */
+    .logotipo {
+        font-family: var(--fuente-logo), sans-serif;
+        text-transform: uppercase;
+        letter-spacing: 0.02em;
+    }
+
+    /* Rótulo de sección: versalitas pequeñas con tracking. Ordena sin
+       necesidad de una línea ni un número decorativo. */
+    .rotulo {
+        font-size: 0.6875rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.09em;
+        color: var(--muted-foreground);
+    }
+
+    /* Entrada de pantalla: 8px de subida y opacidad. Se dispara una vez por
+       navegación (el wrapper se remonta con el pathname como key). Suaviza
+       el corte entre pantallas sin hacer esperar a nadie. */
+    .revelar {
+        animation: revelar 220ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    }
+
+    /* Escalonado para grillas: cada tarjeta entra 25 ms después de la
+       anterior, hasta la sexta. Más allá se percibe como lentitud. */
+    .revelar-lista > * {
+        animation: revelar 260ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    }
+
+    .revelar-lista > :nth-child(2) {
+        animation-delay: 25ms;
+    }
+    .revelar-lista > :nth-child(3) {
+        animation-delay: 50ms;
+    }
+    .revelar-lista > :nth-child(4) {
+        animation-delay: 75ms;
+    }
+    .revelar-lista > :nth-child(n + 5) {
+        animation-delay: 100ms;
+    }
+}
+
+/* Diálogo de formulario. El molde vive en
+   `components/formulario/dialogo-formulario.tsx`; lo que no se puede escribir
+   en `className` va acá: el `::backdrop` es pseudo-elemento del navegador y
+   Tailwind no lo alcanza, y los `<input>`/`<select>` sueltos de los
+   diecisiete formularios no tienen una clase donde colgarse.
+
+   Estilarlos por descendencia es lo que evita reescribir diecisiete
+   pantallas para que un campo deje de parecer HTML de 1998 (ADR-035). El
+   costo aceptado: un campo que quiera verse distinto tiene que decirlo, en
+   vez de partir de cero. */
+/* Sin `@layer`: estas reglas tienen que ganarle a las utilidades de
+   Tailwind que las trece pantallas ya escribieron en su `<dialog>`
+   (`rounded-lg`, `p-0`, `backdrop:bg-dark/40`). Dentro de un `@layer`
+   perderían siempre, sin importar la especificidad — el orden de capas
+   manda sobre el selector. Fuera de toda capa, ganan.
+
+   Es deliberadamente un parche con fecha de vencimiento: cuando esas
+   pantallas migren a `DialogoFormulario` este bloque se borra. */
+.erp dialog::backdrop {
+    background: color-mix(in srgb, var(--marca-dark) 45%, transparent);
+    backdrop-filter: blur(3px);
+    animation: aparecer 160ms ease-out both;
+}
+
+.erp dialog[open] {
+    animation: entrar-dialogo 200ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+/* El molde (`DialogoFormulario`) ya trae su borde, fondo y sombra por
+   clase. Las trece pantallas que todavía escriben su `<dialog>` a mano no,
+   y quedaban con el recuadro por defecto del navegador. */
+.erp dialog:not(.dialogo) {
+    border: 1px solid var(--border);
+    border-radius: calc(var(--radius) * 1.6);
+    background: var(--card);
+    color: var(--card-foreground);
+    box-shadow: var(--sombra-3);
+    padding: 0;
+}
+
+.erp dialog h2 {
+    font-size: 1rem;
+    line-height: 1.3;
+}
+
+.erp dialog :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+    width: 100%;
+    font-family: inherit;
+    font-size: 0.875rem;
+    padding: 0.45rem 0.6rem;
+    border: 1px solid var(--input);
+    border-radius: var(--radius);
+    background: var(--card);
+    color: var(--foreground);
+    transition:
+        border-color var(--transicion),
+        box-shadow var(--transicion);
+}
+
+.erp dialog :where(input, select, textarea):focus-visible {
+    outline: none;
+    border-color: var(--ring);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 18%, transparent);
+}
+
+.erp dialog :where(input, select, textarea):disabled {
+    background: var(--muted);
+    cursor: not-allowed;
+}
+
+/* Toda cantidad, precio o código dentro de un formulario. Un importe
+   tecleado en proporcional se compara mal con el de la fila de al lado. */
+.erp dialog input[type="number"] {
+    font-family: var(--fuente-cifra), ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+}
+
+.erp dialog :where(label) {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+}
+
+/* La casilla y su texto van en línea: apilarlos deja la etiqueta colgando
+   sobre un cuadradito de 13px. */
+.erp dialog label:has(> input[type="checkbox"]) {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.5rem;
+    text-transform: none;
+    letter-spacing: normal;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--foreground);
+}
+
+.erp dialog label:has(> input[type="checkbox"]) > input {
+    width: auto;
+    accent-color: var(--primary);
+}
+
+@keyframes aparecer {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes entrar-dialogo {
+    from {
+        opacity: 0;
+        transform: translateY(6px) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+@keyframes revelar {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+/* Piezas que llevan el acento. Todas leen `--hue` en vez de `--primary`
+   directo: el PDV redefine `--hue` por marca y estas cinco reglas lo siguen
+   sin tocarse. Vive acá y no en utilidades sueltas porque son cinco reglas
+   con la misma variable: repetirlas en cada `className` es donde se
+   desalinean.
+
+   El acento aparece en reposo solo donde marca **estado** —el ítem activo
+   del sidebar, el filo del rótulo de área—. Todo lo demás arranca neutro y
+   se enciende al apuntarlo: doce fichas naranjas al abrir el home es
+   exactamente el "leía recargado" de ADR-013 §8. */
+@layer components {
+    .area-titulo {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+    }
+
+    .area-titulo::before {
+        content: "";
+        width: 18px;
+        height: 3px;
+        border-radius: 2px;
+        background: var(--hue);
+    }
+
+    /* Ficha de módulo del home. */
+    .ficha {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+        overflow: hidden;
+        padding: 1rem 1.125rem 1.125rem;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: calc(var(--radius) * 1.5);
+        transition:
+            border-color var(--transicion),
+            box-shadow var(--transicion),
+            transform var(--transicion);
+    }
+
+    /* El filo del área: crece de arriba abajo al apuntar la ficha. Es el
+       único movimiento decorativo del home y dura lo que un parpadeo. */
+    .ficha::before {
+        content: "";
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: 3px;
+        background: var(--hue);
+        transform: scaleY(0);
+        transform-origin: top;
+        transition: transform var(--transicion);
+    }
+
+    .ficha:hover,
+    .ficha:focus-visible {
+        transform: translateY(-2px);
+        border-color: color-mix(in srgb, var(--hue) 40%, var(--border));
+        box-shadow: 0 12px 24px -16px color-mix(in srgb, var(--hue) 70%, transparent);
+    }
+
+    .ficha:hover::before,
+    .ficha:focus-visible::before {
+        transform: scaleY(1);
+    }
+
+    .ficha-chip {
+        display: grid;
+        place-items: center;
+        width: 2.25rem;
+        height: 2.25rem;
+        border-radius: var(--radius);
+        /* Neutro en reposo: el ícono ya distingue al módulo, el color no
+           tiene nada que agregar hasta que hay intención de entrar. */
+        background: var(--muted);
+        color: var(--muted-foreground);
+        transition:
+            background var(--transicion),
+            color var(--transicion);
+    }
+
+    /* Solo en el home la ficha respira bajo el ícono; en el sidebar el chip
+       va en línea con el título. */
+    .ficha .ficha-chip {
+        margin-bottom: 0.35rem;
+    }
+
+    .ficha:hover .ficha-chip,
+    .ficha:focus-visible .ficha-chip {
+        background: color-mix(in srgb, var(--hue) 12%, transparent);
+        color: var(--hue);
+    }
+
+    .ficha-nombre {
+        font-weight: 600;
+        font-stretch: 94%;
+        letter-spacing: -0.008em;
+    }
+
+    /* Sidebar del módulo: mismo filo, ahora indicando dónde se está. */
+    .nav-modulo {
+        position: relative;
+        display: block;
+        /* En móvil el submenú es una fila con scroll horizontal: sin esto
+           cada etiqueta larga se parte en dos líneas. */
+        white-space: nowrap;
+        padding: 0.45rem 0.7rem;
+        border-radius: var(--radius);
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: var(--foreground);
+        transition:
+            background var(--transicion),
+            color var(--transicion);
+    }
+
+    .nav-modulo::before {
+        content: "";
+        position: absolute;
+        inset: 0.3rem auto 0.3rem 0;
+        width: 2px;
+        border-radius: 2px;
+        background: var(--hue);
+        transform: scaleY(0);
+        transition: transform var(--transicion);
+    }
+
+    .nav-modulo:hover {
+        background: var(--muted);
+    }
+
+    .nav-modulo[aria-current="page"] {
+        color: var(--hue);
+        font-weight: 600;
+        background: color-mix(in srgb, var(--hue) 8%, transparent);
+    }
+
+    .nav-modulo[aria-current="page"]::before {
+        transform: scaleY(1);
+    }
+}
+
+/* Quien pidió menos movimiento recibe menos movimiento. No es una cortesía:
+   para parte del personal el desplazamiento en pantalla produce mareo. */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+/* Login: única pantalla sin sesión, y la primera imagen del ERP cada
+   mañana. Es la que sí se viste con la marca —crema, brasa, logotipo en
+   Anton— porque acá el sistema se presenta antes de ponerse a trabajar. */
 @layer components {
     .login-page {
         min-height: 100vh;
-        display: flex;
-        align-items: center;
-        justify-content: center;
+        display: grid;
+        place-items: center;
         padding: 1.5rem;
+        background:
+            radial-gradient(
+                120% 90% at 50% 0%,
+                var(--marca-cream) 0%,
+                color-mix(in srgb, var(--marca-cream) 55%, var(--marca-steel)) 55%,
+                var(--marca-steel) 100%
+            );
     }
 
     .login-card {
         width: 100%;
-        max-width: 360px;
+        max-width: 380px;
         background: var(--card);
+        border: 1px solid var(--border);
         border-radius: calc(var(--radius) * 2);
-        padding: 2rem;
-        box-shadow: 0 8px 24px rgba(22, 22, 22, 0.12);
+        padding: 2.25rem 2rem;
+        box-shadow:
+            0 1px 2px rgba(21, 23, 28, 0.06),
+            0 12px 32px -12px rgba(21, 23, 28, 0.28);
+        animation: revelar 320ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    }
+
+    /* La brasa como filo superior de la tarjeta: la marca firma sin ocupar
+       el lugar del formulario. */
+    .login-card::before {
+        content: "";
+        display: block;
+        height: 3px;
+        width: 44px;
+        margin-bottom: 1.25rem;
+        border-radius: 3px;
+        background: var(--primary);
     }
 
     .login-card h1 {
-        color: var(--primary);
-        font-size: 2rem;
+        font-family: var(--fuente-logo), sans-serif;
+        font-size: 2.25rem;
+        font-stretch: normal;
+        letter-spacing: 0.01em;
+        text-transform: uppercase;
+        color: var(--foreground);
     }
 
     .login-tagline {
         color: var(--muted-foreground);
-        margin-top: 0.25rem;
-        margin-bottom: 1.5rem;
+        margin-top: 0.35rem;
+        margin-bottom: 1.75rem;
+        font-size: 0.9375rem;
     }
 
     .login-form {
@@ -198,39 +833,69 @@
     .login-form label {
         display: flex;
         flex-direction: column;
-        gap: 0.35rem;
-        font-size: 0.9rem;
+        gap: 0.4rem;
+        font-size: 0.75rem;
         font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        color: var(--muted-foreground);
     }
 
     .login-form input {
         font-family: inherit;
         font-size: 1rem;
-        padding: 0.6rem 0.75rem;
+        padding: 0.65rem 0.8rem;
         border: 1px solid var(--input);
         border-radius: var(--radius);
         background: #fff;
         color: var(--foreground);
+        transition:
+            border-color var(--transicion),
+            box-shadow var(--transicion);
+    }
+
+    .login-form input:focus-visible {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 18%, transparent);
+    }
+
+    /* El PIN es una cifra: monoespaciado y espaciado, como un teclado. */
+    .login-form input[name="pin"] {
+        font-family: var(--fuente-cifra), ui-monospace, monospace;
+        letter-spacing: 0.4em;
     }
 
     .login-form button {
-        margin-top: 0.5rem;
-        padding: 0.75rem;
+        margin-top: 0.75rem;
+        padding: 0.8rem;
         background: var(--primary);
         color: var(--primary-foreground);
-        font-weight: 700;
-        font-size: 1rem;
+        font-weight: 600;
+        font-size: 0.9375rem;
+        letter-spacing: 0.01em;
         border: none;
         border-radius: var(--radius);
+        transition:
+            background var(--transicion),
+            transform var(--transicion);
     }
 
     .login-form button:not(:disabled):hover {
-        background: var(--secondary);
+        background: color-mix(in srgb, var(--primary) 88%, var(--marca-dark));
+    }
+
+    .login-form button:not(:disabled):active {
+        transform: translateY(1px);
+    }
+
+    .login-form button:disabled {
+        opacity: 0.65;
     }
 
     .login-error {
         color: var(--destructive);
-        font-size: 0.9rem;
+        font-size: 0.875rem;
         font-weight: 600;
     }
 }

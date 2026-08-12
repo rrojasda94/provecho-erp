@@ -3,6 +3,7 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import { useMemo } from "react";
 
+import { InsigniaActiva } from "@/components/estado/insignia";
 import { BOTON_FILA, DialogoFormulario } from "@/components/formulario/dialogo-formulario";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
 
@@ -89,17 +90,7 @@ export function PlanCuentasCliente({ cuentas }: { cuentas: Cuenta[] }) {
       {
         accessorKey: "activa",
         header: "Estado",
-        cell: ({ getValue }) => (
-          <span
-            className={
-              getValue<boolean>()
-                ? "rounded-full bg-accent/30 px-2 py-0.5 text-xs font-semibold text-dark"
-                : "rounded-full bg-gray/20 px-2 py-0.5 text-xs font-semibold text-gray"
-            }
-          >
-            {getValue<boolean>() ? "Activa" : "Inactiva"}
-          </span>
-        ),
+        cell: ({ getValue }) => <InsigniaActiva activa={getValue<boolean>()} />,
       },
       {
         id: "acciones",
@@ -113,7 +104,7 @@ export function PlanCuentasCliente({ cuentas }: { cuentas: Cuenta[] }) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h1 className="font-heading text-xl italic uppercase text-dark">Plan de cuentas</h1>
+        <h1 className="font-heading text-xl text-dark">Plan de cuentas</h1>
         <DialogoNuevaCuenta cuentas={cuentas} />
       </div>
       <p className="text-sm text-gray">
