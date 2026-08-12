@@ -2,6 +2,13 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/* Tailwind v4 no trae la variante `dark` por estrategia de clase: hay que
+   declararla. Sin esta línea, las decenas de clases `dark:` que `shadcn add`
+   ya dejó escritas en `components/ui/**` no compilan a nada — no fallan, no
+   avisan, simplemente no existen. Se descubre mirando el navegador, nunca
+   leyendo el código. */
+@custom-variant dark (&:is(.dark *));
+
 /* Tailwind v4 es CSS-first: no hay `tailwind.config.ts`, el tema vive acá.
    Cuatro capas, en este orden y por este motivo:
 
@@ -77,6 +84,33 @@
        suave, que es como se siente un cajón bien montado. */
     --transicion: 180ms cubic-bezier(0.2, 0.7, 0.2, 1);
 
+    /* Elevación. Tres pasos y ninguno más: superficie apoyada (tarjeta),
+       superficie flotante (popover, menú) y superficie que interrumpe
+       (diálogo). Teñidas con la tinta de marca, no con negro puro — el negro
+       sobre acero frío da un gris sucio. */
+    --sombra-1: 0 1px 2px rgb(21 23 28 / 0.06);
+    --sombra-2:
+        0 2px 4px -1px rgb(21 23 28 / 0.08), 0 6px 16px -6px rgb(21 23 28 / 0.12);
+    --sombra-3: 0 16px 40px -16px rgb(21 23 28 / 0.32);
+
+    /* Escala tipográfica accesible (docs/product/ui-ux.md). Multiplicador
+       sobre el tamaño base; los 4 niveles viven en `[data-escala]` más abajo.
+       Todo lo que el ERP dimensiona en `rem` escala con esto. */
+    --font-scale: 1;
+
+    /* Estados semánticos. Existían como colores sueltos repartidos por las
+       pantallas (`bg-accent/30` para "conforme", `text-secondary` para
+       "error"): ahora tienen nombre. `-surface` es el relleno de insignia,
+       `-foreground` el texto que va encima y que sí llega a contraste.
+
+       Regla que los acompaña y que el token solo no puede imponer: ningún
+       estado se comunica SOLO por color (ui-ux.md). El ícono obligatorio
+       viaja junto al token en `lib/estados.tsx`. */
+    --status-success: var(--marca-accent);
+    --status-danger: var(--marca-secondary);
+    --status-warning: #ffb300;
+    --status-info: #1976d2;
+
     /* 3. Roles de shadcn sobre la marca */
     --background: var(--marca-steel);
     --foreground: var(--marca-dark);
@@ -121,6 +155,125 @@
     --sidebar-ring: var(--marca-primary);
 }
 
+/* Superficie y texto de cada estado, derivados en un solo lugar. Se calculan
+   y no se escriben a mano para que cambiar la paleta (modo alto contraste,
+   modo oscuro) no obligue a redefinir doce valores más. */
+:root,
+.dark,
+[data-paleta] {
+    --status-success-surface: color-mix(in srgb, var(--status-success) 12%, transparent);
+    --status-danger-surface: color-mix(in srgb, var(--status-danger) 12%, transparent);
+    --status-warning-surface: color-mix(in srgb, var(--status-warning) 18%, transparent);
+    --status-info-surface: color-mix(in srgb, var(--status-info) 12%, transparent);
+}
+
+/* Modo alto contraste / daltonismo. Una sola paleta alternativa y no una por
+   tipo: la regla del ícono ya cubre el grueso del riesgo, y especializar por
+   protanopía, deuteranopía y tritanopía triplica el sistema de diseño para un
+   beneficio marginal. Esta cubre el par rojo-verde (~95% de los casos).
+   Valores de Okabe-Ito, fijados en docs/product/ui-ux.md.
+
+   La marca NO cambia: el riesgo de accesibilidad está en los estados, no en
+   la identidad. */
+[data-paleta="alto-contraste"] {
+    --status-success: #0072b2;
+    --status-danger: #d55e00;
+    --status-warning: #e69f00;
+    --status-info: #56b4e9;
+}
+
+/* Tamaño de fuente. `100%` y no `1rem`: dentro de la regla que fija el
+   `font-size` de la raíz, `rem` se referencia a sí mismo. `100%` es el
+   tamaño que el navegador ya traía —el que la persona configuró en su
+   sistema— y multiplicarlo lo respeta en vez de pisarlo. */
+html {
+    font-size: calc(100% * var(--font-scale));
+}
+
+[data-escala="grande"] {
+    --font-scale: 1.15;
+}
+
+[data-escala="muy-grande"] {
+    --font-scale: 1.3;
+}
+
+[data-escala="maximo"] {
+    --font-scale: 1.5;
+}
+
+/* Modo oscuro. Remapea los roles, nunca los `--marca-*`: la marca es una
+   sola y el tema es cómo se la ilumina.
+
+   Dos colores sí se recalculan, y por contraste medido, no por gusto:
+   - `--primary` vuelve al naranja original #f4511e. Sobre acero claro daba
+     3.4:1 y por eso se oscureció a brasa; sobre fondo oscuro la brasa cae a
+     3.6:1 y el naranja de origen sube a 5.4:1. Es el mismo criterio de
+     siempre aplicado al fondo contrario.
+   - `--secondary` sube de rescoldo (#7a1414, invisible en oscuro) a un rojo
+     que se lee: 4.8:1.
+
+   No está en docs/product/ui-ux.md porque el brandboard nunca contempló
+   pantallas oscuras fuera del PDV/KDS. Ver ADR-037. */
+.dark {
+    --background: #101216;
+    --foreground: #e6e9ee;
+    --card: #191c22;
+    --card-foreground: var(--foreground);
+    --popover: #1e2128;
+    --popover-foreground: var(--foreground);
+    --primary: #f4511e;
+    --primary-foreground: #16181d;
+    --secondary: #e5484d;
+    --secondary-foreground: #16181d;
+    --muted: #22262e;
+    --muted-foreground: #98a2b3;
+    --accent: #2ea86a;
+    --accent-foreground: #10141a;
+    --destructive: #e5484d;
+    --destructive-foreground: #16181d;
+    --border: #2a2f38;
+    --input: #3a4150;
+    --ring: var(--primary);
+
+    --status-success: #2ea86a;
+    --status-danger: #e5484d;
+    --status-warning: #ffb300;
+    --status-info: #4d94ff;
+
+    /* En oscuro la elevación no se lee por sombra —negro sobre negro no
+       proyecta— sino porque la superficie aclara. Las sombras quedan para
+       separar de los bordes, no para dar altura. */
+    --sombra-1: 0 1px 2px rgb(0 0 0 / 0.4);
+    --sombra-2: 0 2px 4px -1px rgb(0 0 0 / 0.5), 0 6px 16px -6px rgb(0 0 0 / 0.6);
+    --sombra-3: 0 16px 40px -16px rgb(0 0 0 / 0.7);
+
+    --sidebar: var(--card);
+    --sidebar-foreground: var(--foreground);
+    --sidebar-primary: var(--primary);
+    --sidebar-primary-foreground: var(--primary-foreground);
+    --sidebar-accent: var(--muted);
+    --sidebar-accent-foreground: var(--foreground);
+    --sidebar-border: var(--border);
+    --sidebar-ring: var(--ring);
+
+    /* `--hue` cuelga de `--marca-primary`, que no cambia: sin esto el acento
+       del ítem activo se quedaría en la brasa oscura sobre fondo oscuro. */
+    --hue: var(--primary);
+
+    color-scheme: dark;
+}
+
+/* En oscuro la crema del login apagaría toda la pantalla. La marca se
+   mantiene con el degradado hacia la superficie oscura. */
+.dark .login-page {
+    background: radial-gradient(
+        120% 90% at 50% 0%,
+        color-mix(in srgb, var(--marca-primary) 12%, var(--background)) 0%,
+        var(--background) 60%
+    );
+}
+
 /* 4. Utilidades de Tailwind. `inline` = la utilidad referencia la variable
    viva, así el PDV puede recolorear la marca sin recompilar. */
 @theme inline {
@@ -149,6 +302,21 @@
     --color-cream: var(--marca-cream);
     --color-gray: var(--marca-gray);
     --color-steel: var(--marca-steel);
+
+    /* Estados como utilidades: `bg-status-danger-surface text-status-danger`
+       es la insignia completa, sin un hex a la vista. */
+    --color-status-success: var(--status-success);
+    --color-status-success-surface: var(--status-success-surface);
+    --color-status-danger: var(--status-danger);
+    --color-status-danger-surface: var(--status-danger-surface);
+    --color-status-warning: var(--status-warning);
+    --color-status-warning-surface: var(--status-warning-surface);
+    --color-status-info: var(--status-info);
+    --color-status-info-surface: var(--status-info-surface);
+
+    --shadow-1: var(--sombra-1);
+    --shadow-2: var(--sombra-2);
+    --shadow-3: var(--sombra-3);
 
     --color-chart-1: var(--chart-1);
     --color-chart-2: var(--chart-2);
@@ -284,6 +452,132 @@
     }
     .revelar-lista > :nth-child(n + 5) {
         animation-delay: 100ms;
+    }
+}
+
+/* Diálogo de formulario. El molde vive en
+   `components/formulario/dialogo-formulario.tsx`; lo que no se puede escribir
+   en `className` va acá: el `::backdrop` es pseudo-elemento del navegador y
+   Tailwind no lo alcanza, y los `<input>`/`<select>` sueltos de los
+   diecisiete formularios no tienen una clase donde colgarse.
+
+   Estilarlos por descendencia es lo que evita reescribir diecisiete
+   pantallas para que un campo deje de parecer HTML de 1998 (ADR-035). El
+   costo aceptado: un campo que quiera verse distinto tiene que decirlo, en
+   vez de partir de cero. */
+/* Sin `@layer`: estas reglas tienen que ganarle a las utilidades de
+   Tailwind que las trece pantallas ya escribieron en su `<dialog>`
+   (`rounded-lg`, `p-0`, `backdrop:bg-dark/40`). Dentro de un `@layer`
+   perderían siempre, sin importar la especificidad — el orden de capas
+   manda sobre el selector. Fuera de toda capa, ganan.
+
+   Es deliberadamente un parche con fecha de vencimiento: cuando esas
+   pantallas migren a `DialogoFormulario` este bloque se borra. */
+.erp dialog::backdrop {
+    background: color-mix(in srgb, var(--marca-dark) 45%, transparent);
+    backdrop-filter: blur(3px);
+    animation: aparecer 160ms ease-out both;
+}
+
+.erp dialog[open] {
+    animation: entrar-dialogo 200ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+/* El molde (`DialogoFormulario`) ya trae su borde, fondo y sombra por
+   clase. Las trece pantallas que todavía escriben su `<dialog>` a mano no,
+   y quedaban con el recuadro por defecto del navegador. */
+.erp dialog:not(.dialogo) {
+    border: 1px solid var(--border);
+    border-radius: calc(var(--radius) * 1.6);
+    background: var(--card);
+    color: var(--card-foreground);
+    box-shadow: var(--sombra-3);
+    padding: 0;
+}
+
+.erp dialog h2 {
+    font-size: 1rem;
+    line-height: 1.3;
+}
+
+.erp dialog :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+    width: 100%;
+    font-family: inherit;
+    font-size: 0.875rem;
+    padding: 0.45rem 0.6rem;
+    border: 1px solid var(--input);
+    border-radius: var(--radius);
+    background: var(--card);
+    color: var(--foreground);
+    transition:
+        border-color var(--transicion),
+        box-shadow var(--transicion);
+}
+
+.erp dialog :where(input, select, textarea):focus-visible {
+    outline: none;
+    border-color: var(--ring);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 18%, transparent);
+}
+
+.erp dialog :where(input, select, textarea):disabled {
+    background: var(--muted);
+    cursor: not-allowed;
+}
+
+/* Toda cantidad, precio o código dentro de un formulario. Un importe
+   tecleado en proporcional se compara mal con el de la fila de al lado. */
+.erp dialog input[type="number"] {
+    font-family: var(--fuente-cifra), ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+}
+
+.erp dialog :where(label) {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+}
+
+/* La casilla y su texto van en línea: apilarlos deja la etiqueta colgando
+   sobre un cuadradito de 13px. */
+.erp dialog label:has(> input[type="checkbox"]) {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.5rem;
+    text-transform: none;
+    letter-spacing: normal;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--foreground);
+}
+
+.erp dialog label:has(> input[type="checkbox"]) > input {
+    width: auto;
+    accent-color: var(--primary);
+}
+
+@keyframes aparecer {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes entrar-dialogo {
+    from {
+        opacity: 0;
+        transform: translateY(6px) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: none;
     }
 }
 

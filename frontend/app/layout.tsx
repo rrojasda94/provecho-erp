@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Anton, Archivo, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 // Los nombres de variable NO coinciden con los tokens de Tailwind
 // (`--font-heading`/`--font-body`) a propósito: si coincidieran, el token se
@@ -43,7 +44,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             className={`${archivo.variable} ${plexMono.variable} ${anton.variable}`}
         >
             <body>
-                {children}
+                {/* Un solo proveedor de tooltips para todo el ERP: con
+                    `delay=0` por instancia, pasar el mouse por una fila de
+                    íconos dispararía y cancelaría cinco temporizadores. El
+                    proveedor los coordina — el primero espera, los
+                    siguientes abren al instante. */}
+                <TooltipProvider delay={350}>{children}</TooltipProvider>
                 {/* Avisos flotantes (guardado, alertas de cocina). Vive en el
                     layout raíz para que cualquier pantalla pueda emitirlos. */}
                 <Toaster richColors closeButton />

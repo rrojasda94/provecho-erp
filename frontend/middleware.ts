@@ -28,7 +28,13 @@ export function middleware(request: NextRequest) {
     "font-src 'self'",
     // El navegador solo habla con este origen: el frontend llega a la API
     // por su propio proxy (`app/api/proxy`), no por fetch cruzado.
-    "connect-src 'self'",
+    //
+    // En desarrollo se suma el WebSocket de recarga en caliente. `'self'` no
+    // lo cubre en la práctica: Chrome no le reconoce el esquema `ws:` aunque
+    // el origen coincida, así que dentro del contenedor la recarga moría con
+    // un error de CSP en consola y había que reiniciar `web` para ver un
+    // cambio. Fuera de desarrollo la línea queda exactamente como estaba.
+    `connect-src 'self'${desarrollo ? " ws: wss:" : ""}`,
     "object-src 'none'",
     "base-uri 'none'",
     "form-action 'self'",

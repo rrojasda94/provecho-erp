@@ -3,7 +3,6 @@
 import {
   type ColumnDef,
   type SortingState,
-  flexRender,
   getCoreRowModel,
   getFilteredRowModel,
   getPaginationRowModel,
@@ -12,22 +11,58 @@ import {
 } from "@tanstack/react-table";
 import { useState } from "react";
 
+import { Vacio } from "@/components/estado/vacio";
+import { TablaBusqueda } from "@/components/tabla/tabla-busqueda";
+import { TablaCuerpo } from "@/components/tabla/tabla-cuerpo";
+import { TablaEncabezado } from "@/components/tabla/tabla-encabezado";
+import { TablaPaginacion } from "@/components/tabla/tabla-paginacion";
+
 /**
- * Tabla genérica del ERP (F2.11): TanStack Table headless + Tailwind, sin
- * componentes propios que atarse. Alcance v1: orden por columna, búsqueda
- * global, filtro, paginación — lo que ADR-013/frontend-architecture.md
- * definió como suficiente para el primer listado real. v2 (congelar/mover
- * columnas, selección masiva, scroll virtual, totales) se prende con las
- * mismas APIs de TanStack cuando una pantalla lo necesite, no antes.
+ * Tabla genérica del ERP (F2.11): TanStack Table headless + Tailwind. La usan
+ * 28 pantallas, así que todo lo que se arregla acá se arregla 28 veces — por
+ * eso la firma de props se mantiene compatible hacia atrás y lo nuevo entra
+ * como opcional.
+ *
+ * `meta.numero` en una columna la alinea a la derecha y la pasa a cifra
+ * monoespaciada tabular. Suena cosmético y no lo es: una columna de importes
+ * con ancho proporcional obliga a leer dígito por dígito para comparar dos
+ * filas, y comparar dos filas es a lo que se viene a un ERP.
+ *
+ * Repartida en cinco archivos (encabezado, cuerpo, paginación, búsqueda) por
+ * el límite de complejidad del lint. La partición es deliberada, no un truco
+ * para esquivarlo: cada pieza tiene un estado propio que probar.
+ *
+ * v2 (congelar/mover columnas, selección masiva, scroll virtual, totales) se
+ * prende con las mismas APIs de TanStack cuando una pantalla lo necesite.
  */
+declare module "@tanstack/react-table" {
+  // Los dos parámetros no se usan acá pero no pueden renombrarse a `_TData`:
+  // TypeScript solo fusiona una interfaz con la original si la lista de
+  // parámetros coincide **también en los nombres**.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  interface ColumnMeta<TData, TValue> {
+    /** Cifra: alinea a la derecha y aplica tabular monoespaciado. */
+    numero?: boolean;
+  }
+}
+
 export function TablaDatos<T>({
   columnas,
   datos,
   placeholderBusqueda = "Buscar...",
+  cargando = false,
+  denso = false,
+  vacio,
 }: {
   columnas: ColumnDef<T>[];
   datos: T[];
   placeholderBusqueda?: string;
+  /** Dibuja filas fantasma en vez de una tabla en blanco. */
+  cargando?: boolean;
+  /** Filas más juntas: para pantallas con muchas filas por vista. */
+  denso?: boolean;
+  /** Qué decir cuando la consulta salió bien y no trajo filas. */
+  vacio?: React.ReactNode;
 }) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [filtroGlobal, setFiltroGlobal] = useState("");
@@ -45,88 +80,48 @@ export function TablaDatos<T>({
     initialState: { pagination: { pageSize: 10 } },
   });
 
-  const filas = tabla.getRowModel().rows;
+  const sinFilas = !cargando && tabla.getRowModel().rows.length === 0;
 
   return (
     <div>
-      <input
-        value={filtroGlobal}
-        onChange={(e) => setFiltroGlobal(e.target.value)}
+      <TablaBusqueda
+        valor={filtroGlobal}
+        alCambiar={setFiltroGlobal}
         placeholder={placeholderBusqueda}
-        aria-label={placeholderBusqueda}
-        className="mb-3 w-full max-w-xs"
       />
-      <div className="overflow-x-auto rounded border border-gray/20 bg-white">
+
+      <div className="overflow-x-auto rounded-lg border border-border bg-card shadow-[var(--sombra-1)]">
         <table className="w-full text-sm">
-          <thead className="bg-cream">
-            {tabla.getHeaderGroups().map((grupo) => (
-              <tr key={grupo.id}>
-                {grupo.headers.map((header) => {
-                  const puedeOrdenar = header.column.getCanSort();
-                  const orden = header.column.getIsSorted();
-                  return (
-                    <th
-                      key={header.id}
-                      onClick={
-                        puedeOrdenar ? header.column.getToggleSortingHandler() : undefined
-                      }
-                      className={`px-3 py-2 text-left font-heading text-xs uppercase tracking-wide text-gray ${
-                        puedeOrdenar ? "cursor-pointer select-none hover:text-dark" : ""
-                      }`}
-                    >
-                      {flexRender(header.column.columnDef.header, header.getContext())}
-                      {orden === "asc" ? " ↑" : orden === "desc" ? " ↓" : ""}
-                    </th>
-                  );
-                })}
-              </tr>
-            ))}
-          </thead>
-          <tbody>
-            {filas.length === 0 ? (
-              <tr>
-                <td colSpan={columnas.length} className="px-3 py-6 text-center text-gray">
-                  Sin resultados.
-                </td>
-              </tr>
-            ) : (
-              filas.map((fila) => (
-                <tr key={fila.id} className="border-t border-gray/10 hover:bg-cream/40">
-                  {fila.getVisibleCells().map((celda) => (
-                    <td key={celda.id} className="px-3 py-2">
-                      {flexRender(celda.column.columnDef.cell, celda.getContext())}
-                    </td>
-                  ))}
-                </tr>
-              ))
-            )}
-          </tbody>
+          <TablaEncabezado tabla={tabla} />
+          {!sinFilas && (
+            <TablaCuerpo
+              tabla={tabla}
+              cargando={cargando}
+              columnas={columnas.length}
+              denso={denso}
+            />
+          )}
         </table>
+
+        {sinFilas && (vacio ?? <VacioPorDefecto busqueda={filtroGlobal} />)}
       </div>
-      <div className="mt-3 flex items-center justify-between text-sm text-gray">
-        <span>
-          Página {tabla.getState().pagination.pageIndex + 1} de {tabla.getPageCount() || 1} ·{" "}
-          {tabla.getFilteredRowModel().rows.length} resultados
-        </span>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => tabla.previousPage()}
-            disabled={!tabla.getCanPreviousPage()}
-            className="rounded border border-gray px-2 py-1 disabled:opacity-40"
-          >
-            ← Anterior
-          </button>
-          <button
-            type="button"
-            onClick={() => tabla.nextPage()}
-            disabled={!tabla.getCanNextPage()}
-            className="rounded border border-gray px-2 py-1 disabled:opacity-40"
-          >
-            Siguiente →
-          </button>
-        </div>
-      </div>
+
+      <TablaPaginacion tabla={tabla} />
     </div>
   );
+}
+
+/** Buscar y no encontrar no es lo mismo que no tener nada: el primero se
+ * resuelve borrando el filtro y el segundo dando de alta. Decirlo distinto
+ * evita que alguien crea que el ERP perdió los datos. */
+function VacioPorDefecto({ busqueda }: { busqueda: string }) {
+  if (busqueda) {
+    return (
+      <Vacio
+        titulo="Nada coincide con la búsqueda"
+        detalle={`Ningún registro contiene «${busqueda}».`}
+      />
+    );
+  }
+  return <Vacio titulo="Todavía no hay nada acá" />;
 }
