@@ -143,6 +143,39 @@ def resolver_precio(
     return montos[elegida.id]
 
 
+def _extras_de(repo, producto_id, por_id: dict, precio_de: dict) -> list[dict]:
+    """Los extras que admite **este** producto, con el grupo de cada uno.
+
+    Se llama una vez por el padre y una vez por cada variante: los grupos
+    cuelgan del producto que se prepara, y en un producto con presentaciones
+    ese es la variante, no el padre (RN-COM-022/023). Leerlos solo del padre
+    devolvía una carta sin el grupo de sabores y el PDV dejaba confirmar una
+    pizza sin elegir ninguno.
+    """
+    grupos_por_id = {g.id: g for g in repo.grupos_de(producto_id)}
+    extras = []
+    for vinculo in repo.extras_de(producto_id):
+        extra = por_id.get(vinculo.extra_id)
+        # Un extra sin precio vigente en este ámbito no se ofrece,
+        # mismo criterio que un producto sin precio.
+        if extra is None or vinculo.extra_id not in precio_de:
+            continue
+        grupo = grupos_por_id.get(vinculo.grupo_id)
+        extras.append(
+            {
+                "producto_comercial_id": extra.id,
+                "nombre": extra.nombre,
+                "precio_unitario": precio_de[extra.id],
+                "maximo": vinculo.maximo,
+                "grupo_id": vinculo.grupo_id,
+                "grupo_nombre": grupo.nombre if grupo else None,
+                "grupo_minimo": grupo.minimo if grupo else 0,
+                "grupo_maximo": grupo.maximo if grupo else None,
+            }
+        )
+    return extras
+
+
 def carta(
     session: Session,
     *,
@@ -160,6 +193,9 @@ def carta(
     variantes tiene precio. Las variantes no salen sueltas en la grilla
     —aparecen dentro de su padre (RN-COM-022)—, igual que los extras
     (RN-COM-021).
+
+    Cada variante trae **sus propios** extras: una Familiar y una Personal no
+    ofrecen los mismos sabores ni los mismos agregados.
     """
     repo = ProductoComercialRepo(session)
     precio_de = {}
@@ -195,6 +231,7 @@ def carta(
                 "nombre": v.nombre,
                 "precio_unitario": precio_de[v.id],
                 "orden": v.orden,
+                "extras": _extras_de(repo, v.id, por_id, precio_de),
             }
             for v in repo.variantes_de(producto.id)
             if v.id in precio_de
@@ -206,27 +243,7 @@ def carta(
             precio = precio_de.get(producto.id)
         if precio is None:
             continue
-        grupos_por_id = {g.id: g for g in repo.grupos_de(producto.id)}
-        extras = []
-        for vinculo in repo.extras_de(producto.id):
-            extra = por_id.get(vinculo.extra_id)
-            # Un extra sin precio vigente en este ámbito no se ofrece,
-            # mismo criterio que un producto sin precio.
-            if extra is None or vinculo.extra_id not in precio_de:
-                continue
-            grupo = grupos_por_id.get(vinculo.grupo_id)
-            extras.append(
-                {
-                    "producto_comercial_id": extra.id,
-                    "nombre": extra.nombre,
-                    "precio_unitario": precio_de[extra.id],
-                    "maximo": vinculo.maximo,
-                    "grupo_id": vinculo.grupo_id,
-                    "grupo_nombre": grupo.nombre if grupo else None,
-                    "grupo_minimo": grupo.minimo if grupo else 0,
-                    "grupo_maximo": grupo.maximo if grupo else None,
-                }
-            )
+        extras = _extras_de(repo, producto.id, por_id, precio_de)
         items.append(
             {
                 "producto_comercial_id": producto.id,

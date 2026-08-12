@@ -299,6 +299,11 @@ def _tamano(
             es_extra=True,
         )
         _vincular(session, variante.id, opcion.id, grupo.id, maximo=1)
+        # El sabor no cobra aparte —la variante ya lleva el precio completo
+        # (RN-COM-022)—, pero **necesita precio de lista igual**: la carta
+        # descarta todo extra sin precio vigente, y sin esta línea la pizza
+        # sale sin sabores que elegir.
+        _precio(session, lista, opcion, "0")
 
     for i, (extra, (lineas, monto)) in enumerate(EXTRAS.items()):
         receta = _receta(

@@ -497,6 +497,22 @@ export function DialogoCierre({
 
 const NOTAS_RAPIDAS = ["Sin cebolla", "Sin ají", "Bien cocida", "Para llevar aparte"];
 
+/** Qué extras ofrece esta línea.
+ *
+ * Los grupos y extras cuelgan del producto que se prepara, y con
+ * presentaciones ese es la variante: el servidor solo acepta lo vinculado a
+ * ELLA (`admite_extra(prod.id, …)`), así que mezclar los del padre armaría
+ * líneas que van a fallar recién al enviar el pedido. Sin presentaciones, el
+ * producto es el que se prepara y los suyos son los que valen. */
+function extrasOfrecidos(
+  item: ItemDeCarta | null,
+  variante: VarianteDeCarta | undefined,
+): ExtraDeCarta[] {
+  if (!item) return [];
+  if (item.variantes.length === 0) return item.extras;
+  return variante ? variante.extras : [];
+}
+
 /**
  * Configuración de la línea: variante, cantidad, nota a cocina y extras.
  * Todo sale de la carta (`item`), ya con precios resueltos para esta
@@ -562,7 +578,8 @@ export function DialogoProducto({
 
   const variantes = item?.variantes ?? [];
   const variante = variantes.find((v) => v.producto_comercial_id === varianteId);
-  const grupos = agruparExtras(item?.extras ?? []);
+  const ofrecidos = extrasOfrecidos(item, variante);
+  const grupos = agruparExtras(ofrecidos);
   const falta = queFalta(variantes, variante, grupos, extras);
   // Lo quitable sale de la receta del producto que realmente se prepara: la
   // variante si hay, el producto si no.
@@ -570,7 +587,7 @@ export function DialogoProducto({
 
   const guardar = () => {
     if (falta) return;
-    const elegidos = (item?.extras ?? [])
+    const elegidos = ofrecidos
       .filter((e) => (extras[e.producto_comercial_id] ?? 0) > 0)
       .map((e) => ({
         productoId: e.producto_comercial_id,
@@ -598,7 +615,14 @@ export function DialogoProducto({
         variantes={variantes}
         producto={item}
         elegida={varianteId}
-        onElegir={setVarianteId}
+        // Cambiar de tamaño rehace la oferta: "Peperoni Personal" y
+        // "Peperoni Familiar" son dos productos distintos, así que lo
+        // elegido en el anterior no se puede arrastrar al nuevo.
+        onElegir={(id) => {
+          if (id === varianteId) return;
+          setVarianteId(id);
+          setExtras({});
+        }}
       />
 
       <p className="pdv-etiqueta">Cantidad</p>

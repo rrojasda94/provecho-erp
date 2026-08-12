@@ -596,3 +596,72 @@ def test_extra_sin_grupo_sigue_siendo_opcional(env):
         "items": [{"producto_comercial_id": producto_id, "cantidad": "1"}],
     })
     assert r.status_code == 201, r.text
+
+
+def test_la_carta_trae_los_grupos_de_cada_variante(env):
+    """El caso real: los sabores cuelgan del TAMAÑO, no del padre.
+
+    Los otros dos casos de grupo usan un producto sin presentaciones, donde
+    el grupo vive en el propio producto y la carta lo encontraba igual. Con
+    variantes la carta leía los grupos del padre —que no tiene ninguno—, así
+    que el PDV no dibujaba "Sabor", dejaba confirmar sin elegir y el servidor
+    devolvía 409 por algo que la pantalla nunca ofreció.
+    """
+    client, ids = env
+    h = _token(client)
+    padre_id = _producto(client, h, ids, id_interno="PZVA", nombre="Pizza").json()["id"]
+    variante_id = _producto(
+        client, h, ids, id_interno="PZVP", nombre="Pizza Personal",
+        receta_id=_receta(client, h, ids, nombre="Base Personal"),
+        producto_padre_id=padre_id,
+    ).json()["id"]
+    sabor_id = _producto(
+        client, h, ids, id_interno="SPEP", nombre="Peperoni",
+        receta_id=_receta(client, h, ids, nombre="Sabor Peperoni"), es_extra=True,
+    ).json()["id"]
+
+    lista_id = _precio(client, h, ids, variante_id, "25.00")
+    # El sabor no cobra aparte, pero sin precio de lista la carta lo descarta.
+    _precio(client, h, ids, sabor_id, "0.00", lista_id)
+
+    grupo_id = client.post(
+        f"/api/v1/sales/productos/{variante_id}/grupos", headers=h,
+        json={"nombre": "Sabor", "minimo": 1, "maximo": 1},
+    ).json()["id"]
+    assert client.post(
+        f"/api/v1/sales/productos/{variante_id}/extras", headers=h,
+        json={"extra_id": sabor_id, "grupo_id": grupo_id},
+    ).status_code == 201
+
+    carta = client.get(
+        f"/api/v1/sales/carta?sucursal_id={ids['sucursal_id']}"
+        "&canal=pdv&modalidad=takeout",
+        headers=h,
+    ).json()
+    tarjeta = next(i for i in carta if i["producto_comercial_id"] == padre_id)
+    # El padre no ofrece nada por su cuenta: lo suyo es agrupar tamaños.
+    assert tarjeta["extras"] == []
+    variante = tarjeta["variantes"][0]
+    assert variante["producto_comercial_id"] == variante_id
+    assert [e["nombre"] for e in variante["extras"]] == ["Peperoni"]
+    assert variante["extras"][0]["grupo_nombre"] == "Sabor"
+    assert variante["extras"][0]["grupo_minimo"] == 1
+
+    # Y lo que la carta ofrece es exactamente lo que el servidor acepta.
+    def vender(extras, key):
+        return client.post("/api/v1/sales/ventas", headers=h, json={
+            "sucursal_id": ids["sucursal_id"], "punto_venta_id": ids["pv_id"],
+            "canal": "pdv", "modalidad": "takeout", "idempotency_key": key,
+            "items": [{
+                "producto_comercial_id": variante_id, "cantidad": "1",
+                "extras": extras,
+            }],
+        })
+
+    sin_sabor = vender([], "variante-01")
+    assert sin_sabor.status_code == 409, sin_sabor.text
+    assert "Sabor" in sin_sabor.json()["detail"]
+    con_sabor = vender(
+        [{"producto_comercial_id": sabor_id, "cantidad": "1"}], "variante-02"
+    )
+    assert con_sabor.status_code == 201, con_sabor.text

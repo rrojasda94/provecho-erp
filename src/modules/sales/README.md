@@ -158,6 +158,13 @@ ADR-023):**
   el kiosko entra por el mismo endpoint. El replay del hub se exceptúa
   (ADR-009): una venta que ya se cobró no se rechaza por una regla que
   cambió durante el corte.
+  Los grupos cuelgan del producto **que se prepara**: con presentaciones eso
+  es la variante, no el padre (ADR-038). Por eso `GET /carta` devuelve
+  `variantes[].extras[]` además del `extras[]` de nivel producto, y por eso
+  `_armar_extras` rechaza un extra que no esté vinculado a la variante que se
+  vende — ofrecer los del padre sobre una variante arma líneas que el
+  servidor no acepta. El `extras[]` del producto sigue siendo el de los
+  productos simples.
 - **Ficha del producto**: `GET /productos/{id}` devuelve producto +
   variantes + grupos en una lectura, para editar todo en la misma pantalla
   (patrón Odoo). `GET /marcas` acompaña al alta.

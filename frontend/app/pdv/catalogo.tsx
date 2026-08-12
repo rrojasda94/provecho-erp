@@ -108,6 +108,14 @@ export default function Catalogo(props: Props) {
   );
 }
 
+/** Cuántos extras ofrece la tarjeta. Con presentaciones los extras cuelgan
+ * de cada una, así que se cuenta la más surtida: sumarlas diría "18 extras"
+ * por seis sabores repetidos en tres tamaños. */
+function cuantosExtras(p: ItemDeCarta): number {
+  if (p.variantes.length === 0) return p.extras.length;
+  return Math.max(...p.variantes.map((v) => v.extras.length), 0);
+}
+
 function ProductosGrid({
   items,
   busqueda,
@@ -142,12 +150,12 @@ function ProductosGrid({
             {p.variantes.length > 0 ? "desde " : ""}
             {soles(p.precio_unitario)}
           </span>
-          {(p.variantes.length > 0 || p.extras.length > 0) && (
+          {(p.variantes.length > 0 || cuantosExtras(p) > 0) && (
             <span className="pdv-producto-extras">
               {[
                 p.variantes.length > 0 ? `${p.variantes.length} presentaciones` : "",
-                p.extras.length > 0
-                  ? `${p.extras.length} ${p.extras.length === 1 ? "extra" : "extras"}`
+                cuantosExtras(p) > 0
+                  ? `${cuantosExtras(p)} ${cuantosExtras(p) === 1 ? "extra" : "extras"}`
                   : "",
               ]
                 .filter(Boolean)

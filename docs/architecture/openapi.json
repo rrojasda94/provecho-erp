@@ -19873,6 +19873,14 @@
       "VarianteDeCartaOut": {
         "description": "Tamaño/presentación del producto, con precio propio y completo — no\nun recargo sobre el padre (RN-COM-022). Elegir una es obligatorio.",
         "properties": {
+          "extras": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ExtraDeCartaOut"
+            },
+            "title": "Extras",
+            "type": "array"
+          },
           "nombre": {
             "title": "Nombre",
             "type": "string"

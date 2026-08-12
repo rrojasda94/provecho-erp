@@ -40,6 +40,10 @@ export type VarianteDeCarta = {
   nombre: string;
   precio_unitario: string;
   orden: number;
+  /** Los grupos y extras cuelgan del producto que se prepara, y con
+   * presentaciones ese es la variante: los sabores de la Familiar no son los
+   * de la Personal. Elegida la variante, estos mandan sobre los del padre. */
+  extras: ExtraDeCarta[];
 };
 
 export type ItemDeCarta = {
