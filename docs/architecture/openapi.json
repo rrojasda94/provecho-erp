@@ -471,6 +471,18 @@
             ],
             "title": "Almacen Abastecedor Id"
           },
+          "almacen_abastecedor_respaldo_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Almacen Abastecedor Respaldo Id"
+          },
           "direccion": {
             "anyOf": [
               {
@@ -541,6 +553,18 @@
             ],
             "title": "Almacen Abastecedor Id"
           },
+          "almacen_abastecedor_respaldo_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Almacen Abastecedor Respaldo Id"
+          },
           "direccion": {
             "anyOf": [
               {
@@ -607,6 +631,18 @@
               }
             ],
             "title": "Almacen Abastecedor Id"
+          },
+          "almacen_abastecedor_respaldo_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Almacen Abastecedor Respaldo Id"
           },
           "direccion": {
             "anyOf": [
@@ -3565,6 +3601,100 @@
           "sustento"
         ],
         "title": "ConformidadComprobanteCreate",
+        "type": "object"
+      },
+      "ConsultaEmpresaOut": {
+        "properties": {
+          "condicion": {
+            "title": "Condicion",
+            "type": "string"
+          },
+          "departamento": {
+            "title": "Departamento",
+            "type": "string"
+          },
+          "direccion": {
+            "title": "Direccion",
+            "type": "string"
+          },
+          "distrito": {
+            "title": "Distrito",
+            "type": "string"
+          },
+          "encontrado": {
+            "title": "Encontrado",
+            "type": "boolean"
+          },
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          },
+          "numero_documento": {
+            "title": "Numero Documento",
+            "type": "string"
+          },
+          "provincia": {
+            "title": "Provincia",
+            "type": "string"
+          },
+          "razon_social": {
+            "title": "Razon Social",
+            "type": "string"
+          }
+        },
+        "required": [
+          "encontrado",
+          "numero_documento",
+          "razon_social",
+          "estado",
+          "condicion",
+          "direccion",
+          "distrito",
+          "provincia",
+          "departamento"
+        ],
+        "title": "ConsultaEmpresaOut",
+        "type": "object"
+      },
+      "ConsultaPersonaOut": {
+        "description": "Lo que se puede prellenar de una persona natural. Sin `crudo`: la\nrespuesta completa del proveedor trae más datos personales de los que\nesta pantalla necesita, y lo que no se manda no se filtra (Ley 29733).",
+        "properties": {
+          "apellidos": {
+            "title": "Apellidos",
+            "type": "string"
+          },
+          "encontrado": {
+            "title": "Encontrado",
+            "type": "boolean"
+          },
+          "fecha_nacimiento": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Nacimiento"
+          },
+          "nombres": {
+            "title": "Nombres",
+            "type": "string"
+          },
+          "numero_documento": {
+            "title": "Numero Documento",
+            "type": "string"
+          }
+        },
+        "required": [
+          "encontrado",
+          "numero_documento",
+          "nombres",
+          "apellidos"
+        ],
+        "title": "ConsultaPersonaOut",
         "type": "object"
       },
       "ConsumoCreate": {
@@ -8967,6 +9097,11 @@
       },
       "MeOut": {
         "properties": {
+          "debe_cambiar_pin": {
+            "default": false,
+            "title": "Debe Cambiar Pin",
+            "type": "boolean"
+          },
           "empresa_id": {
             "anyOf": [
               {
@@ -13181,6 +13316,25 @@
         "title": "PinChange",
         "type": "object"
       },
+      "PinPropioChange": {
+        "description": "Cambio del PIN propio. Pide el actual aunque haya sesión válida: una\npantalla que quedó abierta no debería alcanzar para quedarse la cuenta.",
+        "properties": {
+          "pin_actual": {
+            "title": "Pin Actual",
+            "type": "string"
+          },
+          "pin_nuevo": {
+            "title": "Pin Nuevo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "pin_actual",
+          "pin_nuevo"
+        ],
+        "title": "PinPropioChange",
+        "type": "object"
+      },
       "PlantillaCreate": {
         "properties": {
           "activa": {
@@ -15088,6 +15242,18 @@
             ],
             "title": "Contacto"
           },
+          "direccion": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direccion"
+          },
           "empresa_id": {
             "anyOf": [
               {
@@ -15104,6 +15270,12 @@
             "default": true,
             "title": "Formal",
             "type": "boolean"
+          },
+          "pais": {
+            "default": "PE",
+            "maxLength": 60,
+            "title": "Pais",
+            "type": "string"
           },
           "persona_id": {
             "anyOf": [
@@ -15142,6 +15314,18 @@
               }
             ],
             "title": "Porcentaje Deteccion"
+          },
+          "provincia": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provincia"
           },
           "razon_social": {
             "anyOf": [
@@ -15210,6 +15394,17 @@
             ],
             "title": "Contacto"
           },
+          "direccion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direccion"
+          },
           "empresa_id": {
             "format": "uuid",
             "title": "Empresa Id",
@@ -15222,6 +15417,10 @@
           "id": {
             "format": "uuid",
             "title": "Id",
+            "type": "string"
+          },
+          "pais": {
+            "title": "Pais",
             "type": "string"
           },
           "persona_id": {
@@ -15246,6 +15445,17 @@
               }
             ],
             "title": "Plazo Dias Credito"
+          },
+          "provincia": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provincia"
           },
           "razon_social": {
             "anyOf": [
@@ -15282,6 +15492,9 @@
           "razon_social",
           "ruc",
           "contacto",
+          "direccion",
+          "provincia",
+          "pais",
           "plazo_dias_credito",
           "formal",
           "clasificacion",
@@ -15347,6 +15560,30 @@
             ],
             "title": "Contacto"
           },
+          "direccion": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direccion"
+          },
+          "pais": {
+            "anyOf": [
+              {
+                "maxLength": 60,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pais"
+          },
           "plazo_dias_credito": {
             "anyOf": [
               {
@@ -15358,6 +15595,18 @@
               }
             ],
             "title": "Plazo Dias Credito"
+          },
+          "provincia": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provincia"
           },
           "razon_social": {
             "anyOf": [
@@ -23447,6 +23696,100 @@
         "summary": "Refresh",
         "tags": [
           "auth"
+        ]
+      }
+    },
+    "/api/v1/consulta/dni/{numero}": {
+      "get": {
+        "operationId": "consultar_dni_api_v1_consulta_dni__numero__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "numero",
+            "required": true,
+            "schema": {
+              "title": "Numero",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsultaPersonaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Consultar Dni",
+        "tags": [
+          "consulta"
+        ]
+      }
+    },
+    "/api/v1/consulta/ruc/{numero}": {
+      "get": {
+        "operationId": "consultar_ruc_api_v1_consulta_ruc__numero__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "numero",
+            "required": true,
+            "schema": {
+              "title": "Numero",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsultaEmpresaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Consultar Ruc",
+        "tags": [
+          "consulta"
         ]
       }
     },
@@ -39903,6 +40246,46 @@
         ]
       }
     },
+    "/api/v1/users/me/pin": {
+      "post": {
+        "description": "El dueño de la cuenta cambia su PIN.\n\nSin permiso: elegir la propia clave no es un privilegio que alguien tenga\nque otorgar, y es la única salida de un PIN reseteado.\n\nDeclarada **antes** que `/users/{usuario_id}/pin`: FastAPI resuelve por\norden de declaración, y la ruta con parámetro capturaba \"me\" como si fuera\nun id — con lo que cambiar el PIN propio terminaba exigiendo\n`users.gestionar`.",
+        "operationId": "cambiar_pin_propio_api_v1_users_me_pin_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PinPropioChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Cambiar Pin Propio",
+        "tags": [
+          "users"
+        ]
+      }
+    },
     "/api/v1/users/me/preferencias": {
       "patch": {
         "description": "Cambia cómo se le presenta el ERP a quien está autenticado.\n\nSin permiso: no hay privilegio que otorgar en elegir el tamaño de la\npropia letra, y exigir uno dejaría la accesibilidad fuera del alcance de\njustamente quien más la necesita. Solo puede tocar su propio perfil —el\nusuario sale del token, no del cuerpo.",
@@ -40054,6 +40437,48 @@
           }
         ],
         "summary": "Cambiar Pin",
+        "tags": [
+          "users-admin"
+        ]
+      }
+    },
+    "/api/v1/users/{usuario_id}/pin/reset": {
+      "post": {
+        "description": "Devuelve la cuenta al PIN por defecto y obliga a cambiarlo al entrar.\n\nPermiso propio y no `users.gestionar`: RRHH atiende el \"me olvidé el PIN\"\ntodos los lunes y no tiene por qué poder crear cuentas ni repartir roles\npara eso. En el otro sentido, resetear el PIN de alguien es poder entrar\ncomo esa persona, así que tampoco viene gratis con administrar usuarios.",
+        "operationId": "resetear_pin_api_v1_users__usuario_id__pin_reset_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "usuario_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Usuario Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Resetear Pin",
         "tags": [
           "users-admin"
         ]
@@ -40750,6 +41175,10 @@
     {
       "description": "Rastro inmutable de cambios (`audit_log`, ADR-031): quién, qué, cuándo, dónde y valor anterior/nuevo. Solo lectura.",
       "name": "auditoria"
+    },
+    {
+      "description": "Consulta de DNI y RUC contra Factiliza (RENIEC/SUNAT) para prellenar altas. Solo lectura: no guarda nada, y lo que devuelve sigue siendo editable en el formulario.",
+      "name": "consulta"
     },
     {
       "description": "Agregado gerencial de solo lectura: ventas del día, stock crítico, caja.",

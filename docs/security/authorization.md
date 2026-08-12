@@ -51,6 +51,9 @@ alcance del usuario.
 | almacenero | `inventory.transferir`, `inventory.recepcion`, `inventory.ajustar` |
 | cajero | `sales.crear`, `sales.cobrar`, `sales.leer`, `sales.entregar_pedido`, `kds.operar`, `accounting.caja_operar` (su sucursal) |
 | — | `accounting.caja_operar` alcanza para **preguntar** por la caja de la sucursal propia (`GET /accounting/cajas/abiertas?sucursal_id=`), no solo para abrirla y cerrarla: el PDV tiene que saber si el turno ya está abierto antes de ofrecer abrirlo. Sin el `sucursal_id` la consulta es de toda la empresa y sigue exigiendo `accounting.leer` — quien opera una caja no tiene por qué ver el efectivo de los demás locales |
+| rrhh_admin | `rrhh.*`, `users.resetear_pin`, `consulta.documento` |
+| — | `users.resetear_pin` está **aparte de `users.gestionar`** en los dos sentidos (ADR-041): RRHH atiende el "me olvidé el PIN" sin poder crear cuentas ni repartir roles, y administrar usuarios no trae de arrastre la facultad de entrar como cualquiera de ellos. **No** lo tiene `supervisor`: entrar como cualquiera de su turno rompe la segregación del ciclo de caja (ADR-025), igual que un encargado no se releva a sí mismo |
+| — | `consulta.documento` (consultar un DNI/RUC contra RENIEC/SUNAT) es propio y no una consecuencia de poder crear personas: cada consulta gasta cuota del proveedor y trae datos personales de alguien que todavía no es nadie en el sistema. Lo tienen `rrhh_admin`, `comprador`, `cajero` y `supervisor` — los que dan altas |
 | agente_ia | `sales.crear_pedido` (canal agente_ia, su marca) |
 | hub_sucursal | `sync.leer`, `sync.empujar` (una sola sucursal, ADR-009) |
 

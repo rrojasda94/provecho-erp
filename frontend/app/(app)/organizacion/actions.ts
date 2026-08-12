@@ -129,7 +129,7 @@ export async function guardarSucursalAction(
   }
   if (!marcaId) return { error: "Elegir la marca.", ok: false };
 
-  return guardar(
+  const guardada = await guardar(
     "/api/v1/sucursales",
     "/organizacion/sucursales",
     formData,
@@ -144,6 +144,43 @@ export async function guardarSucursalAction(
     },
     "la sucursal",
   );
+
+  const almacenId = texto(formData, "almacen_id");
+  if (!guardada.ok || !almacenId) return guardada;
+  return guardarAbastecimiento(almacenId, formData, guardada);
+}
+
+/**
+ * El abastecimiento se elige en la pantalla de sucursales pero se guarda en
+ * `almacen`, que es de quien es el dato.
+ *
+ * Va después de guardar la sucursal y solo si esa parte salió bien: dejar el
+ * almacén apuntando a otro central por un cambio de nombre que falló sería
+ * peor que no haber guardado nada.
+ */
+async function guardarAbastecimiento(
+  almacenId: string,
+  formData: FormData,
+  guardada: EstadoOrganizacion,
+): Promise<EstadoOrganizacion> {
+  try {
+    await apiFetch(`/api/v1/almacenes/${almacenId}`, {
+      token: await token(),
+      metodo: "PATCH",
+      cuerpo: {
+        almacen_abastecedor_id: texto(formData, "almacen_abastecedor_id") || undefined,
+        almacen_abastecedor_respaldo_id:
+          texto(formData, "almacen_abastecedor_respaldo_id") || undefined,
+      },
+    });
+  } catch (e) {
+    return {
+      error: mensajeDe(e, "La sucursal se guardó, pero no su abastecimiento."),
+      ok: false,
+    };
+  }
+  revalidatePath("/organizacion/sucursales");
+  return guardada;
 }
 
 // --- Almacén ----------------------------------------------------------------
@@ -166,6 +203,8 @@ export async function guardarAlmacenAction(
       direccion: texto(formData, "direccion") || undefined,
       sucursal_id: texto(formData, "sucursal_id") || undefined,
       almacen_abastecedor_id: texto(formData, "almacen_abastecedor_id") || undefined,
+      almacen_abastecedor_respaldo_id:
+        texto(formData, "almacen_abastecedor_respaldo_id") || undefined,
     },
     "el almacén",
   );

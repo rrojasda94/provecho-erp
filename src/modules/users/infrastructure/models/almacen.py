@@ -28,3 +28,10 @@ class Almacen(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin):
     almacen_abastecedor_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("almacen.id"), nullable=True
     )
+    # A quién se le pide cuando el principal no está disponible. Vive acá y no
+    # en `sucursal` porque el que se abastece es el almacén: una sucursal
+    # puede tener más de uno (salón y cocina) y no todos se abastecen igual.
+    # Poner el par en `sucursal` sería una segunda fuente de la misma verdad.
+    almacen_abastecedor_respaldo_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("almacen.id"), nullable=True
+    )

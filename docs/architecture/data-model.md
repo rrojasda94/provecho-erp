@@ -80,7 +80,10 @@ erDiagram
   direccion (NULL en los virtuales y en los de sucursal, que heredan la de
   su sucursal — el central no cuelga de ninguna y necesita la suya),
   almacen_abastecedor_id
-  (el central del que se abastece un almacén de sucursal/producción).
+  (el central del que se abastece un almacén de sucursal/producción),
+  almacen_abastecedor_respaldo_id (a quién se le pide cuando el principal
+  está dado de baja — RN-INV-022, ADR-040; distinto del principal y de la
+  misma empresa).
   `activos` es virtual (sin ubicación física ni stock de SKUs). Equipamiento
   y política FEFO/FIFO por tipo — ver
   [domain-model.md](../domain/domain-model.md#almacenes).
@@ -184,7 +187,9 @@ erDiagram
   `natural`) sin exigirles el permiso de administración completo.
 - **usuario**: username, pin_hash (Argon2id), persona_id (nullable — NULL
   si `agente_ia`), nombre_display (fallback para agente_ia), email, tipo
-  (`humano` | `agente_ia`), activo.
+  (`humano` | `agente_ia`), activo, debe_cambiar_pin (el PIN vigente lo puso
+  un reseteo, así que lo sabe alguien más: la cuenta no puede hacer nada
+  hasta elegir otro — ADR-041).
 - **token_agente** (2026-08-08, ADR-032): usuario_id, nombre ("n8n
   producción"), prefijo (los primeros 12 caracteres del token, único dato
   mostrable después de crearlo), token_hash (SHA-256; el claro sale una sola
@@ -594,7 +599,10 @@ descuenta stock vía la receta (ver [../domain/domain-model.md](../domain/domain
 ## 5. Compras (módulo purchases)
 
 - **proveedor**: RUC + razon_social (si empresa) o persona_id (si persona
-  natural, ej. RHE), contacto, condiciones (condición de pago: contado o
+  natural, ej. RHE), contacto, direccion/provincia/pais (domicilio fiscal
+  del jurídico, prellenado desde SUNAT al consultar el RUC; partido porque
+  `provincia` decide si el flete es local o interprovincial, y `pais`
+  existe para el proveedor extranjero — ADR-041), condiciones (condición de pago: contado o
   crédito + plazo pactado — accounting la usa al ejecutar el pago),
   formal (bool — `false` para proveedor informal de mercado/supermercado:
   sin RUC obligatorio, compra sin OC vía caja chica, RN-CMP-011..016),

@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+
 import { RastreoDeNavegacion } from "@/components/shell/rastro";
 import { Revelar } from "@/components/shell/revelar";
 import { TopBar } from "@/components/shell/top-bar";
@@ -9,6 +11,12 @@ import { obtenerSesion } from "@/lib/sesion";
  * (`page.tsx` de esta misma carpeta) no lleva sidebar. */
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const { usuario } = await obtenerSesion();
+
+  // Con el PIN reseteado no hay nada que mostrar: el servidor le responde 403
+  // a todo salvo cambiarlo, así que el shell dibujaría un ERP entero de
+  // pantallas vacías. `/cambiar-pin` vive fuera de este layout justamente
+  // para que este redirect no se llame a sí mismo.
+  if (usuario.debe_cambiar_pin) redirect("/cambiar-pin");
 
   return (
     // `erp`: raíz del back office. La usa `globals.css` para vestir los

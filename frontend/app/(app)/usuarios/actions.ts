@@ -141,3 +141,25 @@ export async function quitarRolAction(
   revalidatePath("/usuarios");
   return { error: "", ok: true };
 }
+
+/**
+ * Devuelve la cuenta al PIN por defecto y la obliga a cambiarlo al entrar.
+ *
+ * Un PIN olvidado no se recupera —está hasheado con Argon2id—, así que la
+ * única salida es ponerle uno conocido. Lo que hace que eso sea aceptable
+ * pasa del lado del servidor: la cuenta queda marcada y no puede hacer nada
+ * más que cambiarlo, se le revocan las sesiones abiertas y queda auditado
+ * quién lo hizo.
+ */
+export async function resetearPinAction(usuarioId: string): Promise<EstadoUsuario> {
+  try {
+    await apiFetch(`/api/v1/users/${usuarioId}/pin/reset`, {
+      token: await token(),
+      metodo: "POST",
+    });
+  } catch (e) {
+    return { error: mensajeDe(e, "No se pudo resetear el PIN."), ok: false };
+  }
+  revalidatePath("/usuarios");
+  return { error: "", ok: true };
+}

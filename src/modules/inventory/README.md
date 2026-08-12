@@ -152,7 +152,13 @@ supervisor aprueba y reserva, el central despacha, el local recibe.
   respaldo, no un error.
 - **La solicitud va por almacén**, no por sucursal: producción también
   solicita. El abastecedor sale de `almacen.almacen_abastecedor_id` y se
-  copia a la fila.
+  copia a la fila. Si ese almacén está **dado de baja** se usa
+  `almacen_abastecedor_respaldo_id` (RN-INV-022, ADR-040): sin eso, dar de
+  baja el central deja al local sin poder pedir nada. El respaldo cubre
+  "no está", no "no tiene" —el faltante se resuelve aprobando por lo que
+  hay (RN-INV-001/002)— y **no** aplica cuando la solicitud nombra su
+  abastecedor: despachar desde donde no se pidió es lo que el que recibe
+  no puede notar hasta contar la mercadería.
 - **Estados**: `pendiente` → `aprobada` | `rechazada` | `cancelada`, y el
   despacho la lleva a `despachada` → `recibida`. Cancelar libera las
   reservas (RN-INV-010). `en_picking` **no existe y no va a existir**

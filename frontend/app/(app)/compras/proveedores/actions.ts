@@ -65,6 +65,30 @@ function validar(datos: DatosProveedor): string | null {
   return identificacion ?? validarCondicionPago(datos);
 }
 
+/** El domicilio fiscal es del proveedor **jurídico**: el natural lo tiene en
+ * su persona (RN-GEN-007) y ahí se corrige. */
+function domicilio(formData: FormData) {
+  return {
+    direccion: texto(formData, "direccion") || undefined,
+    provincia: texto(formData, "provincia") || undefined,
+    pais: texto(formData, "pais") || undefined,
+  };
+}
+
+function cuerpoAlta(formData: FormData, datos: DatosProveedor) {
+  const esJuridico = datos.tipo === "juridico";
+  return {
+    tipo: datos.tipo,
+    persona_id: esJuridico ? undefined : datos.personaId,
+    razon_social: esJuridico ? datos.razonSocial : undefined,
+    ruc: esJuridico ? datos.ruc : undefined,
+    ...(esJuridico ? domicilio(formData) : {}),
+    condicion_pago: datos.condicionPago,
+    plazo_dias_credito:
+      datos.condicionPago === "credito" ? Number(datos.plazoDias) : undefined,
+  };
+}
+
 export async function crearProveedorAction(
   _previo: EstadoProveedor,
   formData: FormData,
@@ -77,15 +101,7 @@ export async function crearProveedorAction(
     await apiFetch("/api/v1/purchases/proveedores", {
       token: await token(),
       metodo: "POST",
-      cuerpo: {
-        tipo: datos.tipo,
-        persona_id: datos.tipo === "natural" ? datos.personaId : undefined,
-        razon_social: datos.tipo === "juridico" ? datos.razonSocial : undefined,
-        ruc: datos.tipo === "juridico" ? datos.ruc : undefined,
-        condicion_pago: datos.condicionPago,
-        plazo_dias_credito:
-          datos.condicionPago === "credito" ? Number(datos.plazoDias) : undefined,
-      },
+      cuerpo: cuerpoAlta(formData, datos),
     });
   } catch (e) {
     const mensaje = e instanceof ApiError ? e.message : "No se pudo crear el proveedor.";
@@ -106,7 +122,11 @@ function corrigeIdentificacion(formData: FormData): boolean {
 function cuerpoEdicion(formData: FormData, datos: DatosProveedor) {
   return {
     ...(corrigeIdentificacion(formData)
-      ? { razon_social: datos.razonSocial, ruc: datos.ruc }
+      ? {
+          razon_social: datos.razonSocial,
+          ruc: datos.ruc,
+          ...domicilio(formData),
+        }
       : {}),
     contacto: texto(formData, "contacto") || undefined,
     clasificacion: String(formData.get("clasificacion") ?? "regular"),

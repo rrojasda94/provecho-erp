@@ -98,7 +98,9 @@ roles siguen diciendo *qué puede* (RN-GEN-004).
 |--------|------|--------|
 | POST/GET | `/api/v1/users` | Crear / listar usuarios |
 | PATCH | `/api/v1/users/{id}` | Editar usuario |
-| POST | `/api/v1/users/{id}/pin` | Cambiar PIN |
+| POST | `/api/v1/users/{id}/pin` | Fijar un PIN a dedo (`users.gestionar`) |
+| POST | `/api/v1/users/{id}/pin/reset` | Devolver al PIN por defecto y obligar a cambiarlo (`users.resetear_pin`, ADR-041) |
+| POST | `/api/v1/users/me/pin` | Cambiar el PIN propio (sin permiso; exige el actual) |
 | POST/DELETE | `/api/v1/users/{id}/roles[/{rol_id}]` | Asignar / quitar rol |
 | POST/DELETE | `/api/v1/users/{id}/sucursales[/{suc_id}]` | Asignar / quitar sucursal (alcance) |
 | POST/GET | `/api/v1/roles` | Crear / listar roles |
@@ -147,6 +149,9 @@ valida la API:
   grupo (data-model §1); licenciarla afuera sería otro contrato, no una fila.
 - Un **almacén de tipo `sucursal` exige `sucursal_id`**, y esa sucursal es de
   la misma empresa. El abastecedor también, y ninguno se abastece de sí mismo.
+  El **abastecedor de respaldo** (ADR-040) sigue las mismas reglas y además
+  no puede ser el principal: el día que el principal no esté, tampoco
+  estaría él. Dar de baja un almacén mira las dos columnas.
 - La **baja es lógica** (`deleted_at`) y se niega con dependientes vivos.
   `DELETE /almacenes/{id}` **no mira el stock**: vive en `inventory` y
   `users` no importa el dominio de otro módulo. Anotado en ROADMAP → Deuda

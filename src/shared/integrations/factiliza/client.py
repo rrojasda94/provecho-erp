@@ -5,6 +5,7 @@ recibe el resultado ya traducido a `RespuestaEmision`.
 """
 
 from dataclasses import dataclass
+from datetime import date, datetime
 
 import httpx
 
@@ -61,6 +62,10 @@ class ConsultaPersona:
     nombres: str
     apellidos: str
     crudo: dict
+    # RENIEC la devuelve según el plan contratado; `None` cuando no viene.
+    # Es opcional a propósito: el alta no puede depender de un campo que el
+    # proveedor entrega a veces.
+    fecha_nacimiento: date | None = None
 
 
 @dataclass(frozen=True)
@@ -73,6 +78,13 @@ class ConsultaEmpresa:
     estado: str
     condicion: str
     crudo: dict
+    # El domicilio fiscal, ya partido. SUNAT lo devuelve en campos separados
+    # y así se guarda: recomponer una dirección y volver a partirla pierde
+    # información en cada vuelta.
+    direccion: str = ""
+    distrito: str = ""
+    provincia: str = ""
+    departamento: str = ""
 
 
 def _interpretar(cuerpo: dict) -> RespuestaEmision:
@@ -88,6 +100,20 @@ def _interpretar(cuerpo: dict) -> RespuestaEmision:
     )
 
 
+def _fecha(valor: object) -> date | None:
+    """`"12/05/1994"` o `"1994-05-12"` → `date`. Cualquier otra cosa es
+    `None`: una fecha que no se entiende no se adivina, se omite — el
+    formulario la deja vacía y la teclea quien la tenga delante."""
+    if not isinstance(valor, str) or not valor.strip():
+        return None
+    for formato in ("%d/%m/%Y", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(valor.strip(), formato).date()
+        except ValueError:
+            continue
+    return None
+
+
 def _interpretar_dni(numero: str, cuerpo: dict) -> ConsultaPersona:
     datos = cuerpo.get("data") or {}
     apellidos = " ".join(
@@ -99,6 +125,7 @@ def _interpretar_dni(numero: str, cuerpo: dict) -> ConsultaPersona:
         nombres=datos.get("nombres") or "",
         apellidos=apellidos,
         crudo=cuerpo,
+        fecha_nacimiento=_fecha(datos.get("fecha_nacimiento")),
     )
 
 
@@ -111,6 +138,10 @@ def _interpretar_ruc(numero: str, cuerpo: dict) -> ConsultaEmpresa:
         estado=datos.get("estado") or "",
         condicion=datos.get("condicion") or "",
         crudo=cuerpo,
+        direccion=datos.get("direccion") or "",
+        distrito=datos.get("distrito") or "",
+        provincia=datos.get("provincia") or "",
+        departamento=datos.get("departamento") or "",
     )
 
 

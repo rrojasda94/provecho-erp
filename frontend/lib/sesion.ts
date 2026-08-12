@@ -16,6 +16,7 @@ export type Usuario = {
   sucursales: string[];
   empresa_id: string | null;
   permisos: string[];
+  debe_cambiar_pin: boolean;
   preferencia_paleta: Paleta;
   preferencia_tamano_fuente: TamanoFuente;
   preferencia_tema: Tema;

@@ -11,6 +11,11 @@ from decimal import Decimal
 PIN_LENGTH = 6
 _PIN_RE = re.compile(rf"^\d{{{PIN_LENGTH}}}$")
 
+# El PIN que deja un reseteo. Es público a propósito —está en CLAUDE.md y en
+# el seeder—: sirve para que su dueño vuelva a entrar, no para proteger nada,
+# y por eso la cuenta queda con `debe_cambiar_pin` hasta que elija otro.
+PIN_POR_DEFECTO = "123456"
+
 # Lockout: N intentos fallidos bloquean el login por una ventana.
 MAX_INTENTOS_FALLIDOS = 5
 DURACION_BLOQUEO = timedelta(minutes=15)

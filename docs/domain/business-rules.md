@@ -1034,6 +1034,16 @@ producción se hace en cocinas de sucursal. Ver
   exigía, se genera un reporte dirigido al área de almacén y a gerencia
   (evento `inventory.conteo_vencido`). El día en que vence todavía no es
   atraso; el reporte sale a partir del día siguiente.
+- **RN-INV-022** Un almacén puede declarar un **abastecedor de respaldo**
+  además del principal (ADR-040). Una solicitud que no nombra abastecedor va
+  al principal, y **si el principal está dado de baja va al respaldo**: sin
+  eso, dar de baja el central deja a la sucursal sin poder pedir nada. El
+  respaldo tiene que ser de la misma empresa y **distinto del principal** —el
+  día que el principal no esté, tampoco estaría él—. Una solicitud que **sí**
+  nombra abastecedor no cae al respaldo: quien nombra un almacén está pidiendo
+  a ese, y despachar desde otro en silencio es lo que el que recibe no puede
+  notar hasta contar la mercadería. "No disponible" es estar dado de baja, no
+  estar sin stock: el faltante tiene su propio camino (RN-INV-001/002).
 - **RN-INV-015** Un ajuste es válido, sin generar alarma, solo si está
   dentro de un margen de error definido por las áreas de almacén y
   contabilidad; fuera de ese margen dispara alarma/auditoría. El margen son

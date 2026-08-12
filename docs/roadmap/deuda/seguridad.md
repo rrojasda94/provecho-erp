@@ -11,6 +11,16 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   operación, no de aplicación. Hasta que se haga, el secreto de sync sigue
   teniendo 20 bits y el lockout de 5 intentos puede dejar una sucursal sin
   sincronizar.
+- ✅ 2026-08-12 **Reseteo de PIN** (ADR-041): un PIN olvidado no se
+  recuperaba y el frontend documentaba un endpoint de autoservicio que no
+  existía. Permiso propio `users.resetear_pin`, marca en la cuenta que la
+  bloquea hasta cambiarlo, revocación de sesiones y auditoría.
+- ⬜ **La consulta de DNI/RUC no tiene rate limit propio** (2026-08-12,
+  ADR-041). `GET /consulta/{dni,ruc}/{n}` gasta cuota de un proveedor **pago**
+  y hoy solo `/auth/login` está detrás de un límite. Con el permiso acotado a
+  cuatro roles el riesgo es de costo y no de fuga, pero una pantalla con un
+  bucle mal escrito basta para agotar el plan del mes. Va con el rate limit
+  global (más abajo) o con uno propio, lo que llegue primero.
 - ⬜ **Dar de baja un almacén no mira el stock** (2026-08-08, con el CRUD de
   organización): `DELETE /almacenes/{id}` niega la baja si otros almacenes
   se abastecen de este, pero el stock vive en `inventory` y `users` no

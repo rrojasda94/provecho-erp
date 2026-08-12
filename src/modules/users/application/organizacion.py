@@ -421,10 +421,18 @@ def crear_almacen(
     sucursal_id: uuid.UUID | None = None,
     direccion: str | None = None,
     almacen_abastecedor_id: uuid.UUID | None = None,
+    almacen_abastecedor_respaldo_id: uuid.UUID | None = None,
     actor_id: uuid.UUID | None = None,
 ) -> Almacen:
     _get(EmpresaRepo(session).get(empresa_id), "empresa")
-    _validar_almacen(session, empresa_id, tipo, sucursal_id, almacen_abastecedor_id)
+    _validar_almacen(
+        session,
+        empresa_id,
+        tipo,
+        sucursal_id,
+        almacen_abastecedor_id,
+        almacen_abastecedor_respaldo_id,
+    )
     almacen = AlmacenRepo(session).add(
         Almacen(
             empresa_id=empresa_id,
@@ -433,6 +441,7 @@ def crear_almacen(
             tipo=tipo,
             direccion=direccion,
             almacen_abastecedor_id=almacen_abastecedor_id,
+            almacen_abastecedor_respaldo_id=almacen_abastecedor_respaldo_id,
         )
     )
     _auditar(
@@ -463,13 +472,26 @@ def editar_almacen(
     abastecedor_id = (
         campos.get("almacen_abastecedor_id") or almacen.almacen_abastecedor_id
     )
-    if abastecedor_id == almacen_id:
+    respaldo_id = (
+        campos.get("almacen_abastecedor_respaldo_id")
+        or almacen.almacen_abastecedor_respaldo_id
+    )
+    if almacen_id in (abastecedor_id, respaldo_id):
         raise ReglaNegocio("un almacén no puede abastecerse a sí mismo")
-    _validar_almacen(session, almacen.empresa_id, tipo, sucursal_id, abastecedor_id)
+    _validar_almacen(
+        session, almacen.empresa_id, tipo, sucursal_id, abastecedor_id, respaldo_id
+    )
     antes = _aplicar(
         almacen,
         campos,
-        ("nombre", "tipo", "direccion", "sucursal_id", "almacen_abastecedor_id"),
+        (
+            "nombre",
+            "tipo",
+            "direccion",
+            "sucursal_id",
+            "almacen_abastecedor_id",
+            "almacen_abastecedor_respaldo_id",
+        ),
     )
     if antes:
         _auditar(
@@ -501,6 +523,7 @@ def _validar_almacen(
     tipo: str,
     sucursal_id: uuid.UUID | None,
     almacen_abastecedor_id: uuid.UUID | None,
+    almacen_abastecedor_respaldo_id: uuid.UUID | None = None,
 ) -> None:
     if tipo == TIPO_ALMACEN_DE_SUCURSAL and sucursal_id is None:
         raise ReglaNegocio("un almacén de tipo 'sucursal' exige sucursal_id")
@@ -508,9 +531,29 @@ def _validar_almacen(
         sucursal = _get(SucursalRepo(session).get(sucursal_id), "sucursal")
         if sucursal.empresa_id != empresa_id:
             raise ReglaNegocio("la sucursal pertenece a otra empresa")
-    if almacen_abastecedor_id is not None:
-        abastecedor = _get(
-            AlmacenRepo(session).get(almacen_abastecedor_id), "almacen abastecedor"
+    _exigir_abastecedor(session, empresa_id, almacen_abastecedor_id, "abastecedor")
+    _exigir_abastecedor(
+        session, empresa_id, almacen_abastecedor_respaldo_id, "abastecedor de respaldo"
+    )
+    # Un respaldo que es el principal no respalda nada: el día que el
+    # principal no esté, tampoco estará él (RN-INV-022).
+    if (
+        almacen_abastecedor_respaldo_id is not None
+        and almacen_abastecedor_respaldo_id == almacen_abastecedor_id
+    ):
+        raise ReglaNegocio(
+            "el almacén de respaldo no puede ser el mismo que el principal"
         )
-        if abastecedor.empresa_id != empresa_id:
-            raise ReglaNegocio("el almacén abastecedor pertenece a otra empresa")
+
+
+def _exigir_abastecedor(
+    session: Session,
+    empresa_id: uuid.UUID,
+    abastecedor_id: uuid.UUID | None,
+    que_es: str,
+) -> None:
+    if abastecedor_id is None:
+        return
+    abastecedor = _get(AlmacenRepo(session).get(abastecedor_id), f"almacen {que_es}")
+    if abastecedor.empresa_id != empresa_id:
+        raise ReglaNegocio(f"el almacén {que_es} pertenece a otra empresa")

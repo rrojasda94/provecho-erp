@@ -3,6 +3,8 @@ solicitud de insumos y transferencia con recepción. SQLite en memoria +
 override de get_db, igual que `test_inventory.py`.
 """
 
+import uuid
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
@@ -305,7 +307,9 @@ def test_almacen_sin_abastecedor_exige_indicarlo(env):
     # El central no tiene abastecedor configurado.
     r = _solicitar(client, h, ids, almacen_solicitante_id=ids["central_id"])
     assert r.status_code == 409
-    assert "no tiene abastecedor configurado" in r.json()["detail"]
+    # "vigente" y no "configurado": desde RN-INV-022 el mensaje cubre también
+    # el caso de un principal configurado pero dado de baja, sin respaldo.
+    assert "no tiene abastecedor vigente" in r.json()["detail"]
 
 
 def test_quien_solicita_no_aprueba(env):
@@ -714,3 +718,68 @@ def test_despachar_sin_stock_falla_entera(env):
     assert client.get(
         f"/api/v1/inventory/transferencias?almacen_id={ids['local_id']}", headers=h
     ).json()["items"] == []
+
+
+def test_el_respaldo_atiende_cuando_el_principal_esta_de_baja(env):
+    """El respaldo existe para el día en que el central no está (RN-INV-022).
+
+    Antes, dar de baja el abastecedor dejaba a la sucursal sin poder pedir
+    nada y con un "almacén abastecedor no encontrado" que no le decía a nadie
+    qué hacer.
+    """
+    client, ids, TestSession = env
+    with TestSession() as s:
+        segundo = Almacen(
+            empresa_id=uuid.UUID(ids["empresa_id"]),
+            nombre="Central Norte",
+            tipo="central",
+        )
+        s.add(segundo)
+        s.flush()
+        local = s.get(Almacen, uuid.UUID(ids["local_id"]))
+        local.almacen_abastecedor_respaldo_id = segundo.id
+        s.commit()
+        respaldo_id = str(segundo.id)
+
+    h = _token(client, "almacenero1", "654321")
+    # Con el principal vigente manda el principal: el respaldo no se usa
+    # "por si acaso", se usa cuando hace falta.
+    assert _solicitar(client, h, ids).json()["almacen_abastecedor_id"] == ids["central_id"]
+
+    with TestSession() as s:
+        s.get(Almacen, uuid.UUID(ids["central_id"])).deleted_at = datetime.now(UTC)
+        s.commit()
+
+    r = _solicitar(client, h, ids)
+    assert r.status_code == 201, r.text
+    assert r.json()["almacen_abastecedor_id"] == respaldo_id
+
+
+def test_el_abastecedor_pedido_a_mano_no_cae_al_respaldo(env):
+    """Quien nombra un almacén está pidiendo a ESE. Darle otro en silencio
+    sería despachar desde donde no se pidió."""
+    client, ids, TestSession = env
+    with TestSession() as s:
+        segundo = Almacen(
+            empresa_id=uuid.UUID(ids["empresa_id"]),
+            nombre="Central Norte",
+            tipo="central",
+        )
+        s.add(segundo)
+        s.flush()
+        local = s.get(Almacen, uuid.UUID(ids["local_id"]))
+        local.almacen_abastecedor_respaldo_id = segundo.id
+        s.get(Almacen, uuid.UUID(ids["central_id"])).deleted_at = datetime.now(UTC)
+        s.commit()
+
+    h = _token(client, "almacenero1", "654321")
+    r = client.post("/api/v1/inventory/solicitudes", headers=h, json={
+        "almacen_solicitante_id": ids["local_id"],
+        "almacen_abastecedor_id": ids["central_id"],
+        "items": [{"sku_id": ids["sku_servilleta"], "cantidad": "10"}],
+    })
+    # 404 y no un 201 despachado desde el respaldo. El mensaje lo da el
+    # scope del router, que rechaza el almacén dado de baja antes de llegar
+    # al caso de uso; lo que importa acá es que **no hay fallback**.
+    assert r.status_code == 404, r.text
+    assert "no encontrado" in r.json()["detail"]

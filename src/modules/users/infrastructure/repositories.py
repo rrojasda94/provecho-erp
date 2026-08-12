@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import select, update
+from sqlalchemy import or_, select, update
 from sqlalchemy.orm import Session
 
 from src.modules.users.infrastructure.models import (
@@ -210,6 +210,18 @@ class RefreshTokenRepo:
         ):
             tok.revocado = True
 
+    def revocar_usuario(self, usuario_id: uuid.UUID) -> None:
+        """Todas las sesiones de una cuenta, no solo la del request. Lo usa el
+        reseteo de PIN: si se resetea por sospecha, dejar viva la sesión que
+        ya estaba abierta no cierra nada."""
+        for tok in self.s.scalars(
+            select(RefreshToken).where(
+                RefreshToken.usuario_id == usuario_id,
+                RefreshToken.revocado.is_(False),
+            )
+        ):
+            tok.revocado = True
+
 
 class TokenAgenteRepo:
     def __init__(self, session: Session) -> None:
@@ -396,12 +408,17 @@ class AlmacenRepo:
         return list(self.s.scalars(stmt.order_by(Almacen.nombre)))
 
     def abastecidos_por(self, almacen_id: uuid.UUID) -> list[Almacen]:
-        """Los que se abastecen de este. Dar de baja al central sin mirarlos
-        dejaría a media empresa apuntando a un almacén que ya no existe."""
+        """Los que se abastecen de este, **como principal o como respaldo**.
+        Dar de baja al central sin mirarlos dejaría a media empresa apuntando
+        a un almacén que ya no existe — y un respaldo que no existe es peor
+        que no tenerlo, porque nadie se entera hasta que hace falta."""
         return list(
             self.s.scalars(
                 select(Almacen).where(
-                    Almacen.almacen_abastecedor_id == almacen_id,
+                    or_(
+                        Almacen.almacen_abastecedor_id == almacen_id,
+                        Almacen.almacen_abastecedor_respaldo_id == almacen_id,
+                    ),
                     Almacen.deleted_at.is_(None),
                 )
             )

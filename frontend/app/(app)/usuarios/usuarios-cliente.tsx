@@ -10,6 +10,7 @@ import {
 } from "@/components/formulario/dialogo-formulario";
 import { PersonaPicker } from "@/components/persona-picker/persona-picker";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
+import { tienePermiso } from "@/lib/permisos";
 
 import {
   asignarRolAction,
@@ -17,6 +18,7 @@ import {
   crearUsuarioAction,
   editarUsuarioAction,
   quitarRolAction,
+  resetearPinAction,
 } from "./actions";
 
 export type Usuario = {
@@ -199,15 +201,64 @@ function BotonActivo({ usuario }: { usuario: Usuario }) {
   );
 }
 
+/** Resetear el PIN es poder entrar como esa persona, así que pregunta antes.
+ * Lo que pasa después lo hace cumplir el servidor: la cuenta no puede hacer
+ * nada hasta elegir un PIN nuevo, se le cierran las sesiones abiertas y queda
+ * escrito quién la reseteó. */
+function BotonResetPin({ usuario }: { usuario: Usuario }) {
+  const [pendiente, startTransition] = useTransition();
+  const [aviso, setAviso] = useState("");
+
+  if (usuario.tipo !== "humano") return null;
+
+  return (
+    <span className="flex flex-col">
+      <button
+        type="button"
+        disabled={pendiente}
+        className={BOTON_FILA}
+        title="Devuelve el PIN a 123456 y obliga a cambiarlo al entrar"
+        onClick={() => {
+          if (
+            !window.confirm(
+              `¿Resetear el PIN de ${usuario.username}? Volverá a 123456, ` +
+                "se cerrarán sus sesiones abiertas y tendrá que elegir uno " +
+                "nuevo la próxima vez que entre.",
+            )
+          ) {
+            return;
+          }
+          startTransition(async () => {
+            const r = await resetearPinAction(usuario.id);
+            setAviso(r.error || "PIN reseteado a 123456.");
+          });
+        }}
+      >
+        {pendiente ? "Reseteando..." : "Resetear PIN"}
+      </button>
+      {aviso && (
+        <span role="status" className="text-xs text-gray">
+          {aviso}
+        </span>
+      )}
+    </span>
+  );
+}
+
 export function UsuariosCliente({
   usuarios,
   roles,
   rolesPorUsuario,
+  permisos,
 }: {
   usuarios: Usuario[];
   roles: Rol[];
   rolesPorUsuario: Record<string, Rol[]>;
+  permisos: string[];
 }) {
+  // El botón se oculta a quien no puede: dejarlo visible para chocar con un
+  // 403 al confirmar es peor que no ofrecerlo (mismo criterio que ADR-013).
+  const puedeResetear = tienePermiso(permisos, "users.resetear_pin");
   const [busquedaRol, setBusquedaRol] = useState("");
   const visibles = useMemo(
     () =>
@@ -249,10 +300,15 @@ export function UsuariosCliente({
       {
         id: "acciones",
         header: "",
-        cell: ({ row }) => <DialogoEditarCuenta usuario={row.original} />,
+        cell: ({ row }) => (
+          <span className="flex items-center gap-2">
+            <DialogoEditarCuenta usuario={row.original} />
+            {puedeResetear && <BotonResetPin usuario={row.original} />}
+          </span>
+        ),
       },
     ],
-    [roles, rolesPorUsuario],
+    [roles, rolesPorUsuario, puedeResetear],
   );
 
   return (

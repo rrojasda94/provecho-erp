@@ -28,27 +28,50 @@ from src.modules.inventory.infrastructure.repositories import SolicitudRepo
 from src.modules.users.infrastructure.models import Almacen
 
 
+def _vigente(session: Session, almacen_id: uuid.UUID | None) -> Almacen | None:
+    """El almacén, si existe y no está dado de baja."""
+    if almacen_id is None:
+        return None
+    almacen = session.get(Almacen, almacen_id)
+    return None if almacen is None or almacen.deleted_at is not None else almacen
+
+
 def _abastecedor_valido(
     session: Session,
     almacen_solicitante_id: uuid.UUID,
     almacen_abastecedor_id: uuid.UUID | None,
 ) -> uuid.UUID:
     """De qué almacén se abastece este, con las cuatro cosas que tienen que
-    ser ciertas para que el pedido signifique algo."""
+    ser ciertas para que el pedido signifique algo.
+
+    Sin abastecedor explícito manda el principal del almacén, y **si el
+    principal está dado de baja se cae al de respaldo** (RN-INV-022). Ese es
+    el caso que el respaldo existe para cubrir: hasta ahora, dar de baja el
+    central dejaba a la sucursal sin poder pedir nada y con un "almacén
+    abastecedor no encontrado" que no le decía a nadie qué hacer.
+
+    El explícito **no** cae al respaldo: quien nombra un almacén está pidiendo
+    a ese, y darle otro en silencio sería despachar desde donde no se pidió.
+    """
     solicitante = session.get(Almacen, almacen_solicitante_id)
     if solicitante is None or solicitante.deleted_at is not None:
         raise NoEncontrado("almacén solicitante no encontrado")
 
-    abastecedor_id = almacen_abastecedor_id or solicitante.almacen_abastecedor_id
+    abastecedor_id = almacen_abastecedor_id
+    if abastecedor_id is None:
+        principal = _vigente(session, solicitante.almacen_abastecedor_id)
+        respaldo = _vigente(session, solicitante.almacen_abastecedor_respaldo_id)
+        elegido = principal or respaldo
+        abastecedor_id = elegido.id if elegido is not None else None
     if abastecedor_id is None:
         raise ReglaNegocio(
-            "el almacén no tiene abastecedor configurado: indicar "
+            "el almacén no tiene abastecedor vigente: indicar "
             "`almacen_abastecedor_id` o configurarlo en el almacén"
         )
     if abastecedor_id == almacen_solicitante_id:
         raise ReglaNegocio("un almacén no se abastece a sí mismo")
-    abastecedor = session.get(Almacen, abastecedor_id)
-    if abastecedor is None or abastecedor.deleted_at is not None:
+    abastecedor = _vigente(session, abastecedor_id)
+    if abastecedor is None:
         raise NoEncontrado("almacén abastecedor no encontrado")
     if abastecedor.empresa_id != solicitante.empresa_id:
         raise ReglaNegocio("los dos almacenes deben ser de la misma empresa")

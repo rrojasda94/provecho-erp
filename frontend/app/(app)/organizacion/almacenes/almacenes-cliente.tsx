@@ -21,6 +21,7 @@ export type Almacen = {
   tipo: string;
   direccion: string | null;
   almacen_abastecedor_id: string | null;
+  almacen_abastecedor_respaldo_id: string | null;
 };
 
 function CamposAlmacen({
@@ -83,6 +84,24 @@ function CamposAlmacen({
         </select>
         <span className="text-xs font-normal text-gray">
           A quién le pide stock cuando le falta: el central despacha, el local recibe.
+        </span>
+      </label>
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Abastecedor de respaldo
+        <select
+          name="almacen_abastecedor_respaldo_id"
+          defaultValue={valor(a.almacen_abastecedor_respaldo_id)}
+        >
+          <option value="">Ninguno</option>
+          {abastecedores.map((otro) => (
+            <option key={otro.id} value={otro.id}>
+              {otro.nombre}
+            </option>
+          ))}
+        </select>
+        <span className="text-xs font-normal text-gray">
+          A quién se le pide si el principal está dado de baja. Puede ser el
+          almacén de otra sucursal.
         </span>
       </label>
     </>

@@ -50,6 +50,10 @@ class MeOut(BaseModel):
     sucursales: list[uuid.UUID]
     empresa_id: uuid.UUID | None
     permisos: list[str]
+    # El PIN vigente lo puso otra persona. Viaja acá porque `/users/me` es
+    # de lo poco que la cuenta puede pedir en ese estado, y el shell tiene
+    # que saber que hay que mandarla a cambiarlo.
+    debe_cambiar_pin: bool = False
     # El frontend las escribe como atributos de `<html>` durante el render en
     # servidor. Van en `/users/me` y no en un endpoint propio para que no haya
     # un instante en el que la pantalla ya se dibujó con la paleta equivocada.
@@ -146,6 +150,9 @@ class AlmacenOut(BaseModel):
     tipo: str
     direccion: str | None
     almacen_abastecedor_id: uuid.UUID | None = None
+    # A quién se le pide cuando el principal no está disponible
+    # (RN-INV-022). Distinto del principal y de la misma empresa.
+    almacen_abastecedor_respaldo_id: uuid.UUID | None = None
 
 
 class MarcaOut(BaseModel):
@@ -289,6 +296,9 @@ class AlmacenCreate(BaseModel):
     tipo: str = Field(min_length=1, max_length=30)
     direccion: str | None = Field(default=None, max_length=255)
     almacen_abastecedor_id: uuid.UUID | None = None
+    # A quién se le pide cuando el principal no está disponible
+    # (RN-INV-022). Distinto del principal y de la misma empresa.
+    almacen_abastecedor_respaldo_id: uuid.UUID | None = None
 
 
 class AlmacenUpdate(BaseModel):
@@ -297,6 +307,9 @@ class AlmacenUpdate(BaseModel):
     direccion: str | None = Field(default=None, max_length=255)
     sucursal_id: uuid.UUID | None = None
     almacen_abastecedor_id: uuid.UUID | None = None
+    # A quién se le pide cuando el principal no está disponible
+    # (RN-INV-022). Distinto del principal y de la misma empresa.
+    almacen_abastecedor_respaldo_id: uuid.UUID | None = None
 
 
 # --- Tokens de API de agentes (`tipo=agente_ia`) ---
@@ -349,6 +362,14 @@ class UsuarioUpdate(BaseModel):
 
 class PinChange(BaseModel):
     pin: str
+
+
+class PinPropioChange(BaseModel):
+    """Cambio del PIN propio. Pide el actual aunque haya sesión válida: una
+    pantalla que quedó abierta no debería alcanzar para quedarse la cuenta."""
+
+    pin_actual: str
+    pin_nuevo: str
 
 
 class UsuarioOut(BaseModel):

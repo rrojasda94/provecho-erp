@@ -10,6 +10,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from src.config.settings import settings
 from src.core import error_handlers
 from src.core.auditoria_router import router as auditoria_router
+from src.core.consulta_router import router as consulta_router
 from src.core.dashboard_router import router as dashboard_router
 from src.core.health_router import router as health_router
 from src.core.logging_config import configurar_logging, request_id_var
@@ -125,6 +126,14 @@ TAGS_METADATA = [
         "description": (
             "Rastro inmutable de cambios (`audit_log`, ADR-031): quién, qué, "
             "cuándo, dónde y valor anterior/nuevo. Solo lectura."
+        ),
+    },
+    {
+        "name": "consulta",
+        "description": (
+            "Consulta de DNI y RUC contra Factiliza (RENIEC/SUNAT) para "
+            "prellenar altas. Solo lectura: no guarda nada, y lo que devuelve "
+            "sigue siendo editable en el formulario."
         ),
     },
     {
@@ -269,6 +278,7 @@ def create_app() -> FastAPI:
 
     app.include_router(health_router)
     app.include_router(auditoria_router, prefix="/api/v1")
+    app.include_router(consulta_router, prefix="/api/v1")
     app.include_router(dashboard_router, prefix="/api/v1")
     app.include_router(reportes_router, prefix="/api/v1")
     app.include_router(router_tableros, prefix="/api/v1")

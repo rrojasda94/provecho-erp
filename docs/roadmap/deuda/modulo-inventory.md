@@ -3,6 +3,16 @@
 Parte del backlog de deuda técnica del proyecto. El índice y las reglas
 de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 
+- ✅ 2026-08-12 **Abastecedor de respaldo** (ADR-040, RN-INV-022,
+  migración `a7c04e3b91d5`): dar de baja el central dejaba a la sucursal sin
+  poder pedir nada.
+- ⬜ **No se puede vaciar un abastecedor ya elegido** (2026-08-12): los
+  `PATCH` de organización tratan `null` como "no tocar" (convención de
+  `users/api/schemas.py`), así que elegir "Ninguno" en el selector no lo
+  limpia — solo lo deja como estaba. Es previo a este cambio y ahora tiene un
+  campo más. Se arregla con un centinela explícito en el `Update`, que es un
+  cambio de contrato para las cinco entidades de organización.
+
 - ✅ 2026-08-03 **Recetas editables** (ADR-023, migración `b6d1e83f47ac`):
   CRUD de receta e ítems, duplicar con "(copy)", escalar por factor y
   aritmética tecleada en la cantidad (`receta_item.expresion`), redondeada
