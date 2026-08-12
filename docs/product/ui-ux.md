@@ -1,31 +1,117 @@
 # UI / UX y branding
 
-## Branding Provecho (brandboard 2026-07)
+## Dos voces, no una (revisión 2026-08-07)
+
+El brandboard de julio se aplicó por igual a todo: fondo crema de pared a
+pared y cada `h1`–`h4` en Anton itálica y VERSALES. Es la voz correcta cuando
+la marca le habla al cliente —PDV, kiosco, carta— y la peor posible en una
+pantalla de trabajo: la itálica en versales es el ajuste menos escaneable que
+existe, y sobre crema las tarjetas blancas pierden contraste justo donde
+están los números.
+
+Desde el rediseño hay **dos superficies con reglas distintas**:
+
+| | Back office | PDV / KDS / login |
+|---|---|---|
+| Quién mira | personal, turnos de 8 h, tablas densas | cliente y quien atiende |
+| Fondo | acero `#F2F4F7` | crema `#FFF4E6` |
+| Titulares | Archivo condensada, caja normal | la voz de la marca |
+| Logotipo | Anton, solo el wordmark | Anton |
+| Color | tinta y gris; brasa solo en acciones | marca completa |
+
+No es un tema nuevo ni un segundo set de tokens: es el **mismo** sistema,
+donde el back office usa el subconjunto sobrio. El mecanismo de skins por
+marca (abajo) no cambia.
+
+## Branding Provecho (brandboard 2026-07, valores revisados 2026-08-07)
 
 ### Paleta
 
 | Token CSS | Hex | Uso |
 |-----------|-----|-----|
-| `--color-primary` | `#F4511E` | Naranja fuego — acciones primarias, logo |
-| `--color-secondary` | `#B71C1C` | Rojo — alertas/énfasis |
-| `--color-dark` | `#161616` | Negro — fondos oscuros, texto sobre claro |
-| `--color-cream` | `#FFF1DC` | Crema — fondo claro por defecto |
-| `--color-accent` | `#AEEA00` | Verde lima — acentos, éxito |
-| `--color-gray` | `#757575` | Gris — texto secundario, bordes |
+| `--color-primary` | `#C6390F` | Brasa — acciones primarias, logo |
+| `--color-secondary` | `#7A1414` | Rescoldo — destructivo, crítico, error |
+| `--color-dark` | `#15171C` | Tinta — texto y fondos oscuros |
+| `--color-cream` | `#FFF4E6` | Crema — superficie de marca (PDV, KDS, login) |
+| `--color-accent` | `#17864B` | Verde operación — estado "activo / conforme" |
+| `--color-gray` | `#5F6B7A` | Humo — texto secundario |
+| `--color-steel` | `#F2F4F7` | Acero — fondo del back office |
+
+Los hex se movieron por contraste medido, no por gusto:
+
+- El naranja `#F4511E` daba **3.4:1** sobre blanco y `text-primary` aparece 41
+  veces en enlaces y títulos — no llegaba a AA. `#C6390F` da 5.3:1.
+- El lima `#AEEA00` era, en la práctica, el color de 30 insignias de estado
+  (`bg-accent/30` = emitida, recibida, cuadra, operativo, activa). En texto
+  era ilegible y en insignia quedaba amarillento. El verde dice lo mismo y se
+  lee.
+- Tinta y humo pasaron de neutro cálido a neutro frío: es lo que hace que el
+  fondo lea como acero de cocina y no como cartón.
+
+### Color por área de negocio
+
+Cuatro colores, uno por área, **no uno por módulo** — doce colores serían un
+arcoíris; cuatro son la división con la que el grupo ya trabaja.
+
+| Token | Hex | Área | Módulos |
+|-------|-----|------|---------|
+| `--area-operacion` | `#C6390F` | Operación | Dashboard, Cocina (KDS), Producción |
+| `--area-comercial` | `#3730A3` | Comercial | Ventas, Catálogo, Marketing |
+| `--area-abastecimiento` | `#0F766E` | Abastecimiento | Compras, Inventario |
+| `--area-administracion` | `#3F4A5A` | Administración | Contabilidad, RRHH, Gerencia, Usuarios |
+
+Aparece en tres lugares y en ninguno más: el filo del ítem activo del
+sidebar, la ficha del ícono, y el borde de la tarjeta al apuntarla. Nunca
+como relleno de un área grande. Sirve para orientarse —se sabe en qué
+estación se está antes de leer el título— y por eso no puede ser el único
+indicador de nada (ver Accesibilidad).
 
 ### Tipografías
 
-- **Anton Italic** — titulares y logotipo (mayúsculas, cursiva). Google Fonts
-  `Anton` + `font-style: italic` (la fuente no trae itálica nativa).
-- **Inter** — textos y cuerpo (Regular / Medium / Bold).
+- **Archivo** (variable, ejes de peso y **ancho**) — títulos y cuerpo. Una
+  sola familia: el contraste entre un título y un párrafo lo dan el ancho
+  condensado (`font-stretch: 92%`) y el peso, no una segunda grotesca que se
+  le parece. En un ERP en español, donde las etiquetas son largas ("Órdenes
+  de compra pendientes de aprobación"), condensar es además lo que hace que
+  quepan sin abreviar.
+- **IBM Plex Mono** — cifras: importes, cantidades, códigos internos, IDs.
+  Clase `.cifra`. Una columna de dinero solo se compara si los dígitos ocupan
+  el mismo ancho; el `body` lleva `font-variant-numeric: tabular-nums` por
+  defecto.
+- **Anton** — **solo el logotipo** (clase `.logotipo`) y las superficies de
+  marca. Era la fuente de todos los títulos del ERP; ahora firma donde
+  corresponde y no se mete en la lectura.
+- Inter salió: era la tercera grotesca neutra y no aportaba nada que Archivo
+  no hiciera.
 
 ### Identidad
 
-- Logotipo: "P" en llamas + PROVECHO (Anton Italic). Variantes: horizontal,
+- Logotipo: "P" en llamas + PROVECHO (Anton). Variantes: horizontal,
   vertical (tagline "Hub Gastronómico"), isotipo reducido, monocromática,
   verde lima sobre oscuro.
+- En el back office el logotipo se reduce a wordmark + un cuadro de 8 px en
+  brasa (que gira 45° al apuntarlo). Es la única firma cromática de la barra.
 - Frase de campaña: **"¿Qué se te antoja hoy?"**
-- Estilo gráfico: texturas urbanas (concreto, grunge, spray).
+- Estilo gráfico: texturas urbanas (concreto, grunge, spray) — en las
+  superficies de marca, no en las pantallas de trabajo.
+
+### Movimiento
+
+Una sola curva para todo el ERP, `--transicion: 180ms cubic-bezier(.2,.7,.2,1)`:
+entra rápido y frena suave, como un cajón bien montado. Cuatro usos y no más:
+
+1. **Entrada de pantalla** — 8 px de subida y opacidad, 220 ms, una vez por
+   navegación (`components/shell/revelar.tsx`).
+2. **Escalonado de grilla** — 25 ms entre fichas, hasta la sexta; más allá se
+   percibe como lentitud (`.revelar-lista`).
+3. **Filos de área** — crecen de arriba abajo al apuntar una ficha o al
+   marcar el ítem activo del sidebar.
+4. **Estados** — fondo, borde y sombra en hover/foco; 1 px de hundimiento al
+   presionar.
+
+Sin parallax, sin animación por scroll, sin nada que retrase una acción. Y
+`prefers-reduced-motion: reduce` apaga todo: para parte del personal el
+desplazamiento en pantalla produce mareo, no es una cortesía.
 
 ## Sistema de skins y temas (multi-marca)
 
@@ -75,8 +161,8 @@ rojo-verde) y sube el contraste general:
 
 | Token semántico | Provecho (estándar) | Alto contraste / daltonismo |
 |---|---|---|
-| `--status-success` | `--color-accent` `#AEEA00` (verde lima) | `#0072B2` (azul) |
-| `--status-danger` | `--color-secondary` `#B71C1C` (rojo) | `#D55E00` (naranja vermellón) |
+| `--status-success` | `--color-accent` `#17864B` (verde operación) | `#0072B2` (azul) |
+| `--status-danger` | `--color-secondary` `#7A1414` (rescoldo) | `#D55E00` (naranja vermellón) |
 | `--status-warning` *(nuevo, no existe hoy)* | `#FFB300` (ámbar) | `#E69F00` (ocre) |
 | `--status-info` *(nuevo, no existe hoy)* | `#1976D2` (azul) | `#56B4E9` (celeste) |
 

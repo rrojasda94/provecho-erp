@@ -44,7 +44,7 @@ export function PeriodosCliente({ periodos }: { periodos: Periodo[] }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="font-heading text-xl italic uppercase text-dark">Periodos contables</h1>
+      <h1 className="font-heading text-xl text-dark">Periodos contables</h1>
       <p className="text-sm text-gray">
         Un asiento solo entra en un periodo <strong>abierto</strong> — por eso el primer
         asiento de una empresa nueva falla hasta abrir su mes. Cerrar un periodo lo

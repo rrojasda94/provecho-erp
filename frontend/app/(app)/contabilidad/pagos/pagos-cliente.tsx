@@ -51,7 +51,7 @@ function DialogoEjecutar({ pago, proveedor }: { pago: Pago; proveedor: string })
       <dialog ref={dialogRef} className="w-full max-w-sm rounded-lg p-0 backdrop:bg-dark/40">
         <form ref={formRef} action={formAction} className="flex flex-col gap-4 p-6">
           <input type="hidden" name="movimiento_id" value={pago.id} />
-          <h2 className="font-heading text-lg italic uppercase text-dark">Ejecutar pago</h2>
+          <h2 className="font-heading text-lg text-dark">Ejecutar pago</h2>
           <p className="text-sm text-gray">
             {proveedor} · S/ {pago.monto}
             {pago.monto_detraccion && Number(pago.monto_detraccion) > 0 && (
@@ -189,7 +189,7 @@ export function PagosCliente({
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="font-heading text-xl italic uppercase text-dark">Pagos a proveedor</h1>
+      <h1 className="font-heading text-xl text-dark">Pagos a proveedor</h1>
       <p className="text-sm text-gray">
         La cola la llena la conformidad del comprobante en Compras: nada entra acá sin
         haberse recibido y conformado antes. Ejecutar genera el asiento contable.

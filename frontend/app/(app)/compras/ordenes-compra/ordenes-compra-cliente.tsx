@@ -142,7 +142,7 @@ function DialogoNuevaOC({
         }}
       >
         <form ref={formRef} action={formAction} className="flex flex-col gap-4 p-6">
-          <h2 className="font-heading text-lg italic uppercase text-dark">
+          <h2 className="font-heading text-lg text-dark">
             Nueva orden de compra
           </h2>
           <div className="grid grid-cols-2 gap-4">
@@ -285,7 +285,7 @@ export function OrdenesCompraCliente({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h1 className="font-heading text-xl italic uppercase text-dark">Órdenes de compra</h1>
+        <h1 className="font-heading text-xl text-dark">Órdenes de compra</h1>
         <DialogoNuevaOC proveedores={proveedores} almacenes={almacenes} articulos={articulos} />
       </div>
       {articulos.length === 0 && (

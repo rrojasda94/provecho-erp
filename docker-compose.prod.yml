@@ -65,6 +65,27 @@ services:
       redis:
         condition: service_healthy
 
+  # Interfaz web. Faltaba: el compose de producción levantaba API, worker y
+  # beat, y el ERP quedaba sin pantallas — la única forma de desplegar el
+  # frontend era construirlo a mano en el servidor.
+  #
+  # Imagen propia (`provecho-web`), no la del backend: son dos runtimes
+  # distintos (Node y Python) y dos ciclos de build distintos.
+  web:
+    image: ${PROVECHO_WEB_IMAGE:-ghcr.io/majambo/provecho-web:latest}
+    restart: unless-stopped
+    environment:
+      # El navegador no habla con la API: la alcanza por `/api/proxy`, que
+      # corre en este mismo contenedor y sale por la red interna de compose.
+      # Por eso acá basta el nombre del servicio y la API puede seguir
+      # escuchando solo en loopback del host.
+      API_INTERNAL_URL: http://api:8000
+    # Solo loopback: el proxy es la única puerta de entrada desde fuera.
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      - api
+
   redis:
     image: redis:7-alpine
     restart: unless-stopped

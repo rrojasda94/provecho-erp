@@ -1,5 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Servidor autocontenido para la imagen de producción: Next copia a
+  // `.next/standalone` el server y SOLO las dependencias que el árbol de
+  // módulos alcanza. Sin esto, la imagen tendría que arrastrar el
+  // `node_modules` completo —devDependencies incluidas— para arrancar.
+  output: "standalone",
+
   // Next 16 escribe `AGENTS.md` y un `CLAUDE.md` que lo incluye cada vez que
   // corre `next dev`. `CLAUDE.md` es un archivo de reglas del proyecto que se
   // redacta a mano y que Claude Code carga como instrucciones: que una

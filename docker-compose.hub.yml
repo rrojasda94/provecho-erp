@@ -45,9 +45,14 @@ services:
       db:
         condition: service_healthy
 
-  # Motor de sync (ADR-009 fase 2): empuja las ventas del corte y baja
-  # catálogo/stock/RBAC. Proceso aparte del que atiende a la LAN — si el
-  # sync se traba, el PDV del local sigue vendiendo igual.
+  # Motor de sync (ADR-009 fases 2 y 3). Proceso aparte del que atiende a la
+  # LAN — si el sync se traba, el PDV del local sigue vendiendo igual.
+  #
+  # Baja catálogo, stock, RBAC y el ciclo de abastecimiento (solicitudes,
+  # transferencias entrantes, reservas, ficha del almacén abastecedor). Sube
+  # las ventas del corte, la solicitud creada, la recepción hecha y el conteo
+  # cerrado — cada módulo con su propio watermark, así que un conteo trabado
+  # no frena las ventas.
   sync:
     image: ${PROVECHO_IMAGE:-ghcr.io/majambo/provecho:latest}
     restart: unless-stopped

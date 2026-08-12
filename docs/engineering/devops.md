@@ -12,13 +12,47 @@ esta guía afirmaba lo contrario): `docker-compose.yml` es de desarrollo
 de juguete— y `docker-compose.prod.yml` es el de servidor. Ver
 [Despliegue](#despliegue).
 
-**Dos variables para la URL de la API en `web`, no una** (desde el
-dashboard de 2026-07-26, ADR-012): `NEXT_PUBLIC_API_URL` es la vista del
-**navegador** (fuera de los contenedores: `localhost`, puerto publicado);
-`API_INTERNAL_URL` es la vista del **proceso de Next.js** (Server Actions/
-Server Components, dentro del contenedor `web`) — usa el nombre del
-servicio (`http://api:8000`), porque `web` y `api` son contenedores
-distintos sin ningún `localhost` en común.
+**Una sola variable para la URL de la API en `web`** (corregido 2026-08-07;
+antes esta guía documentaba dos): `API_INTERNAL_URL` es la vista del
+**proceso de Next.js** (Server Actions, Server Components y el proxy
+`app/api/proxy`) — usa el nombre del servicio (`http://api:8000`), porque
+`web` y `api` son contenedores distintos sin ningún `localhost` en común.
+
+`NEXT_PUBLIC_API_URL` ya no existe. El navegador **nunca** habla con la API:
+la CSP de `frontend/middleware.ts` fija `connect-src 'self'` y todo el
+tráfico sale por `app/api/proxy`, que corre server-side. La variable
+sobrevivía en el compose de la etapa anterior sin que una sola línea del
+frontend la leyera — y como `NEXT_PUBLIC_*` se hornea en el build, mantenerla
+habría obligado a reconstruir la imagen para cambiar de servidor.
+
+### Imágenes: dos, no una
+
+| Imagen | Contexto | Etapa | Qué corre |
+|--------|----------|-------|-----------|
+| `ghcr.io/<repo>` | `.` | única | FastAPI, Celery worker, Celery beat, runner de sync |
+| `ghcr.io/<repo>-web` | `./frontend` | `runner` | Next.js en modo `standalone` |
+
+`frontend/Dockerfile` es multietapa. `deps` instala con **`npm ci`** (el
+árbol exacto del lockfile, el mismo que resolvió CI — con `npm install` y sin
+copiar `package-lock.json`, cada build resolvía los `^` a lo último publicado
+ese día). `dev` es la que usa `docker-compose.yml`; `runner` es la de
+producción y arranca `node server.js` desde `.next/standalone`, sin
+devDependencies y con usuario sin privilegios.
+
+Ambas imágenes corren sobre **Node 24**, la misma versión que CI: `npm test`
+usa el stripping de tipos de fábrica de `node --test`, que no existe antes de
+22.18.
+
+Los dos tags se mueven juntos porque salen del mismo commit. En producción se
+fijan `PROVECHO_IMAGE` y `PROVECHO_WEB_IMAGE` a la **misma** versión: volver
+atrás solo el backend dejaría al frontend hablándole a un contrato que ya
+cambió.
+
+Hay un `.dockerignore` por contexto. Sin ellos, `docker build` empaqueta y
+envía el repositorio entero al daemon antes de leer la primera línea del
+Dockerfile — `.git`, el `node_modules` del host (binarios de Windows que
+Alpine no puede usar), los `.docx` de infraestructura — y cualquier cambio en
+el contexto invalida el `cache-from` de CI aunque no entre en la imagen.
 
 ## Base de datos: contenedor `db` del docker-compose (desarrollo)
 
@@ -166,9 +200,10 @@ GitHub Actions. Ver ADR-008 para el porqué de separar entrega de despliegue.
 |-----|--------------|
 | `backend` | `ruff check`, `pytest`, que Alembic tenga **una sola cabeza** y que el contrato OpenAPI esté regenerado |
 | `migraciones` | contra un Postgres 16 real: `upgrade head` sobre base vacía, `downgrade base`, volver a subir, y `alembic check` |
-| `imagen` | que el `Dockerfile` construya **y que el contenedor arranque** y responda `/health` |
+| `imagen` | que **las dos** imágenes construyan y que los contenedores arranquen: backend responde `/health`, frontend responde `/login` |
 | `seguridad` | `pip-audit` (informativo, no bloquea) |
-| `frontend` | `eslint` + `build` |
+| `frontend` | `eslint` + `npm test` + `build` |
+| `e2e` | flujo del dinero de punta a punta (Playwright) contra la API real |
 
 El chequeo de cabeza única atrapa el caso en que dos ramas crean migraciones
 en paralelo: `alembic upgrade head` falla durante el despliegue, no en el
@@ -176,11 +211,15 @@ merge que lo causó. El job `migraciones` existe porque los tests corren sobre
 SQLite con `create_all` y nunca ejecutan una migración: acá se ejecutan de
 verdad, ida y vuelta, contra Postgres. El job `imagen` cubre lo que nadie
 comprobaba — que la imagen siquiera construyera — y de paso valida el `CMD`,
-el usuario sin privilegios y el `HEALTHCHECK`.
+el usuario sin privilegios y el `HEALTHCHECK`. Desde 2026-08-07 cubre también
+la imagen del frontend: el job `frontend` corre `npm run build` sobre el
+runner, no dentro de la imagen, así que un Dockerfile roto (estáticos sin
+copiar, `standalone` mal armado) se descubría al desplegar.
 
 **`release.yml`** — entrega continua del artefacto: cada push a `main`
-publica la imagen en GHCR (`ghcr.io/<repo>:latest`); los tags `v*` publican
-además la versión exacta (`:1.2.3`, `:1.2`).
+publica **dos** imágenes en GHCR, `ghcr.io/<repo>:latest` y
+`ghcr.io/<repo>-web:latest`; los tags `v*` publican además la versión exacta
+(`:1.2.3`, `:1.2`).
 
 ### Despliegue
 
@@ -189,7 +228,9 @@ desarrollo** (monta el código, `--reload`, Postgres con contraseña de
 juguete); producción usa `docker-compose.prod.yml`.
 
 ```bash
-export PROVECHO_IMAGE=ghcr.io/<repo>:1.2.3   # fijar versión, nunca latest
+# Misma versión en las dos: el frontend y el contrato de la API viajan juntos.
+export PROVECHO_IMAGE=ghcr.io/<repo>:1.2.3        # fijar versión, nunca latest
+export PROVECHO_WEB_IMAGE=ghcr.io/<repo>-web:1.2.3
 docker compose -f docker-compose.prod.yml pull
 alembic upgrade head
 docker compose -f docker-compose.prod.yml up -d
@@ -203,8 +244,10 @@ todas migrarían a la vez, y una migración fallida dejaría el contenedor en
 bucle de reinicio en vez de detenerse con un error legible.
 
 La base de datos no está en el compose de producción: es gestionada, apuntada
-por `DATABASE_URL`. La API publica solo en `127.0.0.1:8000` y Redis no
-publica puerto — el proxy es la única puerta de entrada.
+por `DATABASE_URL`. La API publica solo en `127.0.0.1:8000`, el frontend solo
+en `127.0.0.1:3000` y Redis no publica puerto — el proxy es la única puerta
+de entrada. El proxy manda `/` al `web` y no necesita una regla para la API:
+el navegador la alcanza por `/api/proxy`, que sirve el propio Next.
 
 ## Migraciones
 

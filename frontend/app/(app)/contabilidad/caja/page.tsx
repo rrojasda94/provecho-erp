@@ -73,7 +73,7 @@ export default async function CajaPage({
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="font-heading text-xl italic uppercase text-dark">Caja</h1>
+      <h1 className="font-heading text-xl text-dark">Caja</h1>
       <p className="text-sm text-gray">
         Turnos abiertos ahora mismo, el que lleva más tiempo primero. El esperado es
         apertura + cobrado en efectivo + ingresos − retiros: es contra ese número que

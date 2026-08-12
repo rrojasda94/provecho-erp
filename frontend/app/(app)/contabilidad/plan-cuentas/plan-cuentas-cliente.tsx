@@ -113,7 +113,7 @@ export function PlanCuentasCliente({ cuentas }: { cuentas: Cuenta[] }) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h1 className="font-heading text-xl italic uppercase text-dark">Plan de cuentas</h1>
+        <h1 className="font-heading text-xl text-dark">Plan de cuentas</h1>
         <DialogoNuevaCuenta cuentas={cuentas} />
       </div>
       <p className="text-sm text-gray">

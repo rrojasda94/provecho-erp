@@ -1,3 +1,4 @@
+import { Revelar } from "@/components/shell/revelar";
 import { TopBar } from "@/components/shell/top-bar";
 import { obtenerSesion } from "@/lib/sesion";
 
@@ -14,7 +15,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       {/* flex-1, no un cálculo con la altura de TopBar en píxeles: el alto
           real de la barra (fuentes custom, line-height) no es una constante
           que valga la pena asumir. */}
-      <div className="flex-1">{children}</div>
+      <div className="flex-1">
+        <Revelar>{children}</Revelar>
+      </div>
     </div>
   );
 }

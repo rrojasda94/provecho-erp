@@ -105,16 +105,39 @@ services:
         condition: service_started
 
   web:
-    build: ./frontend
+    build:
+      context: ./frontend
+      # La imagen del frontend es multietapa: `dev` corre `next dev`, `runner`
+      # sirve el build de producción. Sin `target`, docker construye la última
+      # etapa —producción— y este servicio dejaría de recargar al editar.
+      target: dev
+    restart: unless-stopped
     ports:
       - "3000:3000"
     environment:
-      # Vista del NAVEGADOR (fuera del contenedor): localhost, puerto publicado.
-      NEXT_PUBLIC_API_URL: http://localhost:8000
-      # Vista del PROCESO de Next.js (dentro del contenedor, Server Actions/
-      # Server Components): nombre del servicio, no localhost — son
-      # contenedores distintos sin ese "localhost" en común.
+      # Vista del PROCESO de Next.js (dentro del contenedor, Server Actions,
+      # Server Components y el proxy `/api/proxy`): nombre del servicio, no
+      # localhost — son contenedores distintos sin ese "localhost" en común.
+      #
+      # No hay `NEXT_PUBLIC_API_URL`: el navegador NUNCA habla con la API
+      # directo. La CSP de `middleware.ts` fija `connect-src 'self'` y todo
+      # pasa por `app/api/proxy`, que es server-side. La variable estuvo acá
+      # sin que una sola línea del frontend la leyera.
       API_INTERNAL_URL: http://api:8000
+      # En Windows + Docker Desktop los eventos de sistema de archivos no
+      # cruzan el bind mount: sin sondeo, editar un archivo no recarga nada.
+      WATCHPACK_POLLING: "true"
+    volumes:
+      # Sin esto, `next dev` corría sobre el código horneado en la imagen: cada
+      # cambio exigía `docker compose build`. La recarga en caliente estaba
+      # apagada de hecho.
+      - ./frontend:/app
+      # Volúmenes anónimos que TAPAN el bind de arriba en esas dos rutas: el
+      # `node_modules` que vale es el que instaló Alpine (sharp trae binarios
+      # nativos; el del host es de Windows), y `.next` no debe ensuciar el
+      # árbol de trabajo con archivos del contenedor.
+      - /app/node_modules
+      - /app/.next
     depends_on:
       - api
 

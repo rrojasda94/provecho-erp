@@ -107,6 +107,32 @@ jobs:
           docker logs provecho-ci
           exit 1
 
+      # El job `frontend` corre `npm run build` sobre el runner, no sobre la
+      # imagen: un Dockerfile de frontend roto (etapa `runner` sin estáticos,
+      # `standalone` mal copiado) se descubría al desplegar. Es la misma
+      # deuda que este job cerró para el backend.
+      - uses: docker/build-push-action@v7
+        with:
+          context: ./frontend
+          target: runner
+          push: false
+          load: true
+          tags: provecho-web:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      # `/login` no toca la API: si responde, el server de `standalone`
+      # arrancó, sirvió sus estáticos y la CSP del middleware no lo tumbó.
+      - name: La imagen del frontend levanta y responde
+        run: |
+          docker run -d --name provecho-web-ci -p 3000:3000 provecho-web:ci
+          for intento in $(seq 1 30); do
+            if curl -fsS http://localhost:3000/login > /dev/null; then exit 0; fi
+            sleep 1
+          done
+          echo "La imagen del frontend no respondió en /login"
+          docker logs provecho-web-ci
+          exit 1
+
   seguridad:
     runs-on: ubuntu-latest
     steps:

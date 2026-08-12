@@ -51,3 +51,31 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # Frontend: imagen aparte (`-web`), mismos tags. Sin esto, cada push a
+      # main publicaba una API nueva y dejaba las pantallas en la versión que
+      # alguien hubiera construido a mano en el servidor.
+      #
+      # Los dos tags se mueven juntos porque salen del mismo commit: fijar
+      # `PROVECHO_IMAGE` y `PROVECHO_WEB_IMAGE` a la misma versión en el
+      # `.env` de producción es lo que permite volver atrás sin dejar el
+      # frontend hablándole a una API que ya cambió el contrato.
+      - id: meta-web
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.REGISTRO }}/${{ github.repository }}-web
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,format=long
+
+      - uses: docker/build-push-action@v7
+        with:
+          context: ./frontend
+          target: runner
+          push: true
+          tags: ${{ steps.meta-web.outputs.tags }}
+          labels: ${{ steps.meta-web.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

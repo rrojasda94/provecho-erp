@@ -241,7 +241,7 @@ export function ProveedoresCliente({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h1 className="font-heading text-xl italic uppercase text-dark">Proveedores</h1>
+        <h1 className="font-heading text-xl text-dark">Proveedores</h1>
         <DialogoNuevoProveedor />
       </div>
       <TablaDatos columnas={columnas} datos={proveedores} placeholderBusqueda="Buscar proveedor..." />

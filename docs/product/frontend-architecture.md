@@ -93,16 +93,25 @@ solo `app/` + `lib/`).
 
 ## F2.3 Sistema de diseño (tokens)
 
-🔶 **Parcial**. Ya en código (`frontend/app/globals.css`): paleta de color
-(`--color-primary/secondary/dark/cream/accent/gray`) y tipografías (Anton
-Italic para títulos, Inter para cuerpo). Regla ya vigente: colores/fuentes
-**solo** vía tokens CSS, nunca hex hardcodeado en componentes
-(`prompts/frontend.md`).
+🔶 **Parcial**. Ya en código (`frontend/app/globals.css`):
 
-⬜ **Falta tokenizar**: spacing, radius (hoy `8px`/`16px` sueltos en
-`globals.css`), sombras/elevación, duración/easing de animaciones,
-iconografía (sin librería de íconos elegida todavía), ilustraciones,
-estados (hover/focus/disabled ya existen ad-hoc por selector CSS, no como
+- Paleta de color (`--color-primary/secondary/dark/cream/accent/gray/steel`),
+  revisada el 2026-08-07 por contraste medido (ver `ui-ux.md`).
+- Color por **área de negocio** (`--area-operacion/comercial/abastecimiento/
+  administracion`): cuatro tonos que la pantalla fija una vez en `--hue`.
+- Tipografías: Archivo (variable, títulos y cuerpo), IBM Plex Mono (cifras,
+  clase `.cifra`), Anton (solo logotipo, clase `.logotipo`).
+- `--radius` (6px, un solo valor para todos los componentes) y `--transicion`
+  (una curva para todo el ERP).
+- Iconografía: `lucide-react`, ya usada por calendario, diálogos, reportes y
+  el registro de módulos.
+
+Regla ya vigente: colores/fuentes **solo** vía tokens CSS, nunca hex
+hardcodeado en componentes (`prompts/frontend.md`).
+
+⬜ **Falta tokenizar**: spacing, sombras/elevación (hoy sombras sueltas por
+componente), ilustraciones, estados (hover/focus/disabled existen como clases
+de componente —`.ficha`, `.nav-modulo`— y utilidades de Tailwind, no como
 tokens nombrados).
 
 ## F2.4 Componentes base
