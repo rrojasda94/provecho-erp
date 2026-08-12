@@ -26,7 +26,16 @@ export async function ingresar(page: Page, quien = ADMIN) {
   // de una Server Action lo resuelve el cliente sin recargar, así que nunca
   // se dispara el evento `load` que `waitForURL` espera por defecto y la
   // prueba se queda mirando una página que ya cambió.
-  await expect(page.getByText(/Elige un módulo/i)).toBeVisible({ timeout: 30_000 });
+  //
+  // Se ancla al saludo y no al subtítulo: «Hola, <usuario>» es el dato que la
+  // pantalla tiene que mostrar —de hecho confirma de quién es la sesión, que
+  // es lo que estas suites verifican—, mientras que la bajada de abajo es
+  // copy y cambia cada vez que alguien la mejora. Pasó exactamente eso: el
+  // rediseño la cambió por «Elige por dónde empezar» y siete pruebas se
+  // cayeron sin que nada estuviera roto.
+  await expect(
+    page.getByRole("heading", { name: new RegExp(`Hola, ${quien.usuario}`, "i") }),
+  ).toBeVisible({ timeout: 30_000 });
 }
 
 /** El diálogo visible. Los de apertura y cierre están **los dos montados**
