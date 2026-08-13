@@ -51,9 +51,13 @@ from src.modules.inventory.infrastructure.models import (
 )
 from src.modules.sales.application import catalogo as catalogo_uc
 from src.modules.sales.application import precios as precios_uc
-from src.modules.sales.infrastructure.models import ListaPrecio, ProductoComercial
+from src.modules.sales.infrastructure.models import (
+    KdsPantalla,
+    ListaPrecio,
+    ProductoComercial,
+)
 from src.modules.sales.infrastructure.repositories import ProductoComercialRepo
-from src.modules.users.infrastructure.models import Empresa, Marca
+from src.modules.users.infrastructure.models import Empresa, Marca, Sucursal
 
 #: nombre → (unidad, costo unitario). El costo es lo que hace que el lienzo
 #: pueda mostrar un margen: con todo en cero, "quitar un insumo baja el costo"
@@ -385,6 +389,7 @@ def sembrar(session: Session, limpiar: bool = False) -> dict:
     for tamano, (codigo, factor, precio) in TAMANOS.items():
         _tamano(session, ctx, tamano, codigo, factor, precio)
 
+    estaciones = _cocina_en_cadena(session)
     apagados = _desactivar_lo_que_no_es_pizza(session) if limpiar else []
     return {
         "producto": padre.nombre,
@@ -392,8 +397,45 @@ def sembrar(session: Session, limpiar: bool = False) -> dict:
         "tamanos": len(TAMANOS),
         "sabores": len(SABORES),
         "extras": len(EXTRAS),
+        "estaciones": estaciones,
         "desactivados": apagados,
     }
+
+
+#: Cocina de pizzería: se arma, se hornea y se despacha (ADR-044). Sin
+#: `categoria_ids`, así que las dos estaciones atienden todo lo que haya —
+#: la demo tiene una sola categoría de producto y filtrar no mostraría nada
+#: que no se vea igual.
+CADENA = (("Armado", "preparacion", 0), ("Horno", "preparacion", 1),
+          ("Despacho", "despacho", 2))
+
+
+def _cocina_en_cadena(session: Session) -> list[str]:
+    """Deja la sucursal con las tres pantallas de una pizzería real.
+
+    Sin esto la cadena existe pero no se ve: una instalación nueva no tiene
+    ninguna pantalla, y `/kds` pide crearlas a mano antes de que nada llegue
+    a cocina. Idempotente por (sucursal, nombre) — que es su UNIQUE.
+    """
+    creadas = []
+    for sucursal in session.scalars(select(Sucursal)):
+        for nombre, tipo, orden in CADENA:
+            ya = session.scalar(
+                select(KdsPantalla).where(
+                    KdsPantalla.sucursal_id == sucursal.id,
+                    KdsPantalla.nombre == nombre,
+                )
+            )
+            if ya is not None:
+                continue
+            session.add(
+                KdsPantalla(
+                    sucursal_id=sucursal.id, nombre=nombre, tipo=tipo, orden=orden
+                )
+            )
+            creadas.append(f"{sucursal.nombre}/{nombre}")
+    session.flush()
+    return creadas
 
 
 def main() -> None:
@@ -414,6 +456,8 @@ def main() -> None:
         f"Carta de pizzas lista: {datos['tamanos']} tamaños × "
         f"{datos['sabores']} sabores + {datos['extras']} extras."
     )
+    if datos["estaciones"]:
+        print(f"Cocina en cadena: {', '.join(datos['estaciones'])}")
     if datos["desactivados"]:
         print(f"Desactivados (no borrados): {', '.join(datos['desactivados'])}")
     print(f"Lienzo: /catalogo/productos/{datos['producto_id']}/nodos")

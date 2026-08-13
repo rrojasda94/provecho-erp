@@ -63,3 +63,11 @@ class VentaItem(Base, UuidPkMixin, TimestampMixin):
         ),
         default="pendiente",
     )
+    # Eslabón de la cadena de estaciones en el que va la línea (ADR-044).
+    # Es un int y no una FK a `kds_pantalla` a propósito: la línea guarda
+    # DÓNDE VA, no QUIÉN la atiende. Desactivar el horno a media noche no
+    # puede dejar pedidos apuntando a una pantalla que ya no existe — con
+    # el número, la línea cae sola a la siguiente estación que la acepte.
+    etapa_kds: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0", nullable=False
+    )

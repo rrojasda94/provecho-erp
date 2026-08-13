@@ -10,7 +10,9 @@ import { redirect } from "next/navigation";
 
 import { ApiError, apiFetch } from "@/lib/api";
 import { COOKIE_TOKEN, decodificarClaims } from "@/lib/auth";
+import { obtenerSesion } from "@/lib/sesion";
 
+import BloqueoPorInactividad from "./bloqueo";
 import PdvCliente from "./pdv-cliente";
 import "./pdv.css";
 
@@ -87,19 +89,27 @@ export default async function PaginaPdv() {
   const ctx = await resolverContexto(token);
   if (!ctx.ok) return <Bloqueo titulo={ctx.titulo} detalle={ctx.detalle} />;
 
+  // El nombre sale de `/users/me` y no del JWT: el token no lleva username,
+  // y la pantalla bloqueada tiene que decir de quién es la sesión que
+  // sigue abierta debajo.
+  const { usuario } = await obtenerSesion();
+
   return (
-    <PdvCliente
-      sucursalId={ctx.sucursalId}
-      puntoVenta={{
-        id: ctx.punto.id,
-        serieBoleta: ctx.punto.serie_boleta,
-        serieFactura: ctx.punto.serie_factura,
-        modalidades: ctx.punto.modalidades_habilitadas ?? [
-          "mesa",
-          "takeout",
-          "delivery",
-        ],
-      }}
-    />
+    <>
+      <PdvCliente
+        sucursalId={ctx.sucursalId}
+        puntoVenta={{
+          id: ctx.punto.id,
+          serieBoleta: ctx.punto.serie_boleta,
+          serieFactura: ctx.punto.serie_factura,
+          modalidades: ctx.punto.modalidades_habilitadas ?? [
+            "mesa",
+            "takeout",
+            "delivery",
+          ],
+        }}
+      />
+      <BloqueoPorInactividad username={usuario.username} />
+    </>
   );
 }

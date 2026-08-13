@@ -10,6 +10,8 @@ class PantallaCreate(BaseModel):
     nombre: str = Field(min_length=1, max_length=100)
     tipo: str  # preparacion | despacho
     categoria_ids: list[str] | None = None  # None/[] = todas las categorías
+    # Eslabón en la cadena de preparación (ADR-044). 0 = la primera.
+    orden: int = Field(default=0, ge=0)
 
 
 class PantallaUpdate(BaseModel):
@@ -17,6 +19,7 @@ class PantallaUpdate(BaseModel):
     tipo: str | None = None
     categoria_ids: list[str] | None = None
     activo: bool | None = None
+    orden: int | None = Field(default=None, ge=0)
 
 
 class PantallaOut(BaseModel):
@@ -26,6 +29,7 @@ class PantallaOut(BaseModel):
     nombre: str
     tipo: str
     categoria_ids: list[str] | None
+    orden: int
     activo: bool
 
 
@@ -37,6 +41,10 @@ class ItemColaOut(BaseModel):
     # Restas de la línea, ya resueltas a nombre: ["Cebolla"] → "SIN CEBOLLA"
     # en pantalla (RN-COM-028). Lista vacía = el plato va completo.
     sin: list[str] = []
+    etapa_kds: int = 0
+    # Nombre de la estación donde está la línea ahora; `None` = ya salió de
+    # cocina. Es lo que despacho muestra por línea (RN-CUP-013).
+    estacion: str | None = None
 
 
 class PedidoColaOut(BaseModel):
@@ -45,6 +53,10 @@ class PedidoColaOut(BaseModel):
     referencia_atencion: str | None
     modalidad: str
     canal: str
+    # `venta` | `consumo_personal` (RN-COM-025) y su motivo: la cocina
+    # prioriza distinto la comida del turno que un pedido de cliente.
+    tipo: str = "venta"
+    consumo_motivo: str | None = None
     estado_pedido: str
     items: list[ItemColaOut]
 

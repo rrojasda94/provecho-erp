@@ -69,6 +69,17 @@ Leer antes: `/CLAUDE.md`, [product/ui-ux.md](../product/ui-ux.md) y
 - Accesibilidad: paleta alternativa (daltonismo) y tamaño de fuente
   ajustable, ambos como preferencia del perfil del usuario, combinables
   con el tema de marca activo.
+- **Un PIN dentro del PDV se pide con `Pinpad`, nunca con un `<input>`**
+  (ADR-045). Si el navegador puede ofrecer guardarlo, alguien lo guarda, y
+  el turno siguiente opera con la cuenta del anterior. Los cuatro sitios que
+  ya lo piden usan `FirmaConPin` (usuario + pinpad); uno nuevo también.
+- **Un overlay que deba tapar un diálogo abierto tiene que ser otro
+  `<dialog>` con `showModal()`**, no un `div` con `z-index`. Los diálogos
+  nativos viven en el *top layer* del navegador y ningún `z-index` los
+  alcanza — se descubre tarde y en producción. Y al estilarlo, el `display`
+  va en `[open]`: declararlo en el selector base pisa el `display: none` con
+  que el navegador oculta un `<dialog>` cerrado, y queda un panel invisible
+  tapando la pantalla y comiéndose los clicks.
 - Server Components por defecto; Client Component (`"use client"`) solo
   donde hay estado real (dialogs, carrito, buscador). Sin librería de
   estado global mientras `useState`/`useReducer` alcance.

@@ -69,6 +69,17 @@ de su módulo y se prueban de forma aislada.
 - **RN-POS-013** Durante el conteo de efectivo y la apertura de caja, el
   encargado de tienda/supervisor no puede atender otro proceso o
   actividad.
+- **RN-POS-014** La pantalla del punto de venta se bloquea a los **5
+  minutos** sin actividad y se reabre con el PIN de quien tiene la sesión.
+  El bloqueo **no cierra sesión**: la caja abierta y el pedido a medio
+  armar siguen donde estaban — un bloqueo que hiciera perder el pedido se
+  eludiría dejando la pantalla tocada a propósito. Los PIN del punto de
+  venta se teclean en un teclado numérico sin campo de formulario, para que
+  el navegador no pueda ofrecer guardarlos: un PIN guardado en la caja es
+  la vía por la que un turno entra con la cuenta del anterior y toda la
+  auditoría (RN-AUD-005) nombra a la persona equivocada. Un intento
+  fallido de desbloqueo cuenta contra el mismo bloqueo de cuenta que el
+  ingreso.
 
 ## Central de pedidos
 
@@ -1365,6 +1376,15 @@ preparación, despacho y entrega en las tres modalidades.
   crédito y, si corresponde, devolución — RN-GEN-002. La anulación
   temprana coordinada con la sucursal sigue el límite de la Central de
   Pedidos (5 minutos desde la emisión del pedido).
+- **RN-CUP-013** La cocina de una sucursal se configura como una **cadena
+  de estaciones** ordenadas (armado → horno → …). Cada línea del pedido
+  recorre las estaciones que atienden su categoría, de la primera a la
+  última: marcarla en una estación intermedia la manda a la siguiente, y
+  solo queda `listo` cuando ya no le queda ninguna por delante — una
+  bebida cuya categoría no atiende el horno se lo salta sin configurar
+  nada. La pantalla de despacho no prepara ni marca: muestra el pedido
+  completo, cuántas líneas van y **en qué estación está cada una**, para
+  saber por quién se espera antes de entregarlo (RN-CUP-005).
 
 ## Comercial — estrategia
 

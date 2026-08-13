@@ -36,6 +36,13 @@ class AutorizacionIn(BaseModel):
     permiso: str
 
 
+class VerificarPinIn(BaseModel):
+    """Desbloqueo de pantalla: solo el PIN. El usuario sale del token —
+    pedirlo en el cuerpo dejaría verificar el PIN de cualquier otro."""
+
+    pin: str
+
+
 class AutorizacionOut(BaseModel):
     autorizacion: str
     autorizado_por: uuid.UUID

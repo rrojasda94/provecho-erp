@@ -126,6 +126,34 @@ def refresh(body: schemas.RefreshIn, session: Session = Depends(get_db)):
     return tokens
 
 
+@router.post(
+    "/auth/verificar-pin",
+    status_code=status.HTTP_204_NO_CONTENT,
+    tags=["auth"],
+    dependencies=[Depends(rate_limit_login)],
+)
+def verificar_pin(
+    body: schemas.VerificarPinIn,
+    request: Request,
+    actor: Usuario = Depends(get_current_user),
+    session: Session = Depends(get_db),
+):
+    """Confirma que quien está frente al terminal sigue siendo el dueño de
+    la sesión — desbloqueo de la pantalla del PDV (RN-POS-014).
+
+    Detrás del mismo rate limit que el login y contra el mismo lockout: es
+    otro endpoint que recibe PINes, y sin freno sería el camino cómodo
+    para probarlos.
+    """
+    try:
+        auth.verificar_pin(session, actor, body.pin, client_ip(request))
+    except (CredencialesInvalidas, UsuarioBloqueado) as e:
+        session.commit()  # persistir intento fallido / lockout
+        raise http_exception(e) from e
+    session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.post("/auth/logout", status_code=status.HTTP_204_NO_CONTENT, tags=["auth"])
 def logout(body: schemas.RefreshIn, session: Session = Depends(get_db)):
     auth.logout(session, body.refresh_token)

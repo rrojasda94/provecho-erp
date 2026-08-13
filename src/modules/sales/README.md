@@ -410,17 +410,39 @@ tiempo real (Redis/WebSocket) es deuda declarada.
 
 - **`kds_pantalla`**: sucursal + tipo (`preparacion` | `despacho`) +
   `categoria_ids` (filtro por categorías de producto comercial; vacío =
-  todas). `producto_comercial.categoria_id` (nuevo, reusa `categoria`)
-  rutea cada ítem a su estación (pizzas → horno, bebidas → barra).
+  todas) + `orden` (eslabón en la cadena). `producto_comercial.categoria_id`
+  (reusa `categoria`) rutea cada ítem a su estación (pizzas → horno,
+  bebidas → barra).
+- **Cadena de estaciones** (2026-08-13, ADR-044, RN-CUP-013): las pantallas
+  de preparación están ordenadas por `orden` (armado 0 → horno 1 → …) y
+  cada línea sabe en cuál va (`venta_item.etapa_kds`). Todo lo resuelve
+  `_estacion(cadena, producto, desde)`: la primera estación activa con
+  `orden >= desde` que atiende la categoría del producto. La misma función
+  dice **qué muestra una pantalla** (la línea está acá si su estación cae
+  en este `orden`) y **a dónde va al tacharla** (`actual.orden + 1`); si no
+  queda ninguna, la línea pasa a `listo`. Una bebida se salta el horno sola
+  porque el horno no atiende su categoría. Es `>=` y no `==` para que
+  desactivar una estación no deje pedidos invisibles: caen al eslabón
+  siguiente. Dos pantallas con el mismo `orden` son el mismo eslabón
+  trabajando en paralelo. **`orden` viaja en la réplica del hub** — sin él,
+  durante un corte todas las estaciones caerían al mismo eslabón.
 - **Preparación**: ve **todos** los ítems de sus categorías, incluidos los
-  ya `listo` — el ítem tachado tiene que seguir a la vista de quien lo
-  tachó y de las demás pantallas (corregido 2026-08-03: antes desaparecía
-  al marcarlo, que es justo lo contrario de lo que hace la cocina). El
-  pedido sale de esta cola cuando la estación terminó **todo lo suyo**.
+  ya `listo` y los que ya mandó al eslabón siguiente (con el destino a la
+  vista) — el ítem tachado tiene que seguir a la vista de quien lo tachó y
+  de las demás pantallas (corregido 2026-08-03: antes desaparecía al
+  marcarlo, que es justo lo contrario de lo que hace la cocina). El pedido
+  sale de esta cola cuando a la estación no le queda **nada pendiente**.
   Bump por ítem (`POST /kds/items/{id}/avanzar`).
-- **Despacho**: ve pedidos con ítems listos + `estado_pedido` agregado
-  (el ítem más atrasado manda); al estar todo listo se publica
-  `sales.pedido_listo`.
+- **Despacho**: pantalla propia (`despacho-cliente.tsx`) desde 2026-08-13 —
+  antes era el componente de cocina con otro filtro, así que ofrecía tachar
+  ítems. Una tarjeta por **pedido** con cuántas líneas van, en qué estación
+  está cada una (`estacion` en el payload) y por quién se espera; no marca
+  preparado (eso es de la estación que preparó, RN-CUP-003), solo entrega.
+  **Ya no filtra por `categoria_ids`**: mostraba media orden, que es lo que
+  impide verificar el pedido completo contra la comanda antes de entregarlo
+  (RN-CUP-004); el selector desapareció de su formulario. `estado_pedido`
+  sigue siendo el agregado (el ítem más atrasado manda) y al estar todo
+  listo se publica `sales.pedido_listo`.
 - **Entrega**: `POST /sales/ventas/{id}/entrega` cierra el pedido completo
   y publica `sales.venta_entregada` (disparador de la encuesta de
   marketing, RN-COM-007). Exige todos los ítems en `listo` (RN-CUP-005),

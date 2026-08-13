@@ -641,6 +641,7 @@ export default function PdvCliente({ sucursalId, puntoVenta }: Props) {
           mesas={datos.mesas}
           cobrados={datos.cobrados}
           abiertas={datos.abiertas}
+          cajaAbierta={!!datos.caja}
           vista={vista}
           onVista={setVista}
           onProducto={agregarProducto}

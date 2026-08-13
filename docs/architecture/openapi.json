@@ -7989,9 +7989,25 @@
             "title": "Cantidad",
             "type": "string"
           },
+          "estacion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estacion"
+          },
           "estado": {
             "title": "Estado",
             "type": "string"
+          },
+          "etapa_kds": {
+            "default": 0,
+            "title": "Etapa Kds",
+            "type": "integer"
           },
           "producto": {
             "title": "Producto",
@@ -12224,6 +12240,12 @@
             "title": "Nombre",
             "type": "string"
           },
+          "orden": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Orden",
+            "type": "integer"
+          },
           "sucursal_id": {
             "format": "uuid",
             "title": "Sucursal Id",
@@ -12271,6 +12293,10 @@
             "title": "Nombre",
             "type": "string"
           },
+          "orden": {
+            "title": "Orden",
+            "type": "integer"
+          },
           "sucursal_id": {
             "format": "uuid",
             "title": "Sucursal Id",
@@ -12287,6 +12313,7 @@
           "nombre",
           "tipo",
           "categoria_ids",
+          "orden",
           "activo"
         ],
         "title": "PantallaOut",
@@ -12329,6 +12356,18 @@
               }
             ],
             "title": "Nombre"
+          },
+          "orden": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orden"
           },
           "tipo": {
             "anyOf": [
@@ -12545,6 +12584,17 @@
             "title": "Canal",
             "type": "string"
           },
+          "consumo_motivo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consumo Motivo"
+          },
           "estado_pedido": {
             "title": "Estado Pedido",
             "type": "string"
@@ -12574,6 +12624,11 @@
               }
             ],
             "title": "Referencia Atencion"
+          },
+          "tipo": {
+            "default": "venta",
+            "title": "Tipo",
+            "type": "string"
           },
           "venta_id": {
             "title": "Venta Id",
@@ -20914,6 +20969,20 @@
         "title": "VentasHoyOut",
         "type": "object"
       },
+      "VerificarPinIn": {
+        "description": "Desbloqueo de pantalla: solo el PIN. El usuario sale del token —\npedirlo en el cuerpo dejaría verificar el PIN de cualquier otro.",
+        "properties": {
+          "pin": {
+            "title": "Pin",
+            "type": "string"
+          }
+        },
+        "required": [
+          "pin"
+        ],
+        "title": "VerificarPinIn",
+        "type": "object"
+      },
       "VincularExtraCreate": {
         "description": "Habilita un extra sobre un producto. `maximo` es el tope de unidades\ndel extra en una misma línea; NULL = sin tope. `grupo_id` lo mete en un\ngrupo de opciones; sin grupo, el extra es siempre opcional.",
         "properties": {
@@ -23736,6 +23805,46 @@
           }
         },
         "summary": "Refresh",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/verificar-pin": {
+      "post": {
+        "description": "Confirma que quien está frente al terminal sigue siendo el dueño de\nla sesión — desbloqueo de la pantalla del PDV (RN-POS-014).\n\nDetrás del mismo rate limit que el login y contra el mismo lockout: es\notro endpoint que recibe PINes, y sin freno sería el camino cómodo\npara probarlos.",
+        "operationId": "verificar_pin_api_v1_auth_verificar_pin_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerificarPinIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Verificar Pin",
         "tags": [
           "auth"
         ]

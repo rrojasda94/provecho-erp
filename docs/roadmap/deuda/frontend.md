@@ -544,3 +544,18 @@ tiempo real de KDS, i18n, hardware, testing — Playwright ya decidido por
 ADR-013, observabilidad, printing, productividad, multitarea) tiene
 decisión tomada, está correctamente diferido, o depende de un módulo
 backend que todavía no llega a pantalla.
+- ⬜ **La cadena de estaciones se ordena tecleando un número** (2026-08-13,
+  ADR-044): el formulario de estación pide "Paso en la cocina" como entero.
+  Es correcto y se explica en dos líneas, pero reordenar tres estaciones
+  obliga a editar tres veces, e insertar una en el medio exige el truco de
+  dejar huecos (0, 10, 20). Arrastrar la lista sería la interfaz honesta —
+  `@dnd-kit` ya está en el proyecto (lo usa el tablero de reportes).
+- ⬜ **El pinpad no muestra el PIN ni siquiera un instante** (2026-08-13,
+  ADR-045): solo puntos. Es lo correcto para una caja a la vista del
+  público, pero sin un "ojo" para revelar, un error de tecleo solo se
+  descubre al fallar el envío — y fallar cuesta un intento del lockout.
+  Falta el botón de revelar mientras se mantiene pulsado.
+- ⬜ **El bloqueo del PDV no avisa antes de bloquear** (2026-08-13): a los
+  5 minutos aparece de golpe. Quien está contando efectivo al lado de la
+  caja no toca la pantalla y se la encuentra bloqueada sin haber podido
+  evitarlo. Un aviso a los 4:30 con "seguir aquí" lo resuelve.

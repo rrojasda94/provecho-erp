@@ -20,6 +20,10 @@ type Props = {
   mesas: Lista<MesaEnMapa>;
   cobrados: Lista<Venta>;
   abiertas: Lista<Venta>;
+  /** La carta no se pide hasta que hay caja abierta, así que "vacía" antes
+   * de eso no significa lo mismo. Sin esta distinción el PDV culpaba a la
+   * lista de precios de algo que solo era el turno sin abrir. */
+  cajaAbierta: boolean;
   vista: Vista;
   onVista: (v: Vista) => void;
   onProducto: (item: ItemDeCarta) => void;
@@ -101,7 +105,12 @@ export default function Catalogo(props: Props) {
       )}
 
       {vista === "catalogo" && (
-        <ProductosGrid items={visibles} busqueda={busqueda} onProducto={onProducto} />
+        <ProductosGrid
+          items={visibles}
+          busqueda={busqueda}
+          cajaAbierta={props.cajaAbierta}
+          onProducto={onProducto}
+        />
       )}
       {vista === "mesas" && (
         <MapaMesas
@@ -132,10 +141,12 @@ function cuantosExtras(p: ItemDeCarta): number {
 function ProductosGrid({
   items,
   busqueda,
+  cajaAbierta,
   onProducto,
 }: {
   items: ItemDeCarta[];
   busqueda: string;
+  cajaAbierta: boolean;
   onProducto: (i: ItemDeCarta) => void;
 }) {
   if (!items.length) {
@@ -143,7 +154,9 @@ function ProductosGrid({
       <p className="pdv-nada">
         {busqueda
           ? `Nada coincide con “${busqueda}”.`
-          : "La carta está vacía: ningún producto tiene precio vigente para esta sucursal."}
+          : cajaAbierta
+            ? "La carta está vacía: ningún producto tiene precio vigente para esta sucursal."
+            : "Abre la caja para ver la carta."}
       </p>
     );
   }

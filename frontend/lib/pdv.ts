@@ -368,6 +368,12 @@ export const api = {
       cuerpo: { autorizacion: autorizacion ?? null },
     }),
 
+  /** Desbloqueo de la pantalla del PDV (RN-POS-014). No emite tokens: la
+   * sesión de abajo sigue viva, con su caja abierta y su borrador — por eso
+   * no sirve `login`, que la rotaría. 204 si el PIN es el correcto. */
+  verificarPin: (pin: string) =>
+    pedir<void>("/auth/verificar-pin", { metodo: "POST", cuerpo: { pin } }),
+
   /** Suma líneas a una orden ya enviada (RN-COM-029). Sin autorización: la
    * mesa que pide de a poco no debería terminar con dos cuentas. */
   agregarLineas: (ventaId: string, items: VentaNueva["items"]) =>

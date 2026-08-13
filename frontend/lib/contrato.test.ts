@@ -290,6 +290,7 @@ const PDV: Caso[] = [
       ],
     }),
   ),
+  caso("verificarPin", () => api.verificarPin("123456")),
   caso("itemsDeVenta", () => api.itemsDeVenta(UUID)),
   caso("agregarLineas", () =>
     api.agregarLineas(UUID, [
@@ -404,6 +405,7 @@ const KDS: Caso[] = [
       nombre: "Cocina",
       tipo: "preparacion",
       categoria_ids: [UUID],
+      orden: 0,
     }),
   ),
   caso("editarPantalla", () => apiKds.editarPantalla(UUID, { nombre: "Cocina 2", activo: true })),

@@ -10,12 +10,16 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   ser un control.
 - ✅ 2026-08-12 **Los borradores vacíos ya no se apilan**: el "+" reusa el que
   esté vacío y una pestaña sin líneas se descarta con su "×".
-- ⬜ **El KDS no distingue una línea agregada de las originales**
+- 🔶 **El KDS no distingue una línea agregada de las originales**
   (2026-08-12, ADR-043): entra a la cola como cualquier otra, sin decir que
-  llegó después. Para la cocina está bien —hay que prepararla igual— pero el
-  despacho no ve que el pedido creció y puede entregarlo incompleto. Se
-  resuelve mostrando la hora de la línea en la tarjeta del pedido, que es
-  dato que `venta_item.created_at` ya tiene.
+  llegó después. Para la cocina está bien —hay que prepararla igual—, y
+  desde ADR-044 el despacho **sí ve que el pedido creció**: su tarjeta lista
+  todas las líneas con su estación, así que una recién agregada aparece
+  esperando y el contador "N de M" la incluye. Queda solo el matiz de
+  antigüedad: no se ve **cuándo** llegó cada una, que es lo que permitiría
+  distinguir "falta una que pidieron recién" de "falta una que se atascó".
+  Se resuelve mostrando la hora de la línea en la tarjeta, dato que
+  `venta_item.created_at` ya tiene. Va junto con "KDS sin reloj por pedido".
 
 - ✅ 2026-08-12 **La variante hereda del padre** (ADR-042): ADR-038 arregló el
   catálogo del seeder (grupos en la variante) y dejó roto el armado a mano
@@ -339,7 +343,20 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   puente a impresora térmica (ESC/POS por red o agente local) y comanda
   automática al confirmar venta (hoy es bajo demanda).
 - ⬜ **KDS tiempos**: alertas por pedido demorado (umbral por pantalla) y
-  métricas de tiempo de preparación (base: `venta_item.updated_at`).
+  métricas de tiempo de preparación (base: `venta_item.updated_at`). Con la
+  cadena de ADR-044 esto se vuelve **tiempo por estación**, que es lo que
+  responde "dónde se atasca la cocina" en vez de "cuánto tardó el pedido".
+- ⬜ **La cadena de estaciones no se reordena arrastrando** (2026-08-13,
+  ADR-044): el paso se teclea como número en el formulario de la estación.
+  Para tres estaciones alcanza; con más, dejar un hueco entre pasos (0, 10,
+  20) para poder insertar en el medio es un truco que el usuario tiene que
+  saber, y eso ya es una interfaz que no se explica sola.
+- ⬜ **Una estación no puede rechazar y devolver una línea al eslabón
+  anterior** (2026-08-13, ADR-044): la cadena solo avanza, por RN-CUP-002
+  (secuencia estricta, sin retroceso). Si el horno recibe algo mal armado,
+  hoy no hay forma de mandarlo de vuelta desde la pantalla — se resuelve
+  hablando. Un "devolver al paso anterior" sería una excepción explícita a
+  RN-CUP-002 y necesita su propia decisión de negocio, no solo código.
 - 🔶 **Cumplimiento de pedido** (`PROC-OPE-002`, definido 2026-07-27):
   preparación + entrega implementadas (`POST /sales/ventas/{id}/entrega`
   → `sales.venta_entregada`). Falta la **rama delivery con trazabilidad**:

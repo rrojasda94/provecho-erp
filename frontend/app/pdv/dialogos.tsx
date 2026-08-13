@@ -26,6 +26,50 @@ import {
   type LineaBorrador,
   type RestaEnLinea,
 } from "./tipos";
+import Pinpad from "./pinpad";
+
+/**
+ * Usuario + PIN de quien firma. Cuatro puntos del PDV piden exactamente
+ * esto (apertura y cierre de caja, consumo de personal y autorización de
+ * supervisor), y hasta ahora cada uno lo escribía por su cuenta con un
+ * `<input type="password">` — cuatro sitios donde el navegador ofrecía
+ * guardar el PIN, que es de donde salía la cuenta compartida (ADR-045).
+ */
+function FirmaConPin({
+  quien,
+  usuario,
+  onUsuario,
+  pin,
+  onPin,
+  testid,
+}: {
+  quien: string;
+  usuario: string;
+  onUsuario: (v: string) => void;
+  pin: string;
+  onPin: (v: string) => void;
+  testid?: string;
+}) {
+  return (
+    <div className="pdv-firma">
+      <input
+        className="pdv-campo"
+        aria-label={`Usuario ${quien}`}
+        placeholder={`Usuario ${quien}`}
+        autoComplete="off"
+        data-testid={testid && `${testid}-usuario`}
+        value={usuario}
+        onChange={(e) => onUsuario(e.target.value)}
+      />
+      <Pinpad
+        value={pin}
+        onChange={onPin}
+        label={`PIN ${quien}`}
+        testid={testid && `${testid}-pin`}
+      />
+    </div>
+  );
+}
 
 /** Envoltorio común: `<dialog>` nativo, que ya trae foco atrapado, cierre
  * con Escape y backdrop sin una línea de JS.
@@ -203,28 +247,14 @@ export function DialogoApertura({
       )}
 
       <p className="pdv-etiqueta">Entrega el encargado</p>
-      <div className="pdv-dos">
-        <input
-          className="pdv-campo"
-          aria-label="Usuario del encargado"
-          placeholder="Usuario del encargado"
-          autoComplete="off"
-          data-testid="apertura-usuario"
-          value={usuario}
-          onChange={(e) => setUsuario(e.target.value)}
-        />
-        <input
-          className="pdv-campo"
-          type="password"
-          inputMode="numeric"
-          aria-label="PIN del encargado"
-          placeholder="PIN"
-          autoComplete="off"
-          data-testid="apertura-pin"
-          value={pin}
-          onChange={(e) => setPin(e.target.value)}
-        />
-      </div>
+      <FirmaConPin
+        quien="del encargado"
+        usuario={usuario}
+        onUsuario={setUsuario}
+        pin={pin}
+        onPin={setPin}
+        testid="apertura"
+      />
       <p className="pdv-nota">
         El efectivo se entrega de una persona a otra: quien lo entrega firma
         con su PIN para que un faltante tenga a quién preguntarle.
@@ -409,33 +439,14 @@ export function DialogoCierre({
         <option value="traslado_contabilidad">Traslado a contabilidad</option>
       </select>
       <p className="pdv-etiqueta">Recibe</p>
-      <div className="pdv-dos">
-        {/* `aria-label` y no un `<label>` envolvente: los dos campos son celdas
-            de `.pdv-dos` y meterlos dentro de una etiqueta rompe la grilla. Sin
-            esto el `placeholder` era el único nombre —y no lo es: desaparece al
-            escribir y ningún lector de pantalla lo anuncia como nombre del
-            campo. */}
-        <input
-          className="pdv-campo"
-          aria-label="Usuario de quien recibe"
-          placeholder="Usuario de quien recibe"
-          autoComplete="off"
-          data-testid="cierre-usuario"
-          value={usuario}
-          onChange={(e) => setUsuario(e.target.value)}
-        />
-        <input
-          className="pdv-campo"
-          type="password"
-          inputMode="numeric"
-          aria-label="PIN de quien recibe"
-          placeholder="PIN"
-          autoComplete="off"
-          data-testid="cierre-pin"
-          value={pin}
-          onChange={(e) => setPin(e.target.value)}
-        />
-      </div>
+      <FirmaConPin
+        quien="de quien recibe"
+        usuario={usuario}
+        onUsuario={setUsuario}
+        pin={pin}
+        onPin={setPin}
+        testid="cierre"
+      />
 
       <p className="pdv-etiqueta">Si hay descuadre, a quién se le atribuye</p>
       {/* Tres valores y no texto libre: es un enum en la base (RN-MDP-005), y
@@ -1143,28 +1154,14 @@ export function DialogoConsumoPersonal({
       </div>
 
       <p className="pdv-etiqueta">Autoriza el encargado</p>
-      <div className="pdv-fila">
-        <input
-          className="pdv-campo"
-          aria-label="Usuario del encargado"
-          placeholder="Usuario"
-          autoComplete="off"
-          data-testid="consumo-usuario"
-          value={usuario}
-          onChange={(e) => setUsuario(e.target.value)}
-        />
-        <input
-          className="pdv-campo"
-          type="password"
-          inputMode="numeric"
-          aria-label="PIN del encargado"
-          placeholder="PIN"
-          autoComplete="off"
-          data-testid="consumo-pin"
-          value={pin}
-          onChange={(e) => setPin(e.target.value)}
-        />
-      </div>
+      <FirmaConPin
+        quien="del encargado"
+        usuario={usuario}
+        onUsuario={setUsuario}
+        pin={pin}
+        onPin={setPin}
+        testid="consumo"
+      />
 
       <footer className="pdv-dialogo-pie">
         <span />
@@ -1648,24 +1645,14 @@ export function DialogoAutorizacion({
   return (
     <Dialogo titulo={titulo} abierto={abierto} onCerrar={onCerrar}>
       <p className="pdv-nota">{detalle}</p>
-      <div className="pdv-dos">
-        <input
-          className="pdv-campo"
-          placeholder="Usuario del supervisor"
-          autoComplete="off"
-          value={usuario}
-          onChange={(e) => setUsuario(e.target.value)}
-        />
-        <input
-          className="pdv-campo"
-          type="password"
-          inputMode="numeric"
-          placeholder="PIN"
-          autoComplete="off"
-          value={pin}
-          onChange={(e) => setPin(e.target.value)}
-        />
-      </div>
+      <FirmaConPin
+        quien="del supervisor"
+        usuario={usuario}
+        onUsuario={setUsuario}
+        pin={pin}
+        onPin={setPin}
+        testid="autorizacion"
+      />
       <footer className="pdv-dialogo-pie">
         <button type="button" className="pdv-boton-plano" onClick={onCerrar}>
           Cancelar

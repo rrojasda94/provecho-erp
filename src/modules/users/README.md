@@ -56,7 +56,20 @@ Detalle en `docs/architecture/data-model.md` (§1, §2).
 | POST | `/api/v1/auth/login` | `{username, pin}` | `{access_token, refresh_token, token_type}` |
 | POST | `/api/v1/auth/refresh` | `{refresh_token}` | tokens nuevos (rotación) |
 | POST | `/api/v1/auth/logout` | `{refresh_token}` | 204 |
+| POST | `/api/v1/auth/verificar-pin` | `{pin}` | 204 \| 401 \| 423 |
 | GET | `/api/v1/users/me` | — | usuario + roles + sucursales + permisos |
+
+`verificar-pin` (2026-08-13, ADR-045, RN-POS-014) responde una sola
+pregunta: **¿sigue siendo la misma persona frente al terminal?** Es lo que
+desbloquea la pantalla del PDV. No emite tokens y el usuario sale del token,
+no del cuerpo — pedirlo en el cuerpo dejaría verificar el PIN de cualquiera.
+
+Existe porque ninguno de los otros dos dice eso: `login` **rotaría la
+sesión** y con ella se perdería el borrador del pedido que el bloqueo existe
+para preservar, y `autorizar` está para elevar a **otro** (exige un código de
+permiso, RN-AUD-005). Va detrás del mismo rate limit y **cuenta contra el
+mismo lockout** que el login: un contador propio sería la vía cómoda para
+probar PINes sin agotar los cinco intentos.
 
 Claims del JWT: `sub` (usuario_id), `tipo`, `roles`, `sucursales`, `empresa_id`, `iat`, `exp`, `jti`.
 

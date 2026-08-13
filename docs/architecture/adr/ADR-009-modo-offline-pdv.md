@@ -301,7 +301,13 @@ transferencias que entran al local). Decisiones finas dentro de eso:
   guía sale al reconectar.
 - **`venta_item.id` no se conserva** entre hub y nube (sí el de la venta):
   nada fuera del hub referencia un ítem, y el avance de KDS es local al
-  local.
+  local. Lo mismo vale para `venta_item.etapa_kds` (ADR-044): el push
+  replaya la venta como un `POST /ventas` nuevo y nunca llevó
+  `estado_preparacion`, así que el recorrido por las estaciones ya era local
+  por diseño. **`kds_pantalla.orden` sí se replica**: es configuración de la
+  sucursal, y sin ella todas las estaciones del local caerían al mismo
+  eslabón durante un corte — el ruteo se rompería justo cuando no hay red
+  para arreglarlo.
 - **El precio cobrado sí viaja** (agregado 2026-07-27, con el precio
   server-side): el lote ascendente usa `VentaItemSyncIn`, que lleva
   `precio_unitario` y `descuento`, mientras el PDV en línea

@@ -343,7 +343,9 @@
 
 .kds-item {
     display: grid;
-    grid-template-columns: 2.5rem minmax(0, 1fr) 1.5rem;
+    /* La tercera columna crece: donde iba un "✓" ahora puede ir el nombre de
+       la estación a la que se mandó la línea (ADR-044). */
+    grid-template-columns: 2.5rem minmax(0, 1fr) minmax(1.5rem, auto);
     align-items: center;
     gap: 0.625rem;
     width: 100%;
@@ -414,6 +416,54 @@
 .kds-check {
     color: var(--kds-verde);
     font-weight: 700;
+    font-size: 0.8125rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+}
+
+/* --- Despacho: mira y entrega, no cocina ---------------------------------- */
+
+/* Misma caja que un ítem de cocina pero sin ser botón: en despacho tocar no
+   hace nada, y un botón que no responde se toca igual. */
+.kds-item.estatico {
+    cursor: default;
+}
+
+.kds-item.estatico:active {
+    transform: none;
+}
+
+/* Dónde está la línea AHORA. Ámbar mientras espera por una estación, verde
+   cuando ya salió de cocina: despacho lee la tarjeta de reojo y necesita
+   distinguirlo sin leer el texto. */
+.kds-estacion {
+    padding: 0.125rem 0.5rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--kds-ambar);
+    font-size: 0.8125rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+}
+
+.kds-estacion.hecho {
+    color: var(--kds-verde);
+}
+
+/* Cuánto le falta al pedido y por quién espera. Es la línea que decide si
+   despacho lo puede armar o todavía no. */
+.kds-avance {
+    margin: 0.25rem 0 0.5rem;
+    color: var(--kds-muted);
+    font-size: 0.875rem;
+}
+
+.kds-avance strong {
+    color: var(--kds-texto);
+    font-variant-numeric: tabular-nums;
 }
 
 .kds-acciones {

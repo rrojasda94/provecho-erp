@@ -40,6 +40,19 @@ alcance del usuario.
 - Un permiso sin restricción aplica a todo el alcance del usuario; con
   restricción, solo donde la condición se cumple.
 - Cambios de roles/permisos se auditan.
+- **Todo endpoint que reciba un PIN cuenta contra el mismo bloqueo de
+  cuenta** (5 intentos / 15 min, 423) y va detrás del mismo rate limit que
+  el login: `login`, `autorizar` y `verificar-pin`. Un contador propio por
+  endpoint sería el camino cómodo para probar PINes sin agotar los cinco
+  del login.
+
+Los tres caminos con PIN responden preguntas distintas y no se sustituyen:
+
+| Endpoint | Pregunta | Efecto |
+|---|---|---|
+| `/auth/login` | ¿quién sos? | abre sesión (rota tokens) |
+| `/auth/autorizar` | ¿este OTRO tiene tal permiso? | token corto acotado a una acción (RN-AUD-005) |
+| `/auth/verificar-pin` | ¿seguís siendo vos? | ninguno — 204 o 401 (RN-POS-014) |
 
 ## Matriz de permisos (semilla)
 

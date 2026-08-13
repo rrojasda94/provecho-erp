@@ -54,3 +54,18 @@ export async function contar(page: Page, conteo: Record<string, number>) {
     await dialogo(page).getByTestId(`denom-${valor}`).fill(String(piezas));
   }
 }
+
+/** Teclea un PIN en el pinpad (ADR-045). No hay `<input>` que llenar: el
+ * PIN se toca dígito por dígito, que es justamente lo que impide que el
+ * navegador ofrezca guardarlo.
+ *
+ * Se busca por testid a nivel de página y no dentro de `dialogo()` porque
+ * el bloqueo de pantalla es OTRO `<dialog open>` por encima: acotar a
+ * `dialog[open]` encontraría dos y Playwright lo rechaza. Cada pinpad tiene
+ * su testid propio, así que a nivel de página igual hay uno solo. */
+export async function tecleaPin(page: Page, testid: string, pin: string) {
+  const teclas = page.getByTestId(testid);
+  for (const digito of pin) {
+    await teclas.getByRole("button", { name: digito, exact: true }).click();
+  }
+}

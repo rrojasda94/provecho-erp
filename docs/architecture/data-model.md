@@ -768,7 +768,22 @@ Solicitud.
   `en_preparacion` | `listo` | `entregado` — avance de `PROC-OPE-002`,
   fuente única del progreso del pedido; `updated_at` de cada transición es
   la base para medir tiempos de preparación y de despacho,
-  RN-CUP-002/003).
+  RN-CUP-002/003), **etapa_kds** (entero, default 0 — eslabón de la cadena
+  de estaciones en el que va la línea, RN-CUP-013/ADR-044). Es un entero y
+  **no** una FK a `kds_pantalla` a propósito: la línea guarda DÓNDE VA, no
+  QUIÉN la atiende, así que desactivar el horno a media noche no deja
+  pedidos apuntando a una pantalla que ya no opera — caen solos a la
+  siguiente estación que los acepte.
+- **kds_pantalla**: sucursal_id, nombre, tipo (`preparacion` | `despacho`),
+  categoria_ids (JSONB de `categoria.id`; NULL/[] = todas), **orden**
+  (entero, default 0 — eslabón de la estación en la cadena de preparación),
+  activo. `UNIQUE (sucursal_id, nombre)`.
+
+  El `orden` solo significa algo en las pantallas de `preparacion`:
+  despacho no es un eslabón que la línea atraviese, es lo que mira el
+  pedido cuando ya no le queda ninguno. Dos estaciones con el mismo `orden`
+  son el mismo eslabón trabajando en paralelo (horno y barra, cada una con
+  sus categorías). Ver ADR-044 y `src/modules/sales/README.md`.
 - **alerta_pedido** (2026-08-04): venta_id, sucursal_id, **minutos_umbral**,
   minutos_transcurridos, estado_al_alertar (`pendiente` |
   `en_preparacion` — el peor estado del pedido; que cocina ni lo haya
