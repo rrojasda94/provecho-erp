@@ -21,8 +21,14 @@ class VentaItem(Base, UuidPkMixin, TimestampMixin):
     )
     # Línea de la que cuelga este extra (RN-COM-021). NULL = línea normal.
     # Un extra es una línea propia y no una columna del padre porque tiene
-    # su propia receta, su propio precio de lista y su propio avance en
-    # cocina; aplanarlo perdería las tres cosas.
+    # su propia receta, su propio precio de lista y su propio rastro al
+    # anularse; aplanarlo perdería las tres cosas.
+    #
+    # Lo que NO tiene es avance propio en cocina (RN-CUP-014, enmienda de
+    # ADR-044): nadie prepara un peperoni, se prepara la pizza que lo lleva.
+    # El KDS lo muestra dentro de su plato, lo rutea por la categoría del
+    # plato y lo marca cuando marca el plato. Este comentario decía lo
+    # contrario y era la parte equivocada.
     padre_venta_item_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("venta_item.id"), nullable=True, index=True
     )

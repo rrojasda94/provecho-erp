@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { ETIQUETA_ESTADO, marcarPreparado, type ItemCola, type PedidoCola } from "@/lib/kds";
 
+import NombreDeLinea from "./nombre-linea";
 import { useCola } from "./use-cola";
 
 type Props = {
@@ -125,18 +126,7 @@ export default function KdsCliente({ pantalla }: Props) {
                         onClick={() => tachar(item)}
                       >
                         <span className="kds-cant">{Number(item.cantidad)}</span>
-                        <span className="kds-nombre">
-                          {item.producto}
-                          {/* Las restas van DENTRO del nombre y en rojo: en
-                              una pantalla que se lee de reojo, un "sin
-                              cebolla" que pasa desapercibido sale como plato
-                              rehecho (RN-COM-028). */}
-                          {item.sin?.map((insumo) => (
-                            <em key={insumo} className="kds-sin">
-                              SIN {insumo.toUpperCase()}
-                            </em>
-                          ))}
-                        </span>
+                        <NombreDeLinea item={item} />
                         {/* Tachado y con destino: el cocinero necesita ver que
                             lo suyo salió, y a dónde fue (ADR-044). */}
                         <span className="kds-check">

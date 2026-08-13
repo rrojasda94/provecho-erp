@@ -375,3 +375,15 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   con el «no hay `POST /emitidos`» de ADR-033, así que la decisión de fondo es
   **dónde nace una queja**: como venta anotada, como nodo de encuesta, o como
   la primera emisión del ERP que sí admite alta manual.
+- ⬜ **Solo `test_pdv_slice` valida las FK** (2026-08-13): el resto de los
+  fixtures crean el engine SQLite sin `PRAGMA foreign_keys=ON`, así que
+  siguen ciegos a la clase de bug que dejó `anular_lineas` roto contra
+  Postgres durante meses. Encenderlo en `tests/conftest.py` para todos es
+  una línea, pero puede destapar más violaciones latentes y conviene hacerlo
+  como barrido propio, no de arrastre.
+- ⬜ **La cascada del extra vive en el código, no en el esquema**
+  (2026-08-13): `anular_lineas` borra los hijos a mano porque
+  `fk_venta_item_padre` es `NO ACTION`. Un `ON DELETE CASCADE` en la FK lo
+  haría cumplir aunque otro camino borre el padre. Es una migración de una
+  línea; se dejó fuera para no mezclar un cambio de esquema con un arreglo
+  que ya estaba probado.

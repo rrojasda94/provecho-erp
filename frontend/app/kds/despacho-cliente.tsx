@@ -2,6 +2,7 @@
 
 import { ETIQUETA_ESTADO, apiKds, type ItemCola, type PedidoCola } from "@/lib/kds";
 
+import NombreDeLinea from "./nombre-linea";
 import { useCola } from "./use-cola";
 
 /**
@@ -79,14 +80,7 @@ function Tarjeta({
               {/* Sin botón: despacho mira, no tacha. */}
               <div className={`kds-item estatico ${hecho ? "hecho" : ""}`}>
                 <span className="kds-cant">{Number(item.cantidad)}</span>
-                <span className="kds-nombre">
-                  {item.producto}
-                  {item.sin.map((insumo) => (
-                    <em key={insumo} className="kds-sin">
-                      SIN {insumo.toUpperCase()}
-                    </em>
-                  ))}
-                </span>
+                <NombreDeLinea item={item} />
                 <span className={`kds-estacion ${hecho ? "hecho" : ""}`}>
                   {item.estacion ?? "Listo"}
                 </span>

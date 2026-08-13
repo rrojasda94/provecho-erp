@@ -413,6 +413,25 @@
     opacity: 0.6;
 }
 
+/* Extra: mismo bloque sangrado que la resta, pero en el color del texto y no
+   en ámbar. Una resta es una advertencia —lo que el plato NO lleva— y un
+   extra es parte del plato; pintarlos igual haría que la advertencia dejara
+   de destacar (RN-CUP-014). */
+.kds-extra {
+    display: block;
+    margin-top: 0.125rem;
+    color: var(--kds-texto);
+    font-size: 0.8125rem;
+    font-style: normal;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.kds-item.hecho .kds-extra {
+    text-decoration: none;
+    opacity: 0.6;
+}
+
 .kds-check {
     color: var(--kds-verde);
     font-weight: 700;

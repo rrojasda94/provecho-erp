@@ -33,6 +33,11 @@ class PantallaOut(BaseModel):
     activo: bool
 
 
+class ExtraColaOut(BaseModel):
+    producto: str
+    cantidad: str
+
+
 class ItemColaOut(BaseModel):
     venta_item_id: str
     producto: str
@@ -41,6 +46,10 @@ class ItemColaOut(BaseModel):
     # Restas de la línea, ya resueltas a nombre: ["Cebolla"] → "SIN CEBOLLA"
     # en pantalla (RN-COM-028). Lista vacía = el plato va completo.
     sin: list[str] = []
+    # Lo que el plato lleva además (el sabor de la pizza, el queso extra).
+    # Anidados y no como ítems propios: en cocina son el mismo plato
+    # (RN-CUP-014).
+    extras: list[ExtraColaOut] = []
     etapa_kds: int = 0
     # Nombre de la estación donde está la línea ahora; `None` = ya salió de
     # cocina. Es lo que despacho muestra por línea (RN-CUP-013).

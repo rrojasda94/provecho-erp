@@ -1385,6 +1385,14 @@ preparación, despacho y entrega en las tres modalidades.
   nada. La pantalla de despacho no prepara ni marca: muestra el pedido
   completo, cuántas líneas van y **en qué estación está cada una**, para
   saber por quién se espera antes de entregarlo (RN-CUP-005).
+- **RN-CUP-014** Un extra (el sabor de una pizza, el queso adicional) **no
+  es un plato aparte en cocina**: se muestra dentro del plato del que
+  cuelga, recorre las estaciones que le tocan a ese plato, se marca cuando
+  se marca el plato y se anula cuando se anula el plato — reponiendo lo que
+  consumió. Sigue siendo una línea propia de la venta porque tiene su
+  receta, su precio y su rastro (RN-COM-021); lo que no tiene es avance
+  propio. Mostrarlo suelto hacía que la comanda y la pantalla dijeran "una
+  pizza" y "un peperoni" como si fueran dos preparaciones.
 
 ## Comercial — estrategia
 

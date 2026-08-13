@@ -426,6 +426,15 @@ tiempo real (Redis/WebSocket) es deuda declarada.
   siguiente. Dos pantallas con el mismo `orden` son el mismo eslabón
   trabajando en paralelo. **`orden` viaja en la réplica del hub** — sin él,
   durante un corte todas las estaciones caerían al mismo eslabón.
+- **El extra no es un plato aparte** (2026-08-13, RN-CUP-014, enmienda de
+  ADR-044): el sabor viaja **dentro** de su línea (`ItemColaOut.extras`), la
+  cola recorre solo padres, el ruteo mira la categoría del plato y marcarlo
+  marca sus extras. Antes salía como ítem suelto: la tarjeta decía "1 Pizza
+  Personal" y "1 Peperoni" como si fueran dos preparaciones, y un extra sin
+  `categoria_id` no lo atendía ninguna estación filtrada — se quedaba
+  `pendiente` y el pedido no llegaba nunca a entregable. Sigue siendo fila
+  propia por su receta, su precio y su rastro; lo que no tiene es avance
+  propio.
 - **Preparación**: ve **todos** los ítems de sus categorías, incluidos los
   ya `listo` y los que ya mandó al eslabón siguiente (con el destino a la
   vista) — el ítem tachado tiene que seguir a la vista de quien lo tachó y

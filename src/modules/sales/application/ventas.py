@@ -844,9 +844,20 @@ def anular_lineas(
         raise ReglaNegocio("la anulación de línea requiere motivo")
 
     pedidos = set(venta_item_ids)
-    filas = [f for f in VentaRepo(session).items(venta_id) if f.id in pedidos]
+    todas = VentaRepo(session).items(venta_id)
+    filas = [f for f in todas if f.id in pedidos]
     if len(filas) != len(pedidos):
         raise NoEncontrado("alguna línea no pertenece a esta venta")
+
+    # Quitar un plato se lleva sus extras. Son filas propias con su receta
+    # (RN-COM-021), así que sin esto pasaban dos cosas: el insumo del sabor
+    # no volvía al almacén, y borrar el padre dejaba al hijo apuntándolo —
+    # `fk_venta_item_padre` es NO ACTION, o sea `ForeignKeyViolation` en
+    # Postgres. SQLite no valida FKs, por eso ninguna prueba lo veía.
+    padres = {f.id for f in filas}
+    filas = filas + [
+        f for f in todas if f.padre_venta_item_id in padres and f.id not in pedidos
+    ]
 
     productos = ProductoComercialRepo(session)
     devueltos = []
@@ -861,6 +872,8 @@ def anular_lineas(
                 "sin_articulo_ids": fila.sin_articulo_ids,
             }
         )
+    # Los hijos primero: el FK rechaza borrar un padre que todavía tiene uno.
+    for fila in sorted(filas, key=lambda f: f.padre_venta_item_id is None):
         session.delete(fila)
     session.flush()
 

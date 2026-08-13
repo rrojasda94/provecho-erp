@@ -115,3 +115,37 @@ en una migración de datos en vez de que caigan solos al eslabón siguiente.
 - La cola de una estación sigue mostrando lo que ya mandó al eslabón
   siguiente, con el destino a la vista. El pedido sale de esa cola cuando a
   la estación no le queda nada pendiente, no línea por línea.
+
+## Enmienda (2026-08-13) — la unidad de cocina es el plato, no la fila
+
+Al probarlo, una **Pizza Personal Peperoni** salía en la tarjeta como dos
+ítems: `1 Pizza Personal` y `1 Peperoni`. El sabor es una fila propia de
+`venta_item` colgada por `padre_venta_item_id` (ADR-023), y el KDS no
+distinguía padres de hijos: no mencionaba esa columna en ninguna parte.
+
+**Un extra no es una unidad de trabajo.** Nadie prepara un peperoni; se
+prepara la pizza que lo lleva. Así que:
+
+- el payload lo anida (`ItemColaOut.extras`) y la cola recorre solo padres;
+- el ruteo mira la categoría **del plato**, no la del extra;
+- marcar el plato marca sus extras, en el mismo estado y el mismo eslabón;
+- la comanda lo imprime sangrado, como ya hacía con las restas.
+
+Sigue siendo fila propia por lo que ADR-023 decidió —receta, precio,
+anulación—, pero **el avance en cocina deja de ser suyo**. El comentario de
+`venta_item.py` que lo justificaba con "su propio avance en cocina" quedó
+corregido: esa parte era la equivocada.
+
+Dos cosas que esto arregla de paso:
+
+- **Un extra sin `categoria_id` colgaba el pedido.** Como ítem propio, una
+  estación filtrada por categoría no lo atendía, así que se quedaba
+  `pendiente` para siempre y `pedido_entregable` —que suma TODOS los
+  ítems— nunca daba verdadero. Todos los extras de `pizzas_demo` están en
+  ese caso.
+- **Anular un plato con extras reventaba contra Postgres.**
+  `fk_venta_item_padre` es `NO ACTION`, el PDV manda solo el id del padre, y
+  borrarlo dejaba al hijo apuntándolo. SQLite no valida FKs, por eso la
+  suite entera pasaba en verde; el fixture de `test_pdv_slice.py` ahora
+  enciende `PRAGMA foreign_keys=ON` para que pruebe lo que la base real hace
+  cumplir. Además la anulación no reponía el insumo del extra.

@@ -11,7 +11,7 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session
 
 import src.core.models_registry  # noqa: F401
@@ -55,6 +55,17 @@ pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")
 @pytest.fixture
 def session():
     engine = create_engine("sqlite://")
+    # SQLite trae las FK **apagadas** por defecto; Postgres no las apaga
+    # nunca. Sin este PRAGMA, borrar un padre dejando al hijo apuntándolo
+    # pasa en verde acá y revienta en producción — que es exactamente lo que
+    # pasó con `fk_venta_item_padre` al anular una línea con extras
+    # (2026-08-13). Encenderlas hace que esta suite pruebe lo que la base
+    # real hace cumplir.
+    event.listen(
+        engine,
+        "connect",
+        lambda dbapi, _rec: dbapi.execute("PRAGMA foreign_keys=ON"),
+    )
     Base.metadata.create_all(engine)
     with Session(engine) as s:
         yield s
@@ -1067,3 +1078,53 @@ def test_el_extra_sobrevive_al_ida_y_vuelta_de_sincronizacion(session, base):
     assert Decimal(exportado[0]["extras"][0]["cantidad"]) == Decimal(2), (
         "se exporta POR PLATO para que el replay no vuelva a multiplicar"
     )
+
+
+def test_anular_el_plato_se_lleva_su_extra_y_repone_los_dos(session, base):
+    """El extra cuelga del plato con `fk_venta_item_padre`, que es NO ACTION.
+
+    Borrar el padre dejando al hijo apuntándolo es `ForeignKeyViolation` en
+    Postgres — SQLite no valida FKs, así que hasta 2026-08-13 esto pasaba en
+    verde acá y reventaba en producción. Y el insumo del extra tampoco
+    volvía al almacén.
+    """
+    extra = _crear_extra(session, base, "Extra queso", "E900")
+    catalogo_uc.vincular_extra(
+        session, producto_id=base["productos"][0].id, extra_id=extra.id, maximo=3
+    )
+    venta = _crear(
+        session,
+        base,
+        [
+            {
+                **_item(base["productos"][0], cantidad=1, precio="40.00"),
+                "extras": [
+                    {
+                        "producto_comercial_id": extra.id,
+                        "cantidad": Decimal(1),
+                        "precio_unitario": Decimal("5.00"),
+                    }
+                ],
+            }
+        ],
+    )
+    padre = next(
+        f for f in VentaRepo(session).items(venta.id) if f.padre_venta_item_id is None
+    )
+
+    repuestos = []
+    event_bus.subscribe("sales.lineas_anuladas", repuestos.append)
+    ventas_uc.anular_lineas(
+        session,
+        venta_id=venta.id,
+        venta_item_ids=[padre.id],  # el PDV manda SOLO el id del plato
+        autorizado_por=base["usuario"].id,
+        motivo="Cliente se arrepintió",
+    )
+    # Commit y no flush: los eventos se despachan post-commit (ADR-016).
+    session.commit()
+
+    assert VentaRepo(session).items(venta.id) == [], "el extra quedó huérfano"
+    # Dos recetas repuestas: la del plato y la del extra. Con una sola, el
+    # queso del sabor se queda descontado sin haberse preparado.
+    assert len(repuestos[0]["items"]) == 2

@@ -46,3 +46,26 @@
   permiso fue. Se acortó a 248, y hay una prueba que compara cada
   descripción contra el largo declarado en el modelo para que la próxima
   falle donde tiene que fallar.
+- **El sabor dejó de salir como un plato aparte en cocina** (ADR-044
+  enmendado, RN-CUP-014). Una *Pizza Personal Peperoni* aparecía en la
+  tarjeta del KDS como dos ítems —`1 Pizza Personal` y `1 Peperoni`— y en
+  despacho contaba "2 de 2" por una sola pizza. El extra es fila propia de
+  la venta (tiene receta, precio y rastro), pero `kds.py` no mencionaba
+  `padre_venta_item_id` en ninguna parte, así que aplanaba. Ahora viaja
+  anidado y se muestra tabulado bajo su plato, igual que las restas; la
+  comanda impresa lo sangra en vez de imprimirlo como línea de primer nivel;
+  el ruteo por estaciones mira la categoría **del plato**; y marcar el plato
+  marca sus extras — sin eso, `pedido_entregable` (que suma todos los ítems)
+  habría dejado el pedido sin poder entregarse nunca.
+- **Un extra sin categoría colgaba el pedido para siempre**: como ítem
+  suelto, ninguna estación filtrada por categoría lo atendía, así que se
+  quedaba `pendiente` y el pedido no llegaba a entregable. Todos los extras
+  del seeder de pizzas estaban en ese caso.
+- **Anular un plato con extras reventaba contra Postgres**:
+  `fk_venta_item_padre` es `NO ACTION` y el PDV manda solo el id del plato,
+  así que borrarlo dejaba al sabor apuntándolo — `ForeignKeyViolation`.
+  SQLite no valida FKs, por eso las pruebas pasaban en verde. Ahora la
+  anulación se lleva los hijos y **repone también su insumo**, que antes
+  quedaba descontado sin haberse preparado. El fixture de `test_pdv_slice`
+  enciende `PRAGMA foreign_keys=ON` para que la próxima falle donde tiene
+  que fallar.

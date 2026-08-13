@@ -126,6 +126,8 @@ def env(monkeypatch):
             sucursal_id=str(sucursal.id), pv_id=str(pv.id),
             cat_pizzas=str(cat_pizzas.id), cat_bebidas=str(cat_bebidas.id),
             pizza_id=str(pizza.id), bebida_id=str(bebida.id),
+            marca_id=str(marca.id), receta_pizza=str(receta_p.id),
+            lista_precio=str(lista.id),
         )
         s.commit()
 
@@ -562,3 +564,104 @@ def test_despacho_ve_el_pedido_completo_aunque_tenga_categorias(env):
     assert sorted(i["producto"] for i in pedido["items"]) == [
         "Gaseosa 500ml", "Pizza Clásica",
     ]
+
+
+# --- El extra no es un plato aparte (RN-CUP-014) --------------------------------
+def _pizza_con_sabor(client, ids, h, clave="kds-extra-1", cantidad_extra="1"):
+    """Crea el sabor, lo cuelga de la pizza y vende una con él."""
+    sabor = client.post("/api/v1/sales/productos", headers=h, json={
+        "id_interno": "SPEP", "marca_id": ids["marca_id"], "nombre": "Peperoni",
+        "receta_id": ids["receta_pizza"], "es_extra": True,
+    }).json()
+    r = client.post(f"/api/v1/sales/productos/{ids['pizza_id']}/extras", headers=h,
+                    json={"extra_id": sabor["id"], "maximo": 3})
+    assert r.status_code == 201, r.text
+    # El precio lo resuelve el servidor (RN-PRC-003): sin uno vigente, la
+    # venta con el sabor rebota con 409. El sabor no cobra aparte.
+    r = client.post(f"/api/v1/sales/listas-precio/{ids['lista_precio']}/precios",
+                    headers=h,
+                    json={"producto_comercial_id": sabor["id"], "monto": "0.00"})
+    assert r.status_code in (200, 201), r.text
+    venta = client.post("/api/v1/sales/ventas", headers=h, json={
+        "sucursal_id": ids["sucursal_id"], "punto_venta_id": ids["pv_id"],
+        "canal": "pdv", "modalidad": "mesa", "idempotency_key": clave,
+        "referencia_atencion": "Mesa 1",
+        "items": [{
+            "producto_comercial_id": ids["pizza_id"], "cantidad": "1",
+            "extras": [{"producto_comercial_id": sabor["id"],
+                        "cantidad": cantidad_extra}],
+        }],
+    })
+    assert venta.status_code == 201, venta.text
+    return sabor, venta.json()
+
+
+def test_el_sabor_viaja_dentro_del_plato_y_no_como_item_suelto(env):
+    client, ids = env
+    h = _token(client)
+    pantalla = client.post("/api/v1/kds/pantallas", headers=h, json={
+        "sucursal_id": ids["sucursal_id"], "nombre": "Cocina", "tipo": "preparacion",
+    }).json()
+    _pizza_con_sabor(client, ids, h)
+
+    items = _cola(client, h, pantalla["id"])[0]["items"]
+    # Antes salían dos tarjetas —"1 Pizza Clásica" y "1 Peperoni"— y el
+    # cocinero leía dos platos donde hay uno.
+    assert [i["producto"] for i in items] == ["Pizza Clásica"]
+    assert items[0]["extras"] == [{"producto": "Peperoni", "cantidad": "1.00"}]
+
+
+def test_tachar_el_plato_se_lleva_su_extra(env):
+    client, ids = env
+    h = _token(client)
+    pantalla = client.post("/api/v1/kds/pantallas", headers=h, json={
+        "sucursal_id": ids["sucursal_id"], "nombre": "Cocina", "tipo": "preparacion",
+    }).json()
+    _, venta = _pizza_con_sabor(client, ids, h)
+
+    linea = _cola(client, h, pantalla["id"])[0]["items"][0]["venta_item_id"]
+    _tachar(client, h, linea)
+
+    # `estado_pedido` y `pedido_entregable` suman TODOS los ítems: si el
+    # extra se quedara atrás, el pedido no se podría entregar nunca.
+    avance = client.get(f"/api/v1/kds/ventas/{venta['id']}/avance", headers=h).json()
+    assert avance["estado_pedido"] == "listo"
+    assert client.post(
+        f"/api/v1/sales/ventas/{venta['id']}/entrega", headers=h
+    ).status_code == 200
+
+
+def test_con_estaciones_filtradas_el_extra_sin_categoria_no_cuelga_el_pedido(env):
+    """El ruteo mira la categoría del PLATO, no la del extra.
+
+    El sabor se crea sin `categoria_id`, así que una estación filtrada no lo
+    atendería: como ítem suelto se quedaba `pendiente` para siempre y el
+    pedido nunca llegaba a entregable.
+    """
+    client, ids = env
+    h = _token(client)
+    horno = client.post("/api/v1/kds/pantallas", headers=h, json={
+        "sucursal_id": ids["sucursal_id"], "nombre": "Horno", "tipo": "preparacion",
+        "categoria_ids": [ids["cat_pizzas"]],
+    }).json()
+    _, venta = _pizza_con_sabor(client, ids, h)
+
+    _tachar(client, h, _cola(client, h, horno["id"])[0]["items"][0]["venta_item_id"])
+    assert client.get(
+        f"/api/v1/kds/ventas/{venta['id']}/avance", headers=h
+    ).json()["estado_pedido"] == "listo"
+
+
+def test_la_comanda_sangra_el_extra_bajo_su_plato(env):
+    client, ids = env
+    h = _token(client)
+    _, venta = _pizza_con_sabor(client, ids, h, cantidad_extra="2")
+
+    texto = client.post(
+        f"/api/v1/kds/ventas/{venta['id']}/comanda", headers=h
+    ).json()["texto"]
+    lineas = [línea for línea in texto.splitlines() if "PIZZA" in línea.upper()
+              or "PEPERONI" in línea.upper()]
+    # En el papel, "1x Pizza" seguido de "2x Peperoni" al mismo nivel se lee
+    # como dos platos distintos.
+    assert lineas == ["1x Pizza Clásica", "   + 2x PEPERONI"]

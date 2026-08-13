@@ -34,6 +34,11 @@ export type ItemCola = {
    * va completo. Es lo que hasta ahora se escribía en la nota libre, y que
    * ahora además deja de descontarse del almacén. */
   sin: string[];
+  /** Lo que el plato lleva ADEMÁS: el sabor de la pizza, el queso extra.
+   * Vienen anidados y no como ítems propios porque en cocina son el mismo
+   * plato (RN-CUP-014) — sueltos, la tarjeta mostraba "1 Pizza Personal" y
+   * "1 Peperoni" como si fueran dos cosas. */
+  extras: { producto: string; cantidad: string }[];
   etapa_kds: number;
   /** En qué estación está la línea AHORA; `null` = ya salió de cocina. Es
    * lo que despacho lee para saber si el pedido espera por el horno o por

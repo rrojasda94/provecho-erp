@@ -7002,6 +7002,24 @@
         "title": "EvaluacionOut",
         "type": "object"
       },
+      "ExtraColaOut": {
+        "properties": {
+          "cantidad": {
+            "title": "Cantidad",
+            "type": "string"
+          },
+          "producto": {
+            "title": "Producto",
+            "type": "string"
+          }
+        },
+        "required": [
+          "producto",
+          "cantidad"
+        ],
+        "title": "ExtraColaOut",
+        "type": "object"
+      },
       "ExtraDeCartaOut": {
         "description": "Extra ofrecible sobre un producto, con su precio ya resuelto para\neste ámbito (RN-COM-021).",
         "properties": {
@@ -8008,6 +8026,14 @@
             "default": 0,
             "title": "Etapa Kds",
             "type": "integer"
+          },
+          "extras": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ExtraColaOut"
+            },
+            "title": "Extras",
+            "type": "array"
           },
           "producto": {
             "title": "Producto",
