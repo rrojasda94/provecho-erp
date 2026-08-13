@@ -356,6 +356,34 @@ const PDV: Caso[] = [
 
 const CATALOGO: Caso[] = [
   caso("unidadesMedida", () => catalogoApi.unidadesMedida()),
+  caso("crearArticulo", () =>
+    catalogoApi.crearArticulo({
+      id_interno: "ALB1",
+      nombre: "Albahaca",
+      unidad_medida_id: UUID,
+      tipo: "insumo",
+    }),
+  ),
+  caso("validarImportacion", () =>
+    catalogoApi.validarImportacion(
+      new File([new Uint8Array([0x50, 0x4b])], "recetas.xlsx"),
+    ),
+  ),
+  caso("importarRecetas", () =>
+    catalogoApi.importarRecetas([
+      {
+        fila: 2,
+        nombre: "Salsa Base",
+        rendimiento: "1",
+        unidad: "Unidad",
+        unidad_medida_id: UUID,
+        produce: null,
+        articulo_producido_id: null,
+        ingredientes: [],
+        problemas: [],
+      },
+    ]),
+  ),
   caso(
     "articulos",
     () => catalogoApi.articulos(),
@@ -474,6 +502,20 @@ function respuestaExitosa(op: Operacion | undefined): { codigo: string; cuerpo?:
 
 /** Corre la operación con `fetch` intervenido: captura lo que sale y
  * responde con el ejemplo que el contrato promete para esa ruta. */
+/**
+ * El cuerpo tal como el contrato lo entiende.
+ *
+ * Una subida de archivo va en `multipart/form-data`, no en JSON: parsearla
+ * revienta con «Unexpected token 'o'», que no dice nada. Se devuelve
+ * `undefined` para que la ruta se verifique igual y la validación de esquema
+ * no aplique — el contrato de un multipart no describe un objeto JSON.
+ */
+function cuerpoDe(body: BodyInit | null | undefined): unknown {
+  if (!body) return undefined;
+  if (typeof FormData !== "undefined" && body instanceof FormData) return undefined;
+  return JSON.parse(String(body));
+}
+
 async function ejercitar(operacion: Caso): Promise<{ salida: Salida; resultado: unknown }> {
   let salida: Salida | null = null;
   const original = globalThis.fetch;
@@ -484,7 +526,7 @@ async function ejercitar(operacion: Caso): Promise<{ salida: Salida; resultado: 
 
   globalThis.fetch = ((url: string, opciones: RequestInit = {}) => {
     const metodo = opciones.method ?? "GET";
-    salida = { metodo, url, cuerpo: opciones.body ? JSON.parse(String(opciones.body)) : undefined };
+    salida = { metodo, url, cuerpo: cuerpoDe(opciones.body) };
     const { codigo, cuerpo } = respuestaExitosa(operacionDe(url, metodo));
     if (codigo === "204") return Promise.resolve(new Response(null, { status: 204 }));
     return Promise.resolve(

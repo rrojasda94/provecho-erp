@@ -68,6 +68,32 @@ fecha_vencimiento, condiciones de almacenamiento), `conteo`, `ajuste`
   para que `purchases` gestione el reclamo o la nota de crédito.
   **De cliente**: entra, y `destino` decide si vuelve al estante o se
   aparta como merma. Sucursal→central sigue siendo una `transferencia`.
+  Desde 2026-08-13 **registrar y anular escriben en `audit_log`**: mueven
+  stock real, y el evento le avisa a compras o comercial pero no responde
+  "quién sacó esto del almacén". La pantalla estuvo en solo lectura hasta
+  esa fecha, así que la API completa era inalcanzable por UI.
+
+## Estado (slice 7 — carga masiva de recetas, 2026-08-13)
+
+- `GET /inventory/skus`: no existía listado y ninguna pantalla podía ofrecer
+  "qué se mueve". Va con `articulo_nombre`, porque un código de SKU no le
+  dice nada a nadie.
+- `GET /inventory/recetas` acepta `tipo` (`subreceta` | `producto`) y
+  `categoria_id`. **El tipo se deriva** de `receta.articulo_id`, no hay
+  columna (RN-COM-030): guardarlo sería un segundo lugar donde puede estar
+  mal. La categoría es la del artículo que produce, así que solo alcanza a
+  las subrecetas.
+- **Carga masiva** (ADR-046, RN-COM-031): `GET /recetas/plantilla` baja un
+  `.xlsx` con ejemplos e instrucciones;
+  `POST /recetas/importar/validar` (multipart) dice qué entra y qué no **sin
+  guardar nada**; `POST /recetas/importar` crea lo que la pantalla confirmó,
+  **revalidando todo** porque lo que vuelve es un JSON que el cliente pudo
+  editar. Reusa `crear_receta`/`agregar_item`, así que la cantidad acepta
+  aritmética tecleada (RN-COM-024) y el nombre único por empresa se hace
+  cumplir en un solo lugar. Cada receta va en su `SAVEPOINT`: un nombre
+  repetido a mitad del archivo no se lleva puestas a las que ya entraron ni
+  deja una a medias. `plantilla` va declarada **antes** de
+  `/recetas/{receta_id}`, o FastAPI la toma como un id que no es UUID.
 
 ## Estado (slice 5 — recetas editables, 2026-08-03)
 

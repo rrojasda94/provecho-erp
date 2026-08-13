@@ -120,10 +120,26 @@ def editar_receta(session: Session, receta_id: uuid.UUID, **campos) -> Receta:
     return receta
 
 
+TIPOS_RECETA = ("subreceta", "producto")
+
+
 def listar_recetas(
-    session: Session, empresa_id: uuid.UUID | None = None
+    session: Session,
+    empresa_id: uuid.UUID | None = None,
+    *,
+    tipo: str | None = None,
+    categoria_id: uuid.UUID | None = None,
 ) -> list[dict]:
-    return [_resumen(session, r) for r in RecetaRepo(session).list(empresa_id)]
+    """El filtro va al servidor y no en memoria porque el listado ya se trae
+    entero: filtrar en el cliente traería igual las mil recetas."""
+    if tipo is not None and tipo not in TIPOS_RECETA:
+        raise ReglaNegocio(f"tipo de receta inválido: {tipo}")
+    return [
+        _resumen(session, r)
+        for r in RecetaRepo(session).list(
+            empresa_id, tipo=tipo, categoria_id=categoria_id
+        )
+    ]
 
 
 def detalle_receta(session: Session, receta_id: uuid.UUID) -> dict:

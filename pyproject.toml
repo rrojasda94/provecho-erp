@@ -23,6 +23,14 @@ dependencies = [
     # (SUNAT lo exige). Escribirlo a mano falla en los casos raros del
     # español: veintiuno, quinientos, novecientos.
     "num2words>=0.5",
+    # Carga masiva de recetas. Se eligió .xlsx sobre CSV porque Excel en
+    # configuración regional peruana separa con `;` y usa coma decimal:
+    # abrir y guardar un CSV convierte `0.5` en `0,5` y el archivo se
+    # corrompe en silencio, que es el peor modo de falla para una carga que
+    # el usuario cree que salió bien.
+    "openpyxl>=3.1",
+    # FastAPI lo necesita para leer `UploadFile` (multipart/form-data).
+    "python-multipart>=0.0.9",
 ]
 
 [project.optional-dependencies]

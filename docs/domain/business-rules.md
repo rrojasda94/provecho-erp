@@ -1329,6 +1329,21 @@ producción se hace en cocinas de sucursal. Ver
     la forma de quitarla sin que nadie firme.
   - Después del cobro la cuenta está cerrada: lo que venga es otra orden, y
     deshacer lo cobrado es nota de crédito (RN-CPP-009).
+- **RN-COM-030** El **tipo de una receta se deriva, no se declara**: la que
+  produce un artículo es una **subreceta** —se guarda para usarla en otra— y
+  la que no, es un **producto de venta**. Guardarlo en una columna aparte
+  sería un segundo lugar donde puede estar mal. La categoría por la que se
+  filtra es la del artículo que la receta produce, así que solo alcanza a
+  las subrecetas.
+- **RN-COM-031** El recetario **se puede cargar de golpe** desde una hoja de
+  cálculo, y la carga es en **dos pasos con revisión en el medio**: primero
+  se dice qué entra y qué no **sin guardar nada**, y recién después de que
+  alguien lo mira se importa. Un insumo que el catálogo no reconoce no
+  cancela la carga: se elige cuál es, se crea, o se omite esa línea **a la
+  vista** — nunca en silencio. Una receta que no entra (nombre repetido,
+  unidad inexistente) se informa y **no arrastra a las demás**. Lo que la
+  pantalla devuelve se revalida en el servidor: es un dato que el cliente
+  pudo editar.
 
 ## Cumplimiento de pedido
 

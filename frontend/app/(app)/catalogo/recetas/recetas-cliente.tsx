@@ -6,9 +6,11 @@ import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
 
 import { TablaDatos } from "@/components/tabla/tabla-datos";
-import { catalogoApi, type Receta, type UnidadMedida } from "@/lib/catalogo";
+import { catalogoApi, type Categoria, type Receta, type UnidadMedida } from "@/lib/catalogo";
 import { ErrorApi } from "@/lib/cliente-api";
 import { aTitulo } from "@/lib/texto";
+
+import { ImportarRecetas } from "./importar-recetas";
 
 /**
  * Todas las recetas, incluidas las que no cuelgan de ningún producto.
@@ -21,11 +23,30 @@ import { aTitulo } from "@/lib/texto";
 export function RecetasCliente({
   recetas,
   unidades,
+  categorias,
+  tipo,
+  categoria,
 }: {
   recetas: Receta[];
   unidades: UnidadMedida[];
+  categorias: Categoria[];
+  tipo: string;
+  categoria: string;
 }) {
   const router = useRouter();
+
+  /** El filtro vive en la URL: recarga la página, que es la que consulta al
+   * servidor. Filtrar en memoria traería igual las mil recetas. */
+  const filtrar = (clave: "tipo" | "categoria", valor: string) => {
+    const query = new URLSearchParams({ tipo, categoria });
+    query.set(clave, valor);
+    // Una categoría solo tiene sentido sobre subrecetas: un producto de
+    // venta no produce artículo del que sacarla. Elegir una y que el tipo
+    // diga "Producto de venta" daría una lista vacía sin explicar por qué.
+    if (clave === "categoria" && valor) query.set("tipo", "subreceta");
+    for (const [k, v] of [...query]) if (!v) query.delete(k);
+    router.push(query.size ? `/catalogo/recetas?${query}` : "/catalogo/recetas");
+  };
 
   const columnas = useMemo<ColumnDef<Receta>[]>(
     () => [
@@ -66,15 +87,63 @@ export function RecetasCliente({
             incluidas las subrecetas de cocina.
           </p>
         </div>
-        <DialogoNuevaReceta
-          unidades={unidades}
-          onCreada={(id) => router.push(`/catalogo/recetas/${id}`)}
-        />
+        <div className="flex items-center gap-2">
+          <ImportarRecetas onImportadas={() => router.refresh()} />
+          <DialogoNuevaReceta
+            unidades={unidades}
+            onCreada={(id) => router.push(`/catalogo/recetas/${id}`)}
+          />
+        </div>
       </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <label className="flex items-center gap-2 text-xs text-gray">
+          Tipo
+          <select
+            className="rounded border border-borde bg-white px-2 py-1 text-sm text-dark"
+            value={tipo}
+            onChange={(e) => filtrar("tipo", e.target.value)}
+          >
+            <option value="">Todas</option>
+            <option value="subreceta">Subrecetas</option>
+            <option value="producto">Productos de venta</option>
+          </select>
+        </label>
+        <label className="flex items-center gap-2 text-xs text-gray">
+          Categoría
+          <select
+            className="rounded border border-borde bg-white px-2 py-1 text-sm text-dark"
+            value={categoria}
+            onChange={(e) => filtrar("categoria", e.target.value)}
+          >
+            <option value="">Todas</option>
+            {categorias.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.nombre}
+              </option>
+            ))}
+          </select>
+        </label>
+        {(tipo || categoria) && (
+          <button
+            type="button"
+            className="text-xs text-primary underline"
+            onClick={() => router.push("/catalogo/recetas")}
+          >
+            Quitar filtros
+          </button>
+        )}
+      </div>
+
       <TablaDatos
         columnas={columnas}
         datos={recetas}
         placeholderBusqueda="Buscar receta..."
+        vacio={
+          tipo || categoria
+            ? "Ninguna receta coincide con estos filtros."
+            : "Todavía no hay recetas. Créalas una por una o importa tu recetario."
+        }
       />
     </div>
   );

@@ -301,3 +301,29 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   margen de ajuste sin piso—. Reponer y volver a caer avisa de nuevo, que es
   cuando hay que comprar. Sin consumidor todavía (mismo bloqueo de
   notificaciones que `conteo_vencido` y `lote_vencido_detectado`).
+- ✅ 2026-08-13 **Las devoluciones se pueden usar**: la API estaba completa
+  y la pantalla era una tabla de solo lectura, así que registrar una
+  devolución solo se podía llamando al endpoint a mano. Formulario, anular,
+  ficha de detalle y `audit_log` en registrar/anular. Suma
+  `GET /inventory/skus`, que no existía.
+- ⬜ **La devolución se registra de a una línea** (2026-08-13): la API acepta
+  varias desde el primer día y el formulario manda una sola. Es el caso real
+  —vuelve un producto, se decide qué hacer con él— así que ampliarlo es solo
+  pantalla, cuando alguien lo pida.
+- ⬜ **La ficha de devolución muestra el UUID de quien la registró**, no su
+  nombre (2026-08-13). `inventory` no puede leer `usuario`; hace falta un
+  contrato público de `users` tipo `nombres_de_usuarios`, igual que el que
+  `sales` usa para los nombres de artículo en el KDS.
+- ⬜ **La nota de crédito sigue sin pantalla** (`sales/application/notas_credito.py`):
+  es la devolución de una **venta**, no de mercadería, y por eso no entró
+  con esto. Sin ella, deshacer algo ya cobrado no tiene camino por UI.
+- ⬜ **El importador no crea el insumo que falta desde el diálogo**
+  (2026-08-13, ADR-046): la pantalla deja **elegir** uno existente u omitir
+  la línea; crear uno nuevo ahí mismo —que era parte de lo pedido— usa
+  `catalogoApi.crearArticulo`, que ya está expuesto, pero necesita el
+  formulario con unidad y tipo dentro del diálogo. Mientras tanto se crea en
+  `/inventario/articulos` y se vuelve a subir el archivo.
+- ⬜ **La importación no actualiza recetas existentes** (2026-08-13): una
+  receta con nombre repetido se omite. Actualizar exige decidir qué pasa con
+  los ingredientes que el archivo no menciona —¿se borran?— y esa es una
+  decisión de negocio, no de código.

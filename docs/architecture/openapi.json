@@ -1988,6 +1988,20 @@
         "title": "AvanzarIn",
         "type": "object"
       },
+      "Body_validar_importacion_recetas_api_v1_inventory_recetas_importar_validar_post": {
+        "properties": {
+          "archivo": {
+            "contentMediaType": "application/octet-stream",
+            "title": "Archivo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "archivo"
+        ],
+        "title": "Body_validar_importacion_recetas_api_v1_inventory_recetas_importar_validar_post",
+        "type": "object"
+      },
       "BoletaPagoCreate": {
         "properties": {
           "aportes_empleador": {
@@ -5547,6 +5561,30 @@
             "title": "Almacen Id",
             "type": "string"
           },
+          "anulada_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anulada At"
+          },
+          "anulado_por": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anulado Por"
+          },
           "destino": {
             "anyOf": [
               {
@@ -5605,6 +5643,18 @@
             ],
             "title": "Referencia Id"
           },
+          "registrado_por": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registrado Por"
+          },
           "reporte_dirigido_a": {
             "title": "Reporte Dirigido A",
             "type": "string"
@@ -5620,6 +5670,9 @@
           "estado",
           "reporte_dirigido_a",
           "observacion",
+          "registrado_por",
+          "anulado_por",
+          "anulada_at",
           "items"
         ],
         "title": "DevolucionDetalleOut",
@@ -5711,6 +5764,30 @@
             "title": "Almacen Id",
             "type": "string"
           },
+          "anulada_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anulada At"
+          },
+          "anulado_por": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anulado Por"
+          },
           "destino": {
             "anyOf": [
               {
@@ -5762,6 +5839,18 @@
             ],
             "title": "Referencia Id"
           },
+          "registrado_por": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registrado Por"
+          },
           "reporte_dirigido_a": {
             "title": "Reporte Dirigido A",
             "type": "string"
@@ -5776,7 +5865,10 @@
           "destino",
           "estado",
           "reporte_dirigido_a",
-          "observacion"
+          "observacion",
+          "registrado_por",
+          "anulado_por",
+          "anulada_at"
         ],
         "title": "DevolucionOut",
         "type": "object"
@@ -7999,6 +8091,66 @@
           "incidencia"
         ],
         "title": "ImplementacionOut",
+        "type": "object"
+      },
+      "ImportarRecetasIn": {
+        "properties": {
+          "recetas": {
+            "items": {
+              "$ref": "#/components/schemas/RecetaImportadaIn"
+            },
+            "title": "Recetas",
+            "type": "array"
+          }
+        },
+        "required": [
+          "recetas"
+        ],
+        "title": "ImportarRecetasIn",
+        "type": "object"
+      },
+      "IngredienteImportadoIn": {
+        "description": "Una línea de la hoja «Ingredientes», ya resuelta por la pantalla.\n\n`articulo_id` en `None` significa **omitir esta línea**: es lo que\ndevuelve la pantalla cuando el usuario decidió no resolver ese insumo.",
+        "properties": {
+          "articulo_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Articulo Id"
+          },
+          "cantidad": {
+            "title": "Cantidad",
+            "type": "string"
+          },
+          "insumo": {
+            "default": "",
+            "title": "Insumo",
+            "type": "string"
+          },
+          "merma_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "default": "0",
+            "title": "Merma Pct"
+          }
+        },
+        "required": [
+          "cantidad"
+        ],
+        "title": "IngredienteImportadoIn",
         "type": "object"
       },
       "ItemColaOut": {
@@ -16320,6 +16472,61 @@
         "title": "RecetaEscalarIn",
         "type": "object"
       },
+      "RecetaImportadaIn": {
+        "properties": {
+          "articulo_producido_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Articulo Producido Id"
+          },
+          "ingredientes": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/IngredienteImportadoIn"
+            },
+            "title": "Ingredientes",
+            "type": "array"
+          },
+          "nombre": {
+            "maxLength": 150,
+            "minLength": 1,
+            "title": "Nombre",
+            "type": "string"
+          },
+          "rendimiento": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Rendimiento"
+          },
+          "unidad_medida_id": {
+            "format": "uuid",
+            "title": "Unidad Medida Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "nombre",
+          "rendimiento",
+          "unidad_medida_id"
+        ],
+        "title": "RecetaImportadaIn",
+        "type": "object"
+      },
       "RecetaItemCreate": {
         "description": "`cantidad` o `expresion`, no ambas obligatorias: si viene la\noperación (\"1000/3\"), el servidor la evalúa y el número que mande el\ncliente se ignora.",
         "properties": {
@@ -17586,6 +17793,54 @@
           "articulo"
         ],
         "title": "SkuDetalleOut",
+        "type": "object"
+      },
+      "SkuListadoOut": {
+        "description": "El SKU con el nombre de su artículo: un selector que muestre solo el\ncódigo obliga a adivinar qué es cada cosa.",
+        "properties": {
+          "activo": {
+            "title": "Activo",
+            "type": "boolean"
+          },
+          "articulo_id": {
+            "format": "uuid",
+            "title": "Articulo Id",
+            "type": "string"
+          },
+          "articulo_nombre": {
+            "title": "Articulo Nombre",
+            "type": "string"
+          },
+          "codigo": {
+            "title": "Codigo",
+            "type": "string"
+          },
+          "codigo_barras": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Codigo Barras"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "articulo_id",
+          "codigo",
+          "codigo_barras",
+          "activo",
+          "articulo_nombre"
+        ],
+        "title": "SkuListadoOut",
         "type": "object"
       },
       "SkuOut": {
@@ -26920,7 +27175,43 @@
     },
     "/api/v1/inventory/recetas": {
       "get": {
+        "description": "`tipo` es `subreceta` (produce un artículo) o `producto` (se vende);\nse deriva de `articulo_id`, no hay columna que mantener (RN-COM-030).",
         "operationId": "listar_recetas_api_v1_inventory_recetas_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "tipo",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tipo"
+            }
+          },
+          {
+            "in": "query",
+            "name": "categoria_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Categoria Id"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -26935,6 +27226,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "security": [
@@ -26987,6 +27288,121 @@
           }
         ],
         "summary": "Crear Receta",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/recetas/importar": {
+      "post": {
+        "description": "Crea lo que la pantalla confirmó, revalidando todo: lo que llega es un\nJSON que el cliente pudo editar.",
+        "operationId": "importar_recetas_api_v1_inventory_recetas_importar_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportarRecetasIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Importar Recetas",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/recetas/importar/validar": {
+      "post": {
+        "description": "Dice qué entra y qué no. **No guarda nada** — la pantalla resuelve los\ninsumos que el catálogo no reconoce y recién ahí se importa.",
+        "operationId": "validar_importacion_recetas_api_v1_inventory_recetas_importar_validar_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_validar_importacion_recetas_api_v1_inventory_recetas_importar_validar_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Validar Importacion Recetas",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/recetas/plantilla": {
+      "get": {
+        "description": "La hoja que se llena para cargar el recetario de golpe (RN-COM-031).\n\nDeclarada **antes** de `/recetas/{receta_id}`: FastAPI resuelve por orden\ny \"plantilla\" entraría como un `receta_id` que no es UUID.",
+        "operationId": "descargar_plantilla_recetas_api_v1_inventory_recetas_plantilla_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Descargar Plantilla Recetas",
         "tags": [
           "inventory"
         ]
@@ -27553,6 +27969,35 @@
       }
     },
     "/api/v1/inventory/skus": {
+      "get": {
+        "description": "Qué se puede mover: lo consume el formulario de devolución y cualquier\npantalla que pregunte por un SKU concreto.",
+        "operationId": "listar_skus_api_v1_inventory_skus_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SkuListadoOut"
+                  },
+                  "title": "Response Listar Skus Api V1 Inventory Skus Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Skus",
+        "tags": [
+          "inventory"
+        ]
+      },
       "post": {
         "operationId": "crear_sku_api_v1_inventory_skus_post",
         "requestBody": {
