@@ -813,6 +813,57 @@ def listar_items(session: Session, venta_id: uuid.UUID) -> list[dict]:
     ]
 
 
+def _con_sus_extras(filas: list[VentaItem], todas: list[VentaItem]) -> list[VentaItem]:
+    """Quitar un plato se lleva sus extras (RN-CUP-014).
+
+    El PDV manda solo el id del plato. Sin esto pasaban dos cosas: el insumo
+    del sabor no volvía al almacén, y borrar el padre dejaba al hijo
+    apuntándolo — `fk_venta_item_padre` es NO ACTION, o sea
+    `ForeignKeyViolation` en Postgres.
+    """
+    padres = {f.id for f in filas}
+    pedidas = {f.id for f in filas}
+    return filas + [
+        f for f in todas if f.padre_venta_item_id in padres and f.id not in pedidas
+    ]
+
+
+def _a_reponer(session: Session, filas: list[VentaItem]) -> list[dict]:
+    """Qué devolverle al almacén por cada línea que se quita."""
+    productos = ProductoComercialRepo(session)
+    return [
+        {
+            "receta_id": str(productos.get(f.producto_comercial_id).receta_id),
+            "cantidad": str(f.cantidad),
+            # Se repone exactamente lo que se consumió: lo que la línea no
+            # llevó tampoco vuelve al almacén.
+            "sin_articulo_ids": f.sin_articulo_ids,
+        }
+        for f in filas
+    ]
+
+
+def _borrar_hijos_primero(session: Session, filas: list[VentaItem]) -> None:
+    """El FK rechaza borrar un padre que todavía tiene un hijo.
+
+    El flush **entre medio** es lo que lo garantiza: ordenar el bucle no
+    alcanza porque `delete()` solo marca, y el orden real de los DELETE lo
+    decide SQLAlchemy al vaciar la sesión. Como `padre_venta_item_id` no
+    tiene `relationship` declarada, no sabe que la FK es autorreferencial y
+    ordena a su antojo — sin el flush esto pasaba en local y fallaba en CI,
+    que es la peor forma de "funcionar".
+    """
+    hijos = [f for f in filas if f.padre_venta_item_id is not None]
+    for fila in hijos:
+        session.delete(fila)
+    if hijos:
+        session.flush()
+    for fila in filas:
+        if fila.padre_venta_item_id is None:
+            session.delete(fila)
+    session.flush()
+
+
 def anular_lineas(
     session: Session,
     *,
@@ -849,33 +900,9 @@ def anular_lineas(
     if len(filas) != len(pedidos):
         raise NoEncontrado("alguna línea no pertenece a esta venta")
 
-    # Quitar un plato se lleva sus extras. Son filas propias con su receta
-    # (RN-COM-021), así que sin esto pasaban dos cosas: el insumo del sabor
-    # no volvía al almacén, y borrar el padre dejaba al hijo apuntándolo —
-    # `fk_venta_item_padre` es NO ACTION, o sea `ForeignKeyViolation` en
-    # Postgres. SQLite no valida FKs, por eso ninguna prueba lo veía.
-    padres = {f.id for f in filas}
-    filas = filas + [
-        f for f in todas if f.padre_venta_item_id in padres and f.id not in pedidos
-    ]
-
-    productos = ProductoComercialRepo(session)
-    devueltos = []
-    for fila in filas:
-        prod = productos.get(fila.producto_comercial_id)
-        devueltos.append(
-            {
-                "receta_id": str(prod.receta_id),
-                "cantidad": str(fila.cantidad),
-                # Se repone exactamente lo que se consumió: lo que la línea
-                # no llevó tampoco vuelve al almacén.
-                "sin_articulo_ids": fila.sin_articulo_ids,
-            }
-        )
-    # Los hijos primero: el FK rechaza borrar un padre que todavía tiene uno.
-    for fila in sorted(filas, key=lambda f: f.padre_venta_item_id is None):
-        session.delete(fila)
-    session.flush()
+    filas = _con_sus_extras(filas, todas)
+    devueltos = _a_reponer(session, filas)
+    _borrar_hijos_primero(session, filas)
 
     restantes = VentaRepo(session).items(venta_id)
     venta.total = total_a_cobrar(session, venta)
