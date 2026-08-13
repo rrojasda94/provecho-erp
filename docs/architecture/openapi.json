@@ -228,6 +228,24 @@
         "title": "AdjuntoOut",
         "type": "object"
       },
+      "AgregarLineasCreate": {
+        "description": "Sumar líneas a una orden ya enviada a cocina (RN-COM-029). Mismo\nshape que los `items` del alta: una mesa que pide de a poco no debería\nobligar a abrir una orden nueva que después se cobra por separado.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/VentaItemIn"
+            },
+            "minItems": 1,
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "AgregarLineasCreate",
+        "type": "object"
+      },
       "AjusteCreate": {
         "properties": {
           "almacen_id": {
@@ -820,11 +838,18 @@
         "type": "object"
       },
       "AnularLineasCreate": {
-        "description": "Quitar líneas de una orden ya enviada a cocina. `autorizacion` es el\ntoken de `POST /auth/autorizar`: es inventario que se repone, lo\nautoriza un supervisor (RN-COM-020).",
+        "description": "Quitar líneas de una orden ya enviada a cocina.\n\n`autorizacion` es el token de `POST /auth/autorizar` y hace falta cuando\nla línea ya salió de la ventana de corrección (RN-COM-029): ahí el insumo\nse usó de verdad y reponerlo lo firma un supervisor (RN-COM-020). Dentro\nde la ventana es un error de tecleo y lo corrige el cajero solo.",
         "properties": {
           "autorizacion": {
-            "title": "Autorizacion",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Autorizacion"
           },
           "motivo": {
             "maxLength": 120,
@@ -844,8 +869,7 @@
         },
         "required": [
           "venta_item_ids",
-          "motivo",
-          "autorizacion"
+          "motivo"
         ],
         "title": "AnularLineasCreate",
         "type": "object"
@@ -39191,7 +39215,7 @@
     },
     "/api/v1/sales/ventas/{venta_id}/anular-lineas": {
       "post": {
-        "description": "Quita líneas de una orden ya enviada a cocina y repone su insumo.\nLo pide el cajero, lo autoriza un supervisor con su PIN (RN-COM-020).\nAntes de enviar, el pedido vive en el PDV y no pasa por acá.",
+        "description": "Quita líneas de una orden ya enviada a cocina y repone su insumo.\n\n**Dentro de los 5 minutos** de haberse enviado la línea, la quita el\ncajero solo: es corregir un tecleo, el plato todavía no se armó\n(RN-COM-029). Pasada la ventana el insumo ya se usó de verdad y hace\nfalta la firma de un supervisor (RN-COM-020) — la pide el cajero y la da\nel supervisor con su PIN en el mismo terminal.\n\nAntes de enviar, el pedido vive en el PDV y no pasa por acá.",
         "operationId": "anular_lineas_api_v1_sales_ventas__venta_id__anular_lineas_post",
         "parameters": [
           {
@@ -39209,11 +39233,18 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AnularLineasCreate"
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/AnularLineasCreate"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
@@ -39452,6 +39483,63 @@
           }
         ],
         "summary": "Ver Items Venta",
+        "tags": [
+          "sales"
+        ]
+      },
+      "post": {
+        "description": "Suma líneas a una orden ya enviada a cocina (RN-COM-029).\n\nSin autorización de nadie y con el mismo permiso que crear la orden:\nagregar es lo que el negocio quiere que pase. Una mesa pide de a poco, y\nobligar a abrir una orden nueva para la segunda ronda termina en dos\ncuentas y dos entregas para la misma mesa. Lo que sigue necesitando firma\n—después de la ventana— es **quitar**, porque repone inventario.",
+        "operationId": "agregar_lineas_api_v1_sales_ventas__venta_id__items_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "venta_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Venta Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgregarLineasCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VentaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Agregar Lineas",
         "tags": [
           "sales"
         ]

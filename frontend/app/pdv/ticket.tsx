@@ -24,6 +24,7 @@ type Props = {
   ocupado: boolean;
   onActivar: (id: string) => void;
   onNuevo: () => void;
+  onCerrar: (id: string) => void;
   onLinea: (l: LineaBorrador) => void;
   onAlternarSeleccion: (id: string) => void;
   onLimpiarSeleccion: () => void;
@@ -48,6 +49,7 @@ export default function Ticket(props: Props) {
         activoId={activo?.id ?? null}
         onActivar={props.onActivar}
         onNuevo={props.onNuevo}
+        onCerrar={props.onCerrar}
       />
       {!activo ? (
         <p className="pdv-nada">Sin pedido abierto. Toca + para empezar uno.</p>
@@ -86,27 +88,48 @@ function Pestanas({
   activoId,
   onActivar,
   onNuevo,
+  onCerrar,
 }: {
   borradores: Borrador[];
   activoId: string | null;
   onActivar: (id: string) => void;
   onNuevo: () => void;
+  /** Descarta una pestaña que no llegó a ser un pedido. Un pedido con
+   * líneas o ya enviado no se cierra por acá: eso es "Anular pedido", que
+   * repone inventario y queda auditado. */
+  onCerrar: (id: string) => void;
 }) {
+  // La última no se cierra: el PDV sin ninguna pestaña no tiene dónde
+  // empezar a teclear.
+  const cerrables = borradores.length > 1;
   return (
     <div className="pdv-tabs">
       {borradores.map((b) => {
         const total = totalBorrador(b);
+        const descartable = cerrables && b.lineas.length === 0 && !b.ventaId;
         return (
-          <button
-            key={b.id}
-            type="button"
-            className="pdv-tab"
-            aria-pressed={b.id === activoId}
-            onClick={() => onActivar(b.id)}
-          >
-            {etiquetaTipo(b)}
-            {total > 0 && <span className="pdv-tab-monto">{soles(total)}</span>}
-          </button>
+          <span key={b.id} className="pdv-tab-envoltura">
+            <button
+              type="button"
+              className="pdv-tab"
+              aria-pressed={b.id === activoId}
+              onClick={() => onActivar(b.id)}
+            >
+              {etiquetaTipo(b)}
+              {total > 0 && <span className="pdv-tab-monto">{soles(total)}</span>}
+            </button>
+            {descartable && (
+              <button
+                type="button"
+                className="pdv-tab-cerrar"
+                aria-label={`Cerrar ${etiquetaTipo(b)}`}
+                title="Descartar este pedido vacío"
+                onClick={() => onCerrar(b.id)}
+              >
+                ×
+              </button>
+            )}
+          </span>
         );
       })}
       <button

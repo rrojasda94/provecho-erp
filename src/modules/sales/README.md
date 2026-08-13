@@ -128,6 +128,20 @@ cuatro huecos que el punto de venta necesitaba y el modelo no daba.
   admite qué extra, con tope) y `venta_item.padre_venta_item_id` (de qué
   línea cuelga). Hereda el grupo de cobro del padre y su consumo se
   multiplica por el plato.
+- **La orden enviada sigue viva** (RN-COM-029, ADR-043): `POST
+  /ventas/{id}/items` suma líneas a una venta en `orden`, con `sales.crear` y
+  sin firma de nadie — agregar sube el ticket y no saca nada del inventario.
+  Republica `sales.venta_confirmada` con **el incremento** en `total` y solo
+  las líneas nuevas en `items`: mandar el acumulado haría que `accounting`
+  asentara la venta dos veces. Después del cobro devuelve 409: la cuenta está
+  cerrada y lo que venga es otra orden.
+- **Ventana de corrección de 5 minutos** (RN-COM-029): quitar —una línea o la
+  orden entera— no pide firma dentro de la ventana; fuera de ella sí
+  (`rules.VENTANA_CORRECCION`, `ventas.lineas_en_ventana` /
+  `venta_en_ventana`). La de la orden se mide contra su **última** línea, y
+  un lote exige firma si **alguna** salió de la ventana. Por eso
+  `autorizacion` es opcional en los dos cuerpos: el cliente la manda cuando
+  el servidor la pide.
 - **Anular líneas enviadas** (RN-COM-020):
   `POST /ventas/{id}/anular-lineas`, con autorización de supervisor y
   motivo; publica `sales.lineas_anuladas` → inventory repone. Quitar todas

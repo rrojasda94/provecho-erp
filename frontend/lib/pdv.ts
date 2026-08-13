@@ -341,11 +341,18 @@ export const api = {
   itemsDeVenta: (ventaId: string) =>
     pedir<VentaItem[]>(`/sales/ventas/${ventaId}/items`),
 
-  /** Quitar líneas de un pedido ya enviado a cocina exige PIN de supervisor
-   * (RN-COM-020): el insumo ya se descontó, hay que reponerlo. */
+  /** Quitar líneas de un pedido ya enviado a cocina. Dentro de los 5 minutos
+   * lo hace el cajero solo —es corregir un tecleo, RN-COM-029—; después el
+   * insumo ya se usó y hay que reponerlo, así que lo firma un supervisor
+   * (RN-COM-020). Por eso `autorizacion` es opcional: se manda recién cuando
+   * el servidor dice que hace falta. */
   anularLineas: (
     ventaId: string,
-    cuerpo: { venta_item_ids: string[]; motivo: string; autorizacion: string },
+    cuerpo: {
+      venta_item_ids: string[];
+      motivo: string;
+      autorizacion?: string;
+    },
   ) =>
     pedir<Venta>(`/sales/ventas/${ventaId}/anular-lineas`, {
       metodo: "POST",
@@ -359,6 +366,14 @@ export const api = {
     pedir<Venta>(`/sales/ventas/${ventaId}/anular`, {
       metodo: "POST",
       cuerpo: { autorizacion: autorizacion ?? null },
+    }),
+
+  /** Suma líneas a una orden ya enviada (RN-COM-029). Sin autorización: la
+   * mesa que pide de a poco no debería terminar con dos cuentas. */
+  agregarLineas: (ventaId: string, items: VentaNueva["items"]) =>
+    pedir<Venta>(`/sales/ventas/${ventaId}/items`, {
+      metodo: "POST",
+      cuerpo: { items },
     }),
 
   registrarPago: (ventaId: string, cuerpo: PagoNuevo) =>

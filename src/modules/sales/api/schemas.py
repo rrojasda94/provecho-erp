@@ -93,13 +93,25 @@ class DescuentoCreate(BaseModel):
 
 
 class AnularLineasCreate(BaseModel):
-    """Quitar líneas de una orden ya enviada a cocina. `autorizacion` es el
-    token de `POST /auth/autorizar`: es inventario que se repone, lo
-    autoriza un supervisor (RN-COM-020)."""
+    """Quitar líneas de una orden ya enviada a cocina.
+
+    `autorizacion` es el token de `POST /auth/autorizar` y hace falta cuando
+    la línea ya salió de la ventana de corrección (RN-COM-029): ahí el insumo
+    se usó de verdad y reponerlo lo firma un supervisor (RN-COM-020). Dentro
+    de la ventana es un error de tecleo y lo corrige el cajero solo.
+    """
 
     venta_item_ids: list[uuid.UUID] = Field(min_length=1)
     motivo: str = Field(min_length=3, max_length=120)
-    autorizacion: str
+    autorizacion: str | None = None
+
+
+class AgregarLineasCreate(BaseModel):
+    """Sumar líneas a una orden ya enviada a cocina (RN-COM-029). Mismo
+    shape que los `items` del alta: una mesa que pide de a poco no debería
+    obligar a abrir una orden nueva que después se cobra por separado."""
+
+    items: list[VentaItemIn] = Field(min_length=1)
 
 
 class AnularVentaIn(BaseModel):

@@ -9,7 +9,7 @@ mismas reglas de negocio que en producción.
 
 import time
 import uuid
-from datetime import date
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 import pytest
@@ -562,43 +562,63 @@ def test_no_se_ve_la_caja_de_una_sucursal_ajena(env):
     assert r.status_code == 403, r.text
 
 
-def test_el_cajero_anula_una_orden_enviada_con_firma_del_supervisor(env):
+def test_el_cajero_anula_lo_recien_enviado_y_despues_necesita_firma(env):
     """El botón "Anular pedido" del PDV devolvía 403 al cajero y el pedido
     quedaba en cocina.
 
-    `sales.anular` es de supervisor y así queda; lo que cambia es el camino:
-    el cajero pide y el supervisor firma con su PIN en el mismo terminal,
-    igual que para quitar una línea ya enviada (RN-COM-020). Sin esa firma el
-    servidor sigue diciendo que no.
+    Ahora hay dos tramos (RN-COM-029): dentro de los 5 minutos la anula el
+    cajero solo —es corregir un tecleo, el plato todavía no se armó— y
+    después hace falta la firma de un supervisor, igual que para quitar una
+    línea (RN-COM-020).
     """
-    client, ids, _ = env
-    cajero = _token(client, "cajero1", "111111")
-    venta = client.post(
-        "/api/v1/sales/ventas",
-        headers=cajero,
-        json={
-            "sucursal_id": ids["sucursal_id"], "punto_venta_id": ids["pv_id"],
-            "canal": "pdv", "modalidad": "takeout", "idempotency_key": "anu-0001",
-            "items": [{"producto_comercial_id": ids["producto_id"], "cantidad": "1"}],
-        },
-    )
-    assert venta.status_code == 201, venta.text
-    venta_id = venta.json()["id"]
+    from datetime import timedelta
 
-    # Sin firma: 403, y el mensaje dice qué falta.
-    sin_firma = client.post(f"/api/v1/sales/ventas/{venta_id}/anular", headers=cajero)
+    from sqlalchemy import update
+
+    from src.modules.sales.infrastructure.models import VentaItem
+
+    client, ids, TestSession = env
+    cajero = _token(client, "cajero1", "111111")
+
+    def vender(key):
+        r = client.post(
+            "/api/v1/sales/ventas",
+            headers=cajero,
+            json={
+                "sucursal_id": ids["sucursal_id"], "punto_venta_id": ids["pv_id"],
+                "canal": "pdv", "modalidad": "takeout", "idempotency_key": key,
+                "items": [
+                    {"producto_comercial_id": ids["producto_id"], "cantidad": "1"}
+                ],
+            },
+        )
+        assert r.status_code == 201, r.text
+        return r.json()["id"]
+
+    # Recién enviada: el cajero la anula solo.
+    reciente = vender("anu-0001")
+    r = client.post(f"/api/v1/sales/ventas/{reciente}/anular", headers=cajero)
+    assert r.status_code == 200, r.text
+    assert r.json()["estado"] == "anulada"
+
+    # Vieja: el mismo cajero ya no puede, y el mensaje dice por qué.
+    vieja = vender("anu-0002")
+    with TestSession() as s:
+        s.execute(
+            update(VentaItem)
+            .where(VentaItem.venta_id == uuid.UUID(vieja))
+            .values(created_at=datetime.now(UTC).replace(tzinfo=None) - timedelta(minutes=30))
+        )
+        s.commit()
+
+    sin_firma = client.post(f"/api/v1/sales/ventas/{vieja}/anular", headers=cajero)
     assert sin_firma.status_code == 403, sin_firma.text
     assert "supervisor" in sin_firma.json()["detail"]
 
-    firma = client.post(
-        "/api/v1/auth/autorizar",
-        json={"username": "encargado1", "pin": "222222", "permiso": "sales.anular"},
-    )
-    assert firma.status_code == 200, firma.text
     con_firma = client.post(
-        f"/api/v1/sales/ventas/{venta_id}/anular",
+        f"/api/v1/sales/ventas/{vieja}/anular",
         headers=cajero,
-        json={"autorizacion": firma.json()["autorizacion"]},
+        json={"autorizacion": _autorizacion(client, "sales.anular")},
     )
     assert con_firma.status_code == 200, con_firma.text
     assert con_firma.json()["estado"] == "anulada"
@@ -626,3 +646,145 @@ def test_el_supervisor_anula_sin_tener_que_firmarse_a_si_mismo(env):
     r = client.post(f"/api/v1/sales/ventas/{venta['id']}/anular", headers=supervisor)
     assert r.status_code == 200, r.text
     assert r.json()["estado"] == "anulada"
+
+
+def test_una_orden_enviada_admite_lineas_nuevas_sin_permiso_extra(env):
+    """Una mesa pide de a poco (RN-COM-029): la segunda ronda va a la misma
+    orden, no a una nueva que después se cobra y se entrega por separado.
+
+    Agregar no pide firma de nadie — es lo que el negocio quiere que pase —
+    y el evento lleva **solo lo agregado**: si llevara el total acumulado,
+    contabilidad asentaría la venta dos veces.
+    """
+    from src.core.events import event_bus
+
+    client, ids, TestSession = env
+    publicados: list[dict] = []
+    event_bus.subscribe("sales.venta_confirmada", publicados.append)
+    cajero = _token(client, "cajero1", "111111")
+    venta = client.post(
+        "/api/v1/sales/ventas",
+        headers=cajero,
+        json={
+            "sucursal_id": ids["sucursal_id"], "punto_venta_id": ids["pv_id"],
+            "canal": "pdv", "modalidad": "mesa", "idempotency_key": "add-0001",
+            "items": [{"producto_comercial_id": ids["producto_id"], "cantidad": "1"}],
+        },
+    ).json()
+    assert Decimal(venta["total"]) == Decimal("50.00")
+
+    r = client.post(
+        f"/api/v1/sales/ventas/{venta['id']}/items",
+        headers=cajero,
+        json={"items": [{"producto_comercial_id": ids["producto_id"], "cantidad": "2"}]},
+    )
+    assert r.status_code == 201, r.text
+    assert Decimal(r.json()["total"]) == Decimal("150.00")
+    assert r.json()["estado"] == "orden"
+    assert len(client.get(
+        f"/api/v1/sales/ventas/{venta['id']}/items", headers=cajero
+    ).json()) == 2
+
+    # El evento lleva lo agregado (100), no el acumulado (150): accounting
+    # asienta `total`, y mandarle el acumulado contaría la venta dos veces.
+    assert [p["total"] for p in publicados] == ["50.00", "100.00"]
+    # Y solo el detalle de lo nuevo, para que inventory no vuelva a descontar
+    # lo que ya descontó.
+    assert len(publicados[-1]["items"]) == 1
+
+
+def test_no_se_agregan_lineas_a_una_orden_ya_cobrada(env):
+    """Después del cobro la cuenta está cerrada: lo que venga es otra orden.
+    Dejar crecer una venta pagada dejaría el comprobante corto."""
+    client, ids, _ = env
+    admin = _token(client)
+    _abrir_caja(client, admin, ids)
+    venta = client.post(
+        "/api/v1/sales/ventas",
+        headers=admin,
+        json={
+            "sucursal_id": ids["sucursal_id"], "punto_venta_id": ids["pv_id"],
+            "canal": "pdv", "modalidad": "takeout", "idempotency_key": "add-0002",
+            "items": [{"producto_comercial_id": ids["producto_id"], "cantidad": "1"}],
+        },
+    ).json()
+    client.post(
+        f"/api/v1/sales/ventas/{venta['id']}/pagos",
+        headers=admin,
+        json={
+            "medio_pago_id": ids["medio_id"], "monto": "50.00",
+            "idempotency_key": "pago-add-0002",
+        },
+    )
+    r = client.post(
+        f"/api/v1/sales/ventas/{venta['id']}/items",
+        headers=admin,
+        json={"items": [{"producto_comercial_id": ids["producto_id"], "cantidad": "1"}]},
+    )
+    assert r.status_code == 409, r.text
+    assert "otra orden" in r.json()["detail"]
+
+
+def test_quitar_una_linea_vieja_exige_firma_y_una_reciente_no(env):
+    """Los dos tramos de RN-COM-029 sobre la línea, no sobre la orden."""
+    from datetime import timedelta
+
+    from sqlalchemy import update
+
+    from src.modules.sales.infrastructure.models import VentaItem
+
+    client, ids, TestSession = env
+    cajero = _token(client, "cajero1", "111111")
+    venta = client.post(
+        "/api/v1/sales/ventas",
+        headers=cajero,
+        json={
+            "sucursal_id": ids["sucursal_id"], "punto_venta_id": ids["pv_id"],
+            "canal": "pdv", "modalidad": "takeout", "idempotency_key": "qui-0001",
+            "items": [
+                {"producto_comercial_id": ids["producto_id"], "cantidad": "1"},
+                {"producto_comercial_id": ids["producto_id"], "cantidad": "1",
+                 "grupo_cobro": 2},
+            ],
+        },
+    ).json()
+    lineas = client.get(
+        f"/api/v1/sales/ventas/{venta['id']}/items", headers=cajero
+    ).json()
+    reciente, vieja = lineas[0]["id"], lineas[1]["id"]
+
+    # La recién enviada la quita el cajero solo.
+    r = client.post(
+        f"/api/v1/sales/ventas/{venta['id']}/anular-lineas",
+        headers=cajero,
+        json={"venta_item_ids": [reciente], "motivo": "Se equivocó de mesa"},
+    )
+    assert r.status_code == 200, r.text
+
+    with TestSession() as s:
+        s.execute(
+            update(VentaItem)
+            .where(VentaItem.id == uuid.UUID(vieja))
+            .values(created_at=datetime.now(UTC).replace(tzinfo=None) - timedelta(minutes=30))
+        )
+        s.commit()
+
+    sin_firma = client.post(
+        f"/api/v1/sales/ventas/{venta['id']}/anular-lineas",
+        headers=cajero,
+        json={"venta_item_ids": [vieja], "motivo": "El cliente se arrepintió"},
+    )
+    assert sin_firma.status_code == 403, sin_firma.text
+    assert "supervisor" in sin_firma.json()["detail"]
+
+    con_firma = client.post(
+        f"/api/v1/sales/ventas/{venta['id']}/anular-lineas",
+        headers=cajero,
+        json={
+            "venta_item_ids": [vieja],
+            "motivo": "El cliente se arrepintió",
+            "autorizacion": _autorizacion(client, "sales.anular"),
+        },
+    )
+    assert con_firma.status_code == 200, con_firma.text
+    assert con_firma.json()["estado"] == "anulada"

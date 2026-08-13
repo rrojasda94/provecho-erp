@@ -1298,6 +1298,26 @@ producción se hace en cocinas de sucursal. Ver
   por anulación o nota de crédito devuelve solo lo que se consumió. Las
   restas viajan a cocina como parte del pedido (KDS y comanda), no como
   texto libre en la nota.
+- **RN-COM-029** Una orden ya enviada a cocina **sigue viva mientras no se
+  cobre**: admite líneas nuevas y admite que se le quiten.
+  - **Agregar no requiere autorización de nadie** y usa el mismo permiso que
+    crear la orden. Una mesa pide de a poco, y obligar a abrir una orden
+    nueva para la segunda ronda termina en dos cuentas y dos entregas para
+    la misma mesa.
+  - **Quitar** —una línea o la orden entera— es gratis **dentro de los 5
+    minutos** de haber salido a cocina: ahí es corregir un tecleo, el plato
+    todavía no se armó y nadie tuvo tiempo de aprovecharlo. **Pasada esa
+    ventana** lo autoriza un supervisor con su PIN en el mismo terminal
+    (RN-COM-020), porque el insumo ya se usó de verdad y reponerlo es plata
+    que sale del inventario.
+  - La ventana de la **orden** se mide contra su **última línea**, no contra
+    su creación: una mesa que sigue pidiendo tiene la orden abierta desde
+    hace una hora, pero lo último que mandó puede ser de hace un minuto.
+  - Quitar un lote de líneas exige firma si **alguna** salió de la ventana:
+    de lo contrario, acompañar una línea vieja con una recién agregada sería
+    la forma de quitarla sin que nadie firme.
+  - Después del cobro la cuenta está cerrada: lo que venga es otra orden, y
+    deshacer lo cobrado es nota de crédito (RN-CPP-009).
 
 ## Cumplimiento de pedido
 

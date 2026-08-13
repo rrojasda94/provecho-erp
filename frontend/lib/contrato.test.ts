@@ -291,6 +291,11 @@ const PDV: Caso[] = [
     }),
   ),
   caso("itemsDeVenta", () => api.itemsDeVenta(UUID)),
+  caso("agregarLineas", () =>
+    api.agregarLineas(UUID, [
+      { producto_comercial_id: UUID, cantidad: "1", grupo_cobro: 1 },
+    ]),
+  ),
   caso("anularLineas", () =>
     api.anularLineas(UUID, {
       venta_item_ids: [UUID],

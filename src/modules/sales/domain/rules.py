@@ -1,5 +1,6 @@
 """Reglas de negocio de venta y cobro. Puras, sin infraestructura."""
 
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 CANALES = {"pdv", "agente_ia", "delivery"}
@@ -57,6 +58,35 @@ def total_venta(items: list[tuple[Decimal, Decimal, Decimal]]) -> Decimal:
     return sum(
         (cant * precio - desc for cant, precio, desc in items), Decimal(0)
     )
+
+
+#: Cuánto dura la corrección de lo recién enviado a cocina (RN-COM-029).
+#:
+#: Dentro de esta ventana, quitar una línea o anular la orden es corregir un
+#: error de tecleo: la comanda acaba de salir, el plato todavía no se armó y
+#: nadie tuvo tiempo de aprovecharlo. Pasada la ventana el insumo ya se usó de
+#: verdad, y ahí sí hace falta que un supervisor firme.
+#:
+#: Cinco minutos porque es lo que dura un error honesto en caja: más corto y
+#: el cajero termina llamando al encargado por cada dedo mal puesto, más largo
+#: y deja de ser corrección.
+VENTANA_CORRECCION = timedelta(minutes=5)
+
+
+def dentro_de_ventana(momento: datetime, ahora: datetime | None = None) -> bool:
+    """¿`momento` cae dentro de la ventana de corrección?
+
+    Compara en naive UTC: las columnas `created_at` de SQLite vuelven sin
+    tzinfo y restarle un `datetime` con zona revienta. Un `momento` que ya
+    trae zona se normaliza; uno sin zona se asume UTC, que es lo que el
+    servidor escribe.
+    """
+    ahora = ahora or datetime.now(UTC)
+    return _sin_zona(ahora) - _sin_zona(momento) <= VENTANA_CORRECCION
+
+
+def _sin_zona(valor: datetime) -> datetime:
+    return valor.replace(tzinfo=None) if valor.tzinfo else valor
 
 
 def pagos_cubren_total(pagos_confirmados: list[Decimal], total: Decimal) -> bool:

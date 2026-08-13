@@ -454,16 +454,24 @@ def _confirmar(
     detalle_evento: list[dict],
     consumo: bool,
     registrado_por: uuid.UUID,
+    total: Decimal | None = None,
 ) -> None:
     """Anuncia la orden confirmada. Un consumo de personal publica su propio
     evento: no es ingreso para contabilidad ni venta atribuible para
-    marketing, y su costo va a gasto (RN-COM-025)."""
+    marketing, y su costo va a gasto (RN-COM-025).
+
+    `total` es **lo confirmado en esta operación**, no el acumulado de la
+    venta. Al crearla son lo mismo; al agregar líneas a una orden ya enviada
+    (RN-COM-029) es el incremento, que es lo que accounting tiene que
+    asentar — mandarle el total completo lo asentaría dos veces. `items` ya
+    era el detalle de la operación, así que las dos claves dicen lo mismo.
+    """
     payload = {
         "venta_id": str(venta.id),
         "sucursal_id": str(venta.sucursal_id),
         "cliente_id": str(venta.cliente_id) if venta.cliente_id else None,
         "items": detalle_evento,
-        "total": str(venta.total),
+        "total": str(venta.total if total is None else total),
     }
     if not consumo:
         event_bus.publish("sales.venta_confirmada", payload, session=session)
@@ -878,6 +886,115 @@ def anular_lineas(
             "items": devueltos,
         },
         session=session,
+    )
+    return venta
+
+
+def lineas_en_ventana(
+    session: Session, venta_id: uuid.UUID, venta_item_ids: list[uuid.UUID]
+) -> bool:
+    """¿Todas esas líneas siguen dentro de la ventana de corrección?
+
+    **Todas**, no alguna: si una sola ya salió de la ventana, el lote entero
+    necesita firma. Al revés —dejar pasar el lote porque una es reciente— sería
+    la forma de quitar cualquier línea vieja acompañándola de una nueva.
+    """
+    pedidos = set(venta_item_ids)
+    filas = [f for f in VentaRepo(session).items(venta_id) if f.id in pedidos]
+    return bool(filas) and all(rules.dentro_de_ventana(f.created_at) for f in filas)
+
+
+def venta_en_ventana(session: Session, venta_id: uuid.UUID) -> bool:
+    """¿La orden se envió hace menos de la ventana de corrección?
+
+    Se mide contra la **última línea** y no contra la creación de la venta:
+    una mesa que sigue pidiendo tiene la orden abierta desde hace una hora,
+    pero lo último que mandó a cocina puede ser de hace un minuto — y es eso
+    lo que todavía se puede deshacer sin molestar a nadie.
+    """
+    filas = VentaRepo(session).items(venta_id)
+    return bool(filas) and rules.dentro_de_ventana(max(f.created_at for f in filas))
+
+
+def agregar_lineas(
+    session: Session,
+    *,
+    venta_id: uuid.UUID,
+    items: list[dict],
+    usuario_id: uuid.UUID,
+) -> Venta:
+    """Suma líneas a una orden **ya enviada a cocina** (RN-COM-029).
+
+    Una mesa pide de a poco: la primera comanda sale, y diez minutos después
+    piden otra bebida. Sin esto había que abrir una orden nueva para el mismo
+    cliente, que después se cobra por separado y se le entrega en dos veces.
+
+    No exige autorización de nadie: agregar es lo que el negocio quiere que
+    pase. Lo que sí sigue exigiendo firma después de la ventana es **quitar**,
+    porque eso repone inventario.
+
+    Publica `sales.venta_confirmada` con **lo agregado**, no con la venta
+    entera: `items` ya era el detalle de la operación y `total` pasa a serlo
+    también, así que inventory descuenta solo lo nuevo y accounting asienta
+    solo el incremento. Republicar el total completo lo asentaría dos veces.
+    """
+    repo = VentaRepo(session)
+    venta = repo.get(venta_id)
+    if venta is None:
+        raise NoEncontrado("venta no encontrada")
+    if venta.estado != "orden":
+        raise Conflicto(
+            f"la venta está {venta.estado}: no admite líneas nuevas. "
+            "Después del cobro se abre otra orden."
+        )
+    if not items:
+        raise ReglaNegocio("indica al menos una línea a agregar")
+
+    filas, extras_por_padre, detalle_evento = _armar_lineas(
+        session,
+        items,
+        sucursal_id=venta.sucursal_id,
+        canal=venta.canal,
+        modalidad=venta.modalidad,
+        dia=venta.fecha_orden,
+        gratis=rules.es_consumo_personal(venta.tipo),
+    )
+    for fila in filas:
+        fila.venta_id = venta.id
+        session.add(fila)
+    session.flush()
+    for fila, hijos in zip(filas, extras_por_padre, strict=True):
+        for hijo in hijos:
+            hijo.venta_id = venta.id
+            hijo.padre_venta_item_id = fila.id
+            session.add(hijo)
+    session.flush()
+
+    agregado = rules.total_venta(
+        [
+            (f.cantidad, f.precio_unitario, f.descuento)
+            for f in [*filas, *(h for hijos in extras_por_padre for h in hijos)]
+        ]
+    )
+    # El total se recalcula entero (incluye el descuento de orden prorrateado)
+    # y no se le suma el incremento: sumar dejaría fuera el reprorrateo.
+    venta.total = total_a_cobrar(session, venta)
+    auditoria.registrar(
+        session,
+        usuario_id=usuario_id,
+        entidad="venta",
+        entidad_id=venta.id,
+        accion="agregar_lineas",
+        datos_despues={"lineas": len(filas), "agregado": str(agregado)},
+        sucursal_id=venta.sucursal_id,
+    )
+    _confirmar(
+        session,
+        venta,
+        detalle_evento=detalle_evento,
+        consumo=rules.es_consumo_personal(venta.tipo),
+        registrado_por=usuario_id,
+        total=agregado,
     )
     return venta
 

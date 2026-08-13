@@ -543,7 +543,10 @@ export function DialogoProducto({
   enviado: boolean;
   onGuardar: (l: LineaBorrador) => void;
   onQuitar: (id: string) => void;
-  onAnularLinea: (id: string, encargado: { username: string; pin: string }) => void;
+  /** Quitar una línea ya enviada. Sin credenciales: dentro de la ventana
+   * de corrección no hacen falta, y si el servidor las pide, la pantalla
+   * abre su propio diálogo de firma (RN-COM-029). */
+  onAnularLinea: (id: string) => void;
   onCerrar: () => void;
 }) {
   const [cantidad, setCantidad] = useState(1);
@@ -551,9 +554,6 @@ export function DialogoProducto({
   const [extras, setExtras] = useState<Record<string, number>>({});
   const [restas, setRestas] = useState<RestaEnLinea[]>([]);
   const [varianteId, setVarianteId] = useState("");
-  const [pidiendoPin, setPidiendoPin] = useState(false);
-  const [usuario, setUsuario] = useState("");
-  const [pin, setPin] = useState("");
 
   useEffect(() => {
     if (!linea) return;
@@ -569,9 +569,6 @@ export function DialogoProducto({
         ? linea.productoId
         : "",
     );
-    setPidiendoPin(false);
-    setUsuario("");
-    setPin("");
   }, [linea, item]);
 
   if (!linea) return null;
@@ -662,54 +659,19 @@ export function DialogoProducto({
         ))}
       </div>
 
-      {pidiendoPin && (
-        <>
-          <p className="pdv-etiqueta">Ya salió a cocina · PIN de supervisor</p>
-          <div className="pdv-dos">
-            <input
-              className="pdv-campo"
-              placeholder="Usuario del supervisor"
-              autoComplete="off"
-              value={usuario}
-              onChange={(e) => setUsuario(e.target.value)}
-            />
-            <input
-              className="pdv-campo"
-              type="password"
-              inputMode="numeric"
-              placeholder="PIN"
-              autoComplete="off"
-              value={pin}
-              onChange={(e) => setPin(e.target.value)}
-            />
-          </div>
-          <p className="pdv-nota">
-            El insumo ya se descontó: quitar la línea lo repone (RN-COM-020).
-          </p>
-        </>
-      )}
-
       <footer className="pdv-dialogo-pie">
-        {pidiendoPin ? (
-          <button
-            type="button"
-            className="pdv-boton-riesgo"
-            disabled={!usuario.trim() || !pin.trim()}
-            onClick={() =>
-              onAnularLinea(linea.id, { username: usuario.trim(), pin })
-            }
-          >
-            Confirmar anulación
-          </button>
-        ) : (
-          <button
-            type="button"
-            className="pdv-boton-riesgo"
-            onClick={() => (enviado ? setPidiendoPin(true) : onQuitar(linea.id))}
-          >
-            Quitar del pedido
-          </button>
-        )}
+        <button
+          type="button"
+          className="pdv-boton-riesgo"
+          title={
+            enviado
+              ? "Ya salió a cocina: repone el insumo. Pasados 5 minutos lo firma un supervisor"
+              : undefined
+          }
+          onClick={() => (enviado ? onAnularLinea(linea.id) : onQuitar(linea.id))}
+        >
+          Quitar del pedido
+        </button>
         {falta && <span className="pdv-falta">{falta}</span>}
         <button
           type="button"

@@ -3,6 +3,20 @@
 Parte del backlog de deuda técnica del proyecto. El índice y las reglas
 de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 
+- ✅ 2026-08-12 **La orden enviada sigue viva** (ADR-043, RN-COM-029):
+  admite líneas nuevas sin firma de nadie, y quitarlas es gratis dentro de
+  los 5 minutos. Antes agregar era imposible y quitar exigía siempre el PIN
+  de un supervisor — un control que se ejecuta veinte veces por turno deja de
+  ser un control.
+- ✅ 2026-08-12 **Los borradores vacíos ya no se apilan**: el "+" reusa el que
+  esté vacío y una pestaña sin líneas se descarta con su "×".
+- ⬜ **El KDS no distingue una línea agregada de las originales**
+  (2026-08-12, ADR-043): entra a la cola como cualquier otra, sin decir que
+  llegó después. Para la cocina está bien —hay que prepararla igual— pero el
+  despacho no ve que el pedido creció y puede entregarlo incompleto. Se
+  resuelve mostrando la hora de la línea en la tarjeta del pedido, que es
+  dato que `venta_item.created_at` ya tiene.
+
 - ✅ 2026-08-12 **La variante hereda del padre** (ADR-042): ADR-038 arregló el
   catálogo del seeder (grupos en la variante) y dejó roto el armado a mano
   (grupos en el padre, que es donde el lienzo los cuelga mientras el producto
