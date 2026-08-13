@@ -202,10 +202,12 @@ PERMISOS = [
     ),
     (
         "users.resetear_pin",
+        # 255 caracteres es el largo de `permiso.descripcion`, y Postgres lo
+        # hace cumplir aunque SQLite no: pasarse rompe el seeder entero.
         "Devolver la cuenta de otro al PIN por defecto, obligándole a "
         "cambiarlo al entrar. Aparte de `users.gestionar`: RRHH atiende el "
-        "'me olvidé el PIN' sin poder crear cuentas ni repartir roles, y "
-        "administrar usuarios no trae de arrastre poder entrar como cualquiera",
+        "'me olvidé el PIN' sin crear cuentas ni repartir roles, y administrar "
+        "usuarios no trae de arrastre entrar como cualquiera",
     ),
     (
         "consulta.documento",

@@ -38,3 +38,11 @@
   precios por nada: la carta no se pide hasta abrir caja, así que vacía
   antes de eso no significa lo mismo. Ahora dice "Abre la caja para ver la
   carta".
+- **El seeder no corría contra Postgres**: la descripción de
+  `users.resetear_pin` medía 260 caracteres y `permiso.descripcion` es
+  `VARCHAR(255)`. SQLite no valida el largo, así que la suite entera pasaba
+  en verde y el fallo aparecía recién al sembrar una base real — abortando
+  el seeder completo con un `StringDataRightTruncation` que no dice qué
+  permiso fue. Se acortó a 248, y hay una prueba que compara cada
+  descripción contra el largo declarado en el modelo para que la próxima
+  falle donde tiene que fallar.
