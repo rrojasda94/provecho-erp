@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+
+import { Rastro } from "@/components/shell/rastro";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -62,9 +64,7 @@ export function FichaReporte({
 
   return (
     <section className="flex flex-col gap-6">
-      <Link href="/reportes" className="text-sm font-semibold text-primary hover:underline">
-        ← Mis reportes
-      </Link>
+      <Rastro hoja={reporte.titulo} />
 
       <Encabezado reporte={reporte} destino={destino} permisos={permisos} />
 

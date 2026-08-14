@@ -216,6 +216,25 @@ def q_articulos(session: Session, empresa_id: uuid.UUID | None = None):
     return ArticuloRepo(session).q_list(empresa_id)
 
 
+def listar_skus(session: Session, empresa_id: uuid.UUID | None = None) -> list[dict]:
+    """SKUs con el nombre del artículo que representan.
+
+    Lo necesita cualquier pantalla que pregunte "qué se mueve" —devolución,
+    ajuste, conteo—: el código de un SKU no le dice nada a nadie.
+    """
+    return [
+        {
+            "id": sku.id,
+            "articulo_id": sku.articulo_id,
+            "codigo": sku.codigo,
+            "codigo_barras": sku.codigo_barras,
+            "activo": sku.activo,
+            "articulo_nombre": articulo.nombre,
+        }
+        for sku, articulo in SkuRepo(session).list(empresa_id)
+    ]
+
+
 def crear_sku(
     session: Session,
     *,

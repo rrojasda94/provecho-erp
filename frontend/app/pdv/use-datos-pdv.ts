@@ -25,8 +25,9 @@ import {
  * reconocerlo como hook y aplicarle sus reglas; es restricción del
  * framework, no una excepción al idioma del proyecto.
  */
-export function useDatosPdv(empresaId: string | null, puntoVentaId: string, sucursalId: string) {
+export function useDatosPdv(puntoVentaId: string, sucursalId: string) {
   const [caja, setCaja] = useState<CajaAbierta | null>(null);
+  const [fallaCaja, setFallaCaja] = useState<Falla | null>(null);
   const [cajaResuelta, setCajaResuelta] = useState(false);
   const [carta, setCarta] = useState<ItemDeCarta[]>([]);
   const [medios, setMedios] = useState<MedioPago[]>([]);
@@ -52,19 +53,28 @@ export function useDatosPdv(empresaId: string | null, puntoVentaId: string, sucu
     api.posDeSucursal(sucursalId).then(setPos).catch(() => setPos([]));
   }, [sucursalId]);
 
+  // La caja es del **punto de venta**, no del usuario: si el turno ya lo
+  // abrió otro cajero o un mesero del local, quien entra después sigue
+  // trabajando sobre esa caja y no tiene nada que abrir.
+  //
+  // El fallo NO se puede tratar como "no hay caja": eso convertía un 403 en
+  // el diálogo de apertura, y la apertura después rebotaba con "ya hay una
+  // caja abierta" — un callejón sin salida donde el cajero no puede ni
+  // vender ni entender por qué. Es el mismo motivo por el que `useLista`
+  // guarda su falla; acá faltaba.
   useEffect(() => {
-    if (!empresaId) {
-      setCajaResuelta(true);
-      return;
-    }
     api
-      .cajasAbiertas(empresaId)
-      .then((abiertasDeEmpresa) =>
-        setCaja(abiertasDeEmpresa.find((c) => c.punto_venta_id === puntoVentaId) ?? null),
-      )
-      .catch(() => setCaja(null))
+      .cajasAbiertas(sucursalId)
+      .then((deLaSucursal) => {
+        setCaja(deLaSucursal.find((c) => c.punto_venta_id === puntoVentaId) ?? null);
+        setFallaCaja(null);
+      })
+      .catch((e) => {
+        setCaja(null);
+        setFallaCaja(fallaDe(e, "No se pudo saber si la caja está abierta"));
+      })
       .finally(() => setCajaResuelta(true));
-  }, [empresaId, puntoVentaId]);
+  }, [sucursalId, puntoVentaId]);
 
   useEffect(() => {
     if (!caja) return;
@@ -91,6 +101,7 @@ export function useDatosPdv(empresaId: string | null, puntoVentaId: string, sucu
   return {
     caja,
     setCaja,
+    fallaCaja,
     cajaResuelta,
     carta,
     medios,
@@ -106,11 +117,13 @@ const traerMesas = (sucursalId: string) => api.mapaMesas(sucursalId);
 
 const traerCobrados = (sucursalId: string) => api.ventasDelDia(sucursalId, "pagada");
 
-/** Pedidos ya enviados a cocina pero sin cobrar: para llevar/delivery no se
- * ven en el mapa de mesas, y sin esto se pierden si se recarga la página
- * antes de cobrarlos. */
-const traerAbiertas = async (sucursalId: string) =>
-  (await api.ventasDelDia(sucursalId, "orden")).filter((v) => !v.mesa_id);
+/** Todo lo enviado a cocina y sin cobrar, **incluidas las mesas**.
+ *
+ * Antes filtraba las de mesa porque su única vista era el pie del mapa de
+ * salón. Con pestaña propia el filtro sobraba y además mentía: la pregunta
+ * de la caja es "¿qué falta cobrar?", y una mesa ocupada falta cobrar igual
+ * que un delivery. El mapa de mesas sigue mostrándolas como mesas. */
+const traerAbiertas = (sucursalId: string) => api.ventasDelDia(sucursalId, "orden");
 
 /**
  * Una lista del servidor que recuerda **por qué** no se pudo traer.

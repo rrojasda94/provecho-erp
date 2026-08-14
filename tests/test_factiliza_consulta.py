@@ -3,6 +3,8 @@ RN-PTS-004 addendum 2026-08-02). Nunca toca la red: `httpx.get` se
 reemplaza por un doble.
 """
 
+from datetime import date
+
 import httpx
 import pytest
 
@@ -115,3 +117,222 @@ def test_razon_social_desde_ruc_usa_factiliza_si_encuentra(monkeypatch):
         lambda self, ruc: ConsultaEmpresa(True, ruc, "SERVICIOS RENTAURANT S.A.C", "", "", {}),
     )
     assert razon_social_desde_ruc("20610077782", "Tecleado SAC") == "SERVICIOS RENTAURANT S.A.C"
+
+
+def test_el_dni_trae_la_fecha_de_nacimiento_cuando_el_plan_la_incluye(monkeypatch):
+    """RENIEC la devuelve según el plan contratado. Se acepta el formato que
+    manda Factiliza (`dd/mm/aaaa`) y también ISO, porque son los dos que se
+    han visto y ninguno está en el contrato escrito."""
+    for crudo, esperada in (
+        ("12/05/1994", date(1994, 5, 12)),
+        ("1994-05-12", date(1994, 5, 12)),
+        ("", None),
+        ("no es una fecha", None),
+    ):
+        cuerpo = {
+            "success": True,
+            "data": {
+                "numero": "73632127",
+                "nombres": "CARLOS RENATO",
+                "apellido_paterno": "ROJAS",
+                "apellido_materno": "DEL AGUILA",
+                "fecha_nacimiento": crudo,
+            },
+        }
+        # `c=cuerpo`: la lambda se evalúa después del bucle, y sin fijarlo
+        # las cuatro corridas leerían el último valor.
+        monkeypatch.setattr(
+            httpx, "get", lambda *a, c=cuerpo, **k: _RespuestaFalsa(200, "x", c)
+        )
+        assert FactilizaClient(token="t").consultar_dni("73632127").fecha_nacimiento == esperada
+
+
+def test_el_ruc_trae_el_domicilio_fiscal_partido(monkeypatch):
+    """Partido y no como un solo texto: `provincia` es lo que decide si el
+    flete es local o interprovincial, y volver a partirlo es adivinar."""
+    cuerpo = {
+        "success": True,
+        "data": {
+            "numero": "20610077782",
+            "nombre_o_razon_social": "SERVICIOS RENTAURANT S.A.C",
+            "estado": "ACTIVO",
+            "condicion": "HABIDO",
+            "direccion": "JR. ALEGRIA ARIAS DE MOREY NRO. 250",
+            "distrito": "TARAPOTO",
+            "provincia": "SAN MARTIN",
+            "departamento": "SAN MARTIN",
+        },
+    }
+    monkeypatch.setattr(httpx, "get", lambda *a, **k: _RespuestaFalsa(200, "x", cuerpo))
+    r = FactilizaClient(token="t").consultar_ruc("20610077782")
+    assert r.direccion == "JR. ALEGRIA ARIAS DE MOREY NRO. 250"
+    assert r.distrito == "TARAPOTO"
+    assert r.provincia == "SAN MARTIN"
+    assert r.departamento == "SAN MARTIN"
+
+
+def test_un_ruc_sin_domicilio_no_rompe(monkeypatch):
+    """El campo puede no venir: se devuelve vacío, no `None`, para que el
+    formulario lo trate como "sin dato" sin comprobar el tipo."""
+    cuerpo = {
+        "success": True,
+        "data": {"numero": "20610077782", "nombre_o_razon_social": "X S.A.C"},
+    }
+    monkeypatch.setattr(httpx, "get", lambda *a, **k: _RespuestaFalsa(200, "x", cuerpo))
+    r = FactilizaClient(token="t").consultar_ruc("20610077782")
+    assert (r.direccion, r.distrito, r.provincia, r.departamento) == ("", "", "", "")
+
+
+# --- El endpoint HTTP -------------------------------------------------------
+@pytest.fixture()
+def api(monkeypatch):
+    """La consulta expuesta al frontend. Existía el cliente y existían los
+    helpers que lo usan al crear, pero ninguna pantalla podía preguntar antes
+    de tipear: `nombres_desde_dni` no se llamaba desde ningún caso de uso."""
+    from fastapi.testclient import TestClient
+    from sqlalchemy import create_engine, select
+    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.pool import StaticPool
+
+    import src.core.models_registry  # noqa: F401
+    from src.config.settings import settings
+    from src.core.app import create_app
+    from src.core.database import Base
+    from src.modules.users.api.deps import get_db
+    from src.modules.users.infrastructure.models import Rol, Usuario, UsuarioRol
+    from src.modules.users.infrastructure.security import hash_pin
+    from src.seeders.seed import seed
+
+    # Sin token el cliente ni sale a la red y todo responde 502. Acá se
+    # prueba el endpoint, no la configuración del despliegue.
+    monkeypatch.setattr(settings, "factiliza_token", "token-de-prueba")
+
+    engine = create_engine(
+        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
+    )
+    Base.metadata.create_all(engine)
+    TestSession = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+    with TestSession() as s:
+        seed(s)
+        for username, rol in (("compras1", "comprador"), ("cocina1", "cocinero")):
+            u = Usuario(username=username, pin_hash=hash_pin("654321"), tipo="humano")
+            s.add(u)
+            s.flush()
+            s.add(
+                UsuarioRol(
+                    usuario_id=u.id,
+                    rol_id=s.scalar(select(Rol).where(Rol.nombre == rol)).id,
+                )
+            )
+        s.commit()
+
+    app = create_app()
+
+    def _override():
+        session = TestSession()
+        try:
+            yield session
+        finally:
+            session.close()
+
+    app.dependency_overrides[get_db] = _override
+    with TestClient(app) as c:
+        yield c
+
+
+def _tok(client, username, pin):
+    r = client.post("/api/v1/auth/login", json={"username": username, "pin": pin})
+    return {"Authorization": f"Bearer {r.json()['access_token']}"}
+
+
+def test_el_comprador_consulta_un_ruc_y_recibe_el_domicilio(api, monkeypatch):
+    cuerpo = {
+        "success": True,
+        "data": {
+            "numero": "20610077782",
+            "nombre_o_razon_social": "SERVICIOS RENTAURANT S.A.C",
+            "estado": "ACTIVO",
+            "condicion": "HABIDO",
+            "direccion": "JR. ALEGRIA ARIAS DE MOREY NRO. 250",
+            "provincia": "SAN MARTIN",
+            "departamento": "SAN MARTIN",
+        },
+    }
+    monkeypatch.setattr(httpx, "get", lambda *a, **k: _RespuestaFalsa(200, "x", cuerpo))
+    r = api.get(
+        "/api/v1/consulta/ruc/20610077782", headers=_tok(api, "compras1", "654321")
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["razon_social"] == "SERVICIOS RENTAURANT S.A.C"
+    assert r.json()["provincia"] == "SAN MARTIN"
+
+
+def test_la_consulta_no_devuelve_la_respuesta_cruda(api, monkeypatch):
+    """El proveedor manda más datos personales de los que la pantalla
+    necesita, y lo que no se manda no se filtra (Ley 29733)."""
+    cuerpo = {
+        "success": True,
+        "data": {
+            "numero": "73632127",
+            "nombres": "CARLOS RENATO",
+            "apellido_paterno": "ROJAS",
+            "apellido_materno": "DEL AGUILA",
+            "direccion": "un domicilio que nadie pidió",
+        },
+    }
+    monkeypatch.setattr(httpx, "get", lambda *a, **k: _RespuestaFalsa(200, "x", cuerpo))
+    r = api.get(
+        "/api/v1/consulta/dni/73632127", headers=_tok(api, "compras1", "654321")
+    )
+    assert r.status_code == 200, r.text
+    assert set(r.json()) == {
+        "encontrado",
+        "numero_documento",
+        "nombres",
+        "apellidos",
+        "fecha_nacimiento",
+    }
+
+
+def test_sin_el_permiso_no_se_consulta(api):
+    """Es un permiso propio: cada consulta gasta cuota del proveedor y trae
+    datos de alguien que todavía no es nadie en el sistema."""
+    h = _tok(api, "cocina1", "654321")
+    assert api.get("/api/v1/consulta/dni/73632127", headers=h).status_code == 403
+    assert api.get("/api/v1/consulta/ruc/20610077782", headers=h).status_code == 403
+
+
+def test_un_documento_mal_formado_no_llega_al_proveedor(api, monkeypatch):
+    def _explota(*a, **k):
+        raise AssertionError("no debería consultarse")
+
+    monkeypatch.setattr(httpx, "get", _explota)
+    h = _tok(api, "compras1", "654321")
+    assert api.get("/api/v1/consulta/dni/123", headers=h).status_code == 422
+    assert api.get("/api/v1/consulta/ruc/2061007778X", headers=h).status_code == 422
+
+
+def test_el_proveedor_caido_es_502_y_no_500(api, monkeypatch):
+    """El que falló es un tercero, y la diferencia importa: un 500 manda a
+    revisar este servidor, que está bien."""
+    def _cae(*a, **k):
+        raise httpx.ConnectError("sin red")
+
+    monkeypatch.setattr(httpx, "get", _cae)
+    r = api.get(
+        "/api/v1/consulta/ruc/20610077782", headers=_tok(api, "compras1", "654321")
+    )
+    assert r.status_code == 502, r.text
+
+
+def test_documento_no_encontrado_no_es_error(api, monkeypatch):
+    """El alta puede seguir tecleando el nombre: que RENIEC no lo tenga no
+    es una falla del ERP."""
+    monkeypatch.setattr(
+        httpx, "get", lambda *a, **k: _RespuestaFalsa(404, "", None)
+    )
+    r = api.get(
+        "/api/v1/consulta/dni/73632127", headers=_tok(api, "compras1", "654321")
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["encontrado"] is False

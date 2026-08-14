@@ -194,3 +194,37 @@ def test_roles_de_un_usuario_inexistente_404(client):
         headers=_auth(admin_token),
     )
     assert r.status_code == 404
+
+
+# --- Desbloqueo de pantalla del PDV (RN-POS-014) -------------------------------
+def test_verificar_pin_confirma_identidad_sin_rotar_la_sesion(client):
+    tokens = _login(client).json()
+    h = _auth(tokens["access_token"])
+    r = client.post("/api/v1/auth/verificar-pin", headers=h, json={"pin": "123456"})
+    assert r.status_code == 204
+    # No emite tokens: el PDV se desbloquea con la MISMA sesión, así que el
+    # borrador y las cookies siguen donde estaban.
+    assert r.content == b""
+    assert client.get("/api/v1/users/me", headers=h).status_code == 200
+
+
+def test_verificar_pin_incorrecto_401(client):
+    h = _auth(_login(client).json()["access_token"])
+    r = client.post("/api/v1/auth/verificar-pin", headers=h, json={"pin": "999999"})
+    assert r.status_code == 401
+
+
+def test_verificar_pin_sin_sesion_401(client):
+    assert client.post(
+        "/api/v1/auth/verificar-pin", json={"pin": "123456"}
+    ).status_code == 401
+
+
+def test_verificar_pin_cuenta_contra_el_mismo_lockout_que_el_login(client):
+    h = _auth(_login(client).json()["access_token"])
+    for _i in range(rules.MAX_INTENTOS_FALLIDOS):
+        assert client.post(
+            "/api/v1/auth/verificar-pin", headers=h, json={"pin": "000000"}
+        ).status_code in (401, 423)
+    # Un contador propio habría dejado probar PINes sin agotar los del login.
+    assert _login(client).status_code == 423

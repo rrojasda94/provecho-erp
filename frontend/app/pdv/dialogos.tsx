@@ -26,6 +26,50 @@ import {
   type LineaBorrador,
   type RestaEnLinea,
 } from "./tipos";
+import Pinpad from "./pinpad";
+
+/**
+ * Usuario + PIN de quien firma. Cuatro puntos del PDV piden exactamente
+ * esto (apertura y cierre de caja, consumo de personal y autorización de
+ * supervisor), y hasta ahora cada uno lo escribía por su cuenta con un
+ * `<input type="password">` — cuatro sitios donde el navegador ofrecía
+ * guardar el PIN, que es de donde salía la cuenta compartida (ADR-045).
+ */
+function FirmaConPin({
+  quien,
+  usuario,
+  onUsuario,
+  pin,
+  onPin,
+  testid,
+}: {
+  quien: string;
+  usuario: string;
+  onUsuario: (v: string) => void;
+  pin: string;
+  onPin: (v: string) => void;
+  testid?: string;
+}) {
+  return (
+    <div className="pdv-firma">
+      <input
+        className="pdv-campo"
+        aria-label={`Usuario ${quien}`}
+        placeholder={`Usuario ${quien}`}
+        autoComplete="off"
+        data-testid={testid && `${testid}-usuario`}
+        value={usuario}
+        onChange={(e) => onUsuario(e.target.value)}
+      />
+      <Pinpad
+        value={pin}
+        onChange={onPin}
+        label={`PIN ${quien}`}
+        testid={testid && `${testid}-pin`}
+      />
+    </div>
+  );
+}
 
 /** Envoltorio común: `<dialog>` nativo, que ya trae foco atrapado, cierre
  * con Escape y backdrop sin una línea de JS.
@@ -203,28 +247,14 @@ export function DialogoApertura({
       )}
 
       <p className="pdv-etiqueta">Entrega el encargado</p>
-      <div className="pdv-dos">
-        <input
-          className="pdv-campo"
-          aria-label="Usuario del encargado"
-          placeholder="Usuario del encargado"
-          autoComplete="off"
-          data-testid="apertura-usuario"
-          value={usuario}
-          onChange={(e) => setUsuario(e.target.value)}
-        />
-        <input
-          className="pdv-campo"
-          type="password"
-          inputMode="numeric"
-          aria-label="PIN del encargado"
-          placeholder="PIN"
-          autoComplete="off"
-          data-testid="apertura-pin"
-          value={pin}
-          onChange={(e) => setPin(e.target.value)}
-        />
-      </div>
+      <FirmaConPin
+        quien="del encargado"
+        usuario={usuario}
+        onUsuario={setUsuario}
+        pin={pin}
+        onPin={setPin}
+        testid="apertura"
+      />
       <p className="pdv-nota">
         El efectivo se entrega de una persona a otra: quien lo entrega firma
         con su PIN para que un faltante tenga a quién preguntarle.
@@ -409,33 +439,14 @@ export function DialogoCierre({
         <option value="traslado_contabilidad">Traslado a contabilidad</option>
       </select>
       <p className="pdv-etiqueta">Recibe</p>
-      <div className="pdv-dos">
-        {/* `aria-label` y no un `<label>` envolvente: los dos campos son celdas
-            de `.pdv-dos` y meterlos dentro de una etiqueta rompe la grilla. Sin
-            esto el `placeholder` era el único nombre —y no lo es: desaparece al
-            escribir y ningún lector de pantalla lo anuncia como nombre del
-            campo. */}
-        <input
-          className="pdv-campo"
-          aria-label="Usuario de quien recibe"
-          placeholder="Usuario de quien recibe"
-          autoComplete="off"
-          data-testid="cierre-usuario"
-          value={usuario}
-          onChange={(e) => setUsuario(e.target.value)}
-        />
-        <input
-          className="pdv-campo"
-          type="password"
-          inputMode="numeric"
-          aria-label="PIN de quien recibe"
-          placeholder="PIN"
-          autoComplete="off"
-          data-testid="cierre-pin"
-          value={pin}
-          onChange={(e) => setPin(e.target.value)}
-        />
-      </div>
+      <FirmaConPin
+        quien="de quien recibe"
+        usuario={usuario}
+        onUsuario={setUsuario}
+        pin={pin}
+        onPin={setPin}
+        testid="cierre"
+      />
 
       <p className="pdv-etiqueta">Si hay descuadre, a quién se le atribuye</p>
       {/* Tres valores y no texto libre: es un enum en la base (RN-MDP-005), y
@@ -497,6 +508,22 @@ export function DialogoCierre({
 
 const NOTAS_RAPIDAS = ["Sin cebolla", "Sin ají", "Bien cocida", "Para llevar aparte"];
 
+/** Qué extras ofrece esta línea.
+ *
+ * Los grupos y extras cuelgan del producto que se prepara, y con
+ * presentaciones ese es la variante: el servidor solo acepta lo vinculado a
+ * ELLA (`admite_extra(prod.id, …)`), así que mezclar los del padre armaría
+ * líneas que van a fallar recién al enviar el pedido. Sin presentaciones, el
+ * producto es el que se prepara y los suyos son los que valen. */
+function extrasOfrecidos(
+  item: ItemDeCarta | null,
+  variante: VarianteDeCarta | undefined,
+): ExtraDeCarta[] {
+  if (!item) return [];
+  if (item.variantes.length === 0) return item.extras;
+  return variante ? variante.extras : [];
+}
+
 /**
  * Configuración de la línea: variante, cantidad, nota a cocina y extras.
  * Todo sale de la carta (`item`), ya con precios resueltos para esta
@@ -527,7 +554,10 @@ export function DialogoProducto({
   enviado: boolean;
   onGuardar: (l: LineaBorrador) => void;
   onQuitar: (id: string) => void;
-  onAnularLinea: (id: string, encargado: { username: string; pin: string }) => void;
+  /** Quitar una línea ya enviada. Sin credenciales: dentro de la ventana
+   * de corrección no hacen falta, y si el servidor las pide, la pantalla
+   * abre su propio diálogo de firma (RN-COM-029). */
+  onAnularLinea: (id: string) => void;
   onCerrar: () => void;
 }) {
   const [cantidad, setCantidad] = useState(1);
@@ -535,9 +565,6 @@ export function DialogoProducto({
   const [extras, setExtras] = useState<Record<string, number>>({});
   const [restas, setRestas] = useState<RestaEnLinea[]>([]);
   const [varianteId, setVarianteId] = useState("");
-  const [pidiendoPin, setPidiendoPin] = useState(false);
-  const [usuario, setUsuario] = useState("");
-  const [pin, setPin] = useState("");
 
   useEffect(() => {
     if (!linea) return;
@@ -553,16 +580,14 @@ export function DialogoProducto({
         ? linea.productoId
         : "",
     );
-    setPidiendoPin(false);
-    setUsuario("");
-    setPin("");
   }, [linea, item]);
 
   if (!linea) return null;
 
   const variantes = item?.variantes ?? [];
   const variante = variantes.find((v) => v.producto_comercial_id === varianteId);
-  const grupos = agruparExtras(item?.extras ?? []);
+  const ofrecidos = extrasOfrecidos(item, variante);
+  const grupos = agruparExtras(ofrecidos);
   const falta = queFalta(variantes, variante, grupos, extras);
   // Lo quitable sale de la receta del producto que realmente se prepara: la
   // variante si hay, el producto si no.
@@ -570,7 +595,7 @@ export function DialogoProducto({
 
   const guardar = () => {
     if (falta) return;
-    const elegidos = (item?.extras ?? [])
+    const elegidos = ofrecidos
       .filter((e) => (extras[e.producto_comercial_id] ?? 0) > 0)
       .map((e) => ({
         productoId: e.producto_comercial_id,
@@ -598,7 +623,14 @@ export function DialogoProducto({
         variantes={variantes}
         producto={item}
         elegida={varianteId}
-        onElegir={setVarianteId}
+        // Cambiar de tamaño rehace la oferta: "Peperoni Personal" y
+        // "Peperoni Familiar" son dos productos distintos, así que lo
+        // elegido en el anterior no se puede arrastrar al nuevo.
+        onElegir={(id) => {
+          if (id === varianteId) return;
+          setVarianteId(id);
+          setExtras({});
+        }}
       />
 
       <p className="pdv-etiqueta">Cantidad</p>
@@ -638,54 +670,19 @@ export function DialogoProducto({
         ))}
       </div>
 
-      {pidiendoPin && (
-        <>
-          <p className="pdv-etiqueta">Ya salió a cocina · PIN de supervisor</p>
-          <div className="pdv-dos">
-            <input
-              className="pdv-campo"
-              placeholder="Usuario del supervisor"
-              autoComplete="off"
-              value={usuario}
-              onChange={(e) => setUsuario(e.target.value)}
-            />
-            <input
-              className="pdv-campo"
-              type="password"
-              inputMode="numeric"
-              placeholder="PIN"
-              autoComplete="off"
-              value={pin}
-              onChange={(e) => setPin(e.target.value)}
-            />
-          </div>
-          <p className="pdv-nota">
-            El insumo ya se descontó: quitar la línea lo repone (RN-COM-020).
-          </p>
-        </>
-      )}
-
       <footer className="pdv-dialogo-pie">
-        {pidiendoPin ? (
-          <button
-            type="button"
-            className="pdv-boton-riesgo"
-            disabled={!usuario.trim() || !pin.trim()}
-            onClick={() =>
-              onAnularLinea(linea.id, { username: usuario.trim(), pin })
-            }
-          >
-            Confirmar anulación
-          </button>
-        ) : (
-          <button
-            type="button"
-            className="pdv-boton-riesgo"
-            onClick={() => (enviado ? setPidiendoPin(true) : onQuitar(linea.id))}
-          >
-            Quitar del pedido
-          </button>
-        )}
+        <button
+          type="button"
+          className="pdv-boton-riesgo"
+          title={
+            enviado
+              ? "Ya salió a cocina: repone el insumo. Pasados 5 minutos lo firma un supervisor"
+              : undefined
+          }
+          onClick={() => (enviado ? onAnularLinea(linea.id) : onQuitar(linea.id))}
+        >
+          Quitar del pedido
+        </button>
         {falta && <span className="pdv-falta">{falta}</span>}
         <button
           type="button"
@@ -1157,28 +1154,14 @@ export function DialogoConsumoPersonal({
       </div>
 
       <p className="pdv-etiqueta">Autoriza el encargado</p>
-      <div className="pdv-fila">
-        <input
-          className="pdv-campo"
-          aria-label="Usuario del encargado"
-          placeholder="Usuario"
-          autoComplete="off"
-          data-testid="consumo-usuario"
-          value={usuario}
-          onChange={(e) => setUsuario(e.target.value)}
-        />
-        <input
-          className="pdv-campo"
-          type="password"
-          inputMode="numeric"
-          aria-label="PIN del encargado"
-          placeholder="PIN"
-          autoComplete="off"
-          data-testid="consumo-pin"
-          value={pin}
-          onChange={(e) => setPin(e.target.value)}
-        />
-      </div>
+      <FirmaConPin
+        quien="del encargado"
+        usuario={usuario}
+        onUsuario={setUsuario}
+        pin={pin}
+        onPin={setPin}
+        testid="consumo"
+      />
 
       <footer className="pdv-dialogo-pie">
         <span />
@@ -1620,6 +1603,67 @@ export function DialogoCobro({
           }
         >
           Confirmar pago
+        </button>
+      </footer>
+    </Dialogo>
+  );
+}
+
+/**
+ * Firma de un supervisor en el terminal del cajero.
+ *
+ * Aparece **solo cuando hace falta**: quien ya tiene el permiso anula sin que
+ * nadie le pida nada, y recién si el servidor responde 403 se abre esto. Al
+ * revés —pedir el PIN siempre— haría que un encargado tuviera que teclear el
+ * suyo para anular su propio pedido.
+ */
+export function DialogoAutorizacion({
+  abierto,
+  titulo,
+  detalle,
+  ocupado,
+  onCerrar,
+  onFirmar,
+}: {
+  abierto: boolean;
+  titulo: string;
+  detalle: string;
+  ocupado: boolean;
+  onCerrar: () => void;
+  onFirmar: (encargado: { username: string; pin: string }) => void;
+}) {
+  const [usuario, setUsuario] = useState("");
+  const [pin, setPin] = useState("");
+
+  useEffect(() => {
+    if (!abierto) {
+      setUsuario("");
+      setPin("");
+    }
+  }, [abierto]);
+
+  return (
+    <Dialogo titulo={titulo} abierto={abierto} onCerrar={onCerrar}>
+      <p className="pdv-nota">{detalle}</p>
+      <FirmaConPin
+        quien="del supervisor"
+        usuario={usuario}
+        onUsuario={setUsuario}
+        pin={pin}
+        onPin={setPin}
+        testid="autorizacion"
+      />
+      <footer className="pdv-dialogo-pie">
+        <button type="button" className="pdv-boton-plano" onClick={onCerrar}>
+          Cancelar
+        </button>
+        <button
+          type="button"
+          className="pdv-boton-riesgo"
+          disabled={ocupado || !usuario.trim() || !pin.trim()}
+          onClick={() => onFirmar({ username: usuario.trim(), pin })}
+        >
+          Autorizar
         </button>
       </footer>
     </Dialogo>

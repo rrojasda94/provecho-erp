@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { ENCARGADO, contar, dialogo, ingresar } from "./util";
+import { ENCARGADO, contar, dialogo, ingresar, tecleaPin } from "./util";
 
 /**
  * El flujo del dinero de punta a punta: abrir caja → vender → cobrar →
@@ -21,7 +21,7 @@ async function abrirCaja(page: Page, { declarado }: { declarado: string }) {
   await contar(page, { "100": 1, "50": 2 }); // 200.00
   await dialogo(page).getByTestId("apertura-declarado").fill(declarado);
   await dialogo(page).getByTestId("apertura-usuario").fill(ENCARGADO.usuario);
-  await dialogo(page).getByTestId("apertura-pin").fill(ENCARGADO.pin);
+  await tecleaPin(page, "apertura-pin", ENCARGADO.pin);
   await dialogo(page).getByRole("button", { name: "Abrir caja" }).click();
   await expect(page.getByTestId("estado-caja")).toContainText("Caja abierta", {
     timeout: 15_000,
@@ -83,7 +83,7 @@ test.describe.serial("Flujo del dinero", () => {
     await dialogo(page).getByTestId(/^lote-/).first().fill("0");
     await dialogo(page).getByTestId("cierre-custodia").selectOption("local_caja_fuerte");
     await dialogo(page).getByTestId("cierre-usuario").fill(ENCARGADO.usuario);
-    await dialogo(page).getByTestId("cierre-pin").fill(ENCARGADO.pin);
+    await tecleaPin(page, "cierre-pin", ENCARGADO.pin);
     await dialogo(page).getByRole("button", { name: "Cerrar caja" }).click();
 
     await expect(page.getByTestId("estado-caja")).toContainText("Caja cerrada", {
@@ -106,7 +106,7 @@ test.describe.serial("Flujo del dinero", () => {
     await contar(page, { "100": 1, "50": 2 });
     await dialogo(page).getByTestId("apertura-declarado").fill("200");
     await dialogo(page).getByTestId("apertura-usuario").fill(ENCARGADO.usuario);
-    await dialogo(page).getByTestId("apertura-pin").fill("000000");
+    await tecleaPin(page, "apertura-pin", "000000");
     await dialogo(page).getByRole("button", { name: "Abrir caja" }).click();
 
     await expect(page.getByText(/No se pudo abrir la caja|credencial/i)).toBeVisible({
@@ -134,7 +134,7 @@ test.describe.serial("Flujo del dinero", () => {
     await expect(dialogo(page).getByText(/difiere en/i)).toBeVisible();
 
     await dialogo(page).getByTestId("apertura-usuario").fill(ENCARGADO.usuario);
-    await dialogo(page).getByTestId("apertura-pin").fill(ENCARGADO.pin);
+    await tecleaPin(page, "apertura-pin", ENCARGADO.pin);
     await dialogo(page).getByRole("button", { name: "Abrir caja" }).click();
     await expect(page.getByTestId("estado-caja")).toContainText("Caja abierta", {
       timeout: 15_000,
@@ -174,7 +174,15 @@ test.describe.serial("Flujo del dinero", () => {
       .getByLabel("A dónde va el efectivo")
       .selectOption("local_caja_fuerte");
     await dialogo(page).getByLabel("Usuario de quien recibe").fill(ENCARGADO.usuario);
-    await dialogo(page).getByLabel("PIN de quien recibe").fill(ENCARGADO.pin);
+    // El PIN ya no es un campo sino un pinpad (ADR-045): se toca dígito por
+    // dígito. Se llega a él por su nombre accesible igual que al resto —lo
+    // que esta prueba cuida es que un lector de pantalla pueda encontrarlo,
+    // y un `role="group"` con `aria-label` lo cumple tan bien como un
+    // `<input>` etiquetado.
+    const pinpad = dialogo(page).getByRole("group", { name: "PIN de quien recibe" });
+    for (const digito of ENCARGADO.pin) {
+      await pinpad.getByRole("button", { name: digito, exact: true }).click();
+    }
     await dialogo(page).getByRole("button", { name: "Cerrar caja" }).click();
     await expect(page.getByTestId("estado-caja")).toContainText("Caja cerrada", {
       timeout: 15_000,

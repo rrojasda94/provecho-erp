@@ -19,6 +19,12 @@ class ProveedorCreate(BaseModel):
     razon_social: str | None = Field(default=None, max_length=255)
     ruc: str | None = Field(default=None, min_length=11, max_length=11)
     contacto: str | None = Field(default=None, max_length=255)
+    # Domicilio fiscal. Llega prellenado desde `GET /consulta/ruc/{n}`
+    # y sigue siendo editable: SUNAT tiene el domicilio declarado, que
+    # no siempre es el almacén al que uno va a recoger.
+    direccion: str | None = Field(default=None, max_length=255)
+    provincia: str | None = Field(default=None, max_length=100)
+    pais: str = Field(default="PE", max_length=60)
     formal: bool = True
     clasificacion: str = "regular"
     plazo_dias_credito: int | None = None
@@ -42,6 +48,9 @@ class ProveedorUpdate(BaseModel):
     razon_social: str | None = Field(default=None, min_length=1, max_length=255)
     ruc: str | None = Field(default=None, pattern=r"^\d{11}$")
     contacto: str | None = Field(default=None, max_length=255)
+    direccion: str | None = Field(default=None, max_length=255)
+    provincia: str | None = Field(default=None, max_length=100)
+    pais: str | None = Field(default=None, max_length=60)
     # `Literal` y no `str`: las tres columnas son `Enum` con CHECK, así que un
     # valor fuera de rango moría en el flush con un 500. Acá es un 422.
     clasificacion: Literal["regular", "preferente"] | None = None
@@ -64,6 +73,9 @@ class ProveedorOut(BaseModel):
     # Los dos viajan para que el formulario de edición pueda precargarlos:
     # un campo que no se lee no se puede corregir sin borrarlo primero.
     contacto: str | None
+    direccion: str | None
+    provincia: str | None
+    pais: str
     plazo_dias_credito: int | None
     formal: bool
     clasificacion: str

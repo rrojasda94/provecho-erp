@@ -32,6 +32,7 @@ from src.modules.sales.infrastructure.repositories import (
 from src.modules.users.api.deps import (
     ContextoPermiso,
     check_permission,
+    get_current_user,
     get_db,
     get_tenant,
     require_permission,
@@ -263,25 +264,72 @@ def registrar_pago(
 @router.post("/ventas/{venta_id}/anular-lineas", response_model=schemas.VentaOut)
 def anular_lineas(
     venta_id: uuid.UUID,
-    body: schemas.AnularLineasCreate,
-    _: Usuario = Depends(require_permission(COBRAR)),
+    body: schemas.AnularLineasCreate | None = None,
+    actor: Usuario = Depends(require_permission(COBRAR)),
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
     """Quita líneas de una orden ya enviada a cocina y repone su insumo.
-    Lo pide el cajero, lo autoriza un supervisor con su PIN (RN-COM-020).
-    Antes de enviar, el pedido vive en el PDV y no pasa por acá."""
-    try:
-        autorizado_por = autorizacion.verificar(body.autorizacion, ANULAR)
-    except TokenInvalido as e:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, str(e)) from e
+
+    **Dentro de los 5 minutos** de haberse enviado la línea, la quita el
+    cajero solo: es corregir un tecleo, el plato todavía no se armó
+    (RN-COM-029). Pasada la ventana el insumo ya se usó de verdad y hace
+    falta la firma de un supervisor (RN-COM-020) — la pide el cajero y la da
+    el supervisor con su PIN en el mismo terminal.
+
+    Antes de enviar, el pedido vive en el PDV y no pasa por acá.
+    """
+    if body is None:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, "indica las líneas a anular"
+        )
     exigir_venta(session, venta_id, tenant)
+    autorizado_por = actor.id
+    if not ventas.lineas_en_ventana(session, venta_id, body.venta_item_ids):
+        if not body.autorizacion:
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                "pasaron más de "
+                f"{int(rules.VENTANA_CORRECCION.total_seconds() // 60)} minutos: "
+                "quitar la línea lo autoriza un supervisor con su PIN",
+            )
+        try:
+            autorizado_por = autorizacion.verificar(body.autorizacion, ANULAR)
+        except TokenInvalido as e:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, str(e)) from e
     venta = ventas.anular_lineas(
         session,
         venta_id=venta_id,
         venta_item_ids=body.venta_item_ids,
         autorizado_por=autorizado_por,
         motivo=body.motivo,
+    )
+    session.commit()
+    return venta
+
+
+@router.post("/ventas/{venta_id}/items", response_model=schemas.VentaOut, status_code=201)
+def agregar_lineas(
+    venta_id: uuid.UUID,
+    body: schemas.AgregarLineasCreate,
+    actor: Usuario = Depends(require_permission(CREAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Suma líneas a una orden ya enviada a cocina (RN-COM-029).
+
+    Sin autorización de nadie y con el mismo permiso que crear la orden:
+    agregar es lo que el negocio quiere que pase. Una mesa pide de a poco, y
+    obligar a abrir una orden nueva para la segunda ronda termina en dos
+    cuentas y dos entregas para la misma mesa. Lo que sigue necesitando firma
+    —después de la ventana— es **quitar**, porque repone inventario.
+    """
+    exigir_venta(session, venta_id, tenant)
+    venta = ventas.agregar_lineas(
+        session,
+        venta_id=venta_id,
+        items=[it.model_dump() for it in body.items],
+        usuario_id=actor.id,
     )
     session.commit()
     return venta
@@ -305,12 +353,50 @@ def ver_precuenta(
 @router.post("/ventas/{venta_id}/anular", response_model=schemas.VentaOut)
 def anular_venta(
     venta_id: uuid.UUID,
-    actor: Usuario = Depends(require_permission(ANULAR)),
+    body: schemas.AnularVentaIn | None = None,
+    actor: Usuario = Depends(get_current_user),
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
+    """Anula una orden no pagada. Post-pago es nota de crédito.
+
+    Entra quien opera la caja (`sales.cobrar`) **o** quien puede anular
+    (`sales.anular`) — son dos roles distintos y ninguno es subconjunto del
+    otro: el `cajero` cobra y no anula, el `supervisor` anula y no cobra.
+    Exigir los dos habría dejado afuera a los dos.
+
+    Al que solo cobra le hace falta además la firma de alguien que sí pueda,
+    igual que para quitar una línea ya enviada (RN-COM-020): el cajero pide y
+    el supervisor autoriza con su PIN en el mismo terminal.
+
+    Antes exigía `sales.anular` a secas, que el rol `cajero` no tiene: el
+    botón "Anular pedido" del PDV devolvía 403 sin decir qué hacer, y el
+    pedido quedaba en cocina.
+    """
+    check_permission(session, actor, COBRAR, ANULAR)
     exigir_venta(session, venta_id, tenant)
-    venta = ventas.anular_venta(session, venta_id, actor.id)
+    quien_autoriza = actor.id
+    # Dentro de la ventana de corrección alcanza con quien opera la caja
+    # (RN-COM-029): la comanda acaba de salir y el plato todavía no se armó.
+    puede_solo = usuarios_queries.tiene_permiso(
+        session, actor.id, ANULAR
+    ) or ventas.venta_en_ventana(session, venta_id)
+    if not puede_solo:
+        if body is None or not body.autorizacion:
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                "pasaron más de "
+                f"{int(rules.VENTANA_CORRECCION.total_seconds() // 60)} minutos: "
+                "anular la orden lo autoriza un supervisor con su PIN",
+            )
+        try:
+            quien_autoriza = autorizacion.verificar(body.autorizacion, ANULAR)
+        except TokenInvalido as e:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, str(e)) from e
+    # Queda firmada por quien la autorizó, no por quien la tecleó: es lo que
+    # el `audit_log` tiene que poder responder cuando alguien pregunta quién
+    # dejó sin cobrar esa orden.
+    venta = ventas.anular_venta(session, venta_id, quien_autoriza)
     session.commit()
     return venta
 

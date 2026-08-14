@@ -32,6 +32,14 @@ class Usuario(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin):
         Enum("humano", "agente_ia", name="tipo_usuario", native_enum=False)
     )
     activo: Mapped[bool] = mapped_column(Boolean, default=True)
+    # El PIN vigente lo puso otra persona (un reseteo), así que es conocido
+    # por alguien más y no sirve para responder por lo que se haga con esta
+    # cuenta. Mientras esté en `True`, `get_current_user` deja pasar solo lo
+    # necesario para cambiarlo: sin eso, "cambio obligatorio" sería un cartel
+    # que se cierra con la X.
+    debe_cambiar_pin: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false"
+    )
     # Lockout: 5 intentos fallidos en ventana de 15 min bloquean el login.
     intentos_fallidos: Mapped[int] = mapped_column(Integer, default=0)
     bloqueado_hasta: Mapped[datetime | None] = mapped_column(

@@ -228,6 +228,24 @@
         "title": "AdjuntoOut",
         "type": "object"
       },
+      "AgregarLineasCreate": {
+        "description": "Sumar líneas a una orden ya enviada a cocina (RN-COM-029). Mismo\nshape que los `items` del alta: una mesa que pide de a poco no debería\nobligar a abrir una orden nueva que después se cobra por separado.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/VentaItemIn"
+            },
+            "minItems": 1,
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "AgregarLineasCreate",
+        "type": "object"
+      },
       "AjusteCreate": {
         "properties": {
           "almacen_id": {
@@ -471,6 +489,18 @@
             ],
             "title": "Almacen Abastecedor Id"
           },
+          "almacen_abastecedor_respaldo_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Almacen Abastecedor Respaldo Id"
+          },
           "direccion": {
             "anyOf": [
               {
@@ -541,6 +571,18 @@
             ],
             "title": "Almacen Abastecedor Id"
           },
+          "almacen_abastecedor_respaldo_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Almacen Abastecedor Respaldo Id"
+          },
           "direccion": {
             "anyOf": [
               {
@@ -607,6 +649,18 @@
               }
             ],
             "title": "Almacen Abastecedor Id"
+          },
+          "almacen_abastecedor_respaldo_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Almacen Abastecedor Respaldo Id"
           },
           "direccion": {
             "anyOf": [
@@ -784,11 +838,18 @@
         "type": "object"
       },
       "AnularLineasCreate": {
-        "description": "Quitar líneas de una orden ya enviada a cocina. `autorizacion` es el\ntoken de `POST /auth/autorizar`: es inventario que se repone, lo\nautoriza un supervisor (RN-COM-020).",
+        "description": "Quitar líneas de una orden ya enviada a cocina.\n\n`autorizacion` es el token de `POST /auth/autorizar` y hace falta cuando\nla línea ya salió de la ventana de corrección (RN-COM-029): ahí el insumo\nse usó de verdad y reponerlo lo firma un supervisor (RN-COM-020). Dentro\nde la ventana es un error de tecleo y lo corrige el cajero solo.",
         "properties": {
           "autorizacion": {
-            "title": "Autorizacion",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Autorizacion"
           },
           "motivo": {
             "maxLength": 120,
@@ -808,10 +869,27 @@
         },
         "required": [
           "venta_item_ids",
-          "motivo",
-          "autorizacion"
+          "motivo"
         ],
         "title": "AnularLineasCreate",
+        "type": "object"
+      },
+      "AnularVentaIn": {
+        "description": "Anular una orden entera. `autorizacion` es el token de\n`POST /auth/autorizar` y solo hace falta cuando quien la pide no tiene\n`sales.anular` — el cajero, típicamente: la pide él y la firma un\nsupervisor con su PIN, igual que quitar una línea ya enviada\n(RN-COM-020).",
+        "properties": {
+          "autorizacion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Autorizacion"
+          }
+        },
+        "title": "AnularVentaIn",
         "type": "object"
       },
       "AperturaCajaOut": {
@@ -1908,6 +1986,20 @@
           "estado"
         ],
         "title": "AvanzarIn",
+        "type": "object"
+      },
+      "Body_validar_importacion_recetas_api_v1_inventory_recetas_importar_validar_post": {
+        "properties": {
+          "archivo": {
+            "contentMediaType": "application/octet-stream",
+            "title": "Archivo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "archivo"
+        ],
+        "title": "Body_validar_importacion_recetas_api_v1_inventory_recetas_importar_validar_post",
         "type": "object"
       },
       "BoletaPagoCreate": {
@@ -3565,6 +3657,100 @@
           "sustento"
         ],
         "title": "ConformidadComprobanteCreate",
+        "type": "object"
+      },
+      "ConsultaEmpresaOut": {
+        "properties": {
+          "condicion": {
+            "title": "Condicion",
+            "type": "string"
+          },
+          "departamento": {
+            "title": "Departamento",
+            "type": "string"
+          },
+          "direccion": {
+            "title": "Direccion",
+            "type": "string"
+          },
+          "distrito": {
+            "title": "Distrito",
+            "type": "string"
+          },
+          "encontrado": {
+            "title": "Encontrado",
+            "type": "boolean"
+          },
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          },
+          "numero_documento": {
+            "title": "Numero Documento",
+            "type": "string"
+          },
+          "provincia": {
+            "title": "Provincia",
+            "type": "string"
+          },
+          "razon_social": {
+            "title": "Razon Social",
+            "type": "string"
+          }
+        },
+        "required": [
+          "encontrado",
+          "numero_documento",
+          "razon_social",
+          "estado",
+          "condicion",
+          "direccion",
+          "distrito",
+          "provincia",
+          "departamento"
+        ],
+        "title": "ConsultaEmpresaOut",
+        "type": "object"
+      },
+      "ConsultaPersonaOut": {
+        "description": "Lo que se puede prellenar de una persona natural. Sin `crudo`: la\nrespuesta completa del proveedor trae más datos personales de los que\nesta pantalla necesita, y lo que no se manda no se filtra (Ley 29733).",
+        "properties": {
+          "apellidos": {
+            "title": "Apellidos",
+            "type": "string"
+          },
+          "encontrado": {
+            "title": "Encontrado",
+            "type": "boolean"
+          },
+          "fecha_nacimiento": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Nacimiento"
+          },
+          "nombres": {
+            "title": "Nombres",
+            "type": "string"
+          },
+          "numero_documento": {
+            "title": "Numero Documento",
+            "type": "string"
+          }
+        },
+        "required": [
+          "encontrado",
+          "numero_documento",
+          "nombres",
+          "apellidos"
+        ],
+        "title": "ConsultaPersonaOut",
         "type": "object"
       },
       "ConsumoCreate": {
@@ -5375,6 +5561,30 @@
             "title": "Almacen Id",
             "type": "string"
           },
+          "anulada_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anulada At"
+          },
+          "anulado_por": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anulado Por"
+          },
           "destino": {
             "anyOf": [
               {
@@ -5433,6 +5643,18 @@
             ],
             "title": "Referencia Id"
           },
+          "registrado_por": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registrado Por"
+          },
           "reporte_dirigido_a": {
             "title": "Reporte Dirigido A",
             "type": "string"
@@ -5448,6 +5670,9 @@
           "estado",
           "reporte_dirigido_a",
           "observacion",
+          "registrado_por",
+          "anulado_por",
+          "anulada_at",
           "items"
         ],
         "title": "DevolucionDetalleOut",
@@ -5539,6 +5764,30 @@
             "title": "Almacen Id",
             "type": "string"
           },
+          "anulada_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anulada At"
+          },
+          "anulado_por": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anulado Por"
+          },
           "destino": {
             "anyOf": [
               {
@@ -5590,6 +5839,18 @@
             ],
             "title": "Referencia Id"
           },
+          "registrado_por": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registrado Por"
+          },
           "reporte_dirigido_a": {
             "title": "Reporte Dirigido A",
             "type": "string"
@@ -5604,7 +5865,10 @@
           "destino",
           "estado",
           "reporte_dirigido_a",
-          "observacion"
+          "observacion",
+          "registrado_por",
+          "anulado_por",
+          "anulada_at"
         ],
         "title": "DevolucionOut",
         "type": "object"
@@ -6830,6 +7094,24 @@
         "title": "EvaluacionOut",
         "type": "object"
       },
+      "ExtraColaOut": {
+        "properties": {
+          "cantidad": {
+            "title": "Cantidad",
+            "type": "string"
+          },
+          "producto": {
+            "title": "Producto",
+            "type": "string"
+          }
+        },
+        "required": [
+          "producto",
+          "cantidad"
+        ],
+        "title": "ExtraColaOut",
+        "type": "object"
+      },
       "ExtraDeCartaOut": {
         "description": "Extra ofrecible sobre un producto, con su precio ya resuelto para\neste ámbito (RN-COM-021).",
         "properties": {
@@ -7811,15 +8093,99 @@
         "title": "ImplementacionOut",
         "type": "object"
       },
+      "ImportarRecetasIn": {
+        "properties": {
+          "recetas": {
+            "items": {
+              "$ref": "#/components/schemas/RecetaImportadaIn"
+            },
+            "title": "Recetas",
+            "type": "array"
+          }
+        },
+        "required": [
+          "recetas"
+        ],
+        "title": "ImportarRecetasIn",
+        "type": "object"
+      },
+      "IngredienteImportadoIn": {
+        "description": "Una línea de la hoja «Ingredientes», ya resuelta por la pantalla.\n\n`articulo_id` en `None` significa **omitir esta línea**: es lo que\ndevuelve la pantalla cuando el usuario decidió no resolver ese insumo.",
+        "properties": {
+          "articulo_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Articulo Id"
+          },
+          "cantidad": {
+            "title": "Cantidad",
+            "type": "string"
+          },
+          "insumo": {
+            "default": "",
+            "title": "Insumo",
+            "type": "string"
+          },
+          "merma_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "default": "0",
+            "title": "Merma Pct"
+          }
+        },
+        "required": [
+          "cantidad"
+        ],
+        "title": "IngredienteImportadoIn",
+        "type": "object"
+      },
       "ItemColaOut": {
         "properties": {
           "cantidad": {
             "title": "Cantidad",
             "type": "string"
           },
+          "estacion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estacion"
+          },
           "estado": {
             "title": "Estado",
             "type": "string"
+          },
+          "etapa_kds": {
+            "default": 0,
+            "title": "Etapa Kds",
+            "type": "integer"
+          },
+          "extras": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ExtraColaOut"
+            },
+            "title": "Extras",
+            "type": "array"
           },
           "producto": {
             "title": "Producto",
@@ -8967,6 +9333,11 @@
       },
       "MeOut": {
         "properties": {
+          "debe_cambiar_pin": {
+            "default": false,
+            "title": "Debe Cambiar Pin",
+            "type": "boolean"
+          },
           "empresa_id": {
             "anyOf": [
               {
@@ -12047,6 +12418,12 @@
             "title": "Nombre",
             "type": "string"
           },
+          "orden": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Orden",
+            "type": "integer"
+          },
           "sucursal_id": {
             "format": "uuid",
             "title": "Sucursal Id",
@@ -12094,6 +12471,10 @@
             "title": "Nombre",
             "type": "string"
           },
+          "orden": {
+            "title": "Orden",
+            "type": "integer"
+          },
           "sucursal_id": {
             "format": "uuid",
             "title": "Sucursal Id",
@@ -12110,6 +12491,7 @@
           "nombre",
           "tipo",
           "categoria_ids",
+          "orden",
           "activo"
         ],
         "title": "PantallaOut",
@@ -12152,6 +12534,18 @@
               }
             ],
             "title": "Nombre"
+          },
+          "orden": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orden"
           },
           "tipo": {
             "anyOf": [
@@ -12368,6 +12762,17 @@
             "title": "Canal",
             "type": "string"
           },
+          "consumo_motivo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consumo Motivo"
+          },
           "estado_pedido": {
             "title": "Estado Pedido",
             "type": "string"
@@ -12397,6 +12802,11 @@
               }
             ],
             "title": "Referencia Atencion"
+          },
+          "tipo": {
+            "default": "venta",
+            "title": "Tipo",
+            "type": "string"
           },
           "venta_id": {
             "title": "Venta Id",
@@ -13179,6 +13589,25 @@
           "pin"
         ],
         "title": "PinChange",
+        "type": "object"
+      },
+      "PinPropioChange": {
+        "description": "Cambio del PIN propio. Pide el actual aunque haya sesión válida: una\npantalla que quedó abierta no debería alcanzar para quedarse la cuenta.",
+        "properties": {
+          "pin_actual": {
+            "title": "Pin Actual",
+            "type": "string"
+          },
+          "pin_nuevo": {
+            "title": "Pin Nuevo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "pin_actual",
+          "pin_nuevo"
+        ],
+        "title": "PinPropioChange",
         "type": "object"
       },
       "PlantillaCreate": {
@@ -15088,6 +15517,18 @@
             ],
             "title": "Contacto"
           },
+          "direccion": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direccion"
+          },
           "empresa_id": {
             "anyOf": [
               {
@@ -15104,6 +15545,12 @@
             "default": true,
             "title": "Formal",
             "type": "boolean"
+          },
+          "pais": {
+            "default": "PE",
+            "maxLength": 60,
+            "title": "Pais",
+            "type": "string"
           },
           "persona_id": {
             "anyOf": [
@@ -15142,6 +15589,18 @@
               }
             ],
             "title": "Porcentaje Deteccion"
+          },
+          "provincia": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provincia"
           },
           "razon_social": {
             "anyOf": [
@@ -15210,6 +15669,17 @@
             ],
             "title": "Contacto"
           },
+          "direccion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direccion"
+          },
           "empresa_id": {
             "format": "uuid",
             "title": "Empresa Id",
@@ -15222,6 +15692,10 @@
           "id": {
             "format": "uuid",
             "title": "Id",
+            "type": "string"
+          },
+          "pais": {
+            "title": "Pais",
             "type": "string"
           },
           "persona_id": {
@@ -15246,6 +15720,17 @@
               }
             ],
             "title": "Plazo Dias Credito"
+          },
+          "provincia": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provincia"
           },
           "razon_social": {
             "anyOf": [
@@ -15282,6 +15767,9 @@
           "razon_social",
           "ruc",
           "contacto",
+          "direccion",
+          "provincia",
+          "pais",
           "plazo_dias_credito",
           "formal",
           "clasificacion",
@@ -15347,6 +15835,30 @@
             ],
             "title": "Contacto"
           },
+          "direccion": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direccion"
+          },
+          "pais": {
+            "anyOf": [
+              {
+                "maxLength": 60,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pais"
+          },
           "plazo_dias_credito": {
             "anyOf": [
               {
@@ -15358,6 +15870,18 @@
               }
             ],
             "title": "Plazo Dias Credito"
+          },
+          "provincia": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provincia"
           },
           "razon_social": {
             "anyOf": [
@@ -15946,6 +16470,61 @@
           "factor"
         ],
         "title": "RecetaEscalarIn",
+        "type": "object"
+      },
+      "RecetaImportadaIn": {
+        "properties": {
+          "articulo_producido_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Articulo Producido Id"
+          },
+          "ingredientes": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/IngredienteImportadoIn"
+            },
+            "title": "Ingredientes",
+            "type": "array"
+          },
+          "nombre": {
+            "maxLength": 150,
+            "minLength": 1,
+            "title": "Nombre",
+            "type": "string"
+          },
+          "rendimiento": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Rendimiento"
+          },
+          "unidad_medida_id": {
+            "format": "uuid",
+            "title": "Unidad Medida Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "nombre",
+          "rendimiento",
+          "unidad_medida_id"
+        ],
+        "title": "RecetaImportadaIn",
         "type": "object"
       },
       "RecetaItemCreate": {
@@ -17214,6 +17793,54 @@
           "articulo"
         ],
         "title": "SkuDetalleOut",
+        "type": "object"
+      },
+      "SkuListadoOut": {
+        "description": "El SKU con el nombre de su artículo: un selector que muestre solo el\ncódigo obliga a adivinar qué es cada cosa.",
+        "properties": {
+          "activo": {
+            "title": "Activo",
+            "type": "boolean"
+          },
+          "articulo_id": {
+            "format": "uuid",
+            "title": "Articulo Id",
+            "type": "string"
+          },
+          "articulo_nombre": {
+            "title": "Articulo Nombre",
+            "type": "string"
+          },
+          "codigo": {
+            "title": "Codigo",
+            "type": "string"
+          },
+          "codigo_barras": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Codigo Barras"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "articulo_id",
+          "codigo",
+          "codigo_barras",
+          "activo",
+          "articulo_nombre"
+        ],
+        "title": "SkuListadoOut",
         "type": "object"
       },
       "SkuOut": {
@@ -19873,6 +20500,14 @@
       "VarianteDeCartaOut": {
         "description": "Tamaño/presentación del producto, con precio propio y completo — no\nun recargo sobre el padre (RN-COM-022). Elegir una es obligatorio.",
         "properties": {
+          "extras": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ExtraDeCartaOut"
+            },
+            "title": "Extras",
+            "type": "array"
+          },
           "nombre": {
             "title": "Nombre",
             "type": "string"
@@ -20613,6 +21248,20 @@
           "total"
         ],
         "title": "VentasHoyOut",
+        "type": "object"
+      },
+      "VerificarPinIn": {
+        "description": "Desbloqueo de pantalla: solo el PIN. El usuario sale del token —\npedirlo en el cuerpo dejaría verificar el PIN de cualquier otro.",
+        "properties": {
+          "pin": {
+            "title": "Pin",
+            "type": "string"
+          }
+        },
+        "required": [
+          "pin"
+        ],
+        "title": "VerificarPinIn",
         "type": "object"
       },
       "VincularExtraCreate": {
@@ -21392,6 +22041,7 @@
     },
     "/api/v1/accounting/cajas/abiertas": {
       "get": {
+        "description": "Con `sucursal_id`, **quien opera una caja** puede preguntar si la de su\nlocal ya está abierta; sin él hace falta `accounting.leer`, porque son las\nde toda la empresa.\n\nAntes exigía `accounting.leer` siempre, y un cajero —que tiene\n`caja_operar` y no `leer`— recibía 403. El PDV lo trataba como \"no hay\ncaja abierta\" y le pedía abrir una que ya estaba abierta, para después\nnegarle la apertura por duplicada: un callejón sin salida que empezaba\ncomo un permiso mal elegido.",
         "operationId": "listar_cajas_abiertas_api_v1_accounting_cajas_abiertas_get",
         "parameters": [
           {
@@ -21409,6 +22059,23 @@
                 }
               ],
               "title": "Empresa Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sucursal_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sucursal Id"
             }
           }
         ],
@@ -23421,6 +24088,140 @@
         "summary": "Refresh",
         "tags": [
           "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/verificar-pin": {
+      "post": {
+        "description": "Confirma que quien está frente al terminal sigue siendo el dueño de\nla sesión — desbloqueo de la pantalla del PDV (RN-POS-014).\n\nDetrás del mismo rate limit que el login y contra el mismo lockout: es\notro endpoint que recibe PINes, y sin freno sería el camino cómodo\npara probarlos.",
+        "operationId": "verificar_pin_api_v1_auth_verificar_pin_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerificarPinIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Verificar Pin",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/consulta/dni/{numero}": {
+      "get": {
+        "operationId": "consultar_dni_api_v1_consulta_dni__numero__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "numero",
+            "required": true,
+            "schema": {
+              "title": "Numero",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsultaPersonaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Consultar Dni",
+        "tags": [
+          "consulta"
+        ]
+      }
+    },
+    "/api/v1/consulta/ruc/{numero}": {
+      "get": {
+        "operationId": "consultar_ruc_api_v1_consulta_ruc__numero__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "numero",
+            "required": true,
+            "schema": {
+              "title": "Numero",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsultaEmpresaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Consultar Ruc",
+        "tags": [
+          "consulta"
         ]
       }
     },
@@ -26374,7 +27175,43 @@
     },
     "/api/v1/inventory/recetas": {
       "get": {
+        "description": "`tipo` es `subreceta` (produce un artículo) o `producto` (se vende);\nse deriva de `articulo_id`, no hay columna que mantener (RN-COM-030).",
         "operationId": "listar_recetas_api_v1_inventory_recetas_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "tipo",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tipo"
+            }
+          },
+          {
+            "in": "query",
+            "name": "categoria_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Categoria Id"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -26389,6 +27226,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "security": [
@@ -26441,6 +27288,121 @@
           }
         ],
         "summary": "Crear Receta",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/recetas/importar": {
+      "post": {
+        "description": "Crea lo que la pantalla confirmó, revalidando todo: lo que llega es un\nJSON que el cliente pudo editar.",
+        "operationId": "importar_recetas_api_v1_inventory_recetas_importar_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportarRecetasIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Importar Recetas",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/recetas/importar/validar": {
+      "post": {
+        "description": "Dice qué entra y qué no. **No guarda nada** — la pantalla resuelve los\ninsumos que el catálogo no reconoce y recién ahí se importa.",
+        "operationId": "validar_importacion_recetas_api_v1_inventory_recetas_importar_validar_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_validar_importacion_recetas_api_v1_inventory_recetas_importar_validar_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Validar Importacion Recetas",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/recetas/plantilla": {
+      "get": {
+        "description": "La hoja que se llena para cargar el recetario de golpe (RN-COM-031).\n\nDeclarada **antes** de `/recetas/{receta_id}`: FastAPI resuelve por orden\ny \"plantilla\" entraría como un `receta_id` que no es UUID.",
+        "operationId": "descargar_plantilla_recetas_api_v1_inventory_recetas_plantilla_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Descargar Plantilla Recetas",
         "tags": [
           "inventory"
         ]
@@ -27007,6 +27969,35 @@
       }
     },
     "/api/v1/inventory/skus": {
+      "get": {
+        "description": "Qué se puede mover: lo consume el formulario de devolución y cualquier\npantalla que pregunte por un SKU concreto.",
+        "operationId": "listar_skus_api_v1_inventory_skus_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SkuListadoOut"
+                  },
+                  "title": "Response Listar Skus Api V1 Inventory Skus Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Skus",
+        "tags": [
+          "inventory"
+        ]
+      },
       "post": {
         "operationId": "crear_sku_api_v1_inventory_skus_post",
         "requestBody": {
@@ -38738,6 +39729,7 @@
     },
     "/api/v1/sales/ventas/{venta_id}/anular": {
       "post": {
+        "description": "Anula una orden no pagada. Post-pago es nota de crédito.\n\nEntra quien opera la caja (`sales.cobrar`) **o** quien puede anular\n(`sales.anular`) — son dos roles distintos y ninguno es subconjunto del\notro: el `cajero` cobra y no anula, el `supervisor` anula y no cobra.\nExigir los dos habría dejado afuera a los dos.\n\nAl que solo cobra le hace falta además la firma de alguien que sí pueda,\nigual que para quitar una línea ya enviada (RN-COM-020): el cajero pide y\nel supervisor autoriza con su PIN en el mismo terminal.\n\nAntes exigía `sales.anular` a secas, que el rol `cajero` no tiene: el\nbotón \"Anular pedido\" del PDV devolvía 403 sin decir qué hacer, y el\npedido quedaba en cocina.",
         "operationId": "anular_venta_api_v1_sales_ventas__venta_id__anular_post",
         "parameters": [
           {
@@ -38751,6 +39743,23 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/AnularVentaIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "content": {
@@ -38786,7 +39795,7 @@
     },
     "/api/v1/sales/ventas/{venta_id}/anular-lineas": {
       "post": {
-        "description": "Quita líneas de una orden ya enviada a cocina y repone su insumo.\nLo pide el cajero, lo autoriza un supervisor con su PIN (RN-COM-020).\nAntes de enviar, el pedido vive en el PDV y no pasa por acá.",
+        "description": "Quita líneas de una orden ya enviada a cocina y repone su insumo.\n\n**Dentro de los 5 minutos** de haberse enviado la línea, la quita el\ncajero solo: es corregir un tecleo, el plato todavía no se armó\n(RN-COM-029). Pasada la ventana el insumo ya se usó de verdad y hace\nfalta la firma de un supervisor (RN-COM-020) — la pide el cajero y la da\nel supervisor con su PIN en el mismo terminal.\n\nAntes de enviar, el pedido vive en el PDV y no pasa por acá.",
         "operationId": "anular_lineas_api_v1_sales_ventas__venta_id__anular_lineas_post",
         "parameters": [
           {
@@ -38804,11 +39813,18 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AnularLineasCreate"
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/AnularLineasCreate"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
@@ -39047,6 +40063,63 @@
           }
         ],
         "summary": "Ver Items Venta",
+        "tags": [
+          "sales"
+        ]
+      },
+      "post": {
+        "description": "Suma líneas a una orden ya enviada a cocina (RN-COM-029).\n\nSin autorización de nadie y con el mismo permiso que crear la orden:\nagregar es lo que el negocio quiere que pase. Una mesa pide de a poco, y\nobligar a abrir una orden nueva para la segunda ronda termina en dos\ncuentas y dos entregas para la misma mesa. Lo que sigue necesitando firma\n—después de la ventana— es **quitar**, porque repone inventario.",
+        "operationId": "agregar_lineas_api_v1_sales_ventas__venta_id__items_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "venta_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Venta Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgregarLineasCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VentaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Agregar Lineas",
         "tags": [
           "sales"
         ]
@@ -39877,6 +40950,46 @@
         ]
       }
     },
+    "/api/v1/users/me/pin": {
+      "post": {
+        "description": "El dueño de la cuenta cambia su PIN.\n\nSin permiso: elegir la propia clave no es un privilegio que alguien tenga\nque otorgar, y es la única salida de un PIN reseteado.\n\nDeclarada **antes** que `/users/{usuario_id}/pin`: FastAPI resuelve por\norden de declaración, y la ruta con parámetro capturaba \"me\" como si fuera\nun id — con lo que cambiar el PIN propio terminaba exigiendo\n`users.gestionar`.",
+        "operationId": "cambiar_pin_propio_api_v1_users_me_pin_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PinPropioChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Cambiar Pin Propio",
+        "tags": [
+          "users"
+        ]
+      }
+    },
     "/api/v1/users/me/preferencias": {
       "patch": {
         "description": "Cambia cómo se le presenta el ERP a quien está autenticado.\n\nSin permiso: no hay privilegio que otorgar en elegir el tamaño de la\npropia letra, y exigir uno dejaría la accesibilidad fuera del alcance de\njustamente quien más la necesita. Solo puede tocar su propio perfil —el\nusuario sale del token, no del cuerpo.",
@@ -40028,6 +41141,48 @@
           }
         ],
         "summary": "Cambiar Pin",
+        "tags": [
+          "users-admin"
+        ]
+      }
+    },
+    "/api/v1/users/{usuario_id}/pin/reset": {
+      "post": {
+        "description": "Devuelve la cuenta al PIN por defecto y obliga a cambiarlo al entrar.\n\nPermiso propio y no `users.gestionar`: RRHH atiende el \"me olvidé el PIN\"\ntodos los lunes y no tiene por qué poder crear cuentas ni repartir roles\npara eso. En el otro sentido, resetear el PIN de alguien es poder entrar\ncomo esa persona, así que tampoco viene gratis con administrar usuarios.",
+        "operationId": "resetear_pin_api_v1_users__usuario_id__pin_reset_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "usuario_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Usuario Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Resetear Pin",
         "tags": [
           "users-admin"
         ]
@@ -40724,6 +41879,10 @@
     {
       "description": "Rastro inmutable de cambios (`audit_log`, ADR-031): quién, qué, cuándo, dónde y valor anterior/nuevo. Solo lectura.",
       "name": "auditoria"
+    },
+    {
+      "description": "Consulta de DNI y RUC contra Factiliza (RENIEC/SUNAT) para prellenar altas. Solo lectura: no guarda nada, y lo que devuelve sigue siendo editable en el formulario.",
+      "name": "consulta"
     },
     {
       "description": "Agregado gerencial de solo lectura: ventas del día, stock crítico, caja.",

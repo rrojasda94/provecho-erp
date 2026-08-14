@@ -3,6 +3,7 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import { useMemo } from "react";
 
+import { BuscarDocumento } from "@/components/consulta/buscar-documento";
 import {
   BOTON_FILA,
   DialogoFormulario,
@@ -66,6 +67,18 @@ function CamposPersona({ persona }: { persona?: Persona }) {
           />
         </label>
       </div>
+      {/* Con DNI, el nombre lo pone RENIEC y no lo tecleado (RN-PTS-004): acá
+          se trae antes de guardar para poder revisarlo, en vez de descubrir
+          al grabar que el sistema escribió otro. */}
+      <BuscarDocumento
+        tipo="dni"
+        campo="numero_documento"
+        rellena={{
+          nombres: "nombres",
+          apellidos: "apellidos",
+          fecha_nacimiento: "fecha_nacimiento",
+        }}
+      />
       <label className="flex flex-col gap-1 text-sm font-semibold">
         Fecha de nacimiento
         <input name="fecha_nacimiento" type="date" defaultValue={valor(p.fecha_nacimiento)} />

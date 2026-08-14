@@ -128,6 +128,20 @@ cuatro huecos que el punto de venta necesitaba y el modelo no daba.
   admite qué extra, con tope) y `venta_item.padre_venta_item_id` (de qué
   línea cuelga). Hereda el grupo de cobro del padre y su consumo se
   multiplica por el plato.
+- **La orden enviada sigue viva** (RN-COM-029, ADR-043): `POST
+  /ventas/{id}/items` suma líneas a una venta en `orden`, con `sales.crear` y
+  sin firma de nadie — agregar sube el ticket y no saca nada del inventario.
+  Republica `sales.venta_confirmada` con **el incremento** en `total` y solo
+  las líneas nuevas en `items`: mandar el acumulado haría que `accounting`
+  asentara la venta dos veces. Después del cobro devuelve 409: la cuenta está
+  cerrada y lo que venga es otra orden.
+- **Ventana de corrección de 5 minutos** (RN-COM-029): quitar —una línea o la
+  orden entera— no pide firma dentro de la ventana; fuera de ella sí
+  (`rules.VENTANA_CORRECCION`, `ventas.lineas_en_ventana` /
+  `venta_en_ventana`). La de la orden se mide contra su **última** línea, y
+  un lote exige firma si **alguna** salió de la ventana. Por eso
+  `autorizacion` es opcional en los dos cuerpos: el cliente la manda cuando
+  el servidor la pide.
 - **Anular líneas enviadas** (RN-COM-020):
   `POST /ventas/{id}/anular-lineas`, con autorización de supervisor y
   motivo; publica `sales.lineas_anuladas` → inventory repone. Quitar todas
@@ -158,6 +172,17 @@ ADR-023):**
   el kiosko entra por el mismo endpoint. El replay del hub se exceptúa
   (ADR-009): una venta que ya se cobró no se rechaza por una regla que
   cambió durante el corte.
+  Los grupos pueden colgar del padre **o** de la variante, y una variante
+  **hereda los del padre** (ADR-042): el seeder los deja en la variante y el
+  lienzo en el padre —cuelga "+ grupo" del nodo activo, que es el padre
+  mientras no hay tamaños— y de dónde quedaron no debería decidir si se
+  ofrecen. `grupos_efectivos`/`extras_efectivos`/`admite_extra_efectivo` lo
+  dicen una sola vez, y **el vínculo propio gana** sobre el heredado. La
+  venta usa los mismos, para aceptar exactamente lo que la carta ofreció.
+  Los crudos (`grupos_de`, `extras_de`, `admite_extra`) siguen siendo por
+  producto: los usa la ficha, que edita lo propio y no lo heredado.
+  `GET /carta` devuelve `variantes[].extras[]` además del `extras[]` de
+  nivel producto, que es el de los productos simples.
 - **Ficha del producto**: `GET /productos/{id}` devuelve producto +
   variantes + grupos en una lectura, para editar todo en la misma pantalla
   (patrón Odoo). `GET /marcas` acompaña al alta.
@@ -385,17 +410,48 @@ tiempo real (Redis/WebSocket) es deuda declarada.
 
 - **`kds_pantalla`**: sucursal + tipo (`preparacion` | `despacho`) +
   `categoria_ids` (filtro por categorías de producto comercial; vacío =
-  todas). `producto_comercial.categoria_id` (nuevo, reusa `categoria`)
-  rutea cada ítem a su estación (pizzas → horno, bebidas → barra).
+  todas) + `orden` (eslabón en la cadena). `producto_comercial.categoria_id`
+  (reusa `categoria`) rutea cada ítem a su estación (pizzas → horno,
+  bebidas → barra).
+- **Cadena de estaciones** (2026-08-13, ADR-044, RN-CUP-013): las pantallas
+  de preparación están ordenadas por `orden` (armado 0 → horno 1 → …) y
+  cada línea sabe en cuál va (`venta_item.etapa_kds`). Todo lo resuelve
+  `_estacion(cadena, producto, desde)`: la primera estación activa con
+  `orden >= desde` que atiende la categoría del producto. La misma función
+  dice **qué muestra una pantalla** (la línea está acá si su estación cae
+  en este `orden`) y **a dónde va al tacharla** (`actual.orden + 1`); si no
+  queda ninguna, la línea pasa a `listo`. Una bebida se salta el horno sola
+  porque el horno no atiende su categoría. Es `>=` y no `==` para que
+  desactivar una estación no deje pedidos invisibles: caen al eslabón
+  siguiente. Dos pantallas con el mismo `orden` son el mismo eslabón
+  trabajando en paralelo. **`orden` viaja en la réplica del hub** — sin él,
+  durante un corte todas las estaciones caerían al mismo eslabón.
+- **El extra no es un plato aparte** (2026-08-13, RN-CUP-014, enmienda de
+  ADR-044): el sabor viaja **dentro** de su línea (`ItemColaOut.extras`), la
+  cola recorre solo padres, el ruteo mira la categoría del plato y marcarlo
+  marca sus extras. Antes salía como ítem suelto: la tarjeta decía "1 Pizza
+  Personal" y "1 Peperoni" como si fueran dos preparaciones, y un extra sin
+  `categoria_id` no lo atendía ninguna estación filtrada — se quedaba
+  `pendiente` y el pedido no llegaba nunca a entregable. Sigue siendo fila
+  propia por su receta, su precio y su rastro; lo que no tiene es avance
+  propio.
 - **Preparación**: ve **todos** los ítems de sus categorías, incluidos los
-  ya `listo` — el ítem tachado tiene que seguir a la vista de quien lo
-  tachó y de las demás pantallas (corregido 2026-08-03: antes desaparecía
-  al marcarlo, que es justo lo contrario de lo que hace la cocina). El
-  pedido sale de esta cola cuando la estación terminó **todo lo suyo**.
+  ya `listo` y los que ya mandó al eslabón siguiente (con el destino a la
+  vista) — el ítem tachado tiene que seguir a la vista de quien lo tachó y
+  de las demás pantallas (corregido 2026-08-03: antes desaparecía al
+  marcarlo, que es justo lo contrario de lo que hace la cocina). El pedido
+  sale de esta cola cuando a la estación no le queda **nada pendiente**.
   Bump por ítem (`POST /kds/items/{id}/avanzar`).
-- **Despacho**: ve pedidos con ítems listos + `estado_pedido` agregado
-  (el ítem más atrasado manda); al estar todo listo se publica
-  `sales.pedido_listo`.
+- **Despacho**: pantalla propia (`despacho-cliente.tsx`) desde 2026-08-13 —
+  antes era el componente de cocina con otro filtro, así que ofrecía tachar
+  ítems. Una tarjeta por **pedido** con cuántas líneas van, en qué estación
+  está cada una (`estacion` en el payload) y por quién se espera; no marca
+  preparado (eso es de la estación que preparó, RN-CUP-003), solo entrega.
+  **Ya no filtra por `categoria_ids`**: mostraba media orden, que es lo que
+  impide verificar el pedido completo contra la comanda antes de entregarlo
+  (RN-CUP-004); el selector desapareció de su formulario. `estado_pedido`
+  sigue siendo el agregado (el ítem más atrasado manda) y al estar todo
+  listo se publica `sales.pedido_listo`.
 - **Entrega**: `POST /sales/ventas/{id}/entrega` cierra el pedido completo
   y publica `sales.venta_entregada` (disparador de la encuesta de
   marketing, RN-COM-007). Exige todos los ítems en `listo` (RN-CUP-005),

@@ -13,6 +13,13 @@ import { TablaDatos } from "@/components/tabla/tabla-datos";
 import { guardarSucursalAction } from "../actions";
 
 export type Marca = { id: string; nombre: string };
+export type Almacen = {
+  id: string;
+  sucursal_id: string | null;
+  nombre: string;
+  almacen_abastecedor_id: string | null;
+  almacen_abastecedor_respaldo_id: string | null;
+};
 export type Sucursal = {
   id: string;
   empresa_id: string;
@@ -25,11 +32,86 @@ export type Sucursal = {
 
 const TENENCIAS = ["propia", "alquilada", "del_grupo"] as const;
 
+/**
+ * De quién se abastece el local.
+ *
+ * El dato vive en `almacen` y no en `sucursal` —el que se abastece es el
+ * almacén, y una sucursal puede tener más de uno— pero se edita acá porque es
+ * acá donde uno lo busca. Con más de un almacén la pregunta deja de tener una
+ * sola respuesta, así que se manda a Almacenes en vez de elegir por el
+ * usuario cuál de los dos configura.
+ */
+function Abastecimiento({
+  propios,
+  almacenes,
+}: {
+  propios: Almacen[];
+  almacenes: Almacen[];
+}) {
+  if (propios.length === 0) {
+    return (
+      <p className="text-xs text-gray">
+        Esta sucursal todavía no tiene almacén. Créalo en Organización →
+        Almacenes y ahí se elige de quién se abastece.
+      </p>
+    );
+  }
+  if (propios.length > 1) {
+    return (
+      <p className="text-xs text-gray">
+        Esta sucursal tiene {propios.length} almacenes y cada uno se abastece
+        por su cuenta: se configuran en Organización → Almacenes.
+      </p>
+    );
+  }
+  const propio = propios[0];
+  const otros = almacenes.filter((a) => a.id !== propio.id);
+  return (
+    <>
+      <input type="hidden" name="almacen_id" value={propio.id} />
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Se abastece de
+        <select
+          name="almacen_abastecedor_id"
+          defaultValue={valor(propio.almacen_abastecedor_id)}
+        >
+          <option value="">Ninguno (se abastece por compra)</option>
+          {otros.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.nombre}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Y si ese no está, de
+        <select
+          name="almacen_abastecedor_respaldo_id"
+          defaultValue={valor(propio.almacen_abastecedor_respaldo_id)}
+        >
+          <option value="">Ninguno</option>
+          {otros.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.nombre}
+            </option>
+          ))}
+        </select>
+        <span className="text-xs font-normal text-gray">
+          Puede ser el almacén de otra sucursal. Se usa cuando el principal
+          está dado de baja; distinto del principal.
+        </span>
+      </label>
+    </>
+  );
+}
+
 function CamposSucursal({
   marcas,
+  almacenes,
   sucursal,
 }: {
   marcas: Marca[];
+  almacenes: Almacen[];
   sucursal?: Sucursal;
 }) {
   const s: Partial<Sucursal> = sucursal ?? {};
@@ -75,11 +157,25 @@ function CamposSucursal({
           </select>
         </label>
       </div>
+      {/* Solo al editar: en el alta la sucursal todavía no tiene almacén al
+          que colgarle la configuración. */}
+      {sucursal && (
+        <Abastecimiento
+          propios={almacenes.filter((a) => a.sucursal_id === sucursal.id)}
+          almacenes={almacenes}
+        />
+      )}
     </>
   );
 }
 
-function DialogoNuevaSucursal({ marcas }: { marcas: Marca[] }) {
+function DialogoNuevaSucursal({
+  marcas,
+  almacenes,
+}: {
+  marcas: Marca[];
+  almacenes: Almacen[];
+}) {
   return (
     <DialogoFormulario
       titulo="Nueva sucursal"
@@ -94,7 +190,7 @@ function DialogoNuevaSucursal({ marcas }: { marcas: Marca[] }) {
           : undefined
       }
     >
-      <CamposSucursal marcas={marcas} />
+      <CamposSucursal marcas={marcas} almacenes={almacenes} />
     </DialogoFormulario>
   );
 }
@@ -104,9 +200,11 @@ function DialogoNuevaSucursal({ marcas }: { marcas: Marca[] }) {
 function DialogoEditarSucursal({
   sucursal,
   marcas,
+  almacenes,
 }: {
   sucursal: Sucursal;
   marcas: Marca[];
+  almacenes: Almacen[];
 }) {
   return (
     <DialogoFormulario
@@ -117,7 +215,7 @@ function DialogoEditarSucursal({
       ayuda="Cerrar un local es dejarlo 'inactiva': no se da de baja, sigue siendo el ancla de sus ventas, cajas y trabajadores."
     >
       <input type="hidden" name="id" value={sucursal.id} />
-      <CamposSucursal marcas={marcas} sucursal={sucursal} />
+      <CamposSucursal marcas={marcas} almacenes={almacenes} sucursal={sucursal} />
     </DialogoFormulario>
   );
 }
@@ -125,9 +223,11 @@ function DialogoEditarSucursal({
 export function SucursalesCliente({
   sucursales,
   marcas,
+  almacenes,
 }: {
   sucursales: Sucursal[];
   marcas: Marca[];
+  almacenes: Almacen[];
 }) {
   const nombreMarca = useMemo(
     () => new Map(marcas.map((m) => [m.id, m.nombre])),
@@ -166,17 +266,23 @@ export function SucursalesCliente({
       {
         id: "acciones",
         header: "",
-        cell: ({ row }) => <DialogoEditarSucursal sucursal={row.original} marcas={marcas} />,
+        cell: ({ row }) => (
+          <DialogoEditarSucursal
+            sucursal={row.original}
+            marcas={marcas}
+            almacenes={almacenes}
+          />
+        ),
       },
     ],
-    [nombreMarca, marcas],
+    [nombreMarca, marcas, almacenes],
   );
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h1 className="font-heading text-xl italic uppercase text-dark">Sucursales</h1>
-        <DialogoNuevaSucursal marcas={marcas} />
+        <DialogoNuevaSucursal marcas={marcas} almacenes={almacenes} />
       </div>
       <p className="text-sm text-gray">
         Cada local, con la marca bajo la que opera. Es la unidad sobre la que se abre caja,

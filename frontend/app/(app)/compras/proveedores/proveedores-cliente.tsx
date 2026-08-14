@@ -3,6 +3,7 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import { useMemo, useState } from "react";
 
+import { BuscarDocumento } from "@/components/consulta/buscar-documento";
 import { BOTON_FILA, DialogoFormulario } from "@/components/formulario/dialogo-formulario";
 import { PersonaPicker } from "@/components/persona-picker/persona-picker";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
@@ -16,6 +17,9 @@ export type Proveedor = {
   razon_social: string | null;
   ruc: string | null;
   contacto: string | null;
+  direccion: string | null;
+  provincia: string | null;
+  pais: string;
   plazo_dias_credito: number | null;
   formal: boolean;
   clasificacion: string;
@@ -96,6 +100,32 @@ function DialogoNuevoProveedor() {
             RUC
             <input name="ruc" required maxLength={11} minLength={11} inputMode="numeric" />
           </label>
+          {/* El domicilio fiscal lo trae SUNAT junto con la razón social;
+              sigue siendo editable porque el declarado no siempre es el
+              almacén al que uno va a recoger. */}
+          <BuscarDocumento
+            tipo="ruc"
+            campo="ruc"
+            rellena={{
+              razon_social: "razon_social",
+              direccion: "direccion",
+              provincia: "provincia",
+            }}
+          />
+          <label className="flex flex-col gap-1 text-sm font-semibold">
+            Dirección
+            <input name="direccion" maxLength={255} />
+          </label>
+          <div className="flex gap-2">
+            <label className="flex flex-1 flex-col gap-1 text-sm font-semibold">
+              Provincia
+              <input name="provincia" maxLength={100} />
+            </label>
+            <label className="flex flex-1 flex-col gap-1 text-sm font-semibold">
+              País
+              <input name="pais" maxLength={60} defaultValue="PE" />
+            </label>
+          </div>
         </>
       ) : (
         <label className="flex flex-col gap-1 text-sm font-semibold">
@@ -152,6 +182,38 @@ function DialogoEditarProveedor({ proveedor }: { proveedor: Proveedor }) {
               defaultValue={proveedor.ruc ?? ""}
             />
           </label>
+          {/* El domicilio fiscal lo trae SUNAT junto con la razón social;
+              sigue siendo editable porque el declarado no siempre es el
+              almacén al que uno va a recoger. */}
+          <BuscarDocumento
+            tipo="ruc"
+            campo="ruc"
+            rellena={{
+              razon_social: "razon_social",
+              direccion: "direccion",
+              provincia: "provincia",
+            }}
+          />
+          <label className="flex flex-col gap-1 text-sm font-semibold">
+            Dirección
+            <input name="direccion" maxLength={255}
+              defaultValue={proveedor.direccion ?? ""}
+            />
+          </label>
+          <div className="flex gap-2">
+            <label className="flex flex-1 flex-col gap-1 text-sm font-semibold">
+              Provincia
+              <input name="provincia" maxLength={100}
+                defaultValue={proveedor.provincia ?? ""}
+              />
+            </label>
+            <label className="flex flex-1 flex-col gap-1 text-sm font-semibold">
+              País
+              <input name="pais" maxLength={60}
+                defaultValue={proveedor.pais}
+              />
+            </label>
+          </div>
         </>
       )}
       <label className="flex flex-col gap-1 text-sm font-semibold">

@@ -50,6 +50,7 @@ from src.modules.accounting.infrastructure.repositories import (
 )
 from src.modules.sales.application.queries_publicas import (
     puntos_venta_de_empresa,
+    puntos_venta_de_sucursal,
     puntos_venta_rotulados,
     sucursal_de_punto_venta,
     total_efectivo_cobrado,
@@ -641,10 +642,24 @@ def turno_cerrado(session: Session, cierre_id: uuid.UUID) -> dict:
     }
 
 
-def cajas_abiertas(session: Session, empresa_id: uuid.UUID | None = None) -> list[dict]:
-    """Estado actual de caja por punto de venta de la empresa — para el
-    dashboard gerencial (`core.dashboard_router`)."""
-    punto_venta_ids = puntos_venta_de_empresa(session, empresa_id)
+def cajas_abiertas(
+    session: Session,
+    empresa_id: uuid.UUID | None = None,
+    sucursal_id: uuid.UUID | None = None,
+) -> list[dict]:
+    """Estado actual de caja por punto de venta.
+
+    Dos consumidores con alcance distinto: el dashboard gerencial
+    (`core.dashboard_router`) las quiere de **toda la empresa**, y el PDV solo
+    necesita saber si **su** caja está abierta. Con `sucursal_id` se acota a
+    esa sucursal — lo que permite dársela a quien opera una caja sin abrirle
+    de paso el efectivo de los demás locales.
+    """
+    punto_venta_ids = (
+        puntos_venta_de_sucursal(session, sucursal_id)
+        if sucursal_id is not None
+        else puntos_venta_de_empresa(session, empresa_id)
+    )
     aperturas = AperturaCajaRepo(session).abiertas_de(punto_venta_ids)
     return [
         {

@@ -1,7 +1,7 @@
 """DTOs (pydantic) del módulo inventory."""
 
 import uuid
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -142,6 +142,13 @@ class SkuOut(BaseModel):
     codigo: str
     codigo_barras: str | None
     activo: bool
+
+
+class SkuListadoOut(SkuOut):
+    """El SKU con el nombre de su artículo: un selector que muestre solo el
+    código obliga a adivinar qué es cada cosa."""
+
+    articulo_nombre: str
 
 
 class SkuDetalleOut(SkuOut):
@@ -472,6 +479,34 @@ class ProgramaConteoOut(BaseModel):
     dias_atraso: int
 
 
+# --- Carga masiva de recetas (RN-COM-031) ---
+class IngredienteImportadoIn(BaseModel):
+    """Una línea de la hoja «Ingredientes», ya resuelta por la pantalla.
+
+    `articulo_id` en `None` significa **omitir esta línea**: es lo que
+    devuelve la pantalla cuando el usuario decidió no resolver ese insumo.
+    """
+
+    insumo: str = ""
+    articulo_id: uuid.UUID | None = None
+    # Texto y no Decimal: acepta aritmética tecleada ("450/3"), que evalúa
+    # el servidor con los decimales de la unidad del insumo (RN-COM-024).
+    cantidad: str
+    merma_pct: Decimal = Decimal(0)
+
+
+class RecetaImportadaIn(BaseModel):
+    nombre: str = Field(min_length=1, max_length=150)
+    rendimiento: Decimal = Field(gt=0)
+    unidad_medida_id: uuid.UUID
+    articulo_producido_id: uuid.UUID | None = None
+    ingredientes: list[IngredienteImportadoIn] = []
+
+
+class ImportarRecetasIn(BaseModel):
+    recetas: list[RecetaImportadaIn]
+
+
 # --- Recetas ---
 class RecetaCreate(BaseModel):
     # Como en `ArticuloCreate`: el tenant manda y esto solo puede
@@ -648,6 +683,11 @@ class DevolucionOut(BaseModel):
     estado: str
     reporte_dirigido_a: str
     observacion: str | None
+    # Quién movió el stock y quién lo revirtió. Sin esto la ficha decía qué
+    # pasó pero no a quién preguntarle, que es la mitad de auditar.
+    registrado_por: uuid.UUID | None
+    anulado_por: uuid.UUID | None
+    anulada_at: datetime | None
 
 
 class DevolucionDetalleOut(DevolucionOut):

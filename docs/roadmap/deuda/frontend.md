@@ -170,6 +170,19 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   accesible por teclado), **react-day-picker** (calendario del rango
   personalizado) y **sonner** (los avisos del tablero pasaron de un `<span>`
   gris a toasts).
+- ✅ 2026-08-12 **Rastro de navegación y "volver" histórico** (ADR-039):
+  `<Rastro>` en las nueve fichas que cableaban su propio `← Sección`. El
+  rastro se deriva de la ruta contra `MODULOS`/`SUBMENUS` y el `←` usa el
+  historial propio, con el padre como fallback.
+- ⬜ **Las fichas de artículo y de SKU no están enlazadas desde ninguna
+  pantalla** (encontrado 2026-08-12 al probar el rastro):
+  `/inventario/articulos/{id}` y `/inventario/skus/{id}` existen, tienen su
+  ficha construida y solo se alcanzan tecleando la URL o desde el botón de
+  destino de un reporte. El listado de artículos no abre la ficha de ninguna
+  de sus filas.
+- ⬜ **El rastro no llega al PDV, al KDS ni al lienzo**: viven fuera de
+  `(app)` y tienen su propia barra. Es decisión tomada (ADR-039), no olvido;
+  se revisa si alguna de las tres deja de ser una pantalla de una sola tarea.
 - ⬜ **Login y PDV siguen sin migrar a shadcn**: el login conserva sus
   clases `.login-*` en `@layer components` y el PDV su CSS propio. Funcionan;
   se migran cuando se los toque, no antes.
@@ -531,3 +544,18 @@ tiempo real de KDS, i18n, hardware, testing — Playwright ya decidido por
 ADR-013, observabilidad, printing, productividad, multitarea) tiene
 decisión tomada, está correctamente diferido, o depende de un módulo
 backend que todavía no llega a pantalla.
+- ⬜ **La cadena de estaciones se ordena tecleando un número** (2026-08-13,
+  ADR-044): el formulario de estación pide "Paso en la cocina" como entero.
+  Es correcto y se explica en dos líneas, pero reordenar tres estaciones
+  obliga a editar tres veces, e insertar una en el medio exige el truco de
+  dejar huecos (0, 10, 20). Arrastrar la lista sería la interfaz honesta —
+  `@dnd-kit` ya está en el proyecto (lo usa el tablero de reportes).
+- ⬜ **El pinpad no muestra el PIN ni siquiera un instante** (2026-08-13,
+  ADR-045): solo puntos. Es lo correcto para una caja a la vista del
+  público, pero sin un "ojo" para revelar, un error de tecleo solo se
+  descubre al fallar el envío — y fallar cuesta un intento del lockout.
+  Falta el botón de revelar mientras se mantiene pulsado.
+- ⬜ **El bloqueo del PDV no avisa antes de bloquear** (2026-08-13): a los
+  5 minutos aparece de golpe. Quien está contando efectivo al lado de la
+  caja no toca la pantalla y se la encuentra bloqueada sin haber podido
+  evitarlo. Un aviso a los 4:30 con "seguir aquí" lo resuelve.

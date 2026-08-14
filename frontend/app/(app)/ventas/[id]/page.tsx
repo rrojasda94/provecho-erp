@@ -1,5 +1,4 @@
-import Link from "next/link";
-
+import { Rastro } from "@/components/shell/rastro";
 import { ApiError, apiFetch } from "@/lib/api";
 import { obtenerSesion } from "@/lib/sesion";
 
@@ -75,12 +74,10 @@ export default async function VentaPage({
 
   return (
     <section className="flex flex-col gap-6">
-      <Link
-        href={`/ventas?sucursal=${venta.sucursal_id}&fecha=${venta.fecha_orden}`}
-        className="text-sm font-semibold text-primary hover:underline"
-      >
-        ← Jornada
-      </Link>
+      <Rastro
+        hoja={`Pedido #${venta.numero_orden}`}
+        volverA={`/ventas?sucursal=${venta.sucursal_id}&fecha=${venta.fecha_orden}`}
+      />
       <h1 className="font-heading text-xl italic uppercase text-dark">
         Pedido #{venta.numero_orden}
       </h1>

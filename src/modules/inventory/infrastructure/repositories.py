@@ -76,10 +76,33 @@ class RecetaRepo:
             )
         )
 
-    def list(self, empresa_id: uuid.UUID | None = None) -> list[Receta]:
+    def list(
+        self,
+        empresa_id: uuid.UUID | None = None,
+        *,
+        tipo: str | None = None,
+        categoria_id: uuid.UUID | None = None,
+    ) -> list[Receta]:
+        """`tipo` no es una columna: se **deriva** de `articulo_id`
+        (RN-COM-030). Una receta que produce un artículo es una subreceta —
+        se guarda para usarla en otra—; una que no, es un producto de venta.
+        Agregar la columna sería un segundo lugar donde puede estar mal.
+
+        `categoria_id` filtra por la categoría del artículo que produce, así
+        que solo alcanza a las subrecetas — es lo correcto: un producto de
+        venta no tiene artículo del que sacar categoría.
+        """
         q = select(Receta).order_by(Receta.nombre)
         if empresa_id is not None:
             q = q.where(Receta.empresa_id == empresa_id)
+        if tipo == "subreceta":
+            q = q.where(Receta.articulo_id.is_not(None))
+        elif tipo == "producto":
+            q = q.where(Receta.articulo_id.is_(None))
+        if categoria_id is not None:
+            q = q.join(Articulo, Articulo.id == Receta.articulo_id).where(
+                Articulo.categoria_id == categoria_id
+            )
         return list(self.s.scalars(q))
 
     def add(self, receta: Receta) -> Receta:
@@ -190,6 +213,22 @@ class SkuRepo:
 
     def get_by_codigo(self, codigo: str) -> Sku | None:
         return self.s.scalar(select(Sku).where(Sku.codigo == codigo))
+
+    def list(self, empresa_id: uuid.UUID | None = None) -> "list[tuple[Sku, Articulo]]":
+        """SKUs con el artículo que representan.
+
+        Van juntos porque el código de un SKU no le dice nada a nadie: para
+        elegir qué se devuelve hay que ver "Queso Mozzarella", no
+        "SKU-I003-Queso Mo".
+        """
+        q = (
+            select(Sku, Articulo)
+            .join(Articulo, Articulo.id == Sku.articulo_id)
+            .order_by(Articulo.nombre)
+        )
+        if empresa_id is not None:
+            q = q.where(Articulo.empresa_id == empresa_id)
+        return list(self.s.execute(q))
 
     def add(self, sku: Sku) -> Sku:
         self.s.add(sku)

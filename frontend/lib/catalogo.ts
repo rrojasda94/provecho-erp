@@ -10,7 +10,7 @@
  */
 
 import { type Pagina } from "@/lib/api";
-import { pedir } from "@/lib/cliente-api";
+import { pedir, subir } from "@/lib/cliente-api";
 
 // --- Tipos del contrato -----------------------------------------------------
 export type UnidadMedida = {
@@ -46,6 +46,48 @@ export type RecetaItem = {
   merma_pct: string;
   costo_unitario: string;
   costo_linea: string;
+};
+
+/** Categoría del artículo que una receta produce — el filtro del listado
+ * solo alcanza a las subrecetas, porque un producto de venta no produce
+ * artículo del que sacar categoría (RN-COM-030). */
+export type Categoria = { id: string; nombre: string };
+
+// --- Carga masiva de recetas (RN-COM-031) ---
+export type IngredienteRevisado = {
+  fila: number;
+  insumo: string;
+  /** `null` = el catálogo no lo reconoció. La pantalla lo resuelve —eligiendo
+   * uno, creándolo, o dejándolo así para omitir la línea— y el servidor
+   * salta las que sigan en `null`. */
+  articulo_id: string | null;
+  cantidad: string;
+  merma_pct: string;
+  problemas: string[];
+};
+
+export type RecetaRevisada = {
+  fila: number;
+  nombre: string;
+  rendimiento: string;
+  unidad: string;
+  unidad_medida_id: string | null;
+  produce: string | null;
+  articulo_producido_id: string | null;
+  ingredientes: IngredienteRevisado[];
+  problemas: string[];
+};
+
+export type OmitidaImport = { nombre: string; motivo: string };
+
+export type RevisionImportacion = {
+  recetas: RecetaRevisada[];
+  insumos_desconocidos: string[];
+  /** Ingredientes que nombran una receta que la otra hoja no declara: el
+   * error de tipeo más común del formato. */
+  ingredientes_sin_receta: string[];
+  listas: number;
+  con_problema: number;
 };
 
 export type Receta = {
@@ -103,6 +145,13 @@ export type ProductoDetalle = Producto & {
   extras_sueltos: ExtraDeProducto[];
 };
 
+/** La plantilla se baja con un `<a download>`, no con `fetch`: el navegador
+ * tiene que guardar el archivo, y pasarlo por JS obligaría a construir un
+ * Blob y una URL temporal para lograr lo mismo. Por eso es una ruta y no una
+ * operación de `catalogoApi`. */
+export const RUTA_PLANTILLA_RECETAS =
+  "/api/proxy/api/v1/inventory/recetas/plantilla";
+
 // --- Operaciones ------------------------------------------------------------
 export const catalogoApi = {
   unidadesMedida: () => pedir<UnidadMedida[]>("/inventory/unidades-medida"),
@@ -110,6 +159,45 @@ export const catalogoApi = {
   // editor de recetas, que pide la primera página.
   articulos: async () =>
     (await pedir<Pagina<Articulo>>("/inventory/articulos")).items,
+
+  /** Alta rápida de un insumo desde el diálogo de importación: el archivo
+   * nombró algo que el catálogo no tiene y crearlo ahí evita perder el
+   * trabajo de resolver las otras cincuenta filas (RN-COM-031). */
+  crearArticulo: (cuerpo: {
+    id_interno: string;
+    nombre: string;
+    unidad_medida_id: string;
+    tipo: string;
+    categoria_id?: string | null;
+  }) => pedir<Articulo>("/inventory/articulos", { metodo: "POST", cuerpo }),
+
+  validarImportacion: (archivo: File) =>
+    subir<RevisionImportacion>("/inventory/recetas/importar/validar", archivo),
+
+  /** Manda **solo lo que el contrato declara**: la revisión trae además
+   * `fila`, `unidad`, `produce` y `problemas`, que son para mostrar en
+   * pantalla y no significan nada del otro lado. */
+  importarRecetas: (recetas: RecetaRevisada[]) =>
+    pedir<{ creadas: { id: string; nombre: string }[]; omitidas: OmitidaImport[] }>(
+      "/inventory/recetas/importar",
+      {
+        metodo: "POST",
+        cuerpo: {
+          recetas: recetas.map((r) => ({
+            nombre: r.nombre,
+            rendimiento: r.rendimiento,
+            unidad_medida_id: r.unidad_medida_id,
+            articulo_producido_id: r.articulo_producido_id,
+            ingredientes: r.ingredientes.map((i) => ({
+              insumo: i.insumo,
+              articulo_id: i.articulo_id,
+              cantidad: i.cantidad,
+              merma_pct: i.merma_pct,
+            })),
+          })),
+        },
+      },
+    ),
 
   marcas: () => pedir<Marca[]>("/sales/marcas"),
   productos: () => pedir<Producto[]>("/sales/productos"),

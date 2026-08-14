@@ -40,6 +40,10 @@ export type VarianteDeCarta = {
   nombre: string;
   precio_unitario: string;
   orden: number;
+  /** Los grupos y extras cuelgan del producto que se prepara, y con
+   * presentaciones ese es la variante: los sabores de la Familiar no son los
+   * de la Personal. Elegida la variante, estos mandan sobre los del padre. */
+  extras: ExtraDeCarta[];
 };
 
 export type ItemDeCarta = {
@@ -337,19 +341,46 @@ export const api = {
   itemsDeVenta: (ventaId: string) =>
     pedir<VentaItem[]>(`/sales/ventas/${ventaId}/items`),
 
-  /** Quitar líneas de un pedido ya enviado a cocina exige PIN de supervisor
-   * (RN-COM-020): el insumo ya se descontó, hay que reponerlo. */
+  /** Quitar líneas de un pedido ya enviado a cocina. Dentro de los 5 minutos
+   * lo hace el cajero solo —es corregir un tecleo, RN-COM-029—; después el
+   * insumo ya se usó y hay que reponerlo, así que lo firma un supervisor
+   * (RN-COM-020). Por eso `autorizacion` es opcional: se manda recién cuando
+   * el servidor dice que hace falta. */
   anularLineas: (
     ventaId: string,
-    cuerpo: { venta_item_ids: string[]; motivo: string; autorizacion: string },
+    cuerpo: {
+      venta_item_ids: string[];
+      motivo: string;
+      autorizacion?: string;
+    },
   ) =>
     pedir<Venta>(`/sales/ventas/${ventaId}/anular-lineas`, {
       metodo: "POST",
       cuerpo,
     }),
 
-  anularVenta: (ventaId: string) =>
-    pedir<Venta>(`/sales/ventas/${ventaId}/anular`, { metodo: "POST" }),
+  /** `autorizacion` solo hace falta cuando quien anula no tiene
+   * `sales.anular` — el cajero, típicamente: la pide él y la firma un
+   * supervisor con su PIN, igual que quitar una línea enviada. */
+  anularVenta: (ventaId: string, autorizacion?: string) =>
+    pedir<Venta>(`/sales/ventas/${ventaId}/anular`, {
+      metodo: "POST",
+      cuerpo: { autorizacion: autorizacion ?? null },
+    }),
+
+  /** Desbloqueo de la pantalla del PDV (RN-POS-014). No emite tokens: la
+   * sesión de abajo sigue viva, con su caja abierta y su borrador — por eso
+   * no sirve `login`, que la rotaría. 204 si el PIN es el correcto. */
+  verificarPin: (pin: string) =>
+    pedir<void>("/auth/verificar-pin", { metodo: "POST", cuerpo: { pin } }),
+
+  /** Suma líneas a una orden ya enviada (RN-COM-029). Sin autorización: la
+   * mesa que pide de a poco no debería terminar con dos cuentas. */
+  agregarLineas: (ventaId: string, items: VentaNueva["items"]) =>
+    pedir<Venta>(`/sales/ventas/${ventaId}/items`, {
+      metodo: "POST",
+      cuerpo: { items },
+    }),
 
   registrarPago: (ventaId: string, cuerpo: PagoNuevo) =>
     pedir<{ id: string }>(`/sales/ventas/${ventaId}/pagos`, {
@@ -363,8 +394,11 @@ export const api = {
   comprobante: (ventaId: string) =>
     pedir<Record<string, unknown>>(`/sales/ventas/${ventaId}/comprobante`),
 
-  cajasAbiertas: (empresaId: string) =>
-    pedir<CajaAbierta[]>(`/accounting/cajas/abiertas?empresa_id=${empresaId}`),
+  /** Por **sucursal** y no por empresa: es lo que el PDV necesita saber (¿mi
+   * caja está abierta?) y lo único que el servidor le deja ver a quien opera
+   * una caja sin darle de paso el efectivo de los demás locales. */
+  cajasAbiertas: (sucursalId: string) =>
+    pedir<CajaAbierta[]>(`/accounting/cajas/abiertas?sucursal_id=${sucursalId}`),
 
   /** Terminales que le toca verificar a esta sucursal al abrir: los suyos
    * más los de emergencia del pool, que es lo que devuelve el endpoint

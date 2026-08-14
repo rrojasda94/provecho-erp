@@ -11,6 +11,16 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   operación, no de aplicación. Hasta que se haga, el secreto de sync sigue
   teniendo 20 bits y el lockout de 5 intentos puede dejar una sucursal sin
   sincronizar.
+- ✅ 2026-08-12 **Reseteo de PIN** (ADR-041): un PIN olvidado no se
+  recuperaba y el frontend documentaba un endpoint de autoservicio que no
+  existía. Permiso propio `users.resetear_pin`, marca en la cuenta que la
+  bloquea hasta cambiarlo, revocación de sesiones y auditoría.
+- ⬜ **La consulta de DNI/RUC no tiene rate limit propio** (2026-08-12,
+  ADR-041). `GET /consulta/{dni,ruc}/{n}` gasta cuota de un proveedor **pago**
+  y hoy solo `/auth/login` está detrás de un límite. Con el permiso acotado a
+  cuatro roles el riesgo es de costo y no de fuga, pero una pantalla con un
+  bucle mal escrito basta para agotar el plan del mes. Va con el rate limit
+  global (más abajo) o con uno propio, lo que llegue primero.
 - ⬜ **Dar de baja un almacén no mira el stock** (2026-08-08, con el CRUD de
   organización): `DELETE /almacenes/{id}` niega la baja si otros almacenes
   se abastecen de este, pero el stock vive en `inventory` y `users` no
@@ -59,3 +69,30 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 - ⬜ **Verificación de firma en webhooks entrantes** (Izipay, Meta):
   documentada en `security.md`, sin implementar — llega con las
   integraciones.
+- ✅ 2026-08-13 **El PIN del PDV dejó de poder guardarse en el navegador**
+  (ADR-045, RN-POS-014): los cuatro puntos que lo piden usaban
+  `<input type="password">`, y con el PIN guardado en la caja el turno
+  siguiente entraba con la cuenta del anterior — toda la auditoría de
+  RN-AUD-005 nombrando a la persona equivocada. Ahora se teclea en un
+  pinpad **sin campo de formulario**: no hay nada que un gestor de
+  contraseñas pueda ofrecer guardar. Se descartó `readOnly` sobre el
+  `<input>`: los gestores heurísticos igual ofrecen guardar un campo
+  `type="password"`, y queda un campo en el DOM al que un autocompletado
+  puede escribir. La pantalla, además, se bloquea a los 5 minutos **sin
+  cerrar sesión** (un bloqueo que hiciera perder el pedido a medio armar se
+  eludiría dejando la pantalla tocada a propósito) y se reabre con
+  `POST /auth/verificar-pin`, detrás del mismo rate limit y contra el
+  **mismo lockout** que el login. Fuera del PDV no cambia nada: es un
+  problema del mostrador, no de una oficina con un equipo por persona.
+- ⬜ **El bloqueo del PDV no cubre el KDS ni el lienzo** (2026-08-13,
+  ADR-045): son las otras dos pantallas táctiles fuera del shell. El KDS no
+  cobra ni anula, así que el riesgo es menor, pero sí avanza pedidos con la
+  sesión de alguien. Extenderlo es mover `BloqueoPorInactividad` a
+  `components/` y montarlo en sus `page.tsx` — se dejó fuera porque el
+  encargo pedía el PDV y sumar pantallas sin pedirlo cambia la operación de
+  cocina sin avisarle a nadie.
+- ⬜ **El plazo de bloqueo es una constante, no un parámetro de empresa**
+  (2026-08-13): 5 minutos fijos en `app/pdv/bloqueo.tsx`. Un local con
+  mucho tránsito puede querer menos y uno de mesa larga, más. Va a
+  `parametro_empresa` (ADR-014) cuando alguien lo pida — hoy sería un campo
+  de configuración que nadie tocó nunca.

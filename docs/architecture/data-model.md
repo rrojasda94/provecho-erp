@@ -80,7 +80,10 @@ erDiagram
   direccion (NULL en los virtuales y en los de sucursal, que heredan la de
   su sucursal — el central no cuelga de ninguna y necesita la suya),
   almacen_abastecedor_id
-  (el central del que se abastece un almacén de sucursal/producción).
+  (el central del que se abastece un almacén de sucursal/producción),
+  almacen_abastecedor_respaldo_id (a quién se le pide cuando el principal
+  está dado de baja — RN-INV-022, ADR-040; distinto del principal y de la
+  misma empresa).
   `activos` es virtual (sin ubicación física ni stock de SKUs). Equipamiento
   y política FEFO/FIFO por tipo — ver
   [domain-model.md](../domain/domain-model.md#almacenes).
@@ -184,7 +187,9 @@ erDiagram
   `natural`) sin exigirles el permiso de administración completo.
 - **usuario**: username, pin_hash (Argon2id), persona_id (nullable — NULL
   si `agente_ia`), nombre_display (fallback para agente_ia), email, tipo
-  (`humano` | `agente_ia`), activo.
+  (`humano` | `agente_ia`), activo, debe_cambiar_pin (el PIN vigente lo puso
+  un reseteo, así que lo sabe alguien más: la cuenta no puede hacer nada
+  hasta elegir otro — ADR-041).
 - **token_agente** (2026-08-08, ADR-032): usuario_id, nombre ("n8n
   producción"), prefijo (los primeros 12 caracteres del token, único dato
   mostrable después de crearlo), token_hash (SHA-256; el claro sale una sola
@@ -594,7 +599,10 @@ descuenta stock vía la receta (ver [../domain/domain-model.md](../domain/domain
 ## 5. Compras (módulo purchases)
 
 - **proveedor**: RUC + razon_social (si empresa) o persona_id (si persona
-  natural, ej. RHE), contacto, condiciones (condición de pago: contado o
+  natural, ej. RHE), contacto, direccion/provincia/pais (domicilio fiscal
+  del jurídico, prellenado desde SUNAT al consultar el RUC; partido porque
+  `provincia` decide si el flete es local o interprovincial, y `pais`
+  existe para el proveedor extranjero — ADR-041), condiciones (condición de pago: contado o
   crédito + plazo pactado — accounting la usa al ejecutar el pago),
   formal (bool — `false` para proveedor informal de mercado/supermercado:
   sin RUC obligatorio, compra sin OC vía caja chica, RN-CMP-011..016),
@@ -760,7 +768,22 @@ Solicitud.
   `en_preparacion` | `listo` | `entregado` — avance de `PROC-OPE-002`,
   fuente única del progreso del pedido; `updated_at` de cada transición es
   la base para medir tiempos de preparación y de despacho,
-  RN-CUP-002/003).
+  RN-CUP-002/003), **etapa_kds** (entero, default 0 — eslabón de la cadena
+  de estaciones en el que va la línea, RN-CUP-013/ADR-044). Es un entero y
+  **no** una FK a `kds_pantalla` a propósito: la línea guarda DÓNDE VA, no
+  QUIÉN la atiende, así que desactivar el horno a media noche no deja
+  pedidos apuntando a una pantalla que ya no opera — caen solos a la
+  siguiente estación que los acepte.
+- **kds_pantalla**: sucursal_id, nombre, tipo (`preparacion` | `despacho`),
+  categoria_ids (JSONB de `categoria.id`; NULL/[] = todas), **orden**
+  (entero, default 0 — eslabón de la estación en la cadena de preparación),
+  activo. `UNIQUE (sucursal_id, nombre)`.
+
+  El `orden` solo significa algo en las pantallas de `preparacion`:
+  despacho no es un eslabón que la línea atraviese, es lo que mira el
+  pedido cuando ya no le queda ninguno. Dos estaciones con el mismo `orden`
+  son el mismo eslabón trabajando en paralelo (horno y barra, cada una con
+  sus categorías). Ver ADR-044 y `src/modules/sales/README.md`.
 - **alerta_pedido** (2026-08-04): venta_id, sucursal_id, **minutos_umbral**,
   minutos_transcurridos, estado_al_alertar (`pendiente` |
   `en_preparacion` — el peor estado del pedido; que cocina ni lo haya

@@ -200,6 +200,22 @@ PERMISOS = [
         "auditoria.leer",
         "Consultar el rastro de cambios (`audit_log`) — quién tocó qué y cuándo",
     ),
+    (
+        "users.resetear_pin",
+        # 255 caracteres es el largo de `permiso.descripcion`, y Postgres lo
+        # hace cumplir aunque SQLite no: pasarse rompe el seeder entero.
+        "Devolver la cuenta de otro al PIN por defecto, obligándole a "
+        "cambiarlo al entrar. Aparte de `users.gestionar`: RRHH atiende el "
+        "'me olvidé el PIN' sin crear cuentas ni repartir roles, y administrar "
+        "usuarios no trae de arrastre entrar como cualquiera",
+    ),
+    (
+        "consulta.documento",
+        "Consultar un DNI o RUC contra RENIEC/SUNAT para prellenar un alta. "
+        "Es un permiso propio y no una consecuencia de poder crear personas: "
+        "cada consulta gasta cuota del proveedor y trae datos personales de "
+        "alguien que todavía no es nadie en el sistema",
+    ),
     ("reports.leer", "Ver los reportes que el ERP me entregó a mí"),
     (
         "reports.leer_todo",
@@ -446,6 +462,21 @@ for _rol in (
     "marketing",
 ):
     ROLES[_rol].append("reports.leer")
+
+# Consultar un documento lo necesita quien da de alta a alguien: RRHH al
+# contratar, compras al registrar un proveedor, y caja al identificar a un
+# cliente para su factura. `supervisor` porque también da altas. No se le da
+# al resto: cada consulta gasta cuota de Factiliza y trae datos personales de
+# quien todavía no es nadie en el sistema.
+for _rol in ("rrhh_admin", "comprador", "cajero", "supervisor"):
+    ROLES[_rol].append("consulta.documento")
+
+# Resetear un PIN lo hace RRHH, que es quien recibe al trabajador que no
+# puede entrar. `admin` ya lo tiene por el comodín. **No** se le da a
+# `supervisor`: poder entrar como cualquiera de su turno rompe la
+# segregación con la que está armado el ciclo de caja (ADR-025) — el mismo
+# motivo por el que un encargado no se releva a sí mismo.
+ROLES["rrhh_admin"].append("users.resetear_pin")
 
 # Ver el mapa completo de distribución es de quien supervisa la operación y de
 # quien la audita. **Administrarlo** —decidir quién recibe qué— queda solo en

@@ -69,6 +69,17 @@ de su módulo y se prueban de forma aislada.
 - **RN-POS-013** Durante el conteo de efectivo y la apertura de caja, el
   encargado de tienda/supervisor no puede atender otro proceso o
   actividad.
+- **RN-POS-014** La pantalla del punto de venta se bloquea a los **5
+  minutos** sin actividad y se reabre con el PIN de quien tiene la sesión.
+  El bloqueo **no cierra sesión**: la caja abierta y el pedido a medio
+  armar siguen donde estaban — un bloqueo que hiciera perder el pedido se
+  eludiría dejando la pantalla tocada a propósito. Los PIN del punto de
+  venta se teclean en un teclado numérico sin campo de formulario, para que
+  el navegador no pueda ofrecer guardarlos: un PIN guardado en la caja es
+  la vía por la que un turno entra con la cuenta del anterior y toda la
+  auditoría (RN-AUD-005) nombra a la persona equivocada. Un intento
+  fallido de desbloqueo cuenta contra el mismo bloqueo de cuenta que el
+  ingreso.
 
 ## Central de pedidos
 
@@ -1034,6 +1045,16 @@ producción se hace en cocinas de sucursal. Ver
   exigía, se genera un reporte dirigido al área de almacén y a gerencia
   (evento `inventory.conteo_vencido`). El día en que vence todavía no es
   atraso; el reporte sale a partir del día siguiente.
+- **RN-INV-022** Un almacén puede declarar un **abastecedor de respaldo**
+  además del principal (ADR-040). Una solicitud que no nombra abastecedor va
+  al principal, y **si el principal está dado de baja va al respaldo**: sin
+  eso, dar de baja el central deja a la sucursal sin poder pedir nada. El
+  respaldo tiene que ser de la misma empresa y **distinto del principal** —el
+  día que el principal no esté, tampoco estaría él—. Una solicitud que **sí**
+  nombra abastecedor no cae al respaldo: quien nombra un almacén está pidiendo
+  a ese, y despachar desde otro en silencio es lo que el que recibe no puede
+  notar hasta contar la mercadería. "No disponible" es estar dado de baja, no
+  estar sin stock: el faltante tiene su propio camino (RN-INV-001/002).
 - **RN-INV-015** Un ajuste es válido, sin generar alarma, solo si está
   dentro de un margen de error definido por las áreas de almacén y
   contabilidad; fuera de ese margen dispara alarma/auditoría. El margen son
@@ -1288,6 +1309,41 @@ producción se hace en cocinas de sucursal. Ver
   por anulación o nota de crédito devuelve solo lo que se consumió. Las
   restas viajan a cocina como parte del pedido (KDS y comanda), no como
   texto libre en la nota.
+- **RN-COM-029** Una orden ya enviada a cocina **sigue viva mientras no se
+  cobre**: admite líneas nuevas y admite que se le quiten.
+  - **Agregar no requiere autorización de nadie** y usa el mismo permiso que
+    crear la orden. Una mesa pide de a poco, y obligar a abrir una orden
+    nueva para la segunda ronda termina en dos cuentas y dos entregas para
+    la misma mesa.
+  - **Quitar** —una línea o la orden entera— es gratis **dentro de los 5
+    minutos** de haber salido a cocina: ahí es corregir un tecleo, el plato
+    todavía no se armó y nadie tuvo tiempo de aprovecharlo. **Pasada esa
+    ventana** lo autoriza un supervisor con su PIN en el mismo terminal
+    (RN-COM-020), porque el insumo ya se usó de verdad y reponerlo es plata
+    que sale del inventario.
+  - La ventana de la **orden** se mide contra su **última línea**, no contra
+    su creación: una mesa que sigue pidiendo tiene la orden abierta desde
+    hace una hora, pero lo último que mandó puede ser de hace un minuto.
+  - Quitar un lote de líneas exige firma si **alguna** salió de la ventana:
+    de lo contrario, acompañar una línea vieja con una recién agregada sería
+    la forma de quitarla sin que nadie firme.
+  - Después del cobro la cuenta está cerrada: lo que venga es otra orden, y
+    deshacer lo cobrado es nota de crédito (RN-CPP-009).
+- **RN-COM-030** El **tipo de una receta se deriva, no se declara**: la que
+  produce un artículo es una **subreceta** —se guarda para usarla en otra— y
+  la que no, es un **producto de venta**. Guardarlo en una columna aparte
+  sería un segundo lugar donde puede estar mal. La categoría por la que se
+  filtra es la del artículo que la receta produce, así que solo alcanza a
+  las subrecetas.
+- **RN-COM-031** El recetario **se puede cargar de golpe** desde una hoja de
+  cálculo, y la carga es en **dos pasos con revisión en el medio**: primero
+  se dice qué entra y qué no **sin guardar nada**, y recién después de que
+  alguien lo mira se importa. Un insumo que el catálogo no reconoce no
+  cancela la carga: se elige cuál es, se crea, o se omite esa línea **a la
+  vista** — nunca en silencio. Una receta que no entra (nombre repetido,
+  unidad inexistente) se informa y **no arrastra a las demás**. Lo que la
+  pantalla devuelve se revalida en el servidor: es un dato que el cliente
+  pudo editar.
 
 ## Cumplimiento de pedido
 
@@ -1335,6 +1391,23 @@ preparación, despacho y entrega en las tres modalidades.
   crédito y, si corresponde, devolución — RN-GEN-002. La anulación
   temprana coordinada con la sucursal sigue el límite de la Central de
   Pedidos (5 minutos desde la emisión del pedido).
+- **RN-CUP-013** La cocina de una sucursal se configura como una **cadena
+  de estaciones** ordenadas (armado → horno → …). Cada línea del pedido
+  recorre las estaciones que atienden su categoría, de la primera a la
+  última: marcarla en una estación intermedia la manda a la siguiente, y
+  solo queda `listo` cuando ya no le queda ninguna por delante — una
+  bebida cuya categoría no atiende el horno se lo salta sin configurar
+  nada. La pantalla de despacho no prepara ni marca: muestra el pedido
+  completo, cuántas líneas van y **en qué estación está cada una**, para
+  saber por quién se espera antes de entregarlo (RN-CUP-005).
+- **RN-CUP-014** Un extra (el sabor de una pizza, el queso adicional) **no
+  es un plato aparte en cocina**: se muestra dentro del plato del que
+  cuelga, recorre las estaciones que le tocan a ese plato, se marca cuando
+  se marca el plato y se anula cuando se anula el plato — reponiendo lo que
+  consumió. Sigue siendo una línea propia de la venta porque tiene su
+  receta, su precio y su rastro (RN-COM-021); lo que no tiene es avance
+  propio. Mostrarlo suelto hacía que la comanda y la pantalla dijeran "una
+  pizza" y "un peperoni" como si fueran dos preparaciones.
 
 ## Comercial — estrategia
 

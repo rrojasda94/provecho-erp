@@ -18,6 +18,7 @@ import type { Categoria, Pantalla } from "@/lib/kds";
 import { tieneAccesoModulo, tienePermiso } from "@/lib/permisos";
 import { obtenerSesion } from "@/lib/sesion";
 
+import DespachoCliente from "./despacho-cliente";
 import EstacionesCliente from "./estaciones-cliente";
 import KdsCliente from "./kds-cliente";
 import "./kds.css";
@@ -78,12 +79,20 @@ export default async function PaginaKds({
   const pantalla = pantallas.find((p) => p.id === elegida && p.activo);
 
   if (pantalla) {
-    return (
+    // La entrega es acto de despacho, con permiso propio (RN-CUP-006): el
+    // cocinero no ve el botón deshabilitado, no lo ve.
+    const puedeEntregar = tienePermiso(usuario.permisos, "sales.entregar_pedido");
+    // Despacho y preparación miran la misma cola pero no hacen lo mismo:
+    // una cocina y tacha línea por línea, la otra arma el pedido completo y
+    // lo entrega (ADR-044). Por eso son dos componentes y no un filtro.
+    return pantalla.tipo === "despacho" ? (
+      <DespachoCliente
+        pantalla={{ id: pantalla.id, nombre: pantalla.nombre }}
+        puedeEntregar={puedeEntregar}
+      />
+    ) : (
       <KdsCliente
-        pantalla={{ id: pantalla.id, nombre: pantalla.nombre, tipo: pantalla.tipo }}
-        // La entrega es acto de despacho, con permiso propio (RN-CUP-006):
-        // el cocinero no ve el botón deshabilitado, no lo ve.
-        puedeEntregar={tienePermiso(usuario.permisos, "sales.entregar_pedido")}
+        pantalla={{ id: pantalla.id, nombre: pantalla.nombre, orden: pantalla.orden }}
       />
     );
   }

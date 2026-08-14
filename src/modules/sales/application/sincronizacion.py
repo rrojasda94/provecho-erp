@@ -197,6 +197,10 @@ RECURSOS = (
             "nombre",
             "tipo",
             "categoria_ids",
+            # Sin `orden` en la réplica, durante un corte todas las estaciones
+            # del local caerían al mismo eslabón y el ruteo de la cadena se
+            # rompería justo cuando no hay red para arreglarlo (ADR-044).
+            "orden",
             "activo",
             "deleted_at",
             "updated_at",

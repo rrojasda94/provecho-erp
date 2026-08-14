@@ -21,8 +21,14 @@ class VentaItem(Base, UuidPkMixin, TimestampMixin):
     )
     # Línea de la que cuelga este extra (RN-COM-021). NULL = línea normal.
     # Un extra es una línea propia y no una columna del padre porque tiene
-    # su propia receta, su propio precio de lista y su propio avance en
-    # cocina; aplanarlo perdería las tres cosas.
+    # su propia receta, su propio precio de lista y su propio rastro al
+    # anularse; aplanarlo perdería las tres cosas.
+    #
+    # Lo que NO tiene es avance propio en cocina (RN-CUP-014, enmienda de
+    # ADR-044): nadie prepara un peperoni, se prepara la pizza que lo lleva.
+    # El KDS lo muestra dentro de su plato, lo rutea por la categoría del
+    # plato y lo marca cuando marca el plato. Este comentario decía lo
+    # contrario y era la parte equivocada.
     padre_venta_item_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("venta_item.id"), nullable=True, index=True
     )
@@ -62,4 +68,12 @@ class VentaItem(Base, UuidPkMixin, TimestampMixin):
             native_enum=False,
         ),
         default="pendiente",
+    )
+    # Eslabón de la cadena de estaciones en el que va la línea (ADR-044).
+    # Es un int y no una FK a `kds_pantalla` a propósito: la línea guarda
+    # DÓNDE VA, no QUIÉN la atiende. Desactivar el horno a media noche no
+    # puede dejar pedidos apuntando a una pantalla que ya no existe — con
+    # el número, la línea cae sola a la siguiente estación que la acepte.
+    etapa_kds: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0", nullable=False
     )

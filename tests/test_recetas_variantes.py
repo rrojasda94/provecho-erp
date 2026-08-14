@@ -11,6 +11,7 @@ Cubre las tres promesas del slice:
   (RN-COM-023), y el tope del grupo se hace cumplir en el servidor.
 """
 
+import io
 import uuid
 from datetime import timedelta
 from decimal import Decimal
@@ -596,3 +597,347 @@ def test_extra_sin_grupo_sigue_siendo_opcional(env):
         "items": [{"producto_comercial_id": producto_id, "cantidad": "1"}],
     })
     assert r.status_code == 201, r.text
+
+
+def test_la_carta_trae_los_grupos_de_cada_variante(env):
+    """El caso real: los sabores cuelgan del TAMAÑO, no del padre.
+
+    Los otros dos casos de grupo usan un producto sin presentaciones, donde
+    el grupo vive en el propio producto y la carta lo encontraba igual. Con
+    variantes la carta leía los grupos del padre —que no tiene ninguno—, así
+    que el PDV no dibujaba "Sabor", dejaba confirmar sin elegir y el servidor
+    devolvía 409 por algo que la pantalla nunca ofreció.
+    """
+    client, ids = env
+    h = _token(client)
+    padre_id = _producto(client, h, ids, id_interno="PZVA", nombre="Pizza").json()["id"]
+    variante_id = _producto(
+        client, h, ids, id_interno="PZVP", nombre="Pizza Personal",
+        receta_id=_receta(client, h, ids, nombre="Base Personal"),
+        producto_padre_id=padre_id,
+    ).json()["id"]
+    sabor_id = _producto(
+        client, h, ids, id_interno="SPEP", nombre="Peperoni",
+        receta_id=_receta(client, h, ids, nombre="Sabor Peperoni"), es_extra=True,
+    ).json()["id"]
+
+    lista_id = _precio(client, h, ids, variante_id, "25.00")
+    # El sabor no cobra aparte, pero sin precio de lista la carta lo descarta.
+    _precio(client, h, ids, sabor_id, "0.00", lista_id)
+
+    grupo_id = client.post(
+        f"/api/v1/sales/productos/{variante_id}/grupos", headers=h,
+        json={"nombre": "Sabor", "minimo": 1, "maximo": 1},
+    ).json()["id"]
+    assert client.post(
+        f"/api/v1/sales/productos/{variante_id}/extras", headers=h,
+        json={"extra_id": sabor_id, "grupo_id": grupo_id},
+    ).status_code == 201
+
+    carta = client.get(
+        f"/api/v1/sales/carta?sucursal_id={ids['sucursal_id']}"
+        "&canal=pdv&modalidad=takeout",
+        headers=h,
+    ).json()
+    tarjeta = next(i for i in carta if i["producto_comercial_id"] == padre_id)
+    # El padre no ofrece nada por su cuenta: lo suyo es agrupar tamaños.
+    assert tarjeta["extras"] == []
+    variante = tarjeta["variantes"][0]
+    assert variante["producto_comercial_id"] == variante_id
+    assert [e["nombre"] for e in variante["extras"]] == ["Peperoni"]
+    assert variante["extras"][0]["grupo_nombre"] == "Sabor"
+    assert variante["extras"][0]["grupo_minimo"] == 1
+
+    # Y lo que la carta ofrece es exactamente lo que el servidor acepta.
+    def vender(extras, key):
+        return client.post("/api/v1/sales/ventas", headers=h, json={
+            "sucursal_id": ids["sucursal_id"], "punto_venta_id": ids["pv_id"],
+            "canal": "pdv", "modalidad": "takeout", "idempotency_key": key,
+            "items": [{
+                "producto_comercial_id": variante_id, "cantidad": "1",
+                "extras": extras,
+            }],
+        })
+
+    sin_sabor = vender([], "variante-01")
+    assert sin_sabor.status_code == 409, sin_sabor.text
+    assert "Sabor" in sin_sabor.json()["detail"]
+    con_sabor = vender(
+        [{"producto_comercial_id": sabor_id, "cantidad": "1"}], "variante-02"
+    )
+    assert con_sabor.status_code == 201, con_sabor.text
+
+
+def test_la_variante_hereda_los_grupos_del_padre(env):
+    """El caso que rompía en la operación real (ADR-042).
+
+    El seeder cuelga el grupo de la variante; el lienzo lo cuelga del **padre**
+    —"+ grupo" va al nodo activo, que es el padre mientras el producto no
+    tiene tamaños—. Con la herencia, de dónde quedó colgado deja de decidir si
+    la carta lo muestra y si la venta lo acepta.
+    """
+    client, ids = env
+    h = _token(client)
+    padre_id = _producto(client, h, ids, id_interno="PZHE", nombre="Pizza").json()["id"]
+    sabor_id = _producto(
+        client, h, ids, id_interno="SHAW", nombre="Hawaiana",
+        receta_id=_receta(client, h, ids, nombre="Sabor Hawaiana"), es_extra=True,
+    ).json()["id"]
+
+    # El grupo y el extra cuelgan del PADRE, como los deja el lienzo.
+    grupo_id = client.post(
+        f"/api/v1/sales/productos/{padre_id}/grupos", headers=h,
+        json={"nombre": "Sabor", "minimo": 1, "maximo": 1},
+    ).json()["id"]
+    assert client.post(
+        f"/api/v1/sales/productos/{padre_id}/extras", headers=h,
+        json={"extra_id": sabor_id, "grupo_id": grupo_id},
+    ).status_code == 201
+
+    # Y recién después se agrega el tamaño.
+    variante_id = _producto(
+        client, h, ids, id_interno="PZHP", nombre="Pizza Personal",
+        receta_id=_receta(client, h, ids, nombre="Base Personal"),
+        producto_padre_id=padre_id,
+    ).json()["id"]
+    lista_id = _precio(client, h, ids, variante_id, "25.00")
+    _precio(client, h, ids, sabor_id, "0.00", lista_id)
+
+    carta = client.get(
+        f"/api/v1/sales/carta?sucursal_id={ids['sucursal_id']}"
+        "&canal=pdv&modalidad=takeout",
+        headers=h,
+    ).json()
+    variante = next(
+        i for i in carta if i["producto_comercial_id"] == padre_id
+    )["variantes"][0]
+    assert [e["nombre"] for e in variante["extras"]] == ["Hawaiana"]
+    assert variante["extras"][0]["grupo_minimo"] == 1
+
+    def vender(extras, key):
+        return client.post("/api/v1/sales/ventas", headers=h, json={
+            "sucursal_id": ids["sucursal_id"], "punto_venta_id": ids["pv_id"],
+            "canal": "pdv", "modalidad": "takeout", "idempotency_key": key,
+            "items": [{
+                "producto_comercial_id": variante_id, "cantidad": "1",
+                "extras": extras,
+            }],
+        })
+
+    # El grupo heredado obliga igual...
+    sin_sabor = vender([], "hered-01")
+    assert sin_sabor.status_code == 409, sin_sabor.text
+    assert "Sabor" in sin_sabor.json()["detail"]
+    # ...y el extra heredado se acepta: es el que la carta acaba de ofrecer.
+    con_sabor = vender(
+        [{"producto_comercial_id": sabor_id, "cantidad": "1"}], "hered-02"
+    )
+    assert con_sabor.status_code == 201, con_sabor.text
+
+
+def test_lo_propio_de_la_variante_gana_sobre_lo_heredado(env):
+    """Un tamaño puede acotar lo que el padre ofrece: si la familiar declara
+    su propio vínculo, manda el suyo — es el más específico."""
+    client, ids = env
+    h = _token(client)
+    padre_id = _producto(client, h, ids, id_interno="PZG2", nombre="Pizza Dos").json()["id"]
+    extra_id = _producto(
+        client, h, ids, id_interno="EXQ2", nombre="Extra Queso",
+        receta_id=_receta(client, h, ids, nombre="Queso Extra"), es_extra=True,
+    ).json()["id"]
+    variante_id = _producto(
+        client, h, ids, id_interno="PZ2F", nombre="Pizza Dos Familiar",
+        receta_id=_receta(client, h, ids, nombre="Base Familiar Dos"),
+        producto_padre_id=padre_id,
+    ).json()["id"]
+
+    # El padre lo ofrece sin tope; la familiar lo acota a 1.
+    client.post(f"/api/v1/sales/productos/{padre_id}/extras", headers=h,
+                json={"extra_id": extra_id, "maximo": 5})
+    client.post(f"/api/v1/sales/productos/{variante_id}/extras", headers=h,
+                json={"extra_id": extra_id, "maximo": 1})
+
+    lista_id = _precio(client, h, ids, variante_id, "45.00")
+    _precio(client, h, ids, extra_id, "6.00", lista_id)
+
+    carta = client.get(
+        f"/api/v1/sales/carta?sucursal_id={ids['sucursal_id']}"
+        "&canal=pdv&modalidad=takeout",
+        headers=h,
+    ).json()
+    variante = next(
+        i for i in carta if i["producto_comercial_id"] == padre_id
+    )["variantes"][0]
+    # Una sola vez y con el tope de la variante, no dos filas del mismo extra.
+    assert len(variante["extras"]) == 1
+    assert variante["extras"][0]["maximo"] == 1
+
+
+# --- Carga masiva desde .xlsx (RN-COM-031) -------------------------------------
+def _libro(recetas: list[list], ingredientes: list[list]) -> bytes:
+    """Un .xlsx en memoria con las dos hojas que el importador espera."""
+    from openpyxl import Workbook
+
+    libro = Workbook()
+    hoja = libro.active
+    hoja.title = "Recetas"
+    hoja.append(["Receta", "Rendimiento", "Unidad", "Produce el artículo"])
+    for fila in recetas:
+        hoja.append(fila)
+    otra = libro.create_sheet("Ingredientes")
+    otra.append(["Receta", "Insumo", "Cantidad", "Merma %"])
+    for fila in ingredientes:
+        otra.append(fila)
+    buffer = io.BytesIO()
+    libro.save(buffer)
+    return buffer.getvalue()
+
+
+def _validar(client, h, contenido: bytes):
+    return client.post(
+        "/api/v1/inventory/recetas/importar/validar",
+        headers=h,
+        files={"archivo": ("recetas.xlsx", contenido, XLSX_MIME)},
+    )
+
+
+XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+def test_la_plantilla_se_descarga_y_trae_las_hojas_que_el_importador_espera(env):
+    client, _ = env
+    h = _token(client)
+    r = client.get("/api/v1/inventory/recetas/plantilla", headers=h)
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith(XLSX_MIME)
+
+    from openpyxl import load_workbook
+
+    libro = load_workbook(io.BytesIO(r.content))
+    # La plantilla y el parser tienen que hablar el mismo idioma: si alguien
+    # renombra una hoja de un lado, esto falla en vez de rebotar al usuario.
+    assert {"Recetas", "Ingredientes", "Instrucciones"} <= set(libro.sheetnames)
+
+
+def test_un_archivo_limpio_se_importa_entero(env):
+    client, _ = env
+    h = _token(client)
+    contenido = _libro(
+        [["Salsa Base", 1, "Unidad", ""]],
+        [["Salsa Base", "Queso Mozzarella", 200, 3]],
+    )
+    revision = _validar(client, h, contenido).json()
+    assert revision["listas"] == 1 and revision["con_problema"] == 0
+    assert revision["insumos_desconocidos"] == []
+
+    r = client.post("/api/v1/inventory/recetas/importar", headers=h,
+                    json={"recetas": revision["recetas"]})
+    assert r.status_code == 201, r.text
+    assert [c["nombre"] for c in r.json()["creadas"]] == ["Salsa Base"]
+    assert r.json()["omitidas"] == []
+
+    nombres = [x["nombre"] for x in client.get(
+        "/api/v1/inventory/recetas", headers=h).json()]
+    assert "Salsa Base" in nombres
+
+
+def test_validar_no_guarda_nada(env):
+    """Es la promesa de la primera fase: se revisa antes de decidir."""
+    client, _ = env
+    h = _token(client)
+    antes = len(client.get("/api/v1/inventory/recetas", headers=h).json())
+    _validar(client, h, _libro(
+        [["Salsa Base", 1, "Unidad", ""]],
+        [["Salsa Base", "Queso Mozzarella", 200, 0]],
+    ))
+    assert len(client.get("/api/v1/inventory/recetas", headers=h).json()) == antes
+
+
+def test_el_insumo_desconocido_se_reporta_sin_frenar_el_resto(env):
+    client, _ = env
+    h = _token(client)
+    revision = _validar(client, h, _libro(
+        [["Salsa Base", 1, "Unidad", ""]],
+        [["Salsa Base", "Queso Mozzarella", 200, 0],
+         ["Salsa Base", "Albahaca Fresca", 10, 0]],
+    )).json()
+
+    assert revision["insumos_desconocidos"] == ["Albahaca Fresca"]
+    ingredientes = revision["recetas"][0]["ingredientes"]
+    sin_resolver = [i for i in ingredientes if i["articulo_id"] is None]
+    assert [i["insumo"] for i in sin_resolver] == ["Albahaca Fresca"]
+
+    # La pantalla omite esa línea (deja `articulo_id` en None) y el resto entra.
+    r = client.post("/api/v1/inventory/recetas/importar", headers=h,
+                    json={"recetas": revision["recetas"]})
+    assert r.status_code == 201
+    receta_id = r.json()["creadas"][0]["id"]
+    detalle = client.get(f"/api/v1/inventory/recetas/{receta_id}", headers=h).json()
+    assert [i["articulo_nombre"] for i in detalle["items"]] == ["Queso Mozzarella"]
+
+
+def test_los_problemas_de_cada_fila_se_reportan_con_su_numero(env):
+    client, _ = env
+    h = _token(client)
+    revision = _validar(client, h, _libro(
+        [["Sin Ingredientes", 1, "Unidad", ""],
+         ["Unidad Rara", 1, "Cucharadas", ""],
+         ["Rendimiento Cero", 0, "Unidad", ""]],
+        [["Unidad Rara", "Queso Mozzarella", 5, 0],
+         ["Rendimiento Cero", "Queso Mozzarella", 5, 0],
+         ["Receta Fantasma", "Queso Mozzarella", 5, 0]],
+    )).json()
+
+    por_nombre = {r["nombre"]: r["problemas"] for r in revision["recetas"]}
+    assert "la receta no tiene ingredientes" in por_nombre["Sin Ingredientes"]
+    assert any("unidad desconocida" in p for p in por_nombre["Unidad Rara"])
+    assert any("rendimiento inválido" in p for p in por_nombre["Rendimiento Cero"])
+    # El error de tipeo más común: la hoja de ingredientes nombra una receta
+    # que la otra no declara. Callarlo la importaría sin sus insumos.
+    assert revision["ingredientes_sin_receta"] == ["Receta Fantasma"]
+    assert revision["recetas"][0]["fila"] == 2, "la fila 1 es la cabecera"
+
+
+def test_una_receta_repetida_se_omite_sin_tumbar_a_las_demas(env):
+    client, ids = env
+    h = _token(client)
+    _receta(client, h, ids, nombre="Salsa Base")
+
+    revision = _validar(client, h, _libro(
+        [["Salsa Base", 1, "Unidad", ""], ["Salsa Nueva", 1, "Unidad", ""]],
+        [["Salsa Base", "Queso Mozzarella", 5, 0],
+         ["Salsa Nueva", "Queso Mozzarella", 7, 0]],
+    )).json()
+    assert any("ya existe" in p for p in revision["recetas"][0]["problemas"])
+
+    # Se manda igual: el servidor revalida y omite solo la repetida, sin
+    # llevarse puesta a la que sí entra.
+    r = client.post("/api/v1/inventory/recetas/importar", headers=h,
+                    json={"recetas": revision["recetas"]}).json()
+    assert [c["nombre"] for c in r["creadas"]] == ["Salsa Nueva"]
+    assert [o["nombre"] for o in r["omitidas"]] == ["Salsa Base"]
+
+
+def test_la_cantidad_acepta_aritmetica_tecleada(env):
+    client, ids = env
+    h = _token(client)
+    revision = _validar(client, h, _libro(
+        [["Salsa Base", 1, "Unidad", ""]],
+        [["Salsa Base", "Queso Mozzarella", "450/3", 0]],
+    )).json()
+    r = client.post("/api/v1/inventory/recetas/importar", headers=h,
+                    json={"recetas": revision["recetas"]}).json()
+    detalle = client.get(
+        f"/api/v1/inventory/recetas/{r['creadas'][0]['id']}", headers=h).json()
+    # Redondeado a los decimales del Gramo (3), como cualquier línea tecleada
+    # a mano (RN-COM-024), y con la expresión guardada para reeditarla.
+    assert Decimal(detalle["items"][0]["cantidad"]) == Decimal("150")
+    assert detalle["items"][0]["expresion"] == "450/3"
+
+
+def test_un_archivo_que_no_es_xlsx_lo_dice(env):
+    client, _ = env
+    h = _token(client)
+    r = _validar(client, h, b"esto no es un excel")
+    assert r.status_code == 409  # ReglaNegocio, no un 500 sin explicación
+    assert "plantilla" in r.json()["detail"]

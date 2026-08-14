@@ -6,12 +6,17 @@ Reusa las dependencias de auth/RBAC del módulo users (mecanismo transversal).
 import uuid
 from datetime import date
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response, UploadFile
 from sqlalchemy.orm import Session
 
 from src.core.tenant import Tenant
 from src.modules.inventory.api import schemas
-from src.modules.inventory.application import ajustes, catalogo, queries_publicas
+from src.modules.inventory.application import (
+    ajustes,
+    catalogo,
+    importacion_recetas,
+    queries_publicas,
+)
 from src.modules.inventory.application import conteos as conteos_uc
 from src.modules.inventory.application import devoluciones as devoluciones_uc
 from src.modules.inventory.application import guias as guias_uc
@@ -47,6 +52,9 @@ from src.modules.users.infrastructure.models import Usuario
 from src.shared.paginacion import Pagina, Paginacion, paginacion, paginar
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])
+
+#: MIME de un .xlsx. Sin él el navegador lo baja como binario sin nombre.
+XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 LEER = "inventory.leer"
 CATALOGO = "inventory.gestionar_catalogo"
@@ -241,6 +249,17 @@ def editar_articulo(
 
 
 # --- SKU --------------------------------------------------------------------
+@router.get("/skus", response_model=list[schemas.SkuListadoOut])
+def listar_skus(
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Qué se puede mover: lo consume el formulario de devolución y cualquier
+    pantalla que pregunte por un SKU concreto."""
+    return catalogo.listar_skus(session, tenant.filtro_empresa())
+
+
 @router.post("/skus", response_model=schemas.SkuOut, status_code=201)
 def crear_sku(
     body: schemas.SkuCreate,
@@ -1000,11 +1019,69 @@ def crear_receta(
 
 @router.get("/recetas", response_model=list[schemas.RecetaOut])
 def listar_recetas(
+    tipo: str | None = None,
+    categoria_id: uuid.UUID | None = None,
     _: Usuario = Depends(require_permission(LEER)),
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    return recetas_uc.listar_recetas(session, tenant.filtro_empresa())
+    """`tipo` es `subreceta` (produce un artículo) o `producto` (se vende);
+    se deriva de `articulo_id`, no hay columna que mantener (RN-COM-030)."""
+    return recetas_uc.listar_recetas(
+        session, tenant.filtro_empresa(), tipo=tipo, categoria_id=categoria_id
+    )
+
+
+@router.get("/recetas/plantilla")
+def descargar_plantilla_recetas(
+    _: Usuario = Depends(require_permission(CATALOGO)),
+):
+    """La hoja que se llena para cargar el recetario de golpe (RN-COM-031).
+
+    Declarada **antes** de `/recetas/{receta_id}`: FastAPI resuelve por orden
+    y "plantilla" entraría como un `receta_id` que no es UUID.
+    """
+    return Response(
+        content=importacion_recetas.plantilla(),
+        media_type=XLSX,
+        headers={
+            "Content-Disposition": 'attachment; filename="plantilla-recetas.xlsx"'
+        },
+    )
+
+
+@router.post("/recetas/importar/validar")
+async def validar_importacion_recetas(
+    archivo: UploadFile,
+    _: Usuario = Depends(require_permission(CATALOGO)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Dice qué entra y qué no. **No guarda nada** — la pantalla resuelve los
+    insumos que el catálogo no reconoce y recién ahí se importa."""
+    return importacion_recetas.validar(
+        session,
+        empresa_id=tenant.empresa(),
+        contenido=await archivo.read(),
+    )
+
+
+@router.post("/recetas/importar", status_code=201)
+def importar_recetas(
+    body: schemas.ImportarRecetasIn,
+    _: Usuario = Depends(require_permission(CATALOGO)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Crea lo que la pantalla confirmó, revalidando todo: lo que llega es un
+    JSON que el cliente pudo editar."""
+    resultado = importacion_recetas.importar(
+        session,
+        empresa_id=tenant.empresa(),
+        recetas=[r.model_dump() for r in body.recetas],
+    )
+    session.commit()
+    return resultado
 
 
 @router.get("/recetas/{receta_id}", response_model=schemas.RecetaDetalleOut)

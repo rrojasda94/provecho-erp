@@ -28,7 +28,13 @@ from src.modules.accounting.infrastructure.repositories import (
     CustodiaEfectivoRepo,
     MovimientoCajaRepo,
 )
-from src.modules.users.api.deps import get_db, get_tenant, require_permission
+from src.modules.users.api.deps import (
+    check_permission,
+    get_current_user,
+    get_db,
+    get_tenant,
+    require_permission,
+)
 from src.modules.users.application import autorizacion
 from src.modules.users.application.errors import TokenInvalido
 from src.modules.users.application.queries_publicas import tiene_permiso
@@ -553,10 +559,26 @@ def obtener_cierre_caja(
 @router.get("/cajas/abiertas", response_model=list[schemas.CajaAbiertaOut])
 def listar_cajas_abiertas(
     empresa_id: uuid.UUID | None = None,
-    _: Usuario = Depends(require_permission(LEER)),
+    sucursal_id: uuid.UUID | None = None,
+    usuario: Usuario = Depends(get_current_user),
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
+    """Con `sucursal_id`, **quien opera una caja** puede preguntar si la de su
+    local ya está abierta; sin él hace falta `accounting.leer`, porque son las
+    de toda la empresa.
+
+    Antes exigía `accounting.leer` siempre, y un cajero —que tiene
+    `caja_operar` y no `leer`— recibía 403. El PDV lo trataba como "no hay
+    caja abierta" y le pedía abrir una que ya estaba abierta, para después
+    negarle la apertura por duplicada: un callejón sin salida que empezaba
+    como un permiso mal elegido.
+    """
+    if sucursal_id is not None:
+        tenant.exigir_sucursal(sucursal_id)
+        check_permission(session, usuario, LEER, CAJA_OPERAR)
+        return caja.cajas_abiertas(session, sucursal_id=sucursal_id)
+    check_permission(session, usuario, LEER)
     return caja.cajas_abiertas(session, tenant.filtro_empresa(empresa_id))
 
 

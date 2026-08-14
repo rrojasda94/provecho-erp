@@ -299,3 +299,57 @@ de "disponibles" puede ser larga —los sabores de los otros tamaños aparecen
 ahí, porque para *este* tamaño efectivamente no están vinculados—. Se
 envuelve en subcolumnas y el lienzo reserva el ancho; si molesta, el filtro
 del popover "+ opción" sigue siendo el camino corto.
+
+## Tercera enmienda (2026-08-12) — lo que la segunda decidió, ahora se puede hacer
+
+La segunda enmienda decidió que **se conecta y se desconecta de verdad**, y
+escribió el código: `conectar()`/`desconectar()` en `conexiones.tsx`, con su
+tabla de pares admitidos y sus mensajes de rechazo, y `onConnect`/
+`onEdgesDelete` enchufados en `<ReactFlow>`. Nada de eso se podía ejecutar.
+
+**Todos los `<Handle>` llevaban `isConnectable={false}`.** React Flow no deja
+ni empezar el arrastre desde un puerto deshabilitado, así que `onConnect` no
+se disparaba nunca y `conexiones.tsx` era código inalcanzable. El usuario lo
+reportó como *"no se puede enlazar las recetas a nuevos nodos ni conectar
+nodos, ni retirar nodos; es muy estático"* — y tenía razón en las tres.
+
+Lo que se corrige, y por qué cada una:
+
+1. **Los puertos van habilitados en todos los nodos.** No solo en los pares
+   válidos: el criterio de la segunda enmienda es que *un cable que no
+   engancha y no explica por qué es peor que uno que no se deja tirar*, y
+   eso exige que el arrastre llegue a `conectar()` para que pueda explicar.
+   Habilitar solo los puertos "correctos" sería volver al silencio.
+2. **Las aristas se borran solo donde el dominio admite desvincular**
+   (`deletable` en las que terminan en un nodo `opcion`). El resto del árbol
+   lo dicta RN-PRD-004: ofrecer el gesto de cortarlo, para que el único
+   desenlace sea un mensaje de error, es peor que no ofrecerlo. Se agrega
+   `Supr` al `Backspace` de fábrica.
+3. **Los nodos no se borran con la tecla** (`deletable: false`). Sacar un
+   nodo del dibujo sin llamar a la API lo devolvería en el próximo refresco:
+   un fantasma que hace dudar de si se guardó algo. Se retiran con su acción
+   "quitar", que sí llama a la API.
+4. **Una opción que todavía no existe se crea desde el lienzo**, con su
+   receta, en un solo gesto. La segunda enmienda dejó "+ opción" como un
+   selector de extras **ya existentes**: para agregar un sabor nuevo había
+   que ir a Recetas, crear la receta, ir a Catálogo, crear el producto extra,
+   volver al lienzo y recién ahí colgarlo. Ese recorrido es exactamente lo
+   que §4 original dijo que hacía sentir que las recetas no eran componibles.
+   Sigue el mismo patrón que "+ tamaño", que ya creaba receta y producto de
+   una vez.
+5. **El grupo se retira desde su nodo.** `BorrarGrupo` existía como
+   componente y **no estaba montado en ninguna parte**: la única forma de
+   borrar un grupo era el endpoint. Borrar un grupo sigue **soltando** sus
+   opciones, no borrándolas.
+6. **`Tarjeta` deja de deshabilitar el `<button>` del nodo cuando el nodo
+   tiene acciones.** Un `<button disabled>` se traga los clicks de todo lo
+   que contiene, así que "receta" y "quitar" quedaban muertos en cualquier
+   nodo sin `onToggle` —el grupo, sin ir más lejos—.
+7. **Una acción de estructura refresca también el server component**
+   (`router.refresh()`). `recargar()` reelee el producto, pero la lista de
+   recetas la trae la página: sin esto, un tamaño o una opción recién creados
+   mostraban `receta` en el pie en vez del nombre de la suya.
+
+**Lo que sigue sin cambiar:** el modelo, las restas, la fusión calculada en el
+cliente que no se guarda, la topología que dicta RN-PRD-004, y que las
+posiciones de los nodos no se persisten.

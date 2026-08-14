@@ -16,7 +16,12 @@ import { apiKds, type Categoria, type Pantalla, type PantallaEnvio } from "@/lib
  * ocultan los controles (F2.28: el gate visual nunca es la autorización).
  */
 
-const VACIA: PantallaEnvio = { nombre: "", tipo: "preparacion", categoria_ids: null };
+const VACIA: PantallaEnvio = {
+  nombre: "",
+  tipo: "preparacion",
+  categoria_ids: null,
+  orden: 0,
+};
 
 type Props = {
   sucursalId: string;
@@ -46,6 +51,7 @@ export default function EstacionesCliente({
             nombre: pantalla.nombre,
             tipo: pantalla.tipo,
             categoria_ids: pantalla.categoria_ids,
+            orden: pantalla.orden,
           }
         : VACIA,
     );
@@ -135,7 +141,7 @@ export default function EstacionesCliente({
             <a href={`/kds?pantalla=${p.id}`}>
               <strong>{p.nombre}</strong>
               <em>
-                {p.tipo === "despacho" ? "Despacho" : "Preparación"}
+                {p.tipo === "despacho" ? "Despacho" : `Preparación · paso ${p.orden}`}
                 {" · "}
                 {p.categoria_ids?.length
                   ? `${p.categoria_ids.length} categoría(s)`
@@ -198,29 +204,66 @@ export default function EstacionesCliente({
           </div>
           <p className="kds-nota">
             Preparación ve solo los ítems pendientes de sus categorías; despacho ve el
-            pedido completo cuando hay algo listo.
+            pedido completo y en qué estación va cada línea.
           </p>
 
-          <p className="kds-etiqueta">Categorías (ninguna = todas)</p>
-          {categorias.length === 0 ? (
+          {form.tipo === "preparacion" && (
+            <>
+              <label className="kds-etiqueta" htmlFor="kds-orden">
+                Paso en la cocina
+              </label>
+              <input
+                id="kds-orden"
+                className="kds-campo"
+                type="number"
+                min={0}
+                inputMode="numeric"
+                value={form.orden}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, orden: Math.max(0, Number(e.target.value) || 0) }))
+                }
+              />
+              <p className="kds-nota">
+                El pedido recorre las estaciones de menor a mayor: armado 0, horno 1.
+                Al marcarlo acá pasa a la siguiente que atienda su categoría, y si no
+                hay ninguna queda listo — una bebida se salta el horno sola. Dos
+                estaciones con el mismo número trabajan en paralelo.
+              </p>
+            </>
+          )}
+
+          {/* Despacho no filtra: verificar el pedido completo contra la comanda
+              (RN-CUP-004) es imposible viendo la mitad de las líneas. Ofrecer el
+              selector sería un control que no hace nada. */}
+          {form.tipo === "despacho" ? (
             <p className="kds-nota">
-              No se pudieron cargar las categorías; la pantalla se creará sin filtro
-              (atiende todas).
+              Despacho ve el pedido completo, sin filtrar por categoría: es lo que
+              permite contrastarlo contra la comanda antes de entregarlo.
             </p>
           ) : (
-            <div className="kds-chips">
-              {categorias.map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  className={`kds-chip ${form.categoria_ids?.includes(c.id) ? "on" : ""}`}
-                  aria-pressed={form.categoria_ids?.includes(c.id) ?? false}
-                  onClick={() => alternarCategoria(c.id)}
-                >
-                  {c.nombre}
-                </button>
-              ))}
-            </div>
+            <>
+              <p className="kds-etiqueta">Categorías (ninguna = todas)</p>
+              {categorias.length === 0 ? (
+                <p className="kds-nota">
+                  No se pudieron cargar las categorías; la pantalla se creará sin
+                  filtro (atiende todas).
+                </p>
+              ) : (
+                <div className="kds-chips">
+                  {categorias.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      className={`kds-chip ${form.categoria_ids?.includes(c.id) ? "on" : ""}`}
+                      aria-pressed={form.categoria_ids?.includes(c.id) ?? false}
+                      onClick={() => alternarCategoria(c.id)}
+                    >
+                      {c.nombre}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
           )}
 
           {error && <p className="kds-error">{error}</p>}

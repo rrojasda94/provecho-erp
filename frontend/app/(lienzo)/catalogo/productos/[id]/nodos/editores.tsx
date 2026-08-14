@@ -212,27 +212,30 @@ export function NuevoGrupo({
 }
 
 export function AgregarOpcion({
-  productoId,
+  producto,
   grupoId,
   disponibles,
+  unidades,
   onCorrer,
 }: {
-  productoId: string;
+  producto: ProductoDetalle;
   grupoId: string | null;
   disponibles: Producto[];
+  unidades: UnidadMedida[];
   onCorrer: Correr;
 }) {
   const [filtro, setFiltro] = useState("");
-  if (disponibles.length === 0) return null;
+  const [idInterno, setIdInterno] = useState("");
 
   const visibles = disponibles.filter((p) =>
     p.nombre.toLowerCase().includes(filtro.toLowerCase()),
   );
+  const nombre = aTitulo(filtro.trim());
 
   return (
     <Fantasma etiqueta="+ opción" titulo="Colgar un extra de este producto">
       <label>
-        Buscar
+        Buscar o nombrar uno nuevo
         <input
           value={filtro}
           onChange={(e) => setFiltro(e.target.value)}
@@ -246,7 +249,7 @@ export function AgregarOpcion({
           className="lienzo-boton"
           onClick={() =>
             onCorrer(() =>
-              catalogoApi.vincularExtra(productoId, {
+              catalogoApi.vincularExtra(producto.id, {
                 extra_id: p.id,
                 grupo_id: grupoId,
               }),
@@ -256,8 +259,60 @@ export function AgregarOpcion({
           {p.nombre}
         </button>
       ))}
-      {visibles.length === 0 && (
-        <p className="lienzo-nota">Ningún extra libre con ese nombre.</p>
+      {visibles.length === 0 && filtro.trim() === "" && (
+        <p className="lienzo-nota">No queda ningún extra libre por colgar.</p>
+      )}
+
+      {/* Un sabor que todavía no existe se crea acá y no en otro módulo: el
+          lienzo es el lugar de trabajo del catálogo, y mandar a crear el
+          producto y su receta en dos pantallas antes de poder cablearlo es
+          justo lo que hacía sentir que las recetas no eran componibles. */}
+      {nombre && (
+        <>
+          <p className="lienzo-nota">
+            {visibles.length > 0 ? "…o crear uno nuevo:" : "Ninguno con ese nombre."}
+          </p>
+          <label>
+            Código
+            <input
+              value={idInterno}
+              onChange={(e) => setIdInterno(e.target.value.slice(0, 4))}
+              placeholder="SPEP"
+            />
+          </label>
+          <button
+            type="button"
+            className="lienzo-boton"
+            disabled={!idInterno.trim()}
+            onClick={() =>
+              onCorrer(async () => {
+                // Receta vacía con el nombre de la opción, igual que
+                // "+ tamaño": la opción no puede existir sin receta y sus
+                // cantidades se cargan después, en el inspector del nodo.
+                const receta = await catalogoApi.crearReceta({
+                  nombre: `${nombre} ${producto.nombre}`.trim(),
+                  rendimiento_cantidad: "1",
+                  rendimiento_unidad_medida_id: unidades[0]?.id ?? "",
+                });
+                const extra = await catalogoApi.crearProducto({
+                  id_interno: idInterno.trim().toUpperCase(),
+                  marca_id: producto.marca_id,
+                  nombre,
+                  receta_id: receta.id,
+                  es_extra: true,
+                });
+                await catalogoApi.vincularExtra(producto.id, {
+                  extra_id: extra.id,
+                  grupo_id: grupoId,
+                });
+                setFiltro("");
+                setIdInterno("");
+              })
+            }
+          >
+            Crear “{nombre}” y colgarlo
+          </button>
+        </>
       )}
     </Fantasma>
   );
@@ -326,23 +381,3 @@ export function EditorEmpaque({
   );
 }
 
-export function BorrarGrupo({
-  productoId,
-  grupoId,
-  onCorrer,
-}: {
-  productoId: string;
-  grupoId: string;
-  onCorrer: Correr;
-}) {
-  return (
-    <button
-      type="button"
-      className="nodo-accion riesgo nodrag"
-      title="Borra el grupo. Sus opciones siguen ofreciéndose, ya sin mínimo"
-      onClick={() => onCorrer(() => catalogoApi.borrarGrupo(productoId, grupoId))}
-    >
-      borrar grupo
-    </button>
-  );
-}

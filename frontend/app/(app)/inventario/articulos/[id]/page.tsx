@@ -1,5 +1,4 @@
-import Link from "next/link";
-
+import { Rastro } from "@/components/shell/rastro";
 import { ApiError, apiFetch } from "@/lib/api";
 import { obtenerSesion } from "@/lib/sesion";
 
@@ -57,12 +56,7 @@ export default async function ArticuloPage({
 
   return (
     <section className="flex flex-col gap-6">
-      <Link
-        href="/inventario/articulos"
-        className="text-sm font-semibold text-primary hover:underline"
-      >
-        ← Artículos
-      </Link>
+      <Rastro hoja={articulo.nombre} />
       <h1 className="font-heading text-xl italic uppercase text-dark">
         {articulo.nombre}
       </h1>

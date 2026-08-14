@@ -27,7 +27,9 @@ razón social/RUC propios; `ProveedorOut.persona_id` viaja desde 2026-08-02,
 antes un proveedor natural no tenía forma de mostrarse por nombre en un
 listado; el jurídico consulta Factiliza —`consultar_ruc`, RENIEC/SUNAT—
 para la razón social real en vez de confiar en lo tecleado, mismo criterio
-que `sales.crear_cliente`, ver ADR-005) y ciclo de OC tipo `insumo`: crear (borrador,
+que `sales.crear_cliente`, ver ADR-005; desde 2026-08-12 la pantalla puede
+**preguntar antes de guardar** con `GET /consulta/ruc/{n}`, que además
+prellena `direccion`/`provincia`/`pais` — ADR-041) y ciclo de OC tipo `insumo`: crear (borrador,
 idempotente) → emitir (permiso `purchases.aprobar` exigido si el total
 supera el umbral vigente en `parametro_empresa` — `shared`, módulo
 `purchases`, código `oc_umbral`; sin fila configurada cae al valor semilla

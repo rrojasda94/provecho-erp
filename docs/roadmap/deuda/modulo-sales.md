@@ -3,6 +3,69 @@
 Parte del backlog de deuda técnica del proyecto. El índice y las reglas
 de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 
+- ✅ 2026-08-12 **La orden enviada sigue viva** (ADR-043, RN-COM-029):
+  admite líneas nuevas sin firma de nadie, y quitarlas es gratis dentro de
+  los 5 minutos. Antes agregar era imposible y quitar exigía siempre el PIN
+  de un supervisor — un control que se ejecuta veinte veces por turno deja de
+  ser un control.
+- ✅ 2026-08-12 **Los borradores vacíos ya no se apilan**: el "+" reusa el que
+  esté vacío y una pestaña sin líneas se descarta con su "×".
+- 🔶 **El KDS no distingue una línea agregada de las originales**
+  (2026-08-12, ADR-043): entra a la cola como cualquier otra, sin decir que
+  llegó después. Para la cocina está bien —hay que prepararla igual—, y
+  desde ADR-044 el despacho **sí ve que el pedido creció**: su tarjeta lista
+  todas las líneas con su estación, así que una recién agregada aparece
+  esperando y el contador "N de M" la incluye. Queda solo el matiz de
+  antigüedad: no se ve **cuándo** llegó cada una, que es lo que permitiría
+  distinguir "falta una que pidieron recién" de "falta una que se atascó".
+  Se resuelve mostrando la hora de la línea en la tarjeta, dato que
+  `venta_item.created_at` ya tiene. Va junto con "KDS sin reloj por pedido".
+
+- ✅ 2026-08-12 **La variante hereda del padre** (ADR-042): ADR-038 arregló el
+  catálogo del seeder (grupos en la variante) y dejó roto el armado a mano
+  (grupos en el padre, que es donde el lienzo los cuelga mientras el producto
+  no tiene tamaños). Ahora el lugar donde quedó colgado el grupo no decide
+  nada.
+- ✅ 2026-08-12 **El cajero puede anular una orden enviada** con firma de
+  supervisor, igual que para quitar una línea (RN-COM-020). `sales.anular` es
+  de supervisor y sigue siéndolo; lo que faltaba era el camino del cajero.
+- ✅ 2026-08-12 **Pestaña de cuentas abiertas** en el PDV: estaba como nota al
+  pie del mapa de mesas y filtraba fuera las de mesa, así que "¿qué falta
+  cobrar?" no se podía responder de un vistazo.
+
+- ✅ 2026-08-12 **La carta lleva los grupos de cada variante** (ADR-038):
+  `precios.carta` los leía del producto **padre**, que no tiene ninguno, así
+  que el PDV no dibujaba "Sabor" y el servidor rechazaba la venta con 409 por
+  algo que la pantalla nunca ofreció. Cierra también el segundo bloqueo: los
+  sabores del seeder se creaban **sin precio de lista** y la carta descarta
+  todo extra sin precio vigente.
+- ⬜ **`GET /carta` consulta grupos y extras producto por producto** (N+1).
+  Ya era así antes de ADR-038 —dos consultas por producto— pero ahora corre
+  también por cada variante: una pizza de tres tamaños pasó de 2 a 8
+  consultas. Es el endpoint más caliente del PDV, aunque se pide al abrir la
+  caja y al cambiar de modalidad, no por tecla. Se arregla con dos consultas
+  por marca (`grupos_de`/`extras_de` en bloque, agrupadas en memoria); no se
+  hizo ahora para no mezclar una optimización con el arreglo de un bug que
+  impedía vender. Medir antes con un catálogo real: si el número no molesta,
+  no vale el cambio.
+- ⬜ **La ficha de producto solo muestra lo que cuelga de ese producto**
+  (`/catalogo/productos/{id}`, `catalogo.detalle_producto`). No está mal —es
+  por producto a propósito: se edita lo propio, y editar lo heredado desde el
+  hijo es cómo se termina con dos copias del mismo grupo (ADR-042)— pero deja
+  la pantalla mintiendo por omisión en los dos sentidos: el padre no muestra
+  los grupos que viven en sus variantes, y la variante no muestra los que
+  hereda, aunque el PDV se los ofrezca. Lo que falta es que lo diga: "hereda 1
+  grupo de Pizza" con enlace al lienzo, que es el lugar de trabajo de esa
+  estructura (ADR-035).
+- ⬜ **Los seeders de demo corridos fuera de orden no avisan nada**
+  (encontrado 2026-08-12 al verificar la carta). `pizzas_demo._precio` hace
+  `if lista is None: return` y envuelve el resto en un `except Exception`
+  mudo, así que correrlo **antes** de `pdv_demo` —que es quien crea la lista
+  de precios— deja el catálogo entero sin precios y aun así imprime "Carta de
+  pizzas lista: 3 tamaños × 6 sabores + 4 extras". El orden correcto está en
+  `docs/engineering/devops.md`, pero el seeder debería negarse a correr sin
+  lista en vez de dejar una carta muda.
+
 - ✅ 2026-08-03 **Variantes y grupos de opciones** (ADR-023, migración
   `b6d1e83f47ac`): la variante es un `producto_comercial` hijo con receta y
   **precio completo** propios (RN-COM-022) — no un recargo sobre un precio
@@ -280,7 +343,20 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   puente a impresora térmica (ESC/POS por red o agente local) y comanda
   automática al confirmar venta (hoy es bajo demanda).
 - ⬜ **KDS tiempos**: alertas por pedido demorado (umbral por pantalla) y
-  métricas de tiempo de preparación (base: `venta_item.updated_at`).
+  métricas de tiempo de preparación (base: `venta_item.updated_at`). Con la
+  cadena de ADR-044 esto se vuelve **tiempo por estación**, que es lo que
+  responde "dónde se atasca la cocina" en vez de "cuánto tardó el pedido".
+- ⬜ **La cadena de estaciones no se reordena arrastrando** (2026-08-13,
+  ADR-044): el paso se teclea como número en el formulario de la estación.
+  Para tres estaciones alcanza; con más, dejar un hueco entre pasos (0, 10,
+  20) para poder insertar en el medio es un truco que el usuario tiene que
+  saber, y eso ya es una interfaz que no se explica sola.
+- ⬜ **Una estación no puede rechazar y devolver una línea al eslabón
+  anterior** (2026-08-13, ADR-044): la cadena solo avanza, por RN-CUP-002
+  (secuencia estricta, sin retroceso). Si el horno recibe algo mal armado,
+  hoy no hay forma de mandarlo de vuelta desde la pantalla — se resuelve
+  hablando. Un "devolver al paso anterior" sería una excepción explícita a
+  RN-CUP-002 y necesita su propia decisión de negocio, no solo código.
 - 🔶 **Cumplimiento de pedido** (`PROC-OPE-002`, definido 2026-07-27):
   preparación + entrega implementadas (`POST /sales/ventas/{id}/entrega`
   → `sales.venta_entregada`). Falta la **rama delivery con trazabilidad**:
@@ -299,3 +375,15 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   con el «no hay `POST /emitidos`» de ADR-033, así que la decisión de fondo es
   **dónde nace una queja**: como venta anotada, como nodo de encuesta, o como
   la primera emisión del ERP que sí admite alta manual.
+- ⬜ **Solo `test_pdv_slice` valida las FK** (2026-08-13): el resto de los
+  fixtures crean el engine SQLite sin `PRAGMA foreign_keys=ON`, así que
+  siguen ciegos a la clase de bug que dejó `anular_lineas` roto contra
+  Postgres durante meses. Encenderlo en `tests/conftest.py` para todos es
+  una línea, pero puede destapar más violaciones latentes y conviene hacerlo
+  como barrido propio, no de arrastre.
+- ⬜ **La cascada del extra vive en el código, no en el esquema**
+  (2026-08-13): `anular_lineas` borra los hijos a mano porque
+  `fk_venta_item_padre` es `NO ACTION`. Un `ON DELETE CASCADE` en la FK lo
+  haría cumplir aunque otro camino borre el padre. Es una migración de una
+  línea; se dejó fuera para no mezclar un cambio de esquema con un arreglo
+  que ya estaba probado.

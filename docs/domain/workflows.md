@@ -292,7 +292,7 @@ cuando la Orden de Pedido confirmada llega al KDS de la sucursal
 (`sales.venta_confirmada`) y termina cuando el pedido está en manos del
 cliente (`sales.venta_entregada`). Área dueña: Operaciones — cruza cocina
 de sucursal, atención al cliente y reparto, sin pertenecer a una sola.
-Reglas: RN-CUP-001 a RN-CUP-012. Casos de uso por modalidad:
+Reglas: RN-CUP-001 a RN-CUP-013. Casos de uso por modalidad:
 [use-cases.md](use-cases.md) CU-OPE-001/002/003.
 
 **Es UN proceso con dos etapas, no dos procesos** (decisión 2026-07-27):
@@ -302,6 +302,15 @@ traspaso entre cocina y despacho. Las pantallas KDS de tipo `preparacion`
 y `despacho` son vistas distintas del mismo avance, no procesos distintos.
 Si el reparto a domicilio llega a tener ruteo, flota propia y liquidación
 de repartidores, se separa entonces como versión MAYOR.
+
+**La preparación es una cadena de estaciones** (2026-08-13, RN-CUP-013,
+ADR-044): armado → horno → … según cómo la sucursal configure el paso de
+cada pantalla. Cada línea del pedido recorre solo las estaciones que
+atienden su categoría, así que una bebida se salta el horno sin que nadie
+lo configure. Esto **no** agrega etapas al proceso: el recorrido vive en
+`venta_item.etapa_kds` y `estado_preparacion` sigue teniendo los mismos
+cuatro estados — la línea está `en_preparacion` mientras recorre y `listo`
+cuando ya no le queda estación por delante.
 
 > **No confundir con `PROC-PRD-001` (Producción)**: ese es la cocina de
 > producción central (subrecetas y lotes, 2027). Acá se prepara el pedido

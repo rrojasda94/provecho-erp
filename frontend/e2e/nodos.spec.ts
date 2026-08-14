@@ -85,3 +85,54 @@ test("el admin edita la receta desde el nodo y el costo se mueve", async ({
   await page.locator('[role="tab"]', { hasText: "Plato" }).click();
   await expect(costo).not.toHaveText(antes);
 });
+
+test("el admin crea una opción nueva desde el lienzo y la retira", async ({
+  page,
+}) => {
+  // Las tres cosas que el lienzo prometía y no hacía:
+  //  1. los puertos se pueden tomar (con `isConnectable={false}` react-flow
+  //     ni siquiera dejaba empezar el arrastre, así que `conectar()` —escrito
+  //     y probado— era código inalcanzable);
+  //  2. una opción que todavía no existe se crea acá, con su receta, en vez
+  //     de mandar a otras dos pantallas antes de poder cablearla;
+  //  3. se retira.
+  await ingresar(page, ADMIN);
+
+  await page.goto("/catalogo/productos");
+  await page.getByText(/Pizza E2E/).first().click();
+  await page.getByRole("link", { name: /Ver nodos/i }).click();
+
+  const unico = page.locator("button.nodo", { hasText: "Único" });
+  await expect(unico).toBeVisible({ timeout: 30_000 });
+
+  // El puerto se puede tomar: react-flow solo pone `connectable` cuando el
+  // `<Handle>` lo admite. Es la regresión exacta, sin depender de un arrastre
+  // —que en un canvas con zoom es la prueba más frágil que hay—.
+  const nodoUnico = page.locator(".react-flow__node", { hasText: "Único" });
+  await expect(
+    nodoUnico.locator(".react-flow__handle.source"),
+  ).toHaveClass(/connectable/);
+
+  await page.getByRole("button", { name: "+ opción" }).click();
+  await page.getByLabel(/Buscar o nombrar uno nuevo/i).fill("Aceituna E2E");
+  await page.getByLabel(/^Código$/).fill("AE2E");
+  await page.getByRole("button", { name: /Crear .*Aceituna E2E.* y colgarlo/ }).click();
+
+  const comoOpcion = page.locator(".react-flow__node-opcion", {
+    hasText: "Aceituna E2E",
+  });
+  const comoDisponible = page.locator(".react-flow__node-disponible", {
+    hasText: "Aceituna E2E",
+  });
+  await expect(comoOpcion).toBeVisible({ timeout: 15_000 });
+
+  // Retirar es **desvincular**, no borrar: el extra es un producto comercial
+  // con su receta y su precio, y sigue existiendo para volver a cablearlo.
+  // Por eso el nodo no desaparece — cambia de columna.
+  await comoOpcion.hover();
+  // `exact`: el nombre accesible del botón del nodo contiene el de su acción,
+  // así que sin esto el locator matchea los dos.
+  await comoOpcion.getByRole("button", { name: "quitar", exact: true }).click();
+  await expect(comoOpcion).toHaveCount(0, { timeout: 15_000 });
+  await expect(comoDisponible).toHaveCount(1);
+});
