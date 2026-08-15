@@ -11,7 +11,8 @@
         "test:kds": "node --test lib/kds.test.ts",
         "test:reportes": "node --test lib/reportes.test.ts",
         "test": "node --test lib/*.test.ts",
-        "test:e2e": "node e2e/preparar-bd.mjs && playwright test"
+        "test:e2e": "node e2e/preparar-bd.mjs && playwright test",
+        "test:uso": "node e2e/preparar-bd.mjs && playwright test --config playwright.uso.config.ts"
     },
     "dependencies": {
         "@base-ui/react": "^1.7.0",
