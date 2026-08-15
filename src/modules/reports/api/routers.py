@@ -34,7 +34,7 @@ from src.modules.reports.infrastructure.repositories import (
 )
 from src.modules.users.api.deps import (
     client_ip,
-    get_db,
+    get_db_reportes,
     get_tenant,
     require_permission,
 )
@@ -112,7 +112,7 @@ def _emision_visible(session: Session, usuario: Usuario, codigo: str) -> bool:
 @router.get("/emisiones", response_model=schemas.CatalogoEmisionesOut)
 def listar_emisiones(
     usuario: Usuario = Depends(require_permission(LEER)),
-    session: Session = Depends(get_db),
+    session: Session = Depends(get_db_reportes),
 ):
     """Solo lo que este usuario puede ver: el catálogo es una lista de
     capacidades y mostrar lo que después daría 403 solo confunde."""
@@ -149,7 +149,7 @@ def listar_emisiones(
 def matriz(
     usuario: Usuario = Depends(require_permission(LEER_MATRIZ)),
     tenant: Tenant = Depends(get_tenant),
-    session: Session = Depends(get_db),
+    session: Session = Depends(get_db_reportes),
 ):
     """El mapa completo de distribución, con sus huecos y sus fugas.
 
@@ -169,7 +169,7 @@ def matriz(
 def listar_areas(
     _: Usuario = Depends(require_permission(LEER_MATRIZ)),
     tenant: Tenant = Depends(get_tenant),
-    session: Session = Depends(get_db),
+    session: Session = Depends(get_db_reportes),
 ):
     from src.modules.reports.infrastructure.repositories import AreaRepo
 
@@ -181,7 +181,7 @@ def crear_area(
     body: schemas.AreaCreate,
     actor: Usuario = Depends(require_permission(ADMINISTRAR)),
     tenant: Tenant = Depends(get_tenant),
-    session: Session = Depends(get_db),
+    session: Session = Depends(get_db_reportes),
     ip: str | None = Depends(client_ip),
 ):
     area = areas_uc.crear_area(
@@ -202,7 +202,7 @@ def editar_area(
     body: schemas.AreaUpdate,
     actor: Usuario = Depends(require_permission(ADMINISTRAR)),
     tenant: Tenant = Depends(get_tenant),
-    session: Session = Depends(get_db),
+    session: Session = Depends(get_db_reportes),
     ip: str | None = Depends(client_ip),
 ):
     exigir_area(session, area_id, tenant)
@@ -223,7 +223,7 @@ def borrar_area(
     area_id: uuid.UUID,
     actor: Usuario = Depends(require_permission(ADMINISTRAR)),
     tenant: Tenant = Depends(get_tenant),
-    session: Session = Depends(get_db),
+    session: Session = Depends(get_db_reportes),
     ip: str | None = Depends(client_ip),
 ):
     exigir_area(session, area_id, tenant)
@@ -236,7 +236,7 @@ def listar_miembros(
     area_id: uuid.UUID,
     _: Usuario = Depends(require_permission(LEER_MATRIZ)),
     tenant: Tenant = Depends(get_tenant),
-    session: Session = Depends(get_db),
+    session: Session = Depends(get_db_reportes),
 ):
     from src.modules.reports.infrastructure.repositories import AreaRepo
 
@@ -252,7 +252,7 @@ def agregar_miembro(
     body: schemas.MiembroCreate,
     actor: Usuario = Depends(require_permission(ADMINISTRAR)),
     tenant: Tenant = Depends(get_tenant),
-    session: Session = Depends(get_db),
+    session: Session = Depends(get_db_reportes),
     ip: str | None = Depends(client_ip),
 ):
     exigir_area(session, area_id, tenant)
@@ -277,7 +277,7 @@ def quitar_miembro(
     miembro_id: uuid.UUID,
     actor: Usuario = Depends(require_permission(ADMINISTRAR)),
     tenant: Tenant = Depends(get_tenant),
-    session: Session = Depends(get_db),
+    session: Session = Depends(get_db_reportes),
     ip: str | None = Depends(client_ip),
 ):
     miembro = exigir_miembro(session, miembro_id, tenant)
@@ -302,7 +302,7 @@ def listar_reglas(
     codigo_emision: str | None = None,
     _: Usuario = Depends(require_permission(LEER_MATRIZ)),
     tenant: Tenant = Depends(get_tenant),
-    session: Session = Depends(get_db),
+    session: Session = Depends(get_db_reportes),
 ):
     repo = ReglaRepo(session)
     reglas = list(
@@ -316,7 +316,7 @@ def crear_regla(
     body: schemas.ReglaCreate,
     actor: Usuario = Depends(require_permission(ADMINISTRAR)),
     tenant: Tenant = Depends(get_tenant),
-    session: Session = Depends(get_db),
+    session: Session = Depends(get_db_reportes),
     ip: str | None = Depends(client_ip),
 ):
     if body.sucursal_id is not None:
@@ -345,7 +345,7 @@ def editar_regla(
     body: schemas.ReglaUpdate,
     actor: Usuario = Depends(require_permission(ADMINISTRAR)),
     tenant: Tenant = Depends(get_tenant),
-    session: Session = Depends(get_db),
+    session: Session = Depends(get_db_reportes),
     ip: str | None = Depends(client_ip),
 ):
     exigir_regla(session, regla_id, tenant)
@@ -372,7 +372,7 @@ def borrar_regla(
     regla_id: uuid.UUID,
     actor: Usuario = Depends(require_permission(ADMINISTRAR)),
     tenant: Tenant = Depends(get_tenant),
-    session: Session = Depends(get_db),
+    session: Session = Depends(get_db_reportes),
     ip: str | None = Depends(client_ip),
 ):
     exigir_regla(session, regla_id, tenant)
@@ -385,7 +385,7 @@ def borrar_regla(
 def mis_reportes(
     usuario: Usuario = Depends(require_permission(LEER)),
     p: Paginacion = Depends(paginacion),
-    session: Session = Depends(get_db),
+    session: Session = Depends(get_db_reportes),
 ):
     """Lo que me fue entregado. Sin filtro de tenant explícito: la entrega ya
     es a mi `usuario_id`, y nadie me entrega reportes de otra empresa."""
@@ -400,7 +400,7 @@ def listar_emitidos(
     _: Usuario = Depends(require_permission(LEER_TODO)),
     tenant: Tenant = Depends(get_tenant),
     p: Paginacion = Depends(paginacion),
-    session: Session = Depends(get_db),
+    session: Session = Depends(get_db_reportes),
 ):
     return _pagina_con_actores(
         session,
@@ -464,7 +464,7 @@ def listar_escalamientos(
     _: Usuario = Depends(require_permission(LEER_TODO)),
     tenant: Tenant = Depends(get_tenant),
     p: Paginacion = Depends(paginacion),
-    session: Session = Depends(get_db),
+    session: Session = Depends(get_db_reportes),
 ):
     """La bandeja del que responde: qué está abierto y en qué nivel."""
     return paginar(
@@ -488,7 +488,7 @@ def detalle_escalamiento(
     escalamiento_id: uuid.UUID,
     usuario: Usuario = Depends(require_permission(LEER)),
     tenant: Tenant = Depends(get_tenant),
-    session: Session = Depends(get_db),
+    session: Session = Depends(get_db_reportes),
 ):
     fila = exigir_escalamiento(session, escalamiento_id, tenant)
     # La misma doble puerta que el reporte de origen: el escalamiento cuenta
@@ -507,7 +507,7 @@ def abrir_escalamiento(
     body: schemas.EscalamientoCreate,
     actor: Usuario = Depends(require_permission(ESCALAR)),
     tenant: Tenant = Depends(get_tenant),
-    session: Session = Depends(get_db),
+    session: Session = Depends(get_db_reportes),
     ip: str | None = Depends(client_ip),
 ):
     """Elevar un reporte que no se pudo resolver donde llegó (RN-CTP-004).
@@ -538,7 +538,7 @@ def escalamientos_del_reporte(
     reporte_id: uuid.UUID,
     usuario: Usuario = Depends(require_permission(LEER)),
     tenant: Tenant = Depends(get_tenant),
-    session: Session = Depends(get_db),
+    session: Session = Depends(get_db_reportes),
 ):
     """El historial completo, no solo la cadena viva: un problema que vuelve
     a pasar es exactamente lo que la mejora continua viene a mirar."""
@@ -558,7 +558,7 @@ def registrar_accion(
     body: schemas.AccionEscalamientoIn,
     actor: Usuario = Depends(require_permission(RESOLVER)),
     tenant: Tenant = Depends(get_tenant),
-    session: Session = Depends(get_db),
+    session: Session = Depends(get_db_reportes),
     ip: str | None = Depends(client_ip),
 ):
     """Qué hizo este nivel, sin cerrar ni elevar."""
@@ -581,7 +581,7 @@ def elevar_escalamiento(
     body: schemas.AccionEscalamientoIn,
     actor: Usuario = Depends(require_permission(ESCALAR)),
     tenant: Tenant = Depends(get_tenant),
-    session: Session = Depends(get_db),
+    session: Session = Depends(get_db_reportes),
     ip: str | None = Depends(client_ip),
 ):
     """Sube un escalón. La respuesta trae `destinatarios`: si va vacía, el
@@ -611,7 +611,7 @@ def resolver_escalamiento(
     body: schemas.AccionEscalamientoIn,
     actor: Usuario = Depends(require_permission(RESOLVER)),
     tenant: Tenant = Depends(get_tenant),
-    session: Session = Depends(get_db),
+    session: Session = Depends(get_db_reportes),
     ip: str | None = Depends(client_ip),
 ):
     fila = exigir_escalamiento(session, escalamiento_id, tenant)
@@ -634,7 +634,7 @@ def detalle_emitido(
     reporte_id: uuid.UUID,
     usuario: Usuario = Depends(require_permission(LEER)),
     tenant: Tenant = Depends(get_tenant),
-    session: Session = Depends(get_db),
+    session: Session = Depends(get_db_reportes),
 ):
     """Doble puerta (RN-REP-002), en `_exigir_puerta_doble`: alcance —ser
     destinatario o tener `reports.leer_todo`— y contenido —el permiso del

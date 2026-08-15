@@ -390,15 +390,28 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   con el «no hay `POST /emitidos`» de ADR-033, así que la decisión de fondo es
   **dónde nace una queja**: como venta anotada, como nodo de encuesta, o como
   la primera emisión del ERP que sí admite alta manual.
-- ⬜ **Solo `test_pdv_slice` valida las FK** (2026-08-13): el resto de los
-  fixtures crean el engine SQLite sin `PRAGMA foreign_keys=ON`, así que
-  siguen ciegos a la clase de bug que dejó `anular_lineas` roto contra
-  Postgres durante meses. Encenderlo en `tests/conftest.py` para todos es
-  una línea, pero puede destapar más violaciones latentes y conviene hacerlo
-  como barrido propio, no de arrastre.
+- ✅ 2026-08-15 **Las FK se validan en todo el suite, no solo en
+  `test_pdv_slice`**. Un listener del evento `connect` de SQLAlchemy en
+  `tests/conftest.py` enciende `PRAGMA foreign_keys=ON` en **cualquier**
+  engine SQLite del proceso: los ~75 fixtures que arman el suyo quedan
+  cubiertos sin tocarlos, y no hay forma de olvidárselo en el próximo.
+  Destapó cinco violaciones: **dos bugs de producción** —borrar una receta
+  con líneas moría por `fk_receta_item_receta_id_receta` (SQLAlchemy ordenaba
+  el `DELETE` del padre antes que el de los hijos: ninguna receta con insumos
+  se podía borrar) y `reports.emision` guardaba `almacen_id`/`sucursal_id`/
+  `actor_id` de filas inexistentes, o sea que el reporte «que no se pudo
+  ubicar» —el que más importa investigar— era el único que no se emitía— y
+  **tres tests** que sembraban un `uuid4()` en una columna FK
+  (`test_sync_motor` ×2, `test_marketing`).
+  `test_models.py::test_un_engine_sqlite_nuevo_ya_trae_las_fk_encendidas`
+  cuida al guardián.
 - ⬜ **La cascada del extra vive en el código, no en el esquema**
   (2026-08-13): `anular_lineas` borra los hijos a mano porque
   `fk_venta_item_padre` es `NO ACTION`. Un `ON DELETE CASCADE` en la FK lo
   haría cumplir aunque otro camino borre el padre. Es una migración de una
   línea; se dejó fuera para no mezclar un cambio de esquema con un arreglo
-  que ya estaba probado.
+  que ya estaba probado. **Sigue abierto tras el barrido de FK del
+  2026-08-15**: el mismo criterio aplica ahora a
+  `fk_receta_item_receta_id_receta`, que se arregló forzando el orden del
+  flush (`recetas.eliminar_receta`) y no en el esquema. Las dos son la misma
+  migración y conviene hacerlas juntas, contra un Postgres real.
