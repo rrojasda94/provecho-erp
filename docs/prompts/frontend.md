@@ -88,6 +88,14 @@ Leer antes: `/CLAUDE.md`, [product/ui-ux.md](../product/ui-ux.md) y
   **nunca** llama a la API directo: sale por `app/api/proxy` (la CSP de
   `middleware.ts` fija `connect-src 'self'`), y el proceso de Next usa
   `API_INTERNAL_URL`. No existe `NEXT_PUBLIC_API_URL`.
+- **El proxy es transparente** (ADR-048): pasa el cuerpo en bytes y conserva
+  el `Content-Type` y el `Content-Disposition` de los dos lados. Una descarga
+  se hace con un `<a href="/api/proxy/…" download>` sin valor —el nombre lo
+  pone el `Content-Disposition` de la API— y una subida con `subir()` de
+  `lib/cliente-api.ts`, que deja que el navegador escriba el header del
+  `multipart` con su `boundary`. **No se escriben rutas dedicadas por
+  descarga**: es la alternativa descartada, y su costo es una copia del
+  rescate del token por cada endpoint binario.
 
 ## Checklist
 
