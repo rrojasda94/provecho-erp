@@ -12,7 +12,6 @@ su lectura, y el único listener que la llena a partir de un
 
 import datetime
 import uuid
-from decimal import Decimal
 
 import pytest
 from sqlalchemy import create_engine, select
@@ -21,7 +20,6 @@ from sqlalchemy.orm import Session
 import src.core.models_registry  # noqa: F401
 from src.core.database import Base
 from src.core.events import event_bus
-from src.modules.accounting.application import caja
 from src.modules.accounting.application.queries_publicas import encargado_de_turno
 from src.modules.sales.infrastructure.models import PuntoVenta
 from src.modules.users.application import notificaciones
@@ -38,6 +36,7 @@ from src.modules.users.infrastructure.models import (
     UsuarioSucursal,
 )
 from src.modules.users.infrastructure.security import hash_pin
+from tests.conftest import abrir_caja_directa
 
 
 @pytest.fixture()
@@ -99,14 +98,20 @@ def env():
         }
 
 
-def _abrir_caja(s, ids):
-    apertura = caja.abrir_caja(
+def _abrir_caja(s, ids, *, con_encargado=False):
+    """Turno de caja abierto.
+
+    Con `con_encargado=True` se escribe `relevo_encargado_id`, que es lo que
+    dejaban las aperturas **anteriores a ADR-048**, cuando abrir exigía la
+    firma del encargado. Filas así siguen existiendo en cualquier base que
+    ya haya operado, y `encargado_de_turno` tiene que saber leerlas.
+    """
+    apertura = abrir_caja_directa(
         s,
         punto_venta_id=ids["pv"].id,
         cajero_id=ids["cajero"].id,
-        relevo_encargado_id=ids["encargado"].id,
-        monto_declarado=Decimal("100.00"),
-        detalle_denominaciones={"50": 2},
+        encargado_id=ids["encargado"].id if con_encargado else None,
+        monto="100.00",
     )
     s.flush()
     return apertura
@@ -114,9 +119,23 @@ def _abrir_caja(s, ids):
 
 # --- Quién es el encargado de turno -----------------------------------------
 def test_el_encargado_de_turno_sale_de_la_caja_abierta(env):
+    """Aperturas viejas: el encargado firmó y ahí quedó quién estaba a cargo."""
+    s, ids = env
+    _abrir_caja(s, ids, con_encargado=True)
+    assert encargado_de_turno(s, ids["sucursal"].id) == ids["encargado"].id
+
+
+def test_una_apertura_nueva_no_deja_encargado_de_turno(env):
+    """Desde ADR-048 el cajero abre solo, así que la caja abierta ya no dice
+    quién está a cargo del local.
+
+    No se sustituye por el cajero: avisarle a él de algo que él no puede
+    resolver es peor que decir que no se sabe y dejar que el respaldo por rol
+    haga su trabajo (`test_reports.py`).
+    """
     s, ids = env
     _abrir_caja(s, ids)
-    assert encargado_de_turno(s, ids["sucursal"].id) == ids["encargado"].id
+    assert encargado_de_turno(s, ids["sucursal"].id) is None
 
 
 def test_sin_caja_abierta_no_hay_encargado_de_turno(env):

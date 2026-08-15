@@ -20,10 +20,11 @@ Todo esto vive **acá y no en cada prueba** (`docs/engineering/testing-strategy.
 un test que crea sus datos por la UI prueba tres flujos para verificar uno, y
 además cada rama que necesitaba un proveedor terminaba sembrando el suyo.
 
-**El encargado tiene que ser otro usuario**: `abrir_caja` rechaza que el
-cajero se releve a sí mismo (RN-MDP-002), así que un seed con un solo
-usuario no puede abrir caja y la prueba fallaría por el dato, no por el
-código.
+**El encargado sigue siendo otro usuario** aunque la caja ya no le pida
+firma para abrirse (RN-MDP-008, ADR-048): es quien **recibe** el efectivo
+cuando el turno cerró (`en_caja → en_supervisor`, RN-MDP-002), y eso exige
+`accounting.caja_relevar` — permiso que el cajero no tiene ni debe tener.
+Con un solo usuario la cadena de custodia no se puede recorrer.
 
 Idempotente y **prohibido fuera de e2e**: crea un usuario con PIN conocido.
 Correr: `python -m src.seeders.e2e`
@@ -167,8 +168,9 @@ def sembrar_e2e(session: Session) -> dict:
             )
     punto_venta = puntos_venta[0]
 
-    # `supervisor` es quien releva la caja (RN-MDP-002): tiene
-    # `accounting.caja_relevar`, que es el permiso que la apertura exige.
+    # `supervisor` es quien recibe el efectivo del cajón al terminar el
+    # turno (RN-MDP-002): tiene `accounting.caja_relevar`, el permiso que
+    # exige firmar un tramo de la cadena de custodia.
     _usuario_con_rol(session, ENCARGADO_USUARIO, ENCARGADO_PIN, "supervisor", sucursal)
     _usuario_con_rol(session, CAJERO_USUARIO, CAJERO_PIN, "cajero", sucursal)
 

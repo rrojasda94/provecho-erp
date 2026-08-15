@@ -1,7 +1,8 @@
 """Reglas de dominio del libro contable y del ciclo de caja: tipos de
 cuenta, cuadre de asiento, qué admite un periodo según su estado
 (RN-CTB-001/002), conteo por denominación (RN-POS-003/007), cadena de
-custodia del efectivo (RN-MDP-002) y corrección de un cierre (RN-MDP-005).
+custodia del efectivo (RN-MDP-002/008) y corrección de un cierre
+(RN-MDP-005).
 """
 
 from decimal import Decimal
@@ -92,10 +93,16 @@ def total_declarado_en_pos(reportes: list | None) -> Decimal:
     )
 
 
-# --- Cadena de custodia del efectivo (RN-MDP-002/006) -----------------------
+# --- Cadena de custodia del efectivo (RN-MDP-002/006/008) -------------------
 # El efectivo no "desaparece" al cerrar la caja: pasa de mano en mano y cada
 # tramo tiene un responsable con nombre. `disponible` es el final del
 # recorrido — depositado o convertido en el fondo de la siguiente apertura.
+#
+# El recorrido **empieza en `en_caja`** desde ADR-048: al cerrar, la plata
+# sigue en el cajón a nombre del cajero, y `en_caja → en_supervisor` es la
+# entrega que el encargado firma cuando pasa a buscarla. Antes la custodia
+# nacía en `en_supervisor` porque el cierre ya exigía su firma; sin esa
+# firma, nacer ahí sería dar por entregado lo que nadie recibió.
 CUSTODIA_TRANSICIONES: dict[str, tuple[str, ...]] = {
     "en_caja": ("en_supervisor",),
     # Con caja fuerte y monto bajo el efectivo se queda en la sucursal
@@ -121,6 +128,13 @@ def puede_reabrir_cierre(estado_cierre: str, estado_custodia: str) -> bool:
     Una vez que el dinero llegó a contabilidad o se liberó, recontar el
     cajón ya no prueba nada: la corrección de ahí en adelante es un asiento
     contable, no una reapertura.
+
+    Los dos tramos que siguen valiendo son los mismos de siempre
+    (`en_caja`, `en_supervisor`), y con ADR-048 la ventana **se ensancha
+    hacia el lado correcto**: el cierre recién hecho ya no salta a
+    `en_supervisor`, así que recontar mientras la plata sigue en el cajón
+    —el caso en que recontar de verdad prueba algo— pasó a ser el caso
+    normal en vez de un estado que el sistema nunca escribía.
     """
     return (
         estado_cierre in _CIERRES_REABRIBLES

@@ -135,12 +135,15 @@ de su módulo y se prueban de forma aislada.
 - **RN-MDP-001** Un medio de pago a crédito puede tener una lista de
   precios distinta a la del pago al contado.
 - **RN-MDP-002** El efectivo sigue una cadena de custodia obligatoria:
-  cajero → encargado de tienda/supervisor (al cierre de caja, tras
-  confirmar valores) → área contable (verifica y pone a disposición de la
-  empresa). En la apertura de caja la cadena se recorre en sentido
-  inverso: área contable/encargado de tienda/supervisor → cajero. Cada
-  relevo, en cualquier sentido, exige que quien recibe se autentique con
-  usuario y PIN en el ERP y confirme que los valores son correctos.
+  cajero → encargado de tienda/supervisor → área contable (verifica y pone
+  a disposición de la empresa). En la apertura, el fondo recorre la misma
+  cadena en sentido inverso. **Cada relevo, en cualquier sentido, exige que
+  quien recibe se autentique con usuario y PIN en el ERP y confirme que los
+  valores son correctos.**
+  *Enmendada el 2026-08-15 (RN-MDP-008, ADR-048)*: lo que se firma es **el
+  traspaso del efectivo**, no el acto de abrir o cerrar el turno. Abrir y
+  cerrar son conteos que el cajero hace solo; el relevo firmado ocurre
+  cuando la plata cambia de manos, que puede ser horas después del cierre.
 - **RN-MDP-003** Un pago a crédito con otra empresa lo regulariza el área
   contable.
 - **RN-MDP-004** Ante disconformidad o duplicidad de un cobro, el área
@@ -172,6 +175,19 @@ de su módulo y se prueban de forma aislada.
   autorización de supervisor**; ingresar no, porque meter plata al cajón no
   es la operación de la que hay que desconfiar. Un retiro nunca puede
   exceder el efectivo disponible: el cajón no da crédito.
+- **RN-MDP-008** **El cajero abre y cierra su turno de caja solo.** Le basta
+  su propio permiso de operar caja: no hace falta la firma de un encargado
+  ni de nadie más. Lo que prueba cuánto había en el cajón es el conteo por
+  denominación (RN-POS-003/007), no una firma — y exigir que un encargado
+  viniera a poner su PIN en cada apertura terminaba, en el local, con la
+  sesión del encargado abierta en la caja todo el turno, que es peor que no
+  pedir nada.
+  **Al cerrar, el efectivo queda en el cajón a nombre del cajero.** La
+  entrega al encargado de tienda/supervisor es un acto **posterior y
+  aparte**, y esa sí la firma quien recibe con su usuario y PIN
+  (RN-MDP-002). Mientras no la firme nadie, el responsable del faltante
+  sigue siendo el cajero (RN-MDP-005): dar por entregado lo que sigue en el
+  cajón le atribuiría la plata a alguien que no la tocó.
 
 ## Impuestos
 

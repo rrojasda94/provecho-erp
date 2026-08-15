@@ -323,7 +323,6 @@ const PDV: Caso[] = [
         punto_venta_id: UUID,
         monto_declarado: "200.00",
         detalle_denominaciones: { "100": 2 },
-        autorizacion: "t",
         pos_verificados: [{ pos_tarjeta_id: UUID, operativo: true }],
       }),
     // `POST /cajas/apertura` devuelve `id` y el PDV lo renombra a
@@ -338,7 +337,6 @@ const PDV: Caso[] = [
     api.cerrarCaja(UUID, {
       detalle_denominaciones: { "100": 2 },
       custodia: "local_caja_fuerte",
-      autorizacion: "t",
       descuadre_atribucion: null,
       reportes_pos: [{ pos_tarjeta_id: UUID, monto_lote: "0" }],
     }),

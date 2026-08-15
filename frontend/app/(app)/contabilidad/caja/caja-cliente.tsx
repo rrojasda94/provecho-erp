@@ -41,10 +41,15 @@ export type Sucursal = { id: string; nombre: string };
 
 const ESTADO_INICIAL: EstadoCaja = { error: "", ok: false };
 
-/** La cadena de custodia solo avanza (RN-MDP-002): del encargado a
- * contabilidad, y de ahí a depositado/disponible. El paso siguiente no se
- * elige de una lista porque no hay dos caminos — es uno solo, y ofrecer un
- * `<select>` sugeriría que se puede saltear un tramo. */
+/** La cadena de custodia solo avanza (RN-MDP-002): del cajón al encargado,
+ * del encargado a contabilidad, y de ahí a depositado/disponible. El paso
+ * siguiente no se elige de una lista porque no hay dos caminos — es uno
+ * solo, y ofrecer un `<select>` sugeriría que se puede saltear un tramo.
+ *
+ * El primer escalón es el que **de hecho** se usa desde ADR-048: un turno
+ * recién cerrado queda `en_caja`, porque el cajero cierra solo y la plata
+ * sigue en el cajón hasta que alguien firme que la recibió. Antes ese estado
+ * existía en la tabla de transiciones y no lo escribía nadie. */
 const SIGUIENTE: Record<string, { estado: string; boton: string }> = {
   en_caja: { estado: "en_supervisor", boton: "Recibe el encargado" },
   en_supervisor: { estado: "en_contabilidad", boton: "Recibe contabilidad" },
@@ -65,7 +70,9 @@ const ESTADO_CIERRE: Record<string, string> = {
 };
 
 const TRAMO: Record<string, string> = {
-  en_caja: "en el cajón",
+  // Dice de quién es la responsabilidad, no dónde está el sobre: un turno
+  // cerrado sigue siendo del cajero hasta que otro firme haberlo recibido.
+  en_caja: "en el cajón, a cargo del cajero",
   en_supervisor: "con el encargado",
   en_contabilidad: "en contabilidad",
   disponible: "disponible",
@@ -434,8 +441,9 @@ export function CajaCliente({
       <div>
         <h2 className="font-heading text-lg italic uppercase text-dark">Turnos cerrados hoy</h2>
         <p className="text-sm text-gray">
-          Cada turno cerrado entrega su efectivo por la cadena de custodia, y cada tramo lo
-          firma quien recibe. Un cierre con faltante se reabre y se recuenta: no se
+          El cajero abre y cierra su turno solo; el efectivo queda en el cajón a su nombre
+          hasta que alguien firme que lo recibió. De ahí en adelante cada tramo de la cadena
+          lo firma quien recibe. Un cierre con faltante se reabre y se recuenta: no se
           reescribe.
         </p>
       </div>

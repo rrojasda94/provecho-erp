@@ -1,6 +1,11 @@
-"""Ciclo de caja completo (ADR-025): conteo por denominación, relevo firmado
-con PIN, POS de tarjeta, cadena de custodia, corrección de un cierre y el
-candado que impide cobrar sin turno abierto.
+"""Ciclo de caja completo (ADR-025, enmendado por ADR-048): conteo por
+denominación, POS de tarjeta, cadena de custodia firmada con PIN, corrección
+de un cierre y el candado que impide cobrar sin turno abierto.
+
+La línea que separa los dos grupos de casos de acá: **abrir y cerrar los
+hace el cajero solo** (RN-MDP-008) y **entregar el efectivo lo firma quien
+recibe** (RN-MDP-002). Un test que exija PIN para abrir estaría probando la
+regla vieja.
 
 Reusa el entorno de `test_dashboard_caja` (empresa real sembrada, punto de
 venta, producto con precio, cajero y encargado): armar un segundo fixture
@@ -13,6 +18,8 @@ from decimal import Decimal
 from sqlalchemy import select
 
 from src.modules.accounting.infrastructure.models import CierreCaja, PosTarjeta
+from src.modules.users.infrastructure.models import Usuario, UsuarioSucursal
+from src.modules.users.infrastructure.security import hash_pin
 from tests.conftest import billetes
 from tests.test_dashboard_caja import (  # noqa: F401
     _abrir_caja,
@@ -46,7 +53,6 @@ def test_apertura_con_denominacion_inexistente_falla(env):
             "monto_declarado": "37.00",
             # No existe un billete de 37 soles.
             "detalle_denominaciones": {"37": 1},
-            "autorizacion": _autorizacion(client, "accounting.caja_relevar"),
         },
     )
     assert r.status_code == 409
@@ -62,54 +68,183 @@ def test_cierre_toma_el_monto_del_conteo_no_de_un_numero_tipeado(env):
     assert Decimal(cierre["descuadre_monto"]) == 0
 
 
-# --- Relevo autenticado (RN-MDP-002) ------------------------------------------
-def test_abrir_sin_autorizacion_del_encargado_falla(env):
+# --- El turno lo opera el cajero solo (RN-MDP-008) ----------------------------
+def _cajero(client):
+    """Sesión del cajero de verdad, con su rol y nada más.
+
+    Los demás casos entran como `admin` por comodidad, pero acá el rol **es**
+    lo que se prueba: `cajero` tiene `accounting.caja_operar` y no tiene
+    `accounting.caja_relevar`.
+    """
+    return _token(client, username="cajero1", pin="111111")
+
+
+def test_el_cajero_abre_su_turno_sin_firma_de_nadie(env):
+    """Lo que prueba cuánto había en el cajón es el conteo, no una firma.
+
+    Exigir el PIN de un encargado para abrir no protegía el efectivo y sí
+    obligaba a ir a buscarlo cada mañana — que en el local se resolvía
+    dejando la sesión del encargado abierta en la caja.
+    """
     client, ids, _ = env
     r = client.post(
         "/api/v1/accounting/cajas/apertura",
-        headers=_token(client),
+        headers=_cajero(client),
         json={
             "punto_venta_id": ids["pv_id"],
             "monto_declarado": "100.00",
             "detalle_denominaciones": billetes("100.00"),
-            "autorizacion": "no-es-un-token",
+        },
+    )
+    assert r.status_code == 201, r.text
+    body = r.json()
+    assert body["cajero_id"] == ids["cajero_id"]
+    # Nadie firmó: inventar una contraparte sería peor que decir que no hubo.
+    assert body["relevo_encargado_id"] is None
+
+
+def test_el_cajero_cierra_su_turno_sin_firma_de_nadie(env):
+    client, ids, _ = env
+    h = _cajero(client)
+    apertura = client.post(
+        "/api/v1/accounting/cajas/apertura",
+        headers=h,
+        json={
+            "punto_venta_id": ids["pv_id"],
+            "monto_declarado": "100.00",
+            "detalle_denominaciones": billetes("100.00"),
+        },
+    ).json()
+    r = client.post(
+        f"/api/v1/accounting/cajas/apertura/{apertura['id']}/cierre",
+        headers=h,
+        json={
+            "detalle_denominaciones": billetes("100.00"),
+            "custodia": "local_caja_fuerte",
+        },
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["estado"] == "conforme"
+
+
+def test_sin_caja_operar_no_se_abre_la_caja(env):
+    """Sacar la elevación no dejó el endpoint abierto: el permiso de sesión
+    sigue siendo el candado, y ahora es el único."""
+    client, ids, TestSession = env
+    with TestSession() as s:
+        # Con sucursal —si no, el JWT sale sin `empresa_id` y el 403 vendría
+        # del tenant— y sin un solo rol, que es lo que se quiere probar.
+        usuario = Usuario(
+            username="sinpermisos", pin_hash=hash_pin("999999"), tipo="humano"
+        )
+        s.add(usuario)
+        s.flush()
+        s.add(
+            UsuarioSucursal(
+                usuario_id=usuario.id, sucursal_id=uuid.UUID(ids["sucursal_id"])
+            )
+        )
+        s.commit()
+
+    r = client.post(
+        "/api/v1/accounting/cajas/apertura",
+        headers=_token(client, username="sinpermisos", pin="999999"),
+        json={
+            "punto_venta_id": ids["pv_id"],
+            "monto_declarado": "100.00",
+            "detalle_denominaciones": billetes("100.00"),
         },
     )
     assert r.status_code == 403
 
 
-def test_el_cajero_no_puede_relevarse_a_si_mismo(env):
-    """Un relevo de uno solo no es un relevo: si el mismo usuario entrega y
-    recibe, la cadena de custodia no prueba nada."""
-    client, ids, _ = env
-    r = client.post(
-        "/api/v1/accounting/cajas/apertura",
-        headers=_token(client, username="encargado1", pin="222222"),
-        json={
-            "punto_venta_id": ids["pv_id"],
-            "monto_declarado": "100.00",
-            "detalle_denominaciones": billetes("100.00"),
-            "autorizacion": _autorizacion(client, "accounting.caja_relevar"),
-        },
+# --- Relevo autenticado del efectivo (RN-MDP-002) -----------------------------
+def _entregar(client, headers, custodia_id, estado, autorizacion):
+    return client.post(
+        f"/api/v1/accounting/cajas/custodias/{custodia_id}/entregar",
+        headers=headers,
+        json={"estado_siguiente": estado, "autorizacion": autorizacion},
     )
-    assert r.status_code == 409
+
+
+def _custodia_de(client, headers, apertura_id):
+    """Estado del efectivo del turno.
+
+    Leer la custodia exige `accounting.leer`, que el rol `cajero` no tiene:
+    los casos que operan como cajero pasan acá las cabeceras del `admin`
+    para mirar el resultado. Es una lectura de verificación, no parte del
+    flujo que se prueba.
+    """
+    r = client.get(
+        f"/api/v1/accounting/cajas/apertura/{apertura_id}/custodia", headers=headers
+    )
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+def test_entregar_sin_autorizacion_de_quien_recibe_falla(env):
+    """Acá sí hay una entrega de efectivo, y sin firma no prueba nada."""
+    client, ids, _ = env
+    h = _token(client)
+    apertura = _abrir_caja(client, h, ids, monto="100.00").json()
+    _cerrar_caja(client, h, apertura["id"], "100.00")
+    custodia_id = _custodia_de(client, h, apertura["id"])["id"]
+
+    assert _entregar(
+        client, h, custodia_id, "en_supervisor", "no-es-un-token"
+    ).status_code == 403
 
 
 def test_una_autorizacion_de_otra_accion_no_sirve_para_relevar(env):
     """La elevación está acotada al permiso que se pidió: la de retirar
-    efectivo no abre la caja."""
+    efectivo no sirve para recibirlo."""
     client, ids, _ = env
-    r = client.post(
-        "/api/v1/accounting/cajas/apertura",
-        headers=_token(client),
-        json={
-            "punto_venta_id": ids["pv_id"],
-            "monto_declarado": "100.00",
-            "detalle_denominaciones": billetes("100.00"),
-            "autorizacion": _autorizacion(client, "accounting.caja_retirar"),
-        },
+    h = _token(client)
+    apertura = _abrir_caja(client, h, ids, monto="100.00").json()
+    _cerrar_caja(client, h, apertura["id"], "100.00")
+    custodia_id = _custodia_de(client, h, apertura["id"])["id"]
+
+    r = _entregar(
+        client,
+        h,
+        custodia_id,
+        "en_supervisor",
+        _autorizacion(client, "accounting.caja_retirar"),
     )
     assert r.status_code == 403
+
+
+def test_el_cajero_no_puede_firmar_que_recibio_su_propio_efectivo(env):
+    """El cajero cierra solo, pero **no** se entrega la plata a sí mismo.
+
+    Es la segregación que sobrevive: `accounting.caja_relevar` no está en su
+    rol, así que la elevación con su PIN se rechaza aunque tenga la pantalla
+    abierta con su propia sesión.
+    """
+    client, ids, _ = env
+    h, lector = _cajero(client), _token(client)
+    apertura = _abrir_caja(client, h, ids, monto="100.00").json()
+    _cerrar_caja(client, h, apertura["id"], "100.00")
+    custodia_id = _custodia_de(client, lector, apertura["id"])["id"]
+
+    elevacion = client.post(
+        "/api/v1/auth/autorizar",
+        json={
+            "username": "cajero1",
+            "pin": "111111",
+            "permiso": "accounting.caja_relevar",
+        },
+    )
+    # 401 y no 403: `POST /auth/autorizar` no distingue "PIN equivocado" de
+    # "no tenés el permiso" — decirlo sería confirmarle a cualquiera qué
+    # puede hacer cada usuario del local a fuerza de probar.
+    assert elevacion.status_code == 401, elevacion.text
+    # Sin elevación no hay token que mandar, y el tramo no avanza: la plata
+    # sigue en su cajón, a su nombre.
+    assert _entregar(
+        client, h, custodia_id, "en_supervisor", "sin-firma"
+    ).status_code == 403
+    assert _custodia_de(client, lector, apertura["id"])["estado"] == "en_caja"
 
 
 # --- POS de tarjeta (RN-POS-009/010/011) --------------------------------------
@@ -167,7 +302,6 @@ def test_un_pos_averiado_no_impide_abrir_la_caja(env):
             "punto_venta_id": ids["pv_id"],
             "monto_declarado": "100.00",
             "detalle_denominaciones": billetes("100.00"),
-            "autorizacion": _autorizacion(client, "accounting.caja_relevar"),
             "pos_verificados": [
                 {
                     "pos_tarjeta_id": pos_id,
@@ -184,21 +318,53 @@ def test_un_pos_averiado_no_impide_abrir_la_caja(env):
         assert pos.estado == "averiado"
 
 
-# --- Cadena de custodia (RN-MDP-002/006) --------------------------------------
-def test_el_cierre_deja_el_efectivo_en_custodia_del_encargado(env):
+# --- Cadena de custodia (RN-MDP-002/006/008) ----------------------------------
+def test_el_cierre_deja_el_efectivo_en_el_cajon_a_nombre_del_cajero(env):
+    """El cierre es un conteo, no una entrega.
+
+    Nacer en `en_supervisor` daría por recibida plata que sigue en el cajón,
+    y un faltante detectado después quedaría a nombre de alguien que nunca la
+    tocó.
+    """
     client, ids, _ = env
-    h = _token(client)
+    h, lector = _cajero(client), _token(client)
     apertura = _abrir_caja(client, h, ids, monto="100.00").json()
     _cerrar_caja(client, h, apertura["id"], "100.00")
 
-    r = client.get(
-        f"/api/v1/accounting/cajas/apertura/{apertura['id']}/custodia", headers=h
+    custodia = _custodia_de(client, lector, apertura["id"])
+    assert custodia["estado"] == "en_caja"
+    assert custodia["responsable_actual_id"] == ids["cajero_id"]
+    assert Decimal(custodia["monto"]) == Decimal("100.00")
+    assert custodia["timestamps_relevo"][0]["usuario_id"] == ids["cajero_id"]
+
+
+def test_el_encargado_recibe_el_efectivo_del_cajon_y_queda_firmado(env):
+    """El tramo nuevo: `en_caja → en_supervisor`. Lo firma quien recibe, y
+    el registro dice quién y cuándo — sin eso, un turno de hace tres días no
+    dice en manos de quién quedó la plata."""
+    client, ids, _ = env
+    h, lector = _cajero(client), _token(client)
+    apertura = _abrir_caja(client, h, ids, monto="100.00").json()
+    _cerrar_caja(client, h, apertura["id"], "100.00")
+    custodia_id = _custodia_de(client, lector, apertura["id"])["id"]
+
+    # La pantalla la opera quien tenga `caja_operar` —acá, el propio cajero—
+    # y quien firma es otro: el encargado pone su PIN sobre ese terminal.
+    r = _entregar(
+        client,
+        h,
+        custodia_id,
+        "en_supervisor",
+        _autorizacion(client, "accounting.caja_relevar"),
     )
-    assert r.status_code == 200
+    assert r.status_code == 200, r.text
     custodia = r.json()
     assert custodia["estado"] == "en_supervisor"
     assert custodia["responsable_actual_id"] == ids["encargado_id"]
-    assert Decimal(custodia["monto"]) == Decimal("100.00")
+    firma = custodia["timestamps_relevo"][-1]
+    assert firma["usuario_id"] == ids["encargado_id"]
+    assert firma["rol"] == "en_supervisor"
+    assert firma["timestamp"]
 
 
 def test_la_custodia_avanza_hasta_disponible_y_no_salta_tramos(env):
@@ -206,26 +372,28 @@ def test_la_custodia_avanza_hasta_disponible_y_no_salta_tramos(env):
     h = _token(client)
     apertura = _abrir_caja(client, h, ids, monto="100.00").json()
     _cerrar_caja(client, h, apertura["id"], "100.00")
-    custodia_id = client.get(
-        f"/api/v1/accounting/cajas/apertura/{apertura['id']}/custodia", headers=h
-    ).json()["id"]
+    custodia_id = _custodia_de(client, h, apertura["id"])["id"]
 
     def entregar(estado):
-        return client.post(
-            f"/api/v1/accounting/cajas/custodias/{custodia_id}/entregar",
-            headers=h,
-            json={
-                "estado_siguiente": estado,
-                "autorizacion": _autorizacion(client, "accounting.caja_relevar"),
-            },
+        return _entregar(
+            client,
+            h,
+            custodia_id,
+            estado,
+            _autorizacion(client, "accounting.caja_relevar"),
         )
 
+    # Desde el cajón no se salta a contabilidad: el encargado es un eslabón,
+    # no un trámite.
+    assert entregar("en_contabilidad").status_code == 409
+    assert entregar("en_supervisor").json()["estado"] == "en_supervisor"
     assert entregar("en_contabilidad").json()["estado"] == "en_contabilidad"
     # Volver atrás no es una transición: el efectivo ya cambió de manos.
     assert entregar("en_supervisor").status_code == 409
     r = entregar("disponible")
     assert r.status_code == 200
-    assert len(r.json()["timestamps_relevo"]) == 3
+    # Cuatro firmas: el cajero al cerrar, más los tres tramos entregados.
+    assert len(r.json()["timestamps_relevo"]) == 4
 
 
 # --- Corrección de un cierre (RN-MDP-005) -------------------------------------
@@ -264,22 +432,43 @@ def test_un_cierre_con_faltante_se_reabre_recuenta_y_deja_historial(env):
         assert len(cierres) == 1
 
 
+def test_un_cierre_se_recuenta_mientras_la_plata_siga_en_el_cajon(env):
+    """El caso que antes no existía: recién cerrado, el efectivo ya estaba
+    `en_supervisor`. Ahora sigue `en_caja` y recontarlo prueba algo."""
+    client, ids, _ = env
+    h, lector = _cajero(client), _token(client)
+    apertura = _abrir_caja(client, h, ids, monto="100.00").json()
+    cierre = _cerrar_caja(client, h, apertura["id"], "90.00").json()
+    assert _custodia_de(client, lector, apertura["id"])["estado"] == "en_caja"
+
+    r = client.post(
+        f"/api/v1/accounting/cajas/cierres/{cierre['id']}/reabrir",
+        headers=h,
+        json={
+            "motivo": "el cajero no había contado el fondo del segundo cajón",
+            "autorizacion": _autorizacion(client, "accounting.caja_reabrir"),
+        },
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["estado"] == "en_proceso"
+
+
 def test_no_se_reabre_un_cierre_cuyo_efectivo_ya_esta_en_contabilidad(env):
     client, ids, _ = env
     h = _token(client)
     apertura = _abrir_caja(client, h, ids, monto="100.00").json()
     cierre = _cerrar_caja(client, h, apertura["id"], "90.00").json()
-    custodia_id = client.get(
-        f"/api/v1/accounting/cajas/apertura/{apertura['id']}/custodia", headers=h
-    ).json()["id"]
-    client.post(
-        f"/api/v1/accounting/cajas/custodias/{custodia_id}/entregar",
-        headers=h,
-        json={
-            "estado_siguiente": "en_contabilidad",
-            "autorizacion": _autorizacion(client, "accounting.caja_relevar"),
-        },
-    )
+    custodia_id = _custodia_de(client, h, apertura["id"])["id"]
+    # Dos tramos: la plata sale del cajón y recién después viaja a
+    # contabilidad. Es a partir de ahí que recontar el cajón no prueba nada.
+    for estado in ("en_supervisor", "en_contabilidad"):
+        assert _entregar(
+            client,
+            h,
+            custodia_id,
+            estado,
+            _autorizacion(client, "accounting.caja_relevar"),
+        ).status_code == 200
 
     r = client.post(
         f"/api/v1/accounting/cajas/cierres/{cierre['id']}/reabrir",
@@ -389,7 +578,6 @@ def test_el_cierre_exige_el_lote_de_cada_pos_operativo(env):
             "punto_venta_id": ids["pv_id"],
             "monto_declarado": "100.00",
             "detalle_denominaciones": billetes("100.00"),
-            "autorizacion": _autorizacion(client, "accounting.caja_relevar"),
             "pos_verificados": [{"pos_tarjeta_id": pos_id, "operativo": True}],
         },
     ).json()
@@ -422,7 +610,6 @@ def test_un_pos_averiado_no_debe_reporte(env):
             "punto_venta_id": ids["pv_id"],
             "monto_declarado": "100.00",
             "detalle_denominaciones": billetes("100.00"),
-            "autorizacion": _autorizacion(client, "accounting.caja_relevar"),
             "pos_verificados": [{"pos_tarjeta_id": pos_id, "operativo": False}],
         },
     ).json()
@@ -443,7 +630,6 @@ def test_un_lote_que_no_cuadra_deja_el_cierre_irregular(env):
             "punto_venta_id": ids["pv_id"],
             "monto_declarado": "100.00",
             "detalle_denominaciones": billetes("100.00"),
-            "autorizacion": _autorizacion(client, "accounting.caja_relevar"),
             "pos_verificados": [{"pos_tarjeta_id": pos_id, "operativo": True}],
         },
     ).json()
@@ -490,9 +676,9 @@ def test_turnos_cerrados_traen_descuadre_y_tramo_de_custodia(env):
     assert turno["apertura_caja_id"] == apertura["id"]
     assert Decimal(turno["descuadre_monto"]) == Decimal("-10.00")
     assert turno["estado"] == "con_irregularidad"
-    # El efectivo arranca en el encargado: el tramo cajero→encargado ya lo
-    # firmó el cierre.
-    assert turno["custodia_estado"] == "en_supervisor"
+    # El efectivo arranca en el cajón: el tramo cajero→encargado todavía no
+    # ocurrió y es justo la acción que esta pantalla ofrece.
+    assert turno["custodia_estado"] == "en_caja"
     assert turno["custodia_id"] is not None
     assert turno["caja"]
 
@@ -555,7 +741,6 @@ def test_atribucion_del_descuadre_fuera_del_enum_se_rechaza(env):
         json={
             "detalle_denominaciones": billetes("90.00"),
             "custodia": "Encargado de turno",
-            "autorizacion": _autorizacion(client, "accounting.caja_relevar"),
             "descuadre_atribucion": "falta un billete de 20",
         },
     )
@@ -566,8 +751,9 @@ def test_atribucion_del_descuadre_fuera_del_enum_se_rechaza(env):
 
 def test_destino_de_custodia_fuera_del_enum_se_rechaza(env):
     """`custodia` es a dónde va el efectivo, no el nombre de quien lo recibe
-    —eso ya lo prueba la firma—. Un nombre tecleado entraba y dejaba el turno
-    ilegible igual que la atribución del descuadre."""
+    —eso lo prueba la firma del tramo de custodia—. Un nombre tecleado
+    entraba y dejaba el turno ilegible igual que la atribución del
+    descuadre."""
     client, ids, _ = env
     h = _token(client)
     apertura = _abrir_caja(client, h, ids, monto="100.00").json()
@@ -577,7 +763,6 @@ def test_destino_de_custodia_fuera_del_enum_se_rechaza(env):
         json={
             "detalle_denominaciones": billetes("100.00"),
             "custodia": "Juan el encargado",
-            "autorizacion": _autorizacion(client, "accounting.caja_relevar"),
         },
     )
     assert r.status_code == 422

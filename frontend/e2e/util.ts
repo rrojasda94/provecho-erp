@@ -10,11 +10,14 @@ import { expect, type Page } from "@playwright/test";
  */
 
 export const ADMIN = { usuario: "admin", pin: "123456" };
-/** Releva la caja: abrir exige que quien firma **no** sea el cajero
- * (RN-MDP-002), así que la suite necesita dos personas. */
+/** **Recibe** el efectivo al final del turno: el tramo
+ * `en_caja → en_supervisor` lo firma quien recibe (RN-MDP-002) y para eso
+ * hace falta alguien distinto del cajero. Abrir y cerrar ya no lo necesitan
+ * (RN-MDP-008, ADR-048). */
 export const ENCARGADO = { usuario: "encargado_e2e", pin: "654321" };
 /** El rol con menos permisos que igual opera una pantalla: con él se
- * verifica qué **no** se ve. */
+ * verifica qué **no** se ve, y desde ADR-048 también que puede abrir y
+ * cerrar su turno sin ayuda de nadie. */
 export const CAJERO = { usuario: "cajero_e2e", pin: "111111" };
 
 export async function ingresar(page: Page, quien = ADMIN) {

@@ -29,11 +29,15 @@ import {
 import Pinpad from "./pinpad";
 
 /**
- * Usuario + PIN de quien firma. Cuatro puntos del PDV piden exactamente
- * esto (apertura y cierre de caja, consumo de personal y autorización de
- * supervisor), y hasta ahora cada uno lo escribía por su cuenta con un
- * `<input type="password">` — cuatro sitios donde el navegador ofrecía
+ * Usuario + PIN de quien firma. Cada uno lo escribía por su cuenta con un
+ * `<input type="password">` — un sitio más donde el navegador ofrecía
  * guardar el PIN, que es de donde salía la cuenta compartida (ADR-045).
+ *
+ * Quedan dos puntos que lo piden: el consumo de personal y la autorización
+ * de supervisor. La apertura y el cierre de caja lo dejaron de pedir con
+ * ADR-048 — el turno lo opera el cajero solo, y la única firma del ciclo de
+ * caja es la del encargado que recibe el efectivo, que ocurre en
+ * `/contabilidad/caja` y no en el PDV.
  */
 function FirmaConPin({
   quien,
@@ -130,13 +134,14 @@ export function Dialogo({
 const BILLETES = [200, 100, 50, 20, 10];
 const MONEDAS = [5, 2, 1, 0.5, 0.2, 0.1];
 
-/** Apertura: se cuenta el cajón por denominación (RN-POS-003) y el
- * encargado que entrega el efectivo se identifica con su PIN.
+/** Apertura: se cuenta el cajón por denominación (RN-POS-003) y se verifican
+ * los terminales.
  *
- * Las dos cosas son la misma idea: la caja arranca con un traspaso de
- * custodia entre dos personas (RN-MDP-002). Contar pieza por pieza es lo
- * que hace que el cierre signifique algo, y firmar con PIN es lo que hace
- * que un faltante tenga a quién preguntarle. */
+ * **La abre el cajero solo** (RN-MDP-008, ADR-048). Antes pedía además el
+ * PIN del encargado que entregaba el fondo: no probaba nada que el conteo no
+ * pruebe mejor, y obligaba a que alguien viniera a firmar cada mañana — lo
+ * que en el local se resolvía dejando la sesión del encargado abierta en la
+ * caja, que es exactamente lo contrario de lo que la firma buscaba. */
 export function DialogoApertura({
   abierto,
   pos,
@@ -149,15 +154,12 @@ export function DialogoApertura({
     montoDeclarado: number;
     detalle: Record<string, number>;
     posVerificados: { pos_tarjeta_id: string; operativo: boolean; observacion?: string }[];
-    encargado: { username: string; pin: string };
   }) => void;
   ocupado: boolean;
 }) {
   const [conteo, setConteo] = useState<Record<string, number>>({});
   const [declarado, setDeclarado] = useState("");
   const [averiados, setAveriados] = useState<Record<string, string>>({});
-  const [usuario, setUsuario] = useState("");
-  const [pin, setPin] = useState("");
   const total = Object.entries(conteo).reduce(
     (a, [v, n]) => a + Number(v) * (n || 0),
     0,
@@ -246,20 +248,6 @@ export function DialogoApertura({
         </>
       )}
 
-      <p className="pdv-etiqueta">Entrega el encargado</p>
-      <FirmaConPin
-        quien="del encargado"
-        usuario={usuario}
-        onUsuario={setUsuario}
-        pin={pin}
-        onPin={setPin}
-        testid="apertura"
-      />
-      <p className="pdv-nota">
-        El efectivo se entrega de una persona a otra: quien lo entrega firma
-        con su PIN para que un faltante tenga a quién preguntarle.
-      </p>
-
       <footer className="pdv-dialogo-pie">
         <div>
           <p className="pdv-etiqueta">Monto de apertura</p>
@@ -268,7 +256,7 @@ export function DialogoApertura({
         <button
           type="button"
           className="pdv-boton-pri"
-          disabled={ocupado || !usuario.trim() || !pin.trim() || declarado === ""}
+          disabled={ocupado || declarado === ""}
           onClick={() =>
             onAbrir({
               montoDeclarado: Number(declarado) || 0,
@@ -278,7 +266,6 @@ export function DialogoApertura({
                 operativo: !(p.id in averiados),
                 observacion: averiados[p.id]?.trim() || undefined,
               })),
-              encargado: { username: usuario.trim(), pin },
             })
           }
         >
@@ -332,8 +319,12 @@ function ConteoDenominaciones({
 }
 
 /** Cierre: mismo conteo pieza por pieza que la apertura, el reporte de lote
- * de cada terminal que abrió operativo (RN-POS-004) y la firma de quien
- * recibe el efectivo (RN-MDP-002).
+ * de cada terminal que abrió operativo (RN-POS-004) y a dónde va a ir el
+ * efectivo.
+ *
+ * **Lo cierra el cajero solo** (RN-MDP-008, ADR-048). El destino que elige
+ * acá es una declaración, no una entrega: la plata queda en el cajón a su
+ * nombre y quien la recibe la firma después, en `/contabilidad/caja`.
  *
  * Los descuadres los calcula el servidor —conoce lo cobrado y los
  * movimientos del turno, el PDV no—; acá solo se le entrega lo contado y lo
@@ -353,7 +344,6 @@ export function DialogoCierre({
     custodia: CustodiaDestino;
     atribucion: DescuadreAtribucion | "";
     reportesPos: { pos_tarjeta_id: string; monto_lote: string; referencia?: string }[];
-    receptor: { username: string; pin: string };
   }) => void;
   ocupado: boolean;
 }) {
@@ -364,8 +354,6 @@ export function DialogoCierre({
   const [custodia, setCustodia] = useState<CustodiaDestino | "">("");
   const [atribucion, setAtribucion] = useState<DescuadreAtribucion | "">("");
   const [lotes, setLotes] = useState<Record<string, string>>({});
-  const [usuario, setUsuario] = useState("");
-  const [pin, setPin] = useState("");
   const total = Object.entries(conteo).reduce(
     (a, [v, n]) => a + Number(v) * (n || 0),
     0,
@@ -380,8 +368,6 @@ export function DialogoCierre({
     setCustodia("");
     setAtribucion("");
     setLotes({});
-    setUsuario("");
-    setPin("");
   }, [abierto]);
 
   return (
@@ -424,9 +410,9 @@ export function DialogoCierre({
       )}
 
       <p className="pdv-etiqueta">A dónde va el efectivo</p>
-      {/* El destino, no el nombre de quien recibe: a quién se le entregó ya
-          queda probado por el PIN de abajo, y escribirlo además era un dato
-          suelto que no coincidía con nadie. */}
+      {/* El destino, no el nombre de quien recibe: a quién se le entregó lo
+          prueba la firma del tramo de custodia cuando ocurra, y escribirlo
+          acá era un dato suelto que no coincidía con nadie. */}
       <select
         className="pdv-campo"
         aria-label="A dónde va el efectivo"
@@ -438,15 +424,10 @@ export function DialogoCierre({
         <option value="local_caja_fuerte">Caja fuerte del local</option>
         <option value="traslado_contabilidad">Traslado a contabilidad</option>
       </select>
-      <p className="pdv-etiqueta">Recibe</p>
-      <FirmaConPin
-        quien="de quien recibe"
-        usuario={usuario}
-        onUsuario={setUsuario}
-        pin={pin}
-        onPin={setPin}
-        testid="cierre"
-      />
+      <p className="pdv-nota">
+        El efectivo queda en el cajón a tu nombre hasta que el encargado firme
+        que lo recibió.
+      </p>
 
       <p className="pdv-etiqueta">Si hay descuadre, a quién se le atribuye</p>
       {/* Tres valores y no texto libre: es un enum en la base (RN-MDP-005), y
@@ -475,11 +456,7 @@ export function DialogoCierre({
           type="button"
           className="pdv-boton-pri"
           disabled={
-            ocupado ||
-            !custodia ||
-            !usuario.trim() ||
-            !pin.trim() ||
-            operativos.some((p) => !lotes[p.pos_tarjeta_id])
+            ocupado || !custodia || operativos.some((p) => !lotes[p.pos_tarjeta_id])
           }
           onClick={() => {
             // El botón ya está deshabilitado sin destino; el chequeo existe
@@ -495,7 +472,6 @@ export function DialogoCierre({
                 pos_tarjeta_id: p.pos_tarjeta_id,
                 monto_lote: String(Number(lotes[p.pos_tarjeta_id]) || 0),
               })),
-              receptor: { username: usuario.trim(), pin },
             });
           }}
         >

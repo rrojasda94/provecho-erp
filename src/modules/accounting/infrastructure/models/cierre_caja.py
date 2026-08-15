@@ -35,8 +35,11 @@ class CierreCaja(Base, UuidPkMixin, TimestampMixin):
     )
     # Referencias a `archivo` (reportes de cierre de lote de cada POS).
     reportes_pos: Mapped[list | None] = mapped_column(JsonB, nullable=True)
-    # Cajero → encargado → contabilidad, cada uno autenticado con
-    # usuario+PIN — lista de {rol, usuario_id, timestamp}.
+    # Quién actuó sobre este cierre y cuándo — lista de
+    # {rol, usuario_id, timestamp}. Desde ADR-048 son actos del cajero (el
+    # cierre y cada recuento tras una reapertura): la entrega del efectivo
+    # dejó de anotarse acá porque ya no ocurre al cerrar, y su rastro vive
+    # en `custodia_efectivo.timestamps_relevo`, que es donde la firma existe.
     relevos: Mapped[list | None] = mapped_column(JsonB, nullable=True)
     # Reaperturas y recuentos: un cierre con faltante se corrige, y la
     # corrección tiene que verse. Lista de {motivo, autorizado_por,

@@ -247,6 +247,9 @@ export type PosVerificadoNuevo = {
   observacion?: string;
 };
 
+/** Sin `autorizacion`: el turno lo abre el cajero con su propia sesión
+ * (RN-MDP-008, ADR-048). La firma con PIN quedó donde hay una entrega de
+ * efectivo de verdad — la cadena de custodia del cierre. */
 export type AperturaCajaNueva = {
   punto_venta_id: string;
   /** Lo que el encargado dice entregar. Lo que el cajero cuenta va en
@@ -255,7 +258,6 @@ export type AperturaCajaNueva = {
   monto_declarado: string;
   /** Valor del billete → piezas contadas. */
   detalle_denominaciones: Record<string, number>;
-  autorizacion: string;
   pos_verificados?: PosVerificadoNuevo[] | null;
 };
 
@@ -274,10 +276,12 @@ export const esCustodia = (v: string): v is CustodiaDestino =>
 export const esAtribucion = (v: string): v is DescuadreAtribucion =>
   (ATRIBUCIONES as readonly string[]).includes(v);
 
+/** Sin `autorizacion`, igual que la apertura: lo cierra el cajero solo. El
+ * efectivo queda `en_caja` a su nombre y la entrega se firma después, en
+ * `/contabilidad/caja`. */
 export type CierreCajaNuevo = {
   detalle_denominaciones: Record<string, number>;
   custodia: CustodiaDestino;
-  autorizacion: string;
   descuadre_atribucion?: DescuadreAtribucion | null;
   reportes_pos?: {
     pos_tarjeta_id: string;
@@ -407,7 +411,7 @@ export const api = {
     pedir<PosTarjeta[]>(`/accounting/pos-tarjeta?sucursal_id=${sucursalId}`),
 
   /** `POST /cajas/apertura` devuelve el registro completo de la apertura
-   * (`id`, `relevo_encargado_id`, `diferencia_reportada`...); `GET
+   * (`id`, `diferencia_reportada`, `pos_verificados`...); `GET
    * /cajas/abiertas` devuelve la vista liviana de la lista, con
    * `apertura_caja_id`. Se normaliza acá para que el resto del PDV — que
    * después necesita ese id para cerrar la caja o registrar propinas — no

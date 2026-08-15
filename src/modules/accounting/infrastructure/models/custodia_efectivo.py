@@ -1,6 +1,10 @@
 """Custodia de efectivo: cadena cajero → encargado/supervisor →
 contabilidad (RN-MDP-002). Cada transición exige confirmación de
 valores correctos por el receptor (validado en el dominio).
+
+Nace en `en_caja` al cerrar el turno, a nombre del cajero (RN-MDP-008,
+ADR-048): el cierre es un conteo, no una entrega. Recién cuando el
+encargado firma con su PIN el efectivo pasa a `en_supervisor`.
 """
 
 import uuid
