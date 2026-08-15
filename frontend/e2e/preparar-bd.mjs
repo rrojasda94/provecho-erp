@@ -17,11 +17,12 @@
 import { execFileSync } from "node:child_process";
 import { rmSync } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 
-const AQUI = path.dirname(fileURLToPath(import.meta.url));
-const RAIZ = path.resolve(AQUI, "..", "..");
-const PYTHON = process.env.PYTHON ?? "python";
+import { RAIZ, interprete } from "./interprete.mjs";
+
+// Ver `interprete.mjs`: en un worktree no hay `.venv` y el `python` del PATH
+// no tiene instalado el paquete `src`.
+const PYTHON = interprete();
 
 const PREPARAR = `
 import src.core.models_registry  # noqa: F401

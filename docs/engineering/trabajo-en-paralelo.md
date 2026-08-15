@@ -43,6 +43,52 @@ renumera**, siempre, y lo hace antes de mergear:
 | Changelog | `changelog.d/` | Nada: un archivo por cambio, no hay punto de inserción compartido |
 | Deuda técnica | `docs/roadmap/deuda/<área>.md` | Nada, salvo que sean de la misma área |
 
+## Los recursos que no se numeran solos: puertos y bases
+
+Los de arriba chocan al mergear. Éstos chocan **mientras se trabaja**, que es
+peor: el síntoma no dice "otro agente", dice `EADDRINUSE`, o —el modo de
+falla caro— Playwright **reusa el servidor del otro worktree** y la suite
+corre contra código que no es el suyo, en verde.
+
+Cada sesión toma un **slot**, el mismo número para todo:
+
+| Slot | `E2E_PUERTO_API` | `E2E_PUERTO_WEB` | Base Postgres de trabajo |
+|---|---|---|---|
+| 0 (defecto) | 8100 | 3100 | `provecho` |
+| 1 | 8101 | 3101 | `provecho_slot1` |
+| 2 | 8102 | 3102 | `provecho_slot2` |
+| N | `810N` | `310N` | `provecho_slotN` |
+
+```bash
+# Playwright, las dos suites
+E2E_PUERTO_API=8101 E2E_PUERTO_WEB=3101 npm run test:e2e
+E2E_PUERTO_API=8101 E2E_PUERTO_WEB=3101 npm run test:uso
+
+# Trabajo manual contra la API: base propia, en el `.env` del worktree
+DATABASE_URL=postgresql+psycopg://provecho:provecho@localhost:5432/provecho_slot1
+```
+
+El **8100 del slot 0 suele estar tomado por el `docker-compose`** de la
+máquina, así que un agente que corra con los valores por defecto choca contra
+él sin que haya ningún otro agente involucrado. Tomar un slot desde el
+principio evita esa media hora.
+
+Las **suites de Playwright no necesitan Postgres**: corren contra un SQLite
+desechable (`e2e.db`) en la raíz del worktree, que ya es propio de cada uno.
+La base por slot es para el trabajo manual contra la API y las pantallas de
+desarrollo, donde dos agentes sí compartirían datos.
+
+`pytest` tampoco necesita coordinación: usa SQLite en memoria.
+
+### El intérprete de Python
+
+Un worktree **no tiene `.venv` propio** — el entorno vive una sola vez en la
+raíz del repo principal. Los scripts de la suite lo resuelven solos
+(`frontend/e2e/interprete.mjs`): `.venv` del worktree → `.venv` del repo
+principal (por `git rev-parse --git-common-dir`) → `python` del PATH. `PYTHON`
+sigue mandando sobre todo si hace falta apuntar a otro lado. **Nunca
+commitear una ruta absoluta**: son distintas en cada máquina.
+
 ## Integrar `main`, no esperar a que duela
 
 `main` exige que la rama esté al día antes de mergear. Integrarla seguido
