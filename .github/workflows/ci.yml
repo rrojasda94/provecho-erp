@@ -223,3 +223,52 @@ jobs:
           name: e2e-playwright
           path: frontend/test-results/
           retention-days: 7
+
+  # Recorridos de uso con captura en cada hito (ADR-047). Responde otra
+  # pregunta que `e2e`: no "¿arranca?" sino "¿esto se puede usar?", y su
+  # salida no es el verde sino el artefacto — las capturas son lo que permite
+  # mirar una pantalla sin instalar el ERP.
+  #
+  # **NO es un check requerido y no debe serlo.** El ruleset de `main` exige
+  # seis jobs (`backend`, `migraciones`, `imagen`, `seguridad`, `frontend`,
+  # `e2e`); éste queda deliberadamente afuera. Un recorrido largo tarda
+  # minutos y se cae por cosas que no son bugs —una pantalla que cambió una
+  # etiqueta, un runner lento—, y nada de eso puede impedir que se despliegue
+  # un arreglo de caja. Si alguien lo agrega al ruleset, está cambiando esa
+  # decisión, no corrigiendo un olvido.
+  #
+  # `continue-on-error` por lo mismo: sin él el job aparece rojo en el PR y a
+  # las dos semanas nadie distingue "hay algo roto" de "esto siempre está
+  # así". El costo aceptado es que una regresión real acá no grita; se ve
+  # mirando el artefacto, que es justamente para lo que existe.
+  uso:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - run: pip install -e ".[dev]"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - run: npm run test:uso
+        working-directory: frontend
+      # `always()` y no `failure()`, al revés que en `e2e`: acá la corrida
+      # verde es la que hay que poder mirar. Un artefacto que solo aparece
+      # cuando algo falla convierte esta suite en un e2e lento y nada más.
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: uso-playwright
+          path: frontend/test-results/
+          retention-days: 7

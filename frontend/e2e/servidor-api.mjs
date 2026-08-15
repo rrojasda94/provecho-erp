@@ -11,17 +11,20 @@
  * Fijar la variable dentro del proceso que la usa quita el intermediario.
  */
 import { spawn } from "node:child_process";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 
-const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+import { RAIZ, interprete } from "./interprete.mjs";
 
 // 8100 salvo que el puerto ya esté ocupado por otra cosa en la máquina de
-// quien corre la suite. `E2E_PUERTO_API` lo mueve; el default no cambia.
+// quien corre la suite —o por **otro agente**, que es el caso frecuente
+// desde que se trabaja en paralelo—. `E2E_PUERTO_API` lo mueve; el default
+// no cambia. El esquema de slots está en
+// `docs/engineering/trabajo-en-paralelo.md`.
 const PUERTO = process.env.E2E_PUERTO_API ?? "8100";
 
 const hijo = spawn(
-  process.env.PYTHON ?? "python",
+  // Ver `interprete.mjs`: en un worktree no hay `.venv` y el `python` del
+  // PATH no tiene instalado el paquete `src`.
+  interprete(),
   ["-m", "uvicorn", "src.main:app", "--host", "127.0.0.1", "--port", PUERTO],
   {
     cwd: RAIZ,
