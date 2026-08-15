@@ -18,6 +18,12 @@ class Settings(BaseSettings):
     environment: str = "local"
     debug: bool = False
     database_url: str = "postgresql+psycopg://provecho:provecho@localhost:5432/provecho"
+    # Cuánto deja correr Postgres una consulta antes de cancelarla. Dos plazos
+    # y no uno: el cobro de una mesa y un reporte de márgenes del trimestre no
+    # aguantan la misma espera, y con un solo número había que elegir entre
+    # matar reportes legítimos o dejar la caja colgada. 0 = sin límite.
+    db_statement_timeout_segundos: int = 15
+    db_statement_timeout_reportes_segundos: int = 120
     # Zona del negocio, no la del servidor: de ella sale "qué día es hoy"
     # para el ERP (`src/shared/fechas.py`). En Docker el sistema corre en UTC,
     # y con eso un cierre de las 20:00 hora Perú caía al día siguiente.

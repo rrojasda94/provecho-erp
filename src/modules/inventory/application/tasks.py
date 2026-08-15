@@ -15,6 +15,10 @@ from src.modules.inventory.application import conteos, guias
 from src.modules.inventory.application import lotes as lotes_uc
 from src.shared.integrations.factiliza import FactilizaError
 
+# Inyectable (los tests la reemplazan), mismo patrón que `listeners`: sin
+# esto un barrido ejercitado en un test abre la sesión de producción.
+session_factory = SessionLocal
+
 REINTENTOS_MAXIMOS = 4
 ESPERA_BASE_SEGUNDOS = 60
 
@@ -27,7 +31,7 @@ ESPERA_BASE_SEGUNDOS = 60
     retry_kwargs={"max_retries": REINTENTOS_MAXIMOS},
 )
 def emitir_guia_remision(self, guia_id: str) -> str:
-    session = SessionLocal()
+    session = session_factory()
     try:
         guia = guias.enviar_a_sunat(session, uuid.UUID(guia_id))
         session.commit()
@@ -56,7 +60,7 @@ def bloquear_lotes_vencidos() -> int:
     Sin filtro de empresa ni de almacén: un periódico no tiene tenant, y un
     lote vencido lo está para todas.
     """
-    session = SessionLocal()
+    session = session_factory()
     try:
         bloqueados = lotes_uc.bloquear_vencidos(session)
         session.commit()
@@ -79,7 +83,7 @@ def reportar_conteos_vencidos() -> int:
     recordatorio, no una alerta de evento— a diferencia de
     `stock_bajo_minimo`, que avisa al cruzar justamente para no repetirse.
     """
-    session = SessionLocal()
+    session = session_factory()
     try:
         vencidos = conteos.reportar_vencidos(session)
         session.commit()
