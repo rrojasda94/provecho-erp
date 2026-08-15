@@ -387,3 +387,14 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   haría cumplir aunque otro camino borre el padre. Es una migración de una
   línea; se dejó fuera para no mezclar un cambio de esquema con un arreglo
   que ya estaba probado.
+- ⬜ **El receptor del comprobante en el PDV no tiene el botón «Buscar por
+  DNI/RUC»** (2026-08-15, ADR-041): es donde más se teclea un documento —el
+  cajero lo pide para emitir la factura— y el único de los cuatro puntos que
+  quedó sin la consulta. El permiso `consulta.documento` se le da al `cajero`
+  justamente por este caso, así que hoy lo tiene y no puede usarlo desde la
+  caja. El campo vive en `frontend/app/pdv/dialogos.tsx`, que otra rama
+  estaba editando al mismo tiempo: se dejó fuera para no chocar, no porque no
+  corresponda. Montarlo no es solo agregar el componente —ya se esconde solo
+  si falta el permiso—: `BuscarDocumento` escribe en el **DOM** del `<form>`
+  que lo contiene, y el PDV no es un formulario no controlado como el
+  back-office, así que primero hay que decidir dónde deja el dato.

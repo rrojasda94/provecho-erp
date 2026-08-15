@@ -16,15 +16,54 @@ Solo lectura: acá no se guarda nada.
 
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 
+from src.config.settings import settings
+from src.core.rate_limit import consumir, ip_de
 from src.modules.users.api.deps import require_permission
 from src.shared.integrations.factiliza import FactilizaClient, FactilizaError
 
 router = APIRouter(prefix="/consulta", tags=["consulta"])
 
 CONSULTAR = "consulta.documento"
+
+# Una sola instancia y no `require_permission(CONSULTAR)` en cada endpoint:
+# FastAPI cachea el resultado de una dependencia **por objeto llamable**, y la
+# factory devuelve uno nuevo en cada llamada. Compartirlo es lo que hace que
+# los permisos se resuelvan una vez por request y no dos.
+_exigir_permiso = require_permission(CONSULTAR)
+
+
+def _con_cuota(request: Request, usuario=Depends(_exigir_permiso)):
+    """Permiso + cuota. Lo que se cuida acá es el **gasto**: cada consulta
+    vale una llamada a un proveedor pago (ADR-041).
+
+    Se cuenta por usuario **y** por IP porque ninguna de las dos alcanza sola.
+    Solo por IP, un local con cuatro cajas comparte una cuota y el cajero que
+    se pasa deja sin consultar a los otros tres; solo por usuario, nada frena
+    a quien tenga varias cuentas a mano.
+
+    El usuario primero: es el límite angosto y el que identifica a quien se
+    está pasando, y cortarlo ahí evita que además le queme al local la cuota
+    compartida. Va **después** de `require_permission` a propósito — a quien
+    no puede consultar no hay que contarle nada, porque su 403 no le cuesta
+    un centavo a nadie.
+    """
+    ventana = settings.consulta_documento_ventana_segundos
+    consumir(
+        "consulta_usuario",
+        str(usuario.id),
+        settings.consulta_documento_intentos_usuario,
+        ventana,
+    )
+    consumir(
+        "consulta_ip",
+        ip_de(request),
+        settings.consulta_documento_intentos_ip,
+        ventana,
+    )
+    return usuario
 
 
 class ConsultaPersonaOut(BaseModel):
@@ -66,7 +105,7 @@ def _sin_proveedor(e: FactilizaError) -> HTTPException:
 @router.get("/dni/{numero}", response_model=ConsultaPersonaOut)
 def consultar_dni(
     numero: str,
-    _=Depends(require_permission(CONSULTAR)),
+    _=Depends(_con_cuota),
 ):
     if not (numero.isdigit() and len(numero) == 8):
         raise HTTPException(
@@ -90,7 +129,7 @@ def consultar_dni(
 @router.get("/ruc/{numero}", response_model=ConsultaEmpresaOut)
 def consultar_ruc(
     numero: str,
-    _=Depends(require_permission(CONSULTAR)),
+    _=Depends(_con_cuota),
 ):
     if not (numero.isdigit() and len(numero) == 11):
         raise HTTPException(

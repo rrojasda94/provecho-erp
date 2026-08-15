@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { ErrorApi, pedir } from "@/lib/cliente-api";
+import { puedeConsultarDocumento } from "@/lib/permisos";
 
 /** Lo que devuelve la consulta. Las claves que no aplican al tipo pedido
  * simplemente no vienen: el DNI no trae provincia ni el RUC fecha de
@@ -43,12 +44,22 @@ function rellenar(form: HTMLFormElement, datos: Consulta, mapa: Record<string, s
  * Prellena, no decide: todo lo que escribe se puede corregir antes de
  * guardar, y si Factiliza no responde el alta sigue siendo posible tecleando
  * —mismo criterio que ADR-005—.
+ *
+ * **Se esconde solo.** El gate por `consulta.documento` vive acá y no en cada
+ * pantalla que lo monta: repetirlo en seis lugares es cómo el séptimo se
+ * olvida. Como `permisos` es obligatorio, montarlo sin decir de quién es la
+ * sesión no compila.
  */
 export function BuscarDocumento({
+  permisos,
   tipo,
   campo,
   rellena,
 }: {
+  /** Los del usuario de la sesión. Sin `consulta.documento` no se dibuja
+   * nada: el botón terminaría en un 403 y, peor, la consulta que sí sale
+   * gasta cuota de Factiliza. */
+  permisos: string[];
   tipo: "dni" | "ruc";
   /** `name` del input que tiene el número a consultar. */
   campo: string;
@@ -90,6 +101,10 @@ export function BuscarDocumento({
       });
     }
   }
+
+  // Después del `useState` y no antes: el orden de los hooks no puede
+  // depender de una condición.
+  if (!puedeConsultarDocumento(permisos)) return null;
 
   return (
     <div className="flex flex-col gap-1">
