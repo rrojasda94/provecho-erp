@@ -100,10 +100,25 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   vaya a buscar. Es una entrada en `reports/domain/catalogo.py` más su fila
   en `events.md`, pero primero hay que decidir a qué área se dirige —
   gerencia, contabilidad, o el encargado del local.
-- ⬜ **7 íconos del home siguen llevando a 404** (`/produccion`, `/rrhh`,
-  `/marketing`, `/gerencia`, `/usuarios`, `/contabilidad`, y el resto de
-  `/inventario`): el grid lista los módulos que tienen **backend**, no los que
-  tienen pantalla. O se construyen, o el grid deja de mostrar lo que no existe.
+- ✅ 2026-08-15 **Los íconos del home ya no llevan a 404** — y hacía rato que no
+  lo hacían: los siete destinos que la deuda enumeraba (`/produccion`, `/rrhh`,
+  `/marketing`, `/gerencia`, `/usuarios`, `/contabilidad` y el resto de
+  `/inventario`) se construyeron en las entregas siguientes y nadie volvió a
+  marcar el ítem, así que la deuda siguió declarando un 404 que ya no ocurría.
+  Lo que **sí** daba 404 era otra cosa: cinco módulos (`catalogo`, `compras`,
+  `inventario`, `organizacion`, `rrhh`) tenían carpeta y `layout.tsx` pero
+  ninguna ruta en su raíz, porque el ícono apunta a la primera pantalla
+  (`/catalogo/productos`). Nada del shell enlaza ahí, pero sí lo teclea quien
+  recorta la URL para subir un nivel — justo lo que uno hace cuando se pierde.
+  Ahora cada raíz redirige a `modulo.href` (leído de `lib/modulos.ts`, no
+  repetido por archivo) y existe `app/not-found.tsx`: hasta ahora el 404 lo
+  resolvía la pantalla por defecto de Next, en inglés y sin salida, que en una
+  tablet detrás de la barra se resuelve apagando y volviendo a entrar. La causa
+  de fondo era que nada ataba los `href` al árbol de archivos:
+  `lib/navegacion.test.ts` cruza `MODULOS` con `SUBMENUS`, y los dos pueden
+  coincidir apuntando a una ruta que no existe — por eso el ítem sobrevivió sin
+  que nadie pudiera decir si seguía siendo cierto. `lib/rutas.test.ts` resuelve
+  los 14 íconos y los 25 ítems de submenú contra los `page.tsx` reales.
 - ✅ 2026-08-03 **Catálogo separado del PDV en el frontend**: módulo propio
   (`/catalogo/productos`) con gate por permiso **exacto**
   `sales.gestionar_catalogo`, el mismo que la API exige para escribir. El
