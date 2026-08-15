@@ -49,6 +49,17 @@ class Settings(BaseSettings):
     # frena un ataque que rota usernames desde la misma IP).
     rate_limit_login_intentos: int = 10
     rate_limit_login_ventana_segundos: int = 60
+    # Rate limit de la consulta de DNI/RUC (ADR-041). Cada llamada gasta cuota
+    # de un proveedor **pago** y trae datos personales de alguien que todavía
+    # no es nadie en el sistema, así que el límite no es contra el abuso sino
+    # contra el gasto: un bucle mal escrito en una pantalla agota el plan del
+    # mes. Dos cuentas y una sola ventana: la del usuario es la que de verdad
+    # frena a quien se pasa, la de la IP es el techo del local entero —todas
+    # las cajas salen por la misma, y limitar solo por IP dejaría al equipo
+    # sin consultar por culpa de uno—.
+    consulta_documento_intentos_usuario: int = 20
+    consulta_documento_intentos_ip: int = 60
+    consulta_documento_ventana_segundos: int = 60
     # Monto sobre el cual emitir una OC exige permiso purchases.aprobar
     # (RN-CMP — umbral configurable, valor semilla a ajustar por el negocio).
     purchases_umbral_aprobacion_oc: Decimal = Decimal("2000")

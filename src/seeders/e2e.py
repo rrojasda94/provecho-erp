@@ -50,8 +50,10 @@ from src.modules.inventory.infrastructure.models import (
 from src.modules.purchases.application import ordenes as ordenes_uc
 from src.modules.purchases.infrastructure.models import Proveedor
 from src.modules.sales.application import catalogo as catalogo_uc
+from src.modules.sales.application import clientes as clientes_uc
 from src.modules.sales.application import precios as precios_uc
 from src.modules.sales.infrastructure.models import (
+    Cliente,
     ListaPrecio,
     MedioPago,
     Precio,
@@ -117,6 +119,15 @@ PROVEEDOR_RUC = "20512345678"
 # orden existente si lo reconoce: es la idempotencia del seeder, no una
 # comprobación aparte.
 OC_IDEMPOTENCY = "seed-e2e-oc-0001"
+
+# --- Padrón de clientes -----------------------------------------------------
+# Un cliente **jurídico**: es el que Ventas → Clientes deja corregir, y el
+# diálogo donde vive el botón «Buscar por RUC» (ADR-041). Sin ninguno
+# sembrado la pantalla se abre vacía y no hay nada que abrir.
+# La razón social está tecleada **mal a propósito**: el recorrido consiste en
+# traerla de SUNAT, y una que ya está bien no muestra nada.
+CLIENTE_RUC = "20610077782"
+CLIENTE_RAZON = "razon social tecleada a mano"
 
 
 def _primero(session: Session, modelo):
@@ -190,6 +201,7 @@ def sembrar_e2e(session: Session) -> dict:
 
     menu = _sembrar_menu(session, empresa, marca)
     compras = _sembrar_compras(session, empresa)
+    cliente = _sembrar_cliente(session, empresa)
 
     return {
         "sucursales": len(puntos_venta),
@@ -197,7 +209,28 @@ def sembrar_e2e(session: Session) -> dict:
         "producto": PRODUCTO_NOMBRE,
         **menu,
         **compras,
+        **cliente,
     }
+
+
+def _sembrar_cliente(session: Session, empresa: Empresa) -> dict:
+    """Un cliente jurídico en el padrón del grupo (RN-PTS-001).
+
+    Se crea por el caso de uso y no armando el modelo a mano: `crear_cliente`
+    es quien decide que once dígitos son un RUC y por lo tanto un cliente
+    jurídico, y un seeder que lo esquiva puede dejar en la base una fila que
+    el ERP nunca produciría.
+    """
+    cliente = session.scalar(select(Cliente).where(Cliente.ruc == CLIENTE_RUC))
+    if cliente is None:
+        cliente = clientes_uc.crear_cliente(
+            session,
+            grupo_id=clientes_uc.grupo_de_empresa(session, empresa.id),
+            nombre=CLIENTE_RAZON,
+            numero_documento=CLIENTE_RUC,
+        )
+        session.flush()
+    return {"cliente_ruc": CLIENTE_RUC}
 
 
 def _usuario_con_rol(

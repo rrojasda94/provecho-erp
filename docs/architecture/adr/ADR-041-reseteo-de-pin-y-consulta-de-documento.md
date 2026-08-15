@@ -141,5 +141,41 @@ siendo posible tecleando (mismo criterio que ADR-005).
   id, con lo que cambiar el PIN propio terminaba exigiendo `users.gestionar`.
 - `GET /users/me` gana `debe_cambiar_pin`: es de lo poco que una cuenta
   bloqueada puede pedir, y el shell necesita saber a dónde mandarla.
-- Queda anotado en Deuda técnica que la consulta **no tiene rate limit** propio
-  (hoy solo lo tiene `/auth/login`), aunque gaste cuota de un proveedor pago.
+- ~~Queda anotado en Deuda técnica que la consulta **no tiene rate limit**
+  propio~~ — **cerrado el 2026-08-15**, ver el addendum.
+
+## Addendum 2026-08-15 — dónde está el botón y cuánto se puede gastar
+
+Dos cosas que la decisión original dejó implícitas y resultaron ser una sola:
+**quién puede consultar tiene que verse en la pantalla, y cuánto se puede
+consultar tiene que tener techo.**
+
+**El botón se monta donde el documento se teclea, no donde el permiso alcanza.**
+Faltaba en **Ventas → Clientes**, que es donde se corrige la razón social de un
+cliente jurídico y donde el propio diálogo ya prometía que "SUNAT manda sobre
+la razón social tecleada". Ahí prellena **solo** la razón social: `contacto` es
+el teléfono o el correo de quien coordina, y escribirle el domicilio fiscal
+sería reemplazar un dato real por otro distinto. **No** va en el diálogo de
+documento de un cliente natural: ese formulario no tiene un solo campo que la
+consulta pueda llenar —el nombre vive en su `persona` (RN-GEN-007)— así que
+sería gastar cuota para no mostrar nada. Falta el receptor del comprobante en
+el PDV, anotado en la deuda de `sales`.
+
+**El gate por `consulta.documento` vive dentro de `BuscarDocumento`**, no en
+cada pantalla que lo monta: repetirlo en seis lugares es cómo el séptimo se lo
+olvida. `permisos` es prop obligatoria, así que montarlo sin decir de quién es
+la sesión no compila. Esconder es mejor que mostrar y fallar por partida doble:
+sin el gate, un `contador` apretaba el botón y se comía un 403 dibujado como
+aviso, y una consulta que sí sale cuesta plata.
+
+**El límite es por usuario además de por IP.** Lo que se protege no es una
+credencial sino el **gasto**, así que la unidad natural es quien consulta y no
+desde dónde. Un límite solo por IP —que era lo que había en el ERP— junta a
+las cuatro cajas de un local en una sola cuota: el primero que se pasa deja sin
+consultar a los otros tres. Se cuenta **después** de `require_permission`,
+porque un 403 no le cuesta un centavo a nadie, y por usuario antes que por IP,
+para que quien se pasa no le queme además la cuota compartida al local. Se
+reusó `core/rate_limit.py` en vez de escribir otro limitador — con su
+**fail-open**, que acá se sostiene por el mismo motivo que en el login: un
+Redis caído no puede dejar a la caja sin identificar a un cliente, y se acepta
+que durante esa caída la cuota quede sin freno.

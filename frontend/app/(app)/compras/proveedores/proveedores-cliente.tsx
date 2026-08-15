@@ -56,7 +56,7 @@ function CamposCondicionPago({ proveedor }: { proveedor?: Proveedor }) {
   );
 }
 
-function DialogoNuevoProveedor() {
+function DialogoNuevoProveedor({ permisos }: { permisos: string[] }) {
   const [tipo, setTipo] = useState<"juridico" | "natural">("juridico");
 
   return (
@@ -104,6 +104,7 @@ function DialogoNuevoProveedor() {
               sigue siendo editable porque el declarado no siempre es el
               almacén al que uno va a recoger. */}
           <BuscarDocumento
+            permisos={permisos}
             tipo="ruc"
             campo="ruc"
             rellena={{
@@ -144,7 +145,13 @@ function DialogoNuevoProveedor() {
  * sus órdenes de compra apuntando a algo que ya no es. En uno natural
  * tampoco hay razón social ni RUC — esos datos viven en su persona
  * (RN-GEN-007) y se corrigen desde Usuarios → Personas. */
-function DialogoEditarProveedor({ proveedor }: { proveedor: Proveedor }) {
+function DialogoEditarProveedor({
+  proveedor,
+  permisos,
+}: {
+  proveedor: Proveedor;
+  permisos: string[];
+}) {
   const esJuridico = proveedor.tipo === "juridico";
 
   return (
@@ -186,6 +193,7 @@ function DialogoEditarProveedor({ proveedor }: { proveedor: Proveedor }) {
               sigue siendo editable porque el declarado no siempre es el
               almacén al que uno va a recoger. */}
           <BuscarDocumento
+            permisos={permisos}
             tipo="ruc"
             campo="ruc"
             rellena={{
@@ -247,9 +255,11 @@ function DialogoEditarProveedor({ proveedor }: { proveedor: Proveedor }) {
 export function ProveedoresCliente({
   proveedores,
   personas,
+  permisos,
 }: {
   proveedores: Proveedor[];
   personas: Persona[];
+  permisos: string[];
 }) {
   const nombrePersona = useMemo(
     () => new Map(personas.map((p) => [p.id, `${p.apellidos}, ${p.nombres}`])),
@@ -294,17 +304,19 @@ export function ProveedoresCliente({
         header: "",
         // Sin `accessorFn`: el buscador de la tabla filtra por texto y esto
         // es un control, no texto.
-        cell: ({ row }) => <DialogoEditarProveedor proveedor={row.original} />,
+        cell: ({ row }) => (
+          <DialogoEditarProveedor proveedor={row.original} permisos={permisos} />
+        ),
       },
     ],
-    [nombrePersona],
+    [nombrePersona, permisos],
   );
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h1 className="font-heading text-xl text-dark">Proveedores</h1>
-        <DialogoNuevoProveedor />
+        <DialogoNuevoProveedor permisos={permisos} />
       </div>
       <TablaDatos columnas={columnas} datos={proveedores} placeholderBusqueda="Buscar proveedor..." />
     </div>
