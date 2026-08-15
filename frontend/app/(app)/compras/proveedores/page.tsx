@@ -4,7 +4,7 @@ import { obtenerSesion } from "@/lib/sesion";
 import { ProveedoresCliente, type Persona, type Proveedor } from "./proveedores-cliente";
 
 export default async function ProveedoresPage() {
-  const { token } = await obtenerSesion();
+  const { token, usuario } = await obtenerSesion();
 
   let proveedores: Proveedor[];
   try {
@@ -31,5 +31,11 @@ export default async function ProveedoresPage() {
     // silencioso a propósito, ver comentario arriba.
   }
 
-  return <ProveedoresCliente proveedores={proveedores} personas={personas} />;
+  return (
+    <ProveedoresCliente
+      proveedores={proveedores}
+      personas={personas}
+      permisos={usuario.permisos}
+    />
+  );
 }

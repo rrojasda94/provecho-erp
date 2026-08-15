@@ -4,7 +4,7 @@ import { obtenerSesion } from "@/lib/sesion";
 import { PersonasCliente, type Persona } from "./personas-cliente";
 
 export default async function PersonasPage() {
-  const { token } = await obtenerSesion();
+  const { token, usuario } = await obtenerSesion();
 
   let personas: Persona[];
   try {
@@ -22,5 +22,5 @@ export default async function PersonasPage() {
     return <p className="text-secondary">{mensaje}</p>;
   }
 
-  return <PersonasCliente personas={personas} />;
+  return <PersonasCliente personas={personas} permisos={usuario.permisos} />;
 }

@@ -32,7 +32,7 @@ from src.modules.sales.infrastructure.models import (
     PuntoVenta,
     Venta,
 )
-from src.modules.users.api.deps import get_db
+from src.modules.users.api.deps import get_db, get_db_reportes
 from src.modules.users.infrastructure.models import (
     Almacen,
     Empresa,
@@ -142,6 +142,7 @@ def env(monkeypatch):
             session.close()
 
     app.dependency_overrides[get_db] = _override_get_db
+    app.dependency_overrides[get_db_reportes] = _override_get_db
     with TestClient(app) as c:
         yield c, ids, TestSession
 

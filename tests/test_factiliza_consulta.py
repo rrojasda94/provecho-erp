@@ -7,7 +7,9 @@ from datetime import date
 
 import httpx
 import pytest
+import redis
 
+from src.config.settings import settings
 from src.shared.integrations.factiliza import nombres_desde_dni, razon_social_desde_ruc
 from src.shared.integrations.factiliza.client import (
     ConsultaEmpresa,
@@ -195,7 +197,6 @@ def api(monkeypatch):
     from sqlalchemy.pool import StaticPool
 
     import src.core.models_registry  # noqa: F401
-    from src.config.settings import settings
     from src.core.app import create_app
     from src.core.database import Base
     from src.modules.users.api.deps import get_db
@@ -214,7 +215,14 @@ def api(monkeypatch):
     TestSession = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
     with TestSession() as s:
         seed(s)
-        for username, rol in (("compras1", "comprador"), ("cocina1", "cocinero")):
+        # `caja1` no está de adorno: es el segundo usuario **con** el permiso,
+        # y sale por la misma IP que `compras1` en el TestClient — que es
+        # exactamente el caso que el límite por usuario tiene que distinguir.
+        for username, rol in (
+            ("compras1", "comprador"),
+            ("caja1", "cajero"),
+            ("cocina1", "cocinero"),
+        ):
             u = Usuario(username=username, pin_hash=hash_pin("654321"), tipo="humano")
             s.add(u)
             s.flush()
@@ -336,3 +344,108 @@ def test_documento_no_encontrado_no_es_error(api, monkeypatch):
     )
     assert r.status_code == 200, r.text
     assert r.json()["encontrado"] is False
+
+
+# --- Cuota (rate limit propio) ----------------------------------------------
+# Lo que se cuida no es el abuso sino el **gasto**: cada consulta vale una
+# llamada a un proveedor pago, así que un bucle mal escrito en una pantalla
+# agota el plan del mes sin que nadie ataque nada.
+DNI = "/api/v1/consulta/dni/73632127"
+_CUERPO_DNI = {
+    "success": True,
+    "data": {
+        "numero": "73632127",
+        "nombres": "CARLOS RENATO",
+        "apellido_paterno": "ROJAS",
+        "apellido_materno": "DEL AGUILA",
+    },
+}
+
+
+def _contar_llamadas(monkeypatch) -> list:
+    """Reemplaza al proveedor por un doble que además anota cuántas veces lo
+    llamaron: que el 429 corte **antes** de gastar cuota es el punto."""
+    llamadas: list[int] = []
+
+    def _get(*a, **k):
+        llamadas.append(1)
+        return _RespuestaFalsa(200, "x", _CUERPO_DNI)
+
+    monkeypatch.setattr(httpx, "get", _get)
+    return llamadas
+
+
+def _cuota(monkeypatch, *, usuario: int, ip: int, ventana: int = 60) -> None:
+    monkeypatch.setattr(settings, "consulta_documento_intentos_usuario", usuario)
+    monkeypatch.setattr(settings, "consulta_documento_intentos_ip", ip)
+    monkeypatch.setattr(settings, "consulta_documento_ventana_segundos", ventana)
+
+
+def test_la_consulta_corta_al_pasarse_de_cuota(api, monkeypatch):
+    """Y corta en la dependencia, sin llegar al proveedor: un 429 que igual
+    gastó la llamada no habría servido de nada.
+
+    La ventana es 45 y no 60 para que el `Retry-After` no pueda coincidir por
+    casualidad con el del login, que es el otro límite del ERP.
+    """
+    _cuota(monkeypatch, usuario=2, ip=100, ventana=45)
+    llamadas = _contar_llamadas(monkeypatch)
+    h = _tok(api, "compras1", "654321")
+
+    codigos = [api.get(DNI, headers=h).status_code for _ in range(3)]
+
+    assert codigos == [200, 200, 429]
+    assert len(llamadas) == 2
+    assert api.get(DNI, headers=h).headers["Retry-After"] == "45"
+
+
+def test_el_limite_por_usuario_no_deja_sin_consultar_al_de_al_lado(api, monkeypatch):
+    """En un local todas las cajas salen por la misma IP —el TestClient
+    también—, así que un límite solo por IP castigaría al equipo entero por
+    uno solo. El segundo usuario tiene que poder seguir trabajando."""
+    _cuota(monkeypatch, usuario=1, ip=100)
+    _contar_llamadas(monkeypatch)
+    comprador = _tok(api, "compras1", "654321")
+    cajero = _tok(api, "caja1", "654321")
+
+    assert api.get(DNI, headers=comprador).status_code == 200
+    assert api.get(DNI, headers=comprador).status_code == 429
+    assert api.get(DNI, headers=cajero).status_code == 200
+
+
+def test_el_techo_de_la_ip_alcanza_a_todo_el_local(api, monkeypatch):
+    """La contracara: el límite por usuario solo no frena a quien tiene dos
+    cuentas a mano, así que la IP sigue siendo un techo del local entero."""
+    _cuota(monkeypatch, usuario=100, ip=2)
+    _contar_llamadas(monkeypatch)
+    comprador = _tok(api, "compras1", "654321")
+    cajero = _tok(api, "caja1", "654321")
+
+    assert api.get(DNI, headers=comprador).status_code == 200
+    assert api.get(DNI, headers=cajero).status_code == 200
+    assert api.get(DNI, headers=cajero).status_code == 429
+
+
+def test_con_redis_caido_la_consulta_no_se_bloquea(api, monkeypatch):
+    """Fail-open deliberado (mismo criterio que el login): un Redis caído no
+    puede dejar a la caja sin poder identificar a un cliente. Se acepta el
+    costo —con Redis abajo la cuota del proveedor queda sin freno— porque la
+    alternativa es no poder facturar."""
+    from src.core import rate_limit as rl
+
+    class _RedisCaido:
+        def incr(self, clave):
+            raise redis.RedisError("sin conexión")
+
+        def expire(self, clave, segundos):
+            raise redis.RedisError("sin conexión")
+
+    monkeypatch.setattr(rl, "_client", _RedisCaido())
+    monkeypatch.setattr(rl, "_reintentar_desde", 0.0)
+    _cuota(monkeypatch, usuario=1, ip=1)
+    _contar_llamadas(monkeypatch)
+    h = _tok(api, "compras1", "654321")
+
+    codigos = [api.get(DNI, headers=h).status_code for _ in range(4)]
+
+    assert codigos == [200, 200, 200, 200]

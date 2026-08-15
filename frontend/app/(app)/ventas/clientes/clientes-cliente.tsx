@@ -4,6 +4,7 @@ import type { ColumnDef } from "@tanstack/react-table";
 import Link from "next/link";
 import { useMemo } from "react";
 
+import { BuscarDocumento } from "@/components/consulta/buscar-documento";
 import { BOTON_FILA, DialogoFormulario } from "@/components/formulario/dialogo-formulario";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
 
@@ -21,7 +22,13 @@ export type Cliente = {
 };
 
 /** Un cliente jurídico guarda lo suyo: razón social, RUC y contacto. */
-function DialogoEditarJuridico({ cliente }: { cliente: Cliente }) {
+function DialogoEditarJuridico({
+  cliente,
+  permisos,
+}: {
+  cliente: Cliente;
+  permisos: string[];
+}) {
   return (
     <DialogoFormulario
       titulo="Editar cliente"
@@ -46,6 +53,18 @@ function DialogoEditarJuridico({ cliente }: { cliente: Cliente }) {
           defaultValue={cliente.numero_documento ?? ""}
         />
       </label>
+      {/* La ayuda del diálogo dice que SUNAT manda sobre la razón social
+          tecleada, y hasta ahora no había forma de verla antes de guardar:
+          se descubría al grabar que el sistema escribió otra. Solo se
+          prellena la razón social — `contacto` es el teléfono o el correo de
+          quien coordina, no el domicilio fiscal, y traerlo de SUNAT
+          reemplazaría un dato real por otro. */}
+      <BuscarDocumento
+        permisos={permisos}
+        tipo="ruc"
+        campo="ruc"
+        rellena={{ razon_social: "razon_social" }}
+      />
       <label className="flex flex-col gap-1 text-sm font-semibold">
         Contacto
         <input
@@ -63,7 +82,13 @@ function DialogoEditarJuridico({ cliente }: { cliente: Cliente }) {
  *
  * Es el camino normal y no una excepción: el cliente da su DNI cuando le
  * conviene —una factura, entrar al programa de puntos— y desde ese momento
- * cuenta como identificado (RN-PTS-002). */
+ * cuenta como identificado (RN-PTS-002).
+ *
+ * **Sin botón de búsqueda, a propósito**: acá no hay nada que prellenar. El
+ * nombre de un cliente natural vive en su `persona` (RN-GEN-007) y este
+ * endpoint no lo toca —solo le cuelga el documento—, así que una consulta
+ * traería un dato que ningún campo de este formulario puede recibir. El
+ * botón sí está donde ese nombre se edita: Usuarios → Personas. */
 function DialogoCompletarDocumento({ cliente }: { cliente: Cliente }) {
   return (
     <DialogoFormulario
@@ -92,8 +117,9 @@ function DialogoCompletarDocumento({ cliente }: { cliente: Cliente }) {
   );
 }
 
-function AccionesCliente({ cliente }: { cliente: Cliente }) {
-  if (cliente.tipo === "juridico") return <DialogoEditarJuridico cliente={cliente} />;
+function AccionesCliente({ cliente, permisos }: { cliente: Cliente; permisos: string[] }) {
+  if (cliente.tipo === "juridico")
+    return <DialogoEditarJuridico cliente={cliente} permisos={permisos} />;
 
   return (
     <div className="flex items-center gap-1.5">
@@ -114,7 +140,13 @@ function AccionesCliente({ cliente }: { cliente: Cliente }) {
   );
 }
 
-export function ClientesCliente({ clientes }: { clientes: Cliente[] }) {
+export function ClientesCliente({
+  clientes,
+  permisos,
+}: {
+  clientes: Cliente[];
+  permisos: string[];
+}) {
   const columnas: ColumnDef<Cliente>[] = useMemo(
     () => [
       { accessorKey: "nombre", header: "Cliente" },
@@ -144,10 +176,10 @@ export function ClientesCliente({ clientes }: { clientes: Cliente[] }) {
       {
         id: "acciones",
         header: "",
-        cell: ({ row }) => <AccionesCliente cliente={row.original} />,
+        cell: ({ row }) => <AccionesCliente cliente={row.original} permisos={permisos} />,
       },
     ],
-    [],
+    [permisos],
   );
 
   return (

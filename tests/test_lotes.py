@@ -24,7 +24,7 @@ from src.modules.inventory.infrastructure.models import (
     Sku,
     UnidadMedida,
 )
-from src.modules.users.api.deps import get_db
+from src.modules.users.api.deps import get_db, get_db_reportes
 from src.modules.users.infrastructure.models import Almacen, Empresa
 from src.shared import fechas
 
@@ -84,6 +84,7 @@ def env():
             session.close()
 
     app.dependency_overrides[get_db] = _override_get_db
+    app.dependency_overrides[get_db_reportes] = _override_get_db
     with TestClient(app) as c:
         yield c, ids, TestSession
 
@@ -372,7 +373,7 @@ def test_el_barrido_diario_bloquea_lotes_vencidos(env, monkeypatch):
     _ingresar(client, h, ids, vigente, 5)
 
     sesion = TestSession()
-    monkeypatch.setattr(tasks, "SessionLocal", lambda: sesion)
+    monkeypatch.setattr(tasks, "session_factory", lambda: sesion)
     monkeypatch.setattr(sesion, "close", lambda: None)
     assert tasks.bloquear_lotes_vencidos() == 1
 
