@@ -432,8 +432,18 @@ cajero, con autenticación (usuario + PIN) y confirmación de valores en el
 relevo. Durante el conteo y la apertura, el encargado de tienda/supervisor
 no atiende otro proceso (RN-POS-013). Ni el faltante de efectivo, la
 escasez de sencillo, ni un POS averiado bloquean la apertura: se abre en
-el horario normal dejando constancia del problema (RN-POS-011). Diagrama
-BPMN completo:
+el horario normal dejando constancia del problema (RN-POS-011).
+
+**Qué registra el ERP de todo esto** (RN-MDP-008, ADR-048, 2026-08-15): el
+paso `c5` del cajero, y nada más. La entrega del fondo (`b8`) es un acto
+físico que puede haber ocurrido horas antes —el sobre esperando en la caja
+fuerte del local, RN-MDP-006— y **el ERP ya no le pide el PIN al encargado
+para que el cajero pueda abrir**. Exigirlo obligaba a que las dos cosas
+pasaran en el mismo minuto, y en el local eso se terminaba resolviendo
+dejando la sesión del encargado abierta en la caja todo el turno. Lo que
+prueba cuánto había en el cajón es el conteo por denominación de `c5`.
+
+Diagrama BPMN completo:
 [PROC-CTB-002-v1.0.bpmn](../diagrams/Procesos/Contabilidad/PROC-CTB-002-v1.0.bpmn).
 
 ```mermaid
@@ -477,7 +487,18 @@ local en la sucursal o a disposición de la empresa en contabilidad, según
 RN-MDP-006. Sigue la cadena de custodia obligatoria del efectivo
 (RN-MDP-002): cajero → encargado de tienda/supervisor → (área contable, si
 corresponde traslado), con autenticación (usuario + PIN) y confirmación de
-valores en cada relevo. Diagrama BPMN completo:
+valores en cada relevo.
+
+**El ERP recién alineó su modelo con este diagrama** (RN-MDP-008, ADR-048,
+2026-08-15): el cierre del cajero (`a8`–`a13`) y la recepción del encargado
+(`b1`) son dos actos separados acá desde siempre, y hasta ahora el software
+los aplanaba en uno — pedía el PIN del encargado dentro del cierre y daba el
+sobre por recibido en el mismo instante. Ahora el cierre lo hace el cajero
+solo, el efectivo queda `en_caja` a su nombre, y `b1` es una firma aparte
+sobre la cadena de custodia (`en_caja → en_supervisor`), que es donde puede
+pasar una hora o doce.
+
+Diagrama BPMN completo:
 [PROC-CTB-001-v1.1.bpmn](../diagrams/Procesos/Contabilidad/PROC-CTB-001-v1.1.bpmn).
 
 ```mermaid
