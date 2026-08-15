@@ -11,14 +11,39 @@ un turno abierto.
 """
 
 import importlib
+import sqlite3
 import uuid
 from decimal import Decimal
 
 import pytest
 from argon2 import PasswordHasher
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
 
 from src.config.settings import settings
 from src.modules.users.infrastructure import security
+
+
+@event.listens_for(Engine, "connect")
+def _sqlite_con_fk(conexion_dbapi, _record) -> None:
+    """Enciende las FK en cualquier engine SQLite del proceso.
+
+    SQLite las trae apagadas y Postgres no las apaga nunca: sin esto el suite
+    deja pasar borrados que dejan al hijo apuntando a un padre que ya no
+    existe, y el error aparece recién en producción. Pasó de verdad — anular
+    un plato con extras violaba `fk_venta_item_padre` (`NO ACTION`) contra
+    Postgres durante meses con las 900 pruebas en verde, porque `anular_lineas`
+    borraba el padre antes que los hijos.
+
+    Va sobre la clase `Engine` y no sobre un engine puntual porque cada
+    archivo de test arma el suyo con `create_engine("sqlite://")` — son ~75
+    fixtures, y una que se olvide del PRAGMA vuelve a abrir el agujero.
+    `isinstance` y no la URL: es el driver el que entiende el PRAGMA, y a
+    psycopg la sentencia lo haría reventar.
+    """
+    if isinstance(conexion_dbapi, sqlite3.Connection):
+        conexion_dbapi.execute("PRAGMA foreign_keys=ON")
+
 
 #: Los parámetros reales del hasher, antes de abaratarlos para el suite.
 #: `test_security.py` verifica que sigan por encima del piso recomendado.
@@ -144,8 +169,9 @@ def _rate_limit_en_memoria(monkeypatch):
     monkeypatch.setattr(rate_limit, "_reintentar_desde", 0.0)
 
 
-#: Los tres módulos de listeners que abren su propia sesión: reaccionan a un
-#: evento **después** del commit, cuando la sesión del request ya se cerró.
+#: Todo módulo que abre su propia sesión fuera del request: los listeners
+#: reaccionan a un evento **después** del commit, cuando la sesión del request
+#: ya se cerró, y los barridos de Celery ni siquiera corren en un request.
 MODULOS_CON_SESSION_FACTORY = (
     "src.modules.accounting.application.listeners",
     "src.modules.inventory.application.listeners",
@@ -156,12 +182,21 @@ MODULOS_CON_SESSION_FACTORY = (
     # caja (ADR-033).
     "src.modules.reports.application.listeners",
     "src.modules.users.application.listeners",
+    # Los barridos (Celery beat y el cron de la purga). Los ejercitan
+    # `test_lotes`, `test_conteos`, `test_inventory`, `test_offline_hub` y
+    # `test_alerta_pedido`, que hasta ahora los dejaban abrir la base de
+    # producción: 5 s de `connect_timeout` regalados por test y, con la base
+    # de desarrollo levantada, el barrido corriendo **contra ella**.
+    "src.modules.inventory.application.tasks",
+    "src.modules.marketing.application.tasks",
+    "src.modules.rrhh.purga",
+    "src.modules.sales.application.tasks",
 )
 
 
 @pytest.fixture(autouse=True)
 def _listeners_sin_base_real(monkeypatch):
-    """Ningún listener puede abrir la sesión de producción durante un test.
+    """Nada que corra fuera del request abre la sesión de producción en un test.
 
     Cada `env` parchea el `session_factory` de los listeners que su test
     ejercita, pero **solo esos**. Los demás quedaban apuntando al Postgres
@@ -178,9 +213,9 @@ def _listeners_sin_base_real(monkeypatch):
 
     def _sin_base_real():
         raise RuntimeError(
-            "El listener abrió la sesión de producción. El `env` de este test "
-            "tiene que parchear su `session_factory` — ver "
-            "MODULOS_CON_SESSION_FACTORY en tests/conftest.py."
+            "Se abrió la sesión de producción fuera de un request. El `env` de "
+            "este test tiene que parchear el `session_factory` del listener o "
+            "del barrido — ver MODULOS_CON_SESSION_FACTORY en tests/conftest.py."
         )
 
     for nombre in MODULOS_CON_SESSION_FACTORY:

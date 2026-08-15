@@ -89,18 +89,48 @@ def _app_con_limite(intentos: int) -> TestClient:
     [
         (
             "postgresql+psycopg://provecho:s3cr3t@db:5432/provecho",
-            {"connect_timeout": CONNECT_TIMEOUT_SEGUNDOS},
+            {
+                "connect_timeout": CONNECT_TIMEOUT_SEGUNDOS,
+                "options": "-c statement_timeout=15000",
+            },
         ),
-        ("postgresql://provecho:s3cr3t@db:5432/provecho", {"connect_timeout": 5}),
+        (
+            "postgresql://provecho:s3cr3t@db:5432/provecho",
+            {"connect_timeout": 5, "options": "-c statement_timeout=15000"},
+        ),
         # El `e2e` arranca la API contra un SQLite desechable y su driver no
-        # entiende `connect_timeout`: pasárselo mata el arranque.
+        # entiende ninguna de las dos: pasárselas mata el arranque.
         ("sqlite:///./e2e.db", {}),
     ],
 )
-def test_solo_postgres_recibe_connect_timeout(url: str, esperado: dict) -> None:
+def test_solo_postgres_recibe_los_timeouts(url: str, esperado: dict) -> None:
     """Sin timeout, un Postgres que acepta el TCP y se calla clava el request
-    para siempre (ver CHANGELOG 2026-08-08)."""
-    assert connect_args(url) == esperado
+    para siempre (ver CHANGELOG 2026-08-08). `connect_timeout` cubre el
+    conectar; `statement_timeout`, la consulta que ya empezó."""
+    assert connect_args(url, statement_timeout_segundos=15) == esperado
+
+
+def test_el_plazo_de_reportes_es_mas_largo_que_el_de_operacion() -> None:
+    """Son dos engines por una razón: matar un reporte de márgenes del
+    trimestre con el plazo de un cobro sería romper una consulta sana, y
+    darle al cobro el plazo del reporte deja la caja colgada un minuto."""
+    s = _settings()
+    assert s.db_statement_timeout_reportes_segundos > s.db_statement_timeout_segundos > 0
+
+
+def test_cada_sessionmaker_va_a_su_engine() -> None:
+    """El engine por defecto es el corto: quien no dijo nada opera, no
+    reporta. `SessionReportes` es el único que sale por el largo."""
+    from src.core.database import (
+        SessionLocal,
+        SessionReportes,
+        engine,
+        engine_reportes,
+    )
+
+    assert engine is not engine_reportes
+    assert SessionLocal.kw["bind"] is engine
+    assert SessionReportes.kw["bind"] is engine_reportes
 
 
 def test_seguridad_del_hasher_de_produccion() -> None:

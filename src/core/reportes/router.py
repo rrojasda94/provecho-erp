@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 
 from src.core.reportes import catalogo, rangos
 from src.core.tenant import Tenant
-from src.modules.users.api.deps import get_db, get_tenant, require_permission
+from src.modules.users.api.deps import get_db_reportes, get_tenant, require_permission
 from src.modules.users.infrastructure.models import Rol, Usuario, UsuarioRol
 from src.modules.users.infrastructure.repositories import UsuarioRepo
 from src.shared.models import Tablero
@@ -120,7 +120,7 @@ def _sucursales_efectivas(
 @router.get("", response_model=CatalogoOut)
 def listar_catalogo(
     usuario: Usuario = Depends(require_permission(LEER)),
-    session: Session = Depends(get_db),
+    session: Session = Depends(get_db_reportes),
 ):
     """Solo los reportes que este usuario puede pedir: el catálogo mismo es
     una lista de capacidades, no se muestra lo que después daría 403."""
@@ -136,7 +136,7 @@ def datos(
     filtros: FiltrosIn,
     usuario: Usuario = Depends(require_permission(LEER)),
     tenant: Tenant = Depends(get_tenant),
-    session: Session = Depends(get_db),
+    session: Session = Depends(get_db_reportes),
 ):
     reporte = catalogo.obtener(codigo)
     if reporte is None:
@@ -301,7 +301,7 @@ def _a_salida_tablero(tablero: Tablero, usuario: Usuario, dueno: str | None) -> 
 def roles_para_compartir(
     usuario: Usuario = Depends(require_permission(LEER)),
     tenant: Tenant = Depends(get_tenant),
-    session: Session = Depends(get_db),
+    session: Session = Depends(get_db_reportes),
 ):
     """Los roles con los que este usuario puede compartir. Un superusuario
     los ve todos; el resto, los suyos. Declarada antes de `/{tablero_id}`:
@@ -315,7 +315,7 @@ def roles_para_compartir(
 @router_tableros.get("", response_model=list[TableroOut])
 def listar_tableros(
     usuario: Usuario = Depends(require_permission(LEER)),
-    session: Session = Depends(get_db),
+    session: Session = Depends(get_db_reportes),
 ):
     """Los míos, más los que alguien compartió con un rol que tengo."""
     mios = Tablero.usuario_id == usuario.id
@@ -348,7 +348,7 @@ def crear_tablero(
     body: TableroIn,
     usuario: Usuario = Depends(require_permission(LEER)),
     tenant: Tenant = Depends(get_tenant),
-    session: Session = Depends(get_db),
+    session: Session = Depends(get_db_reportes),
 ):
     _validar_tarjetas(body.tarjetas, catalogo.visibles(list(_permisos(session, usuario))))
     _validar_rol(session, body.rol_id, usuario, tenant.superusuario)
@@ -374,7 +374,7 @@ def actualizar_tablero(
     body: TableroIn,
     usuario: Usuario = Depends(require_permission(LEER)),
     tenant: Tenant = Depends(get_tenant),
-    session: Session = Depends(get_db),
+    session: Session = Depends(get_db_reportes),
 ):
     # `_mio`: un tablero compartido lo ve todo su rol, pero lo edita su dueño.
     tablero = _mio(session, tablero_id, usuario)
@@ -395,7 +395,7 @@ def actualizar_tablero(
 def borrar_tablero(
     tablero_id: uuid.UUID,
     usuario: Usuario = Depends(require_permission(LEER)),
-    session: Session = Depends(get_db),
+    session: Session = Depends(get_db_reportes),
 ):
     session.delete(_mio(session, tablero_id, usuario))
     session.commit()

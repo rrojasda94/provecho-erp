@@ -8,6 +8,7 @@ día", el endpoint respondía 500 y nada en el sistema lo notaba.
 import pytest
 from sqlalchemy import Column, Integer, MetaData, Table, create_engine, text
 
+from src.config.settings import settings
 from src.core.database import connect_args
 from src.core.esquema import diagnosticar, head_del_repo, verificar_al_arrancar
 
@@ -123,7 +124,12 @@ def _engine_muerto():
     de que exista (ver CHANGELOG 2026-08-08).
     """
     url = "postgresql+psycopg://x:x@127.0.0.1:1/x"
-    return create_engine(url, connect_args=connect_args(url))
+    return create_engine(
+        url,
+        connect_args=connect_args(
+            url, statement_timeout_segundos=settings.db_statement_timeout_segundos
+        ),
+    )
 
 
 def test_base_inalcanzable_no_reporta_tablas_faltantes():

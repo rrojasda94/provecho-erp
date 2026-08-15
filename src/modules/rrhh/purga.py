@@ -14,11 +14,15 @@ from datetime import UTC, datetime
 from src.core.database import SessionLocal
 from src.modules.rrhh.application.privacidad import purgar_postulantes_vencidos
 
+# Inyectable (los tests la reemplazan), mismo patrón que `listeners`: sin
+# esto un barrido ejercitado desde un test abre la sesión de producción.
+session_factory = SessionLocal
+
 
 def main() -> int:
     hoy = datetime.now(UTC).date()
     try:
-        with SessionLocal() as session:
+        with session_factory() as session:
             purgados = purgar_postulantes_vencidos(session, hoy)
             session.commit()
     except Exception as e:  # noqa: BLE001 — el cron necesita ver el error

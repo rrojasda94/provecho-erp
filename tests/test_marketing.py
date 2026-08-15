@@ -390,8 +390,13 @@ def test_atribucion_automatica_solo_sin_ambiguedad(env):
         ).json()["id"]
 
     unico = _lead("lead-auto-1")
+    # La venta se siembra de verdad: `lead.venta_id` es FK y con un UUID
+    # inventado el UPDATE del listener no pasa contra Postgres.
     listeners.on_venta_confirmada(
-        {"venta_id": str(uuid.uuid4()), "cliente_id": ids["cliente_id"]}
+        {
+            "venta_id": _venta(TestSession, ids, entregada=False, numero=30),
+            "cliente_id": ids["cliente_id"],
+        }
     )
     with TestSession() as s:
         assert s.get(Lead, uuid.UUID(unico)).venta_id is not None
@@ -401,7 +406,10 @@ def test_atribucion_automatica_solo_sin_ambiguedad(env):
     segundo = _lead("lead-auto-2")
     tercero = _lead("lead-auto-3")
     listeners.on_venta_confirmada(
-        {"venta_id": str(uuid.uuid4()), "cliente_id": ids["cliente_id"]}
+        {
+            "venta_id": _venta(TestSession, ids, entregada=False, numero=31),
+            "cliente_id": ids["cliente_id"],
+        }
     )
     with TestSession() as s:
         assert s.get(Lead, uuid.UUID(segundo)).venta_id is None

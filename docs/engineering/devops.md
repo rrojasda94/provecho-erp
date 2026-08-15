@@ -79,6 +79,36 @@ para Redis (`localhost:6379` vs `redis:6379`).
 Puerto de host **5433** y no 5432: el 5432 lo ocupa la plataforma de
 Charlie's Pizzas.
 
+### Dos engines: el que cobra y el que reporta
+
+`src/core/database.py` abre **dos** engines contra la misma base, y la única
+diferencia es cuánto tiempo dejan correr una consulta:
+
+| Engine | Sesión | Quién lo usa | Variable |
+|---|---|---|---|
+| operación | `SessionLocal` | todo el ERP (es el default) | `DB_STATEMENT_TIMEOUT_SEGUNDOS` (15) |
+| reportes | `SessionReportes` | `/reportes`, `/tableros`, `/reports` | `DB_STATEMENT_TIMEOUT_REPORTES_SEGUNDOS` (120) |
+
+Por qué dos y no un número: un cobro del PDV y un reporte gerencial no
+aguantan el mismo plazo. Con un solo valor había que elegir entre cancelar
+reportes que estaban trabajando bien o dejar la caja esperando a un Postgres
+trabado. `connect_timeout` (5 s, 2026-08-08) cubre **no poder conectar**;
+`statement_timeout` cubre la consulta que ya empezó y no vuelve — un lock
+ajeno, un plan malo, el disco al límite. `pool_pre_ping` no sirve para esto:
+hace un `SELECT 1` al sacar la conexión del pool y después no mira más.
+
+Costo aceptado: **dos pools de conexiones** en vez de uno. A cambio, una
+consulta pesada de reportes tampoco se come las conexiones que necesita la
+caja. Poner `0` desactiva el límite de ese engine.
+
+En la API el plazo se elige por dependencia: `get_db` (corto) o
+`get_db_reportes` (largo), ambas en `src/modules/users/api/deps.py`.
+`tests/test_arquitectura.py::test_los_reportes_consultan_por_el_engine_de_plazo_largo`
+falla si un endpoint queda del lado equivocado. Fuera de Postgres —el `e2e`
+levanta la API contra un SQLite desechable— los dos parámetros
+sencillamente no se pasan: libpq no está y SQLite no sabe cancelar una
+consulta por tiempo.
+
 ### Volver a Supabase (o a cualquier Postgres externo)
 
 1. Poner su connection string en `DATABASE_URL` del `.env` (plantilla en

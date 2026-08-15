@@ -157,6 +157,30 @@ verificado contra el contrato** — de esas solo se comprueba la ruta. Se
 cerraría moviendo sus llamadas a módulos importables como los cuatro que ya
 lo son, no escribiendo otro tipo de test.
 
+## Lo que SQLite no hace cumplir y Postgres sí
+
+El suite corre sobre SQLite en memoria, que **no es la base de producción**.
+La diferencia no es teórica: ya dejó pasar bugs.
+
+- **Claves foráneas** — SQLite las trae **apagadas**. Un `DELETE` que dejaba
+  al hijo apuntando a un padre inexistente pasaba en verde. Costó meses de
+  `anular_lineas` roto contra Postgres (`fk_venta_item_padre`) con las ~900
+  pruebas verdes. Desde **2026-08-15** un listener del evento `connect` de
+  SQLAlchemy en `tests/conftest.py` enciende `PRAGMA foreign_keys=ON` en
+  **cualquier** engine SQLite del proceso: no hay que acordarse por fixture,
+  y `test_models.py::test_un_engine_sqlite_nuevo_ya_trae_las_fk_encendidas`
+  se pone rojo si alguien lo saca. Encenderlo destapó **cinco** violaciones:
+  dos bugs de producción (borrar una receta con líneas; emitir un reporte
+  cuyo almacén ya no existe) y tres tests que sembraban un id inventado.
+  Corolario para escribir tests: **un `uuid.uuid4()` en una columna FK ya no
+  compila** — hay que sembrar la fila, que es lo que la base real exige.
+- **Largo de `VARCHAR` y tipos** — SQLite no los valida (ver
+  `docs/roadmap/deuda/transversal.md`). Sigue abierto: la única red es probar
+  cada migración contra un Postgres real.
+- **`statement_timeout`** — no existe en SQLite. La configuración de los dos
+  engines (`docs/engineering/devops.md` → «Dos engines») es inocua ahí, a
+  propósito: fuera de Postgres el parámetro no se pasa.
+
 ## Nota de velocidad
 
 Desde **2026-08-08** la base de desarrollo es el contenedor `db` del
