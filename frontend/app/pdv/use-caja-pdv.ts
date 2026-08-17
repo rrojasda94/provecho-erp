@@ -13,7 +13,6 @@ export type DatosApertura = {
   montoDeclarado: number;
   detalle: Record<string, number>;
   posVerificados: PosVerificadoNuevo[];
-  encargado: { username: string; pin: string };
 };
 
 export type DatosCierre = {
@@ -23,21 +22,22 @@ export type DatosCierre = {
    * investiga después. Viaja como `null`. */
   atribucion: DescuadreAtribucion | "";
   reportesPos: { pos_tarjeta_id: string; monto_lote: string; referencia?: string }[];
-  receptor: { username: string; pin: string };
 };
 
 /**
- * Apertura y cierre del turno desde el PDV (ADR-025).
+ * Apertura y cierre del turno desde el PDV (ADR-025, enmendado por ADR-049).
  *
  * Vive fuera de `PdvCliente` porque el ciclo de caja no es parte de vender:
- * es un traspaso de custodia entre dos personas que se firma con PIN, y
- * tenerlo dentro del componente lo empujaba sobre el límite de complejidad
- * que el proyecto se puso.
+ * son dos operaciones con su propio conteo, su propio cuadre de terminales y
+ * su propio manejo de error, y tenerlas dentro del componente lo empujaba
+ * sobre el límite de complejidad que el proyecto se puso.
  *
- * El PIN nunca se guarda: se cambia por una elevación acotada al permiso
- * (`accounting.caja_relevar`) y lo que viaja al servidor es ese token, del
- * que el backend saca quién firmó. Mandar el id del encargado sería una
- * firma que cualquiera puede escribir.
+ * **Sin PIN de nadie** (RN-MDP-008): las dos son actos del cajero con su
+ * propia sesión. Pedir la firma de un encargado para empezar el turno no
+ * protegía el efectivo —eso lo hace el conteo— y sí obligaba a ir a
+ * buscarlo, que en el local terminaba en la sesión del encargado abierta en
+ * la caja. La firma con PIN sigue viva donde la plata cambia de manos: la
+ * recepción del efectivo, en `/contabilidad/caja`.
  */
 export function useCajaPdv({
   puntoVentaId,
@@ -61,14 +61,8 @@ export function useCajaPdv({
   const abrirCaja = async (datos: DatosApertura) => {
     setOcupado(true);
     try {
-      const elevacion = await api.autorizar(
-        datos.encargado.username,
-        datos.encargado.pin,
-        "accounting.caja_relevar",
-      );
       const abierta = await api.abrirCaja({
         punto_venta_id: puntoVentaId,
-        autorizacion: elevacion.autorizacion,
         // El monto de apertura sale del conteo, no de esto: lo declarado es
         // contra qué se contrasta (RN-POS-003/011).
         monto_declarado: String(datos.montoDeclarado),
@@ -88,15 +82,9 @@ export function useCajaPdv({
     if (!caja) return;
     setOcupado(true);
     try {
-      const elevacion = await api.autorizar(
-        datos.receptor.username,
-        datos.receptor.pin,
-        "accounting.caja_relevar",
-      );
       const cierre = await api.cerrarCaja(caja.apertura_caja_id, {
         detalle_denominaciones: datos.detalle,
         custodia: datos.custodia,
-        autorizacion: elevacion.autorizacion,
         descuadre_atribucion: datos.atribucion === "" ? null : datos.atribucion,
         reportes_pos: datos.reportesPos,
       });
@@ -104,7 +92,7 @@ export function useCajaPdv({
       alCerrarTurno();
       notificar(
         cierre.estado === "conforme"
-          ? "Caja cerrada: conforme"
+          ? "Caja cerrada: conforme. El efectivo queda en el cajón hasta que el encargado lo reciba"
           : `Caja cerrada con descuadre de ${soles(cierre.descuadre_monto)}`,
       );
     } catch (e) {

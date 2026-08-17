@@ -312,8 +312,10 @@ Por sucursal:
 
 1. El **encargado de turno**, derivado del `relevo_encargado_id` de la caja
    abierta (contrato público de `accounting`). No hizo falta una entidad
-   "turno": ese dato ya se registra al abrir caja (RN-MDP-002) y es
-   exactamente la persona a cargo del local en ese momento.
+   "turno": ese dato se registraba al abrir caja (RN-MDP-002).
+   **Desde ADR-049 ya no se registra** —el cajero abre solo y la columna
+   queda en NULL—, así que este paso solo resuelve para aperturas anteriores
+   y el respaldo del punto 2 pasó a ser el camino normal.
 2. Sin caja abierta (local cerrado, o abrieron sin registrarla), los
    `supervisor`/`admin` asignados a esa sucursal. Un aviso sin destinatario
    es un aviso perdido: prefiere avisarle a alguien de más que a nadie.

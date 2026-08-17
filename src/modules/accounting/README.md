@@ -102,7 +102,8 @@ finanzas documentados en el área:
   Gerencia (RN-CTB-005), detracción SPOT (calculada, sin desglose contable
   propio aún) e idempotencia contra doble pago (RN-CTB-008).
 - **Ciclo de caja** (PROC-CTB-002/001, slice mínimo 2026-07-26 con ADR-012,
-  **completado 2026-08-04 con ADR-025**): `abrir_caja`/`cerrar_caja`/
+  **completado 2026-08-04 con ADR-025**, **enmendado 2026-08-15 con
+  ADR-049**): `abrir_caja`/`cerrar_caja`/
   `reabrir_cierre`/`entregar_custodia`/`registrar_arqueo` en
   `application/caja.py`, inventario de terminales en `application/pos.py`.
   - El cierre **reconcilia de verdad**: `esperado = apertura + efectivo
@@ -117,11 +118,24 @@ finanzas documentados en el área:
   - **El monto sale del conteo por denominación** (RN-POS-003/007), no de
     un número tecleado; en la apertura la diferencia contra lo declarado
     por el encargado se calcula y **no bloquea abrir** (RN-POS-011).
-  - **Cada relevo lo firma quien recibe con su PIN** (RN-MDP-002, permiso
-    `accounting.caja_relevar`), y el efectivo sigue por `custodia_efectivo`
-    hasta quedar `disponible`.
+  - **El turno lo abre y lo cierra el cajero solo** (RN-MDP-008, ADR-049):
+    basta `accounting.caja_operar`, sin elevación de PIN. Lo que prueba
+    cuánto había es el conteo, no una firma — y pedir que un encargado
+    viniera a firmar cada apertura terminaba con su sesión abierta en la
+    caja todo el turno.
+  - **Cada entrega de efectivo la firma quien recibe con su PIN**
+    (RN-MDP-002, permiso `accounting.caja_relevar`): el cierre deja la plata
+    `en_caja` a nombre del cajero, y de ahí `custodia_efectivo` avanza
+    `en_caja → en_supervisor → en_contabilidad | disponible`, un tramo por
+    firma. `POST /cajas/custodias/{id}/entregar` es el **único** punto del
+    ciclo que pide elevación. El cajero no puede firmar que recibió su
+    propia plata: no tiene `caja_relevar`, y eso alcanza — no hace falta un
+    candado de dominio contra relevarse a sí mismo.
   - **Un cierre con faltante se corrige, no se reescribe**: reapertura con
-    motivo y autorizador en `cierre_caja.correcciones` (RN-MDP-005).
+    motivo y autorizador en `cierre_caja.correcciones` (RN-MDP-005). Vale
+    mientras el efectivo siga en el local, y desde ADR-049 eso incluye el
+    caso que antes era inalcanzable: recontar con la plata todavía en el
+    cajón.
   - **No se cobra sin caja abierta**: `sales.registrar_pago` pregunta por
     `queries_publicas.hay_caja_abierta`. Excepción única, el replay del
     push del hub (ADR-009), porque el cobro ya ocurrió en la sucursal.
@@ -131,8 +145,8 @@ finanzas documentados en el área:
     `accounting.arqueo_registrar` (`supervisor`/`contador`).
   - **`custodia` y `descuadre_atribucion` son enums, no texto libre**:
     `custodia` es *a dónde va el efectivo* (`local_caja_fuerte` /
-    `traslado_contabilidad`) —a quién se le entregó ya lo prueba la firma
-    del PIN— y `descuadre_atribucion` es `cajero` / `encargado` /
+    `traslado_contabilidad`) —a quién se le entregó lo prueba la firma del
+    tramo de custodia— y `descuadre_atribucion` es `cajero` / `encargado` /
     `tercero_reportado`. Los dos se validan con `pattern` en el schema: sin
     eso, un texto libre se escribía sin protestar y dejaba la fila
     **ilegible**, porque la lectura reventaba después al mapear el enum.
@@ -140,6 +154,12 @@ finanzas documentados en el área:
     el descuadre y el tramo de custodia en una sola consulta — es la lista
     con la que trabaja contabilidad para reabrir un cierre o recibir el
     efectivo, y traerlos por separado era un N+1 por turno.
+  - **Quién está a cargo del local**: `queries_publicas.encargado_de_turno`
+    salía del `relevo_encargado_id` de la caja abierta. Con ADR-049 esa
+    columna queda en NULL en toda apertura nueva, así que devuelve `None` y
+    `reports` cae en su respaldo por rol (ADR-036). Sigue leyendo bien las
+    aperturas anteriores. Recuperarlo de verdad necesita una fuente propia
+    —un turno de personal, no la caja— y está anotado como deuda.
   - **Fuera del slice**: el turno de caja no se replica al hub, y
     RN-POS-012/013 (prever sencillo, dedicación exclusiva durante el
     conteo) son organizativas — viven en el SOP, no en código.
@@ -152,12 +172,12 @@ finanzas documentados en el área:
 
 | Método | Ruta | Permiso |
 |--------|------|---------|
-| POST | `/accounting/cajas/apertura` | `accounting.caja_operar` + PIN `caja_relevar` |
-| POST | `/accounting/cajas/apertura/{id}/cierre` | `accounting.caja_operar` + PIN `caja_relevar` |
+| POST | `/accounting/cajas/apertura` | `accounting.caja_operar` — sin PIN (RN-MDP-008) |
+| POST | `/accounting/cajas/apertura/{id}/cierre` | `accounting.caja_operar` — sin PIN (RN-MDP-008) |
 | POST | `/accounting/cajas/apertura/{id}/movimientos` | `accounting.caja_operar` (+ PIN `caja_retirar` si es retiro) |
 | GET | `/accounting/cajas/apertura/{id}/movimientos` | `accounting.leer` |
 | GET | `/accounting/cajas/apertura/{id}/custodia` | `accounting.leer` |
-| POST | `/accounting/cajas/custodias/{id}/entregar` | `accounting.caja_operar` + PIN `caja_relevar` |
+| POST | `/accounting/cajas/custodias/{id}/entregar` | `accounting.caja_operar` + PIN `caja_relevar` — la única firma del ciclo |
 | POST | `/accounting/cajas/cierres/{id}/reabrir` | `accounting.caja_operar` + PIN `caja_reabrir` |
 | GET | `/accounting/cajas/abiertas?empresa_id=` | `accounting.leer` |
 | GET | `/accounting/cajas/turnos?desde=&hasta=` | `accounting.leer` |
@@ -170,4 +190,6 @@ finanzas documentados en el área:
 
 "+ PIN" = token de `POST /auth/autorizar` en el cuerpo (`autorizacion`): la
 sesión del cajero no alcanza, tiene que firmar quien recibe o autoriza
-(RN-MDP-002, RN-AUD-005).
+(RN-MDP-002, RN-AUD-005). Se pide donde la plata cambia de manos o donde se
+corrige evidencia ya escrita — **no** para abrir ni cerrar el turno, que son
+actos del cajero (RN-MDP-008, ADR-049).

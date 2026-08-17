@@ -1,7 +1,15 @@
 # ADR-025 — Ciclo de caja completo: conteo, relevo firmado y candado del cobro
 
-- Estado: aceptado
+- Estado: aceptado, **parcialmente enmendado por
+  [ADR-049](ADR-049-la-caja-la-abre-el-cajero.md)** (2026-08-15)
 - Fecha: 2026-08-04
+
+> **Lo que ADR-049 cambió**: el punto 3 de abajo aplicaba la firma con PIN a
+> tres momentos (apertura, cierre y cada tramo de custodia). Hoy solo aplica
+> al tercero. Abrir y cerrar el turno son actos del cajero con su propia
+> sesión (RN-MDP-008), y `custodia_efectivo` nace en `en_caja` —no en
+> `en_supervisor`— porque el cierre ya no trae la firma de nadie. Todo lo
+> demás de este ADR sigue vigente.
 
 ## Contexto
 
@@ -64,6 +72,9 @@ Un conteo vacío es válido y vale cero (la caja abre aunque no haya llegado
 el sencillo). Lo que no se acepta es *no contar*.
 
 ### 3. Cada relevo lo firma quien recibe, con su PIN
+
+> **Enmendado por ADR-049 (2026-08-15).** Lo que sigue describe la decisión
+> original; hoy la firma vale solo para los tramos de `custodia_efectivo`.
 
 Apertura, cierre y cada tramo de custodia exigen la **elevación de PIN**
 que ya existía para descuentos (RN-AUD-005, `POST /auth/autorizar`), con el
