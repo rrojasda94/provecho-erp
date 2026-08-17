@@ -1,9 +1,11 @@
 # ADR-045 — Pinpad y bloqueo de pantalla en el PDV
 
-- **Estado:** aceptada
+- **Estado:** aceptada — **enmendada por ADR-050** (el login también usa el
+  pinpad; el componente se mudó a `components/pinpad/`)
 - **Fecha:** 2026-08-13
 - **Contexto:** `frontend/app/pdv`, `users` (auth)
-- **Relacionado:** RN-POS-014, RN-AUD-005, ADR-013 (el PDV vive fuera del shell)
+- **Relacionado:** RN-POS-014, RN-AUD-005, ADR-013 (el PDV vive fuera del shell),
+  ADR-050 (enmienda)
 
 ## Contexto
 
@@ -23,6 +25,13 @@ cualquiera**.
 
 ### Pinpad, y solo en el PDV
 
+> **Enmendado el 2026-08-15 por ADR-050.** El "solo en el PDV" duró dos días:
+> el login pedía el PIN en el mismo `<input type="password">` que esta
+> decisión eliminó, y es la puerta por la que se entra al PDV. Hoy el
+> componente vive en `frontend/components/pinpad/` y el login lo usa;
+> `app/pdv/pinpad.tsx` es un re-export temporal. Todo lo demás de esta
+> sección sigue vigente.
+
 Un teclado numérico táctil (`app/pdv/pinpad.tsx`) **sin ningún `<input>`**.
 El valor vive en el estado de React y lo que se ve son puntos. Esa es la
 razón de existir del componente: un campo que el gestor de contraseñas no
@@ -35,6 +44,11 @@ Fuera del PDV no cambia nada — el login del back office sigue con su campo
 de siempre. Es una decisión explícita del encargo: la contraseña compartida
 es un problema del mostrador, no de una oficina donde cada quien tiene su
 equipo.
+
+> **Este párrafo está revocado (ADR-050).** Describía mal el mapa: el login
+> no es una pantalla de oficina, es la puerta por la que se entra al PDV
+> desde la misma tablet. Sacar el campo de los cuatro diálogos y dejarlo en
+> la puerta no protegía nada.
 
 ### Bloqueo por inactividad que NO cierra sesión
 
@@ -112,7 +126,8 @@ logout que se descartó.
 - Los cuatro diálogos comparten `FirmaConPin` (usuario + pinpad): antes cada
   uno escribía su propio par de campos.
 - Los e2e ya no llenan el PIN con `.fill()`; `tecleaPin()` toca los dígitos.
-  El login del back office sigue usando `input[type="password"]` y no cambia.
+  El login del back office sigue usando `input[type="password"]` y no cambia
+  — **hasta ADR-050**, que lo pasó al pinpad dos días después.
 - El PDV pasa a pedir `/users/me` para saber el nombre de quien tiene la
   sesión: el JWT no lleva `username`, y la pantalla bloqueada tiene que
   decir de quién es la sesión que sigue abierta debajo.

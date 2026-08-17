@@ -117,10 +117,11 @@ nada más. La razón por la que existe no cambió — es un check requerido, cor
 con un solo worker, y cada caso nuevo es tiempo que paga todo merge del repo,
 incluido el arreglo urgente que no toca ninguna pantalla.
 
-El techo es de **categorías, no de casos**: hoy son 13 casos en cuatro
-archivos y los 13 caen en las tres de arriba —el guard del lienzo y el
-bloqueo de pantalla son "candados que solo existen en pantalla"—. Una cuarta
-categoría es lo que no entra.
+El techo es de **categorías, no de casos**: hoy son 16 casos en cuatro
+archivos y los 16 caen en las tres de arriba —el guard del lienzo, el bloqueo
+de pantalla y el login sin campo de contraseña (ADR-050) son "candados que
+solo existen en pantalla": del lado del servidor no hay ninguna diferencia
+entre un PIN escrito y uno tocado—. Una cuarta categoría es lo que no entra.
 
 Lo que cambia es la salida para lo que no entra. Antes había dos: agregarlo
 igual (y romper el techo) o no escribirlo. Ahora hay una tercera, `uso/`, con
@@ -224,9 +225,10 @@ escrito a mano: envejece sin avisar.
   caída no se confunda con un 403 ni se dibuje como lista vacía— y 8
   (2026-08-15, `lib/proxy.test.ts`) fijan que el proxy del navegador no toque
   lo que pasa por él en ninguna de las dos direcciones (ADR-048).
-- e2e: **13 casos en verde y en CI** (job `e2e`), sobre PDV, sesión, el gate
-  de módulo, el lienzo de nodos y el bloqueo de pantalla. Los tres puntos de
-  "qué sí justifica un e2e" quedan cubiertos. Ver ROADMAP → Frontend.
+- e2e: **16 casos en verde y en CI** (job `e2e`), sobre PDV, sesión, el gate
+  de módulo, el lienzo de nodos, el bloqueo de pantalla y el login con pinpad
+  (ADR-050). Los tres puntos de "qué sí justifica un e2e" quedan cubiertos.
+  Ver ROADMAP → Frontend.
 - Uso: **3 casos**. `uso/humo.spec.ts` prueba el arnés y no una pantalla;
   `uso/importador-recetas.spec.ts` (2026-08-15) recorre la carga masiva del
   recetario de punta a punta —descargar la plantilla, abrirla con openpyxl,

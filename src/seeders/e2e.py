@@ -137,6 +137,13 @@ PROVEEDOR_RUC = "20512345678"
 # comprobación aparte.
 OC_IDEMPOTENCY = "seed-e2e-oc-0001"
 
+# Cuenta de sacrificio: la prueba del bloqueo por intentos fallidos (ADR-050)
+# le agota los cinco intentos y la deja inutilizable quince minutos. Gastar
+# para eso al cajero o al encargado dejaría sin sesión a las pruebas que
+# corran después, en un orden que Playwright no promete.
+BLOQUEO_USUARIO = "bloqueo_e2e"
+BLOQUEO_PIN = "222222"
+
 # --- Padrón de clientes -----------------------------------------------------
 # Un cliente **jurídico**: es el que Ventas → Clientes deja corregir, y el
 # diálogo donde vive el botón «Buscar por RUC» (ADR-041). Sin ninguno
@@ -200,6 +207,7 @@ def sembrar_e2e(session: Session) -> dict:
     # exige firmar un tramo de la cadena de custodia.
     _usuario_con_rol(session, ENCARGADO_USUARIO, ENCARGADO_PIN, "supervisor", sucursal)
     _usuario_con_rol(session, CAJERO_USUARIO, CAJERO_PIN, "cajero", sucursal)
+    _usuario_con_rol(session, BLOQUEO_USUARIO, BLOQUEO_PIN, "cajero", sucursal)
 
     producto = session.scalar(
         select(ProductoComercial).where(ProductoComercial.nombre == PRODUCTO_NOMBRE)
