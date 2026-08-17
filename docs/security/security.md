@@ -11,7 +11,18 @@ Autenticación, endurecimiento, auditoría y backups. El control de acceso
 - Login con username + PIN (6 dígitos) → **JWT** access (15 min) +
   **refresh token** (7 días, rotativo; reuso de token viejo revoca la cadena).
 - PIN hasheado con **Argon2id**. Nunca en logs ni respuestas.
+- **Ningún PIN se teclea en un campo de formulario** (ADR-045, ampliado por
+  ADR-050): ni el login ni los cuatro puntos del PDV que lo piden tienen
+  `<input type="password">`. Se toca en `components/pinpad/`, y el valor vive
+  en el estado de React — lo que el gestor de contraseñas del navegador no ve
+  no lo puede ofrecer para guardar, y un PIN guardado en la tablet de la caja
+  hace que el turno siguiente entre con la cuenta del anterior (RN-AUD-005).
+  Única excepción pendiente: `app/cambiar-pin/` (deuda de frontend).
 - Bloqueo tras 5 intentos fallidos (ventana 15 min) — protege **una cuenta**.
+  El login **distingue las tres negativas** (401 credenciales, 423 bloqueo,
+  429 rate limit) y dice qué hacer con cada una; con un solo texto genérico
+  las tres terminaban igual: probando de nuevo hasta bloquear la cuenta. Sin
+  contador de intentos en el cliente — el estado real vive en el servidor.
 - **Rate limit por IP** en `/auth/login` y `/auth/refresh` (contador en Redis,
   10 intentos por minuto por defecto) — protege el **endpoint**: el lockout
   por cuenta no frena a quien rota usernames desde una misma IP. Si Redis no

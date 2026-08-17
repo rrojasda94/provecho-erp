@@ -84,6 +84,29 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   `POST /auth/verificar-pin`, detrás del mismo rate limit y contra el
   **mismo lockout** que el login. Fuera del PDV no cambia nada: es un
   problema del mostrador, no de una oficina con un equipo por persona.
+- ✅ 2026-08-15 **…y el login también** (ADR-050, enmienda a ADR-045). Ese
+  "fuera del PDV no cambia nada" duró dos días. El login **no** es una
+  pantalla de oficina: es la puerta por la que se entra al PDV, desde la
+  misma tablet, y seguía pidiendo el PIN en un
+  `<input type="password" autocomplete="current-password">` — el patrón
+  exacto que se acababa de eliminar, con la etiqueta que le pide al navegador
+  que lo guarde. Sacarlo de los cuatro diálogos y dejarlo en la puerta no
+  protegía nada: basta con entrar una vez. Ahora el usuario se teclea y el
+  PIN se toca; no queda campo, **ni oculto**, y una prueba e2e afirma el DOM
+  para que el patrón no vuelva a colarse (un `type="password"` agregado sin
+  querer no rompería ninguna otra prueba: seguiría todo verde). De paso, el
+  login dejó de tratar igual las tres negativas del servidor: el 401 avisa
+  que a los cinco intentos la cuenta se bloquea, el 423 dice cuántos minutos
+  y a quién pedirle un reseteo (ADR-041), y el 429 dice cuánto esperar
+  leyendo el `Retry-After`. **Sin contador de intentos en el cliente**: el
+  estado real vive en el servidor y uno local mentiría —tranquilizando—
+  apenas alguien abriera otra pestaña.
+- ⬜ **`app/cambiar-pin/` sigue con tres `<input type="password">`**
+  (2026-08-15): PIN actual, nuevo y repetido. Es el último PIN del ERP que se
+  escribe en un campo, con el mismo defecto que ADR-045 describe. Quedó fuera
+  de ADR-050 porque es otro flujo y otra decisión de diseño —tres pinpads en
+  una pantalla, o uno con tres pasos— y mezclarla dejaba un cambio imposible
+  de revisar.
 - ⬜ **El bloqueo del PDV no cubre el KDS ni el lienzo** (2026-08-13,
   ADR-045): son las otras dos pantallas táctiles fuera del shell. El KDS no
   cobra ni anula, así que el riesgo es menor, pero sí avanza pedidos con la

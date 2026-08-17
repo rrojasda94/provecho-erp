@@ -23,11 +23,28 @@ export type Pagina<T> = {
 
 export class ApiError extends Error {
   status: number;
+  /**
+   * Segundos del `Retry-After` cuando el servidor lo manda (hoy solo el 429
+   * de `core/rate_limit.py`). Es el único dato que dice **cuánto** esperar:
+   * sin él una pantalla solo puede escribir "más tarde", que no le sirve a
+   * nadie parado frente a una caja.
+   */
+  reintentarEn?: number;
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, reintentarEn?: number) {
     super(message);
     this.status = status;
+    this.reintentarEn = reintentarEn;
   }
+}
+
+/** `Retry-After` en segundos. La forma con fecha HTTP existe en el estándar
+ * pero ninguna respuesta del ERP la usa, así que se ignora en vez de fingir
+ * que se soporta: `undefined` es honesto, una fecha mal parseada no. */
+function reintentarEn(respuesta: Response): number | undefined {
+  const crudo = respuesta.headers.get("Retry-After");
+  const segundos = crudo === null ? NaN : Number(crudo);
+  return Number.isFinite(segundos) && segundos > 0 ? segundos : undefined;
 }
 
 async function mensajeDeError(respuesta: Response): Promise<string> {
@@ -60,7 +77,11 @@ export async function apiFetch<T>(
   });
 
   if (!respuesta.ok) {
-    throw new ApiError(respuesta.status, await mensajeDeError(respuesta));
+    throw new ApiError(
+      respuesta.status,
+      await mensajeDeError(respuesta),
+      reintentarEn(respuesta),
+    );
   }
   // 204 no trae cuerpo (asignar/quitar rol, marcar leída): pedirle `.json()`
   // revienta con "Unexpected end of JSON input" sobre una llamada que salió

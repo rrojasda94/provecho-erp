@@ -368,6 +368,20 @@ sistema de traducciones para un solo idioma (YAGNI).
 implementada (`lib/auth.ts`, `decodificarClaims`). Protección de rutas por
 autenticación ya existe (redirect a `/login` sin cookie).
 
+✅ **El PIN dejó de tener campo, también en el login** (2026-08-15, ADR-050,
+enmienda a ADR-045). `app/login/page.tsx` lo pedía en un
+`<input type="password" autocomplete="current-password">` — el patrón que
+ADR-045 había eliminado dentro del PDV, con la etiqueta que le pide al
+navegador que lo guarde. Hoy el usuario se teclea y el PIN se toca en
+`components/pinpad/` (mudado desde `app/pdv/`, con su CSS a `globals.css` y
+respaldo de tokens para las dos paletas); no queda ningún campo, ni oculto,
+y una prueba e2e afirma el DOM para que el patrón no vuelva a colarse.
+Además `loginAction` **distingue los tres rechazos** del servidor —401, 423
+con sus 15 minutos, 429 con su `Retry-After`— y devuelve `{error, motivo}`
+en vez de `e.message`: antes los tres llegaban con el mismo texto y las tres
+salidas terminaban igual, probando de nuevo hasta bloquear la cuenta. Sigue
+abierto `app/cambiar-pin/`, con sus tres campos (ver Deuda → Frontend).
+
 ⬜ **Falta**: Content-Security-Policy (deuda ya declarada en
 `ROADMAP.md` → Seguridad — "falta definirla junto con el frontend"),
 expiración de sesión visible al usuario (hoy silenciosa hasta el próximo
@@ -457,6 +471,13 @@ RN-POS-011 y que un rechazo del servidor no borre lo tecleado;
 **gate de módulo por permiso entrando por URL directa** (el filtro del home
 es UX; lo que decide es el `layout.tsx`). Fuera del PDV, el resto de las
 pantallas sigue sin prueba.
+✅ **16 casos** (2026-08-15, ADR-050): `sesion.spec.ts` suma los tres del
+login con pinpad — que **no exista ningún `input` de contraseña en el DOM**
+(se afirma el DOM y no un comportamiento: un `type="password"` agregado sin
+querer no rompería ninguna otra prueba), que un PIN equivocado no borre el
+usuario tecleado, y que una cuenta bloqueada (423) avise distinto que un PIN
+equivocado (401). El 429 no se prueba: `e2e/servidor-api.mjs` sube el rate
+limit a propósito para que la suite entera pueda entrar desde la misma IP.
 ⬜ Sin decidir testing unitario de componentes/hooks (candidato: Vitest +
 Testing Library cuando exista F2.4); los 14 casos de `npm test` corren a
 mano y **no están en CI**. No bloquea el alfa si es una demo guiada, pero sí

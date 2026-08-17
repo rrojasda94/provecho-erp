@@ -69,10 +69,19 @@ Leer antes: `/CLAUDE.md`, [product/ui-ux.md](../product/ui-ux.md) y
 - Accesibilidad: paleta alternativa (daltonismo) y tamaño de fuente
   ajustable, ambos como preferencia del perfil del usuario, combinables
   con el tema de marca activo.
-- **Un PIN dentro del PDV se pide con `Pinpad`, nunca con un `<input>`**
-  (ADR-045). Si el navegador puede ofrecer guardarlo, alguien lo guarda, y
-  el turno siguiente opera con la cuenta del anterior. Los cuatro sitios que
-  ya lo piden usan `FirmaConPin` (usuario + pinpad); uno nuevo también.
+- **Un PIN se pide con `Pinpad` (`components/pinpad/`), nunca con un
+  `<input>`** — en el PDV y fuera de él, login incluido (ADR-045, ADR-050).
+  Si el navegador puede ofrecer guardarlo, alguien lo guarda, y el turno
+  siguiente opera con la cuenta del anterior. Los cuatro sitios del PDV usan
+  `FirmaConPin` (usuario + pinpad); uno nuevo también. Ni siquiera un
+  `<input type="hidden">`: el valor viaja desde el estado de React en el
+  `FormData` que arma el envío, y así "no hay campo" se verifica mirando el
+  DOM — que es lo que hace sostenible la regla.
+- **Una acción que puede fallar se despacha a mano, no por
+  `<form action={...}>`**, y lo que haya que conservar va en campo
+  controlado. React 19 resetea los campos no controlados de un formulario
+  cuando su acción termina, **también cuando devolvió error**: el usuario
+  tecleado se borraba junto con el PIN equivocado.
 - **Un overlay que deba tapar un diálogo abierto tiene que ser otro
   `<dialog>` con `showModal()`**, no un `div` con `z-index`. Los diálogos
   nativos viven en el *top layer* del navegador y ningún `z-index` los

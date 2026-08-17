@@ -78,6 +78,12 @@ ENCARGADO_PIN = "654321"
 # con él que se verifica el gate del home y el de cada `layout.tsx`.
 CAJERO_USUARIO = "cajero_e2e"
 CAJERO_PIN = "111111"
+# Cuenta de sacrificio: la prueba del bloqueo por intentos fallidos (ADR-050)
+# le agota los cinco intentos y la deja inutilizable quince minutos. Gastar
+# para eso al cajero o al encargado dejaría sin sesión a las pruebas que
+# corran después, en un orden que Playwright no promete.
+BLOQUEO_USUARIO = "bloqueo_e2e"
+BLOQUEO_PIN = "222222"
 PRODUCTO_NOMBRE = "Pizza E2E"
 PRODUCTO_PRECIO = Decimal("25.00")
 
@@ -171,6 +177,7 @@ def sembrar_e2e(session: Session) -> dict:
     # `accounting.caja_relevar`, que es el permiso que la apertura exige.
     _usuario_con_rol(session, ENCARGADO_USUARIO, ENCARGADO_PIN, "supervisor", sucursal)
     _usuario_con_rol(session, CAJERO_USUARIO, CAJERO_PIN, "cajero", sucursal)
+    _usuario_con_rol(session, BLOQUEO_USUARIO, BLOQUEO_PIN, "cajero", sucursal)
 
     producto = session.scalar(
         select(ProductoComercial).where(ProductoComercial.nombre == PRODUCTO_NOMBRE)
