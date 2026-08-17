@@ -7,7 +7,7 @@ Tres cosas hacen que el ciclo cierre de verdad y no solo se registre:
    apertura como el cierre reciben el conteo por billete y moneda, y el
    monto sale de esa suma. Lo que el encargado dice haber entregado se
    compara contra lo contado, y la diferencia se calcula — no se teclea.
-2. **El turno lo abre y lo cierra el cajero solo** (RN-MDP-008, ADR-048);
+2. **El turno lo abre y lo cierra el cajero solo** (RN-MDP-008, ADR-049);
    **lo que sí firma quien recibe es cada entrega de efectivo**
    (RN-MDP-002): al cerrar, el dinero queda `en_caja` a nombre del cajero,
    y de ahí en adelante cada tramo de `custodia_efectivo` exige la

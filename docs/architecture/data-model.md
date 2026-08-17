@@ -832,15 +832,15 @@ Solicitud.
   estado (`en_caja` | `en_supervisor` | `en_contabilidad` | `disponible`),
   timestamps por relevo (RN-MDP-002). **Máquina de estados desde ADR-025**:
   **nace en `en_caja`** al cerrar la caja, a nombre del cajero
-  (RN-MDP-008/ADR-048: el cierre es un conteo, no una entrega — hasta
-  ADR-048 nacía en `en_supervisor` y `en_caja` no lo escribía nadie), pasa
+  (RN-MDP-008/ADR-049: el cierre es un conteo, no una entrega — hasta
+  ADR-049 nacía en `en_supervisor` y `en_caja` no lo escribía nadie), pasa
   a `en_supervisor` cuando el encargado firma haberlo recibido, y de ahí a
   `en_contabilidad` o directo a `disponible` cuando el efectivo se queda en
   la caja fuerte del local como fondo del día siguiente (RN-MDP-006). Cada
   transición exige que **quien recibe** se autentique con su PIN; no se
   vuelve atrás.
 - **apertura_caja** (PROC-CTB-002): punto_venta_id, cajero_id,
-  relevo_encargado_id (**NULLABLE desde ADR-048**, migración
+  relevo_encargado_id (**NULLABLE desde ADR-049**, migración
   `c8b41f60d2a7`: el cajero abre solo y no hay contraparte que firme. Las
   filas anteriores conservan quién firmó —evidencia que no se reescribe— y
   son las únicas de las que `encargado_de_turno` puede derivar algo),

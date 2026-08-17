@@ -11,7 +11,7 @@ import { contar, dialogo, ingresar } from "./util";
  * del PDV mandaban el contrato anterior a ADR-025 y la API respondía 422.
  * Ningún test lo vio porque hasta hoy nada tocaba estas pantallas.
  *
- * **Sin PIN de nadie** desde ADR-048: abrir y cerrar son actos del cajero
+ * **Sin PIN de nadie** desde ADR-049: abrir y cerrar son actos del cajero
  * con su propia sesión (RN-MDP-008). La firma del encargado que recibe el
  * efectivo no está acá porque no está en el PDV — vive en
  * `/contabilidad/caja` y se recorre en `uso/caja-custodia.spec.ts`.
@@ -102,7 +102,7 @@ test.describe.serial("Flujo del dinero", () => {
     // calcula el descuadre de todo el turno.
     //
     // El rechazo se simula interceptando la llamada. Antes lo provocaba un
-    // PIN mal tecleado, pero desde ADR-048 la apertura no pide PIN y no
+    // PIN mal tecleado, pero desde ADR-049 la apertura no pide PIN y no
     // quedó ninguna forma de que el servidor la rechace **desde esta
     // pantalla**: los montos salen de un conteo por denominaciones fijas y
     // el diálogo solo aparece cuando no hay caja abierta. Lo que este caso
@@ -164,7 +164,7 @@ test.describe.serial("Flujo del dinero", () => {
     // encontró un campo y no pudo cerrar la caja. Esta prueba busca por
     // etiqueta a propósito: falla si el nombre se pierde otra vez.
     //
-    // Los campos de firma ya no están (ADR-048); lo que queda son los dos
+    // Los campos de firma ya no están (ADR-049); lo que queda son los dos
     // `<select>` del cierre y el monto declarado de la apertura, que son
     // exactamente los que no tienen `<label>` propio y dependen de su
     // `aria-label`.

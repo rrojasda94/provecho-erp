@@ -1,7 +1,7 @@
 """Apertura de caja (PROC-CTB-002): el cajero cuenta el fondo con el que
 arranca su turno y verifica los terminales.
 
-La abre **él solo** (RN-MDP-008, ADR-048): lo que prueba cuánto había es el
+La abre **él solo** (RN-MDP-008, ADR-049): lo que prueba cuánto había es el
 conteo por denominación, no una firma. La cadena de custodia firmada
 (RN-MDP-002) empieza al cerrar, en `custodia_efectivo`.
 """
@@ -22,7 +22,7 @@ class AperturaCaja(Base, UuidPkMixin, TimestampMixin):
     punto_venta_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("punto_venta.id"))
     cajero_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("usuario.id"))
     # Quién firmó la entrega del fondo, cuando la apertura la exigía
-    # (hasta ADR-048). NULL en las aperturas nuevas: el cajero abre solo y
+    # (hasta ADR-049). NULL en las aperturas nuevas: el cajero abre solo y
     # no hay contraparte. Se conserva porque las aperturas anteriores sí
     # tienen firma y esa evidencia no se reescribe.
     relevo_encargado_id: Mapped[uuid.UUID | None] = mapped_column(

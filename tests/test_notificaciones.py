@@ -102,7 +102,7 @@ def _abrir_caja(s, ids, *, con_encargado=False):
     """Turno de caja abierto.
 
     Con `con_encargado=True` se escribe `relevo_encargado_id`, que es lo que
-    dejaban las aperturas **anteriores a ADR-048**, cuando abrir exigía la
+    dejaban las aperturas **anteriores a ADR-049**, cuando abrir exigía la
     firma del encargado. Filas así siguen existiendo en cualquier base que
     ya haya operado, y `encargado_de_turno` tiene que saber leerlas.
     """
@@ -126,7 +126,7 @@ def test_el_encargado_de_turno_sale_de_la_caja_abierta(env):
 
 
 def test_una_apertura_nueva_no_deja_encargado_de_turno(env):
-    """Desde ADR-048 el cajero abre solo, así que la caja abierta ya no dice
+    """Desde ADR-049 el cajero abre solo, así que la caja abierta ya no dice
     quién está a cargo del local.
 
     No se sustituye por el cajero: avisarle a él de algo que él no puede

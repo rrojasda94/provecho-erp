@@ -1,4 +1,4 @@
-"""Ciclo de caja completo (ADR-025, enmendado por ADR-048): conteo por
+"""Ciclo de caja completo (ADR-025, enmendado por ADR-049): conteo por
 denominación, POS de tarjeta, cadena de custodia firmada con PIN, corrección
 de un cierre y el candado que impide cobrar sin turno abierto.
 

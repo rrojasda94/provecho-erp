@@ -286,6 +286,13 @@ def eliminar_receta(session: Session, receta_id: uuid.UUID) -> None:
     repo = RecetaRepo(session)
     for item in repo.items(receta_id):
         repo.borrar_item(item)
+    # El flush no es decorativo: sin `relationship` entre `receta` y
+    # `receta_item`, SQLAlchemy no sabe que una depende de la otra y ordenaba
+    # el DELETE de la cabecera **antes** que el de las líneas. Postgres lo
+    # rechazaba por `fk_receta_item_receta_id_receta`, o sea que una receta
+    # con insumos —todas— no se podía borrar: 500 en la cara del usuario. En
+    # SQLite pasaba en verde porque el suite corría con las FK apagadas.
+    session.flush()
     session.delete(receta)
 
 

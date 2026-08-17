@@ -18,6 +18,12 @@ class Settings(BaseSettings):
     environment: str = "local"
     debug: bool = False
     database_url: str = "postgresql+psycopg://provecho:provecho@localhost:5432/provecho"
+    # Cuánto deja correr Postgres una consulta antes de cancelarla. Dos plazos
+    # y no uno: el cobro de una mesa y un reporte de márgenes del trimestre no
+    # aguantan la misma espera, y con un solo número había que elegir entre
+    # matar reportes legítimos o dejar la caja colgada. 0 = sin límite.
+    db_statement_timeout_segundos: int = 15
+    db_statement_timeout_reportes_segundos: int = 120
     # Zona del negocio, no la del servidor: de ella sale "qué día es hoy"
     # para el ERP (`src/shared/fechas.py`). En Docker el sistema corre en UTC,
     # y con eso un cierre de las 20:00 hora Perú caía al día siguiente.
@@ -43,6 +49,17 @@ class Settings(BaseSettings):
     # frena un ataque que rota usernames desde la misma IP).
     rate_limit_login_intentos: int = 10
     rate_limit_login_ventana_segundos: int = 60
+    # Rate limit de la consulta de DNI/RUC (ADR-041). Cada llamada gasta cuota
+    # de un proveedor **pago** y trae datos personales de alguien que todavía
+    # no es nadie en el sistema, así que el límite no es contra el abuso sino
+    # contra el gasto: un bucle mal escrito en una pantalla agota el plan del
+    # mes. Dos cuentas y una sola ventana: la del usuario es la que de verdad
+    # frena a quien se pasa, la de la IP es el techo del local entero —todas
+    # las cajas salen por la misma, y limitar solo por IP dejaría al equipo
+    # sin consultar por culpa de uno—.
+    consulta_documento_intentos_usuario: int = 20
+    consulta_documento_intentos_ip: int = 60
+    consulta_documento_ventana_segundos: int = 60
     # Monto sobre el cual emitir una OC exige permiso purchases.aprobar
     # (RN-CMP — umbral configurable, valor semilla a ajustar por el negocio).
     purchases_umbral_aprobacion_oc: Decimal = Decimal("2000")

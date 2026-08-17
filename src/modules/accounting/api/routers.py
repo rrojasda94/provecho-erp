@@ -57,7 +57,7 @@ ARQUEO_REGISTRAR = "accounting.arqueo_registrar"
 CAJA_RETIRAR = "accounting.caja_retirar"
 # Recibir el efectivo en cada tramo de la cadena de custodia (RN-MDP-002):
 # del cajón al encargado, del encargado a contabilidad, y de ahí a
-# disponible. **Ya no interviene en abrir ni cerrar** (RN-MDP-008, ADR-048):
+# disponible. **Ya no interviene en abrir ni cerrar** (RN-MDP-008, ADR-049):
 # el turno lo opera el cajero solo y firmar tiene sentido solo donde la
 # plata cambia de manos.
 CAJA_RELEVAR = "accounting.caja_relevar"
@@ -462,7 +462,7 @@ def entregar_custodia(
     """Avanza la cadena de custodia; quien **recibe** firma con su PIN
     (RN-MDP-002).
 
-    Desde ADR-048 este es el **único** endpoint del ciclo de caja que exige
+    Desde ADR-049 este es el **único** endpoint del ciclo de caja que exige
     la elevación con `accounting.caja_relevar`, y el primer tramo
     (`en_caja → en_supervisor`) es la entrega que antes se daba por hecha al
     cerrar: el efectivo sale del cajón cuando alguien firma que lo recibió,

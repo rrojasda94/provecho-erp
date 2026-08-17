@@ -25,7 +25,7 @@ export type DatosCierre = {
 };
 
 /**
- * Apertura y cierre del turno desde el PDV (ADR-025, enmendado por ADR-048).
+ * Apertura y cierre del turno desde el PDV (ADR-025, enmendado por ADR-049).
  *
  * Vive fuera de `PdvCliente` porque el ciclo de caja no es parte de vender:
  * son dos operaciones con su propio conteo, su propio cuadre de terminales y

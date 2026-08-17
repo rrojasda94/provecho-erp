@@ -1,4 +1,4 @@
-- **El cajero abre y cierra su caja solo** (2026-08-15, ADR-048, RN-MDP-008,
+- **El cajero abre y cierra su caja solo** (2026-08-15, ADR-049, RN-MDP-008,
   migración `c8b41f60d2a7`). `POST /accounting/cajas/apertura` y
   `.../cierre` dejan de exigir la elevación por PIN con
   `accounting.caja_relevar`: alcanza `accounting.caja_operar`, el permiso

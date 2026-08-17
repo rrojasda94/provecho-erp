@@ -33,7 +33,7 @@ from src.modules.reports.infrastructure.models import (
     ReporteEmitido,
 )
 from src.modules.sales.infrastructure.models import PuntoVenta
-from src.modules.users.api.deps import get_db
+from src.modules.users.api.deps import get_db, get_db_reportes
 from src.modules.users.infrastructure.models import (
     Almacen,
     Empresa,
@@ -248,7 +248,7 @@ def _abrir_caja(s, ids, *, con_encargado=True):
     """Turno de caja abierto.
 
     Por defecto escribe `relevo_encargado_id`, que es lo que dejaban las
-    aperturas **anteriores a ADR-048**: desde entonces el cajero abre solo y
+    aperturas **anteriores a ADR-049**: desde entonces el cajero abre solo y
     la columna queda en NULL. Los resolutores tienen que seguir leyendo bien
     las filas viejas —existen en cualquier base que ya operó— y caer en el
     respaldo por rol con las nuevas.
@@ -294,7 +294,7 @@ def test_sin_caja_abierta_el_aviso_cae_en_los_supervisores(env):
 
 
 def test_con_apertura_nueva_el_aviso_tambien_cae_en_los_supervisores(env):
-    """Desde ADR-048 la caja abierta no nombra a ningún encargado, así que el
+    """Desde ADR-049 la caja abierta no nombra a ningún encargado, así que el
     respaldo por rol dejó de ser la excepción y pasó a ser el camino normal.
 
     Se congela acá porque es el efecto colateral de sacarle la firma a la
@@ -547,16 +547,72 @@ def test_el_almacen_central_no_inventa_sucursal(env):
 
 def test_un_hecho_que_no_se_puede_ubicar_se_emite_sin_empresa(env):
     """Se guarda igual: un reporte que no se pudo atribuir es justamente el
-    que hay que poder investigar. Solo lo ve el superusuario."""
+    que hay que poder investigar. Solo lo ve el superusuario.
+
+    El almacén desconocido **no** queda en la columna: `almacen_id` es una FK
+    y guardarlo ahí hacía fallar el INSERT contra Postgres, o sea que este
+    reporte —el que más importa— era el único que no se emitía. El id sigue
+    en `datos`, que es lo que se lee al investigar.
+    """
     s, _ = env
+    almacen_fantasma = str(uuid.uuid4())
     reporte, destinatarios = emision_uc.emitir(
         s,
         "inventory.ajuste_fuera_margen",
-        {"ajuste_id": str(uuid.uuid4()), "almacen_id": str(uuid.uuid4())},
+        {"ajuste_id": str(uuid.uuid4()), "almacen_id": almacen_fantasma},
     )
     s.flush()
     assert reporte.empresa_id is None
+    assert reporte.almacen_id is None
+    assert reporte.datos["almacen_id"] == almacen_fantasma
     assert destinatarios == []
+
+
+def test_el_ambito_de_toda_emision_viaja_en_la_foto():
+    """De acá cuelga la decisión de `_existente`: cuando la fila referenciada
+    ya no está, la columna FK queda nula y el rastro lo sostiene `datos`. Una
+    emisión que no declare su `clave_ambito` entre sus campos rompería esa
+    promesa sin que nada más se ponga rojo."""
+    sin_ambito = [e.codigo for e in catalogo.CATALOGO if e.clave_ambito not in e.campos]
+    assert not sin_ambito, f"emisiones cuyo ámbito no queda en `datos`: {sin_ambito}"
+
+
+def test_una_referencia_que_ya_no_existe_no_tumba_la_emision(env):
+    """Mismo agujero que el almacén, en las otras tres columnas con FK.
+
+    Una sucursal cerrada o un usuario dado de baja entre el hecho y su
+    emisión (el bus despacha post-commit, ADR-016) dejaban el id colgando y
+    el `INSERT` moría con violación de clave foránea: se perdía el reporte
+    entero, no el enlace.
+    """
+    s, ids = env
+    reporte, _ = emision_uc.emitir(
+        s,
+        "sales.venta_anulada",
+        {
+            "venta_id": str(uuid.uuid4()),
+            "sucursal_id": str(uuid.uuid4()),
+            "usuario_id": str(uuid.uuid4()),
+        },
+    )
+    s.flush()
+    assert reporte.sucursal_id is None
+    assert reporte.empresa_id is None
+    assert reporte.actor_id is None
+
+    # Y con la sucursal real, el actor fantasma tampoco la tumba.
+    con_sucursal, _ = emision_uc.emitir(
+        s,
+        "sales.venta_anulada",
+        {
+            "venta_id": str(uuid.uuid4()),
+            "sucursal_id": str(ids["sucursal"].id),
+            "usuario_id": str(uuid.uuid4()),
+        },
+    )
+    s.flush()
+    assert con_sucursal.sucursal_id == ids["sucursal"].id
+    assert con_sucursal.actor_id is None
 
 
 def test_la_regla_de_la_sucursal_desplaza_a_la_general_al_emitir(env):
@@ -768,6 +824,7 @@ def api():
 
         app = create_app()
         app.dependency_overrides[get_db] = _override
+        app.dependency_overrides[get_db_reportes] = _override
         with TestClient(app) as c:
             r = c.post(
                 "/api/v1/auth/login", json={"username": "admin", "pin": "123456"}

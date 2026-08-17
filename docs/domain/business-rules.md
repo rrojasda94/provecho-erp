@@ -140,7 +140,7 @@ de su módulo y se prueban de forma aislada.
   cadena en sentido inverso. **Cada relevo, en cualquier sentido, exige que
   quien recibe se autentique con usuario y PIN en el ERP y confirme que los
   valores son correctos.**
-  *Enmendada el 2026-08-15 (RN-MDP-008, ADR-048)*: lo que se firma es **el
+  *Enmendada el 2026-08-15 (RN-MDP-008, ADR-049)*: lo que se firma es **el
   traspaso del efectivo**, no el acto de abrir o cerrar el turno. Abrir y
   cerrar son conteos que el cajero hace solo; el relevo firmado ocurre
   cuando la plata cambia de manos, que puede ser horas después del cierre.

@@ -336,7 +336,7 @@ ROLES = {
         # al cerrar (`en_caja → en_supervisor`, RN-MDP-002/008): es la
         # contraparte del cajero en la cadena de custodia y quien autoriza
         # recontar un cierre (RN-MDP-005). Ya no interviene en la apertura —
-        # el turno lo abre el cajero solo (ADR-048).
+        # el turno lo abre el cajero solo (ADR-049).
         "accounting.caja_relevar",
         "accounting.caja_reabrir",
         # Marketing arma el brief; quien lo aprueba nunca es quien lo escribe.

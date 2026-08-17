@@ -137,7 +137,7 @@ class AbrirCajaIn(BaseModel):
     `detalle_denominaciones` es lo que el cajero cuenta. La diferencia la
     calcula el servidor (RN-POS-011/012) — nunca se teclea.
 
-    **Sin `autorizacion`** desde ADR-048: la abre el cajero con su propia
+    **Sin `autorizacion`** desde ADR-049: la abre el cajero con su propia
     sesión (RN-MDP-008). Lo que prueba cuánto había en el cajón es el
     conteo, no una firma; firmar tiene sentido donde hay una entrega de
     efectivo de verdad, y esa es la cadena de custodia del cierre
@@ -155,7 +155,7 @@ class AperturaCajaOut(BaseModel):
     id: uuid.UUID
     punto_venta_id: uuid.UUID
     cajero_id: uuid.UUID
-    # NULL en toda apertura posterior a ADR-048: nadie firma abrir el turno.
+    # NULL en toda apertura posterior a ADR-049: nadie firma abrir el turno.
     relevo_encargado_id: uuid.UUID | None
     monto_apertura: Decimal
     detalle_denominaciones: dict | None
@@ -176,7 +176,7 @@ class ReportePosIn(BaseModel):
 class CerrarCajaIn(BaseModel):
     """El monto real sale del conteo por denominación (RN-POS-007).
 
-    **Sin `autorizacion`** desde ADR-048: lo cierra el cajero solo
+    **Sin `autorizacion`** desde ADR-049: lo cierra el cajero solo
     (RN-MDP-008). El efectivo queda `en_caja` a su nombre y la entrega al
     encargado se firma después, en
     `POST /cajas/custodias/{id}/entregar` (RN-MDP-002).

@@ -317,13 +317,31 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 - ⬜ **La nota de crédito sigue sin pantalla** (`sales/application/notas_credito.py`):
   es la devolución de una **venta**, no de mercadería, y por eso no entró
   con esto. Sin ella, deshacer algo ya cobrado no tiene camino por UI.
+- ✅ 2026-08-15 **El importador se puede usar de verdad** (ADR-048). Desde
+  ADR-046 el backend estaba bien y la pantalla no servía para nada: el proxy
+  del navegador (`frontend/app/api/proxy/[...ruta]/route.ts`) decodificaba
+  todo cuerpo a texto y le fijaba `application/json`, así que la plantilla
+  `.xlsx` se bajaba corrupta y con nombre `plantilla.json` —un ZIP no
+  sobrevive un `text()` en UTF-8— y la subida de la fase 1 perdía el
+  `boundary` del `multipart` antes de salir. Ahora el proxy pasa bytes en las
+  dos direcciones y conserva `Content-Type` y `Content-Disposition`.
+  Lo que dejó al descubierto es de dónde venía el agujero: los tests del
+  importador (`tests/test_recetas_variantes.py`) atacan a FastAPI con
+  `TestClient` y **nunca pasan por el proxy**, así que el endpoint podía estar
+  perfecto y llegar roto al navegador. Se cierra con dos pruebas nuevas:
+  `frontend/lib/proxy.test.ts` (8 casos, milisegundos) y
+  `frontend/uso/importador-recetas.spec.ts`, que descarga la plantilla, la
+  abre con openpyxl, la llena, la sube y confirma (ADR-047).
 - ⬜ **El importador no crea el insumo que falta desde el diálogo**
   (2026-08-13, ADR-046): la pantalla deja **elegir** uno existente u omitir
   la línea; crear uno nuevo ahí mismo —que era parte de lo pedido— usa
   `catalogoApi.crearArticulo`, que ya está expuesto, pero necesita el
   formulario con unidad y tipo dentro del diálogo. Mientras tanto se crea en
   `/inventario/articulos` y se vuelve a subir el archivo.
+  **Sigue abierto** después del arreglo del proxy: ahora se puede llegar a la
+  pantalla de resolución, que es donde falta el formulario.
 - ⬜ **La importación no actualiza recetas existentes** (2026-08-13): una
   receta con nombre repetido se omite. Actualizar exige decidir qué pasa con
   los ingredientes que el archivo no menciona —¿se borran?— y esa es una
-  decisión de negocio, no de código.
+  decisión de negocio, no de código. **Sigue abierto**: el arreglo del proxy
+  no toca ninguna regla del importador.

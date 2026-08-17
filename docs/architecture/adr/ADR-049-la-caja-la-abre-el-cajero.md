@@ -1,4 +1,4 @@
-# ADR-048 — La caja la abre el cajero; la firma queda donde la plata cambia de manos
+# ADR-049 — La caja la abre el cajero; la firma queda donde la plata cambia de manos
 
 - Estado: aceptado
 - Fecha: 2026-08-15

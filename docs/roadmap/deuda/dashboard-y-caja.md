@@ -29,7 +29,7 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   descuentan `movimiento_caja`. RN-POS-012/013 quedan fuera de código a
   propósito: son organizativas y viven en el SOP. 17 tests nuevos
   (`tests/test_caja_ciclo.py`).
-- ✅ 2026-08-15 **El cajero abre y cierra su turno solo** (ADR-048, migración
+- ✅ 2026-08-15 **El cajero abre y cierra su turno solo** (ADR-049, migración
   `c8b41f60d2a7`, RN-MDP-008; enmienda el punto 3 de ADR-025). Abrir y
   cerrar dejaron de pedir elevación de PIN: basta `accounting.caja_operar`,
   que el rol `cajero` ya tenía. La firma con `accounting.caja_relevar` no se
@@ -54,7 +54,7 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   `/contabilidad/caja` muestra el escalón `en_caja` que nunca se había
   podido ver. Recorrido de uso nuevo: `frontend/uso/caja-custodia.spec.ts`.
 - ⬜ **El encargado no puede ver los turnos que tiene que recibir** (deuda
-  nueva de ADR-048): `GET /accounting/cajas/turnos` exige `accounting.leer`
+  nueva de ADR-049): `GET /accounting/cajas/turnos` exige `accounting.leer`
   y el rol `supervisor` no lo tiene, así que hoy firma la recepción del
   efectivo sobre la pantalla de alguien que sí pueda abrirla. Funciona
   —toda elevación por PIN es así— pero la pantalla donde vive el botón
@@ -62,16 +62,16 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   probablemente sea el patrón que ya usa `GET /cajas/abiertas`: aceptar
   `caja_operar` cuando la consulta viene acotada a una sucursal.
 - ⬜ **El cajero no ve los terminales que tiene que verificar al abrir**
-  (RN-POS-010, encontrado escribiendo el recorrido de uso de ADR-048):
+  (RN-POS-010, encontrado escribiendo el recorrido de uso de ADR-049):
   `GET /accounting/pos-tarjeta?sucursal_id=` exige `accounting.leer`, el
   cajero no lo tiene, y el PDV se come el 403 con un `.catch(() => [])`. La
   apertura queda sin `pos_verificados`, así que el cierre tampoco cuadra
-  tarjetas y **nada lo dice en pantalla**. No lo causó ADR-048 —la apertura
+  tarjetas y **nada lo dice en pantalla**. No lo causó ADR-049 —la apertura
   siempre corrió sobre la sesión del cajero— pero ahora que él es el
   operador esperado la regla queda muerta en la práctica. Mismo arreglo
   candidato que la entrada anterior, más dejar de tragarse ese 403.
 - ⬜ **Ya no se sabe quién es el encargado de turno** (deuda nueva de
-  ADR-048): `accounting.queries_publicas.encargado_de_turno` salía del
+  ADR-049): `accounting.queries_publicas.encargado_de_turno` salía del
   `relevo_encargado_id` de la caja abierta y devuelve `None` para toda
   apertura nueva. `reports` cae en su respaldo por rol (`supervisor`/`admin`
   de la sucursal, ADR-036), que dejó de ser la excepción y pasó a ser el

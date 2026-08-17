@@ -313,7 +313,7 @@ Por sucursal:
 1. El **encargado de turno**, derivado del `relevo_encargado_id` de la caja
    abierta (contrato público de `accounting`). No hizo falta una entidad
    "turno": ese dato se registraba al abrir caja (RN-MDP-002).
-   **Desde ADR-048 ya no se registra** —el cajero abre solo y la columna
+   **Desde ADR-049 ya no se registra** —el cajero abre solo y la columna
    queda en NULL—, así que este paso solo resuelve para aperturas anteriores
    y el respaldo del punto 2 pasó a ser el camino normal.
 2. Sin caja abierta (local cerrado, o abrieron sin registrarla), los

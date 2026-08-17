@@ -4,7 +4,7 @@ import { obtenerSesion } from "@/lib/sesion";
 import { ClientesCliente, type Cliente } from "./clientes-cliente";
 
 export default async function ClientesPage() {
-  const { token } = await obtenerSesion();
+  const { token, usuario } = await obtenerSesion();
 
   let clientes: Cliente[];
   try {
@@ -21,5 +21,5 @@ export default async function ClientesPage() {
     return <p className="text-secondary">{mensaje}</p>;
   }
 
-  return <ClientesCliente clientes={clientes} />;
+  return <ClientesCliente clientes={clientes} permisos={usuario.permisos} />;
 }

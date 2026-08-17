@@ -15,12 +15,18 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   recuperaba y el frontend documentaba un endpoint de autoservicio que no
   existía. Permiso propio `users.resetear_pin`, marca en la cuenta que la
   bloquea hasta cambiarlo, revocación de sesiones y auditoría.
-- ⬜ **La consulta de DNI/RUC no tiene rate limit propio** (2026-08-12,
-  ADR-041). `GET /consulta/{dni,ruc}/{n}` gasta cuota de un proveedor **pago**
-  y hoy solo `/auth/login` está detrás de un límite. Con el permiso acotado a
-  cuatro roles el riesgo es de costo y no de fuga, pero una pantalla con un
-  bucle mal escrito basta para agotar el plan del mes. Va con el rate limit
-  global (más abajo) o con uno propio, lo que llegue primero.
+- ✅ 2026-08-15 **La consulta de DNI/RUC ya tiene rate limit propio**
+  (declarada el 2026-08-12 con ADR-041). `GET /consulta/{dni,ruc}/{n}` gasta
+  cuota de un proveedor **pago**; con el permiso acotado a cuatro roles el
+  riesgo era de costo y no de fuga, pero una pantalla con un bucle mal
+  escrito basta para agotar el plan del mes. Se resolvió con el mecanismo que
+  ya existía (`core/rate_limit.py`: contador en Redis, fail-open,
+  429 con `Retry-After`) y no con uno nuevo — dos implementaciones del mismo
+  límite es cómo una de las dos termina sin el fail-open. **Por usuario y por
+  IP**, 20 y 60 por minuto (`consulta_documento_*` en `settings`). Se cuenta
+  **después** de `require_permission`: un 403 no le cuesta un centavo a
+  nadie. La otra mitad es el frontend — el botón ya no se dibuja sin el
+  permiso, así que la consulta que no debía salir directamente no sale.
 - ⬜ **Dar de baja un almacén no mira el stock** (2026-08-08, con el CRUD de
   organización): `DELETE /almacenes/{id}` niega la baja si otros almacenes
   se abastecen de este, pero el stock vive en `inventory` y `users` no
@@ -40,9 +46,15 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 - ⬜ **Ventana deslizante en el rate limit**: hoy es ventana fija; un pico
   justo en el borde deja pasar hasta el doble del límite. Solo vale la pena
   si aparece abuso real.
-- ⬜ **Rate limit por usuario además de por IP**: una IP compartida (la
-  sucursal entera sale por la misma) puede agotar el límite de todos.
-  Evaluar cuando haya varias cajas por local.
+- ⬜ **Rate limit por usuario además de por IP**, en el resto de la API: una
+  IP compartida (la sucursal entera sale por la misma) puede agotar el
+  límite de todos. **Resuelto solo en la consulta de DNI/RUC** (2026-08-15),
+  que es donde el caso ya era real: cuatro cajas del mismo local detrás de un
+  límite por IP significa que el primero que se pasa deja sin consultar a los
+  otros tres. `rate_limit.consumir()` acepta cualquier sujeto, así que
+  extenderlo a otro endpoint es una línea; falta decidir **a cuáles** — el
+  login, que es el otro límite vivo, no puede ir por usuario porque ahí
+  todavía no hay ninguno identificado.
 - ✅ 2026-08-04 **Content-Security-Policy**, en las dos puntas y con
   criterios distintos porque son dos cosas distintas:
   **API** (`src/core/app.py`) devuelve JSON y no tiene por qué cargar nada,

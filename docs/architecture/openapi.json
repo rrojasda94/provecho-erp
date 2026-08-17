@@ -2,7 +2,7 @@
   "components": {
     "schemas": {
       "AbrirCajaIn": {
-        "description": "`monto_declarado` es lo que el encargado dice entregar;\n`detalle_denominaciones` es lo que el cajero cuenta. La diferencia la\ncalcula el servidor (RN-POS-011/012) — nunca se teclea.\n\n**Sin `autorizacion`** desde ADR-048: la abre el cajero con su propia\nsesión (RN-MDP-008). Lo que prueba cuánto había en el cajón es el\nconteo, no una firma; firmar tiene sentido donde hay una entrega de\nefectivo de verdad, y esa es la cadena de custodia del cierre\n(RN-MDP-002).",
+        "description": "`monto_declarado` es lo que el encargado dice entregar;\n`detalle_denominaciones` es lo que el cajero cuenta. La diferencia la\ncalcula el servidor (RN-POS-011/012) — nunca se teclea.\n\n**Sin `autorizacion`** desde ADR-049: la abre el cajero con su propia\nsesión (RN-MDP-008). Lo que prueba cuánto había en el cajón es el\nconteo, no una firma; firmar tiene sentido donde hay una entrega de\nefectivo de verdad, y esa es la cadena de custodia del cierre\n(RN-MDP-002).",
         "properties": {
           "detalle_denominaciones": {
             "additionalProperties": {
@@ -2756,7 +2756,7 @@
         "type": "object"
       },
       "CerrarCajaIn": {
-        "description": "El monto real sale del conteo por denominación (RN-POS-007).\n\n**Sin `autorizacion`** desde ADR-048: lo cierra el cajero solo\n(RN-MDP-008). El efectivo queda `en_caja` a su nombre y la entrega al\nencargado se firma después, en\n`POST /cajas/custodias/{id}/entregar` (RN-MDP-002).\n\n`reportes_pos` trae el cierre de lote de cada terminal que abrió\noperativo: sin ellos el cierre no cuadra las tarjetas y se rechaza\n(RN-POS-004). Un local sin POS verificados no manda nada.",
+        "description": "El monto real sale del conteo por denominación (RN-POS-007).\n\n**Sin `autorizacion`** desde ADR-049: lo cierra el cajero solo\n(RN-MDP-008). El efectivo queda `en_caja` a su nombre y la entrega al\nencargado se firma después, en\n`POST /cajas/custodias/{id}/entregar` (RN-MDP-002).\n\n`reportes_pos` trae el cierre de lote de cada terminal que abrió\noperativo: sin ellos el cierre no cuadra las tarjetas y se rechaza\n(RN-POS-004). Un local sin POS verificados no manda nada.",
         "properties": {
           "custodia": {
             "pattern": "^(local_caja_fuerte|traslado_contabilidad)$",
@@ -22486,7 +22486,7 @@
     },
     "/api/v1/accounting/cajas/custodias/{custodia_id}/entregar": {
       "post": {
-        "description": "Avanza la cadena de custodia; quien **recibe** firma con su PIN\n(RN-MDP-002).\n\nDesde ADR-048 este es el **único** endpoint del ciclo de caja que exige\nla elevación con `accounting.caja_relevar`, y el primer tramo\n(`en_caja → en_supervisor`) es la entrega que antes se daba por hecha al\ncerrar: el efectivo sale del cajón cuando alguien firma que lo recibió,\nno cuando el cajero terminó de contarlo.\n\nLa sesión que opera la pantalla necesita `accounting.caja_operar`; quien\nfirma es otro y aporta solo su PIN. Un cajero puede tener la pantalla\nabierta y **no** puede firmar la recepción: no tiene `caja_relevar`.",
+        "description": "Avanza la cadena de custodia; quien **recibe** firma con su PIN\n(RN-MDP-002).\n\nDesde ADR-049 este es el **único** endpoint del ciclo de caja que exige\nla elevación con `accounting.caja_relevar`, y el primer tramo\n(`en_caja → en_supervisor`) es la entrega que antes se daba por hecha al\ncerrar: el efectivo sale del cajón cuando alguien firma que lo recibió,\nno cuando el cajero terminó de contarlo.\n\nLa sesión que opera la pantalla necesita `accounting.caja_operar`; quien\nfirma es otro y aporta solo su PIN. Un cajero puede tener la pantalla\nabierta y **no** puede firmar la recepción: no tiene `caja_relevar`.",
         "operationId": "entregar_custodia_api_v1_accounting_cajas_custodias__custodia_id__entregar_post",
         "parameters": [
           {

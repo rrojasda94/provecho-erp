@@ -98,7 +98,7 @@ def total_declarado_en_pos(reportes: list | None) -> Decimal:
 # tramo tiene un responsable con nombre. `disponible` es el final del
 # recorrido — depositado o convertido en el fondo de la siguiente apertura.
 #
-# El recorrido **empieza en `en_caja`** desde ADR-048: al cerrar, la plata
+# El recorrido **empieza en `en_caja`** desde ADR-049: al cerrar, la plata
 # sigue en el cajón a nombre del cajero, y `en_caja → en_supervisor` es la
 # entrega que el encargado firma cuando pasa a buscarla. Antes la custodia
 # nacía en `en_supervisor` porque el cierre ya exigía su firma; sin esa
@@ -130,7 +130,7 @@ def puede_reabrir_cierre(estado_cierre: str, estado_custodia: str) -> bool:
     contable, no una reapertura.
 
     Los dos tramos que siguen valiendo son los mismos de siempre
-    (`en_caja`, `en_supervisor`), y con ADR-048 la ventana **se ensancha
+    (`en_caja`, `en_supervisor`), y con ADR-049 la ventana **se ensancha
     hacia el lado correcto**: el cierre recién hecho ya no salta a
     `en_supervisor`, así que recontar mientras la plata sigue en el cajón
     —el caso en que recontar de verdad prueba algo— pasó a ser el caso

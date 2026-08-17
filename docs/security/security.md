@@ -17,6 +17,14 @@ Autenticación, endurecimiento, auditoría y backups. El control de acceso
   por cuenta no frena a quien rota usernames desde una misma IP. Si Redis no
   responde el límite se desactiva (fail-open) y se registra advertencia: una
   caída de Redis no puede dejar sin operar al restaurante.
+- **Rate limit por usuario y por IP** en `GET /consulta/{dni,ruc}/{n}`
+  (20 y 60 por minuto por defecto, ADR-041). Acá lo protegido no es una
+  credencial sino el **gasto**: cada consulta vale una llamada a un proveedor
+  pago, así que un bucle mal escrito en una pantalla agota el plan del mes sin
+  que nadie ataque nada. Por usuario **además de** por IP porque un local
+  entero sale por la misma dirección: con un límite solo por IP, el primer
+  cajero que se pasa deja sin consultar a los otros tres. Se cuenta después
+  del permiso —un 403 no gasta cuota— y con el mismo fail-open que el login.
 - Agentes de IA: usuarios `tipo=agente_ia` con permisos mínimos y
   **credencial propia** — un token de API de larga vida (`token_agente`,
   ADR-032), no un PIN. `Authorization: Bearer prv_...`; se guarda solo su

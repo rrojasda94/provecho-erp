@@ -217,16 +217,22 @@ escrito a mano: envejece sin avisar.
 - Dominio y API: **1379 casos** en verde, en CI. Salen de **1041 funciones
   `test_*`** repartidas en **76 archivos** de `tests/`; la diferencia son
   `parametrize`.
-- Unidad de frontend + contrato: **258 casos** (`npm test`), en CI desde
+- Unidad de frontend + contrato: **273 casos** (`npm test`), en CI desde
   2026-08-06 — el job de frontend hacía solo `lint` y `build`. De esos, **186
-  son de contrato** (`lib/contrato.test.ts`) y 7 (2026-08-07,
-  `lib/carga.test.ts`) cubren la clasificación de fallos de carga: que una red
-  caída no se confunda con un 403 ni se dibuje como lista vacía.
+  son de contrato** (`lib/contrato.test.ts`), 7 (2026-08-07,
+  `lib/carga.test.ts`) cubren la clasificación de fallos de carga —que una red
+  caída no se confunda con un 403 ni se dibuje como lista vacía— y 8
+  (2026-08-15, `lib/proxy.test.ts`) fijan que el proxy del navegador no toque
+  lo que pasa por él en ninguna de las dos direcciones (ADR-048).
 - e2e: **13 casos en verde y en CI** (job `e2e`), sobre PDV, sesión, el gate
   de módulo, el lienzo de nodos y el bloqueo de pantalla. Los tres puntos de
   "qué sí justifica un e2e" quedan cubiertos. Ver ROADMAP → Frontend.
-- Uso: **1 caso** (`uso/humo.spec.ts`), que prueba el arnés y no una pantalla.
-  Job `uso`, **no requerido** (ADR-047).
+- Uso: **3 casos**. `uso/humo.spec.ts` prueba el arnés y no una pantalla;
+  `uso/importador-recetas.spec.ts` (2026-08-15) recorre la carga masiva del
+  recetario de punta a punta —descargar la plantilla, abrirla con openpyxl,
+  llenarla, subirla y confirmar—, que es el camino donde vivía el bug del
+  proxy (ADR-048); y `uso/consulta-documento.spec.ts` (2026-08-15) corrige un
+  cliente con el botón de RUC. Job `uso`, **no requerido** (ADR-047).
 
 Los cuatro niveles de la tabla existen y ninguno está vacío. Lo que queda
 abierto, dicho sin adornos: **el cuerpo que arman las pantallas de Compras,
@@ -234,6 +240,30 @@ Inventario, RRHH, Gerencia, Contabilidad, Marketing y Usuarios no está
 verificado contra el contrato** — de esas solo se comprueba la ruta. Se
 cerraría moviendo sus llamadas a módulos importables como los cuatro que ya
 lo son, no escribiendo otro tipo de test.
+
+## Lo que SQLite no hace cumplir y Postgres sí
+
+El suite corre sobre SQLite en memoria, que **no es la base de producción**.
+La diferencia no es teórica: ya dejó pasar bugs.
+
+- **Claves foráneas** — SQLite las trae **apagadas**. Un `DELETE` que dejaba
+  al hijo apuntando a un padre inexistente pasaba en verde. Costó meses de
+  `anular_lineas` roto contra Postgres (`fk_venta_item_padre`) con las ~900
+  pruebas verdes. Desde **2026-08-15** un listener del evento `connect` de
+  SQLAlchemy en `tests/conftest.py` enciende `PRAGMA foreign_keys=ON` en
+  **cualquier** engine SQLite del proceso: no hay que acordarse por fixture,
+  y `test_models.py::test_un_engine_sqlite_nuevo_ya_trae_las_fk_encendidas`
+  se pone rojo si alguien lo saca. Encenderlo destapó **cinco** violaciones:
+  dos bugs de producción (borrar una receta con líneas; emitir un reporte
+  cuyo almacén ya no existe) y tres tests que sembraban un id inventado.
+  Corolario para escribir tests: **un `uuid.uuid4()` en una columna FK ya no
+  compila** — hay que sembrar la fila, que es lo que la base real exige.
+- **Largo de `VARCHAR` y tipos** — SQLite no los valida (ver
+  `docs/roadmap/deuda/transversal.md`). Sigue abierto: la única red es probar
+  cada migración contra un Postgres real.
+- **`statement_timeout`** — no existe en SQLite. La configuración de los dos
+  engines (`docs/engineering/devops.md` → «Dos engines») es inocua ahí, a
+  propósito: fuera de Postgres el parámetro no se pasa.
 
 ## Nota de velocidad
 

@@ -23,7 +23,7 @@ from src.modules.reports.infrastructure.repositories import (
     ReglaRepo,
     ReporteEmitidoRepo,
 )
-from src.modules.users.infrastructure.models import Almacen, Sucursal
+from src.modules.users.infrastructure.models import Almacen, Empresa, Sucursal, Usuario
 
 log = logging.getLogger("provecho.app")
 
@@ -43,6 +43,25 @@ def _uuid(valor) -> uuid.UUID | None:
         return None
 
 
+def _existente(session: Session, modelo, clave: uuid.UUID | None) -> uuid.UUID | None:
+    """`clave` si esa fila existe; `None` si no.
+
+    Las cuatro columnas que apuntan a otra tabla son FK de verdad: guardar un
+    id que ya no está no deja un reporte "sin ubicar", **hace fallar el INSERT
+    entero** y con él se pierde el hecho que justamente había que poder
+    investigar. Y el hueco es real: el bus despacha post-commit (ADR-016), así
+    que entre el hecho y su emisión el almacén pudo darse de baja.
+
+    El id del ámbito sobrevive igual en `datos` —toda emisión declara su
+    `clave_ambito` entre sus campos, lo cuida
+    `test_el_ambito_de_toda_emision_viaja_en_la_foto`—, así que ahí no se
+    pierde el rastro: se pierde el enlace, que es lo que dejó de existir. El
+    actor no siempre está declarado; perderlo sigue siendo mejor que perder el
+    reporte entero.
+    """
+    return clave if clave and session.get(modelo, clave) is not None else None
+
+
 def _ubicar(
     session: Session, emision: catalogo.Emision, payload: dict
 ) -> tuple[uuid.UUID | None, uuid.UUID | None, uuid.UUID | None]:
@@ -55,13 +74,15 @@ def _ubicar(
     """
     clave = _uuid(payload.get(emision.clave_ambito))
     if emision.ambito == "empresa":
-        return clave, None, None
+        return _existente(session, Empresa, clave), None, None
     if emision.ambito == "sucursal":
         sucursal = session.get(Sucursal, clave) if clave else None
-        return (sucursal.empresa_id if sucursal else None), clave, None
+        if sucursal is None:
+            return None, None, None
+        return sucursal.empresa_id, clave, None
     almacen = session.get(Almacen, clave) if clave else None
     if almacen is None:
-        return None, None, clave
+        return None, None, None
     return almacen.empresa_id, almacen.sucursal_id, clave
 
 
@@ -94,10 +115,14 @@ def emitir(
             empresa_id=empresa_id,
             sucursal_id=sucursal_id,
             almacen_id=almacen_id,
-            # `_uuid()` devuelve `None` ante ausencia o basura: una emisión no
-            # puede perderse porque el publisher todavía no manda el actor.
+            # `_uuid()` devuelve `None` ante ausencia o basura y `_existente`
+            # ante un usuario dado de baja: una emisión no puede perderse
+            # porque el publisher todavía no manda el actor, ni porque el que
+            # lo provocó ya no esté en la tabla.
             actor_id=(
-                _uuid(payload.get(emision.clave_actor)) if emision.clave_actor else None
+                _existente(session, Usuario, _uuid(payload.get(emision.clave_actor)))
+                if emision.clave_actor
+                else None
             ),
             codigo_emision=codigo,
             titulo=titulo[:LARGO_TITULO],

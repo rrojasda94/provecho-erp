@@ -248,7 +248,7 @@ export type PosVerificadoNuevo = {
 };
 
 /** Sin `autorizacion`: el turno lo abre el cajero con su propia sesión
- * (RN-MDP-008, ADR-048). La firma con PIN quedó donde hay una entrega de
+ * (RN-MDP-008, ADR-049). La firma con PIN quedó donde hay una entrega de
  * efectivo de verdad — la cadena de custodia del cierre. */
 export type AperturaCajaNueva = {
   punto_venta_id: string;

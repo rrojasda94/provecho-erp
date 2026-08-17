@@ -20,8 +20,24 @@ Todo esto vive **acá y no en cada prueba** (`docs/engineering/testing-strategy.
 un test que crea sus datos por la UI prueba tres flujos para verificar uno, y
 además cada rama que necesitaba un proveedor terminaba sembrando el suyo.
 
+- **Caja y venta simple**: un punto de venta por sucursal, un encargado
+  distinto del cajero, un terminal de tarjeta, y `Pizza E2E` —producto plano,
+  un solo insumo— con precio vigente y stock.
+- **Carta armada** (2026-08-15): `Menú E2E`, un producto **con variantes**,
+  **grupo de opciones obligatorio** y **extras**, que es el modelo de nodos
+  que describe ADR-035/ADR-038 y dibuja el lienzo. `Pizza E2E` no alcanza
+  para eso: es deliberadamente plana, y las pruebas del lienzo dependen de
+  que siga teniendo un único insumo — por eso la carta armada es un producto
+  aparte y no un cambio sobre ella.
+- **Compras** (2026-08-15): un proveedor y una orden de compra en borrador,
+  con stock real en el almacén central.
+
+Todo esto vive **acá y no en cada prueba** (`docs/engineering/testing-strategy.md`):
+un test que crea sus datos por la UI prueba tres flujos para verificar uno, y
+además cada rama que necesitaba un proveedor terminaba sembrando el suyo.
+
 **El encargado sigue siendo otro usuario** aunque la caja ya no le pida
-firma para abrirse (RN-MDP-008, ADR-048): es quien **recibe** el efectivo
+firma para abrirse (RN-MDP-008, ADR-049): es quien **recibe** el efectivo
 cuando el turno cerró (`en_caja → en_supervisor`, RN-MDP-002), y eso exige
 `accounting.caja_relevar` — permiso que el cajero no tiene ni debe tener.
 Con un solo usuario la cadena de custodia no se puede recorrer.
@@ -51,8 +67,10 @@ from src.modules.inventory.infrastructure.models import (
 from src.modules.purchases.application import ordenes as ordenes_uc
 from src.modules.purchases.infrastructure.models import Proveedor
 from src.modules.sales.application import catalogo as catalogo_uc
+from src.modules.sales.application import clientes as clientes_uc
 from src.modules.sales.application import precios as precios_uc
 from src.modules.sales.infrastructure.models import (
+    Cliente,
     ListaPrecio,
     MedioPago,
     Precio,
@@ -118,6 +136,15 @@ PROVEEDOR_RUC = "20512345678"
 # orden existente si lo reconoce: es la idempotencia del seeder, no una
 # comprobación aparte.
 OC_IDEMPOTENCY = "seed-e2e-oc-0001"
+
+# --- Padrón de clientes -----------------------------------------------------
+# Un cliente **jurídico**: es el que Ventas → Clientes deja corregir, y el
+# diálogo donde vive el botón «Buscar por RUC» (ADR-041). Sin ninguno
+# sembrado la pantalla se abre vacía y no hay nada que abrir.
+# La razón social está tecleada **mal a propósito**: el recorrido consiste en
+# traerla de SUNAT, y una que ya está bien no muestra nada.
+CLIENTE_RUC = "20610077782"
+CLIENTE_RAZON = "razon social tecleada a mano"
 
 
 def _primero(session: Session, modelo):
@@ -192,6 +219,7 @@ def sembrar_e2e(session: Session) -> dict:
 
     menu = _sembrar_menu(session, empresa, marca)
     compras = _sembrar_compras(session, empresa)
+    cliente = _sembrar_cliente(session, empresa)
 
     return {
         "sucursales": len(puntos_venta),
@@ -199,7 +227,28 @@ def sembrar_e2e(session: Session) -> dict:
         "producto": PRODUCTO_NOMBRE,
         **menu,
         **compras,
+        **cliente,
     }
+
+
+def _sembrar_cliente(session: Session, empresa: Empresa) -> dict:
+    """Un cliente jurídico en el padrón del grupo (RN-PTS-001).
+
+    Se crea por el caso de uso y no armando el modelo a mano: `crear_cliente`
+    es quien decide que once dígitos son un RUC y por lo tanto un cliente
+    jurídico, y un seeder que lo esquiva puede dejar en la base una fila que
+    el ERP nunca produciría.
+    """
+    cliente = session.scalar(select(Cliente).where(Cliente.ruc == CLIENTE_RUC))
+    if cliente is None:
+        cliente = clientes_uc.crear_cliente(
+            session,
+            grupo_id=clientes_uc.grupo_de_empresa(session, empresa.id),
+            nombre=CLIENTE_RAZON,
+            numero_documento=CLIENTE_RUC,
+        )
+        session.flush()
+    return {"cliente_ruc": CLIENTE_RUC}
 
 
 def _usuario_con_rol(

@@ -46,7 +46,7 @@ const ESTADO_INICIAL: EstadoCaja = { error: "", ok: false };
  * siguiente no se elige de una lista porque no hay dos caminos — es uno
  * solo, y ofrecer un `<select>` sugeriría que se puede saltear un tramo.
  *
- * El primer escalón es el que **de hecho** se usa desde ADR-048: un turno
+ * El primer escalón es el que **de hecho** se usa desde ADR-049: un turno
  * recién cerrado queda `en_caja`, porque el cajero cierra solo y la plata
  * sigue en el cajón hasta que alguien firme que la recibió. Antes ese estado
  * existía en la tabla de transiciones y no lo escribía nadie. */

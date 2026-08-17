@@ -6,7 +6,7 @@ Create Date: 2026-08-15 10:40:00.000000
 
 Una sola columna: `apertura_caja.relevo_encargado_id` pasa a ser NULLABLE.
 
-Desde RN-MDP-008 (ADR-048) el cajero abre y cierra su turno solo, así que la
+Desde RN-MDP-008 (ADR-049) el cajero abre y cierra su turno solo, así que la
 apertura ya no tiene un encargado que la firme. La columna se conserva —las
 aperturas anteriores sí tienen quién firmó, y esa evidencia no se borra—
 pero las nuevas la dejan en NULL. Escribir ahí al propio cajero habría

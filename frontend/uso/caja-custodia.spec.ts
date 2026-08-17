@@ -5,7 +5,7 @@ import { capturar } from "./util";
 
 /**
  * El turno de un cajero, de punta a punta y con la cadena de custodia
- * completa (ADR-048).
+ * completa (ADR-049).
  *
  * Es el recorrido que **no puede vivir en `e2e/`**: cruza dos identidades y
  * dos módulos —el PDV del cajero y la pantalla de caja de contabilidad—, y
@@ -16,7 +16,7 @@ import { capturar } from "./util";
  *
  * Lo que verifica, en orden:
  *
- * 1. El cajero abre su caja solo (RN-MDP-008). Antes de ADR-048 este paso
+ * 1. El cajero abre su caja solo (RN-MDP-008). Antes de ADR-049 este paso
  *    era imposible con esta sesión: el diálogo pedía el PIN de un encargado
  *    y el rol `cajero` ni siquiera tiene el permiso que esa firma exige.
  * 2. Vende y cobra.
@@ -86,7 +86,7 @@ test("el cajero abre, vende y cierra solo; el encargado firma la recepción", as
   // **Hallazgo del recorrido**: al cajero no le aparece ningún terminal que
   // cuadrar, porque listar los POS de la sucursal exige `accounting.leer` y
   // su rol no lo tiene — el PDV se come el 403 y muestra la lista vacía. No
-  // lo causa ADR-048 (la apertura siempre corrió sobre la sesión del
+  // lo causa ADR-049 (la apertura siempre corrió sobre la sesión del
   // cajero), pero ahora que él es el operador esperado, RN-POS-010 queda
   // muerta en la práctica. Anotado en `docs/roadmap/deuda/dashboard-y-caja.md`.
   // El bucle se escribe igual para que el día que se arregle el permiso este
@@ -109,7 +109,7 @@ test("el cajero abre, vende y cierra solo; el encargado firma la recepción", as
 
   const fila = page.locator("tr", { hasText: "Recibe el encargado" }).first();
   await expect(fila).toBeVisible({ timeout: 30_000 });
-  // El tramo con el que nace la custodia desde ADR-048: la plata sigue en el
+  // El tramo con el que nace la custodia desde ADR-049: la plata sigue en el
   // cajón y el responsable es el cajero que cerró.
   await expect(fila).toContainText(/en el cajón/i);
   await capturar(page, testInfo, "turno-cerrado-en-el-cajon");

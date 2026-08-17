@@ -35,7 +35,7 @@ import Pinpad from "./pinpad";
  *
  * Quedan dos puntos que lo piden: el consumo de personal y la autorización
  * de supervisor. La apertura y el cierre de caja lo dejaron de pedir con
- * ADR-048 — el turno lo opera el cajero solo, y la única firma del ciclo de
+ * ADR-049 — el turno lo opera el cajero solo, y la única firma del ciclo de
  * caja es la del encargado que recibe el efectivo, que ocurre en
  * `/contabilidad/caja` y no en el PDV.
  */
@@ -137,7 +137,7 @@ const MONEDAS = [5, 2, 1, 0.5, 0.2, 0.1];
 /** Apertura: se cuenta el cajón por denominación (RN-POS-003) y se verifican
  * los terminales.
  *
- * **La abre el cajero solo** (RN-MDP-008, ADR-048). Antes pedía además el
+ * **La abre el cajero solo** (RN-MDP-008, ADR-049). Antes pedía además el
  * PIN del encargado que entregaba el fondo: no probaba nada que el conteo no
  * pruebe mejor, y obligaba a que alguien viniera a firmar cada mañana — lo
  * que en el local se resolvía dejando la sesión del encargado abierta en la
@@ -322,7 +322,7 @@ function ConteoDenominaciones({
  * de cada terminal que abrió operativo (RN-POS-004) y a dónde va a ir el
  * efectivo.
  *
- * **Lo cierra el cajero solo** (RN-MDP-008, ADR-048). El destino que elige
+ * **Lo cierra el cajero solo** (RN-MDP-008, ADR-049). El destino que elige
  * acá es una declaración, no una entrega: la plata queda en el cajón a su
  * nombre y quien la recibe la firma después, en `/contabilidad/caja`.
  *
