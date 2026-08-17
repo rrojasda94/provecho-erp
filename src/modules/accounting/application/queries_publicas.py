@@ -38,14 +38,22 @@ def hay_caja_abierta(session: Session, punto_venta_id: uuid.UUID) -> bool:
 def encargado_de_turno(session: Session, sucursal_id: uuid.UUID) -> uuid.UUID | None:
     """Quién es el encargado **de turno** en esta sucursal, ahora.
 
-    Se deriva del `relevo_encargado_id` de la caja abierta: es el encargado
-    que dio el relevo al abrir el turno (RN-MDP-002), o sea exactamente la
-    persona que está a cargo del local en este momento. No hace falta una
-    entidad "turno" para saberlo — el dato ya se registra al abrir caja.
+    Se deriva del `relevo_encargado_id` de la caja abierta: el encargado que
+    firmó la apertura era exactamente la persona a cargo del local en ese
+    momento, y el dato ya se registraba al abrir turno.
 
-    `None` si no hay caja abierta (local cerrado, o abrieron sin registrar
-    la caja). Quien llama decide el respaldo; inventar un destinatario acá
-    sería peor que decir que no se sabe.
+    **Desde RN-MDP-008 el cajero abre solo**, así que las aperturas nuevas
+    dejan esa columna en NULL y esta función devuelve `None` casi siempre.
+    No se sustituye por el cajero: el cajero no es el encargado, y avisarle
+    a él de un pedido demorado sería mandar el aviso a quien no puede
+    resolverlo. Quien llama ya tiene respaldo por rol
+    (`reports.destinatarios`, ADR-036) y ese respaldo pasa a ser el camino
+    normal. Recuperar un encargado de turno de verdad necesita una fuente
+    propia —un turno de personal, no la caja— y está anotado como deuda en
+    `docs/roadmap/deuda/dashboard-y-caja.md`.
+
+    `None` también si no hay caja abierta (local cerrado). Inventar un
+    destinatario acá sería peor que decir que no se sabe.
     """
     puntos = puntos_venta_de_sucursal(session, sucursal_id)
     aperturas = AperturaCajaRepo(session).abiertas_de(puntos)

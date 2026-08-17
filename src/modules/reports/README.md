@@ -169,6 +169,20 @@ evento del módulo  →  reports.listeners  →  ReporteEmitido + EntregaReporte
 Dos saltos, ambos post-commit (ADR-016). `users` sigue siendo dueño de la
 bandeja: el usuario tiene una sola campana, no dos.
 
+Que el bus despache **después** del commit tiene una consecuencia que costó un
+bug: entre el hecho y su emisión la fila referenciada puede desaparecer. Por
+eso `emision._existente` verifica `almacen_id`, `sucursal_id`, `empresa_id` y
+`actor_id` antes de guardarlos — las cuatro son FK y un id colgando no dejaba
+un reporte "sin ubicar", tumbaba el `INSERT` entero. El id sobrevive en
+`datos`, que es la foto que se lee al investigar.
+
+## Sesión: el engine de plazo largo
+
+Los routers de `reports` piden `get_db_reportes`, no `get_db`: sus consultas
+recorren rangos de fechas y no aguantan el `statement_timeout` de un cobro
+(ver `docs/engineering/devops.md` → «Dos engines»). Un endpoint nuevo que se
+olvide lo caza `tests/test_arquitectura.py`.
+
 ## Relaciones
 
 - **Escucha**: los 13 eventos del catálogo (`domain/catalogo.py`), de
@@ -179,7 +193,10 @@ bandeja: el usuario tiene una sola campana, no dos.
   `destinatarios` (lista de `usuario_id`).
 - **Consume el contrato público de**: `accounting.queries_publicas.encargado_de_turno`
   (quién está a cargo del local ahora) — el resolutor dinámico que se mudó
-  desde `users/application/notificaciones.py`.
+  desde `users/application/notificaciones.py`. **Devuelve `None` para toda
+  apertura posterior a ADR-049**: el cajero abre solo y la caja ya no nombra
+  a ningún encargado, así que el respaldo por rol (`supervisor`/`admin` de
+  la sucursal) dejó de ser la excepción y pasó a ser el camino normal.
 - Lee `users.infrastructure.models` (`Rol`, `UsuarioRol`, `UsuarioSucursal`,
   `Sucursal`, `Almacen`) para resolver destinatarios — organización
   transversal, excepción `"*"` de `tests/test_arquitectura.py`.

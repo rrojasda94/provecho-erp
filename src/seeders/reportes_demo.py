@@ -409,10 +409,13 @@ def sembrar_situaciones(session: Session, ctx: dict) -> list[str]:
     guion.append("Pedido #1042 demorado 41 min (umbral 15) — Sistema")
 
     # --- 8. Cierre de caja irregular ---------------------------------------
+    # Sin `relevo_encargado_id` y sin relevo del encargado en el cierre: el
+    # cajero abre y cierra su turno solo (RN-MDP-008), y la demo tiene que
+    # mostrar exactamente lo que escribe el ciclo real — sembrar un dato que
+    # el sistema ya no produce enseña un ERP que no existe.
     apertura = AperturaCaja(
         punto_venta_id=punto.id,
         cajero_id=ctx["cajero"].id,
-        relevo_encargado_id=ctx["supervisor"].id,
         monto_apertura=Decimal("150.00"),
         detalle_denominaciones={"50": 3},
     )
@@ -429,10 +432,7 @@ def sembrar_situaciones(session: Session, ctx: dict) -> list[str]:
         # A dónde va el efectivo, no en qué tramo de la cadena está: eso
         # último vive en `custodia_efectivo.estado`, que es otra tabla.
         custodia="local_caja_fuerte",
-        relevos=[
-            {"rol": "cajero", "usuario_id": str(ctx["cajero"].id)},
-            {"rol": "encargado", "usuario_id": str(ctx["supervisor"].id)},
-        ],
+        relevos=[{"rol": "cajero", "usuario_id": str(ctx["cajero"].id)}],
     )
     session.add(cierre)
     session.flush()
@@ -441,7 +441,9 @@ def sembrar_situaciones(session: Session, ctx: dict) -> list[str]:
         {
             "cierre_caja_id": str(cierre.id),
             "sucursal_id": str(sucursal.id),
-            "cerrado_por": str(ctx["supervisor"].id),
+            # Quien cerró el turno es el cajero (RN-MDP-008); el reporte lo
+            # usa como actor y `cajero_id` como "de quién era la caja".
+            "cerrado_por": str(ctx["cajero"].id),
             "cajero_id": str(ctx["cajero"].id),
             "descuadre_monto": "-35.50",
             "descuadre_tarjeta": "0.00",
@@ -449,7 +451,7 @@ def sembrar_situaciones(session: Session, ctx: dict) -> list[str]:
         },
         session=session,
     )
-    guion.append("Cierre de caja con faltante de S/ 35.50 — Ivana Ruiz")
+    guion.append("Cierre de caja con faltante de S/ 35.50 — Beto Salas")
 
     # --- 9. Pago sobre umbral esperando aprobación -------------------------
     pago = MovimientoDinero(

@@ -2,7 +2,9 @@
 
 import uuid
 
-from sqlalchemy import create_engine
+import pytest
+from sqlalchemy import create_engine, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, configure_mappers
 
 import src.core.models_registry  # noqa: F401
@@ -52,3 +54,29 @@ def test_esquema_se_crea_e_inserta():
         session.commit()
         assert isinstance(empresa.id, uuid.UUID)
         assert empresa.created_at is not None
+
+
+def test_un_engine_sqlite_nuevo_ya_trae_las_fk_encendidas():
+    """El seguro del suite entero, en un test.
+
+    SQLite trae las FK apagadas; el listener de `tests/conftest.py` las
+    enciende en cualquier engine del proceso. Si alguien lo saca, ~75 fixtures
+    vuelven a dejar pasar en verde lo que Postgres rechaza —y nada más se
+    pondría rojo—, así que el guardián necesita su propio test.
+    """
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as session:
+        assert session.scalar(text("PRAGMA foreign_keys")) == 1
+        session.add(
+            Empresa(
+                grupo_id=uuid.uuid4(),
+                razon_social="Empresa sin grupo",
+                ruc="20450311520",
+                domicilio_fiscal="Tarapoto",
+                tipo="operativa",
+                zona_tributaria="amazonia_ley27037",
+            )
+        )
+        with pytest.raises(IntegrityError):
+            session.flush()

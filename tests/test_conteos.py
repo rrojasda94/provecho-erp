@@ -493,7 +493,7 @@ def test_el_barrido_diario_reporta_los_conteos_vencidos(env, monkeypatch):
     avisos = []
     event_bus.subscribe("inventory.conteo_vencido", avisos.append)
     sesion = TestSession()
-    monkeypatch.setattr(tasks, "SessionLocal", lambda: sesion)
+    monkeypatch.setattr(tasks, "session_factory", lambda: sesion)
     monkeypatch.setattr(sesion, "close", lambda: None)
 
     assert tasks.reportar_conteos_vencidos() == 1

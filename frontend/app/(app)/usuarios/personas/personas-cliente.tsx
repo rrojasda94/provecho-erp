@@ -32,7 +32,7 @@ const TIPOS_DOCUMENTO = ["dni", "ce", "pasaporte", "ruc"] as const;
 /** Los mismos campos en el alta y en la corrección: una persona es una
  * persona, y tener dos formularios distintos para la misma ficha es cómo
  * termina habiendo un campo que solo se puede cargar al crearla. */
-function CamposPersona({ persona }: { persona?: Persona }) {
+function CamposPersona({ persona, permisos }: { persona?: Persona; permisos: string[] }) {
   const p: Partial<Persona> = persona ?? {};
   return (
     <>
@@ -71,6 +71,7 @@ function CamposPersona({ persona }: { persona?: Persona }) {
           se trae antes de guardar para poder revisarlo, en vez de descubrir
           al grabar que el sistema escribió otro. */}
       <BuscarDocumento
+        permisos={permisos}
         tipo="dni"
         campo="numero_documento"
         rellena={{
@@ -101,7 +102,7 @@ function CamposPersona({ persona }: { persona?: Persona }) {
   );
 }
 
-function DialogoNuevaPersona() {
+function DialogoNuevaPersona({ permisos }: { permisos: string[] }) {
   return (
     <DialogoFormulario
       titulo="Nueva persona"
@@ -111,7 +112,7 @@ function DialogoNuevaPersona() {
       accion={crearPersonaAction}
       ayuda="La ficha única de alguien. Trabajador, proveedor natural y cliente apuntan acá en vez de repetir su nombre (RN-GEN-007)."
     >
-      <CamposPersona />
+      <CamposPersona permisos={permisos} />
     </DialogoFormulario>
   );
 }
@@ -121,7 +122,13 @@ function DialogoNuevaPersona() {
  * La `version` viaja en un input oculto: si otro administrador guardó
  * primero, la API responde 409 en vez de dejar que el segundo pise al
  * primero sin que nadie se entere. */
-function DialogoEditarPersona({ persona }: { persona: Persona }) {
+function DialogoEditarPersona({
+  persona,
+  permisos,
+}: {
+  persona: Persona;
+  permisos: string[];
+}) {
   return (
     <DialogoFormulario
       titulo="Editar persona"
@@ -132,12 +139,18 @@ function DialogoEditarPersona({ persona }: { persona: Persona }) {
     >
       <input type="hidden" name="id" value={persona.id} />
       <input type="hidden" name="version" value={persona.version} />
-      <CamposPersona persona={persona} />
+      <CamposPersona persona={persona} permisos={permisos} />
     </DialogoFormulario>
   );
 }
 
-export function PersonasCliente({ personas }: { personas: Persona[] }) {
+export function PersonasCliente({
+  personas,
+  permisos,
+}: {
+  personas: Persona[];
+  permisos: string[];
+}) {
   const columnas: ColumnDef<Persona>[] = useMemo(
     () => [
       {
@@ -162,18 +175,18 @@ export function PersonasCliente({ personas }: { personas: Persona[] }) {
           row.original.anonimizado_at ? (
             <span className="text-xs text-gray">Anonimizada</span>
           ) : (
-            <DialogoEditarPersona persona={row.original} />
+            <DialogoEditarPersona persona={row.original} permisos={permisos} />
           ),
       },
     ],
-    [],
+    [permisos],
   );
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h1 className="font-heading text-xl italic uppercase text-dark">Personas</h1>
-        <DialogoNuevaPersona />
+        <DialogoNuevaPersona permisos={permisos} />
       </div>
       <p className="text-sm text-gray">
         La ficha única de cada persona del ERP (RN-GEN-007): trabajador, proveedor natural

@@ -208,6 +208,45 @@ def test_router_del_modulo_montado_en_la_app(modulo: str) -> None:
     assert not faltan, f"{modulo}: routers sin montar en src/core/app.py: {faltan}"
 
 
+# Rutas que consultan por el engine de plazo largo (`SessionReportes`). Todo
+# lo demás cobra, factura o mueve stock y va por el corto. Sin `/api/v1`: las
+# rutas incluidas conservan el path de su router, no el de la app.
+_PREFIJOS_DE_REPORTES = ("/reportes", "/tableros", "/reports")
+
+
+def _sesion_del_handler(dependant) -> set:
+    """La sesión que recibe el handler, sin mirar sub-dependencias.
+
+    A propósito: `require_permission` resuelve el RBAC por `get_db` y eso está
+    bien —comprobar un permiso es operación, no reporte—, así que la búsqueda
+    en profundidad encontraría `get_db` en todas las rutas del ERP.
+    """
+    return {dep.call for dep in getattr(dependant, "dependencies", [])}
+
+
+def test_los_reportes_consultan_por_el_engine_de_plazo_largo() -> None:
+    """Un reporte que cruza tres meses tarda de verdad y el plazo del cobro lo
+    mataría; al revés, un cobro con el plazo del reporte deja la caja colgada.
+    Un endpoint de reportes nuevo que se olvide de `get_db_reportes` hereda el
+    plazo equivocado sin que nada se ponga rojo — salvo esto."""
+    from src.modules.users.api.deps import get_db, get_db_reportes
+
+    mal_corto, mal_largo = [], []
+    for ruta in _rutas(create_app()):
+        camino = getattr(ruta, "path", "").removeprefix("/api/v1")
+        deps = _sesion_del_handler(getattr(ruta, "dependant", None))
+        if not deps & {get_db, get_db_reportes}:
+            continue
+        if camino.startswith(_PREFIJOS_DE_REPORTES):
+            if get_db in deps:
+                mal_corto.append(camino)
+        elif get_db_reportes in deps:
+            mal_largo.append(camino)
+
+    assert not mal_corto, f"rutas de reportes sobre el engine de operación: {mal_corto}"
+    assert not mal_largo, f"rutas de operación sobre el engine de reportes: {mal_largo}"
+
+
 def test_permisos_exigidos_por_la_api_existen_en_el_seeder() -> None:
     """Un permiso que ningún rol puede tener porque no está sembrado deja el
     endpoint en 403 permanente — y el 403 no dice que la causa sea esa."""

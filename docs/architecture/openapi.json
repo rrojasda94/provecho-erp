@@ -2,12 +2,8 @@
   "components": {
     "schemas": {
       "AbrirCajaIn": {
-        "description": "`monto_declarado` es lo que el encargado dice entregar;\n`detalle_denominaciones` es lo que el cajero cuenta. La diferencia la\ncalcula el servidor (RN-POS-011/012) — nunca se teclea.\n\n`autorizacion` es el token de `POST /auth/autorizar` del encargado que\nreleva: sin su PIN no hay cadena de custodia (RN-MDP-002).",
+        "description": "`monto_declarado` es lo que el encargado dice entregar;\n`detalle_denominaciones` es lo que el cajero cuenta. La diferencia la\ncalcula el servidor (RN-POS-011/012) — nunca se teclea.\n\n**Sin `autorizacion`** desde ADR-049: la abre el cajero con su propia\nsesión (RN-MDP-008). Lo que prueba cuánto había en el cajón es el\nconteo, no una firma; firmar tiene sentido donde hay una entrega de\nefectivo de verdad, y esa es la cadena de custodia del cierre\n(RN-MDP-002).",
         "properties": {
-          "autorizacion": {
-            "title": "Autorizacion",
-            "type": "string"
-          },
           "detalle_denominaciones": {
             "additionalProperties": {
               "type": "integer"
@@ -51,8 +47,7 @@
         "required": [
           "punto_venta_id",
           "monto_declarado",
-          "detalle_denominaciones",
-          "autorizacion"
+          "detalle_denominaciones"
         ],
         "title": "AbrirCajaIn",
         "type": "object"
@@ -956,9 +951,16 @@
             "type": "string"
           },
           "relevo_encargado_id": {
-            "format": "uuid",
-            "title": "Relevo Encargado Id",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relevo Encargado Id"
           }
         },
         "required": [
@@ -2754,12 +2756,8 @@
         "type": "object"
       },
       "CerrarCajaIn": {
-        "description": "El monto real sale del conteo por denominación (RN-POS-007), y el\nefectivo se entrega al encargado que firma con su PIN (RN-MDP-002).\n\n`reportes_pos` trae el cierre de lote de cada terminal que abrió\noperativo: sin ellos el cierre no cuadra las tarjetas y se rechaza\n(RN-POS-004). Un local sin POS verificados no manda nada.",
+        "description": "El monto real sale del conteo por denominación (RN-POS-007).\n\n**Sin `autorizacion`** desde ADR-049: lo cierra el cajero solo\n(RN-MDP-008). El efectivo queda `en_caja` a su nombre y la entrega al\nencargado se firma después, en\n`POST /cajas/custodias/{id}/entregar` (RN-MDP-002).\n\n`reportes_pos` trae el cierre de lote de cada terminal que abrió\noperativo: sin ellos el cierre no cuadra las tarjetas y se rechaza\n(RN-POS-004). Un local sin POS verificados no manda nada.",
         "properties": {
-          "autorizacion": {
-            "title": "Autorizacion",
-            "type": "string"
-          },
           "custodia": {
             "pattern": "^(local_caja_fuerte|traslado_contabilidad)$",
             "title": "Custodia",
@@ -2801,8 +2799,7 @@
         },
         "required": [
           "detalle_denominaciones",
-          "custodia",
-          "autorizacion"
+          "custodia"
         ],
         "title": "CerrarCajaIn",
         "type": "object"
@@ -22118,7 +22115,7 @@
     },
     "/api/v1/accounting/cajas/apertura": {
       "post": {
-        "description": "Abre el turno: el cajero cuenta el fondo, el encargado lo firma con su\nPIN y los POS de tarjeta quedan verificados (RN-MDP-002, RN-POS-003/010).\n\nUn faltante de sencillo o un POS averiado **no impiden abrir**\n(RN-POS-011): quedan reportados y el local abre en su horario.",
+        "description": "Abre el turno: el cajero cuenta el fondo y verifica los POS de tarjeta\n(RN-POS-003/010).\n\n**La abre él solo** (RN-MDP-008): alcanza con `accounting.caja_operar`,\nel permiso que su rol ya tiene. Sin elevación de PIN — exigirla obligaba\na que un encargado viniera a firmar cada apertura, y en el local eso se\nterminaba resolviendo dejando la sesión del encargado abierta en la caja.\n\nUn faltante de sencillo o un POS averiado **no impiden abrir**\n(RN-POS-011): quedan reportados y el local abre en su horario.",
         "operationId": "abrir_caja_api_v1_accounting_cajas_apertura_post",
         "requestBody": {
           "content": {
@@ -22165,7 +22162,7 @@
     },
     "/api/v1/accounting/cajas/apertura/{apertura_caja_id}/cierre": {
       "post": {
-        "description": "Cierra el turno contra el conteo por denominación y entrega el\nefectivo al encargado, que firma con su PIN (RN-POS-007, RN-MDP-002).\n\nSi el cierre venía reabierto, este mismo endpoint lo recalcula sobre el\nregistro existente — un turno tiene un solo cierre, con su historial de\ncorrecciones.",
+        "description": "Cierra el turno contra el conteo por denominación (RN-POS-007).\n\n**Lo cierra el cajero solo** (RN-MDP-008), sin elevación de PIN. El\nefectivo queda `en_caja` a su nombre; entregárselo al encargado es un\nacto aparte y posterior, y ese sí lo firma quien recibe\n(`POST /cajas/custodias/{id}/entregar`, RN-MDP-002).\n\nSi el cierre venía reabierto, este mismo endpoint lo recalcula sobre el\nregistro existente — un turno tiene un solo cierre, con su historial de\ncorrecciones.",
         "operationId": "cerrar_caja_api_v1_accounting_cajas_apertura__apertura_caja_id__cierre_post",
         "parameters": [
           {
@@ -22489,7 +22486,7 @@
     },
     "/api/v1/accounting/cajas/custodias/{custodia_id}/entregar": {
       "post": {
-        "description": "Avanza la cadena de custodia; quien **recibe** firma con su PIN\n(RN-MDP-002).",
+        "description": "Avanza la cadena de custodia; quien **recibe** firma con su PIN\n(RN-MDP-002).\n\nDesde ADR-049 este es el **único** endpoint del ciclo de caja que exige\nla elevación con `accounting.caja_relevar`, y el primer tramo\n(`en_caja → en_supervisor`) es la entrega que antes se daba por hecha al\ncerrar: el efectivo sale del cajón cuando alguien firma que lo recibió,\nno cuando el cajero terminó de contarlo.\n\nLa sesión que opera la pantalla necesita `accounting.caja_operar`; quien\nfirma es otro y aporta solo su PIN. Un cajero puede tener la pantalla\nabierta y **no** puede firmar la recepción: no tiene `caja_relevar`.",
         "operationId": "entregar_custodia_api_v1_accounting_cajas_custodias__custodia_id__entregar_post",
         "parameters": [
           {

@@ -831,22 +831,24 @@ Solicitud.
 - **custodia_efectivo**: apertura_caja_id, monto, responsable_actual_id,
   estado (`en_caja` | `en_supervisor` | `en_contabilidad` | `disponible`),
   timestamps por relevo (RN-MDP-002). **Máquina de estados desde ADR-025**:
-  nace en `en_supervisor` al cerrar la caja (el cierre ya exigió la firma
-  del encargado, así que el tramo cajero→encargado acaba de ocurrir) y
-  avanza a `en_contabilidad` o directo a `disponible` cuando el efectivo
-  se queda en la caja fuerte del local como fondo del día siguiente
-  (RN-MDP-006). Cada transición exige que **quien recibe** se autentique
-  con su PIN; no se vuelve atrás.
+  **nace en `en_caja`** al cerrar la caja, a nombre del cajero
+  (RN-MDP-008/ADR-049: el cierre es un conteo, no una entrega — hasta
+  ADR-049 nacía en `en_supervisor` y `en_caja` no lo escribía nadie), pasa
+  a `en_supervisor` cuando el encargado firma haberlo recibido, y de ahí a
+  `en_contabilidad` o directo a `disponible` cuando el efectivo se queda en
+  la caja fuerte del local como fondo del día siguiente (RN-MDP-006). Cada
+  transición exige que **quien recibe** se autentique con su PIN; no se
+  vuelve atrás.
 - **apertura_caja** (PROC-CTB-002): punto_venta_id, cajero_id,
-  relevo_encargado_id (relevo autenticado por ambas partes con
-  usuario+PIN — desde ADR-025 sale del token de `POST /auth/autorizar`,
-  nunca del cuerpo del request), monto_apertura (RN-POS-003, **suma del
-  conteo**, no un número tecleado), detalle_denominaciones (JSONB —
-  conteo por billete/moneda, obligatorio), diferencia_reportada
-  (calculada: contado − declarado por el encargado; no bloquea la
-  apertura, RN-POS-011), pos_verificados (JSONB — un registro por POS de
-  tarjeta con `operativo` y observación, RN-POS-010), timestamp. Inicia la
-  cadena de custodia inversa (RN-MDP-002).
+  relevo_encargado_id (**NULLABLE desde ADR-049**, migración
+  `c8b41f60d2a7`: el cajero abre solo y no hay contraparte que firme. Las
+  filas anteriores conservan quién firmó —evidencia que no se reescribe— y
+  son las únicas de las que `encargado_de_turno` puede derivar algo),
+  monto_apertura (RN-POS-003, **suma del conteo**, no un número tecleado),
+  detalle_denominaciones (JSONB — conteo por billete/moneda, obligatorio),
+  diferencia_reportada (calculada: contado − declarado por el encargado; no
+  bloquea la apertura, RN-POS-011), pos_verificados (JSONB — un registro por
+  POS de tarjeta con `operativo` y observación, RN-POS-010), timestamp.
 - **pos_tarjeta** (ADR-025, RN-POS-009/010): empresa_id, sucursal_id
   (**NULL = terminal de emergencia** del pool de contabilidad, que se
   presta a la sucursal que lo necesite), serie (única), codigo_comercio,

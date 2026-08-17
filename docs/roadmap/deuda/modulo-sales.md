@@ -100,10 +100,25 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   vaya a buscar. Es una entrada en `reports/domain/catalogo.py` más su fila
   en `events.md`, pero primero hay que decidir a qué área se dirige —
   gerencia, contabilidad, o el encargado del local.
-- ⬜ **7 íconos del home siguen llevando a 404** (`/produccion`, `/rrhh`,
-  `/marketing`, `/gerencia`, `/usuarios`, `/contabilidad`, y el resto de
-  `/inventario`): el grid lista los módulos que tienen **backend**, no los que
-  tienen pantalla. O se construyen, o el grid deja de mostrar lo que no existe.
+- ✅ 2026-08-15 **Los íconos del home ya no llevan a 404** — y hacía rato que no
+  lo hacían: los siete destinos que la deuda enumeraba (`/produccion`, `/rrhh`,
+  `/marketing`, `/gerencia`, `/usuarios`, `/contabilidad` y el resto de
+  `/inventario`) se construyeron en las entregas siguientes y nadie volvió a
+  marcar el ítem, así que la deuda siguió declarando un 404 que ya no ocurría.
+  Lo que **sí** daba 404 era otra cosa: cinco módulos (`catalogo`, `compras`,
+  `inventario`, `organizacion`, `rrhh`) tenían carpeta y `layout.tsx` pero
+  ninguna ruta en su raíz, porque el ícono apunta a la primera pantalla
+  (`/catalogo/productos`). Nada del shell enlaza ahí, pero sí lo teclea quien
+  recorta la URL para subir un nivel — justo lo que uno hace cuando se pierde.
+  Ahora cada raíz redirige a `modulo.href` (leído de `lib/modulos.ts`, no
+  repetido por archivo) y existe `app/not-found.tsx`: hasta ahora el 404 lo
+  resolvía la pantalla por defecto de Next, en inglés y sin salida, que en una
+  tablet detrás de la barra se resuelve apagando y volviendo a entrar. La causa
+  de fondo era que nada ataba los `href` al árbol de archivos:
+  `lib/navegacion.test.ts` cruza `MODULOS` con `SUBMENUS`, y los dos pueden
+  coincidir apuntando a una ruta que no existe — por eso el ítem sobrevivió sin
+  que nadie pudiera decir si seguía siendo cierto. `lib/rutas.test.ts` resuelve
+  los 14 íconos y los 25 ítems de submenú contra los `page.tsx` reales.
 - ✅ 2026-08-03 **Catálogo separado del PDV en el frontend**: módulo propio
   (`/catalogo/productos`) con gate por permiso **exacto**
   `sales.gestionar_catalogo`, el mismo que la API exige para escribir. El
@@ -375,15 +390,39 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   con el «no hay `POST /emitidos`» de ADR-033, así que la decisión de fondo es
   **dónde nace una queja**: como venta anotada, como nodo de encuesta, o como
   la primera emisión del ERP que sí admite alta manual.
-- ⬜ **Solo `test_pdv_slice` valida las FK** (2026-08-13): el resto de los
-  fixtures crean el engine SQLite sin `PRAGMA foreign_keys=ON`, así que
-  siguen ciegos a la clase de bug que dejó `anular_lineas` roto contra
-  Postgres durante meses. Encenderlo en `tests/conftest.py` para todos es
-  una línea, pero puede destapar más violaciones latentes y conviene hacerlo
-  como barrido propio, no de arrastre.
+- ✅ 2026-08-15 **Las FK se validan en todo el suite, no solo en
+  `test_pdv_slice`**. Un listener del evento `connect` de SQLAlchemy en
+  `tests/conftest.py` enciende `PRAGMA foreign_keys=ON` en **cualquier**
+  engine SQLite del proceso: los ~75 fixtures que arman el suyo quedan
+  cubiertos sin tocarlos, y no hay forma de olvidárselo en el próximo.
+  Destapó cinco violaciones: **dos bugs de producción** —borrar una receta
+  con líneas moría por `fk_receta_item_receta_id_receta` (SQLAlchemy ordenaba
+  el `DELETE` del padre antes que el de los hijos: ninguna receta con insumos
+  se podía borrar) y `reports.emision` guardaba `almacen_id`/`sucursal_id`/
+  `actor_id` de filas inexistentes, o sea que el reporte «que no se pudo
+  ubicar» —el que más importa investigar— era el único que no se emitía— y
+  **tres tests** que sembraban un `uuid4()` en una columna FK
+  (`test_sync_motor` ×2, `test_marketing`).
+  `test_models.py::test_un_engine_sqlite_nuevo_ya_trae_las_fk_encendidas`
+  cuida al guardián.
 - ⬜ **La cascada del extra vive en el código, no en el esquema**
   (2026-08-13): `anular_lineas` borra los hijos a mano porque
   `fk_venta_item_padre` es `NO ACTION`. Un `ON DELETE CASCADE` en la FK lo
   haría cumplir aunque otro camino borre el padre. Es una migración de una
   línea; se dejó fuera para no mezclar un cambio de esquema con un arreglo
-  que ya estaba probado.
+  que ya estaba probado. **Sigue abierto tras el barrido de FK del
+  2026-08-15**: el mismo criterio aplica ahora a
+  `fk_receta_item_receta_id_receta`, que se arregló forzando el orden del
+  flush (`recetas.eliminar_receta`) y no en el esquema. Las dos son la misma
+  migración y conviene hacerlas juntas, contra un Postgres real.
+- ⬜ **El receptor del comprobante en el PDV no tiene el botón «Buscar por
+  DNI/RUC»** (2026-08-15, ADR-041): es donde más se teclea un documento —el
+  cajero lo pide para emitir la factura— y el único de los cuatro puntos que
+  quedó sin la consulta. El permiso `consulta.documento` se le da al `cajero`
+  justamente por este caso, así que hoy lo tiene y no puede usarlo desde la
+  caja. El campo vive en `frontend/app/pdv/dialogos.tsx`, que otra rama
+  estaba editando al mismo tiempo: se dejó fuera para no chocar, no porque no
+  corresponda. Montarlo no es solo agregar el componente —ya se esconde solo
+  si falta el permiso—: `BuscarDocumento` escribe en el **DOM** del `<form>`
+  que lo contiene, y el PDV no es un formulario no controlado como el
+  back-office, así que primero hay que decidir dónde deja el dato.

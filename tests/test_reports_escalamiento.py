@@ -23,7 +23,7 @@ from src.modules.reports.infrastructure.models import (
     ReporteEmitido,
     ReporteEscalamiento,
 )
-from src.modules.users.api.deps import get_db
+from src.modules.users.api.deps import get_db, get_db_reportes
 from src.modules.users.infrastructure.models import (
     Empresa,
     Grupo,
@@ -81,6 +81,7 @@ def api():
 
         app = create_app()
         app.dependency_overrides[get_db] = _override
+        app.dependency_overrides[get_db_reportes] = _override
         with TestClient(app) as c:
             r = c.post(
                 "/api/v1/auth/login", json={"username": "admin", "pin": "123456"}

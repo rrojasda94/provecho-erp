@@ -378,21 +378,12 @@ def test_cuentas_contables_de_empresa_ajena_403(env):
 def test_abrir_caja_en_punto_venta_ajeno_403(env):
     client, ids = env
     h = _token(client, "cajero_a")
-    # El relevo lo firma contabilidad con su PIN, no el cajero desde su
-    # sesión (RN-MDP-002).
-    autorizacion = client.post(
-        "/api/v1/auth/autorizar",
-        json={
-            "username": "contador_a",
-            "pin": "654321",
-            "permiso": "accounting.caja_relevar",
-        },
-    ).json()["autorizacion"]
+    # La abre el cajero con su sola sesión (RN-MDP-008), así que lo único
+    # que separa su caja de la del otro local es el filtro de tenant.
     body = {
         "punto_venta_id": ids["pv_b"],
         "monto_declarado": "100.00",
         "detalle_denominaciones": {"50": 2},
-        "autorizacion": autorizacion,
     }
     assert client.post("/api/v1/accounting/cajas/apertura",
                        headers=h, json=body).status_code == 403
