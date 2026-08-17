@@ -217,16 +217,22 @@ escrito a mano: envejece sin avisar.
 - Dominio y API: **1379 casos** en verde, en CI. Salen de **1041 funciones
   `test_*`** repartidas en **76 archivos** de `tests/`; la diferencia son
   `parametrize`.
-- Unidad de frontend + contrato: **258 casos** (`npm test`), en CI desde
+- Unidad de frontend + contrato: **273 casos** (`npm test`), en CI desde
   2026-08-06 — el job de frontend hacía solo `lint` y `build`. De esos, **186
-  son de contrato** (`lib/contrato.test.ts`) y 7 (2026-08-07,
-  `lib/carga.test.ts`) cubren la clasificación de fallos de carga: que una red
-  caída no se confunda con un 403 ni se dibuje como lista vacía.
+  son de contrato** (`lib/contrato.test.ts`), 7 (2026-08-07,
+  `lib/carga.test.ts`) cubren la clasificación de fallos de carga —que una red
+  caída no se confunda con un 403 ni se dibuje como lista vacía— y 8
+  (2026-08-15, `lib/proxy.test.ts`) fijan que el proxy del navegador no toque
+  lo que pasa por él en ninguna de las dos direcciones (ADR-048).
 - e2e: **13 casos en verde y en CI** (job `e2e`), sobre PDV, sesión, el gate
   de módulo, el lienzo de nodos y el bloqueo de pantalla. Los tres puntos de
   "qué sí justifica un e2e" quedan cubiertos. Ver ROADMAP → Frontend.
-- Uso: **1 caso** (`uso/humo.spec.ts`), que prueba el arnés y no una pantalla.
-  Job `uso`, **no requerido** (ADR-047).
+- Uso: **3 casos**. `uso/humo.spec.ts` prueba el arnés y no una pantalla;
+  `uso/importador-recetas.spec.ts` (2026-08-15) recorre la carga masiva del
+  recetario de punta a punta —descargar la plantilla, abrirla con openpyxl,
+  llenarla, subirla y confirmar—, que es el camino donde vivía el bug del
+  proxy (ADR-048); y `uso/consulta-documento.spec.ts` (2026-08-15) corrige un
+  cliente con el botón de RUC. Job `uso`, **no requerido** (ADR-047).
 
 Los cuatro niveles de la tabla existen y ninguno está vacío. Lo que queda
 abierto, dicho sin adornos: **el cuerpo que arman las pantallas de Compras,
