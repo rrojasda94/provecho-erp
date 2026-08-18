@@ -104,6 +104,33 @@ function EstadoCaja({
   );
 }
 
+/** El interruptor entre carta y ticket, para el ancho donde no entran los
+ * dos. Lleva el total del pedido activo porque en ese ancho el ticket no
+ * está a la vista y el cajero necesita saber que hay algo cargado. */
+function CambiarPanel({
+  panel,
+  activo,
+  onCambiar,
+}: {
+  panel: "carta" | "ticket";
+  activo: Borrador | null;
+  onCambiar: () => void;
+}) {
+  const total = activo ? totalBorrador(activo) : 0;
+  const monto = panel === "carta" && total > 0 ? ` · ${soles(total)}` : "";
+  return (
+    <button
+      type="button"
+      className="pdv-cambia-panel"
+      data-testid="cambiar-panel"
+      onClick={onCambiar}
+    >
+      {panel === "carta" ? "Pedido" : "Carta"}
+      {monto}
+    </button>
+  );
+}
+
 function tituloComprobante(venta: Venta | null): string {
   return venta ? `Orden #${venta.numero_orden}` : "Comprobante";
 }
@@ -134,6 +161,10 @@ export default function PdvCliente({ sucursalId, puntoVenta }: Props) {
   const [borradores, setBorradores] = useState<Borrador[]>([nuevoBorrador()]);
   const [activoId, setActivoId] = useState<string | null>(null);
   const [seleccion, setSeleccion] = useState<Set<string>>(new Set());
+  /** Qué panel ocupa la pantalla cuando no entran los dos: en tablet vertical
+   * y en teléfono la carta y el ticket comparten el mismo lugar. En el ancho
+   * de mostrador este estado no se usa — los dos paneles se ven a la vez. */
+  const [panel, setPanel] = useState<"carta" | "ticket">("carta");
   const [vista, setVista] = useState<"catalogo" | "mesas" | "abiertas" | "cobrados">(
     "catalogo",
   );
@@ -632,10 +663,18 @@ export default function PdvCliente({ sucursalId, puntoVenta }: Props) {
         </div>
         <EstadoCaja caja={datos.caja} onClick={() => setDialogo("cierre")} />
         <span className="pdv-spacer" />
+        {/* Solo existe en el ancho donde los dos paneles no entran lado a
+            lado (`.pdv-cambia-panel`, `pdv.css`). Antes de esto el ticket
+            simplemente no estaba en una tablet vertical. */}
+        <CambiarPanel
+          panel={panel}
+          activo={activo}
+          onCambiar={() => setPanel((p) => (p === "carta" ? "ticket" : "carta"))}
+        />
         <span className="pdv-meta">{hora()}</span>
       </header>
 
-      <div className="pdv-shell">
+      <div className={`pdv-shell ver-${panel}`}>
         <Catalogo
           carta={datos.carta}
           mesas={datos.mesas}

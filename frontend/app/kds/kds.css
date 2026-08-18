@@ -201,9 +201,11 @@
 }
 
 /* --- Barra superior --- */
+/* Mismo motivo que en el PDV: con la altura clavada, el nombre de la estación
+   envuelto se salía de la banda. */
 .kds-top {
     flex: none;
-    height: 56px;
+    min-height: 56px;
     display: flex;
     align-items: center;
     gap: 0.875rem;
@@ -215,9 +217,16 @@
     z-index: 2;
 }
 
+.kds-marca {
+    min-width: 0;
+}
+
 .kds-marca strong {
     display: block;
     font-size: 1rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .kds-marca small {

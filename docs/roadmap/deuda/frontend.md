@@ -581,8 +581,9 @@ backend que todavía no llega a pantalla.
       por qué tocar. **Se borra** cambiando los dos `import Pinpad from
       "./pinpad"` de `dialogos.tsx` y `bloqueo.tsx` a
       `@/components/pinpad/pinpad`, en la rama que los toque.
-    - ⬜ **El overlay de bloqueo del PDV se pinta con tokens que no existen
-      ahí** (encontrado al mover el CSS). `BloqueoPorInactividad` se monta
+    - ✅ **El overlay de bloqueo del PDV se pinta con tokens que no existen
+      ahí** (encontrado al mover el CSS; resuelto 2026-08-18 con respaldo en
+      cada `var()`, igual que las reglas del pinpad). `BloqueoPorInactividad` se monta
       como **hermano** de `<main className="pdv">` en `app/pdv/page.tsx`, no
       dentro, y los `--pdv-*` están definidos en `.pdv`/`.pdv-vacio`: cada
       `var(--pdv-bg)` / `var(--pdv-texto)` de `.pdv-bloqueo` es inválido al

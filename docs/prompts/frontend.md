@@ -65,7 +65,12 @@ Leer antes: `/CLAUDE.md`, [product/ui-ux.md](../product/ui-ux.md) y
   sistema los dibuja distinto.
 - Responsive siempre (webapp + Android táctil vía PWA, no app nativa —
   ADR-013); táctil obligatorio en PDV/Kiosk/KDS/Inventario, el resto de
-  módulos es PC-first pero igual responsive.
+  módulos es PC-first pero igual responsive. **Nunca `display: none` por
+  ancho sobre un control**: esconder es quitarle la opción a quien opera
+  desde una tablet en vertical. Si dos paneles no entran juntos, se alternan
+  con un botón que exista solo en ese ancho — es lo que hace el PDV con la
+  carta y el ticket. Ver `docs/product/ui-ux.md` → «Qué significa "no
+  romperse en pantallas chicas"».
 - Accesibilidad: paleta alternativa (daltonismo) y tamaño de fuente
   ajustable, ambos como preferencia del perfil del usuario, combinables
   con el tema de marca activo.
@@ -109,7 +114,10 @@ Leer antes: `/CLAUDE.md`, [product/ui-ux.md](../product/ui-ux.md) y
 ## Checklist
 
 - [ ] `npm run lint`, `npm run typecheck`, `npm test` y `npm run build` limpios.
-- [ ] Probado en viewport móvil y desktop.
+- [ ] Probado en viewport móvil y desktop. Si la pantalla es nueva, agregada
+      a `frontend/uso/responsive.spec.ts`, que la recorre en 390×844,
+      820×1180 y 1440×900 afirmando que ningún control quede fuera de un
+      contenedor que lo recorta y que todo modal quede centrado.
 - [ ] Sin colores/tamaños mágicos fuera de los tokens de `globals.css`.
 - [ ] Si el módulo es nuevo: agregado a `frontend/lib/modulos.ts` con su
       prefijo de permiso **y su área**, y `layout.tsx` propio con guard
