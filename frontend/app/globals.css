@@ -447,15 +447,28 @@ html {
 
     /* Entrada de pantalla: 8px de subida y opacidad. Se dispara una vez por
        navegación (el wrapper se remonta con el pathname como key). Suaviza
-       el corte entre pantallas sin hacer esperar a nadie. */
+       el corte entre pantallas sin hacer esperar a nadie.
+
+       `backwards` y NO `both`: el relleno hacia adelante deja la animación
+       "aplicada" para siempre, y con eso el `transform` del último fotograma
+       queda computado como `matrix(1, 0, 0, 1, 0, 0)` —identidad, invisible,
+       pero **distinto de `none`**—. Un transform no-`none` convierte al
+       elemento en bloque contenedor de todo `position: fixed` que tenga
+       debajo, incluidos los `<dialog>` del top layer: los diecisiete
+       diálogos del ERP quedaban clavados en la esquina superior izquierda de
+       `.revelar` en vez de centrados en la pantalla. Como el último
+       fotograma es idéntico al estado natural, quitar el relleno hacia
+       adelante no cambia nada de lo que se ve. */
     .revelar {
-        animation: revelar 220ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+        animation: revelar 220ms cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
     }
 
     /* Escalonado para grillas: cada tarjeta entra 25 ms después de la
-       anterior, hasta la sexta. Más allá se percibe como lentitud. */
+       anterior, hasta la sexta. Más allá se percibe como lentitud.
+       `backwards` es acá lo que sostiene el estado inicial durante el
+       retraso; el relleno hacia adelante sobra por el mismo motivo. */
     .revelar-lista > * {
-        animation: revelar 260ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+        animation: revelar 260ms cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
     }
 
     .revelar-lista > :nth-child(2) {
@@ -496,8 +509,33 @@ html {
     animation: aparecer 160ms ease-out both;
 }
 
+/* Mismo motivo que en `.revelar` para el `backwards`: un diálogo abierto que
+   se queda con el `transform` del último fotograma relleno hacia adelante es
+   bloque contenedor de cualquier `position: fixed` propio. */
 .erp dialog[open] {
-    animation: entrar-dialogo 200ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    animation: entrar-dialogo 200ms cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+}
+
+/* Centrado de todo diálogo modal.
+
+   El navegador centra un `<dialog>` modal con `margin: auto` sobre los cuatro
+   `inset: 0` de su hoja de estilos. El preflight de Tailwind pone
+   `margin: 0` en **todos** los elementos y ese `margin: 0` gana por orden de
+   cascada: el diálogo se va a la esquina superior izquierda. Se ve en el ERP,
+   en el PDV, en el KDS y en el lienzo, así que la regla es global y no va
+   dentro de `.erp`.
+
+   Fuera de `@layer` a propósito, igual que el bloque de arriba: dentro
+   perdería contra las utilidades que las pantallas escriben en su `<dialog>`.
+
+   `overflow: auto` porque el navegador limita la altura del modal
+   (`max-height: calc(100% - 6px - 2em)`) pero no lo hace scrollear: un
+   formulario más alto que la pantalla —el conteo por denominaciones de la
+   apertura de caja en un teléfono— dejaba el botón de confirmar dibujado
+   fuera del recuadro, sin forma de llegar. */
+dialog:modal {
+    margin: auto;
+    overflow: auto;
 }
 
 /* El molde (`DialogoFormulario`) ya trae su borde, fondo y sombra por

@@ -55,7 +55,11 @@ test.describe.serial("Flujo del dinero", () => {
     // la prueba pasa por los dos pasos y no por un atajo.
     await page.getByRole("button", { name: new RegExp(PRODUCTO, "i") }).first().click();
     await dialogo(page).getByRole("button", { name: /Guardar/i }).click();
-    await expect(page.getByText(/S\/ 25\.00/).first()).toBeVisible();
+    // Acotado al ticket: el mismo importe aparece también en el botón que
+    // alterna carta/pedido, que existe solo en el ancho angosto y acá está
+    // oculto — un `getByText` suelto lo encontraba primero y esperaba 15 s a
+    // que se hiciera visible algo que en esta medida no se ve.
+    await expect(page.locator(".pdv-der").getByText(/S\/ 25\.00/).first()).toBeVisible();
 
     // --- Tipo de orden ---------------------------------------------------
     // El PDV no deja salir del borrador sin tipo de orden (RN-COM-005), así
