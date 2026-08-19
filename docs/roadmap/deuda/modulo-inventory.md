@@ -345,3 +345,22 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   los ingredientes que el archivo no menciona —¿se borran?— y esa es una
   decisión de negocio, no de código. **Sigue abierto**: el arreglo del proxy
   no toca ninguna regla del importador.
+- ✅ 2026-08-19 **Requerimiento de la jornada** (ADR-051, RN-INV-023/024,
+  migración `b5f27ac41e83`): el local no tenía cómo armar su lista de pedido
+  ni el almacén cómo distinguir urgencia de decisión propia, pese a que la
+  API de solicitudes existía desde el slice 4. `GET
+  /solicitudes/borrador?almacen_id=` arma sola la lista con lo bajo
+  `stock_minimo` y `solicitud_item.bajo_minimo_al_pedir` se estampa al
+  agregar cada ítem. Suma `GET /conteos` (faltaba) y pantallas
+  `/inventario/solicitudes` + `/inventario/conteos`. Deuda que deja abierta:
+  - ⬜ **El borrador no se encadena al cierre de un conteo cíclico**: hoy lee
+    el `stock_minimo` vigente al abrir la pantalla, independiente de
+    ADR-019. El SOP de abastecimiento (`docs/domain/workflows.md`
+    §Abastecimiento de locales, paso 4) describe que el conteo **genera**
+    el borrador; conectar los dos es una decisión de flujo —¿todo cierre de
+    conteo dispara un borrador, o solo el conteo general?— que no se tomó
+    en este slice.
+  - ⬜ **Recortar lo aprobado por SKU sin pantalla**: `SolicitudAprobar.aprobadas`
+    existe desde ADR-020 y la pantalla nueva solo ofrece aprobar tal cual se
+    pidió (`aprobadas: []`). Falta el formulario que deje editar cantidad
+    por ítem al aprobar.
