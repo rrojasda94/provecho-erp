@@ -11462,6 +11462,37 @@
         "title": "Pagina[ClienteBuscadoOut]",
         "type": "object"
       },
+      "Pagina_ConteoOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ConteoOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "Pagina[ConteoOut]",
+        "type": "object"
+      },
       "Pagina_EscalamientoOut_": {
         "properties": {
           "items": {
@@ -18181,6 +18212,34 @@
         "title": "SolicitudDetalleOut",
         "type": "object"
       },
+      "SolicitudItemAgregarIn": {
+        "properties": {
+          "cantidad": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Cantidad"
+          },
+          "sku_id": {
+            "format": "uuid",
+            "title": "Sku Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "cantidad",
+          "sku_id"
+        ],
+        "title": "SolicitudItemAgregarIn",
+        "type": "object"
+      },
       "SolicitudItemCantidad": {
         "properties": {
           "cantidad": {
@@ -18207,6 +18266,29 @@
           "cantidad"
         ],
         "title": "SolicitudItemCantidad",
+        "type": "object"
+      },
+      "SolicitudItemCantidadIn": {
+        "description": "Cantidad de un ítem del borrador. Solo el `sku_id` viaja en la ruta.",
+        "properties": {
+          "cantidad": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Cantidad"
+          }
+        },
+        "required": [
+          "cantidad"
+        ],
+        "title": "SolicitudItemCantidadIn",
         "type": "object"
       },
       "SolicitudItemIn": {
@@ -18239,6 +18321,11 @@
       },
       "SolicitudItemOut": {
         "properties": {
+          "bajo_minimo_al_pedir": {
+            "default": false,
+            "title": "Bajo Minimo Al Pedir",
+            "type": "boolean"
+          },
           "cantidad_aprobada": {
             "anyOf": [
               {
@@ -18533,7 +18620,7 @@
           },
           "items": {
             "items": {
-              "$ref": "#/components/schemas/SolicitudItemIn"
+              "$ref": "#/components/schemas/SolicitudSyncItemIn"
             },
             "minItems": 1,
             "title": "Items",
@@ -18564,6 +18651,40 @@
           "items"
         ],
         "title": "SolicitudSyncIn",
+        "type": "object"
+      },
+      "SolicitudSyncItemIn": {
+        "description": "Ítem de una solicitud que se reproduce desde el hub.\n\nTrae la marca de urgencia porque la puso el local contra su propio stock\n(RN-INV-024) y recalcularla en la nube al reproducir el lote contaría\notra cosa. No está en `SolicitudItemIn` a propósito: en el alta normal\nla calcula el servidor, y dejarla entrar por el cuerpo permitiría\ndeclararse urgente a uno mismo.",
+        "properties": {
+          "bajo_minimo_al_pedir": {
+            "default": false,
+            "title": "Bajo Minimo Al Pedir",
+            "type": "boolean"
+          },
+          "cantidad": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Cantidad"
+          },
+          "sku_id": {
+            "format": "uuid",
+            "title": "Sku Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sku_id",
+          "cantidad"
+        ],
+        "title": "SolicitudSyncItemIn",
         "type": "object"
       },
       "StockDeSkuOut": {
@@ -25971,6 +26092,137 @@
       }
     },
     "/api/v1/inventory/conteos": {
+      "get": {
+        "description": "Los conteos del almacén, sucursal o marca, con el abierto primero.\n\nFaltaba: hasta ahora un conteo solo se podía pedir por su id, o sea\nsabiéndolo de antemano, y ninguna pantalla podía ofrecer \"seguir\ncontando lo que quedó abierto\".",
+        "operationId": "listar_conteos_api_v1_inventory_conteos_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "almacen_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Almacen Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "estado",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Estado"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sucursal_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sucursal Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "marca_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Marca Id"
+            }
+          },
+          {
+            "description": "Página, empezando en 1",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "description": "Página, empezando en 1",
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Filas por página (máx. 200)",
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Filas por página (máx. 200)",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pagina_ConteoOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Conteos",
+        "tags": [
+          "inventory"
+        ]
+      },
       "post": {
         "operationId": "abrir_conteo_api_v1_inventory_conteos_post",
         "requestBody": {
@@ -26036,6 +26288,40 @@
                 }
               ],
               "title": "Almacen Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sucursal_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sucursal Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "marca_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Marca Id"
             }
           }
         ],
@@ -28091,6 +28377,7 @@
     },
     "/api/v1/inventory/solicitudes": {
       "get": {
+        "description": "Los borradores no aparecen acá salvo pidiendo `estado=borrador`: una\nlista que nadie envió todavía no le pidió nada a nadie.",
         "operationId": "listar_solicitudes_api_v1_inventory_solicitudes_get",
         "parameters": [
           {
@@ -28124,6 +28411,40 @@
                 }
               ],
               "title": "Estado"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sucursal_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sucursal Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "marca_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Marca Id"
             }
           },
           {
@@ -28226,6 +28547,55 @@
           }
         ],
         "summary": "Crear Solicitud",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/solicitudes/borrador": {
+      "get": {
+        "description": "El requerimiento de la jornada de ese almacén, listo para editar.\n\nLa crea si no existe, ya cargada con lo que está bajo mínimo, y si ya\nexistía le suma lo que cayó desde la última vez (RN-INV-023). Es lo que\nhay detrás del botón: el personal no arma la lista desde cero.",
+        "operationId": "borrador_de_solicitud_api_v1_inventory_solicitudes_borrador_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "almacen_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Almacen Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SolicitudDetalleOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Borrador De Solicitud",
         "tags": [
           "inventory"
         ]
@@ -28469,6 +28839,238 @@
           }
         ],
         "summary": "Cancelar Solicitud",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/solicitudes/{solicitud_id}/enviar": {
+      "post": {
+        "description": "El borrador pasa a `pendiente` y recién ahí espera aprobación.",
+        "operationId": "enviar_solicitud_api_v1_inventory_solicitudes__solicitud_id__enviar_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "solicitud_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Solicitud Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SolicitudOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Enviar Solicitud",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/solicitudes/{solicitud_id}/items": {
+      "post": {
+        "description": "Lo que el local decide pedir sin que el stock lo pida. Queda marcado\ncomo no urgente si el SKU no estaba bajo mínimo (RN-INV-024).",
+        "operationId": "agregar_item_solicitud_api_v1_inventory_solicitudes__solicitud_id__items_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "solicitud_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Solicitud Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SolicitudItemAgregarIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SolicitudDetalleOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Agregar Item Solicitud",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/solicitudes/{solicitud_id}/items/{sku_id}": {
+      "delete": {
+        "operationId": "quitar_item_solicitud_api_v1_inventory_solicitudes__solicitud_id__items__sku_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "solicitud_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Solicitud Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "sku_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sku Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SolicitudDetalleOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Quitar Item Solicitud",
+        "tags": [
+          "inventory"
+        ]
+      },
+      "patch": {
+        "operationId": "cambiar_item_solicitud_api_v1_inventory_solicitudes__solicitud_id__items__sku_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "solicitud_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Solicitud Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "sku_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sku Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SolicitudItemCantidadIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SolicitudDetalleOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Cambiar Item Solicitud",
         "tags": [
           "inventory"
         ]

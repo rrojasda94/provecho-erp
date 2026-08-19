@@ -282,6 +282,7 @@ RECURSOS = (
             "cantidad_solicitada",
             "cantidad_aprobada",
             "cantidad_despachada",
+            "bajo_minimo_al_pedir",
             "updated_at",
         ),
         filtro=lambda q, a: q.where(
@@ -293,7 +294,11 @@ RECURSOS = (
                 )
             )
         ),
-        motivo="El detalle: lo pedido, lo aprobado y lo que el central despachó.",
+        motivo=(
+            "El detalle: lo pedido, lo aprobado, lo que el central despachó "
+            "y si era urgencia — sin eso el local no puede mostrar su propia "
+            "lista como la mandó."
+        ),
     ),
     RecursoSync(
         nombre="transferencia",
@@ -374,7 +379,11 @@ def _solicitud_a_dict(session: Session, solicitud: SolicitudInsumos) -> dict:
         "solicitado_por": str(solicitud.solicitado_por),
         "observacion": solicitud.observacion,
         "items": [
-            {"sku_id": str(i.sku_id), "cantidad": str(i.cantidad_solicitada)}
+            {
+                "sku_id": str(i.sku_id),
+                "cantidad": str(i.cantidad_solicitada),
+                "bajo_minimo_al_pedir": i.bajo_minimo_al_pedir,
+            }
             for i in items
         ],
     }
@@ -430,8 +439,13 @@ def pendientes(
 ) -> dict:
     """Solicitudes, recepciones y conteos del local desde `desde`."""
     almacenes = _almacenes_de_la_sucursal(alcance)
+    # El borrador **no sube**: es la lista que el turno está juntando y
+    # todavía no le pidió nada a nadie (RN-INV-023). Reproducirlo en la nube
+    # sería enviarlo por su cuenta, que es exactamente lo que el estado
+    # existe para no hacer.
     q_solicitudes = select(SolicitudInsumos).where(
-        SolicitudInsumos.almacen_solicitante_id.in_(almacenes)
+        SolicitudInsumos.almacen_solicitante_id.in_(almacenes),
+        SolicitudInsumos.estado != "borrador",
     )
     # Solo las YA recibidas: una transferencia en tránsito no tiene nada que
     # reproducir, y una parcial todavía no cerró su ciclo.
@@ -516,6 +530,12 @@ def _aplicar_solicitud(session: Session, datos: dict) -> None:
         items=[
             (uuid.UUID(i["sku_id"]), Decimal(i["cantidad"])) for i in datos["items"]
         ],
+        # La marca la puso el local contra **su** stock; el de la nube ya se
+        # movió mientras no había internet (RN-INV-024).
+        urgencias={
+            uuid.UUID(i["sku_id"]): bool(i.get("bajo_minimo_al_pedir", False))
+            for i in datos["items"]
+        },
     )
 
 

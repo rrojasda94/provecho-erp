@@ -37,6 +37,9 @@ export const SUBMENUS: Record<string, ItemSubmenu[]> = {
     { label: "Divisas", href: "/gerencia/divisas" },
   ],
   inventario: [
+    // Primero lo que se hace todos los días: pedir y contar.
+    { label: "Requerimientos", href: "/inventario/solicitudes" },
+    { label: "Conteos", href: "/inventario/conteos" },
     { label: "Artículos", href: "/inventario/articulos" },
     { label: "Categorías", href: "/inventario/categorias" },
     { label: "Unidades de medida", href: "/inventario/unidades-medida" },

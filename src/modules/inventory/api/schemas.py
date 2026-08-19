@@ -248,12 +248,24 @@ class SolicitudAprobar(BaseModel):
     aprobadas: list[SolicitudItemCantidad] = []
 
 
+class SolicitudItemCantidadIn(BaseModel):
+    """Cantidad de un ítem del borrador. Solo el `sku_id` viaja en la ruta."""
+    cantidad: Decimal = Field(gt=0)
+
+
+class SolicitudItemAgregarIn(SolicitudItemCantidadIn):
+    sku_id: uuid.UUID
+
+
 class SolicitudItemOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     sku_id: uuid.UUID
     cantidad_solicitada: Decimal
     cantidad_aprobada: Decimal | None
     cantidad_despachada: Decimal | None
+    # Qué es urgencia y qué es decisión del local (RN-INV-024): en falso, el
+    # almacenero sabe que ese ítem no está por faltar.
+    bajo_minimo_al_pedir: bool = False
 
 
 class SolicitudOut(BaseModel):
@@ -755,6 +767,19 @@ class GuiaRemisionDetalleOut(GuiaRemisionOut):
 
 
 # --- Lote ascendente del hub (ADR-009) ---------------------------------------
+class SolicitudSyncItemIn(SolicitudItemIn):
+    """Ítem de una solicitud que se reproduce desde el hub.
+
+    Trae la marca de urgencia porque la puso el local contra su propio stock
+    (RN-INV-024) y recalcularla en la nube al reproducir el lote contaría
+    otra cosa. No está en `SolicitudItemIn` a propósito: en el alta normal
+    la calcula el servidor, y dejarla entrar por el cuerpo permitiría
+    declararse urgente a uno mismo.
+    """
+
+    bajo_minimo_al_pedir: bool = False
+
+
 class SolicitudSyncIn(BaseModel):
     """Solicitud creada en el local durante un corte. Viaja con su `id`
     client-generado: reproducirla dos veces no la duplica."""
@@ -764,7 +789,7 @@ class SolicitudSyncIn(BaseModel):
     almacen_abastecedor_id: uuid.UUID
     solicitado_por: uuid.UUID
     observacion: str | None = None
-    items: list[SolicitudItemIn] = Field(min_length=1)
+    items: list[SolicitudSyncItemIn] = Field(min_length=1)
 
 
 class RecepcionSyncItemIn(BaseModel):

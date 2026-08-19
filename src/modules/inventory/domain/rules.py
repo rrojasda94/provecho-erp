@@ -30,7 +30,10 @@ MOTIVOS_RESERVA_MERMA = {"devolucion", "rechazo_sucursal", "auditoria"}
 # Estados desde los que todavía se puede cancelar una solicitud y soltar
 # sus reservas (RN-INV-010). Despachada ya movió stock: eso se corrige
 # recibiendo o con una transferencia de vuelta, no cancelando.
-ESTADOS_SOLICITUD_CANCELABLES = {"pendiente", "aprobada"}
+# `borrador` entra porque descartar la lista de la jornada es cancelarla
+# (RN-INV-023): nunca reservó nada, así que liberar es un no-op, y así el
+# descarte no necesita su propio camino.
+ESTADOS_SOLICITUD_CANCELABLES = {"borrador", "pendiente", "aprobada"}
 
 # Cada cuánto toca contar una categoría, en días (RN-INV-007). El período
 # es en días y no en meses de calendario a propósito: el almacén cuenta
@@ -89,6 +92,21 @@ def puede_aprobar(solicitante_id, aprobador_id) -> bool:
 
 def stock_bajo(cantidad: Decimal, stock_minimo: Decimal | None) -> bool:
     return stock_minimo is not None and cantidad <= stock_minimo
+
+
+def cantidad_a_reponer(cantidad: Decimal, stock_minimo: Decimal | None) -> Decimal:
+    """Cuánto pedir para volver al mínimo. Es una **sugerencia**: el que
+    arma el requerimiento la edita.
+
+    Sin punto de reorden ni máximo en el modelo, el mínimo es el único
+    número que el negocio ya declaró. Un almacén que quedó en cero pide su
+    mínimo entero; uno que quedó justo en el mínimo pide el mínimo otra vez
+    —quedarse en el umbral es quedarse a un consumo de faltar—.
+    """
+    if stock_minimo is None:
+        return Decimal(0)
+    falta = stock_minimo - cantidad
+    return falta if falta > 0 else stock_minimo
 
 
 def disponible(fisico: Decimal, reservado: Decimal) -> Decimal:
