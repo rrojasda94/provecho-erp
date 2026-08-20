@@ -488,11 +488,15 @@ def crear_solicitud(
 def listar_solicitudes(
     almacen_solicitante_id: uuid.UUID | None = None,
     estado: str | None = None,
+    sucursal_id: uuid.UUID | None = None,
+    marca_id: uuid.UUID | None = None,
     _: Usuario = Depends(require_permission(LEER)),
     tenant: Tenant = Depends(get_tenant),
     p: Paginacion = Depends(paginacion),
     session: Session = Depends(get_db),
 ):
+    """Los borradores no aparecen acá salvo pidiendo `estado=borrador`: una
+    lista que nadie envió todavía no le pidió nada a nadie."""
     if almacen_solicitante_id is not None:
         exigir_almacen(session, almacen_solicitante_id, tenant)
     return paginar(
@@ -502,6 +506,8 @@ def listar_solicitudes(
             almacen_solicitante_id=almacen_solicitante_id,
             estado=estado,
             empresa_id=tenant.filtro_empresa(),
+            sucursal_id=sucursal_id,
+            marca_id=marca_id,
         ),
         p,
     )
@@ -526,6 +532,116 @@ def resumen_solicitudes(
     )
 
 
+def _detalle_solicitud(
+    session: Session, solicitud_id: uuid.UUID
+) -> schemas.SolicitudDetalleOut:
+    solicitud, items = solicitudes_uc.detalle(session, solicitud_id)
+    return schemas.SolicitudDetalleOut(
+        **schemas.SolicitudOut.model_validate(solicitud).model_dump(),
+        items=[schemas.SolicitudItemOut.model_validate(i) for i in items],
+    )
+
+
+# `/solicitudes/borrador` va antes que `/solicitudes/{solicitud_id}`: si no,
+# FastAPI intenta leer "borrador" como UUID (mismo motivo que en conteos).
+@router.get(
+    "/solicitudes/borrador", response_model=schemas.SolicitudDetalleOut
+)
+def borrador_de_solicitud(
+    almacen_id: uuid.UUID,
+    actor: Usuario = Depends(require_permission(SOLICITAR_INSUMOS)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """El requerimiento de la jornada de ese almacén, listo para editar.
+
+    La crea si no existe, ya cargada con lo que está bajo mínimo, y si ya
+    existía le suma lo que cayó desde la última vez (RN-INV-023). Es lo que
+    hay detrás del botón: el personal no arma la lista desde cero.
+    """
+    exigir_almacen(session, almacen_id, tenant)
+    borrador = solicitudes_uc.borrador_del_almacen(
+        session, almacen_id=almacen_id, usuario_id=actor.id
+    )
+    session.commit()
+    return _detalle_solicitud(session, borrador.id)
+
+
+@router.post(
+    "/solicitudes/{solicitud_id}/items",
+    response_model=schemas.SolicitudDetalleOut,
+    status_code=201,
+)
+def agregar_item_solicitud(
+    solicitud_id: uuid.UUID,
+    body: schemas.SolicitudItemAgregarIn,
+    _: Usuario = Depends(require_permission(SOLICITAR_INSUMOS)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Lo que el local decide pedir sin que el stock lo pida. Queda marcado
+    como no urgente si el SKU no estaba bajo mínimo (RN-INV-024)."""
+    exigir_solicitud(session, solicitud_id, tenant)
+    solicitudes_uc.agregar_item(
+        session, solicitud_id, sku_id=body.sku_id, cantidad=body.cantidad
+    )
+    session.commit()
+    return _detalle_solicitud(session, solicitud_id)
+
+
+@router.patch(
+    "/solicitudes/{solicitud_id}/items/{sku_id}",
+    response_model=schemas.SolicitudDetalleOut,
+)
+def cambiar_item_solicitud(
+    solicitud_id: uuid.UUID,
+    sku_id: uuid.UUID,
+    body: schemas.SolicitudItemCantidadIn,
+    _: Usuario = Depends(require_permission(SOLICITAR_INSUMOS)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    exigir_solicitud(session, solicitud_id, tenant)
+    solicitudes_uc.cambiar_cantidad(
+        session, solicitud_id, sku_id=sku_id, cantidad=body.cantidad
+    )
+    session.commit()
+    return _detalle_solicitud(session, solicitud_id)
+
+
+@router.delete(
+    "/solicitudes/{solicitud_id}/items/{sku_id}",
+    response_model=schemas.SolicitudDetalleOut,
+)
+def quitar_item_solicitud(
+    solicitud_id: uuid.UUID,
+    sku_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(SOLICITAR_INSUMOS)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    exigir_solicitud(session, solicitud_id, tenant)
+    solicitudes_uc.quitar_item(session, solicitud_id, sku_id=sku_id)
+    session.commit()
+    return _detalle_solicitud(session, solicitud_id)
+
+
+@router.post(
+    "/solicitudes/{solicitud_id}/enviar", response_model=schemas.SolicitudOut
+)
+def enviar_solicitud(
+    solicitud_id: uuid.UUID,
+    actor: Usuario = Depends(require_permission(SOLICITAR_INSUMOS)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """El borrador pasa a `pendiente` y recién ahí espera aprobación."""
+    exigir_solicitud(session, solicitud_id, tenant)
+    solicitud = solicitudes_uc.enviar_borrador(session, solicitud_id, actor.id)
+    session.commit()
+    return solicitud
+
+
 @router.get(
     "/solicitudes/{solicitud_id}", response_model=schemas.SolicitudDetalleOut
 )
@@ -536,11 +652,7 @@ def ver_solicitud(
     session: Session = Depends(get_db),
 ):
     exigir_solicitud(session, solicitud_id, tenant)
-    solicitud, items = solicitudes_uc.detalle(session, solicitud_id)
-    return schemas.SolicitudDetalleOut(
-        **schemas.SolicitudOut.model_validate(solicitud).model_dump(),
-        items=[schemas.SolicitudItemOut.model_validate(i) for i in items],
-    )
+    return _detalle_solicitud(session, solicitud_id)
 
 
 @router.post(
@@ -789,6 +901,8 @@ def listar_guias(
 @router.get("/conteos/programa", response_model=list[schemas.ProgramaConteoOut])
 def programa_conteos(
     almacen_id: uuid.UUID | None = None,
+    sucursal_id: uuid.UUID | None = None,
+    marca_id: uuid.UUID | None = None,
     _: Usuario = Depends(require_permission(LEER)),
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
@@ -798,7 +912,11 @@ def programa_conteos(
     if almacen_id is not None:
         exigir_almacen(session, almacen_id, tenant)
     return conteos_uc.programa(
-        session, almacen_id=almacen_id, empresa_id=tenant.filtro_empresa()
+        session,
+        almacen_id=almacen_id,
+        empresa_id=tenant.filtro_empresa(),
+        sucursal_id=sucursal_id,
+        marca_id=marca_id,
     )
 
 
@@ -843,6 +961,39 @@ def abrir_conteo(
     )
     session.commit()
     return conteo
+
+
+@router.get("/conteos", response_model=Pagina[schemas.ConteoOut])
+def listar_conteos(
+    almacen_id: uuid.UUID | None = None,
+    estado: str | None = None,
+    sucursal_id: uuid.UUID | None = None,
+    marca_id: uuid.UUID | None = None,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    p: Paginacion = Depends(paginacion),
+    session: Session = Depends(get_db),
+):
+    """Los conteos del almacén, sucursal o marca, con el abierto primero.
+
+    Faltaba: hasta ahora un conteo solo se podía pedir por su id, o sea
+    sabiéndolo de antemano, y ninguna pantalla podía ofrecer "seguir
+    contando lo que quedó abierto".
+    """
+    if almacen_id is not None:
+        exigir_almacen(session, almacen_id, tenant)
+    return paginar(
+        session,
+        conteos_uc.q_listar(
+            session,
+            almacen_id=almacen_id,
+            estado=estado,
+            empresa_id=tenant.filtro_empresa(),
+            sucursal_id=sucursal_id,
+            marca_id=marca_id,
+        ),
+        p,
+    )
 
 
 @router.get("/conteos/{conteo_id}", response_model=schemas.ConteoDetalleOut)

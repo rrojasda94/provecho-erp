@@ -16,6 +16,10 @@ from src.core.database import Base
 from src.core.model_base import TimestampMixin, UuidPkMixin
 
 ESTADO_SOLICITUD = Enum(
+    # La lista que el turno va juntando durante la jornada (RN-INV-023).
+    # Todavía no le pidió nada a nadie, así que no aparece en el listado de
+    # solicitudes ni reserva stock: enviarla es lo que la vuelve un pedido.
+    "borrador",
     "pendiente",
     "aprobada",
     "rechazada",

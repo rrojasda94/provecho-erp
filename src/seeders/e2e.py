@@ -228,6 +228,7 @@ def sembrar_e2e(session: Session) -> dict:
     menu = _sembrar_menu(session, empresa, marca)
     compras = _sembrar_compras(session, empresa)
     cliente = _sembrar_cliente(session, empresa)
+    abastecimiento = _sembrar_abastecimiento(session, empresa, sucursal)
 
     return {
         "sucursales": len(puntos_venta),
@@ -236,7 +237,66 @@ def sembrar_e2e(session: Session) -> dict:
         **menu,
         **compras,
         **cliente,
+        **abastecimiento,
     }
+
+
+#: Almacén de local con su punto de reorden. Los dos primeros insumos quedan
+#: **por debajo** del mínimo (el requerimiento de la jornada los trae solo) y
+#: el tercero sobrado, para que "agregar producto" tenga un candidato que no
+#: es urgencia (RN-INV-023/024).
+ALMACEN_LOCAL = "Almacén Tarapoto Centro"
+STOCK_LOCAL: dict[str, tuple[str, str]] = {
+    "Queso E2E": ("2", "10"),
+    "Papa E2E": ("5", "20"),
+    "Lechuga E2E": ("40", "10"),
+}
+
+
+def _sembrar_abastecimiento(
+    session: Session, empresa: Empresa, sucursal: Sucursal
+) -> dict:
+    """El almacén del local, su abastecedor y un stock que ya pide reponerse.
+
+    Sin punto de reorden declarado no hay nada que sugerir, y la pantalla de
+    Requerimientos se vería vacía en la demo por falta de dato y no por falta
+    de código — que es exactamente la confusión que este seeder evita en el
+    resto de los flujos.
+    """
+    central = session.scalar(
+        select(Almacen).where(Almacen.sucursal_id.is_(None), Almacen.tipo == "central")
+    )
+    local = session.scalar(select(Almacen).where(Almacen.nombre == ALMACEN_LOCAL))
+    if local is None:
+        local = Almacen(
+            empresa_id=empresa.id,
+            sucursal_id=sucursal.id,
+            nombre=ALMACEN_LOCAL,
+            tipo="sucursal",
+            almacen_abastecedor_id=central.id if central else None,
+        )
+        session.add(local)
+        session.flush()
+
+    for nombre, (cantidad, minimo) in STOCK_LOCAL.items():
+        sku = session.scalar(
+            select(Sku)
+            .join(Articulo, Articulo.id == Sku.articulo_id)
+            .where(Articulo.nombre == nombre, Articulo.empresa_id == empresa.id)
+        )
+        if sku is None:
+            continue
+        fila = session.scalar(
+            select(Stock).where(Stock.almacen_id == local.id, Stock.sku_id == sku.id)
+        )
+        if fila is None:
+            fila = Stock(almacen_id=local.id, sku_id=sku.id)
+            session.add(fila)
+        # Valor absoluto, igual que `_stock`: el seeder se vuelve a correr.
+        fila.cantidad = Decimal(cantidad)
+        fila.stock_minimo = Decimal(minimo)
+    session.flush()
+    return {"almacen_local_id": str(local.id)}
 
 
 def _sembrar_cliente(session: Session, empresa: Empresa) -> dict:

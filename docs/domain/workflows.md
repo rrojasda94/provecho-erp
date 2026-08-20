@@ -143,6 +143,22 @@ flowchart LR
 > Borrador (se revisa/corrige en otra sesión): detalle de conteo en
 > sucursal ya está a este nivel; picking/packing/transporte en almacén
 > central todavía no.
+
+**Implementado (2026-08-19, ADR-051):** los pasos 4–9 —conteo → borrador de
+requerimiento sugerido por punto de reorden → ajuste/edición por el
+Encargado/Supervisor → envío a Almacén Central. `GET
+/inventory/solicitudes/borrador?almacen_id=` arma la lista sola con lo que
+está bajo `stock_minimo` (RN-INV-013) y el Encargado la edita —incluida la
+cantidad menor que describe el paso 8— antes de enviarla; lo que se agrega a
+mano queda marcado como pedido del local y no como urgencia (RN-INV-024).
+El paso 4 (el conteo **genera** el borrador automáticamente) queda **fuera**
+de este slice: hoy el borrador se arma independiente del conteo cíclico
+(ADR-019), leyendo el stock vigente al abrir la pantalla, no el resultado de
+un conteo recién cerrado — encadenar los dos es deuda técnica. Los pasos
+10–14 (picking, packing, transporte, recepción, devoluciones) siguen sin
+implementarse: el ciclo de aprobación → despacho → recepción ya existía
+desde ADR-020, y es lo que cubren `GET /inventory/transferencias` y las
+pantallas de `/inventario/lotes` para lo recibido.
 >
 > 1. El conteo de fin de jornada lo hacen Personal de cocina y Personal de
 >    atención al cliente, usando balanza, lector QR (si aplica) y el ERP.

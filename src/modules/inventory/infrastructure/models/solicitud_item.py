@@ -9,7 +9,7 @@ llegó a despachar cuando el stock no alcanzó.
 import uuid
 from decimal import Decimal
 
-from sqlalchemy import ForeignKey, Numeric, UniqueConstraint
+from sqlalchemy import Boolean, ForeignKey, Numeric, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -30,4 +30,11 @@ class SolicitudItem(Base, UuidPkMixin, TimestampMixin):
     )
     cantidad_despachada: Mapped[Decimal | None] = mapped_column(
         Numeric(12, 4), nullable=True
+    )
+    # Si el SKU estaba bajo su mínimo **cuando se agregó** (RN-INV-024). Es
+    # lo que le dice al almacenero qué es urgencia y qué es decisión del
+    # local. Se estampa y no se deriva: al aprobar, el stock ya se movió, y
+    # recalcularlo entonces contaría otra historia que la que el local vio.
+    bajo_minimo_al_pedir: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
     )
