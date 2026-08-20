@@ -73,6 +73,58 @@ fecha_vencimiento, condiciones de almacenamiento), `conteo`, `ajuste`
   "quién sacó esto del almacén". La pantalla estuvo en solo lectura hasta
   esa fecha, así que la API completa era inalcanzable por UI.
 
+## Estado (slice 8 — planillas de catálogo, 2026-08-20)
+
+Exportar es la plantilla con los datos adentro (ADR-051): lo que baja se edita
+en Excel y se vuelve a subir. La E/S de `.xlsx` vive en `src/shared/planilla.py`
+—abrir, mapear cabecera, filas, celda→texto/número/fecha/uuid, escribir— y la
+lógica de cada entidad en su propio archivo de `application/`.
+
+**Recetario** (`GET /recetas/exportar`)
+
+| Hoja | Columnas |
+|---|---|
+| `Recetas` | `ID` · `Receta` · `Rendimiento` · `Unidad` · `Produce el artículo` |
+| `Ingredientes` | `Receta` · `Insumo` · `Cantidad` · `Merma %` |
+| `Instrucciones` | texto |
+
+- La columna `ID` decide alta o actualización. Recetas se actualizan **solo
+  por `ID`**: su única clave natural es el nombre, y el nombre es lo que se
+  edita.
+- `Ingredientes` **no lleva `ID`** a propósito: la identidad de una línea es
+  `(receta, insumo)` y el dominio ya la hace única. Una columna con
+  `receta_item.id` sería una segunda verdad que no sobrevive un copiar-pegar.
+- `Cantidad` se exporta como `expresion or cantidad`: exportar `150` donde
+  alguien escribió `450/3` perdería lo que RN-COM-024 existe para conservar.
+- Al actualizar, **los ingredientes que el archivo no menciona se conservan**
+  salvo que la revisión pida `quitar` para esa receta, con el número de líneas
+  a la vista (RN-COM-031).
+- El insumo que falta **se crea desde el diálogo**, con `catalogoApi.crearArticulo`
+  — lo crea una persona, no el importador (ADR-046).
+
+**Catálogo de artículos** (`/articulos/plantilla`, `/articulos/exportar`,
+`/articulos/importar/validar`, `/articulos/importar` — RN-INV-023)
+
+| Hoja | Columnas |
+|---|---|
+| `Artículos` | `ID` · `Código` · `Nombre` · `Tipo` · `Unidad` · `Categoría` · `Costo promedio` · `Controla lote` · `Días alerta vencimiento` · `Archivado` |
+| `SKUs` | `Artículo` (código interno) · `Código` · `Código de barras` · `Activo` |
+| `Instrucciones` | texto |
+
+- Identidad: `ID`, o `Código` (`id_interno`) si el `ID` va vacío.
+- **La unidad de un artículo existente no se cambia**: `editar_articulo` la
+  excluye a propósito, y una fila que la cambie se reporta como problema en vez
+  de ignorarse en silencio.
+- El largo de `id_interno` (4) se valida **en el importador**: SQLite no aplica
+  el largo de un `VARCHAR`, así que sin eso la fila pasa en verde y revienta
+  contra Postgres. Un test ata la constante a la columna del modelo.
+- Los SKU **solo se crean**; uno con código ya usado se informa. Ver deuda.
+
+Exportar pide permiso de **lectura** (`inventory.leer`): son los mismos datos
+que el listado, solo empaquetados. Plantilla, validar e importar piden
+`inventory.gestionar_catalogo`. Las rutas literales van declaradas **antes** de
+`/{id}`, o FastAPI las toma como un id que no es UUID.
+
 ## Estado (slice 7 — carga masiva de recetas, 2026-08-13)
 
 - `GET /inventory/skus`: no existía listado y ninguna pantalla podía ofrecer

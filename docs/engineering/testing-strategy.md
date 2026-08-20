@@ -229,12 +229,18 @@ escrito a mano: envejece sin avisar.
   de módulo, el lienzo de nodos, el bloqueo de pantalla y el login con pinpad
   (ADR-050). Los tres puntos de "qué sí justifica un e2e" quedan cubiertos.
   Ver ROADMAP → Frontend.
-- Uso: **3 casos**. `uso/humo.spec.ts` prueba el arnés y no una pantalla;
+- Uso: **7 casos**. `uso/humo.spec.ts` prueba el arnés y no una pantalla;
   `uso/importador-recetas.spec.ts` (2026-08-15) recorre la carga masiva del
   recetario de punta a punta —descargar la plantilla, abrirla con openpyxl,
   llenarla, subirla y confirmar—, que es el camino donde vivía el bug del
-  proxy (ADR-048); y `uso/consulta-documento.spec.ts` (2026-08-15) corrige un
-  cliente con el botón de RUC. Job `uso`, **no requerido** (ADR-047).
+  proxy (ADR-048); `uso/importador-articulos.spec.ts` y
+  `uso/importador-clientes.spec.ts` (2026-08-20, ADR-051) hacen lo mismo con el
+  catálogo y el padrón, y además el **round-trip nulo**: bajar lo que ya está
+  cargado, volver a subirlo sin tocarlo y exigir que todo salga "a actualizar"
+  y nada "nuevo" — es lo único que verifica que el export y el importador
+  hablan el mismo idioma desde el navegador; y `uso/consulta-documento.spec.ts`
+  (2026-08-15) corrige un cliente con el botón de RUC. Job `uso`, **no
+  requerido** (ADR-047).
 
 Los cuatro niveles de la tabla existen y ninguno está vacío. Lo que queda
 abierto, dicho sin adornos: **el cuerpo que arman las pantallas de Compras,
@@ -262,7 +268,14 @@ La diferencia no es teórica: ya dejó pasar bugs.
   compila** — hay que sembrar la fila, que es lo que la base real exige.
 - **Largo de `VARCHAR` y tipos** — SQLite no los valida (ver
   `docs/roadmap/deuda/transversal.md`). Sigue abierto: la única red es probar
-  cada migración contra un Postgres real.
+  cada migración contra un Postgres real. Los importadores de planilla
+  (2026-08-20, ADR-051) le agregan una segunda: **validan el largo ellos
+  mismos**, por fila, para que un `Código = "HARINA"` se reporte como problema
+  en vez de pasar en verde y dar `StringDataRightTruncation` en producción — y
+  `test_importacion_articulos.py` ata la constante a `Articulo.__table__.c
+  .id_interno.type.length`, así que ensanchar la columna sin mover la
+  constante se pone rojo. Cubre las columnas que alguien se acordó de atar,
+  no todas.
 - **`statement_timeout`** — no existe en SQLite. La configuración de los dos
   engines (`docs/engineering/devops.md` → «Dos engines») es inocua ahí, a
   propósito: fuera de Postgres el parámetro no se pasa.

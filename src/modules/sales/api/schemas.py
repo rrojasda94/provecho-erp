@@ -3,6 +3,7 @@
 import uuid
 from datetime import date
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -244,6 +245,70 @@ class ClienteOut(BaseModel):
     razon_social: str | None
     ruc: str | None
     persona_id: uuid.UUID | None
+
+
+# --- Carga masiva de clientes (RN-PTS-007, ADR-051) ---
+class ClienteImportadoIn(BaseModel):
+    """Una fila de la hoja «Clientes», ya revisada por la pantalla.
+
+    `id` y `accion` no son hechos: son **el permiso que una persona dio**. El
+    servidor los vuelve a derivar contra la base antes de escribir.
+    """
+
+    id: uuid.UUID | None = None
+    accion: Literal["crear", "actualizar", "omitir"] = "crear"
+    nombre: str = Field(min_length=1, max_length=255)
+    tipo_documento: str = Field(default="dni", max_length=20)
+    documento: str = Field(default="", max_length=11)
+    telefono: str | None = None
+    email: str | None = None
+    contacto: str | None = None
+    fecha_nacimiento: str | None = None
+
+
+class ImportarClientesIn(BaseModel):
+    clientes: list[ClienteImportadoIn]
+
+
+class ClienteRevisadoOut(BaseModel):
+    fila: int
+    id: uuid.UUID | None
+    accion: str
+    tipo: str
+    nombre: str
+    tipo_documento: str
+    documento: str
+    telefono: str
+    email: str
+    contacto: str
+    fecha_nacimiento: str | None
+    cambios: list[str]
+    problemas: list[str]
+
+
+class RevisionClientesOut(BaseModel):
+    clientes: list[ClienteRevisadoOut]
+    listas: int
+    a_actualizar: int
+    con_problema: int
+
+
+class ImportadoOut(BaseModel):
+    id: uuid.UUID
+    nombre: str
+
+
+class OmitidoOut(BaseModel):
+    nombre: str
+    motivo: str
+
+
+class ResultadoImportacionOut(BaseModel):
+    """El mismo sobre que usa inventory: crear, actualizar, omitir."""
+
+    creadas: list[ImportadoOut]
+    actualizadas: list[ImportadoOut]
+    omitidas: list[OmitidoOut]
 
 
 class ClienteBuscadoOut(BaseModel):

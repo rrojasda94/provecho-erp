@@ -1254,6 +1254,123 @@
         "title": "ArticuloCreate",
         "type": "object"
       },
+      "ArticuloImportadoIn": {
+        "description": "Una fila de la hoja «Artículos», ya revisada por la pantalla.\n\n`unidad_medida_id` puede venir en `None` al actualizar: la unidad de un\nartículo que ya existe no se cambia por planilla (ADR-051).",
+        "properties": {
+          "accion": {
+            "default": "crear",
+            "enum": [
+              "crear",
+              "actualizar",
+              "omitir"
+            ],
+            "title": "Accion",
+            "type": "string"
+          },
+          "archivado": {
+            "default": false,
+            "title": "Archivado",
+            "type": "boolean"
+          },
+          "categoria_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Categoria Id"
+          },
+          "codigo": {
+            "maxLength": 4,
+            "minLength": 1,
+            "title": "Codigo",
+            "type": "string"
+          },
+          "controla_lote": {
+            "default": false,
+            "title": "Controla Lote",
+            "type": "boolean"
+          },
+          "costo_promedio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "default": "0",
+            "title": "Costo Promedio"
+          },
+          "dias_alerta_vencimiento": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dias Alerta Vencimiento"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "nombre": {
+            "maxLength": 150,
+            "minLength": 1,
+            "title": "Nombre",
+            "type": "string"
+          },
+          "skus": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/SkuImportadoIn"
+            },
+            "title": "Skus",
+            "type": "array"
+          },
+          "tipo": {
+            "default": "insumo",
+            "maxLength": 30,
+            "title": "Tipo",
+            "type": "string"
+          },
+          "unidad_medida_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unidad Medida Id"
+          }
+        },
+        "required": [
+          "codigo",
+          "nombre"
+        ],
+        "title": "ArticuloImportadoIn",
+        "type": "object"
+      },
       "ArticuloOut": {
         "properties": {
           "archivado": {
@@ -1334,6 +1451,139 @@
           "dias_alerta_vencimiento"
         ],
         "title": "ArticuloOut",
+        "type": "object"
+      },
+      "ArticuloRevisadoOut": {
+        "properties": {
+          "accion": {
+            "title": "Accion",
+            "type": "string"
+          },
+          "archivado": {
+            "title": "Archivado",
+            "type": "boolean"
+          },
+          "cambios": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Cambios",
+            "type": "array"
+          },
+          "categoria": {
+            "title": "Categoria",
+            "type": "string"
+          },
+          "categoria_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Categoria Id"
+          },
+          "codigo": {
+            "title": "Codigo",
+            "type": "string"
+          },
+          "controla_lote": {
+            "title": "Controla Lote",
+            "type": "boolean"
+          },
+          "costo_promedio": {
+            "title": "Costo Promedio",
+            "type": "string"
+          },
+          "dias_alerta_vencimiento": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dias Alerta Vencimiento"
+          },
+          "fila": {
+            "title": "Fila",
+            "type": "integer"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "problemas": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Problemas",
+            "type": "array"
+          },
+          "skus": {
+            "items": {
+              "$ref": "#/components/schemas/SkuRevisadoOut"
+            },
+            "title": "Skus",
+            "type": "array"
+          },
+          "tipo": {
+            "title": "Tipo",
+            "type": "string"
+          },
+          "unidad": {
+            "title": "Unidad",
+            "type": "string"
+          },
+          "unidad_medida_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unidad Medida Id"
+          }
+        },
+        "required": [
+          "fila",
+          "id",
+          "accion",
+          "codigo",
+          "nombre",
+          "tipo",
+          "unidad",
+          "unidad_medida_id",
+          "categoria",
+          "categoria_id",
+          "costo_promedio",
+          "controla_lote",
+          "dias_alerta_vencimiento",
+          "archivado",
+          "skus",
+          "cambios",
+          "problemas"
+        ],
+        "title": "ArticuloRevisadoOut",
         "type": "object"
       },
       "ArticuloUpdate": {
@@ -1988,6 +2238,34 @@
           "estado"
         ],
         "title": "AvanzarIn",
+        "type": "object"
+      },
+      "Body_validar_importacion_articulos_api_v1_inventory_articulos_importar_validar_post": {
+        "properties": {
+          "archivo": {
+            "contentMediaType": "application/octet-stream",
+            "title": "Archivo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "archivo"
+        ],
+        "title": "Body_validar_importacion_articulos_api_v1_inventory_articulos_importar_validar_post",
+        "type": "object"
+      },
+      "Body_validar_importacion_clientes_api_v1_sales_clientes_importar_validar_post": {
+        "properties": {
+          "archivo": {
+            "contentMediaType": "application/octet-stream",
+            "title": "Archivo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "archivo"
+        ],
+        "title": "Body_validar_importacion_clientes_api_v1_sales_clientes_importar_validar_post",
         "type": "object"
       },
       "Body_validar_importacion_recetas_api_v1_inventory_recetas_importar_validar_post": {
@@ -3331,6 +3609,100 @@
         "title": "ClienteDocumentoUpdate",
         "type": "object"
       },
+      "ClienteImportadoIn": {
+        "description": "Una fila de la hoja «Clientes», ya revisada por la pantalla.\n\n`id` y `accion` no son hechos: son **el permiso que una persona dio**. El\nservidor los vuelve a derivar contra la base antes de escribir.",
+        "properties": {
+          "accion": {
+            "default": "crear",
+            "enum": [
+              "crear",
+              "actualizar",
+              "omitir"
+            ],
+            "title": "Accion",
+            "type": "string"
+          },
+          "contacto": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contacto"
+          },
+          "documento": {
+            "default": "",
+            "maxLength": 11,
+            "title": "Documento",
+            "type": "string"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "fecha_nacimiento": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Nacimiento"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "nombre": {
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Nombre",
+            "type": "string"
+          },
+          "telefono": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Telefono"
+          },
+          "tipo_documento": {
+            "default": "dni",
+            "maxLength": 20,
+            "title": "Tipo Documento",
+            "type": "string"
+          }
+        },
+        "required": [
+          "nombre"
+        ],
+        "title": "ClienteImportadoIn",
+        "type": "object"
+      },
       "ClienteOut": {
         "properties": {
           "id": {
@@ -3428,6 +3800,100 @@
           "contacto"
         ],
         "title": "ClientePublicoOut",
+        "type": "object"
+      },
+      "ClienteRevisadoOut": {
+        "properties": {
+          "accion": {
+            "title": "Accion",
+            "type": "string"
+          },
+          "cambios": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Cambios",
+            "type": "array"
+          },
+          "contacto": {
+            "title": "Contacto",
+            "type": "string"
+          },
+          "documento": {
+            "title": "Documento",
+            "type": "string"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "fecha_nacimiento": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Nacimiento"
+          },
+          "fila": {
+            "title": "Fila",
+            "type": "integer"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "problemas": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Problemas",
+            "type": "array"
+          },
+          "telefono": {
+            "title": "Telefono",
+            "type": "string"
+          },
+          "tipo": {
+            "title": "Tipo",
+            "type": "string"
+          },
+          "tipo_documento": {
+            "title": "Tipo Documento",
+            "type": "string"
+          }
+        },
+        "required": [
+          "fila",
+          "id",
+          "accion",
+          "tipo",
+          "nombre",
+          "tipo_documento",
+          "documento",
+          "telefono",
+          "email",
+          "contacto",
+          "fecha_nacimiento",
+          "cambios",
+          "problemas"
+        ],
+        "title": "ClienteRevisadoOut",
         "type": "object"
       },
       "ClienteUpdate": {
@@ -8090,6 +8556,76 @@
         "title": "ImplementacionOut",
         "type": "object"
       },
+      "ImportadaOut": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "nombre"
+        ],
+        "title": "ImportadaOut",
+        "type": "object"
+      },
+      "ImportadoOut": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "nombre"
+        ],
+        "title": "ImportadoOut",
+        "type": "object"
+      },
+      "ImportarArticulosIn": {
+        "properties": {
+          "articulos": {
+            "items": {
+              "$ref": "#/components/schemas/ArticuloImportadoIn"
+            },
+            "title": "Articulos",
+            "type": "array"
+          }
+        },
+        "required": [
+          "articulos"
+        ],
+        "title": "ImportarArticulosIn",
+        "type": "object"
+      },
+      "ImportarClientesIn": {
+        "properties": {
+          "clientes": {
+            "items": {
+              "$ref": "#/components/schemas/ClienteImportadoIn"
+            },
+            "title": "Clientes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "clientes"
+        ],
+        "title": "ImportarClientesIn",
+        "type": "object"
+      },
       "ImportarRecetasIn": {
         "properties": {
           "recetas": {
@@ -8148,6 +8684,55 @@
           "cantidad"
         ],
         "title": "IngredienteImportadoIn",
+        "type": "object"
+      },
+      "IngredienteRevisadoOut": {
+        "properties": {
+          "articulo_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Articulo Id"
+          },
+          "cantidad": {
+            "title": "Cantidad",
+            "type": "string"
+          },
+          "fila": {
+            "title": "Fila",
+            "type": "integer"
+          },
+          "insumo": {
+            "title": "Insumo",
+            "type": "string"
+          },
+          "merma_pct": {
+            "title": "Merma Pct",
+            "type": "string"
+          },
+          "problemas": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Problemas",
+            "type": "array"
+          }
+        },
+        "required": [
+          "fila",
+          "insumo",
+          "articulo_id",
+          "cantidad",
+          "merma_pct",
+          "problemas"
+        ],
+        "title": "IngredienteRevisadoOut",
         "type": "object"
       },
       "ItemColaOut": {
@@ -10699,6 +11284,42 @@
           "created_at"
         ],
         "title": "NotificacionOut",
+        "type": "object"
+      },
+      "OmitidaOut": {
+        "properties": {
+          "motivo": {
+            "title": "Motivo",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          }
+        },
+        "required": [
+          "nombre",
+          "motivo"
+        ],
+        "title": "OmitidaOut",
+        "type": "object"
+      },
+      "OmitidoOut": {
+        "properties": {
+          "motivo": {
+            "title": "Motivo",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          }
+        },
+        "required": [
+          "nombre",
+          "motivo"
+        ],
+        "title": "OmitidoOut",
         "type": "object"
       },
       "OpcionCreate": {
@@ -16470,7 +17091,18 @@
         "type": "object"
       },
       "RecetaImportadaIn": {
+        "description": "Una fila de la hoja «Recetas», ya revisada por la pantalla.\n\n`id` y `accion` no son hechos: son **el permiso que una persona dio**. El\nservidor los vuelve a derivar contra la base antes de escribir (ADR-051).",
         "properties": {
+          "accion": {
+            "default": "crear",
+            "enum": [
+              "crear",
+              "actualizar",
+              "omitir"
+            ],
+            "title": "Accion",
+            "type": "string"
+          },
           "articulo_producido_id": {
             "anyOf": [
               {
@@ -16483,6 +17115,18 @@
             ],
             "title": "Articulo Producido Id"
           },
+          "id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
           "ingredientes": {
             "default": [],
             "items": {
@@ -16490,6 +17134,15 @@
             },
             "title": "Ingredientes",
             "type": "array"
+          },
+          "ingredientes_ausentes": {
+            "default": "conservar",
+            "enum": [
+              "conservar",
+              "quitar"
+            ],
+            "title": "Ingredientes Ausentes",
+            "type": "string"
           },
           "nombre": {
             "maxLength": 150,
@@ -16785,6 +17438,127 @@
           "criterio_ajuste"
         ],
         "title": "RecetaOut",
+        "type": "object"
+      },
+      "RecetaRevisadaOut": {
+        "properties": {
+          "accion": {
+            "title": "Accion",
+            "type": "string"
+          },
+          "articulo_producido_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Articulo Producido Id"
+          },
+          "cambios": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Cambios",
+            "type": "array"
+          },
+          "fila": {
+            "title": "Fila",
+            "type": "integer"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "ingredientes": {
+            "items": {
+              "$ref": "#/components/schemas/IngredienteRevisadoOut"
+            },
+            "title": "Ingredientes",
+            "type": "array"
+          },
+          "ingredientes_ausentes": {
+            "title": "Ingredientes Ausentes",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "problemas": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Problemas",
+            "type": "array"
+          },
+          "produce": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Produce"
+          },
+          "rendimiento": {
+            "title": "Rendimiento",
+            "type": "string"
+          },
+          "se_quitarian": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Se Quitarian",
+            "type": "array"
+          },
+          "unidad": {
+            "title": "Unidad",
+            "type": "string"
+          },
+          "unidad_medida_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unidad Medida Id"
+          }
+        },
+        "required": [
+          "fila",
+          "id",
+          "accion",
+          "ingredientes_ausentes",
+          "nombre",
+          "rendimiento",
+          "unidad",
+          "unidad_medida_id",
+          "produce",
+          "articulo_producido_id",
+          "ingredientes",
+          "cambios",
+          "se_quitarian",
+          "problemas"
+        ],
+        "title": "RecetaRevisadaOut",
         "type": "object"
       },
       "RecetaUpdate": {
@@ -17668,6 +18442,140 @@
         "title": "RespuestaPublicaIn",
         "type": "object"
       },
+      "RevisionArticulosOut": {
+        "properties": {
+          "a_actualizar": {
+            "title": "A Actualizar",
+            "type": "integer"
+          },
+          "articulos": {
+            "items": {
+              "$ref": "#/components/schemas/ArticuloRevisadoOut"
+            },
+            "title": "Articulos",
+            "type": "array"
+          },
+          "categorias_desconocidas": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Categorias Desconocidas",
+            "type": "array"
+          },
+          "con_problema": {
+            "title": "Con Problema",
+            "type": "integer"
+          },
+          "listas": {
+            "title": "Listas",
+            "type": "integer"
+          },
+          "skus_sin_articulo": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Skus Sin Articulo",
+            "type": "array"
+          },
+          "unidades_desconocidas": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unidades Desconocidas",
+            "type": "array"
+          }
+        },
+        "required": [
+          "articulos",
+          "unidades_desconocidas",
+          "categorias_desconocidas",
+          "skus_sin_articulo",
+          "listas",
+          "a_actualizar",
+          "con_problema"
+        ],
+        "title": "RevisionArticulosOut",
+        "type": "object"
+      },
+      "RevisionClientesOut": {
+        "properties": {
+          "a_actualizar": {
+            "title": "A Actualizar",
+            "type": "integer"
+          },
+          "clientes": {
+            "items": {
+              "$ref": "#/components/schemas/ClienteRevisadoOut"
+            },
+            "title": "Clientes",
+            "type": "array"
+          },
+          "con_problema": {
+            "title": "Con Problema",
+            "type": "integer"
+          },
+          "listas": {
+            "title": "Listas",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "clientes",
+          "listas",
+          "a_actualizar",
+          "con_problema"
+        ],
+        "title": "RevisionClientesOut",
+        "type": "object"
+      },
+      "RevisionRecetasOut": {
+        "description": "Lo que devuelve la fase 1. Declarado para que `openapi.json` lo\ndocumente: sin `response_model` salía como `{}` y los tipos del frontend\nno los verificaba nadie.",
+        "properties": {
+          "a_actualizar": {
+            "title": "A Actualizar",
+            "type": "integer"
+          },
+          "con_problema": {
+            "title": "Con Problema",
+            "type": "integer"
+          },
+          "ingredientes_sin_receta": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Ingredientes Sin Receta",
+            "type": "array"
+          },
+          "insumos_desconocidos": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Insumos Desconocidos",
+            "type": "array"
+          },
+          "listas": {
+            "title": "Listas",
+            "type": "integer"
+          },
+          "recetas": {
+            "items": {
+              "$ref": "#/components/schemas/RecetaRevisadaOut"
+            },
+            "title": "Recetas",
+            "type": "array"
+          }
+        },
+        "required": [
+          "recetas",
+          "insumos_desconocidos",
+          "ingredientes_sin_receta",
+          "listas",
+          "a_actualizar",
+          "con_problema"
+        ],
+        "title": "RevisionRecetasOut",
+        "type": "object"
+      },
       "RolCreate": {
         "properties": {
           "descripcion": {
@@ -17792,6 +18700,32 @@
         "title": "SkuDetalleOut",
         "type": "object"
       },
+      "SkuImportadoIn": {
+        "properties": {
+          "codigo": {
+            "maxLength": 50,
+            "minLength": 1,
+            "title": "Codigo",
+            "type": "string"
+          },
+          "codigo_barras": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Codigo Barras"
+          }
+        },
+        "required": [
+          "codigo"
+        ],
+        "title": "SkuImportadoIn",
+        "type": "object"
+      },
       "SkuListadoOut": {
         "description": "El SKU con el nombre de su artículo: un selector que muestre solo el\ncódigo obliga a adivinar qué es cada cosa.",
         "properties": {
@@ -17880,6 +18814,44 @@
           "activo"
         ],
         "title": "SkuOut",
+        "type": "object"
+      },
+      "SkuRevisadoOut": {
+        "properties": {
+          "codigo": {
+            "title": "Codigo",
+            "type": "string"
+          },
+          "codigo_barras": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Codigo Barras"
+          },
+          "fila": {
+            "title": "Fila",
+            "type": "integer"
+          },
+          "problemas": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Problemas",
+            "type": "array"
+          }
+        },
+        "required": [
+          "fila",
+          "codigo",
+          "codigo_barras",
+          "problemas"
+        ],
+        "title": "SkuRevisadoOut",
         "type": "object"
       },
       "SocioCreate": {
@@ -21407,6 +22379,39 @@
         "title": "CajaAbiertaOut",
         "type": "object"
       },
+      "src__modules__inventory__api__schemas__ResultadoImportacionOut": {
+        "description": "El mismo sobre para las tres entidades: crear, actualizar, omitir.",
+        "properties": {
+          "actualizadas": {
+            "items": {
+              "$ref": "#/components/schemas/ImportadaOut"
+            },
+            "title": "Actualizadas",
+            "type": "array"
+          },
+          "creadas": {
+            "items": {
+              "$ref": "#/components/schemas/ImportadaOut"
+            },
+            "title": "Creadas",
+            "type": "array"
+          },
+          "omitidas": {
+            "items": {
+              "$ref": "#/components/schemas/OmitidaOut"
+            },
+            "title": "Omitidas",
+            "type": "array"
+          }
+        },
+        "required": [
+          "creadas",
+          "actualizadas",
+          "omitidas"
+        ],
+        "title": "ResultadoImportacionOut",
+        "type": "object"
+      },
       "src__modules__purchases__api__schemas__ComprobanteOut": {
         "properties": {
           "compra_id": {
@@ -21638,6 +22643,39 @@
           "tipo"
         ],
         "title": "MarcaOut",
+        "type": "object"
+      },
+      "src__modules__sales__api__schemas__ResultadoImportacionOut": {
+        "description": "El mismo sobre que usa inventory: crear, actualizar, omitir.",
+        "properties": {
+          "actualizadas": {
+            "items": {
+              "$ref": "#/components/schemas/ImportadoOut"
+            },
+            "title": "Actualizadas",
+            "type": "array"
+          },
+          "creadas": {
+            "items": {
+              "$ref": "#/components/schemas/ImportadoOut"
+            },
+            "title": "Creadas",
+            "type": "array"
+          },
+          "omitidas": {
+            "items": {
+              "$ref": "#/components/schemas/OmitidoOut"
+            },
+            "title": "Omitidas",
+            "type": "array"
+          }
+        },
+        "required": [
+          "creadas",
+          "actualizadas",
+          "omitidas"
+        ],
+        "title": "ResultadoImportacionOut",
         "type": "object"
       },
       "src__modules__users__api__schemas__MarcaOut": {
@@ -25583,6 +26621,150 @@
         ]
       }
     },
+    "/api/v1/inventory/articulos/exportar": {
+      "get": {
+        "description": "El catálogo en la misma plantilla, con los datos adentro (ADR-051).",
+        "operationId": "exportar_articulos_api_v1_inventory_articulos_exportar_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Exportar Articulos",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/articulos/importar": {
+      "post": {
+        "description": "Crea y actualiza lo que la pantalla confirmó, revalidando todo.",
+        "operationId": "importar_articulos_api_v1_inventory_articulos_importar_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportarArticulosIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/src__modules__inventory__api__schemas__ResultadoImportacionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Importar Articulos",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/articulos/importar/validar": {
+      "post": {
+        "description": "Dice qué entra, qué actualiza y qué no. **No guarda nada.**",
+        "operationId": "validar_importacion_articulos_api_v1_inventory_articulos_importar_validar_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_validar_importacion_articulos_api_v1_inventory_articulos_importar_validar_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevisionArticulosOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Validar Importacion Articulos",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/articulos/plantilla": {
+      "get": {
+        "description": "La hoja que se llena para cargar el catálogo de golpe (RN-INV-023).",
+        "operationId": "descargar_plantilla_articulos_api_v1_inventory_articulos_plantilla_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Descargar Plantilla Articulos",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
     "/api/v1/inventory/articulos/{articulo_id}": {
       "get": {
         "operationId": "obtener_articulo_api_v1_inventory_articulos__articulo_id__get",
@@ -27290,6 +28472,31 @@
         ]
       }
     },
+    "/api/v1/inventory/recetas/exportar": {
+      "get": {
+        "description": "El recetario en la misma plantilla, con los datos adentro (ADR-051).\n\nPide permiso de **lectura**: son los mismos datos que devuelve el listado,\nsolo empaquetados en un archivo.",
+        "operationId": "exportar_recetas_api_v1_inventory_recetas_exportar_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Exportar Recetas",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
     "/api/v1/inventory/recetas/importar": {
       "post": {
         "description": "Crea lo que la pantalla confirmó, revalidando todo: lo que llega es un\nJSON que el cliente pudo editar.",
@@ -27308,7 +28515,9 @@
           "201": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/src__modules__inventory__api__schemas__ResultadoImportacionOut"
+                }
               }
             },
             "description": "Successful Response"
@@ -27337,7 +28546,7 @@
     },
     "/api/v1/inventory/recetas/importar/validar": {
       "post": {
-        "description": "Dice qué entra y qué no. **No guarda nada** — la pantalla resuelve los\ninsumos que el catálogo no reconoce y recién ahí se importa.",
+        "description": "Dice qué entra, qué actualiza y qué no. **No guarda nada** — la pantalla\nresuelve los insumos que el catálogo no reconoce y recién ahí se importa.",
         "operationId": "validar_importacion_recetas_api_v1_inventory_recetas_importar_validar_post",
         "requestBody": {
           "content": {
@@ -27353,7 +28562,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/RevisionRecetasOut"
+                }
               }
             },
             "description": "Successful Response"
@@ -38017,6 +39228,125 @@
         ]
       }
     },
+    "/api/v1/sales/clientes/exportar": {
+      "get": {
+        "description": "El padrón en la misma plantilla, con los datos adentro (ADR-051).\n\nPide permiso de **lectura**: son los mismos datos que devuelve el listado\nde back-office, solo empaquetados en un archivo.",
+        "operationId": "exportar_clientes_api_v1_sales_clientes_exportar_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Exportar Clientes",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/clientes/importar": {
+      "post": {
+        "description": "Crea y actualiza lo que la pantalla confirmó, revalidando todo.",
+        "operationId": "importar_clientes_api_v1_sales_clientes_importar_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportarClientesIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/src__modules__sales__api__schemas__ResultadoImportacionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Importar Clientes",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/clientes/importar/validar": {
+      "post": {
+        "description": "Dice qué entra, qué actualiza y qué no. **No guarda nada.**",
+        "operationId": "validar_importacion_clientes_api_v1_sales_clientes_importar_validar_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_validar_importacion_clientes_api_v1_sales_clientes_importar_validar_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevisionClientesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Validar Importacion Clientes",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
     "/api/v1/sales/clientes/listado": {
       "get": {
         "description": "El padrón de clientes del grupo, para la pantalla de back-office.\n\nEndpoint propio y no `GET /clientes`: ese es el contrato público de\nanálisis (`sales.leer_clientes_externos`, `grupo_id` por query), pensado\npara que marketing lea desde afuera. Pedirle a quien administra el padrón\nde su propio grupo el permiso de lectura externa sería abrirle de paso\nlos clientes que no le tocan.\n\nTampoco es `/clientes/buscar`: aquella corta en 20 y exige `q` porque en\ncaja se busca a alguien concreto; acá se recorre el padrón entero.",
@@ -38094,6 +39424,31 @@
           }
         ],
         "summary": "Listar Clientes Backoffice",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/clientes/plantilla": {
+      "get": {
+        "description": "La hoja que se llena para cargar el padrón de golpe (RN-PTS-007).",
+        "operationId": "descargar_plantilla_clientes_api_v1_sales_clientes_plantilla_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Descargar Plantilla Clientes",
         "tags": [
           "sales"
         ]

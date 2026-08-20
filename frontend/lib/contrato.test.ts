@@ -67,6 +67,7 @@ registerHooks({
 
 const { api } = await import("./pdv.ts");
 const { catalogoApi } = await import("./catalogo.ts");
+const { clientesApi } = await import("./clientes.ts");
 const { apiKds } = await import("./kds.ts");
 const reportes = await import("./reportes.ts");
 
@@ -371,6 +372,9 @@ const CATALOGO: Caso[] = [
     catalogoApi.importarRecetas([
       {
         fila: 2,
+        id: null,
+        accion: "crear",
+        ingredientes_ausentes: "conservar",
         nombre: "Salsa Base",
         rendimiento: "1",
         unidad: "Unidad",
@@ -378,6 +382,38 @@ const CATALOGO: Caso[] = [
         produce: null,
         articulo_producido_id: null,
         ingredientes: [],
+        cambios: [],
+        se_quitarian: [],
+        problemas: [],
+      },
+    ]),
+  ),
+  caso("categorias", () => catalogoApi.categorias()),
+  caso("crearCategoria", () => catalogoApi.crearCategoria({ nombre: "Abarrotes" })),
+  caso("validarImportacionArticulos", () =>
+    catalogoApi.validarImportacionArticulos(
+      new File([new Uint8Array([0x50, 0x4b])], "articulos.xlsx"),
+    ),
+  ),
+  caso("importarArticulos", () =>
+    catalogoApi.importarArticulos([
+      {
+        fila: 2,
+        id: null,
+        accion: "crear",
+        codigo: "TOMA",
+        nombre: "Tomate",
+        tipo: "insumo",
+        unidad: "Gramo",
+        unidad_medida_id: UUID,
+        categoria: "",
+        categoria_id: null,
+        costo_promedio: "0.01",
+        controla_lote: false,
+        dias_alerta_vencimiento: null,
+        archivado: false,
+        skus: [],
+        cambios: [],
         problemas: [],
       },
     ]),
@@ -476,12 +512,41 @@ const REPORTES: Caso[] = [
   caso("borrarTablero", () => reportes.borrarTablero(UUID)),
 ];
 
+
+const CLIENTES: Caso[] = [
+  caso("validarImportacion", () =>
+    clientesApi.validarImportacion(
+      new File([new Uint8Array([0x50, 0x4b])], "clientes.xlsx"),
+    ),
+  ),
+  caso("importarClientes", () =>
+    clientesApi.importarClientes([
+      {
+        fila: 2,
+        id: null,
+        accion: "crear",
+        tipo: "natural",
+        nombre: "Ana Quispe",
+        tipo_documento: "dni",
+        documento: "40404040",
+        telefono: "987654321",
+        email: "",
+        contacto: "Jr. Lima 100",
+        fecha_nacimiento: null,
+        cambios: [],
+        problemas: [],
+      },
+    ]),
+  ),
+];
+
 /** Con `superficie` el test compara la lista contra el objeto real del
  * módulo; sin ella (reportes) la lista es la fuente. */
 const MODULOS: { nombre: string; casos: Caso[]; superficie?: object }[] = [
   { nombre: "pdv", casos: PDV, superficie: api },
   { nombre: "catalogo", casos: CATALOGO, superficie: catalogoApi },
   { nombre: "kds", casos: KDS, superficie: apiKds },
+  { nombre: "clientes", casos: CLIENTES, superficie: clientesApi },
   { nombre: "reportes", casos: REPORTES },
 ];
 

@@ -941,3 +941,218 @@ def test_un_archivo_que_no_es_xlsx_lo_dice(env):
     r = _validar(client, h, b"esto no es un excel")
     assert r.status_code == 409  # ReglaNegocio, no un 500 sin explicación
     assert "plantilla" in r.json()["detail"]
+
+
+# --- Exportar y actualizar (ADR-051) -------------------------------------------
+def _libro_con_id(recetas: list[list], ingredientes: list[list]) -> bytes:
+    """Como `_libro`, pero con la columna `ID` que escribe el export."""
+    from openpyxl import Workbook
+
+    libro = Workbook()
+    hoja = libro.active
+    hoja.title = "Recetas"
+    hoja.append(["ID", "Receta", "Rendimiento", "Unidad", "Produce el artículo"])
+    for fila in recetas:
+        hoja.append(fila)
+    otra = libro.create_sheet("Ingredientes")
+    otra.append(["Receta", "Insumo", "Cantidad", "Merma %"])
+    for fila in ingredientes:
+        otra.append(fila)
+    buffer = io.BytesIO()
+    libro.save(buffer)
+    return buffer.getvalue()
+
+
+def _importar_limpio(client, h, contenido) -> dict:
+    revision = _validar(client, h, contenido).json()
+    assert revision["con_problema"] == 0, revision["recetas"]
+    r = client.post("/api/v1/inventory/recetas/importar", headers=h,
+                    json={"recetas": revision["recetas"]})
+    assert r.status_code == 201, r.text
+    return r.json()
+
+
+def test_el_export_baja_y_se_vuelve_a_subir_sin_crear_nada(env):
+    """El round-trip nulo: es la única prueba que verifica que el export y el
+    importador hablan el mismo idioma. Sin ella el resto pasa con un formato
+    que después nadie puede reimportar."""
+    client, _ = env
+    h = _token(client)
+    _importar_limpio(client, h, _libro(
+        [["Salsa Base", 1, "Unidad", ""]],
+        [["Salsa Base", "Queso Mozzarella", "450/3", 3]],
+    ))
+    antes = client.get("/api/v1/inventory/recetas", headers=h).json()
+
+    r = client.get("/api/v1/inventory/recetas/exportar", headers=h)
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith(XLSX_MIME)
+
+    resultado = _importar_limpio(client, h, r.content)
+    assert resultado["creadas"] == []
+    assert [a["nombre"] for a in resultado["actualizadas"]] == ["Salsa Base"]
+    assert client.get("/api/v1/inventory/recetas", headers=h).json() == antes
+
+
+def test_la_expresion_tecleada_sobrevive_el_export(env):
+    """Exportar `150` donde alguien escribió `450/3` perdería justo lo que
+    RN-COM-024 existe para conservar."""
+    client, _ = env
+    h = _token(client)
+    _importar_limpio(client, h, _libro(
+        [["Salsa Base", 1, "Unidad", ""]],
+        [["Salsa Base", "Queso Mozzarella", "450/3", 0]],
+    ))
+    from openpyxl import load_workbook
+
+    libro = load_workbook(io.BytesIO(
+        client.get("/api/v1/inventory/recetas/exportar", headers=h).content))
+    filas = list(libro["Ingredientes"].iter_rows(min_row=2, values_only=True))
+    assert filas[0][2] == "450/3"
+    # Y el rendimiento sale sin ceros de relleno: "1", no "1.0000".
+    cabeceras = list(libro["Recetas"].iter_rows(min_row=2, values_only=True))
+    assert cabeceras[0][2] == "1"
+
+
+def test_el_id_actualiza_la_receta_en_vez_de_duplicarla(env):
+    """Sin la columna `ID`, renombrar y duplicar son indistinguibles: el
+    nombre es justamente lo que alguien puede querer cambiar (ADR-051)."""
+    client, ids = env
+    h = _token(client)
+    receta_id = _receta(client, h, ids, nombre="Salsa Base")
+
+    resultado = _importar_limpio(client, h, _libro_con_id(
+        [[receta_id, "Salsa Madre", 2, "Unidad", ""]],
+        [["Salsa Madre", "Queso Mozzarella", 5, 0]],
+    ))
+    assert resultado["creadas"] == []
+    assert [a["id"] for a in resultado["actualizadas"]] == [receta_id]
+
+    detalle = client.get(f"/api/v1/inventory/recetas/{receta_id}", headers=h).json()
+    assert detalle["nombre"] == "Salsa Madre"
+    assert Decimal(detalle["rendimiento_cantidad"]) == Decimal("2")
+    assert [i["articulo_nombre"] for i in detalle["items"]] == ["Queso Mozzarella"]
+
+
+def test_la_revision_dice_que_va_a_cambiar_antes_de_confirmar(env):
+    client, ids = env
+    h = _token(client)
+    receta_id = _receta(client, h, ids, nombre="Salsa Base")
+
+    revision = _validar(client, h, _libro_con_id(
+        [[receta_id, "Salsa Madre", 3, "Unidad", ""]],
+        [["Salsa Madre", "Queso Mozzarella", 5, 0]],
+    )).json()
+    fila = revision["recetas"][0]
+    assert fila["accion"] == "actualizar"
+    assert revision["a_actualizar"] == 1 and revision["listas"] == 0
+    assert "nombre: Salsa Base → Salsa Madre" in fila["cambios"]
+    assert any("rendimiento" in c for c in fila["cambios"])
+
+
+def test_los_ingredientes_ausentes_se_conservan_salvo_que_se_pidan_quitar(env):
+    """La decisión es por receta y con el número a la vista: subir una hoja
+    parcial por error no puede vaciar una receta (ADR-051)."""
+    client, ids = env
+    h = _token(client)
+    creadas = _importar_limpio(client, h, _libro(
+        [["Salsa Base", 1, "Unidad", ""]],
+        [["Salsa Base", "Queso Mozzarella", 5, 0],
+         ["Salsa Base", "Bollo de Masa", 2, 0]],
+    ))["creadas"]
+    receta_id = creadas[0]["id"]
+
+    # El archivo solo nombra uno de los dos insumos.
+    parcial = _libro_con_id(
+        [[receta_id, "Salsa Base", 1, "Unidad", ""]],
+        [["Salsa Base", "Queso Mozzarella", 9, 0]],
+    )
+    revision = _validar(client, h, parcial).json()
+    fila = revision["recetas"][0]
+    assert fila["ingredientes_ausentes"] == "conservar", "el defecto no borra"
+    assert fila["se_quitarian"] == ["Bollo de Masa"]
+
+    client.post("/api/v1/inventory/recetas/importar", headers=h,
+                json={"recetas": revision["recetas"]})
+    detalle = client.get(f"/api/v1/inventory/recetas/{receta_id}", headers=h).json()
+    assert sorted(i["articulo_nombre"] for i in detalle["items"]) == [
+        "Bollo de Masa", "Queso Mozzarella"]
+    # Y la línea que sí venía en el archivo se actualizó.
+    queso = next(
+        i for i in detalle["items"] if i["articulo_nombre"] == "Queso Mozzarella"
+    )
+    assert Decimal(queso["cantidad"]) == Decimal("9")
+
+    # Ahora la persona pide quitarlas, para esta receta.
+    fila["ingredientes_ausentes"] = "quitar"
+    client.post("/api/v1/inventory/recetas/importar", headers=h,
+                json={"recetas": [fila]})
+    detalle = client.get(f"/api/v1/inventory/recetas/{receta_id}", headers=h).json()
+    assert [i["articulo_nombre"] for i in detalle["items"]] == ["Queso Mozzarella"]
+
+
+def test_el_mismo_id_en_dos_filas_marca_las_dos(env):
+    """Copiar-pegar una fila entera es el accidente esperable, y silenciarlo
+    escribiría dos veces sobre el mismo registro."""
+    client, ids = env
+    h = _token(client)
+    receta_id = _receta(client, h, ids, nombre="Salsa Base")
+    revision = _validar(client, h, _libro_con_id(
+        [[receta_id, "Salsa Una", 1, "Unidad", ""],
+         [receta_id, "Salsa Otra", 1, "Unidad", ""]],
+        [["Salsa Una", "Queso Mozzarella", 5, 0],
+         ["Salsa Otra", "Queso Mozzarella", 5, 0]],
+    )).json()
+    assert all(
+        any("más de una fila" in p for p in r["problemas"])
+        for r in revision["recetas"]
+    )
+
+
+def test_un_id_que_no_es_de_la_empresa_se_omite_sin_tumbar_la_importacion(env):
+    client, _ = env
+    h = _token(client)
+    ajeno = str(uuid.uuid4())
+    revision = _validar(client, h, _libro_con_id(
+        [[ajeno, "Salsa Ajena", 1, "Unidad", ""],
+         ["", "Salsa Propia", 1, "Unidad", ""]],
+        [["Salsa Ajena", "Queso Mozzarella", 5, 0],
+         ["Salsa Propia", "Queso Mozzarella", 5, 0]],
+    )).json()
+    assert any("no corresponde" in p for p in revision["recetas"][0]["problemas"])
+
+    # Se manda igual: el servidor revalida y omite solo esa fila.
+    r = client.post("/api/v1/inventory/recetas/importar", headers=h,
+                    json={"recetas": revision["recetas"]}).json()
+    assert [c["nombre"] for c in r["creadas"]] == ["Salsa Propia"]
+    assert [o["nombre"] for o in r["omitidas"]] == ["Salsa Ajena"]
+
+
+def test_una_receta_marcada_omitir_no_se_toca(env):
+    client, ids = env
+    h = _token(client)
+    receta_id = _receta(client, h, ids, nombre="Salsa Base")
+    revision = _validar(client, h, _libro_con_id(
+        [[receta_id, "Salsa Renombrada", 1, "Unidad", ""]],
+        [["Salsa Renombrada", "Queso Mozzarella", 5, 0]],
+    )).json()
+    revision["recetas"][0]["accion"] = "omitir"
+
+    r = client.post("/api/v1/inventory/recetas/importar", headers=h,
+                    json={"recetas": revision["recetas"]}).json()
+    assert r["creadas"] == [] and r["actualizadas"] == []
+    detalle = client.get(f"/api/v1/inventory/recetas/{receta_id}", headers=h).json()
+    assert detalle["nombre"] == "Salsa Base"
+
+
+def test_una_cantidad_mas_larga_que_la_columna_se_reporta_por_fila(env):
+    """SQLite no aplica el largo de un VARCHAR: sin validarlo en el importador
+    esto pasa en verde y revienta contra Postgres."""
+    client, _ = env
+    h = _token(client)
+    revision = _validar(client, h, _libro(
+        [["Salsa Base", 1, "Unidad", ""]],
+        [["Salsa Base", "Queso Mozzarella", "1+" * 40 + "1", 0]],
+    )).json()
+    linea = revision["recetas"][0]["ingredientes"][0]
+    assert any("caracteres" in p for p in linea["problemas"])

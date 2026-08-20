@@ -511,6 +511,35 @@ ninguna entidad de negocio.
 - `tasks.encolar` es no-op en un hub — la emisión a SUNAT es siempre de la
   nube, después del sync.
 
+## Estado (slice — planilla del padrón, 2026-08-20)
+
+El padrón de clientes se baja, se edita en Excel y se vuelve a subir
+(RN-PTS-007, ADR-051). Endpoints: `GET /sales/clientes/plantilla`,
+`GET /sales/clientes/exportar`, `POST /sales/clientes/importar/validar`
+(multipart) y `POST /sales/clientes/importar`.
+
+| Hoja | Columnas |
+|---|---|
+| `Clientes` | `ID` · `Tipo` (solo salida) · `Nombre / Razón social` · `Tipo de documento` · `Número de documento` · `Teléfono` · `Email` · `Dirección / contacto` · `Fecha de nacimiento` |
+| `Instrucciones` | texto |
+
+- Identidad: `ID`, o el **número de documento** si el `ID` va vacío.
+- `Tipo` es derivado (RN-PTS-002: lo decide el documento). Se exporta para que
+  se lea; al importar se ignora.
+- Una sola columna `Dirección / contacto`: en un jurídico es `cliente.contacto`
+  y en un natural el `domicilio` de su `persona` — dos columnas darían un
+  round-trip con pérdida.
+- De un **natural** que ya existe solo se completa el documento. Nombre,
+  teléfono y dirección viven en `persona` (RN-GEN-007) y `sales` no puede
+  escribirla: la fila se reporta con "se corrige en Personas".
+- **No consulta a Factiliza.** `crear_cliente` y `editar_cliente` reciben
+  `consultar_documento=False`: trescientas filas serían trescientas llamadas
+  externas secuenciales dentro de un request, contra una cuota.
+- Permiso propio **`sales.gestionar_clientes`** para plantilla, validar e
+  importar. Exportar pide `sales.leer`, que es lo que ya cuesta ver el listado.
+- El `grupo_id` se deriva de la empresa del token (RN-PTS-001), nunca llega
+  desde el request.
+
 ## Casos de uso
 
 - CRUD de productos comerciales y recetas (separados de artículos inventariables).

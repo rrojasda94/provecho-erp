@@ -262,6 +262,19 @@ de su módulo y se prueban de forma aislada.
   nombre** — lo que recuerde en el momento
   (`GET /sales/clientes/buscar?q=`). Una misma persona es cliente a lo más
   una vez por grupo: registrarla dos veces partiría su historial.
+- **RN-PTS-007** El padrón **se baja, se edita y se vuelve a subir** en el
+  mismo formato, con revisión en el medio (ADR-051). La identidad de una fila
+  es su `ID` o, si va vacío, su **número de documento**. El tipo sigue sin
+  declararse: lo decide el documento (RN-PTS-002). De un cliente **natural**
+  que ya existe la planilla solo puede **completar el documento**: su nombre,
+  su teléfono y su dirección viven en su `persona` (RN-GEN-007) y se corrigen
+  desde ahí — una fila que los cambie se informa con ese enlace, no se aplica
+  a medias. La carga masiva **no consulta a SUNAT ni a RENIEC**: trescientas
+  filas serían trescientas llamadas externas contra una cuota, así que el
+  nombre del archivo manda; cuando el cliente se edita de a uno, SUNAT vuelve
+  a mandar (RN-PTS-004). Administrar el padrón es un permiso propio
+  (`sales.gestionar_clientes`), distinto del que tiene el cajero para
+  registrar a alguien en el mostrador.
 
 ## Grupo empresarial
 
@@ -1071,6 +1084,18 @@ producción se hace en cocinas de sucursal. Ver
   a ese, y despachar desde otro en silencio es lo que el que recibe no puede
   notar hasta contar la mercadería. "No disponible" es estar dado de baja, no
   estar sin stock: el faltante tiene su propio camino (RN-INV-001/002).
+- **RN-INV-023** El catálogo de artículos **se baja, se edita y se vuelve a
+  subir** en el mismo formato, con revisión en el medio (ADR-051). La
+  identidad de una fila es su `ID` o, si va vacío, su **código interno** — el
+  nombre no sirve de clave porque el nombre es justamente lo que se corrige.
+  La **unidad de medida de un artículo que ya existe no se cambia por
+  planilla**: el stock, los movimientos y las recetas ya cargadas están
+  expresados en la unidad actual, así que cambiarla no convierte nada,
+  reinterpreta en silencio todo lo que ya existe; la fila se informa y no
+  entra. Una categoría que el catálogo no reconoce **no frena la fila** —el
+  artículo entra sin categoría— pero se muestra para que alguien la elija o
+  la cree; el importador nunca la crea solo. Una celda vacía significa **no
+  tocar**, no vaciar.
 - **RN-INV-015** Un ajuste es válido, sin generar alarma, solo si está
   dentro de un margen de error definido por las áreas de almacén y
   contabilidad; fuera de ese margen dispara alarma/auditoría. El margen son
@@ -1351,15 +1376,19 @@ producción se hace en cocinas de sucursal. Ver
   sería un segundo lugar donde puede estar mal. La categoría por la que se
   filtra es la del artículo que la receta produce, así que solo alcanza a
   las subrecetas.
-- **RN-COM-031** El recetario **se puede cargar de golpe** desde una hoja de
-  cálculo, y la carga es en **dos pasos con revisión en el medio**: primero
-  se dice qué entra y qué no **sin guardar nada**, y recién después de que
-  alguien lo mira se importa. Un insumo que el catálogo no reconoce no
-  cancela la carga: se elige cuál es, se crea, o se omite esa línea **a la
-  vista** — nunca en silencio. Una receta que no entra (nombre repetido,
-  unidad inexistente) se informa y **no arrastra a las demás**. Lo que la
-  pantalla devuelve se revalida en el servidor: es un dato que el cliente
-  pudo editar.
+- **RN-COM-031** El recetario **se baja, se edita y se vuelve a subir**, y la
+  carga es en **dos pasos con revisión en el medio**: primero se dice qué
+  entra y qué no **sin guardar nada**, y recién después de que alguien lo
+  mira se importa. Un insumo que el catálogo no reconoce no cancela la carga:
+  se elige cuál es, **se crea desde el mismo diálogo**, o se omite esa línea
+  **a la vista** — nunca en silencio, y nunca creado solo por el importador
+  (ADR-046). Una fila con la columna `ID` llena **actualiza** esa receta en
+  vez de crear otra; una sin `ID` cuyo nombre ya existe se informa y **no
+  arrastra a las demás**. Al actualizar, los ingredientes que el archivo no
+  menciona **se conservan** salvo que se pida quitarlos **receta por receta**,
+  viendo antes cuántas líneas se pierden: subir una hoja parcial por error no
+  puede vaciar una receta (ADR-051). Lo que la pantalla devuelve se revalida
+  en el servidor: es un dato que el cliente pudo editar.
 
 ## Cumplimiento de pedido
 

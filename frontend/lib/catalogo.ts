@@ -68,6 +68,12 @@ export type IngredienteRevisado = {
 
 export type RecetaRevisada = {
   fila: number;
+  /** El id que trajo la columna `ID` del archivo. `null` = alta (ADR-051). */
+  id: string | null;
+  accion: "crear" | "actualizar" | "omitir";
+  /** Qué hacer con los ingredientes que el archivo no menciona. Se decide
+   * receta por receta y el defecto no borra nada. */
+  ingredientes_ausentes: "conservar" | "quitar";
   nombre: string;
   rendimiento: string;
   unidad: string;
@@ -75,10 +81,61 @@ export type RecetaRevisada = {
   produce: string | null;
   articulo_producido_id: string | null;
   ingredientes: IngredienteRevisado[];
+  /** Solo para pintar: el servidor recalcula todo antes de escribir. */
+  cambios: string[];
+  /** Los ingredientes que se perderían si esta receta se marca `quitar`. */
+  se_quitarian: string[];
   problemas: string[];
 };
 
 export type OmitidaImport = { nombre: string; motivo: string };
+
+export type ResultadoImportacion = {
+  creadas: { id: string; nombre: string }[];
+  actualizadas: { id: string; nombre: string }[];
+  omitidas: OmitidaImport[];
+};
+
+// --- Carga masiva de artículos (RN-INV-023) ---
+export type SkuRevisado = {
+  fila: number;
+  codigo: string;
+  codigo_barras: string | null;
+  problemas: string[];
+};
+
+export type ArticuloRevisado = {
+  fila: number;
+  /** El id que trajo la columna `ID`, o el que resolvió el código. */
+  id: string | null;
+  accion: "crear" | "actualizar" | "omitir";
+  codigo: string;
+  nombre: string;
+  tipo: string;
+  unidad: string;
+  unidad_medida_id: string | null;
+  categoria: string;
+  /** `null` con `categoria` lleno = la pantalla tiene que resolverlo. */
+  categoria_id: string | null;
+  costo_promedio: string;
+  controla_lote: boolean;
+  dias_alerta_vencimiento: number | null;
+  archivado: boolean;
+  skus: SkuRevisado[];
+  cambios: string[];
+  problemas: string[];
+};
+
+export type RevisionArticulos = {
+  articulos: ArticuloRevisado[];
+  unidades_desconocidas: string[];
+  categorias_desconocidas: string[];
+  /** SKUs que nombran un artículo que la otra hoja no declara. */
+  skus_sin_articulo: string[];
+  listas: number;
+  a_actualizar: number;
+  con_problema: number;
+};
 
 export type RevisionImportacion = {
   recetas: RecetaRevisada[];
@@ -87,6 +144,7 @@ export type RevisionImportacion = {
    * error de tipeo más común del formato. */
   ingredientes_sin_receta: string[];
   listas: number;
+  a_actualizar: number;
   con_problema: number;
 };
 
@@ -152,6 +210,17 @@ export type ProductoDetalle = Producto & {
 export const RUTA_PLANTILLA_RECETAS =
   "/api/proxy/api/v1/inventory/recetas/plantilla";
 
+/** El mismo libro que la plantilla, con el recetario adentro: se baja, se
+ * edita en Excel y se vuelve a subir (ADR-051). */
+export const RUTA_EXPORTAR_RECETAS =
+  "/api/proxy/api/v1/inventory/recetas/exportar";
+
+export const RUTA_PLANTILLA_ARTICULOS =
+  "/api/proxy/api/v1/inventory/articulos/plantilla";
+
+export const RUTA_EXPORTAR_ARTICULOS =
+  "/api/proxy/api/v1/inventory/articulos/exportar";
+
 // --- Operaciones ------------------------------------------------------------
 export const catalogoApi = {
   unidadesMedida: () => pedir<UnidadMedida[]>("/inventory/unidades-medida"),
@@ -175,29 +244,64 @@ export const catalogoApi = {
     subir<RevisionImportacion>("/inventory/recetas/importar/validar", archivo),
 
   /** Manda **solo lo que el contrato declara**: la revisión trae además
-   * `fila`, `unidad`, `produce` y `problemas`, que son para mostrar en
-   * pantalla y no significan nada del otro lado. */
+   * `fila`, `unidad`, `produce`, `cambios` y `problemas`, que son para
+   * mostrar en pantalla y no significan nada del otro lado. */
   importarRecetas: (recetas: RecetaRevisada[]) =>
-    pedir<{ creadas: { id: string; nombre: string }[]; omitidas: OmitidaImport[] }>(
-      "/inventory/recetas/importar",
-      {
-        metodo: "POST",
-        cuerpo: {
-          recetas: recetas.map((r) => ({
-            nombre: r.nombre,
-            rendimiento: r.rendimiento,
-            unidad_medida_id: r.unidad_medida_id,
-            articulo_producido_id: r.articulo_producido_id,
-            ingredientes: r.ingredientes.map((i) => ({
-              insumo: i.insumo,
-              articulo_id: i.articulo_id,
-              cantidad: i.cantidad,
-              merma_pct: i.merma_pct,
-            })),
+    pedir<ResultadoImportacion>("/inventory/recetas/importar", {
+      metodo: "POST",
+      cuerpo: {
+        recetas: recetas.map((r) => ({
+          id: r.id,
+          accion: r.accion,
+          ingredientes_ausentes: r.ingredientes_ausentes,
+          nombre: r.nombre,
+          rendimiento: r.rendimiento,
+          unidad_medida_id: r.unidad_medida_id,
+          articulo_producido_id: r.articulo_producido_id,
+          ingredientes: r.ingredientes.map((i) => ({
+            insumo: i.insumo,
+            articulo_id: i.articulo_id,
+            cantidad: i.cantidad,
+            merma_pct: i.merma_pct,
           })),
-        },
+        })),
       },
-    ),
+    }),
+
+  categorias: () => pedir<Categoria[]>("/inventory/categorias"),
+
+  /** Alta rápida de una categoría desde el diálogo de importación: el archivo
+   * nombró una que el catálogo no tiene (RN-INV-023). */
+  crearCategoria: (cuerpo: { nombre: string }) =>
+    pedir<Categoria>("/inventory/categorias", { metodo: "POST", cuerpo }),
+
+  validarImportacionArticulos: (archivo: File) =>
+    subir<RevisionArticulos>("/inventory/articulos/importar/validar", archivo),
+
+  /** Manda **solo lo que el contrato declara**: la revisión trae además
+   * `fila`, `unidad`, `categoria` y `problemas`, que son para la pantalla. */
+  importarArticulos: (articulos: ArticuloRevisado[]) =>
+    pedir<ResultadoImportacion>("/inventory/articulos/importar", {
+      metodo: "POST",
+      cuerpo: {
+        articulos: articulos.map((a) => ({
+          id: a.id,
+          accion: a.accion,
+          codigo: a.codigo,
+          nombre: a.nombre,
+          tipo: a.tipo,
+          unidad_medida_id: a.unidad_medida_id,
+          categoria_id: a.categoria_id,
+          costo_promedio: a.costo_promedio,
+          controla_lote: a.controla_lote,
+          dias_alerta_vencimiento: a.dias_alerta_vencimiento,
+          archivado: a.archivado,
+          skus: a.skus
+            .filter((s) => !s.problemas.length)
+            .map((s) => ({ codigo: s.codigo, codigo_barras: s.codigo_barras })),
+        })),
+      },
+    }),
 
   marcas: () => pedir<Marca[]>("/sales/marcas"),
   productos: () => pedir<Producto[]>("/sales/productos"),
