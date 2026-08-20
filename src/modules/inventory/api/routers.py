@@ -14,6 +14,7 @@ from src.modules.inventory.api import schemas
 from src.modules.inventory.application import (
     ajustes,
     catalogo,
+    importacion_articulos,
     importacion_recetas,
     queries_publicas,
 )
@@ -49,12 +50,10 @@ from src.modules.users.api.deps import (
     tiene_permiso,
 )
 from src.modules.users.infrastructure.models import Usuario
+from src.shared import planilla
 from src.shared.paginacion import Pagina, Paginacion, paginacion, paginar
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])
-
-#: MIME de un .xlsx. Sin él el navegador lo baja como binario sin nombre.
-XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 LEER = "inventory.leer"
 CATALOGO = "inventory.gestionar_catalogo"
@@ -73,6 +72,16 @@ RECEPCION = "inventory.recepcion"
 # La guía la emite el área de almacén (RN-GDR-002), no quien despacha ni
 # quien factura: permiso propio.
 EMITIR_GUIA = "inventory.emitir_guia"
+
+
+def _xlsx(contenido: bytes, nombre: str) -> Response:
+    """Una planilla como descarga. El `Content-Disposition` es lo que le da
+    nombre al archivo en el navegador; sin él baja como binario anónimo."""
+    return Response(
+        content=contenido,
+        media_type=planilla.MIME,
+        headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
+    )
 
 
 # --- Categorías -------------------------------------------------------------
@@ -222,6 +231,65 @@ def listar_articulos(
     return paginar(
         session, catalogo.q_articulos(session, tenant.filtro_empresa(empresa_id)), p
     )
+
+
+# Las tres rutas literales van **antes** de `/articulos/{articulo_id}`:
+# FastAPI resuelve por orden y "plantilla" entraría como un id que no es UUID.
+@router.get("/articulos/plantilla")
+def descargar_plantilla_articulos(
+    _: Usuario = Depends(require_permission(CATALOGO)),
+):
+    """La hoja que se llena para cargar el catálogo de golpe (RN-INV-023)."""
+    return _xlsx(importacion_articulos.plantilla(), "plantilla-articulos.xlsx")
+
+
+@router.get("/articulos/exportar")
+def exportar_articulos(
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """El catálogo en la misma plantilla, con los datos adentro (ADR-052)."""
+    return _xlsx(
+        importacion_articulos.exportar(session, empresa_id=tenant.empresa()),
+        "articulos.xlsx",
+    )
+
+
+@router.post("/articulos/importar/validar", response_model=schemas.RevisionArticulosOut)
+async def validar_importacion_articulos(
+    archivo: UploadFile,
+    _: Usuario = Depends(require_permission(CATALOGO)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Dice qué entra, qué actualiza y qué no. **No guarda nada.**"""
+    return importacion_articulos.validar(
+        session,
+        empresa_id=tenant.empresa(),
+        contenido=await archivo.read(),
+    )
+
+
+@router.post(
+    "/articulos/importar",
+    status_code=201,
+    response_model=schemas.ResultadoImportacionOut,
+)
+def importar_articulos(
+    body: schemas.ImportarArticulosIn,
+    _: Usuario = Depends(require_permission(CATALOGO)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Crea y actualiza lo que la pantalla confirmó, revalidando todo."""
+    resultado = importacion_articulos.importar(
+        session,
+        empresa_id=tenant.empresa(),
+        articulos=[a.model_dump() for a in body.articulos],
+    )
+    session.commit()
+    return resultado
 
 
 @router.get("/articulos/{articulo_id}", response_model=schemas.ArticuloOut)
@@ -1192,24 +1260,35 @@ def descargar_plantilla_recetas(
     Declarada **antes** de `/recetas/{receta_id}`: FastAPI resuelve por orden
     y "plantilla" entraría como un `receta_id` que no es UUID.
     """
-    return Response(
-        content=importacion_recetas.plantilla(),
-        media_type=XLSX,
-        headers={
-            "Content-Disposition": 'attachment; filename="plantilla-recetas.xlsx"'
-        },
+    return _xlsx(importacion_recetas.plantilla(), "plantilla-recetas.xlsx")
+
+
+@router.get("/recetas/exportar")
+def exportar_recetas(
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """El recetario en la misma plantilla, con los datos adentro (ADR-052).
+
+    Pide permiso de **lectura**: son los mismos datos que devuelve el listado,
+    solo empaquetados en un archivo.
+    """
+    return _xlsx(
+        importacion_recetas.exportar(session, empresa_id=tenant.empresa()),
+        "recetas.xlsx",
     )
 
 
-@router.post("/recetas/importar/validar")
+@router.post("/recetas/importar/validar", response_model=schemas.RevisionRecetasOut)
 async def validar_importacion_recetas(
     archivo: UploadFile,
     _: Usuario = Depends(require_permission(CATALOGO)),
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    """Dice qué entra y qué no. **No guarda nada** — la pantalla resuelve los
-    insumos que el catálogo no reconoce y recién ahí se importa."""
+    """Dice qué entra, qué actualiza y qué no. **No guarda nada** — la pantalla
+    resuelve los insumos que el catálogo no reconoce y recién ahí se importa."""
     return importacion_recetas.validar(
         session,
         empresa_id=tenant.empresa(),
@@ -1217,7 +1296,11 @@ async def validar_importacion_recetas(
     )
 
 
-@router.post("/recetas/importar", status_code=201)
+@router.post(
+    "/recetas/importar",
+    status_code=201,
+    response_model=schemas.ResultadoImportacionOut,
+)
 def importar_recetas(
     body: schemas.ImportarRecetasIn,
     _: Usuario = Depends(require_permission(CATALOGO)),

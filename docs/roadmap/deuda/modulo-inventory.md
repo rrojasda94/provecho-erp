@@ -332,19 +332,6 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   `frontend/lib/proxy.test.ts` (8 casos, milisegundos) y
   `frontend/uso/importador-recetas.spec.ts`, que descarga la plantilla, la
   abre con openpyxl, la llena, la sube y confirma (ADR-047).
-- ⬜ **El importador no crea el insumo que falta desde el diálogo**
-  (2026-08-13, ADR-046): la pantalla deja **elegir** uno existente u omitir
-  la línea; crear uno nuevo ahí mismo —que era parte de lo pedido— usa
-  `catalogoApi.crearArticulo`, que ya está expuesto, pero necesita el
-  formulario con unidad y tipo dentro del diálogo. Mientras tanto se crea en
-  `/inventario/articulos` y se vuelve a subir el archivo.
-  **Sigue abierto** después del arreglo del proxy: ahora se puede llegar a la
-  pantalla de resolución, que es donde falta el formulario.
-- ⬜ **La importación no actualiza recetas existentes** (2026-08-13): una
-  receta con nombre repetido se omite. Actualizar exige decidir qué pasa con
-  los ingredientes que el archivo no menciona —¿se borran?— y esa es una
-  decisión de negocio, no de código. **Sigue abierto**: el arreglo del proxy
-  no toca ninguna regla del importador.
 - ✅ 2026-08-19 **Requerimiento de la jornada** (ADR-051, RN-INV-023/024,
   migración `b5f27ac41e83`): el local no tenía cómo armar su lista de pedido
   ni el almacén cómo distinguir urgencia de decisión propia, pese a que la
@@ -364,3 +351,44 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
     existe desde ADR-020 y la pantalla nueva solo ofrece aprobar tal cual se
     pidió (`aprobadas: []`). Falta el formulario que deje editar cantidad
     por ítem al aprobar.
+- ✅ 2026-08-20 **El importador crea el insumo que falta desde el diálogo**
+  (ADR-052). El `<select>` de resolución tiene ahora un botón «Crear» con un
+  formulario en línea —código, unidad y tipo, con el nombre prellenado del
+  archivo— contra `catalogoApi.crearArticulo`, que existía desde ADR-046 y
+  cuyo único llamador era `contrato.test.ts`. Lo que dejó al descubierto: el
+  docstring del componente, el del caso de uso, la hoja de instrucciones de la
+  plantilla y **RN-COM-031** afirmaban desde el 2026-08-13 que eso ya se podía
+  hacer. Cuatro textos describiendo una función que no existía; los cuatro
+  corregidos con la entrega. Mismo patrón aplicado a las **categorías** al
+  importar artículos.
+- ✅ 2026-08-20 **La importación actualiza recetas existentes** (ADR-052,
+  RN-COM-031). La decisión de negocio que faltaba —qué pasa con los
+  ingredientes que el archivo no menciona— se cerró así: **se conservan**, y
+  la revisión deja pedir que se quiten **receta por receta**, mostrando cuántas
+  líneas se pierden antes de confirmar. El defecto no borra porque el modo de
+  falla es asimétrico: subir la hoja equivocada no puede vaciar una receta sin
+  que nadie vea el número. La identidad es la columna `ID` que escribe el
+  export, no el nombre — el nombre es justamente lo que se edita.
+- ⬜ **Los SKU solo se crean por planilla, no se editan** (2026-08-20,
+  ADR-052): no existe `editar_sku` en `catalogo.py`, así que un SKU cuyo
+  código ya existe se informa como omitido y no se toca. Tocarlo a medias sería
+  peor que informarlo, pero corregir un código de barras mal tecleado sigue
+  exigiendo la pantalla de a uno. Se cierra agregando `editar_sku` con las
+  mismas reglas de unicidad que `crear_sku`.
+- ⬜ **`articulo.id_interno` son 4 caracteres únicos en TODO el grupo**
+  (2026-08-20): no por empresa —`UniqueConstraint("id_interno")` sin
+  `empresa_id`—, así que un catálogo de trescientos artículos exige trescientos
+  códigos distintos de cuatro caracteres compartidos entre todas las empresas.
+  El importador lo exige y **valida el largo por fila** en vez de
+  autogenerarlo, porque un código inventado termina tecleado en una orden de
+  compra. Ensancharlo es una migración con datos existentes y no entró acá.
+- ⬜ **Los importadores no tienen carril de pruebas contra Postgres**
+  (2026-08-20): `pytest` corre sobre SQLite con `create_all`, y el job
+  `migraciones` corre Alembic contra Postgres pero **no la suite**
+  (`.github/workflows/ci.yml`). SQLite no aplica el largo de un `VARCHAR`, así
+  que una fila con el código demasiado largo pasa en verde y da
+  `StringDataRightTruncation` en producción. La defensa actual es validar el
+  largo **en el importador** y un test que ata la constante a la columna del
+  modelo (`test_importacion_articulos.py`), pero eso cubre las columnas que
+  alguien se acordó de atar. Se cierra corriendo la suite también contra
+  Postgres en CI.

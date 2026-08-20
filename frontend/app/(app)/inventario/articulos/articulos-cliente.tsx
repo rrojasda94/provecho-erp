@@ -1,12 +1,15 @@
 "use client";
 
 import type { ColumnDef } from "@tanstack/react-table";
+import { useRouter } from "next/navigation";
 import { useMemo } from "react";
 
 import { BOTON_FILA, DialogoFormulario } from "@/components/formulario/dialogo-formulario";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
+import { RUTA_EXPORTAR_ARTICULOS } from "@/lib/catalogo";
 
 import { crearArticuloAction, editarArticuloAction } from "./actions";
+import { ImportarArticulos } from "./importar-articulos";
 
 export type Articulo = {
   id: string;
@@ -203,6 +206,9 @@ export function ArticulosCliente({
   categorias: Categoria[];
   unidadesMedida: UnidadMedida[];
 }) {
+  // La pantalla se renderiza en el servidor: tras importar hay que pedirle
+  // los datos de nuevo, no mantener una copia acá.
+  const router = useRouter();
   const nombreCategoria = useMemo(
     () => new Map(categorias.map((c) => [c.id, c.nombre])),
     [categorias],
@@ -262,7 +268,19 @@ export function ArticulosCliente({
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h1 className="font-heading text-xl text-dark">Artículos</h1>
-        <DialogoNuevoArticulo categorias={categorias} unidadesMedida={unidadesMedida} />
+        <div className="flex items-center gap-2">
+          {/* El export se baja con un `<a download>` contra el proxy, que ya
+              pasa bytes y conserva el nombre del archivo (ADR-048). */}
+          <a
+            href={RUTA_EXPORTAR_ARTICULOS}
+            download
+            className="rounded border border-borde px-4 py-2 text-sm font-bold text-dark hover:bg-fondo"
+          >
+            Exportar
+          </a>
+          <ImportarArticulos onImportados={() => router.refresh()} />
+          <DialogoNuevoArticulo categorias={categorias} unidadesMedida={unidadesMedida} />
+        </div>
       </div>
       <TablaDatos columnas={columnas} datos={articulos} placeholderBusqueda="Buscar artículo..." />
     </div>

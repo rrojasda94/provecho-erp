@@ -76,6 +76,9 @@ test("el recetario se descarga, se llena y se carga de golpe", async ({ page }, 
   const plantilla = await leerPlanilla(bajada);
   expect(plantilla.hojas).toEqual(["Recetas", "Ingredientes", "Instrucciones"]);
   expect(plantilla.primeraFila).toEqual([
+    // La columna `ID` va primera y vacía en la plantilla: llena significa
+    // «actualiza esta receta» (ADR-052).
+    "ID",
     "Receta",
     "Rendimiento",
     "Unidad",
@@ -86,8 +89,8 @@ test("el recetario se descarga, se llena y se carga de golpe", async ({ page }, 
   const llenada = testInfo.outputPath("recetario-lleno.xlsx");
   await escribirPlanilla(llenada, {
     Recetas: [
-      ["Receta", "Rendimiento", "Unidad", "Produce el artículo"],
-      [RECETA, 2, "Kilo", ""],
+      ["ID", "Receta", "Rendimiento", "Unidad", "Produce el artículo"],
+      ["", RECETA, 2, "Kilo", ""],
     ],
     Ingredientes: [
       ["Receta", "Insumo", "Cantidad", "Merma %"],
@@ -100,14 +103,14 @@ test("el recetario se descarga, se llena y se carga de golpe", async ({ page }, 
 
   await dialogo(page).locator('input[type="file"]').setInputFiles(llenada);
 
-  await expect(dialogo(page).getByText(/lista\(s\) para importar/)).toBeVisible();
+  await expect(dialogo(page).getByText(/nueva\(s\)/)).toBeVisible();
   await expect(dialogo(page).getByText(DESCONOCIDO)).toBeVisible();
   await capturar(page, testInfo, "revision");
 
   await dialogo(page).locator("select").selectOption({ label: RESUELTO_A });
-  await dialogo(page).getByRole("button", { name: /^Importar \d+ receta/ }).click();
+  await dialogo(page).getByRole("button", { name: /^Importar \d+ fila/ }).click();
 
-  await expect(dialogo(page).getByText(/1 receta\(s\) importada\(s\)/)).toBeVisible();
+  await expect(dialogo(page).getByText(/1 importada\(s\)/)).toBeVisible();
   await capturar(page, testInfo, "importada");
 
   // --- El listado -----------------------------------------------------------

@@ -3,6 +3,23 @@
 Parte del backlog de deuda técnica del proyecto. El índice y las reglas
 de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 
+- ⬜ **Un cliente natural no se actualiza por planilla** (2026-08-20,
+  ADR-052, RN-PTS-007): de uno que ya existe la carga masiva solo puede
+  **completar el documento**. Su nombre, teléfono y domicilio viven en
+  `persona` (RN-GEN-007) y `sales` no puede escribirla — el contrato público
+  de `users` (`queries_publicas`) es de solo lectura. La fila que los cambie se
+  reporta con "se corrige en Personas" y no se aplica a medias, que es lo
+  correcto hoy; lo que falta es poder corregirlos de golpe. Se cierra con un
+  contrato público de **escritura** en `users`, que es un patrón nuevo y no
+  debía inventarse dentro de la carga masiva.
+- ⬜ **La carga masiva de clientes no consulta a SUNAT ni a RENIEC**
+  (2026-08-20, ADR-052): `consultar_documento=False` a propósito — trescientas
+  filas serían trescientas llamadas externas secuenciales dentro de un request,
+  contra una cuota. Consecuencia asumida: una razón social mal tecleada en la
+  planilla entra tal cual, y solo se corrige editando el cliente de a uno. Se
+  cierra encolando la consulta después del commit (una tarea por lote), no
+  dentro del request.
+
 - ✅ 2026-08-12 **La orden enviada sigue viva** (ADR-043, RN-COM-029):
   admite líneas nuevas sin firma de nadie, y quitarlas es gratis dentro de
   los 5 minutos. Antes agregar era imposible y quitar exigía siempre el PIN

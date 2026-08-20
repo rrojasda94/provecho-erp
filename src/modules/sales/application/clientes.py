@@ -89,10 +89,17 @@ def crear_cliente(
     direccion: str | None = None,
     fecha_nacimiento: date | None = None,
     tipo_documento: str = "dni",
+    consultar_documento: bool = True,
 ) -> Cliente:
     """RUC de 11 dígitos crea un cliente jurídico; el resto, uno natural con
     su `persona`. El tipo NO se pide al cajero: lo decide el documento,
     igual que el tipo de comprobante (RN-CPP-003).
+
+    `consultar_documento=False` salta la consulta a SUNAT/RENIEC y usa el
+    nombre tal cual viene. Lo usa la carga masiva (ADR-052): una planilla de
+    trescientos clientes serían trescientas llamadas externas secuenciales
+    dentro de un solo request, contra una cuota. Cuando el cliente se edita de
+    a uno, SUNAT vuelve a mandar.
     """
     nombre = (nombre or "").strip()
     telefono = (telefono or "").strip() or None
@@ -104,7 +111,15 @@ def crear_cliente(
 
     repo = ClienteRepo(session)
     if numero_documento and len(numero_documento) == rules.LARGO_RUC:
-        return _crear_juridico(repo, grupo_id, nombre, numero_documento, direccion, telefono)
+        return _crear_juridico(
+            repo,
+            grupo_id,
+            nombre,
+            numero_documento,
+            direccion,
+            telefono,
+            consultar_documento,
+        )
 
     # Natural: el teléfono sustituye al documento como forma de encontrarlo
     # después. Sin ninguno de los dos el registro no sirve para nada.
@@ -118,7 +133,11 @@ def crear_cliente(
     persona = _persona_por_documento(session, numero_documento) if numero_documento else None
     if persona is None:
         nombres, apellidos = _partir_nombre(nombre)
-        if numero_documento and len(numero_documento) == rules.LARGO_DNI:
+        if (
+            consultar_documento
+            and numero_documento
+            and len(numero_documento) == rules.LARGO_DNI
+        ):
             nombres, apellidos = nombres_desde_dni(numero_documento, nombres, apellidos)
         persona = Persona(
             nombres=nombres,
@@ -157,11 +176,13 @@ def _crear_juridico(
     ruc: str,
     direccion: str | None,
     telefono: str | None,
+    consultar_documento: bool = True,
 ) -> Cliente:
     existente = repo.por_ruc(grupo_id, ruc)
     if existente is not None:
         raise Conflicto(f"ya existe un cliente con RUC {ruc}")
-    razon_social = razon_social_desde_ruc(ruc, razon_social)
+    if consultar_documento:
+        razon_social = razon_social_desde_ruc(ruc, razon_social)
     return repo.add(
         Cliente(
             grupo_id=grupo_id,
@@ -214,7 +235,13 @@ def actualizar_documento(
     return cliente
 
 
-def editar_cliente(session: Session, cliente_id: uuid.UUID, **campos) -> Cliente:
+def editar_cliente(
+    session: Session,
+    cliente_id: uuid.UUID,
+    *,
+    consultar_documento: bool = True,
+    **campos,
+) -> Cliente:
     """Corrige un cliente **jurídico**. Campo `None` = no tocar.
 
     Solo jurídico porque es lo único que `cliente` guarda por su cuenta: en
@@ -250,8 +277,9 @@ def editar_cliente(session: Session, cliente_id: uuid.UUID, **campos) -> Cliente
         cliente.razon_social = razon_social
     if campos.get("contacto") is not None:
         cliente.contacto = campos["contacto"].strip() or None
-    # Mismo criterio que el alta: SUNAT manda sobre lo tecleado.
-    if ruc or razon_social:
+    # Mismo criterio que el alta: SUNAT manda sobre lo tecleado — salvo en la
+    # carga masiva, que no puede consultar una vez por fila (ADR-052).
+    if consultar_documento and (ruc or razon_social):
         cliente.razon_social = razon_social_desde_ruc(cliente.ruc, cliente.razon_social)
     return cliente
 

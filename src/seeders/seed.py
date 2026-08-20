@@ -101,6 +101,11 @@ PERMISOS = [
         "Autorizar la comida del personal, sin precio ni cobro (RN-COM-025)",
     ),
     ("sales.gestionar_mesas", "Configurar las mesas del salón de una sucursal"),
+    (
+        "sales.gestionar_clientes",
+        "Administrar el padrón de clientes del grupo, incluida la carga masiva "
+        "por planilla (RN-PTS-007) — distinto de registrar a alguien en caja",
+    ),
     ("kds.configurar", "Crear y configurar pantallas KDS"),
     ("kds.operar", "Operar KDS: cola, avance de ítems, comanda"),
     (
@@ -313,6 +318,9 @@ ROLES = {
         # encargado del turno, no quien la va a comer (RN-COM-025).
         "sales.registrar_consumo_personal",
         "sales.gestionar_mesas",
+        # Reescribir el padrón del grupo desde una planilla no es el mismo
+        # acto que registrar a alguien en el mostrador (ADR-052).
+        "sales.gestionar_clientes",
         "kds.configurar",
         "kds.operar",
         "inventory.leer",

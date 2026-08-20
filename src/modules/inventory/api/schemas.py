@@ -3,6 +3,7 @@
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -508,6 +509,18 @@ class IngredienteImportadoIn(BaseModel):
 
 
 class RecetaImportadaIn(BaseModel):
+    """Una fila de la hoja «Recetas», ya revisada por la pantalla.
+
+    `id` y `accion` no son hechos: son **el permiso que una persona dio**. El
+    servidor los vuelve a derivar contra la base antes de escribir (ADR-052).
+    """
+
+    id: uuid.UUID | None = None
+    accion: Literal["crear", "actualizar", "omitir"] = "crear"
+    # Qué hacer con los ingredientes que el archivo no menciona. Por defecto
+    # se conservan: subir una hoja parcial por error no puede vaciar una
+    # receta sin que alguien vea cuántas líneas pierde (ADR-052).
+    ingredientes_ausentes: Literal["conservar", "quitar"] = "conservar"
     nombre: str = Field(min_length=1, max_length=150)
     rendimiento: Decimal = Field(gt=0)
     unidad_medida_id: uuid.UUID
@@ -517,6 +530,131 @@ class RecetaImportadaIn(BaseModel):
 
 class ImportarRecetasIn(BaseModel):
     recetas: list[RecetaImportadaIn]
+
+
+class IngredienteRevisadoOut(BaseModel):
+    fila: int
+    insumo: str
+    articulo_id: uuid.UUID | None
+    cantidad: str
+    merma_pct: str
+    problemas: list[str]
+
+
+class RecetaRevisadaOut(BaseModel):
+    fila: int
+    id: uuid.UUID | None
+    accion: str
+    ingredientes_ausentes: str
+    nombre: str
+    rendimiento: str
+    unidad: str
+    unidad_medida_id: uuid.UUID | None
+    produce: str | None
+    articulo_producido_id: uuid.UUID | None
+    ingredientes: list[IngredienteRevisadoOut]
+    cambios: list[str]
+    se_quitarian: list[str]
+    problemas: list[str]
+
+
+class RevisionRecetasOut(BaseModel):
+    """Lo que devuelve la fase 1. Declarado para que `openapi.json` lo
+    documente: sin `response_model` salía como `{}` y los tipos del frontend
+    no los verificaba nadie."""
+
+    recetas: list[RecetaRevisadaOut]
+    insumos_desconocidos: list[str]
+    ingredientes_sin_receta: list[str]
+    listas: int
+    a_actualizar: int
+    con_problema: int
+
+
+class ImportadaOut(BaseModel):
+    id: uuid.UUID
+    nombre: str
+
+
+class OmitidaOut(BaseModel):
+    nombre: str
+    motivo: str
+
+
+class ResultadoImportacionOut(BaseModel):
+    """El mismo sobre para las tres entidades: crear, actualizar, omitir."""
+
+    creadas: list[ImportadaOut]
+    actualizadas: list[ImportadaOut]
+    omitidas: list[OmitidaOut]
+
+
+# --- Carga masiva de artículos (RN-INV-023) ---
+class SkuImportadoIn(BaseModel):
+    codigo: str = Field(min_length=1, max_length=50)
+    codigo_barras: str | None = None
+
+
+class ArticuloImportadoIn(BaseModel):
+    """Una fila de la hoja «Artículos», ya revisada por la pantalla.
+
+    `unidad_medida_id` puede venir en `None` al actualizar: la unidad de un
+    artículo que ya existe no se cambia por planilla (ADR-052).
+    """
+
+    id: uuid.UUID | None = None
+    accion: Literal["crear", "actualizar", "omitir"] = "crear"
+    codigo: str = Field(min_length=1, max_length=4)
+    nombre: str = Field(min_length=1, max_length=150)
+    tipo: str = Field(default="insumo", max_length=30)
+    unidad_medida_id: uuid.UUID | None = None
+    categoria_id: uuid.UUID | None = None
+    costo_promedio: Decimal = Decimal(0)
+    controla_lote: bool = False
+    dias_alerta_vencimiento: int | None = None
+    archivado: bool = False
+    skus: list[SkuImportadoIn] = []
+
+
+class ImportarArticulosIn(BaseModel):
+    articulos: list[ArticuloImportadoIn]
+
+
+class SkuRevisadoOut(BaseModel):
+    fila: int
+    codigo: str
+    codigo_barras: str | None
+    problemas: list[str]
+
+
+class ArticuloRevisadoOut(BaseModel):
+    fila: int
+    id: uuid.UUID | None
+    accion: str
+    codigo: str
+    nombre: str
+    tipo: str
+    unidad: str
+    unidad_medida_id: uuid.UUID | None
+    categoria: str
+    categoria_id: uuid.UUID | None
+    costo_promedio: str
+    controla_lote: bool
+    dias_alerta_vencimiento: int | None
+    archivado: bool
+    skus: list[SkuRevisadoOut]
+    cambios: list[str]
+    problemas: list[str]
+
+
+class RevisionArticulosOut(BaseModel):
+    articulos: list[ArticuloRevisadoOut]
+    unidades_desconocidas: list[str]
+    categorias_desconocidas: list[str]
+    skus_sin_articulo: list[str]
+    listas: int
+    a_actualizar: int
+    con_problema: int
 
 
 # --- Recetas ---

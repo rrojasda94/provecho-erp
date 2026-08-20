@@ -4,7 +4,14 @@ import uuid
 from datetime import date
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Response,
+    UploadFile,
+    status,
+)
 from sqlalchemy.orm import Session
 
 from src.core.tenant import Tenant
@@ -14,6 +21,7 @@ from src.modules.sales.application import (
     clientes,
     comprobantes,
     cumplimiento,
+    importacion_clientes,
     mesas,
     notas_credito,
     precios,
@@ -41,7 +49,7 @@ from src.modules.users.application import autorizacion
 from src.modules.users.application import queries_publicas as usuarios_queries
 from src.modules.users.application.errors import TokenInvalido
 from src.modules.users.infrastructure.models import Usuario
-from src.shared import fechas
+from src.shared import fechas, planilla
 from src.shared.integrations.factiliza import FactilizaError
 from src.shared.paginacion import Pagina, Paginacion, paginacion, paginar
 
@@ -60,11 +68,25 @@ DESCONTAR = "sales.aplicar_descuento"
 CONSUMO_PERSONAL = "sales.registrar_consumo_personal"
 GESTIONAR_MESAS = "sales.gestionar_mesas"
 LEER_CLIENTES_EXTERNOS = "sales.leer_clientes_externos"
+# Administrar el padron del grupo no es el mismo acto que registrar a
+# alguien en el mostrador, que es lo que hace el cajero con `sales.crear`.
+GESTIONAR_CLIENTES = "sales.gestionar_clientes"
 EMITIR = "sales.emitir_comprobante"
 # Acreditar una venta cobrada devuelve plata: permiso propio, no el del
 # cajero que emitió (RN-CPP-009).
 NOTA_CREDITO = "sales.emitir_nota_credito"
 ENTREGAR = "sales.entregar_pedido"
+
+
+def _xlsx(contenido: bytes, nombre: str) -> Response:
+    """Una planilla como descarga. El `Content-Disposition` es lo que le da
+    nombre al archivo en el navegador."""
+    return Response(
+        content=contenido,
+        media_type=planilla.MIME,
+        headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
+    )
+
 
 
 # --- Venta ------------------------------------------------------------------
@@ -974,6 +996,69 @@ def listar_clientes_backoffice(
             _cliente_buscado(c, personas.get(c.persona_id)) for c in pagina["items"]
         ],
     }
+
+
+# Las cuatro rutas literales van **antes** de `/clientes/{cliente_id}`:
+# FastAPI resuelve por orden y "plantilla" entraría como un id que no es UUID.
+@router.get("/clientes/plantilla")
+def descargar_plantilla_clientes(
+    _: Usuario = Depends(require_permission(GESTIONAR_CLIENTES)),
+):
+    """La hoja que se llena para cargar el padrón de golpe (RN-PTS-007)."""
+    return _xlsx(importacion_clientes.plantilla(), "plantilla-clientes.xlsx")
+
+
+@router.get("/clientes/exportar")
+def exportar_clientes(
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """El padrón en la misma plantilla, con los datos adentro (ADR-052).
+
+    Pide permiso de **lectura**: son los mismos datos que devuelve el listado
+    de back-office, solo empaquetados en un archivo.
+    """
+    grupo_id = clientes.grupo_de_empresa(session, tenant.empresa())
+    return _xlsx(
+        importacion_clientes.exportar(session, grupo_id=grupo_id), "clientes.xlsx"
+    )
+
+
+@router.post("/clientes/importar/validar", response_model=schemas.RevisionClientesOut)
+async def validar_importacion_clientes(
+    archivo: UploadFile,
+    _: Usuario = Depends(require_permission(GESTIONAR_CLIENTES)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Dice qué entra, qué actualiza y qué no. **No guarda nada.**"""
+    grupo_id = clientes.grupo_de_empresa(session, tenant.empresa())
+    return importacion_clientes.validar(
+        session, grupo_id=grupo_id, contenido=await archivo.read()
+    )
+
+
+@router.post(
+    "/clientes/importar",
+    status_code=201,
+    response_model=schemas.ResultadoImportacionOut,
+)
+def importar_clientes(
+    body: schemas.ImportarClientesIn,
+    _: Usuario = Depends(require_permission(GESTIONAR_CLIENTES)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Crea y actualiza lo que la pantalla confirmó, revalidando todo."""
+    grupo_id = clientes.grupo_de_empresa(session, tenant.empresa())
+    resultado = importacion_clientes.importar(
+        session,
+        grupo_id=grupo_id,
+        clientes=[c.model_dump() for c in body.clientes],
+    )
+    session.commit()
+    return resultado
 
 
 @router.patch("/clientes/{cliente_id}", response_model=schemas.ClienteOut)
