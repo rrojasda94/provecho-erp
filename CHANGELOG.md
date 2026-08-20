@@ -12,6 +12,797 @@ editando este archivo chocaban siempre — escribían en la misma línea.
 
 Ver [`changelog.d/`](changelog.d/).
 
+## [0.5.0] - 2026-08-20
+
+### Added
+
+- **Dos agentes ya pueden correr Playwright a la vez** (2026-08-15). El
+  puerto web estaba fijo en `3100` dentro del código —`E2E_PUERTO_API` existía,
+  su par no— así que la segunda suite que arrancaba chocaba con la primera o,
+  peor, reusaba su servidor y corría contra código de otro worktree **en
+  verde**. Ahora hay `E2E_PUERTO_WEB` y un esquema de slots (`810N` / `310N` /
+  `provecho_slotN`) en `docs/engineering/trabajo-en-paralelo.md`.
+- **El intérprete de Python se resuelve solo** (2026-08-15). Los scripts de
+  la suite usaban `process.env.PYTHON ?? "python"`, y en un worktree no hay
+  `.venv` —vive una sola vez en la raíz del repo principal—: el `python` del
+  PATH no tiene instalado el paquete `src` y la corrida moría con
+  `ModuleNotFoundError` tres pasos antes de la prueba que alguien quería
+  correr. `frontend/e2e/interprete.mjs` busca el `.venv` del worktree, después
+  el del repo principal (vía `git rev-parse --git-common-dir`) y recién
+  entonces cae a `python`. `PYTHON` sigue mandando sobre todo.
+- **Suite de uso separada de la de e2e** (2026-08-15, ADR-047).
+  `npm run test:uso` corre `frontend/uso/` con captura en cada hito, traza
+  siempre y sin reintentos, y su job de CI **no es requerido**: el techo de
+  tres casos de `e2e` sigue vigente porque bloquea todo merge, y un recorrido
+  lento no puede frenar un arreglo de caja. El arranque de los dos servidores
+  quedó en `frontend/playwright.comun.ts`, que las dos configs comparten en
+  vez de copiarse. Esta entrega deja **una sola spec de humo**: prueba el
+  arnés, no una pantalla.
+- **El seeder de e2e siembra lo que las ramas iban a sembrar de a una**
+  (2026-08-15). `src/seeders/e2e.py` agrega `Menú E2E` —producto con
+  variantes, grupo de opciones obligatorio y extras, el modelo de nodos
+  completo—, cuatro insumos con stock real en el almacén central, un
+  proveedor y una orden de compra en borrador. Sigue siendo idempotente y
+  prohibido en producción. `Pizza E2E` no se tocó a propósito: es plana
+  porque las pruebas del lienzo dependen de que tenga un único insumo.
+- **Conteos de pruebas al día en la estrategia** (2026-08-15). Decía 895
+  casos de backend, 183 de frontend y 7 de e2e; los reales son **1379**
+  (1041 funciones `test_*` en 76 archivos, la diferencia son `parametrize`),
+  **258** y **13**. Un conteo escrito a mano envejece sin avisar, y estos
+  llevaban nueve días vencidos.
+
+- **Una prueba que recorre el ERP en teléfono, tablet y PC**
+  (`frontend/uso/responsive.spec.ts`). No compara píxeles contra una imagen de
+  referencia —eso se rompe con cada cambio de copy— sino que afirma las dos
+  cosas que sí son bugs: que ningún control quede dibujado fuera de un
+  contenedor que lo recorta (una opción que existe y no se puede tocar) y que
+  todo diálogo modal quede centrado. Recorre el home, las ocho pantallas de
+  inventario, el KDS con una estación de preparación y otra de despacho, y el
+  PDV con caja abierta y un pedido en cola, abriendo además cada diálogo que
+  la pantalla sepa abrir. Encontró los cinco fallos de esta entrega y ninguno
+  era visible en el ancho de escritorio, que es el único en el que se
+  desarrolla.
+
+- **La cocina pasa a ser una cadena de estaciones** (2026-08-13, ADR-044,
+  RN-CUP-013). El KDS ruteaba solo por categoría: la pizza aparecía a la vez
+  en armado y en horno, cualquiera de los dos podía tacharla, y tacharla la
+  dejaba lista sin haber pasado por el horno. Ahora cada estación tiene un
+  **paso** (`kds_pantalla.orden`) y cada línea sabe en cuál va
+  (`venta_item.etapa_kds`): marcarla en una estación intermedia la manda a la
+  siguiente que atienda su categoría, y solo queda `listo` cuando ya no le
+  queda ninguna. Una bebida se salta el horno sola, sin configurar
+  excepciones. Todo lo ya configurado sigue igual — las dos columnas nacen
+  en 0, y una cocina de una estación es una cadena de un eslabón.
+- **Despacho deja de ser la pantalla de cocina con otro filtro**: era el
+  mismo componente, así que ofrecía tachar ítems en vez de decir qué falta.
+  Ahora es una tarjeta por **pedido** con cuántas líneas van, en qué
+  estación está cada una y por quién se espera; desde ahí solo se entrega,
+  porque marcar preparado es un acto de la estación que preparó
+  (RN-CUP-003).
+- **La cocina volvió a ver los pedidos de consumo de personal**: el
+  `response_model` de la cola filtraba en silencio `tipo` y
+  `consumo_motivo` pese a que el servidor los devolvía, así que el aviso que
+  la pantalla tenía escrito no se mostraba nunca (RN-COM-025).
+- **Los PIN del PDV se teclean en un pinpad, sin campo de formulario**
+  (ADR-045, RN-POS-014). Los cuatro sitios que piden PIN —apertura y cierre
+  de caja, consumo de personal y firma de supervisor— usaban un
+  `<input type="password">`: el navegador ofrecía guardarlo, y con el PIN
+  guardado en la caja el turno siguiente entra con la cuenta del anterior y
+  toda la auditoría nombra a la persona equivocada (RN-AUD-005). Sin campo
+  no hay nada que guardar. Fuera del PDV no cambia nada.
+- **La pantalla del PDV se bloquea a los 5 minutos y NO cierra sesión**: la
+  caja abierta y el pedido a medio armar siguen donde estaban, y se reabre
+  con el PIN de quien tiene la sesión contra el nuevo
+  `POST /auth/verificar-pin`. Cerrar sesión habría sido peor que no hacer
+  nada: el turno habría dejado la pantalla tocada a propósito para no perder
+  el pedido. Un intento fallido cuenta contra el mismo bloqueo de cuenta que
+  el login, y no contra un contador propio que sería la vía cómoda para
+  probar PINes.
+- **El PDV con la caja cerrada decía "la carta está vacía: ningún producto
+  tiene precio vigente para esta sucursal"**, que manda a revisar listas de
+  precios por nada: la carta no se pide hasta abrir caja, así que vacía
+  antes de eso no significa lo mismo. Ahora dice "Abre la caja para ver la
+  carta".
+- **El seeder no corría contra Postgres**: la descripción de
+  `users.resetear_pin` medía 260 caracteres y `permiso.descripcion` es
+  `VARCHAR(255)`. SQLite no valida el largo, así que la suite entera pasaba
+  en verde y el fallo aparecía recién al sembrar una base real — abortando
+  el seeder completo con un `StringDataRightTruncation` que no dice qué
+  permiso fue. Se acortó a 248, y hay una prueba que compara cada
+  descripción contra el largo declarado en el modelo para que la próxima
+  falle donde tiene que fallar.
+- **El sabor dejó de salir como un plato aparte en cocina** (ADR-044
+  enmendado, RN-CUP-014). Una *Pizza Personal Peperoni* aparecía en la
+  tarjeta del KDS como dos ítems —`1 Pizza Personal` y `1 Peperoni`— y en
+  despacho contaba "2 de 2" por una sola pizza. El extra es fila propia de
+  la venta (tiene receta, precio y rastro), pero `kds.py` no mencionaba
+  `padre_venta_item_id` en ninguna parte, así que aplanaba. Ahora viaja
+  anidado y se muestra tabulado bajo su plato, igual que las restas; la
+  comanda impresa lo sangra en vez de imprimirlo como línea de primer nivel;
+  el ruteo por estaciones mira la categoría **del plato**; y marcar el plato
+  marca sus extras — sin eso, `pedido_entregable` (que suma todos los ítems)
+  habría dejado el pedido sin poder entregarse nunca.
+- **Un extra sin categoría colgaba el pedido para siempre**: como ítem
+  suelto, ninguna estación filtrada por categoría lo atendía, así que se
+  quedaba `pendiente` y el pedido no llegaba a entregable. Todos los extras
+  del seeder de pizzas estaban en ese caso.
+- **Anular un plato con extras reventaba contra Postgres**:
+  `fk_venta_item_padre` es `NO ACTION` y el PDV manda solo el id del plato,
+  así que borrarlo dejaba al sabor apuntándolo — `ForeignKeyViolation`.
+  SQLite no valida FKs, por eso las pruebas pasaban en verde. Ahora la
+  anulación se lleva los hijos y **repone también su insumo**, que antes
+  quedaba descontado sin haberse preparado. El fixture de `test_pdv_slice`
+  enciende `PRAGMA foreign_keys=ON` para que la próxima falle donde tiene
+  que fallar.
+
+- **Un reporte ya no es una línea de texto: lleva al lugar donde se actúa**
+  (2026-08-09, ADR-036). `reporte_emitido` guardaba `referencia_tipo` +
+  `referencia_id` desde ADR-033 y **nadie los renderizaba**; el detalle
+  `GET /reports/emitidos/{id}` existía y el frontend **nunca lo llamaba**. Ahora
+  hay ficha de reporte (`/reportes/emitidos/[id]`) con quién lo provocó, de
+  dónde viene, la foto de datos, a quién le llegó y por qué, y un botón al
+  registro. El botón se esconde si el usuario no tiene el permiso del módulo
+  dueño: ser destinatario no da acceso al dato (RN-REP-002).
+- **Ocho endpoints `GET` que no existían.** Detalle de artículo, SKU, lote,
+  categoría y ajuste en `inventory`; cierre de caja y pago a proveedor en
+  `accounting`. Los ajustes de inventario **no tenían ni siquiera un listado**:
+  se creaban y se aprobaban por API, y el reporte urgente de «ajuste fuera de
+  margen» apuntaba a una pantalla que no existía. Ahora se aprueban y se
+  rechazan desde `/inventario/ajustes`.
+- **`src/core/destinos.py`**: el mapa `referencia_tipo` → endpoint + permiso.
+  Vive en `core` porque lo leen `modules/reports` y `core/reportes`, que no
+  pueden verse entre sí. `tests/test_destinos.py` verifica que **toda ruta del
+  mapa esté montada de verdad** en la app: un rename de endpoint rompe el
+  enlace en CI y no en producción (RN-REP-010).
+- **Cada fila del tablero de consulta enlaza a su registro.** `Columna` gana
+  `enlace` y las cuatro `queries_publicas` de las listas de problemas
+  (`pedidos_demorados`, `consumos_omitidos`, `disponible_negativo`,
+  `salidas_sin_lote`) proyectan el id que no proyectaban. Solo esas cuatro: el
+  total de un martes no es un registro al que se pueda ir.
+- **La campana navega al reporte** además de marcarlo leído. Antes decía que
+  algo pasó y había que salir a buscarlo a mano.
+
+- **Las devoluciones se pueden usar** (2026-08-13, RN-INV-019/020). La API
+  estaba completa —registrar, anular, detalle, listar— y la pantalla era una
+  tabla de solo lectura: la única forma de registrar una devolución era
+  llamar al endpoint a mano. Ahora hay formulario de registro, botón de
+  anular y ficha por devolución con qué se devolvió, por qué, a dónde fue y
+  quién la registró o anuló. El destino solo aparece para una devolución de
+  cliente: a proveedor la mercadería se va y no hay nada que decidir.
+- **Registrar y anular una devolución quedan en `audit_log`**: mueven stock
+  real y hasta ahora solo dejaban el evento que avisa a compras o comercial,
+  que responde otra pregunta. Anular es además el movimiento con el que se
+  podría tapar un faltante, así que tiene que decir quién lo hizo.
+- **`GET /inventory/skus`**: no existía listado de SKUs, así que ninguna
+  pantalla podía ofrecer "qué se mueve". Va con el nombre del artículo,
+  porque el código de un SKU no le dice nada a nadie.
+- **El catálogo de recetas se filtra por tipo y categoría** (RN-COM-030). El
+  tipo **se deriva** de si la receta produce un artículo (subreceta) o no
+  (producto de venta): no se agregó columna, que sería un segundo lugar
+  donde puede estar mal. Los filtros viajan en la URL, así que el listado se
+  filtra en el servidor —donde están las recetas— y se comparte pegando el
+  enlace.
+- **El recetario se carga de golpe desde un `.xlsx`** (ADR-046, RN-COM-031).
+  Se descarga una plantilla con ejemplos e instrucciones, se sube llena, y
+  **antes de guardar nada** la pantalla dice qué entra y qué no: unidad
+  desconocida, rendimiento inválido, receta repetida, o ingredientes que
+  nombran una receta que la otra hoja no declara —el error de tipeo más
+  común del formato—. Un insumo que el catálogo no reconoce no cancela la
+  carga: se elige cuál es o se omite esa línea **a la vista**, y lo que se
+  elige se aplica a todas las recetas que lo nombran. Una receta que no
+  entra se informa y no arrastra a las demás (un `SAVEPOINT` por receta). La
+  cantidad acepta aritmética tecleada (`450/3`) igual que en la pantalla,
+  porque el importador reusa los mismos casos de uso.
+- Se eligió `.xlsx` sobre CSV porque Excel en configuración regional peruana
+  usa `;` y coma decimal: abrir y guardar un CSV convierte `0.5` en `0,5` y
+  corrompe el archivo en silencio.
+
+- **`statement_timeout`, y son dos** (2026-08-15). `connect_timeout: 5` cubría
+  no poder conectar; un Postgres que **acepta la conexión y después se traba**
+  —lock ajeno, plan malo, disco al límite— seguía clavando el request sin
+  límite, porque `pool_pre_ping` hace un `SELECT 1` al sacar la conexión del
+  pool y después no mira más. `src/core/database.py` abre ahora **dos engines**
+  contra la misma base: el de operación (`SessionLocal`,
+  `DB_STATEMENT_TIMEOUT_SEGUNDOS=15`) es el default de todo el ERP, y el de
+  reportes (`SessionReportes`, `DB_STATEMENT_TIMEOUT_REPORTES_SEGUNDOS=120`) lo
+  consumen `src/core/reportes/` y el módulo `reports` vía la dependencia
+  `get_db_reportes`. Un número único obligaba a elegir entre cancelar reportes
+  que estaban trabajando bien o dejar la caja esperando; en el mostrador, un
+  error se maneja mejor que una pantalla que no vuelve. Costo aceptado: un
+  segundo pool de conexiones — que de paso impide que una consulta pesada de
+  reportes se coma las conexiones de la caja. `0` desactiva el límite, y fuera
+  de Postgres el parámetro no se pasa (el `e2e` corre sobre SQLite, que no sabe
+  cancelar por tiempo). Un test de arquitectura falla si un endpoint queda del
+  lado equivocado.
+- **Ningún barrido puede abrir la base de producción desde un test**
+  (2026-08-15). `inventory/application/tasks.py`, `sales/application/tasks.py`
+  y `rrhh/purga.py` llamaban `SessionLocal()` directo: el test que los
+  ejercitaba pagaba una conexión real —5 s de `connect_timeout`— o, con la base
+  de desarrollo levantada, corría el barrido **contra ella**. Ahora exponen
+  `session_factory` como los listeners y entran en el guardián autouse de
+  `tests/conftest.py`, que ya cubría a los cinco módulos de listeners.
+
+- **Un reporte se puede elevar, y queda el rastro de quién intentó qué**
+  (2026-08-09, ADR-036). `reporte_escalamiento` salda RN-CTP-004 y RN-PRD-014,
+  declaradas como deuda desde ADR-033: cadena supervisor → comercial →
+  gerencia, un escalón por vez, con historial append-only por nivel. Siete
+  endpoints nuevos bajo `/api/v1/reports` y dos permisos —`reports.escalar` y
+  `reports.escalamiento_resolver`— separados por lo mismo que solicitar y
+  aprobar un ajuste: quien eleva no es quien cierra.
+- **Vive en `src/modules/reports/`, no en `shared`**, contra lo que decía
+  `data-model.md` §6. Esa línea se escribió cuatro meses antes de que el módulo
+  existiera; hoy la entidad tiene un solo escritor y un solo lector, y su
+  lógica necesita `Area`, `AreaMiembro` y los resolutores de destinatarios, que
+  `shared` tiene prohibido importar.
+- **Ancla al `reporte_emitido`, no a la venta.** Los `venta_id` / `carrito_id` /
+  `orden_produccion_id` del diseño original son lo que `referencia_tipo` +
+  `referencia_id` ya guardan, para los nueve tipos y no para tres — y `carrito`
+  ni siquiera existe como tabla. Anclar a la venta perdería la foto de datos,
+  el nivel, el actor y la doble puerta de RN-REP-002.
+- **A quién elevar, sin jerarquía organizacional**: el ERP no tiene
+  `supervisor_id` ni nivel de rol, así que el escalón se resuelve con el
+  encargado de turno (nivel supervisor) y las áreas Comercial y Gerencia. El
+  seeder pone el rol `supervisor` dentro del área Comercial, así que **elevar
+  puede caer en la misma persona**: es la organización de hoy, y el endpoint
+  devuelve los destinatarios para que quien eleva lo vea en vez de suponer que
+  llegó a otro.
+
+- **Modo oscuro y preferencias de accesibilidad, guardadas en el perfil**
+  (ADR-037). Cierra el catálogo que `docs/product/ui-ux.md` dejó especificado
+  en julio con hex exactos y nunca se implementó: paleta de alto contraste
+  para daltonismo rojo-verde (Okabe-Ito, ~95% de los casos), escala de letra
+  en cuatro niveles y modo oscuro. Las tres viven en `usuario`, no en el
+  navegador, porque el documento es explícito y el motivo es operativo: en un
+  local la misma tablet la usan tres turnos y la misma persona salta de la
+  caja a la oficina; guardadas en el dispositivo hay que reconfigurarlas en
+  cada máquina, que en la práctica significa no usarlas. Nuevo endpoint
+  `PATCH /users/me/preferencias`, **sin permiso**: no hay privilegio que
+  otorgar en elegir el tamaño de la propia letra, y pedir uno dejaría la
+  accesibilidad fuera del alcance de quien más la necesita.
+- Se resuelven **en el servidor**: el layout raíz escribe `class="dark"`,
+  `data-escala` y `data-paleta` en `<html>`. No se usa `next-themes` —aunque
+  ya estuviera instalado alimentando a `sonner`— porque guarda en
+  `localStorage` y necesita un script inline antes del primer pintado, y la
+  CSP de `middleware.ts` firma cada script con un nonce por request. Costo
+  aceptado: no hay opción "seguir al sistema" (detectarla exige justo ese
+  script) y cada cambio es un viaje al servidor.
+- **Paleta y tema se combinan**, como pedía ui-ux.md: hay un bloque
+  `.dark[data-paleta="alto-contraste"]` con la paleta Okabe-Ito aclarada —sus
+  valores están medidos contra blanco y sobre `#101216` el azul cae a 3.6:1—.
+  El orden importa: declarado antes del bloque oscuro, el tema apagaba la
+  paleta accesible.
+- **`Insignia` ata el ícono al tono**, que es lo que hace cumplible la regla
+  de que ningún estado se comunique solo por color. Antes «activa» e
+  «inactiva» eran la misma píldora gris para quien no distingue rojo de verde.
+  De paso, un pago pendiente deja de mostrarse en rojo: no es un error, es
+  plata que todavía se puede detener, y se leía igual que uno rechazado.
+- **`Ctrl+K` abre cualquier pantalla del ERP** (cierra F2.29, que estaba «sin
+  decidir»). Llegar a Plan de cuentas eran tres clics; ahora son cinco teclas.
+  Sin dependencias nuevas: `@base-ui/react` Autocomplete + Dialog. `cmdk`
+  traería un motor de coincidencia difusa para ~50 entradas estáticas y
+  arrastra el árbol de Radix que ADR-013 descartó. Cada resultado es un enlace
+  de verdad, así que Enter, clic central y «abrir en pestaña nueva» funcionan
+  sin programarlos, y los destinos llegan filtrados por permiso.
+- **Esqueletos de carga por módulo** (cierra F2.31, que decía «el dashboard
+  hoy no tiene ni loading skeleton»). Sin `loading.tsx` Next espera a que el
+  `page.tsx` resuelva y recién ahí pinta: el clic en el sidebar no acusa
+  recibo y se lee como que la aplicación se colgó.
+- **Ayuda contextual por campo de formulario** (`CampoFormulario`), pendiente
+  escrito en ui-ux.md desde julio: quien carga un proveedor no tiene por qué
+  saber que "condición de pago" se cuenta en días desde la recepción.
+
+### Added
+
+- **Requerimiento de la jornada** (`inventory`, ADR-051, RN-INV-023/024): el
+  local abre `/inventario/solicitudes` y encuentra una lista ya armada con lo
+  que está bajo su punto de reorden (`stock_minimo`), la edita, suma lo que
+  necesite aunque no esté bajo mínimo —queda marcado como pedido del local,
+  no como urgencia— y la envía para aprobación. Nuevo estado `borrador`
+  (uno por almacén) en `solicitud_insumos` y columna `bajo_minimo_al_pedir`
+  en `solicitud_item`, estampada al agregar cada ítem.
+- **Toma de inventario con pantalla propia**: `/inventario/conteos` cubre lo
+  que la API ya tenía desde ADR-019 y ningún formulario ofrecía — abrir,
+  contar a ciegas, cerrar viendo los ajustes generados, anular con motivo.
+  Suma `GET /inventory/conteos`, que faltaba.
+- `GET /inventory/solicitudes`, `GET /inventory/conteos` y
+  `GET /inventory/conteos/programa` filtran por `sucursal_id` y `marca_id`,
+  resueltos por join a través del almacén.
+
+- **Almacén abastecedor de respaldo** (2026-08-12, ADR-040, RN-INV-022,
+  migración `a7c04e3b91d5`). Con un solo abastecedor, el día que ese almacén
+  se da de baja la sucursal no puede pedir nada y recibe un "almacén
+  abastecedor no encontrado" que no le dice a nadie qué hacer. Ahora
+  `almacen` declara un respaldo y `crear_solicitud` cae a él **cuando el
+  principal está dado de baja** — no cuando está sin stock, que tiene su
+  propio camino. Un abastecedor pedido a mano nunca cae al respaldo:
+  despachar desde donde no se pidió es lo que el que recibe no puede notar
+  hasta contar la mercadería. La columna vive en `almacen` y no en
+  `sucursal` (el que se abastece es el almacén, y una sucursal puede tener
+  varios), pero se elige desde el formulario de Sucursal, que es donde se
+  busca. Dar de baja un almacén ahora mira también a quien lo tenga de
+  respaldo, y el respaldo viaja al hub: un corte de red es justo cuando no se
+  puede ir a preguntar quién es el suplente.
+- **Consulta de DNI y RUC desde la pantalla** (ADR-041). El cliente de
+  Factiliza existía desde agosto, con pruebas, y **ninguna pantalla podía
+  usarlo**: no había endpoint. `nombres_desde_dni` aplicaba el nombre de
+  RENIEC al guardar (RN-PTS-004), así que quien tecleaba descubría recién
+  después que el sistema había escrito otro. Ahora hay un botón "Buscar" en
+  Personas (rellena nombres, apellidos y fecha de nacimiento) y en Proveedores
+  (razón social, dirección y provincia), contra `GET /consulta/{dni,ruc}/{n}`
+  en `core` — no tiene dueño de módulo: el mismo documento lo teclean
+  personas, proveedores y caja. Prellena y no decide: todo queda editable, y
+  si Factiliza no responde el alta sigue siendo posible tecleando. La
+  respuesta **no** incluye el cuerpo crudo del proveedor, que trae más datos
+  personales de los que la pantalla necesita (Ley 29733).
+- **El proveedor guarda su domicilio fiscal** (`direccion`, `provincia`,
+  `pais`), partido y no como un solo texto: `provincia` es lo que decide si
+  el flete es local o interprovincial, y volver a partir una dirección
+  concatenada es adivinar.
+- **Reseteo de PIN con cambio obligatorio** (ADR-041). Un PIN olvidado no se
+  recuperaba —está hasheado con Argon2id— y el frontend ni siquiera ofrecía
+  cambiarlo: sus comentarios afirmaban que "lo cambia su dueño con su propia
+  sesión", endpoint que no existía. Ahora `rrhh_admin` (permiso propio
+  `users.resetear_pin`, aparte de `users.gestionar` en los dos sentidos)
+  devuelve la cuenta al PIN por defecto, y pasan tres cosas juntas porque
+  ninguna sirve sola: la cuenta **no puede hacer nada** salvo cambiarlo, se le
+  revocan las sesiones abiertas, y se le limpia el lockout —quien olvidó su
+  PIN normalmente lo agotó intentando—. La obligación la hace cumplir
+  `get_current_user` leyendo la marca **de la base** y no de un claim, así que
+  vale desde el request siguiente y no cuando venza el token; se verificó que
+  ningún endpoint la esquiva. Suma `POST /users/me/pin`, que no lleva permiso
+  —elegir la propia clave no es un privilegio que otorgar— pero exige el PIN
+  actual.
+- **`/users/me/pin` se declara antes que `/users/{usuario_id}/pin`**: FastAPI
+  resuelve por orden de declaración y la ruta con parámetro capturaba `"me"`
+  como si fuera un id, con lo que cambiar el PIN propio habría exigido
+  `users.gestionar`.
+
+- **Los reportes de la base de desarrollo no se podían usar para nada**
+  (2026-08-10). Eran de pruebas sueltas: títulos sin entidad detrás, sin
+  actor y sin destino, así que con ADR-036 el botón «ir al registro» llevaba
+  a un 404 y la columna «Quién» decía «Sistema» en todas las filas. Nuevo
+  `python -m src.seeders.reportes_demo`: borra lo viejo y arma diez
+  situaciones con su fila real —un ajuste de −18 pendiente de aprobar, un
+  lote vencido hace cuatro días, una caja con S/ 35.50 de faltante, un pago
+  de S/ 4800 sobre el umbral— más tres cadenas de escalamiento (abierta,
+  elevada a comercial, resuelta). Los hechos se insertan y **el reporte se
+  emite por el camino real**: mismo listener, misma resolución de
+  destinatarios, misma bandeja.
+- **El reparto de la demo respeta el RBAC, no al revés.** Cada cadena la abre
+  y la cierra alguien que de verdad puede: la doble puerta de RN-REP-002
+  también aplica al escalamiento, y una demo donde el protagonista recibe un
+  403 al abrir su propia cadena enseña lo contrario de lo que quiere enseñar.
+- **`jefe_cocina` gana `reports.escalamiento_resolver`.** Sin él, una no
+  conformidad de producción solo la podía cerrar alguien sin
+  `production.leer` — o sea, nadie. RN-PRD-014 ya decía que «el jefe de
+  cocina redacta el hallazgo y la acción tomada».
+- **`production.no_conformidad_detectada` ahora también avisa al área
+  Cocina.** Iba a Gerencia y Almacén: a todos menos a quien RN-PRD-014 pone
+  a actuar.
+- **La ficha de un reporte de escalamiento ya no ofrece botón de destino.**
+  La cadena se ve más abajo en esa misma ficha, y su lectura se gatea contra
+  el módulo del reporte de origen, no contra `reports.leer`: era el único
+  enlace que podía prometer acceso y terminar en 403.
+
+### Changed
+
+- **El back office deja de vestirse de afiche y se viste de mesa de trabajo**
+  (ADR-037). El brandboard de julio se aplicaba por igual a todo: crema de
+  pared a pared y cada `h1`–`h4` en Anton itálica y VERSALES. Es la voz
+  correcta cuando la marca le habla al cliente —PDV, KDS, carta— y la peor
+  posible en una pantalla de trabajo: la itálica en versales es el ajuste
+  menos escaneable que existe, y sobre crema las tarjetas blancas pierden
+  contraste justo donde están los números. Ahora son **dos voces**: acero,
+  Archivo condensada y tinta en el back office; crema, Anton y brasa en PDV,
+  KDS y login. Los hex se movieron por contraste medido, no por gusto: el
+  naranja `#F4511E` daba 3.4:1 sobre blanco con `text-primary` en 41 lugares
+  y pasa a `#C6390F` (5.3:1); el lima `#AEEA00`, que en la práctica era el
+  color de ~30 insignias de estado, era ilegible en texto y amarillento en
+  insignia, y pasa a verde `#17864B`.
+- **La tabla y el diálogo dejan de parecer HTML de 1998**, y con ellos 45
+  pantallas que no se editaron. El buscador de `TablaDatos` (28 pantallas) era
+  un `<input>` **sin una sola clase de estilo** y el estado del orden un
+  `" ↑"` concatenado al texto — el "parece más HTML que elementos
+  interactivos" de ADR-035, replicado 28 veces. Suma encabezado pegajoso,
+  atajo `/`, filas fantasma mientras carga, vacío que distingue "no encontré"
+  de "no hay", selector de tamaño de página, y `meta.numero` para alinear
+  cifras a la derecha en monoespaciada tabular: una columna de importes con
+  ancho proporcional obliga a leer dígito por dígito para comparar dos filas,
+  y comparar dos filas es a lo que se viene a un ERP. `DialogoFormulario` (17
+  pantallas) gana backdrop desenfocado, entrada con escala, y encabezado y pie
+  fijos con el cuerpo scrolleable — un formulario de doce campos dejaba
+  «Guardar» fuera de la pantalla. Las dos mantienen la firma de props
+  compatible hacia atrás.
+- **Los emoji de los módulos salen**; entran íconos de trazo (`lucide-react`,
+  ya instalado). Cada sistema dibuja un emoji distinto —el 🍕 de una tablet
+  Android no se parece al de Windows— y doce emoji de colores en la grilla del
+  home compiten entre sí. El home además agrupa por área de negocio en vez de
+  escupir catorce fichas iguales.
+- **Un acento, no una paleta por área.** Se probó un color por área de negocio
+  (`--area-*`) y se descartó: ADR-013 §8 ya había rechazado el color por
+  módulo o por tarjeta, y cuatro tintes son el mismo arcoíris con menos pasos.
+  Las áreas sobreviven como agrupación del home; ordenar no necesita pintar.
+
+- **Un reporte decía qué pasó y no quién ni dónde exactamente** (2026-08-09,
+  ADR-036). `reporte_emitido` gana `actor_id` y `almacen_id`, y el catálogo de
+  emisiones declara `clave_actor`: qué campo del payload es el actor. Ocho
+  eventos de `inventory`, `accounting` y `production` lo publican ahora
+  (ampliación aditiva). `sales.pedido_demorado` queda **sin actor a
+  propósito**: lo detecta un barrido de Celery, y poner ahí al mozo que tomó
+  el pedido convertiría un aviso de proceso en una acusación contra quien no
+  provocó la demora. Un test parametrizado congela la lista de emisiones sin
+  actor, para que la próxima se declare en vez de perderse en silencio.
+- **Los reportes anteriores a este cambio dicen «Sistema»**: las dos columnas
+  son nullable y **no hay backfill**. Un reporte de agosto no puede decir quién
+  lo provocó porque el dato nunca se guardó, e inventárselo sería peor que
+  dejarlo vacío (RN-REP-009).
+- **`inventory.ajuste_fuera_margen` publicaba menos de lo que `events.md`
+  decía**: la doc prometía `sku_id, diferencia, margen` y el código mandaba
+  solo `ajuste_id` y `almacen_id`, así que el reporte decía «ajuste fuera de
+  margen» sin decir de qué ni de cuánto. Ahora viajan `sku_id`, `cantidad`,
+  `motivo` y `aprobado_por`, y la fila de `events.md` dice la verdad.
+
+- **El cajero abre y cierra su caja solo** (2026-08-15, ADR-049, RN-MDP-008,
+  migración `c8b41f60d2a7`). `POST /accounting/cajas/apertura` y
+  `.../cierre` dejan de exigir la elevación por PIN con
+  `accounting.caja_relevar`: alcanza `accounting.caja_operar`, el permiso
+  que el rol `cajero` ya tenía. El campo `autorizacion` desaparece de
+  `AbrirCajaIn` y `CerrarCajaIn` (era requerido), y
+  `AperturaCajaOut.relevo_encargado_id` pasa a nullable.
+  El motivo es de operación, no de modelo: para empezar su turno el cajero
+  necesitaba que un encargado caminara hasta la caja a poner su PIN, todos
+  los días — y eso se pagaba **dejando la sesión del encargado abierta en la
+  caja**, que es exactamente el escenario que hace imposible probar quién
+  tenía el efectivo. Lo que prueba cuánto había en el cajón sigue siendo el
+  conteo por denominación, no una firma.
+- **La firma no se debilitó: se movió a donde la plata cambia de manos.** Al
+  cerrar, el efectivo queda `en_caja` a nombre del cajero, y el encargado
+  firma la recepción después, en `POST /cajas/custodias/{id}/entregar` —
+  ahora el único punto del ciclo que pide `accounting.caja_relevar`. Antes
+  la custodia nacía directamente en `en_supervisor`: el sistema declaraba
+  entregado a las 23:00 lo que se entregaba a las 09:00 del día siguiente, y
+  un faltante detectado en el medio le caía al encargado por una firma que
+  el software le había puesto solo. El estado `en_caja` ya existía en el
+  enum y en la tabla de transiciones desde el primer día — **no lo escribía
+  nadie**, así que no hizo falta migrar datos.
+  La segregación que importa sigue en pie sin ningún candado nuevo: el
+  cajero no puede firmar que recibió su propia plata porque su rol no tiene
+  `caja_relevar`.
+- **De regalo, recontar un cierre vuelve a significar algo.** Un cierre se
+  corrige mientras el efectivo siga en el local (RN-MDP-005); como ahora
+  arranca `en_caja` en vez de saltar a `en_supervisor`, recontar *con la
+  plata todavía en el cajón* pasó de ser un estado inalcanzable a ser el
+  caso normal.
+- **Costo aceptado**: `accounting.queries_publicas.encargado_de_turno` salía
+  del `relevo_encargado_id` de la caja abierta y devuelve `None` para toda
+  apertura nueva, así que `reports` cae en su respaldo por rol
+  (`supervisor`/`admin` de la sucursal). Los avisos siguen llegando, a más
+  gente y menos dirigidos. Saber quién está a cargo del local necesita una
+  fuente propia —un turno de personal— y queda anotado como deuda junto con
+  otros dos huecos de permisos que el recorrido de uso destapó: el encargado
+  no puede abrir la pantalla donde firma la recepción, y el cajero no ve los
+  terminales que RN-POS-010 le pide verificar al abrir.
+
+### Fixed
+
+- **El PDV pedía abrir una caja que ya estaba abierta** (2026-08-12). El
+  cajero entraba, le aparecía el diálogo de apertura, y al aceptarlo el
+  servidor lo rechazaba —correctamente— con "ya hay una caja abierta": un
+  callejón sin salida donde no se puede ni vender ni entender por qué.
+  El origen era un permiso mal elegido: `GET /accounting/cajas/abiertas`
+  exigía `accounting.leer`, que es el permiso de **todo** el módulo contable y
+  que el rol `cajero` no tiene ni le corresponde. Recibía 403 y el PDV lo
+  trataba como "no hay caja". Ahora el endpoint acepta `sucursal_id` y en ese
+  caso alcanza con `accounting.caja_operar` —quien opera una caja puede
+  preguntar si su turno está abierto— con el alcance validado contra el tenant
+  (ADR-004), no contra el parámetro. Sin `sucursal_id` sigue siendo la empresa
+  entera y sigue exigiendo `accounting.leer`: quien opera una caja no tiene por
+  qué ver el efectivo de los demás locales. La caja es del **punto de venta**,
+  así que el turno que abrió un compañero vale para todos los del local.
+- **Un fallo al consultar la caja ya no se dibuja como "no hay caja"**: el
+  `.catch(() => setCaja(null))` del PDV era el mismo patrón que `useLista` ya
+  había corregido en el resto de sus cargas. Ahora la pantalla dice qué pasó y
+  no ofrece abrir una caja sobre la que no pudo preguntar.
+- **El "volver" de las fichas subía de nivel en vez de volver** (ADR-039).
+  Llegando a una receta desde la ficha de un producto, `← Recetas` llevaba al
+  listado y no al producto. Cada ficha cableaba su propia salida —nueve en
+  total— y todas contestaban "¿qué hay encima?" cuando la pregunta era "¿de
+  dónde vengo?". Ahora hay un `<Rastro>` con dos controles: el rastro
+  jerárquico (Inicio / Módulo / Sección / lo que se ve), derivado de la ruta
+  contra los mismos registros que alimentan el sidebar y la paleta, y un `←`
+  que usa el historial propio y cae al padre cuando no lo hay —una entrada por
+  URL directa o una recarga—.
+
+- **La búsqueda por DNI/RUC no estaba donde se necesitaba** (2026-08-15,
+  ADR-041). El botón existía y se montaba en Personas y en Proveedores, pero
+  no en **Ventas → Clientes**, que es la pantalla donde se corrige la razón
+  social de un cliente jurídico — y cuyo propio texto de ayuda ya decía que
+  "SUNAT manda sobre la razón social tecleada". Ahora está ahí, prellenando
+  solo la razón social: `contacto` es el teléfono o el correo de quien
+  coordina, y traerle el domicilio fiscal reemplazaría un dato real por otro.
+  **No** se montó en el diálogo de documento de un cliente natural: ese
+  formulario no tiene ningún campo que la consulta pueda llenar (el nombre
+  vive en su `persona`, RN-GEN-007, y ahí el botón ya estaba).
+- **El botón se le ofrecía a quien no puede usarlo** (2026-08-15). Ningún
+  punto de montaje miraba `consulta.documento`: un `contador` o un
+  `almacenero` lo veía, lo apretaba y se comía un 403 dibujado como aviso.
+  El gate vive ahora **dentro** de `BuscarDocumento` —repetirlo en cada
+  pantalla es cómo la siguiente se lo olvida— y `permisos` es una prop
+  obligatoria, así que montarlo sin decir de quién es la sesión no compila.
+  Sigue siendo UX: quien manda es `require_permission` en la API.
+- **La consulta de DNI/RUC ya tiene cuota propia** (2026-08-15), deuda
+  declarada con ADR-041. Cada llamada gasta crédito de un proveedor **pago**,
+  así que lo que se cuida no es el abuso sino el gasto: un bucle mal escrito
+  en una pantalla agota el plan del mes sin que nadie ataque nada. Se reusó
+  `core/rate_limit.py` en vez de escribir otro limitador —fail-open incluido:
+  un Redis caído no puede dejar a la caja sin identificar a un cliente—.
+  **Por usuario además de por IP** (20 y 60 por minuto, configurables): en un
+  local todas las cajas salen por la misma dirección, y un límite solo por IP
+  deja al equipo entero sin consultar por culpa de uno. Se cuenta después del
+  permiso, porque un 403 no le cuesta un centavo a nadie.
+
+- **Los diecisiete diálogos del ERP se abrían pegados a la esquina superior
+  izquierda, no centrados** (2026-08-18). Dos causas encimadas, y ninguna se
+  ve leyendo el componente del diálogo. La primera: el preflight de Tailwind
+  pone `margin: 0` en todos los elementos y con eso pisa el `margin: auto`
+  con el que el navegador centra un `<dialog>` modal. La segunda: `.revelar`
+  —la animación de entrada de cada pantalla— usaba
+  `animation-fill-mode: both`, que deja la animación aplicada para siempre;
+  el `transform` del último fotograma queda computado como
+  `matrix(1, 0, 0, 1, 0, 0)`, que es la identidad pero **no es `none`**, y un
+  `transform` no-`none` convierte al elemento en bloque contenedor de todo
+  `position: fixed` que tenga debajo, incluido el top layer del diálogo. Se
+  arregla con `dialog:modal { margin: auto; overflow: auto }` global y con
+  `backwards` en lugar de `both` en las tres animaciones de entrada.
+- **El PDV escondía el ticket entero por debajo de 60rem** (2026-08-18): el
+  pedido, los totales, «Enviar» y «Cobrar» desaparecían con un `display: none`
+  en toda tablet en vertical y en todo teléfono, sin nada que los reemplazara.
+  Ahora la carta y el ticket comparten la celda y se alternan con el botón
+  «Pedido»/«Carta» de la barra, que solo existe en ese ancho.
+- **La barra del PDV recortaba «Cuentas» y «Cobrados» a 390 px**: no entraban
+  en una línea junto al buscador y `.pdv` tiene `overflow: hidden`, así que
+  las dos vistas quedaban dibujadas fuera de la pantalla sin scroll que las
+  alcanzara. La barra ahora envuelve.
+- **El conteo por denominaciones no entraba en el diálogo en un teléfono**: la
+  grilla de dos columnas fijas se desbordaba llevándose «Abrir caja» con ella,
+  y sin caja abierta no se vende. Pasa a una columna donde no entren dos.
+- Las barras superiores del PDV y del KDS tenían la altura clavada en 56 px:
+  el título envuelto a dos líneas se salía de la banda y se montaba sobre el
+  contenido de abajo.
+- **La pantalla de bloqueo del PDV se pintaba con el fondo blanco del
+  navegador**: `.pdv-bloqueo` se monta como hermano de `<main class="pdv">`,
+  donde los tokens `--pdv-*` no existen, y un `var()` sin respaldo invalida la
+  declaración entera. Deuda declarada en ADR-050 y cerrada acá.
+
+- **La plantilla de recetas se descargaba como un `.json` corrupto**
+  (2026-08-15, ADR-048). El backend siempre armó un `.xlsx` de verdad; quien
+  lo rompía era el proxy del navegador (`app/api/proxy/[...ruta]/route.ts`),
+  que leía todo cuerpo con `text()` —un `.xlsx` es un ZIP y no sobrevive una
+  decodificación UTF-8— y lo devolvía con `Content-Type: application/json`
+  fijo, descartando el `Content-Disposition`. Sin nombre y con ese tipo, el
+  navegador guardaba `plantilla.json`. Ahora el cuerpo viaja como stream y
+  conservando el tipo y el nombre de archivo que manda la API.
+- **La subida del recetario nunca llegó a funcionar desde la pantalla**
+  (2026-08-15, ADR-048). El mismo proxy forzaba `Content-Type:
+  application/json` en la ida, y en `multipart/form-data` ese header lleva un
+  `boundary` que genera el navegador: pisarlo dejaba al servidor buscando una
+  marca que el cuerpo no tenía. La fase 1 del importador (ADR-046) estaba
+  rota desde que se escribió y nadie lo reportó porque nadie pudo pasar de la
+  descarga. Ahora se reenvía el `Content-Type` entrante y el cuerpo sin
+  decodificar.
+- **Nada probaba el camino que recorre una persona.** Los tests del
+  importador atacan a FastAPI con `TestClient` y el proxy queda fuera del
+  recorrido, así que el endpoint podía estar perfecto y llegar roto al
+  navegador. Se cierra con `frontend/lib/proxy.test.ts` (8 casos, sin
+  levantar nada: binario byte por byte, `boundary` intacto, JSON intacto,
+  error literal, 204 y 401) y con el recorrido
+  `frontend/uso/importador-recetas.spec.ts` (ADR-047), que descarga la
+  plantilla, verifica la firma `PK\x03\x04`, **la abre con openpyxl**, la
+  llena, la sube, resuelve un insumo desconocido y la importa. Contra el
+  proxy viejo falla con `Received: "plantilla.json"`.
+- Costo aceptado: el cuerpo de subida se junta en memoria en vez de
+  encadenarse como stream —`duplex: "half"` no está en el tipo estándar de
+  `RequestInit`— y de la respuesta se copian solo `Content-Type` y
+  `Content-Disposition`. Reenviar `content-encoding`/`content-length` de una
+  respuesta que `fetch` ya descomprimió corrompe la descarga, y `set-cookie`
+  de la API no tiene por qué cruzar al navegador.
+
+- **Las claves foráneas se hacen cumplir en todo el suite** (2026-08-15). SQLite
+  las trae **apagadas** y Postgres no las apaga nunca: el suite dejaba pasar en
+  verde borrados e inserciones que la base real rechaza —así estuvo meses roto
+  `anular_lineas` contra `fk_venta_item_padre`—. Un listener del evento
+  `connect` de SQLAlchemy en `tests/conftest.py` enciende
+  `PRAGMA foreign_keys=ON` en **cualquier** engine SQLite del proceso, en vez
+  de fixture por fixture: son ~75 y una que se olvide reabre el agujero.
+  Corolario para escribir tests: un `uuid.uuid4()` en una columna FK ya no
+  pasa, hay que sembrar la fila. Destapó cinco violaciones, dos de ellas bugs
+  de producción de verdad.
+- **Una receta con insumos no se podía borrar** (2026-08-15). `eliminar_receta`
+  borraba las líneas y después la cabecera, pero sin `relationship` entre
+  `receta` y `receta_item` SQLAlchemy no sabe que una depende de la otra y
+  emitía el `DELETE` del padre **primero**: Postgres lo rechazaba por
+  `fk_receta_item_receta_id_receta` y el usuario veía un 500. Como toda receta
+  real tiene insumos, la operación estaba rota entera. Se fuerza el flush entre
+  los dos borrados; hacerlo cumplir en el esquema (`ON DELETE CASCADE`) queda
+  como deuda junto con el caso gemelo de `venta_item`.
+- **El reporte que no se podía ubicar era el único que no se emitía**
+  (2026-08-15). `reports.emision` guardaba en `almacen_id`, `sucursal_id`,
+  `empresa_id` y `actor_id` el id que venía en el payload **aunque esa fila ya
+  no existiera** — un almacén dado de baja, un usuario desactivado entre el
+  hecho y su emisión (el bus despacha post-commit, ADR-016). Las cuatro son FK:
+  el `INSERT` moría y se perdía el reporte completo, justo el que había que
+  investigar. Ahora la columna queda nula y el id sobrevive en `datos`, que es
+  lo que se lee al investigar: se pierde el enlace, que es exactamente lo que
+  dejó de existir.
+
+- **No se podía vender una pizza** (2026-08-12, ADR-038). `GET /sales/carta`
+  armaba los grupos de opciones leyendo el producto **padre**, pero los
+  sabores cuelgan de la **variante**, que es el producto que se prepara
+  (RN-COM-022/023). La carta devolvía `extras: []`, el PDV no dibujaba
+  "Sabor", habilitaba Guardar sin elegir ninguno, y el servidor —que sí mira
+  los grupos de la variante— rechazaba el pedido con
+  `409 'Sabor' exige elegir 1, llegaron 0`. El cajero veía un error que la
+  pantalla nunca le dejó evitar, y como sin venta confirmada no hay comanda,
+  tampoco llegaba nada al KDS. Ahora cada variante viaja con su propio
+  `extras[]` (aditivo, sin migración) y el PDV ofrece los de la presentación
+  elegida — que son exactamente los que el servidor acepta. Cambiar de tamaño
+  limpia lo ya elegido: los ids son de otra variante.
+- **Los sabores del catálogo de demo se creaban sin precio de lista** y la
+  carta descarta todo extra sin precio vigente, así que no habrían aparecido
+  igual. Se les fija precio 0: el sabor no cobra aparte, pero "vale cero" y
+  "no tiene precio" son cosas distintas, y la carta hace bien en no ofrecer
+  la segunda.
+- **El lienzo de nodos no se podía cablear** (ADR-035, tercera enmienda).
+  `conectar()`/`desconectar()` estaban escritos, probados y enchufados, pero
+  todos los `<Handle>` llevaban `isConnectable={false}`: react-flow no deja ni
+  empezar el arrastre desde un puerto deshabilitado, así que era código
+  inalcanzable. Se habilitan los puertos, las aristas se cortan **solo** donde
+  el dominio admite desvincular, y `Supr` se suma al `Backspace` de fábrica.
+- **Un nodo con acciones ya no se traga sus propios clicks**: `Tarjeta`
+  deshabilitaba el `<button>` del nodo cuando no tenía `onToggle`, y un
+  `<button disabled>` anula lo que contiene — con eso "receta" y "quitar"
+  estaban muertos en el nodo de grupo.
+- **El grupo se retira desde su nodo**: `BorrarGrupo` existía como componente
+  y no estaba montado en ninguna pantalla, así que la única forma de borrar un
+  grupo era el endpoint. Sigue **soltando** sus opciones, no borrándolas.
+- **Una acción de estructura del lienzo refresca también la lista de recetas**
+  (`router.refresh()`): un tamaño o una opción recién creados mostraban
+  `receta` en el pie en vez del nombre de la suya hasta recargar a mano.
+
+- **Una orden ya enviada a cocina admite líneas nuevas** (2026-08-12,
+  ADR-043, RN-COM-029). El PDV respondía "Este pedido ya se envió, usa + para
+  abrir uno nuevo", así que la mesa que pide una bebida diez minutos después
+  terminaba con dos cuentas, que se cobran por separado y se entregan por
+  separado. Ahora `POST /ventas/{id}/items` las suma a la misma orden, con el
+  mismo permiso que crearla y sin firma de nadie: agregar es lo que el
+  negocio quiere que pase, no saca nada del inventario y el rastro queda
+  igual. El evento republicado lleva **el incremento** y no el acumulado, así
+  que inventory descuenta solo lo nuevo y contabilidad no asienta la venta
+  dos veces.
+- **Quitar lo recién enviado dejó de necesitar al supervisor**: quitar una
+  línea exigía su PIN **siempre**, incluso treinta segundos después de un
+  error de tecleo. Un control que se ejecuta veinte veces por turno deja de
+  ser un control — se termina dejando la sesión del encargado abierta en la
+  caja, que es justo lo que RN-AUD-005 quiere evitar. Ahora hay ventana de
+  **5 minutos**: dentro, lo corrige quien opera la caja; fuera, lo firma un
+  supervisor como antes (RN-COM-020). La ventana de la orden entera se mide
+  contra su **última** línea —una mesa larga sigue teniendo algo recién
+  mandado— y un lote necesita firma si **alguna** de sus líneas salió de
+  ella, porque si no bastaría con acompañar la vieja de una nueva. El PDV
+  intenta sin firma y la pide recién cuando el servidor la exige.
+- **Los pedidos vacíos ya no se apilan sin poder cerrarse**: cada toque del
+  "+" abría otra pestaña, y ninguna se podía descartar, así que la columna
+  derecha se llenaba de pedidos que no eran nada. Ahora el "+" reusa el
+  borrador vacío que ya esté abierto —un pedido sin líneas y sin destino no
+  es distinto de otro igual— y una pestaña sin líneas y sin enviar se
+  descarta con su "×". Una con líneas o ya enviada no: eso es "Anular
+  pedido", que repone inventario y queda auditado.
+
+- **La pizza seguía sin poder elegir sabor** (2026-08-12, ADR-042). El arreglo
+  anterior (ADR-038) servía para el catálogo del **seeder**, que cuelga el
+  grupo de la variante, y dejaba roto el armado **a mano**: el lienzo cuelga
+  "+ grupo" del nodo activo, y el nodo activo es el padre mientras el producto
+  no tiene tamaños. El recorrido natural —crear "Pizza", armarle los sabores,
+  y recién después agregar Personal/Mediana/Familiar— deja los sabores en el
+  padre y las variantes vacías. Mientras el lugar donde quedó colgado el grupo
+  importe, siempre va a haber una mitad de los casos rota, así que ahora **una
+  variante ofrece lo suyo más lo del padre**, y la venta acepta exactamente lo
+  que la carta ofreció. El vínculo propio gana sobre el heredado: si la
+  Familiar declara su propio "extra queso", manda su tope. Sin migración: es
+  una regla de lectura, y los dos catálogos que hay hoy funcionan sin tocar
+  sus datos.
+- **El cajero no podía anular un pedido ya enviado**: `sales.anular` es un
+  permiso de supervisor, así que el botón del PDV devolvía 403 sin decir qué
+  hacer y el pedido quedaba en cocina. El permiso sigue siendo de supervisor;
+  lo que faltaba era el camino del cajero, que es el mismo que ya existía para
+  quitar una línea enviada (RN-COM-020): la pide él y la firma un supervisor
+  con su PIN en el mismo terminal. El PDV lo intenta sin firma primero — quien
+  ya tiene el permiso no debería teclear su propio PIN para anular su pedido —
+  y solo pide la firma si el servidor dice que no le alcanza. El endpoint
+  entra con `sales.cobrar` **o** `sales.anular`: son roles disjuntos —el
+  cajero cobra y no anula, el supervisor anula y no cobra— y exigir los dos
+  habría dejado afuera a los dos.
+- **Los pedidos enviados y sin cobrar no se veían**: existían como una nota al
+  pie del mapa de mesas, y encima filtrando fuera los de mesa, así que un
+  "para llevar" solo se encontraba entrando a Mesas y bajando, y uno de mesa
+  había que reconocerlo por el color de una celda. Ahora es una pestaña propia
+  ("Cuentas") con todo lo que falta cobrar —mesa, para llevar y delivery en la
+  misma lista, con su total— porque esa es la pregunta de la caja y no es una
+  pregunta sobre el salón. El mapa de mesas sigue siendo el mapa de mesas.
+
+- **La raíz de cinco módulos daba 404** (2026-08-15). `catalogo`, `compras`,
+  `inventario`, `organizacion` y `rrhh` tenían carpeta, `layout.tsx` y todas
+  sus pantallas, pero ninguna ruta en la raíz: el ícono del home apunta a la
+  primera pantalla (`/catalogo/productos`), así que nada del shell enlazaba
+  `/catalogo` y el agujero no se veía. Sí lo teclea quien recorta la URL para
+  subir un nivel, que es justo lo que uno hace cuando se perdió. Ahora cada
+  raíz redirige a `modulo.href` leído de `lib/modulos.ts`: la primera pantalla
+  de un módulo cambia, y dos lugares donde declararla son dos lugares donde
+  puede quedar mal.
+- **El ERP no tenía pantalla de 404**: cualquier dirección equivocada caía en
+  la página por defecto de Next —fondo blanco, "404" en inglés y ninguna
+  salida—. En una tablet detrás de la barra, una pantalla sin botón de vuelta
+  se resuelve apagando y volviendo a entrar. `app/not-found.tsx` dice qué pasó
+  en español y ofrece el inicio. No repite la ruta que falló: quien tecleó la
+  dirección ya la vio, lo que le falta es la puerta.
+- **Nada ataba la navegación al árbol de archivos**: `lib/navegacion.test.ts`
+  cruza `MODULOS` con `SUBMENUS`, pero los dos pueden estar de acuerdo
+  apuntando a una pantalla que no existe. Por eso la deuda "7 íconos del home
+  llevan a 404" sobrevivió meses después de que esas pantallas se
+  construyeran, sin que nadie pudiera decir si seguía siendo cierta.
+  `lib/rutas.test.ts` resuelve los 14 íconos y los 25 ítems de submenú contra
+  los `page.tsx` reales, y comprueba que ninguna raíz se redirija a sí misma.
+
+### Security
+
+- **El login se teclea en el pinpad, no en un campo de contraseña**
+  (2026-08-15, ADR-050, enmienda a ADR-045). `frontend/app/login/page.tsx`
+  pedía el PIN en un `<input type="password" autocomplete="current-password">`
+  — el patrón exacto que ADR-045 había eliminado dos días antes dentro del
+  PDV, en la pantalla que más veces se cruza y desde la misma tablet de la
+  caja. El navegador ofrece guardarlo, y con el PIN guardado el turno
+  siguiente entra con la cuenta del anterior: toda la auditoría de RN-AUD-005
+  nombrando a la persona equivocada. Sacar el campo de los cuatro diálogos del
+  PDV y dejarlo en la puerta no protegía nada — basta con entrar una vez.
+  Ahora el usuario se teclea (es un identificador, no un secreto) y el PIN se
+  toca en un teclado numérico **sin campo de formulario, ni oculto**: el valor
+  vive en el estado de React y viaja en el `FormData` del envío. Al sexto
+  dígito entra solo. Se descartó la lista de usuarios para elegir: enumerar al
+  personal le regala la mitad de la credencial a cualquiera que pase frente a
+  la caja.
+- **El pinpad dejó de ser del PDV.** Se mudó de `app/pdv/pinpad.tsx` a
+  `frontend/components/pinpad/` y su CSS de `pdv.css` a `globals.css`, con
+  cada color pedido al token `--pdv-*` **con respaldo** en el del back office
+  (`var(--pdv-rojo, var(--primary))`): dentro del PDV se ve exactamente igual
+  que antes y fuera cae al sistema visual de ADR-037, modo oscuro incluido,
+  sin duplicar el bloque. `app/pdv/pinpad.tsx` queda como re-export de una
+  línea a propósito, para no chocar con la rama que trabaja sobre
+  `dialogos.tsx`; el puente y `app/cambiar-pin/` quedan anotados como deuda.
+- **El login dejó de tratar igual a las tres negativas del servidor.**
+  `actions.ts` devolvía `e.message` sin mirar el status, así que "PIN
+  equivocado" (401), "cuenta bloqueada quince minutos" (423) y "demasiados
+  intentos desde esta IP" (429) llegaban con el mismo texto genérico — y las
+  tres terminaban en lo mismo: probar de nuevo hasta bloquear la cuenta. Ahora
+  cada una dice qué hacer y cuánto esperar (el 429 lee el `Retry-After`, para
+  lo cual `ApiError` lo expone), y un PIN de menos de seis dígitos se corta
+  **antes** de llamar a la API: con un pinpad, un "Ingresar" de más gastaría
+  uno de los cinco intentos del lockout. Sin contador de intentos en el
+  cliente — el estado real vive en el servidor.
+- **El usuario tecleado ya no se borra al errar el PIN.** React 19 resetea los
+  campos no controlados de un `<form action>` cuando la acción termina,
+  también cuando devolvió error; volver a escribir el usuario en cada intento
+  es justo la fricción que empuja a dejar la sesión de otro abierta. Mismo
+  candado que el back office puso en sus diálogos el 2026-08-10.
+- **Tres casos e2e nuevos** (13 → 16, `frontend/e2e/sesion.spec.ts`): que en
+  el DOM del login no exista ningún `input` de tipo password ni con
+  `autocomplete` de contraseña —se afirma el DOM y no un comportamiento,
+  porque un `type="password"` agregado sin querer dejaría todo lo demás en
+  verde—, con teclado físico y región viva verificados; que un PIN equivocado
+  no borre el usuario; y que una cuenta bloqueada avise distinto que un PIN
+  equivocado, agotando de verdad los cinco intentos sobre una cuenta de
+  sacrificio del seeder (`bloqueo_e2e`). El 429 no se prueba: la suite sube el
+  rate limit a propósito para poder entrar muchas veces desde la misma IP.
+
 ## [0.4.0] - 2026-08-10
 
 ### Added
