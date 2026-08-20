@@ -20,10 +20,6 @@ import { capturar } from "./util";
 
 const NOMBRE = "Cliente Uso";
 const TELEFONO = "955444333";
-/** El cliente jurídico que siembra `src/seeders/e2e.py`, con la razón social
- * tecleada mal a propósito. */
-const CLIENTE_SEMBRADO = "razon social tecleada a mano";
-
 const FIRMA_ZIP = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
 
 test("el padrón se descarga, se llena y se carga de golpe", async ({ page }, testInfo) => {
@@ -104,8 +100,8 @@ test("el padrón exportado se vuelve a subir sin duplicar a nadie", async ({ pag
   // y un locator ambiguo falla por strict mode sin probar nada. Que empiece en
   // "0 nuevo(s)" es la mitad que importa: el round-trip no crea a nadie.
   await expect(dialogo(page).getByText(/^0 nuevo\(s\).+a actualizar/)).toBeVisible();
-  // El cliente sembrado se reconoce por su RUC, no por su razón social —
-  // que es justamente lo que se edita (ADR-052).
-  await expect(dialogo(page).getByText(CLIENTE_SEMBRADO)).toBeVisible();
+  // Y **nada** que no se pueda importar: si el export escribiera una columna
+  // que el parser no entiende, las filas caerían acá.
+  await expect(dialogo(page).getByText(/con problemas/)).toHaveCount(0);
   await capturar(page, testInfo, "round-trip");
 });
