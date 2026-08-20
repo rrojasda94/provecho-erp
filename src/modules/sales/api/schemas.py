@@ -247,7 +247,7 @@ class ClienteOut(BaseModel):
     persona_id: uuid.UUID | None
 
 
-# --- Carga masiva de clientes (RN-PTS-007, ADR-051) ---
+# --- Carga masiva de clientes (RN-PTS-007, ADR-052) ---
 class ClienteImportadoIn(BaseModel):
     """Una fila de la hoja «Clientes», ya revisada por la pantalla.
 

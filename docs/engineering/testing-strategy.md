@@ -234,7 +234,7 @@ escrito a mano: envejece sin avisar.
   recetario de punta a punta —descargar la plantilla, abrirla con openpyxl,
   llenarla, subirla y confirmar—, que es el camino donde vivía el bug del
   proxy (ADR-048); `uso/importador-articulos.spec.ts` y
-  `uso/importador-clientes.spec.ts` (2026-08-20, ADR-051) hacen lo mismo con el
+  `uso/importador-clientes.spec.ts` (2026-08-20, ADR-052) hacen lo mismo con el
   catálogo y el padrón, y además el **round-trip nulo**: bajar lo que ya está
   cargado, volver a subirlo sin tocarlo y exigir que todo salga "a actualizar"
   y nada "nuevo" — es lo único que verifica que el export y el importador
@@ -269,7 +269,7 @@ La diferencia no es teórica: ya dejó pasar bugs.
 - **Largo de `VARCHAR` y tipos** — SQLite no los valida (ver
   `docs/roadmap/deuda/transversal.md`). Sigue abierto: la única red es probar
   cada migración contra un Postgres real. Los importadores de planilla
-  (2026-08-20, ADR-051) le agregan una segunda: **validan el largo ellos
+  (2026-08-20, ADR-052) le agregan una segunda: **validan el largo ellos
   mismos**, por fila, para que un `Código = "HARINA"` se reporte como problema
   en vez de pasar en verde y dar `StringDataRightTruncation` en producción — y
   `test_importacion_articulos.py` ata la constante a `Articulo.__table__.c

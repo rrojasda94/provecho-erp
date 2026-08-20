@@ -96,7 +96,7 @@ def crear_cliente(
     igual que el tipo de comprobante (RN-CPP-003).
 
     `consultar_documento=False` salta la consulta a SUNAT/RENIEC y usa el
-    nombre tal cual viene. Lo usa la carga masiva (ADR-051): una planilla de
+    nombre tal cual viene. Lo usa la carga masiva (ADR-052): una planilla de
     trescientos clientes serían trescientas llamadas externas secuenciales
     dentro de un solo request, contra una cuota. Cuando el cliente se edita de
     a uno, SUNAT vuelve a mandar.
@@ -278,7 +278,7 @@ def editar_cliente(
     if campos.get("contacto") is not None:
         cliente.contacto = campos["contacto"].strip() or None
     # Mismo criterio que el alta: SUNAT manda sobre lo tecleado — salvo en la
-    # carga masiva, que no puede consultar una vez por fila (ADR-051).
+    # carga masiva, que no puede consultar una vez por fila (ADR-052).
     if consultar_documento and (ruc or razon_social):
         cliente.razon_social = razon_social_desde_ruc(cliente.ruc, cliente.razon_social)
     return cliente

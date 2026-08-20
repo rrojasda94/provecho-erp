@@ -1014,7 +1014,7 @@ def exportar_clientes(
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    """El padrón en la misma plantilla, con los datos adentro (ADR-051).
+    """El padrón en la misma plantilla, con los datos adentro (ADR-052).
 
     Pide permiso de **lectura**: son los mismos datos que devuelve el listado
     de back-office, solo empaquetados en un archivo.

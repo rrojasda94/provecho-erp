@@ -5,7 +5,7 @@ Lo propio de esta entidad, más allá del round-trip:
 - El cliente es del **grupo**, no de la empresa (RN-PTS-001): un id de otro
   grupo no se toca.
 - **No se consulta a Factiliza.** Una planilla de trescientos clientes serían
-  trescientas llamadas externas secuenciales contra una cuota (ADR-051).
+  trescientas llamadas externas secuenciales contra una cuota (ADR-052).
 - De un cliente **natural** solo se completa el documento: su nombre, teléfono
   y dirección viven en `persona` (RN-GEN-007) y `sales` no puede escribirla.
 """
@@ -169,7 +169,7 @@ def test_un_archivo_limpio_se_importa_entero(env):
 
 def test_el_importador_no_consulta_a_factiliza(env, monkeypatch):
     """Trescientas filas serían trescientas llamadas externas secuenciales
-    dentro de un solo request, contra una cuota (ADR-051)."""
+    dentro de un solo request, contra una cuota (ADR-052)."""
     client, _, _ = env
     h = _token(client)
     llamadas = []
@@ -363,7 +363,7 @@ def test_un_archivo_que_no_es_xlsx_lo_dice(env):
 
 def test_importar_exige_el_permiso_de_gestionar_el_padron(env):
     """Reescribir el padrón del grupo no es el mismo acto que registrar a
-    alguien en el mostrador, que es lo que hace el cajero (ADR-051)."""
+    alguien en el mostrador, que es lo que hace el cajero (ADR-052)."""
     client, _, _ = env
     assert client.get("/api/v1/sales/clientes/plantilla").status_code == 401
     assert _validar(client, {}, _libro([NATURAL])).status_code == 401

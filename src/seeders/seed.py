@@ -319,7 +319,7 @@ ROLES = {
         "sales.registrar_consumo_personal",
         "sales.gestionar_mesas",
         # Reescribir el padrón del grupo desde una planilla no es el mismo
-        # acto que registrar a alguien en el mostrador (ADR-051).
+        # acto que registrar a alguien en el mostrador (ADR-052).
         "sales.gestionar_clientes",
         "kds.configurar",
         "kds.operar",

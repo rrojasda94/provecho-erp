@@ -5,7 +5,7 @@ import { useRef, useState, type ReactNode } from "react";
 import { ErrorApi } from "@/lib/cliente-api";
 
 /**
- * La carcasa de una carga masiva por planilla (ADR-051).
+ * La carcasa de una carga masiva por planilla (ADR-052).
  *
  * Lo que es igual en recetas, artículos y clientes no tiene nada de negocio
  * adentro: el botón, el modal, los dos enlaces de descarga, el `<input

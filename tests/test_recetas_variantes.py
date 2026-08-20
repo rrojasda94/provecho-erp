@@ -943,7 +943,7 @@ def test_un_archivo_que_no_es_xlsx_lo_dice(env):
     assert "plantilla" in r.json()["detail"]
 
 
-# --- Exportar y actualizar (ADR-051) -------------------------------------------
+# --- Exportar y actualizar (ADR-052) -------------------------------------------
 def _libro_con_id(recetas: list[list], ingredientes: list[list]) -> bytes:
     """Como `_libro`, pero con la columna `ID` que escribe el export."""
     from openpyxl import Workbook
@@ -1016,7 +1016,7 @@ def test_la_expresion_tecleada_sobrevive_el_export(env):
 
 def test_el_id_actualiza_la_receta_en_vez_de_duplicarla(env):
     """Sin la columna `ID`, renombrar y duplicar son indistinguibles: el
-    nombre es justamente lo que alguien puede querer cambiar (ADR-051)."""
+    nombre es justamente lo que alguien puede querer cambiar (ADR-052)."""
     client, ids = env
     h = _token(client)
     receta_id = _receta(client, h, ids, nombre="Salsa Base")
@@ -1052,7 +1052,7 @@ def test_la_revision_dice_que_va_a_cambiar_antes_de_confirmar(env):
 
 def test_los_ingredientes_ausentes_se_conservan_salvo_que_se_pidan_quitar(env):
     """La decisión es por receta y con el número a la vista: subir una hoja
-    parcial por error no puede vaciar una receta (ADR-051)."""
+    parcial por error no puede vaciar una receta (ADR-052)."""
     client, ids = env
     h = _token(client)
     creadas = _importar_limpio(client, h, _libro(

@@ -149,7 +149,9 @@ def solicitudes_resumen_para_negociacion(
     `inventory`. Suma `cantidad_solicitada` por artículo y sucursal —lo
     pedido, no lo aprobado ni lo despachado: es la demanda real, incluso la
     que el central no llegó a cubrir— y descarta las solicitudes canceladas,
-    que nunca representaron una necesidad real.
+    que nunca representaron una necesidad real, y los borradores, que todavía
+    no se pidieron: negociar volumen con una lista a medio llenar sería
+    prometerle al proveedor demanda que nadie confirmó (RN-INV-023).
 
     `sucursal_id` es `None` para almacenes sin sucursal (central, producción):
     su demanda cuenta igual, solo no se puede atribuir a un local.
@@ -168,7 +170,7 @@ def solicitudes_resumen_para_negociacion(
         .join(Almacen, Almacen.id == SolicitudInsumos.almacen_solicitante_id)
         .join(Sku, Sku.id == SolicitudItem.sku_id)
         .join(Articulo, Articulo.id == Sku.articulo_id)
-        .where(SolicitudInsumos.estado != "cancelada")
+        .where(SolicitudInsumos.estado.not_in(("cancelada", "borrador")))
         .group_by(Articulo.id, Articulo.nombre, Almacen.sucursal_id)
         .order_by(func.sum(SolicitudItem.cantidad_solicitada).desc())
         .limit(limit)

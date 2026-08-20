@@ -1,4 +1,4 @@
-"""El catálogo de artículos se baja, se edita y se vuelve a subir (RN-INV-023).
+"""El catálogo de artículos se baja, se edita y se vuelve a subir (RN-INV-025).
 
 Lo que estas pruebas cuidan, en orden de importancia:
 

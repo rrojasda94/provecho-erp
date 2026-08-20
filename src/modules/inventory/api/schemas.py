@@ -249,12 +249,24 @@ class SolicitudAprobar(BaseModel):
     aprobadas: list[SolicitudItemCantidad] = []
 
 
+class SolicitudItemCantidadIn(BaseModel):
+    """Cantidad de un ítem del borrador. Solo el `sku_id` viaja en la ruta."""
+    cantidad: Decimal = Field(gt=0)
+
+
+class SolicitudItemAgregarIn(SolicitudItemCantidadIn):
+    sku_id: uuid.UUID
+
+
 class SolicitudItemOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     sku_id: uuid.UUID
     cantidad_solicitada: Decimal
     cantidad_aprobada: Decimal | None
     cantidad_despachada: Decimal | None
+    # Qué es urgencia y qué es decisión del local (RN-INV-024): en falso, el
+    # almacenero sabe que ese ítem no está por faltar.
+    bajo_minimo_al_pedir: bool = False
 
 
 class SolicitudOut(BaseModel):
@@ -500,14 +512,14 @@ class RecetaImportadaIn(BaseModel):
     """Una fila de la hoja «Recetas», ya revisada por la pantalla.
 
     `id` y `accion` no son hechos: son **el permiso que una persona dio**. El
-    servidor los vuelve a derivar contra la base antes de escribir (ADR-051).
+    servidor los vuelve a derivar contra la base antes de escribir (ADR-052).
     """
 
     id: uuid.UUID | None = None
     accion: Literal["crear", "actualizar", "omitir"] = "crear"
     # Qué hacer con los ingredientes que el archivo no menciona. Por defecto
     # se conservan: subir una hoja parcial por error no puede vaciar una
-    # receta sin que alguien vea cuántas líneas pierde (ADR-051).
+    # receta sin que alguien vea cuántas líneas pierde (ADR-052).
     ingredientes_ausentes: Literal["conservar", "quitar"] = "conservar"
     nombre: str = Field(min_length=1, max_length=150)
     rendimiento: Decimal = Field(gt=0)
@@ -587,7 +599,7 @@ class ArticuloImportadoIn(BaseModel):
     """Una fila de la hoja «Artículos», ya revisada por la pantalla.
 
     `unidad_medida_id` puede venir en `None` al actualizar: la unidad de un
-    artículo que ya existe no se cambia por planilla (ADR-051).
+    artículo que ya existe no se cambia por planilla (ADR-052).
     """
 
     id: uuid.UUID | None = None
@@ -893,6 +905,19 @@ class GuiaRemisionDetalleOut(GuiaRemisionOut):
 
 
 # --- Lote ascendente del hub (ADR-009) ---------------------------------------
+class SolicitudSyncItemIn(SolicitudItemIn):
+    """Ítem de una solicitud que se reproduce desde el hub.
+
+    Trae la marca de urgencia porque la puso el local contra su propio stock
+    (RN-INV-024) y recalcularla en la nube al reproducir el lote contaría
+    otra cosa. No está en `SolicitudItemIn` a propósito: en el alta normal
+    la calcula el servidor, y dejarla entrar por el cuerpo permitiría
+    declararse urgente a uno mismo.
+    """
+
+    bajo_minimo_al_pedir: bool = False
+
+
 class SolicitudSyncIn(BaseModel):
     """Solicitud creada en el local durante un corte. Viaja con su `id`
     client-generado: reproducirla dos veces no la duplica."""
@@ -902,7 +927,7 @@ class SolicitudSyncIn(BaseModel):
     almacen_abastecedor_id: uuid.UUID
     solicitado_por: uuid.UUID
     observacion: str | None = None
-    items: list[SolicitudItemIn] = Field(min_length=1)
+    items: list[SolicitudSyncItemIn] = Field(min_length=1)
 
 
 class RecepcionSyncItemIn(BaseModel):

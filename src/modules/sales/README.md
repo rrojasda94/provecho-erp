@@ -514,7 +514,7 @@ ninguna entidad de negocio.
 ## Estado (slice — planilla del padrón, 2026-08-20)
 
 El padrón de clientes se baja, se edita en Excel y se vuelve a subir
-(RN-PTS-007, ADR-051). Endpoints: `GET /sales/clientes/plantilla`,
+(RN-PTS-007, ADR-052). Endpoints: `GET /sales/clientes/plantilla`,
 `GET /sales/clientes/exportar`, `POST /sales/clientes/importar/validar`
 (multipart) y `POST /sales/clientes/importar`.
 

@@ -14,7 +14,7 @@ import {
 import { ErrorApi } from "@/lib/cliente-api";
 
 /**
- * Carga masiva del catálogo de artículos (RN-INV-023, ADR-051).
+ * Carga masiva del catálogo de artículos (RN-INV-025, ADR-052).
  *
  * La identidad de una fila es el `ID` o, si va vacío, el `Código`: el nombre
  * no sirve de clave porque el nombre es justamente lo que se edita.

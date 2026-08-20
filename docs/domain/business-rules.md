@@ -1084,7 +1084,23 @@ producción se hace en cocinas de sucursal. Ver
   a ese, y despachar desde otro en silencio es lo que el que recibe no puede
   notar hasta contar la mercadería. "No disponible" es estar dado de baja, no
   estar sin stock: el faltante tiene su propio camino (RN-INV-001/002).
-- **RN-INV-023** El catálogo de artículos **se baja, se edita y se vuelve a
+- **RN-INV-023** Un almacén tiene a lo más **un** requerimiento en estado
+  `borrador` a la vez — la lista que su turno junta durante la jornada
+  (ADR-051). Se crea sola con lo que está bajo mínimo la primera vez que se
+  abre, y volver a abrirla suma lo que cayó bajo mínimo desde entonces sin
+  tocar lo ya tecleado. Enviarla la vuelve `pendiente` y recién ahí cuenta
+  como una solicitud: mientras es borrador no aparece en el listado general
+  ni en el resumen de demanda para negociación con proveedores
+  (`solicitudes_resumen_para_negociacion`), y el hub no la sube offline —
+  todavía no le pidió nada a nadie.
+- **RN-INV-024** Un ítem que estaba bajo su mínimo al momento de agregarse a
+  una solicitud (por sugerencia o a mano) queda marcado como tal; uno que no
+  lo estaba queda marcado como pedido por decisión del local, no por
+  urgencia. La marca se **estampa al agregar el ítem y no se recalcula**
+  después: entre pedir y aprobar el stock se mueve, y recalcularla contaría
+  una historia distinta de la que quien pidió vio. Es lo que le permite al
+  abastecedor priorizar sin adivinar.
+- **RN-INV-025** El catálogo de artículos **se baja, se edita y se vuelve a
   subir** en el mismo formato, con revisión en el medio (ADR-051). La
   identidad de una fila es su `ID` o, si va vacío, su **código interno** — el
   nombre no sirve de clave porque el nombre es justamente lo que se corrige.

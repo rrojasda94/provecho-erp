@@ -4,7 +4,7 @@ Un recetario de restaurante no se teclea receta por receta: llega en una
 hoja de cálculo que ya existe, con decenas de platos y cientos de líneas. Y
 corregir el rendimiento de treinta recetas ya cargadas tampoco se hace
 abriendo treinta fichas: por eso `exportar` devuelve la misma plantilla con
-los datos adentro (ADR-051).
+los datos adentro (ADR-052).
 
 **Dos fases, sin tabla de staging.** `validar` parsea y devuelve qué está
 bien y qué no, **sin guardar nada**; la pantalla resuelve los insumos que no
@@ -15,7 +15,7 @@ estado, una importación abandonada no deja nada que barrer.
 
 **La columna `ID` decide alta o actualización**: vacía es alta, llena es la
 receta que el export nombró. El nombre no sirve de clave porque el nombre es
-justamente lo que alguien puede querer cambiar (ADR-051).
+justamente lo que alguien puede querer cambiar (ADR-052).
 
 **Qué se borra lo decide una persona, receta por receta.** Al actualizar, los
 ingredientes que el archivo no menciona se conservan salvo que la revisión
@@ -88,7 +88,7 @@ def exportar(session: Session, *, empresa_id: uuid.UUID) -> bytes:
     """El recetario de la empresa en el formato que `validar` sabe leer.
 
     Es la plantilla con los datos adentro: lo que baja se edita y se vuelve a
-    subir sin traducir nada (ADR-051).
+    subir sin traducir nada (ADR-052).
     """
     udms = {u.id: u.nombre for u in session.scalars(select(UnidadMedida))}
     articulos = {
@@ -279,7 +279,7 @@ def _revisar_receta(
         "id": str(fila["id"]) if fila["id"] else None,
         "accion": accion,
         # Lo que el archivo no menciona se conserva salvo que la pantalla pida
-        # lo contrario para esta receta (ADR-051).
+        # lo contrario para esta receta (ADR-052).
         "ingredientes_ausentes": "conservar",
         "nombre": nombre,
         "rendimiento": str(fila["rendimiento"]),

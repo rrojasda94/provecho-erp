@@ -73,9 +73,9 @@ fecha_vencimiento, condiciones de almacenamiento), `conteo`, `ajuste`
   "quién sacó esto del almacén". La pantalla estuvo en solo lectura hasta
   esa fecha, así que la API completa era inalcanzable por UI.
 
-## Estado (slice 8 — planillas de catálogo, 2026-08-20)
+## Estado (slice 9 — planillas de catálogo, 2026-08-20)
 
-Exportar es la plantilla con los datos adentro (ADR-051): lo que baja se edita
+Exportar es la plantilla con los datos adentro (ADR-052): lo que baja se edita
 en Excel y se vuelve a subir. La E/S de `.xlsx` vive en `src/shared/planilla.py`
 —abrir, mapear cabecera, filas, celda→texto/número/fecha/uuid, escribir— y la
 lógica de cada entidad en su propio archivo de `application/`.
@@ -124,6 +124,38 @@ Exportar pide permiso de **lectura** (`inventory.leer`): son los mismos datos
 que el listado, solo empaquetados. Plantilla, validar e importar piden
 `inventory.gestionar_catalogo`. Las rutas literales van declaradas **antes** de
 `/{id}`, o FastAPI las toma como un id que no es UUID.
+## Estado (slice 8 — requerimiento de la jornada, 2026-08-19)
+
+`solicitud_insumos` gana el estado `borrador` y `solicitud_item` la columna
+`bajo_minimo_al_pedir` (ADR-051, RN-INV-023/024, migración `b5f27ac41e83`).
+
+- **`borrador`**: la lista que el turno junta durante la jornada. Uno por
+  almacén, no por usuario —dos listas paralelas del mismo almacén se
+  solapan y ninguna queda completa—; `GET /solicitudes/borrador?almacen_id=`
+  la crea si no existe (ya cargada con lo que está bajo `stock_minimo`) y si
+  existía le suma lo que cayó bajo mínimo desde la última vez, **sin tocar
+  lo ya tecleado**. No aparece en `GET /solicitudes` salvo pidiendo
+  `estado=borrador`, ni en `solicitudes_resumen_para_negociacion`, ni sube
+  al hub: todavía no le pidió nada a nadie.
+- **`bajo_minimo_al_pedir`**: si el SKU estaba bajo mínimo cuando entró a la
+  lista. Se **estampa al agregar el ítem**, nunca se recalcula —entre pedir
+  y aprobar el stock se mueve, y recalcularla contaría otra historia—. Es lo
+  que le dice al abastecedor qué es urgencia real y qué es decisión del
+  local (ambas preguntas que hasta ahora no tenían dónde vivir).
+- `POST/PATCH/DELETE /solicitudes/{id}/items[/{sku_id}]` editan el borrador;
+  `POST /solicitudes/{id}/enviar` lo pasa a `pendiente` y **re-resuelve** el
+  abastecedor (RN-INV-022 pudo cambiar mientras la lista estaba abierta).
+- `GET /conteos` (paginado, faltaba: solo se podía pedir un conteo por su
+  `id`) y `GET /solicitudes` / `GET /conteos/programa` ganan `sucursal_id` /
+  `marca_id`, resueltos por join a través del almacén — las dos entidades
+  van por almacén y sucursal/marca cuelgan de él.
+- Pantallas nuevas: `/inventario/solicitudes` (la lista de la jornada +
+  aprobar/rechazar/cancelar) y `/inventario/conteos` (abrir, contar a
+  ciegas, cerrar viendo los ajustes generados, anular con motivo).
+
+Tests: `tests/test_solicitudes_borrador.py` (10 casos) y los agregados a
+`tests/test_conteos.py`. Recorrido de uso:
+`frontend/uso/requerimientos.spec.ts`.
 
 ## Estado (slice 7 — carga masiva de recetas, 2026-08-13)
 
@@ -256,6 +288,9 @@ supervisor aprueba y reserva, el central despacha, el local recibe.
 | GET | `/reservas?almacen_id&sku_id` | `leer` |
 | POST | `/reservas/{id}/liberar` | `liberar_reserva` |
 | POST/GET | `/solicitudes` | `solicitar_insumos` / `leer` |
+| GET | `/solicitudes/borrador?almacen_id=` | `solicitar_insumos` |
+| POST/PATCH/DELETE | `/solicitudes/{id}/items[/{sku_id}]` | `solicitar_insumos` |
+| POST | `/solicitudes/{id}/enviar` | `solicitar_insumos` |
 | GET | `/solicitudes/resumen` | `leer_solicitudes_externas` |
 | GET | `/solicitudes/{id}` | `leer` |
 | POST | `/solicitudes/{id}/aprobar` \| `/rechazar` | `aprobar_solicitud` |

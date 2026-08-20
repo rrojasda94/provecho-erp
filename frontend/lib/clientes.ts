@@ -14,7 +14,7 @@ import { pedir, subir } from "@/lib/cliente-api";
 export const RUTA_PLANTILLA_CLIENTES =
   "/api/proxy/api/v1/sales/clientes/plantilla";
 
-/** El mismo libro que la plantilla, con el padrón adentro (ADR-051). */
+/** El mismo libro que la plantilla, con el padrón adentro (ADR-052). */
 export const RUTA_EXPORTAR_CLIENTES = "/api/proxy/api/v1/sales/clientes/exportar";
 
 export type ClienteRevisado = {

@@ -1,5 +1,5 @@
 """El padrón de clientes se baja, se edita en Excel y se vuelve a subir
-(RN-PTS-007, ADR-051).
+(RN-PTS-007, ADR-052).
 
 Mismo recorrido que el recetario y el catálogo: `exportar` da la plantilla con
 los datos adentro, `validar` dice qué entra y qué no **sin guardar nada**, y
@@ -399,7 +399,7 @@ def _crear_uno(session: Session, grupo_id, entrada: dict, nombre: str) -> Client
         fecha_nacimiento=planilla.a_fecha(entrada.get("fecha_nacimiento")),
         tipo_documento=_tipo_documento(entrada),
         # La planilla manda sobre el nombre: una consulta externa por fila
-        # es lo que hace inviable una carga de trescientas (ADR-051).
+        # es lo que hace inviable una carga de trescientas (ADR-052).
         consultar_documento=False,
     )
 

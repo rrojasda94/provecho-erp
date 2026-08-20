@@ -1,5 +1,5 @@
 - **Una receta que ya existe se actualiza en vez de omitirse** (2026-08-20,
-  ADR-051, RN-COM-031). Desde ADR-046 el nombre repetido se informaba y la fila
+  ADR-052, RN-COM-031). Desde ADR-046 el nombre repetido se informaba y la fila
   no entraba, y la deuda quedó abierta a propósito: actualizar exigía decidir
   qué pasa con los ingredientes que el archivo no menciona, y eso es decisión de
   negocio, no de código. La decisión: **se conservan**, y la revisión deja

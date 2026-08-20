@@ -1,4 +1,4 @@
-"""Leer y escribir planillas `.xlsx` — el acarreo, no las reglas (ADR-051).
+"""Leer y escribir planillas `.xlsx` — el acarreo, no las reglas (ADR-052).
 
 Tres entidades se bajan a Excel y se vuelven a subir —recetas, artículos y
 clientes— y lo que comparten no tiene negocio adentro: abrir el libro y decir
@@ -9,7 +9,7 @@ Lo que **no** vive acá es qué hojas tiene cada libro, qué columnas, qué cuen
 como "ya existe" y qué puede cambiar una actualización: eso son tres
 significados distintos y cada módulo lo escribe plano en su propio archivo. Un
 motor genérico con descriptores de columnas se lee peor que las tres copias que
-evita (ADR-051).
+evita (ADR-052).
 
 **Se lee por nombre de cabecera, no por índice.** El parser original de ADR-046
 leía la columna 0, así que agregar la columna `ID` a la izquierda habría roto

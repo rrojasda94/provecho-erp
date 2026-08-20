@@ -15,7 +15,7 @@ import {
 import { ErrorApi } from "@/lib/cliente-api";
 
 /**
- * Carga masiva del recetario (RN-COM-031, ADR-051).
+ * Carga masiva del recetario (RN-COM-031, ADR-052).
  *
  * El recorrido es: bajar la plantilla —o el recetario ya cargado— → subirla →
  * **revisar** → confirmar. La revisión es el punto: el archivo casi nunca

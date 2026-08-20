@@ -1,4 +1,4 @@
-"""La capa de E/S de planillas `.xlsx` (ADR-051), sin base de datos.
+"""La capa de E/S de planillas `.xlsx` (ADR-052), sin base de datos.
 
 Lo que se prueba acá es el acarreo: que un archivo que no es un `.xlsx` dé un
 error entendible en vez de un 500, que la cabecera se lea por nombre y no por

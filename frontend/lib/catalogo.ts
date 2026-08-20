@@ -68,7 +68,7 @@ export type IngredienteRevisado = {
 
 export type RecetaRevisada = {
   fila: number;
-  /** El id que trajo la columna `ID` del archivo. `null` = alta (ADR-051). */
+  /** El id que trajo la columna `ID` del archivo. `null` = alta (ADR-052). */
   id: string | null;
   accion: "crear" | "actualizar" | "omitir";
   /** Qué hacer con los ingredientes que el archivo no menciona. Se decide
@@ -96,7 +96,7 @@ export type ResultadoImportacion = {
   omitidas: OmitidaImport[];
 };
 
-// --- Carga masiva de artículos (RN-INV-023) ---
+// --- Carga masiva de artículos (RN-INV-025) ---
 export type SkuRevisado = {
   fila: number;
   codigo: string;
@@ -211,7 +211,7 @@ export const RUTA_PLANTILLA_RECETAS =
   "/api/proxy/api/v1/inventory/recetas/plantilla";
 
 /** El mismo libro que la plantilla, con el recetario adentro: se baja, se
- * edita en Excel y se vuelve a subir (ADR-051). */
+ * edita en Excel y se vuelve a subir (ADR-052). */
 export const RUTA_EXPORTAR_RECETAS =
   "/api/proxy/api/v1/inventory/recetas/exportar";
 
@@ -271,7 +271,7 @@ export const catalogoApi = {
   categorias: () => pedir<Categoria[]>("/inventory/categorias"),
 
   /** Alta rápida de una categoría desde el diálogo de importación: el archivo
-   * nombró una que el catálogo no tiene (RN-INV-023). */
+   * nombró una que el catálogo no tiene (RN-INV-025). */
   crearCategoria: (cuerpo: { nombre: string }) =>
     pedir<Categoria>("/inventory/categorias", { metodo: "POST", cuerpo }),
 

@@ -77,7 +77,7 @@ test("el recetario se descarga, se llena y se carga de golpe", async ({ page }, 
   expect(plantilla.hojas).toEqual(["Recetas", "Ingredientes", "Instrucciones"]);
   expect(plantilla.primeraFila).toEqual([
     // La columna `ID` va primera y vacía en la plantilla: llena significa
-    // «actualiza esta receta» (ADR-051).
+    // «actualiza esta receta» (ADR-052).
     "ID",
     "Receta",
     "Rendimiento",

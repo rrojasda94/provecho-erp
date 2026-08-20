@@ -12,7 +12,7 @@ import {
 } from "@/lib/clientes";
 
 /**
- * Carga masiva del padrón de clientes (RN-PTS-007, ADR-051).
+ * Carga masiva del padrón de clientes (RN-PTS-007, ADR-052).
  *
  * La identidad de una fila es el `ID` o, si va vacío, el número de documento.
  * El tipo no se declara: lo decide el documento — 11 dígitos es un RUC y hace

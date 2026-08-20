@@ -1,11 +1,11 @@
-- **Exportar es la plantilla con los datos adentro** (2026-08-20, ADR-051).
+- **Exportar es la plantilla con los datos adentro** (2026-08-20, ADR-052).
   Hasta ahora lo único que bajaba era una plantilla **vacía** de recetas: servía
   para la primera carga y para nada más — corregir el rendimiento de treinta
   recetas ya cargadas exigía abrir treinta fichas. Ahora las tres entidades
   tienen `…/exportar` en el mismo formato que `…/plantilla`: lo que baja se
   edita en Excel y se vuelve a subir sin traducir nada. Exportar pide permiso de
   **lectura**, no de escritura: son los mismos datos del listado, empaquetados.
-- **El catálogo de artículos se carga de golpe** (RN-INV-023):
+- **El catálogo de artículos se carga de golpe** (RN-INV-025):
   `GET /inventory/articulos/plantilla`, `/exportar`, `POST /importar/validar`
   (multipart) e `/importar`. Dos hojas —`Artículos` y `SKUs`— con la misma
   revisión en dos fases que ADR-046 fijó para recetas. Desbloquea de paso la

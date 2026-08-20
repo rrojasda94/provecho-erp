@@ -1,5 +1,5 @@
 """El catálogo de artículos se baja, se edita en Excel y se vuelve a subir
-(RN-INV-023, ADR-051).
+(RN-INV-025, ADR-052).
 
 Mismo recorrido que el recetario: `exportar` da la plantilla con los datos
 adentro, `validar` dice qué entra y qué no **sin guardar nada**, y `importar`
@@ -10,7 +10,7 @@ encontraba un insumo que no existía, había que crearlo a mano.
 
 **La identidad es `ID`, o el `Código` si el `ID` viene vacío.** El código
 interno es corto, estable y ya se usa; el nombre no sirve de clave porque el
-nombre es lo que se edita (ADR-051).
+nombre es lo que se edita (ADR-052).
 
 **La unidad de un artículo existente no se cambia.** `editar_articulo` la
 excluye a propósito: el stock, los movimientos y las recetas ya cargadas están
@@ -279,7 +279,7 @@ def _revisar(
 def _identidad(
     fila, codigo, por_id, por_codigo, repetidos
 ) -> tuple[str, Articulo | None, list[str]]:
-    """Quién es esta fila: `ID` si vino, si no el `Código` (ADR-051)."""
+    """Quién es esta fila: `ID` si vino, si no el `Código` (ADR-052)."""
     problemas: list[str] = []
     existente = None
     accion = "crear"

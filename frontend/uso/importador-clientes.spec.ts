@@ -105,7 +105,7 @@ test("el padrón exportado se vuelve a subir sin duplicar a nadie", async ({ pag
   // "0 nuevo(s)" es la mitad que importa: el round-trip no crea a nadie.
   await expect(dialogo(page).getByText(/^0 nuevo\(s\).+a actualizar/)).toBeVisible();
   // El cliente sembrado se reconoce por su RUC, no por su razón social —
-  // que es justamente lo que se edita (ADR-051).
+  // que es justamente lo que se edita (ADR-052).
   await expect(dialogo(page).getByText(CLIENTE_SEMBRADO)).toBeVisible();
   await capturar(page, testInfo, "round-trip");
 });

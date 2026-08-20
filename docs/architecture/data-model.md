@@ -544,10 +544,17 @@ descuenta stock vía la receta (ver [../domain/domain-model.md](../domain/domain
   `guia_remision`; la de cliente con destino `desecho`/`auditoria` entra al
   almacén y se aparta como merma en el mismo acto.
 - **solicitud_insumos**: almacen_solicitante_id, almacen_abastecedor_id,
-  estado (`pendiente` | `aprobada` | `rechazada` | `cancelada` |
-  `despachada` | `recibida`), solicitado_por, aprobado_por, observacion.
-  Ítems en **solicitud_item** (sku_id, cantidad_solicitada,
-  cantidad_aprobada, cantidad_despachada; único por solicitud+sku). Caso
+  estado (`borrador` | `pendiente` | `aprobada` | `rechazada` |
+  `cancelada` | `despachada` | `recibida`), solicitado_por, aprobado_por,
+  observacion. `borrador` es la lista que el turno junta durante la
+  jornada (ADR-051, RN-INV-023): uno por almacén, se arma sola con lo que
+  está bajo `stock_minimo` y no cuenta como solicitud hasta que se envía
+  (no aparece en el listado general, en el resumen para negociación de
+  `purchases`, ni sube al hub). Ítems en **solicitud_item** (sku_id,
+  cantidad_solicitada, cantidad_aprobada, cantidad_despachada,
+  **bajo_minimo_al_pedir**; único por solicitud+sku). `bajo_minimo_al_pedir`
+  se estampa al agregar el ítem y no se recalcula (RN-INV-024): distingue
+  urgencia real de lo que el local pidió por decisión propia. Caso
   concreto (ámbito inventario) del concepto marco Solicitud (RN-DOC-005).
   Va **por almacén y no por sucursal** (ADR-020): producción también
   solicita y la transferencia opera sobre almacenes; la sucursal se deriva

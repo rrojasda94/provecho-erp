@@ -7,7 +7,7 @@ import { escribirPlanilla, leerPlanilla } from "./planilla";
 import { capturar } from "./util";
 
 /**
- * Carga masiva del catálogo de artículos, de punta a punta (ADR-051).
+ * Carga masiva del catálogo de artículos, de punta a punta (ADR-052).
  *
  * Calcado del recorrido de recetas, y por el mismo motivo: lo que un test de
  * unidad no puede afirmar es que el archivo que **el navegador guarda** sea

@@ -332,8 +332,27 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   `frontend/lib/proxy.test.ts` (8 casos, milisegundos) y
   `frontend/uso/importador-recetas.spec.ts`, que descarga la plantilla, la
   abre con openpyxl, la llena, la sube y confirma (ADR-047).
+- ✅ 2026-08-19 **Requerimiento de la jornada** (ADR-051, RN-INV-023/024,
+  migración `b5f27ac41e83`): el local no tenía cómo armar su lista de pedido
+  ni el almacén cómo distinguir urgencia de decisión propia, pese a que la
+  API de solicitudes existía desde el slice 4. `GET
+  /solicitudes/borrador?almacen_id=` arma sola la lista con lo bajo
+  `stock_minimo` y `solicitud_item.bajo_minimo_al_pedir` se estampa al
+  agregar cada ítem. Suma `GET /conteos` (faltaba) y pantallas
+  `/inventario/solicitudes` + `/inventario/conteos`. Deuda que deja abierta:
+  - ⬜ **El borrador no se encadena al cierre de un conteo cíclico**: hoy lee
+    el `stock_minimo` vigente al abrir la pantalla, independiente de
+    ADR-019. El SOP de abastecimiento (`docs/domain/workflows.md`
+    §Abastecimiento de locales, paso 4) describe que el conteo **genera**
+    el borrador; conectar los dos es una decisión de flujo —¿todo cierre de
+    conteo dispara un borrador, o solo el conteo general?— que no se tomó
+    en este slice.
+  - ⬜ **Recortar lo aprobado por SKU sin pantalla**: `SolicitudAprobar.aprobadas`
+    existe desde ADR-020 y la pantalla nueva solo ofrece aprobar tal cual se
+    pidió (`aprobadas: []`). Falta el formulario que deje editar cantidad
+    por ítem al aprobar.
 - ✅ 2026-08-20 **El importador crea el insumo que falta desde el diálogo**
-  (ADR-051). El `<select>` de resolución tiene ahora un botón «Crear» con un
+  (ADR-052). El `<select>` de resolución tiene ahora un botón «Crear» con un
   formulario en línea —código, unidad y tipo, con el nombre prellenado del
   archivo— contra `catalogoApi.crearArticulo`, que existía desde ADR-046 y
   cuyo único llamador era `contrato.test.ts`. Lo que dejó al descubierto: el
@@ -342,7 +361,7 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   hacer. Cuatro textos describiendo una función que no existía; los cuatro
   corregidos con la entrega. Mismo patrón aplicado a las **categorías** al
   importar artículos.
-- ✅ 2026-08-20 **La importación actualiza recetas existentes** (ADR-051,
+- ✅ 2026-08-20 **La importación actualiza recetas existentes** (ADR-052,
   RN-COM-031). La decisión de negocio que faltaba —qué pasa con los
   ingredientes que el archivo no menciona— se cerró así: **se conservan**, y
   la revisión deja pedir que se quiten **receta por receta**, mostrando cuántas
@@ -351,7 +370,7 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   que nadie vea el número. La identidad es la columna `ID` que escribe el
   export, no el nombre — el nombre es justamente lo que se edita.
 - ⬜ **Los SKU solo se crean por planilla, no se editan** (2026-08-20,
-  ADR-051): no existe `editar_sku` en `catalogo.py`, así que un SKU cuyo
+  ADR-052): no existe `editar_sku` en `catalogo.py`, así que un SKU cuyo
   código ya existe se informa como omitido y no se toca. Tocarlo a medias sería
   peor que informarlo, pero corregir un código de barras mal tecleado sigue
   exigiendo la pantalla de a uno. Se cierra agregando `editar_sku` con las

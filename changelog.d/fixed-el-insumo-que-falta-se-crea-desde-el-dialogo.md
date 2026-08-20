@@ -1,5 +1,5 @@
 - **El insumo que falta se crea desde el diálogo de importación** (2026-08-20,
-  ADR-046 → ADR-051). Era parte de lo pedido en ADR-046 y nunca se entregó: la
+  ADR-046 → ADR-052). Era parte de lo pedido en ADR-046 y nunca se entregó: la
   pantalla dejaba **elegir** uno existente u omitir la línea, y crear uno nuevo
   obligaba a irse a `/inventario/articulos`, crearlo a mano y volver a subir el
   archivo entero. Ahora el `<select>` viene con un botón «Crear» que abre un

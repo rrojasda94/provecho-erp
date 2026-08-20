@@ -1,10 +1,10 @@
-# ADR-051 — Exportar es la plantilla llena, y la columna `ID` es la identidad
+# ADR-052 — Exportar es la plantilla llena, y la columna `ID` es la identidad
 
 - **Estado:** aceptada
 - **Fecha:** 2026-08-20
 - **Contexto:** `inventory` (recetas, artículos), `sales` (clientes)
 - **Relacionado:** ADR-046 (carga masiva de recetas), ADR-048 (el proxy pasa
-  bytes), RN-COM-031, RN-INV-023, RN-PTS-007
+  bytes), RN-COM-031, RN-INV-025, RN-PTS-007
 
 ## Contexto
 
