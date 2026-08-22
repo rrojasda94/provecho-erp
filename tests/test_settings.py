@@ -8,6 +8,9 @@ validador, así que `_lista_por_comas` no llegaba a ejecutarse nunca. Se veía
 recién al levantar `docker compose`, con la API en bucle de reinicio.
 """
 
+import pathlib
+import re
+
 import pytest
 
 from src.config.settings import Settings
@@ -74,3 +77,51 @@ def test_produccion_sigue_rechazando_el_comodin(monkeypatch):
             JWT_SECRET="x" * 48,
             DATABASE_URL="postgresql+psycopg://u:secreta@db:5432/provecho",
         )
+
+
+# --- Sincronía entre `Settings` y los `.env.example` -------------------------
+# El archivo de ejemplo es la única documentación operativa de cómo se
+# configura el ERP: si una variable existe en el código y nadie la escribió
+# ahí, en la práctica no existe — se descubre el día que hace falta, en
+# producción. La deriva no la ve ruff ni el type checker, por eso se prueba.
+
+_RAIZ = pathlib.Path(__file__).resolve().parents[1]
+# Campos internos que a propósito NO se exponen: nadie los ajusta por entorno
+# y ofrecerlos en el ejemplo solo invita a romper cosas.
+_NO_SE_DOCUMENTAN = {"APP_NAME", "APP_VERSION", "JWT_ALGORITHM"}
+
+
+def _variables(nombre_archivo: str) -> set[str]:
+    """Nombres declarados en un `.env`, incluidas las líneas comentadas (una
+    variable comentada sigue estando documentada: dice qué poner y cuándo)."""
+    texto = (_RAIZ / nombre_archivo).read_text(encoding="utf-8")
+    return {
+        linea.split("=", 1)[0].lstrip("# ").strip()
+        for linea in texto.splitlines()
+        if re.match(r"^#?\s*[A-Z][A-Z0-9_]*=", linea)
+    }
+
+
+def test_toda_variable_de_settings_esta_documentada():
+    """El hub tiene su propio ejemplo, así que vale que la variable esté en
+    cualquiera de los dos."""
+    documentadas = _variables(".env.example") | _variables(".env.hub.example")
+    del_codigo = {nombre.upper() for nombre in Settings.model_fields}
+    faltan = del_codigo - documentadas - _NO_SE_DOCUMENTAN
+    assert not faltan, f"sin documentar en .env.example: {sorted(faltan)}"
+
+
+def test_el_ejemplo_no_lleva_secretos_de_verdad():
+    """`.env.example` SÍ se commitea. Un JWT o una API key de Google copiados
+    del `.env` real quedan en el historial de git para siempre, y rotarlos
+    después es un trámite con el proveedor, no un `git revert`."""
+    texto = (_RAIZ / ".env.example").read_text(encoding="utf-8")
+    sospechosos = re.findall(r"eyJ[A-Za-z0-9_-]{20,}|AIza[A-Za-z0-9_-]{20,}", texto)
+    assert not sospechosos, "hay credenciales reales en .env.example"
+
+
+def test_el_ejemplo_copiado_tal_cual_arranca():
+    """`cp .env.example .env` es el primer paso del README. Un valor mal
+    escrito ahí (un decimal con coma, un entero con unidad) no lo ve nadie
+    hasta que la API entra en bucle de reinicio."""
+    Settings(_env_file=_RAIZ / ".env.example")
