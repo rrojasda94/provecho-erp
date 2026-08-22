@@ -83,10 +83,16 @@ class Settings(BaseSettings):
     # Facturación electrónica (Factiliza → SUNAT). Por defecto apunta al
     # entorno QA: emitir contra producción exige cambiar la URL a conciencia.
     factiliza_base_url: str = "https://apife-qa.factiliza.com/api/v1"
-    # Consulta RUC/DNI (RENIEC/SUNAT) — producto distinto de la emisión,
-    # mismo token, host propio (no tiene sandbox QA separado).
+    # Consulta RUC/DNI (RENIEC/SUNAT) — producto distinto de la emisión, con
+    # host propio (no tiene sandbox QA separado).
     factiliza_consulta_base_url: str = "https://api.factiliza.com/v1"
     factiliza_token: str = ""
+    # Son dos productos contratados por separado y Factiliza entrega un token
+    # por cada uno. Vacío = se reusa `factiliza_token`, que es lo correcto
+    # cuando el plan contratado cubre ambos con una sola credencial. Tenerlo
+    # aparte importa además para el día que uno se rote: rotar el de emisión
+    # no debería apagar el buscador de DNI del mostrador.
+    factiliza_consulta_documento_token: str = ""
     factiliza_timeout_segundos: float = 30.0
     igv_porcentaje: Decimal = Decimal("18")
     # --- WhatsApp Cloud API (Meta) — encuesta de satisfacción ---------------
