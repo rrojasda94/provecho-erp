@@ -14759,6 +14759,18 @@
             ],
             "title": "Afp Nombre"
           },
+          "apellidos": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Apellidos"
+          },
           "area": {
             "maxLength": 100,
             "title": "Area",
@@ -14788,6 +14800,18 @@
               }
             ],
             "title": "Jornada Horas Semana"
+          },
+          "nombres": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nombres"
           },
           "numero_documento": {
             "anyOf": [

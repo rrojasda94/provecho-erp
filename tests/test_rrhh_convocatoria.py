@@ -265,6 +265,81 @@ def test_contratar_crea_persona_y_trabajador(env):
         assert persona.numero_documento == "70123456"
 
 
+def test_contratar_usa_el_nombre_de_reniec_y_no_el_autodeclarado(env, monkeypatch):
+    """Con ese nombre se firma el contrato y se declara a SUNAT, así que no
+    puede salir de lo que el postulante escribió de sí mismo en un formulario
+    público (RN-PTS-004, mismo criterio que el alta de cliente).
+
+    Lo revisado en pantalla —`nombres`/`apellidos` en el cuerpo— tampoco
+    manda sobre RENIEC: prellenar es para **ver** el dato antes de guardar,
+    no para pisarlo. Lo enviado se usa solo cuando el proveedor no contesta,
+    que es lo que cubre el test de abajo.
+    """
+    from src.modules.rrhh.application import postulantes as caso_de_uso
+
+    monkeypatch.setattr(
+        caso_de_uso, "nombres_desde_dni", lambda dni, n, a: ("PEDRO ANTONIO", "QUISPE MAMANI")
+    )
+    client, ids, TestSession = env
+    h = _token(client)
+    _, postulante_id = _hasta_oferta(client, h, ids)
+
+    r = client.post(
+        f"/api/v1/rrhh/postulantes/{postulante_id}/contratar",
+        headers=h,
+        json={
+            "cargo": "Pizzero",
+            "area": "Cocina",
+            "tipo_vinculo": "planilla",
+            "fecha_ingreso": "2026-08-15",
+            "numero_documento": "70123456",
+            "nombres": "Luchito",
+            "apellidos": "Tecleado Mal",
+        },
+    )
+
+    assert r.status_code in (200, 201)
+    with TestSession() as s:
+        persona = s.get(Persona, __import__("uuid").UUID(r.json()["persona_id"]))
+        assert persona.nombres == "PEDRO ANTONIO"
+        assert persona.apellidos == "QUISPE MAMANI"
+
+
+def test_contratar_sin_reniec_usa_lo_revisado_en_pantalla(env, monkeypatch):
+    """Factiliza caído o documento que no figura: la contratación **sigue**
+    con lo que corrigió quien contrata (ADR-005). Sin esto, un proveedor
+    externo caído dejaría a alguien sin poder entrar a planilla."""
+    from src.shared.integrations.factiliza import client as factiliza
+
+    def explota(self, dni):
+        raise factiliza.FactilizaError("caído")
+
+    monkeypatch.setattr(factiliza.FactilizaClient, "consultar_dni", explota)
+    client, ids, TestSession = env
+    h = _token(client)
+    _, postulante_id = _hasta_oferta(client, h, ids)
+
+    r = client.post(
+        f"/api/v1/rrhh/postulantes/{postulante_id}/contratar",
+        headers=h,
+        json={
+            "cargo": "Pizzero",
+            "area": "Cocina",
+            "tipo_vinculo": "planilla",
+            "fecha_ingreso": "2026-08-15",
+            "numero_documento": "70123456",
+            "nombres": "Luis Alberto",
+            "apellidos": "Corregido Aca",
+        },
+    )
+
+    assert r.status_code in (200, 201)
+    with TestSession() as s:
+        persona = s.get(Persona, __import__("uuid").UUID(r.json()["persona_id"]))
+        assert persona.nombres == "Luis Alberto"
+        assert persona.apellidos == "Corregido Aca"
+
+
 def test_contratar_sin_documento_rechazado(env):
     client, ids, _ = env
     h = _token(client)

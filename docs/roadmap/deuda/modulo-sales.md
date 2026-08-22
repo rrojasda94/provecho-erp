@@ -213,8 +213,9 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
     ADR-005 ya lo dejaba previsto). `FactilizaClient.consultar_dni`/
     `consultar_ruc` (host propio, `FACTILIZA_CONSULTA_BASE_URL` —
     `api.factiliza.com`, **distinto** de `FACTILIZA_BASE_URL` que es solo
-    emisión de comprobantes contra la QA `apife-qa.factiliza.com`; mismo
-    token). `nombres_desde_dni`/`razon_social_desde_ruc`
+    emisión de comprobantes contra la QA `apife-qa.factiliza.com`; y **token
+    propio**, `FACTILIZA_CONSULTA_DOCUMENTO_TOKEN` — acá decía "mismo token"
+    y era falso, corregido el 2026-08-22). `nombres_desde_dni`/`razon_social_desde_ruc`
     (`src/shared/integrations/factiliza/`) hacen fallback a lo tecleado si
     Factiliza no responde o no encuentra el documento — el alta nunca se
     bloquea por un proveedor externo caído. Cableado en
@@ -432,14 +433,17 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   `fk_receta_item_receta_id_receta`, que se arregló forzando el orden del
   flush (`recetas.eliminar_receta`) y no en el esquema. Las dos son la misma
   migración y conviene hacerlas juntas, contra un Postgres real.
-- ⬜ **El receptor del comprobante en el PDV no tiene el botón «Buscar por
-  DNI/RUC»** (2026-08-15, ADR-041): es donde más se teclea un documento —el
-  cajero lo pide para emitir la factura— y el único de los cuatro puntos que
-  quedó sin la consulta. El permiso `consulta.documento` se le da al `cajero`
-  justamente por este caso, así que hoy lo tiene y no puede usarlo desde la
-  caja. El campo vive en `frontend/app/pdv/dialogos.tsx`, que otra rama
-  estaba editando al mismo tiempo: se dejó fuera para no chocar, no porque no
-  corresponda. Montarlo no es solo agregar el componente —ya se esconde solo
-  si falta el permiso—: `BuscarDocumento` escribe en el **DOM** del `<form>`
-  que lo contiene, y el PDV no es un formulario no controlado como el
-  back-office, así que primero hay que decidir dónde deja el dato.
+- ✅ **El receptor del comprobante en el PDV no tiene el botón «Buscar por
+  DNI/RUC»** (2026-08-15, ADR-041) — **cerrado el 2026-08-22** (addendum de
+  ADR-041). Era donde más se teclea un documento —el cajero lo pide para
+  emitir la factura— y el único de los cuatro puntos que quedó sin la
+  consulta, con el `cajero` teniendo el permiso justamente por este caso.
+  Lo que quedaba por decidir era dónde deja el dato: `BuscarDocumento`
+  escribe en el **DOM** del `<form>`, y el PDV lleva estado de React. Se
+  resolvió con `ConsultaDocumento`, la misma lógica en versión **controlada**
+  —recibe el número tecleado y devuelve la respuesta cruda por `onDatos`—, en
+  vez de rehacer el diálogo de cobro como formulario no controlado. Quedó en
+  los **dos** puntos del PDV donde se identifica a alguien que aún no existe:
+  el alta de cliente y el receptor del comprobante. Y con modo `auto`: en caja
+  hay un solo campo, así que el largo decide el padrón (RN-CPP-003, regla en
+  `frontend/lib/documento.ts` con su prueba).
