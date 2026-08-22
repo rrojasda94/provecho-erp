@@ -7,6 +7,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.shared.ubicacion import UbicacionMixin
+
 
 # El precio NO viaja en el request: lo fija el servidor contra
 # `lista_precio` (RN-PRC-003). `venta_item.precio_unitario` guarda el
@@ -31,7 +33,7 @@ class VentaItemIn(BaseModel):
     sin_articulo_ids: list[uuid.UUID] = []
 
 
-class VentaCreate(BaseModel):
+class VentaCreate(UbicacionMixin):
     sucursal_id: uuid.UUID
     punto_venta_id: uuid.UUID
     canal: str
@@ -42,6 +44,10 @@ class VentaCreate(BaseModel):
     # "Carlos", "Rappi #1042" — visible en KDS y comanda. Para modalidad
     # `mesa` el dato tipado es `mesa_id`.
     referencia_atencion: str | None = Field(default=None, max_length=50)
+    # Adónde va el pedido. Los `ubicacion_*` del mixin son su ancla en el
+    # mapa: con ella se cotiza la distancia de reparto (ADR-054). Sin ancla
+    # el pedido se toma igual, con tarifa base y sin distancia.
+    direccion_entrega: str | None = Field(default=None, max_length=255)
     mesa_id: uuid.UUID | None = None
     comensales: int | None = Field(default=None, ge=1)
     # Identificador generado por el cliente. El PDV puede crear la venta sin
@@ -57,6 +63,30 @@ class VentaCreate(BaseModel):
     autorizacion: str | None = None
 
 
+class CotizacionDeliveryIn(UbicacionMixin):
+    """A dónde hay que llevar el pedido, desde qué local.
+
+    Se manda el ancla completa y no un `cliente_id`: en caja la mitad de los
+    deliveries son de alguien que todavía no está registrado, y la dirección
+    se acaba de escribir en el diálogo.
+    """
+
+    sucursal_id: uuid.UUID
+
+
+class CotizacionDeliveryOut(BaseModel):
+    """Lo que el cajero necesita para decidir antes de tomar el pedido."""
+
+    distancia_km: Decimal | None
+    costo: Decimal
+    # True = la distancia salió de la línea recta porque Google no contestó.
+    # El PDV lo muestra como "aprox." para que nadie discuta el monto como si
+    # fuera una medición.
+    aproximada: bool
+    derivar_a_externo: bool
+    motivo: str | None = None
+
+
 class VentaOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
@@ -68,6 +98,11 @@ class VentaOut(BaseModel):
     estado: str
     total: Decimal
     referencia_atencion: str | None
+    direccion_entrega: str | None = None
+    # Lo cotizado al tomar la orden, congelado: la tarifa cambia y el
+    # pedido de ayer no puede cambiar de precio.
+    distancia_entrega_km: Decimal | None = None
+    costo_entrega: Decimal | None = None
     mesa_id: uuid.UUID | None = None
     comensales: int | None = None
     descuento_modo: str | None = None
@@ -198,7 +233,7 @@ class MesaEnMapaOut(BaseModel):
 
 
 # --- Cliente creado desde caja ----------------------------------------------
-class ClienteCreate(BaseModel):
+class ClienteCreate(UbicacionMixin):
     """El tipo lo decide el documento: 11 dígitos crea cliente jurídico con
     RUC; el resto, uno natural con su persona.
 
@@ -311,7 +346,7 @@ class ResultadoImportacionOut(BaseModel):
     omitidas: list[OmitidoOut]
 
 
-class ClienteBuscadoOut(BaseModel):
+class ClienteBuscadoOut(UbicacionMixin):
     """Lo que el PDV necesita para pintar un resultado de búsqueda."""
 
     id: uuid.UUID
@@ -372,6 +407,11 @@ class VentaSyncIn(BaseModel):
     items: list[VentaItemSyncIn] = Field(min_length=1)
     cliente_id: uuid.UUID | None = None
     referencia_atencion: str | None = Field(default=None, max_length=50)
+    # Un delivery tomado sin internet sube con su dirección y lo que se
+    # cobró por llevarla; sin esto la nube los perdería al sincronizar.
+    direccion_entrega: str | None = Field(default=None, max_length=255)
+    distancia_entrega_km: Decimal | None = None
+    costo_entrega: Decimal | None = None
     mesa_id: uuid.UUID | None = None
     comensales: int | None = Field(default=None, ge=1)
     # El descuento del local viaja con su motivo y autorizador para que la

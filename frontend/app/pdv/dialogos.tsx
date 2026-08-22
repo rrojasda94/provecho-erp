@@ -8,6 +8,7 @@ import {
   esCustodia,
   soles,
   type ClienteBuscado,
+  type CotizacionDelivery,
   type CustodiaDestino,
   type DescuadreAtribucion,
   type ExtraDeCarta,
@@ -27,6 +28,8 @@ import {
   type RestaEnLinea,
 } from "./tipos";
 import Pinpad from "./pinpad";
+import { CampoDireccion } from "@/components/direccion/campo-direccion";
+import { UBICACION_VACIA, type Ubicacion } from "@/components/direccion/ubicacion";
 
 /**
  * Usuario + PIN de quien firma. Cada uno lo escribía por su cuenta con un
@@ -954,16 +957,95 @@ const TIPOS = [
   ["delivery", "Delivery", "Empaques + tarifa · comanda con dirección"],
 ] as const;
 
+const MOTIVO_DERIVACION: Record<string, string> = {
+  fuera_de_radio: "más lejos del radio propio",
+  zona_restringida: "zona donde no repartimos",
+};
+
+/**
+ * Lo que sale llevar el pedido, y el aviso de cuándo conviene no llevarlo.
+ *
+ * Lo calcula el servidor y no el navegador: este número define cuánta plata
+ * paga el cliente (ADR-054). Se pide al ANCLAR la dirección y no en cada
+ * tecla — cada llamada gasta cuota de un proveedor pago.
+ *
+ * Sin ancla no se cotiza: una dirección escrita a mano no se puede medir, y
+ * el pedido se toma igual con la tarifa base.
+ */
+function CotizacionEntrega({
+  sucursalId,
+  ubicacion,
+}: {
+  sucursalId: string;
+  ubicacion: Ubicacion;
+}) {
+  const [cotizacion, setCotizacion] = useState<CotizacionDelivery | null>(null);
+  const [error, setError] = useState("");
+  const lat = ubicacion.ubicacion_lat;
+  const lng = ubicacion.ubicacion_lng;
+
+  useEffect(() => {
+    if (lat === null || lat === undefined) {
+      setCotizacion(null);
+      return;
+    }
+    let vivo = true;
+    api
+      .cotizarDelivery({
+        sucursal_id: sucursalId,
+        ubicacion_lat: lat,
+        ubicacion_lng: lng,
+        ubicacion_distrito: ubicacion.ubicacion_distrito,
+      })
+      .then((c) => {
+        if (vivo) setCotizacion(c);
+      })
+      // El pedido se toma igual: no poder cotizar no es no poder vender.
+      .catch(() => {
+        if (vivo) setError("No se pudo calcular el reparto.");
+      });
+    return () => {
+      vivo = false;
+    };
+    // Solo cuando cambia el punto: el resto del objeto viaja con él.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lat, lng, sucursalId]);
+
+  if (error) return <p className="pdv-nota">{error}</p>;
+  if (!cotizacion) return null;
+
+  const detalle = cotizacion.distancia_km
+    ? `${cotizacion.distancia_km} km${cotizacion.aproximada ? " aprox." : ""} · reparto S/ ${cotizacion.costo}`
+    : `Reparto S/ ${cotizacion.costo}`;
+
+  return (
+    <p className="pdv-nota">
+      {detalle}
+      {cotizacion.derivar_a_externo && (
+        <strong>
+          {" — "}
+          {MOTIVO_DERIVACION[cotizacion.motivo ?? ""] ?? "fuera del reparto propio"}:
+          sugerir DAZ DAZ.
+        </strong>
+      )}
+    </p>
+  );
+}
+
+
 export function DialogoTipo({
   abierto,
   borrador,
   mesas,
+  sucursalId,
   onCerrar,
   onConfirmar,
 }: {
   abierto: boolean;
   borrador: Borrador | null;
   mesas: MesaEnMapa[];
+  /** Desde dónde sale el reparto: es el origen de la distancia. */
+  sucursalId: string;
   onCerrar: () => void;
   onConfirmar: (cambios: Partial<Borrador>) => void;
 }) {
@@ -971,6 +1053,7 @@ export function DialogoTipo({
   const [mesaId, setMesaId] = useState<string | null>(null);
   const [comensales, setComensales] = useState(2);
   const [direccion, setDireccion] = useState("");
+  const [ubicacion, setUbicacion] = useState<Ubicacion>(UBICACION_VACIA);
 
   useEffect(() => {
     if (!borrador) return;
@@ -980,6 +1063,7 @@ export function DialogoTipo({
     // La dirección del cliente registrado entra sola; solo se escribe si no
     // tiene ninguna.
     setDireccion(borrador.direccion ?? borrador.cliente?.direccion ?? "");
+    setUbicacion(borrador.ubicacion ?? UBICACION_VACIA);
   }, [borrador]);
 
   const listo = tipo !== null && (tipo !== "mesa" || mesaId !== null);
@@ -1035,13 +1119,22 @@ export function DialogoTipo({
 
       {tipo === "delivery" && (
         <>
-          <p className="pdv-etiqueta">Dirección de entrega</p>
-          <input
-            className="pdv-campo"
-            value={direccion}
-            placeholder="Jr. San Martín 456"
-            onChange={(e) => setDireccion(e.target.value)}
+          {/* `key` con el id del borrador: el diálogo no se desmonta entre
+              pedidos, y sin esto el campo —no controlado por dentro— seguiría
+              mostrando la dirección del pedido anterior. */}
+          <CampoDireccion
+            key={borrador?.id ?? "sin-borrador"}
+            etiqueta="Dirección de entrega"
+            claseEtiqueta="pdv-etiqueta"
+            claseCampo="pdv-campo"
+            defaultValue={direccion}
+            ubicacion={ubicacion}
+            onCambio={(texto, punto) => {
+              setDireccion(texto);
+              setUbicacion(punto);
+            }}
           />
+          <CotizacionEntrega sucursalId={sucursalId} ubicacion={ubicacion} />
           <p className="pdv-nota">
             {borrador?.cliente
               ? borrador.cliente.direccion
@@ -1065,6 +1158,7 @@ export function DialogoTipo({
               mesaNumero: tipo === "mesa" ? (mesa?.numero ?? null) : null,
               comensales: tipo === "mesa" ? comensales : null,
               direccion: tipo === "delivery" ? direccion.trim() : null,
+              ubicacion: tipo === "delivery" ? ubicacion : UBICACION_VACIA,
             })
           }
         >

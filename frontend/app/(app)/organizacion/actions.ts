@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import type { EstadoFormulario } from "@/components/formulario/dialogo-formulario";
 import { ApiError, apiFetch } from "@/lib/api";
 import { COOKIE_TOKEN } from "@/lib/auth";
+import { ubicacionDe } from "@/lib/ubicacion-form";
 
 export type EstadoOrganizacion = EstadoFormulario;
 
@@ -92,6 +93,7 @@ export async function guardarEmpresaAction(
       tipo: String(formData.get("tipo") ?? "operativa"),
       zona_tributaria: String(formData.get("zona_tributaria") ?? "general"),
       contacto: texto(formData, "contacto") || undefined,
+      ...ubicacionDe(formData),
     },
     "la empresa",
   );
@@ -141,6 +143,7 @@ export async function guardarSucursalAction(
       // Cerrar un local es `estado="inactiva"`: no hay baja de sucursal, sigue
       // siendo el ancla de sus ventas, cajas y trabajadores.
       estado: String(formData.get("estado") ?? "activa"),
+      ...ubicacionDe(formData),
     },
     "la sucursal",
   );
@@ -205,6 +208,7 @@ export async function guardarAlmacenAction(
       almacen_abastecedor_id: texto(formData, "almacen_abastecedor_id") || undefined,
       almacen_abastecedor_respaldo_id:
         texto(formData, "almacen_abastecedor_respaldo_id") || undefined,
+      ...ubicacionDe(formData),
     },
     "el almacén",
   );

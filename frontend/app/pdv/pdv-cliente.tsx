@@ -39,6 +39,7 @@ import {
 } from "./tipos";
 import { useCajaPdv } from "./use-caja-pdv";
 import { useDatosPdv } from "./use-datos-pdv";
+import { UBICACION_VACIA } from "@/components/direccion/ubicacion";
 
 type Props = {
   sucursalId: string;
@@ -61,6 +62,7 @@ function nuevoBorrador(mesa?: MesaEnMapa): Borrador {
     mesaNumero: mesa?.numero ?? null,
     comensales: null,
     direccion: null,
+    ubicacion: UBICACION_VACIA,
     cliente: null,
     lineas: [],
     ventaId: null,
@@ -276,6 +278,11 @@ export default function PdvCliente({ sucursalId, puntoVenta }: Props) {
       mesa_id: b.mesaId,
       comensales: b.comensales,
       referencia_atencion: b.tipo === "mesa" ? null : (b.cliente?.nombre ?? null),
+      // Solo el delivery lleva dirección; el costo del reparto lo calcula
+      // el servidor y se congela en la venta (ADR-054).
+      ...(b.tipo === "delivery"
+        ? { direccion_entrega: b.direccion, ...b.ubicacion }
+        : {}),
       // Comida del personal: el servidor pone los precios en cero y exige la
       // elevación del encargado (RN-COM-025).
       ...(b.consumoMotivo
@@ -431,6 +438,7 @@ export default function PdvCliente({ sucursalId, puntoVenta }: Props) {
         mesaNumero: info.mesaNumero,
         comensales: info.comensales,
         direccion: null,
+        ubicacion: UBICACION_VACIA,
         cliente: null,
         lineas: items.map(lineaDesdeVentaItem),
         ventaId: info.ventaId,
@@ -780,6 +788,7 @@ export default function PdvCliente({ sucursalId, puntoVenta }: Props) {
         abierto={dialogo === "tipo"}
         borrador={activo}
         mesas={datos.mesas.datos}
+        sucursalId={sucursalId}
         onCerrar={() => setDialogo(null)}
         onConfirmar={(cambios) => {
           parchar(cambios);

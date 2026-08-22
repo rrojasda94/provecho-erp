@@ -18,6 +18,26 @@ dejó de ser suya: `audit_log` es transversal y vive en `src/shared`
 Incluye además la organización: `grupo`, `empresa`, `marca`, `sucursal`, `almacen`.
 Detalle en `docs/architecture/data-model.md` (§1, §2).
 
+## Direcciones ancladas al mapa (implementado 2026-08-22, ADR-053)
+
+`sucursal`, `almacen`, `empresa` y `persona` llevan el `UbicacionMixin` de
+`core/model_base`: place_id de Google, lat/lng, plus code y distrito, todo
+nullable. El texto sigue donde estaba (`direccion`, `domicilio`,
+`domicilio_fiscal`); esto se le suma.
+
+Dos reglas que no son opcionales:
+
+- **Corregir el texto sin reanclar borra el punto**
+  (`shared/ubicacion.desanclar_si_cambio_el_texto`, aplicada en los tres
+  `editar_*` de `organizacion.py` y en `editar_persona`). Un texto que dice una
+  calle con las coordenadas de otra manda el reparto al lugar equivocado.
+- **`anonimizar_persona` borra el ancla** junto con el domicilio (Ley 29733,
+  ADR-011). Las coordenadas de la casa de alguien son más identificatorias que
+  el texto, no menos.
+
+La sucursal es el caso que importa cerrar: sin sus coordenadas no hay origen
+desde donde medir un reparto (ADR-054).
+
 ## Casos de uso
 
 - Login con username + PIN (6 dígitos) → access token (15 min) + refresh (7 días, rotativo).

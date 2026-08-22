@@ -11,6 +11,8 @@ import { redirect } from "next/navigation";
 import { ApiError, apiFetch } from "@/lib/api";
 import { COOKIE_TOKEN, decodificarClaims } from "@/lib/auth";
 import { obtenerSesion } from "@/lib/sesion";
+import { ProveedorConfigMapas } from "@/components/direccion/config-mapas";
+import { configMapas } from "@/lib/mapas";
 
 import BloqueoPorInactividad from "./bloqueo";
 import PdvCliente from "./pdv-cliente";
@@ -95,7 +97,10 @@ export default async function PaginaPdv() {
   const { usuario } = await obtenerSesion();
 
   return (
-    <>
+    // El PDV vive fuera del layout del back office, así que declara su propia
+    // configuración de Maps: sin esto el campo de dirección de un delivery
+    // quedaría sin buscador aunque la clave esté puesta.
+    <ProveedorConfigMapas config={configMapas()}>
       <PdvCliente
         sucursalId={ctx.sucursalId}
         puntoVenta={{
@@ -110,6 +115,6 @@ export default async function PaginaPdv() {
         }}
       />
       <BloqueoPorInactividad username={usuario.username} />
-    </>
+    </ProveedorConfigMapas>
   );
 }

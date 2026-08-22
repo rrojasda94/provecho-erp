@@ -1,3 +1,4 @@
+import type { Ubicacion } from "@/components/direccion/ubicacion";
 import type { ClienteBuscado } from "@/lib/pdv";
 
 /** Extra agregado a una línea. Es una línea propia en el backend
@@ -44,6 +45,10 @@ export type Borrador = {
   mesaNumero: number | null;
   comensales: number | null;
   direccion: string | null;
+  /** El punto en el mapa de esa dirección, cuando se eligió con el
+   * buscador. Sin él el pedido se toma igual y el reparto se cobra a
+   * tarifa base (ADR-054). */
+  ubicacion: Ubicacion;
   cliente: ClienteBuscado | null;
   lineas: LineaBorrador[];
   /** Se llena al enviar: desde ese momento el pedido existe en la base. */

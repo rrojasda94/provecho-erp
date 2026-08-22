@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import type { EstadoFormulario } from "@/components/formulario/dialogo-formulario";
 import { ApiError, apiFetch } from "@/lib/api";
 import { COOKIE_TOKEN } from "@/lib/auth";
+import { ubicacionDe } from "@/lib/ubicacion-form";
 
 export type EstadoPersona = EstadoFormulario;
 
@@ -36,6 +37,7 @@ function datosComunes(formData: FormData) {
     domicilio: texto(formData, "domicilio") || undefined,
     telefono: texto(formData, "telefono") || undefined,
     email: texto(formData, "email") || undefined,
+    ...ubicacionDe(formData),
   };
 }
 
