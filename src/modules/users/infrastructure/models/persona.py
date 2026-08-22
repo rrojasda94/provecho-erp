@@ -19,12 +19,20 @@ from src.core.database import Base
 from src.core.model_base import (
     SoftDeleteMixin,
     TimestampMixin,
+    UbicacionMixin,
     UuidPkMixin,
     VersionedMixin,
 )
 
 
-class Persona(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin, VersionedMixin):
+class Persona(
+    Base,
+    UuidPkMixin,
+    TimestampMixin,
+    SoftDeleteMixin,
+    VersionedMixin,
+    UbicacionMixin,
+):
     __tablename__ = "persona"
 
     nombres: Mapped[str] = mapped_column(String(100))

@@ -9,6 +9,7 @@ import { PersonaPicker } from "@/components/persona-picker/persona-picker";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
 
 import { crearProveedorAction, editarProveedorAction } from "./actions";
+import { CampoDireccion } from "@/components/direccion/campo-direccion";
 
 export type Proveedor = {
   id: string;
@@ -18,6 +19,11 @@ export type Proveedor = {
   ruc: string | null;
   contacto: string | null;
   direccion: string | null;
+  ubicacion_place_id: string | null;
+  ubicacion_lat: string | number | null;
+  ubicacion_lng: string | number | null;
+  ubicacion_plus_code: string | null;
+  ubicacion_distrito: string | null;
   provincia: string | null;
   pais: string;
   plazo_dias_credito: number | null;
@@ -113,10 +119,7 @@ function DialogoNuevoProveedor({ permisos }: { permisos: string[] }) {
               provincia: "provincia",
             }}
           />
-          <label className="flex flex-col gap-1 text-sm font-semibold">
-            Dirección
-            <input name="direccion" maxLength={255} />
-          </label>
+          <CampoDireccion />
           <div className="flex gap-2">
             <label className="flex flex-1 flex-col gap-1 text-sm font-semibold">
               Provincia
@@ -202,12 +205,7 @@ function DialogoEditarProveedor({
               provincia: "provincia",
             }}
           />
-          <label className="flex flex-col gap-1 text-sm font-semibold">
-            Dirección
-            <input name="direccion" maxLength={255}
-              defaultValue={proveedor.direccion ?? ""}
-            />
-          </label>
+          <CampoDireccion defaultValue={proveedor.direccion} ubicacion={proveedor} />
           <div className="flex gap-2">
             <label className="flex flex-1 flex-col gap-1 text-sm font-semibold">
               Provincia

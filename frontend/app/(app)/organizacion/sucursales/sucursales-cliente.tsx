@@ -11,6 +11,7 @@ import {
 import { TablaDatos } from "@/components/tabla/tabla-datos";
 
 import { guardarSucursalAction } from "../actions";
+import { CampoDireccion } from "@/components/direccion/campo-direccion";
 
 export type Marca = { id: string; nombre: string };
 export type Almacen = {
@@ -28,6 +29,11 @@ export type Sucursal = {
   direccion: string;
   tenencia: string;
   estado: string;
+  ubicacion_place_id: string | null;
+  ubicacion_lat: string | number | null;
+  ubicacion_lng: string | number | null;
+  ubicacion_plus_code: string | null;
+  ubicacion_distrito: string | null;
 };
 
 const TENENCIAS = ["propia", "alquilada", "del_grupo"] as const;
@@ -134,10 +140,11 @@ function CamposSucursal({
         Nombre
         <input name="nombre" required maxLength={100} defaultValue={valor(s.nombre)} />
       </label>
-      <label className="flex flex-col gap-1 text-sm font-semibold">
-        Dirección
-        <input name="direccion" required maxLength={255} defaultValue={valor(s.direccion)} />
-      </label>
+      <CampoDireccion
+        requerido
+        defaultValue={s.direccion}
+        ubicacion={sucursal ?? null}
+      />
       <div className="flex gap-2">
         <label className="flex flex-1 flex-col gap-1 text-sm font-semibold">
           Tenencia

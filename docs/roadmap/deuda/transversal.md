@@ -141,6 +141,18 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   tocar un solo test**, que es la prueba de que el error no estaba ahí.
   `tests/test_fechas_negocio.py` congela la regla, incluido un caso que falla
   si algún módulo vuelve a usar `date.today()`.
+- ⬜ **Las direcciones ya cargadas no tienen ancla** (2026-08-22, ADR-053):
+  las cinco tablas ganaron sus columnas nullable y nadie las llenó. No hay
+  backfill porque geocodificar en masa se cobra por registro y el dato viejo no
+  urge: cada ficha queda anclada la próxima vez que alguien la edite. Si algún
+  día hace falta de golpe, es un comando que recorra las filas sin
+  `ubicacion_place_id` con la clave del servidor y un tope de gasto.
+- ⬜ **La CSP no se probó contra el mapa real** (2026-08-22, ADR-053): la lista
+  de hosts de Google salió de su guía oficial recortada a lo que este ERP usa,
+  **sin `'unsafe-eval'`**, que Google recomienda por las dudas. Falta la
+  verificación en el navegador con clave puesta: si un mapa muere con un error
+  de `eval` en consola, esa es la línea que falta y la decisión hay que volver a
+  tomarla a conciencia, no agregarla de reflejo.
 - ⬜ Los tests de `conteos` comparan contra `date.today()` local mientras
   `created_at` usa `CURRENT_TIMESTAMP` (UTC): corriendo después de las
   19:00 hora Perú fallan cuatro casos por un día de diferencia. Falla

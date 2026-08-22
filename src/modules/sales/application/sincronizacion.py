@@ -222,6 +222,26 @@ def _venta_a_dict(session: Session, venta: Venta) -> dict:
         "usuario_id": str(venta.usuario_id),
         "cliente_id": str(venta.cliente_id) if venta.cliente_id else None,
         "referencia_atencion": venta.referencia_atencion,
+        # El delivery tomado sin internet sube con su dirección, su
+        # ancla en el mapa y lo que se cobró por llevarla.
+        "direccion_entrega": venta.direccion_entrega,
+        "ubicacion_place_id": venta.ubicacion_place_id,
+        "ubicacion_lat": (
+            str(venta.ubicacion_lat) if venta.ubicacion_lat is not None else None
+        ),
+        "ubicacion_lng": (
+            str(venta.ubicacion_lng) if venta.ubicacion_lng is not None else None
+        ),
+        "ubicacion_plus_code": venta.ubicacion_plus_code,
+        "ubicacion_distrito": venta.ubicacion_distrito,
+        "distancia_entrega_km": (
+            str(venta.distancia_entrega_km)
+            if venta.distancia_entrega_km is not None
+            else None
+        ),
+        "costo_entrega": (
+            str(venta.costo_entrega) if venta.costo_entrega is not None else None
+        ),
         "mesa_id": str(venta.mesa_id) if venta.mesa_id else None,
         "comensales": venta.comensales,
         "idempotency_key": venta.idempotency_key,
@@ -382,6 +402,12 @@ def _intentar(session: Session, resumen: dict, tipo: str, ident: str, funcion, d
         return _FALLO
 
 
+def _decimal(valor) -> Decimal | None:
+    """Los lotes viejos no traen las claves de entrega; los nuevos las
+    mandan como texto para no perder precisión en el JSON."""
+    return None if valor is None else Decimal(str(valor))
+
+
 def _crear(session: Session, datos: dict) -> None:
     ventas_uc.crear_venta(
         session,
@@ -417,6 +443,14 @@ def _crear(session: Session, datos: dict) -> None:
         ],
         cliente_id=uuid.UUID(datos["cliente_id"]) if datos.get("cliente_id") else None,
         referencia_atencion=datos.get("referencia_atencion"),
+        direccion_entrega=datos.get("direccion_entrega"),
+        ubicacion_place_id=datos.get("ubicacion_place_id"),
+        ubicacion_lat=_decimal(datos.get("ubicacion_lat")),
+        ubicacion_lng=_decimal(datos.get("ubicacion_lng")),
+        ubicacion_plus_code=datos.get("ubicacion_plus_code"),
+        ubicacion_distrito=datos.get("ubicacion_distrito"),
+        distancia_entrega_km=_decimal(datos.get("distancia_entrega_km")),
+        costo_entrega=_decimal(datos.get("costo_entrega")),
         mesa_id=uuid.UUID(datos["mesa_id"]) if datos.get("mesa_id") else None,
         comensales=datos.get("comensales"),
         fecha_orden=date.fromisoformat(datos["fecha_orden"]),

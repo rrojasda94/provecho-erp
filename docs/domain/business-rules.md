@@ -1406,6 +1406,30 @@ producción se hace en cocinas de sucursal. Ver
   puede vaciar una receta (ADR-051). Lo que la pantalla devuelve se revalida
   en el servidor: es un dato que el cliente pudo editar.
 
+- **RN-COM-032** Una dirección del ERP son **dos cosas**: el texto que se lee
+  y su punto en el mapa (`place_id`, coordenadas, plus code, distrito). El
+  punto es **opcional**: una dirección escrita a mano es válida —hay calles
+  que Google no conoce y hay locales sin internet— y ninguna alta se bloquea
+  por no tenerlo (ADR-053). Lo que **no** es válido es que las dos cuenten
+  historias distintas: corregir el texto sin volver a elegir en el mapa
+  **borra el punto**, porque un texto que dice una calle con las coordenadas
+  de otra manda el reparto al lugar equivocado.
+- **RN-COM-033** El reparto propio se cobra **tarifa base + precio por
+  kilómetro de manejo real** (no en línea recta: un río en el medio son dos
+  kilómetros de puente). El monto lo calcula el servidor —nunca el navegador,
+  porque define cuánta plata paga el cliente— y se **congela** en la venta al
+  tomar la orden: si la tarifa cambia el mes que viene, el pedido de ayer
+  siguió costando lo que costó (ADR-054).
+- **RN-COM-034** Un pedido que se pasa del **radio de reparto propio** o cae
+  en un **distrito donde el negocio decidió no repartir** se sugiere derivar a
+  una plataforma externa. Es una **sugerencia al cajero, no un bloqueo**:
+  quien decide es la persona que está atendiendo, y si acepta queda registrado
+  en la venta qué plataforma lo llevó.
+- **RN-COM-035** Si no se puede medir la distancia —proveedor caído, sin
+  internet en el local— el pedido **se toma igual**, con la distancia estimada
+  y marcada como aproximada. Cobrar de menos por un kilómetro es preferible a
+  no poder vender (mismo criterio que RN-CPP y ADR-005).
+
 ## Cumplimiento de pedido
 
 Proceso `PROC-OPE-002` ([workflows.md](workflows.md#cumplimiento-de-pedido)),

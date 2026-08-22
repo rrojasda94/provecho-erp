@@ -291,6 +291,14 @@ const PDV: Caso[] = [
       ],
     }),
   ),
+  caso("cotizarDelivery", () =>
+    api.cotizarDelivery({
+      sucursal_id: UUID,
+      ubicacion_lat: "-6.488430",
+      ubicacion_lng: "-76.365280",
+      ubicacion_distrito: "Tarapoto",
+    }),
+  ),
   caso("verificarPin", () => api.verificarPin("123456")),
   caso("itemsDeVenta", () => api.itemsDeVenta(UUID)),
   caso("agregarLineas", () =>

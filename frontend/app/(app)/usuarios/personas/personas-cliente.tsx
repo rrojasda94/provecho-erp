@@ -12,6 +12,7 @@ import {
 import { TablaDatos } from "@/components/tabla/tabla-datos";
 
 import { crearPersonaAction, editarPersonaAction } from "./actions";
+import { CampoDireccion } from "@/components/direccion/campo-direccion";
 
 export type Persona = {
   id: string;
@@ -21,6 +22,11 @@ export type Persona = {
   numero_documento: string;
   fecha_nacimiento: string | null;
   domicilio: string | null;
+  ubicacion_place_id: string | null;
+  ubicacion_lat: string | number | null;
+  ubicacion_lng: string | number | null;
+  ubicacion_plus_code: string | null;
+  ubicacion_distrito: string | null;
   telefono: string | null;
   email: string | null;
   version: number;
@@ -84,10 +90,12 @@ function CamposPersona({ persona, permisos }: { persona?: Persona; permisos: str
         Fecha de nacimiento
         <input name="fecha_nacimiento" type="date" defaultValue={valor(p.fecha_nacimiento)} />
       </label>
-      <label className="flex flex-col gap-1 text-sm font-semibold">
-        Domicilio
-        <input name="domicilio" maxLength={255} defaultValue={valor(p.domicilio)} />
-      </label>
+      <CampoDireccion
+        nombre="domicilio"
+        etiqueta="Domicilio"
+        defaultValue={p.domicilio}
+        ubicacion={persona ?? null}
+      />
       <div className="flex gap-2">
         <label className="flex flex-1 flex-col gap-1 text-sm font-semibold">
           Teléfono

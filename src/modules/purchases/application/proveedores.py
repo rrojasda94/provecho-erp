@@ -12,6 +12,7 @@ from src.modules.purchases.infrastructure.models import Proveedor
 from src.modules.purchases.infrastructure.repositories import ProveedorRepo
 from src.modules.users.infrastructure.models import Persona
 from src.shared.integrations.factiliza import razon_social_desde_ruc
+from src.shared.ubicacion import desanclar_si_cambio_el_texto
 
 
 def crear_proveedor(
@@ -27,6 +28,11 @@ def crear_proveedor(
     direccion: str | None = None,
     provincia: str | None = None,
     pais: str = "PE",
+    ubicacion_place_id: str | None = None,
+    ubicacion_lat: Decimal | None = None,
+    ubicacion_lng: Decimal | None = None,
+    ubicacion_plus_code: str | None = None,
+    ubicacion_distrito: str | None = None,
     formal: bool = True,
     clasificacion: str = "regular",
     plazo_dias_credito: int | None = None,
@@ -67,6 +73,11 @@ def crear_proveedor(
             direccion=direccion,
             provincia=provincia,
             pais=pais,
+            ubicacion_place_id=ubicacion_place_id,
+            ubicacion_lat=ubicacion_lat,
+            ubicacion_lng=ubicacion_lng,
+            ubicacion_plus_code=ubicacion_plus_code,
+            ubicacion_distrito=ubicacion_distrito,
             formal=formal,
             clasificacion=clasificacion,
             condicion_pago=condicion_pago,
@@ -107,9 +118,13 @@ def editar_proveedor(session: Session, proveedor_id: uuid.UUID, **campos) -> Pro
             "los datos viven en su persona (RN-GEN-007)"
         )
 
+    direccion_previa = proveedor.direccion
     for campo, valor in campos.items():
         if valor is not None:
             setattr(proveedor, campo, valor)
+    desanclar_si_cambio_el_texto(
+        proveedor, campos, direccion_previa, "direccion"
+    )
 
     if proveedor.condicion_pago == "credito" and not proveedor.plazo_dias_credito:
         raise ReglaNegocio("condición 'credito' requiere plazo_dias_credito")
