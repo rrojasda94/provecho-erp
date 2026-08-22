@@ -174,6 +174,10 @@ export async function contratarPostulanteAction(
         fecha_ingreso: fechaIngreso,
         tipo_documento: opcional(datos, "tipo_documento"),
         numero_documento: opcional(datos, "numero_documento"),
+        // Lo que quedó en pantalla tras contrastarlo con RENIEC. Vacío = el
+        // servidor usa lo que el postulante declaró de sí mismo.
+        nombres: opcional(datos, "nombres"),
+        apellidos: opcional(datos, "apellidos"),
         remuneracion_base: opcional(datos, "remuneracion_base"),
         // Locación de servicios nunca marca asistencia (RN-PER-002): el
         // servidor lo rechaza, y ofrecerlo acá sería invitar al error.

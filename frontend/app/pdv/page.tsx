@@ -98,6 +98,10 @@ export default async function PaginaPdv() {
     <>
       <PdvCliente
         sucursalId={ctx.sucursalId}
+        // Solo para esconder el botón de consulta a quien no puede gastar
+        // cuota de Factiliza (ADR-041). La autorización real la sigue
+        // haciendo la API en cada request.
+        permisos={usuario.permisos}
         puntoVenta={{
           id: ctx.punto.id,
           serieBoleta: ctx.punto.serie_boleta,
