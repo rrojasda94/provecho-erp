@@ -38,6 +38,8 @@ CLAVES_SENSIBLES = frozenset(
         "refresh_token",
         "jwt_secret",
         "factiliza_token",
+        "factiliza_consulta_documento_token",
+        "token_consulta",
         "s3_secret_key",
         "s3_access_key",
         "pgpassword",

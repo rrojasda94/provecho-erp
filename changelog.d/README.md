@@ -45,6 +45,19 @@ git tag -a v0.3.0 -m "0.3.0"
 git push origin main --tags
 ```
 
+El script mueve **dos** archivos: junta los fragmentos en `CHANGELOG.md` y
+sube `version` en `pyproject.toml`. Esa segunda mitad se agregó el 2026-08-22,
+después de descubrir que el paquete llevaba cuatro releases clavado en 0.1.0:
+la versión se tecleaba tres veces —argumento, mensaje de commit y tag— y no
+aterrizaba en ningún archivo salvo el CHANGELOG. De `pyproject.toml` salen el
+`release` con el que GlitchTip agrupa errores y la versión de `/docs`, así que
+todo lo reportado desde julio cayó en el mismo balde. `tests/test_version.py`
+falla si las dos vuelven a separarse.
+
+En desarrollo, la versión que reporta la app se refresca al reinstalar
+(`pip install -e ".[dev]"`): la metadata del paquete se congela al instalar.
+La imagen de Docker no tiene ese problema — instala desde cero en cada build.
+
 El tag dispara `.github/workflows/release.yml`, que publica la imagen
 etiquetada con esa versión.
 

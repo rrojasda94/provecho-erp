@@ -151,11 +151,25 @@ class FactilizaClient:
         base_url: str | None = None,
         token: str | None = None,
         timeout: float | None = None,
+        token_consulta: str | None = None,
     ) -> None:
         self.base_url = (base_url or settings.factiliza_base_url).rstrip("/")
         self.consulta_base_url = settings.factiliza_consulta_base_url.rstrip("/")
         self.token = token if token is not None else settings.factiliza_token
+        self.token_consulta = self._resolver_token_consulta(token, token_consulta)
         self.timeout = timeout or settings.factiliza_timeout_segundos
+
+    def _resolver_token_consulta(self, token: str | None, token_consulta: str | None) -> str:
+        """Emisión y consulta son dos productos de Factiliza, cada uno con su
+        credencial. La cascada es: lo que se pasó explícito manda sobre la
+        configuración, y `FACTILIZA_CONSULTA_DOCUMENTO_TOKEN` vacío cae al de
+        emisión — un plan que cubre ambos con un solo token sigue andando sin
+        tocar nada."""
+        if token_consulta is not None:
+            return token_consulta
+        if token is not None:
+            return token
+        return settings.factiliza_consulta_documento_token or settings.factiliza_token
 
     def enviar_comprobante(self, payload: dict) -> RespuestaEmision:
         """POST /invoice/send — boleta o factura.
@@ -201,16 +215,19 @@ class FactilizaClient:
         return _interpretar(cuerpo)
 
     def _consultar(self, ruta: str, numero: str) -> dict | None:
-        """GET de consulta RUC/DNI, contra `consulta_base_url` — producto
-        distinto de `invoice/send` (esa es solo emisión, apunta a la QA de
-        facturación). Un 404 vacío es "no encontrado", respuesta válida, no
-        excepción; solo transporte/servidor caído levanta `FactilizaError`."""
-        if not self.token:
-            raise FactilizaError("FACTILIZA_TOKEN no configurado")
+        """GET de consulta RUC/DNI, contra `consulta_base_url` y con
+        `token_consulta` — producto distinto de `invoice/send` (esa es solo
+        emisión, apunta a la QA de facturación) y con credencial propia. Un
+        404 vacío es "no encontrado", respuesta válida, no excepción; solo
+        transporte/servidor caído levanta `FactilizaError`."""
+        if not self.token_consulta:
+            raise FactilizaError(
+                "FACTILIZA_CONSULTA_DOCUMENTO_TOKEN (o FACTILIZA_TOKEN) no configurado"
+            )
         try:
             respuesta = httpx.get(
                 f"{self.consulta_base_url}/{ruta}/info/{numero}",
-                headers={"Authorization": f"Bearer {self.token}"},
+                headers={"Authorization": f"Bearer {self.token_consulta}"},
                 timeout=self.timeout,
             )
         except httpx.HTTPError as e:

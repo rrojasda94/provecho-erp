@@ -164,6 +164,14 @@ demo usa el PIN `654321`.
 `.env` (plantilla: `.env.example`). Variable `ENVIRONMENT` controla el modo.
 Secretos nunca en el repo.
 
+`.env.example` es la documentación operativa de la configuración, así que no
+puede quedarse atrás del código: `tests/test_settings.py` verifica que **toda**
+variable de `Settings` esté ahí (o en `.env.hub.example`, para lo que solo
+existe en el hub), que copiarlo tal cual produzca una configuración que
+arranca, y que no lleve credenciales de verdad. Una variable nueva en
+`src/config/settings.py` sin su renglón en el ejemplo rompe el CI — que es
+donde tiene que doler, y no el día que hace falta en producción.
+
 Con `ENVIRONMENT=production` la aplicación **no arranca** si la configuración
 quedó con valores de desarrollo (`src/config/settings.py`): `JWT_SECRET`
 placeholder o menor a 32 caracteres, `DEBUG=true`, `DATABASE_URL` con la
@@ -206,7 +214,10 @@ filtración o salida de alguien con acceso a producción.
 - **Contraseña de Postgres** — cambiar en el gestor (Supabase o `ALTER ROLE`),
   actualizar `DATABASE_URL` y reiniciar la aplicación.
 - **Tokens de integraciones** (Factiliza, Izipay, Google, Meta) — revocar en
-  el proveedor primero, luego actualizar `.env`.
+  el proveedor primero, luego actualizar `.env`. Factiliza son **dos**:
+  `FACTILIZA_TOKEN` (emisión) y `FACTILIZA_CONSULTA_DOCUMENTO_TOKEN`
+  (consulta RUC/DNI). Rotar uno no toca al otro — que es justo el motivo de
+  tenerlos separados.
 - **PIN de usuario comprometido** — se resetea desde el CRUD de `users`; no
   requiere despliegue.
 

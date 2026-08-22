@@ -1,4 +1,5 @@
 from decimal import Decimal
+from importlib import metadata
 from typing import Annotated
 
 from pydantic import field_validator, model_validator
@@ -7,6 +8,20 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 JWT_SECRET_MIN_LEN = 32
 _PLACEHOLDER_SECRETO = "change-me"
 _PASSWORD_DB_POR_DEFECTO = "provecho:provecho@"
+#: Cuando se corre desde el fuente sin instalar el paquete (no pasa ni en la
+#: imagen ni con `pip install -e ".[dev]"`, que es el primer paso del README).
+_VERSION_DESCONOCIDA = "0.0.0"
+
+
+def _version_del_paquete() -> str:
+    """La versión sale de `pyproject.toml`, vía la metadata del paquete
+    instalado. Tenerla escrita a mano acá fue justamente lo que la dejó cuatro
+    releases atrás: `cortar_version.py` movía el CHANGELOG y el tag, y este
+    literal no se enteraba."""
+    try:
+        return metadata.version("provecho")
+    except metadata.PackageNotFoundError:
+        return _VERSION_DESCONOCIDA
 
 
 class Settings(BaseSettings):
@@ -83,10 +98,16 @@ class Settings(BaseSettings):
     # Facturación electrónica (Factiliza → SUNAT). Por defecto apunta al
     # entorno QA: emitir contra producción exige cambiar la URL a conciencia.
     factiliza_base_url: str = "https://apife-qa.factiliza.com/api/v1"
-    # Consulta RUC/DNI (RENIEC/SUNAT) — producto distinto de la emisión,
-    # mismo token, host propio (no tiene sandbox QA separado).
+    # Consulta RUC/DNI (RENIEC/SUNAT) — producto distinto de la emisión, con
+    # host propio (no tiene sandbox QA separado).
     factiliza_consulta_base_url: str = "https://api.factiliza.com/v1"
     factiliza_token: str = ""
+    # Son dos productos contratados por separado y Factiliza entrega un token
+    # por cada uno. Vacío = se reusa `factiliza_token`, que es lo correcto
+    # cuando el plan contratado cubre ambos con una sola credencial. Tenerlo
+    # aparte importa además para el día que uno se rote: rotar el de emisión
+    # no debería apagar el buscador de DNI del mostrador.
+    factiliza_consulta_documento_token: str = ""
     factiliza_timeout_segundos: float = 30.0
     igv_porcentaje: Decimal = Decimal("18")
     # --- WhatsApp Cloud API (Meta) — encuesta de satisfacción ---------------
@@ -115,7 +136,11 @@ class Settings(BaseSettings):
     # Cola de emisión de comprobantes (Celery). Por defecto reusa Redis.
     celery_broker_url: str = ""
     # --- Observabilidad -----------------------------------------------------
-    app_version: str = "0.1.0"
+    # No es un literal: quedó cuatro releases atrás (0.1.0 con el proyecto en
+    # 0.5.0) porque nada lo movía, y con él se etiquetan los errores en
+    # GlitchTip y la versión de `/docs`. Un `release` congelado hace inútil el
+    # "apareció en la versión X" que es la mitad del valor de reportar errores.
+    app_version: str = _version_del_paquete()
     log_level: str = "INFO"
     # JSON siempre en producción; acá se fuerza también fuera de ella.
     log_json: bool = False
