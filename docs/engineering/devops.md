@@ -210,6 +210,60 @@ La cabecera `Strict-Transport-Security` la emite la propia aplicación cuando
 En producción `/docs` y `/openapi.json` quedan deshabilitados: el mapa de la
 API expone esquemas y nombres de permisos.
 
+## Desplegar desde GitHub (ADR-059)
+
+El despliegue se dispara desde **Actions → Desplegar → Run workflow**: se
+elige la versión (`0.7.1`, o `latest`) y opcionalmente se pide la simulación
+de carga del catálogo. No hace falta una PC en particular.
+
+Se prepara una sola vez:
+
+**1. Una llave de despliegue propia, sin passphrase.** Propia y no la de una
+persona: se puede revocar sin dejar a nadie sin acceso, y un secreto de CI no
+puede depender de que alguien escriba algo.
+
+```bash
+ssh-keygen -t ed25519 -f ~/.ssh/provecho_despliegue -N "" -C "github-actions-despliegue"
+```
+
+**2. Autorizarla en el servidor**, en el usuario `app`:
+
+```bash
+ssh provecho 'cat >> ~/.ssh/authorized_keys' < ~/.ssh/provecho_despliegue.pub
+```
+
+**3. La huella del servidor**, para no aceptar a ciegas:
+
+```bash
+ssh-keyscan -H 165.227.120.112
+```
+
+**4. Los dos secretos**, en Settings → Secrets and variables → Actions:
+
+| Secreto | Contenido |
+|---|---|
+| `STAGING_SSH_KEY` | el contenido de `~/.ssh/provecho_despliegue` (la **privada**) |
+| `STAGING_KNOWN_HOSTS` | la salida de `ssh-keyscan` |
+
+Y opcionalmente, como *Variables* (no secretos), `STAGING_HOST`,
+`STAGING_USER`, `STAGING_DIR` y `STAGING_API` si cambian: recrear el droplet
+cambia la IP y no debería obligar a editar el workflow.
+
+> **La carga del catálogo no se automatiza.** El workflow puede correr
+> `cargar_catalogo --simular`, que deshace todo al final. La carga de verdad
+> escribe cientos de filas de negocio y se hace a mano, mirando primero el
+> resultado de la simulación.
+
+### Por qué la llave personal no sirve para esto
+
+`~/.ssh/provecho_droplet` (la de `staging.md`) **tiene passphrase**. Sirve
+para entrar a mano y no sirve para un shell no interactivo: `ssh` ofrece la
+pública, el servidor pide la firma, y ahí se corta sin poder preguntar. En el
+log del servidor eso aparece como `Connection closed by authenticating user
+app [preauth]`, que **no** es un rechazo de la llave — es el cliente
+rindiéndose. Para usarla desde una terminal no interactiva hay que cargarla
+antes en un agente (`ssh-add`), que es justo lo que un runner no puede hacer.
+
 ## Rotación de credenciales
 
 Runbook mínimo. Frecuencia base: anual, e **inmediata** ante sospecha de

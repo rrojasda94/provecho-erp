@@ -21,7 +21,7 @@ general del despliegue.
 | Dominio frontend | `staging.majambo.com.pe` |
 | Dominio API | `api-staging.majambo.com.pe` |
 | Usuario de la app | `app` (sudo, sin login root, sin login por contraseña) |
-| Llave SSH | `renato-provecho` — privada en `~/.ssh/provecho_droplet` (tu PC, nunca en el repo) |
+| Llave SSH | `renato-provecho` — privada en `~/.ssh/provecho_droplet` (tu PC, nunca en el repo). **Con passphrase**: sirve para entrar a mano y no desde un shell no interactivo — para eso está la llave de despliegue de ADR-059, ver `devops.md` |
 
 > La IP puede cambiar si el droplet se recrea (ya pasó una vez durante el
 > setup inicial, 2026-08-23). Si cambia: actualizar los dos registros A del
