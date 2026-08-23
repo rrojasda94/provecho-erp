@@ -12,6 +12,357 @@ editando este archivo chocaban siempre — escribían en la misma línea.
 
 Ver [`changelog.d/`](changelog.d/).
 
+## [0.6.0] - 2026-08-23
+
+### Added
+
+### Added
+
+- **El PDV trae el nombre del cliente de RENIEC o SUNAT, y el largo decide a
+  cuál.** El botón «Buscar DNI / RUC» aparece en los dos puntos donde caja
+  identifica a alguien que todavía no está registrado: al crear el cliente y al
+  pedir el documento del comprobante. Un número de 8 dígitos va a RENIEC y trae
+  nombre y fecha de nacimiento; uno de 11 va a SUNAT y trae razón social y
+  domicilio fiscal — el mismo largo que ya decidía boleta o factura
+  (RN-CPP-003). Antes el cajero escribía la razón social de oído y SUNAT
+  rechazaba la que no coincidía.
+- El campo de documento del alta en caja acepta ahora las dos cosas (era solo
+  DNI): con 11 dígitos el cliente nace jurídico, que es lo que el servidor ya
+  hacía y la pantalla no dejaba pedir.
+- **RRHH → Contratación también trae el nombre de RENIEC.** La ficha del
+  trabajador nacía con el nombre que el candidato escribió de sí mismo en el
+  formulario público, y es el nombre con el que se firma el contrato y se
+  declara a SUNAT. Ahora el diálogo de contratar muestra nombres y apellidos
+  editables con «Buscar por DNI» al lado, y el servidor aplica RENIEC aunque
+  nadie lo apriete (RN-PTS-004, mismo criterio que el alta de cliente y de
+  proveedor).
+
+Prellena, no decide: todo lo traído queda editable, y sin `FACTILIZA_TOKEN` —o
+con el proveedor caído— el aviso manda a completar a mano y la venta o la
+contratación siguen (ADR-005, ADR-041). El botón solo se le ofrece a quien
+tiene `consulta.documento`: cada consulta gasta cuota de un proveedor pago.
+
+### Fixed
+
+- **La consulta de documento usaba el token equivocado.** Emisión y consulta
+  son dos productos de Factiliza con **dos credenciales distintas**, y el ERP
+  mandaba el de emisión a los dos hosts: contra `api.factiliza.com` eso es un
+  401 aunque el token esté vigente, así que el botón «Buscar» nunca podía
+  funcionar. Nueva variable `FACTILIZA_CONSULTA_DOCUMENTO_TOKEN`; sin ella se
+  cae al de emisión, como antes.
+- **Un token rechazado ya no se reporta como «respuesta ilegible».** El 401
+  llega con el cuerpo vacío y caía en el parseo de JSON, que mandaba a buscar
+  un error de formato donde lo que hay que revisar es la credencial.
+
+- **El reparto propio se cotiza por distancia real** (2026-08-22, ADR-054,
+  migración `d41f6a2c98b7`). Con las direcciones ya ancladas en el mapa
+  (ADR-053), `POST /sales/ventas/cotizar-delivery` devuelve kilómetros de
+  manejo, cuánto sale llevarlo (`base + precio × km`) y si conviene derivarlo.
+  El PDV lo muestra en el diálogo de tipo de orden, antes de aceptar el pedido.
+- **El cálculo NO sale del navegador.** Define cuánta plata paga el cliente, y
+  un número que viaja por el navegador es un número que se puede editar. Lo
+  mide la Routes API desde el servidor, con una **segunda clave restringida por
+  IP** (`GOOGLE_MAPS_SERVER_KEY`) — son dos claves porque Google no admite
+  restringir la misma por referente HTTP y por IP a la vez. De ahí sale un
+  invariante verificable: si aparece una llamada a `routes.googleapis.com` en
+  la pestaña de red del navegador, está mal hecho.
+- **Google caído no impide vender.** Se cae a distancia en línea recta
+  (haversine × 1,3) marcada `aproximada`, que el PDV muestra como "aprox.".
+  Cobrar de menos por un kilómetro es preferible a no poder tomar el pedido, y
+  es además lo único que funciona en el hub offline de una sucursal (ADR-009).
+  El `1,3` es una perilla de calibración, no una constante: se ajusta
+  comparando cotizaciones aproximadas contra las reales.
+- **Pasado el radio, o en distrito vetado, se sugiere DAZ DAZ.** Es un aviso al
+  cajero y no una integración: quien decide es la persona, y si acepta se marca
+  el campo que **ya existía**, `venta.repartidor_externo_plataforma`
+  (`rappi|ubereats|pedidosya|dazdaz`). Cero tablas nuevas. La zona restringida
+  se evalúa **antes** de medir: no depende de la distancia, y preguntarle a
+  Google costaría una llamada por una respuesta que ya se sabe.
+- **Las zonas vetadas son una lista de distritos, no polígonos.**
+  `DELIVERY_DISTRITOS_RESTRINGIDOS` se compara sin tildes ni mayúsculas contra
+  el distrito que ya viene con la dirección. PostGIS resolvería zonas de verdad
+  y traería una extensión, un tipo de columna y una pantalla para dibujar
+  polígonos: es mucha máquina para una lista de cuatro nombres (queda en la
+  deuda del módulo).
+- **Lo cotizado se congela en la venta.** `venta.distancia_entrega_km` y
+  `venta.costo_entrega` se guardan al crear la orden y no se recalculan: la
+  tarifa cambia y el pedido de ayer no puede cambiar de precio — el mismo
+  criterio por el que la guía de remisión congela sus direcciones. El replay
+  del hub **no vuelve a cotizar**: esa venta ya se cobró con un precio.
+- **La cotización tiene cuota**, por usuario y por IP, reusando el mismo
+  mecanismo que la consulta de DNI/RUC (ADR-041). Cada llamada gasta una
+  medición de un proveedor pago y un bucle mal escrito en el PDV se come el
+  plan del mes. Se suma un `@lru_cache` sobre la medición, con las coordenadas
+  redondeadas a ~1 m: cada pedido se cotiza dos veces —la que ve el cajero y la
+  que congela la orden— y así paga una sola llamada. Va sobre la medición y no
+  sobre la cotización completa para que un fallo de Google **no** quede
+  cacheado.
+- **Arranca apagado**: `DELIVERY_TARIFA_BASE`, `DELIVERY_PRECIO_POR_KM` y
+  `DELIVERY_DISTANCIA_MAXIMA_KM` valen `0` de fábrica y el delivery se sigue
+  cobrando como antes hasta que el negocio defina la tarifa.
+- Costo aceptado: **el reparto se calcula, se guarda y se muestra, pero todavía
+  no suma al total de la venta** ni aparece en el comprobante. Cobrarlo de
+  verdad exige una línea de venta sobre un producto de servicio "Delivery", con
+  su IGV y su cuenta contable — radio de impacto mucho mayor que el resto de
+  este cambio. Queda declarado en la deuda del módulo `sales`.
+
+- **Toda dirección del ERP se elige en un mapa** (2026-08-22, ADR-053,
+  migración `c3d8b1f47a95`). Una dirección era `String(255)` en seis lugares y
+  nada más: nadie validaba que existiera, nadie podía navegar hacia ella y el
+  repartidor recibía una cadena que podía decir "por el mercado, casa azul".
+  Ahora `UbicacionMixin` le suma `place_id`, latitud/longitud (6 decimales,
+  ~11 cm), plus code y distrito a `sucursal`, `almacen`, `empresa`, `persona`,
+  `proveedor` y `venta`. El campo único
+  (`components/direccion/campo-direccion.tsx`) autocompleta con Places, muestra
+  el punto en un mapa y deja arrastrar el pin para corregir la puerta cuando
+  Google la deja a media cuadra.
+- **La dirección escrita a mano sigue valiendo, y ese es el caso que se
+  prueba.** En Tarapoto hay calles que Google no conoce, en el hub offline de
+  una sucursal no hay internet y la clave se puede quedar sin cuota un martes a
+  las ocho. Sin `GOOGLE_MAPS_BROWSER_KEY` el campo es el `<input>` de siempre y
+  el ERP se comporta **exactamente** como antes de este cambio — lo verifica
+  `frontend/uso/direccion.spec.ts`, que corre **sin** clave a propósito. Mismo
+  criterio que ADR-005 y ADR-041: la integración prellena, no decide.
+- **Editar el texto a mano suelta el pin**, en el servidor
+  (`shared/ubicacion.py`) y de paso en la pantalla. Corregir "Jr. Lima 200" por
+  "Jr. Lima 400" sin volver a elegir en el mapa dejaría las coordenadas de la
+  puerta vieja: el texto diría una calle y el reparto iría a otra, cobrando la
+  distancia equivocada. Ante la duda se pierde el pin —que se vuelve a poner en
+  dos clicks— y no la verdad. No alcanzaba con la convención de PATCH del ERP
+  (`None` = no tocar): justamente por esa convención, un formulario que corrige
+  el texto sin ancla nueva no puede pedir el borrado.
+- **La dirección de delivery del PDV por fin se guarda.** Se tecleaba en caja y
+  se perdía: vivía solo en el borrador del navegador y `venta` no tenía columna
+  que la recibiera (`referencia_atencion` es "para quién es el pedido", 50
+  caracteres, no adónde va). Ahora viaja a `venta.direccion_entrega`, sube por
+  el contrato de sync del hub offline y se imprime en la comanda, que es el
+  papel que sale con el repartidor.
+- **Anonimizar una persona también le borra el punto en el mapa** (Ley 29733,
+  ADR-011). Las coordenadas de la casa de alguien son tan personales como su
+  dirección escrita, o más: un punto no admite la ambigüedad de un "por el
+  mercado". Sin esto la anonimización dejaba la puerta exacta en la base.
+- **La CSP suma hosts de terceros por primera vez.** El mapa lo dibuja el
+  navegador con una clave restringida por dominio, porque los tokens de sesión
+  de Places —lo que hace que una búsqueda se cobre como una y no como ocho— los
+  maneja el elemento oficial de Google y no tienen versión server-side. Se
+  aceptó abrir `connect-src`, `img-src`, `font-src`, `style-src`, `script-src`
+  y `worker-src` a la lista de Google **recortada a lo que este ERP usa**: sin
+  Street View y **sin `'unsafe-eval'`**, que Google recomienda por las dudas.
+  Queda pendiente verificarlo en el navegador con clave puesta (deuda
+  transversal).
+- **La clave del navegador baja por contexto y no es `NEXT_PUBLIC_*`.** La lee
+  el proceso de Next y el layout la pasa una vez, así que se cambia reiniciando
+  el contenedor en vez de reconstruyendo la imagen — la misma razón por la que
+  se eliminó `NEXT_PUBLIC_API_URL`. Paso a paso de la consola de Google Cloud
+  en `docs/engineering/integraciones-google.md`.
+
+- **Exportar es la plantilla con los datos adentro** (2026-08-20, ADR-052).
+  Hasta ahora lo único que bajaba era una plantilla **vacía** de recetas: servía
+  para la primera carga y para nada más — corregir el rendimiento de treinta
+  recetas ya cargadas exigía abrir treinta fichas. Ahora las tres entidades
+  tienen `…/exportar` en el mismo formato que `…/plantilla`: lo que baja se
+  edita en Excel y se vuelve a subir sin traducir nada. Exportar pide permiso de
+  **lectura**, no de escritura: son los mismos datos del listado, empaquetados.
+- **El catálogo de artículos se carga de golpe** (RN-INV-025):
+  `GET /inventory/articulos/plantilla`, `/exportar`, `POST /importar/validar`
+  (multipart) e `/importar`. Dos hojas —`Artículos` y `SKUs`— con la misma
+  revisión en dos fases que ADR-046 fijó para recetas. Desbloquea de paso la
+  peor arista del importador de recetas: cuando el archivo nombraba un insumo
+  que no existía, la única salida era irse a `/inventario/articulos` y crearlo a
+  mano, uno por uno.
+- **El padrón de clientes se carga de golpe** (RN-PTS-007):
+  `GET /sales/clientes/plantilla`, `/exportar`, `POST /importar/validar` e
+  `/importar`, con permiso propio **`sales.gestionar_clientes`**. Reescribir el
+  padrón del grupo desde una planilla no es el mismo acto que registrar a
+  alguien en el mostrador, que es lo que hace el cajero con `sales.crear`.
+- **La carga de clientes no consulta a SUNAT ni a RENIEC.** `crear_cliente`
+  pregunta por el nombre cuando se registra de a uno; trescientas filas serían
+  trescientas llamadas externas secuenciales dentro de un solo request, contra
+  una cuota (ver `fixed-consulta-documento-visible-y-con-cuota.md`). Se agregó
+  `consultar_documento=False` y la planilla manda sobre el nombre; cuando el
+  cliente se edita de a uno, SUNAT vuelve a mandar.
+- **La E/S de `.xlsx` vive una sola vez, en `src/shared/planilla.py`**: abrir,
+  mapear la cabecera, descartar filas vacías, el tope de filas, y convertir una
+  celda a texto, número, booleano, fecha o UUID. Lo que **no** se construyó es
+  un motor genérico con descriptores de columnas: qué hojas tiene cada libro y
+  qué cuenta como "ya existe" son tres significados distintos, y un DSL que
+  exprese los tres se lee peor que los tres archivos planos que evita. La regla
+  de módulos ya lo hacía imposible de todos modos —`sales` no puede importar de
+  `inventory`— y `shared` es el único domicilio legal.
+- **Se lee por nombre de cabecera, no por posición de columna.** El parser de
+  ADR-046 leía la columna 0, así que agregar `ID` a la izquierda habría roto en
+  silencio cualquier archivo ya llenado. Ahora agregar o reordenar columnas no
+  rompe nada, y una columna que falta da un error que **la nombra**.
+- **La fase de validación pasa a tener `response_model`.** Devolvía un dict
+  crudo, así que `openapi.json` la documentaba como `{}` y los tipos del
+  frontend no los verificaba nadie — el mismo agujero para las tres entidades.
+- Costo aceptado: los **SKU solo se crean**, no se editan (no existe
+  `editar_sku`); uno con el código ya usado se informa y no se toca. Y el
+  código interno de un artículo sigue siendo de **4 caracteres únicos en todo
+  el grupo**: el importador lo exige y valida su largo por fila en vez de
+  autogenerarlo, porque un código inventado termina tecleado en una orden de
+  compra. Ambas quedan registradas en la deuda del módulo.
+
+- **Las consultas RUC/DNI se prueban también contra Factiliza de verdad**
+  (2026-08-22, `tests/test_factiliza_red.py`). Los dobles de `httpx` prueban
+  que el cliente manda el token correcto; no prueban que **ese** token sirva.
+  La corrida real confirmó las dos mitades: la consulta funciona con
+  `FACTILIZA_CONSULTA_DOCUMENTO_TOKEN`, y el token de emisión **no** consulta
+  documentos — o sea que tenerlos separados no era una precaución teórica.
+- **El suite normal sigue sin salir a internet.** El archivo está marcado
+  `red` y `addopts` lleva `-m "not red"`, así que `pytest` a secas —lo que
+  corre el CI— no lo toca. Se dispara a mano con `pytest -m red` desde la raíz
+  del repo. Sin token, queda `skipped`, no rojo. La alternativa —hacer que el
+  suite de siempre pegue a la API— habría atado el CI a que RENIEC y SUNAT
+  estén arriba y quemado cuota paga en cada push.
+- **Solo consultas, nunca emisión.** Un `POST /invoice/send` real genera un
+  comprobante ante SUNAT: eso no lo dispara una prueba.
+- Costo aceptado: **no se prueba por red el camino "documento no encontrado"**.
+  Dar con un DNI que de verdad no exista obliga a consultar documentos de
+  desconocidos hasta que alguno falle — el primer intento devolvió a una
+  persona real con nombre y domicilio. Ese caso se queda con dobles, que es
+  donde siempre estuvo bien cubierto.
+
+### Changed
+
+- **Una receta que ya existe se actualiza en vez de omitirse** (2026-08-20,
+  ADR-052, RN-COM-031). Desde ADR-046 el nombre repetido se informaba y la fila
+  no entraba, y la deuda quedó abierta a propósito: actualizar exigía decidir
+  qué pasa con los ingredientes que el archivo no menciona, y eso es decisión de
+  negocio, no de código. La decisión: **se conservan**, y la revisión deja
+  pedir que se quiten **receta por receta**, mostrando antes cuántas líneas se
+  pierden. El defecto no borra porque el modo de falla es asimétrico — subir la
+  hoja equivocada no puede vaciar una receta sin que nadie vea el número.
+- **La identidad de una fila es la columna `ID`, no el nombre.** Sin ella,
+  renombrar y duplicar son indistinguibles: el nombre es justamente lo que
+  alguien quiere cambiar. La regla que gobierna a las tres entidades es que *la
+  clave de actualización tiene que ser un campo que la persona no está
+  editando* — de ahí que artículos acepten además su **código interno** y
+  clientes su **número de documento**, y que recetas solo acepten `ID`.
+- Un `ID` repetido dentro del mismo archivo marca **las dos filas**, no la
+  segunda: copiar-pegar una fila entera es el accidente esperable, y silenciarlo
+  escribiría dos veces sobre el mismo registro.
+- Una fila con `ID` que no resuelve **no se degrada a alta**. Se informa y se
+  omite con motivo: un id mal pegado convertido en registro nuevo es un
+  duplicado que nadie sale a buscar.
+- La respuesta de importar pasa de `{creadas, omitidas}` a
+  `{creadas, actualizadas, omitidas}` en las tres entidades.
+- **La cantidad se exporta como la expresión tecleada, no como el resultado.**
+  Una línea escrita `450/3` vuelve a bajar `450/3`, no `150`: el dominio guarda
+  las dos y exportar solo el número perdería justo lo que RN-COM-024 existe para
+  conservar.
+
+### Fixed
+
+- **El insumo que falta se crea desde el diálogo de importación** (2026-08-20,
+  ADR-046 → ADR-052). Era parte de lo pedido en ADR-046 y nunca se entregó: la
+  pantalla dejaba **elegir** uno existente u omitir la línea, y crear uno nuevo
+  obligaba a irse a `/inventario/articulos`, crearlo a mano y volver a subir el
+  archivo entero. Ahora el `<select>` viene con un botón «Crear» que abre un
+  formulario en línea —código, unidad y tipo, con el nombre prellenado con el
+  que trajo el archivo— y resuelve esa línea en todas las recetas que la
+  nombran.
+- **Cuatro lugares afirmaban que eso ya funcionaba.** El docstring de
+  `importar-recetas.tsx`, el de `importacion_recetas.py`, la hoja de
+  instrucciones de la plantilla y **RN-COM-031** decían "se elige cuál es, se
+  crea, o se omite". `catalogoApi.crearArticulo` existía desde ADR-046 con un
+  comentario que la describía como "alta rápida desde el diálogo de
+  importación" y su único llamador era `contrato.test.ts`: código muerto con un
+  comentario que describía una función inexistente. Los cuatro textos ahora
+  describen lo que el código hace.
+- Esto **no revierte** la alternativa que ADR-046 descartó: lo descartado era
+  que el *importador* creara solo los insumos que faltan, porque un "Queso
+  mozarela" mal tecleado se volvería un artículo duplicado que después hay que
+  fusionar a mano. Que lo cree una persona, viendo el nombre que trajo el
+  archivo, es lo contrario de autocrear.
+- Mismo patrón para las **categorías** desconocidas al importar artículos:
+  elegir, crear, o dejar el artículo sin categoría. Una **unidad de medida**
+  desconocida no se crea desde acá a propósito —define cómo se cuenta el stock,
+  y necesita categoría, ratio y decimales—: se informa para que se cree en su
+  pantalla.
+
+- **`.env.example` volvió a documentar toda la configuración** (2026-08-22).
+  Se había quedado 22 variables atrás de `src/config/settings.py`: faltaban
+  `ZONA_HORARIA` —de la que sale "qué día es hoy" para el ERP, y sin ella un
+  cierre de las 20:00 hora Perú cae al día siguiente porque Docker corre en
+  UTC—, `HSTS_MAX_AGE_SEGUNDOS`, los tres límites de la consulta de DNI/RUC
+  (`CONSULTA_DOCUMENTO_*`, ADR-041) y **los seis umbrales de negocio**
+  (`PURCHASES_UMBRAL_APROBACION_OC`, `ACCOUNTING_UMBRAL_APROBACION_PAGO`,
+  `INVENTORY_MARGEN_AJUSTE_PCT`, `PRODUCTION_COSTO_HORA_MANO_OBRA`,
+  `RRHH_RMV_VIGENTE`, `RRHH_PLAZO_CONSERVACION_POSTULANTE_MESES`). Estos
+  últimos son los que deciden si una OC o un pago pasan solos o piden
+  aprobación: existían en el código como valor semilla y no había ni un
+  renglón que le dijera al negocio que se podían mover. También se agregaron
+  `PROVECHO_IMAGE` y `PROVECHO_WEB_IMAGE`, que `docker-compose.prod.yml`
+  exige para desplegar.
+- **La deriva ahora la ve el CI, no el día del incidente.** Tres pruebas en
+  `tests/test_settings.py`: que todo campo de `Settings` esté documentado en
+  `.env.example` o en `.env.hub.example`, que copiar `.env.example` tal cual
+  —el primer paso del README— produzca una configuración que **arranca**, y
+  que el ejemplo no lleve credenciales de verdad. La última no es paranoia
+  barata: `.env.example` sí se commitea, y un JWT copiado del `.env` real
+  queda en el historial de git para siempre; rotarlo después es un trámite
+  con el proveedor, no un `git revert`.
+- **`NUBEFACT_URL` y `NUBEFACT_TOKEN` salieron del ejemplo.** Factiliza lo
+  reemplazó el 2026-07-26 y ningún módulo las lee; seguían ahí invitando a
+  configurar un proveedor descartado.
+- **`GOOGLE_API_KEY` pasó a llamarse `GOOGLE_MAPS_BROWSER_KEY`**, que es lo
+  que de verdad es: una clave de navegador restringida por referrer que
+  consume el frontend. Ningún código la lee todavía, así que el cambio de
+  nombre no rompe nada — y evita que alguien pegue ahí una clave de servidor
+  creyendo que el backend la usa.
+- Se decidió **no** documentar `APP_NAME`, `APP_VERSION` ni `JWT_ALGORITHM`:
+  nadie los ajusta por entorno y ofrecerlos en el ejemplo solo invita a
+  romper cosas. Quedan en una lista explícita dentro de la prueba, no como
+  olvido.
+
+- **La consulta RUC/DNI tiene su propio token** (2026-08-22, ADR-005).
+  Emisión y consulta son dos productos que Factiliza contrata y cobra por
+  separado, y entrega una credencial para cada uno — pero el cliente mandaba
+  `FACTILIZA_TOKEN` a los dos hosts. Con dos tokens distintos el buscador de
+  DNI/RUC del mostrador recibía 401 de `api.factiliza.com` y moría con un 502
+  genérico: el síntoma no nombra la causa, y el token de emisión seguía
+  funcionando, así que la facturación se veía sana. Ahora
+  `FACTILIZA_CONSULTA_DOCUMENTO_TOKEN` alimenta `consultar_dni`/`consultar_ruc`
+  y `FACTILIZA_TOKEN` solo la emisión.
+- **Vacío se reusa el de emisión**, así que quien tenga un plan con una sola
+  credencial no configura nada nuevo. La cascada completa —argumento
+  explícito, luego configuración, luego el de emisión— vive en
+  `FactilizaClient._resolver_token_consulta`, no repartida por los métodos.
+- **Se prueba el cruce en las dos direcciones.** Que la consulta use el suyo
+  es la mitad fácil; la otra es que la emisión **nunca** use el de consulta,
+  porque un comprobante firmado con la credencial equivocada lo rechaza SUNAT
+  y eso sí llega a la caja. Los tests espían la cabecera `Authorization` de
+  `httpx`, que es donde el error se vería.
+- El token nuevo entra a `CLAVES_SENSIBLES` de `logging_config`, que redacta
+  por nombre exacto: sin esa línea, la credencial recién agregada viajaba en
+  claro a los logs y a GlitchTip.
+
+- **El paquete decía 0.1.0 con el proyecto en 0.5.0** (2026-08-22). No era
+  `settings.app_version` desactualizado: `pyproject.toml` llevaba clavado en
+  `0.1.0` desde el 2026-07-04, cuatro releases atrás. `cortar_version.py`
+  juntaba los fragmentos en `CHANGELOG.md` y borraba `changelog.d/`, y ahí
+  terminaba; la versión se teclea tres veces al cortar un release —argumento
+  del script, mensaje de commit y tag— y no aterrizaba en ningún archivo salvo
+  el CHANGELOG. Nadie la olvidó una vez: **no había mecanismo**.
+- **Costó donde más duele para diagnosticar.** De `pyproject.toml` salen el
+  `release` con el que GlitchTip agrupa los errores y la `version` que publica
+  `/docs`. Cada error reportado desde julio quedó etiquetado `0.1.0`, así que
+  "esto apareció en la 0.4.0" —la mitad del valor de tener reporte de
+  errores— no se podía responder. El tag de la imagen sí era correcto (sale
+  del tag de git), lo que hacía el desfase más difícil de notar: por fuera
+  todo se veía bien versionado.
+- **Ahora hay una sola fuente de verdad.** `pyproject.toml` la declara,
+  `settings.app_version` la lee de la metadata del paquete instalado en vez de
+  repetirla como literal, y `cortar_version.py` la sube al cortar cada
+  release. Un literal duplicado era la condición para que esto pasara.
+- **`tests/test_version.py` falla si se vuelven a separar**: compara
+  `pyproject.toml` con la última sección con número del CHANGELOG. Verificado
+  contra la deriva real — con `0.1.0` la prueba se pone roja.
+- En desarrollo la versión se refresca al reinstalar (`pip install -e
+  ".[dev]"`): la metadata se congela al instalar. La imagen instala desde cero
+  en cada build, así que ahí no aplica.
+
 ## [0.5.0] - 2026-08-20
 
 ### Added
