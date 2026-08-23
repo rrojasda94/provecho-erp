@@ -59,3 +59,10 @@ frontend/blob-report/
 
 # Scratch de TestSprite: credenciales del runner y salida de cada corrida.
 testsprite_tests/tmp/
+
+# Planillas generadas por scripts/odoo/convertir_catalogo.py. Son datos reales
+# del negocio derivados de un export privado: se generan cuando se necesitan y
+# no viven en el repositorio.
+salida-catalogo/
+verif-carga.db
+carga-simulacion.txt

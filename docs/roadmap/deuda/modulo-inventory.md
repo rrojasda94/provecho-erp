@@ -392,3 +392,43 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   modelo (`test_importacion_articulos.py`), pero eso cubre las columnas que
   alguien se acordó de atar. Se cierra corriendo la suite también contra
   Postgres en CI.
+
+## ~~Mitad-y-mitad: la regla de Odoo descuenta de menos~~ — SALDADA 2026-08-23
+
+`aplica_a_variante` implementa la regla de Odoo 18 al pie de la letra: se
+agrupan los valores de la condición por atributo y se exige **al menos uno de
+cada grupo**. La consecuencia es que una línea que nombra `Mitad 1` y
+`Mitad 2` en la misma condición —que es como viene el archivo de Charlie's—
+**no aplica** si solo una de las dos mitades califica. Media americana + media
+peperoni no descuenta el jamón.
+
+No es un bug del motor: es el comportamiento del sistema del que salen los
+datos, y cambiarlo haría que importar su catálogo descontara distinto a como
+descuenta hoy en Odoo, que es peor.
+
+**Cómo se salda: con datos, no con código.** Una línea por mitad, a media
+cantidad, cada una condicionada a un solo atributo. Se hace desde la planilla
+(ADR-057) sin tocar el motor. `tests/test_variantes_odoo.py` tiene las dos
+formas lado a lado —el jamón a la manera de Odoo, la piña por mitad— para que
+la diferencia sea visible y para que quien lo arregle sepa contra qué
+comparar.
+
+**Saldada el mismo día**, al aparecer la regla que faltaba: las dos mitades
+tienen que ser **distintas** (RN-COM-038). Con eso, una condición que pide el
+mismo sabor en las dos mitades no es que descuente de menos — es que no se
+cumple nunca. Las 52 líneas del archivo resultaron ser **todas simétricas**, y
+`scripts/odoo/` las parte en una por mitad con la mitad del gramaje. Ver la
+enmienda de ADR-056.
+
+## La condición de una línea no se valida contra el producto (2026-08-23)
+
+`receta_item.aplica_valores` guarda PTAV de `sales`, y `inventory` no puede
+verificar contra su ORM que esos valores pertenezcan al producto que usa la
+receta. Hoy el único guardarraíl es la lectura conservadora: un valor que
+`atributo_de_valores` no reconoce forma su propio grupo y la línea no aplica.
+
+Alcanza para no descontar de más, que es el lado caro, pero deja pasar una
+receta mal armada sin avisar. Cuando se construya el editor de la condición
+(F4/F5) conviene validarla ahí, donde `sales` sí está a mano, y no en el
+camino del descuento.
+

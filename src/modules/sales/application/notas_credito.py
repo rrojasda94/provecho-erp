@@ -120,6 +120,7 @@ def _items_para_reponer(session: Session, filas, cantidades: dict[str, Decimal])
                 "cantidad": str(cantidades[str(fila.id)]),
                 # Lo que la línea no llevó tampoco vuelve al almacén.
                 "sin_articulo_ids": fila.sin_articulo_ids,
+                "valores_variante_ids": fila.valores_variante_ids,
             }
         )
     return items

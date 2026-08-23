@@ -586,6 +586,58 @@ Con las tarifas en `0` —el estado de fábrica— nada de esto cobra y el deliv
 funciona como antes. **El costo todavía no suma al total de la venta**: ver la
 deuda del módulo.
 
+## Estado (slice 10 — atributos y variantes generadas, 2026-08-23)
+
+Migración `e2b7c40d91af`, ADR-055/056, RN-COM-036, RN-COM-037.
+
+Tres correcciones sobre el mismo modelo en once días —ADR-035 §5, ADR-038,
+ADR-042— y el catálogo real seguía sin poder cargarse: `Pizza MitadxMitad
+Familiar` con 19 sabores por mitad son **361 filas de producto con 361
+recetas**. La causa no era dónde colgaba el grupo: era que **la combinación
+no fuera una entidad**.
+
+**Seis tablas nuevas**, los nombres de Odoo traducidos:
+
+| Tabla | Odoo | Qué es |
+|---|---|---|
+| `atributo` | `product.attribute` | La dimensión: Tamaño, Mitad 1 |
+| `atributo_valor` | `product.attribute.value` | Familiar, Hawaiana |
+| `producto_atributo_linea` | `product.template.attribute.line` | Qué atributo ofrece un producto |
+| `producto_atributo_valor` (PTAV) | `product.template.attribute.value` | Ese valor **en ese producto**, con su `precio_extra` |
+| `producto_variante_valor` | — | Qué combinación **es** una fila hija |
+| `producto_exclusion` | `product.template.attribute.exclusion` | Combinaciones que no existen |
+
+**La variante generada sigue siendo `producto_comercial`** con
+`producto_padre_id`. No es una concesión: es lo que hace que precio
+server-side (RN-PRC-003), margen, ruteo KDS, `venta_item.precio_unitario`
+congelado, `GET /carta` y la réplica al hub sigan funcionando sin escribir
+una línea. Lo que cambia es quién crea esas filas.
+
+**`atributo.modo_variante`** decide si se materializan: `siempre` /
+`dinamica` / `nunca`, los tres modos de `create_variant` de Odoo. Con
+`siempre`, Mitad 1 × Mitad 2 son las 361 filas del problema; con `nunca`
+son cero filas y una receta condicionada.
+
+**`venta_item.valores_variante_ids`** (JSONB, nullable) guarda los PTAV
+elegidos. Misma forma y mismas razones que `sin_articulo_ids` (ADR-035 §1).
+Viaja en los cinco eventos de venta, de forma **aditiva**.
+
+**Contrato público nuevo**: `atributo_de_valores(session, ids)` →
+`{ptav_id: atributo_id}`. Lo consume `inventory` para evaluar las líneas de
+receta condicionadas (ADR-056); sin él no se puede agrupar la condición por
+atributo.
+
+`valores_ofrecidos(session, producto)` aplica la herencia del padre, misma
+regla que `grupos_efectivos`/`extras_efectivos` (ADR-042).
+
+**Interruptor**: `parametro_empresa` → `sales` / `catalogo.modelo_odoo`,
+default `False`. La migración es solo aditiva, así que la imagen 0.6.0 corre
+contra este esquema sin enterarse: volver atrás es desplegar 0.6.0, sin
+downgrade.
+
+Pruebas: `tests/test_variantes_odoo.py` (integración) y
+`tests/test_receta_condicionada.py` (funciones puras).
+
 ## Casos de uso
 
 - CRUD de productos comerciales y recetas (separados de artículos inventariables).

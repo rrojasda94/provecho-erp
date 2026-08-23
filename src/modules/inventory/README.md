@@ -29,6 +29,47 @@ fecha_vencimiento, condiciones de almacenamiento), `conteo`, `ajuste`
 `proveedor` | `cliente`). Detalle en `docs/architecture/data-model.md`
 §3–§4.
 
+## Estado (slice 10 — recetas condicionadas y UdM por línea, 2026-08-23)
+
+Migración `e2b7c40d91af`, ADR-056, RN-COM-037, RN-UDM-005.
+
+**`receta_item.aplica_valores`** (JSONB, nullable): array de
+`producto_atributo_valor.id`. NULL o `[]` = la línea aplica siempre, que es
+el caso de todas las recetas de hoy — por eso no hay backfill.
+
+La regla es la de Odoo 18 (`mrp.bom.line._skip_bom_line` →
+`_skip_for_no_variant`), en `domain/rules.aplica_a_variante`: se agrupan los
+valores de la condición **por atributo** y la combinación tiene que coincidir
+con **al menos uno de cada grupo**. Entre grupos es Y; dentro de un grupo es
+O. Es lo que convierte 361 recetas en una de 26 líneas.
+
+> Consecuencia aceptada: media Americana + media Peperoni **no** descuenta el
+> jamón si la línea nombra los dos atributos. Es el comportamiento de Odoo y
+> el que el archivo de Charlie's asume. La corrección es de **datos** —una
+> línea por mitad, a media cantidad— y `test_variantes_odoo.py` prueba las
+> dos formas lado a lado.
+
+**`receta_item.unidad_medida_id`** (FK, nullable): NULL = la del artículo.
+Si viene, es de la **misma categoría de UdM** (RN-UDM-001) y se convierte por
+`ratio` al descontar y al costear. No revierte ADR-023: lo que ADR-023
+descartó era una unidad *libre*; ésta es exacta.
+
+**`domain/rules.consumo_de_linea`** es ahora la única cuenta de merma +
+conversión. La usan `listeners._consumos_de_items` y `recetas.costo_linea`,
+que antes la escribían distinto: el día que una gane un paréntesis, el costo
+de un plato deja de cuadrar con lo que salió de la cámara.
+
+**`receta.es_kit`** (booleano, default False) es el `type` de `mrp.bom`
+(`normal` | `phantom`). Booleano y no un `tipo` de tres valores porque
+`recetas.TIPOS_RECETA` ya significa otra cosa (`subreceta` | `producto`).
+
+**`receta_item.orden`** existe para que exportar dos veces dé el mismo
+archivo: sin orden explícito, un diff contra el export anterior no sirve.
+
+`_consumos_de_items` pasa a cargar las líneas **una vez por receta** en vez
+de una por ítem, y `GET /inventory/recetas/{id}` devuelve la unidad **de la
+línea** cuando la línea eligió una.
+
 ## Casos de uso
 
 - CRUD de artículos y categorías.

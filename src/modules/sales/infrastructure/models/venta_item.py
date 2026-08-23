@@ -46,6 +46,19 @@ class VentaItem(Base, UuidPkMixin, TimestampMixin):
     # haya que reportar "qué se quita más" conviene la tabla; hoy sería una
     # tabla vacía de datos y llena de joins.
     sin_articulo_ids: Mapped[list | None] = mapped_column(JsonB, nullable=True)
+    # Valores de atributo elegidos en esta línea: array de
+    # `producto_atributo_valor.id` como texto (ADR-055).
+    #
+    # Es lo que permite que una receta tenga líneas condicionadas
+    # (`receta_item.aplica_valores`) en vez de una receta por combinación.
+    # Sin esto, "mitad hawaiana / mitad peperoni" solo se puede modelar como
+    # 361 productos hijos con 361 recetas.
+    #
+    # Misma forma y mismas razones que `sin_articulo_ids`: columna y no
+    # tabla —un conjunto de ids que solo se lee entero con su línea—, y
+    # NULL y no `[]` cuando no se eligió nada, que es lo que vale para todo
+    # lo vendido antes de la migración, sin backfill.
+    valores_variante_ids: Mapped[list | None] = mapped_column(JsonB, nullable=True)
     cantidad: Mapped[Decimal] = mapped_column(Numeric(10, 2))
     precio_unitario: Mapped[Decimal] = mapped_column(Numeric(10, 2))
     descuento: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=Decimal(0))

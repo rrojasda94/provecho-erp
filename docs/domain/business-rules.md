@@ -879,6 +879,12 @@ producción se hace en cocinas de sucursal. Ver
   desactivado en recetas, requerimientos y ventas.
 - **RN-UDM-004** La creación/edición de categorías de UdM y sus ratios es
   responsabilidad del área de compras y del área contable.
+- **RN-UDM-005** Una **línea de receta** puede expresarse en una UdM distinta
+  a la de su artículo, siempre que sea **de la misma categoría** (RN-UDM-001):
+  el aceite se compra por litros y la receta lleva 30 ml. Al descontar stock y
+  al costear se convierte por el `ratio` de la unidad, y la UdM del artículo
+  sigue siendo la que manda en el almacén. Sin unidad declarada, la línea
+  hereda la del artículo, que es el comportamiento por defecto.
 
 ## Empaques
 
@@ -1429,6 +1435,28 @@ producción se hace en cocinas de sucursal. Ver
   internet en el local— el pedido **se toma igual**, con la distancia estimada
   y marcada como aproximada. Cobrar de menos por un kilómetro es preferible a
   no poder vender (mismo criterio que RN-CPP y ADR-005).
+- **RN-COM-036** Un producto comercial puede declarar **atributos** (Tamaño,
+  Mitad 1, Temperatura) con sus **valores**. Cada atributo decide si sus
+  combinaciones se **materializan** como variante vendible: `siempre` (todas,
+  al vincularlo), `dinámica` (la primera vez que se vende) o `nunca` (ninguna
+  — el valor elegido viaja en la línea de venta y solo cambia lo que se
+  consume). Una variante **hereda** los atributos de su producto padre, igual
+  que hereda sus grupos y extras (RN-COM-023). El sobreprecio de un valor
+  **se suma** al precio de la lista vigente, no lo reemplaza (RN-PRC-003).
+- **RN-COM-037** Una **línea de receta** puede aplicar solo a ciertas
+  combinaciones. La condición se lee agrupando sus valores **por atributo**:
+  la línea cuenta cuando la combinación elegida coincide con **al menos un
+  valor de cada atributo** nombrado. Sin condición, la línea aplica siempre.
+  Es lo que permite que una pizza mitad-y-mitad de 19 sabores sea **una**
+  receta y no 361.
+- **RN-COM-038** Un producto puede declarar **combinaciones que no existen**.
+  El caso que la obliga: en una pizza **mitad y mitad las dos mitades tienen
+  que ser distintas** — media hawaiana y media hawaiana no es una
+  mitad-y-mitad, es una hawaiana entera, que se vende como su propio producto
+  con su receta y su precio. La exclusión se declara una vez y **vale en los
+  dos sentidos**; `«A» + «B»` y `«B» + «A»` son el mismo plato y consumen lo
+  mismo. Se hace cumplir **al confirmar la venta**, no solo en el PDV: el
+  kiosko y la central de pedidos entran por el mismo endpoint.
 
 ## Cumplimiento de pedido
 

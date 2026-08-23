@@ -6,10 +6,14 @@ para partir de una existente y el escalado por factor.
 
 Dos decisiones que se repiten en todo el archivo:
 
-- **La unidad la pone el insumo.** La cantidad de cada línea se expresa en
-  la UdM del artículo y se redondea a los decimales de esa unidad
-  (RN-GER-010). No hay campo de unidad en la línea: sería un segundo lugar
-  donde el dato puede quedar distinto del que usa el descuento de stock.
+- **La unidad la pone el insumo, salvo que la línea diga otra cosa.** Por
+  defecto la cantidad se expresa en la UdM del artículo y se redondea a los
+  decimales de esa unidad (RN-GER-010), que es como está cargado todo lo de
+  hoy. Desde ADR-056 la línea puede elegir otra UdM **de la misma categoría**
+  (RN-UDM-005) —el aceite se compra por litros y la receta lleva 30 ml— y se
+  convierte por `ratio` al descontar y al costear. No son dos verdades: la
+  conversión es exacta y la unidad del artículo sigue siendo la que manda en
+  el almacén.
 - **La operación se evalúa en el servidor.** El campo acepta "1000/3"; el
   cliente puede mostrar el resultado mientras se teclea, pero el número que
   se guarda lo calcula `shared/aritmetica.py` a partir de la expresión, no
@@ -28,6 +32,7 @@ from src.modules.inventory.application.errors import (
     NoEncontrado,
     ReglaNegocio,
 )
+from src.modules.inventory.domain import rules as domain_rules
 from src.modules.inventory.infrastructure.models import (
     Articulo,
     Receta,
@@ -151,16 +156,22 @@ def detalle_receta(session: Session, receta_id: uuid.UUID) -> dict:
     lineas, costo = [], Decimal(0)
     for item in items:
         articulo, udm = _articulo_y_udm(session, item.articulo_id)
-        costo_linea_valor = costo_linea(item, articulo)
+        ratio_linea, ratio_articulo = ratios_de_linea(session, item, articulo)
+        udm_linea = (
+            session.get(UnidadMedida, item.unidad_medida_id)
+            if item.unidad_medida_id
+            else udm
+        ) or udm
+        costo_linea_valor = costo_linea(item, articulo, ratio_linea, ratio_articulo)
         costo += costo_linea_valor
         lineas.append(
             {
                 "id": item.id,
                 "articulo_id": articulo.id,
                 "articulo_nombre": articulo.nombre,
-                "unidad_medida_id": udm.id,
-                "unidad_medida_nombre": udm.nombre,
-                "decimales": _decimales(udm),
+                "unidad_medida_id": udm_linea.id,
+                "unidad_medida_nombre": udm_linea.nombre,
+                "decimales": _decimales(udm_linea),
                 "cantidad": item.cantidad,
                 "expresion": item.expresion,
                 "merma_pct": item.merma_pct,
@@ -179,6 +190,9 @@ def agregar_item(
     cantidad: Decimal | None = None,
     expresion: str | None = None,
     merma_pct: Decimal = Decimal(0),
+    unidad_medida_id: uuid.UUID | None = None,
+    aplica_valores: list[str] | None = None,
+    orden: int = 0,
 ) -> RecetaItem:
     receta = _exigir(session, receta_id)
     _exigir_articulo_de_la_empresa(session, articulo_id, receta.empresa_id)
@@ -188,10 +202,22 @@ def agregar_item(
             f"'{articulo.nombre}' es lo que la receta produce: no puede ser "
             "también su insumo"
         )
+    udm_linea = _udm_de_linea(session, unidad_medida_id, articulo, udm)
+    condicion = _condicion_normalizada(aplica_valores)
     repo = RecetaRepo(session)
-    if any(i.articulo_id == articulo_id for i in repo.items(receta_id)):
-        raise Conflicto(f"'{articulo.nombre}' ya está en la receta")
-    valor, texto = _resolver_cantidad(cantidad, expresion, udm)
+    # El mismo insumo puede repetirse **si cada línea aplica a otra
+    # combinación** (ADR-056): la pizza mitad-y-mitad lleva jamón en una línea
+    # para unos sabores y en otra para otros. Lo que sigue prohibido es la
+    # misma condición dos veces, que sí es la línea duplicada de siempre.
+    if any(
+        i.articulo_id == articulo_id
+        and _condicion_normalizada(i.aplica_valores) == condicion
+        for i in repo.items(receta_id)
+    ):
+        raise Conflicto(
+            f"'{articulo.nombre}' ya está en la receta con esa misma condición"
+        )
+    valor, texto = _resolver_cantidad(cantidad, expresion, udm_linea)
     _validar_merma(merma_pct)
     return repo.add_item(
         RecetaItem(
@@ -200,8 +226,45 @@ def agregar_item(
             cantidad=valor,
             expresion=texto,
             merma_pct=merma_pct,
+            unidad_medida_id=udm_linea.id if udm_linea is not udm else None,
+            aplica_valores=list(aplica_valores) if aplica_valores else None,
+            orden=orden,
         )
     )
+
+
+def _udm_de_linea(
+    session: Session,
+    unidad_medida_id: uuid.UUID | None,
+    articulo: Articulo,
+    udm_articulo: UnidadMedida,
+) -> UnidadMedida:
+    """La unidad en la que se teclea esta línea (RN-UDM-005).
+
+    Sin unidad propia, la del artículo — que es como funcionó siempre. Con
+    una, tiene que ser de **la misma categoría**: RN-UDM-001 no admite otra
+    cosa, y la conversión por `ratio` solo tiene sentido dentro de una
+    categoría. Se rechaza en vez de ignorarse porque una línea que dice
+    "kilos" sobre un artículo que se lleva por unidad no es un detalle de
+    presentación: es un gramaje que nadie puede interpretar.
+    """
+    if unidad_medida_id is None or unidad_medida_id == udm_articulo.id:
+        return udm_articulo
+    udm = session.get(UnidadMedida, unidad_medida_id)
+    if udm is None:
+        raise NoEncontrado("unidad de medida no encontrada")
+    if udm.categoria_udm_id != udm_articulo.categoria_udm_id:
+        raise ReglaNegocio(
+            f"'{articulo.nombre}' se lleva en {udm_articulo.nombre}: la receta "
+            f"no puede pedirlo en {udm.nombre}, que es de otra categoría de "
+            "unidad de medida"
+        )
+    return udm
+
+
+def _condicion_normalizada(valores: list[str] | None) -> frozenset[str]:
+    """El orden en que se listan los valores no hace a la condición."""
+    return frozenset(str(v) for v in (valores or []))
 
 
 def editar_item(
@@ -394,10 +457,45 @@ def _validar_merma(merma_pct: Decimal) -> None:
         raise ReglaNegocio("la merma debe estar entre 0 y 100 %")
 
 
-def costo_linea(item: RecetaItem, articulo: Articulo) -> Decimal:
-    """La merma es insumo que entra y no llega al plato: se costea igual."""
-    factor = Decimal(1) + (item.merma_pct / Decimal(100))
-    return item.cantidad * factor * articulo.costo_promedio
+def costo_linea(
+    item: RecetaItem,
+    articulo: Articulo,
+    ratio_linea: Decimal | None = None,
+    ratio_articulo: Decimal | None = None,
+) -> Decimal:
+    """La merma es insumo que entra y no llega al plato: se costea igual.
+
+    Misma cuenta que descuenta el stock (`domain.rules.consumo_de_linea`), y
+    a propósito: costear con una fórmula y descontar con otra es cómo el
+    margen de un plato deja de cuadrar con lo que salió de la cámara, sin
+    que ninguna de las dos parezca estar mal.
+
+    Los ratios solo hacen falta si la línea eligió una unidad distinta a la
+    del artículo (RN-UDM-005); sin ellos no se convierte nada, que es el
+    caso de toda receta que hereda la unidad de su insumo.
+    """
+    cantidad = domain_rules.consumo_de_linea(
+        item.cantidad, item.merma_pct, ratio_linea, ratio_articulo
+    )
+    return cantidad * articulo.costo_promedio
+
+
+def ratios_de_linea(
+    session: Session, item: RecetaItem, articulo: Articulo
+) -> tuple[Decimal | None, Decimal | None]:
+    """Los dos ratios que `costo_linea` necesita, o `(None, None)`.
+
+    Devuelve `(None, None)` cuando la línea no eligió unidad: así quien
+    costea no tiene que saber si hay conversión o no, y no paga dos
+    consultas por línea cuando no la hay.
+    """
+    if not item.unidad_medida_id:
+        return None, None
+    udm_linea = session.get(UnidadMedida, item.unidad_medida_id)
+    udm_articulo = session.get(UnidadMedida, articulo.unidad_medida_id)
+    if udm_linea is None or udm_articulo is None:
+        return None, None
+    return udm_linea.ratio, udm_articulo.ratio
 
 
 def _resumen(session: Session, receta: Receta) -> dict:

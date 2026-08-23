@@ -1,6 +1,6 @@
 """Reglas de negocio de inventario. Puras, sin infraestructura."""
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import date, timedelta
 from decimal import Decimal
 from typing import Any
@@ -221,3 +221,98 @@ def codigo_lote_auto(fecha: date) -> str:
     lote — es lo que hace el almacén en la práctica.
     """
     return f"L{fecha:%y%m%d}"
+
+
+# --- Recetas condicionadas por variante (ADR-056) ----------------------------
+
+#: Prefijo de grupo para un valor cuyo atributo no se conoce. Ver
+#: `aplica_a_variante`: cada huérfano queda en su propio grupo, no todos
+#: juntos en uno —que sería un O entre valores de atributos distintos—.
+_GRUPO_HUERFANO = "sin-atributo:"
+
+
+def aplica_a_variante(
+    aplica_valores: Sequence[str] | None,
+    elegidos: Sequence[str] | None,
+    atributo_de: Mapping[str, str],
+) -> bool:
+    """¿Le toca esta línea de receta a la combinación elegida? (RN-COM-037)
+
+    Regla de Odoo 18, literal (`mrp.bom.line._skip_bom_line` →
+    `_skip_for_no_variant`): se agrupan los valores de la condición **por
+    atributo**, y la combinación tiene que coincidir con **al menos uno de
+    cada grupo**. Entre grupos es Y; dentro de un grupo es O.
+
+    Es lo que hace legible el archivo real de Charlie's. La línea "Jamón
+    picado" de la Pizza MitadxMitad lleva esta condición::
+
+        Mitad 1: Americana, Mitad 1: Hawaiana, Mitad 2: Americana, Mitad 2: Hawaiana
+
+    Son dos grupos —Mitad 1 y Mitad 2—, así que aplica cuando la primera
+    mitad es Americana **u** Hawaiana **y** la segunda también. Si fuera O
+    entre todo, cualquier pizza con una sola mitad americana descontaría el
+    jamón de las dos.
+
+    `aplica_valores` vacío o `None` = la línea aplica siempre. Es el caso de
+    toda receta que existe hoy, y por eso la columna nace nullable: sin
+    condición, el comportamiento es exactamente el de antes.
+
+    `atributo_de` mapea `producto_atributo_valor.id` → `atributo.id`. Un
+    valor que no esté en el mapa —porque alguien lo borró y la línea quedó
+    apuntando a nada— forma **su propio grupo**: la línea solo aplica si la
+    combinación trae ese id exacto. Es la lectura conservadora, y la que hay
+    que preferir: la alternativa es descontar un insumo que quizá no va, y
+    eso descuadra el conteo sin que nadie sepa por qué.
+    """
+    if not aplica_valores:
+        return True
+    disponibles = set(elegidos or ())
+    if not disponibles:
+        return False
+    grupos: dict[str, set[str]] = {}
+    for valor in aplica_valores:
+        clave = atributo_de.get(valor) or f"{_GRUPO_HUERFANO}{valor}"
+        grupos.setdefault(clave, set()).add(valor)
+    return all(grupo & disponibles for grupo in grupos.values())
+
+
+def consumo_de_linea(
+    cantidad: Decimal,
+    merma_pct: Decimal,
+    ratio_linea: Decimal | None = None,
+    ratio_articulo: Decimal | None = None,
+) -> Decimal:
+    """Cuánto insumo sale del almacén por una línea de receta.
+
+    Merma más conversión de unidad, en **un solo lugar**. Estaban en dos
+    —`listeners._consumos_de_items` para descontar y `recetas.costo_linea`
+    para costear— escritas distinto, y dos formas de la misma cuenta
+    terminan diciendo cosas distintas: el día que una gane un paréntesis, el
+    costo de un plato deja de coincidir con lo que se descontó de la cámara
+    y nadie sabe cuál de los dos está mal.
+
+    Sin ratios, no convierte: es el caso de toda línea que hereda la unidad
+    de su artículo, que son todas las de hoy.
+    """
+    base = cantidad * (Decimal(1) + merma_pct / Decimal(100))
+    if ratio_linea is None or ratio_articulo is None:
+        return base
+    return convertir_cantidad(base, ratio_linea, ratio_articulo)
+
+
+def convertir_cantidad(
+    cantidad: Decimal, ratio_origen: Decimal, ratio_destino: Decimal
+) -> Decimal:
+    """Pasa `cantidad` de una UdM a otra de la **misma categoría** (RN-UDM-005).
+
+    `unidad_medida.ratio` dice cuántas unidades base vale una unidad de esa
+    UdM (Doypack 2 kg = ratio 2 sobre Kilo). Así que se va a la base y se
+    vuelve: 30 en `ml` (ratio 0.001) son 0.03 en `L` (ratio 1).
+
+    Sin redondear: quien llama sabe con cuántos decimales admite la unidad
+    de destino (RN-GER-010) y redondea una sola vez, al final. Redondear acá
+    y otra vez afuera es cómo un gramo se convierte en dos.
+    """
+    if ratio_destino == 0:
+        raise ValueError("una unidad de medida no puede tener ratio 0")
+    return cantidad * ratio_origen / ratio_destino

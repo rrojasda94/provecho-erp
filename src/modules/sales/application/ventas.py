@@ -14,7 +14,12 @@ from sqlalchemy.orm import Session
 from src.core.events import event_bus
 from src.modules.accounting.application.queries_publicas import hay_caja_abierta
 from src.modules.inventory.application.queries_publicas import insumos_de_receta
-from src.modules.sales.application import comprobantes, precios, tarifa_delivery
+from src.modules.sales.application import (
+    catalogo,
+    comprobantes,
+    precios,
+    tarifa_delivery,
+)
 from src.modules.sales.application.errors import (
     Conflicto,
     NoEncontrado,
@@ -87,6 +92,9 @@ def _armar_item(
     restas = _resolver_restas(
         session, prod, it.get("sin_articulo_ids"), exigir=exigir_opciones
     )
+    valores = _resolver_valores_variante(
+        session, prod, it.get("valores_variante_ids"), exigir=exigir_opciones
+    )
     fila = VentaItem(
         producto_comercial_id=prod.id,
         cantidad=cantidad,
@@ -96,6 +104,7 @@ def _armar_item(
         descuento=Decimal(0) if gratis else Decimal(str(it.get("descuento") or 0)),
         grupo_cobro=grupo,
         sin_articulo_ids=restas,
+        valores_variante_ids=valores,
     )
     # Empaque se descuenta solo en las modalidades configuradas (RN-EMP-003).
     con_empaque = bool(prod.empaque_id and modalidad in (prod.modalidades_empaque or []))
@@ -104,8 +113,64 @@ def _armar_item(
         "cantidad": str(cantidad),
         "empaque_articulo_id": str(prod.empaque_id) if con_empaque else None,
         "sin_articulo_ids": restas,
+        # Aditivo (ADR-056): un consumidor que lo ignore se comporta como
+        # antes, igual que pasó con `sin_articulo_ids` en ADR-035.
+        "valores_variante_ids": valores,
     }
     return fila, detalle, prod
+
+
+def _resolver_valores_variante(
+    session: Session, prod, pedidos, *, exigir: bool
+) -> list[str] | None:
+    """Qué valores de atributo eligió esta línea (ADR-055/056).
+
+    Solo se aceptan valores que el producto **o su padre** ofrecen. La
+    herencia es la misma regla que ADR-042 fijó para grupos y extras, y por
+    la misma razón: dónde quedó colgado el atributo no debería decidir
+    nada, y mientras eso importe siempre hay una mitad de los catálogos
+    rota — el que arma una persona cuelga del padre, el que genera el
+    importador cuelga de la variante.
+
+    Rechazar en vez de ignorar: un valor ajeno no es inocuo, porque puede
+    activar líneas de receta condicionadas y mover stock que nadie pidió.
+
+    Y se rechaza también la **combinación imposible** que declara
+    `producto_exclusion`: media hawaiana y media hawaiana no es una
+    mitad-y-mitad, es una hawaiana entera —que ya se vende como su propio
+    producto, con su receta y su precio—. Que la pantalla no la ofrezca no
+    alcanza: el kiosko y la central de pedidos entran por este mismo
+    endpoint, y una regla que solo vive en una pantalla no es una regla
+    (mismo criterio que `_validar_grupos`, ADR-023 §2).
+
+    `exigir=False` en el replay del hub (ADR-009), mismo criterio que las
+    restas: esa venta ya se preparó y se cobró, y el catálogo pudo cambiar
+    durante el corte.
+    """
+    if not pedidos:
+        return None
+    ids = list(dict.fromkeys(str(v) for v in pedidos))
+    if not exigir:
+        return ids
+    ofrecidos = catalogo.valores_ofrecidos(session, prod)
+    ajenos = [v for v in ids if v not in ofrecidos]
+    if ajenos:
+        raise ReglaNegocio(
+            f"'{prod.nombre}' no ofrece {len(ajenos)} de los valores "
+            "elegidos: solo se puede elegir lo que el producto declara"
+        )
+    choque = catalogo.combinacion_excluida(session, ids)
+    if choque:
+        izquierda, derecha = choque
+        if izquierda == derecha:
+            raise ReglaNegocio(
+                f"'{prod.nombre}' lleva dos mitades distintas: «{izquierda}» "
+                "no se puede elegir en las dos"
+            )
+        raise ReglaNegocio(
+            f"'{prod.nombre}' no admite «{izquierda}» junto con «{derecha}»"
+        )
+    return ids
 
 
 def _resolver_restas(
@@ -899,8 +964,11 @@ def _a_reponer(session: Session, filas: list[VentaItem]) -> list[dict]:
             "receta_id": str(productos.get(f.producto_comercial_id).receta_id),
             "cantidad": str(f.cantidad),
             # Se repone exactamente lo que se consumió: lo que la línea no
-            # llevó tampoco vuelve al almacén.
+            # llevó tampoco vuelve al almacén. Vale igual para la
+            # combinación: reponer una línea de receta que la variante
+            # elegida nunca activó dejaría stock de más.
             "sin_articulo_ids": f.sin_articulo_ids,
+            "valores_variante_ids": f.valores_variante_ids,
         }
         for f in filas
     ]
@@ -1131,6 +1199,7 @@ def anular_venta(session: Session, venta_id: uuid.UUID, usuario_id: uuid.UUID) -
                 "receta_id": str(prod.receta_id),
                 "cantidad": str(it.cantidad),
                 "sin_articulo_ids": it.sin_articulo_ids,
+                "valores_variante_ids": it.valores_variante_ids,
             }
         )
     event_bus.publish(

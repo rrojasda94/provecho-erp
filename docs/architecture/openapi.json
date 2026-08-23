@@ -23208,6 +23208,15 @@
             },
             "title": "Sin Articulo Ids",
             "type": "array"
+          },
+          "valores_variante_ids": {
+            "default": [],
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Valores Variante Ids",
+            "type": "array"
           }
         },
         "required": [
@@ -23336,6 +23345,15 @@
               "type": "string"
             },
             "title": "Sin Articulo Ids",
+            "type": "array"
+          },
+          "valores_variante_ids": {
+            "default": [],
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Valores Variante Ids",
             "type": "array"
           }
         },

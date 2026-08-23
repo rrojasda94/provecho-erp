@@ -16,10 +16,11 @@ no un enum:
 """
 
 import uuid
+from collections.abc import Sequence
 from decimal import Decimal
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
 from src.modules.inventory.application.queries_publicas import (
     insumos_de_receta,
@@ -27,8 +28,12 @@ from src.modules.inventory.application.queries_publicas import (
 )
 from src.modules.sales.application.errors import Conflicto, NoEncontrado, ReglaNegocio
 from src.modules.sales.infrastructure.models import (
+    AtributoValor,
     MedioPago,
+    ProductoAtributoLinea,
+    ProductoAtributoValor,
     ProductoComercial,
+    ProductoExclusion,
     ProductoOpcionGrupo,
 )
 from src.modules.sales.infrastructure.repositories import (
@@ -37,6 +42,10 @@ from src.modules.sales.infrastructure.repositories import (
 )
 from src.modules.users.infrastructure.models import Marca
 from src.shared.texto import a_titulo
+
+#: El otro extremo de la exclusión. Alias porque la tabla se une dos
+#: veces contra `producto_atributo_valor`: una por cada lado del par.
+_EXCLUIDO = aliased(ProductoAtributoValor)
 
 
 def crear_producto(
@@ -394,3 +403,78 @@ def listar_medios_pago(
     session: Session, empresa_id: uuid.UUID | None = None
 ) -> list[MedioPago]:
     return MedioPagoRepo(session).list(empresa_id)
+
+
+def valores_ofrecidos(session: Session, producto: ProductoComercial) -> set[str]:
+    """`producto_atributo_valor.id` (texto) que este producto puede recibir.
+
+    **Lo propio más lo del padre**, exactamente como `grupos_efectivos` y
+    `extras_efectivos` (ADR-042). La razón es la misma y ya costó dos
+    correcciones: quien arma un producto a mano cuelga el atributo del padre
+    —porque cuando lo crea todavía no hay variantes—, y el importador lo
+    cuelga donde diga la planilla. Mientras el lugar importe, siempre hay
+    una mitad de los catálogos rota.
+
+    Solo valores activos: retirar un valor tiene que sacarlo de la oferta sin
+    romper las ventas viejas que lo nombran.
+    """
+    productos = [producto.id]
+    if producto.producto_padre_id is not None:
+        productos.append(producto.producto_padre_id)
+    filas = session.scalars(
+        select(ProductoAtributoValor.id)
+        .join(
+            ProductoAtributoLinea,
+            ProductoAtributoValor.linea_id == ProductoAtributoLinea.id,
+        )
+        .where(
+            ProductoAtributoLinea.producto_comercial_id.in_(productos),
+            ProductoAtributoValor.activo.is_(True),
+        )
+    )
+    return {str(v) for v in filas}
+
+
+def combinacion_excluida(
+    session: Session, valor_ids: Sequence[str]
+) -> tuple[str, str] | None:
+    """El primer par de valores elegidos que no pueden ir juntos, o `None`.
+
+    Es `product.template.attribute.exclusion` de Odoo, y el caso que lo hace
+    obligatorio en Charlie's es la pizza mitad-y-mitad: **las dos mitades
+    tienen que ser distintas**. Media hawaiana y media hawaiana no es una
+    mitad-y-mitad, es una hawaiana entera — que ya se vende como su propio
+    producto, con su receta y su precio.
+
+    La exclusión se guarda una vez y se lee en los dos sentidos: son el mismo
+    hecho, y guardar las dos filas sería la primera en desincronizarse.
+
+    Devuelve los **nombres** y no los ids porque lo único que se hace con
+    esto es escribir el mensaje de error, y un mensaje con dos UUID no le
+    dice nada al cajero.
+    """
+    if len(valor_ids) < 2:
+        return None
+    ids = [uuid.UUID(str(v)) for v in valor_ids]
+    izquierda = aliased(AtributoValor)
+    derecha = aliased(AtributoValor)
+    fila = session.execute(
+        select(izquierda.nombre, derecha.nombre)
+        .select_from(ProductoExclusion)
+        .join(
+            ProductoAtributoValor,
+            ProductoExclusion.producto_atributo_valor_id == ProductoAtributoValor.id,
+        )
+        .join(izquierda, ProductoAtributoValor.atributo_valor_id == izquierda.id)
+        .join(
+            _EXCLUIDO,
+            ProductoExclusion.excluye_valor_id == _EXCLUIDO.id,
+        )
+        .join(derecha, _EXCLUIDO.atributo_valor_id == derecha.id)
+        .where(
+            ProductoExclusion.producto_atributo_valor_id.in_(ids),
+            ProductoExclusion.excluye_valor_id.in_(ids),
+        )
+        .limit(1)
+    ).first()
+    return (fila[0], fila[1]) if fila else None
