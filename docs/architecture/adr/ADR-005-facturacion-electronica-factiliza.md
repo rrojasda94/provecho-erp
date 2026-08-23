@@ -45,16 +45,14 @@ Motivos:
 - La consulta RUC/DNI (`FactilizaClient.consultar_dni`/`consultar_ruc`,
   2026-08-02) vive en un **host distinto** al de emisión: `api.factiliza.com`
   (`FACTILIZA_CONSULTA_BASE_URL`), no `apife-qa.factiliza.com`
-  (`FACTILIZA_BASE_URL`) — son productos separados de Factiliza, que se
-  contratan y se cobran por separado y tienen **una credencial cada uno**
-  (`FACTILIZA_CONSULTA_DOCUMENTO_TOKEN`, 2026-08-22). Vacío, se reusa
-  `FACTILIZA_TOKEN`: un plan que cubra ambos con un solo token no configura
-  nada. Se sostienen aparte porque cruzarlos falla de forma cara y muda —el
-  token de emisión contra el host de consulta da 401, y el buscador de DNI
-  del mostrador muere con un 502 genérico— y porque rotar uno no puede
-  apagar el otro. La consulta no tiene sandbox QA propio: la prueba con
-  datos reales (DNI 73632127, RUC 20610077782) se hizo contra ese único
-  host. `nombres_desde_dni`/`razon_social_desde_ruc` envuelven la consulta
+  (`FACTILIZA_BASE_URL`). Son productos separados de Factiliza y **cada uno
+  tiene su token**: `FACTILIZA_CONSULTA_DOCUMENTO_TOKEN` ≠ `FACTILIZA_TOKEN`.
+  Esta línea decía "aunque comparten token" y era falso —corregido el
+  2026-08-22, después de que el de emisión devolviera 401 contra el host de
+  consulta estando vigente—; se contratan y se regeneran por separado en el
+  panel. El cliente cae al de emisión solo si no hay uno propio configurado.
+  La consulta no tiene sandbox QA propio: la prueba con datos reales (DNI
+  73632127, RUC 20610077782) se hizo contra ese único host. `nombres_desde_dni`/`razon_social_desde_ruc` envuelven la consulta
   con el mismo criterio de "nunca bloquear": sin respuesta o documento no
   encontrado, cae a lo tecleado por el usuario. Cableado en el alta de
   cliente (`sales`) y proveedor jurídico (`purchases`) — ver RN-PTS-004 en

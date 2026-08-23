@@ -217,7 +217,8 @@ filtración o salida de alguien con acceso a producción.
   el proveedor primero, luego actualizar `.env`. Factiliza son **dos**:
   `FACTILIZA_TOKEN` (emisión) y `FACTILIZA_CONSULTA_DOCUMENTO_TOKEN`
   (consulta RUC/DNI). Rotar uno no toca al otro — que es justo el motivo de
-  tenerlos separados.
+  tenerlos separados. Google son dos claves con restricciones distintas: ver
+  [integraciones-google.md](integraciones-google.md).
 - **PIN de usuario comprometido** — se resetea desde el CRUD de `users`; no
   requiere despliegue.
 

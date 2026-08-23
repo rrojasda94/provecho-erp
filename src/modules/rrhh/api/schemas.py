@@ -223,6 +223,10 @@ class PostulanteContratar(BaseModel):
     fecha_ingreso: date
     tipo_documento: str | None = None
     numero_documento: str | None = Field(default=None, max_length=20)
+    # Corregidos por quien contrata tras verlos contra RENIEC. Opcionales:
+    # sin ellos manda lo que el postulante declaró de sí mismo.
+    nombres: str | None = Field(default=None, max_length=100)
+    apellidos: str | None = Field(default=None, max_length=100)
     # Ex-trabajador recontratado: se reusa su `persona`, no se duplica.
     persona_id: uuid.UUID | None = None
     regimen_laboral: str | None = None

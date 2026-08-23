@@ -151,25 +151,22 @@ class FactilizaClient:
         base_url: str | None = None,
         token: str | None = None,
         timeout: float | None = None,
-        token_consulta: str | None = None,
+        consulta_token: str | None = None,
     ) -> None:
         self.base_url = (base_url or settings.factiliza_base_url).rstrip("/")
         self.consulta_base_url = settings.factiliza_consulta_base_url.rstrip("/")
         self.token = token if token is not None else settings.factiliza_token
-        self.token_consulta = self._resolver_token_consulta(token, token_consulta)
+        # Emisión y consulta son **dos productos con dos credenciales**: el
+        # token de emisión devuelve 401 contra `api.factiliza.com` aunque esté
+        # vigente. Cae al de emisión solo si no hay uno propio configurado —
+        # una cuenta que use el mismo para todo sigue funcionando, y quien no
+        # tiene ninguno recibe el error de "no configurado" de siempre.
+        self.consulta_token = (
+            consulta_token
+            if consulta_token is not None
+            else (settings.factiliza_consulta_documento_token or self.token)
+        )
         self.timeout = timeout or settings.factiliza_timeout_segundos
-
-    def _resolver_token_consulta(self, token: str | None, token_consulta: str | None) -> str:
-        """Emisión y consulta son dos productos de Factiliza, cada uno con su
-        credencial. La cascada es: lo que se pasó explícito manda sobre la
-        configuración, y `FACTILIZA_CONSULTA_DOCUMENTO_TOKEN` vacío cae al de
-        emisión — un plan que cubre ambos con un solo token sigue andando sin
-        tocar nada."""
-        if token_consulta is not None:
-            return token_consulta
-        if token is not None:
-            return token
-        return settings.factiliza_consulta_documento_token or settings.factiliza_token
 
     def enviar_comprobante(self, payload: dict) -> RespuestaEmision:
         """POST /invoice/send — boleta o factura.
@@ -215,31 +212,41 @@ class FactilizaClient:
         return _interpretar(cuerpo)
 
     def _consultar(self, ruta: str, numero: str) -> dict | None:
-        """GET de consulta RUC/DNI, contra `consulta_base_url` y con
-        `token_consulta` — producto distinto de `invoice/send` (esa es solo
-        emisión, apunta a la QA de facturación) y con credencial propia. Un
-        404 vacío es "no encontrado", respuesta válida, no excepción; solo
-        transporte/servidor caído levanta `FactilizaError`."""
-        if not self.token_consulta:
-            raise FactilizaError(
-                "FACTILIZA_CONSULTA_DOCUMENTO_TOKEN (o FACTILIZA_TOKEN) no configurado"
-            )
+        """GET de consulta RUC/DNI, contra `consulta_base_url` — producto
+        distinto de `invoice/send` (esa es solo emisión, apunta a la QA de
+        facturación). Un 404 vacío es "no encontrado", respuesta válida, no
+        excepción; solo transporte/servidor caído levanta `FactilizaError`."""
+        if not self.consulta_token:
+            raise FactilizaError("FACTILIZA_CONSULTA_DOCUMENTO_TOKEN no configurado")
         try:
             respuesta = httpx.get(
                 f"{self.consulta_base_url}/{ruta}/info/{numero}",
-                headers={"Authorization": f"Bearer {self.token_consulta}"},
+                headers={"Authorization": f"Bearer {self.consulta_token}"},
                 timeout=self.timeout,
             )
         except httpx.HTTPError as e:
             raise FactilizaError(f"Factiliza no responde: {e}") from e
         if respuesta.status_code == 404 and not respuesta.text:
             return None
+        # 401/403 con cuerpo vacío es lo que devuelve el producto de consulta
+        # cuando el token no le sirve —revocado, regenerado en el panel, o de
+        # otro producto—. Se nombra: sin esto caía en el `.json()` de abajo y
+        # el operador leía "respuesta ilegible", que manda a buscar un error
+        # de parseo donde lo que hay que revisar es la credencial.
+        if respuesta.status_code in (401, 403):
+            raise FactilizaError(
+                f"Factiliza rechazó el token ({respuesta.status_code}): revisa "
+                "FACTILIZA_CONSULTA_DOCUMENTO_TOKEN —es distinto del de "
+                "emisión— y que el plan de consultas esté activo"
+            )
         if respuesta.status_code >= 500:
             raise FactilizaError(f"Factiliza devolvió {respuesta.status_code}")
         try:
             return respuesta.json()
         except ValueError as e:
-            raise FactilizaError(f"Respuesta ilegible de Factiliza: {e}") from e
+            raise FactilizaError(
+                f"Respuesta ilegible de Factiliza ({respuesta.status_code}): {e}"
+            ) from e
 
     def consultar_dni(self, dni: str) -> ConsultaPersona:
         """GET /dni/info/{dni} — RENIEC vía Factiliza."""

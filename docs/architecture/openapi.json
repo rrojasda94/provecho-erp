@@ -543,6 +543,76 @@
             "minLength": 1,
             "title": "Tipo",
             "type": "string"
+          },
+          "ubicacion_distrito": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Distrito"
+          },
+          "ubicacion_lat": {
+            "anyOf": [
+              {
+                "maximum": 90.0,
+                "minimum": -90.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lat"
+          },
+          "ubicacion_lng": {
+            "anyOf": [
+              {
+                "maximum": 180.0,
+                "minimum": -180.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lng"
+          },
+          "ubicacion_place_id": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Place Id"
+          },
+          "ubicacion_plus_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Plus Code"
           }
         },
         "required": [
@@ -618,6 +688,66 @@
           "tipo": {
             "title": "Tipo",
             "type": "string"
+          },
+          "ubicacion_distrito": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Distrito"
+          },
+          "ubicacion_lat": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lat"
+          },
+          "ubicacion_lng": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lng"
+          },
+          "ubicacion_place_id": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Place Id"
+          },
+          "ubicacion_plus_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Plus Code"
           }
         },
         "required": [
@@ -706,6 +836,76 @@
               }
             ],
             "title": "Tipo"
+          },
+          "ubicacion_distrito": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Distrito"
+          },
+          "ubicacion_lat": {
+            "anyOf": [
+              {
+                "maximum": 90.0,
+                "minimum": -90.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lat"
+          },
+          "ubicacion_lng": {
+            "anyOf": [
+              {
+                "maximum": 180.0,
+                "minimum": -180.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lng"
+          },
+          "ubicacion_place_id": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Place Id"
+          },
+          "ubicacion_plus_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Plus Code"
           }
         },
         "title": "AlmacenUpdate",
@@ -3493,6 +3693,66 @@
           "tipo": {
             "title": "Tipo",
             "type": "string"
+          },
+          "ubicacion_distrito": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Distrito"
+          },
+          "ubicacion_lat": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lat"
+          },
+          "ubicacion_lng": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lng"
+          },
+          "ubicacion_place_id": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Place Id"
+          },
+          "ubicacion_plus_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Plus Code"
           }
         },
         "required": [
@@ -3580,6 +3840,76 @@
             "default": "dni",
             "title": "Tipo Documento",
             "type": "string"
+          },
+          "ubicacion_distrito": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Distrito"
+          },
+          "ubicacion_lat": {
+            "anyOf": [
+              {
+                "maximum": 90.0,
+                "minimum": -90.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lat"
+          },
+          "ubicacion_lng": {
+            "anyOf": [
+              {
+                "maximum": 180.0,
+                "minimum": -180.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lng"
+          },
+          "ubicacion_place_id": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Place Id"
+          },
+          "ubicacion_plus_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Plus Code"
           }
         },
         "required": [
@@ -5214,6 +5544,140 @@
         "title": "ConvocatoriaPublicar",
         "type": "object"
       },
+      "CotizacionDeliveryIn": {
+        "description": "A dónde hay que llevar el pedido, desde qué local.\n\nSe manda el ancla completa y no un `cliente_id`: en caja la mitad de los\ndeliveries son de alguien que todavía no está registrado, y la dirección\nse acaba de escribir en el diálogo.",
+        "properties": {
+          "sucursal_id": {
+            "format": "uuid",
+            "title": "Sucursal Id",
+            "type": "string"
+          },
+          "ubicacion_distrito": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Distrito"
+          },
+          "ubicacion_lat": {
+            "anyOf": [
+              {
+                "maximum": 90.0,
+                "minimum": -90.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lat"
+          },
+          "ubicacion_lng": {
+            "anyOf": [
+              {
+                "maximum": 180.0,
+                "minimum": -180.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lng"
+          },
+          "ubicacion_place_id": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Place Id"
+          },
+          "ubicacion_plus_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Plus Code"
+          }
+        },
+        "required": [
+          "sucursal_id"
+        ],
+        "title": "CotizacionDeliveryIn",
+        "type": "object"
+      },
+      "CotizacionDeliveryOut": {
+        "description": "Lo que el cajero necesita para decidir antes de tomar el pedido.",
+        "properties": {
+          "aproximada": {
+            "title": "Aproximada",
+            "type": "boolean"
+          },
+          "costo": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Costo",
+            "type": "string"
+          },
+          "derivar_a_externo": {
+            "title": "Derivar A Externo",
+            "type": "boolean"
+          },
+          "distancia_km": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distancia Km"
+          },
+          "motivo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Motivo"
+          }
+        },
+        "required": [
+          "distancia_km",
+          "costo",
+          "aproximada",
+          "derivar_a_externo"
+        ],
+        "title": "CotizacionDeliveryOut",
+        "type": "object"
+      },
       "CriterioIn": {
         "properties": {
           "codigo": {
@@ -6636,6 +7100,76 @@
             "title": "Tipo",
             "type": "string"
           },
+          "ubicacion_distrito": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Distrito"
+          },
+          "ubicacion_lat": {
+            "anyOf": [
+              {
+                "maximum": 90.0,
+                "minimum": -90.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lat"
+          },
+          "ubicacion_lng": {
+            "anyOf": [
+              {
+                "maximum": 180.0,
+                "minimum": -180.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lng"
+          },
+          "ubicacion_place_id": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Place Id"
+          },
+          "ubicacion_plus_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Plus Code"
+          },
           "zona_tributaria": {
             "default": "general",
             "enum": [
@@ -6706,6 +7240,66 @@
           "tipo": {
             "title": "Tipo",
             "type": "string"
+          },
+          "ubicacion_distrito": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Distrito"
+          },
+          "ubicacion_lat": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lat"
+          },
+          "ubicacion_lng": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lng"
+          },
+          "ubicacion_place_id": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Place Id"
+          },
+          "ubicacion_plus_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Plus Code"
           },
           "zona_tributaria": {
             "title": "Zona Tributaria",
@@ -6807,6 +7401,76 @@
               }
             ],
             "title": "Tipo"
+          },
+          "ubicacion_distrito": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Distrito"
+          },
+          "ubicacion_lat": {
+            "anyOf": [
+              {
+                "maximum": 90.0,
+                "minimum": -90.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lat"
+          },
+          "ubicacion_lng": {
+            "anyOf": [
+              {
+                "maximum": 180.0,
+                "minimum": -180.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lng"
+          },
+          "ubicacion_place_id": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Place Id"
+          },
+          "ubicacion_plus_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Plus Code"
           },
           "zona_tributaria": {
             "anyOf": [
@@ -13752,6 +14416,76 @@
           "tipo_documento": {
             "title": "Tipo Documento",
             "type": "string"
+          },
+          "ubicacion_distrito": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Distrito"
+          },
+          "ubicacion_lat": {
+            "anyOf": [
+              {
+                "maximum": 90.0,
+                "minimum": -90.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lat"
+          },
+          "ubicacion_lng": {
+            "anyOf": [
+              {
+                "maximum": 180.0,
+                "minimum": -180.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lng"
+          },
+          "ubicacion_place_id": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Place Id"
+          },
+          "ubicacion_plus_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Plus Code"
           }
         },
         "required": [
@@ -13842,6 +14576,66 @@
           "tipo_documento": {
             "title": "Tipo Documento",
             "type": "string"
+          },
+          "ubicacion_distrito": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Distrito"
+          },
+          "ubicacion_lat": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lat"
+          },
+          "ubicacion_lng": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lng"
+          },
+          "ubicacion_place_id": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Place Id"
+          },
+          "ubicacion_plus_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Plus Code"
           },
           "version": {
             "title": "Version",
@@ -13954,6 +14748,76 @@
               }
             ],
             "title": "Tipo Documento"
+          },
+          "ubicacion_distrito": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Distrito"
+          },
+          "ubicacion_lat": {
+            "anyOf": [
+              {
+                "maximum": 90.0,
+                "minimum": -90.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lat"
+          },
+          "ubicacion_lng": {
+            "anyOf": [
+              {
+                "maximum": 180.0,
+                "minimum": -180.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lng"
+          },
+          "ubicacion_place_id": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Place Id"
+          },
+          "ubicacion_plus_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Plus Code"
           },
           "version": {
             "title": "Version",
@@ -14759,6 +15623,18 @@
             ],
             "title": "Afp Nombre"
           },
+          "apellidos": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Apellidos"
+          },
           "area": {
             "maxLength": 100,
             "title": "Area",
@@ -14788,6 +15664,18 @@
               }
             ],
             "title": "Jornada Horas Semana"
+          },
+          "nombres": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nombres"
           },
           "numero_documento": {
             "anyOf": [
@@ -16284,6 +17172,76 @@
           "tipo": {
             "title": "Tipo",
             "type": "string"
+          },
+          "ubicacion_distrito": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Distrito"
+          },
+          "ubicacion_lat": {
+            "anyOf": [
+              {
+                "maximum": 90.0,
+                "minimum": -90.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lat"
+          },
+          "ubicacion_lng": {
+            "anyOf": [
+              {
+                "maximum": 180.0,
+                "minimum": -180.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lng"
+          },
+          "ubicacion_place_id": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Place Id"
+          },
+          "ubicacion_plus_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Plus Code"
           }
         },
         "required": [
@@ -16406,6 +17364,66 @@
           "tipo": {
             "title": "Tipo",
             "type": "string"
+          },
+          "ubicacion_distrito": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Distrito"
+          },
+          "ubicacion_lat": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lat"
+          },
+          "ubicacion_lng": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lng"
+          },
+          "ubicacion_place_id": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Place Id"
+          },
+          "ubicacion_plus_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Plus Code"
           }
         },
         "required": [
@@ -16556,6 +17574,76 @@
               }
             ],
             "title": "Ruc"
+          },
+          "ubicacion_distrito": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Distrito"
+          },
+          "ubicacion_lat": {
+            "anyOf": [
+              {
+                "maximum": 90.0,
+                "minimum": -90.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lat"
+          },
+          "ubicacion_lng": {
+            "anyOf": [
+              {
+                "maximum": 180.0,
+                "minimum": -180.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lng"
+          },
+          "ubicacion_place_id": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Place Id"
+          },
+          "ubicacion_plus_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Plus Code"
           }
         },
         "title": "ProveedorUpdate",
@@ -19902,6 +20990,76 @@
             ],
             "title": "Tenencia",
             "type": "string"
+          },
+          "ubicacion_distrito": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Distrito"
+          },
+          "ubicacion_lat": {
+            "anyOf": [
+              {
+                "maximum": 90.0,
+                "minimum": -90.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lat"
+          },
+          "ubicacion_lng": {
+            "anyOf": [
+              {
+                "maximum": 180.0,
+                "minimum": -180.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lng"
+          },
+          "ubicacion_place_id": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Place Id"
+          },
+          "ubicacion_plus_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Plus Code"
           }
         },
         "required": [
@@ -19973,6 +21131,66 @@
               }
             ],
             "title": "Tenencia"
+          },
+          "ubicacion_distrito": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Distrito"
+          },
+          "ubicacion_lat": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lat"
+          },
+          "ubicacion_lng": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lng"
+          },
+          "ubicacion_place_id": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Place Id"
+          },
+          "ubicacion_plus_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Plus Code"
           }
         },
         "required": [
@@ -20068,6 +21286,76 @@
               }
             ],
             "title": "Tenencia"
+          },
+          "ubicacion_distrito": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Distrito"
+          },
+          "ubicacion_lat": {
+            "anyOf": [
+              {
+                "maximum": 90.0,
+                "minimum": -90.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lat"
+          },
+          "ubicacion_lng": {
+            "anyOf": [
+              {
+                "maximum": 180.0,
+                "minimum": -180.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lng"
+          },
+          "ubicacion_place_id": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Place Id"
+          },
+          "ubicacion_plus_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Plus Code"
           }
         },
         "title": "SucursalUpdate",
@@ -21678,6 +22966,18 @@
             ],
             "title": "Consumo Motivo"
           },
+          "direccion_entrega": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direccion Entrega"
+          },
           "id": {
             "anyOf": [
               {
@@ -21746,6 +23046,76 @@
             "default": "venta",
             "title": "Tipo",
             "type": "string"
+          },
+          "ubicacion_distrito": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Distrito"
+          },
+          "ubicacion_lat": {
+            "anyOf": [
+              {
+                "maximum": 90.0,
+                "minimum": -90.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lat"
+          },
+          "ubicacion_lng": {
+            "anyOf": [
+              {
+                "maximum": 180.0,
+                "minimum": -180.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lng"
+          },
+          "ubicacion_place_id": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Place Id"
+          },
+          "ubicacion_plus_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Plus Code"
           }
         },
         "required": [
@@ -22005,6 +23375,18 @@
             ],
             "title": "Consumo Motivo"
           },
+          "costo_entrega": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Costo Entrega"
+          },
           "descuento_modo": {
             "anyOf": [
               {
@@ -22038,6 +23420,29 @@
               }
             ],
             "title": "Descuento Valor"
+          },
+          "direccion_entrega": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direccion Entrega"
+          },
+          "distancia_entrega_km": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distancia Entrega Km"
           },
           "estado": {
             "title": "Estado",
@@ -22168,6 +23573,21 @@
             ],
             "title": "Consumo Motivo"
           },
+          "costo_entrega": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Costo Entrega"
+          },
           "descuento_autorizado_por": {
             "anyOf": [
               {
@@ -22216,6 +23636,33 @@
               }
             ],
             "title": "Descuento Valor"
+          },
+          "direccion_entrega": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direccion Entrega"
+          },
+          "distancia_entrega_km": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distancia Entrega Km"
           },
           "estado": {
             "title": "Estado",
@@ -22871,7 +24318,7 @@
   "info": {
     "description": "ERP modular para grupo de restaurantes multi-marca. Convenciones de la API: docs/engineering/api-guidelines.md.",
     "title": "Provecho ERP",
-    "version": "0.1.0"
+    "version": "0.5.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -41628,6 +43075,53 @@
           }
         ],
         "summary": "Crear Venta",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/ventas/cotizar-delivery": {
+      "post": {
+        "description": "Cuánto sale llevar este pedido, y si conviene derivarlo (ADR-054).\n\n**Con cuota, como la consulta de documento**: cada llamada gasta una\nmedición de un proveedor pago, y un bucle mal escrito en el PDV se come\nel plan del mes. Se cuenta por usuario y por IP por la misma razón que\nen `core/consulta_router.py` — todas las cajas del local salen por la\nmisma IP, y limitar solo por ahí castiga al equipo por uno solo.\n\nNo decide nada: el precio que se cobra lo vuelve a calcular el servidor\nal crear la venta, y es el que queda congelado en la fila. Esto es lo que\nel cajero ve antes de aceptar.",
+        "operationId": "cotizar_delivery_api_v1_sales_ventas_cotizar_delivery_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CotizacionDeliveryIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CotizacionDeliveryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Cotizar Delivery",
         "tags": [
           "sales"
         ]

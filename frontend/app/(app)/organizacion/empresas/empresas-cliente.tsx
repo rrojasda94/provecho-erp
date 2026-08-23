@@ -11,6 +11,7 @@ import {
 import { TablaDatos } from "@/components/tabla/tabla-datos";
 
 import { guardarEmpresaAction, guardarGrupoAction } from "../actions";
+import { CampoDireccion } from "@/components/direccion/campo-direccion";
 
 export type Grupo = { id: string; nombre: string };
 export type Empresa = {
@@ -19,6 +20,11 @@ export type Empresa = {
   razon_social: string;
   ruc: string;
   domicilio_fiscal: string;
+  ubicacion_place_id: string | null;
+  ubicacion_lat: string | number | null;
+  ubicacion_lng: string | number | null;
+  ubicacion_plus_code: string | null;
+  ubicacion_distrito: string | null;
   contacto: string | null;
   tipo: string;
   zona_tributaria: string;
@@ -45,15 +51,13 @@ function CamposEmpresa({ empresa }: { empresa?: Empresa }) {
           defaultValue={valor(e.ruc)}
         />
       </label>
-      <label className="flex flex-col gap-1 text-sm font-semibold">
-        Domicilio fiscal
-        <input
-          name="domicilio_fiscal"
-          required
-          maxLength={255}
-          defaultValue={valor(e.domicilio_fiscal)}
-        />
-      </label>
+      <CampoDireccion
+        nombre="domicilio_fiscal"
+        etiqueta="Domicilio fiscal"
+        requerido
+        defaultValue={e.domicilio_fiscal}
+        ubicacion={empresa ?? null}
+      />
       <div className="flex gap-2">
         <label className="flex flex-1 flex-col gap-1 text-sm font-semibold">
           Tipo

@@ -23,6 +23,7 @@ from src.modules.users.application.errors import Conflicto, NoEncontrado
 from src.modules.users.infrastructure.models import Persona
 from src.modules.users.infrastructure.repositories import PersonaRepo
 from src.shared import auditoria
+from src.shared.ubicacion import CAMPOS as CAMPOS_UBICACION
 
 MARCADOR_ANONIMO = "ANONIMIZADO"
 # Campos que se sobrescriben. numero_documento es UNIQUE: no puede quedar
@@ -36,6 +37,11 @@ CAMPOS_ANONIMIZADOS = (
     "domicilio",
     "telefono",
     "email",
+    # Las coordenadas de la casa de alguien son tan personales como
+    # su dirección escrita, o más: un punto en el mapa no admite la
+    # ambigüedad de un "por el mercado". Sin esto la anonimización
+    # dejaba la puerta exacta en la base.
+    *CAMPOS_UBICACION,
 )
 
 
@@ -65,6 +71,8 @@ def anonimizar_persona(
     persona.domicilio = None
     persona.telefono = None
     persona.email = None
+    for campo in CAMPOS_UBICACION:
+        setattr(persona, campo, None)
     persona.anonimizado_at = datetime.now(UTC)
     persona.version += 1
 

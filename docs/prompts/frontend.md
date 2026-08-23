@@ -99,9 +99,18 @@ Leer antes: `/CLAUDE.md`, [product/ui-ux.md](../product/ui-ux.md) y
   estado global mientras `useState`/`useReducer` alcance.
 - TypeScript estricto; componentes en PascalCase; App Router de Next.js.
 - Datos solo de la API REST — sin lógica de negocio en el front. El navegador
-  **nunca** llama a la API directo: sale por `app/api/proxy` (la CSP de
-  `middleware.ts` fija `connect-src 'self'`), y el proceso de Next usa
-  `API_INTERNAL_URL`. No existe `NEXT_PUBLIC_API_URL`.
+  **nunca** llama a la API del ERP directo: sale por `app/api/proxy`, y el
+  proceso de Next usa `API_INTERNAL_URL`. No existe `NEXT_PUBLIC_API_URL`.
+- **La CSP tiene una sola excepción, y es Google Maps** (ADR-053). Desde
+  2026-08-22 `connect-src` no es `'self'` puro: el campo de dirección
+  autocompleta y geocodifica contra Google desde el navegador. Lo que **no**
+  sale del navegador es la distancia de reparto —esa la mide la API con su
+  propia clave (ADR-054)—, así que una llamada a `routes.googleapis.com` en la
+  pestaña de red es señal de que algo se implementó mal. Agregar otro host a
+  la CSP es una decisión de ADR, no un ajuste.
+- Una clave que el navegador necesita se lee server-side y baja **como prop o
+  por contexto** (`components/direccion/config-mapas`), nunca como
+  `NEXT_PUBLIC_*`: esa familia se hornea en el build.
 - **El proxy es transparente** (ADR-048): pasa el cuerpo en bytes y conserva
   el `Content-Type` y el `Content-Disposition` de los dos lados. Una descarga
   se hace con un `<a href="/api/proxy/…" download>` sin valor —el nombre lo

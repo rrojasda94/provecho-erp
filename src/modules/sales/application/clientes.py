@@ -20,6 +20,7 @@ programa. El nombre y los datos siguen viviendo en `persona`, fuente única
 
 import uuid
 from datetime import date
+from decimal import Decimal
 
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
@@ -67,6 +68,7 @@ def _completar_persona(
     telefono: str | None,
     direccion: str | None,
     fecha_nacimiento: date | None,
+    ubicacion: dict | None = None,
 ) -> None:
     """Rellena solo lo que falte: la persona ya existía por otro motivo
     (trabajador, otro registro) y no se pisa lo que ya dio."""
@@ -76,6 +78,12 @@ def _completar_persona(
         persona.domicilio = direccion
     if fecha_nacimiento and not persona.fecha_nacimiento:
         persona.fecha_nacimiento = fecha_nacimiento
+    # La ubicación se escribe solo si vino la dirección con ella: anclar
+    # un punto sin haber tocado el texto dejaría los dos contando
+    # historias distintas.
+    if direccion and ubicacion and not persona.ubicacion_place_id:
+        for campo, valor in ubicacion.items():
+            setattr(persona, campo, valor)
 
 
 def crear_cliente(
@@ -89,6 +97,11 @@ def crear_cliente(
     direccion: str | None = None,
     fecha_nacimiento: date | None = None,
     tipo_documento: str = "dni",
+    ubicacion_place_id: str | None = None,
+    ubicacion_lat: Decimal | None = None,
+    ubicacion_lng: Decimal | None = None,
+    ubicacion_plus_code: str | None = None,
+    ubicacion_distrito: str | None = None,
     consultar_documento: bool = True,
 ) -> Cliente:
     """RUC de 11 dígitos crea un cliente jurídico; el resto, uno natural con
@@ -101,6 +114,13 @@ def crear_cliente(
     dentro de un solo request, contra una cuota. Cuando el cliente se edita de
     a uno, SUNAT vuelve a mandar.
     """
+    ubicacion = {
+        "ubicacion_place_id": ubicacion_place_id,
+        "ubicacion_lat": ubicacion_lat,
+        "ubicacion_lng": ubicacion_lng,
+        "ubicacion_plus_code": ubicacion_plus_code,
+        "ubicacion_distrito": ubicacion_distrito,
+    }
     nombre = (nombre or "").strip()
     telefono = (telefono or "").strip() or None
     numero_documento = (numero_documento or "").strip() or None
@@ -111,6 +131,9 @@ def crear_cliente(
 
     repo = ClienteRepo(session)
     if numero_documento and len(numero_documento) == rules.LARGO_RUC:
+        # Sin `ubicacion`: el cliente jurídico no tiene columna de
+        # dirección —hoy termina en `contacto`— y por lo tanto tampoco
+        # dónde anclarla. Queda anotado en la deuda del ROADMAP.
         return _crear_juridico(
             repo,
             grupo_id,
@@ -152,6 +175,7 @@ def crear_cliente(
             email=email,
             domicilio=direccion,
             fecha_nacimiento=fecha_nacimiento,
+            **ubicacion,
         )
         session.add(persona)
         session.flush()
@@ -159,7 +183,9 @@ def crear_cliente(
         # `persona` es única por documento y la comparten users/rrhh: si ya
         # existe (un trabajador que compra, por ejemplo) se reutiliza en vez
         # de duplicarla, y se completa lo que le falte.
-        _completar_persona(persona, telefono, direccion, fecha_nacimiento)
+        _completar_persona(
+            persona, telefono, direccion, fecha_nacimiento, ubicacion
+        )
         existente = repo.por_persona(grupo_id, persona.id)
         if existente is not None:
             raise Conflicto("esa persona ya está registrada como cliente")

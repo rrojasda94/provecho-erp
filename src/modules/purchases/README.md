@@ -100,6 +100,14 @@ automática por recepción, listener de `inventory.devolucion_a_proveedor`.
 La OC no queda marcada como "pagada" tras el pago (RN-CMP-014 vive del
 lado de `accounting`, `orden_compra.estado` no tiene ese valor todavía).
 
+## Dirección del proveedor anclada al mapa (2026-08-22, ADR-053)
+
+`proveedor` lleva el `UbicacionMixin` de `core/model_base`. Convive con
+`BuscarDocumento`: lo que llega de SUNAT sigue prellenando el texto —que es el
+domicilio **declarado**, no siempre el almacén al que uno va a recoger— y
+después se puede anclar en el mapa. Corregir el texto a mano suelta el punto
+(`shared/ubicacion.py`).
+
 ## Casos de uso
 
 - CRUD de proveedores, con alta condicionada a verificación de RUC

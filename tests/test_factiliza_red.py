@@ -82,7 +82,7 @@ def test_el_token_de_emision_no_sirve_para_consultar():
     esto empieza a pasar, significa que el proveedor unificó las credenciales
     y `FACTILIZA_CONSULTA_DOCUMENTO_TOKEN` dejó de hacer falta.
     """
-    cliente = FactilizaClient(token_consulta=settings.factiliza_token)
+    cliente = FactilizaClient(consulta_token=settings.factiliza_token)
     try:
         r = cliente.consultar_dni(DNI_DE_PRUEBA)
     except FactilizaError:

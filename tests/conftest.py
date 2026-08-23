@@ -226,6 +226,11 @@ def _listeners_sin_base_real(monkeypatch):
 @pytest.fixture(autouse=True)
 def _sin_token_factiliza_por_defecto(monkeypatch):
     monkeypatch.setattr(settings, "factiliza_token", "")
+    # El de consulta va aparte porque **es** otra credencial (otro producto).
+    # Sin blanquearlo, un `.env` local con el token real haría que un test
+    # olvidado saliera a la red: gastaría cuota de un proveedor pago y traería
+    # datos personales de alguien a un artefacto de CI.
+    monkeypatch.setattr(settings, "factiliza_consulta_documento_token", "")
 
 
 @pytest.fixture(autouse=True)

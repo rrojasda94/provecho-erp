@@ -117,6 +117,14 @@ cuatro huecos que el punto de venta necesitaba y el modelo no daba.
   confiar en lo tecleado en caja. Documento ya visto no vuelve a consultar.
   Sin respuesta de Factiliza (o no encontrado) cae a lo tecleado — el alta
   nunca se bloquea.
+- **Y en la pantalla, antes de guardar** (2026-08-22, addendum de ADR-041):
+  el PDV ofrece «Buscar DNI / RUC» en el alta de cliente y en el receptor del
+  comprobante, contra `GET /consulta/{dni,ruc}/{numero}`. El servidor sigue
+  teniendo la última palabra —el fallback de arriba no cambia—; lo que suma
+  es poder **ver** el nombre real antes de cobrar, en vez de descubrir al
+  emitir que SUNAT escribió otro. En caja hay un solo campo para los dos
+  documentos, así que el largo decide el padrón (8 → RENIEC, 11 → SUNAT,
+  RN-CPP-003) y con 11 el cliente nace jurídico.
 
 **Cierre para alfa (2026-07-28, migraciones `f2a8c15e94d7` y `b6d41e07af92`):**
 
@@ -539,6 +547,44 @@ El padrón de clientes se baja, se edita en Excel y se vuelve a subir
   importar. Exportar pide `sales.leer`, que es lo que ya cuesta ver el listado.
 - El `grupo_id` se deriva de la empresa del token (RN-PTS-001), nunca llega
   desde el request.
+
+## Entrega del delivery y su costo (implementado 2026-08-22, ADR-053/054)
+
+Hasta este slice la dirección de un delivery **se perdía**: se tecleaba en el
+PDV, vivía en el borrador del navegador y `venta` no tenía columna que la
+recibiera — `referencia_atencion` es "para quién es el pedido" ("Carlos",
+"Rappi #1042"), no adónde va.
+
+`venta` gana `direccion_entrega`, el `UbicacionMixin` de `core/model_base`
+(place_id, lat/lng, plus code, distrito) y dos columnas de plata:
+`distancia_entrega_km` y `costo_entrega`.
+
+**Lo que cobra, lo calcula el servidor.**
+`application/tarifa_delivery.py` pregunta la distancia de manejo a
+`shared/integrations/google` (Routes API, clave restringida por IP) y decide:
+
+- `costo` = `DELIVERY_TARIFA_BASE` + `DELIVERY_PRECIO_POR_KM` × km.
+- `derivar_a_externo` cuando se pasa de `DELIVERY_DISTANCIA_MAXIMA_KM` o el
+  distrito está en `DELIVERY_DISTRITOS_RESTRINGIDOS`. La zona vetada se evalúa
+  **antes** de medir: no depende de la distancia y preguntarle a Google
+  costaría una llamada por una respuesta que ya se sabe.
+- `aproximada` cuando Google no contestó y se usó la línea recta
+  (haversine × 1,3). El pedido se toma igual — es lo único que funciona en el
+  hub offline (ADR-009).
+
+`POST /sales/ventas/cotizar-delivery` es lo que el PDV muestra antes de
+aceptar, con **cuota por usuario e IP** (mismo mecanismo que la consulta de
+DNI/RUC: es un proveedor pago). El precio que vale es el que el servidor
+recalcula al crear la venta y **congela** en la fila; el replay del hub no
+vuelve a cotizar, porque esa venta ya se cobró.
+
+Derivar a una plataforma externa (DAZ DAZ) es un **aviso al cajero**, no una
+integración: si acepta, se marca `venta.repartidor_externo_plataforma`, que ya
+existía.
+
+Con las tarifas en `0` —el estado de fábrica— nada de esto cobra y el delivery
+funciona como antes. **El costo todavía no suma al total de la venta**: ver la
+deuda del módulo.
 
 ## Casos de uso
 

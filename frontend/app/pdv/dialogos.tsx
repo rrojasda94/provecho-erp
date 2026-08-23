@@ -3,11 +3,17 @@
 import { useEffect, useRef, useState } from "react";
 
 import {
+  ConsultaDocumento,
+  type Consulta,
+} from "@/components/consulta/buscar-documento";
+import { documentoValido, LARGO_DNI, LARGO_RUC } from "@/lib/documento";
+import {
   api,
   esAtribucion,
   esCustodia,
   soles,
   type ClienteBuscado,
+  type CotizacionDelivery,
   type CustodiaDestino,
   type DescuadreAtribucion,
   type ExtraDeCarta,
@@ -27,6 +33,8 @@ import {
   type RestaEnLinea,
 } from "./tipos";
 import Pinpad from "./pinpad";
+import { CampoDireccion } from "@/components/direccion/campo-direccion";
+import { UBICACION_VACIA, type Ubicacion } from "@/components/direccion/ubicacion";
 
 /**
  * Usuario + PIN de quien firma. Cada uno lo escribía por su cuenta con un
@@ -954,16 +962,95 @@ const TIPOS = [
   ["delivery", "Delivery", "Empaques + tarifa · comanda con dirección"],
 ] as const;
 
+const MOTIVO_DERIVACION: Record<string, string> = {
+  fuera_de_radio: "más lejos del radio propio",
+  zona_restringida: "zona donde no repartimos",
+};
+
+/**
+ * Lo que sale llevar el pedido, y el aviso de cuándo conviene no llevarlo.
+ *
+ * Lo calcula el servidor y no el navegador: este número define cuánta plata
+ * paga el cliente (ADR-054). Se pide al ANCLAR la dirección y no en cada
+ * tecla — cada llamada gasta cuota de un proveedor pago.
+ *
+ * Sin ancla no se cotiza: una dirección escrita a mano no se puede medir, y
+ * el pedido se toma igual con la tarifa base.
+ */
+function CotizacionEntrega({
+  sucursalId,
+  ubicacion,
+}: {
+  sucursalId: string;
+  ubicacion: Ubicacion;
+}) {
+  const [cotizacion, setCotizacion] = useState<CotizacionDelivery | null>(null);
+  const [error, setError] = useState("");
+  const lat = ubicacion.ubicacion_lat;
+  const lng = ubicacion.ubicacion_lng;
+
+  useEffect(() => {
+    if (lat === null || lat === undefined) {
+      setCotizacion(null);
+      return;
+    }
+    let vivo = true;
+    api
+      .cotizarDelivery({
+        sucursal_id: sucursalId,
+        ubicacion_lat: lat,
+        ubicacion_lng: lng,
+        ubicacion_distrito: ubicacion.ubicacion_distrito,
+      })
+      .then((c) => {
+        if (vivo) setCotizacion(c);
+      })
+      // El pedido se toma igual: no poder cotizar no es no poder vender.
+      .catch(() => {
+        if (vivo) setError("No se pudo calcular el reparto.");
+      });
+    return () => {
+      vivo = false;
+    };
+    // Solo cuando cambia el punto: el resto del objeto viaja con él.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lat, lng, sucursalId]);
+
+  if (error) return <p className="pdv-nota">{error}</p>;
+  if (!cotizacion) return null;
+
+  const detalle = cotizacion.distancia_km
+    ? `${cotizacion.distancia_km} km${cotizacion.aproximada ? " aprox." : ""} · reparto S/ ${cotizacion.costo}`
+    : `Reparto S/ ${cotizacion.costo}`;
+
+  return (
+    <p className="pdv-nota">
+      {detalle}
+      {cotizacion.derivar_a_externo && (
+        <strong>
+          {" — "}
+          {MOTIVO_DERIVACION[cotizacion.motivo ?? ""] ?? "fuera del reparto propio"}:
+          sugerir DAZ DAZ.
+        </strong>
+      )}
+    </p>
+  );
+}
+
+
 export function DialogoTipo({
   abierto,
   borrador,
   mesas,
+  sucursalId,
   onCerrar,
   onConfirmar,
 }: {
   abierto: boolean;
   borrador: Borrador | null;
   mesas: MesaEnMapa[];
+  /** Desde dónde sale el reparto: es el origen de la distancia. */
+  sucursalId: string;
   onCerrar: () => void;
   onConfirmar: (cambios: Partial<Borrador>) => void;
 }) {
@@ -971,6 +1058,7 @@ export function DialogoTipo({
   const [mesaId, setMesaId] = useState<string | null>(null);
   const [comensales, setComensales] = useState(2);
   const [direccion, setDireccion] = useState("");
+  const [ubicacion, setUbicacion] = useState<Ubicacion>(UBICACION_VACIA);
 
   useEffect(() => {
     if (!borrador) return;
@@ -980,6 +1068,7 @@ export function DialogoTipo({
     // La dirección del cliente registrado entra sola; solo se escribe si no
     // tiene ninguna.
     setDireccion(borrador.direccion ?? borrador.cliente?.direccion ?? "");
+    setUbicacion(borrador.ubicacion ?? UBICACION_VACIA);
   }, [borrador]);
 
   const listo = tipo !== null && (tipo !== "mesa" || mesaId !== null);
@@ -1035,13 +1124,22 @@ export function DialogoTipo({
 
       {tipo === "delivery" && (
         <>
-          <p className="pdv-etiqueta">Dirección de entrega</p>
-          <input
-            className="pdv-campo"
-            value={direccion}
-            placeholder="Jr. San Martín 456"
-            onChange={(e) => setDireccion(e.target.value)}
+          {/* `key` con el id del borrador: el diálogo no se desmonta entre
+              pedidos, y sin esto el campo —no controlado por dentro— seguiría
+              mostrando la dirección del pedido anterior. */}
+          <CampoDireccion
+            key={borrador?.id ?? "sin-borrador"}
+            etiqueta="Dirección de entrega"
+            claseEtiqueta="pdv-etiqueta"
+            claseCampo="pdv-campo"
+            defaultValue={direccion}
+            ubicacion={ubicacion}
+            onCambio={(texto, punto) => {
+              setDireccion(texto);
+              setUbicacion(punto);
+            }}
           />
+          <CotizacionEntrega sucursalId={sucursalId} ubicacion={ubicacion} />
           <p className="pdv-nota">
             {borrador?.cliente
               ? borrador.cliente.direccion
@@ -1065,6 +1163,7 @@ export function DialogoTipo({
               mesaNumero: tipo === "mesa" ? (mesa?.numero ?? null) : null,
               comensales: tipo === "mesa" ? comensales : null,
               direccion: tipo === "delivery" ? direccion.trim() : null,
+              ubicacion: tipo === "delivery" ? ubicacion : UBICACION_VACIA,
             })
           }
         >
@@ -1159,14 +1258,30 @@ export function DialogoConsumoPersonal({
   );
 }
 
+/** El nombre que trajo la consulta, sea de quien sea: una empresa lo tiene
+ * entero en `razon_social` y una persona partido en dos (RENIEC los devuelve
+ * separados). El PDV guarda **un** campo «nombre», así que acá se juntan —es
+ * el único lugar del ERP donde se hace, porque en las fichas de alta hay un
+ * campo para cada uno y partirlos de vuelta perdería información. */
+function nombreDe(datos: Consulta): string {
+  const texto = (clave: string) =>
+    typeof datos[clave] === "string" ? (datos[clave] as string) : "";
+  return (
+    texto("razon_social") ||
+    [texto("nombres"), texto("apellidos")].filter(Boolean).join(" ")
+  );
+}
+
 export function DialogoCliente({
   abierto,
+  permisos,
   onCerrar,
   onBuscar,
   onElegir,
   onCrear,
 }: {
   abierto: boolean;
+  permisos: string[];
   onCerrar: () => void;
   onBuscar: (q: string) => Promise<ClienteBuscado[]>;
   onElegir: (c: ClienteBuscado) => void;
@@ -1218,6 +1333,7 @@ export function DialogoCliente({
           <p className="pdv-etiqueta">Nombre</p>
           <input
             className="pdv-campo"
+            aria-label="Nombre del cliente"
             value={nombre}
             onChange={(e) => setNombre(e.target.value)}
           />
@@ -1225,6 +1341,7 @@ export function DialogoCliente({
           <input
             className="pdv-campo"
             inputMode="tel"
+            aria-label="Teléfono del cliente"
             value={telefono}
             onChange={(e) => setTelefono(e.target.value)}
           />
@@ -1234,11 +1351,16 @@ export function DialogoCliente({
           </p>
           <div className="pdv-dos">
             <div>
-              <p className="pdv-etiqueta">DNI (opcional)</p>
+              <p className="pdv-etiqueta">DNI o RUC (opcional)</p>
+              {/* Los dos en un solo campo, y el largo decide cuál es
+                  (RN-CPP-003): el cliente dicta su número sin decir de qué
+                  padrón es, y con 11 dígitos el servidor lo da de alta como
+                  jurídico —`crear_cliente` deriva solo—. */}
               <input
                 className="pdv-campo"
                 inputMode="numeric"
-                maxLength={8}
+                aria-label="DNI o RUC del cliente"
+                maxLength={LARGO_RUC}
                 value={documento}
                 onChange={(e) => setDocumento(e.target.value.replace(/\D/g, ""))}
               />
@@ -1253,6 +1375,24 @@ export function DialogoCliente({
               />
             </div>
           </div>
+          {/* Prellena, no decide: lo que trae se corrige antes de guardar, y
+              si Factiliza no contesta el alta sigue tecleando (ADR-005). */}
+          <ConsultaDocumento
+            permisos={permisos}
+            numero={documento}
+            className="pdv-boton-sec ancho"
+            onDatos={(datos) => {
+              const traido = nombreDe(datos);
+              if (traido) setNombre(traido);
+              if (typeof datos.direccion === "string" && datos.direccion) {
+                setDireccion(datos.direccion);
+              }
+              if (typeof datos.fecha_nacimiento === "string" && datos.fecha_nacimiento) {
+                setCumpleanos(datos.fecha_nacimiento);
+              }
+            }}
+          />
+
           <p className="pdv-etiqueta">Dirección (opcional)</p>
           <input
             className="pdv-campo"
@@ -1333,10 +1473,14 @@ export function DialogoCliente({
  * pantalla antes de confirmar: enterarse de que salió boleta cuando el
  * cliente quería factura ya es tarde. */
 function leyendaDocumento(doc: string): string {
-  if (doc.length === 11) return "Se emite FACTURA · el documento tiene 11 dígitos";
-  if (doc.length === 8) return "Se emite BOLETA · el documento tiene 8 dígitos";
+  if (doc.length === LARGO_RUC) {
+    return `Se emite FACTURA · el documento tiene ${LARGO_RUC} dígitos`;
+  }
+  if (doc.length === LARGO_DNI) {
+    return `Se emite BOLETA · el documento tiene ${LARGO_DNI} dígitos`;
+  }
   if (doc.length > 0) {
-    return "Documento incompleto: debe tener 8 (DNI) u 11 (RUC) dígitos";
+    return `Documento incompleto: debe tener ${LARGO_DNI} (DNI) u ${LARGO_RUC} (RUC) dígitos`;
   }
   return "Sin documento se emite boleta a nombre de Clientes varios.";
 }
@@ -1374,10 +1518,6 @@ function calcularCobro(
   };
 }
 
-function documentoValido(doc: string): boolean {
-  return [0, 8, 11].includes(doc.length);
-}
-
 function cobroBloqueado(
   ocupado: boolean,
   excede: boolean,
@@ -1405,6 +1545,7 @@ function FilaVueltoRestante({ vuelto, restante }: { vuelto: number; restante: nu
  * para sumar un segundo medio que cubra el faltante del primero. */
 export function DialogoCobro({
   abierto,
+  permisos,
   total,
   medios,
   ocupado,
@@ -1412,6 +1553,7 @@ export function DialogoCobro({
   onConfirmar,
 }: {
   abierto: boolean;
+  permisos: string[];
   total: number;
   medios: MedioPago[];
   ocupado: boolean;
@@ -1547,18 +1689,32 @@ export function DialogoCobro({
             <input
               className="pdv-campo"
               inputMode="numeric"
-              maxLength={11}
-              placeholder="DNI (8) o RUC (11)"
+              aria-label="Documento del receptor"
+              maxLength={LARGO_RUC}
+              placeholder={`DNI (${LARGO_DNI}) o RUC (${LARGO_RUC})`}
               value={doc}
               onChange={(e) => setDoc(e.target.value.replace(/\D/g, ""))}
             />
             <input
               className="pdv-campo"
+              aria-label="Nombre o razón social del receptor"
               placeholder="Nombre / razón social"
               value={nombre}
               onChange={(e) => setNombre(e.target.value)}
             />
           </div>
+          {/* La razón social de una factura la escribía el cajero de oído, y
+              SUNAT rechaza la que no coincide. Acá se trae del padrón que la
+              emite —el largo decide cuál— y queda editable. */}
+          <ConsultaDocumento
+            permisos={permisos}
+            numero={doc}
+            className="pdv-boton-sec ancho"
+            onDatos={(datos) => {
+              const traido = nombreDe(datos);
+              if (traido) setNombre(traido);
+            }}
+          />
           <p className="pdv-nota">{tipoDoc}</p>
         </div>
       </div>

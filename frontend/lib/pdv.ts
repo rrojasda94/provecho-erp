@@ -220,11 +220,36 @@ export type VentaNueva = {
   mesa_id?: string | null;
   comensales?: number | null;
   referencia_atencion?: string | null;
+  /** Adónde va el delivery y su ancla en el mapa. El costo del
+   * reparto NO se manda: lo calcula el servidor (ADR-054), porque un
+   * precio que viaja por el navegador es un precio que se edita. */
+  direccion_entrega?: string | null;
+  ubicacion_place_id?: string | null;
+  ubicacion_lat?: string | number | null;
+  ubicacion_lng?: string | number | null;
+  ubicacion_plus_code?: string | null;
+  ubicacion_distrito?: string | null;
   /** `consumo_personal` arma el pedido en cero y exige `consumo_motivo` +
    * la elevación de PIN del encargado (RN-COM-025). */
   tipo?: string;
   consumo_motivo?: string | null;
   autorizacion?: string;
+};
+
+export type CotizacionDeliveryIn = {
+  sucursal_id: string;
+  ubicacion_lat?: string | number | null;
+  ubicacion_lng?: string | number | null;
+  ubicacion_distrito?: string | null;
+};
+
+export type CotizacionDelivery = {
+  distancia_km: string | null;
+  costo: string;
+  /** La distancia salió de la línea recta porque Google no contestó. */
+  aproximada: boolean;
+  derivar_a_externo: boolean;
+  motivo: string | null;
 };
 
 export type PagoNuevo = {
@@ -341,6 +366,18 @@ export const api = {
 
   crearVenta: (cuerpo: VentaNueva) =>
     pedir<Venta>("/sales/ventas", { metodo: "POST", cuerpo }),
+
+  /** Cuánto sale llevar el pedido a esa dirección, antes de aceptarlo.
+   *
+   * El número lo calcula el servidor con su propia clave de Google: esto
+   * solo lo muestra. Cada llamada gasta cuota de un proveedor pago, así
+   * que se pide al anclar la dirección y no en cada tecla.
+   */
+  cotizarDelivery: (cuerpo: CotizacionDeliveryIn) =>
+    pedir<CotizacionDelivery>("/sales/ventas/cotizar-delivery", {
+      metodo: "POST",
+      cuerpo,
+    }),
 
   itemsDeVenta: (ventaId: string) =>
     pedir<VentaItem[]>(`/sales/ventas/${ventaId}/items`),

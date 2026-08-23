@@ -140,6 +140,32 @@ erDiagram
 - **sucursal_zona_servicio**: sucursal_id, zona_servicio_id — relación N:N
   (una sucursal se suscribe a un grupo de zonas).
 
+### Ubicación: el ancla de una dirección (ADR-053, implementado 2026-08-22)
+
+Una dirección son **dos cosas**: el texto que se lee y se imprime, y el punto
+del mapa donde está. El texto sigue en la columna que cada tabla ya tenía
+(`direccion`, `domicilio`, `domicilio_fiscal`, `direccion_entrega`); el ancla
+llega por el mixin `core/model_base.UbicacionMixin`, siempre con el mismo
+nombre para no tener que traducir nada entre capas:
+
+- `ubicacion_place_id` — `VARCHAR(255)`. Identificador estable del lugar en
+  Google; es lo que se compara para saber si dos pedidos van al mismo sitio.
+- `ubicacion_lat` / `ubicacion_lng` — `NUMERIC(9,6)`. Seis decimales son
+  ~11 cm: más sería ruido del GPS.
+- `ubicacion_plus_code` — `VARCHAR(20)`. Derivable de las coordenadas, pero
+  viene gratis en la respuesta y derivarlo pediría una dependencia.
+- `ubicacion_distrito` — `VARCHAR(100)`. Es lo que decide si un reparto cae en
+  zona restringida (ADR-054) sin traer geometría al proyecto.
+
+Lo llevan: `sucursal`, `almacen`, `empresa`, `persona` (§2), `proveedor` (§5)
+y `venta` (§6). **Todo nullable**: una dirección escrita a mano es válida y las
+filas anteriores a 2026-08-22 no tienen ancla.
+
+`ubicacion_distrito` es el sustituto pobre de `zona_servicio` de arriba
+—que sigue sin implementarse— y hace el trabajo mientras las zonas del negocio
+coincidan con distritos. Una geocerca de verdad (polígono, PostGIS) recién se
+justifica cuando no coincidan.
+
 ## 2. Usuarios y seguridad (módulo users)
 
 ```mermaid
@@ -668,6 +694,13 @@ descuenta stock vía la receta (ver [../domain/domain-model.md](../domain/domain
   `purchases.caja_chica_rendida`.
 
 ## 6. Ventas (módulo sales)
+
+La entrega de un delivery (ADR-053/054, 2026-08-22): `direccion_entrega`
+(texto) + el `UbicacionMixin` de §1b + `distancia_entrega_km` `NUMERIC(6,2)` y
+`costo_entrega` `NUMERIC(10,2)`. Las dos últimas se **congelan** al crear la
+orden: la tarifa por kilómetro cambia y el pedido de ayer no puede cambiar de
+precio, igual que la guía de remisión congela sus direcciones al emitirse. El
+costo todavía **no** suma al total de la venta (ver deuda de `sales`).
 
 - **punto_venta**: sucursal_id, canal (`trabajador` | `web` | `kiosko`),
   hardware_id (NULL si web), serie_boleta, serie_factura (series SUNAT

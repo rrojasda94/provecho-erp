@@ -39,9 +39,13 @@ import {
 } from "./tipos";
 import { useCajaPdv } from "./use-caja-pdv";
 import { useDatosPdv } from "./use-datos-pdv";
+import { UBICACION_VACIA } from "@/components/direccion/ubicacion";
 
 type Props = {
   sucursalId: string;
+  /** Los del cajero. Solo deciden si se le ofrece traer un documento de
+   * RENIEC/SUNAT: el resto del PDV ya está detrás del permiso de la caja. */
+  permisos: string[];
   puntoVenta: {
     id: string;
     serieBoleta: string;
@@ -61,6 +65,7 @@ function nuevoBorrador(mesa?: MesaEnMapa): Borrador {
     mesaNumero: mesa?.numero ?? null,
     comensales: null,
     direccion: null,
+    ubicacion: UBICACION_VACIA,
     cliente: null,
     lineas: [],
     ventaId: null,
@@ -156,7 +161,7 @@ function bloqueoDeCaja(resuelta: boolean, falla: Falla | null) {
   );
 }
 
-export default function PdvCliente({ sucursalId, puntoVenta }: Props) {
+export default function PdvCliente({ sucursalId, permisos, puntoVenta }: Props) {
   const datos = useDatosPdv(puntoVenta.id, sucursalId);
   const [borradores, setBorradores] = useState<Borrador[]>([nuevoBorrador()]);
   const [activoId, setActivoId] = useState<string | null>(null);
@@ -276,6 +281,11 @@ export default function PdvCliente({ sucursalId, puntoVenta }: Props) {
       mesa_id: b.mesaId,
       comensales: b.comensales,
       referencia_atencion: b.tipo === "mesa" ? null : (b.cliente?.nombre ?? null),
+      // Solo el delivery lleva dirección; el costo del reparto lo calcula
+      // el servidor y se congela en la venta (ADR-054).
+      ...(b.tipo === "delivery"
+        ? { direccion_entrega: b.direccion, ...b.ubicacion }
+        : {}),
       // Comida del personal: el servidor pone los precios en cero y exige la
       // elevación del encargado (RN-COM-025).
       ...(b.consumoMotivo
@@ -431,6 +441,7 @@ export default function PdvCliente({ sucursalId, puntoVenta }: Props) {
         mesaNumero: info.mesaNumero,
         comensales: info.comensales,
         direccion: null,
+        ubicacion: UBICACION_VACIA,
         cliente: null,
         lineas: items.map(lineaDesdeVentaItem),
         ventaId: info.ventaId,
@@ -780,6 +791,7 @@ export default function PdvCliente({ sucursalId, puntoVenta }: Props) {
         abierto={dialogo === "tipo"}
         borrador={activo}
         mesas={datos.mesas.datos}
+        sucursalId={sucursalId}
         onCerrar={() => setDialogo(null)}
         onConfirmar={(cambios) => {
           parchar(cambios);
@@ -794,6 +806,7 @@ export default function PdvCliente({ sucursalId, puntoVenta }: Props) {
       />
       <DialogoCliente
         abierto={dialogo === "cliente"}
+        permisos={permisos}
         onCerrar={() => setDialogo(null)}
         onBuscar={api.buscarClientes}
         onElegir={(c: ClienteBuscado) => {
@@ -804,6 +817,7 @@ export default function PdvCliente({ sucursalId, puntoVenta }: Props) {
       />
       <DialogoCobro
         abierto={dialogo === "cobro"}
+        permisos={permisos}
         total={totalACobrar(activo, seleccion)}
         medios={datos.medios}
         ocupado={ocupado}
