@@ -1,8 +1,10 @@
 import { redirect } from "next/navigation";
 
+import { ProveedorConfigMapas } from "@/components/direccion/config-mapas";
 import { RastreoDeNavegacion } from "@/components/shell/rastro";
 import { Revelar } from "@/components/shell/revelar";
 import { TopBar } from "@/components/shell/top-bar";
+import { configMapas } from "@/lib/mapas";
 import { obtenerSesion } from "@/lib/sesion";
 
 /** Nivel 1 del shell Odoo (F2.6, ADR-013): guard de sesión + barra superior,
@@ -33,7 +35,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           real de la barra (fuentes custom, line-height) no es una constante
           que valga la pena asumir. */}
       <div className="flex-1">
-        <Revelar>{children}</Revelar>
+        {/* La clave de Google Maps la lee el servidor y baja por contexto:
+            declararla acá es lo que hace que un campo de dirección nuevo la
+            encuentre solo, sin tocar su página ni su componente cliente. */}
+        <ProveedorConfigMapas config={configMapas()}>
+          <Revelar>{children}</Revelar>
+        </ProveedorConfigMapas>
       </div>
     </div>
   );

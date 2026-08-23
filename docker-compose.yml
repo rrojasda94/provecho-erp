@@ -124,6 +124,18 @@ services:
       # pasa por `app/api/proxy`, que es server-side. La variable estuvo acá
       # sin que una sola línea del frontend la leyera.
       API_INTERNAL_URL: http://api:8000
+      # Clave de Google Maps del NAVEGADOR (mapa + autocompletado de
+      # direcciones). Se declara acá y no con `env_file: .env` para que este
+      # contenedor vea esa clave y NO la del servidor: la que calcula el cobro
+      # del delivery (`GOOGLE_MAPS_SERVER_KEY`) no tiene nada que hacer en el
+      # proceso que sirve el frontend.
+      #
+      # Tampoco es `NEXT_PUBLIC_*`: eso se hornea en el build (misma razón por
+      # la que se eliminó `NEXT_PUBLIC_API_URL`). La lee un Server Component y
+      # baja al componente del mapa como prop, en tiempo de ejecución.
+      GOOGLE_MAPS_BROWSER_KEY: ${GOOGLE_MAPS_BROWSER_KEY:-}
+      GOOGLE_MAPS_MAP_ID: ${GOOGLE_MAPS_MAP_ID:-DEMO_MAP_ID}
+      GOOGLE_MAPS_PAIS: ${GOOGLE_MAPS_PAIS:-pe}
       # En Windows + Docker Desktop los eventos de sistema de archivos no
       # cruzan el bind mount: sin sondeo, editar un archivo no recarga nada.
       WATCHPACK_POLLING: "true"

@@ -206,7 +206,9 @@ filtración o salida de alguien con acceso a producción.
 - **Contraseña de Postgres** — cambiar en el gestor (Supabase o `ALTER ROLE`),
   actualizar `DATABASE_URL` y reiniciar la aplicación.
 - **Tokens de integraciones** (Factiliza, Izipay, Google, Meta) — revocar en
-  el proveedor primero, luego actualizar `.env`.
+  el proveedor primero, luego actualizar `.env`. Google son dos claves con
+  restricciones distintas: ver
+  [integraciones-google.md](integraciones-google.md).
 - **PIN de usuario comprometido** — se resetea desde el CRUD de `users`; no
   requiere despliegue.
 

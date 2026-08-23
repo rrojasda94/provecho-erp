@@ -19,6 +19,7 @@ el router, como en el resto del módulo: ADR-004 dice que sale del token.
 
 import uuid
 from datetime import UTC, datetime
+from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
@@ -44,6 +45,8 @@ from src.modules.users.infrastructure.repositories import (
     SucursalRepo,
 )
 from src.shared import auditoria
+from src.shared.ubicacion import CAMPOS as CAMPOS_UBICACION
+from src.shared.ubicacion import desanclar_si_cambio_el_texto
 
 # Tipo de almacén que sí cuelga de un local; el resto (central, producción,
 # activos) no tiene sucursal. Ver data-model §1.
@@ -137,6 +140,11 @@ def crear_empresa(
     zona_tributaria: str = "general",
     contacto: str | None = None,
     config_fiscal: dict | None = None,
+    ubicacion_place_id: str | None = None,
+    ubicacion_lat: Decimal | None = None,
+    ubicacion_lng: Decimal | None = None,
+    ubicacion_plus_code: str | None = None,
+    ubicacion_distrito: str | None = None,
     actor_id: uuid.UUID | None = None,
 ) -> Empresa:
     _get(GrupoRepo(session).get(grupo_id), "grupo")
@@ -153,6 +161,11 @@ def crear_empresa(
             zona_tributaria=zona_tributaria,
             contacto=contacto,
             config_fiscal=config_fiscal,
+            ubicacion_place_id=ubicacion_place_id,
+            ubicacion_lat=ubicacion_lat,
+            ubicacion_lng=ubicacion_lng,
+            ubicacion_plus_code=ubicacion_plus_code,
+            ubicacion_distrito=ubicacion_distrito,
         )
     )
     _auditar(
@@ -180,6 +193,7 @@ EDITABLES_EMPRESA = (
     "tipo",
     "zona_tributaria",
     "config_fiscal",
+    *CAMPOS_UBICACION,
 )
 
 
@@ -200,7 +214,11 @@ def editar_empresa(
         otra = repo.get_by_ruc(ruc_nuevo)
         if otra is not None and otra.id != empresa_id:
             raise Conflicto(f"RUC '{ruc_nuevo}' ya existe")
+    domicilio_previo = empresa.domicilio_fiscal
     antes = _aplicar(empresa, campos, EDITABLES_EMPRESA)
+    antes |= desanclar_si_cambio_el_texto(
+        empresa, campos, domicilio_previo, "domicilio_fiscal"
+    )
     if antes:
         _auditar(
             session, actor_id, "empresa", empresa.id, "editar", antes,
@@ -350,6 +368,11 @@ def crear_sucursal(
     tenencia: str,
     estado: str = "activa",
     horario_atencion: dict | None = None,
+    ubicacion_place_id: str | None = None,
+    ubicacion_lat: Decimal | None = None,
+    ubicacion_lng: Decimal | None = None,
+    ubicacion_plus_code: str | None = None,
+    ubicacion_distrito: str | None = None,
     actor_id: uuid.UUID | None = None,
 ) -> Sucursal:
     _exigir_licencia(session, empresa_id, marca_id)
@@ -362,6 +385,11 @@ def crear_sucursal(
             tenencia=tenencia,
             estado=estado,
             horario_atencion=horario_atencion,
+            ubicacion_place_id=ubicacion_place_id,
+            ubicacion_lat=ubicacion_lat,
+            ubicacion_lng=ubicacion_lng,
+            ubicacion_plus_code=ubicacion_plus_code,
+            ubicacion_distrito=ubicacion_distrito,
         )
     )
     _auditar(
@@ -389,10 +417,22 @@ def editar_sucursal(
     marca_nueva = campos.get("marca_id")
     if marca_nueva and marca_nueva != sucursal.marca_id:
         _exigir_licencia(session, sucursal.empresa_id, marca_nueva)
+    direccion_previa = sucursal.direccion
     antes = _aplicar(
         sucursal,
         campos,
-        ("marca_id", "nombre", "direccion", "estado", "tenencia", "horario_atencion"),
+        (
+            "marca_id",
+            "nombre",
+            "direccion",
+            "estado",
+            "tenencia",
+            "horario_atencion",
+            *CAMPOS_UBICACION,
+        ),
+    )
+    antes |= desanclar_si_cambio_el_texto(
+        sucursal, campos, direccion_previa, "direccion"
     )
     if antes:
         _auditar(
@@ -422,6 +462,11 @@ def crear_almacen(
     direccion: str | None = None,
     almacen_abastecedor_id: uuid.UUID | None = None,
     almacen_abastecedor_respaldo_id: uuid.UUID | None = None,
+    ubicacion_place_id: str | None = None,
+    ubicacion_lat: Decimal | None = None,
+    ubicacion_lng: Decimal | None = None,
+    ubicacion_plus_code: str | None = None,
+    ubicacion_distrito: str | None = None,
     actor_id: uuid.UUID | None = None,
 ) -> Almacen:
     _get(EmpresaRepo(session).get(empresa_id), "empresa")
@@ -442,6 +487,11 @@ def crear_almacen(
             direccion=direccion,
             almacen_abastecedor_id=almacen_abastecedor_id,
             almacen_abastecedor_respaldo_id=almacen_abastecedor_respaldo_id,
+            ubicacion_place_id=ubicacion_place_id,
+            ubicacion_lat=ubicacion_lat,
+            ubicacion_lng=ubicacion_lng,
+            ubicacion_plus_code=ubicacion_plus_code,
+            ubicacion_distrito=ubicacion_distrito,
         )
     )
     _auditar(
@@ -481,6 +531,7 @@ def editar_almacen(
     _validar_almacen(
         session, almacen.empresa_id, tipo, sucursal_id, abastecedor_id, respaldo_id
     )
+    direccion_previa = almacen.direccion
     antes = _aplicar(
         almacen,
         campos,
@@ -491,7 +542,11 @@ def editar_almacen(
             "sucursal_id",
             "almacen_abastecedor_id",
             "almacen_abastecedor_respaldo_id",
+            *CAMPOS_UBICACION,
         ),
+    )
+    antes |= desanclar_si_cambio_el_texto(
+        almacen, campos, direccion_previa, "direccion"
     )
     if antes:
         _auditar(

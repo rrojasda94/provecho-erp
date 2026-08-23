@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from src.core.events import event_bus
 from src.modules.accounting.application.queries_publicas import hay_caja_abierta
 from src.modules.inventory.application.queries_publicas import insumos_de_receta
-from src.modules.sales.application import comprobantes, precios
+from src.modules.sales.application import comprobantes, precios, tarifa_delivery
 from src.modules.sales.application.errors import (
     Conflicto,
     NoEncontrado,
@@ -325,6 +325,34 @@ def _validar_tipo(
     return True
 
 
+def _cotizar_entrega(
+    session: Session,
+    sucursal_id: uuid.UUID,
+    modalidad: str,
+    direccion_entrega: str | None,
+    lat: Decimal | None,
+    lng: Decimal | None,
+    distrito: str | None,
+    ya_cotizado: bool = False,
+):
+    """Cotiza el reparto, o `None` si este pedido no se lleva a ningún lado.
+
+    Mesa y takeout no pagan reparto, y un delivery sin dirección tampoco se
+    puede medir: en los dos casos la venta se crea sin costo de entrega, que
+    es como funcionaba antes de ADR-054.
+
+    `ya_cotizado` es el replay del hub: esa venta ya se cobró con un
+    precio, y recalcularlo acá lo cambiaría a espaldas del cliente.
+    """
+    if ya_cotizado or modalidad != "delivery" or not direccion_entrega:
+        return None
+    return tarifa_delivery.cotizar(
+        tarifa_delivery.origen_de_sucursal(session, sucursal_id),
+        tarifa_delivery.coordenada(lat, lng),
+        distrito,
+    )
+
+
 def crear_venta(
     session: Session,
     *,
@@ -337,6 +365,17 @@ def crear_venta(
     items: list[dict],  # [{producto_comercial_id, cantidad}]
     cliente_id: uuid.UUID | None = None,
     referencia_atencion: str | None = None,
+    direccion_entrega: str | None = None,
+    ubicacion_place_id: str | None = None,
+    ubicacion_lat: Decimal | None = None,
+    ubicacion_lng: Decimal | None = None,
+    ubicacion_plus_code: str | None = None,
+    ubicacion_distrito: str | None = None,
+    # Solo en el replay del hub: la venta ya se cotizó allá y ese es el
+    # precio que se le cobró al cliente. Volver a preguntarle a Google
+    # daría otro número y una llamada de más.
+    distancia_entrega_km: Decimal | None = None,
+    costo_entrega: Decimal | None = None,
     mesa_id: uuid.UUID | None = None,
     comensales: int | None = None,
     id: uuid.UUID | None = None,
@@ -395,6 +434,20 @@ def crear_venta(
         gratis=consumo,
     )
 
+    # Se cotiza acá y no en el navegador: este número define cuánta plata
+    # paga el cliente. Se congela en la fila (ADR-054) — la tarifa por
+    # kilómetro cambia y el pedido de ayer no puede cambiar de precio.
+    cotizacion = _cotizar_entrega(
+        session,
+        sucursal_id,
+        modalidad,
+        direccion_entrega,
+        ubicacion_lat,
+        ubicacion_lng,
+        ubicacion_distrito,
+        ya_cotizado=costo_entrega is not None,
+    )
+
     venta = Venta(
         id=id or uuid.uuid4(),
         sucursal_id=sucursal_id,
@@ -414,6 +467,16 @@ def crear_venta(
         ),
         idempotency_key=idempotency_key,
         referencia_atencion=referencia_atencion,
+        direccion_entrega=direccion_entrega,
+        ubicacion_place_id=ubicacion_place_id,
+        ubicacion_lat=ubicacion_lat,
+        ubicacion_lng=ubicacion_lng,
+        ubicacion_plus_code=ubicacion_plus_code,
+        ubicacion_distrito=ubicacion_distrito,
+        distancia_entrega_km=(
+            cotizacion.distancia_km if cotizacion else distancia_entrega_km
+        ),
+        costo_entrega=cotizacion.costo if cotizacion else costo_entrega,
         mesa_id=mesa_id,
         comensales=comensales,
         tipo=tipo,

@@ -3,6 +3,34 @@
 Parte del backlog de deuda técnica del proyecto. El índice y las reglas
 de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 
+- ⬜ **El reparto se calcula y se guarda, pero no se cobra como línea de
+  venta** (2026-08-22, ADR-054): `venta.costo_entrega` queda en la fila y se
+  muestra en caja, pero **no suma al total** ni aparece en el comprobante ni
+  en el asiento contable. Cobrarlo de verdad exige una línea de venta sobre un
+  producto de servicio "Delivery" —con su IGV y su cuenta— y eso toca
+  comprobante, contabilidad y el cálculo del total. Se dejó afuera a propósito:
+  el radio de impacto del cambio es mucho mayor que el resto de este slice y no
+  se puede validar sin decidir antes qué producto y qué cuenta usa.
+- ⬜ **La tarifa de delivery es una sola para todo el grupo** (2026-08-22,
+  ADR-054): `DELIVERY_TARIFA_BASE`, `DELIVERY_PRECIO_POR_KM` y
+  `DELIVERY_DISTANCIA_MAXIMA_KM` viven en `settings`. El día que dos locales
+  necesiten precios distintos —o dos marcas—, pasan a columnas de `sucursal`,
+  que es donde ya vive el resto de lo que distingue a un local.
+- ⬜ **Las zonas de reparto son una lista de distritos, no polígonos**
+  (2026-08-22, ADR-054): `DELIVERY_DISTRITOS_RESTRINGIDOS` compara contra el
+  distrito que devuelve Google. Alcanza para "no repartimos en Belén" y no para
+  "no repartimos del río para allá". Se cierra con PostGIS y una pantalla para
+  dibujar el polígono; hasta que el negocio lo pida, es mucha máquina.
+- ⬜ **DAZ DAZ es un aviso al cajero, no una integración** (2026-08-22,
+  ADR-054): cuando el pedido queda fuera del radio o en zona vetada, el PDV lo
+  sugiere y quien decide es la persona. Mandarles el pedido de verdad exige su
+  API, credenciales y un adaptador propio en `shared/integrations/`.
+- ⬜ **El cliente jurídico no tiene dónde anclar su dirección** (2026-08-22,
+  ADR-053): `Cliente` no tiene columna de dirección — hoy la dirección de uno
+  jurídico termina en `contacto`, que es un campo para el teléfono o el correo
+  de quien coordina. `crear_cliente` recibe la ubicación y la aplica solo al
+  natural (a su `persona`). Se cierra dándole a `Cliente` su propia dirección,
+  que es un cambio de modelo que este slice no necesitaba.
 - ⬜ **Un cliente natural no se actualiza por planilla** (2026-08-20,
   ADR-052, RN-PTS-007): de uno que ya existe la carga masiva solo puede
   **completar el documento**. Su nombre, teléfono y domicilio viven en

@@ -7,8 +7,10 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.shared.ubicacion import UbicacionMixin
 
-class ProveedorCreate(BaseModel):
+
+class ProveedorCreate(UbicacionMixin):
     # `empresa_id` sale del JWT (ADR-004). Solo un superusuario sin empresa
     # asignada puede indicarla; a cualquier otro usuario, una empresa
     # distinta a la suya le responde 403.
@@ -33,7 +35,7 @@ class ProveedorCreate(BaseModel):
     porcentaje_deteccion: Decimal | None = None
 
 
-class ProveedorUpdate(BaseModel):
+class ProveedorUpdate(UbicacionMixin):
     """Campo ausente o `null` = no tocar.
 
     `razon_social`/`ruc` se admiten porque un RUC mal tecleado llega hasta la
@@ -59,7 +61,7 @@ class ProveedorUpdate(BaseModel):
     plazo_dias_credito: int | None = Field(default=None, ge=1)
 
 
-class ProveedorOut(BaseModel):
+class ProveedorOut(UbicacionMixin):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     empresa_id: uuid.UUID

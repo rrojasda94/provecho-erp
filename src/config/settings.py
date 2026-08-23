@@ -107,6 +107,41 @@ class Settings(BaseSettings):
     # ventana de 24 h, Meta no acepta otra cosa.
     whatsapp_plantilla_encuesta: str = "encuesta_satisfaccion"
     whatsapp_plantilla_idioma: str = "es"
+    # --- Google Maps (direcciones y reparto) --------------------------------
+    # Dos claves y no una porque Google no deja restringir la misma por
+    # referente HTTP **y** por IP a la vez, y son dos usos con riesgos
+    # distintos.
+    #
+    # La del navegador dibuja el mapa y autocompleta: viaja al cliente a
+    # propósito, y lo único que la protege es la restricción por dominio más
+    # la cuota diaria de la consola. Vacía = el campo de dirección se comporta
+    # como el `<input>` de texto de siempre.
+    google_maps_browser_key: str = ""
+    # La del servidor calcula la distancia con la que se le cobra el delivery
+    # al cliente. NUNCA sale de la API: un número que viaja por el navegador
+    # es un número que se puede editar. Vacía = la distancia se estima en
+    # línea recta y la cotización se marca aproximada.
+    google_maps_server_key: str = ""
+    # Map ID de la consola de Google: sin uno, el pin del mapa no se
+    # dibuja. `DEMO_MAP_ID` es el que Google publica para desarrollo.
+    google_maps_map_id: str = "DEMO_MAP_ID"
+    google_routes_base_url: str = "https://routes.googleapis.com"
+    google_timeout_segundos: float = 10.0
+    # Sesga el autocompletado al país del negocio (ISO 3166-1 alfa-2).
+    google_maps_pais: str = "pe"
+    # --- Tarifa del delivery propio -----------------------------------------
+    # Los tres en 0 = función apagada: el delivery se sigue cobrando como
+    # hasta ahora hasta que el negocio defina la tarifa. Nada se enciende solo.
+    delivery_tarifa_base: Decimal = Decimal("0")
+    delivery_precio_por_km: Decimal = Decimal("0")
+    # Pasado este radio se sugiere derivar a una plataforma externa en vez de
+    # mandar al repartidor propio. 0 = sin radio máximo.
+    delivery_distancia_maxima_km: Decimal = Decimal("0")
+    # Distritos donde no se reparte con repartidor propio, separados por coma.
+    # Es una lista de nombres y no un polígono a propósito: el distrito ya
+    # viene en la respuesta de Google y resuelve el caso real sin traer
+    # geometría (ni PostGIS) al proyecto.
+    delivery_distritos_restringidos: Annotated[list[str], NoDecode] = []
     # --- Encuesta de satisfacción (marketing) --------------------------------
     # Vigencia de la encuesta enviada. Pasado el plazo, el barrido la expira:
     # una respuesta de dos semanas después no mide la experiencia de ese
@@ -183,7 +218,12 @@ class Settings(BaseSettings):
     def es_hub(self) -> bool:
         return self.deployment_mode == "hub"
 
-    @field_validator("allowed_hosts", "cors_origins", mode="before")
+    @field_validator(
+        "allowed_hosts",
+        "cors_origins",
+        "delivery_distritos_restringidos",
+        mode="before",
+    )
     @classmethod
     def _lista_por_comas(cls, valor: object) -> object:
         """Acepta `a,b` en .env además de la lista JSON de pydantic.

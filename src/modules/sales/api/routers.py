@@ -8,12 +8,15 @@ from fastapi import (
     APIRouter,
     Depends,
     HTTPException,
+    Request,
     Response,
     UploadFile,
     status,
 )
 from sqlalchemy.orm import Session
 
+from src.config.settings import settings
+from src.core.rate_limit import consumir, ip_de
 from src.core.tenant import Tenant
 from src.modules.sales.api import schemas
 from src.modules.sales.application import (
@@ -27,6 +30,7 @@ from src.modules.sales.application import (
     precios,
     precuenta,
     queries_publicas,
+    tarifa_delivery,
     tasks,
     ventas,
 )
@@ -127,6 +131,12 @@ def crear_venta(
         items=[it.model_dump() for it in body.items],
         cliente_id=body.cliente_id,
         referencia_atencion=body.referencia_atencion,
+        direccion_entrega=body.direccion_entrega,
+        ubicacion_place_id=body.ubicacion_place_id,
+        ubicacion_lat=body.ubicacion_lat,
+        ubicacion_lng=body.ubicacion_lng,
+        ubicacion_plus_code=body.ubicacion_plus_code,
+        ubicacion_distrito=body.ubicacion_distrito,
         mesa_id=body.mesa_id,
         comensales=body.comensales,
         id=body.id,
@@ -136,6 +146,52 @@ def crear_venta(
     )
     session.commit()
     return venta
+
+
+@router.post("/ventas/cotizar-delivery", response_model=schemas.CotizacionDeliveryOut)
+def cotizar_delivery(
+    body: schemas.CotizacionDeliveryIn,
+    request: Request,
+    actor: Usuario = Depends(require_permission(CREAR)),
+    session: Session = Depends(get_db),
+):
+    """Cuánto sale llevar este pedido, y si conviene derivarlo (ADR-054).
+
+    **Con cuota, como la consulta de documento**: cada llamada gasta una
+    medición de un proveedor pago, y un bucle mal escrito en el PDV se come
+    el plan del mes. Se cuenta por usuario y por IP por la misma razón que
+    en `core/consulta_router.py` — todas las cajas del local salen por la
+    misma IP, y limitar solo por ahí castiga al equipo por uno solo.
+
+    No decide nada: el precio que se cobra lo vuelve a calcular el servidor
+    al crear la venta, y es el que queda congelado en la fila. Esto es lo que
+    el cajero ve antes de aceptar.
+    """
+    ventana = settings.consulta_documento_ventana_segundos
+    consumir(
+        "cotizar_delivery_usuario",
+        str(actor.id),
+        settings.consulta_documento_intentos_usuario,
+        ventana,
+    )
+    consumir(
+        "cotizar_delivery_ip",
+        ip_de(request),
+        settings.consulta_documento_intentos_ip,
+        ventana,
+    )
+    cotizacion = tarifa_delivery.cotizar(
+        tarifa_delivery.origen_de_sucursal(session, body.sucursal_id),
+        tarifa_delivery.coordenada(body.ubicacion_lat, body.ubicacion_lng),
+        body.ubicacion_distrito,
+    )
+    return schemas.CotizacionDeliveryOut(
+        distancia_km=cotizacion.distancia_km,
+        costo=cotizacion.costo,
+        aproximada=cotizacion.aproximada,
+        derivar_a_externo=cotizacion.derivar_a_externo,
+        motivo=cotizacion.motivo,
+    )
 
 
 @router.get("/ventas", response_model=Pagina[schemas.VentaOut])

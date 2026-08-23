@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from src.shared.models.decision_gerencial import RESULTADOS, TIPOS
 from src.shared.parametros import MODULOS
+from src.shared.ubicacion import UbicacionMixin
 
 
 # --- Auth ---
@@ -83,7 +84,7 @@ class PreferenciasIn(BaseModel):
 
 
 # --- Persona (party model) ---
-class PersonaCreate(BaseModel):
+class PersonaCreate(UbicacionMixin):
     nombres: str = Field(max_length=100)
     apellidos: str = Field(max_length=100)
     tipo_documento: str
@@ -94,7 +95,7 @@ class PersonaCreate(BaseModel):
     email: str | None = None
 
 
-class PersonaUpdate(BaseModel):
+class PersonaUpdate(UbicacionMixin):
     version: int
     nombres: str | None = None
     apellidos: str | None = None
@@ -106,7 +107,7 @@ class PersonaUpdate(BaseModel):
     email: str | None = None
 
 
-class PersonaOut(BaseModel):
+class PersonaOut(UbicacionMixin):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     nombres: str
@@ -148,7 +149,7 @@ class NotificacionOut(BaseModel):
     created_at: datetime
 
 
-class AlmacenOut(BaseModel):
+class AlmacenOut(UbicacionMixin):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     empresa_id: uuid.UUID
@@ -170,7 +171,7 @@ class MarcaOut(BaseModel):
     tipo: str
 
 
-class SucursalOut(BaseModel):
+class SucursalOut(UbicacionMixin):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     empresa_id: uuid.UUID
@@ -205,7 +206,7 @@ TipoEmpresa = Literal[
 ZonaTributaria = Literal["amazonia_ley27037", "general"]
 
 
-class EmpresaCreate(BaseModel):
+class EmpresaCreate(UbicacionMixin):
     grupo_id: uuid.UUID
     razon_social: str = Field(min_length=1, max_length=255)
     # 11 dígitos: el RUC peruano no admite otra forma, y un RUC mal formado
@@ -218,7 +219,7 @@ class EmpresaCreate(BaseModel):
     config_fiscal: dict | None = None
 
 
-class EmpresaUpdate(BaseModel):
+class EmpresaUpdate(UbicacionMixin):
     razon_social: str | None = Field(default=None, min_length=1, max_length=255)
     ruc: str | None = Field(default=None, pattern=r"^\d{11}$")
     domicilio_fiscal: str | None = Field(default=None, min_length=1, max_length=255)
@@ -228,7 +229,7 @@ class EmpresaUpdate(BaseModel):
     config_fiscal: dict | None = None
 
 
-class EmpresaOut(BaseModel):
+class EmpresaOut(UbicacionMixin):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     grupo_id: uuid.UUID
@@ -271,7 +272,7 @@ TenenciaSucursal = Literal["propia", "alquilada", "del_grupo"]
 EstadoSucursal = Literal["activa", "inactiva"]
 
 
-class SucursalCreate(BaseModel):
+class SucursalCreate(UbicacionMixin):
     marca_id: uuid.UUID
     # Igual que el resto del ERP: sale del tenant (ADR-004); informarla
     # ajena es 403.
@@ -283,7 +284,7 @@ class SucursalCreate(BaseModel):
     horario_atencion: dict | None = None
 
 
-class SucursalUpdate(BaseModel):
+class SucursalUpdate(UbicacionMixin):
     """Cerrar un local es `estado="inactiva"`; no hay DELETE de sucursal —
     sigue siendo el ancla de sus ventas, cajas y trabajadores."""
 
@@ -295,7 +296,7 @@ class SucursalUpdate(BaseModel):
     horario_atencion: dict | None = None
 
 
-class AlmacenCreate(BaseModel):
+class AlmacenCreate(UbicacionMixin):
     empresa_id: uuid.UUID | None = None
     sucursal_id: uuid.UUID | None = None
     nombre: str = Field(min_length=1, max_length=100)
@@ -308,7 +309,7 @@ class AlmacenCreate(BaseModel):
     almacen_abastecedor_respaldo_id: uuid.UUID | None = None
 
 
-class AlmacenUpdate(BaseModel):
+class AlmacenUpdate(UbicacionMixin):
     nombre: str | None = Field(default=None, min_length=1, max_length=100)
     tipo: str | None = Field(default=None, min_length=1, max_length=30)
     direccion: str | None = Field(default=None, max_length=255)

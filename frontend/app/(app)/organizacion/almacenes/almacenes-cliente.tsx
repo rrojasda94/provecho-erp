@@ -11,6 +11,7 @@ import {
 import { TablaDatos } from "@/components/tabla/tabla-datos";
 
 import { guardarAlmacenAction } from "../actions";
+import { CampoDireccion } from "@/components/direccion/campo-direccion";
 
 export type Sucursal = { id: string; nombre: string };
 export type Almacen = {
@@ -20,6 +21,11 @@ export type Almacen = {
   nombre: string;
   tipo: string;
   direccion: string | null;
+  ubicacion_place_id: string | null;
+  ubicacion_lat: string | number | null;
+  ubicacion_lng: string | number | null;
+  ubicacion_plus_code: string | null;
+  ubicacion_distrito: string | null;
   almacen_abastecedor_id: string | null;
   almacen_abastecedor_respaldo_id: string | null;
 };
@@ -65,10 +71,7 @@ function CamposAlmacen({
           ))}
         </select>
       </label>
-      <label className="flex flex-col gap-1 text-sm font-semibold">
-        Dirección
-        <input name="direccion" maxLength={255} defaultValue={valor(a.direccion)} />
-      </label>
+      <CampoDireccion defaultValue={a.direccion} ubicacion={almacen ?? null} />
       <label className="flex flex-col gap-1 text-sm font-semibold">
         Almacén abastecedor
         <select
