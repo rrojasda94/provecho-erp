@@ -1,0 +1,140 @@
+# Demo portable: el ERP completo corriendo en la PC de quien lo prueba, sin
+# internet, sin servidor y sin consola. Es el compose que viaja dentro de
+# `ZIP_<versión>/provecho-demo-<versión>.zip` — ver `scripts/empaquetar_demo.py`
+# y `docs/engineering/devops.md#paquete-de-demo-portable`.
+#
+# **NO ES PARA PRODUCCIÓN, ni siquiera para una demo publicada en internet.**
+# Los secretos están escritos acá y versionados, `ALLOWED_HOSTS`/`CORS_ORIGINS`
+# aceptan todo, `/docs` queda abierto y la base entera se siembra con datos
+# ficticios al arrancar. Para servidor: `docker-compose.prod.yml`.
+#
+# Sin `build:` a propósito: en la PC del tester no hay código fuente, solo las
+# imágenes que trae `imagenes.tar`. Las construye el empaquetador, y
+# `tests/test_repo_coherencia.py` verifica que las que se nombran acá sean
+# exactamente las que ese script exporta.
+#
+# Uso (lo hace `INICIAR.bat` por el tester):
+#   docker compose -f docker-compose.demo.yml up -d --no-build
+
+# Nombre de proyecto propio: sin esto compose lo deriva de la carpeta y, al
+# correr este archivo dentro del repo, adopta y recrea los contenedores del
+# compose de desarrollo (mismo proyecto `provecho-erp`, servicios homónimos).
+# En la PC de quien prueba da igual; acá no.
+name: provecho-demo
+
+# `ENVIRONMENT=demo` deja `settings.es_produccion` en falso, que es lo que
+# habilita los seeders (prohibidos en producción) y evita los guardas de
+# arranque de `src/config/settings.py`. Es texto libre: aparece tal cual en
+# `/health`, así que un pantallazo de la demo se distingue del de un servidor.
+x-entorno-demo: &entorno-demo
+  ENVIRONMENT: demo
+  DEBUG: "false"
+  DATABASE_URL: postgresql+psycopg://provecho:demo@db:5432/provecho
+  REDIS_URL: redis://redis:6379/0
+  JWT_SECRET: demo-portable-no-sirve-en-produccion-cambiar-siempre
+  ALLOWED_HOSTS: "*"
+  CORS_ORIGINS: "*"
+  LOG_JSON: "false"
+  # Sin Factiliza ni WhatsApp: la venta y el cobro funcionan igual, los
+  # comprobantes se acumulan en estado `pendiente` y no se envía nada a
+  # ningún tercero desde la PC de quien prueba.
+  FACTILIZA_TOKEN: ""
+  WHATSAPP_TOKEN: ""
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: provecho
+      POSTGRES_PASSWORD: demo
+      POSTGRES_DB: provecho
+    # Sin puertos publicados: el 5432 y el 5433 de la PC del tester pueden
+    # estar ocupados y nadie fuera de este compose necesita la base.
+    volumes:
+      - demodata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U provecho"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+
+  # Corre una sola vez y termina: migra y siembra. Los cuatro seeders son
+  # idempotentes, así que repetirlo en cada arranque no duplica nada — y es lo
+  # que permite que `INICIAR.bat` sea un único `up` en vez de cuatro comandos
+  # que el tester tendría que escribir.
+  init:
+    image: provecho-demo-api:latest
+    environment: *entorno-demo
+    command: >
+      sh -c "alembic upgrade head &&
+             python -m src.seeders.seed &&
+             python -m src.seeders.pdv_demo &&
+             python -m src.seeders.pizzas_demo &&
+             python -m src.seeders.parametros"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    image: provecho-demo-api:latest
+    restart: unless-stopped
+    environment: *entorno-demo
+    # Sin publicar el 8000: el navegador nunca llama a la API directamente,
+    # todo pasa por el proxy del servidor de Next (`frontend/lib/api.ts`).
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+
+  worker:
+    image: provecho-demo-api:latest
+    restart: unless-stopped
+    environment: *entorno-demo
+    command: celery -A src.core.celery_app worker --loglevel=warning
+    # El HEALTHCHECK de la imagen pega a /health, que este proceso no sirve.
+    healthcheck:
+      disable: true
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+
+  beat:
+    image: provecho-demo-api:latest
+    restart: unless-stopped
+    environment: *entorno-demo
+    command: celery -A src.core.celery_app beat --loglevel=warning
+    healthcheck:
+      disable: true
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+
+  web:
+    image: provecho-demo-web:latest
+    restart: unless-stopped
+    environment:
+      API_INTERNAL_URL: http://api:8000
+      # La demo se sirve por http, sin TLS. Con la cookie en `Secure`, entrar
+      # desde otro equipo de la red (la tablet, el celular) fallaría en
+      # silencio. Ver `frontend/app/login/actions.ts`.
+      COOKIE_SECURE: "false"
+    # Único puerto publicado. `PUERTO_WEB=3001 INICIAR.bat` si el 3000 está
+    # ocupado en esa PC.
+    ports:
+      - "${PUERTO_WEB:-3000}:3000"
+    depends_on:
+      - api
+
+volumes:
+  demodata:

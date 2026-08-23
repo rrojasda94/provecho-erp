@@ -17,7 +17,7 @@ Frontend: lint + build en CI; tests de componentes al crecer la UI.
 
 - **Factories** para entidades de dominio (crear al implementar cada módulo).
 - **Fixtures** pytest para sesión de DB transaccional (rollback por test).
-- **Seeders** para entornos de desarrollo: usuario `admin`/PIN `123456`,
+- **Seeders** para entornos de desarrollo: usuarios `admin` y `cajero1`, PIN `123456`,
   organización base (grupo, empresa, marcas, sucursales). Prohibidos en producción.
 
 ## Convenciones

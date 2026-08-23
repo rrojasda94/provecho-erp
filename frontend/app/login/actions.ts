@@ -10,7 +10,15 @@ type TokenPair = { access_token: string; refresh_token: string; token_type: stri
 
 export type EstadoLogin = { error: string };
 
-const ES_PRODUCCION = process.env.NODE_ENV === "production";
+// `secure` sigue a NODE_ENV salvo que se diga lo contrario. El override
+// existe para la demo portable, que se sirve por http sin TLS: desde otra
+// máquina de la red (`http://192.168.x.x:3000`, la tablet del local) el
+// navegador descarta una cookie `Secure` y el login falla **en silencio** —
+// devuelve al formulario sin error. En `localhost` no se nota, porque los
+// navegadores lo tratan como contexto seguro.
+const ES_PRODUCCION = process.env.COOKIE_SECURE
+  ? process.env.COOKIE_SECURE === "true"
+  : process.env.NODE_ENV === "production";
 // Mismos plazos que el backend (access_token_minutes / refresh_token_days,
 // settings.py) — la cookie no debe sobrevivir más que el token que guarda.
 const MINUTOS_ACCESS = 15;

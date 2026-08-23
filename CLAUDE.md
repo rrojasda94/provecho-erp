@@ -82,7 +82,8 @@ APIs externas desde el dominio.
 
 ## Datos de prueba
 
-Usuario: `admin`, PIN: `123456` (solo entornos no productivos, vía seeder).
+Usuarios: `admin` (rol admin) y `cajero1` (rol cajero), PIN: `123456`
+(solo entornos no productivos, vía seeder).
 
 ## Referencias
 

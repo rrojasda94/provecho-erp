@@ -66,7 +66,7 @@ def env():
             id_interno="P001", marca_id=marca.id, nombre="Pizza"
         )
         cajero = Usuario(
-            username="cajero1", pin_hash=hash_pin("654321"), tipo="humano"
+            username="cajero_test", pin_hash=hash_pin("654321"), tipo="humano"
         )
         s.add_all([pv, producto, cajero])
         s.flush()

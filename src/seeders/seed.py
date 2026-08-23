@@ -456,6 +456,13 @@ ROLES_POR_AREA = {
     "contabilidad": ("contador",),
 }
 
+# Usuarios de desarrollo (username, rol). Todos con PIN 123456 y acceso a todas
+# las sucursales sembradas. Prohibido en producción — ver `main()`.
+USUARIOS_SEMILLA = (
+    ("admin", "admin"),
+    ("cajero1", "cajero"),
+)
+
 
 def _seed_distribucion(session: Session, roles: dict) -> None:
     """Áreas semilla y una regla por emisión, por empresa (ADR-033).
@@ -694,29 +701,40 @@ def seed(session: Session) -> None:
                     RolPermiso(rol_id=rol.id, permiso_id=permisos[codigo].id)
                 )
 
-    # --- Usuario admin (PIN 123456) ---
-    admin, creado = _get_or_create(
-        session,
-        Usuario,
-        username="admin",
-        defaults=dict(pin_hash=hash_pin("123456"), tipo="humano", activo=True),
-    )
-    if session.get(UsuarioRol, (admin.id, roles["admin"].id)) is None:
-        session.add(UsuarioRol(usuario_id=admin.id, rol_id=roles["admin"].id))
+    # --- Usuarios semilla (PIN 123456) ---
+    sucursales = list(session.scalars(select(Sucursal)))
+    usuarios = {}
+    for username, nombre_rol in USUARIOS_SEMILLA:
+        usuario, _ = _get_or_create(
+            session,
+            Usuario,
+            username=username,
+            defaults=dict(pin_hash=hash_pin("123456"), tipo="humano", activo=True),
+        )
+        usuarios[username] = usuario
+        if session.get(UsuarioRol, (usuario.id, roles[nombre_rol].id)) is None:
+            session.add(
+                UsuarioRol(usuario_id=usuario.id, rol_id=roles[nombre_rol].id)
+            )
 
-    # Sin `usuario_sucursal` el JWT sale sin `empresa_id` y toda operación
-    # escopada responde 403 "usuario sin empresa asignada" (ADR-004): una
-    # instalación nueva quedaba inutilizable hasta asignar sucursales a mano.
-    for sucursal in session.scalars(select(Sucursal)):
-        if session.get(UsuarioSucursal, (admin.id, sucursal.id)) is None:
-            session.add(UsuarioSucursal(usuario_id=admin.id, sucursal_id=sucursal.id))
+        # Sin `usuario_sucursal` el JWT sale sin `empresa_id` y toda operación
+        # escopada responde 403 "usuario sin empresa asignada" (ADR-004): una
+        # instalación nueva quedaba inutilizable hasta asignar sucursales a mano.
+        for sucursal in sucursales:
+            if session.get(UsuarioSucursal, (usuario.id, sucursal.id)) is None:
+                session.add(
+                    UsuarioSucursal(usuario_id=usuario.id, sucursal_id=sucursal.id)
+                )
+
+    admin = usuarios["admin"]
 
     _seed_encuesta(session, admin.id)
     _seed_distribucion(session, roles)
 
     session.commit()
-    print("Seed OK. admin/123456 con rol admin. Usuario nuevo:" if creado else
-          "Seed OK (idempotente). admin ya existía.")
+    print("Seed OK (idempotente). Usuarios PIN 123456: " + ", ".join(
+        f"{u}/{r}" for u, r in USUARIOS_SEMILLA
+    ))
 
 
 def main() -> None:

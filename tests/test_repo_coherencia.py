@@ -1,24 +1,31 @@
 """Lo que hasta ahora se vigilaba a ojo entre archivos que no se importan.
 
-Tres coherencias que ningún test funcional puede romper, porque no pasan por
-el código: el número de un ADR, su entrada en el índice de documentación y la
-versión de Python que corre el suite frente a la que envía la imagen. Las
-tres fallaron de verdad el 2026-08-08 y las tres se detectaron a mano,
-después del merge.
+Coherencias que ningún test funcional puede romper, porque no pasan por el
+código: el número de un ADR, su entrada en el índice de documentación, las
+versiones de Python y Node que corre el CI frente a las que envían las
+imágenes, y las imágenes que el paquete de demo exporta frente a las que su
+compose usa. Las tres primeras fallaron de verdad el 2026-08-08 y las tres se
+detectaron a mano, después del merge.
 
 La cadena de Alembic no está acá porque el job `backend` ya falla si hay más
 de una cabeza (ver `.github/workflows/ci.yml`).
 """
 
+import json
 import pathlib
 import re
+import tomllib
 
 import pytest
 
 RAIZ = pathlib.Path(__file__).resolve().parent.parent
+PYPROJECT = RAIZ / "pyproject.toml"
+PACKAGE_JSON = RAIZ / "frontend" / "package.json"
 ADRS = RAIZ / "docs" / "architecture" / "adr"
 INDICE = RAIZ / "docs" / "00_PROJECT.md"
 DOCKERFILE = RAIZ / "Dockerfile"
+DOCKERFILE_WEB = RAIZ / "frontend" / "Dockerfile"
+COMPOSE_DEMO = RAIZ / "docker-compose.demo.yml"
 CI = RAIZ / ".github" / "workflows" / "ci.yml"
 
 _NOMBRE_ADR = re.compile(r"^ADR-(\d{3})-[a-z0-9-]+\.md$")
@@ -101,7 +108,68 @@ def test_el_python_del_ci_es_el_que_envia_la_imagen():
     )
 
 
-@pytest.mark.parametrize("archivo", [INDICE, DOCKERFILE, CI])
+def test_el_node_del_ci_es_el_que_envia_la_imagen_del_frontend():
+    """Mismo riesgo que con Python, en el otro lenguaje.
+
+    El job `frontend` es el único que ejecuta `next build`: si la imagen se
+    construye con otro Node, lo que se reparte en la demo es un build que
+    nadie probó.
+    """
+    base = re.search(r"^FROM node:(\d+)", DOCKERFILE_WEB.read_text(encoding="utf-8"), re.M)
+    assert base, "No encontré el `FROM node:X` del Dockerfile del frontend"
+
+    jobs = re.findall(r'node-version:\s*"(\d+)"', CI.read_text(encoding="utf-8"))
+    assert jobs, "No encontré ningún `node-version:` en ci.yml"
+
+    distintos = sorted(set(jobs) - {base.group(1)})
+    assert not distintos, (
+        f"La imagen del frontend corre Node {base.group(1)} y el CI prueba con {distintos}."
+    )
+
+
+def test_el_paquete_de_demo_exporta_todas_las_imagenes_que_usa():
+    """El ZIP y el compose de la demo no se importan entre sí, pero dependen.
+
+    `docker-compose.demo.yml` no tiene `build:` —en la PC de quien prueba no
+    hay código fuente—, así que un servicio nuevo con una imagen que el
+    empaquetador no exporta produce un ZIP incompleto. Ahí no falla nada
+    visible: el tester abre el navegador y ve una pantalla que no carga.
+    """
+    from scripts.empaquetar_demo import IMAGENES, imagenes_del_compose
+
+    usadas = imagenes_del_compose(COMPOSE_DEMO.read_text(encoding="utf-8"))
+    faltan = sorted(usadas - set(IMAGENES))
+    assert not faltan, (
+        f"docker-compose.demo.yml usa {faltan} y scripts/empaquetar_demo.py no las exporta."
+    )
+
+    sobran = sorted(set(IMAGENES) - usadas)
+    assert not sobran, (
+        f"scripts/empaquetar_demo.py exporta {sobran}, que ya nadie usa en el compose de la demo."
+    )
+
+
+def test_backend_y_frontend_declaran_la_misma_version():
+    """La versión se escribe en dos archivos y nadie la leía de un solo lado.
+
+    Hasta el 2026-08-09 `cortar_version.py` solo tocaba `CHANGELOG.md`: el repo
+    iba por `v0.4.0` y los dos archivos seguían diciendo `0.1.0`, así que la
+    versión vivía únicamente en el tag de git. Lo notó el paquete de demo, que
+    nombra el ZIP con lo que dice `pyproject.toml` y salió etiquetado con una
+    versión de hacía un mes.
+    """
+    with PYPROJECT.open("rb") as f:
+        backend = tomllib.load(f)["project"]["version"]
+    frontend = json.loads(PACKAGE_JSON.read_text(encoding="utf-8"))["version"]
+    assert backend == frontend, (
+        f"pyproject.toml dice {backend} y frontend/package.json dice {frontend}. "
+        "Las escribe `scripts/cortar_version.py` al cortar la versión."
+    )
+
+
+@pytest.mark.parametrize(
+    "archivo", [INDICE, DOCKERFILE, DOCKERFILE_WEB, COMPOSE_DEMO, CI, PYPROJECT, PACKAGE_JSON]
+)
 def test_los_archivos_que_este_test_vigila_existen(archivo):
     """Si alguno se mueve, este test tiene que fallar en vez de no probar nada."""
     assert archivo.is_file(), f"{archivo.relative_to(RAIZ)} ya no está donde este test lo busca"

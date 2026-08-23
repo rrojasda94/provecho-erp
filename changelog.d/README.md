@@ -45,6 +45,10 @@ git tag -a v0.3.0 -m "0.3.0"
 git push origin main --tags
 ```
 
+El script también escribe la versión en `pyproject.toml` y
+`frontend/package.json` — antes no, y el repo llegó a `v0.4.0` con los dos
+archivos diciendo `0.1.0`. El `git commit -am` de arriba los recoge.
+
 El tag dispara `.github/workflows/release.yml`, que publica la imagen
 etiquetada con esa versión.
 

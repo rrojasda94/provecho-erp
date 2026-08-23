@@ -20,8 +20,11 @@ from src.modules.users.infrastructure.models import (
     Rol,
     RolPermiso,
     Sucursal,
+    Usuario,
+    UsuarioRol,
+    UsuarioSucursal,
 )
-from src.seeders.seed import seed
+from src.seeders.seed import USUARIOS_SEMILLA, seed
 from src.shared.parametros import MODULOS
 
 SEDE_CASTILLA = "Jr. Ramón Castilla 248 - Tarapoto"
@@ -160,3 +163,22 @@ def test_seed_actualiza_el_domicilio_fiscal_de_una_empresa_ya_sembrada(session):
 
     empresa = session.scalar(select(Empresa))
     assert empresa.domicilio_fiscal == SEDE_CASTILLA
+
+
+def test_usuarios_semilla_con_su_rol_y_todas_las_sucursales(sembrado):
+    """Sin `usuario_sucursal` el JWT sale sin `empresa_id` (ADR-004): cada
+    usuario semilla necesita rol Y sucursales, no solo existir."""
+    sucursales = sembrado.scalar(select(func.count()).select_from(Sucursal))
+    for username, nombre_rol in USUARIOS_SEMILLA:
+        usuario = sembrado.scalar(
+            select(Usuario).where(Usuario.username == username)
+        )
+        assert usuario is not None and usuario.activo
+        rol = sembrado.scalar(select(Rol).where(Rol.nombre == nombre_rol))
+        assert sembrado.get(UsuarioRol, (usuario.id, rol.id)) is not None
+        asignadas = sembrado.scalar(
+            select(func.count())
+            .select_from(UsuarioSucursal)
+            .where(UsuarioSucursal.usuario_id == usuario.id)
+        )
+        assert asignadas == sucursales

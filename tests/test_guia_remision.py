@@ -186,14 +186,14 @@ def test_sin_permiso_de_almacen_no_se_emite(traslado):
     from src.modules.users.infrastructure.security import hash_pin
 
     with TestSession() as s:
-        cajero = Usuario(username="cajero1", pin_hash=hash_pin("111111"), tipo="humano")
+        cajero = Usuario(username="cajero_test", pin_hash=hash_pin("111111"), tipo="humano")
         s.add(cajero)
         s.flush()
         rol = s.scalar(_select(Rol).where(Rol.nombre == "cajero"))
         s.add(UsuarioRol(usuario_id=cajero.id, rol_id=rol.id))
         s.commit()
 
-    h_cajero = _token(client, "cajero1", "111111")
+    h_cajero = _token(client, "cajero_test", "111111")
     assert _emitir(client, h_cajero, transferencia["id"]).status_code == 403
 
 

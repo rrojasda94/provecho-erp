@@ -4,17 +4,32 @@ Existe para que `CHANGELOG.md` deje de ser un punto de inserción compartido:
 cada cambio escribe su propio archivo y el conflicto entre ramas paralelas
 deja de ser posible. Ver `changelog.d/README.md`.
 
+También escribe la versión en `pyproject.toml` y `frontend/package.json`. No
+lo hacía, y para el 2026-08-09 el repo iba por `v0.4.0` con los dos archivos
+declarando `0.1.0`: la versión vivía solo en el tag de git, así que cualquier
+cosa que la leyera del proyecto —el paquete de demo, por ejemplo— mentía.
+
 Uso: `python scripts/cortar_version.py 0.3.0 [--fecha 2026-08-09]`
 """
 
 import argparse
 import datetime
 import pathlib
+import re
 import sys
 
 RAIZ = pathlib.Path(__file__).resolve().parent.parent
 CHANGELOG = RAIZ / "CHANGELOG.md"
 FRAGMENTOS = RAIZ / "changelog.d"
+PYPROJECT = RAIZ / "pyproject.toml"
+PACKAGE_JSON = RAIZ / "frontend" / "package.json"
+
+#: archivo -> patrón de la línea que declara la versión. El `count=1` de abajo
+#: importa: `package.json` menciona versiones de dependencias más abajo.
+_VERSION_EN = {
+    PYPROJECT: re.compile(r'^(version = ")[^"]+(")', re.M),
+    PACKAGE_JSON: re.compile(r'^(\s*"version":\s*")[^"]+(")', re.M),
+}
 
 #: Orden de Keep a Changelog. El prefijo del nombre del archivo decide la
 #: sección, así que un tipo fuera de esta lista es un error de nombre.
@@ -58,6 +73,16 @@ def cortar(texto: str, seccion: str) -> str:
     return f"{cabeza}{_ENCABEZADO}\n\nVer [`changelog.d/`](changelog.d/).\n\n{seccion}\n## {resto}"
 
 
+def sellar_version(version: str) -> None:
+    """Deja la versión escrita en los dos archivos que la declaran."""
+    for archivo, patron in _VERSION_EN.items():
+        texto = archivo.read_text(encoding="utf-8")
+        nuevo, cambios = patron.subn(rf"\g<1>{version}\g<2>", texto, count=1)
+        if not cambios:
+            raise SystemExit(f"No encontré la línea de versión en {archivo.name}.")
+        archivo.write_text(nuevo, encoding="utf-8", newline="")
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("version", help="versión SemVer sin la 'v', ej. 0.3.0")
@@ -77,14 +102,22 @@ def main(argv: list[str] | None = None) -> int:
     for archivo in FRAGMENTOS.glob("*.md"):
         if archivo.name != "README.md":
             archivo.unlink()
+    sellar_version(args.version)
 
     total = sum(len(v) for v in por_tipo.values())
     print(f"{args.version}: {total} fragmentos en {len(por_tipo)} secciones.")
+    print(f"Versión escrita en {PYPROJECT.name} y frontend/{PACKAGE_JSON.name}.")
     return 0
 
 
 def _autocomprobacion() -> None:
-    """Lo único que puede romperse en silencio es dónde se inserta la sección."""
+    """Lo que puede romperse en silencio: dónde se inserta y qué se sella."""
+    for archivo, patron in _VERSION_EN.items():
+        texto = archivo.read_text(encoding="utf-8")
+        nuevo, cambios = patron.subn(r"\g<1>9.9.9\g<2>", texto, count=1)
+        assert cambios == 1, f"{archivo.name}: el patrón de versión ya no engancha"
+        assert '"9.9.9"' in nuevo or "9.9.9" in nuevo, f"{archivo.name}: no reemplazó"
+
     antes = (
         "# Changelog\n\n## [Unreleased]\n\nVer [`changelog.d/`](changelog.d/).\n\n"
         "## [0.2.0] - 2026-08-08\n\n### Added\n\n- algo viejo\n"

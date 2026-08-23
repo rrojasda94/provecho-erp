@@ -105,7 +105,12 @@ services:
         condition: service_started
 
   web:
-    build: ./frontend
+    # `target: dev` es obligatorio desde que el Dockerfile es multi-etapa: sin
+    # él docker construye la última etapa (`runtime`, el build de producción
+    # que se reparte en la demo) y este servicio dejaría de recargar al editar.
+    build:
+      context: ./frontend
+      target: dev
     ports:
       - "3000:3000"
     environment:

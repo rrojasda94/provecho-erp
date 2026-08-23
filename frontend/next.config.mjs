@@ -9,6 +9,12 @@ const nextConfig = {
   // sigue disponible en `node_modules/next/dist/docs/`.
   agentRules: false,
 
+  // Servidor autocontenido en `.next/standalone`: trae solo las dependencias
+  // que el runtime realmente carga. Es lo que hace posible la imagen de
+  // producción del frontend (`frontend/Dockerfile`, etapa `runtime`) sin
+  // arrastrar `node_modules` entero. Inerte en `next dev`.
+  output: "standalone",
+
   // Cabeceras que no dependen del contenido. La CSP no está acá porque
   // lleva un nonce por request — se arma en `middleware.ts`.
   async headers() {

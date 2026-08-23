@@ -39,7 +39,7 @@ def env():
         s.add(cliente)
 
         supervisor = Usuario(username="super1", pin_hash=hash_pin("222222"), tipo="humano")
-        cajero = Usuario(username="cajero1", pin_hash=hash_pin("333333"), tipo="humano")
+        cajero = Usuario(username="cajero_test", pin_hash=hash_pin("333333"), tipo="humano")
         s.add_all([supervisor, cajero])
         s.flush()
         rol_supervisor = s.scalar(select(Rol).where(Rol.nombre == "supervisor"))
@@ -82,6 +82,6 @@ def test_supervisor_lee_clientes_para_analisis(env):
 
 def test_cajero_sin_permiso_403(env):
     client, ids = env
-    headers = _token(client, "cajero1", "333333")
+    headers = _token(client, "cajero_test", "333333")
     r = client.get(f"/api/v1/sales/clientes?grupo_id={ids['grupo_id']}", headers=headers)
     assert r.status_code == 403

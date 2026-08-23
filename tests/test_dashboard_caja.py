@@ -130,7 +130,7 @@ def env(monkeypatch):
             )
         )
 
-        cajero = Usuario(username="cajero1", pin_hash=hash_pin("111111"), tipo="humano")
+        cajero = Usuario(username="cajero_test", pin_hash=hash_pin("111111"), tipo="humano")
         # La cadena de custodia necesita dos personas: quien entrega el fondo
         # y quien lo recibe (RN-MDP-002). El encargado firma con su PIN.
         encargado = Usuario(
@@ -351,7 +351,7 @@ def test_cajero_puede_abrir_su_propia_caja(env):
     """El permiso `accounting.caja_operar` (rol cajero) alcanza — no exige
     permisos de administración general."""
     client, ids, _ = env
-    h = _token(client, username="cajero1", pin="111111")
+    h = _token(client, username="cajero_test", pin="111111")
     assert _abrir_caja(client, h, ids).status_code == 201
 
 
@@ -447,7 +447,7 @@ def test_dashboard_venta_anulada_no_cuenta(env):
 
 def test_dashboard_sin_permiso_403(env):
     client, ids, _ = env
-    h = _token(client, username="cajero1", pin="111111")
+    h = _token(client, username="cajero_test", pin="111111")
     r = client.get(
         f"/api/v1/dashboard/resumen?empresa_id={ids['empresa_id']}", headers=h
     )
