@@ -688,6 +688,20 @@ class Conversion:
                 )
         return libro, pendientes
 
+    @property
+    def atributos_que_entran(self) -> dict[str, dict]:
+        """Los que llegan a la planilla: «Quitar ingrediente» no entra
+        porque en Provecho las restas no se configuran (ADR-035 §2)."""
+        return {
+            nombre: datos
+            for nombre, datos in self.atributos.items()
+            if normalizar(nombre) != "quitar ingrediente"
+        }
+
+    @property
+    def valores_que_entran(self) -> int:
+        return sum(len(a["valores"]) for a in self.atributos_que_entran.values())
+
     def libro_atributos(self) -> Workbook:
         libro = Workbook()
         hoja = libro.active
@@ -871,35 +885,69 @@ def informe(conversion: Conversion, nombres: list[str], salida: Path) -> None:
         "archivos a mano salvo para vetar una corrección**: volver a correr el",
         "conversor los reescribe.",
         "",
-        "## Orden de carga",
+        "## Cómo se carga",
         "",
-        "El orden no es cosmético: cada libro referencia por **nombre** lo que",
-        "el anterior creó, y subirlos al revés hace que esas referencias no",
-        "resuelvan.",
+        "```bash",
+        "# 1. simular: resuelve todo contra la base y deshace al final",
+        "python -m scripts.odoo.cargar_catalogo --origen <esta carpeta> --simular",
         "",
-        "| # | Archivo | Dónde se sube | Qué necesita antes |",
+        "# 2. cargar de verdad, cuando la simulación cierra sin problemas",
+        "python -m scripts.odoo.cargar_catalogo --origen <esta carpeta>",
+        "```",
+        "",
+        "En staging, con el contenedor arriba:",
+        "",
+        "```bash",
+        "docker compose -f docker-compose.staging.yml cp <esta carpeta> api:/tmp/catalogo",
+        "docker compose -f docker-compose.staging.yml exec api \\",
+        "    python -m scripts.odoo.cargar_catalogo --origen /tmp/catalogo --simular",
+        "```",
+        "",
+        "## Orden de los libros",
+        "",
+        "El script los recorre en este orden, y **no es cosmético**: cada uno",
+        "referencia por **nombre** lo que creó el anterior.",
+        "",
+        "| # | Archivo | Qué crea | Necesita |",
         "|---|---|---|---|",
-        "| 1 | `1-fundaciones.xlsx` | Inventario → Unidades de medida | nada |",
-        "| 2 | `2-articulos.xlsx` | Inventario → Artículos → Importar | 1 |",
-        "| 3 | `3-recetas.xlsx` | Catálogo → Recetas → Importar | 2 |",
-        "| 4 | `4-atributos.xlsx` | Catálogo → Atributos → Importar | nada |",
-        "| 5 | `5-productos.xlsx` | Catálogo → Productos → Importar | 2, 3, 4 |",
-        "| 6 | `6-recetas-mitadxmitad.xlsx` | Catálogo → Recetas → Importar | 5 |",
+        "| 1 | `1-fundaciones.xlsx` | categorías de UdM, unidades, categorías en árbol | — |",
+        "| 2 | `2-articulos.xlsx` | artículos e insumos | 1 |",
+        "| 3 | `3-recetas.xlsx` | **todas** las cabeceras de receta y las "
+        "líneas sin condición | 2 |",
+        "| 4 | `4-atributos.xlsx` | atributos y sus valores | — |",
+        "| 5 | `5-productos.xlsx` | productos, variantes, atributos por "
+        "producto, precios | 2, 3, 4 |",
+        "| 6 | `6-recetas-mitadxmitad.xlsx` | **solo** las líneas condicionadas de los kits | 5 |",
         "",
-        "El 6 va **después** del 5 a propósito: sus líneas se condicionan a",
-        "valores de atributo que solo existen una vez que el producto los",
-        "declara.",
+        "La dependencia parece circular y no lo es: `producto_comercial.receta_id`",
+        "obliga a que la receta exista antes que el producto, y una condición de",
+        "línea obliga a que el producto exista antes que la línea. Se resuelve",
+        "separando cabecera de líneas — las dos recetas Kit se crean **vacías** en",
+        "el libro 3 y sus líneas condicionadas entran en el 6.",
+        "",
+        "`7-pendiente-cantidades.xlsx` **no** se carga: son las líneas que Odoo",
+        "trae sin gramaje. Una vez completadas, se suben por Catálogo → Recetas →",
+        "Importar, que actualiza lo que ya existe (ADR-052).",
         "",
         f"## Qué entra ({len(conversion.plantillas)} filas del export)",
         "",
-        f"- **{len(conversion.articulos)} artículos** "
-        f"({Counter(conversion.tipo_articulo.values())})",
-        f"- **{len(conversion.recetas)} recetas** del export"
-        f" + {len(conversion.recetas_reventa)} de reventa generadas",
+        f"- **{len(conversion.articulos)} artículos**: "
+        + ", ".join(
+            f"{n} {tipo}"
+            for tipo, n in sorted(Counter(conversion.tipo_articulo.values()).items())
+        ),
+        f"- **{len(conversion.recetas) + len(conversion.recetas_reventa)} recetas** "
+        f"({len(conversion.recetas)} del export y "
+        f"{len(conversion.recetas_reventa)} de reventa, generadas para que un "
+        "producto que se compra y se revende tenga qué descontar)",
         f"- **{len(conversion.categorias)} categorías** en árbol",
-        f"- **{len(conversion.atributos)} atributos** con "
-        f"{sum(len(a['valores']) for a in conversion.atributos.values())} valores",
-        f"- **{len(conversion.productos)} productos comerciales**",
+        f"- **{len(conversion.atributos_que_entran)} atributos** con "
+        f"{conversion.valores_que_entran} valores",
+        f"- **{len(conversion.productos) + len(conversion.padres)} productos "
+        f"comerciales**: {len(conversion.padres)} agrupadores con "
+        f"{sum(len(p['hijos']) for p in conversion.padres.values())} variantes, "
+        f"y {len(conversion.productos) - sum(len(p['hijos']) for p in conversion.padres.values())} "
+        "sueltos",
         "",
     ]
 
