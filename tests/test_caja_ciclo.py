@@ -76,7 +76,7 @@ def _cajero(client):
     lo que se prueba: `cajero` tiene `accounting.caja_operar` y no tiene
     `accounting.caja_relevar`.
     """
-    return _token(client, username="cajero1", pin="111111")
+    return _token(client, username="cajero_test", pin="111111")
 
 
 def test_el_cajero_abre_su_turno_sin_firma_de_nadie(env):
@@ -230,7 +230,7 @@ def test_el_cajero_no_puede_firmar_que_recibio_su_propio_efectivo(env):
     elevacion = client.post(
         "/api/v1/auth/autorizar",
         json={
-            "username": "cajero1",
+            "username": "cajero_test",
             "pin": "111111",
             "permiso": "accounting.caja_relevar",
         },

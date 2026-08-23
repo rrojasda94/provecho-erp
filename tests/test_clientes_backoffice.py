@@ -66,7 +66,7 @@ def env(monkeypatch):
         natural = Cliente(grupo_id=grupo.id, tipo="natural", persona_id=persona.id)
         s.add(natural)
 
-        cajero = Usuario(username="cajero1", pin_hash=hash_pin("333333"), tipo="humano")
+        cajero = Usuario(username="cajero_test", pin_hash=hash_pin("333333"), tipo="humano")
         s.add(cajero)
         s.flush()
         s.add(UsuarioRol(
@@ -101,7 +101,7 @@ def env(monkeypatch):
         yield c, ids, TestSession
 
 
-def _token(client, username="cajero1", pin="333333"):
+def _token(client, username="cajero_test", pin="333333"):
     r = client.post("/api/v1/auth/login", json={"username": username, "pin": pin})
     return {"Authorization": f"Bearer {r.json()['access_token']}"}
 
