@@ -112,6 +112,7 @@ def env():
             perecibles_id=str(perecibles.id), abarrotes_id=str(abarrotes.id),
             descartables_id=str(descartables.id),
             sku_queso=str(sku_q.id), sku_harina=str(sku_h.id),
+            sucursal_id=str(sucursal.id), marca_id=str(marca.id),
         )
         s.commit()
 
@@ -274,6 +275,8 @@ def test_conteo_vencido_reporta_a_almacen_y_gerencia(env):
     assert len(recibidos) == 1
     assert recibidos[0]["dirigido_a"] == ["almacen", "gerencia"]
     assert recibidos[0]["frecuencia"] == "diario"
+    # Quién pidió la verificación. Nulo cuando la corre el beat de las 06:15.
+    assert recibidos[0]["usuario_id"] is not None
 
 
 def test_al_dia_no_genera_reporte(env):
@@ -491,7 +494,7 @@ def test_el_barrido_diario_reporta_los_conteos_vencidos(env, monkeypatch):
     avisos = []
     event_bus.subscribe("inventory.conteo_vencido", avisos.append)
     sesion = TestSession()
-    monkeypatch.setattr(tasks, "SessionLocal", lambda: sesion)
+    monkeypatch.setattr(tasks, "session_factory", lambda: sesion)
     monkeypatch.setattr(sesion, "close", lambda: None)
 
     assert tasks.reportar_conteos_vencidos() == 1
@@ -699,3 +702,56 @@ def test_contar_exige_permiso(env):
         json={"frecuencia_conteo": "semanal"},
     )
     assert r.status_code == 403
+
+
+def test_listado_de_conteos_por_almacen_sucursal_y_marca(env):
+    """Hasta ADR-051 un conteo solo se podía pedir por su id, o sea sabiéndolo
+    de antemano: ninguna pantalla podía ofrecer "seguir el que quedó abierto".
+    """
+    client, ids, TestSession = env
+    h = _token(client)
+    abierto = _abrir(client, h, ids, ids["perecibles_id"]).json()
+
+    # Un segundo almacén, este sí colgado de la sucursal (el central no lo
+    # está: su conteo cuenta igual, solo no se atribuye a un local).
+    with TestSession() as s:
+        local = Almacen(
+            empresa_id=uuid.UUID(ids["empresa_id"]),
+            sucursal_id=uuid.UUID(ids["sucursal_id"]),
+            nombre="Local Centro",
+            tipo="sucursal",
+        )
+        s.add(local)
+        s.commit()
+        local_id = str(local.id)
+    del_local = client.post(
+        "/api/v1/inventory/conteos", headers=h,
+        json={"almacen_id": local_id, "categoria_id": ids["abarrotes_id"]},
+    )
+    assert del_local.status_code == 201, del_local.text
+    del_local = del_local.json()
+
+    def ids_de(query=""):
+        r = client.get(f"/api/v1/inventory/conteos{query}", headers=h)
+        assert r.status_code == 200, r.text
+        return [c["id"] for c in r.json()["items"]]
+
+    assert set(ids_de()) == {abierto["id"], del_local["id"]}
+    assert ids_de(f"?almacen_id={ids['almacen_id']}") == [abierto["id"]]
+    assert ids_de(f"?sucursal_id={ids['sucursal_id']}") == [del_local["id"]]
+    assert ids_de(f"?marca_id={ids['marca_id']}") == [del_local["id"]]
+    assert ids_de("?estado=cerrado") == []
+
+
+def test_el_conteo_abierto_encabeza_el_listado(env):
+    """Es el único sobre el que se puede actuar: va primero."""
+    client, ids, _ = env
+    h = _token(client)
+    cerrado = _abrir(client, h, ids, ids["perecibles_id"]).json()
+    assert client.post(
+        f"/api/v1/inventory/conteos/{cerrado['id']}/cerrar", headers=h
+    ).status_code == 200
+    abierto = _abrir(client, h, ids, ids["abarrotes_id"]).json()
+
+    listado = client.get("/api/v1/inventory/conteos", headers=h).json()["items"]
+    assert [c["id"] for c in listado] == [abierto["id"], cerrado["id"]]

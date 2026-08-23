@@ -2,6 +2,7 @@
 permisos y asignaciones. Los cambios de roles/permisos se auditan."""
 
 import uuid
+from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
@@ -28,12 +29,14 @@ from src.modules.users.infrastructure.repositories import (
     MarcaRepo,
     PermisoRepo,
     PersonaRepo,
+    RefreshTokenRepo,
     RolRepo,
     SucursalRepo,
     UsuarioRepo,
 )
-from src.modules.users.infrastructure.security import hash_pin
+from src.modules.users.infrastructure.security import hash_pin, verify_pin
 from src.shared import auditoria
+from src.shared.ubicacion import desanclar
 
 
 # --- Usuarios ---------------------------------------------------------------
@@ -89,6 +92,71 @@ def cambiar_pin(session: Session, usuario_id: uuid.UUID, nuevo_pin: str) -> Usua
     return usuario
 
 
+def resetear_pin(
+    session: Session, usuario_id: uuid.UUID, *, actor_id: uuid.UUID | None = None
+) -> Usuario:
+    """Devuelve la cuenta al PIN por defecto para que su dueño vuelva a
+    entrar, y la marca para que lo primero que haga sea cambiarlo.
+
+    Un PIN olvidado no se puede recuperar —está hasheado con Argon2id— así
+    que la única salida es ponerle uno conocido. Eso deja, por un rato, una
+    cuenta cuyo PIN sabe alguien más: de ahí las tres cosas que pasan juntas
+    y no por separado.
+
+    1. `debe_cambiar_pin` bloquea todo salvo cambiarlo (`api.deps`). Sin esto
+       el PIN público queda vigente indefinidamente.
+    2. Se **revocan los refresh tokens**: si alguien ya estaba dentro con esa
+       cuenta, el reseteo lo saca. Un reseteo que deja viva la sesión anterior
+       no sirve para el caso en que se hace por sospecha.
+    3. Se **desbloquea el lockout**: quien olvidó su PIN normalmente lo agotó
+       intentando, y dejarlo bloqueado convierte el reseteo en nada.
+
+    Queda auditado quién reseteó a quién: es la contracara de que un
+    administrador pueda entrar como cualquiera.
+    """
+    usuario = _get(UsuarioRepo(session).get(usuario_id), "usuario")
+    if usuario.tipo != "humano":
+        raise Conflicto(
+            "una cuenta de agente no tiene PIN: se le rota el token (ADR-032)"
+        )
+    usuario.pin_hash = hash_pin(rules.PIN_POR_DEFECTO)
+    usuario.debe_cambiar_pin = True
+    usuario.intentos_fallidos = 0
+    usuario.bloqueado_hasta = None
+    RefreshTokenRepo(session).revocar_usuario(usuario.id)
+    auditoria.registrar(
+        session,
+        usuario_id=actor_id,
+        entidad="usuario",
+        entidad_id=usuario.id,
+        accion="resetear_pin",
+        datos_despues={"username": usuario.username, "debe_cambiar_pin": True},
+    )
+    return usuario
+
+
+def cambiar_pin_propio(
+    session: Session, usuario_id: uuid.UUID, *, pin_actual: str, nuevo_pin: str
+) -> Usuario:
+    """Autoservicio: el dueño de la cuenta cambia su PIN con el que tiene.
+
+    Exige el PIN actual aunque haya sesión válida: un token robado o una
+    pantalla que quedó abierta no deberían alcanzar para quedarse con la
+    cuenta. Y rechaza el PIN por defecto como valor nuevo — cambiarlo por el
+    mismo que puso el reseteo es no cambiarlo.
+    """
+    usuario = _get(UsuarioRepo(session).get(usuario_id), "usuario")
+    if not verify_pin(usuario.pin_hash, pin_actual):
+        raise PinInvalido("El PIN actual no coincide")
+    if not rules.pin_valido(nuevo_pin):
+        raise PinInvalido(f"El PIN debe ser {rules.PIN_LENGTH} dígitos")
+    if nuevo_pin == rules.PIN_POR_DEFECTO:
+        raise PinInvalido("Elige un PIN distinto del que viene por defecto")
+    usuario.pin_hash = hash_pin(nuevo_pin)
+    usuario.debe_cambiar_pin = False
+    return usuario
+
+
 def listar_usuarios(session: Session) -> list[Usuario]:
     return UsuarioRepo(session).list()
 
@@ -110,6 +178,11 @@ def crear_persona(
     domicilio: str | None = None,
     telefono: str | None = None,
     email: str | None = None,
+    ubicacion_place_id: str | None = None,
+    ubicacion_lat: Decimal | None = None,
+    ubicacion_lng: Decimal | None = None,
+    ubicacion_plus_code: str | None = None,
+    ubicacion_distrito: str | None = None,
 ) -> Persona:
     repo = PersonaRepo(session)
     if repo.get_by_documento(numero_documento):
@@ -124,6 +197,11 @@ def crear_persona(
             domicilio=domicilio,
             telefono=telefono,
             email=email,
+            ubicacion_place_id=ubicacion_place_id,
+            ubicacion_lat=ubicacion_lat,
+            ubicacion_lng=ubicacion_lng,
+            ubicacion_plus_code=ubicacion_plus_code,
+            ubicacion_distrito=ubicacion_distrito,
         )
     )
 
@@ -168,11 +246,24 @@ def editar_persona(
         otra = repo.get_by_documento(numero_nuevo)
         if otra is not None and otra.id != persona_id:
             raise Conflicto(f"numero_documento '{numero_nuevo}' ya existe")
+    # Corregir el domicilio sin volver a elegirlo en el mapa desancla el
+    # punto viejo, que ya no es de esa dirección. El borrado va DESPUÉS del
+    # UPDATE y no dentro de `campos`: `actualizar_con_lock` descarta los
+    # `None` —así es como distingue "no tocar"— y un `None` acá no llegaría
+    # nunca a la base.
+    domicilio_nuevo = campos.get("domicilio")
+    desancla = (
+        domicilio_nuevo is not None
+        and domicilio_nuevo != actual.domicilio
+        and not campos.get("ubicacion_place_id")
+    )
     actualizada = repo.actualizar_con_lock(persona_id, version, **campos)
     if actualizada is None:
         raise Conflicto(
             f"version {version} desactualizada (actual {actual.version})"
         )
+    if desancla:
+        desanclar(actualizada)
     return actualizada
 
 

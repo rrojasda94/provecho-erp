@@ -24,7 +24,7 @@ from src.modules.inventory.infrastructure.models import (
     Sku,
     UnidadMedida,
 )
-from src.modules.users.api.deps import get_db
+from src.modules.users.api.deps import get_db, get_db_reportes
 from src.modules.users.infrastructure.models import Almacen, Empresa
 from src.shared import fechas
 
@@ -84,6 +84,7 @@ def env():
             session.close()
 
     app.dependency_overrides[get_db] = _override_get_db
+    app.dependency_overrides[get_db_reportes] = _override_get_db
     with TestClient(app) as c:
         yield c, ids, TestSession
 
@@ -180,6 +181,9 @@ def test_lote_vencido_se_bloquea_y_publica_evento(env):
     assert [m["lote_id"] for m in movs] == [vigente]  # el vencido no se despacha
     assert len(recibidos) == 1
     assert recibidos[0]["lote_id"] == vencido
+    # Quién lo descubrió: el reporte tiene que decir a quién preguntarle, y
+    # acá lo descubre la salida que pidió una persona.
+    assert recibidos[0]["usuario_id"] is not None
 
     lotes = {x["codigo"]: x for x in client.get(
         "/api/v1/inventory/lotes", headers=h).json()}
@@ -191,6 +195,8 @@ def test_lote_vencido_se_bloquea_y_publica_evento(env):
 def test_barrido_bloquea_vencidos_sin_esperar_salida(env):
     client, ids, _ = env
     h = _token(client)
+    recibidos = []
+    event_bus.subscribe("inventory.lote_vencido_detectado", recibidos.append)
     vencido = _crear_lote(client, h, ids, "L-VENCIDO", -5)
     _ingresar(client, h, ids, vencido, 3)
 
@@ -201,6 +207,10 @@ def test_barrido_bloquea_vencidos_sin_esperar_salida(env):
     assert client.post(
         "/api/v1/inventory/lotes/bloquear-vencidos", headers=h
     ).json() == []
+    # El barrido a demanda sí tiene quién lo pidió; el beat de las 06:00 no
+    # y por eso el campo es opcional.
+    assert [e["usuario_id"] for e in recibidos] == [recibidos[0]["usuario_id"]]
+    assert recibidos[0]["usuario_id"] is not None
 
 
 def test_articulo_sin_control_de_lote_no_cambia(env):
@@ -363,7 +373,7 @@ def test_el_barrido_diario_bloquea_lotes_vencidos(env, monkeypatch):
     _ingresar(client, h, ids, vigente, 5)
 
     sesion = TestSession()
-    monkeypatch.setattr(tasks, "SessionLocal", lambda: sesion)
+    monkeypatch.setattr(tasks, "session_factory", lambda: sesion)
     monkeypatch.setattr(sesion, "close", lambda: None)
     assert tasks.bloquear_lotes_vencidos() == 1
 

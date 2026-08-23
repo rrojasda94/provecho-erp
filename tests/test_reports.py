@@ -10,7 +10,6 @@ mañana no reescriba a quién le llegó ayer.
 """
 
 import uuid
-from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
@@ -21,7 +20,6 @@ from sqlalchemy.pool import StaticPool
 import src.core.models_registry  # noqa: F401
 from src.core.app import create_app
 from src.core.database import Base
-from src.modules.accounting.application import caja
 from src.modules.reports.application import destinatarios as resolucion
 from src.modules.reports.application import emision as emision_uc
 from src.modules.reports.application import reglas as reglas_uc
@@ -35,7 +33,7 @@ from src.modules.reports.infrastructure.models import (
     ReporteEmitido,
 )
 from src.modules.sales.infrastructure.models import PuntoVenta
-from src.modules.users.api.deps import get_db
+from src.modules.users.api.deps import get_db, get_db_reportes
 from src.modules.users.infrastructure.models import (
     Almacen,
     Empresa,
@@ -49,6 +47,7 @@ from src.modules.users.infrastructure.models import (
 )
 from src.modules.users.infrastructure.security import hash_pin
 from src.shared.models import AuditLog
+from tests.conftest import abrir_caja_directa
 
 
 # =============================================================================
@@ -73,10 +72,30 @@ def test_las_plantillas_solo_usan_campos_declarados(emision):
 def test_toda_emision_declara_permiso_ambito_y_nivel_validos(emision):
     assert emision.nivel in catalogo.NIVELES
     assert emision.ambito in catalogo.AMBITOS
-    # El permiso es el del módulo dueño: `<modulo>.<verbo>`, nunca uno propio
-    # de reports (si no, habría dos matrices de permisos que mantener).
-    assert "." in emision.permiso and not emision.permiso.startswith("reports.")
+    # El permiso es el del módulo dueño: `<modulo>.<verbo>`. Nunca uno propio
+    # de reports —habría dos matrices de permisos que mantener— salvo cuando
+    # el hecho **es** de reports, que es el caso de la cadena de escalamiento.
+    assert "." in emision.permiso
+    if not emision.codigo.startswith("reports."):
+        assert not emision.permiso.startswith("reports.")
     assert emision.clave_referencia in emision.campos
+
+
+# Emisiones que no tienen actor y no pueden tenerlo. Cada entrada acá es una
+# decisión, no un olvido: si mañana alguien agrega una emisión y se olvida de
+# `clave_actor`, el test de abajo falla en CI en vez de perder el dato en
+# silencio.
+SIN_ACTOR = {
+    # Lo detecta un barrido de Celery. El hecho es «el pedido siguió en
+    # cocina pasado el umbral», no «alguien tomó el pedido»: atribuírselo al
+    # mozo sería acusarlo de algo que no hizo (RN-REP-009).
+    "sales.pedido_demorado",
+}
+
+
+@pytest.mark.parametrize("emision", catalogo.CATALOGO, ids=lambda e: e.codigo)
+def test_toda_emision_declara_actor_o_esta_declarada_sin_el(emision):
+    assert bool(emision.clave_actor) != (emision.codigo in SIN_ACTOR)
 
 
 @pytest.mark.parametrize("emision", catalogo.CATALOGO, ids=lambda e: e.codigo)
@@ -104,16 +123,17 @@ def test_proyectar_descarta_lo_no_declarado():
         emision,
         {"ajuste_id": "a", "almacen_id": "b", "costo_interno": "SECRETO"},
     )
-    assert datos == {"ajuste_id": "a", "almacen_id": "b"}
+    assert "costo_interno" not in datos
+    assert datos["ajuste_id"] == "a" and datos["almacen_id"] == "b"
 
 
 def test_proyectar_conserva_el_campo_ausente_como_none():
     """Un campo que faltó es un dato que faltó, no un campo que no existe."""
     emision = catalogo.obtener("inventory.ajuste_fuera_margen")
-    assert catalogo.proyectar(emision, {"ajuste_id": "a"}) == {
-        "ajuste_id": "a",
-        "almacen_id": None,
-    }
+    datos = catalogo.proyectar(emision, {"ajuste_id": "a"})
+    assert set(datos) == set(emision.campos)
+    assert datos["ajuste_id"] == "a"
+    assert datos["almacen_id"] is None
 
 
 def test_render_no_revienta_por_un_campo_faltante():
@@ -224,14 +244,21 @@ def env():
         }
 
 
-def _abrir_caja(s, ids):
-    apertura = caja.abrir_caja(
+def _abrir_caja(s, ids, *, con_encargado=True):
+    """Turno de caja abierto.
+
+    Por defecto escribe `relevo_encargado_id`, que es lo que dejaban las
+    aperturas **anteriores a ADR-049**: desde entonces el cajero abre solo y
+    la columna queda en NULL. Los resolutores tienen que seguir leyendo bien
+    las filas viejas —existen en cualquier base que ya operó— y caer en el
+    respaldo por rol con las nuevas.
+    """
+    apertura = abrir_caja_directa(
         s,
         punto_venta_id=ids["pv"].id,
         cajero_id=ids["cajero"].id,
-        relevo_encargado_id=ids["encargado"].id,
-        monto_declarado=Decimal("100.00"),
-        detalle_denominaciones={"50": 2},
+        encargado_id=ids["encargado"].id if con_encargado else None,
+        monto="100.00",
     )
     s.flush()
     return apertura
@@ -263,6 +290,19 @@ def test_sin_caja_abierta_el_aviso_cae_en_los_supervisores(env):
     """Local cerrado o caja sin registrar: avisarle a alguien de más es mejor
     que perder el aviso."""
     s, ids = env
+    assert resolucion.de_sucursal(s, ids["sucursal"].id) == [ids["supervisor1"].id]
+
+
+def test_con_apertura_nueva_el_aviso_tambien_cae_en_los_supervisores(env):
+    """Desde ADR-049 la caja abierta no nombra a ningún encargado, así que el
+    respaldo por rol dejó de ser la excepción y pasó a ser el camino normal.
+
+    Se congela acá porque es el efecto colateral de sacarle la firma a la
+    apertura: si mañana alguien vuelve a necesitar un encargado de turno de
+    verdad, va a hacer falta una fuente propia y no la caja.
+    """
+    s, ids = env
+    _abrir_caja(s, ids, con_encargado=False)
     assert resolucion.de_sucursal(s, ids["sucursal"].id) == [ids["supervisor1"].id]
 
 
@@ -384,10 +424,8 @@ def test_emitir_guarda_la_foto_y_una_entrega_por_destinatario(env):
     assert reporte.empresa_id == ids["empresa"].id
     assert reporte.referencia_id == ajuste_id
     assert reporte.referencia_tipo == "ajuste"
-    assert reporte.datos == {
-        "ajuste_id": str(ajuste_id),
-        "almacen_id": str(ids["alm_central"].id),
-    }
+    assert reporte.datos["ajuste_id"] == str(ajuste_id)
+    assert reporte.datos["almacen_id"] == str(ids["alm_central"].id)
     (entrega,) = s.scalars(select(EntregaReporte)).all()
     assert entrega.motivo == f"area:{ids['area_almacen'].id}"
 
@@ -429,8 +467,66 @@ def test_el_ambito_almacen_deduce_empresa_y_sucursal(env):
     s.flush()
     assert reporte.empresa_id == ids["empresa"].id
     assert reporte.sucursal_id == ids["sucursal"].id
+    # `_ubicar` ya lo resolvía para elegir destinatarios y lo descartaba: sin
+    # él, el reporte no dice en qué almacén hay que reponer.
+    assert reporte.almacen_id == ids["alm_sucursal"].id
     # El título sale de la plantilla, con los campos declarados.
     assert "4.0000" in reporte.titulo and "5.0000" in reporte.titulo
+
+
+def test_el_reporte_guarda_quien_provoco_el_hecho(env):
+    """`clave_actor` apunta al campo del payload que dice quién lo hizo."""
+    s, ids = env
+    reporte, _ = emision_uc.emitir(
+        s,
+        "sales.venta_anulada",
+        {
+            "venta_id": str(uuid.uuid4()),
+            "sucursal_id": str(ids["sucursal"].id),
+            "usuario_id": str(ids["cajero"].id),
+        },
+    )
+    s.flush()
+    assert reporte.actor_id == ids["cajero"].id
+
+
+def test_un_hecho_del_sistema_se_guarda_sin_actor(env):
+    """RN-REP-009: `sales.pedido_demorado` lo detecta un barrido. Ponerle el
+    mozo que tomó el pedido sería acusarlo de una demora de cocina."""
+    s, ids = env
+    reporte, _ = emision_uc.emitir(
+        s,
+        "sales.pedido_demorado",
+        {
+            "venta_id": str(uuid.uuid4()),
+            "sucursal_id": str(ids["sucursal"].id),
+            "usuario_id": str(ids["cajero"].id),
+            "minutos_umbral": 15,
+            "minutos_transcurridos": 40,
+            "estado": "en_cocina",
+            "items_pendientes": 2,
+        },
+    )
+    s.flush()
+    assert reporte.actor_id is None
+
+
+def test_un_actor_ausente_o_invalido_no_tumba_la_emision(env):
+    """El listener corre post-commit sobre un hecho ya guardado: si esto
+    lanzara, se perdería el reporte entero por un campo que faltó."""
+    s, ids = env
+    for payload_actor in ({}, {"usuario_id": "no-es-un-uuid"}):
+        reporte, _ = emision_uc.emitir(
+            s,
+            "sales.venta_anulada",
+            {
+                "venta_id": str(uuid.uuid4()),
+                "sucursal_id": str(ids["sucursal"].id),
+                **payload_actor,
+            },
+        )
+        s.flush()
+        assert reporte.actor_id is None
 
 
 def test_el_almacen_central_no_inventa_sucursal(env):
@@ -451,16 +547,72 @@ def test_el_almacen_central_no_inventa_sucursal(env):
 
 def test_un_hecho_que_no_se_puede_ubicar_se_emite_sin_empresa(env):
     """Se guarda igual: un reporte que no se pudo atribuir es justamente el
-    que hay que poder investigar. Solo lo ve el superusuario."""
+    que hay que poder investigar. Solo lo ve el superusuario.
+
+    El almacén desconocido **no** queda en la columna: `almacen_id` es una FK
+    y guardarlo ahí hacía fallar el INSERT contra Postgres, o sea que este
+    reporte —el que más importa— era el único que no se emitía. El id sigue
+    en `datos`, que es lo que se lee al investigar.
+    """
     s, _ = env
+    almacen_fantasma = str(uuid.uuid4())
     reporte, destinatarios = emision_uc.emitir(
         s,
         "inventory.ajuste_fuera_margen",
-        {"ajuste_id": str(uuid.uuid4()), "almacen_id": str(uuid.uuid4())},
+        {"ajuste_id": str(uuid.uuid4()), "almacen_id": almacen_fantasma},
     )
     s.flush()
     assert reporte.empresa_id is None
+    assert reporte.almacen_id is None
+    assert reporte.datos["almacen_id"] == almacen_fantasma
     assert destinatarios == []
+
+
+def test_el_ambito_de_toda_emision_viaja_en_la_foto():
+    """De acá cuelga la decisión de `_existente`: cuando la fila referenciada
+    ya no está, la columna FK queda nula y el rastro lo sostiene `datos`. Una
+    emisión que no declare su `clave_ambito` entre sus campos rompería esa
+    promesa sin que nada más se ponga rojo."""
+    sin_ambito = [e.codigo for e in catalogo.CATALOGO if e.clave_ambito not in e.campos]
+    assert not sin_ambito, f"emisiones cuyo ámbito no queda en `datos`: {sin_ambito}"
+
+
+def test_una_referencia_que_ya_no_existe_no_tumba_la_emision(env):
+    """Mismo agujero que el almacén, en las otras tres columnas con FK.
+
+    Una sucursal cerrada o un usuario dado de baja entre el hecho y su
+    emisión (el bus despacha post-commit, ADR-016) dejaban el id colgando y
+    el `INSERT` moría con violación de clave foránea: se perdía el reporte
+    entero, no el enlace.
+    """
+    s, ids = env
+    reporte, _ = emision_uc.emitir(
+        s,
+        "sales.venta_anulada",
+        {
+            "venta_id": str(uuid.uuid4()),
+            "sucursal_id": str(uuid.uuid4()),
+            "usuario_id": str(uuid.uuid4()),
+        },
+    )
+    s.flush()
+    assert reporte.sucursal_id is None
+    assert reporte.empresa_id is None
+    assert reporte.actor_id is None
+
+    # Y con la sucursal real, el actor fantasma tampoco la tumba.
+    con_sucursal, _ = emision_uc.emitir(
+        s,
+        "sales.venta_anulada",
+        {
+            "venta_id": str(uuid.uuid4()),
+            "sucursal_id": str(ids["sucursal"].id),
+            "usuario_id": str(uuid.uuid4()),
+        },
+    )
+    s.flush()
+    assert con_sucursal.sucursal_id == ids["sucursal"].id
+    assert con_sucursal.actor_id is None
 
 
 def test_la_regla_de_la_sucursal_desplaza_a_la_general_al_emitir(env):
@@ -672,6 +824,7 @@ def api():
 
         app = create_app()
         app.dependency_overrides[get_db] = _override
+        app.dependency_overrides[get_db_reportes] = _override
         with TestClient(app) as c:
             r = c.post(
                 "/api/v1/auth/login", json={"username": "admin", "pin": "123456"}
@@ -724,9 +877,16 @@ def test_el_catalogo_de_emisiones_se_recorta_por_permiso(api):
         catalogo.CATALOGO
     )
 
+    # Con `inventory.leer` se ven las de inventario; `reports.leer` además
+    # abre la cadena de escalamiento, que es del propio módulo.
     permisos = {"reports.leer", "inventory.leer"}
     visibles = catalogo.visibles(permisos)
-    assert visibles and all(e.permiso == "inventory.leer" for e in visibles)
+    assert visibles and all(e.permiso in permisos for e in visibles)
+    assert not any(e.permiso == "sales.leer" for e in visibles)
+
+    solo_inventario = catalogo.visibles({"inventory.leer"})
+    assert solo_inventario
+    assert all(e.permiso == "inventory.leer" for e in solo_inventario)
 
 
 def test_sin_permiso_no_se_ve_la_matriz(api):
@@ -860,6 +1020,39 @@ def test_el_detalle_dice_quien_lo_recibio_y_por_que(api):
             "canal": "bandeja",
         }
     ]
+
+
+def test_la_api_nombra_al_actor_y_dice_sistema_cuando_no_lo_hay(api):
+    """Un hueco en «quién» obliga a salir del ERP a averiguarlo, que es
+    justamente lo que el reporte tenía que evitar."""
+    c, s, ids = api
+    admin = s.scalar(select(Usuario).where(Usuario.username == "admin"))
+    con_actor = ReporteEmitido(
+        empresa_id=ids["empresa"].id,
+        codigo_emision="sales.venta_anulada",
+        titulo="Venta anulada",
+        datos={},
+        actor_id=admin.id,
+    )
+    del_sistema = ReporteEmitido(
+        empresa_id=ids["empresa"].id,
+        codigo_emision="sales.pedido_demorado",
+        titulo="Pedido demorado",
+        datos={},
+    )
+    s.add_all([con_actor, del_sistema])
+    s.commit()
+
+    por_id = {
+        r["id"]: r for r in c.get("/api/v1/reports/emitidos").json()["items"]
+    }
+    assert por_id[str(con_actor.id)]["actor"] == "admin"
+    assert por_id[str(con_actor.id)]["actor_id"] == str(admin.id)
+    assert por_id[str(del_sistema.id)]["actor"] == "Sistema"
+    assert por_id[str(del_sistema.id)]["actor_id"] is None
+
+    detalle = c.get(f"/api/v1/reports/emitidos/{con_actor.id}").json()
+    assert detalle["actor"] == "admin"
 
 
 def test_no_existe_endpoint_para_escribir_un_reporte(api):

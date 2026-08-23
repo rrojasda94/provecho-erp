@@ -80,7 +80,10 @@ erDiagram
   direccion (NULL en los virtuales y en los de sucursal, que heredan la de
   su sucursal — el central no cuelga de ninguna y necesita la suya),
   almacen_abastecedor_id
-  (el central del que se abastece un almacén de sucursal/producción).
+  (el central del que se abastece un almacén de sucursal/producción),
+  almacen_abastecedor_respaldo_id (a quién se le pide cuando el principal
+  está dado de baja — RN-INV-022, ADR-040; distinto del principal y de la
+  misma empresa).
   `activos` es virtual (sin ubicación física ni stock de SKUs). Equipamiento
   y política FEFO/FIFO por tipo — ver
   [domain-model.md](../domain/domain-model.md#almacenes).
@@ -137,6 +140,32 @@ erDiagram
 - **sucursal_zona_servicio**: sucursal_id, zona_servicio_id — relación N:N
   (una sucursal se suscribe a un grupo de zonas).
 
+### Ubicación: el ancla de una dirección (ADR-053, implementado 2026-08-22)
+
+Una dirección son **dos cosas**: el texto que se lee y se imprime, y el punto
+del mapa donde está. El texto sigue en la columna que cada tabla ya tenía
+(`direccion`, `domicilio`, `domicilio_fiscal`, `direccion_entrega`); el ancla
+llega por el mixin `core/model_base.UbicacionMixin`, siempre con el mismo
+nombre para no tener que traducir nada entre capas:
+
+- `ubicacion_place_id` — `VARCHAR(255)`. Identificador estable del lugar en
+  Google; es lo que se compara para saber si dos pedidos van al mismo sitio.
+- `ubicacion_lat` / `ubicacion_lng` — `NUMERIC(9,6)`. Seis decimales son
+  ~11 cm: más sería ruido del GPS.
+- `ubicacion_plus_code` — `VARCHAR(20)`. Derivable de las coordenadas, pero
+  viene gratis en la respuesta y derivarlo pediría una dependencia.
+- `ubicacion_distrito` — `VARCHAR(100)`. Es lo que decide si un reparto cae en
+  zona restringida (ADR-054) sin traer geometría al proyecto.
+
+Lo llevan: `sucursal`, `almacen`, `empresa`, `persona` (§2), `proveedor` (§5)
+y `venta` (§6). **Todo nullable**: una dirección escrita a mano es válida y las
+filas anteriores a 2026-08-22 no tienen ancla.
+
+`ubicacion_distrito` es el sustituto pobre de `zona_servicio` de arriba
+—que sigue sin implementarse— y hace el trabajo mientras las zonas del negocio
+coincidan con distritos. Una geocerca de verdad (polígono, PostGIS) recién se
+justifica cuando no coincidan.
+
 ## 2. Usuarios y seguridad (módulo users)
 
 ```mermaid
@@ -184,7 +213,9 @@ erDiagram
   `natural`) sin exigirles el permiso de administración completo.
 - **usuario**: username, pin_hash (Argon2id), persona_id (nullable — NULL
   si `agente_ia`), nombre_display (fallback para agente_ia), email, tipo
-  (`humano` | `agente_ia`), activo.
+  (`humano` | `agente_ia`), activo, debe_cambiar_pin (el PIN vigente lo puso
+  un reseteo, así que lo sabe alguien más: la cuenta no puede hacer nada
+  hasta elegir otro — ADR-041).
 - **token_agente** (2026-08-08, ADR-032): usuario_id, nombre ("n8n
   producción"), prefijo (los primeros 12 caracteres del token, único dato
   mostrable después de crearlo), token_hash (SHA-256; el claro sale una sola
@@ -416,6 +447,55 @@ descuenta stock vía la receta (ver [../domain/domain-model.md](../domain/domain
   delivery usa por distancia; RN-SRV-001..003), archivado (bool — oculta
   de listados, nunca se elimina). No referencia receta_id.
 
+### Atributos y variantes generadas (ADR-055, implementado 2026-08-23)
+
+El modelo de `product.attribute*` de Odoo 18, traducido. Reemplaza la
+alternativa que ADR-023 había descartado —"atributos con recargo"— sin
+revertirla: la variante **sigue siendo** una fila de `producto_comercial`
+con `producto_padre_id`, y por eso precio, margen, KDS, carta y réplica no
+cambian. Lo que se agrega es de dónde salen esas filas y qué las identifica.
+
+- **atributo**: empresa_id, nombre, `modo_variante`
+  (`siempre` | `dinamica` | `nunca` — el `create_variant` de Odoo),
+  `display` (`radio` | `pildoras` | `select` | `color`), orden,
+  ref_externa. UNIQUE(empresa_id, nombre).
+- **atributo_valor**: atributo_id, nombre, orden, activo.
+  UNIQUE(atributo_id, nombre).
+- **producto_atributo_linea**: producto_comercial_id, atributo_id, orden —
+  qué atributo ofrece un producto. UNIQUE(producto_comercial_id, atributo_id).
+- **producto_atributo_valor** (**PTAV**): linea_id, atributo_valor_id,
+  `precio_extra` (se **suma** al precio de la lista vigente, RN-PRC-003),
+  activo. Es la pieza a la que apuntan tanto la variante materializada como
+  la línea de receta condicionada: "Familiar" es una idea, "Familiar en la
+  Pizza Peperoni" tiene sobreprecio propio.
+- **producto_variante_valor**: producto_comercial_id (la fila **hija**),
+  producto_atributo_valor_id — qué combinación *es* esa variante.
+- **producto_exclusion**: producto_atributo_valor_id, excluye_valor_id —
+  combinaciones que no existen (RN-COM-038). Se guarda una fila y se lee en
+  los dos sentidos: el par es simétrico y guardar el espejo sería la misma
+  verdad dos veces. El caso que la obliga es la pizza mitad-y-mitad, donde
+  las dos mitades tienen que ser **distintas**.
+
+`venta_item.valores_variante_ids` (JSONB, nullable) guarda los PTAV elegidos
+en la línea. Misma forma y mismas razones que `sin_articulo_ids`.
+
+### La línea de receta se condiciona y elige unidad (ADR-056, 2026-08-23)
+
+- `receta_item.aplica_valores` (JSONB, nullable): array de PTAV. NULL o `[]`
+  = aplica siempre. La regla agrupa los valores **por atributo** y exige al
+  menos uno de cada grupo (RN-COM-037) — es lo que convierte 361 recetas de
+  mitad-y-mitad en una de 26 líneas.
+- `receta_item.unidad_medida_id` (FK, nullable): NULL = la del artículo. Si
+  viene, es de la misma categoría de UdM y se convierte por `ratio`
+  (RN-UDM-005).
+- `receta_item.orden`: para que exportar dos veces dé el mismo archivo.
+- `receta.es_kit` (bool): el `type` de `mrp.bom` (`normal` | `phantom`).
+- `categoria.padre_id`: jerarquía. La ruta completa
+  ("MATERIA PRIMA / Procesados / PIZZAS") se **calcula al leer**.
+- `ref_externa` en `articulo`, `receta`, `producto_comercial` y `atributo`:
+  el identificador del sistema de origen, para que reimportar la misma
+  planilla actualice en vez de duplicar.
+
 ## 4. Inventario (módulo inventory)
 
 - **stock**: almacen_id, sku_id, cantidad (en la UdM del artículo),
@@ -539,10 +619,17 @@ descuenta stock vía la receta (ver [../domain/domain-model.md](../domain/domain
   `guia_remision`; la de cliente con destino `desecho`/`auditoria` entra al
   almacén y se aparta como merma en el mismo acto.
 - **solicitud_insumos**: almacen_solicitante_id, almacen_abastecedor_id,
-  estado (`pendiente` | `aprobada` | `rechazada` | `cancelada` |
-  `despachada` | `recibida`), solicitado_por, aprobado_por, observacion.
-  Ítems en **solicitud_item** (sku_id, cantidad_solicitada,
-  cantidad_aprobada, cantidad_despachada; único por solicitud+sku). Caso
+  estado (`borrador` | `pendiente` | `aprobada` | `rechazada` |
+  `cancelada` | `despachada` | `recibida`), solicitado_por, aprobado_por,
+  observacion. `borrador` es la lista que el turno junta durante la
+  jornada (ADR-051, RN-INV-023): uno por almacén, se arma sola con lo que
+  está bajo `stock_minimo` y no cuenta como solicitud hasta que se envía
+  (no aparece en el listado general, en el resumen para negociación de
+  `purchases`, ni sube al hub). Ítems en **solicitud_item** (sku_id,
+  cantidad_solicitada, cantidad_aprobada, cantidad_despachada,
+  **bajo_minimo_al_pedir**; único por solicitud+sku). `bajo_minimo_al_pedir`
+  se estampa al agregar el ítem y no se recalcula (RN-INV-024): distingue
+  urgencia real de lo que el local pidió por decisión propia. Caso
   concreto (ámbito inventario) del concepto marco Solicitud (RN-DOC-005).
   Va **por almacén y no por sucursal** (ADR-020): producción también
   solicita y la transferencia opera sobre almacenes; la sucursal se deriva
@@ -594,7 +681,10 @@ descuenta stock vía la receta (ver [../domain/domain-model.md](../domain/domain
 ## 5. Compras (módulo purchases)
 
 - **proveedor**: RUC + razon_social (si empresa) o persona_id (si persona
-  natural, ej. RHE), contacto, condiciones (condición de pago: contado o
+  natural, ej. RHE), contacto, direccion/provincia/pais (domicilio fiscal
+  del jurídico, prellenado desde SUNAT al consultar el RUC; partido porque
+  `provincia` decide si el flete es local o interprovincial, y `pais`
+  existe para el proveedor extranjero — ADR-041), condiciones (condición de pago: contado o
   crédito + plazo pactado — accounting la usa al ejecutar el pago),
   formal (bool — `false` para proveedor informal de mercado/supermercado:
   sin RUC obligatorio, compra sin OC vía caja chica, RN-CMP-011..016),
@@ -653,6 +743,13 @@ descuenta stock vía la receta (ver [../domain/domain-model.md](../domain/domain
   `purchases.caja_chica_rendida`.
 
 ## 6. Ventas (módulo sales)
+
+La entrega de un delivery (ADR-053/054, 2026-08-22): `direccion_entrega`
+(texto) + el `UbicacionMixin` de §1b + `distancia_entrega_km` `NUMERIC(6,2)` y
+`costo_entrega` `NUMERIC(10,2)`. Las dos últimas se **congelan** al crear la
+orden: la tarifa por kilómetro cambia y el pedido de ayer no puede cambiar de
+precio, igual que la guía de remisión congela sus direcciones al emitirse. El
+costo todavía **no** suma al total de la venta (ver deuda de `sales`).
 
 - **punto_venta**: sucursal_id, canal (`trabajador` | `web` | `kiosko`),
   hardware_id (NULL si web), serie_boleta, serie_factura (series SUNAT
@@ -760,7 +857,22 @@ Solicitud.
   `en_preparacion` | `listo` | `entregado` — avance de `PROC-OPE-002`,
   fuente única del progreso del pedido; `updated_at` de cada transición es
   la base para medir tiempos de preparación y de despacho,
-  RN-CUP-002/003).
+  RN-CUP-002/003), **etapa_kds** (entero, default 0 — eslabón de la cadena
+  de estaciones en el que va la línea, RN-CUP-013/ADR-044). Es un entero y
+  **no** una FK a `kds_pantalla` a propósito: la línea guarda DÓNDE VA, no
+  QUIÉN la atiende, así que desactivar el horno a media noche no deja
+  pedidos apuntando a una pantalla que ya no opera — caen solos a la
+  siguiente estación que los acepte.
+- **kds_pantalla**: sucursal_id, nombre, tipo (`preparacion` | `despacho`),
+  categoria_ids (JSONB de `categoria.id`; NULL/[] = todas), **orden**
+  (entero, default 0 — eslabón de la estación en la cadena de preparación),
+  activo. `UNIQUE (sucursal_id, nombre)`.
+
+  El `orden` solo significa algo en las pantallas de `preparacion`:
+  despacho no es un eslabón que la línea atraviese, es lo que mira el
+  pedido cuando ya no le queda ninguno. Dos estaciones con el mismo `orden`
+  son el mismo eslabón trabajando en paralelo (horno y barra, cada una con
+  sus categorías). Ver ADR-044 y `src/modules/sales/README.md`.
 - **alerta_pedido** (2026-08-04): venta_id, sucursal_id, **minutos_umbral**,
   minutos_transcurridos, estado_al_alertar (`pendiente` |
   `en_preparacion` — el peor estado del pedido; que cocina ni lo haya
@@ -808,22 +920,24 @@ Solicitud.
 - **custodia_efectivo**: apertura_caja_id, monto, responsable_actual_id,
   estado (`en_caja` | `en_supervisor` | `en_contabilidad` | `disponible`),
   timestamps por relevo (RN-MDP-002). **Máquina de estados desde ADR-025**:
-  nace en `en_supervisor` al cerrar la caja (el cierre ya exigió la firma
-  del encargado, así que el tramo cajero→encargado acaba de ocurrir) y
-  avanza a `en_contabilidad` o directo a `disponible` cuando el efectivo
-  se queda en la caja fuerte del local como fondo del día siguiente
-  (RN-MDP-006). Cada transición exige que **quien recibe** se autentique
-  con su PIN; no se vuelve atrás.
+  **nace en `en_caja`** al cerrar la caja, a nombre del cajero
+  (RN-MDP-008/ADR-049: el cierre es un conteo, no una entrega — hasta
+  ADR-049 nacía en `en_supervisor` y `en_caja` no lo escribía nadie), pasa
+  a `en_supervisor` cuando el encargado firma haberlo recibido, y de ahí a
+  `en_contabilidad` o directo a `disponible` cuando el efectivo se queda en
+  la caja fuerte del local como fondo del día siguiente (RN-MDP-006). Cada
+  transición exige que **quien recibe** se autentique con su PIN; no se
+  vuelve atrás.
 - **apertura_caja** (PROC-CTB-002): punto_venta_id, cajero_id,
-  relevo_encargado_id (relevo autenticado por ambas partes con
-  usuario+PIN — desde ADR-025 sale del token de `POST /auth/autorizar`,
-  nunca del cuerpo del request), monto_apertura (RN-POS-003, **suma del
-  conteo**, no un número tecleado), detalle_denominaciones (JSONB —
-  conteo por billete/moneda, obligatorio), diferencia_reportada
-  (calculada: contado − declarado por el encargado; no bloquea la
-  apertura, RN-POS-011), pos_verificados (JSONB — un registro por POS de
-  tarjeta con `operativo` y observación, RN-POS-010), timestamp. Inicia la
-  cadena de custodia inversa (RN-MDP-002).
+  relevo_encargado_id (**NULLABLE desde ADR-049**, migración
+  `c8b41f60d2a7`: el cajero abre solo y no hay contraparte que firme. Las
+  filas anteriores conservan quién firmó —evidencia que no se reescribe— y
+  son las únicas de las que `encargado_de_turno` puede derivar algo),
+  monto_apertura (RN-POS-003, **suma del conteo**, no un número tecleado),
+  detalle_denominaciones (JSONB — conteo por billete/moneda, obligatorio),
+  diferencia_reportada (calculada: contado − declarado por el encargado; no
+  bloquea la apertura, RN-POS-011), pos_verificados (JSONB — un registro por
+  POS de tarjeta con `operativo` y observación, RN-POS-010), timestamp.
 - **pos_tarjeta** (ADR-025, RN-POS-009/010): empresa_id, sucursal_id
   (**NULL = terminal de emergencia** del pool de contabilidad, que se
   presta a la sucursal que lo necesite), serie (única), codigo_comercio,
@@ -858,25 +972,38 @@ Solicitud.
 - **arqueo**: punto_venta_id, tipo (`sorpresa` | `programado`),
   realizado_por, monto_esperado, monto_contado, diferencia, acta_id.
   Verificación puntual de caja fuera del ciclo apertura/cierre.
-- **reporte_escalamiento** (entidad transversal — el escalamiento es
-  parte de la naturaleza de todo reporte del ERP, no un concepto propio
-  de `sales`; vive en `shared`, no en un módulo dueño único, mismo patrón
-  que `comprobante`): origen (`central_pedidos` | `punto_venta` |
-  `produccion`), sucursal_id, venta_id o carrito_id (opcional; nulo si
-  origen=`produccion`, usa orden_produccion_id en su lugar), reportado_por
-  (personal de atención al cliente, o jefe de cocina si origen=
-  `produccion`), motivo (`queja` | `demora` | `error_sistema` |
-  `desistimiento_no_resuelto` | `no_conformidad_calidad` | ...),
-  descripcion del problema; evidencia_id (FK `archivo`, obligatorio si
-  motivo=`no_conformidad_calidad` y termina en desecho, RN-PRD-015). Flujo de
-  escalamiento en cadena: alerta al **supervisor**, que intenta
-  resolverlo y redacta su solución en el reporte; si no puede, escala al
-  **área comercial o gerencia**, que realiza acciones y las reporta en el
-  mismo documento. Campos: nivel_actual (`supervisor` | `comercial` |
-  `gerencia`), acciones (historial por nivel: quién, qué, cuándo),
-  estado (`abierto` | `resuelto_supervisor` | `escalado` | `resuelto` |
-  `cerrado`). Se almacena en el ERP para **mejora continua** (insumo del
-  SOP de mejora continua de experiencia de cliente, área Comercial).
+- **reporte_escalamiento** — **implementado en `src/modules/reports/`
+  (ADR-036), no en `shared`**. Esta entrada se escribió el 2026-07-20, cuatro
+  meses antes de que existiera el módulo, y decía `shared` porque entonces el
+  escalamiento no tenía dueño. Hoy lo tiene: un solo escritor y un solo lector.
+  La definición vigente está en §16.
+
+  Dos diferencias con lo que este párrafo pedía originalmente, argumentadas en
+  ADR-036:
+
+  1. **Ancla a `reporte_emitido`, no a la venta.** Los `venta_id` /
+     `carrito_id` / `orden_produccion_id` de la idea original son exactamente
+     lo que `reporte_emitido.referencia_tipo` + `referencia_id` ya guardan,
+     para los nueve tipos y no para tres — y `carrito` ni siquiera existe como
+     tabla. Anclar a la venta perdería la foto `datos`, el `nivel`, el
+     `actor_id` y la doble puerta de RN-REP-002.
+  2. **`origen` se deriva del reporte**, no se pide: quien eleva ya dijo qué
+     reporte eleva.
+
+  Lo demás se mantiene: motivo (`queja` | `demora` | `error_sistema` |
+  `desistimiento_no_resuelto` | `no_conformidad_calidad`), evidencia_id
+  obligatoria si motivo=`no_conformidad_calidad` y termina en desecho
+  (RN-PRD-015, validado en la capa de aplicación porque «termina en desecho»
+  vive en otra tabla de otro módulo), y el flujo en cadena: alerta al
+  **supervisor**, que intenta resolverlo y redacta su solución; si no puede,
+  escala al **área comercial** y de ahí a **gerencia**, cada nivel dejando su
+  entrada en `acciones`. Se almacena para **mejora continua** (insumo del SOP
+  de experiencia de cliente, área Comercial).
+
+  Caveat de alcance: hoy solo se escala lo que el catálogo cerrado emite. Los
+  motivos `queja`, `error_sistema` y `desistimiento_no_resuelto` se pueden
+  elegir, pero ninguna emisión los produce todavía — ver la deuda declarada en
+  ADR-036.
 - **carta_disputa_pago**: operacion_id (venta/pago), fecha, hora,
   cliente_id, referencia_pago, lote, monto, procedencia (o motivo de
   ausencia), emitida_por (área contable, RN-MDP-004).
@@ -1606,15 +1733,35 @@ cualquier payload del bus (RN-REP-001).
   exige la del tipo declarado, porque una fila `tipo=area` con `area_id` nulo
   resolvería a cero destinatarios en silencio. `dinamico` es
   `encargado_de_turno` | `responsables_de_almacen`: destinatarios que no se
-  pueden listar de antemano porque dependen del momento.
-- **reporte_emitido**: empresa_id/sucursal_id (nullables — un hecho que no se
-  pudo atribuir se guarda igual y solo lo ve el superusuario, mismo criterio
-  que `audit_log`), codigo_emision, titulo, cuerpo, nivel, **datos** JSONB
+  pueden listar de antemano porque dependen del momento. Desde ADR-036 hay un
+  tercero, `responsables_del_nivel`, que resuelve el escalón de una cadena de
+  escalamiento.
+- **reporte_emitido**: empresa_id/sucursal_id/**almacen_id** (nullables — un
+  hecho que no se pudo atribuir se guarda igual y solo lo ve el superusuario,
+  mismo criterio que `audit_log`), **actor_id** (quién provocó el hecho; NULL =
+  lo detectó el sistema y la API lo muestra como «Sistema», RN-REP-009),
+  codigo_emision, titulo, cuerpo, nivel, **datos** JSONB
   (la foto: solo los campos que la emisión declara, RN-REP-003; puede traer
   PII y por eso no sale al logger), referencia_tipo/referencia_id
   (polimórficos sin FK, como `notificacion`), regla_id (la que lo produjo;
   NULL = el hueco), emitido_at. Es una **foto, no un puntero**: un reporte de
   «descuadre de S/ 40» sigue diciendo 40 aunque el cierre se corrija después.
+  `referencia_tipo` se traduce a un endpoint en `src/core/destinos.py`
+  (ADR-036): es lo que convierte al reporte en un enlace al lugar donde se
+  actúa. `actor_id` y `almacen_id` son de ADR-036 y **no tienen backfill**: un
+  reporte anterior dice «Sistema» porque el dato nunca se guardó.
+- **reporte_escalamiento** (ADR-036, vive en `reports` y **no** en `shared` —
+  ver §6 y el ADR): empresa_id NOT NULL, sucursal_id nullable,
+  reporte_emitido_id NOT NULL (`ondelete=RESTRICT`: el reporte es la evidencia
+  de la cadena, distinto del CASCADE de `entrega_reporte`), origen, motivo,
+  descripcion, reportado_por_id, evidencia_id (FK `archivo`), nivel_actual
+  (`supervisor`|`comercial`|`gerencia`), estado, **acciones** JSONB append-only
+  (`[{nivel, usuario_id, accion, descripcion, ts}]`, RN-REP-012), cerrado_at.
+  **Un índice único parcial** —no un `UniqueConstraint`— para «una cadena
+  abierta por reporte» (RN-REP-013): las terminadas tienen que poder convivir,
+  y dos UNIQUE que empiezan por la misma columna colisionan de nombre con la
+  convención de `core/database.py`. El CHECK exige `cerrado_at` en los tres
+  estados terminados.
 - **entrega_reporte**: reporte_emitido_id (cascade), usuario_id, **motivo**
   (`area:almacen`, `rol:supervisor`, `dinamico:encargado_de_turno`), canal.
   Único por (reporte, usuario): quien está en el área *y* es el encargado de

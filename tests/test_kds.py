@@ -126,6 +126,8 @@ def env(monkeypatch):
             sucursal_id=str(sucursal.id), pv_id=str(pv.id),
             cat_pizzas=str(cat_pizzas.id), cat_bebidas=str(cat_bebidas.id),
             pizza_id=str(pizza.id), bebida_id=str(bebida.id),
+            marca_id=str(marca.id), receta_pizza=str(receta_p.id),
+            lista_precio=str(lista.id),
         )
         s.commit()
 
@@ -422,3 +424,244 @@ def test_pantalla_sin_categorias_ve_todo(env):
     })
     cola = _cola(client, h, todo["id"])
     assert len(cola[0]["items"]) == 2
+
+
+# --- Cadena de estaciones (ADR-044, RN-CUP-013) --------------------------------
+def _cadena_de_tres(client, ids, h):
+    """Armado(0) → Horno(1) para pizzas; Barra(0) para bebidas; Despacho."""
+    def pantalla(nombre, tipo, orden, cats=None):
+        return client.post("/api/v1/kds/pantallas", headers=h, json={
+            "sucursal_id": ids["sucursal_id"], "nombre": nombre, "tipo": tipo,
+            "categoria_ids": cats, "orden": orden,
+        }).json()
+
+    armado = pantalla("Armado", "preparacion", 0, [ids["cat_pizzas"]])
+    horno = pantalla("Horno", "preparacion", 1, [ids["cat_pizzas"]])
+    barra = pantalla("Barra", "preparacion", 0, [ids["cat_bebidas"]])
+    despacho = pantalla("Despacho", "despacho", 9)
+    client.post("/api/v1/sales/ventas", headers=h, json={
+        "sucursal_id": ids["sucursal_id"], "punto_venta_id": ids["pv_id"],
+        "canal": "pdv", "modalidad": "mesa", "idempotency_key": "kds-cadena-1",
+        "referencia_atencion": "Mesa 9",
+        "items": [
+            {"producto_comercial_id": ids["pizza_id"], "cantidad": "1"},
+            {"producto_comercial_id": ids["bebida_id"], "cantidad": "1"},
+        ],
+    })
+    return armado, horno, barra, despacho
+
+
+def _tachar(client, h, item_id, desde="pendiente"):
+    """Un toque en la pantalla = los pasos que falten hasta `listo`."""
+    pasos = ["en_preparacion", "listo"] if desde == "pendiente" else ["listo"]
+    for estado in pasos:
+        r = client.post(f"/api/v1/kds/items/{item_id}/avanzar", headers=h,
+                        json={"estado": estado})
+        assert r.status_code == 200, r.text
+    return r.json()
+
+
+def test_la_linea_recorre_la_cadena_de_estaciones(env):
+    client, ids = env
+    h = _token(client)
+    armado, horno, barra, despacho = _cadena_de_tres(client, ids, h)
+
+    # Arranca en el primer eslabón que la atiende, no en el horno.
+    pizza = _cola(client, h, armado["id"])[0]["items"][0]
+    assert pizza["etapa_kds"] == 0
+    assert pizza["estacion"] == "Armado"
+    assert _cola(client, h, horno["id"]) == []
+
+    # Tacharla en armado NO la deja lista: la manda al horno.
+    salida = _tachar(client, h, pizza["venta_item_id"])
+    assert salida["estado"] == "en_preparacion"
+    assert salida["etapa_kds"] == 1
+
+    # Armado ya no la tiene pendiente, así que el pedido sale de su cola;
+    # el horno la recibe con su nombre a la vista.
+    assert _cola(client, h, armado["id"]) == []
+    en_horno = _cola(client, h, horno["id"])[0]["items"][0]
+    assert en_horno["estacion"] == "Horno"
+
+    # Tacharla en el horno sí, porque no queda cadena por delante.
+    final = _tachar(client, h, en_horno["venta_item_id"], desde="en_preparacion")
+    assert final["estado"] == "listo"
+
+
+def test_la_bebida_se_salta_el_horno_sola(env):
+    client, ids = env
+    h = _token(client)
+    armado, horno, barra, _despacho = _cadena_de_tres(client, ids, h)
+
+    bebida = _cola(client, h, barra["id"])[0]["items"][0]
+    assert bebida["estacion"] == "Barra"
+
+    # La barra es su único eslabón: el horno no atiende bebidas, así que
+    # tacharla la deja lista sin configurar ningún salto.
+    assert _tachar(client, h, bebida["venta_item_id"])["estado"] == "listo"
+
+    # La bebida no aparece en el horno ni cuando la pizza sí llega.
+    _tachar(client, h, _cola(client, h, armado["id"])[0]["items"][0]["venta_item_id"])
+    assert [i["producto"] for i in _cola(client, h, horno["id"])[0]["items"]] == [
+        "Pizza Clásica"
+    ]
+
+
+def test_despacho_muestra_en_que_estacion_va_cada_linea(env):
+    client, ids = env
+    h = _token(client)
+    _armado, _horno, barra, despacho = _cadena_de_tres(client, ids, h)
+
+    _tachar(client, h, _cola(client, h, barra["id"])[0]["items"][0]["venta_item_id"])
+
+    pedido = _cola(client, h, despacho["id"])[0]
+    porestacion = {i["producto"]: i["estacion"] for i in pedido["items"]}
+    # Despacho ve el pedido COMPLETO, con la bebida ya fuera de cocina y la
+    # pizza todavía esperando en su estación.
+    assert porestacion == {"Pizza Clásica": "Armado", "Gaseosa 500ml": None}
+    assert pedido["estado_pedido"] == "pendiente"
+    assert pedido["tipo"] == "venta"
+
+
+def test_estacion_desactivada_no_deja_la_linea_invisible(env):
+    client, ids = env
+    h = _token(client)
+    armado, horno, _barra, _despacho = _cadena_de_tres(client, ids, h)
+
+    client.patch(f"/api/v1/kds/pantallas/{armado['id']}", headers=h,
+                 json={"activo": False})
+
+    # La pizza estaba en el eslabón 0 y ese eslabón ya no existe: cae al
+    # horno en vez de quedarse sin pantalla que la muestre.
+    en_horno = _cola(client, h, horno["id"])[0]["items"][0]
+    assert en_horno["estacion"] == "Horno"
+    assert _tachar(client, h, en_horno["venta_item_id"])["estado"] == "listo"
+
+
+def test_orden_negativo_se_rechaza(env):
+    client, ids = env
+    h = _token(client)
+    r = client.post("/api/v1/kds/pantallas", headers=h, json={
+        "sucursal_id": ids["sucursal_id"], "nombre": "Imposible",
+        "tipo": "preparacion", "orden": -1,
+    })
+    assert r.status_code == 422
+
+
+def test_despacho_ve_el_pedido_completo_aunque_tenga_categorias(env):
+    """Filtrar despacho por categoría lo dejaría viendo media orden, y con
+    media orden no se puede contrastar contra la comanda (RN-CUP-004)."""
+    client, ids = env
+    h = _token(client)
+    _armado, _horno, barra, despacho = _cadena_de_tres(client, ids, h)
+
+    # Configurada —mal— para atender solo bebidas.
+    client.patch(f"/api/v1/kds/pantallas/{despacho['id']}", headers=h,
+                 json={"categoria_ids": [ids["cat_bebidas"]]})
+    _tachar(client, h, _cola(client, h, barra["id"])[0]["items"][0]["venta_item_id"])
+
+    pedido = _cola(client, h, despacho["id"])[0]
+    assert sorted(i["producto"] for i in pedido["items"]) == [
+        "Gaseosa 500ml", "Pizza Clásica",
+    ]
+
+
+# --- El extra no es un plato aparte (RN-CUP-014) --------------------------------
+def _pizza_con_sabor(client, ids, h, clave="kds-extra-1", cantidad_extra="1"):
+    """Crea el sabor, lo cuelga de la pizza y vende una con él."""
+    sabor = client.post("/api/v1/sales/productos", headers=h, json={
+        "id_interno": "SPEP", "marca_id": ids["marca_id"], "nombre": "Peperoni",
+        "receta_id": ids["receta_pizza"], "es_extra": True,
+    }).json()
+    r = client.post(f"/api/v1/sales/productos/{ids['pizza_id']}/extras", headers=h,
+                    json={"extra_id": sabor["id"], "maximo": 3})
+    assert r.status_code == 201, r.text
+    # El precio lo resuelve el servidor (RN-PRC-003): sin uno vigente, la
+    # venta con el sabor rebota con 409. El sabor no cobra aparte.
+    r = client.post(f"/api/v1/sales/listas-precio/{ids['lista_precio']}/precios",
+                    headers=h,
+                    json={"producto_comercial_id": sabor["id"], "monto": "0.00"})
+    assert r.status_code in (200, 201), r.text
+    venta = client.post("/api/v1/sales/ventas", headers=h, json={
+        "sucursal_id": ids["sucursal_id"], "punto_venta_id": ids["pv_id"],
+        "canal": "pdv", "modalidad": "mesa", "idempotency_key": clave,
+        "referencia_atencion": "Mesa 1",
+        "items": [{
+            "producto_comercial_id": ids["pizza_id"], "cantidad": "1",
+            "extras": [{"producto_comercial_id": sabor["id"],
+                        "cantidad": cantidad_extra}],
+        }],
+    })
+    assert venta.status_code == 201, venta.text
+    return sabor, venta.json()
+
+
+def test_el_sabor_viaja_dentro_del_plato_y_no_como_item_suelto(env):
+    client, ids = env
+    h = _token(client)
+    pantalla = client.post("/api/v1/kds/pantallas", headers=h, json={
+        "sucursal_id": ids["sucursal_id"], "nombre": "Cocina", "tipo": "preparacion",
+    }).json()
+    _pizza_con_sabor(client, ids, h)
+
+    items = _cola(client, h, pantalla["id"])[0]["items"]
+    # Antes salían dos tarjetas —"1 Pizza Clásica" y "1 Peperoni"— y el
+    # cocinero leía dos platos donde hay uno.
+    assert [i["producto"] for i in items] == ["Pizza Clásica"]
+    assert items[0]["extras"] == [{"producto": "Peperoni", "cantidad": "1.00"}]
+
+
+def test_tachar_el_plato_se_lleva_su_extra(env):
+    client, ids = env
+    h = _token(client)
+    pantalla = client.post("/api/v1/kds/pantallas", headers=h, json={
+        "sucursal_id": ids["sucursal_id"], "nombre": "Cocina", "tipo": "preparacion",
+    }).json()
+    _, venta = _pizza_con_sabor(client, ids, h)
+
+    linea = _cola(client, h, pantalla["id"])[0]["items"][0]["venta_item_id"]
+    _tachar(client, h, linea)
+
+    # `estado_pedido` y `pedido_entregable` suman TODOS los ítems: si el
+    # extra se quedara atrás, el pedido no se podría entregar nunca.
+    avance = client.get(f"/api/v1/kds/ventas/{venta['id']}/avance", headers=h).json()
+    assert avance["estado_pedido"] == "listo"
+    assert client.post(
+        f"/api/v1/sales/ventas/{venta['id']}/entrega", headers=h
+    ).status_code == 200
+
+
+def test_con_estaciones_filtradas_el_extra_sin_categoria_no_cuelga_el_pedido(env):
+    """El ruteo mira la categoría del PLATO, no la del extra.
+
+    El sabor se crea sin `categoria_id`, así que una estación filtrada no lo
+    atendería: como ítem suelto se quedaba `pendiente` para siempre y el
+    pedido nunca llegaba a entregable.
+    """
+    client, ids = env
+    h = _token(client)
+    horno = client.post("/api/v1/kds/pantallas", headers=h, json={
+        "sucursal_id": ids["sucursal_id"], "nombre": "Horno", "tipo": "preparacion",
+        "categoria_ids": [ids["cat_pizzas"]],
+    }).json()
+    _, venta = _pizza_con_sabor(client, ids, h)
+
+    _tachar(client, h, _cola(client, h, horno["id"])[0]["items"][0]["venta_item_id"])
+    assert client.get(
+        f"/api/v1/kds/ventas/{venta['id']}/avance", headers=h
+    ).json()["estado_pedido"] == "listo"
+
+
+def test_la_comanda_sangra_el_extra_bajo_su_plato(env):
+    client, ids = env
+    h = _token(client)
+    _, venta = _pizza_con_sabor(client, ids, h, cantidad_extra="2")
+
+    texto = client.post(
+        f"/api/v1/kds/ventas/{venta['id']}/comanda", headers=h
+    ).json()["texto"]
+    lineas = [línea for línea in texto.splitlines() if "PIZZA" in línea.upper()
+              or "PEPERONI" in línea.upper()]
+    # En el papel, "1x Pizza" seguido de "2x Peperoni" al mismo nivel se lee
+    # como dos platos distintos.
+    assert lineas == ["1x Pizza Clásica", "   + 2x PEPERONI"]

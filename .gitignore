@@ -52,8 +52,10 @@ Thumbs.db
 # Tooling local de Claude Code (config y skills personales)
 .claude/
 
-# Base desechable y artefactos de las pruebas e2e.
+# Base desechable y artefactos de las pruebas e2e. El `-journal` lo deja
+# SQLite mientras la API corre y sobrevive a una corrida interrumpida.
 e2e.db
+e2e.db-journal
 # La crea el perfil `provecho-api-smoke` de `.claude/launch.json`.
 pdv_smoke.db
 frontend/test-results/
@@ -63,3 +65,10 @@ frontend/blob-report/
 # Scratch de TestSprite: credenciales del runner y salida de cada corrida.
 testsprite_tests/tmp/
 testsprite_tests/tmp/config.json
+
+# Planillas generadas por scripts/odoo/convertir_catalogo.py. Son datos reales
+# del negocio derivados de un export privado: se generan cuando se necesitan y
+# no viven en el repositorio.
+salida-catalogo/
+verif-carga.db
+carga-simulacion.txt

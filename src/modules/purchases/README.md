@@ -27,7 +27,9 @@ razón social/RUC propios; `ProveedorOut.persona_id` viaja desde 2026-08-02,
 antes un proveedor natural no tenía forma de mostrarse por nombre en un
 listado; el jurídico consulta Factiliza —`consultar_ruc`, RENIEC/SUNAT—
 para la razón social real en vez de confiar en lo tecleado, mismo criterio
-que `sales.crear_cliente`, ver ADR-005) y ciclo de OC tipo `insumo`: crear (borrador,
+que `sales.crear_cliente`, ver ADR-005; desde 2026-08-12 la pantalla puede
+**preguntar antes de guardar** con `GET /consulta/ruc/{n}`, que además
+prellena `direccion`/`provincia`/`pais` — ADR-041) y ciclo de OC tipo `insumo`: crear (borrador,
 idempotente) → emitir (permiso `purchases.aprobar` exigido si el total
 supera el umbral vigente en `parametro_empresa` — `shared`, módulo
 `purchases`, código `oc_umbral`; sin fila configurada cae al valor semilla
@@ -39,11 +41,34 @@ cualquier recepción). Capas `domain/rules.py`,
 
 | Método | Ruta | Permiso |
 |--------|------|---------|
-| POST/GET/PATCH | `/proveedores[/{id}]` | `purchases.crear` / `leer` |
+| POST/GET/PATCH | `/proveedores[/{id}]` | `purchases.crear` / `leer` — ver *Qué se corrige de un proveedor* |
 | POST | `/ordenes-compra` | `purchases.crear` |
 | GET | `/ordenes-compra` | `purchases.leer` — listado; tenant vía join a `almacen` (la orden no tiene `empresa_id` propio) |
 | GET | `/ordenes-compra/{id}` | `purchases.leer` |
 | POST | `/ordenes-compra/{id}/emitir` | `purchases.crear` (+ `aprobar` sobre umbral) |
+
+### Qué se corrige de un proveedor (y qué no)
+
+`PATCH /proveedores/{id}` acepta **razón social y RUC** desde el 2026-08-10.
+Antes no: un RUC mal tecleado llega hasta la factura electrónica y la única
+salida era tocar la base. La corrección **vuelve a consultar SUNAT**, igual
+que el alta — corregir el RUC es justo el caso en que lo tecleado estaba mal,
+así que reconsultar es el punto del cambio y no un efecto colateral.
+
+Los dos campos valen **solo sobre un proveedor jurídico** (409 si no): en uno
+natural el nombre y el documento viven en su `persona` (RN-GEN-007) y se
+corrigen desde `PATCH /personas/{id}`. Darle razón social propia a un natural
+crearía la segunda fuente que esa regla existe para evitar.
+
+**`tipo` y `persona_id` no son editables.** Cambiarlos convierte al proveedor
+en otro y deja sus órdenes de compra apuntando a algo que ya no es; el camino
+correcto es darlo de baja y crear el que corresponde.
+
+La condición de pago mantiene su regla del alta: pasar a `credito` sin
+`plazo_dias_credito` es 409, porque `accounting` no tendría vencimiento que
+calcular. `clasificacion` y `condicion_pago` son `Literal` en el schema — las
+columnas son `Enum` con CHECK, así que sin eso un valor inválido moría en el
+flush con un 500 en vez de un 422 legible.
 | POST | `/ordenes-compra/{id}/recepciones` | `purchases.recepcionar` |
 | POST | `/ordenes-compra/{id}/anular` | `purchases.anular` |
 | POST | `/ordenes-compra/{id}/conformidad-comprobante` | `purchases.dar_conformidad` |
@@ -74,6 +99,14 @@ OC tipo `activo` + `requerimiento_activo` con doble aprobación,
 automática por recepción, listener de `inventory.devolucion_a_proveedor`.
 La OC no queda marcada como "pagada" tras el pago (RN-CMP-014 vive del
 lado de `accounting`, `orden_compra.estado` no tiene ese valor todavía).
+
+## Dirección del proveedor anclada al mapa (2026-08-22, ADR-053)
+
+`proveedor` lleva el `UbicacionMixin` de `core/model_base`. Convive con
+`BuscarDocumento`: lo que llega de SUNAT sigue prellenando el texto —que es el
+domicilio **declarado**, no siempre el almacén al que uno va a recoger— y
+después se puede anclar en el mapa. Corregir el texto a mano suelta el punto
+(`shared/ubicacion.py`).
 
 ## Casos de uso
 

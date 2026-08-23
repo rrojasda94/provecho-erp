@@ -108,19 +108,28 @@ RECURSOS = (
             "nombre",
             "tipo",
             "almacen_abastecedor_id",
+            "almacen_abastecedor_respaldo_id",
             "updated_at",
         ),
-        # El almacén del local **y su abastecedor**. El central se agregó el
+        # El almacén del local **y sus abastecedores**. El central se agregó el
         # 2026-08-07: sin él, el local no puede ni pedirle insumos durante un
         # corte —`crear_solicitud` exige que el abastecedor exista— ni saber
-        # de dónde viene el camión que está recibiendo. Su *stock* sigue sin
-        # replicarse (`stock` filtra por almacenes de la sucursal): lo que
-        # viaja es la ficha del almacén, no cuánto tiene.
+        # de dónde viene el camión que está recibiendo. El de respaldo viaja
+        # por el mismo motivo y con más razón: existe justamente para el día
+        # en que el principal no está, y un corte de red es cuando menos se
+        # puede ir a consultarlo. Su *stock* sigue sin replicarse (`stock`
+        # filtra por almacenes de la sucursal): lo que viaja es la ficha del
+        # almacén, no cuánto tiene.
         filtro=lambda q, a: q.where(
             or_(
                 Almacen.sucursal_id == a.sucursal_id,
                 Almacen.id.in_(
                     select(Almacen.almacen_abastecedor_id).where(
+                        Almacen.sucursal_id == a.sucursal_id
+                    )
+                ),
+                Almacen.id.in_(
+                    select(Almacen.almacen_abastecedor_respaldo_id).where(
                         Almacen.sucursal_id == a.sucursal_id
                     )
                 ),

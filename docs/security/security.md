@@ -11,12 +11,31 @@ Autenticación, endurecimiento, auditoría y backups. El control de acceso
 - Login con username + PIN (6 dígitos) → **JWT** access (15 min) +
   **refresh token** (7 días, rotativo; reuso de token viejo revoca la cadena).
 - PIN hasheado con **Argon2id**. Nunca en logs ni respuestas.
+- **Ningún PIN se teclea en un campo de formulario** (ADR-045, ampliado por
+  ADR-050): ni el login ni los cuatro puntos del PDV que lo piden tienen
+  `<input type="password">`. Se toca en `components/pinpad/`, y el valor vive
+  en el estado de React — lo que el gestor de contraseñas del navegador no ve
+  no lo puede ofrecer para guardar, y un PIN guardado en la tablet de la caja
+  hace que el turno siguiente entre con la cuenta del anterior (RN-AUD-005).
+  Única excepción pendiente: `app/cambiar-pin/` (deuda de frontend).
 - Bloqueo tras 5 intentos fallidos (ventana 15 min) — protege **una cuenta**.
+  El login **distingue las tres negativas** (401 credenciales, 423 bloqueo,
+  429 rate limit) y dice qué hacer con cada una; con un solo texto genérico
+  las tres terminaban igual: probando de nuevo hasta bloquear la cuenta. Sin
+  contador de intentos en el cliente — el estado real vive en el servidor.
 - **Rate limit por IP** en `/auth/login` y `/auth/refresh` (contador en Redis,
   10 intentos por minuto por defecto) — protege el **endpoint**: el lockout
   por cuenta no frena a quien rota usernames desde una misma IP. Si Redis no
   responde el límite se desactiva (fail-open) y se registra advertencia: una
   caída de Redis no puede dejar sin operar al restaurante.
+- **Rate limit por usuario y por IP** en `GET /consulta/{dni,ruc}/{n}`
+  (20 y 60 por minuto por defecto, ADR-041). Acá lo protegido no es una
+  credencial sino el **gasto**: cada consulta vale una llamada a un proveedor
+  pago, así que un bucle mal escrito en una pantalla agota el plan del mes sin
+  que nadie ataque nada. Por usuario **además de** por IP porque un local
+  entero sale por la misma dirección: con un límite solo por IP, el primer
+  cajero que se pasa deja sin consultar a los otros tres. Se cuenta después
+  del permiso —un 403 no gasta cuota— y con el mismo fail-open que el login.
 - Agentes de IA: usuarios `tipo=agente_ia` con permisos mínimos y
   **credencial propia** — un token de API de larga vida (`token_agente`,
   ADR-032), no un PIN. `Authorization: Bearer prv_...`; se guarda solo su

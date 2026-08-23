@@ -93,17 +93,41 @@ solo `app/` + `lib/`).
 
 ## F2.3 Sistema de diseño (tokens)
 
-🔶 **Parcial**. Ya en código (`frontend/app/globals.css`): paleta de color
-(`--color-primary/secondary/dark/cream/accent/gray`) y tipografías (Anton
-Italic para títulos, Inter para cuerpo). Regla ya vigente: colores/fuentes
-**solo** vía tokens CSS, nunca hex hardcodeado en componentes
-(`prompts/frontend.md`).
+🔶 **Parcial**. Ya en código (`frontend/app/globals.css`):
 
-⬜ **Falta tokenizar**: spacing, radius (hoy `8px`/`16px` sueltos en
-`globals.css`), sombras/elevación, duración/easing de animaciones,
-iconografía (sin librería de íconos elegida todavía), ilustraciones,
-estados (hover/focus/disabled ya existen ad-hoc por selector CSS, no como
-tokens nombrados).
+- Paleta de color (`--color-primary/secondary/dark/cream/accent/gray/steel`),
+  revisada el 2026-08-07 por contraste medido (ver `ui-ux.md`).
+- Un **acento único** (`--hue`, sobre `--marca-primary`). El color por área de
+  negocio se probó y se descartó el 2026-08-12 (ADR-037): ADR-013 §8 ya había
+  rechazado el color por módulo o tarjeta. Las áreas siguen agrupando el home,
+  sin pintar.
+- **Estados semánticos**: `--status-success/danger/warning/info`, cada uno con
+  su `-surface` para el relleno de insignia, y su variante de alto contraste y
+  de modo oscuro.
+- Tipografías: Archivo (variable, títulos y cuerpo), IBM Plex Mono (cifras,
+  clase `.cifra`), Anton (solo logotipo, clase `.logotipo`).
+- `--radius` (6px, un solo valor para todos los componentes) y `--transicion`
+  (una curva para todo el ERP).
+- Iconografía: `lucide-react`, ya usada por calendario, diálogos, reportes y
+  el registro de módulos.
+
+Regla ya vigente: colores/fuentes **solo** vía tokens CSS, nunca hex
+hardcodeado en componentes (`prompts/frontend.md`).
+
+- **Elevación**: `--sombra-1/2/3` (apoyada, flotante, interrumpe), teñidas con
+  la tinta de marca y no con negro puro, con su juego para modo oscuro.
+- **Escala tipográfica accesible**: `--font-scale` con sus cuatro niveles en
+  `[data-escala]`.
+- `@custom-variant dark (&:is(.dark *))` — **obligatorio**. Tailwind v4 no
+  declara la variante `dark` por estrategia de clase: sin esa línea las
+  decenas de clases `dark:` que `shadcn add` deja escritas en
+  `components/ui/**` no compilan a nada, y el síntoma solo se ve en el
+  navegador.
+
+⬜ **Falta tokenizar**: spacing (la escala de Tailwind alcanza por ahora),
+ilustraciones, y los estados hover/focus/disabled, que existen como clases de
+componente (`.ficha`, `.nav-modulo`) y utilidades de Tailwind, no como tokens
+nombrados.
 
 ## F2.4 Componentes base
 
@@ -261,11 +285,40 @@ El componente reusable vive en `frontend/components/tabla/`.
 
 ## F2.12 Formularios
 
-⬜ **Sin empezar** más allá del login (formulario simple, sin librería).
-Ya hay una regla de negocio que los afecta a todos: **tooltip de ayuda por
-campo** (`ui-ux.md`) — todo formulario nuevo debe nacer con esto, no
-agregarse después. Autoguardado/undo/redo/drafts: diferible hasta que un
-formulario largo (ej. orden de compra, ficha de producto) lo justifique.
+🔶 **Molde común desde el 2026-08-10**: `components/formulario/
+dialogo-formulario.tsx`. Toda alta y toda corrección del ERP pasan por él —
+`<dialog>` nativo, `useActionState`, el error del servidor en un
+`role="alert"`, Cancelar/Guardar, y cerrar al `ok`. Antes ese bloque estaba
+copiado en siete pantallas; con la edición encima habrían sido veinte
+copias, y la que se olvidara de cerrar al `ok` iba a ser un bug sin relación
+aparente con las otras diecinueve.
+
+Sigue siendo `<dialog>` nativo y no el `Dialog` de shadcn: el overlay, el
+foco atrapado y el cierre con Esc vienen del navegador, y ninguna pantalla
+pidió todavía algo que eso no cubra. ADR-013 dejó shadcn instalado para
+cuando haga falta, no para usarlo por defecto.
+
+**Dos reglas que el componente hace cumplir por todos:**
+
+1. **La acción se despacha a mano dentro de una transición, no por el prop
+   `action` de `<form>`.** React 19 resetea solo el formulario cuando la
+   acción va en `action`, y lo hace también cuando la acción devolvió error:
+   un rechazo del servidor borraba todo lo tecleado. Reteclear un formulario
+   entero porque un campo estaba mal es la fricción que termina en un dato
+   inventado — es el mismo candado que `e2e/caja.spec.ts` ya probaba para el
+   conteo de caja, ahora extendido a todo formulario.
+2. **El reset va al cerrar, no al enviar.** Cancelar limpia; un error deja
+   todo donde estaba.
+
+Cada diálogo de edición además **dice qué no se puede cambiar y por qué**
+(prop `ayuda`): la unidad de medida de un artículo, el `username` de una
+cuenta, el código de una cuenta contable. Un campo ausente sin explicación se
+lee como un olvido.
+
+Sigue pendiente el **tooltip de ayuda por campo** (`ui-ux.md`) —hoy la ayuda
+es a nivel de formulario, no de campo— y autoguardado/undo/redo/drafts,
+diferibles hasta que un formulario largo (orden de compra, ficha de
+producto) lo justifique.
 
 ## F2.13 Experiencia de usuario (UX)
 
@@ -277,14 +330,30 @@ alfa no debería diseñar pantallas de PDV sin releer esas tres secciones.
 
 ## F2.14 Accesibilidad
 
-🔶 **Decidido, sin implementar** (`ui-ux.md`): paleta alternativa
-(daltonismo) + tamaño de fuente ajustable, ambos guardados en el **perfil
-del usuario** (no en el dispositivo), combinables con el tema de marca
-activo. Catálogo ya definido (2026-07-27): dos paletas (Provecho estándar
-+ un modo alto contraste/daltonismo inspirado en Okabe-Ito, tokens
-`--status-success/danger/warning/info`) y 4 niveles de tamaño de fuente
-vía `--font-scale` (1.0/1.15/1.3/1.5) — ver `ui-ux.md#accesibilidad`. Ya
-no bloquea implementar; sigue sin construirse.
+✅ **Implementado 2026-08-12 (ADR-037)**. Paleta alternativa (daltonismo
+rojo-verde, Okabe-Ito), tamaño de fuente en cuatro niveles y modo oscuro, las
+tres guardadas en el **perfil del usuario** (`preferencia_paleta`,
+`preferencia_tamano_fuente`, `preferencia_tema`) y no en el dispositivo — en
+un local la misma tablet la usan tres turnos.
+
+Se resuelven en el servidor: el layout raíz lee `/users/me` y escribe
+`class="dark"`, `data-escala` y `data-paleta` en `<html>`. No se usa
+`next-themes` (instalado, pero solo alimenta a `sonner`): guarda en
+`localStorage` y necesita un script inline antes del primer pintado, que la
+CSP con nonce de `middleware.ts` tendría que autorizar. Sin parpadeo y sin
+tocar la CSP.
+
+Paleta y tema **se combinan**: `[data-paleta="alto-contraste"]` va declarado
+después de `.dark` (misma especificidad, gana el último) y hay un
+`.dark[data-paleta="alto-contraste"]` con los valores aclarados.
+
+El ícono obligatorio por estado vive en `components/estado/insignia.tsx`,
+atado al tono. `PATCH /users/me/preferencias` no exige permiso.
+
+⬜ **Falta**: auditoría de contraste sobre las pantallas ya construidas
+(los tokens cumplen AA; los pares que cada pantalla combina no se
+verificaron uno por uno), navegación por teclado en el PDV y el KDS, y
+lectores de pantalla.
 
 ## F2.15 Internacionalización
 
@@ -298,6 +367,20 @@ sistema de traducciones para un solo idioma (YAGNI).
 🔶 **Parcial**. JWT + refresh + Argon2id ya en backend; cookie de sesión ya
 implementada (`lib/auth.ts`, `decodificarClaims`). Protección de rutas por
 autenticación ya existe (redirect a `/login` sin cookie).
+
+✅ **El PIN dejó de tener campo, también en el login** (2026-08-15, ADR-050,
+enmienda a ADR-045). `app/login/page.tsx` lo pedía en un
+`<input type="password" autocomplete="current-password">` — el patrón que
+ADR-045 había eliminado dentro del PDV, con la etiqueta que le pide al
+navegador que lo guarde. Hoy el usuario se teclea y el PIN se toca en
+`components/pinpad/` (mudado desde `app/pdv/`, con su CSS a `globals.css` y
+respaldo de tokens para las dos paletas); no queda ningún campo, ni oculto,
+y una prueba e2e afirma el DOM para que el patrón no vuelva a colarse.
+Además `loginAction` **distingue los tres rechazos** del servidor —401, 423
+con sus 15 minutos, 429 con su `Retry-After`— y devuelve `{error, motivo}`
+en vez de `e.message`: antes los tres llegaban con el mismo texto y las tres
+salidas terminaban igual, probando de nuevo hasta bloquear la cuenta. Sigue
+abierto `app/cambiar-pin/`, con sus tres campos (ver Deuda → Frontend).
 
 ⬜ **Falta**: Content-Security-Policy (deuda ya declarada en
 `ROADMAP.md` → Seguridad — "falta definirla junto con el frontend"),
@@ -388,6 +471,13 @@ RN-POS-011 y que un rechazo del servidor no borre lo tecleado;
 **gate de módulo por permiso entrando por URL directa** (el filtro del home
 es UX; lo que decide es el `layout.tsx`). Fuera del PDV, el resto de las
 pantallas sigue sin prueba.
+✅ **16 casos** (2026-08-15, ADR-050): `sesion.spec.ts` suma los tres del
+login con pinpad — que **no exista ningún `input` de contraseña en el DOM**
+(se afirma el DOM y no un comportamiento: un `type="password"` agregado sin
+querer no rompería ninguna otra prueba), que un PIN equivocado no borre el
+usuario tecleado, y que una cuenta bloqueada (423) avise distinto que un PIN
+equivocado (401). El 429 no se prueba: `e2e/servidor-api.mjs` sube el rate
+limit a propósito para que la suite entera pueda entrar desde la misma IP.
 ⬜ Sin decidir testing unitario de componentes/hooks (candidato: Vitest +
 Testing Library cuando exista F2.4); los 14 casos de `npm test` corren a
 mano y **no están en CI**. No bloquea el alfa si es una demo guiada, pero sí
@@ -424,11 +514,21 @@ el de botón/acción no.
 
 ## F2.29 Sistema de productividad *(agregado local)*
 
-⬜ **Sin decidir.** Atajos de teclado, Command Palette, navegación rápida:
-nada construido. Razonable de diferir — valioso para el usuario de 8-10h
-(cajero, cocinero) pero no bloquea que el alfa funcione. Revisar cuando el
-POS tenga su primer flujo real (ahí es donde más se nota la fricción de
-clics).
+🔶 **Paleta de comandos construida 2026-08-12 (ADR-037)**.
+`components/shell/paleta-comandos.tsx`: `Ctrl+K` / `⌘K` abre un buscador de
+pantallas sobre `@base-ui/react` Autocomplete + Dialog — sin `cmdk`, que
+traería un motor de coincidencia difusa para ~50 entradas estáticas y el
+árbol de Radix que ADR-013 descartó. Los destinos salen de
+`lib/navegacion.ts`, se arman en el servidor y llegan **filtrados por
+permiso**. Cada resultado es un `<Link>` de verdad: Enter, clic, clic central
+y "abrir en pestaña nueva" funcionan sin programarlos.
+
+La tabla suma `/` para enfocar su buscador.
+
+⬜ **Falta**: atajos por acción dentro de una pantalla (guardar, nuevo,
+siguiente fila) y comandos que ejecuten en vez de navegar. Se revisan cuando
+el PDV tenga su primer flujo real — ahí es donde más se nota la fricción de
+clics.
 
 ## F2.30 Gestión de ventanas y multitarea *(agregado local)*
 
@@ -438,10 +538,21 @@ F2.8. Diferible hasta que el PDV real exponga el problema concreto.
 
 ## F2.31 Microinteracciones y feedback *(agregado local)*
 
-⬜ **Sin empezar.** Indicadores de guardado/sincronización/estados de
-carga: ninguno construido (el dashboard hoy no tiene ni loading skeleton).
-Entra naturalmente con F2.4 (Skeleton, Toast) — no es una sección aparte
-que requiera su propia decisión previa.
+✅ **Resuelto 2026-08-12 (ADR-037)**. Un `loading.tsx` por módulo
+(`components/estado/esqueleto-pantalla.tsx`): sin él Next espera a que el
+`page.tsx` resuelva y recién ahí pinta, así que el clic en el sidebar no
+acusa recibo. La silueta imita la pantalla real —título, acciones, tabla— en
+vez de un spinner: un rectángulo donde va a ir la tabla prepara la vista, un
+spinner solo informa que hay que esperar.
+
+También: transición de entrada por navegación (`revelar.tsx`), escalonado en
+la grilla del home, filas fantasma en la tabla mientras carga, `aria-busy` en
+el formulario mientras se envía, y toasts de `sonner` ya montados. Todo el
+movimiento cuelga de `--transicion` y se apaga entero con
+`prefers-reduced-motion: reduce`.
+
+⬜ **Falta**: indicador de sincronización para el PDV offline (ADR-009), que
+depende del motor de sync y no de esta capa.
 
 ## Resumen — qué cerrar antes de los diseños finales del alfa
 

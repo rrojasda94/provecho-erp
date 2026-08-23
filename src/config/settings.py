@@ -1,4 +1,5 @@
 from decimal import Decimal
+from importlib import metadata
 from typing import Annotated
 
 from pydantic import field_validator, model_validator
@@ -7,6 +8,20 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 JWT_SECRET_MIN_LEN = 32
 _PLACEHOLDER_SECRETO = "change-me"
 _PASSWORD_DB_POR_DEFECTO = "provecho:provecho@"
+#: Cuando se corre desde el fuente sin instalar el paquete (no pasa ni en la
+#: imagen ni con `pip install -e ".[dev]"`, que es el primer paso del README).
+_VERSION_DESCONOCIDA = "0.0.0"
+
+
+def _version_del_paquete() -> str:
+    """La versión sale de `pyproject.toml`, vía la metadata del paquete
+    instalado. Tenerla escrita a mano acá fue justamente lo que la dejó cuatro
+    releases atrás: `cortar_version.py` movía el CHANGELOG y el tag, y este
+    literal no se enteraba."""
+    try:
+        return metadata.version("provecho")
+    except metadata.PackageNotFoundError:
+        return _VERSION_DESCONOCIDA
 
 
 class Settings(BaseSettings):
@@ -18,6 +33,12 @@ class Settings(BaseSettings):
     environment: str = "local"
     debug: bool = False
     database_url: str = "postgresql+psycopg://provecho:provecho@localhost:5432/provecho"
+    # Cuánto deja correr Postgres una consulta antes de cancelarla. Dos plazos
+    # y no uno: el cobro de una mesa y un reporte de márgenes del trimestre no
+    # aguantan la misma espera, y con un solo número había que elegir entre
+    # matar reportes legítimos o dejar la caja colgada. 0 = sin límite.
+    db_statement_timeout_segundos: int = 15
+    db_statement_timeout_reportes_segundos: int = 120
     # Zona del negocio, no la del servidor: de ella sale "qué día es hoy"
     # para el ERP (`src/shared/fechas.py`). En Docker el sistema corre en UTC,
     # y con eso un cierre de las 20:00 hora Perú caía al día siguiente.
@@ -43,6 +64,17 @@ class Settings(BaseSettings):
     # frena un ataque que rota usernames desde la misma IP).
     rate_limit_login_intentos: int = 10
     rate_limit_login_ventana_segundos: int = 60
+    # Rate limit de la consulta de DNI/RUC (ADR-041). Cada llamada gasta cuota
+    # de un proveedor **pago** y trae datos personales de alguien que todavía
+    # no es nadie en el sistema, así que el límite no es contra el abuso sino
+    # contra el gasto: un bucle mal escrito en una pantalla agota el plan del
+    # mes. Dos cuentas y una sola ventana: la del usuario es la que de verdad
+    # frena a quien se pasa, la de la IP es el techo del local entero —todas
+    # las cajas salen por la misma, y limitar solo por IP dejaría al equipo
+    # sin consultar por culpa de uno—.
+    consulta_documento_intentos_usuario: int = 20
+    consulta_documento_intentos_ip: int = 60
+    consulta_documento_ventana_segundos: int = 60
     # Monto sobre el cual emitir una OC exige permiso purchases.aprobar
     # (RN-CMP — umbral configurable, valor semilla a ajustar por el negocio).
     purchases_umbral_aprobacion_oc: Decimal = Decimal("2000")
@@ -66,10 +98,18 @@ class Settings(BaseSettings):
     # Facturación electrónica (Factiliza → SUNAT). Por defecto apunta al
     # entorno QA: emitir contra producción exige cambiar la URL a conciencia.
     factiliza_base_url: str = "https://apife-qa.factiliza.com/api/v1"
-    # Consulta RUC/DNI (RENIEC/SUNAT) — producto distinto de la emisión,
-    # mismo token, host propio (no tiene sandbox QA separado).
+    # Consulta RUC/DNI (RENIEC/SUNAT) — producto distinto de la emisión: host
+    # propio (sin sandbox QA separado) **y token propio**. Se contrata y se
+    # regenera por separado en el panel de Factiliza, así que el de emisión
+    # devuelve 401 acá aunque sea válido — comprobado el 2026-08-22.
     factiliza_consulta_base_url: str = "https://api.factiliza.com/v1"
     factiliza_token: str = ""
+    # Son dos productos contratados por separado y Factiliza entrega un token
+    # por cada uno. Vacío = se reusa `factiliza_token`, que es lo correcto
+    # cuando el plan contratado cubre ambos con una sola credencial. Tenerlo
+    # aparte importa además para el día que uno se rote: rotar el de emisión
+    # no debería apagar el buscador de DNI del mostrador.
+    factiliza_consulta_documento_token: str = ""
     factiliza_timeout_segundos: float = 30.0
     igv_porcentaje: Decimal = Decimal("18")
     # --- WhatsApp Cloud API (Meta) — encuesta de satisfacción ---------------
@@ -87,6 +127,41 @@ class Settings(BaseSettings):
     # ventana de 24 h, Meta no acepta otra cosa.
     whatsapp_plantilla_encuesta: str = "encuesta_satisfaccion"
     whatsapp_plantilla_idioma: str = "es"
+    # --- Google Maps (direcciones y reparto) --------------------------------
+    # Dos claves y no una porque Google no deja restringir la misma por
+    # referente HTTP **y** por IP a la vez, y son dos usos con riesgos
+    # distintos.
+    #
+    # La del navegador dibuja el mapa y autocompleta: viaja al cliente a
+    # propósito, y lo único que la protege es la restricción por dominio más
+    # la cuota diaria de la consola. Vacía = el campo de dirección se comporta
+    # como el `<input>` de texto de siempre.
+    google_maps_browser_key: str = ""
+    # La del servidor calcula la distancia con la que se le cobra el delivery
+    # al cliente. NUNCA sale de la API: un número que viaja por el navegador
+    # es un número que se puede editar. Vacía = la distancia se estima en
+    # línea recta y la cotización se marca aproximada.
+    google_maps_server_key: str = ""
+    # Map ID de la consola de Google: sin uno, el pin del mapa no se
+    # dibuja. `DEMO_MAP_ID` es el que Google publica para desarrollo.
+    google_maps_map_id: str = "DEMO_MAP_ID"
+    google_routes_base_url: str = "https://routes.googleapis.com"
+    google_timeout_segundos: float = 10.0
+    # Sesga el autocompletado al país del negocio (ISO 3166-1 alfa-2).
+    google_maps_pais: str = "pe"
+    # --- Tarifa del delivery propio -----------------------------------------
+    # Los tres en 0 = función apagada: el delivery se sigue cobrando como
+    # hasta ahora hasta que el negocio defina la tarifa. Nada se enciende solo.
+    delivery_tarifa_base: Decimal = Decimal("0")
+    delivery_precio_por_km: Decimal = Decimal("0")
+    # Pasado este radio se sugiere derivar a una plataforma externa en vez de
+    # mandar al repartidor propio. 0 = sin radio máximo.
+    delivery_distancia_maxima_km: Decimal = Decimal("0")
+    # Distritos donde no se reparte con repartidor propio, separados por coma.
+    # Es una lista de nombres y no un polígono a propósito: el distrito ya
+    # viene en la respuesta de Google y resuelve el caso real sin traer
+    # geometría (ni PostGIS) al proyecto.
+    delivery_distritos_restringidos: Annotated[list[str], NoDecode] = []
     # --- Encuesta de satisfacción (marketing) --------------------------------
     # Vigencia de la encuesta enviada. Pasado el plazo, el barrido la expira:
     # una respuesta de dos semanas después no mide la experiencia de ese
@@ -98,7 +173,11 @@ class Settings(BaseSettings):
     # Cola de emisión de comprobantes (Celery). Por defecto reusa Redis.
     celery_broker_url: str = ""
     # --- Observabilidad -----------------------------------------------------
-    app_version: str = "0.1.0"
+    # No es un literal: quedó cuatro releases atrás (0.1.0 con el proyecto en
+    # 0.5.0) porque nada lo movía, y con él se etiquetan los errores en
+    # GlitchTip y la versión de `/docs`. Un `release` congelado hace inútil el
+    # "apareció en la versión X" que es la mitad del valor de reportar errores.
+    app_version: str = _version_del_paquete()
     log_level: str = "INFO"
     # JSON siempre en producción; acá se fuerza también fuera de ella.
     log_json: bool = False
@@ -163,7 +242,12 @@ class Settings(BaseSettings):
     def es_hub(self) -> bool:
         return self.deployment_mode == "hub"
 
-    @field_validator("allowed_hosts", "cors_origins", mode="before")
+    @field_validator(
+        "allowed_hosts",
+        "cors_origins",
+        "delivery_distritos_restringidos",
+        mode="before",
+    )
     @classmethod
     def _lista_por_comas(cls, valor: object) -> object:
         """Acepta `a,b` en .env además de la lista JSON de pydantic.

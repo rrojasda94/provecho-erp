@@ -40,6 +40,18 @@ class ReporteEmitido(Base, UuidPkMixin, TimestampMixin):
     sucursal_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("sucursal.id"), nullable=True
     )
+    # De dónde viene, hasta el último nivel. `_ubicar()` ya lo resolvía para
+    # elegir destinatarios y lo descartaba: sin él, un «stock bajo mínimo» no
+    # dice en qué almacén hay que reponer.
+    almacen_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("almacen.id"), nullable=True
+    )
+    # Quién provocó el hecho. Nulo = lo detectó el sistema (un barrido, un
+    # cruce de umbral) y no hay a quién atribuírselo (RN-REP-009). Distinto de
+    # `entrega_reporte.usuario_id`, que es a quién le *llegó*.
+    actor_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("usuario.id"), nullable=True
+    )
     codigo_emision: Mapped[str] = mapped_column(String(60))
     titulo: Mapped[str] = mapped_column(String(200))
     cuerpo: Mapped[str | None] = mapped_column(Text, nullable=True)

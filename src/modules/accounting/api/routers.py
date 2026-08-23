@@ -28,7 +28,13 @@ from src.modules.accounting.infrastructure.repositories import (
     CustodiaEfectivoRepo,
     MovimientoCajaRepo,
 )
-from src.modules.users.api.deps import get_db, get_tenant, require_permission
+from src.modules.users.api.deps import (
+    check_permission,
+    get_current_user,
+    get_db,
+    get_tenant,
+    require_permission,
+)
 from src.modules.users.application import autorizacion
 from src.modules.users.application.errors import TokenInvalido
 from src.modules.users.application.queries_publicas import tiene_permiso
@@ -49,8 +55,11 @@ ARQUEO_REGISTRAR = "accounting.arqueo_registrar"
 # Retirar efectivo del cajón lo autoriza un supervisor, no el cajero solo
 # (RN-MDP-007).
 CAJA_RETIRAR = "accounting.caja_retirar"
-# Recibir o entregar el efectivo en cada tramo de la cadena de custodia
-# (RN-MDP-002): apertura, cierre y traslado a contabilidad.
+# Recibir el efectivo en cada tramo de la cadena de custodia (RN-MDP-002):
+# del cajón al encargado, del encargado a contabilidad, y de ahí a
+# disponible. **Ya no interviene en abrir ni cerrar** (RN-MDP-008, ADR-049):
+# el turno lo opera el cajero solo y firmar tiene sentido solo donde la
+# plata cambia de manos.
 CAJA_RELEVAR = "accounting.caja_relevar"
 # Corregir un cierre ya registrado (RN-MDP-005).
 CAJA_REABRIR = "accounting.caja_reabrir"
@@ -273,6 +282,20 @@ def listar_pagos(
     )
 
 
+@router.get(
+    "/pagos-proveedor/{movimiento_id}", response_model=schemas.MovimientoDineroOut
+)
+def obtener_pago(
+    movimiento_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Destino de `accounting.pago_requiere_aprobacion`: el aviso decía que
+    un pago espera aprobación y no había forma de ir a mirar cuál."""
+    return exigir_pago(session, movimiento_id, tenant)
+
+
 @router.post(
     "/pagos-proveedor/{movimiento_id}/ejecutar", response_model=schemas.MovimientoDineroOut
 )
@@ -321,8 +344,13 @@ def abrir_caja(
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    """Abre el turno: el cajero cuenta el fondo, el encargado lo firma con su
-    PIN y los POS de tarjeta quedan verificados (RN-MDP-002, RN-POS-003/010).
+    """Abre el turno: el cajero cuenta el fondo y verifica los POS de tarjeta
+    (RN-POS-003/010).
+
+    **La abre él solo** (RN-MDP-008): alcanza con `accounting.caja_operar`,
+    el permiso que su rol ya tiene. Sin elevación de PIN — exigirla obligaba
+    a que un encargado viniera a firmar cada apertura, y en el local eso se
+    terminaba resolviendo dejando la sesión del encargado abierta en la caja.
 
     Un faltante de sencillo o un POS averiado **no impiden abrir**
     (RN-POS-011): quedan reportados y el local abre en su horario.
@@ -332,7 +360,6 @@ def abrir_caja(
         session,
         punto_venta_id=body.punto_venta_id,
         cajero_id=actor.id,
-        relevo_encargado_id=_autorizado(body.autorizacion, CAJA_RELEVAR),
         monto_declarado=body.monto_declarado,
         detalle_denominaciones=body.detalle_denominaciones,
         pos_verificados=[p.model_dump() for p in body.pos_verificados or []],
@@ -351,8 +378,12 @@ def cerrar_caja(
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    """Cierra el turno contra el conteo por denominación y entrega el
-    efectivo al encargado, que firma con su PIN (RN-POS-007, RN-MDP-002).
+    """Cierra el turno contra el conteo por denominación (RN-POS-007).
+
+    **Lo cierra el cajero solo** (RN-MDP-008), sin elevación de PIN. El
+    efectivo queda `en_caja` a su nombre; entregárselo al encargado es un
+    acto aparte y posterior, y ese sí lo firma quien recibe
+    (`POST /cajas/custodias/{id}/entregar`, RN-MDP-002).
 
     Si el cierre venía reabierto, este mismo endpoint lo recalcula sobre el
     registro existente — un turno tiene un solo cierre, con su historial de
@@ -363,7 +394,6 @@ def cerrar_caja(
         session,
         apertura_caja_id,
         cajero_id=actor.id,
-        receptor_id=_autorizado(body.autorizacion, CAJA_RELEVAR),
         detalle_denominaciones=body.detalle_denominaciones,
         custodia=body.custodia,
         descuadre_atribucion=body.descuadre_atribucion,
@@ -430,7 +460,18 @@ def entregar_custodia(
     session: Session = Depends(get_db),
 ):
     """Avanza la cadena de custodia; quien **recibe** firma con su PIN
-    (RN-MDP-002)."""
+    (RN-MDP-002).
+
+    Desde ADR-049 este es el **único** endpoint del ciclo de caja que exige
+    la elevación con `accounting.caja_relevar`, y el primer tramo
+    (`en_caja → en_supervisor`) es la entrega que antes se daba por hecha al
+    cerrar: el efectivo sale del cajón cuando alguien firma que lo recibió,
+    no cuando el cajero terminó de contarlo.
+
+    La sesión que opera la pantalla necesita `accounting.caja_operar`; quien
+    firma es otro y aporta solo su PIN. Un cajero puede tener la pantalla
+    abierta y **no** puede firmar la recepción: no tiene `caja_relevar`.
+    """
     exigir_custodia(session, custodia_id, tenant)
     custodia = caja.entregar_custodia(
         session,
@@ -522,13 +563,43 @@ def listar_turnos_cerrados(
     )
 
 
-@router.get("/cajas/abiertas", response_model=list[schemas.CajaAbiertaOut])
-def listar_cajas_abiertas(
-    empresa_id: uuid.UUID | None = None,
+@router.get(
+    "/cajas/cierres/{cierre_caja_id}", response_model=schemas.CierreCajaDetalleOut
+)
+def obtener_cierre_caja(
+    cierre_caja_id: uuid.UUID,
     _: Usuario = Depends(require_permission(LEER)),
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
+    """Destino de `accounting.cierre_caja_irregular`."""
+    exigir_cierre_caja(session, cierre_caja_id, tenant)
+    return caja.turno_cerrado(session, cierre_caja_id)
+
+
+@router.get("/cajas/abiertas", response_model=list[schemas.CajaAbiertaOut])
+def listar_cajas_abiertas(
+    empresa_id: uuid.UUID | None = None,
+    sucursal_id: uuid.UUID | None = None,
+    usuario: Usuario = Depends(get_current_user),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Con `sucursal_id`, **quien opera una caja** puede preguntar si la de su
+    local ya está abierta; sin él hace falta `accounting.leer`, porque son las
+    de toda la empresa.
+
+    Antes exigía `accounting.leer` siempre, y un cajero —que tiene
+    `caja_operar` y no `leer`— recibía 403. El PDV lo trataba como "no hay
+    caja abierta" y le pedía abrir una que ya estaba abierta, para después
+    negarle la apertura por duplicada: un callejón sin salida que empezaba
+    como un permiso mal elegido.
+    """
+    if sucursal_id is not None:
+        tenant.exigir_sucursal(sucursal_id)
+        check_permission(session, usuario, LEER, CAJA_OPERAR)
+        return caja.cajas_abiertas(session, sucursal_id=sucursal_id)
+    check_permission(session, usuario, LEER)
     return caja.cajas_abiertas(session, tenant.filtro_empresa(empresa_id))
 
 

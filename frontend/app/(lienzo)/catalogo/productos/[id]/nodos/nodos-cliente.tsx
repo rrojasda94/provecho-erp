@@ -12,6 +12,7 @@ import {
   type Edge,
   type Node,
 } from "@xyflow/react";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
@@ -19,6 +20,7 @@ import {
   type Articulo,
   type GrupoOpcion,
   type Producto,
+  type LineaDeAtributo,
   type ProductoDetalle,
   type Receta,
   type RecetaDetalle,
@@ -35,6 +37,7 @@ import {
   recetasDelLienzo,
   resolverEmpaque,
   sinVincular,
+  valoresExcluidos,
   tituloDelPlato,
   type Camino,
   type Grafo,
@@ -87,6 +90,10 @@ export function LienzoNodos(props: Props) {
 type Props = {
   inicial: ProductoDetalle;
   variantesIniciales: ProductoDetalle[];
+  /** Atributos que el producto ofrece (ADR-055). Vacío = catálogo viejo, y
+   * el lienzo dibuja exactamente lo de antes. */
+  atributos?: LineaDeAtributo[];
+  exclusiones?: [string, string][];
   recetas: Receta[];
   unidades: UnidadMedida[];
   extrasDisponibles: Producto[];
@@ -96,11 +103,14 @@ type Props = {
 function Lienzo({
   inicial,
   variantesIniciales,
+  atributos = [],
+  exclusiones = [],
   recetas,
   unidades,
   extrasDisponibles,
   empaques,
 }: Props) {
+  const router = useRouter();
   const [padre, setPadre] = useState(inicial);
   const [variantes, setVariantes] = useState(variantesIniciales);
   const [error, setError] = useState("");
@@ -116,6 +126,7 @@ function Lienzo({
     elegidas: {},
     sueltos: [],
     restas: [],
+    valores: [],
   });
   const [precio, setPrecio] = useState("");
   const [modalidad, setModalidad] = useState("mesa");
@@ -149,13 +160,18 @@ function Lienzo({
       try {
         await accion();
         await recargar();
+        // `recargar` reelee el producto, pero la lista de recetas la trae el
+        // server component: sin esto, un tamaño o una opción recién creados
+        // muestran "receta" en el pie en vez del nombre de la suya, hasta
+        // que alguien recargue la página a mano.
+        router.refresh();
       } catch (e) {
         setError(e instanceof ErrorApi ? e.message : "No se pudo guardar el cambio.");
       } finally {
         setOcupado(false);
       }
     },
-    [recargar],
+    [recargar, router],
   );
 
   const elegidos = useMemo(
@@ -185,17 +201,61 @@ function Lienzo({
   const acciones = useMemo(
     () => ({
       irA: (id: string) =>
-        setCamino({ activoId: id, elegidas: {}, sueltos: [], restas: [] }),
+        setCamino({
+          activoId: id,
+          elegidas: {},
+          sueltos: [],
+          restas: [],
+          valores: [],
+        }),
       enGrupo: (grupo: GrupoOpcion, extraId: string) =>
         setCamino((previo) => elegirEnGrupo(previo, grupo, extraId)),
       suelto: (id: string) =>
         setCamino((p) => ({ ...p, sueltos: alternar(p.sueltos, id) })),
       resta: (id: string) =>
         setCamino((p) => ({ ...p, restas: alternar(p.restas, id) })),
+      // Elegir un valor **suelta** los que quedan excluidos por él
+      // (RN-COM-038): media hawaiana en la primera mitad no puede convivir
+      // con media hawaiana en la segunda, y dejarlas las dos marcadas sería
+      // mostrar un plato que la venta va a rechazar.
+      valor: (ptavId: string) =>
+        setCamino((p) => {
+          const elegidos = alternar(p.valores, ptavId);
+          const fuera = valoresExcluidos(elegidos, exclusiones);
+          return { ...p, valores: elegidos.filter((v) => !fuera.has(v)) };
+        }),
       quitarExtra: (extraId: string) =>
         correr(() => catalogoApi.desvincularExtra(activo.id, extraId)),
+      borrarGrupo: (grupoId: string) =>
+        correr(() => catalogoApi.borrarGrupo(activo.id, grupoId)),
     }),
-    [activo.id, correr],
+    [activo.id, correr, exclusiones],
+  );
+
+  /**
+   * Dónde quedó un nodo, cuando hay dónde guardarlo (ADR-058).
+   *
+   * Solo el producto y los tamaños son filas de `producto_comercial`: un
+   * nodo de grupo, de valor o de resta no tiene columna que lo reciba, y su
+   * lugar lo sigue dictando la topología. Persistir lo que sí se puede es
+   * mejor que no persistir nada — es lo que la gente reacomoda para comparar
+   * dos tamaños de un vistazo.
+   *
+   * No pasa por `correr`: recolocar un nodo no puede bloquear el lienzo ni
+   * pintar un error si falla. Es cosmético, y el próximo arrastre lo
+   * reintenta solo.
+   */
+  const guardarPosicion = useCallback(
+    (nodoId: string, x: number, y: number) => {
+      const [tipo, id] = nodoId.split(":");
+      const productoId =
+        tipo === "producto" ? padre.id : tipo === "tamano" ? id : null;
+      if (!productoId) return;
+      void catalogoApi
+        .editarProducto(productoId, { lienzo_pos: { x, y } })
+        .catch(() => {});
+    },
+    [padre.id],
   );
 
   const disponibles = useMemo(
@@ -215,9 +275,11 @@ function Lienzo({
         empaques,
         modalidad,
         disponibles,
+        atributos,
+        exclusiones,
       }),
     [padre, variantes, activo, camino, recetas, fusion.quitables, empaques,
-     modalidad, disponibles],
+     modalidad, disponibles, atributos, exclusiones],
   );
 
   const { nodos, aristas } = useMemo(
@@ -252,6 +314,7 @@ function Lienzo({
         onDesconectar={(desde, hasta) =>
           correr(() => desconectar(activo.id, desde, hasta))
         }
+        onMover={guardarPosicion}
       />
 
       <Inspector
@@ -317,9 +380,11 @@ function EditorDeNodo({
  * El canvas propiamente dicho.
  *
  * `useNodesState` mantiene lo que el usuario arrastró; el efecto lo reemplaza
- * cuando el grafo cambia. Por eso mover un nodo dura hasta el próximo cambio
- * de estructura: es la consecuencia aceptada de no persistir posiciones
- * (ADR-035).
+ * cuando el grafo cambia. Desde ADR-058 el producto y los tamaños guardan su
+ * posición (`lienzo_pos`), así que el grafo que llega ya trae dónde iban y el
+ * reemplazo deja de perderlas. Los demás nodos los sigue colocando la
+ * topología, que es lo que ADR-035 decidió y sigue siendo cierto para una
+ * columna de dieciocho extras.
  *
  * `fitView` corre al montar y a pedido, nunca en cada cambio: reencuadrar
  * mientras alguien está tocando nodos les mueve el objetivo debajo del dedo.
@@ -331,6 +396,7 @@ function Canvas({
   onSeleccion,
   onConectar,
   onDesconectar,
+  onMover,
 }: {
   nodos: Node[];
   aristas: Edge[];
@@ -338,6 +404,7 @@ function Canvas({
   onSeleccion: (d: DatosNodo | null) => void;
   onConectar: (desde: string, hasta: string) => void;
   onDesconectar: (desde: string, hasta: string) => void;
+  onMover: (nodoId: string, x: number, y: number) => void;
 }) {
   const [pintados, setPintados, onNodesChange] = useNodesState(nodos);
   const { fitView, getZoom } = useReactFlow();
@@ -383,6 +450,10 @@ function Canvas({
         nodes={pintados}
         edges={aristas}
         onNodesChange={onNodesChange}
+        // Se guarda al **soltar**, no en cada cuadro del arrastre: mover un
+        // nodo cincuenta pixeles son cincuenta PATCH si se escucha el
+        // movimiento (ADR-058).
+        onNodeDragStop={(_, n) => onMover(n.id, n.position.x, n.position.y)}
         nodeTypes={TIPOS_NODO}
         colorMode="dark"
         fitView
@@ -392,12 +463,13 @@ function Canvas({
         fitViewOptions={{ padding: 0.14, maxZoom: 1 }}
         minZoom={0.25}
         maxZoom={1.75}
-        // La topología la dicta RN-PRD-004: se pueden mover los nodos, pero
-        // no cablearlos a mano.
         // Se cablea, pero solo lo que el dominio admite: `conexiones.ts`
-        // rechaza cualquier par que no sea colgar un extra.
+        // rechaza cualquier par que no sea colgar un extra, y lo dice.
         nodesConnectable
         onConnect={(c) => onConectar(c.source, c.target)}
+        // `Supr` además de `Backspace` (el default): en una caja con teclado
+        // numérico `Supr` es la tecla que se busca para borrar.
+        deleteKeyCode={["Delete", "Backspace"]}
         onEdgesDelete={(ids) =>
           ids.forEach((e) => onDesconectar(e.source, e.target))
         }
@@ -422,8 +494,35 @@ type Acciones = {
   enGrupo: (grupo: GrupoOpcion, extraId: string) => void;
   suelto: (id: string) => void;
   resta: (id: string) => void;
+  valor: (ptavId: string) => void;
   quitarExtra: (extraId: string) => void;
+  borrarGrupo: (grupoId: string) => void;
 };
+
+/** El "quitar" de cada nodo, o nada si ese tipo no se retira. Lo que se
+ * retira no es lo mismo en cada uno: la opción se **desvincula** (el extra
+ * sigue existiendo con su receta y su precio) y el grupo se **borra**,
+ * soltando sus opciones, que pasan a ofrecerse sin mínimo. */
+function alQuitar(
+  nodo: Grafo["nodos"][number],
+  acc: Acciones,
+): Pick<DatosNodo, "onQuitar" | "quitarAria"> {
+  const ref = nodo.datos.refId;
+  if (!ref) return {};
+  if (nodo.tipo === "opcion") {
+    return {
+      onQuitar: () => acc.quitarExtra(ref),
+      quitarAria: "Deja de ofrecerlo en este producto. El extra no se borra",
+    };
+  }
+  if (nodo.tipo === "grupo") {
+    return {
+      onQuitar: () => acc.borrarGrupo(ref),
+      quitarAria: "Borra el grupo. Sus opciones siguen ofreciéndose, ya sin mínimo",
+    };
+  }
+  return {};
+}
 
 /** Qué hace un click sobre cada tipo de nodo. Tabla en vez de cadena de
  * ternarios: la complejidad de una búsqueda en `Record` es 1. */
@@ -436,6 +535,7 @@ function alTocar(
   if (!ref) return undefined;
   if (nodo.tipo === "tamano") return () => acc.irA(ref);
   if (nodo.tipo === "resta") return () => acc.resta(ref);
+  if (nodo.tipo === "valor") return () => acc.valor(ref);
   if (nodo.tipo !== "opcion") return undefined;
   const grupo = activo.grupos.find((g) => g.id === nodo.datos.grupoId);
   return grupo ? () => acc.enGrupo(grupo, ref) : () => acc.suelto(ref);
@@ -455,14 +555,15 @@ function aReactFlow(
     type: n.tipo,
     position: { x: n.x, y: n.y },
     className: n.datos.activo ? "activo-rf" : undefined,
+    // El nodo se retira con su acción "quitar", que llama a la API. Borrarlo
+    // con `Supr` solo lo sacaría del dibujo y volvería en el próximo
+    // refresco: un fantasma que hace dudar de si se guardó algo.
+    deletable: false,
     data: {
       ...n.datos,
       total,
       onToggle: alTocar(n, activo, acc),
-      onQuitar:
-        n.tipo === "opcion" && n.datos.refId
-          ? () => acc.quitarExtra(n.datos.refId as string)
-          : undefined,
+      ...alQuitar(n, acc),
     } satisfies DatosNodo,
   }));
   const aristas: Edge[] = grafo.aristas.map((a) => ({
@@ -473,6 +574,10 @@ function aReactFlow(
     // Solo lo que está en el plato se anima: animar todo es ruido, y con
     // `prefers-reduced-motion` la hoja de estilo lo apaga.
     animated: a.clase === "camino",
+    // Se corta lo que se puede desvincular y nada más. El resto del árbol lo
+    // dicta RN-PRD-004: dejarlo borrable sería ofrecer un gesto cuyo único
+    // desenlace es un mensaje de error.
+    deletable: a.hasta.startsWith("opcion:"),
   }));
   return { nodos, aristas };
 }

@@ -3,6 +3,114 @@
 Parte del backlog de deuda técnica del proyecto. El índice y las reglas
 de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 
+- ⬜ **El reparto se calcula y se guarda, pero no se cobra como línea de
+  venta** (2026-08-22, ADR-054): `venta.costo_entrega` queda en la fila y se
+  muestra en caja, pero **no suma al total** ni aparece en el comprobante ni
+  en el asiento contable. Cobrarlo de verdad exige una línea de venta sobre un
+  producto de servicio "Delivery" —con su IGV y su cuenta— y eso toca
+  comprobante, contabilidad y el cálculo del total. Se dejó afuera a propósito:
+  el radio de impacto del cambio es mucho mayor que el resto de este slice y no
+  se puede validar sin decidir antes qué producto y qué cuenta usa.
+- ⬜ **La tarifa de delivery es una sola para todo el grupo** (2026-08-22,
+  ADR-054): `DELIVERY_TARIFA_BASE`, `DELIVERY_PRECIO_POR_KM` y
+  `DELIVERY_DISTANCIA_MAXIMA_KM` viven en `settings`. El día que dos locales
+  necesiten precios distintos —o dos marcas—, pasan a columnas de `sucursal`,
+  que es donde ya vive el resto de lo que distingue a un local.
+- ⬜ **Las zonas de reparto son una lista de distritos, no polígonos**
+  (2026-08-22, ADR-054): `DELIVERY_DISTRITOS_RESTRINGIDOS` compara contra el
+  distrito que devuelve Google. Alcanza para "no repartimos en Belén" y no para
+  "no repartimos del río para allá". Se cierra con PostGIS y una pantalla para
+  dibujar el polígono; hasta que el negocio lo pida, es mucha máquina.
+- ⬜ **DAZ DAZ es un aviso al cajero, no una integración** (2026-08-22,
+  ADR-054): cuando el pedido queda fuera del radio o en zona vetada, el PDV lo
+  sugiere y quien decide es la persona. Mandarles el pedido de verdad exige su
+  API, credenciales y un adaptador propio en `shared/integrations/`.
+- ⬜ **El cliente jurídico no tiene dónde anclar su dirección** (2026-08-22,
+  ADR-053): `Cliente` no tiene columna de dirección — hoy la dirección de uno
+  jurídico termina en `contacto`, que es un campo para el teléfono o el correo
+  de quien coordina. `crear_cliente` recibe la ubicación y la aplica solo al
+  natural (a su `persona`). Se cierra dándole a `Cliente` su propia dirección,
+  que es un cambio de modelo que este slice no necesitaba.
+- ⬜ **Un cliente natural no se actualiza por planilla** (2026-08-20,
+  ADR-052, RN-PTS-007): de uno que ya existe la carga masiva solo puede
+  **completar el documento**. Su nombre, teléfono y domicilio viven en
+  `persona` (RN-GEN-007) y `sales` no puede escribirla — el contrato público
+  de `users` (`queries_publicas`) es de solo lectura. La fila que los cambie se
+  reporta con "se corrige en Personas" y no se aplica a medias, que es lo
+  correcto hoy; lo que falta es poder corregirlos de golpe. Se cierra con un
+  contrato público de **escritura** en `users`, que es un patrón nuevo y no
+  debía inventarse dentro de la carga masiva.
+- ⬜ **La carga masiva de clientes no consulta a SUNAT ni a RENIEC**
+  (2026-08-20, ADR-052): `consultar_documento=False` a propósito — trescientas
+  filas serían trescientas llamadas externas secuenciales dentro de un request,
+  contra una cuota. Consecuencia asumida: una razón social mal tecleada en la
+  planilla entra tal cual, y solo se corrige editando el cliente de a uno. Se
+  cierra encolando la consulta después del commit (una tarea por lote), no
+  dentro del request.
+
+- ✅ 2026-08-12 **La orden enviada sigue viva** (ADR-043, RN-COM-029):
+  admite líneas nuevas sin firma de nadie, y quitarlas es gratis dentro de
+  los 5 minutos. Antes agregar era imposible y quitar exigía siempre el PIN
+  de un supervisor — un control que se ejecuta veinte veces por turno deja de
+  ser un control.
+- ✅ 2026-08-12 **Los borradores vacíos ya no se apilan**: el "+" reusa el que
+  esté vacío y una pestaña sin líneas se descarta con su "×".
+- 🔶 **El KDS no distingue una línea agregada de las originales**
+  (2026-08-12, ADR-043): entra a la cola como cualquier otra, sin decir que
+  llegó después. Para la cocina está bien —hay que prepararla igual—, y
+  desde ADR-044 el despacho **sí ve que el pedido creció**: su tarjeta lista
+  todas las líneas con su estación, así que una recién agregada aparece
+  esperando y el contador "N de M" la incluye. Queda solo el matiz de
+  antigüedad: no se ve **cuándo** llegó cada una, que es lo que permitiría
+  distinguir "falta una que pidieron recién" de "falta una que se atascó".
+  Se resuelve mostrando la hora de la línea en la tarjeta, dato que
+  `venta_item.created_at` ya tiene. Va junto con "KDS sin reloj por pedido".
+
+- ✅ 2026-08-12 **La variante hereda del padre** (ADR-042): ADR-038 arregló el
+  catálogo del seeder (grupos en la variante) y dejó roto el armado a mano
+  (grupos en el padre, que es donde el lienzo los cuelga mientras el producto
+  no tiene tamaños). Ahora el lugar donde quedó colgado el grupo no decide
+  nada.
+- ✅ 2026-08-12 **El cajero puede anular una orden enviada** con firma de
+  supervisor, igual que para quitar una línea (RN-COM-020). `sales.anular` es
+  de supervisor y sigue siéndolo; lo que faltaba era el camino del cajero.
+- ✅ 2026-08-12 **Pestaña de cuentas abiertas** en el PDV: estaba como nota al
+  pie del mapa de mesas y filtraba fuera las de mesa, así que "¿qué falta
+  cobrar?" no se podía responder de un vistazo.
+
+- ✅ 2026-08-12 **La carta lleva los grupos de cada variante** (ADR-038):
+  `precios.carta` los leía del producto **padre**, que no tiene ninguno, así
+  que el PDV no dibujaba "Sabor" y el servidor rechazaba la venta con 409 por
+  algo que la pantalla nunca ofreció. Cierra también el segundo bloqueo: los
+  sabores del seeder se creaban **sin precio de lista** y la carta descarta
+  todo extra sin precio vigente.
+- ⬜ **`GET /carta` consulta grupos y extras producto por producto** (N+1).
+  Ya era así antes de ADR-038 —dos consultas por producto— pero ahora corre
+  también por cada variante: una pizza de tres tamaños pasó de 2 a 8
+  consultas. Es el endpoint más caliente del PDV, aunque se pide al abrir la
+  caja y al cambiar de modalidad, no por tecla. Se arregla con dos consultas
+  por marca (`grupos_de`/`extras_de` en bloque, agrupadas en memoria); no se
+  hizo ahora para no mezclar una optimización con el arreglo de un bug que
+  impedía vender. Medir antes con un catálogo real: si el número no molesta,
+  no vale el cambio.
+- ⬜ **La ficha de producto solo muestra lo que cuelga de ese producto**
+  (`/catalogo/productos/{id}`, `catalogo.detalle_producto`). No está mal —es
+  por producto a propósito: se edita lo propio, y editar lo heredado desde el
+  hijo es cómo se termina con dos copias del mismo grupo (ADR-042)— pero deja
+  la pantalla mintiendo por omisión en los dos sentidos: el padre no muestra
+  los grupos que viven en sus variantes, y la variante no muestra los que
+  hereda, aunque el PDV se los ofrezca. Lo que falta es que lo diga: "hereda 1
+  grupo de Pizza" con enlace al lienzo, que es el lugar de trabajo de esa
+  estructura (ADR-035).
+- ⬜ **Los seeders de demo corridos fuera de orden no avisan nada**
+  (encontrado 2026-08-12 al verificar la carta). `pizzas_demo._precio` hace
+  `if lista is None: return` y envuelve el resto en un `except Exception`
+  mudo, así que correrlo **antes** de `pdv_demo` —que es quien crea la lista
+  de precios— deja el catálogo entero sin precios y aun así imprime "Carta de
+  pizzas lista: 3 tamaños × 6 sabores + 4 extras". El orden correcto está en
+  `docs/engineering/devops.md`, pero el seeder debería negarse a correr sin
+  lista en vez de dejar una carta muda.
+
 - ✅ 2026-08-03 **Variantes y grupos de opciones** (ADR-023, migración
   `b6d1e83f47ac`): la variante es un `producto_comercial` hijo con receta y
   **precio completo** propios (RN-COM-022) — no un recargo sobre un precio
@@ -37,10 +145,25 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   vaya a buscar. Es una entrada en `reports/domain/catalogo.py` más su fila
   en `events.md`, pero primero hay que decidir a qué área se dirige —
   gerencia, contabilidad, o el encargado del local.
-- ⬜ **7 íconos del home siguen llevando a 404** (`/produccion`, `/rrhh`,
-  `/marketing`, `/gerencia`, `/usuarios`, `/contabilidad`, y el resto de
-  `/inventario`): el grid lista los módulos que tienen **backend**, no los que
-  tienen pantalla. O se construyen, o el grid deja de mostrar lo que no existe.
+- ✅ 2026-08-15 **Los íconos del home ya no llevan a 404** — y hacía rato que no
+  lo hacían: los siete destinos que la deuda enumeraba (`/produccion`, `/rrhh`,
+  `/marketing`, `/gerencia`, `/usuarios`, `/contabilidad` y el resto de
+  `/inventario`) se construyeron en las entregas siguientes y nadie volvió a
+  marcar el ítem, así que la deuda siguió declarando un 404 que ya no ocurría.
+  Lo que **sí** daba 404 era otra cosa: cinco módulos (`catalogo`, `compras`,
+  `inventario`, `organizacion`, `rrhh`) tenían carpeta y `layout.tsx` pero
+  ninguna ruta en su raíz, porque el ícono apunta a la primera pantalla
+  (`/catalogo/productos`). Nada del shell enlaza ahí, pero sí lo teclea quien
+  recorta la URL para subir un nivel — justo lo que uno hace cuando se pierde.
+  Ahora cada raíz redirige a `modulo.href` (leído de `lib/modulos.ts`, no
+  repetido por archivo) y existe `app/not-found.tsx`: hasta ahora el 404 lo
+  resolvía la pantalla por defecto de Next, en inglés y sin salida, que en una
+  tablet detrás de la barra se resuelve apagando y volviendo a entrar. La causa
+  de fondo era que nada ataba los `href` al árbol de archivos:
+  `lib/navegacion.test.ts` cruza `MODULOS` con `SUBMENUS`, y los dos pueden
+  coincidir apuntando a una ruta que no existe — por eso el ítem sobrevivió sin
+  que nadie pudiera decir si seguía siendo cierto. `lib/rutas.test.ts` resuelve
+  los 14 íconos y los 25 ítems de submenú contra los `page.tsx` reales.
 - ✅ 2026-08-03 **Catálogo separado del PDV en el frontend**: módulo propio
   (`/catalogo/productos`) con gate por permiso **exacto**
   `sales.gestionar_catalogo`, el mismo que la API exige para escribir. El
@@ -118,8 +241,9 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
     ADR-005 ya lo dejaba previsto). `FactilizaClient.consultar_dni`/
     `consultar_ruc` (host propio, `FACTILIZA_CONSULTA_BASE_URL` —
     `api.factiliza.com`, **distinto** de `FACTILIZA_BASE_URL` que es solo
-    emisión de comprobantes contra la QA `apife-qa.factiliza.com`; mismo
-    token). `nombres_desde_dni`/`razon_social_desde_ruc`
+    emisión de comprobantes contra la QA `apife-qa.factiliza.com`; y **token
+    propio**, `FACTILIZA_CONSULTA_DOCUMENTO_TOKEN` — acá decía "mismo token"
+    y era falso, corregido el 2026-08-22). `nombres_desde_dni`/`razon_social_desde_ruc`
     (`src/shared/integrations/factiliza/`) hacen fallback a lo tecleado si
     Factiliza no responde o no encuentra el documento — el alta nunca se
     bloquea por un proveedor externo caído. Cableado en
@@ -280,7 +404,20 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   puente a impresora térmica (ESC/POS por red o agente local) y comanda
   automática al confirmar venta (hoy es bajo demanda).
 - ⬜ **KDS tiempos**: alertas por pedido demorado (umbral por pantalla) y
-  métricas de tiempo de preparación (base: `venta_item.updated_at`).
+  métricas de tiempo de preparación (base: `venta_item.updated_at`). Con la
+  cadena de ADR-044 esto se vuelve **tiempo por estación**, que es lo que
+  responde "dónde se atasca la cocina" en vez de "cuánto tardó el pedido".
+- ⬜ **La cadena de estaciones no se reordena arrastrando** (2026-08-13,
+  ADR-044): el paso se teclea como número en el formulario de la estación.
+  Para tres estaciones alcanza; con más, dejar un hueco entre pasos (0, 10,
+  20) para poder insertar en el medio es un truco que el usuario tiene que
+  saber, y eso ya es una interfaz que no se explica sola.
+- ⬜ **Una estación no puede rechazar y devolver una línea al eslabón
+  anterior** (2026-08-13, ADR-044): la cadena solo avanza, por RN-CUP-002
+  (secuencia estricta, sin retroceso). Si el horno recibe algo mal armado,
+  hoy no hay forma de mandarlo de vuelta desde la pantalla — se resuelve
+  hablando. Un "devolver al paso anterior" sería una excepción explícita a
+  RN-CUP-002 y necesita su propia decisión de negocio, no solo código.
 - 🔶 **Cumplimiento de pedido** (`PROC-OPE-002`, definido 2026-07-27):
   preparación + entrega implementadas (`POST /sales/ventas/{id}/entrega`
   → `sales.venta_entregada`). Falta la **rama delivery con trazabilidad**:
@@ -290,3 +427,73 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   puede registrar: solo se marca el pedido entregado o no se marca nada.
 - ⬜ **Plazo de espera de takeout no recogido** (RN-CUP-011): la regla
   existe, el plazo por sucursal no está configurado ni modelado.
+- ⬜ **Escalar un problema sin reporte previo** (RN-CTP-004, deuda declarada
+  en ADR-036): la cadena de escalamiento ya existe, pero solo se puede abrir
+  sobre un `reporte_emitido`, y el catálogo cerrado no produce ninguno para
+  `queja`, `error_sistema` ni `desistimiento_no_resuelto`. Un cliente que se
+  queja en el mostrador no genera ningún hecho en el bus. Haría falta una
+  emisión `sales.queja_registrada` con endpoint de alta — que choca de frente
+  con el «no hay `POST /emitidos`» de ADR-033, así que la decisión de fondo es
+  **dónde nace una queja**: como venta anotada, como nodo de encuesta, o como
+  la primera emisión del ERP que sí admite alta manual.
+- ✅ 2026-08-15 **Las FK se validan en todo el suite, no solo en
+  `test_pdv_slice`**. Un listener del evento `connect` de SQLAlchemy en
+  `tests/conftest.py` enciende `PRAGMA foreign_keys=ON` en **cualquier**
+  engine SQLite del proceso: los ~75 fixtures que arman el suyo quedan
+  cubiertos sin tocarlos, y no hay forma de olvidárselo en el próximo.
+  Destapó cinco violaciones: **dos bugs de producción** —borrar una receta
+  con líneas moría por `fk_receta_item_receta_id_receta` (SQLAlchemy ordenaba
+  el `DELETE` del padre antes que el de los hijos: ninguna receta con insumos
+  se podía borrar) y `reports.emision` guardaba `almacen_id`/`sucursal_id`/
+  `actor_id` de filas inexistentes, o sea que el reporte «que no se pudo
+  ubicar» —el que más importa investigar— era el único que no se emitía— y
+  **tres tests** que sembraban un `uuid4()` en una columna FK
+  (`test_sync_motor` ×2, `test_marketing`).
+  `test_models.py::test_un_engine_sqlite_nuevo_ya_trae_las_fk_encendidas`
+  cuida al guardián.
+- ⬜ **La cascada del extra vive en el código, no en el esquema**
+  (2026-08-13): `anular_lineas` borra los hijos a mano porque
+  `fk_venta_item_padre` es `NO ACTION`. Un `ON DELETE CASCADE` en la FK lo
+  haría cumplir aunque otro camino borre el padre. Es una migración de una
+  línea; se dejó fuera para no mezclar un cambio de esquema con un arreglo
+  que ya estaba probado. **Sigue abierto tras el barrido de FK del
+  2026-08-15**: el mismo criterio aplica ahora a
+  `fk_receta_item_receta_id_receta`, que se arregló forzando el orden del
+  flush (`recetas.eliminar_receta`) y no en el esquema. Las dos son la misma
+  migración y conviene hacerlas juntas, contra un Postgres real.
+- ✅ **El receptor del comprobante en el PDV no tiene el botón «Buscar por
+  DNI/RUC»** (2026-08-15, ADR-041) — **cerrado el 2026-08-22** (addendum de
+  ADR-041). Era donde más se teclea un documento —el cajero lo pide para
+  emitir la factura— y el único de los cuatro puntos que quedó sin la
+  consulta, con el `cajero` teniendo el permiso justamente por este caso.
+  Lo que quedaba por decidir era dónde deja el dato: `BuscarDocumento`
+  escribe en el **DOM** del `<form>`, y el PDV lleva estado de React. Se
+  resolvió con `ConsultaDocumento`, la misma lógica en versión **controlada**
+  —recibe el número tecleado y devuelve la respuesta cruda por `onDatos`—, en
+  vez de rehacer el diálogo de cobro como formulario no controlado. Quedó en
+  los **dos** puntos del PDV donde se identifica a alguien que aún no existe:
+  el alta de cliente y el receptor del comprobante. Y con modo `auto`: en caja
+  hay un solo campo, así que el largo decide el padrón (RN-CPP-003, regla en
+  `frontend/lib/documento.ts` con su prueba).
+
+## Lo que el lienzo y la matriz todavía no hacen (2026-08-23, ADR-057/058)
+
+Lo que entró con el modelo de atributos deja tres huecos, todos con su API ya
+lista y su pantalla pendiente:
+
+- **Crear un atributo desde el lienzo.** `POST /sales/atributos` existe; el
+  popover no. Hoy se crea por API o por planilla, y el lienzo lo dibuja apenas
+  el producto lo ofrece.
+- **Materializar combinaciones.** `modo_variante = siempre` está en el modelo
+  y validado, pero el generador que crea las filas hijas no se escribió: hoy
+  todo entra como `nunca`, que es lo que el catálogo de Charlie's necesita.
+  El árbol ya devuelve `combinaciones` para cuando exista.
+- **Multi-selección y "aplicar a todos los tamaños".** Es el pedido detrás de
+  "editar 18 sabores", y la matriz lo cubre por otro camino (una columna por
+  tamaño, una mirada). Vale la pena medir si sigue haciendo falta en el
+  lienzo antes de escribirlo.
+
+Y uno de la matriz: **editar la condición de una celda**. `aplica_valores`
+viaja y se ve, pero se edita en el lienzo, que es donde los valores tienen
+nombre. Una columna de la grilla con dieciocho UUID no ayuda a nadie.
+

@@ -35,6 +35,7 @@ from src.modules.inventory.application import stock as stock_uc
 from src.modules.inventory.application.errors import NoEncontrado, ReglaNegocio
 from src.modules.inventory.infrastructure.models import Devolucion, DevolucionItem
 from src.modules.inventory.infrastructure.repositories import DevolucionRepo
+from src.shared import auditoria
 
 ORIGENES = ("proveedor", "cliente")
 MOTIVOS = (
@@ -104,6 +105,27 @@ def registrar_devolucion(
         item = _agregar_item(session, devolucion, linea)
         _mover_stock(session, devolucion, item, registrado_por, signo=1)
 
+    lineas = DevolucionRepo(session).items(devolucion.id)
+    # Mueve stock real, así que deja rastro como el ajuste (RN-AUD-001). El
+    # evento le avisa a purchases o a comercial; el `audit_log` responde
+    # "quién sacó esto del almacén y cuándo", que es otra pregunta.
+    auditoria.registrar(
+        session,
+        usuario_id=registrado_por,
+        entidad="devolucion",
+        entidad_id=devolucion.id,
+        accion="registrar",
+        datos_despues={
+            "origen": origen,
+            "motivo": motivo,
+            "destino": destino,
+            "almacen_id": str(almacen_id),
+            "items": [
+                {"sku_id": str(i.sku_id), "cantidad": str(i.cantidad)} for i in lineas
+            ],
+        },
+    )
+
     event_bus.publish(
         _EVENTO[origen],
         {
@@ -113,6 +135,7 @@ def registrar_devolucion(
             "motivo": motivo,
             "destino": destino,
             "reporte_dirigido_a": devolucion.reporte_dirigido_a,
+            "registrado_por": str(registrado_por) if registrado_por else None,
             "items": [
                 {
                     "sku_id": str(i.sku_id),
@@ -233,6 +256,18 @@ def anular_devolucion(
     devolucion.estado = "anulada"
     devolucion.anulado_por = anulado_por
     devolucion.anulada_at = datetime.datetime.now(datetime.UTC)
+    # Anular devuelve stock al almacén: es exactamente el movimiento que
+    # alguien podría usar para tapar un faltante, así que tiene que decir
+    # quién lo hizo (RN-AUD-001).
+    auditoria.registrar(
+        session,
+        usuario_id=anulado_por,
+        entidad="devolucion",
+        entidad_id=devolucion.id,
+        accion="anular",
+        datos_antes={"estado": "registrada"},
+        datos_despues={"estado": "anulada", "motivo": devolucion.motivo},
+    )
     return devolucion
 
 

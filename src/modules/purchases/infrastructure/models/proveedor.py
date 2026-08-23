@@ -14,10 +14,17 @@ from sqlalchemy import Boolean, Enum, ForeignKey, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
-from src.core.model_base import SoftDeleteMixin, TimestampMixin, UuidPkMixin
+from src.core.model_base import (
+    SoftDeleteMixin,
+    TimestampMixin,
+    UbicacionMixin,
+    UuidPkMixin,
+)
 
 
-class Proveedor(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin):
+class Proveedor(
+    Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin, UbicacionMixin
+):
     __tablename__ = "proveedor"
 
     empresa_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("empresa.id"))
@@ -32,6 +39,14 @@ class Proveedor(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin):
     razon_social: Mapped[str | None] = mapped_column(String(255), nullable=True)
     ruc: Mapped[str | None] = mapped_column(String(11), nullable=True)
     contacto: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Domicilio fiscal, tal como lo devuelve SUNAT al consultar el RUC. Se
+    # guarda partido y no como un solo texto porque `provincia` es lo que
+    # decide si el flete es local o interprovincial, y volver a partir una
+    # dirección concatenada es adivinar. `pais` existe para el proveedor
+    # extranjero, que no tiene RUC ni provincia peruana.
+    direccion: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    provincia: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    pais: Mapped[str] = mapped_column(String(60), default="PE")
     # `false` = proveedor informal de mercado/supermercado (RN-CMP-011).
     formal: Mapped[bool] = mapped_column(Boolean, default=True)
     clasificacion: Mapped[str] = mapped_column(

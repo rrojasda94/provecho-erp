@@ -3,6 +3,79 @@
 Parte del backlog de deuda técnica del proyecto. El índice y las reglas
 de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 
+- ✅ 2026-08-12 **El sistema visual, cerrado (ADR-037).** Lo que se salda y lo
+  que queda:
+  - **Tokens que faltaban** (F2.3): elevación (`--sombra-1..3`), estados
+    semánticos (`--status-*` con su `-surface`), escala de letra
+    (`--font-scale`), y el bloque de modo oscuro. Sigue sin tokenizarse el
+    espaciado —la escala de Tailwind alcanza— y los estados hover/focus, que
+    viven como clases de componente.
+  - **`@custom-variant dark` faltaba en `globals.css`.** Tailwind v4 no
+    declara la variante `dark` por estrategia de clase: las decenas de clases
+    `dark:` que `shadcn add` ya había dejado escritas en `components/ui/**`
+    **no compilaban a nada**. No fallaban ni avisaban. Solo se descubre
+    mirando el navegador.
+  - **Preferencias de accesibilidad en el perfil** (F2.14): implementadas, con
+    tres columnas nuevas en `usuario` y `PATCH /users/me/preferencias`.
+  - **Paleta de comandos** (F2.29) y **esqueletos por módulo** (F2.31).
+  - **Ayuda contextual por campo** (`CampoFormulario`), pendiente de ui-ux.md
+    desde julio.
+  - **Sigue abierto**: el breadcrumb por ruta recorrida (especificado, sin
+    construir), los `<dialog>` a mano de trece pantallas —hoy vestidos por
+    descendencia desde `.erp`, que es un parche con fecha de vencimiento—, y
+    la auditoría de contraste par por par sobre las pantallas ya construidas.
+    Los tokens cumplen AA; las combinaciones concretas de cada pantalla no se
+    verificaron una por una.
+
+- ✅ 2026-08-10 **El ERP no sabía corregir nada.** Sabía crear y listar; un
+  RUC mal tecleado o un cargo que cambió solo se arreglaban por `curl`. El
+  diagnóstico no era el que parecía: **el backend ya tenía `PATCH` para casi
+  todo** —personas, usuarios, proveedores, artículos, categorías, unidades de
+  medida, trabajadores, cuentas contables, divisas y los cinco de
+  organización—; lo que faltaba era la pantalla. Cada listado se había
+  construido con el mismo molde (`TablaDatos` + un `<dialog>` de alta) y ahí
+  se detuvo.
+  - **Botón "Editar" en la fila** de seis pantallas existentes y **ocho rutas
+    nuevas** (Personas, Clientes, Categorías, Unidades de medida, y el módulo
+    Organización con sus cuatro). Detalle en `CHANGELOG.md`.
+  - **`components/formulario/dialogo-formulario.tsx`**: el shell del diálogo
+    estaba copiado en siete pantallas y con la edición encima habrían sido
+    veinte. Las altas ya existentes se migraron en el mismo cambio — dejar dos
+    formas de hacer lo mismo es peor que la duplicación que se venía a sacar.
+  - **Módulo `organizacion` nuevo en `lib/modulos.ts`**, con
+    `prefijoPermiso: "organizacion."`. No es una sección de Gerencia ni de
+    Usuarios porque el permiso real es `organizacion.gestionar`: colgarlo de
+    otro prefijo se lo escondería justo a quien sí lo tiene. Fundar empresa y
+    renombrar grupo aparecen solo para la cuenta de administración
+    (`esCuentaDeAdministracion`, misma condición que `_solo_superusuario`).
+  - **Dos bugs encontrados al verificar en el navegador**, que es para lo que
+    sirve verificar en el navegador:
+    1. **React 19 resetea solo el formulario** cuando la acción va en el prop
+       `action` de `<form>`, también cuando la acción devolvió error: corregir
+       un RUC y errarle al plazo de crédito dejaba el diálogo abierto con el
+       RUC viejo de vuelta. La acción se despacha ahora a mano dentro de una
+       transición. Es el mismo candado que `e2e/caja.spec.ts` ya probaba para
+       el conteo de caja, y que el resto de los formularios no tenía.
+    2. El **seeder de e2e** sembraba `id_interno` de ocho caracteres en una
+       columna `String(4)` (ver Deuda → CI/CD y el fragmento de changelog):
+       SQLite no aplica el largo, Postgres sí.
+  - **Verificado end-to-end** (API + Next contra la SQLite desechable de e2e,
+    por navegador): alta y corrección de persona con el 409 de versión
+    desactualizada mostrado y el formulario intacto; sucursal a `inactiva`;
+    documento completado a un cliente natural con `identificado` pasando a
+    "Sí" y el botón desapareciendo; `id_interno` duplicado devolviendo un 409
+    legible dentro del diálogo; nombre visible de una cuenta persistido. Sin
+    errores de consola.
+  - **Deuda que deja**: desde un `PATCH` sigue sin poderse *vaciar* un campo
+    opcional (`null` = "no tocar"); solo `frecuencia_conteo` tiene centinela
+    (`quitar_frecuencia`). El resto se cambia por otro valor, no se borra. El
+    día que una pantalla lo pida de verdad, es un centinela por campo o un
+    `Field` con valor especial — no un `None` ambiguo.
+  - **Fuera de alcance a propósito**: las licencias de marca a empresa
+    (N:N) siguen otorgándose por API; `asiento_contable_config` de una
+    categoría también (es un `dict` de configuración contable, no un campo de
+    formulario).
+
 - ✅ 2026-08-07 **Un fetch caído se dibujaba igual que "no hay datos".** El
   patrón `.catch(() => setLista([]))` estaba en cuatro lugares y dejó sin
   diagnóstico posible un fallo real: una venta con pago dividido no salía en
@@ -97,9 +170,25 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   accesible por teclado), **react-day-picker** (calendario del rango
   personalizado) y **sonner** (los avisos del tablero pasaron de un `<span>`
   gris a toasts).
+- ✅ 2026-08-12 **Rastro de navegación y "volver" histórico** (ADR-039):
+  `<Rastro>` en las nueve fichas que cableaban su propio `← Sección`. El
+  rastro se deriva de la ruta contra `MODULOS`/`SUBMENUS` y el `←` usa el
+  historial propio, con el padre como fallback.
+- ⬜ **Las fichas de artículo y de SKU no están enlazadas desde ninguna
+  pantalla** (encontrado 2026-08-12 al probar el rastro):
+  `/inventario/articulos/{id}` y `/inventario/skus/{id}` existen, tienen su
+  ficha construida y solo se alcanzan tecleando la URL o desde el botón de
+  destino de un reporte. El listado de artículos no abre la ficha de ninguna
+  de sus filas.
+- ⬜ **El rastro no llega al PDV, al KDS ni al lienzo**: viven fuera de
+  `(app)` y tienen su propia barra. Es decisión tomada (ADR-039), no olvido;
+  se revisa si alguna de las tres deja de ser una pantalla de una sola tarea.
 - ⬜ **Login y PDV siguen sin migrar a shadcn**: el login conserva sus
   clases `.login-*` en `@layer components` y el PDV su CSS propio. Funcionan;
-  se migran cuando se los toque, no antes.
+  se migran cuando se los toque, no antes. (El login se tocó el 2026-08-15
+  por ADR-050 y **no** se migró: cambiar la forma de pedir el PIN y la
+  librería de componentes en el mismo diff dejaba imposible revisar cuál de
+  las dos cosas rompió qué.)
 - ⬜ **`components/ui/**` exento del límite de complejidad de ESLint**: es
   código generado por el CLI y se regenera en cada `shadcn add`. Si alguna
   vez se edita a mano de forma sustancial, deja de ser generado y el override
@@ -171,8 +260,9 @@ complejo):
   `GET /api/v1/inventory/unidades-medida`, que tampoco existía — sin
   eso el selector de `unidad_medida_id` (obligatorio para crear) queda
   vacío. CRUD de escritura de `unidad_medida`/`categoria_udm` agregado el
-  mismo día (ver Deuda técnica → Transversal) — sigue sin pantalla propia,
-  se gestiona por API.
+  mismo día (ver Deuda técnica → Transversal) — ✅ **ya tiene pantalla
+  propia** desde el 2026-08-10 (`/inventario/categorias` y
+  `/inventario/unidades-medida`).
 - **RRHH → Trabajadores** (2026-08-02): alta usa `PersonaPicker` (mismo
   componente que Proveedores). El gap de RBAC que esta pantalla encontró
   (`GET /personas` exigía `users.gestionar`) se cerró el mismo día con
@@ -457,3 +547,56 @@ tiempo real de KDS, i18n, hardware, testing — Playwright ya decidido por
 ADR-013, observabilidad, printing, productividad, multitarea) tiene
 decisión tomada, está correctamente diferido, o depende de un módulo
 backend que todavía no llega a pantalla.
+- ⬜ **La cadena de estaciones se ordena tecleando un número** (2026-08-13,
+  ADR-044): el formulario de estación pide "Paso en la cocina" como entero.
+  Es correcto y se explica en dos líneas, pero reordenar tres estaciones
+  obliga a editar tres veces, e insertar una en el medio exige el truco de
+  dejar huecos (0, 10, 20). Arrastrar la lista sería la interfaz honesta —
+  `@dnd-kit` ya está en el proyecto (lo usa el tablero de reportes).
+- ⬜ **El pinpad no muestra el PIN ni siquiera un instante** (2026-08-13,
+  ADR-045): solo puntos. Es lo correcto para una caja a la vista del
+  público, pero sin un "ojo" para revelar, un error de tecleo solo se
+  descubre al fallar el envío — y fallar cuesta un intento del lockout.
+  Falta el botón de revelar mientras se mantiene pulsado.
+- ⬜ **El bloqueo del PDV no avisa antes de bloquear** (2026-08-13): a los
+  5 minutos aparece de golpe. Quien está contando efectivo al lado de la
+  caja no toca la pantalla y se la encuentra bloqueada sin haber podido
+  evitarlo. Un aviso a los 4:30 con "seguir aquí" lo resuelve.
+
+- ✅ 2026-08-15 **El login se teclea en el pinpad** (ADR-050, enmienda a
+  ADR-045). `app/login/page.tsx` seguía pidiendo el PIN en un
+  `<input type="password" autocomplete="current-password">`: el patrón exacto
+  que ADR-045 había eliminado dentro del PDV, en la pantalla que más veces se
+  cruza y desde la misma tablet de la caja. El pinpad salió de `app/pdv/` a
+  `components/pinpad/` y su CSS de `pdv.css` a `globals.css`, pidiendo los
+  colores a los tokens `--pdv-*` **con respaldo** en los del back office
+  (`var(--pdv-rojo, var(--primary))`): una sola regla sirve a la paleta
+  oscura del mostrador y al modo claro/oscuro de ADR-037. De paso, el login
+  dejó de tratar igual al 401, al 423 y al 429.
+  - **Deuda que deja, dos puntos concretos:**
+    - ⬜ **`frontend/app/pdv/pinpad.tsx` quedó como re-export de una línea.**
+      Es un puente a propósito: había otra rama trabajando sobre
+      `app/pdv/dialogos.tsx` (900 líneas) y cambiarle el `import` desde acá
+      era un conflicto garantizado sobre un archivo que este cambio no tenía
+      por qué tocar. **Se borra** cambiando los dos `import Pinpad from
+      "./pinpad"` de `dialogos.tsx` y `bloqueo.tsx` a
+      `@/components/pinpad/pinpad`, en la rama que los toque.
+    - ✅ **El overlay de bloqueo del PDV se pinta con tokens que no existen
+      ahí** (encontrado al mover el CSS; resuelto 2026-08-18 con respaldo en
+      cada `var()`, igual que las reglas del pinpad). `BloqueoPorInactividad` se monta
+      como **hermano** de `<main className="pdv">` en `app/pdv/page.tsx`, no
+      dentro, y los `--pdv-*` están definidos en `.pdv`/`.pdv-vacio`: cada
+      `var(--pdv-bg)` / `var(--pdv-texto)` de `.pdv-bloqueo` es inválido al
+      calcular y la declaración entera queda en `unset`, o sea overlay con el
+      fondo blanco del navegador en vez de la paleta oscura del PDV. El
+      pinpad de adentro ya no lo sufre —sus reglas llevan respaldo—, el
+      overlay sí. Se arregla montándolo dentro de `.pdv` o repitiendo los
+      tokens en `.pdv-bloqueo`; no se hizo acá porque cambia cómo se ve una
+      pantalla que este cambio no venía a tocar y merece su verificación.
+    - ⬜ **`frontend/app/cambiar-pin/` sigue con tres
+      `<input type="password">`** (PIN actual, nuevo y repetido). Es el
+      último PIN del ERP que se escribe en un campo. No entró acá porque es
+      otro flujo y otra decisión de diseño —tres pinpads en una pantalla, o
+      uno con tres pasos— y mezclarla dejaba un cambio imposible de revisar.
+      Mientras tanto es un campo `type="password"` que el navegador ofrece
+      guardar, con el mismo defecto que ADR-045 describe.

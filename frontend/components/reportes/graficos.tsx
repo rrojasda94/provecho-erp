@@ -12,6 +12,7 @@
  * marca — un gráfico no elige su paleta por su cuenta.
  */
 
+import Link from "next/link";
 import {
   Bar,
   BarChart,
@@ -37,6 +38,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { rutaDestino } from "@/lib/destinos";
 import { aNumero, formatear, type Columna, type Fila } from "@/lib/reportes";
 
 type Props = {
@@ -164,12 +166,17 @@ export function GraficoLineas({ filas, columnas, etiqueta, valor }: Props) {
 
 export function TablaReporte({ filas, columnas }: Omit<Props, "etiqueta" | "valor">) {
   if (filas.length === 0) return <Vacio />;
+  // La columna `tipo="id"` no se dibuja: es el ancla del enlace de la fila
+  // (ADR-036). Un reporte de problemas que no lleva al registro deja al que
+  // lo lee saliendo a buscarlo a mano.
+  const ancla = columnas.find((c) => c.tipo === "id" && c.enlace);
+  const visibles = columnas.filter((c) => c.tipo !== "id");
   return (
     <div className="h-full overflow-auto">
       <Table>
         <TableHeader className="sticky top-0 bg-background">
           <TableRow>
-            {columnas.map((c) => (
+            {visibles.map((c) => (
               <TableHead
                 key={c.clave}
                 className={c.tipo === "texto" ? "" : "text-right"}
@@ -177,23 +184,42 @@ export function TablaReporte({ filas, columnas }: Omit<Props, "etiqueta" | "valo
                 {c.titulo}
               </TableHead>
             ))}
+            {ancla && <TableHead className="w-8" />}
           </TableRow>
         </TableHeader>
         <TableBody>
-          {filas.map((fila, i) => (
-            <TableRow key={i}>
-              {columnas.map((c) => (
-                <TableCell
-                  key={c.clave}
-                  className={
-                    c.tipo === "texto" ? "" : "text-right tabular-nums"
-                  }
-                >
-                  {formatear(fila[c.clave], c.tipo)}
-                </TableCell>
-              ))}
-            </TableRow>
-          ))}
+          {filas.map((fila, i) => {
+            const destino = ancla
+              ? rutaDestino(ancla.enlace, String(fila[ancla.clave] ?? ""))
+              : null;
+            return (
+              <TableRow key={i}>
+                {visibles.map((c) => (
+                  <TableCell
+                    key={c.clave}
+                    className={
+                      c.tipo === "texto" ? "" : "text-right tabular-nums"
+                    }
+                  >
+                    {formatear(fila[c.clave], c.tipo)}
+                  </TableCell>
+                ))}
+                {ancla && (
+                  <TableCell className="text-right">
+                    {destino && (
+                      <Link
+                        href={destino}
+                        className="font-semibold text-primary hover:underline"
+                        aria-label="Abrir el registro de esta fila"
+                      >
+                        →
+                      </Link>
+                    )}
+                  </TableCell>
+                )}
+              </TableRow>
+            );
+          })}
         </TableBody>
       </Table>
     </div>

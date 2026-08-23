@@ -597,7 +597,18 @@ def test_una_venta_rechazada_no_arrastra_al_resto_ni_avanza_la_marca(entorno):
     _venta_offline(entorno, key="venta-buena")
     # Una venta que en el hub existe pero que la nube no puede aceptar: su
     # producto ya no está de ese lado (se descontinuó durante el corte).
+    # El producto se crea **solo en el hub**: un `uuid4()` suelto dejaba el
+    # `venta_item` apuntando a la nada y la propia base del hub lo rechaza
+    # (`fk_venta_item_producto_comercial_id_producto_comercial`). Además así
+    # el escenario es el real — el hub sí conoce su producto, la nube no —, y
+    # `producto_comercial` viaja nube→hub, nunca al revés.
     with entorno.HubSession() as s:
+        solo_del_hub = ProductoComercial(
+            id_interno="P999", marca_id=entorno.ids["marca_id"],
+            nombre="Pizza Descontinuada",
+        )
+        s.add(solo_del_hub)
+        s.flush()
         fantasma = Venta(
             sucursal_id=entorno.ids["sucursal_id"],
             punto_venta_id=entorno.ids["pv_id"],
@@ -610,7 +621,7 @@ def test_una_venta_rechazada_no_arrastra_al_resto_ni_avanza_la_marca(entorno):
         s.add(fantasma)
         s.flush()
         s.add(VentaItem(
-            venta_id=fantasma.id, producto_comercial_id=uuid.uuid4(),
+            venta_id=fantasma.id, producto_comercial_id=solo_del_hub.id,
             cantidad=Decimal("1"), precio_unitario=Decimal("10.00"),
         ))
         s.commit()
@@ -986,6 +997,17 @@ def test_inventory_trabado_no_frena_las_ventas(entorno):
     central_id = _almacen_central(entorno)
     entorno.ciclo()
     with entorno.HubSession() as s:
+        # Un abastecedor que existe en el hub pero que la nube no conoce
+        # (`almacen` viaja nube→hub): la solicitud va a rebotar arriba. Con un
+        # `uuid4()` suelto rebotaba antes, en el `commit` del propio hub —
+        # `fk_solicitud_insumos_almacen_abastecedor_id_almacen`—, y el test
+        # medía otra cosa.
+        solo_del_hub = Almacen(
+            empresa_id=entorno.ids["empresa_id"], nombre="Central fantasma",
+            tipo="central",
+        )
+        s.add(solo_del_hub)
+        s.flush()
         solicitud = solicitudes_uc.crear_solicitud(
             s,
             almacen_solicitante_id=entorno.ids["almacen_id"],
@@ -993,8 +1015,7 @@ def test_inventory_trabado_no_frena_las_ventas(entorno):
             solicitado_por=entorno.ids["cajero_id"],
             items=[(entorno.ids["sku_id"], Decimal("5"))],
         )
-        # Un abastecedor que la nube no conoce: la solicitud va a rebotar.
-        solicitud.almacen_abastecedor_id = uuid.uuid4()
+        solicitud.almacen_abastecedor_id = solo_del_hub.id
         s.commit()
 
     venta_id = _venta_offline(entorno)

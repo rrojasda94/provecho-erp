@@ -76,9 +76,10 @@ export function Barra({
       />
       <NuevoGrupo productoId={activo.id} onCorrer={onCorrer} />
       <AgregarOpcion
-        productoId={activo.id}
+        producto={activo}
         grupoId={combinacion?.id ?? null}
         disponibles={libres}
+        unidades={unidades}
         onCorrer={onCorrer}
       />
       <EditorEmpaque nodo={activo} empaques={empaques} onCorrer={onCorrer} />

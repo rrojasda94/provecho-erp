@@ -1,0 +1,35 @@
+# Sin este archivo, `docker build .` empaqueta y envía TODO el repositorio al
+# daemon antes de leer la primera línea del Dockerfile: `.git`, el
+# `node_modules` del frontend, el `.venv` local, los `.docx` de los
+# documentos de infraestructura. La imagen sale igual —el Dockerfile solo
+# copia `src/`, `alembic/` y los dos archivos de configuración— pero cada
+# build paga el envío y cada `cache-from` de CI se invalida cuando cambia
+# cualquier archivo del contexto, aunque no entre en la imagen.
+
+.git
+.github
+.claude
+
+# El frontend es su propia imagen (`frontend/Dockerfile`, contexto
+# `./frontend`). Acá solo pesa.
+frontend
+
+.venv
+**/__pycache__
+*.pyc
+.pytest_cache
+.ruff_cache
+htmlcov
+.coverage
+
+docs
+tests
+
+# Secretos: el Dockerfile no los copia, pero un `COPY .` futuro los hornearía
+# en una capa pública del registro.
+.env
+.env.*
+
+*.docx
+~$*
+~WRL*.tmp

@@ -137,14 +137,16 @@ class AbrirCajaIn(BaseModel):
     `detalle_denominaciones` es lo que el cajero cuenta. La diferencia la
     calcula el servidor (RN-POS-011/012) — nunca se teclea.
 
-    `autorizacion` es el token de `POST /auth/autorizar` del encargado que
-    releva: sin su PIN no hay cadena de custodia (RN-MDP-002).
+    **Sin `autorizacion`** desde ADR-049: la abre el cajero con su propia
+    sesión (RN-MDP-008). Lo que prueba cuánto había en el cajón es el
+    conteo, no una firma; firmar tiene sentido donde hay una entrega de
+    efectivo de verdad, y esa es la cadena de custodia del cierre
+    (RN-MDP-002).
     """
 
     punto_venta_id: uuid.UUID
     monto_declarado: Decimal = Field(ge=0)
     detalle_denominaciones: dict[str, int]
-    autorizacion: str
     pos_verificados: list[PosVerificadoIn] | None = None
 
 
@@ -153,7 +155,8 @@ class AperturaCajaOut(BaseModel):
     id: uuid.UUID
     punto_venta_id: uuid.UUID
     cajero_id: uuid.UUID
-    relevo_encargado_id: uuid.UUID
+    # NULL en toda apertura posterior a ADR-049: nadie firma abrir el turno.
+    relevo_encargado_id: uuid.UUID | None
     monto_apertura: Decimal
     detalle_denominaciones: dict | None
     diferencia_reportada: Decimal | None
@@ -171,8 +174,12 @@ class ReportePosIn(BaseModel):
 
 
 class CerrarCajaIn(BaseModel):
-    """El monto real sale del conteo por denominación (RN-POS-007), y el
-    efectivo se entrega al encargado que firma con su PIN (RN-MDP-002).
+    """El monto real sale del conteo por denominación (RN-POS-007).
+
+    **Sin `autorizacion`** desde ADR-049: lo cierra el cajero solo
+    (RN-MDP-008). El efectivo queda `en_caja` a su nombre y la entrega al
+    encargado se firma después, en
+    `POST /cajas/custodias/{id}/entregar` (RN-MDP-002).
 
     `reportes_pos` trae el cierre de lote de cada terminal que abrió
     operativo: sin ellos el cierre no cuadra las tarjetas y se rechaza
@@ -180,11 +187,11 @@ class CerrarCajaIn(BaseModel):
     """
 
     detalle_denominaciones: dict[str, int]
-    # A dónde va el efectivo, no quién lo recibe: a quién se le entregó ya lo
-    # prueba la firma de `autorizacion`. También es enum en la base, y sin el
-    # patrón un nombre tecleado dejaba el turno ilegible.
+    # A dónde **va a ir** el efectivo, no quién lo recibe: a quién se le
+    # entregó lo prueba la firma del tramo de custodia, cuando ocurra.
+    # También es enum en la base, y sin el patrón un nombre tecleado dejaba
+    # el turno ilegible.
     custodia: str = Field(pattern="^(local_caja_fuerte|traslado_contabilidad)$")
-    autorizacion: str
     # La columna es un enum de tres valores (RN-MDP-005). Sin este patrón, un
     # texto libre entraba, se guardaba, y el turno quedaba **ilegible**: la
     # lectura reventaba después con `LookupError` al mapear la fila. Un 422 en
@@ -334,6 +341,17 @@ class TurnoCerradoOut(BaseModel):
     custodia_estado: str | None
     custodia_monto: Decimal | None
     correcciones: list | None
+
+
+class CierreCajaDetalleOut(TurnoCerradoOut):
+    """El turno con el conteo a la vista. A donde lleva
+    `accounting.cierre_caja_irregular`: la fila dice cuánto descuadró, esto
+    dice contra qué, que es con lo único que se decide reclamar o corregir."""
+
+    montos_esperados: dict | None
+    montos_reales: dict | None
+    reportes_pos: list | None
+    relevos: list | None
 
 
 class MovimientoDineroOut(BaseModel):

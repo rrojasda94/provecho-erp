@@ -5,6 +5,7 @@ recibe el resultado ya traducido a `RespuestaEmision`.
 """
 
 from dataclasses import dataclass
+from datetime import date, datetime
 
 import httpx
 
@@ -61,6 +62,10 @@ class ConsultaPersona:
     nombres: str
     apellidos: str
     crudo: dict
+    # RENIEC la devuelve según el plan contratado; `None` cuando no viene.
+    # Es opcional a propósito: el alta no puede depender de un campo que el
+    # proveedor entrega a veces.
+    fecha_nacimiento: date | None = None
 
 
 @dataclass(frozen=True)
@@ -73,6 +78,13 @@ class ConsultaEmpresa:
     estado: str
     condicion: str
     crudo: dict
+    # El domicilio fiscal, ya partido. SUNAT lo devuelve en campos separados
+    # y así se guarda: recomponer una dirección y volver a partirla pierde
+    # información en cada vuelta.
+    direccion: str = ""
+    distrito: str = ""
+    provincia: str = ""
+    departamento: str = ""
 
 
 def _interpretar(cuerpo: dict) -> RespuestaEmision:
@@ -88,6 +100,20 @@ def _interpretar(cuerpo: dict) -> RespuestaEmision:
     )
 
 
+def _fecha(valor: object) -> date | None:
+    """`"12/05/1994"` o `"1994-05-12"` → `date`. Cualquier otra cosa es
+    `None`: una fecha que no se entiende no se adivina, se omite — el
+    formulario la deja vacía y la teclea quien la tenga delante."""
+    if not isinstance(valor, str) or not valor.strip():
+        return None
+    for formato in ("%d/%m/%Y", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(valor.strip(), formato).date()
+        except ValueError:
+            continue
+    return None
+
+
 def _interpretar_dni(numero: str, cuerpo: dict) -> ConsultaPersona:
     datos = cuerpo.get("data") or {}
     apellidos = " ".join(
@@ -99,6 +125,7 @@ def _interpretar_dni(numero: str, cuerpo: dict) -> ConsultaPersona:
         nombres=datos.get("nombres") or "",
         apellidos=apellidos,
         crudo=cuerpo,
+        fecha_nacimiento=_fecha(datos.get("fecha_nacimiento")),
     )
 
 
@@ -111,6 +138,10 @@ def _interpretar_ruc(numero: str, cuerpo: dict) -> ConsultaEmpresa:
         estado=datos.get("estado") or "",
         condicion=datos.get("condicion") or "",
         crudo=cuerpo,
+        direccion=datos.get("direccion") or "",
+        distrito=datos.get("distrito") or "",
+        provincia=datos.get("provincia") or "",
+        departamento=datos.get("departamento") or "",
     )
 
 
@@ -120,10 +151,21 @@ class FactilizaClient:
         base_url: str | None = None,
         token: str | None = None,
         timeout: float | None = None,
+        consulta_token: str | None = None,
     ) -> None:
         self.base_url = (base_url or settings.factiliza_base_url).rstrip("/")
         self.consulta_base_url = settings.factiliza_consulta_base_url.rstrip("/")
         self.token = token if token is not None else settings.factiliza_token
+        # Emisión y consulta son **dos productos con dos credenciales**: el
+        # token de emisión devuelve 401 contra `api.factiliza.com` aunque esté
+        # vigente. Cae al de emisión solo si no hay uno propio configurado —
+        # una cuenta que use el mismo para todo sigue funcionando, y quien no
+        # tiene ninguno recibe el error de "no configurado" de siempre.
+        self.consulta_token = (
+            consulta_token
+            if consulta_token is not None
+            else (settings.factiliza_consulta_documento_token or self.token)
+        )
         self.timeout = timeout or settings.factiliza_timeout_segundos
 
     def enviar_comprobante(self, payload: dict) -> RespuestaEmision:
@@ -174,24 +216,37 @@ class FactilizaClient:
         distinto de `invoice/send` (esa es solo emisión, apunta a la QA de
         facturación). Un 404 vacío es "no encontrado", respuesta válida, no
         excepción; solo transporte/servidor caído levanta `FactilizaError`."""
-        if not self.token:
-            raise FactilizaError("FACTILIZA_TOKEN no configurado")
+        if not self.consulta_token:
+            raise FactilizaError("FACTILIZA_CONSULTA_DOCUMENTO_TOKEN no configurado")
         try:
             respuesta = httpx.get(
                 f"{self.consulta_base_url}/{ruta}/info/{numero}",
-                headers={"Authorization": f"Bearer {self.token}"},
+                headers={"Authorization": f"Bearer {self.consulta_token}"},
                 timeout=self.timeout,
             )
         except httpx.HTTPError as e:
             raise FactilizaError(f"Factiliza no responde: {e}") from e
         if respuesta.status_code == 404 and not respuesta.text:
             return None
+        # 401/403 con cuerpo vacío es lo que devuelve el producto de consulta
+        # cuando el token no le sirve —revocado, regenerado en el panel, o de
+        # otro producto—. Se nombra: sin esto caía en el `.json()` de abajo y
+        # el operador leía "respuesta ilegible", que manda a buscar un error
+        # de parseo donde lo que hay que revisar es la credencial.
+        if respuesta.status_code in (401, 403):
+            raise FactilizaError(
+                f"Factiliza rechazó el token ({respuesta.status_code}): revisa "
+                "FACTILIZA_CONSULTA_DOCUMENTO_TOKEN —es distinto del de "
+                "emisión— y que el plan de consultas esté activo"
+            )
         if respuesta.status_code >= 500:
             raise FactilizaError(f"Factiliza devolvió {respuesta.status_code}")
         try:
             return respuesta.json()
         except ValueError as e:
-            raise FactilizaError(f"Respuesta ilegible de Factiliza: {e}") from e
+            raise FactilizaError(
+                f"Respuesta ilegible de Factiliza ({respuesta.status_code}): {e}"
+            ) from e
 
     def consultar_dni(self, dni: str) -> ConsultaPersona:
         """GET /dni/info/{dni} — RENIEC vía Factiliza."""

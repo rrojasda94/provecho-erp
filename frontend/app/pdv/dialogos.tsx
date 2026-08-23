@@ -3,11 +3,17 @@
 import { useEffect, useRef, useState } from "react";
 
 import {
+  ConsultaDocumento,
+  type Consulta,
+} from "@/components/consulta/buscar-documento";
+import { documentoValido, LARGO_DNI, LARGO_RUC } from "@/lib/documento";
+import {
   api,
   esAtribucion,
   esCustodia,
   soles,
   type ClienteBuscado,
+  type CotizacionDelivery,
   type CustodiaDestino,
   type DescuadreAtribucion,
   type ExtraDeCarta,
@@ -26,6 +32,56 @@ import {
   type LineaBorrador,
   type RestaEnLinea,
 } from "./tipos";
+import Pinpad from "./pinpad";
+import { CampoDireccion } from "@/components/direccion/campo-direccion";
+import { UBICACION_VACIA, type Ubicacion } from "@/components/direccion/ubicacion";
+
+/**
+ * Usuario + PIN de quien firma. Cada uno lo escribía por su cuenta con un
+ * `<input type="password">` — un sitio más donde el navegador ofrecía
+ * guardar el PIN, que es de donde salía la cuenta compartida (ADR-045).
+ *
+ * Quedan dos puntos que lo piden: el consumo de personal y la autorización
+ * de supervisor. La apertura y el cierre de caja lo dejaron de pedir con
+ * ADR-049 — el turno lo opera el cajero solo, y la única firma del ciclo de
+ * caja es la del encargado que recibe el efectivo, que ocurre en
+ * `/contabilidad/caja` y no en el PDV.
+ */
+function FirmaConPin({
+  quien,
+  usuario,
+  onUsuario,
+  pin,
+  onPin,
+  testid,
+}: {
+  quien: string;
+  usuario: string;
+  onUsuario: (v: string) => void;
+  pin: string;
+  onPin: (v: string) => void;
+  testid?: string;
+}) {
+  return (
+    <div className="pdv-firma">
+      <input
+        className="pdv-campo"
+        aria-label={`Usuario ${quien}`}
+        placeholder={`Usuario ${quien}`}
+        autoComplete="off"
+        data-testid={testid && `${testid}-usuario`}
+        value={usuario}
+        onChange={(e) => onUsuario(e.target.value)}
+      />
+      <Pinpad
+        value={pin}
+        onChange={onPin}
+        label={`PIN ${quien}`}
+        testid={testid && `${testid}-pin`}
+      />
+    </div>
+  );
+}
 
 /** Envoltorio común: `<dialog>` nativo, que ya trae foco atrapado, cierre
  * con Escape y backdrop sin una línea de JS.
@@ -86,13 +142,14 @@ export function Dialogo({
 const BILLETES = [200, 100, 50, 20, 10];
 const MONEDAS = [5, 2, 1, 0.5, 0.2, 0.1];
 
-/** Apertura: se cuenta el cajón por denominación (RN-POS-003) y el
- * encargado que entrega el efectivo se identifica con su PIN.
+/** Apertura: se cuenta el cajón por denominación (RN-POS-003) y se verifican
+ * los terminales.
  *
- * Las dos cosas son la misma idea: la caja arranca con un traspaso de
- * custodia entre dos personas (RN-MDP-002). Contar pieza por pieza es lo
- * que hace que el cierre signifique algo, y firmar con PIN es lo que hace
- * que un faltante tenga a quién preguntarle. */
+ * **La abre el cajero solo** (RN-MDP-008, ADR-049). Antes pedía además el
+ * PIN del encargado que entregaba el fondo: no probaba nada que el conteo no
+ * pruebe mejor, y obligaba a que alguien viniera a firmar cada mañana — lo
+ * que en el local se resolvía dejando la sesión del encargado abierta en la
+ * caja, que es exactamente lo contrario de lo que la firma buscaba. */
 export function DialogoApertura({
   abierto,
   pos,
@@ -105,15 +162,12 @@ export function DialogoApertura({
     montoDeclarado: number;
     detalle: Record<string, number>;
     posVerificados: { pos_tarjeta_id: string; operativo: boolean; observacion?: string }[];
-    encargado: { username: string; pin: string };
   }) => void;
   ocupado: boolean;
 }) {
   const [conteo, setConteo] = useState<Record<string, number>>({});
   const [declarado, setDeclarado] = useState("");
   const [averiados, setAveriados] = useState<Record<string, string>>({});
-  const [usuario, setUsuario] = useState("");
-  const [pin, setPin] = useState("");
   const total = Object.entries(conteo).reduce(
     (a, [v, n]) => a + Number(v) * (n || 0),
     0,
@@ -202,34 +256,6 @@ export function DialogoApertura({
         </>
       )}
 
-      <p className="pdv-etiqueta">Entrega el encargado</p>
-      <div className="pdv-dos">
-        <input
-          className="pdv-campo"
-          aria-label="Usuario del encargado"
-          placeholder="Usuario del encargado"
-          autoComplete="off"
-          data-testid="apertura-usuario"
-          value={usuario}
-          onChange={(e) => setUsuario(e.target.value)}
-        />
-        <input
-          className="pdv-campo"
-          type="password"
-          inputMode="numeric"
-          aria-label="PIN del encargado"
-          placeholder="PIN"
-          autoComplete="off"
-          data-testid="apertura-pin"
-          value={pin}
-          onChange={(e) => setPin(e.target.value)}
-        />
-      </div>
-      <p className="pdv-nota">
-        El efectivo se entrega de una persona a otra: quien lo entrega firma
-        con su PIN para que un faltante tenga a quién preguntarle.
-      </p>
-
       <footer className="pdv-dialogo-pie">
         <div>
           <p className="pdv-etiqueta">Monto de apertura</p>
@@ -238,7 +264,7 @@ export function DialogoApertura({
         <button
           type="button"
           className="pdv-boton-pri"
-          disabled={ocupado || !usuario.trim() || !pin.trim() || declarado === ""}
+          disabled={ocupado || declarado === ""}
           onClick={() =>
             onAbrir({
               montoDeclarado: Number(declarado) || 0,
@@ -248,7 +274,6 @@ export function DialogoApertura({
                 operativo: !(p.id in averiados),
                 observacion: averiados[p.id]?.trim() || undefined,
               })),
-              encargado: { username: usuario.trim(), pin },
             })
           }
         >
@@ -302,8 +327,12 @@ function ConteoDenominaciones({
 }
 
 /** Cierre: mismo conteo pieza por pieza que la apertura, el reporte de lote
- * de cada terminal que abrió operativo (RN-POS-004) y la firma de quien
- * recibe el efectivo (RN-MDP-002).
+ * de cada terminal que abrió operativo (RN-POS-004) y a dónde va a ir el
+ * efectivo.
+ *
+ * **Lo cierra el cajero solo** (RN-MDP-008, ADR-049). El destino que elige
+ * acá es una declaración, no una entrega: la plata queda en el cajón a su
+ * nombre y quien la recibe la firma después, en `/contabilidad/caja`.
  *
  * Los descuadres los calcula el servidor —conoce lo cobrado y los
  * movimientos del turno, el PDV no—; acá solo se le entrega lo contado y lo
@@ -323,7 +352,6 @@ export function DialogoCierre({
     custodia: CustodiaDestino;
     atribucion: DescuadreAtribucion | "";
     reportesPos: { pos_tarjeta_id: string; monto_lote: string; referencia?: string }[];
-    receptor: { username: string; pin: string };
   }) => void;
   ocupado: boolean;
 }) {
@@ -334,8 +362,6 @@ export function DialogoCierre({
   const [custodia, setCustodia] = useState<CustodiaDestino | "">("");
   const [atribucion, setAtribucion] = useState<DescuadreAtribucion | "">("");
   const [lotes, setLotes] = useState<Record<string, string>>({});
-  const [usuario, setUsuario] = useState("");
-  const [pin, setPin] = useState("");
   const total = Object.entries(conteo).reduce(
     (a, [v, n]) => a + Number(v) * (n || 0),
     0,
@@ -350,8 +376,6 @@ export function DialogoCierre({
     setCustodia("");
     setAtribucion("");
     setLotes({});
-    setUsuario("");
-    setPin("");
   }, [abierto]);
 
   return (
@@ -394,9 +418,9 @@ export function DialogoCierre({
       )}
 
       <p className="pdv-etiqueta">A dónde va el efectivo</p>
-      {/* El destino, no el nombre de quien recibe: a quién se le entregó ya
-          queda probado por el PIN de abajo, y escribirlo además era un dato
-          suelto que no coincidía con nadie. */}
+      {/* El destino, no el nombre de quien recibe: a quién se le entregó lo
+          prueba la firma del tramo de custodia cuando ocurra, y escribirlo
+          acá era un dato suelto que no coincidía con nadie. */}
       <select
         className="pdv-campo"
         aria-label="A dónde va el efectivo"
@@ -408,34 +432,10 @@ export function DialogoCierre({
         <option value="local_caja_fuerte">Caja fuerte del local</option>
         <option value="traslado_contabilidad">Traslado a contabilidad</option>
       </select>
-      <p className="pdv-etiqueta">Recibe</p>
-      <div className="pdv-dos">
-        {/* `aria-label` y no un `<label>` envolvente: los dos campos son celdas
-            de `.pdv-dos` y meterlos dentro de una etiqueta rompe la grilla. Sin
-            esto el `placeholder` era el único nombre —y no lo es: desaparece al
-            escribir y ningún lector de pantalla lo anuncia como nombre del
-            campo. */}
-        <input
-          className="pdv-campo"
-          aria-label="Usuario de quien recibe"
-          placeholder="Usuario de quien recibe"
-          autoComplete="off"
-          data-testid="cierre-usuario"
-          value={usuario}
-          onChange={(e) => setUsuario(e.target.value)}
-        />
-        <input
-          className="pdv-campo"
-          type="password"
-          inputMode="numeric"
-          aria-label="PIN de quien recibe"
-          placeholder="PIN"
-          autoComplete="off"
-          data-testid="cierre-pin"
-          value={pin}
-          onChange={(e) => setPin(e.target.value)}
-        />
-      </div>
+      <p className="pdv-nota">
+        El efectivo queda en el cajón a tu nombre hasta que el encargado firme
+        que lo recibió.
+      </p>
 
       <p className="pdv-etiqueta">Si hay descuadre, a quién se le atribuye</p>
       {/* Tres valores y no texto libre: es un enum en la base (RN-MDP-005), y
@@ -464,11 +464,7 @@ export function DialogoCierre({
           type="button"
           className="pdv-boton-pri"
           disabled={
-            ocupado ||
-            !custodia ||
-            !usuario.trim() ||
-            !pin.trim() ||
-            operativos.some((p) => !lotes[p.pos_tarjeta_id])
+            ocupado || !custodia || operativos.some((p) => !lotes[p.pos_tarjeta_id])
           }
           onClick={() => {
             // El botón ya está deshabilitado sin destino; el chequeo existe
@@ -484,7 +480,6 @@ export function DialogoCierre({
                 pos_tarjeta_id: p.pos_tarjeta_id,
                 monto_lote: String(Number(lotes[p.pos_tarjeta_id]) || 0),
               })),
-              receptor: { username: usuario.trim(), pin },
             });
           }}
         >
@@ -496,6 +491,22 @@ export function DialogoCierre({
 }
 
 const NOTAS_RAPIDAS = ["Sin cebolla", "Sin ají", "Bien cocida", "Para llevar aparte"];
+
+/** Qué extras ofrece esta línea.
+ *
+ * Los grupos y extras cuelgan del producto que se prepara, y con
+ * presentaciones ese es la variante: el servidor solo acepta lo vinculado a
+ * ELLA (`admite_extra(prod.id, …)`), así que mezclar los del padre armaría
+ * líneas que van a fallar recién al enviar el pedido. Sin presentaciones, el
+ * producto es el que se prepara y los suyos son los que valen. */
+function extrasOfrecidos(
+  item: ItemDeCarta | null,
+  variante: VarianteDeCarta | undefined,
+): ExtraDeCarta[] {
+  if (!item) return [];
+  if (item.variantes.length === 0) return item.extras;
+  return variante ? variante.extras : [];
+}
 
 /**
  * Configuración de la línea: variante, cantidad, nota a cocina y extras.
@@ -527,7 +538,10 @@ export function DialogoProducto({
   enviado: boolean;
   onGuardar: (l: LineaBorrador) => void;
   onQuitar: (id: string) => void;
-  onAnularLinea: (id: string, encargado: { username: string; pin: string }) => void;
+  /** Quitar una línea ya enviada. Sin credenciales: dentro de la ventana
+   * de corrección no hacen falta, y si el servidor las pide, la pantalla
+   * abre su propio diálogo de firma (RN-COM-029). */
+  onAnularLinea: (id: string) => void;
   onCerrar: () => void;
 }) {
   const [cantidad, setCantidad] = useState(1);
@@ -535,9 +549,6 @@ export function DialogoProducto({
   const [extras, setExtras] = useState<Record<string, number>>({});
   const [restas, setRestas] = useState<RestaEnLinea[]>([]);
   const [varianteId, setVarianteId] = useState("");
-  const [pidiendoPin, setPidiendoPin] = useState(false);
-  const [usuario, setUsuario] = useState("");
-  const [pin, setPin] = useState("");
 
   useEffect(() => {
     if (!linea) return;
@@ -553,16 +564,14 @@ export function DialogoProducto({
         ? linea.productoId
         : "",
     );
-    setPidiendoPin(false);
-    setUsuario("");
-    setPin("");
   }, [linea, item]);
 
   if (!linea) return null;
 
   const variantes = item?.variantes ?? [];
   const variante = variantes.find((v) => v.producto_comercial_id === varianteId);
-  const grupos = agruparExtras(item?.extras ?? []);
+  const ofrecidos = extrasOfrecidos(item, variante);
+  const grupos = agruparExtras(ofrecidos);
   const falta = queFalta(variantes, variante, grupos, extras);
   // Lo quitable sale de la receta del producto que realmente se prepara: la
   // variante si hay, el producto si no.
@@ -570,7 +579,7 @@ export function DialogoProducto({
 
   const guardar = () => {
     if (falta) return;
-    const elegidos = (item?.extras ?? [])
+    const elegidos = ofrecidos
       .filter((e) => (extras[e.producto_comercial_id] ?? 0) > 0)
       .map((e) => ({
         productoId: e.producto_comercial_id,
@@ -598,7 +607,14 @@ export function DialogoProducto({
         variantes={variantes}
         producto={item}
         elegida={varianteId}
-        onElegir={setVarianteId}
+        // Cambiar de tamaño rehace la oferta: "Peperoni Personal" y
+        // "Peperoni Familiar" son dos productos distintos, así que lo
+        // elegido en el anterior no se puede arrastrar al nuevo.
+        onElegir={(id) => {
+          if (id === varianteId) return;
+          setVarianteId(id);
+          setExtras({});
+        }}
       />
 
       <p className="pdv-etiqueta">Cantidad</p>
@@ -638,54 +654,19 @@ export function DialogoProducto({
         ))}
       </div>
 
-      {pidiendoPin && (
-        <>
-          <p className="pdv-etiqueta">Ya salió a cocina · PIN de supervisor</p>
-          <div className="pdv-dos">
-            <input
-              className="pdv-campo"
-              placeholder="Usuario del supervisor"
-              autoComplete="off"
-              value={usuario}
-              onChange={(e) => setUsuario(e.target.value)}
-            />
-            <input
-              className="pdv-campo"
-              type="password"
-              inputMode="numeric"
-              placeholder="PIN"
-              autoComplete="off"
-              value={pin}
-              onChange={(e) => setPin(e.target.value)}
-            />
-          </div>
-          <p className="pdv-nota">
-            El insumo ya se descontó: quitar la línea lo repone (RN-COM-020).
-          </p>
-        </>
-      )}
-
       <footer className="pdv-dialogo-pie">
-        {pidiendoPin ? (
-          <button
-            type="button"
-            className="pdv-boton-riesgo"
-            disabled={!usuario.trim() || !pin.trim()}
-            onClick={() =>
-              onAnularLinea(linea.id, { username: usuario.trim(), pin })
-            }
-          >
-            Confirmar anulación
-          </button>
-        ) : (
-          <button
-            type="button"
-            className="pdv-boton-riesgo"
-            onClick={() => (enviado ? setPidiendoPin(true) : onQuitar(linea.id))}
-          >
-            Quitar del pedido
-          </button>
-        )}
+        <button
+          type="button"
+          className="pdv-boton-riesgo"
+          title={
+            enviado
+              ? "Ya salió a cocina: repone el insumo. Pasados 5 minutos lo firma un supervisor"
+              : undefined
+          }
+          onClick={() => (enviado ? onAnularLinea(linea.id) : onQuitar(linea.id))}
+        >
+          Quitar del pedido
+        </button>
         {falta && <span className="pdv-falta">{falta}</span>}
         <button
           type="button"
@@ -981,16 +962,95 @@ const TIPOS = [
   ["delivery", "Delivery", "Empaques + tarifa · comanda con dirección"],
 ] as const;
 
+const MOTIVO_DERIVACION: Record<string, string> = {
+  fuera_de_radio: "más lejos del radio propio",
+  zona_restringida: "zona donde no repartimos",
+};
+
+/**
+ * Lo que sale llevar el pedido, y el aviso de cuándo conviene no llevarlo.
+ *
+ * Lo calcula el servidor y no el navegador: este número define cuánta plata
+ * paga el cliente (ADR-054). Se pide al ANCLAR la dirección y no en cada
+ * tecla — cada llamada gasta cuota de un proveedor pago.
+ *
+ * Sin ancla no se cotiza: una dirección escrita a mano no se puede medir, y
+ * el pedido se toma igual con la tarifa base.
+ */
+function CotizacionEntrega({
+  sucursalId,
+  ubicacion,
+}: {
+  sucursalId: string;
+  ubicacion: Ubicacion;
+}) {
+  const [cotizacion, setCotizacion] = useState<CotizacionDelivery | null>(null);
+  const [error, setError] = useState("");
+  const lat = ubicacion.ubicacion_lat;
+  const lng = ubicacion.ubicacion_lng;
+
+  useEffect(() => {
+    if (lat === null || lat === undefined) {
+      setCotizacion(null);
+      return;
+    }
+    let vivo = true;
+    api
+      .cotizarDelivery({
+        sucursal_id: sucursalId,
+        ubicacion_lat: lat,
+        ubicacion_lng: lng,
+        ubicacion_distrito: ubicacion.ubicacion_distrito,
+      })
+      .then((c) => {
+        if (vivo) setCotizacion(c);
+      })
+      // El pedido se toma igual: no poder cotizar no es no poder vender.
+      .catch(() => {
+        if (vivo) setError("No se pudo calcular el reparto.");
+      });
+    return () => {
+      vivo = false;
+    };
+    // Solo cuando cambia el punto: el resto del objeto viaja con él.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lat, lng, sucursalId]);
+
+  if (error) return <p className="pdv-nota">{error}</p>;
+  if (!cotizacion) return null;
+
+  const detalle = cotizacion.distancia_km
+    ? `${cotizacion.distancia_km} km${cotizacion.aproximada ? " aprox." : ""} · reparto S/ ${cotizacion.costo}`
+    : `Reparto S/ ${cotizacion.costo}`;
+
+  return (
+    <p className="pdv-nota">
+      {detalle}
+      {cotizacion.derivar_a_externo && (
+        <strong>
+          {" — "}
+          {MOTIVO_DERIVACION[cotizacion.motivo ?? ""] ?? "fuera del reparto propio"}:
+          sugerir DAZ DAZ.
+        </strong>
+      )}
+    </p>
+  );
+}
+
+
 export function DialogoTipo({
   abierto,
   borrador,
   mesas,
+  sucursalId,
   onCerrar,
   onConfirmar,
 }: {
   abierto: boolean;
   borrador: Borrador | null;
   mesas: MesaEnMapa[];
+  /** Desde dónde sale el reparto: es el origen de la distancia. */
+  sucursalId: string;
   onCerrar: () => void;
   onConfirmar: (cambios: Partial<Borrador>) => void;
 }) {
@@ -998,6 +1058,7 @@ export function DialogoTipo({
   const [mesaId, setMesaId] = useState<string | null>(null);
   const [comensales, setComensales] = useState(2);
   const [direccion, setDireccion] = useState("");
+  const [ubicacion, setUbicacion] = useState<Ubicacion>(UBICACION_VACIA);
 
   useEffect(() => {
     if (!borrador) return;
@@ -1007,6 +1068,7 @@ export function DialogoTipo({
     // La dirección del cliente registrado entra sola; solo se escribe si no
     // tiene ninguna.
     setDireccion(borrador.direccion ?? borrador.cliente?.direccion ?? "");
+    setUbicacion(borrador.ubicacion ?? UBICACION_VACIA);
   }, [borrador]);
 
   const listo = tipo !== null && (tipo !== "mesa" || mesaId !== null);
@@ -1062,13 +1124,22 @@ export function DialogoTipo({
 
       {tipo === "delivery" && (
         <>
-          <p className="pdv-etiqueta">Dirección de entrega</p>
-          <input
-            className="pdv-campo"
-            value={direccion}
-            placeholder="Jr. San Martín 456"
-            onChange={(e) => setDireccion(e.target.value)}
+          {/* `key` con el id del borrador: el diálogo no se desmonta entre
+              pedidos, y sin esto el campo —no controlado por dentro— seguiría
+              mostrando la dirección del pedido anterior. */}
+          <CampoDireccion
+            key={borrador?.id ?? "sin-borrador"}
+            etiqueta="Dirección de entrega"
+            claseEtiqueta="pdv-etiqueta"
+            claseCampo="pdv-campo"
+            defaultValue={direccion}
+            ubicacion={ubicacion}
+            onCambio={(texto, punto) => {
+              setDireccion(texto);
+              setUbicacion(punto);
+            }}
           />
+          <CotizacionEntrega sucursalId={sucursalId} ubicacion={ubicacion} />
           <p className="pdv-nota">
             {borrador?.cliente
               ? borrador.cliente.direccion
@@ -1092,6 +1163,7 @@ export function DialogoTipo({
               mesaNumero: tipo === "mesa" ? (mesa?.numero ?? null) : null,
               comensales: tipo === "mesa" ? comensales : null,
               direccion: tipo === "delivery" ? direccion.trim() : null,
+              ubicacion: tipo === "delivery" ? ubicacion : UBICACION_VACIA,
             })
           }
         >
@@ -1157,28 +1229,14 @@ export function DialogoConsumoPersonal({
       </div>
 
       <p className="pdv-etiqueta">Autoriza el encargado</p>
-      <div className="pdv-fila">
-        <input
-          className="pdv-campo"
-          aria-label="Usuario del encargado"
-          placeholder="Usuario"
-          autoComplete="off"
-          data-testid="consumo-usuario"
-          value={usuario}
-          onChange={(e) => setUsuario(e.target.value)}
-        />
-        <input
-          className="pdv-campo"
-          type="password"
-          inputMode="numeric"
-          aria-label="PIN del encargado"
-          placeholder="PIN"
-          autoComplete="off"
-          data-testid="consumo-pin"
-          value={pin}
-          onChange={(e) => setPin(e.target.value)}
-        />
-      </div>
+      <FirmaConPin
+        quien="del encargado"
+        usuario={usuario}
+        onUsuario={setUsuario}
+        pin={pin}
+        onPin={setPin}
+        testid="consumo"
+      />
 
       <footer className="pdv-dialogo-pie">
         <span />
@@ -1200,14 +1258,30 @@ export function DialogoConsumoPersonal({
   );
 }
 
+/** El nombre que trajo la consulta, sea de quien sea: una empresa lo tiene
+ * entero en `razon_social` y una persona partido en dos (RENIEC los devuelve
+ * separados). El PDV guarda **un** campo «nombre», así que acá se juntan —es
+ * el único lugar del ERP donde se hace, porque en las fichas de alta hay un
+ * campo para cada uno y partirlos de vuelta perdería información. */
+function nombreDe(datos: Consulta): string {
+  const texto = (clave: string) =>
+    typeof datos[clave] === "string" ? (datos[clave] as string) : "";
+  return (
+    texto("razon_social") ||
+    [texto("nombres"), texto("apellidos")].filter(Boolean).join(" ")
+  );
+}
+
 export function DialogoCliente({
   abierto,
+  permisos,
   onCerrar,
   onBuscar,
   onElegir,
   onCrear,
 }: {
   abierto: boolean;
+  permisos: string[];
   onCerrar: () => void;
   onBuscar: (q: string) => Promise<ClienteBuscado[]>;
   onElegir: (c: ClienteBuscado) => void;
@@ -1259,6 +1333,7 @@ export function DialogoCliente({
           <p className="pdv-etiqueta">Nombre</p>
           <input
             className="pdv-campo"
+            aria-label="Nombre del cliente"
             value={nombre}
             onChange={(e) => setNombre(e.target.value)}
           />
@@ -1266,6 +1341,7 @@ export function DialogoCliente({
           <input
             className="pdv-campo"
             inputMode="tel"
+            aria-label="Teléfono del cliente"
             value={telefono}
             onChange={(e) => setTelefono(e.target.value)}
           />
@@ -1275,11 +1351,16 @@ export function DialogoCliente({
           </p>
           <div className="pdv-dos">
             <div>
-              <p className="pdv-etiqueta">DNI (opcional)</p>
+              <p className="pdv-etiqueta">DNI o RUC (opcional)</p>
+              {/* Los dos en un solo campo, y el largo decide cuál es
+                  (RN-CPP-003): el cliente dicta su número sin decir de qué
+                  padrón es, y con 11 dígitos el servidor lo da de alta como
+                  jurídico —`crear_cliente` deriva solo—. */}
               <input
                 className="pdv-campo"
                 inputMode="numeric"
-                maxLength={8}
+                aria-label="DNI o RUC del cliente"
+                maxLength={LARGO_RUC}
                 value={documento}
                 onChange={(e) => setDocumento(e.target.value.replace(/\D/g, ""))}
               />
@@ -1294,6 +1375,24 @@ export function DialogoCliente({
               />
             </div>
           </div>
+          {/* Prellena, no decide: lo que trae se corrige antes de guardar, y
+              si Factiliza no contesta el alta sigue tecleando (ADR-005). */}
+          <ConsultaDocumento
+            permisos={permisos}
+            numero={documento}
+            className="pdv-boton-sec ancho"
+            onDatos={(datos) => {
+              const traido = nombreDe(datos);
+              if (traido) setNombre(traido);
+              if (typeof datos.direccion === "string" && datos.direccion) {
+                setDireccion(datos.direccion);
+              }
+              if (typeof datos.fecha_nacimiento === "string" && datos.fecha_nacimiento) {
+                setCumpleanos(datos.fecha_nacimiento);
+              }
+            }}
+          />
+
           <p className="pdv-etiqueta">Dirección (opcional)</p>
           <input
             className="pdv-campo"
@@ -1374,10 +1473,14 @@ export function DialogoCliente({
  * pantalla antes de confirmar: enterarse de que salió boleta cuando el
  * cliente quería factura ya es tarde. */
 function leyendaDocumento(doc: string): string {
-  if (doc.length === 11) return "Se emite FACTURA · el documento tiene 11 dígitos";
-  if (doc.length === 8) return "Se emite BOLETA · el documento tiene 8 dígitos";
+  if (doc.length === LARGO_RUC) {
+    return `Se emite FACTURA · el documento tiene ${LARGO_RUC} dígitos`;
+  }
+  if (doc.length === LARGO_DNI) {
+    return `Se emite BOLETA · el documento tiene ${LARGO_DNI} dígitos`;
+  }
   if (doc.length > 0) {
-    return "Documento incompleto: debe tener 8 (DNI) u 11 (RUC) dígitos";
+    return `Documento incompleto: debe tener ${LARGO_DNI} (DNI) u ${LARGO_RUC} (RUC) dígitos`;
   }
   return "Sin documento se emite boleta a nombre de Clientes varios.";
 }
@@ -1415,10 +1518,6 @@ function calcularCobro(
   };
 }
 
-function documentoValido(doc: string): boolean {
-  return [0, 8, 11].includes(doc.length);
-}
-
 function cobroBloqueado(
   ocupado: boolean,
   excede: boolean,
@@ -1446,6 +1545,7 @@ function FilaVueltoRestante({ vuelto, restante }: { vuelto: number; restante: nu
  * para sumar un segundo medio que cubra el faltante del primero. */
 export function DialogoCobro({
   abierto,
+  permisos,
   total,
   medios,
   ocupado,
@@ -1453,6 +1553,7 @@ export function DialogoCobro({
   onConfirmar,
 }: {
   abierto: boolean;
+  permisos: string[];
   total: number;
   medios: MedioPago[];
   ocupado: boolean;
@@ -1588,18 +1689,32 @@ export function DialogoCobro({
             <input
               className="pdv-campo"
               inputMode="numeric"
-              maxLength={11}
-              placeholder="DNI (8) o RUC (11)"
+              aria-label="Documento del receptor"
+              maxLength={LARGO_RUC}
+              placeholder={`DNI (${LARGO_DNI}) o RUC (${LARGO_RUC})`}
               value={doc}
               onChange={(e) => setDoc(e.target.value.replace(/\D/g, ""))}
             />
             <input
               className="pdv-campo"
+              aria-label="Nombre o razón social del receptor"
               placeholder="Nombre / razón social"
               value={nombre}
               onChange={(e) => setNombre(e.target.value)}
             />
           </div>
+          {/* La razón social de una factura la escribía el cajero de oído, y
+              SUNAT rechaza la que no coincide. Acá se trae del padrón que la
+              emite —el largo decide cuál— y queda editable. */}
+          <ConsultaDocumento
+            permisos={permisos}
+            numero={doc}
+            className="pdv-boton-sec ancho"
+            onDatos={(datos) => {
+              const traido = nombreDe(datos);
+              if (traido) setNombre(traido);
+            }}
+          />
           <p className="pdv-nota">{tipoDoc}</p>
         </div>
       </div>
@@ -1620,6 +1735,67 @@ export function DialogoCobro({
           }
         >
           Confirmar pago
+        </button>
+      </footer>
+    </Dialogo>
+  );
+}
+
+/**
+ * Firma de un supervisor en el terminal del cajero.
+ *
+ * Aparece **solo cuando hace falta**: quien ya tiene el permiso anula sin que
+ * nadie le pida nada, y recién si el servidor responde 403 se abre esto. Al
+ * revés —pedir el PIN siempre— haría que un encargado tuviera que teclear el
+ * suyo para anular su propio pedido.
+ */
+export function DialogoAutorizacion({
+  abierto,
+  titulo,
+  detalle,
+  ocupado,
+  onCerrar,
+  onFirmar,
+}: {
+  abierto: boolean;
+  titulo: string;
+  detalle: string;
+  ocupado: boolean;
+  onCerrar: () => void;
+  onFirmar: (encargado: { username: string; pin: string }) => void;
+}) {
+  const [usuario, setUsuario] = useState("");
+  const [pin, setPin] = useState("");
+
+  useEffect(() => {
+    if (!abierto) {
+      setUsuario("");
+      setPin("");
+    }
+  }, [abierto]);
+
+  return (
+    <Dialogo titulo={titulo} abierto={abierto} onCerrar={onCerrar}>
+      <p className="pdv-nota">{detalle}</p>
+      <FirmaConPin
+        quien="del supervisor"
+        usuario={usuario}
+        onUsuario={setUsuario}
+        pin={pin}
+        onPin={setPin}
+        testid="autorizacion"
+      />
+      <footer className="pdv-dialogo-pie">
+        <button type="button" className="pdv-boton-plano" onClick={onCerrar}>
+          Cancelar
+        </button>
+        <button
+          type="button"
+          className="pdv-boton-riesgo"
+          disabled={ocupado || !usuario.trim() || !pin.trim()}
+          onClick={() => onFirmar({ username: usuario.trim(), pin })}
+        >
+          Autorizar
         </button>
       </footer>
     </Dialogo>

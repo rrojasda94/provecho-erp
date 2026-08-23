@@ -3,29 +3,30 @@
 Parte del backlog de deuda técnica del proyecto. El índice y las reglas
 de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 
-- **Falta `statement_timeout`: el timeout de conexión no cubre la consulta**
-  (2026-08-08). `connect_timeout: 5` ya está (CHANGELOG 2026-08-08) y tapa el
-  caso de no poder conectar, pero un Postgres que **acepta la conexión y
-  después se traba** —lock ajeno, consulta pesada, disco al límite— sigue
-  clavando el request sin límite: `pool_pre_ping` solo hace un `SELECT 1` al
-  sacar la conexión del pool, no vigila la consulta real. Arreglo:
-  `connect_args={"options": "-c statement_timeout=…"}` en el mismo
-  `connect_args()` de `src/core/database.py`, con el número decidido a
-  conciencia — un reporte gerencial legítimamente tarda más que un cobro, así
-  que probablemente sean dos engines o un `SET LOCAL` por caso. No se hizo
-  junto con `connect_timeout` porque ese era una cota obvia y este exige
-  elegir un número que puede cortar consultas buenas.
-- **Los barridos de Celery abren la sesión de producción en los tests**
-  (2026-08-08). `inventory/application/tasks.py`, `sales/application/tasks.py`
-  y `rrhh/purga.py` llaman `SessionLocal()` directo, y `test_lotes`,
-  `test_conteos`, `test_inventory` y `test_offline_hub` los ejercitan sin
-  parchearlo siempre: cada uno intenta una conexión real. Ya no cuelga
-  —`connect_timeout` lo corta en 5 s— pero son 5 s regalados por test y, con
-  la base de desarrollo levantada, el barrido corre **contra ella**. El
-  arreglo es el mismo que se le hizo a los listeners (`_listeners_sin_base_real`
-  en `tests/conftest.py`): sumar estos módulos a la lista y que cada test
-  parchee el suyo. No se hizo en el mismo cambio porque son cuatro archivos de
-  test a revisar uno por uno, no una línea de conftest.
+- ✅ 2026-08-15 **`statement_timeout`, en dos engines**. `connect_timeout: 5`
+  tapaba no poder conectar; un Postgres que **acepta la conexión y después se
+  traba** —lock ajeno, plan malo, disco al límite— clavaba el request sin
+  límite, porque `pool_pre_ping` hace un `SELECT 1` al sacar la conexión del
+  pool y después no mira más. Se resolvió con **dos engines** sobre la misma
+  base (`src/core/database.py`): `SessionLocal` con
+  `DB_STATEMENT_TIMEOUT_SEGUNDOS` (15) es el default de todo el ERP, y
+  `SessionReportes` con `DB_STATEMENT_TIMEOUT_REPORTES_SEGUNDOS` (120) lo usan
+  `src/core/reportes/` y el módulo `reports` vía la dependencia
+  `get_db_reportes`. Un número único obligaba a elegir entre cancelar reportes
+  sanos o dejar la caja colgada; se aceptó el costo de un segundo pool de
+  conexiones —que además aísla a la caja de una consulta pesada—. Fuera de
+  Postgres el parámetro no se pasa (el `e2e` corre sobre SQLite).
+  `test_arquitectura` falla si un endpoint queda del lado equivocado.
+- ✅ 2026-08-15 **Los barridos ya no pueden abrir la sesión de producción en
+  los tests**. `inventory/application/tasks.py`, `sales/application/tasks.py`
+  y `rrhh/purga.py` llamaban `SessionLocal()` directo; ahora exponen
+  `session_factory` como los listeners y están en
+  `MODULOS_CON_SESSION_FACTORY`, así que el guardián autouse de
+  `tests/conftest.py` los cubre: el test que ejercita un barrido parchea el
+  suyo (`test_lotes`, `test_conteos`) y el que no, ve un error explícito en
+  vez de una conexión real de 5 s —o, con la base de desarrollo levantada, un
+  barrido corriendo contra ella—. `marketing/application/tasks.py` ya tenía
+  `session_factory` y solo faltaba en la lista.
 - **Cada test rearma el esquema, el seeder y la app desde cero** (2026-08-08).
   44 de los 58 archivos de test copiaron el mismo fixture `env` —
   `create_engine("sqlite://")` + `create_all` de las 99 tablas + `seed(s)` +
@@ -140,6 +141,18 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   tocar un solo test**, que es la prueba de que el error no estaba ahí.
   `tests/test_fechas_negocio.py` congela la regla, incluido un caso que falla
   si algún módulo vuelve a usar `date.today()`.
+- ⬜ **Las direcciones ya cargadas no tienen ancla** (2026-08-22, ADR-053):
+  las cinco tablas ganaron sus columnas nullable y nadie las llenó. No hay
+  backfill porque geocodificar en masa se cobra por registro y el dato viejo no
+  urge: cada ficha queda anclada la próxima vez que alguien la edite. Si algún
+  día hace falta de golpe, es un comando que recorra las filas sin
+  `ubicacion_place_id` con la clave del servidor y un tope de gasto.
+- ⬜ **La CSP no se probó contra el mapa real** (2026-08-22, ADR-053): la lista
+  de hosts de Google salió de su guía oficial recortada a lo que este ERP usa,
+  **sin `'unsafe-eval'`**, que Google recomienda por las dudas. Falta la
+  verificación en el navegador con clave puesta: si un mapa muere con un error
+  de `eval` en consola, esa es la línea que falta y la decisión hay que volver a
+  tomarla a conciencia, no agregarla de reflejo.
 - ⬜ Los tests de `conteos` comparan contra `date.today()` local mientras
   `created_at` usa `CURRENT_TIMESTAMP` (UTC): corriendo después de las
   19:00 hora Perú fallan cuatro casos por un día de diferencia. Falla

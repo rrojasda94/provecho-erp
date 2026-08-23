@@ -19,14 +19,15 @@ recibe qué.
 
 import logging
 import uuid
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.modules.accounting.application.queries_publicas import encargado_de_turno
-from src.modules.reports.domain import rules
+from src.modules.reports.domain import catalogo, rules
 from src.modules.reports.infrastructure.models import AreaMiembro, ReglaDestinatario
+from src.modules.reports.infrastructure.repositories import AreaRepo
 from src.modules.users.infrastructure.models import (
     Almacen,
     Rol,
@@ -195,12 +196,18 @@ def resolver(
     empresa_id: uuid.UUID | None,
     sucursal_id: uuid.UUID | None,
     almacen_id: uuid.UUID | None,
+    contexto: Mapping | None = None,
 ) -> list[tuple[uuid.UUID, str]]:
     """Los destinatarios de una regla, resueltos a personas y deduplicados.
 
     Gana el **primer** motivo que trajo a cada persona: quien está en el área
     Almacén y además es el encargado de turno recibe una vez, y el motivo que
     queda es el que el administrador escribió primero en la regla.
+
+    `contexto` es la proyección del payload **ya recortada por la whitelist**
+    de la emisión (`catalogo.proyectar`). Un resolutor dinámico no puede ver
+    más de lo que la emisión declaró: así la garantía de RN-REP-003 se
+    extiende sola a los destinatarios.
     """
     encontrados: dict[uuid.UUID, str] = {}
 
@@ -236,8 +243,10 @@ def resolver(
                 _dinamico(
                     session,
                     destinatario.dinamico,
+                    empresa_id=empresa_id,
                     sucursal_id=sucursal_id,
                     almacen_id=almacen_id,
+                    contexto=contexto,
                 ),
                 rules.motivo("dinamico", destinatario.dinamico or ""),
             )
@@ -249,13 +258,68 @@ def _dinamico(
     session: Session,
     nombre: str | None,
     *,
+    empresa_id: uuid.UUID | None = None,
     sucursal_id: uuid.UUID | None,
     almacen_id: uuid.UUID | None,
+    contexto: Mapping | None = None,
 ) -> list[uuid.UUID]:
     if nombre == "encargado_de_turno" and sucursal_id is not None:
         return de_sucursal(session, sucursal_id)
     if nombre == "responsables_de_almacen" and almacen_id is not None:
         return de_almacen(session, almacen_id)
+    if nombre == "responsables_del_nivel":
+        return del_nivel(
+            session,
+            (contexto or {}).get("nivel_actual"),
+            empresa_id=empresa_id,
+            # El escalamiento se emite con ámbito `empresa` (puede nacer de un
+            # hecho sin local), así que la sucursal viene en su propio payload.
+            sucursal_id=sucursal_id or _uuid(contexto, "sucursal_id"),
+        )
     # Un dinámico que no aplica al ámbito del hecho (pedir el encargado de
     # turno de un pago de empresa) resuelve a nadie, no a todos.
+    return []
+
+
+def _uuid(contexto: Mapping | None, clave: str) -> uuid.UUID | None:
+    """El payload viaja serializado (los ids son strings). Un valor ausente o
+    inválido resuelve a nadie: un reporte no se pierde por un campo mal."""
+    valor = (contexto or {}).get(clave)
+    if isinstance(valor, uuid.UUID):
+        return valor
+    try:
+        return uuid.UUID(str(valor)) if valor else None
+    except ValueError:
+        return None
+
+
+def del_nivel(
+    session: Session,
+    nivel: str | None,
+    *,
+    empresa_id: uuid.UUID | None,
+    sucursal_id: uuid.UUID | None,
+) -> list[uuid.UUID]:
+    """Quién responde en un nivel de la cadena de escalamiento (ADR-036).
+
+    El ERP no tiene jerarquía organizacional —no hay `supervisor_id` ni nivel
+    de rol—, así que el escalón se resuelve con lo que sí existe: el encargado
+    de turno para el piso y las áreas para los dos de arriba
+    (`catalogo.DESTINO_POR_NIVEL`).
+
+    Es público porque el endpoint que eleva lo llama para responder **a quién
+    le va a llegar**: el reporte de la elevación se emite post-commit
+    (ADR-016), así que sus entregas todavía no existen cuando hay que
+    contestar. Una lista vacía es la respuesta correcta cuando el nivel no
+    tiene a nadie, y verla es el punto (RN-REP-005).
+    """
+    tipo, valor = catalogo.DESTINO_POR_NIVEL.get(nivel or "", (None, None))
+    if tipo == "dinamico" and sucursal_id is not None:
+        return de_sucursal(session, sucursal_id)
+    if tipo == "area" and empresa_id is not None:
+        area = AreaRepo(session).por_codigo(empresa_id, valor)
+        if area is not None:
+            return de_area(
+                session, area.id, empresa_id=empresa_id, sucursal_id=sucursal_id
+            )
     return []

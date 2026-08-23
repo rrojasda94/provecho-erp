@@ -1,45 +1,63 @@
-# Multi-etapa. `dev` es lo que levanta `docker-compose.yml` (código montado,
-# `next dev`); `runtime` es la imagen que se reparte en el paquete de demo
-# (`docker-compose.demo.yml`): build de producción con `output: "standalone"`,
-# sin dependencias de desarrollo. Son ~250 MB contra ~1.5 GB, y sobre todo no
-# compila cada pantalla la primera vez que alguien la abre — con `next dev` el
-# primer clic en el PDV se queda pensando varios segundos, y quien está
-# probando lo lee como que el sistema es lento.
-#
-# node 24 es la versión con la que el job `frontend` del CI corre `next build`.
-# Construir la imagen con otra sería enviar un build que nadie probó (el mismo
-# error que el PR #49 con Python; lo vigila `tests/test_repo_coherencia.py`).
-
+# Node 24: el mismo runtime que corre CI (`ci.yml`, jobs `frontend` y `e2e`).
+# La imagen traía node:20, que ni siquiera es la que valida los tests —
+# `npm test` usa el stripping de tipos de fábrica de `node --test`, que no
+# existe antes de 22.18. Dos runtimes distintos para el mismo `package.json`
+# significa que lo que pasa en CI no es lo que se despliega.
 FROM node:24-alpine AS deps
+
 WORKDIR /app
-# Con el lock: `npm ci` instala exactamente las versiones que el repo fijó y
-# que probó el CI. `npm install` sin lock resolvía los rangos de nuevo en cada
-# build, así que la imagen podía traer paquetes que nadie verificó.
+# `npm ci` (no `npm install`): instala EXACTAMENTE el árbol del lockfile, el
+# mismo que resolvió CI. Con `npm install` y sin copiar el lock, cada build
+# resolvía los `^` a lo último publicado ese día — un major de una
+# dependencia se colaba en la imagen sin pasar por un PR.
 COPY package.json package-lock.json ./
 RUN npm ci
 
+# --- Desarrollo -------------------------------------------------------------
+# El `web` de `docker-compose.yml` apunta acá. Monta el código encima, así
+# que este COPY solo existe para que la imagen también corra suelta.
 FROM deps AS dev
 COPY . .
 EXPOSE 3000
 CMD ["npm", "run", "dev"]
 
-FROM deps AS build
+# --- Build de producción ----------------------------------------------------
+FROM deps AS builder
 COPY . .
+ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
-FROM node:24-alpine AS runtime
+# --- Runtime de producción --------------------------------------------------
+# `output: "standalone"` (next.config.mjs) deja en `.next/standalone` el
+# servidor con solo las dependencias que realmente se importan. La alternativa
+# —arrastrar `node_modules` entero— es un orden de magnitud más de imagen y
+# mete las devDependencies (Playwright, TypeScript) en producción.
+FROM node:24-alpine AS runner
+
 WORKDIR /app
-ENV NODE_ENV=production
-# Sin esto el servidor de Next escucha en `localhost` DENTRO del contenedor:
-# el puerto queda publicado y ninguna conexión entra.
-ENV HOSTNAME=0.0.0.0
-ENV PORT=3000
-# `output: "standalone"` deja en `.next/standalone` el servidor con solo las
-# dependencias que el runtime usa. Los estáticos quedan fuera a propósito y se
-# copian aparte.
-COPY --from=build /app/.next/standalone ./
-COPY --from=build /app/.next/static ./.next/static
-# Sin privilegios, igual que la imagen del backend.
-USER node
+# `HOSTNAME=0.0.0.0`: sin esto el server de `standalone` escucha en el
+# localhost del contenedor y nada de fuera lo alcanza — el mapeo de puertos
+# parece roto y no lo está.
+ENV NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1 \
+    PORT=3000 \
+    HOSTNAME=0.0.0.0
+
+# Sin privilegios, igual que la imagen del backend: una vulnerabilidad en la
+# aplicación no debe traer consigo root dentro del contenedor.
+RUN addgroup -g 10001 provecho && adduser -D -u 10001 -G provecho provecho
+
+COPY --from=builder --chown=provecho:provecho /app/.next/standalone ./
+# `standalone` no incluye los estáticos ni las fuentes self-hosted que
+# `next/font` descarga en build: van aparte o la app carga sin CSS.
+COPY --from=builder --chown=provecho:provecho /app/.next/static ./.next/static
+
+USER provecho
+
+# `/login` y no `/`: la raíz exige sesión y responde con una redirección, que
+# como señal de salud no distingue "vivo" de "roto".
+HEALTHCHECK --interval=30s --timeout=3s --start-period=15s --retries=3 \
+    CMD wget -q --spider http://127.0.0.1:3000/login || exit 1
+
 EXPOSE 3000
 CMD ["node", "server.js"]

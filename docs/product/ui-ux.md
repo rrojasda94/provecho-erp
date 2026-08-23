@@ -1,31 +1,127 @@
 # UI / UX y branding
 
-## Branding Provecho (brandboard 2026-07)
+## Dos voces, no una (revisión 2026-08-07)
+
+El brandboard de julio se aplicó por igual a todo: fondo crema de pared a
+pared y cada `h1`–`h4` en Anton itálica y VERSALES. Es la voz correcta cuando
+la marca le habla al cliente —PDV, kiosco, carta— y la peor posible en una
+pantalla de trabajo: la itálica en versales es el ajuste menos escaneable que
+existe, y sobre crema las tarjetas blancas pierden contraste justo donde
+están los números.
+
+Desde el rediseño hay **dos superficies con reglas distintas**:
+
+| | Back office | PDV / KDS / login |
+|---|---|---|
+| Quién mira | personal, turnos de 8 h, tablas densas | cliente y quien atiende |
+| Fondo | acero `#F2F4F7` | crema `#FFF4E6` |
+| Titulares | Archivo condensada, caja normal | la voz de la marca |
+| Logotipo | Anton, solo el wordmark | Anton |
+| Color | tinta y gris; brasa solo en acciones | marca completa |
+
+No es un tema nuevo ni un segundo set de tokens: es el **mismo** sistema,
+donde el back office usa el subconjunto sobrio. El mecanismo de skins por
+marca (abajo) no cambia.
+
+## Branding Provecho (brandboard 2026-07, valores revisados 2026-08-07)
 
 ### Paleta
 
 | Token CSS | Hex | Uso |
 |-----------|-----|-----|
-| `--color-primary` | `#F4511E` | Naranja fuego — acciones primarias, logo |
-| `--color-secondary` | `#B71C1C` | Rojo — alertas/énfasis |
-| `--color-dark` | `#161616` | Negro — fondos oscuros, texto sobre claro |
-| `--color-cream` | `#FFF1DC` | Crema — fondo claro por defecto |
-| `--color-accent` | `#AEEA00` | Verde lima — acentos, éxito |
-| `--color-gray` | `#757575` | Gris — texto secundario, bordes |
+| `--color-primary` | `#C6390F` | Brasa — acciones primarias, logo |
+| `--color-secondary` | `#7A1414` | Rescoldo — destructivo, crítico, error |
+| `--color-dark` | `#15171C` | Tinta — texto y fondos oscuros |
+| `--color-cream` | `#FFF4E6` | Crema — superficie de marca (PDV, KDS, login) |
+| `--color-accent` | `#17864B` | Verde operación — estado "activo / conforme" |
+| `--color-gray` | `#5F6B7A` | Humo — texto secundario |
+| `--color-steel` | `#F2F4F7` | Acero — fondo del back office |
+
+Los hex se movieron por contraste medido, no por gusto:
+
+- El naranja `#F4511E` daba **3.4:1** sobre blanco y `text-primary` aparece 41
+  veces en enlaces y títulos — no llegaba a AA. `#C6390F` da 5.3:1.
+- El lima `#AEEA00` era, en la práctica, el color de 30 insignias de estado
+  (`bg-accent/30` = emitida, recibida, cuadra, operativo, activa). En texto
+  era ilegible y en insignia quedaba amarillento. El verde dice lo mismo y se
+  lee.
+- Tinta y humo pasaron de neutro cálido a neutro frío: es lo que hace que el
+  fondo lea como acero de cocina y no como cartón.
+
+### Un acento, no una paleta por área (revisión 2026-08-12, ADR-037)
+
+Se probó un color por **área de negocio** (`--area-operacion`,
+`--area-comercial`, `--area-abastecimiento`, `--area-administracion`) y se
+descartó: ADR-013 §8 ya había rechazado el color por módulo o por tarjeta
+—"la identidad de marca queda en tipografía y un acento consistente, no en
+variedad de color de fondo"— y cuatro tintes son el mismo arcoíris con menos
+pasos. La ficha del home con el ícono coloreado era, literalmente, el mockup
+que ese ADR rechazó.
+
+Queda **un acento** (`--hue`, que cuelga de `--marca-primary`), y aparece en
+reposo solo donde marca **estado**: el ítem activo del sidebar y el filo del
+rótulo de área. Todo lo demás arranca neutro y se enciende al apuntarlo.
+
+Las **áreas de negocio siguen existiendo** como agrupación del home
+(`AREAS` en `frontend/lib/modulos.ts`): Operación, Comercial,
+Abastecimiento, Administración. Ordenan la grilla en el orden en que
+transcurre el día. Ordenar no necesita pintar.
+
+`--hue` existe como indirección —y no se usa `--primary` directo— para que el
+PDV pueda recolorearlo por marca sin reescribir las cinco reglas que lo leen.
 
 ### Tipografías
 
-- **Anton Italic** — titulares y logotipo (mayúsculas, cursiva). Google Fonts
-  `Anton` + `font-style: italic` (la fuente no trae itálica nativa).
-- **Inter** — textos y cuerpo (Regular / Medium / Bold).
+- **Archivo** (variable, ejes de peso y **ancho**) — títulos y cuerpo. Una
+  sola familia: el contraste entre un título y un párrafo lo dan el ancho
+  condensado (`font-stretch: 92%`) y el peso, no una segunda grotesca que se
+  le parece. En un ERP en español, donde las etiquetas son largas ("Órdenes
+  de compra pendientes de aprobación"), condensar es además lo que hace que
+  quepan sin abreviar.
+- **IBM Plex Mono** — cifras: importes, cantidades, códigos internos, IDs.
+  Clase `.cifra`. Una columna de dinero solo se compara si los dígitos ocupan
+  el mismo ancho; el `body` lleva `font-variant-numeric: tabular-nums` por
+  defecto.
+- **Anton** — **solo el logotipo** (clase `.logotipo`) y las superficies de
+  marca. Era la fuente de todos los títulos del ERP; ahora firma donde
+  corresponde y no se mete en la lectura.
+- Inter salió: era la tercera grotesca neutra y no aportaba nada que Archivo
+  no hiciera.
 
 ### Identidad
 
-- Logotipo: "P" en llamas + PROVECHO (Anton Italic). Variantes: horizontal,
+- Logotipo: "P" en llamas + PROVECHO (Anton). Variantes: horizontal,
   vertical (tagline "Hub Gastronómico"), isotipo reducido, monocromática,
   verde lima sobre oscuro.
+- En el back office el logotipo se reduce a wordmark + un cuadro de 8 px en
+  brasa (que gira 45° al apuntarlo). Es la única firma cromática de la barra.
 - Frase de campaña: **"¿Qué se te antoja hoy?"**
-- Estilo gráfico: texturas urbanas (concreto, grunge, spray).
+- Estilo gráfico: texturas urbanas (concreto, grunge, spray) — en las
+  superficies de marca, no en las pantallas de trabajo.
+
+### Movimiento
+
+Una sola curva para todo el ERP, `--transicion: 180ms cubic-bezier(.2,.7,.2,1)`:
+entra rápido y frena suave, como un cajón bien montado. Cuatro usos y no más:
+
+1. **Entrada de pantalla** — 8 px de subida y opacidad, 220 ms, una vez por
+   navegación (`components/shell/revelar.tsx`).
+2. **Escalonado de grilla** — 25 ms entre fichas, hasta la sexta; más allá se
+   percibe como lentitud (`.revelar-lista`).
+3. **Filo del acento** — crece de arriba abajo al apuntar una ficha o al
+   marcar el ítem activo del sidebar.
+4. **Estados** — fondo, borde y sombra en hover/foco; 1 px de hundimiento al
+   presionar.
+5. **Diálogo** — `::backdrop` con desenfoque de 3 px y panel que entra con
+   escala (200 ms). Solo la entrada: animar la salida de un `<dialog>` nativo
+   exige `@starting-style` y `transition-behavior: allow-discrete` para no
+   dejarlo colgado, y no compensa.
+6. **Esqueletos** — `animate-pulse` mientras el servidor resuelve la
+   pantalla (un `loading.tsx` por módulo).
+
+Sin parallax, sin animación por scroll, sin nada que retrase una acción. Y
+`prefers-reduced-motion: reduce` apaga todo: para parte del personal el
+desplazamiento en pantalla produce mareo, no es una cortesía.
 
 ## Sistema de skins y temas (multi-marca)
 
@@ -58,7 +154,7 @@
   tema por marca — deben poder combinarse sin conflicto (ej. tema Charlie's
   + modo daltonismo + fuente grande, a la vez).
 
-### Catálogo de paletas y tamaños de fuente (propuesta técnica, 2026-07-27)
+### Catálogo de paletas y tamaños de fuente (propuesta 2026-07-27, ✅ implementado 2026-08-12)
 
 Resuelve el pendiente de catálogo exacto. Es una propuesta de partida —
 válida para empezar a construir; se ajusta si una validación real con
@@ -75,8 +171,8 @@ rojo-verde) y sube el contraste general:
 
 | Token semántico | Provecho (estándar) | Alto contraste / daltonismo |
 |---|---|---|
-| `--status-success` | `--color-accent` `#AEEA00` (verde lima) | `#0072B2` (azul) |
-| `--status-danger` | `--color-secondary` `#B71C1C` (rojo) | `#D55E00` (naranja vermellón) |
+| `--status-success` | `--color-accent` `#17864B` (verde operación) | `#0072B2` (azul) |
+| `--status-danger` | `--color-secondary` `#7A1414` (rescoldo) | `#D55E00` (naranja vermellón) |
 | `--status-warning` *(nuevo, no existe hoy)* | `#FFB300` (ámbar) | `#E69F00` (ocre) |
 | `--status-info` *(nuevo, no existe hoy)* | `#1976D2` (azul) | `#56B4E9` (celeste) |
 
@@ -98,10 +194,52 @@ dimensionado en `rem` escale junto:
 | Muy grande | `1.3` | ~20.8px |
 | Máximo | `1.5` | 24px |
 
-Ambas preferencias viven en `usuario` (ej.
-`preferencia_paleta: estandar\|alto_contraste`,
-`preferencia_tamano_fuente: estandar\|grande\|muy_grande\|maximo`) — sin
-implementar todavía, ver `docs/product/frontend-architecture.md` F2.14.
+Ambas preferencias viven en `usuario`
+(`preferencia_paleta: estandar|alto_contraste`,
+`preferencia_tamano_fuente: estandar|grande|muy_grande|maximo`), junto con
+`preferencia_tema: claro|oscuro`. Se leen en `GET /users/me` y se cambian con
+`PATCH /users/me/preferencias`, que **no exige permiso**: no hay privilegio
+que otorgar en elegir el tamaño de la propia letra, y pedir uno dejaría la
+accesibilidad fuera del alcance de quien más la necesita.
+
+**Se resuelven en el servidor** (ADR-037): el layout raíz escribe
+`class="dark"`, `data-escala` y `data-paleta` en `<html>`. No se usa
+`next-themes` —aunque esté instalado para `sonner`— porque guarda en
+`localStorage` y necesita un script inline antes del primer pintado, y la CSP
+de `middleware.ts` firma cada script con un nonce por request. Por lo mismo
+el tema no ofrece "seguir al sistema": detectarlo exige leer
+`prefers-color-scheme` en el navegador.
+
+Los dos ejes se combinan, como pide la sección anterior. El bloque
+`[data-paleta="alto-contraste"]` se declara **después** de `.dark` —misma
+especificidad, gana el último— y existe un
+`.dark[data-paleta="alto-contraste"]` con la paleta Okabe-Ito aclarada: sus
+valores están medidos contra blanco y sobre el fondo oscuro (`#101216`) el
+azul cae a 3.6:1. Conserva el tono, que es lo que distingue los estados, y
+sube la luminosidad, que es lo que los hace legibles.
+
+| Token | Estándar | Alto contraste | Oscuro | Oscuro + alto contraste |
+|---|---|---|---|---|
+| `--status-success` | `#17864B` | `#0072B2` | `#2EA86A` | `#3D9EE0` |
+| `--status-danger` | `#7A1414` | `#D55E00` | `#E5484D` | `#EF7D1A` |
+| `--status-warning` | `#FFB300` | `#E69F00` | `#FFB300` | `#F0B429` |
+| `--status-info` | `#1976D2` | `#56B4E9` | `#4D94FF` | `#56B4E9` |
+
+La regla de "ningún estado depende solo del color" no queda como convención:
+el ícono viaja **atado al tono** en `components/estado/insignia.tsx`. Si
+fuera una prop opcional, la pantalla número treinta y uno lo olvidaría y
+nadie lo notaría en la revisión.
+
+### Modo oscuro (nuevo 2026-08-12, ADR-037)
+
+El brandboard nunca contempló pantallas oscuras fuera del PDV, el KDS y el
+lienzo. Se agrega para el resto del ERP: la oficina a las 3 p.m. y la cocina
+a las 6 a.m. no son la misma luz, y el turno de cierre trabaja de noche.
+
+Remapea **roles**, nunca los `--marca-*`. Dos colores se recalculan por
+contraste medido: `--primary` vuelve al naranja original `#F4511E` (la brasa
+`#C6390F` cae a 3.6:1 sobre fondo oscuro; el naranja de origen sube a 5.4:1)
+y `--secondary` pasa de rescoldo a `#E5484D`.
 
 ## Responsive y plataformas
 
@@ -115,6 +253,31 @@ implementar todavía, ver `docs/product/frontend-architecture.md` F2.14.
 - Los módulos táctiles deben funcionar tanto con mouse/teclado (PC) como con
   touch (tablet): sin interacciones hover-only, touch targets de tamaño
   adecuado.
+
+### Qué significa "no romperse en pantallas chicas"
+
+Dos reglas, y las dos se verifican solas en `frontend/uso/responsive.spec.ts`
+sobre tres medidas (teléfono 390×844, tablet vertical 820×1180, PC 1440×900):
+
+1. **Ninguna opción desaparece al angostar la pantalla.** Un control puede
+   cambiar de lugar, entrar en un panel que se alterna o quedar detrás de un
+   scroll; lo que no puede es dejar de existir ni quedar dibujado fuera de un
+   contenedor que lo recorta. `display: none` por ancho es la forma más fácil
+   de romper esto: fue lo que escondió el ticket entero del PDV —pedido,
+   totales, «Enviar» y «Cobrar»— en toda tablet en vertical.
+2. **Todo diálogo modal queda centrado en la pantalla**, en cualquier ancho.
+   El centrado lo da el navegador (`margin: auto` sobre los `inset: 0` del
+   `<dialog>` modal) y es más frágil de lo que parece: el preflight de
+   Tailwind lo pisa con `margin: 0`, y cualquier ancestro con un `transform`
+   distinto de `none` —incluida una animación con `animation-fill-mode: both`
+   cuyo último fotograma es `transform: none`, que computa a la matriz
+   identidad— se vuelve bloque contenedor del diálogo y lo clava en su esquina
+   superior izquierda. Por eso las animaciones de entrada del ERP usan
+   `backwards` y no `both`.
+
+En el PDV y el KDS, además, el ancho de mostrador (≥ 60rem) muestra los dos
+paneles a la vez; por debajo se alternan con un botón que solo existe en ese
+ancho. Alternar es aceptable, esconder no.
 
 ## Flujos clave de UI
 

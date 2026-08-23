@@ -20,6 +20,7 @@ from src.modules.inventory.infrastructure.repositories import (
     LoteRepo,
     MovimientoRepo,
     ReservaRepo,
+    SkuRepo,
     StockRepo,
 )
 
@@ -101,7 +102,7 @@ def registrar_movimiento(
             )
 
     stock = aplicar_a_stock(session, almacen_id, sku_id, cantidad)
-    _avisar_si_cruza_el_minimo(session, stock, cantidad)
+    _avisar_si_cruza_el_minimo(session, stock, cantidad, usuario_id)
     if lote_id is not None:
         lotes_uc.aplicar_a_lote(session, almacen_id, sku_id, lote_id, cantidad)
     mov = MovimientoRepo(session).add(
@@ -128,6 +129,7 @@ def _exigir_motivo_del_override(
     lote_id: uuid.UUID,
     motivo_lote: str | None,
     hoy: date | None,
+    usuario_id: uuid.UUID | None = None,
 ) -> None:
     """Tomar el lote que FEFO ya sugería no es un override; tomar otro sí.
 
@@ -137,7 +139,9 @@ def _exigir_motivo_del_override(
     """
     if motivo_lote:
         return
-    disponibles = lotes_uc.disponibles_fefo(session, almacen_id, sku_id, hoy)
+    disponibles = lotes_uc.disponibles_fefo(
+        session, almacen_id, sku_id, hoy, usuario_id=usuario_id
+    )
     sugerido = disponibles[0].lote_id if disponibles else None
     if sugerido is not None and sugerido != lote_id:
         raise ReglaNegocio(
@@ -146,7 +150,10 @@ def _exigir_motivo_del_override(
 
 
 def _avisar_si_cruza_el_minimo(
-    session: Session, stock: Stock, delta: Decimal
+    session: Session,
+    stock: Stock,
+    delta: Decimal,
+    usuario_id: uuid.UUID | None = None,
 ) -> None:
     """Publica `inventory.stock_bajo_minimo` al **cruzar** el mínimo, no cada
     vez que se está por debajo.
@@ -169,6 +176,10 @@ def _avisar_si_cruza_el_minimo(
                 "sku_id": str(stock.sku_id),
                 "cantidad": str(stock.cantidad),
                 "stock_minimo": str(stock.stock_minimo),
+                # Quién hizo el movimiento que cruzó el mínimo. Nulo cuando
+                # el movimiento no viene de una persona (una sincronización,
+                # un listener): el reporte dirá «Sistema».
+                "usuario_id": str(usuario_id) if usuario_id else None,
             },
             session=session,
         )
@@ -206,7 +217,9 @@ def registrar_salida(
     articulo = lotes_uc.articulo_de_sku(session, sku_id)
     if lote_id is not None or not articulo.controla_lote:
         if lote_id is not None and articulo.controla_lote:
-            _exigir_motivo_del_override(session, almacen_id, sku_id, lote_id, motivo_lote, hoy)
+            _exigir_motivo_del_override(
+                session, almacen_id, sku_id, lote_id, motivo_lote, hoy, usuario_id
+            )
         mov, _ = registrar_movimiento(
             session,
             almacen_id=almacen_id,
@@ -230,7 +243,9 @@ def registrar_salida(
             f"stock insuficiente: {disponible} disponible, se requieren {cantidad}"
         )
 
-    disponibles = lotes_uc.disponibles_fefo(session, almacen_id, sku_id, hoy)
+    disponibles = lotes_uc.disponibles_fefo(
+        session, almacen_id, sku_id, hoy, usuario_id=usuario_id
+    )
     asignaciones, faltante = rules.repartir_fefo(
         [(f.lote_id, f.cantidad) for f in disponibles], cantidad
     )
@@ -293,6 +308,41 @@ def consultar_stock(
     (RN-INV-009) — es el número contra el que se compromete stock nuevo."""
     return _componer(
         session, StockRepo(session).list(almacen_id, empresa_id), almacen_id, empresa_id
+    )
+
+
+def detalle_sku(session: Session, sku_id: uuid.UUID) -> dict:
+    """El SKU, su artículo y su saldo en cada almacén donde existe.
+
+    Es a donde lleva `inventory.stock_bajo_minimo`: el que abre el reporte
+    quiere ver qué es, cuánto queda y dónde, no encadenar tres pantallas.
+    """
+    sku = SkuRepo(session).get(sku_id)
+    articulo = lotes_uc.articulo_de_sku(session, sku_id)
+    filas = StockRepo(session).list(sku_id=sku_id)
+    nombres = _nombres_de_almacen(session, [f.almacen_id for f in filas])
+    return {
+        "id": sku.id,
+        "articulo_id": sku.articulo_id,
+        "codigo": sku.codigo,
+        "codigo_barras": sku.codigo_barras,
+        "activo": sku.activo,
+        "articulo": articulo,
+        "stock": [
+            {**fila, "almacen": nombres.get(fila["almacen_id"], "(borrado)")}
+            for fila in _componer(session, filas, None, None)
+        ],
+    }
+
+
+def _nombres_de_almacen(session: Session, ids) -> dict[uuid.UUID, str]:
+    ids = {i for i in ids if i is not None}
+    if not ids:
+        return {}
+    return dict(
+        session.execute(
+            select(Almacen.id, Almacen.nombre).where(Almacen.id.in_(ids))
+        ).all()
     )
 
 

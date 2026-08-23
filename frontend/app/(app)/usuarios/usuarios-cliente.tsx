@@ -1,16 +1,24 @@
 "use client";
 
 import type { ColumnDef } from "@tanstack/react-table";
-import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useActionState, useMemo, useState, useTransition } from "react";
 
+import {
+  BOTON_FILA,
+  DialogoFormulario,
+  ESTADO_INICIAL,
+} from "@/components/formulario/dialogo-formulario";
+import { PersonaPicker } from "@/components/persona-picker/persona-picker";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
+import { tienePermiso } from "@/lib/permisos";
 
 import {
   asignarRolAction,
   cambiarActivoAction,
   crearUsuarioAction,
+  editarUsuarioAction,
   quitarRolAction,
-  type EstadoUsuario,
+  resetearPinAction,
 } from "./actions";
 
 export type Usuario = {
@@ -19,93 +27,92 @@ export type Usuario = {
   tipo: string;
   nombre_display: string | null;
   email: string | null;
+  persona_id: string | null;
   activo: boolean;
 };
 export type Rol = { id: string; nombre: string; descripcion: string | null };
 
-const ESTADO_INICIAL: EstadoUsuario = { error: "", ok: false };
-
 function DialogoNuevaCuenta() {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const formRef = useRef<HTMLFormElement>(null);
-  const [estado, formAction, pendiente] = useActionState(crearUsuarioAction, ESTADO_INICIAL);
-
-  useEffect(() => {
-    if (estado.ok) {
-      formRef.current?.reset();
-      dialogRef.current?.close();
-    }
-  }, [estado.ok]);
-
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => dialogRef.current?.showModal()}
-        className="rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary"
-      >
-        + Nueva cuenta
-      </button>
-      <dialog ref={dialogRef} className="w-full max-w-md rounded-lg p-0 backdrop:bg-dark/40">
-        <form ref={formRef} action={formAction} className="flex flex-col gap-4 p-6">
-          <h2 className="font-heading text-lg italic uppercase text-dark">Nueva cuenta</h2>
-          <label className="flex flex-col gap-1 text-sm font-semibold">
-            Usuario
-            <input name="username" required minLength={3} maxLength={50} autoComplete="off" />
-          </label>
-          <label className="flex flex-col gap-1 text-sm font-semibold">
-            PIN
-            <input
-              name="pin"
-              required
-              inputMode="numeric"
-              autoComplete="new-password"
-              type="password"
-            />
-            <span className="text-xs font-normal text-gray">
-              Solo dígitos. El usuario lo cambia después con su propia sesión.
-            </span>
-          </label>
-          <label className="flex flex-col gap-1 text-sm font-semibold">
-            Nombre visible
-            <input name="nombre_display" maxLength={100} placeholder="Opcional" />
-          </label>
-          <label className="flex flex-col gap-1 text-sm font-semibold">
-            Email
-            <input name="email" type="email" placeholder="Opcional" />
-          </label>
-          <label className="flex flex-col gap-1 text-sm font-semibold">
-            Tipo
-            <select name="tipo" defaultValue="humano">
-              <option value="humano">Humano</option>
-              <option value="servicio">Servicio</option>
-              <option value="agente_ia">Agente IA</option>
-            </select>
-          </label>
-          {estado.error && (
-            <p role="alert" className="text-sm font-semibold text-secondary">
-              {estado.error}
-            </p>
-          )}
-          <div className="mt-2 flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => dialogRef.current?.close()}
-              className="rounded border border-gray px-4 py-2 text-sm font-semibold text-dark"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={pendiente}
-              className="rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary"
-            >
-              {pendiente ? "Creando..." : "Crear"}
-            </button>
-          </div>
-        </form>
-      </dialog>
-    </>
+    <DialogoFormulario
+      titulo="Nueva cuenta"
+      disparador="+ Nueva cuenta"
+      etiquetaEnvio="Crear"
+      etiquetaPendiente="Creando..."
+      accion={crearUsuarioAction}
+    >
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Usuario
+        <input name="username" required minLength={3} maxLength={50} autoComplete="off" />
+      </label>
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        PIN
+        <input
+          name="pin"
+          required
+          inputMode="numeric"
+          autoComplete="new-password"
+          type="password"
+        />
+        <span className="text-xs font-normal text-gray">
+          Solo dígitos. El usuario lo cambia después con su propia sesión.
+        </span>
+      </label>
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Nombre visible
+        <input name="nombre_display" maxLength={100} placeholder="Opcional" />
+      </label>
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Email
+        <input name="email" type="email" placeholder="Opcional" />
+      </label>
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Tipo
+        <select name="tipo" defaultValue="humano">
+          <option value="humano">Humano</option>
+          <option value="servicio">Servicio</option>
+          <option value="agente_ia">Agente IA</option>
+        </select>
+      </label>
+    </DialogoFormulario>
+  );
+}
+
+/** Corrige los datos de la cuenta.
+ *
+ * El `username` no se ofrece: es con lo que quedó firmada cada acción en el
+ * `audit_log`, y cambiarlo dejaría ese rastro apuntando a un nombre que ya
+ * no existe. El PIN tampoco — lo cambia su dueño con su propia sesión. */
+function DialogoEditarCuenta({ usuario }: { usuario: Usuario }) {
+  return (
+    <DialogoFormulario
+      titulo={`Editar ${usuario.username}`}
+      disparador="Editar"
+      claseDisparador={BOTON_FILA}
+      accion={editarUsuarioAction}
+      ayuda="El usuario y el PIN no se editan: el primero firma el rastro de auditoría, el segundo lo cambia su dueño."
+    >
+      <input type="hidden" name="id" value={usuario.id} />
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Nombre visible
+        <input
+          name="nombre_display"
+          maxLength={100}
+          defaultValue={usuario.nombre_display ?? ""}
+        />
+      </label>
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Email
+        <input name="email" type="email" defaultValue={usuario.email ?? ""} />
+      </label>
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Persona vinculada
+        <PersonaPicker name="persona_id" />
+        <span className="text-xs font-normal text-gray">
+          Quién es esta cuenta en la vida real. Vacío deja la que ya tenga.
+        </span>
+      </label>
+    </DialogoFormulario>
   );
 }
 
@@ -194,15 +201,64 @@ function BotonActivo({ usuario }: { usuario: Usuario }) {
   );
 }
 
+/** Resetear el PIN es poder entrar como esa persona, así que pregunta antes.
+ * Lo que pasa después lo hace cumplir el servidor: la cuenta no puede hacer
+ * nada hasta elegir un PIN nuevo, se le cierran las sesiones abiertas y queda
+ * escrito quién la reseteó. */
+function BotonResetPin({ usuario }: { usuario: Usuario }) {
+  const [pendiente, startTransition] = useTransition();
+  const [aviso, setAviso] = useState("");
+
+  if (usuario.tipo !== "humano") return null;
+
+  return (
+    <span className="flex flex-col">
+      <button
+        type="button"
+        disabled={pendiente}
+        className={BOTON_FILA}
+        title="Devuelve el PIN a 123456 y obliga a cambiarlo al entrar"
+        onClick={() => {
+          if (
+            !window.confirm(
+              `¿Resetear el PIN de ${usuario.username}? Volverá a 123456, ` +
+                "se cerrarán sus sesiones abiertas y tendrá que elegir uno " +
+                "nuevo la próxima vez que entre.",
+            )
+          ) {
+            return;
+          }
+          startTransition(async () => {
+            const r = await resetearPinAction(usuario.id);
+            setAviso(r.error || "PIN reseteado a 123456.");
+          });
+        }}
+      >
+        {pendiente ? "Reseteando..." : "Resetear PIN"}
+      </button>
+      {aviso && (
+        <span role="status" className="text-xs text-gray">
+          {aviso}
+        </span>
+      )}
+    </span>
+  );
+}
+
 export function UsuariosCliente({
   usuarios,
   roles,
   rolesPorUsuario,
+  permisos,
 }: {
   usuarios: Usuario[];
   roles: Rol[];
   rolesPorUsuario: Record<string, Rol[]>;
+  permisos: string[];
 }) {
+  // El botón se oculta a quien no puede: dejarlo visible para chocar con un
+  // 403 al confirmar es peor que no ofrecerlo (mismo criterio que ADR-013).
+  const puedeResetear = tienePermiso(permisos, "users.resetear_pin");
   const [busquedaRol, setBusquedaRol] = useState("");
   const visibles = useMemo(
     () =>
@@ -241,14 +297,24 @@ export function UsuariosCliente({
         header: "Estado",
         cell: ({ row }) => <BotonActivo usuario={row.original} />,
       },
+      {
+        id: "acciones",
+        header: "",
+        cell: ({ row }) => (
+          <span className="flex items-center gap-2">
+            <DialogoEditarCuenta usuario={row.original} />
+            {puedeResetear && <BotonResetPin usuario={row.original} />}
+          </span>
+        ),
+      },
     ],
-    [roles, rolesPorUsuario],
+    [roles, rolesPorUsuario, puedeResetear],
   );
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h1 className="font-heading text-xl italic uppercase text-dark">Cuentas</h1>
+        <h1 className="font-heading text-xl text-dark">Cuentas</h1>
         <DialogoNuevaCuenta />
       </div>
       <p className="text-sm text-gray">

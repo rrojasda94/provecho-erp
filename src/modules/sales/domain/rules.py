@@ -1,5 +1,6 @@
 """Reglas de negocio de venta y cobro. Puras, sin infraestructura."""
 
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 CANALES = {"pdv", "agente_ia", "delivery"}
@@ -57,6 +58,35 @@ def total_venta(items: list[tuple[Decimal, Decimal, Decimal]]) -> Decimal:
     return sum(
         (cant * precio - desc for cant, precio, desc in items), Decimal(0)
     )
+
+
+#: Cuánto dura la corrección de lo recién enviado a cocina (RN-COM-029).
+#:
+#: Dentro de esta ventana, quitar una línea o anular la orden es corregir un
+#: error de tecleo: la comanda acaba de salir, el plato todavía no se armó y
+#: nadie tuvo tiempo de aprovecharlo. Pasada la ventana el insumo ya se usó de
+#: verdad, y ahí sí hace falta que un supervisor firme.
+#:
+#: Cinco minutos porque es lo que dura un error honesto en caja: más corto y
+#: el cajero termina llamando al encargado por cada dedo mal puesto, más largo
+#: y deja de ser corrección.
+VENTANA_CORRECCION = timedelta(minutes=5)
+
+
+def dentro_de_ventana(momento: datetime, ahora: datetime | None = None) -> bool:
+    """¿`momento` cae dentro de la ventana de corrección?
+
+    Compara en naive UTC: las columnas `created_at` de SQLite vuelven sin
+    tzinfo y restarle un `datetime` con zona revienta. Un `momento` que ya
+    trae zona se normaliza; uno sin zona se asume UTC, que es lo que el
+    servidor escribe.
+    """
+    ahora = ahora or datetime.now(UTC)
+    return _sin_zona(ahora) - _sin_zona(momento) <= VENTANA_CORRECCION
+
+
+def _sin_zona(valor: datetime) -> datetime:
+    return valor.replace(tzinfo=None) if valor.tzinfo else valor
 
 
 def pagos_cubren_total(pagos_confirmados: list[Decimal], total: Decimal) -> bool:
@@ -284,3 +314,34 @@ def pedido_entregado(estados_items: list[str]) -> bool:
     return bool(estados_items) and all(
         estado == "entregado" for estado in estados_items
     )
+
+
+# --- Atributos y variantes (ADR-055) -----------------------------------------
+
+MODOS_VARIANTE = {"siempre", "dinamica", "nunca"}
+"""Si la combinación se materializa como fila hija de `producto_comercial`.
+
+Es el `create_variant` de `product.attribute` en Odoo
+(`always` | `dynamic` | `no_variant`), y elegir mal es lo que rompe un
+catálogo de pizzas:
+
+- `siempre` — se generan todas las combinaciones al vincular el atributo.
+  Hace falta cuando cada una tiene precio o receta propios (Tamaño).
+- `dinamica` — la fila se crea la primera vez que se vende esa combinación.
+- `nunca` — no se genera fila. El valor viaja en la línea de venta y solo
+  filtra líneas de receta. Es lo correcto para Mitad 1 / Mitad 2: con
+  `siempre` serían 19 x 19 = 361 filas de producto por tamaño.
+"""
+
+DISPLAYS_ATRIBUTO = {"radio", "pildoras", "select", "color"}
+"""Cómo lo dibuja el PDV. No cambia ninguna aritmética — igual que
+`producto_opcion_grupo` no tiene `tipo` (ADR-035 §5) — pero 19 valores en
+botones de radio es una pantalla inusable y en desplegable no."""
+
+
+def combinaciones_a_generar(modo_variante: str) -> bool:
+    """¿Este atributo materializa filas de producto al vincularse?
+
+    Solo `siempre`. `dinamica` las crea al vender y `nunca` no las crea.
+    """
+    return modo_variante == "siempre"

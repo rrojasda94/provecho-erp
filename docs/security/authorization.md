@@ -40,6 +40,19 @@ alcance del usuario.
 - Un permiso sin restricción aplica a todo el alcance del usuario; con
   restricción, solo donde la condición se cumple.
 - Cambios de roles/permisos se auditan.
+- **Todo endpoint que reciba un PIN cuenta contra el mismo bloqueo de
+  cuenta** (5 intentos / 15 min, 423) y va detrás del mismo rate limit que
+  el login: `login`, `autorizar` y `verificar-pin`. Un contador propio por
+  endpoint sería el camino cómodo para probar PINes sin agotar los cinco
+  del login.
+
+Los tres caminos con PIN responden preguntas distintas y no se sustituyen:
+
+| Endpoint | Pregunta | Efecto |
+|---|---|---|
+| `/auth/login` | ¿quién sos? | abre sesión (rota tokens) |
+| `/auth/autorizar` | ¿este OTRO tiene tal permiso? | token corto acotado a una acción (RN-AUD-005) |
+| `/auth/verificar-pin` | ¿seguís siendo vos? | ninguno — 204 o 401 (RN-POS-014) |
 
 ## Matriz de permisos (semilla)
 
@@ -49,7 +62,14 @@ alcance del usuario.
 | — | `organizacion.gestionar`: CRUD de grupo, empresas, marcas, licencias, sucursales y almacenes. **Aparte de `users.gestionar`**: quien crea cajeros no funda sucursales. Fundar un grupo o una empresa exige además `*` — el recurso nuevo todavía no pertenece a la empresa de nadie |
 | supervisor | `inventory.*`, `purchases.aprobar`, `sales.leer`, aprueba solicitudes |
 | almacenero | `inventory.transferir`, `inventory.recepcion`, `inventory.ajustar` |
-| cajero | `sales.crear`, `sales.cobrar`, `sales.leer` (su sucursal) |
+| cajero | `sales.crear`, `sales.cobrar`, `sales.leer`, `sales.entregar_pedido`, `kds.operar`, `accounting.caja_operar` (su sucursal) |
+| — | `accounting.caja_operar` alcanza para **preguntar** por la caja de la sucursal propia (`GET /accounting/cajas/abiertas?sucursal_id=`), no solo para abrirla y cerrarla: el PDV tiene que saber si el turno ya está abierto antes de ofrecer abrirlo. Sin el `sucursal_id` la consulta es de toda la empresa y sigue exigiendo `accounting.leer` — quien opera una caja no tiene por qué ver el efectivo de los demás locales |
+| — | **Abrir y cerrar el turno no piden elevación de PIN** (RN-MDP-008, ADR-049): `accounting.caja_operar` es el único candado, y es el permiso que el cajero ya tiene. La firma con `accounting.caja_relevar` quedó donde la plata cambia de manos (`POST /cajas/custodias/{id}/entregar`); como el `cajero` **no** tiene ese permiso, no puede firmar que recibió su propio efectivo. La segregación la hace el permiso, no un candado de dominio |
+| rrhh_admin | `rrhh.*`, `users.resetear_pin`, `consulta.documento` |
+| — | `users.resetear_pin` está **aparte de `users.gestionar`** en los dos sentidos (ADR-041): RRHH atiende el "me olvidé el PIN" sin poder crear cuentas ni repartir roles, y administrar usuarios no trae de arrastre la facultad de entrar como cualquiera de ellos. **No** lo tiene `supervisor`: entrar como cualquiera de su turno rompe la segregación del ciclo de caja (ADR-025/048) — entrar como el cajero sería firmarse a sí mismo la recepción del efectivo por la puerta de al lado |
+| — | `consulta.documento` (consultar un DNI/RUC contra RENIEC/SUNAT) es propio y no una consecuencia de poder crear personas: cada consulta gasta cuota del proveedor y trae datos personales de alguien que todavía no es nadie en el sistema. Lo tienen `rrhh_admin`, `comprador`, `cajero` y `supervisor` — los que dan altas |
+| — | Dónde se usa: el botón «Buscar por DNI/RUC» (`components/consulta/buscar-documento.tsx`) en Usuarios → Personas, Compras → Proveedores y Ventas → Clientes. **El botón no se dibuja sin el permiso** — es de los pocos gates de UI que además evitan un gasto: sin él, un `contador` lo apretaba y se comía un 403, y una consulta que sí sale cuesta cuota. Sigue siendo UX; la autorización real la hace `require_permission` en cada request |
+| — | `GET /consulta/{dni,ruc}/{n}` tiene **cuota propia** (2026-08-15): por usuario y por IP, con la misma ventana (`consulta_documento_*` en `settings`). Se cuenta **después** del permiso —a quien no puede consultar no hay que contarle nada— y por usuario **antes** que por IP, porque en un local todas las cajas salen por la misma dirección y un límite solo por IP deja al equipo entero sin consultar por culpa de uno |
 | agente_ia | `sales.crear_pedido` (canal agente_ia, su marca) |
 | hub_sucursal | `sync.leer`, `sync.empujar` (una sola sucursal, ADR-009) |
 

@@ -149,7 +149,7 @@ function DialogoNotaCredito({
       <dialog ref={dialogRef} className="w-full max-w-lg rounded-lg p-0 backdrop:bg-dark/40">
         <form ref={formRef} action={formAction} className="flex flex-col gap-4 p-6">
           <input type="hidden" name="comprobante_id" value={comprobante.id} />
-          <h2 className="font-heading text-lg italic uppercase text-dark">
+          <h2 className="font-heading text-lg text-dark">
             Nota de crédito · {comprobante.serie}-{comprobante.correlativo}
           </h2>
           <p className="text-xs text-gray">
@@ -353,7 +353,7 @@ export function JornadaCliente({
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="font-heading text-xl italic uppercase text-dark">Jornada</h1>
+      <h1 className="font-heading text-xl text-dark">Jornada</h1>
       <p className="text-sm text-gray">
         Lo vendido en una sucursal, día por día: verificar lo cobrado, reintentar el
         comprobante que SUNAT rechazó y anular una orden que nunca se cobró.

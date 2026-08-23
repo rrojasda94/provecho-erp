@@ -14,7 +14,12 @@ from sqlalchemy.orm import Session
 from src.core.events import event_bus
 from src.modules.accounting.application.queries_publicas import hay_caja_abierta
 from src.modules.inventory.application.queries_publicas import insumos_de_receta
-from src.modules.sales.application import comprobantes, precios
+from src.modules.sales.application import (
+    catalogo,
+    comprobantes,
+    precios,
+    tarifa_delivery,
+)
 from src.modules.sales.application.errors import (
     Conflicto,
     NoEncontrado,
@@ -87,6 +92,9 @@ def _armar_item(
     restas = _resolver_restas(
         session, prod, it.get("sin_articulo_ids"), exigir=exigir_opciones
     )
+    valores = _resolver_valores_variante(
+        session, prod, it.get("valores_variante_ids"), exigir=exigir_opciones
+    )
     fila = VentaItem(
         producto_comercial_id=prod.id,
         cantidad=cantidad,
@@ -96,6 +104,7 @@ def _armar_item(
         descuento=Decimal(0) if gratis else Decimal(str(it.get("descuento") or 0)),
         grupo_cobro=grupo,
         sin_articulo_ids=restas,
+        valores_variante_ids=valores,
     )
     # Empaque se descuenta solo en las modalidades configuradas (RN-EMP-003).
     con_empaque = bool(prod.empaque_id and modalidad in (prod.modalidades_empaque or []))
@@ -104,8 +113,64 @@ def _armar_item(
         "cantidad": str(cantidad),
         "empaque_articulo_id": str(prod.empaque_id) if con_empaque else None,
         "sin_articulo_ids": restas,
+        # Aditivo (ADR-056): un consumidor que lo ignore se comporta como
+        # antes, igual que pasó con `sin_articulo_ids` en ADR-035.
+        "valores_variante_ids": valores,
     }
     return fila, detalle, prod
+
+
+def _resolver_valores_variante(
+    session: Session, prod, pedidos, *, exigir: bool
+) -> list[str] | None:
+    """Qué valores de atributo eligió esta línea (ADR-055/056).
+
+    Solo se aceptan valores que el producto **o su padre** ofrecen. La
+    herencia es la misma regla que ADR-042 fijó para grupos y extras, y por
+    la misma razón: dónde quedó colgado el atributo no debería decidir
+    nada, y mientras eso importe siempre hay una mitad de los catálogos
+    rota — el que arma una persona cuelga del padre, el que genera el
+    importador cuelga de la variante.
+
+    Rechazar en vez de ignorar: un valor ajeno no es inocuo, porque puede
+    activar líneas de receta condicionadas y mover stock que nadie pidió.
+
+    Y se rechaza también la **combinación imposible** que declara
+    `producto_exclusion`: media hawaiana y media hawaiana no es una
+    mitad-y-mitad, es una hawaiana entera —que ya se vende como su propio
+    producto, con su receta y su precio—. Que la pantalla no la ofrezca no
+    alcanza: el kiosko y la central de pedidos entran por este mismo
+    endpoint, y una regla que solo vive en una pantalla no es una regla
+    (mismo criterio que `_validar_grupos`, ADR-023 §2).
+
+    `exigir=False` en el replay del hub (ADR-009), mismo criterio que las
+    restas: esa venta ya se preparó y se cobró, y el catálogo pudo cambiar
+    durante el corte.
+    """
+    if not pedidos:
+        return None
+    ids = list(dict.fromkeys(str(v) for v in pedidos))
+    if not exigir:
+        return ids
+    ofrecidos = catalogo.valores_ofrecidos(session, prod)
+    ajenos = [v for v in ids if v not in ofrecidos]
+    if ajenos:
+        raise ReglaNegocio(
+            f"'{prod.nombre}' no ofrece {len(ajenos)} de los valores "
+            "elegidos: solo se puede elegir lo que el producto declara"
+        )
+    choque = catalogo.combinacion_excluida(session, ids)
+    if choque:
+        izquierda, derecha = choque
+        if izquierda == derecha:
+            raise ReglaNegocio(
+                f"'{prod.nombre}' lleva dos mitades distintas: «{izquierda}» "
+                "no se puede elegir en las dos"
+            )
+        raise ReglaNegocio(
+            f"'{prod.nombre}' no admite «{izquierda}» junto con «{derecha}»"
+        )
+    return ids
 
 
 def _resolver_restas(
@@ -169,7 +234,10 @@ def _armar_extras(
     filas, detalles = [], []
     for ex in extras:
         extra_id = ex["producto_comercial_id"]
-        vinculo = productos.admite_extra(padre_prod.id, extra_id)
+        # Efectivo: incluye lo heredado del padre (ADR-042). Rechazar un
+        # extra que la carta acaba de ofrecer manda al cajero a un error
+        # que no puede corregir desde la pantalla que se lo ofreció.
+        vinculo = productos.admite_extra_efectivo(padre_prod, extra_id)
         if vinculo is None:
             raise ReglaNegocio(
                 f"{padre_prod.nombre} no admite el extra {extra_id}"
@@ -213,12 +281,12 @@ def _validar_grupos(
     central de pedidos y cualquier integración futura entran por el mismo
     endpoint: una regla que solo vive en una pantalla no es una regla.
     """
-    grupos = productos.grupos_de(prod.id)
+    grupos = productos.grupos_efectivos(prod)
     if not grupos:
         return
     elegidos: dict[uuid.UUID, int] = {}
     for ex in extras:
-        vinculo = productos.admite_extra(prod.id, ex["producto_comercial_id"])
+        vinculo = productos.admite_extra_efectivo(prod, ex["producto_comercial_id"])
         if vinculo is not None and vinculo.grupo_id is not None:
             elegidos[vinculo.grupo_id] = elegidos.get(vinculo.grupo_id, 0) + 1
     for grupo in grupos:
@@ -322,6 +390,34 @@ def _validar_tipo(
     return True
 
 
+def _cotizar_entrega(
+    session: Session,
+    sucursal_id: uuid.UUID,
+    modalidad: str,
+    direccion_entrega: str | None,
+    lat: Decimal | None,
+    lng: Decimal | None,
+    distrito: str | None,
+    ya_cotizado: bool = False,
+):
+    """Cotiza el reparto, o `None` si este pedido no se lleva a ningún lado.
+
+    Mesa y takeout no pagan reparto, y un delivery sin dirección tampoco se
+    puede medir: en los dos casos la venta se crea sin costo de entrega, que
+    es como funcionaba antes de ADR-054.
+
+    `ya_cotizado` es el replay del hub: esa venta ya se cobró con un
+    precio, y recalcularlo acá lo cambiaría a espaldas del cliente.
+    """
+    if ya_cotizado or modalidad != "delivery" or not direccion_entrega:
+        return None
+    return tarifa_delivery.cotizar(
+        tarifa_delivery.origen_de_sucursal(session, sucursal_id),
+        tarifa_delivery.coordenada(lat, lng),
+        distrito,
+    )
+
+
 def crear_venta(
     session: Session,
     *,
@@ -334,6 +430,17 @@ def crear_venta(
     items: list[dict],  # [{producto_comercial_id, cantidad}]
     cliente_id: uuid.UUID | None = None,
     referencia_atencion: str | None = None,
+    direccion_entrega: str | None = None,
+    ubicacion_place_id: str | None = None,
+    ubicacion_lat: Decimal | None = None,
+    ubicacion_lng: Decimal | None = None,
+    ubicacion_plus_code: str | None = None,
+    ubicacion_distrito: str | None = None,
+    # Solo en el replay del hub: la venta ya se cotizó allá y ese es el
+    # precio que se le cobró al cliente. Volver a preguntarle a Google
+    # daría otro número y una llamada de más.
+    distancia_entrega_km: Decimal | None = None,
+    costo_entrega: Decimal | None = None,
     mesa_id: uuid.UUID | None = None,
     comensales: int | None = None,
     id: uuid.UUID | None = None,
@@ -392,6 +499,20 @@ def crear_venta(
         gratis=consumo,
     )
 
+    # Se cotiza acá y no en el navegador: este número define cuánta plata
+    # paga el cliente. Se congela en la fila (ADR-054) — la tarifa por
+    # kilómetro cambia y el pedido de ayer no puede cambiar de precio.
+    cotizacion = _cotizar_entrega(
+        session,
+        sucursal_id,
+        modalidad,
+        direccion_entrega,
+        ubicacion_lat,
+        ubicacion_lng,
+        ubicacion_distrito,
+        ya_cotizado=costo_entrega is not None,
+    )
+
     venta = Venta(
         id=id or uuid.uuid4(),
         sucursal_id=sucursal_id,
@@ -411,6 +532,16 @@ def crear_venta(
         ),
         idempotency_key=idempotency_key,
         referencia_atencion=referencia_atencion,
+        direccion_entrega=direccion_entrega,
+        ubicacion_place_id=ubicacion_place_id,
+        ubicacion_lat=ubicacion_lat,
+        ubicacion_lng=ubicacion_lng,
+        ubicacion_plus_code=ubicacion_plus_code,
+        ubicacion_distrito=ubicacion_distrito,
+        distancia_entrega_km=(
+            cotizacion.distancia_km if cotizacion else distancia_entrega_km
+        ),
+        costo_entrega=cotizacion.costo if cotizacion else costo_entrega,
         mesa_id=mesa_id,
         comensales=comensales,
         tipo=tipo,
@@ -451,16 +582,24 @@ def _confirmar(
     detalle_evento: list[dict],
     consumo: bool,
     registrado_por: uuid.UUID,
+    total: Decimal | None = None,
 ) -> None:
     """Anuncia la orden confirmada. Un consumo de personal publica su propio
     evento: no es ingreso para contabilidad ni venta atribuible para
-    marketing, y su costo va a gasto (RN-COM-025)."""
+    marketing, y su costo va a gasto (RN-COM-025).
+
+    `total` es **lo confirmado en esta operación**, no el acumulado de la
+    venta. Al crearla son lo mismo; al agregar líneas a una orden ya enviada
+    (RN-COM-029) es el incremento, que es lo que accounting tiene que
+    asentar — mandarle el total completo lo asentaría dos veces. `items` ya
+    era el detalle de la operación, así que las dos claves dicen lo mismo.
+    """
     payload = {
         "venta_id": str(venta.id),
         "sucursal_id": str(venta.sucursal_id),
         "cliente_id": str(venta.cliente_id) if venta.cliente_id else None,
         "items": detalle_evento,
-        "total": str(venta.total),
+        "total": str(venta.total if total is None else total),
     }
     if not consumo:
         event_bus.publish("sales.venta_confirmada", payload, session=session)
@@ -802,6 +941,60 @@ def listar_items(session: Session, venta_id: uuid.UUID) -> list[dict]:
     ]
 
 
+def _con_sus_extras(filas: list[VentaItem], todas: list[VentaItem]) -> list[VentaItem]:
+    """Quitar un plato se lleva sus extras (RN-CUP-014).
+
+    El PDV manda solo el id del plato. Sin esto pasaban dos cosas: el insumo
+    del sabor no volvía al almacén, y borrar el padre dejaba al hijo
+    apuntándolo — `fk_venta_item_padre` es NO ACTION, o sea
+    `ForeignKeyViolation` en Postgres.
+    """
+    padres = {f.id for f in filas}
+    pedidas = {f.id for f in filas}
+    return filas + [
+        f for f in todas if f.padre_venta_item_id in padres and f.id not in pedidas
+    ]
+
+
+def _a_reponer(session: Session, filas: list[VentaItem]) -> list[dict]:
+    """Qué devolverle al almacén por cada línea que se quita."""
+    productos = ProductoComercialRepo(session)
+    return [
+        {
+            "receta_id": str(productos.get(f.producto_comercial_id).receta_id),
+            "cantidad": str(f.cantidad),
+            # Se repone exactamente lo que se consumió: lo que la línea no
+            # llevó tampoco vuelve al almacén. Vale igual para la
+            # combinación: reponer una línea de receta que la variante
+            # elegida nunca activó dejaría stock de más.
+            "sin_articulo_ids": f.sin_articulo_ids,
+            "valores_variante_ids": f.valores_variante_ids,
+        }
+        for f in filas
+    ]
+
+
+def _borrar_hijos_primero(session: Session, filas: list[VentaItem]) -> None:
+    """El FK rechaza borrar un padre que todavía tiene un hijo.
+
+    El flush **entre medio** es lo que lo garantiza: ordenar el bucle no
+    alcanza porque `delete()` solo marca, y el orden real de los DELETE lo
+    decide SQLAlchemy al vaciar la sesión. Como `padre_venta_item_id` no
+    tiene `relationship` declarada, no sabe que la FK es autorreferencial y
+    ordena a su antojo — sin el flush esto pasaba en local y fallaba en CI,
+    que es la peor forma de "funcionar".
+    """
+    hijos = [f for f in filas if f.padre_venta_item_id is not None]
+    for fila in hijos:
+        session.delete(fila)
+    if hijos:
+        session.flush()
+    for fila in filas:
+        if fila.padre_venta_item_id is None:
+            session.delete(fila)
+    session.flush()
+
+
 def anular_lineas(
     session: Session,
     *,
@@ -833,25 +1026,14 @@ def anular_lineas(
         raise ReglaNegocio("la anulación de línea requiere motivo")
 
     pedidos = set(venta_item_ids)
-    filas = [f for f in VentaRepo(session).items(venta_id) if f.id in pedidos]
+    todas = VentaRepo(session).items(venta_id)
+    filas = [f for f in todas if f.id in pedidos]
     if len(filas) != len(pedidos):
         raise NoEncontrado("alguna línea no pertenece a esta venta")
 
-    productos = ProductoComercialRepo(session)
-    devueltos = []
-    for fila in filas:
-        prod = productos.get(fila.producto_comercial_id)
-        devueltos.append(
-            {
-                "receta_id": str(prod.receta_id),
-                "cantidad": str(fila.cantidad),
-                # Se repone exactamente lo que se consumió: lo que la línea
-                # no llevó tampoco vuelve al almacén.
-                "sin_articulo_ids": fila.sin_articulo_ids,
-            }
-        )
-        session.delete(fila)
-    session.flush()
+    filas = _con_sus_extras(filas, todas)
+    devueltos = _a_reponer(session, filas)
+    _borrar_hijos_primero(session, filas)
 
     restantes = VentaRepo(session).items(venta_id)
     venta.total = total_a_cobrar(session, venta)
@@ -875,6 +1057,115 @@ def anular_lineas(
             "items": devueltos,
         },
         session=session,
+    )
+    return venta
+
+
+def lineas_en_ventana(
+    session: Session, venta_id: uuid.UUID, venta_item_ids: list[uuid.UUID]
+) -> bool:
+    """¿Todas esas líneas siguen dentro de la ventana de corrección?
+
+    **Todas**, no alguna: si una sola ya salió de la ventana, el lote entero
+    necesita firma. Al revés —dejar pasar el lote porque una es reciente— sería
+    la forma de quitar cualquier línea vieja acompañándola de una nueva.
+    """
+    pedidos = set(venta_item_ids)
+    filas = [f for f in VentaRepo(session).items(venta_id) if f.id in pedidos]
+    return bool(filas) and all(rules.dentro_de_ventana(f.created_at) for f in filas)
+
+
+def venta_en_ventana(session: Session, venta_id: uuid.UUID) -> bool:
+    """¿La orden se envió hace menos de la ventana de corrección?
+
+    Se mide contra la **última línea** y no contra la creación de la venta:
+    una mesa que sigue pidiendo tiene la orden abierta desde hace una hora,
+    pero lo último que mandó a cocina puede ser de hace un minuto — y es eso
+    lo que todavía se puede deshacer sin molestar a nadie.
+    """
+    filas = VentaRepo(session).items(venta_id)
+    return bool(filas) and rules.dentro_de_ventana(max(f.created_at for f in filas))
+
+
+def agregar_lineas(
+    session: Session,
+    *,
+    venta_id: uuid.UUID,
+    items: list[dict],
+    usuario_id: uuid.UUID,
+) -> Venta:
+    """Suma líneas a una orden **ya enviada a cocina** (RN-COM-029).
+
+    Una mesa pide de a poco: la primera comanda sale, y diez minutos después
+    piden otra bebida. Sin esto había que abrir una orden nueva para el mismo
+    cliente, que después se cobra por separado y se le entrega en dos veces.
+
+    No exige autorización de nadie: agregar es lo que el negocio quiere que
+    pase. Lo que sí sigue exigiendo firma después de la ventana es **quitar**,
+    porque eso repone inventario.
+
+    Publica `sales.venta_confirmada` con **lo agregado**, no con la venta
+    entera: `items` ya era el detalle de la operación y `total` pasa a serlo
+    también, así que inventory descuenta solo lo nuevo y accounting asienta
+    solo el incremento. Republicar el total completo lo asentaría dos veces.
+    """
+    repo = VentaRepo(session)
+    venta = repo.get(venta_id)
+    if venta is None:
+        raise NoEncontrado("venta no encontrada")
+    if venta.estado != "orden":
+        raise Conflicto(
+            f"la venta está {venta.estado}: no admite líneas nuevas. "
+            "Después del cobro se abre otra orden."
+        )
+    if not items:
+        raise ReglaNegocio("indica al menos una línea a agregar")
+
+    filas, extras_por_padre, detalle_evento = _armar_lineas(
+        session,
+        items,
+        sucursal_id=venta.sucursal_id,
+        canal=venta.canal,
+        modalidad=venta.modalidad,
+        dia=venta.fecha_orden,
+        gratis=rules.es_consumo_personal(venta.tipo),
+    )
+    for fila in filas:
+        fila.venta_id = venta.id
+        session.add(fila)
+    session.flush()
+    for fila, hijos in zip(filas, extras_por_padre, strict=True):
+        for hijo in hijos:
+            hijo.venta_id = venta.id
+            hijo.padre_venta_item_id = fila.id
+            session.add(hijo)
+    session.flush()
+
+    agregado = rules.total_venta(
+        [
+            (f.cantidad, f.precio_unitario, f.descuento)
+            for f in [*filas, *(h for hijos in extras_por_padre for h in hijos)]
+        ]
+    )
+    # El total se recalcula entero (incluye el descuento de orden prorrateado)
+    # y no se le suma el incremento: sumar dejaría fuera el reprorrateo.
+    venta.total = total_a_cobrar(session, venta)
+    auditoria.registrar(
+        session,
+        usuario_id=usuario_id,
+        entidad="venta",
+        entidad_id=venta.id,
+        accion="agregar_lineas",
+        datos_despues={"lineas": len(filas), "agregado": str(agregado)},
+        sucursal_id=venta.sucursal_id,
+    )
+    _confirmar(
+        session,
+        venta,
+        detalle_evento=detalle_evento,
+        consumo=rules.es_consumo_personal(venta.tipo),
+        registrado_por=usuario_id,
+        total=agregado,
     )
     return venta
 
@@ -908,6 +1199,7 @@ def anular_venta(session: Session, venta_id: uuid.UUID, usuario_id: uuid.UUID) -
                 "receta_id": str(prod.receta_id),
                 "cantidad": str(it.cantidad),
                 "sin_articulo_ids": it.sin_articulo_ids,
+                "valores_variante_ids": it.valores_variante_ids,
             }
         )
     event_bus.publish(

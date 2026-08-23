@@ -76,6 +76,35 @@ export async function cambiarActivoAction(
   return { error: "", ok: true };
 }
 
+/** Corrige los datos de la cuenta. El `username` no está: es la identidad
+ * con la que se firma cada acción del ERP y con la que quedó escrita en el
+ * `audit_log` — cambiarlo dejaría el rastro apuntando a un nombre que ya no
+ * existe. Una cuenta con el usuario equivocado se desactiva y se crea otra.
+ * El PIN tampoco: lo cambia su dueño con su propia sesión. */
+export async function editarUsuarioAction(
+  _previo: EstadoUsuario,
+  formData: FormData,
+): Promise<EstadoUsuario> {
+  const id = String(formData.get("id") ?? "");
+  if (!id) return { error: "Falta la cuenta a editar.", ok: false };
+
+  try {
+    await apiFetch(`/api/v1/users/${id}`, {
+      token: await token(),
+      metodo: "PATCH",
+      cuerpo: {
+        nombre_display: String(formData.get("nombre_display") ?? "").trim() || undefined,
+        email: String(formData.get("email") ?? "").trim() || undefined,
+        persona_id: String(formData.get("persona_id") ?? "") || undefined,
+      },
+    });
+  } catch (e) {
+    return { error: mensajeDe(e, "No se pudo guardar la cuenta."), ok: false };
+  }
+  revalidatePath("/usuarios");
+  return { error: "", ok: true };
+}
+
 export async function asignarRolAction(
   _previo: EstadoUsuario,
   formData: FormData,
@@ -108,6 +137,28 @@ export async function quitarRolAction(
     });
   } catch (e) {
     return { error: mensajeDe(e, "No se pudo quitar el rol."), ok: false };
+  }
+  revalidatePath("/usuarios");
+  return { error: "", ok: true };
+}
+
+/**
+ * Devuelve la cuenta al PIN por defecto y la obliga a cambiarlo al entrar.
+ *
+ * Un PIN olvidado no se recupera —está hasheado con Argon2id—, así que la
+ * única salida es ponerle uno conocido. Lo que hace que eso sea aceptable
+ * pasa del lado del servidor: la cuenta queda marcada y no puede hacer nada
+ * más que cambiarlo, se le revocan las sesiones abiertas y queda auditado
+ * quién lo hizo.
+ */
+export async function resetearPinAction(usuarioId: string): Promise<EstadoUsuario> {
+  try {
+    await apiFetch(`/api/v1/users/${usuarioId}/pin/reset`, {
+      token: await token(),
+      metodo: "POST",
+    });
+  } catch (e) {
+    return { error: mensajeDe(e, "No se pudo resetear el PIN."), ok: false };
   }
   revalidatePath("/usuarios");
   return { error: "", ok: true };

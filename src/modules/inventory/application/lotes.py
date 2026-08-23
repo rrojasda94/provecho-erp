@@ -109,7 +109,12 @@ def aplicar_a_lote(
     return fila
 
 
-def _bloquear(session: Session, fila: StockLote, lote: Lote) -> None:
+def _bloquear(
+    session: Session,
+    fila: StockLote,
+    lote: Lote,
+    usuario_id: uuid.UUID | None = None,
+) -> None:
     fila.estado = "bloqueado"
     event_bus.publish(
         "inventory.lote_vencido_detectado",
@@ -119,6 +124,9 @@ def _bloquear(session: Session, fila: StockLote, lote: Lote) -> None:
             "sku_id": str(fila.sku_id),
             "fecha_vencimiento": lote.fecha_vencimiento.isoformat(),
             "cantidad": str(fila.cantidad),
+            # Quién lo descubrió, no quién lo dejó vencer: el vencimiento no
+            # lo provoca nadie. Nulo cuando corre el barrido programado.
+            "usuario_id": str(usuario_id) if usuario_id else None,
         },
         session=session,
     )
@@ -129,6 +137,7 @@ def disponibles_fefo(
     almacen_id: uuid.UUID,
     sku_id: uuid.UUID,
     hoy: date | None = None,
+    usuario_id: uuid.UUID | None = None,
 ) -> list[StockLote]:
     """Lotes que el picking puede tomar, en orden FEFO.
 
@@ -142,7 +151,7 @@ def disponibles_fefo(
         lote = session.get(Lote, fila.lote_id)
         if rules.lote_vencido(lote.fecha_vencimiento, hoy):
             if fila.estado != "bloqueado":
-                _bloquear(session, fila, lote)
+                _bloquear(session, fila, lote, usuario_id)
             continue
         if fila.estado == "bloqueado":
             continue
@@ -155,9 +164,12 @@ def bloquear_vencidos(
     almacen_id: uuid.UUID | None = None,
     empresa_id: uuid.UUID | None = None,
     hoy: date | None = None,
+    usuario_id: uuid.UUID | None = None,
 ) -> list[StockLote]:
     """Barrido explícito: bloquea todo lote vencido que aún tenga saldo
-    disponible. Lo mismo que hace el picking, pero sin esperar a la salida."""
+    disponible. Lo mismo que hace el picking, pero sin esperar a la salida.
+
+    `usuario_id` es quien pidió el barrido; nulo cuando lo corre el beat."""
     hoy = hoy or fechas.hoy()
     bloqueados = []
     for fila, lote in StockLoteRepo(session).list(almacen_id, None, empresa_id):
@@ -166,9 +178,40 @@ def bloquear_vencidos(
             and fila.cantidad > 0
             and rules.lote_vencido(lote.fecha_vencimiento, hoy)
         ):
-            _bloquear(session, fila, lote)
+            _bloquear(session, fila, lote, usuario_id)
             bloqueados.append(fila)
     return bloqueados
+
+
+def detalle(
+    session: Session,
+    lote_id: uuid.UUID,
+    *,
+    empresa_id: uuid.UUID | None = None,
+    hoy: date | None = None,
+) -> dict:
+    """El lote con su saldo en cada almacén. A donde lleva
+    `inventory.lote_vencido_detectado`: el reporte dice que se bloqueó, esto
+    dice cuánto quedó bloqueado y dónde está."""
+    lote = LoteRepo(session).get(lote_id)
+    articulo = session.get(Articulo, lote.articulo_id)
+    saldos = [
+        fila
+        for fila in listar(session, empresa_id=empresa_id, hoy=hoy)
+        if fila["lote_id"] == lote_id
+    ]
+    return {
+        "id": lote.id,
+        "articulo_id": lote.articulo_id,
+        "codigo": lote.codigo,
+        "fecha_vencimiento": lote.fecha_vencimiento,
+        "fecha_elaboracion": lote.fecha_elaboracion,
+        "origen": lote.origen,
+        "referencia": lote.referencia,
+        "condicion_almacenamiento": lote.condicion_almacenamiento,
+        "articulo": articulo.nombre if articulo else "(borrado)",
+        "saldos": saldos,
+    }
 
 
 def listar(

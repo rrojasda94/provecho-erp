@@ -105,21 +105,52 @@ services:
         condition: service_started
 
   web:
-    # `target: dev` es obligatorio desde que el Dockerfile es multi-etapa: sin
-    # él docker construye la última etapa (`runtime`, el build de producción
-    # que se reparte en la demo) y este servicio dejaría de recargar al editar.
     build:
       context: ./frontend
+      # La imagen del frontend es multietapa: `dev` corre `next dev`, `runner`
+      # sirve el build de producción (el que se reparte en la demo). Sin
+      # `target`, docker construye la última etapa y este servicio dejaría de
+      # recargar al editar.
       target: dev
+    restart: unless-stopped
     ports:
       - "3000:3000"
     environment:
-      # Vista del NAVEGADOR (fuera del contenedor): localhost, puerto publicado.
-      NEXT_PUBLIC_API_URL: http://localhost:8000
-      # Vista del PROCESO de Next.js (dentro del contenedor, Server Actions/
-      # Server Components): nombre del servicio, no localhost — son
-      # contenedores distintos sin ese "localhost" en común.
+      # Vista del PROCESO de Next.js (dentro del contenedor, Server Actions,
+      # Server Components y el proxy `/api/proxy`): nombre del servicio, no
+      # localhost — son contenedores distintos sin ese "localhost" en común.
+      #
+      # No hay `NEXT_PUBLIC_API_URL`: el navegador NUNCA habla con la API
+      # directo. La CSP de `middleware.ts` fija `connect-src 'self'` y todo
+      # pasa por `app/api/proxy`, que es server-side. La variable estuvo acá
+      # sin que una sola línea del frontend la leyera.
       API_INTERNAL_URL: http://api:8000
+      # Clave de Google Maps del NAVEGADOR (mapa + autocompletado de
+      # direcciones). Se declara acá y no con `env_file: .env` para que este
+      # contenedor vea esa clave y NO la del servidor: la que calcula el cobro
+      # del delivery (`GOOGLE_MAPS_SERVER_KEY`) no tiene nada que hacer en el
+      # proceso que sirve el frontend.
+      #
+      # Tampoco es `NEXT_PUBLIC_*`: eso se hornea en el build (misma razón por
+      # la que se eliminó `NEXT_PUBLIC_API_URL`). La lee un Server Component y
+      # baja al componente del mapa como prop, en tiempo de ejecución.
+      GOOGLE_MAPS_BROWSER_KEY: ${GOOGLE_MAPS_BROWSER_KEY:-}
+      GOOGLE_MAPS_MAP_ID: ${GOOGLE_MAPS_MAP_ID:-DEMO_MAP_ID}
+      GOOGLE_MAPS_PAIS: ${GOOGLE_MAPS_PAIS:-pe}
+      # En Windows + Docker Desktop los eventos de sistema de archivos no
+      # cruzan el bind mount: sin sondeo, editar un archivo no recarga nada.
+      WATCHPACK_POLLING: "true"
+    volumes:
+      # Sin esto, `next dev` corría sobre el código horneado en la imagen: cada
+      # cambio exigía `docker compose build`. La recarga en caliente estaba
+      # apagada de hecho.
+      - ./frontend:/app
+      # Volúmenes anónimos que TAPAN el bind de arriba en esas dos rutas: el
+      # `node_modules` que vale es el que instaló Alpine (sharp trae binarios
+      # nativos; el del host es de Windows), y `.next` no debe ensuciar el
+      # árbol de trabajo con archivos del contenedor.
+      - /app/node_modules
+      - /app/.next
     depends_on:
       - api
 

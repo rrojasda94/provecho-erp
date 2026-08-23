@@ -118,6 +118,34 @@ export async function crearCuentaAction(
   return { error: "", ok: true };
 }
 
+/** Corrección de una cuenta contable.
+ *
+ * El código y el tipo no se ofrecen: los asientos ya registrados apuntan a
+ * esta cuenta y el tipo decide su naturaleza (deudora/acreedora), o sea el
+ * signo con el que se leyó todo lo que ya se asentó. Una cuenta mal creada
+ * se desactiva y se crea la correcta. */
+export async function editarCuentaAction(
+  _previo: EstadoAsiento,
+  formData: FormData,
+): Promise<EstadoAsiento> {
+  const id = String(formData.get("id") ?? "");
+  const nombre = String(formData.get("nombre") ?? "").trim();
+  if (!id) return { error: "Falta la cuenta a editar.", ok: false };
+  if (!nombre) return { error: "El nombre es obligatorio.", ok: false };
+
+  try {
+    await apiFetch(`/api/v1/accounting/cuentas-contables/${id}`, {
+      token: await token(),
+      metodo: "PATCH",
+      cuerpo: { nombre, activa: formData.get("activa") === "on" },
+    });
+  } catch (e) {
+    return { error: mensajeDe(e, "No se pudo guardar la cuenta."), ok: false };
+  }
+  revalidatePath("/contabilidad/plan-cuentas");
+  return { error: "", ok: true };
+}
+
 export async function abrirPeriodoAction(
   _previo: EstadoAsiento,
   formData: FormData,

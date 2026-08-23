@@ -18,6 +18,26 @@ dejó de ser suya: `audit_log` es transversal y vive en `src/shared`
 Incluye además la organización: `grupo`, `empresa`, `marca`, `sucursal`, `almacen`.
 Detalle en `docs/architecture/data-model.md` (§1, §2).
 
+## Direcciones ancladas al mapa (implementado 2026-08-22, ADR-053)
+
+`sucursal`, `almacen`, `empresa` y `persona` llevan el `UbicacionMixin` de
+`core/model_base`: place_id de Google, lat/lng, plus code y distrito, todo
+nullable. El texto sigue donde estaba (`direccion`, `domicilio`,
+`domicilio_fiscal`); esto se le suma.
+
+Dos reglas que no son opcionales:
+
+- **Corregir el texto sin reanclar borra el punto**
+  (`shared/ubicacion.desanclar_si_cambio_el_texto`, aplicada en los tres
+  `editar_*` de `organizacion.py` y en `editar_persona`). Un texto que dice una
+  calle con las coordenadas de otra manda el reparto al lugar equivocado.
+- **`anonimizar_persona` borra el ancla** junto con el domicilio (Ley 29733,
+  ADR-011). Las coordenadas de la casa de alguien son más identificatorias que
+  el texto, no menos.
+
+La sucursal es el caso que importa cerrar: sin sus coordenadas no hay origen
+desde donde medir un reparto (ADR-054).
+
 ## Casos de uso
 
 - Login con username + PIN (6 dígitos) → access token (15 min) + refresh (7 días, rotativo).
@@ -56,7 +76,20 @@ Detalle en `docs/architecture/data-model.md` (§1, §2).
 | POST | `/api/v1/auth/login` | `{username, pin}` | `{access_token, refresh_token, token_type}` |
 | POST | `/api/v1/auth/refresh` | `{refresh_token}` | tokens nuevos (rotación) |
 | POST | `/api/v1/auth/logout` | `{refresh_token}` | 204 |
+| POST | `/api/v1/auth/verificar-pin` | `{pin}` | 204 \| 401 \| 423 |
 | GET | `/api/v1/users/me` | — | usuario + roles + sucursales + permisos |
+
+`verificar-pin` (2026-08-13, ADR-045, RN-POS-014) responde una sola
+pregunta: **¿sigue siendo la misma persona frente al terminal?** Es lo que
+desbloquea la pantalla del PDV. No emite tokens y el usuario sale del token,
+no del cuerpo — pedirlo en el cuerpo dejaría verificar el PIN de cualquiera.
+
+Existe porque ninguno de los otros dos dice eso: `login` **rotaría la
+sesión** y con ella se perdería el borrador del pedido que el bloqueo existe
+para preservar, y `autorizar` está para elevar a **otro** (exige un código de
+permiso, RN-AUD-005). Va detrás del mismo rate limit y **cuenta contra el
+mismo lockout** que el login: un contador propio sería la vía cómoda para
+probar PINes sin agotar los cinco intentos.
 
 Claims del JWT: `sub` (usuario_id), `tipo`, `roles`, `sucursales`, `empresa_id`, `iat`, `exp`, `jti`.
 
@@ -98,7 +131,9 @@ roles siguen diciendo *qué puede* (RN-GEN-004).
 |--------|------|--------|
 | POST/GET | `/api/v1/users` | Crear / listar usuarios |
 | PATCH | `/api/v1/users/{id}` | Editar usuario |
-| POST | `/api/v1/users/{id}/pin` | Cambiar PIN |
+| POST | `/api/v1/users/{id}/pin` | Fijar un PIN a dedo (`users.gestionar`) |
+| POST | `/api/v1/users/{id}/pin/reset` | Devolver al PIN por defecto y obligar a cambiarlo (`users.resetear_pin`, ADR-041) |
+| POST | `/api/v1/users/me/pin` | Cambiar el PIN propio (sin permiso; exige el actual) |
 | POST/DELETE | `/api/v1/users/{id}/roles[/{rol_id}]` | Asignar / quitar rol |
 | POST/DELETE | `/api/v1/users/{id}/sucursales[/{suc_id}]` | Asignar / quitar sucursal (alcance) |
 | POST/GET | `/api/v1/roles` | Crear / listar roles |
@@ -147,6 +182,9 @@ valida la API:
   grupo (data-model §1); licenciarla afuera sería otro contrato, no una fila.
 - Un **almacén de tipo `sucursal` exige `sucursal_id`**, y esa sucursal es de
   la misma empresa. El abastecedor también, y ninguno se abastece de sí mismo.
+  El **abastecedor de respaldo** (ADR-040) sigue las mismas reglas y además
+  no puede ser el principal: el día que el principal no esté, tampoco
+  estaría él. Dar de baja un almacén mira las dos columnas.
 - La **baja es lógica** (`deleted_at`) y se niega con dependientes vivos.
   `DELETE /almacenes/{id}` **no mira el stock**: vive en `inventory` y
   `users` no importa el dominio de otro módulo. Anotado en ROADMAP → Deuda
@@ -294,8 +332,10 @@ Por sucursal:
 
 1. El **encargado de turno**, derivado del `relevo_encargado_id` de la caja
    abierta (contrato público de `accounting`). No hizo falta una entidad
-   "turno": ese dato ya se registra al abrir caja (RN-MDP-002) y es
-   exactamente la persona a cargo del local en ese momento.
+   "turno": ese dato se registraba al abrir caja (RN-MDP-002).
+   **Desde ADR-049 ya no se registra** —el cajero abre solo y la columna
+   queda en NULL—, así que este paso solo resuelve para aperturas anteriores
+   y el respaldo del punto 2 pasó a ser el camino normal.
 2. Sin caja abierta (local cerrado, o abrieron sin registrarla), los
    `supervisor`/`admin` asignados a esa sucursal. Un aviso sin destinatario
    es un aviso perdido: prefiere avisarle a alguien de más que a nadie.

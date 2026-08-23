@@ -87,6 +87,62 @@ def _emitir_tokens(session: Session, usuario: Usuario, sesion_id: uuid.UUID) -> 
     }
 
 
+def _registrar_pin_fallido(
+    session: Session, usuario: Usuario, ahora: datetime, ip: str | None, accion: str
+) -> None:
+    """Suma el intento, bloquea al llegar al tope y deja el rastro.
+
+    Vive acá y no en `login` porque todo camino que reciba un PIN tiene que
+    contar contra el MISMO lockout: si el desbloqueo del PDV llevara su
+    propio contador, sería el camino cómodo para probar PINes sin agotar
+    los cinco intentos del login.
+    """
+    usuario.intentos_fallidos += 1
+    recien_bloqueado = usuario.intentos_fallidos >= rules.MAX_INTENTOS_FALLIDOS
+    if recien_bloqueado:
+        usuario.bloqueado_hasta = ahora + rules.DURACION_BLOQUEO
+        usuario.intentos_fallidos = 0
+    auditoria.registrar(
+        session, usuario_id=usuario.id, entidad="usuario", entidad_id=usuario.id,
+        accion=accion, ip=ip,
+    )
+    # El `audit_log` deja el rastro legal; el log de seguridad es lo que
+    # dispara una alerta cuando alguien está probando credenciales.
+    log_seguridad.warning(
+        "PIN fallido (%s)%s",
+        accion,
+        " — usuario bloqueado" if recien_bloqueado else "",
+        extra={
+            "usuario_id": str(usuario.id),
+            "ip": ip,
+            "intentos": usuario.intentos_fallidos,
+            "bloqueado": recien_bloqueado,
+        },
+    )
+    if recien_bloqueado:
+        raise UsuarioBloqueado("Usuario bloqueado por intentos fallidos")
+
+
+def verificar_pin(
+    session: Session, usuario: Usuario, pin: str, ip: str | None = None
+) -> None:
+    """¿Sigue siendo la misma persona frente al terminal? (RN-POS-014)
+
+    No emite tokens ni exige un código de permiso: solo responde si el PIN
+    es el de quien ya tiene la sesión abierta. `login` rotaría la sesión y
+    perdería el borrador del PDV; `autorizar` está para elevar a OTRO. Este
+    solo confirma identidad, que es lo que pide desbloquear una pantalla.
+    """
+    ahora = datetime.now(UTC)
+    if usuario.bloqueado_hasta and _aware(usuario.bloqueado_hasta) > ahora:
+        raise UsuarioBloqueado("Usuario bloqueado por intentos fallidos")
+    if not verify_pin(usuario.pin_hash, pin):
+        _registrar_pin_fallido(session, usuario, ahora, ip, "desbloqueo_fallido")
+        raise CredencialesInvalidas("Credenciales inválidas")
+    usuario.intentos_fallidos = 0
+    usuario.bloqueado_hasta = None
+
+
 def login(session: Session, username: str, pin: str, ip: str | None = None) -> dict:
     repo = UsuarioRepo(session)
     usuario = repo.get_by_username(username)
@@ -100,29 +156,7 @@ def login(session: Session, username: str, pin: str, ip: str | None = None) -> d
         raise UsuarioBloqueado("Usuario bloqueado por intentos fallidos")
 
     if not verify_pin(usuario.pin_hash, pin):
-        usuario.intentos_fallidos += 1
-        recien_bloqueado = usuario.intentos_fallidos >= rules.MAX_INTENTOS_FALLIDOS
-        if recien_bloqueado:
-            usuario.bloqueado_hasta = ahora + rules.DURACION_BLOQUEO
-            usuario.intentos_fallidos = 0
-        auditoria.registrar(
-            session, usuario_id=usuario.id, entidad="usuario", entidad_id=usuario.id,
-            accion="login_fallido", ip=ip,
-        )
-        # El `audit_log` deja el rastro legal; el log de seguridad es lo que
-        # dispara una alerta cuando alguien está probando credenciales.
-        log_seguridad.warning(
-            "Login fallido%s",
-            " — usuario bloqueado" if recien_bloqueado else "",
-            extra={
-                "usuario_id": str(usuario.id),
-                "ip": ip,
-                "intentos": usuario.intentos_fallidos,
-                "bloqueado": recien_bloqueado,
-            },
-        )
-        if recien_bloqueado:
-            raise UsuarioBloqueado("Usuario bloqueado por intentos fallidos")
+        _registrar_pin_fallido(session, usuario, ahora, ip, "login_fallido")
         raise CredencialesInvalidas("Credenciales inválidas")
 
     # Éxito: resetear lockout y emitir tokens.

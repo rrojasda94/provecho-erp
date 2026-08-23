@@ -1,20 +1,16 @@
-# El `COPY . .` del Dockerfile arrastraba el `node_modules` del host encima
-# del que instala la imagen. Con el árbol local desactualizado (Next 15) sobre
-# un `npm ci` de Next 16, el contenedor arrancaba con `@next/swc` de una
-# versión y `next` de otra y moría en el arranque:
-#   ⚠ Mismatching @next/swc version, detected: 16.3.0 while Next.js is on 15.5.22
-#   [Error: Missing field `writeRoutesHashesManifest`]
-# Además son cientos de MB de contexto de build por nada.
+# `node_modules` del host no debe entrar al contexto: la imagen instala el
+# suyo con `npm ci` y los binarios nativos (sharp) compilados en Windows no
+# corren en Alpine. Copiarlo además rompe el `npm ci` de la capa `deps`.
 node_modules
 .next
 out
-coverage
 
-# Nada de esto se ejecuta dentro de la imagen.
-.env*
-.git
-.gitignore
+# Artefactos de Playwright: se generan al correr la suite, no al construir.
+test-results
+playwright-report
+e2e/.tmp
+
+.env
+.env.*
 Dockerfile
 .dockerignore
-README.md
-npm-debug.log*

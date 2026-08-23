@@ -10,6 +10,10 @@ TipoDestinatario = Literal["area", "rol", "usuario", "dinamico"]
 Nivel = Literal["info", "aviso", "urgente"]
 Canal = Literal["bandeja"]
 
+# Cómo se nombra al actor de un hecho que no provocó nadie. Se muestra igual
+# que un nombre de usuario para que la ficha nunca tenga un hueco (RN-REP-009).
+ACTOR_SISTEMA = "Sistema"
+
 
 # --- Catálogo -----------------------------------------------------------------
 class EmisionOut(BaseModel):
@@ -25,11 +29,23 @@ class EmisionOut(BaseModel):
     referencia_tipo: str
 
 
+class DestinoOut(BaseModel):
+    """A dónde lleva un `referencia_tipo` y con qué permiso (ADR-036)."""
+
+    ruta: str
+    permiso: str
+    etiqueta: str
+
+
 class CatalogoEmisionesOut(BaseModel):
     emisiones: list[EmisionOut]
     # El frontend no repite estas listas ni las traduce por su cuenta.
     niveles: list[str]
     dinamicos: list[str]
+    # `referencia_tipo` → destino. Va acá y no en cada reporte para que el
+    # cliente sepa qué permiso exige el botón antes de dibujarlo: un enlace
+    # visible para todos lleva a un 403 (RN-REP-002).
+    destinos: dict[str, DestinoOut] = Field(default_factory=dict)
 
 
 # --- Áreas --------------------------------------------------------------------
@@ -166,6 +182,7 @@ class ReporteEmitidoOut(BaseModel):
     id: uuid.UUID
     empresa_id: uuid.UUID | None
     sucursal_id: uuid.UUID | None
+    almacen_id: uuid.UUID | None
     codigo_emision: str
     titulo: str
     cuerpo: str | None
@@ -173,6 +190,14 @@ class ReporteEmitidoOut(BaseModel):
     referencia_tipo: str | None
     referencia_id: uuid.UUID | None
     emitido_at: datetime
+    # El endpoint donde se mira —y se resuelve— el hecho. Nulo cuando el
+    # reporte no apunta a ninguna entidad.
+    referencia_url: str | None = None
+    # Quién provocó el hecho. Nulo con `actor = "Sistema"` cuando lo detectó
+    # un barrido y no hay a quién atribuírselo (RN-REP-009). Se resuelve
+    # aparte del ORM, así que lleva default.
+    actor_id: uuid.UUID | None = None
+    actor: str = ACTOR_SISTEMA
 
 
 class EntregaReporteOut(BaseModel):
@@ -181,6 +206,55 @@ class EntregaReporteOut(BaseModel):
     # `area:almacen`, `rol:supervisor`, `dinamico:encargado_de_turno`.
     motivo: str
     canal: str
+
+
+# --- Escalamiento (ADR-036) ---------------------------------------------------
+MotivoEscalamiento = Literal[
+    "queja",
+    "demora",
+    "error_sistema",
+    "desistimiento_no_resuelto",
+    "no_conformidad_calidad",
+]
+
+
+class EscalamientoCreate(BaseModel):
+    motivo: MotivoEscalamiento
+    descripcion: str = Field(min_length=1, max_length=2000)
+    # Obligatoria si el motivo es no conformidad y la orden terminó en desecho
+    # (RN-PRD-015). Lo valida el caso de uso contra la foto del reporte.
+    evidencia_id: uuid.UUID | None = None
+
+
+class AccionEscalamientoIn(BaseModel):
+    descripcion: str = Field(min_length=1, max_length=2000)
+
+
+class EscalamientoOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    empresa_id: uuid.UUID
+    sucursal_id: uuid.UUID | None
+    reporte_emitido_id: uuid.UUID
+    origen: str
+    motivo: str
+    descripcion: str
+    reportado_por_id: uuid.UUID
+    evidencia_id: uuid.UUID | None
+    nivel_actual: str
+    estado: str
+    cerrado_at: datetime | None
+    created_at: datetime
+
+
+class EscalamientoDetalleOut(EscalamientoOut):
+    # El historial por nivel: quién, qué y cuándo. Append-only (RN-REP-012).
+    acciones: list[dict[str, Any]] = Field(default_factory=list)
+    # A quiénes le llegó el aviso de esta elevación. Vacío no es un error: la
+    # emisión se guarda igual y sale como fuga en la matriz (RN-REP-005). Que
+    # se vea es el punto — quien eleva tiene que saber si llegó a alguien.
+    destinatarios: list[str] = Field(default_factory=list)
 
 
 class ReporteEmitidoDetalleOut(ReporteEmitidoOut):

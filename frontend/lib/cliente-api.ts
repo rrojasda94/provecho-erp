@@ -51,6 +51,23 @@ export async function pedir<T>(
   return (await respuesta.json()) as T;
 }
 
+/**
+ * Sube un archivo (multipart). Aparte de `pedir` porque ahí el
+ * `Content-Type: application/json` está fijo, y en multipart **el navegador
+ * tiene que poner el header él**: lleva un `boundary` generado al vuelo que
+ * nosotros no podemos escribir. Ponerlo a mano rompe el parseo del lado del
+ * servidor con un error que no menciona la palabra "boundary".
+ */
+export async function subir<T>(ruta: string, archivo: File): Promise<T> {
+  const cuerpo = new FormData();
+  cuerpo.append("archivo", archivo);
+  const respuesta = await fetch(`${BASE}${ruta}`, { method: "POST", body: cuerpo });
+  if (!respuesta.ok) {
+    throw new ErrorApi(respuesta.status, await mensajeDeError(respuesta));
+  }
+  return (await respuesta.json()) as T;
+}
+
 /** Cada operación crítica necesita su clave (RN-COM-002): un reintento por
  * red inestable no puede convertirse en un segundo cobro. */
 export function claveIdempotencia(prefijo: string): string {

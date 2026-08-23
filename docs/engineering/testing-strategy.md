@@ -20,7 +20,8 @@ disfrazado.
 | **API** (`TestClient`, `tests/test_*.py`) | Contrato HTTP: códigos, permisos, validación, forma del JSON | ms | Todo endpoint nuevo |
 | **Contrato cliente↔servidor** | Que el frontend mande y lea **lo que el servidor espera y devuelve** | ms | Ver abajo — es el hueco real |
 | **Unidad de frontend** (`node --test`) | Lógica pura del cliente: CSV, orden de tarjetas, avance de KDS | ms | Cuando hay lógica, no marcado |
-| **e2e** (Playwright) | Que las piezas **arranquen y se hablen**: sesión, navegación, un flujo completo | minutos | Poquísimos, y solo del camino del dinero |
+| **e2e** (Playwright, `frontend/e2e/`) | Que las piezas **arranquen y se hablen**: sesión, navegación, un flujo completo | minutos | Poquísimos, y solo del camino del dinero |
+| **Uso** (Playwright, `frontend/uso/`) | Que un recorrido completo **se pueda hacer**, y cómo se ve mientras se hace | minutos | Cuando el entregable son las capturas. No bloquea merge (ADR-047) |
 
 ## El hueco real no era e2e
 
@@ -36,8 +37,9 @@ Ninguno necesitaba un navegador. Los dos se cazan comparando lo que el
 cliente manda contra `docs/architecture/openapi.json`, que **ya se genera y
 ya se verifica en CI**.
 
-✅ **Escrito el 2026-08-06** (`frontend/lib/contrato.test.ts`, **162 casos en
-~350 ms**). Son **dos capas**, y la primera importa más que la segunda:
+✅ **Escrito el 2026-08-06** (`frontend/lib/contrato.test.ts`, **186 casos en
+menos de un segundo**). Son **dos capas**, y la primera importa más que la
+segunda:
 
 **1. El tipo, que es el que trabaja todo el día.** Los cinco cuerpos de
 request del PDV viajaban como `Record<string, unknown>` — sin contrato del
@@ -50,7 +52,7 @@ se manda), y dos enums que viajaban como `string` suelto.
 **2. El test, que verifica que esos tipos y el contrato digan lo mismo.**
 Cubre en **dos profundidades**, y la diferencia importa:
 
-- **Los cuatro módulos importables** (`pdv` 19 operaciones, `catalogo` 20,
+- **Los cuatro módulos importables** (`pdv` 22 operaciones, `catalogo` 25,
   `kds` 7, `reportes` 6) exponen la API como un objeto llamable, así que se
   ejercitan de verdad con `fetch` intervenido: ruta, método, cuerpo contra
   su `requestBody`, y —alimentando al cliente con una respuesta **generada
@@ -108,13 +110,81 @@ Sin la contraparte, un gate que esconde el módulo para todos pasa por bueno.
 Todo lo demás que se sienta como "hay que probar la pantalla" es, casi
 siempre, un test de contrato o de dominio mal ubicado.
 
-## Reglas para escribir un e2e
+### Enmienda 2026-08-15 (ADR-047): el techo sigue, pero ya hay adónde mandar el resto
 
-Aprendidas a los golpes; cada una costó tiempo:
+El techo **no se levanta**: `frontend/e2e/` sigue cubriendo esas tres cosas y
+nada más. La razón por la que existe no cambió — es un check requerido, corre
+con un solo worker, y cada caso nuevo es tiempo que paga todo merge del repo,
+incluido el arreglo urgente que no toca ninguna pantalla.
+
+El techo es de **categorías, no de casos**: hoy son 16 casos en cuatro
+archivos y los 16 caen en las tres de arriba —el guard del lienzo, el bloqueo
+de pantalla y el login sin campo de contraseña (ADR-050) son "candados que
+solo existen en pantalla": del lado del servidor no hay ninguna diferencia
+entre un PIN escrito y uno tocado—. Una cuarta categoría es lo que no entra.
+
+Lo que cambia es la salida para lo que no entra. Antes había dos: agregarlo
+igual (y romper el techo) o no escribirlo. Ahora hay una tercera, `uso/`, con
+otro propósito y otras consecuencias.
+
+## La suite de uso (`frontend/uso/`)
+
+Responde otra pregunta. `e2e` pregunta *¿arranca y se hablan?*; `uso`
+pregunta *¿esto se puede usar de punta a punta?* — y su entregable **no es el
+verde, son las capturas**. Es lo que permite mirar una pantalla sin instalar
+el ERP, y dejar evidencia de cómo se veía.
+
+|  | `e2e/` | `uso/` |
+|---|---|---|
+| Techo | las tres cosas de arriba | no tiene |
+| `screenshot` / `trace` | `on-failure` | `on` |
+| Reintentos en CI | 1 | 0 |
+| Check requerido | **sí** | **no** |
+| Artefacto en CI | `if: failure()` | `if: always()` |
+
+```bash
+npm run test:uso        # frontend/, mismo seeder y misma base que test:e2e
+```
+
+Reglas propias, además de todas las de abajo (que siguen valiendo igual):
+
+- **Captura en cada hito**, con `capturar(page, testInfo, "<nombre>")`
+  (`uso/util.ts`). Se numeran solas: la carpeta se lee como una secuencia.
+- **No bloquea un merge, y no debe empezar a hacerlo.** El job `uso` de
+  `ci.yml` está fuera de los seis requeridos y además con
+  `continue-on-error: true`. Un recorrido largo se cae por cosas que no son
+  bugs, y un check requerido que falla por ruido es un check que la gente
+  aprende a ignorar. Agregarlo al ruleset es cambiar la decisión de ADR-047,
+  no corregir un olvido.
+- **Las capturas nunca se versionan.** Van a `frontend/test-results/uso/`,
+  que ya está en `.gitignore`, y CI las sube como artefacto.
+- El arranque de los dos servidores es el mismo que el de `e2e` y vive en
+  `frontend/playwright.comun.ts`. Si hay que tocar puertos o tiempos, se
+  tocan ahí una vez.
+
+## Reglas para escribir un e2e (o un recorrido de uso)
+
+Aprendidas a los golpes; cada una costó tiempo. Valen igual para las dos
+suites: comparten el arranque, la base y el seeder.
 
 - **Los datos los siembra un seeder versionado** (`src/seeders/e2e.py`), no
   el test. Un test que crea sus datos por la UI prueba tres flujos para
-  verificar uno.
+  verificar uno. Lo que ya está sembrado —y por lo tanto **no hay que volver
+  a sembrar**— es:
+
+  | Para probar | Ya existe |
+  |---|---|
+  | Caja y venta simple | punto de venta y POS por sucursal, `admin`, `encargado_e2e`, `cajero_e2e`, medio de pago |
+  | Venta de un producto plano | `Pizza E2E` (S/ 25.00), un solo insumo, con stock |
+  | Variantes, grupo obligatorio y extras | `Menú E2E` → Simple/Doble → grupo `Guarnición` (`minimo=1`) → `Extra Queso E2E` |
+  | Inventario | cuatro insumos con SKU y stock en el almacén central |
+  | Compras | proveedor `Distribuidora E2E SAC` y una orden de compra **en borrador** |
+
+  La orden queda en borrador a propósito: emitirla es el paso que un
+  recorrido quiere dar **por la pantalla**, y una orden que llega emitida se
+  lo saltea. Si una rama necesita algo que no está, se agrega **al seeder**,
+  no al test — y se agrega sin tocar `Pizza E2E`, que es plana a propósito
+  (las pruebas del lienzo dependen de que tenga un único insumo).
 - **Base desechable y rehecha en cada corrida.** Los seeders son
   idempotentes pero el *estado* no: una corrida que deja la caja abierta
   hace fallar a la siguiente con un mensaje que no menciona la corrida
@@ -138,17 +208,39 @@ Aprendidas a los golpes; cada una costó tiempo:
   la caché más tibia, el punto de falla se mueve solo. Eso se lee como
   flakiness y no lo es.
 
-## Estado actual (2026-08-06)
+## Estado actual (2026-08-15)
 
-- Dominio y API: **895 casos**, en verde, en CI.
-- Unidad de frontend + contrato: **183 casos** (`npm test`), en CI desde
-  2026-08-06 — el job de frontend hacía solo `lint` y `build`. De esos, 162
-  son de contrato y 7 (2026-08-07, `lib/carga.test.ts`) cubren la
-  clasificación de fallos de carga: que una red caída no se confunda con un
-  403 ni se dibuje como lista vacía.
-- e2e: **7 casos en verde y en CI** (job `e2e`), sobre PDV, sesión y el gate
-  de módulo. Los tres puntos de "qué sí justifica un e2e" quedan cubiertos.
+Números contados, no recordados: `pytest --collect-only -q`, `npm test`, y
+los `test(` de `frontend/e2e/`. Los anteriores (895 / 183 / 7) eran del
+2026-08-06 y llevaban nueve días vencidos, que es lo que pasa con un conteo
+escrito a mano: envejece sin avisar.
+
+- Dominio y API: **1379 casos** en verde, en CI. Salen de **1041 funciones
+  `test_*`** repartidas en **76 archivos** de `tests/`; la diferencia son
+  `parametrize`.
+- Unidad de frontend + contrato: **273 casos** (`npm test`), en CI desde
+  2026-08-06 — el job de frontend hacía solo `lint` y `build`. De esos, **186
+  son de contrato** (`lib/contrato.test.ts`), 7 (2026-08-07,
+  `lib/carga.test.ts`) cubren la clasificación de fallos de carga —que una red
+  caída no se confunda con un 403 ni se dibuje como lista vacía— y 8
+  (2026-08-15, `lib/proxy.test.ts`) fijan que el proxy del navegador no toque
+  lo que pasa por él en ninguna de las dos direcciones (ADR-048).
+- e2e: **16 casos en verde y en CI** (job `e2e`), sobre PDV, sesión, el gate
+  de módulo, el lienzo de nodos, el bloqueo de pantalla y el login con pinpad
+  (ADR-050). Los tres puntos de "qué sí justifica un e2e" quedan cubiertos.
   Ver ROADMAP → Frontend.
+- Uso: **7 casos**. `uso/humo.spec.ts` prueba el arnés y no una pantalla;
+  `uso/importador-recetas.spec.ts` (2026-08-15) recorre la carga masiva del
+  recetario de punta a punta —descargar la plantilla, abrirla con openpyxl,
+  llenarla, subirla y confirmar—, que es el camino donde vivía el bug del
+  proxy (ADR-048); `uso/importador-articulos.spec.ts` y
+  `uso/importador-clientes.spec.ts` (2026-08-20, ADR-052) hacen lo mismo con el
+  catálogo y el padrón, y además el **round-trip nulo**: bajar lo que ya está
+  cargado, volver a subirlo sin tocarlo y exigir que todo salga "a actualizar"
+  y nada "nuevo" — es lo único que verifica que el export y el importador
+  hablan el mismo idioma desde el navegador; y `uso/consulta-documento.spec.ts`
+  (2026-08-15) corrige un cliente con el botón de RUC. Job `uso`, **no
+  requerido** (ADR-047).
 
 Los cuatro niveles de la tabla existen y ninguno está vacío. Lo que queda
 abierto, dicho sin adornos: **el cuerpo que arman las pantallas de Compras,
@@ -156,6 +248,37 @@ Inventario, RRHH, Gerencia, Contabilidad, Marketing y Usuarios no está
 verificado contra el contrato** — de esas solo se comprueba la ruta. Se
 cerraría moviendo sus llamadas a módulos importables como los cuatro que ya
 lo son, no escribiendo otro tipo de test.
+
+## Lo que SQLite no hace cumplir y Postgres sí
+
+El suite corre sobre SQLite en memoria, que **no es la base de producción**.
+La diferencia no es teórica: ya dejó pasar bugs.
+
+- **Claves foráneas** — SQLite las trae **apagadas**. Un `DELETE` que dejaba
+  al hijo apuntando a un padre inexistente pasaba en verde. Costó meses de
+  `anular_lineas` roto contra Postgres (`fk_venta_item_padre`) con las ~900
+  pruebas verdes. Desde **2026-08-15** un listener del evento `connect` de
+  SQLAlchemy en `tests/conftest.py` enciende `PRAGMA foreign_keys=ON` en
+  **cualquier** engine SQLite del proceso: no hay que acordarse por fixture,
+  y `test_models.py::test_un_engine_sqlite_nuevo_ya_trae_las_fk_encendidas`
+  se pone rojo si alguien lo saca. Encenderlo destapó **cinco** violaciones:
+  dos bugs de producción (borrar una receta con líneas; emitir un reporte
+  cuyo almacén ya no existe) y tres tests que sembraban un id inventado.
+  Corolario para escribir tests: **un `uuid.uuid4()` en una columna FK ya no
+  compila** — hay que sembrar la fila, que es lo que la base real exige.
+- **Largo de `VARCHAR` y tipos** — SQLite no los valida (ver
+  `docs/roadmap/deuda/transversal.md`). Sigue abierto: la única red es probar
+  cada migración contra un Postgres real. Los importadores de planilla
+  (2026-08-20, ADR-052) le agregan una segunda: **validan el largo ellos
+  mismos**, por fila, para que un `Código = "HARINA"` se reporte como problema
+  en vez de pasar en verde y dar `StringDataRightTruncation` en producción — y
+  `test_importacion_articulos.py` ata la constante a `Articulo.__table__.c
+  .id_interno.type.length`, así que ensanchar la columna sin mover la
+  constante se pone rojo. Cubre las columnas que alguien se acordó de atar,
+  no todas.
+- **`statement_timeout`** — no existe en SQLite. La configuración de los dos
+  engines (`docs/engineering/devops.md` → «Dos engines») es inocua ahí, a
+  propósito: fuera de Postgres el parámetro no se pasa.
 
 ## Nota de velocidad
 

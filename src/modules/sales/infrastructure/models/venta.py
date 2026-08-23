@@ -21,10 +21,10 @@ from sqlalchemy import Enum, ForeignKey, Integer, Numeric, String, UniqueConstra
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
-from src.core.model_base import TimestampMixin, UuidPkMixin
+from src.core.model_base import TimestampMixin, UbicacionMixin, UuidPkMixin
 
 
-class Venta(Base, UuidPkMixin, TimestampMixin):
+class Venta(Base, UuidPkMixin, TimestampMixin, UbicacionMixin):
     __tablename__ = "venta"
     __table_args__ = (UniqueConstraint("sucursal_id", "fecha_orden", "numero_orden"),)
 
@@ -105,6 +105,21 @@ class Venta(Base, UuidPkMixin, TimestampMixin):
     # el dato tipado es `mesa_id`; este campo queda para takeout/delivery.
     referencia_atencion: Mapped[str | None] = mapped_column(
         String(50), nullable=True
+    )
+    # Adónde va el pedido de delivery, congelada al tomarlo: si el cliente se
+    # muda el mes que viene, este pedido siguió yendo adonde fue. Mismo
+    # criterio que las direcciones congeladas de la guía de remisión.
+    #
+    # Hasta 2026-08-22 se tecleaba en caja y se perdía: vivía solo en el
+    # borrador del navegador y ninguna columna la recibía.
+    direccion_entrega: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Lo cotizado al crear la orden, no lo que daría recalcular hoy: la
+    # tarifa cambia y el pedido de ayer no puede cambiar de precio (ADR-054).
+    distancia_entrega_km: Mapped[Decimal | None] = mapped_column(
+        Numeric(6, 2), nullable=True
+    )
+    costo_entrega: Mapped[Decimal | None] = mapped_column(
+        Numeric(10, 2), nullable=True
     )
     # Solo si modalidad=mesa (validado en el dominio, no en el esquema).
     # Nullable también por compatibilidad: las ventas anteriores a la

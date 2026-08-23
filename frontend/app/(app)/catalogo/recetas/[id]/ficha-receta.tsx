@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+
+import { Rastro } from "@/components/shell/rastro";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -66,9 +68,7 @@ export function FichaReceta({
   return (
     <div className="flex max-w-4xl flex-col gap-6">
       <div className="flex items-center justify-between">
-        <Link href="/catalogo/recetas" className="text-sm text-gray hover:text-primary">
-          ← Recetas
-        </Link>
+        <Rastro hoja={receta.nombre} />
         <button
           type="button"
           onClick={borrar}
@@ -90,7 +90,7 @@ export function FichaReceta({
       </section>
 
       <section className="rounded-lg border border-gray/20 bg-white p-4">
-        <h2 className="mb-1 font-heading text-lg italic uppercase text-dark">
+        <h2 className="mb-1 font-heading text-lg text-dark">
           ¿Qué produce?
         </h2>
         <p className="mb-3 text-xs text-gray">

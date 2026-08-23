@@ -29,6 +29,69 @@ fecha_vencimiento, condiciones de almacenamiento), `conteo`, `ajuste`
 `proveedor` | `cliente`). Detalle en `docs/architecture/data-model.md`
 §3–§4.
 
+## Estado (slice 10 — recetas condicionadas y UdM por línea, 2026-08-23)
+
+Migración `e2b7c40d91af`, ADR-056, RN-COM-037, RN-UDM-005.
+
+**`receta_item.aplica_valores`** (JSONB, nullable): array de
+`producto_atributo_valor.id`. NULL o `[]` = la línea aplica siempre, que es
+el caso de todas las recetas de hoy — por eso no hay backfill.
+
+La regla es la de Odoo 18 (`mrp.bom.line._skip_bom_line` →
+`_skip_for_no_variant`), en `domain/rules.aplica_a_variante`: se agrupan los
+valores de la condición **por atributo** y la combinación tiene que coincidir
+con **al menos uno de cada grupo**. Entre grupos es Y; dentro de un grupo es
+O. Es lo que convierte 361 recetas en una de 26 líneas.
+
+> Consecuencia aceptada: media Americana + media Peperoni **no** descuenta el
+> jamón si la línea nombra los dos atributos. Es el comportamiento de Odoo y
+> el que el archivo de Charlie's asume. La corrección es de **datos** —una
+> línea por mitad, a media cantidad— y `test_variantes_odoo.py` prueba las
+> dos formas lado a lado.
+
+**`receta_item.unidad_medida_id`** (FK, nullable): NULL = la del artículo.
+Si viene, es de la **misma categoría de UdM** (RN-UDM-001) y se convierte por
+`ratio` al descontar y al costear. No revierte ADR-023: lo que ADR-023
+descartó era una unidad *libre*; ésta es exacta.
+
+**`domain/rules.consumo_de_linea`** es ahora la única cuenta de merma +
+conversión. La usan `listeners._consumos_de_items` y `recetas.costo_linea`,
+que antes la escribían distinto: el día que una gane un paréntesis, el costo
+de un plato deja de cuadrar con lo que salió de la cámara.
+
+**`receta.es_kit`** (booleano, default False) es el `type` de `mrp.bom`
+(`normal` | `phantom`). Booleano y no un `tipo` de tres valores porque
+`recetas.TIPOS_RECETA` ya significa otra cosa (`subreceta` | `producto`).
+
+**`receta_item.orden`** existe para que exportar dos veces dé el mismo
+archivo: sin orden explícito, un diff contra el export anterior no sirve.
+
+`_consumos_de_items` pasa a cargar las líneas **una vez por receta** en vez
+de una por ítem, y `GET /inventory/recetas/{id}` devuelve la unidad **de la
+línea** cuando la línea eligió una.
+
+## Estado (slice 11 — la matriz de recetas, 2026-08-23)
+
+ADR-057. `GET`/`PUT /inventory/recetas/matriz`: el recetario en grilla,
+insumos en las filas y recetas en las columnas.
+
+**La identidad de una celda es `(receta, insumo, condición)`**, no un id de
+línea — es lo que permite pegar un rectángulo desde Excel, que no trae ids.
+La condición entra en la clave porque desde ADR-056 el mismo insumo puede
+estar dos veces en la misma receta si cada línea aplica a otra combinación.
+
+Vaciar la celda borra la línea. Vaciar una que ya estaba vacía **no** es un
+error: pegar un rectángulo con huecos no puede reportar cuarenta problemas.
+
+Cada celda entra en su propio `SAVEPOINT` (mismo criterio que ADR-046) y la
+respuesta dice qué pasó con cada una, en vez de cortar con un 409.
+
+La ruta va declarada **antes** de `/recetas/{receta_id}`: FastAPI resuelve por
+orden y "matriz" entraría como un `receta_id` que no es UUID.
+
+`editar_item` acepta `unidad_medida_id` y redondea con los decimales de **la
+unidad de la línea**, no con los del artículo.
+
 ## Casos de uso
 
 - CRUD de artículos y categorías.
@@ -68,6 +131,116 @@ fecha_vencimiento, condiciones de almacenamiento), `conteo`, `ajuste`
   para que `purchases` gestione el reclamo o la nota de crédito.
   **De cliente**: entra, y `destino` decide si vuelve al estante o se
   aparta como merma. Sucursal→central sigue siendo una `transferencia`.
+  Desde 2026-08-13 **registrar y anular escriben en `audit_log`**: mueven
+  stock real, y el evento le avisa a compras o comercial pero no responde
+  "quién sacó esto del almacén". La pantalla estuvo en solo lectura hasta
+  esa fecha, así que la API completa era inalcanzable por UI.
+
+## Estado (slice 9 — planillas de catálogo, 2026-08-20)
+
+Exportar es la plantilla con los datos adentro (ADR-052): lo que baja se edita
+en Excel y se vuelve a subir. La E/S de `.xlsx` vive en `src/shared/planilla.py`
+—abrir, mapear cabecera, filas, celda→texto/número/fecha/uuid, escribir— y la
+lógica de cada entidad en su propio archivo de `application/`.
+
+**Recetario** (`GET /recetas/exportar`)
+
+| Hoja | Columnas |
+|---|---|
+| `Recetas` | `ID` · `Receta` · `Rendimiento` · `Unidad` · `Produce el artículo` |
+| `Ingredientes` | `Receta` · `Insumo` · `Cantidad` · `Merma %` |
+| `Instrucciones` | texto |
+
+- La columna `ID` decide alta o actualización. Recetas se actualizan **solo
+  por `ID`**: su única clave natural es el nombre, y el nombre es lo que se
+  edita.
+- `Ingredientes` **no lleva `ID`** a propósito: la identidad de una línea es
+  `(receta, insumo)` y el dominio ya la hace única. Una columna con
+  `receta_item.id` sería una segunda verdad que no sobrevive un copiar-pegar.
+- `Cantidad` se exporta como `expresion or cantidad`: exportar `150` donde
+  alguien escribió `450/3` perdería lo que RN-COM-024 existe para conservar.
+- Al actualizar, **los ingredientes que el archivo no menciona se conservan**
+  salvo que la revisión pida `quitar` para esa receta, con el número de líneas
+  a la vista (RN-COM-031).
+- El insumo que falta **se crea desde el diálogo**, con `catalogoApi.crearArticulo`
+  — lo crea una persona, no el importador (ADR-046).
+
+**Catálogo de artículos** (`/articulos/plantilla`, `/articulos/exportar`,
+`/articulos/importar/validar`, `/articulos/importar` — RN-INV-023)
+
+| Hoja | Columnas |
+|---|---|
+| `Artículos` | `ID` · `Código` · `Nombre` · `Tipo` · `Unidad` · `Categoría` · `Costo promedio` · `Controla lote` · `Días alerta vencimiento` · `Archivado` |
+| `SKUs` | `Artículo` (código interno) · `Código` · `Código de barras` · `Activo` |
+| `Instrucciones` | texto |
+
+- Identidad: `ID`, o `Código` (`id_interno`) si el `ID` va vacío.
+- **La unidad de un artículo existente no se cambia**: `editar_articulo` la
+  excluye a propósito, y una fila que la cambie se reporta como problema en vez
+  de ignorarse en silencio.
+- El largo de `id_interno` (4) se valida **en el importador**: SQLite no aplica
+  el largo de un `VARCHAR`, así que sin eso la fila pasa en verde y revienta
+  contra Postgres. Un test ata la constante a la columna del modelo.
+- Los SKU **solo se crean**; uno con código ya usado se informa. Ver deuda.
+
+Exportar pide permiso de **lectura** (`inventory.leer`): son los mismos datos
+que el listado, solo empaquetados. Plantilla, validar e importar piden
+`inventory.gestionar_catalogo`. Las rutas literales van declaradas **antes** de
+`/{id}`, o FastAPI las toma como un id que no es UUID.
+## Estado (slice 8 — requerimiento de la jornada, 2026-08-19)
+
+`solicitud_insumos` gana el estado `borrador` y `solicitud_item` la columna
+`bajo_minimo_al_pedir` (ADR-051, RN-INV-023/024, migración `b5f27ac41e83`).
+
+- **`borrador`**: la lista que el turno junta durante la jornada. Uno por
+  almacén, no por usuario —dos listas paralelas del mismo almacén se
+  solapan y ninguna queda completa—; `GET /solicitudes/borrador?almacen_id=`
+  la crea si no existe (ya cargada con lo que está bajo `stock_minimo`) y si
+  existía le suma lo que cayó bajo mínimo desde la última vez, **sin tocar
+  lo ya tecleado**. No aparece en `GET /solicitudes` salvo pidiendo
+  `estado=borrador`, ni en `solicitudes_resumen_para_negociacion`, ni sube
+  al hub: todavía no le pidió nada a nadie.
+- **`bajo_minimo_al_pedir`**: si el SKU estaba bajo mínimo cuando entró a la
+  lista. Se **estampa al agregar el ítem**, nunca se recalcula —entre pedir
+  y aprobar el stock se mueve, y recalcularla contaría otra historia—. Es lo
+  que le dice al abastecedor qué es urgencia real y qué es decisión del
+  local (ambas preguntas que hasta ahora no tenían dónde vivir).
+- `POST/PATCH/DELETE /solicitudes/{id}/items[/{sku_id}]` editan el borrador;
+  `POST /solicitudes/{id}/enviar` lo pasa a `pendiente` y **re-resuelve** el
+  abastecedor (RN-INV-022 pudo cambiar mientras la lista estaba abierta).
+- `GET /conteos` (paginado, faltaba: solo se podía pedir un conteo por su
+  `id`) y `GET /solicitudes` / `GET /conteos/programa` ganan `sucursal_id` /
+  `marca_id`, resueltos por join a través del almacén — las dos entidades
+  van por almacén y sucursal/marca cuelgan de él.
+- Pantallas nuevas: `/inventario/solicitudes` (la lista de la jornada +
+  aprobar/rechazar/cancelar) y `/inventario/conteos` (abrir, contar a
+  ciegas, cerrar viendo los ajustes generados, anular con motivo).
+
+Tests: `tests/test_solicitudes_borrador.py` (10 casos) y los agregados a
+`tests/test_conteos.py`. Recorrido de uso:
+`frontend/uso/requerimientos.spec.ts`.
+
+## Estado (slice 7 — carga masiva de recetas, 2026-08-13)
+
+- `GET /inventory/skus`: no existía listado y ninguna pantalla podía ofrecer
+  "qué se mueve". Va con `articulo_nombre`, porque un código de SKU no le
+  dice nada a nadie.
+- `GET /inventory/recetas` acepta `tipo` (`subreceta` | `producto`) y
+  `categoria_id`. **El tipo se deriva** de `receta.articulo_id`, no hay
+  columna (RN-COM-030): guardarlo sería un segundo lugar donde puede estar
+  mal. La categoría es la del artículo que produce, así que solo alcanza a
+  las subrecetas.
+- **Carga masiva** (ADR-046, RN-COM-031): `GET /recetas/plantilla` baja un
+  `.xlsx` con ejemplos e instrucciones;
+  `POST /recetas/importar/validar` (multipart) dice qué entra y qué no **sin
+  guardar nada**; `POST /recetas/importar` crea lo que la pantalla confirmó,
+  **revalidando todo** porque lo que vuelve es un JSON que el cliente pudo
+  editar. Reusa `crear_receta`/`agregar_item`, así que la cantidad acepta
+  aritmética tecleada (RN-COM-024) y el nombre único por empresa se hace
+  cumplir en un solo lugar. Cada receta va en su `SAVEPOINT`: un nombre
+  repetido a mitad del archivo no se lleva puestas a las que ya entraron ni
+  deja una a medias. `plantilla` va declarada **antes** de
+  `/recetas/{receta_id}`, o FastAPI la toma como un id que no es UUID.
 
 ## Estado (slice 5 — recetas editables, 2026-08-03)
 
@@ -152,7 +325,13 @@ supervisor aprueba y reserva, el central despacha, el local recibe.
   respaldo, no un error.
 - **La solicitud va por almacén**, no por sucursal: producción también
   solicita. El abastecedor sale de `almacen.almacen_abastecedor_id` y se
-  copia a la fila.
+  copia a la fila. Si ese almacén está **dado de baja** se usa
+  `almacen_abastecedor_respaldo_id` (RN-INV-022, ADR-040): sin eso, dar de
+  baja el central deja al local sin poder pedir nada. El respaldo cubre
+  "no está", no "no tiene" —el faltante se resuelve aprobando por lo que
+  hay (RN-INV-001/002)— y **no** aplica cuando la solicitud nombra su
+  abastecedor: despachar desde donde no se pidió es lo que el que recibe
+  no puede notar hasta contar la mercadería.
 - **Estados**: `pendiente` → `aprobada` | `rechazada` | `cancelada`, y el
   despacho la lleva a `despachada` → `recibida`. Cancelar libera las
   reservas (RN-INV-010). `en_picking` **no existe y no va a existir**
@@ -172,6 +351,9 @@ supervisor aprueba y reserva, el central despacha, el local recibe.
 | GET | `/reservas?almacen_id&sku_id` | `leer` |
 | POST | `/reservas/{id}/liberar` | `liberar_reserva` |
 | POST/GET | `/solicitudes` | `solicitar_insumos` / `leer` |
+| GET | `/solicitudes/borrador?almacen_id=` | `solicitar_insumos` |
+| POST/PATCH/DELETE | `/solicitudes/{id}/items[/{sku_id}]` | `solicitar_insumos` |
+| POST | `/solicitudes/{id}/enviar` | `solicitar_insumos` |
 | GET | `/solicitudes/resumen` | `leer_solicitudes_externas` |
 | GET | `/solicitudes/{id}` | `leer` |
 | POST | `/solicitudes/{id}/aprobar` \| `/rechazar` | `aprobar_solicitud` |
@@ -238,7 +420,21 @@ y ninguno mueve stock sin la firma de un aprobador distinto.
 
 `PATCH /categorias/{id}` acepta `quitar_frecuencia: true` para sacar una
 categoría del ciclo — mandar `frecuencia_conteo: null` significa "no la
-toques", no "bórrala".
+toques", no "bórrala". Es el **único campo del módulo que se puede vaciar**
+desde un PATCH; el resto se cambia por otro valor.
+
+### Qué se corrige de un artículo (y qué no)
+
+`PATCH /articulos/{id}` acepta `id_interno` desde el 2026-08-10, con la misma
+unicidad del alta (reenviar el propio código no choca consigo mismo). Es el
+código de cuatro caracteres que el almacenero lee en el estante: tecleado mal
+se arrastra por toda la operación y hasta ahora era inmutable.
+
+**`unidad_medida_id` no está en `ArticuloUpdate` y no va a estar.** El stock,
+los movimientos y las recetas ya cargadas están expresados en la unidad
+actual: cambiarla no convierte nada, **reinterpreta en silencio** todo lo que
+ya existe — 10 pasa de 10 kilos a 10 gramos sin que se mueva una fila. Un
+artículo con la unidad equivocada se archiva y se crea de nuevo.
 
 **Anular** (2026-08-06) descarta un conteo abierto por error con motivo
 obligatorio: no genera ajustes y no pone al día el calendario, porque el
@@ -278,6 +474,7 @@ lote.
 | POST | `/lotes` | `registrar_movimiento` |
 | GET | `/lotes?almacen_id&sku_id&por_vencer_dias` | `leer` |
 | POST | `/lotes/bloquear-vencidos` | `registrar_movimiento` |
+| GET | `/lotes/{id}` | `leer` — el lote con su saldo por almacén (ADR-036) |
 
 `POST /movimientos` devuelve ahora una **lista** de movimientos (una salida
 FEFO puede repartirse entre varios lotes) y acepta `lote_id` + `motivo_lote`
@@ -301,11 +498,16 @@ Endpoints `/api/v1/inventory`:
 | Método | Ruta | Permiso |
 |--------|------|---------|
 | POST/GET | `/categorias` | `gestionar_catalogo` / `leer` |
+| GET | `/categorias/{id}` | `leer` |
+| GET | `/articulos/{id}` | `leer` |
+| GET | `/skus/{id}` | `leer` — el SKU con su artículo y su saldo por almacén |
+| GET | `/ajustes?almacen_id&estado` | `leer` — no existía: `ajuste_fuera_margen` reportaba un hecho que no se podía ir a mirar (ADR-036) |
+| GET | `/ajustes/{id}` | `leer` — con artículo, almacén, solicitante y aprobador resueltos |
 | GET | `/unidades-medida` | `leer` — catálogo global, sin filtro de tenant (`data-model.md` §3) |
 | POST | `/unidades-medida` | `gestionar_catalogo` — CRUD antes diferido (ADR-014 Addendum b); requiere `categoria_udm_id` existente |
 | PATCH | `/unidades-medida/{id}` | `gestionar_catalogo` — corrige `decimales` (RN-GER-010) sin recrear la unidad |
 | GET/POST | `/categorias-udm` | `leer` / `gestionar_catalogo` |
-| POST/GET/PATCH | `/articulos[/{id}]` | `gestionar_catalogo` / `leer` |
+| POST/GET/PATCH | `/articulos[/{id}]` | `gestionar_catalogo` / `leer` — el PATCH corrige `id_interno`, **nunca** `unidad_medida_id` (ver abajo) |
 | POST | `/skus` | `gestionar_catalogo` |
 | GET | `/stock` | `leer` |
 | POST | `/movimientos` | `registrar_movimiento` |

@@ -73,7 +73,7 @@ export function ProductosCliente({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h1 className="font-heading text-xl italic uppercase text-dark">
+        <h1 className="font-heading text-xl text-dark">
           Productos comerciales
         </h1>
         <DialogoNuevoProducto
@@ -136,7 +136,7 @@ function DialogoNuevoProducto({
       </button>
       <dialog ref={dialogRef} className="w-full max-w-md rounded-lg p-0 backdrop:bg-dark/40">
         <div className="flex flex-col gap-4 p-6">
-          <h2 className="font-heading text-lg italic uppercase text-dark">Nuevo producto</h2>
+          <h2 className="font-heading text-lg text-dark">Nuevo producto</h2>
           <label className="flex flex-col gap-1 text-sm font-semibold">
             Nombre
             <input

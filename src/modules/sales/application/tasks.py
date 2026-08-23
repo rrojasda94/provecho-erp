@@ -13,6 +13,10 @@ from src.core.database import SessionLocal
 from src.modules.sales.application import alertas, comprobantes
 from src.shared.integrations.factiliza import FactilizaError
 
+# Inyectable (los tests la reemplazan), mismo patrón que `listeners`: sin
+# esto un barrido ejercitado en un test abre la sesión de producción.
+session_factory = SessionLocal
+
 # Reintentos espaciados: 1, 2, 4... minutos. Un rechazo de SUNAT no
 # reintenta (no es fallo de transporte, el dato está mal).
 REINTENTOS_MAXIMOS = 4
@@ -27,7 +31,7 @@ ESPERA_BASE_SEGUNDOS = 60
     retry_kwargs={"max_retries": REINTENTOS_MAXIMOS},
 )
 def emitir_comprobante(self, comprobante_id: str) -> str:
-    session = SessionLocal()
+    session = session_factory()
     try:
         comprobante = comprobantes.emitir_comprobante(
             session, uuid.UUID(comprobante_id)
@@ -69,7 +73,7 @@ def revisar_demora_pedido(venta_id: str) -> bool:
     barrido periódico lo vuelve a mirar en el próximo ciclo — reintentar
     acá solo adelantaría lo que la red de seguridad ya hace.
     """
-    session = SessionLocal()
+    session = session_factory()
     try:
         alerta = alertas.revisar_pedido(session, uuid.UUID(venta_id))
         session.commit()
@@ -91,7 +95,7 @@ def barrer_comprobantes_pendientes() -> int:
     """
     if not comprobantes.emision_habilitada():
         return 0
-    session = SessionLocal()
+    session = session_factory()
     try:
         ids = comprobantes.pendientes_de_emitir(session)
     finally:
@@ -106,7 +110,7 @@ def barrer_pedidos_demorados() -> int:
     """Barrido periódico (Celery beat). Red de seguridad de la revisión
     puntual: levanta lo que se perdió porque el worker estaba caído, el
     broker soltó la tarea, o la venta nació sin worker escuchando."""
-    session = SessionLocal()
+    session = session_factory()
     try:
         creadas = alertas.barrer(session)
         session.commit()

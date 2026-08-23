@@ -67,6 +67,7 @@ registerHooks({
 
 const { api } = await import("./pdv.ts");
 const { catalogoApi } = await import("./catalogo.ts");
+const { clientesApi } = await import("./clientes.ts");
 const { apiKds } = await import("./kds.ts");
 const reportes = await import("./reportes.ts");
 
@@ -290,7 +291,21 @@ const PDV: Caso[] = [
       ],
     }),
   ),
+  caso("cotizarDelivery", () =>
+    api.cotizarDelivery({
+      sucursal_id: UUID,
+      ubicacion_lat: "-6.488430",
+      ubicacion_lng: "-76.365280",
+      ubicacion_distrito: "Tarapoto",
+    }),
+  ),
+  caso("verificarPin", () => api.verificarPin("123456")),
   caso("itemsDeVenta", () => api.itemsDeVenta(UUID)),
+  caso("agregarLineas", () =>
+    api.agregarLineas(UUID, [
+      { producto_comercial_id: UUID, cantidad: "1", grupo_cobro: 1 },
+    ]),
+  ),
   caso("anularLineas", () =>
     api.anularLineas(UUID, {
       venta_item_ids: [UUID],
@@ -317,7 +332,6 @@ const PDV: Caso[] = [
         punto_venta_id: UUID,
         monto_declarado: "200.00",
         detalle_denominaciones: { "100": 2 },
-        autorizacion: "t",
         pos_verificados: [{ pos_tarjeta_id: UUID, operativo: true }],
       }),
     // `POST /cajas/apertura` devuelve `id` y el PDV lo renombra a
@@ -332,7 +346,6 @@ const PDV: Caso[] = [
     api.cerrarCaja(UUID, {
       detalle_denominaciones: { "100": 2 },
       custodia: "local_caja_fuerte",
-      autorizacion: "t",
       descuadre_atribucion: null,
       reportes_pos: [{ pos_tarjeta_id: UUID, monto_lote: "0" }],
     }),
@@ -350,6 +363,69 @@ const PDV: Caso[] = [
 
 const CATALOGO: Caso[] = [
   caso("unidadesMedida", () => catalogoApi.unidadesMedida()),
+  caso("crearArticulo", () =>
+    catalogoApi.crearArticulo({
+      id_interno: "ALB1",
+      nombre: "Albahaca",
+      unidad_medida_id: UUID,
+      tipo: "insumo",
+    }),
+  ),
+  caso("validarImportacion", () =>
+    catalogoApi.validarImportacion(
+      new File([new Uint8Array([0x50, 0x4b])], "recetas.xlsx"),
+    ),
+  ),
+  caso("importarRecetas", () =>
+    catalogoApi.importarRecetas([
+      {
+        fila: 2,
+        id: null,
+        accion: "crear",
+        ingredientes_ausentes: "conservar",
+        nombre: "Salsa Base",
+        rendimiento: "1",
+        unidad: "Unidad",
+        unidad_medida_id: UUID,
+        produce: null,
+        articulo_producido_id: null,
+        ingredientes: [],
+        cambios: [],
+        se_quitarian: [],
+        problemas: [],
+      },
+    ]),
+  ),
+  caso("categorias", () => catalogoApi.categorias()),
+  caso("crearCategoria", () => catalogoApi.crearCategoria({ nombre: "Abarrotes" })),
+  caso("validarImportacionArticulos", () =>
+    catalogoApi.validarImportacionArticulos(
+      new File([new Uint8Array([0x50, 0x4b])], "articulos.xlsx"),
+    ),
+  ),
+  caso("importarArticulos", () =>
+    catalogoApi.importarArticulos([
+      {
+        fila: 2,
+        id: null,
+        accion: "crear",
+        codigo: "TOMA",
+        nombre: "Tomate",
+        tipo: "insumo",
+        unidad: "Gramo",
+        unidad_medida_id: UUID,
+        categoria: "",
+        categoria_id: null,
+        costo_promedio: "0.01",
+        controla_lote: false,
+        dias_alerta_vencimiento: null,
+        archivado: false,
+        skus: [],
+        cambios: [],
+        problemas: [],
+      },
+    ]),
+  ),
   caso(
     "articulos",
     () => catalogoApi.articulos(),
@@ -389,6 +465,33 @@ const CATALOGO: Caso[] = [
   ),
   caso("editarItem", () => catalogoApi.editarItem(UUID, UUID, { cantidad: "0.30" })),
   caso("eliminarItem", () => catalogoApi.eliminarItem(UUID, UUID)),
+  // --- Matriz de recetas y atributos (ADR-055, ADR-057, ADR-058) ------------
+  caso("matriz", () => catalogoApi.matriz()),
+  caso("guardarMatriz", () =>
+    catalogoApi.guardarMatriz([
+      {
+        receta_id: UUID,
+        articulo_id: UUID,
+        expresion: "450/3",
+        unidad_medida_id: null,
+        aplica_valores: [],
+      },
+    ]),
+  ),
+  caso("arbol", () => catalogoApi.arbol(UUID)),
+  caso("atributos", () => catalogoApi.atributos()),
+  caso("crearAtributo", () =>
+    catalogoApi.crearAtributo({ nombre: "Tamaño", display: "pildoras" }),
+  ),
+  caso("agregarValorDeAtributo", () =>
+    catalogoApi.agregarValorDeAtributo(UUID, { nombre: "Familiar" }),
+  ),
+  caso("ofrecerAtributo", () =>
+    catalogoApi.ofrecerAtributo(UUID, { atributo_id: UUID }),
+  ),
+  caso("fijarPrecioExtra", () => catalogoApi.fijarPrecioExtra(UUID, "8.50")),
+  caso("retirarValor", () => catalogoApi.retirarValor(UUID)),
+  caso("excluir", () => catalogoApi.excluir(UUID, UUID)),
 ];
 
 const KDS: Caso[] = [
@@ -399,6 +502,7 @@ const KDS: Caso[] = [
       nombre: "Cocina",
       tipo: "preparacion",
       categoria_ids: [UUID],
+      orden: 0,
     }),
   ),
   caso("editarPantalla", () => apiKds.editarPantalla(UUID, { nombre: "Cocina 2", activo: true })),
@@ -443,12 +547,41 @@ const REPORTES: Caso[] = [
   caso("borrarTablero", () => reportes.borrarTablero(UUID)),
 ];
 
+
+const CLIENTES: Caso[] = [
+  caso("validarImportacion", () =>
+    clientesApi.validarImportacion(
+      new File([new Uint8Array([0x50, 0x4b])], "clientes.xlsx"),
+    ),
+  ),
+  caso("importarClientes", () =>
+    clientesApi.importarClientes([
+      {
+        fila: 2,
+        id: null,
+        accion: "crear",
+        tipo: "natural",
+        nombre: "Ana Quispe",
+        tipo_documento: "dni",
+        documento: "40404040",
+        telefono: "987654321",
+        email: "",
+        contacto: "Jr. Lima 100",
+        fecha_nacimiento: null,
+        cambios: [],
+        problemas: [],
+      },
+    ]),
+  ),
+];
+
 /** Con `superficie` el test compara la lista contra el objeto real del
  * módulo; sin ella (reportes) la lista es la fuente. */
 const MODULOS: { nombre: string; casos: Caso[]; superficie?: object }[] = [
   { nombre: "pdv", casos: PDV, superficie: api },
   { nombre: "catalogo", casos: CATALOGO, superficie: catalogoApi },
   { nombre: "kds", casos: KDS, superficie: apiKds },
+  { nombre: "clientes", casos: CLIENTES, superficie: clientesApi },
   { nombre: "reportes", casos: REPORTES },
 ];
 
@@ -467,6 +600,20 @@ function respuestaExitosa(op: Operacion | undefined): { codigo: string; cuerpo?:
 
 /** Corre la operación con `fetch` intervenido: captura lo que sale y
  * responde con el ejemplo que el contrato promete para esa ruta. */
+/**
+ * El cuerpo tal como el contrato lo entiende.
+ *
+ * Una subida de archivo va en `multipart/form-data`, no en JSON: parsearla
+ * revienta con «Unexpected token 'o'», que no dice nada. Se devuelve
+ * `undefined` para que la ruta se verifique igual y la validación de esquema
+ * no aplique — el contrato de un multipart no describe un objeto JSON.
+ */
+function cuerpoDe(body: BodyInit | null | undefined): unknown {
+  if (!body) return undefined;
+  if (typeof FormData !== "undefined" && body instanceof FormData) return undefined;
+  return JSON.parse(String(body));
+}
+
 async function ejercitar(operacion: Caso): Promise<{ salida: Salida; resultado: unknown }> {
   let salida: Salida | null = null;
   const original = globalThis.fetch;
@@ -477,7 +624,7 @@ async function ejercitar(operacion: Caso): Promise<{ salida: Salida; resultado: 
 
   globalThis.fetch = ((url: string, opciones: RequestInit = {}) => {
     const metodo = opciones.method ?? "GET";
-    salida = { metodo, url, cuerpo: opciones.body ? JSON.parse(String(opciones.body)) : undefined };
+    salida = { metodo, url, cuerpo: cuerpoDe(opciones.body) };
     const { codigo, cuerpo } = respuestaExitosa(operacionDe(url, metodo));
     if (codigo === "204") return Promise.resolve(new Response(null, { status: 204 }));
     return Promise.resolve(

@@ -20,6 +20,7 @@ programa. El nombre y los datos siguen viviendo en `persona`, fuente única
 
 import uuid
 from datetime import date
+from decimal import Decimal
 
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
@@ -67,6 +68,7 @@ def _completar_persona(
     telefono: str | None,
     direccion: str | None,
     fecha_nacimiento: date | None,
+    ubicacion: dict | None = None,
 ) -> None:
     """Rellena solo lo que falte: la persona ya existía por otro motivo
     (trabajador, otro registro) y no se pisa lo que ya dio."""
@@ -76,6 +78,12 @@ def _completar_persona(
         persona.domicilio = direccion
     if fecha_nacimiento and not persona.fecha_nacimiento:
         persona.fecha_nacimiento = fecha_nacimiento
+    # La ubicación se escribe solo si vino la dirección con ella: anclar
+    # un punto sin haber tocado el texto dejaría los dos contando
+    # historias distintas.
+    if direccion and ubicacion and not persona.ubicacion_place_id:
+        for campo, valor in ubicacion.items():
+            setattr(persona, campo, valor)
 
 
 def crear_cliente(
@@ -89,11 +97,30 @@ def crear_cliente(
     direccion: str | None = None,
     fecha_nacimiento: date | None = None,
     tipo_documento: str = "dni",
+    ubicacion_place_id: str | None = None,
+    ubicacion_lat: Decimal | None = None,
+    ubicacion_lng: Decimal | None = None,
+    ubicacion_plus_code: str | None = None,
+    ubicacion_distrito: str | None = None,
+    consultar_documento: bool = True,
 ) -> Cliente:
     """RUC de 11 dígitos crea un cliente jurídico; el resto, uno natural con
     su `persona`. El tipo NO se pide al cajero: lo decide el documento,
     igual que el tipo de comprobante (RN-CPP-003).
+
+    `consultar_documento=False` salta la consulta a SUNAT/RENIEC y usa el
+    nombre tal cual viene. Lo usa la carga masiva (ADR-052): una planilla de
+    trescientos clientes serían trescientas llamadas externas secuenciales
+    dentro de un solo request, contra una cuota. Cuando el cliente se edita de
+    a uno, SUNAT vuelve a mandar.
     """
+    ubicacion = {
+        "ubicacion_place_id": ubicacion_place_id,
+        "ubicacion_lat": ubicacion_lat,
+        "ubicacion_lng": ubicacion_lng,
+        "ubicacion_plus_code": ubicacion_plus_code,
+        "ubicacion_distrito": ubicacion_distrito,
+    }
     nombre = (nombre or "").strip()
     telefono = (telefono or "").strip() or None
     numero_documento = (numero_documento or "").strip() or None
@@ -104,7 +131,18 @@ def crear_cliente(
 
     repo = ClienteRepo(session)
     if numero_documento and len(numero_documento) == rules.LARGO_RUC:
-        return _crear_juridico(repo, grupo_id, nombre, numero_documento, direccion, telefono)
+        # Sin `ubicacion`: el cliente jurídico no tiene columna de
+        # dirección —hoy termina en `contacto`— y por lo tanto tampoco
+        # dónde anclarla. Queda anotado en la deuda del ROADMAP.
+        return _crear_juridico(
+            repo,
+            grupo_id,
+            nombre,
+            numero_documento,
+            direccion,
+            telefono,
+            consultar_documento,
+        )
 
     # Natural: el teléfono sustituye al documento como forma de encontrarlo
     # después. Sin ninguno de los dos el registro no sirve para nada.
@@ -118,7 +156,11 @@ def crear_cliente(
     persona = _persona_por_documento(session, numero_documento) if numero_documento else None
     if persona is None:
         nombres, apellidos = _partir_nombre(nombre)
-        if numero_documento and len(numero_documento) == rules.LARGO_DNI:
+        if (
+            consultar_documento
+            and numero_documento
+            and len(numero_documento) == rules.LARGO_DNI
+        ):
             nombres, apellidos = nombres_desde_dni(numero_documento, nombres, apellidos)
         persona = Persona(
             nombres=nombres,
@@ -133,6 +175,7 @@ def crear_cliente(
             email=email,
             domicilio=direccion,
             fecha_nacimiento=fecha_nacimiento,
+            **ubicacion,
         )
         session.add(persona)
         session.flush()
@@ -140,7 +183,9 @@ def crear_cliente(
         # `persona` es única por documento y la comparten users/rrhh: si ya
         # existe (un trabajador que compra, por ejemplo) se reutiliza en vez
         # de duplicarla, y se completa lo que le falte.
-        _completar_persona(persona, telefono, direccion, fecha_nacimiento)
+        _completar_persona(
+            persona, telefono, direccion, fecha_nacimiento, ubicacion
+        )
         existente = repo.por_persona(grupo_id, persona.id)
         if existente is not None:
             raise Conflicto("esa persona ya está registrada como cliente")
@@ -157,11 +202,13 @@ def _crear_juridico(
     ruc: str,
     direccion: str | None,
     telefono: str | None,
+    consultar_documento: bool = True,
 ) -> Cliente:
     existente = repo.por_ruc(grupo_id, ruc)
     if existente is not None:
         raise Conflicto(f"ya existe un cliente con RUC {ruc}")
-    razon_social = razon_social_desde_ruc(ruc, razon_social)
+    if consultar_documento:
+        razon_social = razon_social_desde_ruc(ruc, razon_social)
     return repo.add(
         Cliente(
             grupo_id=grupo_id,
@@ -214,22 +261,73 @@ def actualizar_documento(
     return cliente
 
 
-def buscar(
-    session: Session, *, grupo_id: uuid.UUID, q: str, limite: int = 20
-) -> list[tuple[Cliente, Persona | None]]:
-    """Busca por teléfono, documento o nombre — en caja se pregunta lo que
-    el cliente recuerde. Devuelve el cliente junto a su persona para que el
-    llamador arme el nombre sin volver a consultar."""
-    q = (q or "").strip()
-    if not q:
-        return []
-    patron = f"%{q}%"
-    filas = session.execute(
-        select(Cliente, Persona)
+def editar_cliente(
+    session: Session,
+    cliente_id: uuid.UUID,
+    *,
+    consultar_documento: bool = True,
+    **campos,
+) -> Cliente:
+    """Corrige un cliente **jurídico**. Campo `None` = no tocar.
+
+    Solo jurídico porque es lo único que `cliente` guarda por su cuenta: en
+    uno natural el nombre, el teléfono, el documento y la dirección viven en
+    su `persona` (RN-GEN-007, fuente única) y se corrigen desde ahí. Duplicar
+    esos campos acá sería crear la segunda fuente que esa regla existe para
+    evitar.
+
+    El documento tiene su propio caso de uso (`actualizar_documento`), que
+    aplica las reglas de identificación; este no lo toca.
+    """
+    repo = ClienteRepo(session)
+    cliente = repo.get(cliente_id)
+    if cliente is None or cliente.deleted_at is not None:
+        raise NoEncontrado("cliente no encontrado")
+    if cliente.tipo != "juridico":
+        raise ReglaNegocio(
+            "los datos de un cliente natural viven en su persona "
+            "(RN-GEN-007): se corrigen desde Personas"
+        )
+
+    ruc = (campos.get("ruc") or "").strip()
+    if ruc:
+        if len(ruc) != rules.LARGO_RUC or not ruc.isdigit():
+            raise ReglaNegocio("un cliente jurídico se identifica con RUC (11 dígitos)")
+        ajeno = repo.por_ruc(cliente.grupo_id, ruc)
+        if ajeno is not None and ajeno.id != cliente.id:
+            raise Conflicto(f"ya existe un cliente con RUC {ruc}")
+        cliente.ruc = ruc
+
+    razon_social = (campos.get("razon_social") or "").strip()
+    if razon_social:
+        cliente.razon_social = razon_social
+    if campos.get("contacto") is not None:
+        cliente.contacto = campos["contacto"].strip() or None
+    # Mismo criterio que el alta: SUNAT manda sobre lo tecleado — salvo en la
+    # carga masiva, que no puede consultar una vez por fila (ADR-052).
+    if consultar_documento and (ruc or razon_social):
+        cliente.razon_social = razon_social_desde_ruc(cliente.ruc, cliente.razon_social)
+    return cliente
+
+
+def q_listado(session: Session, *, grupo_id: uuid.UUID, q: str | None = None):
+    """La consulta sin ejecutar, para que el router la pagine (ADR-026).
+
+    Es la misma de `buscar` sin el `LIMIT`: la caja pide las primeras 20
+    coincidencias y el back-office pagina el padrón entero, pero *qué* es un
+    cliente del grupo y por qué campos se lo encuentra tiene que ser una sola
+    definición — si no, la pantalla y la caja terminan mostrando universos
+    distintos.
+    """
+    consulta = (
+        select(Cliente)
         .outerjoin(Persona, Persona.id == Cliente.persona_id)
-        .where(
-            Cliente.grupo_id == grupo_id,
-            Cliente.deleted_at.is_(None),
+        .where(Cliente.grupo_id == grupo_id, Cliente.deleted_at.is_(None))
+    )
+    q = (q or "").strip()
+    if q:
+        patron = f"%{q}%"
+        consulta = consulta.where(
             or_(
                 Persona.telefono.ilike(patron),
                 Persona.numero_documento.ilike(patron),
@@ -237,8 +335,38 @@ def buscar(
                 Persona.apellidos.ilike(patron),
                 Cliente.razon_social.ilike(patron),
                 Cliente.ruc.ilike(patron),
-            ),
+            )
         )
-        .limit(limite)
+    return consulta.order_by(Cliente.created_at.desc())
+
+
+def personas_de(
+    session: Session, clientes_: list[Cliente]
+) -> dict[uuid.UUID, Persona]:
+    """Las personas de una página de clientes, en una consulta.
+
+    `q_listado` devuelve `Cliente` a secas porque `paginar` sabe contar y
+    cortar un `Select` de una entidad, no de dos. Resolver la persona acá
+    cuesta una consulta por página; hacerlo fila por fila costaría N.
+    """
+    ids = {c.persona_id for c in clientes_ if c.persona_id is not None}
+    if not ids:
+        return {}
+    return {
+        p.id: p for p in session.scalars(select(Persona).where(Persona.id.in_(ids)))
+    }
+
+
+def buscar(
+    session: Session, *, grupo_id: uuid.UUID, q: str, limite: int = 20
+) -> list[tuple[Cliente, Persona | None]]:
+    """Busca por teléfono, documento o nombre — en caja se pregunta lo que
+    el cliente recuerde. Devuelve el cliente junto a su persona para que el
+    llamador arme el nombre sin volver a consultar."""
+    if not (q or "").strip():
+        return []
+    encontrados = list(
+        session.scalars(q_listado(session, grupo_id=grupo_id, q=q).limit(limite))
     )
-    return [(cliente, persona) for cliente, persona in filas]
+    personas = personas_de(session, encontrados)
+    return [(c, personas.get(c.persona_id)) for c in encontrados]

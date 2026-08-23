@@ -143,6 +143,22 @@ flowchart LR
 > Borrador (se revisa/corrige en otra sesión): detalle de conteo en
 > sucursal ya está a este nivel; picking/packing/transporte en almacén
 > central todavía no.
+
+**Implementado (2026-08-19, ADR-051):** los pasos 4–9 —conteo → borrador de
+requerimiento sugerido por punto de reorden → ajuste/edición por el
+Encargado/Supervisor → envío a Almacén Central. `GET
+/inventory/solicitudes/borrador?almacen_id=` arma la lista sola con lo que
+está bajo `stock_minimo` (RN-INV-013) y el Encargado la edita —incluida la
+cantidad menor que describe el paso 8— antes de enviarla; lo que se agrega a
+mano queda marcado como pedido del local y no como urgencia (RN-INV-024).
+El paso 4 (el conteo **genera** el borrador automáticamente) queda **fuera**
+de este slice: hoy el borrador se arma independiente del conteo cíclico
+(ADR-019), leyendo el stock vigente al abrir la pantalla, no el resultado de
+un conteo recién cerrado — encadenar los dos es deuda técnica. Los pasos
+10–14 (picking, packing, transporte, recepción, devoluciones) siguen sin
+implementarse: el ciclo de aprobación → despacho → recepción ya existía
+desde ADR-020, y es lo que cubren `GET /inventory/transferencias` y las
+pantallas de `/inventario/lotes` para lo recibido.
 >
 > 1. El conteo de fin de jornada lo hacen Personal de cocina y Personal de
 >    atención al cliente, usando balanza, lector QR (si aplica) y el ERP.
@@ -292,7 +308,7 @@ cuando la Orden de Pedido confirmada llega al KDS de la sucursal
 (`sales.venta_confirmada`) y termina cuando el pedido está en manos del
 cliente (`sales.venta_entregada`). Área dueña: Operaciones — cruza cocina
 de sucursal, atención al cliente y reparto, sin pertenecer a una sola.
-Reglas: RN-CUP-001 a RN-CUP-012. Casos de uso por modalidad:
+Reglas: RN-CUP-001 a RN-CUP-013. Casos de uso por modalidad:
 [use-cases.md](use-cases.md) CU-OPE-001/002/003.
 
 **Es UN proceso con dos etapas, no dos procesos** (decisión 2026-07-27):
@@ -302,6 +318,15 @@ traspaso entre cocina y despacho. Las pantallas KDS de tipo `preparacion`
 y `despacho` son vistas distintas del mismo avance, no procesos distintos.
 Si el reparto a domicilio llega a tener ruteo, flota propia y liquidación
 de repartidores, se separa entonces como versión MAYOR.
+
+**La preparación es una cadena de estaciones** (2026-08-13, RN-CUP-013,
+ADR-044): armado → horno → … según cómo la sucursal configure el paso de
+cada pantalla. Cada línea del pedido recorre solo las estaciones que
+atienden su categoría, así que una bebida se salta el horno sin que nadie
+lo configure. Esto **no** agrega etapas al proceso: el recorrido vive en
+`venta_item.etapa_kds` y `estado_preparacion` sigue teniendo los mismos
+cuatro estados — la línea está `en_preparacion` mientras recorre y `listo`
+cuando ya no le queda estación por delante.
 
 > **No confundir con `PROC-PRD-001` (Producción)**: ese es la cocina de
 > producción central (subrecetas y lotes, 2027). Acá se prepara el pedido
@@ -423,8 +448,18 @@ cajero, con autenticación (usuario + PIN) y confirmación de valores en el
 relevo. Durante el conteo y la apertura, el encargado de tienda/supervisor
 no atiende otro proceso (RN-POS-013). Ni el faltante de efectivo, la
 escasez de sencillo, ni un POS averiado bloquean la apertura: se abre en
-el horario normal dejando constancia del problema (RN-POS-011). Diagrama
-BPMN completo:
+el horario normal dejando constancia del problema (RN-POS-011).
+
+**Qué registra el ERP de todo esto** (RN-MDP-008, ADR-049, 2026-08-15): el
+paso `c5` del cajero, y nada más. La entrega del fondo (`b8`) es un acto
+físico que puede haber ocurrido horas antes —el sobre esperando en la caja
+fuerte del local, RN-MDP-006— y **el ERP ya no le pide el PIN al encargado
+para que el cajero pueda abrir**. Exigirlo obligaba a que las dos cosas
+pasaran en el mismo minuto, y en el local eso se terminaba resolviendo
+dejando la sesión del encargado abierta en la caja todo el turno. Lo que
+prueba cuánto había en el cajón es el conteo por denominación de `c5`.
+
+Diagrama BPMN completo:
 [PROC-CTB-002-v1.0.bpmn](../diagrams/Procesos/Contabilidad/PROC-CTB-002-v1.0.bpmn).
 
 ```mermaid
@@ -468,7 +503,18 @@ local en la sucursal o a disposición de la empresa en contabilidad, según
 RN-MDP-006. Sigue la cadena de custodia obligatoria del efectivo
 (RN-MDP-002): cajero → encargado de tienda/supervisor → (área contable, si
 corresponde traslado), con autenticación (usuario + PIN) y confirmación de
-valores en cada relevo. Diagrama BPMN completo:
+valores en cada relevo.
+
+**El ERP recién alineó su modelo con este diagrama** (RN-MDP-008, ADR-049,
+2026-08-15): el cierre del cajero (`a8`–`a13`) y la recepción del encargado
+(`b1`) son dos actos separados acá desde siempre, y hasta ahora el software
+los aplanaba en uno — pedía el PIN del encargado dentro del cierre y daba el
+sobre por recibido en el mismo instante. Ahora el cierre lo hace el cajero
+solo, el efectivo queda `en_caja` a su nombre, y `b1` es una firma aparte
+sobre la cadena de custodia (`en_caja → en_supervisor`), que es donde puede
+pasar una hora o doce.
+
+Diagrama BPMN completo:
 [PROC-CTB-001-v1.1.bpmn](../diagrams/Procesos/Contabilidad/PROC-CTB-001-v1.1.bpmn).
 
 ```mermaid

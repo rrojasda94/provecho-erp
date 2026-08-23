@@ -4,7 +4,7 @@ import { obtenerSesion } from "@/lib/sesion";
 import { UsuariosCliente, type Rol, type Usuario } from "./usuarios-cliente";
 
 export default async function UsuariosPage() {
-  const { token } = await obtenerSesion();
+  const { token, usuario } = await obtenerSesion();
 
   try {
     const [usuarios, roles] = await Promise.all([
@@ -28,6 +28,7 @@ export default async function UsuariosPage() {
         usuarios={usuarios.items}
         roles={roles}
         rolesPorUsuario={rolesPorUsuario}
+        permisos={usuario.permisos}
       />
     );
   } catch (e) {

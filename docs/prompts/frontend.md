@@ -22,31 +22,114 @@ Leer antes: `/CLAUDE.md`, [product/ui-ux.md](../product/ui-ux.md) y
   `GET /users/me`) cubre su prefijo — el filtro del grid es UX, el guard real
   vive en el `layout.tsx` de cada módulo (server-side, deny por defecto,
   igual que el backend).
-- **Color con moderación** (2026-07-27): superficies neutras por defecto
-  (blanco/gris/crema) — el color de marca (`--color-primary`/`--color-accent`)
-  se reserva para acción primaria, estado activo/seleccionado y alertas, no
-  para pintar cada tarjeta/módulo de un color distinto. Moderno y funcional
-  antes que colorido; la identidad de marca vive en tipografía + un acento
-  consistente, no en un arcoíris de superficies.
-- Anton Italic para titulares (h1–h4 ya lo heredan), Inter para texto.
+- **Color con moderación** (2026-07-27, revisado 2026-08-07): superficies
+  neutras por defecto — acero `--color-steel` en el back office, blanco en las
+  tarjetas, crema **solo** en PDV/KDS/login. El color de marca
+  (`--color-primary`) se reserva para acción primaria y alertas. Nada de un
+  color por tarjeta o por módulo.
+- **Un acento, no una paleta por área** (revisado 2026-08-12, ADR-037): `--hue`
+  aparece en reposo solo donde marca **estado** — el ítem activo del sidebar y
+  el filo del rótulo de área. Todo lo demás arranca neutro y se enciende al
+  apuntarlo. Se probó un color por área de negocio y se descartó: es el mismo
+  arcoíris que ADR-013 §8 rechazó, con menos pasos.
+- **Un estado nunca se comunica solo por color**: usar `Insignia` de
+  `components/estado/insignia.tsx`, que ata el ícono al tono. Los colores
+  salen de `--status-success/danger/warning/info`, nunca de `bg-accent/30` a
+  mano — esos no tienen variante de alto contraste ni de modo oscuro.
+- **Modo oscuro y accesibilidad**: los tokens ya están; una pantalla nueva no
+  hace nada especial mientras use roles (`bg-card`, `text-muted-foreground`) y
+  no colores de marca directos. No usar `next-themes` ni `localStorage` para
+  preferencias: viven en el perfil y las escribe el layout raíz.
+- **Tipografía**: Archivo para títulos y texto (los `h1`–`h4` ya heredan ancho
+  92% y peso 600 — no agregar `italic` ni `uppercase`), `.cifra` (IBM Plex
+  Mono) para importes, cantidades, códigos e IDs, `.logotipo` (Anton) solo
+  para el wordmark.
+- **Movimiento**: una sola curva, `var(--transicion)`. Entrada de pantalla,
+  escalonado de grilla (`.revelar-lista`), filo del acento y estados. Nada que
+  retrase una acción; `prefers-reduced-motion` ya está resuelto globalmente en
+  `globals.css`, no reimplementarlo por componente. Sin librería de animación:
+  si algo no sale con keyframes CSS o con los `data-starting-style` /
+  `data-ending-style` de Base UI, discutirlo antes de instalar nada.
+- **Moldes antes que pantallas**: una lista va con `TablaDatos` (28 pantallas
+  la usan) y un alta o edición con `DialogoFormulario` (17). Marcar
+  `meta.numero` en toda columna de importes o cantidades. Una pantalla nueva
+  con su propia tabla o su propio `<dialog>` es deuda desde el primer día.
+- **Registrar la pantalla en `lib/navegacion.ts`**, no en su `layout.tsx`: de
+  ahí salen el sidebar y la paleta de comandos. Una pantalla sin registrar
+  existe pero no se puede buscar.
+- **Un `loading.tsx` por módulo**. Sin él el clic en el sidebar no acusa
+  recibo hasta que el servidor termina, y se lee como que la aplicación se
+  colgó.
+- **Íconos**: `lucide-react`, tamaño 15–18 y `strokeWidth` 1.75, siempre
+  `aria-hidden` con una etiqueta de texto al lado. Sin emoji en la UI: cada
+  sistema los dibuja distinto.
 - Responsive siempre (webapp + Android táctil vía PWA, no app nativa —
   ADR-013); táctil obligatorio en PDV/Kiosk/KDS/Inventario, el resto de
-  módulos es PC-first pero igual responsive.
+  módulos es PC-first pero igual responsive. **Nunca `display: none` por
+  ancho sobre un control**: esconder es quitarle la opción a quien opera
+  desde una tablet en vertical. Si dos paneles no entran juntos, se alternan
+  con un botón que exista solo en ese ancho — es lo que hace el PDV con la
+  carta y el ticket. Ver `docs/product/ui-ux.md` → «Qué significa "no
+  romperse en pantallas chicas"».
 - Accesibilidad: paleta alternativa (daltonismo) y tamaño de fuente
   ajustable, ambos como preferencia del perfil del usuario, combinables
   con el tema de marca activo.
+- **Un PIN se pide con `Pinpad` (`components/pinpad/`), nunca con un
+  `<input>`** — en el PDV y fuera de él, login incluido (ADR-045, ADR-050).
+  Si el navegador puede ofrecer guardarlo, alguien lo guarda, y el turno
+  siguiente opera con la cuenta del anterior. Los cuatro sitios del PDV usan
+  `FirmaConPin` (usuario + pinpad); uno nuevo también. Ni siquiera un
+  `<input type="hidden">`: el valor viaja desde el estado de React en el
+  `FormData` que arma el envío, y así "no hay campo" se verifica mirando el
+  DOM — que es lo que hace sostenible la regla.
+- **Una acción que puede fallar se despacha a mano, no por
+  `<form action={...}>`**, y lo que haya que conservar va en campo
+  controlado. React 19 resetea los campos no controlados de un formulario
+  cuando su acción termina, **también cuando devolvió error**: el usuario
+  tecleado se borraba junto con el PIN equivocado.
+- **Un overlay que deba tapar un diálogo abierto tiene que ser otro
+  `<dialog>` con `showModal()`**, no un `div` con `z-index`. Los diálogos
+  nativos viven en el *top layer* del navegador y ningún `z-index` los
+  alcanza — se descubre tarde y en producción. Y al estilarlo, el `display`
+  va en `[open]`: declararlo en el selector base pisa el `display: none` con
+  que el navegador oculta un `<dialog>` cerrado, y queda un panel invisible
+  tapando la pantalla y comiéndose los clicks.
 - Server Components por defecto; Client Component (`"use client"`) solo
   donde hay estado real (dialogs, carrito, buscador). Sin librería de
   estado global mientras `useState`/`useReducer` alcance.
 - TypeScript estricto; componentes en PascalCase; App Router de Next.js.
-- Datos solo de la API REST (`NEXT_PUBLIC_API_URL`) — sin lógica de negocio en el front.
+- Datos solo de la API REST — sin lógica de negocio en el front. El navegador
+  **nunca** llama a la API del ERP directo: sale por `app/api/proxy`, y el
+  proceso de Next usa `API_INTERNAL_URL`. No existe `NEXT_PUBLIC_API_URL`.
+- **La CSP tiene una sola excepción, y es Google Maps** (ADR-053). Desde
+  2026-08-22 `connect-src` no es `'self'` puro: el campo de dirección
+  autocompleta y geocodifica contra Google desde el navegador. Lo que **no**
+  sale del navegador es la distancia de reparto —esa la mide la API con su
+  propia clave (ADR-054)—, así que una llamada a `routes.googleapis.com` en la
+  pestaña de red es señal de que algo se implementó mal. Agregar otro host a
+  la CSP es una decisión de ADR, no un ajuste.
+- Una clave que el navegador necesita se lee server-side y baja **como prop o
+  por contexto** (`components/direccion/config-mapas`), nunca como
+  `NEXT_PUBLIC_*`: esa familia se hornea en el build.
+- **El proxy es transparente** (ADR-048): pasa el cuerpo en bytes y conserva
+  el `Content-Type` y el `Content-Disposition` de los dos lados. Una descarga
+  se hace con un `<a href="/api/proxy/…" download>` sin valor —el nombre lo
+  pone el `Content-Disposition` de la API— y una subida con `subir()` de
+  `lib/cliente-api.ts`, que deja que el navegador escriba el header del
+  `multipart` con su `boundary`. **No se escriben rutas dedicadas por
+  descarga**: es la alternativa descartada, y su costo es una copia del
+  rescate del token por cada endpoint binario.
 
 ## Checklist
 
-- [ ] `npm run lint`, `npm run typecheck` y `npm run build` limpios.
-- [ ] Probado en viewport móvil y desktop.
-- [ ] Sin colores/tamaños mágicos fuera de tokens/`tailwind.config.ts`.
-- [ ] Si el módulo es nuevo: agregado a `apps.config.ts` con su prefijo de
-      permiso, y `layout.tsx` propio con guard server-side.
+- [ ] `npm run lint`, `npm run typecheck`, `npm test` y `npm run build` limpios.
+- [ ] Probado en viewport móvil y desktop. Si la pantalla es nueva, agregada
+      a `frontend/uso/responsive.spec.ts`, que la recorre en 390×844,
+      820×1180 y 1440×900 afirmando que ningún control quede fuera de un
+      contenedor que lo recorta y que todo modal quede centrado.
+- [ ] Sin colores/tamaños mágicos fuera de los tokens de `globals.css`.
+- [ ] Si el módulo es nuevo: agregado a `frontend/lib/modulos.ts` con su
+      prefijo de permiso **y su área**, y `layout.tsx` propio con guard
+      server-side.
 - [ ] Flujo crítico nuevo (venta, cobro, login) cubierto con un test de
       Playwright.

@@ -1,8 +1,9 @@
 """DTOs (pydantic) del módulo inventory."""
 
 import uuid
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -94,9 +95,19 @@ class ArticuloCreate(BaseModel):
 
 
 class ArticuloUpdate(BaseModel):
-    nombre: str | None = None
+    """Campo ausente o `null` = no tocar.
+
+    `unidad_medida_id` no está y no va a estar: el stock y las recetas ya
+    cargadas están expresados en la unidad actual (ver `editar_articulo`).
+    """
+
+    # Un código de 4 caracteres mal tecleado se arrastra por toda la
+    # operación —es lo que el almacenero lee en el estante— y hasta ahora
+    # era inmutable.
+    id_interno: str | None = Field(default=None, min_length=1, max_length=4)
+    nombre: str | None = Field(default=None, min_length=1, max_length=150)
     categoria_id: uuid.UUID | None = None
-    tipo: str | None = None
+    tipo: str | None = Field(default=None, max_length=30)
     costo_promedio: Decimal | None = None
     archivado: bool | None = None
     controla_lote: bool | None = None
@@ -132,6 +143,34 @@ class SkuOut(BaseModel):
     codigo: str
     codigo_barras: str | None
     activo: bool
+
+
+class SkuListadoOut(SkuOut):
+    """El SKU con el nombre de su artículo: un selector que muestre solo el
+    código obliga a adivinar qué es cada cosa."""
+
+    articulo_nombre: str
+
+
+class SkuDetalleOut(SkuOut):
+    """El SKU con su artículo y su saldo por almacén.
+
+    Es el destino de `inventory.stock_bajo_minimo`: quien abre el reporte
+    quiere saber qué es, cuánto queda y dónde, sin encadenar tres pantallas.
+    """
+
+    articulo: ArticuloOut
+    stock: list["StockDeSkuOut"] = Field(default_factory=list)
+
+
+class StockDeSkuOut(BaseModel):
+    almacen_id: uuid.UUID
+    almacen: str
+    cantidad: Decimal
+    reservado: Decimal
+    disponible: Decimal
+    stock_minimo: Decimal | None
+    bajo_minimo: bool
 
 
 # --- Stock / movimientos ---
@@ -210,12 +249,24 @@ class SolicitudAprobar(BaseModel):
     aprobadas: list[SolicitudItemCantidad] = []
 
 
+class SolicitudItemCantidadIn(BaseModel):
+    """Cantidad de un ítem del borrador. Solo el `sku_id` viaja en la ruta."""
+    cantidad: Decimal = Field(gt=0)
+
+
+class SolicitudItemAgregarIn(SolicitudItemCantidadIn):
+    sku_id: uuid.UUID
+
+
 class SolicitudItemOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     sku_id: uuid.UUID
     cantidad_solicitada: Decimal
     cantidad_aprobada: Decimal | None
     cantidad_despachada: Decimal | None
+    # Qué es urgencia y qué es decisión del local (RN-INV-024): en falso, el
+    # almacenero sabe que ese ítem no está por faltar.
+    bajo_minimo_al_pedir: bool = False
 
 
 class SolicitudOut(BaseModel):
@@ -312,6 +363,14 @@ class LoteOut(BaseModel):
     condicion_almacenamiento: str | None
 
 
+class LoteDetalleOut(LoteOut):
+    """El lote con sus saldos. Destino de `inventory.lote_vencido_detectado`:
+    el reporte dice que se bloqueó, esto dice cuánto quedó y en qué almacén."""
+
+    articulo: str
+    saldos: list["StockLoteOut"] = Field(default_factory=list)
+
+
 class StockLoteOut(BaseModel):
     """Saldo por lote — el listado que el picking lee en orden FEFO."""
     lote_id: uuid.UUID
@@ -351,6 +410,18 @@ class AjusteOut(BaseModel):
     solicitado_por: uuid.UUID
     aprobado_por: uuid.UUID | None
     dentro_margen: bool
+
+
+class AjusteDetalleOut(AjusteOut):
+    """Destino de `inventory.ajuste_fuera_margen`. Los nombres van resueltos:
+    la pantalla que aprueba o rechaza no puede pedir cuatro endpoints más
+    para saber qué artículo es y quién lo pidió."""
+
+    articulo: str
+    sku_codigo: str
+    almacen: str
+    solicitante: str
+    aprobador: str | None
 
 
 # --- Conteo cíclico ---
@@ -419,6 +490,171 @@ class ProgramaConteoOut(BaseModel):
     proxima_fecha: date
     estado: str  # al_dia | vence_hoy | vencido
     dias_atraso: int
+
+
+# --- Carga masiva de recetas (RN-COM-031) ---
+class IngredienteImportadoIn(BaseModel):
+    """Una línea de la hoja «Ingredientes», ya resuelta por la pantalla.
+
+    `articulo_id` en `None` significa **omitir esta línea**: es lo que
+    devuelve la pantalla cuando el usuario decidió no resolver ese insumo.
+    """
+
+    insumo: str = ""
+    articulo_id: uuid.UUID | None = None
+    # Texto y no Decimal: acepta aritmética tecleada ("450/3"), que evalúa
+    # el servidor con los decimales de la unidad del insumo (RN-COM-024).
+    cantidad: str
+    merma_pct: Decimal = Decimal(0)
+
+
+class RecetaImportadaIn(BaseModel):
+    """Una fila de la hoja «Recetas», ya revisada por la pantalla.
+
+    `id` y `accion` no son hechos: son **el permiso que una persona dio**. El
+    servidor los vuelve a derivar contra la base antes de escribir (ADR-052).
+    """
+
+    id: uuid.UUID | None = None
+    accion: Literal["crear", "actualizar", "omitir"] = "crear"
+    # Qué hacer con los ingredientes que el archivo no menciona. Por defecto
+    # se conservan: subir una hoja parcial por error no puede vaciar una
+    # receta sin que alguien vea cuántas líneas pierde (ADR-052).
+    ingredientes_ausentes: Literal["conservar", "quitar"] = "conservar"
+    nombre: str = Field(min_length=1, max_length=150)
+    rendimiento: Decimal = Field(gt=0)
+    unidad_medida_id: uuid.UUID
+    articulo_producido_id: uuid.UUID | None = None
+    ingredientes: list[IngredienteImportadoIn] = []
+
+
+class ImportarRecetasIn(BaseModel):
+    recetas: list[RecetaImportadaIn]
+
+
+class IngredienteRevisadoOut(BaseModel):
+    fila: int
+    insumo: str
+    articulo_id: uuid.UUID | None
+    cantidad: str
+    merma_pct: str
+    problemas: list[str]
+
+
+class RecetaRevisadaOut(BaseModel):
+    fila: int
+    id: uuid.UUID | None
+    accion: str
+    ingredientes_ausentes: str
+    nombre: str
+    rendimiento: str
+    unidad: str
+    unidad_medida_id: uuid.UUID | None
+    produce: str | None
+    articulo_producido_id: uuid.UUID | None
+    ingredientes: list[IngredienteRevisadoOut]
+    cambios: list[str]
+    se_quitarian: list[str]
+    problemas: list[str]
+
+
+class RevisionRecetasOut(BaseModel):
+    """Lo que devuelve la fase 1. Declarado para que `openapi.json` lo
+    documente: sin `response_model` salía como `{}` y los tipos del frontend
+    no los verificaba nadie."""
+
+    recetas: list[RecetaRevisadaOut]
+    insumos_desconocidos: list[str]
+    ingredientes_sin_receta: list[str]
+    listas: int
+    a_actualizar: int
+    con_problema: int
+
+
+class ImportadaOut(BaseModel):
+    id: uuid.UUID
+    nombre: str
+
+
+class OmitidaOut(BaseModel):
+    nombre: str
+    motivo: str
+
+
+class ResultadoImportacionOut(BaseModel):
+    """El mismo sobre para las tres entidades: crear, actualizar, omitir."""
+
+    creadas: list[ImportadaOut]
+    actualizadas: list[ImportadaOut]
+    omitidas: list[OmitidaOut]
+
+
+# --- Carga masiva de artículos (RN-INV-023) ---
+class SkuImportadoIn(BaseModel):
+    codigo: str = Field(min_length=1, max_length=50)
+    codigo_barras: str | None = None
+
+
+class ArticuloImportadoIn(BaseModel):
+    """Una fila de la hoja «Artículos», ya revisada por la pantalla.
+
+    `unidad_medida_id` puede venir en `None` al actualizar: la unidad de un
+    artículo que ya existe no se cambia por planilla (ADR-052).
+    """
+
+    id: uuid.UUID | None = None
+    accion: Literal["crear", "actualizar", "omitir"] = "crear"
+    codigo: str = Field(min_length=1, max_length=4)
+    nombre: str = Field(min_length=1, max_length=150)
+    tipo: str = Field(default="insumo", max_length=30)
+    unidad_medida_id: uuid.UUID | None = None
+    categoria_id: uuid.UUID | None = None
+    costo_promedio: Decimal = Decimal(0)
+    controla_lote: bool = False
+    dias_alerta_vencimiento: int | None = None
+    archivado: bool = False
+    skus: list[SkuImportadoIn] = []
+
+
+class ImportarArticulosIn(BaseModel):
+    articulos: list[ArticuloImportadoIn]
+
+
+class SkuRevisadoOut(BaseModel):
+    fila: int
+    codigo: str
+    codigo_barras: str | None
+    problemas: list[str]
+
+
+class ArticuloRevisadoOut(BaseModel):
+    fila: int
+    id: uuid.UUID | None
+    accion: str
+    codigo: str
+    nombre: str
+    tipo: str
+    unidad: str
+    unidad_medida_id: uuid.UUID | None
+    categoria: str
+    categoria_id: uuid.UUID | None
+    costo_promedio: str
+    controla_lote: bool
+    dias_alerta_vencimiento: int | None
+    archivado: bool
+    skus: list[SkuRevisadoOut]
+    cambios: list[str]
+    problemas: list[str]
+
+
+class RevisionArticulosOut(BaseModel):
+    articulos: list[ArticuloRevisadoOut]
+    unidades_desconocidas: list[str]
+    categorias_desconocidas: list[str]
+    skus_sin_articulo: list[str]
+    listas: int
+    a_actualizar: int
+    con_problema: int
 
 
 # --- Recetas ---
@@ -597,6 +833,11 @@ class DevolucionOut(BaseModel):
     estado: str
     reporte_dirigido_a: str
     observacion: str | None
+    # Quién movió el stock y quién lo revirtió. Sin esto la ficha decía qué
+    # pasó pero no a quién preguntarle, que es la mitad de auditar.
+    registrado_por: uuid.UUID | None
+    anulado_por: uuid.UUID | None
+    anulada_at: datetime | None
 
 
 class DevolucionDetalleOut(DevolucionOut):
@@ -664,6 +905,19 @@ class GuiaRemisionDetalleOut(GuiaRemisionOut):
 
 
 # --- Lote ascendente del hub (ADR-009) ---------------------------------------
+class SolicitudSyncItemIn(SolicitudItemIn):
+    """Ítem de una solicitud que se reproduce desde el hub.
+
+    Trae la marca de urgencia porque la puso el local contra su propio stock
+    (RN-INV-024) y recalcularla en la nube al reproducir el lote contaría
+    otra cosa. No está en `SolicitudItemIn` a propósito: en el alta normal
+    la calcula el servidor, y dejarla entrar por el cuerpo permitiría
+    declararse urgente a uno mismo.
+    """
+
+    bajo_minimo_al_pedir: bool = False
+
+
 class SolicitudSyncIn(BaseModel):
     """Solicitud creada en el local durante un corte. Viaja con su `id`
     client-generado: reproducirla dos veces no la duplica."""
@@ -673,7 +927,7 @@ class SolicitudSyncIn(BaseModel):
     almacen_abastecedor_id: uuid.UUID
     solicitado_por: uuid.UUID
     observacion: str | None = None
-    items: list[SolicitudItemIn] = Field(min_length=1)
+    items: list[SolicitudSyncItemIn] = Field(min_length=1)
 
 
 class RecepcionSyncItemIn(BaseModel):
@@ -715,3 +969,77 @@ class LoteInventorySyncIn(BaseModel):
     solicitudes: list[SolicitudSyncIn] = []
     recepciones: list[RecepcionSyncIn] = []
     conteos: list[ConteoSyncIn] = []
+
+
+# --- Matriz de recetas (ADR-057) ---------------------------------------------
+class MatrizRecetaOut(BaseModel):
+    id: uuid.UUID
+    nombre: str
+    rendimiento_cantidad: Decimal
+    rendimiento_unidad_medida_id: uuid.UUID
+    es_kit: bool
+
+
+class MatrizInsumoOut(BaseModel):
+    articulo_id: uuid.UUID
+    nombre: str
+    unidad_medida_id: uuid.UUID
+    unidad: str
+    decimales: int
+    costo_promedio: Decimal
+
+
+class MatrizCeldaOut(BaseModel):
+    item_id: uuid.UUID
+    receta_id: uuid.UUID
+    articulo_id: uuid.UUID
+    cantidad: Decimal
+    expresion: str | None
+    merma_pct: Decimal
+    unidad_medida_id: uuid.UUID | None
+    unidad: str
+    decimales: int
+    aplica_valores: list[str]
+    orden: int
+
+
+class MatrizOut(BaseModel):
+    recetas: list[MatrizRecetaOut]
+    insumos: list[MatrizInsumoOut]
+    celdas: list[MatrizCeldaOut]
+
+
+class CeldaIn(BaseModel):
+    """Una celda de la grilla. La identidad es `(receta, insumo, condición)`,
+    no un id de línea: es lo que permite pegar un rectángulo desde Excel, que
+    no trae ids."""
+
+    receta_id: uuid.UUID
+    articulo_id: uuid.UUID
+    # Vacío borra la línea: en una grilla, vaciar la celda es cómo se dice
+    # "este insumo no va en esta receta".
+    expresion: str | None = None
+    merma_pct: Decimal = Decimal(0)
+    unidad_medida_id: uuid.UUID | None = None
+    aplica_valores: list[uuid.UUID] = []
+    orden: int = 0
+
+
+class GuardarMatrizIn(BaseModel):
+    celdas: list[CeldaIn] = Field(min_length=1)
+
+
+class ResultadoCeldaOut(BaseModel):
+    receta_id: uuid.UUID | None = None
+    articulo_id: uuid.UUID | None = None
+    accion: str
+    item_id: uuid.UUID | None = None
+    cantidad: Decimal | None = None
+    detalle: str | None = None
+
+
+class GuardarMatrizOut(BaseModel):
+    resultados: list[ResultadoCeldaOut]
+    aplicadas: int
+    con_problema: int
+

@@ -40,6 +40,10 @@ from src.shared.paginacion import Pagina, Paginacion, paginacion, paginar
 router = APIRouter()
 
 GESTIONAR = "users.gestionar"  # permiso para el CRUD administrativo
+# Aparte de `users.gestionar` en los dos sentidos: RRHH atiende el "me olvidé
+# el PIN" sin tener que poder crear cuentas ni repartir roles, y administrar
+# usuarios no trae de arrastre la facultad de entrar como cualquiera de ellos.
+RESETEAR_PIN = "users.resetear_pin"
 # Separado de `users.gestionar` a propósito: dar de alta un local o cambiar
 # el RUC de la empresa no es administrar usuarios. Quien crea cajeros no
 # tiene por qué poder fundar sucursales.
@@ -122,6 +126,34 @@ def refresh(body: schemas.RefreshIn, session: Session = Depends(get_db)):
     return tokens
 
 
+@router.post(
+    "/auth/verificar-pin",
+    status_code=status.HTTP_204_NO_CONTENT,
+    tags=["auth"],
+    dependencies=[Depends(rate_limit_login)],
+)
+def verificar_pin(
+    body: schemas.VerificarPinIn,
+    request: Request,
+    actor: Usuario = Depends(get_current_user),
+    session: Session = Depends(get_db),
+):
+    """Confirma que quien está frente al terminal sigue siendo el dueño de
+    la sesión — desbloqueo de la pantalla del PDV (RN-POS-014).
+
+    Detrás del mismo rate limit que el login y contra el mismo lockout: es
+    otro endpoint que recibe PINes, y sin freno sería el camino cómodo
+    para probarlos.
+    """
+    try:
+        auth.verificar_pin(session, actor, body.pin, client_ip(request))
+    except (CredencialesInvalidas, UsuarioBloqueado) as e:
+        session.commit()  # persistir intento fallido / lockout
+        raise http_exception(e) from e
+    session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.post("/auth/logout", status_code=status.HTTP_204_NO_CONTENT, tags=["auth"])
 def logout(body: schemas.RefreshIn, session: Session = Depends(get_db)):
     auth.logout(session, body.refresh_token)
@@ -143,6 +175,73 @@ def me(
         sucursales=claims["sucursales"],
         empresa_id=claims["empresa_id"],
         permisos=sorted(UsuarioRepo(session).permiso_codigos(usuario.id)),
+        debe_cambiar_pin=usuario.debe_cambiar_pin,
+        preferencia_paleta=usuario.preferencia_paleta,
+        preferencia_tamano_fuente=usuario.preferencia_tamano_fuente,
+        preferencia_tema=usuario.preferencia_tema,
+    )
+
+
+@router.post(
+    "/users/me/pin", status_code=status.HTTP_204_NO_CONTENT, tags=["users"]
+)
+def cambiar_pin_propio(
+    body: schemas.PinPropioChange,
+    usuario: Usuario = Depends(get_current_user),
+    session: Session = Depends(get_db),
+):
+    """El dueño de la cuenta cambia su PIN.
+
+    Sin permiso: elegir la propia clave no es un privilegio que alguien tenga
+    que otorgar, y es la única salida de un PIN reseteado.
+
+    Declarada **antes** que `/users/{usuario_id}/pin`: FastAPI resuelve por
+    orden de declaración, y la ruta con parámetro capturaba "me" como si fuera
+    un id — con lo que cambiar el PIN propio terminaba exigiendo
+    `users.gestionar`.
+    """
+    admin.cambiar_pin_propio(
+        session, usuario.id, pin_actual=body.pin_actual, nuevo_pin=body.pin_nuevo
+    )
+    session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.patch("/users/me/preferencias", response_model=schemas.MeOut, tags=["users"])
+def actualizar_preferencias(
+    datos: schemas.PreferenciasIn,
+    usuario: Usuario = Depends(get_current_user),
+    session: Session = Depends(get_db),
+):
+    """Cambia cómo se le presenta el ERP a quien está autenticado.
+
+    Sin permiso: no hay privilegio que otorgar en elegir el tamaño de la
+    propia letra, y exigir uno dejaría la accesibilidad fuera del alcance de
+    justamente quien más la necesita. Solo puede tocar su propio perfil —el
+    usuario sale del token, no del cuerpo.
+    """
+    if datos.paleta is not None:
+        usuario.preferencia_paleta = datos.paleta
+    if datos.tamano_fuente is not None:
+        usuario.preferencia_tamano_fuente = datos.tamano_fuente
+    if datos.tema is not None:
+        usuario.preferencia_tema = datos.tema
+    session.commit()
+    session.refresh(usuario)
+
+    claims = auth.build_claims(session, usuario)
+    return schemas.MeOut(
+        id=usuario.id,
+        username=usuario.username,
+        tipo=usuario.tipo,
+        roles=claims["roles"],
+        sucursales=claims["sucursales"],
+        empresa_id=claims["empresa_id"],
+        permisos=sorted(UsuarioRepo(session).permiso_codigos(usuario.id)),
+        debe_cambiar_pin=usuario.debe_cambiar_pin,
+        preferencia_paleta=usuario.preferencia_paleta,
+        preferencia_tamano_fuente=usuario.preferencia_tamano_fuente,
+        preferencia_tema=usuario.preferencia_tema,
     )
 
 
@@ -417,6 +516,28 @@ def cambiar_pin(
     session: Session = Depends(get_db),
 ):
     admin.cambiar_pin(session, usuario_id, body.pin)
+    session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/users/{usuario_id}/pin/reset",
+    status_code=status.HTTP_204_NO_CONTENT,
+    tags=["users-admin"],
+)
+def resetear_pin(
+    usuario_id: uuid.UUID,
+    actor: Usuario = Depends(require_permission(RESETEAR_PIN)),
+    session: Session = Depends(get_db),
+):
+    """Devuelve la cuenta al PIN por defecto y obliga a cambiarlo al entrar.
+
+    Permiso propio y no `users.gestionar`: RRHH atiende el "me olvidé el PIN"
+    todos los lunes y no tiene por qué poder crear cuentas ni repartir roles
+    para eso. En el otro sentido, resetear el PIN de alguien es poder entrar
+    como esa persona, así que tampoco viene gratis con administrar usuarios.
+    """
+    admin.resetear_pin(session, usuario_id, actor_id=actor.id)
     session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 

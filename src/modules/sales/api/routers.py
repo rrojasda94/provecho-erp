@@ -4,25 +4,38 @@ import uuid
 from datetime import date
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Request,
+    Response,
+    UploadFile,
+    status,
+)
 from sqlalchemy.orm import Session
 
+from src.config.settings import settings
+from src.core.rate_limit import consumir, ip_de
 from src.core.tenant import Tenant
 from src.modules.sales.api import schemas
+from src.modules.sales.application import atributos as atributos_uc
 from src.modules.sales.application import (
     catalogo,
     clientes,
     comprobantes,
     cumplimiento,
+    importacion_clientes,
     mesas,
     notas_credito,
     precios,
     precuenta,
     queries_publicas,
+    tarifa_delivery,
     tasks,
     ventas,
 )
-from src.modules.sales.application.scope import exigir_venta
+from src.modules.sales.application.scope import exigir_cliente, exigir_venta
 from src.modules.sales.domain import rules
 from src.modules.sales.infrastructure.repositories import (
     ComprobanteRepo,
@@ -32,6 +45,7 @@ from src.modules.sales.infrastructure.repositories import (
 from src.modules.users.api.deps import (
     ContextoPermiso,
     check_permission,
+    get_current_user,
     get_db,
     get_tenant,
     require_permission,
@@ -40,7 +54,7 @@ from src.modules.users.application import autorizacion
 from src.modules.users.application import queries_publicas as usuarios_queries
 from src.modules.users.application.errors import TokenInvalido
 from src.modules.users.infrastructure.models import Usuario
-from src.shared import fechas
+from src.shared import fechas, planilla
 from src.shared.integrations.factiliza import FactilizaError
 from src.shared.paginacion import Pagina, Paginacion, paginacion, paginar
 
@@ -59,11 +73,25 @@ DESCONTAR = "sales.aplicar_descuento"
 CONSUMO_PERSONAL = "sales.registrar_consumo_personal"
 GESTIONAR_MESAS = "sales.gestionar_mesas"
 LEER_CLIENTES_EXTERNOS = "sales.leer_clientes_externos"
+# Administrar el padron del grupo no es el mismo acto que registrar a
+# alguien en el mostrador, que es lo que hace el cajero con `sales.crear`.
+GESTIONAR_CLIENTES = "sales.gestionar_clientes"
 EMITIR = "sales.emitir_comprobante"
 # Acreditar una venta cobrada devuelve plata: permiso propio, no el del
 # cajero que emitió (RN-CPP-009).
 NOTA_CREDITO = "sales.emitir_nota_credito"
 ENTREGAR = "sales.entregar_pedido"
+
+
+def _xlsx(contenido: bytes, nombre: str) -> Response:
+    """Una planilla como descarga. El `Content-Disposition` es lo que le da
+    nombre al archivo en el navegador."""
+    return Response(
+        content=contenido,
+        media_type=planilla.MIME,
+        headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
+    )
+
 
 
 # --- Venta ------------------------------------------------------------------
@@ -104,6 +132,12 @@ def crear_venta(
         items=[it.model_dump() for it in body.items],
         cliente_id=body.cliente_id,
         referencia_atencion=body.referencia_atencion,
+        direccion_entrega=body.direccion_entrega,
+        ubicacion_place_id=body.ubicacion_place_id,
+        ubicacion_lat=body.ubicacion_lat,
+        ubicacion_lng=body.ubicacion_lng,
+        ubicacion_plus_code=body.ubicacion_plus_code,
+        ubicacion_distrito=body.ubicacion_distrito,
         mesa_id=body.mesa_id,
         comensales=body.comensales,
         id=body.id,
@@ -113,6 +147,52 @@ def crear_venta(
     )
     session.commit()
     return venta
+
+
+@router.post("/ventas/cotizar-delivery", response_model=schemas.CotizacionDeliveryOut)
+def cotizar_delivery(
+    body: schemas.CotizacionDeliveryIn,
+    request: Request,
+    actor: Usuario = Depends(require_permission(CREAR)),
+    session: Session = Depends(get_db),
+):
+    """Cuánto sale llevar este pedido, y si conviene derivarlo (ADR-054).
+
+    **Con cuota, como la consulta de documento**: cada llamada gasta una
+    medición de un proveedor pago, y un bucle mal escrito en el PDV se come
+    el plan del mes. Se cuenta por usuario y por IP por la misma razón que
+    en `core/consulta_router.py` — todas las cajas del local salen por la
+    misma IP, y limitar solo por ahí castiga al equipo por uno solo.
+
+    No decide nada: el precio que se cobra lo vuelve a calcular el servidor
+    al crear la venta, y es el que queda congelado en la fila. Esto es lo que
+    el cajero ve antes de aceptar.
+    """
+    ventana = settings.consulta_documento_ventana_segundos
+    consumir(
+        "cotizar_delivery_usuario",
+        str(actor.id),
+        settings.consulta_documento_intentos_usuario,
+        ventana,
+    )
+    consumir(
+        "cotizar_delivery_ip",
+        ip_de(request),
+        settings.consulta_documento_intentos_ip,
+        ventana,
+    )
+    cotizacion = tarifa_delivery.cotizar(
+        tarifa_delivery.origen_de_sucursal(session, body.sucursal_id),
+        tarifa_delivery.coordenada(body.ubicacion_lat, body.ubicacion_lng),
+        body.ubicacion_distrito,
+    )
+    return schemas.CotizacionDeliveryOut(
+        distancia_km=cotizacion.distancia_km,
+        costo=cotizacion.costo,
+        aproximada=cotizacion.aproximada,
+        derivar_a_externo=cotizacion.derivar_a_externo,
+        motivo=cotizacion.motivo,
+    )
 
 
 @router.get("/ventas", response_model=Pagina[schemas.VentaOut])
@@ -263,25 +343,72 @@ def registrar_pago(
 @router.post("/ventas/{venta_id}/anular-lineas", response_model=schemas.VentaOut)
 def anular_lineas(
     venta_id: uuid.UUID,
-    body: schemas.AnularLineasCreate,
-    _: Usuario = Depends(require_permission(COBRAR)),
+    body: schemas.AnularLineasCreate | None = None,
+    actor: Usuario = Depends(require_permission(COBRAR)),
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
     """Quita líneas de una orden ya enviada a cocina y repone su insumo.
-    Lo pide el cajero, lo autoriza un supervisor con su PIN (RN-COM-020).
-    Antes de enviar, el pedido vive en el PDV y no pasa por acá."""
-    try:
-        autorizado_por = autorizacion.verificar(body.autorizacion, ANULAR)
-    except TokenInvalido as e:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, str(e)) from e
+
+    **Dentro de los 5 minutos** de haberse enviado la línea, la quita el
+    cajero solo: es corregir un tecleo, el plato todavía no se armó
+    (RN-COM-029). Pasada la ventana el insumo ya se usó de verdad y hace
+    falta la firma de un supervisor (RN-COM-020) — la pide el cajero y la da
+    el supervisor con su PIN en el mismo terminal.
+
+    Antes de enviar, el pedido vive en el PDV y no pasa por acá.
+    """
+    if body is None:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, "indica las líneas a anular"
+        )
     exigir_venta(session, venta_id, tenant)
+    autorizado_por = actor.id
+    if not ventas.lineas_en_ventana(session, venta_id, body.venta_item_ids):
+        if not body.autorizacion:
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                "pasaron más de "
+                f"{int(rules.VENTANA_CORRECCION.total_seconds() // 60)} minutos: "
+                "quitar la línea lo autoriza un supervisor con su PIN",
+            )
+        try:
+            autorizado_por = autorizacion.verificar(body.autorizacion, ANULAR)
+        except TokenInvalido as e:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, str(e)) from e
     venta = ventas.anular_lineas(
         session,
         venta_id=venta_id,
         venta_item_ids=body.venta_item_ids,
         autorizado_por=autorizado_por,
         motivo=body.motivo,
+    )
+    session.commit()
+    return venta
+
+
+@router.post("/ventas/{venta_id}/items", response_model=schemas.VentaOut, status_code=201)
+def agregar_lineas(
+    venta_id: uuid.UUID,
+    body: schemas.AgregarLineasCreate,
+    actor: Usuario = Depends(require_permission(CREAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Suma líneas a una orden ya enviada a cocina (RN-COM-029).
+
+    Sin autorización de nadie y con el mismo permiso que crear la orden:
+    agregar es lo que el negocio quiere que pase. Una mesa pide de a poco, y
+    obligar a abrir una orden nueva para la segunda ronda termina en dos
+    cuentas y dos entregas para la misma mesa. Lo que sigue necesitando firma
+    —después de la ventana— es **quitar**, porque repone inventario.
+    """
+    exigir_venta(session, venta_id, tenant)
+    venta = ventas.agregar_lineas(
+        session,
+        venta_id=venta_id,
+        items=[it.model_dump() for it in body.items],
+        usuario_id=actor.id,
     )
     session.commit()
     return venta
@@ -305,12 +432,50 @@ def ver_precuenta(
 @router.post("/ventas/{venta_id}/anular", response_model=schemas.VentaOut)
 def anular_venta(
     venta_id: uuid.UUID,
-    actor: Usuario = Depends(require_permission(ANULAR)),
+    body: schemas.AnularVentaIn | None = None,
+    actor: Usuario = Depends(get_current_user),
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
+    """Anula una orden no pagada. Post-pago es nota de crédito.
+
+    Entra quien opera la caja (`sales.cobrar`) **o** quien puede anular
+    (`sales.anular`) — son dos roles distintos y ninguno es subconjunto del
+    otro: el `cajero` cobra y no anula, el `supervisor` anula y no cobra.
+    Exigir los dos habría dejado afuera a los dos.
+
+    Al que solo cobra le hace falta además la firma de alguien que sí pueda,
+    igual que para quitar una línea ya enviada (RN-COM-020): el cajero pide y
+    el supervisor autoriza con su PIN en el mismo terminal.
+
+    Antes exigía `sales.anular` a secas, que el rol `cajero` no tiene: el
+    botón "Anular pedido" del PDV devolvía 403 sin decir qué hacer, y el
+    pedido quedaba en cocina.
+    """
+    check_permission(session, actor, COBRAR, ANULAR)
     exigir_venta(session, venta_id, tenant)
-    venta = ventas.anular_venta(session, venta_id, actor.id)
+    quien_autoriza = actor.id
+    # Dentro de la ventana de corrección alcanza con quien opera la caja
+    # (RN-COM-029): la comanda acaba de salir y el plato todavía no se armó.
+    puede_solo = usuarios_queries.tiene_permiso(
+        session, actor.id, ANULAR
+    ) or ventas.venta_en_ventana(session, venta_id)
+    if not puede_solo:
+        if body is None or not body.autorizacion:
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                "pasaron más de "
+                f"{int(rules.VENTANA_CORRECCION.total_seconds() // 60)} minutos: "
+                "anular la orden lo autoriza un supervisor con su PIN",
+            )
+        try:
+            quien_autoriza = autorizacion.verificar(body.autorizacion, ANULAR)
+        except TokenInvalido as e:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, str(e)) from e
+    # Queda firmada por quien la autorizó, no por quien la tecleó: es lo que
+    # el `audit_log` tiene que poder responder cuando alguien pregunta quién
+    # dejó sin cobrar esa orden.
+    venta = ventas.anular_venta(session, venta_id, quien_autoriza)
     session.commit()
     return venta
 
@@ -517,6 +682,176 @@ def desvincular_extra(
     es un producto comercial con su receta y su precio."""
     catalogo.desvincular_extra(session, producto_id=producto_id, extra_id=extra_id)
     session.commit()
+
+
+# --- Atributos y variantes (ADR-055) -----------------------------------------
+# Las rutas literales van **antes** que las paramétricas: FastAPI resuelve por
+# orden, y "/atributos/exclusiones" entraría como un `atributo_id` que no es
+# UUID. Mismo cuidado que `/recetas/plantilla` en inventory.
+@router.post("/atributos/exclusiones", status_code=201)
+def declarar_exclusion(
+    body: schemas.ExclusionIn,
+    _: Usuario = Depends(require_permission(CATALOGO)),
+    session: Session = Depends(get_db),
+):
+    """Estos dos valores no van juntos (RN-COM-038).
+
+    El caso que la obliga: en una pizza mitad y mitad las dos mitades tienen
+    que ser distintas. Media hawaiana y media hawaiana no es una
+    mitad-y-mitad, es una hawaiana entera — que ya se vende como su propio
+    producto.
+    """
+    atributos_uc.excluir(session, valor_id=body.valor_id, excluye_id=body.excluye_id)
+    session.commit()
+    return {"ok": True}
+
+
+@router.delete("/atributos/exclusiones", status_code=204)
+def quitar_exclusion(
+    body: schemas.ExclusionIn,
+    _: Usuario = Depends(require_permission(CATALOGO)),
+    session: Session = Depends(get_db),
+):
+    atributos_uc.dejar_de_excluir(
+        session, valor_id=body.valor_id, excluye_id=body.excluye_id
+    )
+    session.commit()
+
+
+@router.patch("/atributos/valores/{ptav_id}", response_model=schemas.ValorDeProductoOut)
+def fijar_precio_extra(
+    ptav_id: uuid.UUID,
+    body: schemas.PrecioExtraIn,
+    _: Usuario = Depends(require_permission(CATALOGO)),
+    session: Session = Depends(get_db),
+):
+    """Cuánto suma este valor **en este producto**. La lista de precios sigue
+    mandando sobre el precio base (RN-PRC-003); esto se suma."""
+    ptav = atributos_uc.fijar_precio_extra(
+        session, ptav_id, precio_extra=body.precio_extra
+    )
+    valor = atributos_uc.exigir_valor(session, ptav.atributo_valor_id)
+    session.commit()
+    return {
+        "id": ptav.id,
+        "atributo_valor_id": ptav.atributo_valor_id,
+        "nombre": valor.nombre,
+        "precio_extra": ptav.precio_extra,
+        "activo": ptav.activo,
+    }
+
+
+@router.delete("/atributos/valores/{ptav_id}", status_code=204)
+def retirar_valor_de_producto(
+    ptav_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(CATALOGO)),
+    session: Session = Depends(get_db),
+):
+    """Lo saca de la oferta **sin borrarlo**: hay ventas que lo nombran y
+    líneas de receta que lo usan como condición."""
+    atributos_uc.retirar_valor(session, ptav_id)
+    session.commit()
+
+
+@router.get("/atributos", response_model=list[schemas.AtributoOut])
+def listar_atributos(
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    return atributos_uc.listar_atributos(session, tenant.empresa_id)
+
+
+@router.post("/atributos", response_model=schemas.AtributoOut, status_code=201)
+def crear_atributo(
+    body: schemas.AtributoCreate,
+    _: Usuario = Depends(require_permission(CATALOGO)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    atributo = atributos_uc.crear_atributo(
+        session, empresa_id=tenant.empresa_id, **body.model_dump()
+    )
+    session.commit()
+    return _atributo_dict(session, atributo)
+
+
+@router.patch("/atributos/{atributo_id}", response_model=schemas.AtributoOut)
+def editar_atributo(
+    atributo_id: uuid.UUID,
+    body: schemas.AtributoUpdate,
+    _: Usuario = Depends(require_permission(CATALOGO)),
+    session: Session = Depends(get_db),
+):
+    """Bajar `modo_variante` de `siempre` a `nunca` **no borra** las variantes
+    ya materializadas: puede haber ventas que las nombran. Deja de generar
+    nuevas, que es lo que alguien quiere al descubrir que un atributo de 17
+    valores iba a materializar 289 combinaciones."""
+    atributo = atributos_uc.editar_atributo(session, atributo_id, **body.model_dump())
+    session.commit()
+    return _atributo_dict(session, atributo)
+
+
+@router.post("/atributos/{atributo_id}/valores", response_model=schemas.AtributoOut,
+             status_code=201)
+def agregar_valor_de_atributo(
+    atributo_id: uuid.UUID,
+    body: schemas.AtributoValorCreate,
+    _: Usuario = Depends(require_permission(CATALOGO)),
+    session: Session = Depends(get_db),
+):
+    atributos_uc.agregar_valor(session, atributo_id, **body.model_dump())
+    session.commit()
+    return _atributo_dict(session, atributos_uc.exigir_atributo(session, atributo_id))
+
+
+def _atributo_dict(session: Session, atributo) -> dict:
+    return {
+        "id": atributo.id,
+        "nombre": atributo.nombre,
+        "modo_variante": atributo.modo_variante,
+        "display": atributo.display,
+        "orden": atributo.orden,
+        "valores": [
+            {"id": v.id, "nombre": v.nombre, "orden": v.orden, "activo": v.activo}
+            for v in atributos_uc.valores_de(session, atributo.id)
+        ],
+    }
+
+
+@router.get("/productos/{producto_id}/arbol", response_model=schemas.ArbolProductoOut)
+def ver_arbol_de_producto(
+    producto_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(LEER)),
+    session: Session = Depends(get_db),
+):
+    """El producto entero para el lienzo, en una llamada.
+
+    La versión anterior pedía la ficha del padre y una por cada variante:
+    con tres tamaños y ocho sabores eran veintisiete idas a la red para
+    dibujar un árbol.
+    """
+    return catalogo.arbol_de_producto(session, producto_id)
+
+
+@router.post("/productos/{producto_id}/atributos", response_model=schemas.ArbolProductoOut,
+             status_code=201)
+def ofrecer_atributo(
+    producto_id: uuid.UUID,
+    body: schemas.OfrecerAtributoIn,
+    _: Usuario = Depends(require_permission(CATALOGO)),
+    session: Session = Depends(get_db),
+):
+    """El producto pasa a ofrecer este atributo. Sin `valores`, todos."""
+    atributos_uc.ofrecer_atributo(
+        session,
+        producto_id=producto_id,
+        atributo_id=body.atributo_id,
+        valores=body.valores or None,
+        orden=body.orden,
+    )
+    session.commit()
+    return catalogo.arbol_de_producto(session, producto_id)
 
 
 @router.post("/productos/{producto_id}/grupos", response_model=schemas.GrupoOpcionOut,
@@ -811,6 +1146,38 @@ def crear_cliente(
     return cliente
 
 
+def _cliente_buscado(cliente, persona) -> schemas.ClienteBuscadoOut:
+    """Arma la vista de un cliente juntando lo suyo con lo de su persona.
+
+    Vive acá y no duplicado en cada endpoint porque la caja y el back-office
+    tienen que leer al mismo cliente igual: dos armados distintos es cómo un
+    natural termina mostrándose con un nombre en una pantalla y con otro en
+    la de al lado.
+    """
+    es_juridico = cliente.tipo == "juridico"
+    doc = cliente.ruc if es_juridico else (persona.numero_documento if persona else None)
+    return schemas.ClienteBuscadoOut(
+        id=cliente.id,
+        tipo=cliente.tipo,
+        nombre=(
+            cliente.razon_social
+            if es_juridico
+            else f"{persona.nombres} {persona.apellidos}".strip()
+            if persona
+            else "—"
+        ),
+        telefono=persona.telefono if persona else None,
+        numero_documento=doc,
+        direccion=(
+            cliente.contacto if es_juridico else (persona.domicilio if persona else None)
+        ),
+        identificado=(
+            bool(cliente.ruc) if es_juridico else rules.cliente_identificado(doc)
+        ),
+        persona_id=cliente.persona_id,
+    )
+
+
 @router.get("/clientes/buscar", response_model=list[schemas.ClienteBuscadoOut])
 def buscar_clientes(
     q: str,
@@ -822,32 +1189,124 @@ def buscar_clientes(
     cliente recuerde. Distinta de `GET /clientes`, que es el listado para
     análisis externo y usa otro permiso."""
     grupo_id = clientes.grupo_de_empresa(session, tenant.empresa())
-    salida = []
-    for cliente, persona in clientes.buscar(session, grupo_id=grupo_id, q=q):
-        es_juridico = cliente.tipo == "juridico"
-        doc = cliente.ruc if es_juridico else (persona.numero_documento if persona else None)
-        salida.append(
-            schemas.ClienteBuscadoOut(
-                id=cliente.id,
-                tipo=cliente.tipo,
-                nombre=(
-                    cliente.razon_social
-                    if es_juridico
-                    else f"{persona.nombres} {persona.apellidos}".strip()
-                    if persona
-                    else "—"
-                ),
-                telefono=persona.telefono if persona else None,
-                numero_documento=doc,
-                direccion=(
-                    cliente.contacto if es_juridico else (persona.domicilio if persona else None)
-                ),
-                identificado=(
-                    bool(cliente.ruc) if es_juridico else rules.cliente_identificado(doc)
-                ),
-            )
-        )
-    return salida
+    return [
+        _cliente_buscado(cliente, persona)
+        for cliente, persona in clientes.buscar(session, grupo_id=grupo_id, q=q)
+    ]
+
+
+@router.get("/clientes/listado", response_model=Pagina[schemas.ClienteBuscadoOut])
+def listar_clientes_backoffice(
+    q: str | None = None,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    p: Paginacion = Depends(paginacion),
+    session: Session = Depends(get_db),
+):
+    """El padrón de clientes del grupo, para la pantalla de back-office.
+
+    Endpoint propio y no `GET /clientes`: ese es el contrato público de
+    análisis (`sales.leer_clientes_externos`, `grupo_id` por query), pensado
+    para que marketing lea desde afuera. Pedirle a quien administra el padrón
+    de su propio grupo el permiso de lectura externa sería abrirle de paso
+    los clientes que no le tocan.
+
+    Tampoco es `/clientes/buscar`: aquella corta en 20 y exige `q` porque en
+    caja se busca a alguien concreto; acá se recorre el padrón entero.
+    """
+    grupo_id = clientes.grupo_de_empresa(session, tenant.empresa())
+    pagina = paginar(session, clientes.q_listado(session, grupo_id=grupo_id, q=q), p)
+    personas = clientes.personas_de(session, pagina["items"])
+    return {
+        **pagina,
+        "items": [
+            _cliente_buscado(c, personas.get(c.persona_id)) for c in pagina["items"]
+        ],
+    }
+
+
+# Las cuatro rutas literales van **antes** de `/clientes/{cliente_id}`:
+# FastAPI resuelve por orden y "plantilla" entraría como un id que no es UUID.
+@router.get("/clientes/plantilla")
+def descargar_plantilla_clientes(
+    _: Usuario = Depends(require_permission(GESTIONAR_CLIENTES)),
+):
+    """La hoja que se llena para cargar el padrón de golpe (RN-PTS-007)."""
+    return _xlsx(importacion_clientes.plantilla(), "plantilla-clientes.xlsx")
+
+
+@router.get("/clientes/exportar")
+def exportar_clientes(
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """El padrón en la misma plantilla, con los datos adentro (ADR-052).
+
+    Pide permiso de **lectura**: son los mismos datos que devuelve el listado
+    de back-office, solo empaquetados en un archivo.
+    """
+    grupo_id = clientes.grupo_de_empresa(session, tenant.empresa())
+    return _xlsx(
+        importacion_clientes.exportar(session, grupo_id=grupo_id), "clientes.xlsx"
+    )
+
+
+@router.post("/clientes/importar/validar", response_model=schemas.RevisionClientesOut)
+async def validar_importacion_clientes(
+    archivo: UploadFile,
+    _: Usuario = Depends(require_permission(GESTIONAR_CLIENTES)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Dice qué entra, qué actualiza y qué no. **No guarda nada.**"""
+    grupo_id = clientes.grupo_de_empresa(session, tenant.empresa())
+    return importacion_clientes.validar(
+        session, grupo_id=grupo_id, contenido=await archivo.read()
+    )
+
+
+@router.post(
+    "/clientes/importar",
+    status_code=201,
+    response_model=schemas.ResultadoImportacionOut,
+)
+def importar_clientes(
+    body: schemas.ImportarClientesIn,
+    _: Usuario = Depends(require_permission(GESTIONAR_CLIENTES)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Crea y actualiza lo que la pantalla confirmó, revalidando todo."""
+    grupo_id = clientes.grupo_de_empresa(session, tenant.empresa())
+    resultado = importacion_clientes.importar(
+        session,
+        grupo_id=grupo_id,
+        clientes=[c.model_dump() for c in body.clientes],
+    )
+    session.commit()
+    return resultado
+
+
+@router.patch("/clientes/{cliente_id}", response_model=schemas.ClienteOut)
+def editar_cliente(
+    cliente_id: uuid.UUID,
+    body: schemas.ClienteUpdate,
+    _: Usuario = Depends(require_permission(CREAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Corrige razón social, RUC o contacto de un cliente **jurídico**. Un
+    RUC mal tecleado llega hasta la factura electrónica y hasta ahora no
+    tenía arreglo por API.
+
+    Un cliente natural responde 422: sus datos viven en su `persona`
+    (RN-GEN-007) y se corrigen desde `PATCH /personas/{id}`.
+    """
+    exigir_cliente(session, cliente_id, tenant)
+    cliente = clientes.editar_cliente(session, cliente_id, **body.model_dump())
+    session.commit()
+    return cliente
 
 
 @router.patch("/clientes/{cliente_id}/documento", response_model=schemas.ClienteOut)
@@ -855,11 +1314,15 @@ def actualizar_documento_cliente(
     cliente_id: uuid.UUID,
     body: schemas.ClienteDocumentoUpdate,
     _: Usuario = Depends(require_permission(CREAR)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
     """Completa el documento de un cliente que se registró solo por
     teléfono. Desde ese momento cuenta como identificado para promociones
     (RN-PTS-002)."""
+    # Faltaba el alcance de tenant: con el `cliente_id` de otro grupo, este
+    # endpoint le escribía el documento igual (ADR-004).
+    exigir_cliente(session, cliente_id, tenant)
     cliente = clientes.actualizar_documento(
         session,
         cliente_id=cliente_id,

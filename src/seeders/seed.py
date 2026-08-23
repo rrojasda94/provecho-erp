@@ -101,6 +101,11 @@ PERMISOS = [
         "Autorizar la comida del personal, sin precio ni cobro (RN-COM-025)",
     ),
     ("sales.gestionar_mesas", "Configurar las mesas del salón de una sucursal"),
+    (
+        "sales.gestionar_clientes",
+        "Administrar el padrón de clientes del grupo, incluida la carga masiva "
+        "por planilla (RN-PTS-007) — distinto de registrar a alguien en caja",
+    ),
     ("kds.configurar", "Crear y configurar pantallas KDS"),
     ("kds.operar", "Operar KDS: cola, avance de ítems, comanda"),
     (
@@ -157,8 +162,9 @@ PERMISOS = [
     ),
     (
         "accounting.caja_relevar",
-        "Entregar o recibir el efectivo en la cadena de custodia: apertura, "
-        "cierre y traslado a contabilidad (RN-MDP-002)",
+        "Recibir el efectivo en la cadena de custodia: del cajón al "
+        "encargado, del encargado a contabilidad y de ahí a disponible "
+        "(RN-MDP-002). No interviene en abrir ni cerrar (RN-MDP-008)",
     ),
     (
         "accounting.caja_reabrir",
@@ -200,6 +206,22 @@ PERMISOS = [
         "auditoria.leer",
         "Consultar el rastro de cambios (`audit_log`) — quién tocó qué y cuándo",
     ),
+    (
+        "users.resetear_pin",
+        # 255 caracteres es el largo de `permiso.descripcion`, y Postgres lo
+        # hace cumplir aunque SQLite no: pasarse rompe el seeder entero.
+        "Devolver la cuenta de otro al PIN por defecto, obligándole a "
+        "cambiarlo al entrar. Aparte de `users.gestionar`: RRHH atiende el "
+        "'me olvidé el PIN' sin crear cuentas ni repartir roles, y administrar "
+        "usuarios no trae de arrastre entrar como cualquiera",
+    ),
+    (
+        "consulta.documento",
+        "Consultar un DNI o RUC contra RENIEC/SUNAT para prellenar un alta. "
+        "Es un permiso propio y no una consecuencia de poder crear personas: "
+        "cada consulta gasta cuota del proveedor y trae datos personales de "
+        "alguien que todavía no es nadie en el sistema",
+    ),
     ("reports.leer", "Ver los reportes que el ERP me entregó a mí"),
     (
         "reports.leer_todo",
@@ -214,6 +236,17 @@ PERMISOS = [
     (
         "reports.administrar",
         "Editar áreas y reglas de distribución: decidir quién recibe qué",
+    ),
+    (
+        "reports.escalar",
+        "Elevar un reporte que no se pudo resolver en el propio nivel "
+        "(RN-CTP-004)",
+    ),
+    (
+        "reports.escalamiento_resolver",
+        "Registrar lo actuado en un escalamiento y darlo por resuelto. "
+        "Separado de `reports.escalar` por lo mismo que solicitar y aprobar "
+        "un ajuste: quien eleva no es quien cierra",
     ),
     (
         "gerencia.gestionar_parametros_empresa",
@@ -285,6 +318,9 @@ ROLES = {
         # encargado del turno, no quien la va a comer (RN-COM-025).
         "sales.registrar_consumo_personal",
         "sales.gestionar_mesas",
+        # Reescribir el padrón del grupo desde una planilla no es el mismo
+        # acto que registrar a alguien en el mostrador (ADR-052).
+        "sales.gestionar_clientes",
         "kds.configurar",
         "kds.operar",
         "inventory.leer",
@@ -302,12 +338,13 @@ ROLES = {
         "accounting.pago_aprobar",
         "accounting.arqueo_registrar",
         "accounting.caja_retirar",
-        # También opera caja cuando le toca cubrir el turno; el candado de
-        # que nadie se releve a sí mismo vive en el dominio, no en el rol.
+        # También opera caja cuando le toca cubrir el turno.
         "accounting.caja_operar",
-        # El encargado entrega el fondo al abrir y recibe el efectivo al
-        # cerrar: es la contraparte del cajero en la cadena de custodia
-        # (RN-MDP-002), y quien autoriza recontar un cierre (RN-MDP-005).
+        # El encargado **recibe** el efectivo que el cajero dejó en el cajón
+        # al cerrar (`en_caja → en_supervisor`, RN-MDP-002/008): es la
+        # contraparte del cajero en la cadena de custodia y quien autoriza
+        # recontar un cierre (RN-MDP-005). Ya no interviene en la apertura —
+        # el turno lo abre el cajero solo (ADR-049).
         "accounting.caja_relevar",
         "accounting.caja_reabrir",
         # Marketing arma el brief; quien lo aprueba nunca es quien lo escribe.
@@ -436,12 +473,41 @@ for _rol in (
 ):
     ROLES[_rol].append("reports.leer")
 
+# Consultar un documento lo necesita quien da de alta a alguien: RRHH al
+# contratar, compras al registrar un proveedor, y caja al identificar a un
+# cliente para su factura. `supervisor` porque también da altas. No se le da
+# al resto: cada consulta gasta cuota de Factiliza y trae datos personales de
+# quien todavía no es nadie en el sistema.
+for _rol in ("rrhh_admin", "comprador", "cajero", "supervisor"):
+    ROLES[_rol].append("consulta.documento")
+
+# Resetear un PIN lo hace RRHH, que es quien recibe al trabajador que no
+# puede entrar. `admin` ya lo tiene por el comodín. **No** se le da a
+# `supervisor`: poder entrar como cualquiera de su turno rompe la
+# segregación con la que está armado el ciclo de caja (ADR-025) — el mismo
+# motivo por el que un encargado no se releva a sí mismo.
+ROLES["rrhh_admin"].append("users.resetear_pin")
+
 # Ver el mapa completo de distribución es de quien supervisa la operación y de
 # quien la audita. **Administrarlo** —decidir quién recibe qué— queda solo en
 # `admin`, por lo mismo que `purchases.aprobar`: cambiar a quién le llega un
 # descuadre de caja es una decisión de gobierno, no de turno.
 ROLES["supervisor"].append("reports.leer_matriz")
 ROLES["contador"].append("reports.leer_matriz")
+
+# Elevar lo puede hacer quien está en la operación y se topa con algo que no
+# le corresponde resolver; cerrarlo, quien responde por el nivel. Que sean dos
+# permisos evita que el mismo turno abra y cierre su propio escalamiento sin
+# que nadie más lo mire.
+for _rol in ("supervisor", "cajero", "jefe_cocina", "despachador", "almacenero"):
+    ROLES[_rol].append("reports.escalar")
+# `jefe_cocina` cierra los suyos porque RN-PRD-014 lo dice con todas las
+# letras: «el jefe de cocina redacta el hallazgo y la acción tomada». Sin
+# esto, una no conformidad solo la podía cerrar alguien sin `production.leer`
+# — o sea, nadie: la doble puerta de RN-REP-002 también aplica al
+# escalamiento, así que hace falta el permiso del módulo *y* el de resolver.
+for _rol in ("supervisor", "contador", "jefe_cocina"):
+    ROLES[_rol].append("reports.escalamiento_resolver")
 
 # Qué roles componen cada área semilla. El área es «de qué me entero» y el rol
 # es «qué puedo hacer»: se parecen, y por eso hay que decir el mapeo en vez de

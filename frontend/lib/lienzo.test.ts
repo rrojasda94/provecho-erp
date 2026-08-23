@@ -32,6 +32,8 @@ import {
   subcolumnas,
   tituloDelPlato,
   type Camino,
+  modoLegible,
+  valoresExcluidos,
 } from "./lienzo.ts";
 
 function extra(id: string, nombre: string, recetaId: string | null = null) {
@@ -81,6 +83,7 @@ const CAMINO: Camino = {
   elegidas: { g1: ["e1"] },
   sueltos: [],
   restas: [],
+  valores: [],
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -358,3 +361,29 @@ test("alternar agrega y quita sin mutar", () => {
   assert.deepEqual(alternar(base, "a"), []);
   assert.deepEqual(base, ["a"]);
 });
+
+// --- Atributos en el lienzo (ADR-055, ADR-058) -----------------------------
+
+test("una exclusión se lee en los dos sentidos", () => {
+  // Se guarda una sola fila porque el par es simétrico (RN-COM-038), así que
+  // hay que mirar las dos puntas.
+  assert.deepEqual([...valoresExcluidos(["a"], [["a", "b"]])], ["b"]);
+  assert.deepEqual([...valoresExcluidos(["b"], [["a", "b"]])], ["a"]);
+});
+
+test("lo elegido no se apaga a sí mismo", () => {
+  // Si no, elegir algo lo tacharía en el mismo click.
+  assert.deepEqual([...valoresExcluidos(["a", "b"], [["a", "b"]])], []);
+});
+
+test("sin nada elegido no hay nada apagado", () => {
+  assert.equal(valoresExcluidos([], [["a", "b"]]).size, 0);
+});
+
+test("el modo de variante se dice sin jerga", () => {
+  assert.match(modoLegible("siempre"), /variante/);
+  assert.equal(modoLegible("nunca"), "no genera variantes");
+  // Un modo que no conocemos no rompe la pantalla.
+  assert.equal(modoLegible("otro"), "no genera variantes");
+});
+

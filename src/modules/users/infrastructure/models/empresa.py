@@ -6,10 +6,18 @@ from sqlalchemy import Enum, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
-from src.core.model_base import JsonB, SoftDeleteMixin, TimestampMixin, UuidPkMixin
+from src.core.model_base import (
+    JsonB,
+    SoftDeleteMixin,
+    TimestampMixin,
+    UbicacionMixin,
+    UuidPkMixin,
+)
 
 
-class Empresa(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin):
+class Empresa(
+    Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin, UbicacionMixin
+):
     __tablename__ = "empresa"
 
     grupo_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("grupo.id"))

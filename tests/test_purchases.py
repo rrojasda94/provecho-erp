@@ -183,6 +183,82 @@ def test_credito_sin_plazo_409(env):
     assert r.status_code == 409
 
 
+# --- Corrección de un proveedor ya dado de alta -----------------------------
+def test_editar_proveedor_corrige_ruc_y_razon_social(env, monkeypatch):
+    """El caso que motivó el cambio: un RUC mal tecleado llega hasta la
+    factura electrónica y hasta ahora solo se corregía tocando la base."""
+    client, ids, _ = env
+    monkeypatch.setattr(
+        proveedores_uc, "razon_social_desde_ruc", lambda ruc, fallback: fallback
+    )
+    h = _token(client)
+    proveedor_id = _crear_proveedor(client, h, ids).json()["id"]
+
+    r = client.patch(
+        f"/api/v1/purchases/proveedores/{proveedor_id}",
+        headers=h,
+        json={"ruc": "20222222222", "razon_social": "Molinera del Sur SAC"},
+    )
+    assert r.status_code == 200
+    assert r.json()["ruc"] == "20222222222"
+    assert r.json()["razon_social"] == "Molinera del Sur SAC"
+
+
+def test_editar_proveedor_natural_no_admite_razon_social(env):
+    """Los datos de un natural viven en su persona (RN-GEN-007); dejarle
+    razón social propia sería crear la segunda fuente que esa regla evita."""
+    client, ids, _ = env
+    h = _token(client)
+    proveedor_id = client.post(
+        "/api/v1/purchases/proveedores",
+        headers=h,
+        json={
+            "empresa_id": ids["empresa_id"],
+            "tipo": "natural",
+            "condicion_pago": "contado",
+            "persona_id": ids["persona_id"],
+        },
+    ).json()["id"]
+
+    r = client.patch(
+        f"/api/v1/purchases/proveedores/{proveedor_id}",
+        headers=h,
+        json={"razon_social": "Inventada SAC"},
+    )
+    assert r.status_code == 409
+    assert "persona" in r.json()["detail"]
+
+
+def test_editar_proveedor_a_credito_sin_plazo_409(env):
+    """Misma regla que el alta: 'credito' sin plazo deja a accounting sin
+    fecha de vencimiento que calcular."""
+    client, ids, _ = env
+    h = _token(client)
+    proveedor_id = _crear_proveedor(client, h, ids).json()["id"]
+
+    r = client.patch(
+        f"/api/v1/purchases/proveedores/{proveedor_id}",
+        headers=h,
+        json={"condicion_pago": "credito"},
+    )
+    assert r.status_code == 409
+
+
+def test_editar_proveedor_clasificacion_invalida_422(env):
+    """La columna es un Enum con CHECK: sin el `Literal` del schema esto
+    moría en el flush con un 500 en vez de un 422 que se lee."""
+    client, ids, _ = env
+    h = _token(client)
+    proveedor_id = _crear_proveedor(client, h, ids).json()["id"]
+
+    r = client.patch(
+        f"/api/v1/purchases/proveedores/{proveedor_id}",
+        headers=h,
+        json={"clasificacion": "vip"},
+    )
+    assert r.status_code == 422
+
+
 def _crear_oc(client, headers, ids, proveedor_id, idempotency_key="oc-key-1", costo="10.00"):
     return client.post("/api/v1/purchases/ordenes-compra", headers=headers, json={
         "proveedor_id": proveedor_id,

@@ -7,6 +7,7 @@ usuario. Al aprobarse se genera el movimiento y se refleja en el stock.
 import uuid
 from decimal import Decimal
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.core.events import event_bus
@@ -14,10 +15,78 @@ from src.modules.inventory.application import margenes
 from src.modules.inventory.application import stock as stock_uc
 from src.modules.inventory.application.errors import NoEncontrado, ReglaNegocio
 from src.modules.inventory.domain import rules
-from src.modules.inventory.infrastructure.models import Ajuste
+from src.modules.inventory.infrastructure.models import Ajuste, Articulo, Sku
 from src.modules.inventory.infrastructure.repositories import AjusteRepo, StockRepo
-from src.modules.users.infrastructure.models import Almacen
+from src.modules.users.infrastructure.models import Almacen, Usuario
 from src.shared import auditoria
+
+
+def q_ajustes(
+    session: Session,
+    empresa_id: uuid.UUID | None = None,
+    *,
+    almacen_id: uuid.UUID | None = None,
+    estado: str | None = None,
+):
+    """Consulta paginable de ajustes. `Ajuste` no lleva empresa: la hereda
+    del almacén, igual que `stock` y `reserva` (ADR-004)."""
+    q = select(Ajuste)
+    if almacen_id is not None:
+        q = q.where(Ajuste.almacen_id == almacen_id)
+    if estado is not None:
+        q = q.where(Ajuste.estado == estado)
+    if empresa_id is not None:
+        q = q.join(Almacen, Almacen.id == Ajuste.almacen_id).where(
+            Almacen.empresa_id == empresa_id
+        )
+    # Los pendientes primero: la pantalla existe para aprobarlos o
+    # rechazarlos, no para leer el histórico.
+    return q.order_by(Ajuste.created_at.desc())
+
+
+def detalle_ajuste(session: Session, ajuste_id: uuid.UUID) -> dict:
+    """El ajuste con los nombres ya resueltos.
+
+    A donde lleva `inventory.ajuste_fuera_margen`, y ahí se aprueba o se
+    rechaza: la pantalla no puede pedir cuatro endpoints más para saber qué
+    artículo es y quién lo pidió.
+    """
+    ajuste = AjusteRepo(session).get(ajuste_id)
+    if ajuste is None:
+        raise NoEncontrado("ajuste no encontrado")
+    sku = session.get(Sku, ajuste.sku_id)
+    articulo = session.get(Articulo, sku.articulo_id) if sku else None
+    almacen = session.get(Almacen, ajuste.almacen_id)
+    nombres = dict(
+        session.execute(
+            select(Usuario.id, Usuario.username).where(
+                Usuario.id.in_(
+                    {ajuste.solicitado_por, ajuste.aprobado_por} - {None}
+                )
+            )
+        ).all()
+    )
+    return {
+        "id": ajuste.id,
+        "almacen_id": ajuste.almacen_id,
+        "sku_id": ajuste.sku_id,
+        "cantidad": ajuste.cantidad,
+        "motivo": ajuste.motivo,
+        "estado": ajuste.estado,
+        "conteo_id": ajuste.conteo_id,
+        "solicitado_por": ajuste.solicitado_por,
+        "aprobado_por": ajuste.aprobado_por,
+        "dentro_margen": ajuste.dentro_margen,
+        "articulo": articulo.nombre if articulo else "(borrado)",
+        "sku_codigo": sku.codigo if sku else "(borrado)",
+        "almacen": almacen.nombre if almacen else "(borrado)",
+        "solicitante": nombres.get(ajuste.solicitado_por, "(borrado)"),
+        "aprobador": (
+            nombres.get(ajuste.aprobado_por, "(borrado)")
+            if ajuste.aprobado_por
+            else None
+        ),
+    }
 
 
 def solicitar_ajuste(
@@ -117,7 +186,16 @@ def aprobar_ajuste(
     if not ajuste.dentro_margen:
         event_bus.publish(
             "inventory.ajuste_fuera_margen",
-            {"ajuste_id": str(ajuste.id), "almacen_id": str(ajuste.almacen_id)},
+            {
+                "ajuste_id": str(ajuste.id),
+                "almacen_id": str(ajuste.almacen_id),
+                # Quien lo aprobó, no quien lo solicitó: el hecho reportado es
+                # que un ajuste fuera de margen se ejecutó.
+                "aprobado_por": str(aprobado_por),
+                "sku_id": str(ajuste.sku_id),
+                "cantidad": str(ajuste.cantidad),
+                "motivo": ajuste.motivo,
+            },
             session=session,
         )
     return ajuste

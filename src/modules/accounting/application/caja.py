@@ -7,9 +7,11 @@ Tres cosas hacen que el ciclo cierre de verdad y no solo se registre:
    apertura como el cierre reciben el conteo por billete y moneda, y el
    monto sale de esa suma. Lo que el encargado dice haber entregado se
    compara contra lo contado, y la diferencia se calcula — no se teclea.
-2. **Cada relevo lo firma quien recibe** (RN-MDP-002): abrir y cerrar exigen
-   la elevación de PIN del encargado (`POST /auth/autorizar`), y el
-   efectivo sigue viajando por `custodia_efectivo` hasta quedar disponible.
+2. **El turno lo abre y lo cierra el cajero solo** (RN-MDP-008, ADR-049);
+   **lo que sí firma quien recibe es cada entrega de efectivo**
+   (RN-MDP-002): al cerrar, el dinero queda `en_caja` a nombre del cajero,
+   y de ahí en adelante cada tramo de `custodia_efectivo` exige la
+   elevación de PIN de quien lo recibe (`POST /auth/autorizar`).
 3. **Un cierre con faltante se corrige, no se reescribe** (RN-MDP-005): la
    reapertura queda registrada con motivo y autorizador en
    `cierre_caja.correcciones`.
@@ -50,6 +52,7 @@ from src.modules.accounting.infrastructure.repositories import (
 )
 from src.modules.sales.application.queries_publicas import (
     puntos_venta_de_empresa,
+    puntos_venta_de_sucursal,
     puntos_venta_rotulados,
     sucursal_de_punto_venta,
     total_efectivo_cobrado,
@@ -89,23 +92,24 @@ def abrir_caja(
     *,
     punto_venta_id: uuid.UUID,
     cajero_id: uuid.UUID,
-    relevo_encargado_id: uuid.UUID,
     monto_declarado: Decimal,
     detalle_denominaciones: dict,
     pos_verificados: list[dict] | None = None,
 ) -> AperturaCaja:
     """Abre el turno con el efectivo contado y los POS verificados.
 
-    `relevo_encargado_id` sale de la elevación de PIN del encargado, no del
-    cuerpo del request: un identificador suelto sería una firma
-    falsificable y la cadena de custodia dejaría de probar nada.
+    **La abre el cajero solo** (RN-MDP-008): le basta su propia sesión con
+    `accounting.caja_operar`. Exigir la firma de un encargado para arrancar
+    el turno no probaba nada del efectivo —el conteo es lo que lo prueba— y
+    en el local se pagaba dejando la sesión del encargado abierta en la caja
+    para no ir a buscarlo cada mañana.
+
+    `relevo_encargado_id` queda en NULL: nadie firmó la apertura, y escribir
+    ahí al propio cajero sería inventar una contraparte.
     """
     repo = AperturaCajaRepo(session)
     if repo.abierta_en(punto_venta_id) is not None:
         raise Conflicto("ya hay una caja abierta en este punto de venta")
-    if relevo_encargado_id == cajero_id:
-        # Un relevo de uno solo no es un relevo (RN-MDP-002).
-        raise Conflicto("el encargado que releva no puede ser el mismo cajero")
 
     monto_apertura = _contar(detalle_denominaciones, "la apertura de caja")
     # Lo contado contra lo que el encargado dice haber entregado. No bloquea
@@ -116,7 +120,6 @@ def abrir_caja(
         AperturaCaja(
             punto_venta_id=punto_venta_id,
             cajero_id=cajero_id,
-            relevo_encargado_id=relevo_encargado_id,
             monto_apertura=monto_apertura,
             detalle_denominaciones=detalle_denominaciones,
             diferencia_reportada=diferencia if diferencia != 0 else None,
@@ -317,14 +320,18 @@ def cerrar_caja(
     apertura_caja_id: uuid.UUID,
     *,
     cajero_id: uuid.UUID,
-    receptor_id: uuid.UUID,
     detalle_denominaciones: dict,
     custodia: str,
     descuadre_atribucion: str | None = None,
     reportes_pos: list | None = None,
 ) -> CierreCaja:
-    """Cierra el turno: cuenta el cajón, cuadra las tarjetas y entrega el
-    efectivo.
+    """Cierra el turno: cuenta el cajón, cuadra las tarjetas y deja el
+    efectivo listo para entregar.
+
+    **Lo cierra el cajero solo** (RN-MDP-008): el conteo, el cuadre de
+    tarjetas y el destino declarado son todos actos suyos. La entrega del
+    efectivo es otro acto, posterior, y esa sí la firma quien recibe —
+    `entregar_custodia` (RN-MDP-002).
 
     El cierre no cuadra solo efectivo (RN-POS-004): cada POS que abrió
     operativo trae su reporte de lote, y la suma se contrasta con lo cobrado
@@ -340,8 +347,6 @@ def cerrar_caja(
     apertura = AperturaCajaRepo(session).get(apertura_caja_id)
     if apertura is None:
         raise NoEncontrado("apertura de caja no encontrada")
-    if receptor_id == cajero_id:
-        raise Conflicto("el encargado que recibe no puede ser el mismo cajero")
 
     cierre = CierreCajaRepo(session).get_by_apertura(apertura_caja_id)
     if cierre is not None and cierre.estado != "en_proceso":
@@ -377,7 +382,10 @@ def cerrar_caja(
                 reportes_pos=reportes_pos,
                 custodia=custodia,
                 estado=estado,
-                relevos=[_relevo("cajero", cajero_id), _relevo("encargado", receptor_id)],
+                # Solo el cajero: el tramo cajero→encargado todavía no
+                # ocurrió, y anotarlo acá sería afirmar una entrega que
+                # nadie firmó. Lo suma `entregar_custodia` cuando pase.
+                relevos=[_relevo("cajero", cajero_id)],
             )
         )
     else:
@@ -388,9 +396,11 @@ def cerrar_caja(
         cierre.reportes_pos = reportes_pos
         cierre.custodia = custodia
         cierre.estado = estado
-        cierre.relevos = (cierre.relevos or []) + [_relevo("encargado", receptor_id)]
+        # Recuento tras una reapertura: el cajero volvió a contar y a
+        # cerrar, así que es un acto suyo más en el mismo cierre.
+        cierre.relevos = (cierre.relevos or []) + [_relevo("cajero", cajero_id)]
 
-    _abrir_custodia(session, apertura_caja_id, monto_real, receptor_id)
+    _abrir_custodia(session, apertura_caja_id, monto_real, cajero_id)
     event_bus.publish(
         "accounting.cierre_caja_registrado",
         {
@@ -411,6 +421,14 @@ def cerrar_caja(
                 "sucursal_id": str(
                     sucursal_de_punto_venta(session, apertura.punto_venta_id)
                 ),
+                # Quien cerró el turno. Desde RN-MDP-008 es el propio
+                # cajero: nadie más firma el cierre. Se mantiene el campo
+                # —`reports` lo usa como `clave_actor` (ADR-036)— porque el
+                # actor del hecho sigue existiendo; lo que cambió es quién
+                # es. `cajero_id` sigue aparte: es la clave de "de quién era
+                # la caja", que el reporte muestra aunque el actor cambie.
+                "cerrado_por": str(cajero_id),
+                "cajero_id": str(cajero_id),
                 "descuadre_monto": str(descuadre),
                 "descuadre_tarjeta": str(tarjetas["descuadre"]),
                 "descuadre_atribucion": descuadre_atribucion,
@@ -424,12 +442,16 @@ def _abrir_custodia(
     session: Session,
     apertura_caja_id: uuid.UUID,
     monto: Decimal,
-    receptor_id: uuid.UUID,
+    cajero_id: uuid.UUID,
 ) -> CustodiaEfectivo:
-    """El efectivo pasa del cajero al encargado al cerrar (RN-MDP-002).
+    """Al cerrar, el efectivo queda **en el cajón, a nombre del cajero**
+    (RN-MDP-008).
 
-    Nace en `en_supervisor` y no en `en_caja` porque el cierre ya exigió la
-    firma del encargado: el tramo cajero→encargado acaba de ocurrir.
+    Nace en `en_caja` y no en `en_supervisor` porque el cierre ya no exige
+    la firma de nadie más: el tramo cajero→encargado todavía no ocurrió y lo
+    firma quien recibe, después, por `entregar_custodia` (RN-MDP-002).
+    Arrancar en `en_supervisor` daría por entregada plata que sigue en el
+    cajón, y el faltante quedaría a nombre de alguien que no la tocó.
     """
     repo = CustodiaEfectivoRepo(session)
     custodia = repo.de_apertura(apertura_caja_id)
@@ -442,9 +464,9 @@ def _abrir_custodia(
         CustodiaEfectivo(
             apertura_caja_id=apertura_caja_id,
             monto=monto,
-            responsable_actual_id=receptor_id,
-            estado="en_supervisor",
-            timestamps_relevo=[_relevo("encargado", receptor_id)],
+            responsable_actual_id=cajero_id,
+            estado="en_caja",
+            timestamps_relevo=[_relevo("cajero", cajero_id)],
         )
     )
 
@@ -456,7 +478,14 @@ def entregar_custodia(
     estado_siguiente: str,
     receptor_id: uuid.UUID,
 ) -> CustodiaEfectivo:
-    """Avanza la cadena de custodia; quien recibe firma con su PIN."""
+    """Avanza la cadena de custodia; quien recibe firma con su PIN.
+
+    Es el único punto donde se firma efectivo (RN-MDP-002), y desde
+    RN-MDP-008 incluye el primer tramo: `en_caja → en_supervisor`, o sea el
+    encargado recibiendo lo que el cajero dejó al cerrar. `timestamps_relevo`
+    guarda a qué tramo pasó, quién lo recibió y cuándo — sin eso, un turno
+    cerrado hace tres días no dice en manos de quién quedó la plata.
+    """
     custodia = CustodiaEfectivoRepo(session).get(custodia_id)
     if custodia is None:
         raise NoEncontrado("custodia de efectivo no encontrada")
@@ -590,31 +619,70 @@ def turnos_cerrados(
     # de qué caja habla no sirve para ir a reclamar un faltante.
     rotulos = puntos_venta_rotulados(session, [a.punto_venta_id for _, a, _ in filas])
     return [
-        {
-            "cierre_id": cierre.id,
-            "apertura_caja_id": apertura.id,
-            "punto_venta_id": apertura.punto_venta_id,
-            "caja": rotulos.get(apertura.punto_venta_id, "(sin rótulo)"),
-            "cajero_id": apertura.cajero_id,
-            "abierta_desde": apertura.created_at,
-            "monto_apertura": apertura.monto_apertura,
-            "descuadre_monto": cierre.descuadre_monto,
-            "descuadre_atribucion": cierre.descuadre_atribucion,
-            "estado": cierre.estado,
-            "custodia_destino": cierre.custodia,
-            "custodia_id": custodia.id if custodia else None,
-            "custodia_estado": custodia.estado if custodia else None,
-            "custodia_monto": custodia.monto if custodia else None,
-            "correcciones": cierre.correcciones,
-        }
+        _fila_turno(cierre, apertura, custodia, rotulos)
         for cierre, apertura, custodia in filas
     ]
 
 
-def cajas_abiertas(session: Session, empresa_id: uuid.UUID | None = None) -> list[dict]:
-    """Estado actual de caja por punto de venta de la empresa — para el
-    dashboard gerencial (`core.dashboard_router`)."""
-    punto_venta_ids = puntos_venta_de_empresa(session, empresa_id)
+def _fila_turno(cierre, apertura, custodia, rotulos: dict) -> dict:
+    return {
+        "cierre_id": cierre.id,
+        "apertura_caja_id": apertura.id,
+        "punto_venta_id": apertura.punto_venta_id,
+        "caja": rotulos.get(apertura.punto_venta_id, "(sin rótulo)"),
+        "cajero_id": apertura.cajero_id,
+        "abierta_desde": apertura.created_at,
+        "monto_apertura": apertura.monto_apertura,
+        "descuadre_monto": cierre.descuadre_monto,
+        "descuadre_atribucion": cierre.descuadre_atribucion,
+        "estado": cierre.estado,
+        "custodia_destino": cierre.custodia,
+        "custodia_id": custodia.id if custodia else None,
+        "custodia_estado": custodia.estado if custodia else None,
+        "custodia_monto": custodia.monto if custodia else None,
+        "correcciones": cierre.correcciones,
+    }
+
+
+def turno_cerrado(session: Session, cierre_id: uuid.UUID) -> dict:
+    """Un turno cerrado con el detalle del conteo.
+
+    A donde lleva `accounting.cierre_caja_irregular`. La fila del listado
+    dice *cuánto* descuadró; acá están los montos esperados contra los
+    contados y los reportes de POS, que es lo único con lo que se puede
+    decidir si el faltante se reclama o se corrige (RN-MDP-005).
+    """
+    cierre = CierreCajaRepo(session).get(cierre_id)
+    apertura = AperturaCajaRepo(session).get(cierre.apertura_caja_id)
+    rotulos = puntos_venta_rotulados(session, [apertura.punto_venta_id])
+    custodia = CustodiaEfectivoRepo(session).de_apertura(apertura.id)
+    return {
+        **_fila_turno(cierre, apertura, custodia, rotulos),
+        "montos_esperados": cierre.montos_esperados,
+        "montos_reales": cierre.montos_reales,
+        "reportes_pos": cierre.reportes_pos,
+        "relevos": cierre.relevos,
+    }
+
+
+def cajas_abiertas(
+    session: Session,
+    empresa_id: uuid.UUID | None = None,
+    sucursal_id: uuid.UUID | None = None,
+) -> list[dict]:
+    """Estado actual de caja por punto de venta.
+
+    Dos consumidores con alcance distinto: el dashboard gerencial
+    (`core.dashboard_router`) las quiere de **toda la empresa**, y el PDV solo
+    necesita saber si **su** caja está abierta. Con `sucursal_id` se acota a
+    esa sucursal — lo que permite dársela a quien opera una caja sin abrirle
+    de paso el efectivo de los demás locales.
+    """
+    punto_venta_ids = (
+        puntos_venta_de_sucursal(session, sucursal_id)
+        if sucursal_id is not None
+        else puntos_venta_de_empresa(session, empresa_id)
+    )
     aperturas = AperturaCajaRepo(session).abiertas_de(punto_venta_ids)
     return [
         {

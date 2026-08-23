@@ -40,20 +40,56 @@ def crear_categoria(
     nombre: str,
     asiento_contable_config: dict | None = None,
     frecuencia_conteo: str | None = None,
+    padre_id: uuid.UUID | None = None,
 ) -> Categoria:
     _validar_frecuencia(frecuencia_conteo)
     nombre = a_titulo(nombre)
     repo = CategoriaRepo(session)
     if repo.get_by_nombre(empresa_id, nombre):
         raise Conflicto(f"categoría '{nombre}' ya existe en la empresa")
+    _validar_madre(session, empresa_id, padre_id)
     return repo.add(
         Categoria(
             empresa_id=empresa_id,
             nombre=nombre,
             asiento_contable_config=asiento_contable_config,
             frecuencia_conteo=frecuencia_conteo,
+            padre_id=padre_id,
         )
     )
+
+
+PROFUNDIDAD_MAXIMA_CATEGORIA = 6
+"""Odoo llega a cuatro niveles (`All / Saleable / PoS / PIZZAS / Extras`).
+Seis deja margen y hace de tope duro contra un ciclo que se haya colado por
+otra vía: recorrer la cadena sin límite cuelga el request."""
+
+
+def _validar_madre(
+    session: Session, empresa_id: uuid.UUID, padre_id: uuid.UUID | None
+) -> None:
+    """La madre existe, es de la misma empresa y no arma un ciclo.
+
+    La base no puede impedirlo —es la misma tabla apuntándose a sí misma—,
+    así que lo hace la aplicación, igual que con `producto_padre_id`
+    (ADR-023).
+    """
+    if padre_id is None:
+        return
+    madre = CategoriaRepo(session).get(padre_id)
+    if madre is None or madre.empresa_id != empresa_id:
+        raise NoEncontrado("categoría madre no encontrada")
+    profundidad, actual = 0, madre
+    while actual is not None:
+        profundidad += 1
+        if profundidad > PROFUNDIDAD_MAXIMA_CATEGORIA:
+            raise ReglaNegocio(
+                "la categoría madre cuelga de una cadena demasiado profunda "
+                f"(máximo {PROFUNDIDAD_MAXIMA_CATEGORIA} niveles)"
+            )
+        actual = (
+            CategoriaRepo(session).get(actual.padre_id) if actual.padre_id else None
+        )
 
 
 def _validar_frecuencia(frecuencia: str | None) -> None:
@@ -175,11 +211,27 @@ def crear_articulo(
 
 
 def editar_articulo(session: Session, articulo_id: uuid.UUID, **campos) -> Articulo:
-    articulo = ArticuloRepo(session).get(articulo_id)
+    """Campo `None` = no tocar.
+
+    `unidad_medida_id` **no** es editable a propósito: el stock, los
+    movimientos y las recetas ya cargadas están expresados en la unidad
+    actual, así que cambiarla no convierte nada — reinterpreta en silencio
+    todo lo que ya existe. Un artículo con la unidad equivocada se archiva y
+    se crea de nuevo.
+    """
+    repo = ArticuloRepo(session)
+    articulo = repo.get(articulo_id)
     if articulo is None:
         raise NoEncontrado("artículo no encontrado")
+    if campos.get("id_interno") is not None:
+        otro = repo.get_by_id_interno(campos["id_interno"])
+        if otro is not None and otro.id != articulo_id:
+            raise Conflicto(f"id_interno '{campos['id_interno']}' ya existe")
+        articulo.id_interno = campos["id_interno"]
     if campos.get("nombre") is not None:
         articulo.nombre = a_titulo(campos["nombre"])
+    if campos.get("categoria_id") is not None:
+        _existe(session, Categoria, campos["categoria_id"], "categoría")
     for campo in (
         "categoria_id", "tipo", "costo_promedio", "archivado", "controla_lote",
         "dias_alerta_vencimiento",
@@ -198,6 +250,25 @@ def listar_articulos(
 def q_articulos(session: Session, empresa_id: uuid.UUID | None = None):
     """La consulta sin ejecutar, para que el router la pagine (ADR-026)."""
     return ArticuloRepo(session).q_list(empresa_id)
+
+
+def listar_skus(session: Session, empresa_id: uuid.UUID | None = None) -> list[dict]:
+    """SKUs con el nombre del artículo que representan.
+
+    Lo necesita cualquier pantalla que pregunte "qué se mueve" —devolución,
+    ajuste, conteo—: el código de un SKU no le dice nada a nadie.
+    """
+    return [
+        {
+            "id": sku.id,
+            "articulo_id": sku.articulo_id,
+            "codigo": sku.codigo,
+            "codigo_barras": sku.codigo_barras,
+            "activo": sku.activo,
+            "articulo_nombre": articulo.nombre,
+        }
+        for sku, articulo in SkuRepo(session).list(empresa_id)
+    ]
 
 
 def crear_sku(

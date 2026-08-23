@@ -9,8 +9,10 @@
  * lo que el servidor calculó (el redondeo por UdM se decide allá).
  */
 
+import type { CeldaAGuardar, Grilla } from "./matriz";
+
 import { type Pagina } from "@/lib/api";
-import { pedir } from "@/lib/cliente-api";
+import { pedir, subir } from "@/lib/cliente-api";
 
 // --- Tipos del contrato -----------------------------------------------------
 export type UnidadMedida = {
@@ -48,6 +50,106 @@ export type RecetaItem = {
   costo_linea: string;
 };
 
+/** Categoría del artículo que una receta produce — el filtro del listado
+ * solo alcanza a las subrecetas, porque un producto de venta no produce
+ * artículo del que sacar categoría (RN-COM-030). */
+export type Categoria = { id: string; nombre: string };
+
+// --- Carga masiva de recetas (RN-COM-031) ---
+export type IngredienteRevisado = {
+  fila: number;
+  insumo: string;
+  /** `null` = el catálogo no lo reconoció. La pantalla lo resuelve —eligiendo
+   * uno, creándolo, o dejándolo así para omitir la línea— y el servidor
+   * salta las que sigan en `null`. */
+  articulo_id: string | null;
+  cantidad: string;
+  merma_pct: string;
+  problemas: string[];
+};
+
+export type RecetaRevisada = {
+  fila: number;
+  /** El id que trajo la columna `ID` del archivo. `null` = alta (ADR-052). */
+  id: string | null;
+  accion: "crear" | "actualizar" | "omitir";
+  /** Qué hacer con los ingredientes que el archivo no menciona. Se decide
+   * receta por receta y el defecto no borra nada. */
+  ingredientes_ausentes: "conservar" | "quitar";
+  nombre: string;
+  rendimiento: string;
+  unidad: string;
+  unidad_medida_id: string | null;
+  produce: string | null;
+  articulo_producido_id: string | null;
+  ingredientes: IngredienteRevisado[];
+  /** Solo para pintar: el servidor recalcula todo antes de escribir. */
+  cambios: string[];
+  /** Los ingredientes que se perderían si esta receta se marca `quitar`. */
+  se_quitarian: string[];
+  problemas: string[];
+};
+
+export type OmitidaImport = { nombre: string; motivo: string };
+
+export type ResultadoImportacion = {
+  creadas: { id: string; nombre: string }[];
+  actualizadas: { id: string; nombre: string }[];
+  omitidas: OmitidaImport[];
+};
+
+// --- Carga masiva de artículos (RN-INV-025) ---
+export type SkuRevisado = {
+  fila: number;
+  codigo: string;
+  codigo_barras: string | null;
+  problemas: string[];
+};
+
+export type ArticuloRevisado = {
+  fila: number;
+  /** El id que trajo la columna `ID`, o el que resolvió el código. */
+  id: string | null;
+  accion: "crear" | "actualizar" | "omitir";
+  codigo: string;
+  nombre: string;
+  tipo: string;
+  unidad: string;
+  unidad_medida_id: string | null;
+  categoria: string;
+  /** `null` con `categoria` lleno = la pantalla tiene que resolverlo. */
+  categoria_id: string | null;
+  costo_promedio: string;
+  controla_lote: boolean;
+  dias_alerta_vencimiento: number | null;
+  archivado: boolean;
+  skus: SkuRevisado[];
+  cambios: string[];
+  problemas: string[];
+};
+
+export type RevisionArticulos = {
+  articulos: ArticuloRevisado[];
+  unidades_desconocidas: string[];
+  categorias_desconocidas: string[];
+  /** SKUs que nombran un artículo que la otra hoja no declara. */
+  skus_sin_articulo: string[];
+  listas: number;
+  a_actualizar: number;
+  con_problema: number;
+};
+
+export type RevisionImportacion = {
+  recetas: RecetaRevisada[];
+  insumos_desconocidos: string[];
+  /** Ingredientes que nombran una receta que la otra hoja no declara: el
+   * error de tipeo más común del formato. */
+  ingredientes_sin_receta: string[];
+  listas: number;
+  a_actualizar: number;
+  con_problema: number;
+};
+
 export type Receta = {
   id: string;
   nombre: string;
@@ -79,6 +181,9 @@ export type Producto = {
   es_extra: boolean;
   empaque_id: string | null;
   modalidades_empaque: string[] | null;
+  /** Dónde quedó el nodo en el lienzo (ADR-058). `null` = todavía no se
+   * movió, y el lienzo lo coloca por topología. */
+  lienzo_pos: { x: number; y: number } | null;
 };
 
 export type ExtraDeProducto = {
@@ -103,6 +208,24 @@ export type ProductoDetalle = Producto & {
   extras_sueltos: ExtraDeProducto[];
 };
 
+/** La plantilla se baja con un `<a download>`, no con `fetch`: el navegador
+ * tiene que guardar el archivo, y pasarlo por JS obligaría a construir un
+ * Blob y una URL temporal para lograr lo mismo. Por eso es una ruta y no una
+ * operación de `catalogoApi`. */
+export const RUTA_PLANTILLA_RECETAS =
+  "/api/proxy/api/v1/inventory/recetas/plantilla";
+
+/** El mismo libro que la plantilla, con el recetario adentro: se baja, se
+ * edita en Excel y se vuelve a subir (ADR-052). */
+export const RUTA_EXPORTAR_RECETAS =
+  "/api/proxy/api/v1/inventory/recetas/exportar";
+
+export const RUTA_PLANTILLA_ARTICULOS =
+  "/api/proxy/api/v1/inventory/articulos/plantilla";
+
+export const RUTA_EXPORTAR_ARTICULOS =
+  "/api/proxy/api/v1/inventory/articulos/exportar";
+
 // --- Operaciones ------------------------------------------------------------
 export const catalogoApi = {
   unidadesMedida: () => pedir<UnidadMedida[]>("/inventory/unidades-medida"),
@@ -110,6 +233,80 @@ export const catalogoApi = {
   // editor de recetas, que pide la primera página.
   articulos: async () =>
     (await pedir<Pagina<Articulo>>("/inventory/articulos")).items,
+
+  /** Alta rápida de un insumo desde el diálogo de importación: el archivo
+   * nombró algo que el catálogo no tiene y crearlo ahí evita perder el
+   * trabajo de resolver las otras cincuenta filas (RN-COM-031). */
+  crearArticulo: (cuerpo: {
+    id_interno: string;
+    nombre: string;
+    unidad_medida_id: string;
+    tipo: string;
+    categoria_id?: string | null;
+  }) => pedir<Articulo>("/inventory/articulos", { metodo: "POST", cuerpo }),
+
+  validarImportacion: (archivo: File) =>
+    subir<RevisionImportacion>("/inventory/recetas/importar/validar", archivo),
+
+  /** Manda **solo lo que el contrato declara**: la revisión trae además
+   * `fila`, `unidad`, `produce`, `cambios` y `problemas`, que son para
+   * mostrar en pantalla y no significan nada del otro lado. */
+  importarRecetas: (recetas: RecetaRevisada[]) =>
+    pedir<ResultadoImportacion>("/inventory/recetas/importar", {
+      metodo: "POST",
+      cuerpo: {
+        recetas: recetas.map((r) => ({
+          id: r.id,
+          accion: r.accion,
+          ingredientes_ausentes: r.ingredientes_ausentes,
+          nombre: r.nombre,
+          rendimiento: r.rendimiento,
+          unidad_medida_id: r.unidad_medida_id,
+          articulo_producido_id: r.articulo_producido_id,
+          ingredientes: r.ingredientes.map((i) => ({
+            insumo: i.insumo,
+            articulo_id: i.articulo_id,
+            cantidad: i.cantidad,
+            merma_pct: i.merma_pct,
+          })),
+        })),
+      },
+    }),
+
+  categorias: () => pedir<Categoria[]>("/inventory/categorias"),
+
+  /** Alta rápida de una categoría desde el diálogo de importación: el archivo
+   * nombró una que el catálogo no tiene (RN-INV-025). */
+  crearCategoria: (cuerpo: { nombre: string }) =>
+    pedir<Categoria>("/inventory/categorias", { metodo: "POST", cuerpo }),
+
+  validarImportacionArticulos: (archivo: File) =>
+    subir<RevisionArticulos>("/inventory/articulos/importar/validar", archivo),
+
+  /** Manda **solo lo que el contrato declara**: la revisión trae además
+   * `fila`, `unidad`, `categoria` y `problemas`, que son para la pantalla. */
+  importarArticulos: (articulos: ArticuloRevisado[]) =>
+    pedir<ResultadoImportacion>("/inventory/articulos/importar", {
+      metodo: "POST",
+      cuerpo: {
+        articulos: articulos.map((a) => ({
+          id: a.id,
+          accion: a.accion,
+          codigo: a.codigo,
+          nombre: a.nombre,
+          tipo: a.tipo,
+          unidad_medida_id: a.unidad_medida_id,
+          categoria_id: a.categoria_id,
+          costo_promedio: a.costo_promedio,
+          controla_lote: a.controla_lote,
+          dias_alerta_vencimiento: a.dias_alerta_vencimiento,
+          archivado: a.archivado,
+          skus: a.skus
+            .filter((s) => !s.problemas.length)
+            .map((s) => ({ codigo: s.codigo, codigo_barras: s.codigo_barras })),
+        })),
+      },
+    }),
 
   marcas: () => pedir<Marca[]>("/sales/marcas"),
   productos: () => pedir<Producto[]>("/sales/productos"),
@@ -140,6 +337,8 @@ export const catalogoApi = {
       /** Artículo de empaque y en qué modalidades se descuenta (RN-EMP-003). */
       empaque_id: string | null;
       modalidades_empaque: string[] | null;
+      /** Dónde quedó el nodo en el lienzo (ADR-058). */
+      lienzo_pos: { x: number; y: number } | null;
     }>,
   ) => pedir<Producto>(`/sales/productos/${id}`, { metodo: "PATCH", cuerpo }),
 
@@ -226,4 +425,124 @@ export const catalogoApi = {
     pedir<RecetaDetalle>(`/inventory/recetas/${recetaId}/items/${itemId}`, {
       metodo: "DELETE",
     }),
+
+  matriz: (recetaIds?: string[]) =>
+    pedir<Grilla>(
+      "/inventory/recetas/matriz" +
+        (recetaIds?.length ? `?receta_ids=${recetaIds.join(",")}` : ""),
+    ),
+
+  guardarMatriz: (celdas: CeldaAGuardar[]) =>
+    pedir<GuardadoMatriz>("/inventory/recetas/matriz", {
+      metodo: "PUT",
+      cuerpo: { celdas },
+    }),
+
+  arbol: (productoId: string) =>
+    pedir<ArbolProducto>(`/sales/productos/${productoId}/arbol`),
+
+  atributos: () => pedir<Atributo[]>("/sales/atributos"),
+
+  crearAtributo: (cuerpo: {
+    nombre: string;
+    modo_variante?: string;
+    display?: string;
+    orden?: number;
+  }) => pedir<Atributo>("/sales/atributos", { metodo: "POST", cuerpo }),
+
+  agregarValorDeAtributo: (atributoId: string, cuerpo: { nombre: string; orden?: number }) =>
+    pedir<Atributo>(`/sales/atributos/${atributoId}/valores`, {
+      metodo: "POST",
+      cuerpo,
+    }),
+
+  ofrecerAtributo: (
+    productoId: string,
+    cuerpo: { atributo_id: string; valores?: string[]; orden?: number },
+  ) =>
+    pedir<ArbolProducto>(`/sales/productos/${productoId}/atributos`, {
+      metodo: "POST",
+      cuerpo,
+    }),
+
+  fijarPrecioExtra: (ptavId: string, precio_extra: string) =>
+    pedir<ValorDeProducto>(`/sales/atributos/valores/${ptavId}`, {
+      metodo: "PATCH",
+      cuerpo: { precio_extra },
+    }),
+
+  retirarValor: (ptavId: string) =>
+    pedir<void>(`/sales/atributos/valores/${ptavId}`, { metodo: "DELETE" }),
+
+  excluir: (valor_id: string, excluye_id: string) =>
+    pedir<{ ok: boolean }>("/sales/atributos/exclusiones", {
+      metodo: "POST",
+      cuerpo: { valor_id, excluye_id },
+    }),
+};
+
+// --- Matriz de recetas y atributos (ADR-055, ADR-057, ADR-058) --------------
+export type { Grilla } from "./matriz";
+
+export type GuardadoMatriz = {
+  resultados: {
+    receta_id: string | null;
+    articulo_id: string | null;
+    accion: "creada" | "actualizada" | "borrada" | "sin_cambio" | "problema";
+    item_id: string | null;
+    cantidad: string | null;
+    detalle: string | null;
+  }[];
+  aplicadas: number;
+  con_problema: number;
+};
+
+export type ValorDeAtributo = {
+  id: string;
+  nombre: string;
+  orden: number;
+  activo: boolean;
+};
+
+export type Atributo = {
+  id: string;
+  nombre: string;
+  /** `siempre` | `dinamica` | `nunca` — el `create_variant` de Odoo. */
+  modo_variante: string;
+  display: string;
+  orden: number;
+  valores: ValorDeAtributo[];
+};
+
+export type ValorDeProducto = {
+  id: string;
+  atributo_valor_id: string;
+  nombre: string;
+  precio_extra: string;
+  activo: boolean;
+};
+
+export type LineaDeAtributo = {
+  linea_id: string;
+  producto_comercial_id: string;
+  atributo_id: string;
+  nombre: string;
+  modo_variante: string;
+  display: string;
+  orden: number;
+  valores: ValorDeProducto[];
+};
+
+export type ArbolProducto = ProductoDetalle & {
+  /** La ficha completa de cada variante, con SUS grupos y extras. Viene acá
+   * y no se pide aparte: era una petición por variante (ADR-058). */
+  variantes_detalle: ProductoDetalle[];
+  atributos: LineaDeAtributo[];
+  /** Pares que no van juntos (RN-COM-038). El lienzo solo necesita saber qué
+   * apagar cuando alguien ya eligió un valor. */
+  exclusiones: [string, string][];
+  combinaciones: {
+    producto_comercial_id: string;
+    producto_atributo_valor_id: string;
+  }[];
 };

@@ -3,8 +3,11 @@
 import uuid
 from datetime import date
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from src.shared.ubicacion import UbicacionMixin
 
 
 # El precio NO viaja en el request: lo fija el servidor contra
@@ -28,9 +31,13 @@ class VentaItemIn(BaseModel):
     # RN-PRD-004). Solo admite artículos que la receta usa; no cambian el
     # precio, sí el descuento de inventario.
     sin_articulo_ids: list[uuid.UUID] = []
+    # Valores de atributo elegidos (ADR-055): `producto_atributo_valor.id`.
+    # Deciden qué líneas condicionadas de la receta se descuentan
+    # (RN-COM-037). Solo admite valores que el producto o su padre ofrecen.
+    valores_variante_ids: list[uuid.UUID] = []
 
 
-class VentaCreate(BaseModel):
+class VentaCreate(UbicacionMixin):
     sucursal_id: uuid.UUID
     punto_venta_id: uuid.UUID
     canal: str
@@ -41,6 +48,10 @@ class VentaCreate(BaseModel):
     # "Carlos", "Rappi #1042" — visible en KDS y comanda. Para modalidad
     # `mesa` el dato tipado es `mesa_id`.
     referencia_atencion: str | None = Field(default=None, max_length=50)
+    # Adónde va el pedido. Los `ubicacion_*` del mixin son su ancla en el
+    # mapa: con ella se cotiza la distancia de reparto (ADR-054). Sin ancla
+    # el pedido se toma igual, con tarifa base y sin distancia.
+    direccion_entrega: str | None = Field(default=None, max_length=255)
     mesa_id: uuid.UUID | None = None
     comensales: int | None = Field(default=None, ge=1)
     # Identificador generado por el cliente. El PDV puede crear la venta sin
@@ -56,6 +67,30 @@ class VentaCreate(BaseModel):
     autorizacion: str | None = None
 
 
+class CotizacionDeliveryIn(UbicacionMixin):
+    """A dónde hay que llevar el pedido, desde qué local.
+
+    Se manda el ancla completa y no un `cliente_id`: en caja la mitad de los
+    deliveries son de alguien que todavía no está registrado, y la dirección
+    se acaba de escribir en el diálogo.
+    """
+
+    sucursal_id: uuid.UUID
+
+
+class CotizacionDeliveryOut(BaseModel):
+    """Lo que el cajero necesita para decidir antes de tomar el pedido."""
+
+    distancia_km: Decimal | None
+    costo: Decimal
+    # True = la distancia salió de la línea recta porque Google no contestó.
+    # El PDV lo muestra como "aprox." para que nadie discuta el monto como si
+    # fuera una medición.
+    aproximada: bool
+    derivar_a_externo: bool
+    motivo: str | None = None
+
+
 class VentaOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
@@ -67,6 +102,11 @@ class VentaOut(BaseModel):
     estado: str
     total: Decimal
     referencia_atencion: str | None
+    direccion_entrega: str | None = None
+    # Lo cotizado al tomar la orden, congelado: la tarifa cambia y el
+    # pedido de ayer no puede cambiar de precio.
+    distancia_entrega_km: Decimal | None = None
+    costo_entrega: Decimal | None = None
     mesa_id: uuid.UUID | None = None
     comensales: int | None = None
     descuento_modo: str | None = None
@@ -93,13 +133,35 @@ class DescuentoCreate(BaseModel):
 
 
 class AnularLineasCreate(BaseModel):
-    """Quitar líneas de una orden ya enviada a cocina. `autorizacion` es el
-    token de `POST /auth/autorizar`: es inventario que se repone, lo
-    autoriza un supervisor (RN-COM-020)."""
+    """Quitar líneas de una orden ya enviada a cocina.
+
+    `autorizacion` es el token de `POST /auth/autorizar` y hace falta cuando
+    la línea ya salió de la ventana de corrección (RN-COM-029): ahí el insumo
+    se usó de verdad y reponerlo lo firma un supervisor (RN-COM-020). Dentro
+    de la ventana es un error de tecleo y lo corrige el cajero solo.
+    """
 
     venta_item_ids: list[uuid.UUID] = Field(min_length=1)
     motivo: str = Field(min_length=3, max_length=120)
-    autorizacion: str
+    autorizacion: str | None = None
+
+
+class AgregarLineasCreate(BaseModel):
+    """Sumar líneas a una orden ya enviada a cocina (RN-COM-029). Mismo
+    shape que los `items` del alta: una mesa que pide de a poco no debería
+    obligar a abrir una orden nueva que después se cobra por separado."""
+
+    items: list[VentaItemIn] = Field(min_length=1)
+
+
+class AnularVentaIn(BaseModel):
+    """Anular una orden entera. `autorizacion` es el token de
+    `POST /auth/autorizar` y solo hace falta cuando quien la pide no tiene
+    `sales.anular` — el cajero, típicamente: la pide él y la firma un
+    supervisor con su PIN, igual que quitar una línea ya enviada
+    (RN-COM-020)."""
+
+    autorizacion: str | None = None
 
 
 class PrecuentaOut(BaseModel):
@@ -175,7 +237,7 @@ class MesaEnMapaOut(BaseModel):
 
 
 # --- Cliente creado desde caja ----------------------------------------------
-class ClienteCreate(BaseModel):
+class ClienteCreate(UbicacionMixin):
     """El tipo lo decide el documento: 11 dígitos crea cliente jurídico con
     RUC; el resto, uno natural con su persona.
 
@@ -201,6 +263,20 @@ class ClienteDocumentoUpdate(BaseModel):
     tipo_documento: str = "dni"
 
 
+class ClienteUpdate(BaseModel):
+    """Corrección de un cliente **jurídico**. Campo ausente o `null` = no tocar.
+
+    No lleva nombre, teléfono ni dirección: en un cliente natural esos datos
+    viven en su `persona` (RN-GEN-007) y se corrigen desde Personas. El
+    documento tiene su propio endpoint (`PATCH /clientes/{id}/documento`),
+    que aplica las reglas de identificación.
+    """
+
+    razon_social: str | None = Field(default=None, min_length=1, max_length=255)
+    ruc: str | None = Field(default=None, pattern=r"^\d{11}$")
+    contacto: str | None = Field(default=None, max_length=255)
+
+
 class ClienteOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
@@ -210,7 +286,71 @@ class ClienteOut(BaseModel):
     persona_id: uuid.UUID | None
 
 
-class ClienteBuscadoOut(BaseModel):
+# --- Carga masiva de clientes (RN-PTS-007, ADR-052) ---
+class ClienteImportadoIn(BaseModel):
+    """Una fila de la hoja «Clientes», ya revisada por la pantalla.
+
+    `id` y `accion` no son hechos: son **el permiso que una persona dio**. El
+    servidor los vuelve a derivar contra la base antes de escribir.
+    """
+
+    id: uuid.UUID | None = None
+    accion: Literal["crear", "actualizar", "omitir"] = "crear"
+    nombre: str = Field(min_length=1, max_length=255)
+    tipo_documento: str = Field(default="dni", max_length=20)
+    documento: str = Field(default="", max_length=11)
+    telefono: str | None = None
+    email: str | None = None
+    contacto: str | None = None
+    fecha_nacimiento: str | None = None
+
+
+class ImportarClientesIn(BaseModel):
+    clientes: list[ClienteImportadoIn]
+
+
+class ClienteRevisadoOut(BaseModel):
+    fila: int
+    id: uuid.UUID | None
+    accion: str
+    tipo: str
+    nombre: str
+    tipo_documento: str
+    documento: str
+    telefono: str
+    email: str
+    contacto: str
+    fecha_nacimiento: str | None
+    cambios: list[str]
+    problemas: list[str]
+
+
+class RevisionClientesOut(BaseModel):
+    clientes: list[ClienteRevisadoOut]
+    listas: int
+    a_actualizar: int
+    con_problema: int
+
+
+class ImportadoOut(BaseModel):
+    id: uuid.UUID
+    nombre: str
+
+
+class OmitidoOut(BaseModel):
+    nombre: str
+    motivo: str
+
+
+class ResultadoImportacionOut(BaseModel):
+    """El mismo sobre que usa inventory: crear, actualizar, omitir."""
+
+    creadas: list[ImportadoOut]
+    actualizadas: list[ImportadoOut]
+    omitidas: list[OmitidoOut]
+
+
+class ClienteBuscadoOut(UbicacionMixin):
     """Lo que el PDV necesita para pintar un resultado de búsqueda."""
 
     id: uuid.UUID
@@ -222,6 +362,9 @@ class ClienteBuscadoOut(BaseModel):
     # False si no dio documento o dio el genérico: queda fuera de las
     # promociones para clientes registrados con documento (RN-PTS-002).
     identificado: bool
+    # El back-office lo usa para mandar a la ficha de la persona: los datos
+    # de un cliente natural se corrigen allá, no acá.
+    persona_id: uuid.UUID | None = None
 
 
 # --- Lote de sincronización del hub (ADR-009) -------------------------------
@@ -248,6 +391,9 @@ class VentaItemSyncIn(BaseModel):
     # esa venta no quitó nada. No se revalidan contra la receta —la venta ya
     # se preparó y la receta pudo cambiar durante el corte (ADR-009).
     sin_articulo_ids: list[uuid.UUID] = []
+    # Valores de atributo de la línea. Ausentes en lotes emitidos antes de
+    # ADR-055. Tampoco se revalidan contra el catálogo, por lo mismo.
+    valores_variante_ids: list[uuid.UUID] = []
 
 
 class VentaSyncIn(BaseModel):
@@ -268,6 +414,11 @@ class VentaSyncIn(BaseModel):
     items: list[VentaItemSyncIn] = Field(min_length=1)
     cliente_id: uuid.UUID | None = None
     referencia_atencion: str | None = Field(default=None, max_length=50)
+    # Un delivery tomado sin internet sube con su dirección y lo que se
+    # cobró por llevarla; sin esto la nube los perdería al sincronizar.
+    direccion_entrega: str | None = Field(default=None, max_length=255)
+    distancia_entrega_km: Decimal | None = None
+    costo_entrega: Decimal | None = None
     mesa_id: uuid.UUID | None = None
     comensales: int | None = Field(default=None, ge=1)
     # El descuento del local viaja con su motivo y autorizador para que la
@@ -384,6 +535,8 @@ class ProductoUpdate(BaseModel):
     orden: int | None = None
     empaque_id: uuid.UUID | None = None
     modalidades_empaque: list[str] | None = None
+    # Dónde quedó el nodo en el lienzo (ADR-058): `{"x": 120, "y": 40}`.
+    lienzo_pos: dict | None = None
 
 
 class ProductoOut(BaseModel):
@@ -400,6 +553,7 @@ class ProductoOut(BaseModel):
     es_extra: bool = False
     empaque_id: uuid.UUID | None = None
     modalidades_empaque: list[str] | None = None
+    lienzo_pos: dict | None = None
 
 
 class ProductoDetalleOut(ProductoOut):
@@ -485,6 +639,11 @@ class VarianteDeCartaOut(BaseModel):
     nombre: str
     precio_unitario: Decimal
     orden: int
+    # Los grupos y extras cuelgan del producto que se prepara, y con
+    # presentaciones ese es la variante: una Familiar y una Personal no
+    # ofrecen los mismos sabores. Elegida la variante, estos mandan sobre
+    # los del padre.
+    extras: list[ExtraDeCartaOut] = []
 
 
 class CartaItemOut(BaseModel):
@@ -497,6 +656,8 @@ class CartaItemOut(BaseModel):
     # se cobra sale de la variante elegida, nunca de este campo.
     precio_unitario: Decimal
     variantes: list[VarianteDeCartaOut] = []
+    # Los del padre. Un producto con variantes normalmente los tiene vacíos
+    # (cuelgan de cada variante); se conserva para los productos simples.
     extras: list[ExtraDeCartaOut] = []
 
 
@@ -594,3 +755,104 @@ class EntregaOut(BaseModel):
     modalidad: str
     estado_pedido: str
     ya_entregado: bool
+
+
+# --- Atributos y variantes (ADR-055) -----------------------------------------
+class AtributoCreate(BaseModel):
+    """`modo_variante` decide si las combinaciones se materializan como
+    variante vendible. `nunca` no genera ninguna fila: el valor viaja en la
+    línea de venta y solo decide qué líneas de receta se descuentan."""
+
+    nombre: str = Field(min_length=1, max_length=80)
+    modo_variante: str = "nunca"
+    display: str = "radio"
+    orden: int = 0
+
+
+class AtributoUpdate(BaseModel):
+    nombre: str | None = Field(default=None, min_length=1, max_length=80)
+    modo_variante: str | None = None
+    display: str | None = None
+    orden: int | None = None
+
+
+class AtributoValorCreate(BaseModel):
+    nombre: str = Field(min_length=1, max_length=80)
+    orden: int = 0
+
+
+class AtributoValorOut(BaseModel):
+    id: uuid.UUID
+    nombre: str
+    orden: int
+    activo: bool
+
+
+class AtributoOut(BaseModel):
+    id: uuid.UUID
+    nombre: str
+    modo_variante: str
+    display: str
+    orden: int
+    valores: list[AtributoValorOut]
+
+
+class OfrecerAtributoIn(BaseModel):
+    """Lista vacía = **todos** los valores del atributo, que es lo que quiere
+    quien acaba de crearlo."""
+
+    atributo_id: uuid.UUID
+    valores: list[uuid.UUID] = []
+    orden: int = 0
+
+
+class PrecioExtraIn(BaseModel):
+    precio_extra: Decimal = Field(ge=0)
+
+
+class ExclusionIn(BaseModel):
+    """Los dos valores no van juntos (RN-COM-038). Se guarda una sola fila:
+    el par es simétrico y se lee en los dos sentidos."""
+
+    valor_id: uuid.UUID
+    excluye_id: uuid.UUID
+
+
+class ValorDeProductoOut(BaseModel):
+    id: uuid.UUID
+    atributo_valor_id: uuid.UUID
+    nombre: str
+    precio_extra: Decimal
+    activo: bool
+
+
+class LineaDeAtributoOut(BaseModel):
+    linea_id: uuid.UUID
+    producto_comercial_id: uuid.UUID
+    atributo_id: uuid.UUID
+    nombre: str
+    modo_variante: str
+    display: str
+    orden: int
+    valores: list[ValorDeProductoOut]
+
+
+class CombinacionOut(BaseModel):
+    producto_comercial_id: str
+    producto_atributo_valor_id: str
+
+
+class ArbolProductoOut(ProductoDetalleOut):
+    """Todo lo que el lienzo necesita en una sola llamada.
+
+    Hereda de `ProductoDetalleOut` a propósito: con el interruptor
+    `catalogo.modelo_odoo` apagado el lienzo sigue dibujando grupos y extras,
+    y una sola forma de traer los datos evita que las dos pantallas se
+    separen.
+    """
+
+    variantes_detalle: list[ProductoDetalleOut]
+    atributos: list[LineaDeAtributoOut]
+    exclusiones: list[list[str]]
+    combinaciones: list[CombinacionOut]
+

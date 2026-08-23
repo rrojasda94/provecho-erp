@@ -49,6 +49,18 @@ Contratar exige `rrhh.trabajador_gestionar`, no el permiso de postulante: ahí
 nace la planilla. Publicar/cerrar una convocatoria exige
 `rrhh.convocatoria_gestionar` (el administrador aprueba, el encargado pide).
 
+**El nombre de la planilla lo da RENIEC** (2026-08-22, RN-PTS-004, addendum de
+ADR-041). La `persona` nacía con `postulante.nombres`/`apellidos` — lo que el
+candidato escribió de sí mismo en un formulario **público**— y con ese nombre
+se firma el contrato y se declara a SUNAT. Ahora `contratar_postulante` pasa el
+DNI por `nombres_desde_dni` (`src/shared/integrations/factiliza/`), igual que
+el alta de cliente y la de proveedor; el cuerpo acepta `nombres`/`apellidos`
+opcionales para lo que corrigió quien contrata, y el tablero ofrece «Buscar por
+DNI» para verlo antes de guardar. Precedencia: **RENIEC > lo revisado en
+pantalla > lo declarado**, y si Factiliza no contesta o el documento no figura
+se usa lo revisado — la contratación nunca se bloquea por un tercero (ADR-005).
+Con carné de extranjería o pasaporte no se consulta: RENIEC no los tiene.
+
 ## Formulario público de postulación
 
 `POST /rrhh/postulaciones/{token}` — **sin JWT**. El token lo genera

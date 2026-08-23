@@ -1,0 +1,275 @@
+# ADR-041 — Reseteo de PIN y consulta de documento
+
+- Estado: aceptado
+- Fecha: 2026-08-12
+
+Dos decisiones de la misma entrega. Van juntas porque comparten el criterio
+—qué se le permite a quién sobre datos de otra persona— y porque cada una sola
+sería media página.
+
+## Parte 1 — Reseteo de PIN
+
+### Contexto
+
+Un PIN olvidado no se recupera: está hasheado con Argon2id. Hasta ahora la
+única salida era que alguien con `users.gestionar` le fijara uno a mano
+(`POST /users/{id}/pin`), y el frontend ni siquiera lo ofrecía — sus
+comentarios afirmaban que "lo cambia su dueño con su propia sesión", endpoint
+que **no existía**. En la práctica, un trabajador que olvidaba su PIN no
+entraba más.
+
+### Decisión
+
+**El reseteo deja el PIN por defecto y marca la cuenta.** Tres cosas pasan
+juntas, y ninguna sirve sin las otras dos:
+
+1. `usuario.debe_cambiar_pin = True` bloquea todo salvo cambiarlo. Sin esto,
+   un PIN público queda vigente indefinidamente.
+2. Se **revocan los refresh tokens** de esa cuenta. Un reseteo por sospecha
+   que deja viva la sesión abierta no cierra nada.
+3. Se **limpia el lockout**. Quien olvidó su PIN normalmente lo agotó
+   intentando, y dejarlo bloqueado convierte el reseteo en nada.
+
+**La obligación se hace cumplir en el servidor, y se lee de la base.**
+`get_current_user` mira `usuario.debe_cambiar_pin` en cada request y responde
+403 a todo lo que no sea verse, cambiarlo o salir
+(`RUTAS_CON_PIN_TEMPORAL`). Se descartó llevarlo como claim del JWT: un claim
+se congela al emitir el token, así que un reseteo no surtiría efecto hasta que
+venciera el access token. Leerlo de la base cuesta nada —el usuario ya se
+carga en esa dependencia— y vale en el request siguiente.
+
+Que esto cubra **todo** el ERP no es confianza: se verificó que no hay ningún
+handler que use `get_tenant` sin pasar por `get_current_user`, así que no
+queda puerta lateral.
+
+**Permiso propio `users.resetear_pin`**, aparte de `users.gestionar` en los
+dos sentidos: RRHH atiende el "me olvidé el PIN" todos los lunes y no tiene
+por qué poder crear cuentas ni repartir roles; y administrar usuarios no trae
+de arrastre la facultad de entrar como cualquiera de ellos. **No** se le da a
+`supervisor`: poder entrar como cualquiera de su turno rompe la segregación
+con la que está armado el ciclo de caja (ADR-025), por el mismo motivo por el
+que un encargado no se releva a sí mismo.
+
+**Queda auditado** quién reseteó a quién: es la contracara de que un
+administrador pueda dejar entrar a alguien como otro.
+
+**El PIN por defecto es `123456` y es público** —está en `CLAUDE.md` y en el
+seeder—. No pretende proteger nada: sirve para que su dueño vuelva a entrar, y
+por eso la cuenta no puede hacer otra cosa hasta cambiarlo. Se evaluó generar
+uno aleatorio y mostrarlo una sola vez; se descartó porque hay que dictárselo
+al trabajador por teléfono o por WhatsApp, que es exactamente igual de público
+y además se pierde. `cambiar_pin_propio` rechaza el PIN por defecto como valor
+nuevo: cambiarlo por el mismo que puso el reseteo es no cambiarlo.
+
+**`POST /users/me/pin` no lleva permiso** —elegir la propia clave no es un
+privilegio que alguien tenga que otorgar— pero **sí exige el PIN actual**: un
+token robado o una pantalla que quedó abierta no deberían alcanzar para
+quedarse con la cuenta.
+
+**La pantalla de cambio vive fuera del grupo de rutas `(app)`**, como el
+login: el layout del shell manda ahí a toda cuenta marcada, y si estuviera
+adentro se redirigiría a sí misma para siempre.
+
+### Alternativas descartadas
+
+- **Claim `pin_temporal` en el JWT**: se congela al emitir (ver arriba).
+- **PIN aleatorio de un solo uso**: hay que dictárselo, con lo que deja de ser
+  secreto igual, y se pierde.
+- **Reusar `users.gestionar`**: obliga a darle a RRHH el CRUD de cuentas
+  entero para que pueda atender un olvido.
+- **Marcar y no bloquear** (solo avisar al entrar): es un cartel que se cierra
+  con la X.
+
+## Parte 2 — Consulta de DNI y RUC
+
+### Contexto
+
+`FactilizaClient.consultar_dni()` y `consultar_ruc()` existían desde
+2026-08-02, con pruebas, y **ninguna pantalla podía usarlos**: no había
+endpoint. Los helpers `nombres_desde_dni` / `razon_social_desde_ruc` aplican
+el dato en el servidor al crear —así que el nombre que se guarda es el de
+RENIEC (RN-PTS-004)— pero quien está tecleando no lo ve hasta después de
+guardar, y descubre que el sistema escribió otro.
+
+### Decisión
+
+**`GET /consulta/dni/{n}` y `GET /consulta/ruc/{n}`, en `core`.** No tiene
+dueño de módulo: el mismo documento lo teclean `users` al dar de alta una
+persona, `purchases` al registrar un proveedor y `sales` al identificar a un
+cliente en caja. Mismo criterio que el router de `audit_log`.
+
+**Permiso propio `consulta.documento`** y no una consecuencia de poder crear
+personas: cada consulta gasta cuota del proveedor y trae datos personales de
+alguien que todavía no es nadie en el sistema.
+
+**No devuelve la respuesta cruda.** El proveedor manda más de lo que la
+pantalla necesita, y lo que no se manda no se filtra (Ley 29733, ADR-011).
+
+**"No encontrado" es 200 con `encontrado: false`, no 404**: que RENIEC no
+tenga ese documento no es una falla, y el alta sigue adelante tecleando.
+**El proveedor caído es 502 y no 500**: el que falló es un tercero, y un 500
+manda a revisar este servidor, que está bien.
+
+**El domicilio fiscal se guarda partido** (`direccion`, `provincia`, `pais` en
+`proveedor`): `provincia` es lo que decide si el flete es local o
+interprovincial, y volver a partir una dirección concatenada es adivinar.
+`pais` existe para el proveedor extranjero, que no tiene RUC peruano.
+
+**Prellena, no decide.** Lo que trae se escribe en un formulario que todavía
+se puede corregir —SUNAT tiene el domicilio *declarado*, que no siempre es el
+almacén al que uno va a recoger— y si Factiliza no responde, el alta sigue
+siendo posible tecleando (mismo criterio que ADR-005).
+
+### Alternativas descartadas
+
+- **Un endpoint por módulo**: tres copias de la misma llamada y tres formas de
+  manejar el mismo error.
+- **Colgar la consulta de `personas.leer` / `purchases.crear`**: quien puede
+  registrar un proveedor podría barrer RUCs; son cosas distintas.
+- **Devolver `crudo`**: datos personales que nadie pidió.
+- **Guardar la dirección como un solo texto**: pierde `provincia`, que es el
+  campo que se usa.
+
+## Consecuencias
+
+- Migración `a7c04e3b91d5` (compartida con ADR-040): `usuario.debe_cambiar_pin`
+  y `proveedor.direccion`/`provincia`/`pais`.
+- Permisos nuevos `users.resetear_pin` (a `rrhh_admin`) y `consulta.documento`
+  (a `rrhh_admin`, `comprador`, `cajero`, `supervisor`).
+- `/users/me/pin` se declara **antes** que `/users/{usuario_id}/pin`: FastAPI
+  resuelve por orden y la ruta con parámetro capturaba `"me"` como si fuera un
+  id, con lo que cambiar el PIN propio terminaba exigiendo `users.gestionar`.
+- `GET /users/me` gana `debe_cambiar_pin`: es de lo poco que una cuenta
+  bloqueada puede pedir, y el shell necesita saber a dónde mandarla.
+- ~~Queda anotado en Deuda técnica que la consulta **no tiene rate limit**
+  propio~~ — **cerrado el 2026-08-15**, ver el addendum.
+
+## Addendum 2026-08-15 — dónde está el botón y cuánto se puede gastar
+
+Dos cosas que la decisión original dejó implícitas y resultaron ser una sola:
+**quién puede consultar tiene que verse en la pantalla, y cuánto se puede
+consultar tiene que tener techo.**
+
+**El botón se monta donde el documento se teclea, no donde el permiso alcanza.**
+Faltaba en **Ventas → Clientes**, que es donde se corrige la razón social de un
+cliente jurídico y donde el propio diálogo ya prometía que "SUNAT manda sobre
+la razón social tecleada". Ahí prellena **solo** la razón social: `contacto` es
+el teléfono o el correo de quien coordina, y escribirle el domicilio fiscal
+sería reemplazar un dato real por otro distinto. **No** va en el diálogo de
+documento de un cliente natural: ese formulario no tiene un solo campo que la
+consulta pueda llenar —el nombre vive en su `persona` (RN-GEN-007)— así que
+sería gastar cuota para no mostrar nada. Falta el receptor del comprobante en
+el PDV, anotado en la deuda de `sales`.
+
+**El gate por `consulta.documento` vive dentro de `BuscarDocumento`**, no en
+cada pantalla que lo monta: repetirlo en seis lugares es cómo el séptimo se lo
+olvida. `permisos` es prop obligatoria, así que montarlo sin decir de quién es
+la sesión no compila. Esconder es mejor que mostrar y fallar por partida doble:
+sin el gate, un `contador` apretaba el botón y se comía un 403 dibujado como
+aviso, y una consulta que sí sale cuesta plata.
+
+**El límite es por usuario además de por IP.** Lo que se protege no es una
+credencial sino el **gasto**, así que la unidad natural es quien consulta y no
+desde dónde. Un límite solo por IP —que era lo que había en el ERP— junta a
+las cuatro cajas de un local en una sola cuota: el primero que se pasa deja sin
+consultar a los otros tres. Se cuenta **después** de `require_permission`,
+porque un 403 no le cuesta un centavo a nadie, y por usuario antes que por IP,
+para que quien se pasa no le queme además la cuota compartida al local. Se
+reusó `core/rate_limit.py` en vez de escribir otro limitador — con su
+**fail-open**, que acá se sostiene por el mismo motivo que en el login: un
+Redis caído no puede dejar a la caja sin identificar a un cliente, y se acepta
+que durante esa caída la cuota quede sin freno.
+
+## Addendum 2026-08-22 — el largo decide el padrón, y el botón llega a caja
+
+El addendum anterior dejó anotado que faltaba el PDV. Cerrarlo obligó a
+resolver algo que en las fichas de alta no se presenta.
+
+**En caja no hay dos campos, hay uno.** Una ficha de persona tiene un campo
+"DNI" y una de proveedor tiene uno "RUC": el formulario ya sabe a qué padrón le
+va a preguntar. En el mostrador el cliente dicta un número y recién su largo
+dice qué es —8 va a RENIEC, 11 a SUNAT—, que es **exactamente** la regla que ya
+decidía boleta o factura (RN-CPP-003). Se agregó el modo `auto`, que resuelve
+con `tipoPorLargo`. Un largo intermedio **no se consulta**: no está "casi
+bien", no es ninguno de los dos, y una consulta a ciegas gasta cuota para
+volver con un "no encontrado" que no significa nada.
+
+Esa regla vive en `frontend/lib/documento.ts` y no dentro del componente por lo
+mismo que `permisos.ts`: `npm test` corre sobre Node pelado, que hace
+type-stripping pero no transforma JSX. Lo que decide a quién se le pregunta
+tiene que poder probarse sin montar React.
+
+**Dos formas del mismo botón, porque hay dos formas de formulario en el ERP.**
+Las fichas de alta son formularios **no controlados** (`defaultValue` + `name`)
+y `BuscarDocumento` escribe en el DOM del `<form>`. El PDV se dibuja con estado
+de React, un `useState` por campo: ahí `form.elements` no lleva a ningún lado
+—el `value` de un input controlado se pisa en el siguiente render—. Se descartó
+levantar los campos del PDV a formulario no controlado (sería rehacer el
+diálogo de cobro por un botón) y también duplicar el fetch: quedó
+`ConsultaDocumento`, misma lógica, que recibe el número y **devuelve la
+respuesta cruda**. Devuelve el objeto entero y no un mapa `campo → clave`
+porque en `auto` quien llama no sabe de antemano si le va a llegar una persona
+(`nombres`/`apellidos`) o una empresa (`razon_social`/`direccion`).
+
+**Dónde quedó, en el PDV.** En los dos puntos donde se identifica a alguien que
+todavía no está registrado: el alta de cliente y el receptor del comprobante.
+En el alta, el campo de documento pasó a aceptar los dos largos —con 11 el
+cliente nace jurídico, que es lo que `crear_cliente` ya hacía y la pantalla no
+dejaba pedir—. En el cobro llena la razón social, que hasta ahora el cajero
+escribía de oído y SUNAT rechazaba cuando no coincidía.
+
+**No se consulta al tipear.** Se dispara con el botón: cada llamada es plata, y
+un RUC pasa por 8 dígitos mientras se escribe — una consulta por tecla gastaría
+una cuota entera para prellenar con los datos de otra persona.
+
+### RRHH: el mismo criterio, donde más pesa
+
+La contratación quedó fuera del addendum anterior por ser "un trabajador y no
+un cliente". Al montar el botón se vio que el problema ahí era peor que en
+caja: `contratar_postulante` creaba la `persona` con `postulante.nombres` y
+`postulante.apellidos` —lo que el candidato escribió de sí mismo en un
+formulario **público**, sin sesión ni permiso— y con ese nombre se firma el
+contrato y se declara a SUNAT. `sales` y `purchases` ya pasaban el documento
+por `nombres_desde_dni`; RRHH no, sin razón que lo justificara.
+
+Se cerró en los dos lados: el servidor aplica RENIEC aunque nadie apriete el
+botón, y el diálogo de contratar suma **nombres y apellidos editables**
+—precargados con lo declarado— para que el botón tenga dónde escribir y quien
+contrata pueda ver el nombre real antes de que nazca la ficha. La precedencia
+es **RENIEC > lo revisado en pantalla > lo declarado**: prellenar es para ver
+el dato antes de guardar, no para pisar al padrón. Con carné de extranjería o
+pasaporte no se consulta — RENIEC no los tiene.
+
+### Un 401 se llamaba "respuesta ilegible"
+
+Probando con un token real, el producto de consulta devolvió **401 con el
+cuerpo vacío**. `_consultar` solo trataba aparte el 404 vacío y el 5xx, así que
+el 401 caía en `respuesta.json()`, reventaba en el parseo y el operador leía
+"Respuesta ilegible de Factiliza" — un mensaje que manda a buscar un error de
+formato cuando lo que hay que revisar es la credencial. Ahora 401 y 403 se
+nombran: "Factiliza rechazó el token; revisa `FACTILIZA_TOKEN` y que el plan de
+consultas esté activo". El resto de los mensajes ilegibles llevan el código de
+estado, por el mismo motivo.
+
+### Son dos tokens, no uno
+
+El 401 de arriba no era un plan vencido: **emisión y consulta tienen
+credenciales distintas**. ADR-005 afirmaba que los dos productos "comparten
+token" y el ERP mandaba `FACTILIZA_TOKEN` a los dos hosts; contra
+`api.factiliza.com` eso es un 401 aunque el token de emisión esté perfectamente
+vigente. Se agregó `FACTILIZA_CONSULTA_DOCUMENTO_TOKEN` —el nombre que ya
+usaba el `.env` real, para no obligar a reescribirlo— y `_consultar` manda ese.
+Cae al de emisión solo si no hay uno propio configurado: una cuenta que sí use
+el mismo para todo sigue funcionando sin tocar nada.
+
+`conftest.py` blanquea **los dos** por defecto. Con uno solo, un `.env` local
+con el token real dejaba que un test olvidado saliera a la red: gastaría cuota
+de un proveedor pago y traería datos personales de alguien a un artefacto de
+CI que se sube y se guarda.
+
+Verificado contra el proveedor real el 2026-08-22: DNI y RUC devuelven 200 y
+el mapeo entra entero en `ConsultaPersona`/`ConsultaEmpresa`. Anotado de esa
+corrida: **`fecha_nacimiento` llega vacía** en este plan de RENIEC (la clave
+viene, el valor es `""`), que es exactamente el caso que `_fecha` ya convertía
+en `None` y por el que el campo es opcional — el alta no puede depender de un
+dato que el proveedor entrega a veces.

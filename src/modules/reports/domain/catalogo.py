@@ -52,7 +52,31 @@ AREAS_BASE = (
 # Resolutores dinámicos: destinatarios que no se pueden listar de antemano
 # porque dependen del estado del momento. Se implementan en
 # `application/destinatarios.py`.
-DINAMICOS = ("encargado_de_turno", "responsables_de_almacen")
+DINAMICOS = (
+    "encargado_de_turno",
+    "responsables_de_almacen",
+    "responsables_del_nivel",
+)
+
+# La cadena de RN-CTP-004: quien atiende no resuelve, escala al supervisor;
+# si el supervisor no puede, va a Comercial y de ahí a Gerencia.
+NIVELES_ESCALAMIENTO = ("supervisor", "comercial", "gerencia")
+
+# A quién le toca en cada nivel. El ERP **no tiene jerarquía organizacional**
+# —no existe `supervisor_id` ni nivel de rol (ADR-036)—, así que el escalón se
+# resuelve con lo que sí existe: el encargado de turno para el piso y las
+# áreas para los dos de arriba.
+#
+# Ojo con una consecuencia real: el seeder pone el rol `supervisor` dentro del
+# área Comercial, así que elevar de `supervisor` a `comercial` puede caer en
+# la misma persona. Es la organización de hoy, no un bug del código; el
+# endpoint devuelve los destinatarios para que quien eleva lo vea, en vez de
+# bloquear la elevación y esconderlo.
+DESTINO_POR_NIVEL: dict[str, tuple[str, str]] = {
+    "supervisor": ("dinamico", "encargado_de_turno"),
+    "comercial": ("area", "comercial"),
+    "gerencia": ("area", "gerencia"),
+}
 
 
 @dataclass(frozen=True)
@@ -82,6 +106,16 @@ class Emision:
     referencia_tipo: str = ""
     # Qué campo del payload es el id de la entidad referida.
     clave_referencia: str = ""
+    # Qué campo del payload dice **quién provocó el hecho**. Vacío = lo
+    # detecta el sistema (un barrido, un cruce de umbral) y no hay a quién
+    # atribuírselo: `actor_id` queda nulo y la API lo muestra como «Sistema»
+    # (RN-REP-009). Inventarle un actor a un hecho del sistema convierte un
+    # aviso de proceso en una acusación.
+    #
+    # Puede nombrar una clave que `campos` no declara: `emitir()` lee del
+    # payload y la columna es el lugar canónico del actor. `datos` sigue
+    # siendo la foto de negocio y solo guarda lo declarado (RN-REP-003).
+    clave_actor: str = ""
 
     @property
     def clave_ambito(self) -> str:
@@ -150,6 +184,12 @@ CATALOGO: tuple[Emision, ...] = (
         dinamicos_sugeridos=("encargado_de_turno",),
         referencia_tipo="venta",
         clave_referencia="venta_id",
+        # Sin actor a propósito. Lo detecta un barrido de Celery, y el hecho
+        # es «el pedido siguió en cocina pasado el umbral», no «alguien tomó
+        # el pedido»: poner ahí al mozo sería acusarlo de algo que no hizo.
+        # Quien responde por el pedido ya es el destinatario
+        # (`encargado_de_turno`), que es donde corresponde.
+        clave_actor="",
     ),
     Emision(
         codigo="sales.descuento_aplicado",
@@ -166,6 +206,7 @@ CATALOGO: tuple[Emision, ...] = (
         areas_sugeridas=("gerencia",),
         referencia_tipo="venta",
         clave_referencia="venta_id",
+        clave_actor="autorizado_por",
     ),
     Emision(
         codigo="sales.venta_anulada",
@@ -178,6 +219,7 @@ CATALOGO: tuple[Emision, ...] = (
         areas_sugeridas=("gerencia",),
         referencia_tipo="venta",
         clave_referencia="venta_id",
+        clave_actor="usuario_id",
     ),
     Emision(
         codigo="sales.lineas_anuladas",
@@ -194,6 +236,7 @@ CATALOGO: tuple[Emision, ...] = (
         areas_sugeridas=("gerencia", "cocina"),
         referencia_tipo="venta",
         clave_referencia="venta_id",
+        clave_actor="autorizado_por",
     ),
     # --- inventory -----------------------------------------------------------
     Emision(
@@ -211,6 +254,7 @@ CATALOGO: tuple[Emision, ...] = (
         dinamicos_sugeridos=("responsables_de_almacen",),
         referencia_tipo="sku",
         clave_referencia="sku_id",
+        clave_actor="usuario_id",
     ),
     Emision(
         codigo="inventory.lote_vencido_detectado",
@@ -228,6 +272,7 @@ CATALOGO: tuple[Emision, ...] = (
         dinamicos_sugeridos=("responsables_de_almacen",),
         referencia_tipo="lote",
         clave_referencia="lote_id",
+        clave_actor="usuario_id",
     ),
     Emision(
         codigo="inventory.conteo_vencido",
@@ -252,6 +297,7 @@ CATALOGO: tuple[Emision, ...] = (
         areas_sugeridas=("almacen", "gerencia"),
         referencia_tipo="categoria",
         clave_referencia="categoria_id",
+        clave_actor="usuario_id",
     ),
     Emision(
         codigo="inventory.devolucion_a_proveedor",
@@ -276,6 +322,7 @@ CATALOGO: tuple[Emision, ...] = (
         areas_sugeridas=("almacen",),
         referencia_tipo="devolucion",
         clave_referencia="devolucion_id",
+        clave_actor="registrado_por",
     ),
     Emision(
         codigo="inventory.devolucion_de_cliente",
@@ -296,6 +343,7 @@ CATALOGO: tuple[Emision, ...] = (
         areas_sugeridas=("comercial",),
         referencia_tipo="devolucion",
         clave_referencia="devolucion_id",
+        clave_actor="registrado_por",
     ),
     Emision(
         codigo="inventory.ajuste_fuera_margen",
@@ -307,11 +355,12 @@ CATALOGO: tuple[Emision, ...] = (
         permiso="inventory.leer",
         nivel="urgente",
         ambito="almacen",
-        campos=("ajuste_id", "almacen_id"),
-        titulo="Ajuste de inventario fuera de margen",
+        campos=("ajuste_id", "almacen_id", "sku_id", "cantidad", "motivo"),
+        titulo="Ajuste fuera de margen: {cantidad} por {motivo}",
         areas_sugeridas=("almacen", "gerencia"),
         referencia_tipo="ajuste",
         clave_referencia="ajuste_id",
+        clave_actor="aprobado_por",
     ),
     # --- accounting ----------------------------------------------------------
     Emision(
@@ -327,6 +376,7 @@ CATALOGO: tuple[Emision, ...] = (
         campos=(
             "cierre_caja_id",
             "sucursal_id",
+            "cajero_id",
             "descuadre_monto",
             "descuadre_tarjeta",
             "descuadre_atribucion",
@@ -336,6 +386,9 @@ CATALOGO: tuple[Emision, ...] = (
         areas_sugeridas=("contabilidad", "gerencia"),
         referencia_tipo="cierre_caja",
         clave_referencia="cierre_caja_id",
+        # Quien firma el relevo, no el cajero: el cierre es su acto.
+        # `cajero_id` viaja en `datos` para saber de quién era la caja.
+        clave_actor="cerrado_por",
     ),
     Emision(
         codigo="accounting.pago_requiere_aprobacion",
@@ -351,6 +404,7 @@ CATALOGO: tuple[Emision, ...] = (
         areas_sugeridas=("gerencia", "contabilidad"),
         referencia_tipo="movimiento_dinero",
         clave_referencia="movimiento_dinero_id",
+        clave_actor="solicitado_por",
     ),
     # --- production ----------------------------------------------------------
     Emision(
@@ -365,9 +419,99 @@ CATALOGO: tuple[Emision, ...] = (
         ambito="almacen",
         campos=("orden_produccion_id", "almacen_id", "resultado"),
         titulo="No conformidad de producción: {resultado}",
-        areas_sugeridas=("gerencia", "almacen"),
+        # `cocina` desde 2026-08-10: RN-PRD-014 le pide al jefe de cocina que
+        # redacte el hallazgo y la acción tomada, y hasta ahora el aviso iba a
+        # Gerencia y Almacén — o sea, a todos menos a quien tiene que actuar.
+        areas_sugeridas=("gerencia", "almacen", "cocina"),
         referencia_tipo="orden_produccion",
         clave_referencia="orden_produccion_id",
+        clave_actor="registrado_por",
+    ),
+    # --- reports (la cadena de escalamiento, RN-CTP-004) ----------------------
+    # Ámbito `empresa` y no `sucursal`: un escalamiento puede nacer de un hecho
+    # que no tiene local (un pago sobre umbral es de la empresa). El
+    # `sucursal_id` viaja igual en `campos` y de ahí lo lee
+    # `responsables_del_nivel` para encontrar al encargado de turno.
+    Emision(
+        codigo="reports.escalamiento_abierto",
+        nombre="Escalamiento abierto",
+        descripcion=(
+            "Alguien elevó un reporte porque no lo pudo resolver en su nivel "
+            "(RN-CTP-004). Arranca en el supervisor."
+        ),
+        permiso="reports.leer",
+        ambito="empresa",
+        campos=(
+            "escalamiento_id",
+            "empresa_id",
+            "sucursal_id",
+            "reporte_emitido_id",
+            "origen",
+            "motivo",
+            "nivel_actual",
+            "descripcion",
+            "reportado_por",
+        ),
+        titulo="Escalamiento por {motivo}",
+        cuerpo="{descripcion}",
+        dinamicos_sugeridos=("responsables_del_nivel",),
+        referencia_tipo="escalamiento",
+        clave_referencia="escalamiento_id",
+        clave_actor="reportado_por",
+    ),
+    Emision(
+        codigo="reports.escalamiento_elevado",
+        nombre="Escalamiento elevado",
+        descripcion=(
+            "El nivel anterior no pudo resolverlo y lo pasó al siguiente. "
+            "Urgente: ya se intentó una vez y sigue abierto."
+        ),
+        permiso="reports.leer",
+        nivel="urgente",
+        ambito="empresa",
+        campos=(
+            "escalamiento_id",
+            "empresa_id",
+            "sucursal_id",
+            "reporte_emitido_id",
+            "motivo",
+            "nivel_actual",
+            "nivel_anterior",
+            "elevado_por",
+        ),
+        titulo="Escalamiento elevado a {nivel_actual}",
+        cuerpo="Venía de {nivel_anterior}. Motivo: {motivo}.",
+        dinamicos_sugeridos=("responsables_del_nivel",),
+        referencia_tipo="escalamiento",
+        clave_referencia="escalamiento_id",
+        clave_actor="elevado_por",
+    ),
+    Emision(
+        codigo="reports.escalamiento_resuelto",
+        nombre="Escalamiento resuelto",
+        descripcion=(
+            "La cadena terminó. Va también al área Comercial: quien lo abrió "
+            "tiene que enterarse de cómo terminó, y el histórico alimenta la "
+            "mejora continua."
+        ),
+        permiso="reports.leer",
+        nivel="info",
+        ambito="empresa",
+        campos=(
+            "escalamiento_id",
+            "empresa_id",
+            "sucursal_id",
+            "reporte_emitido_id",
+            "nivel_actual",
+            "estado",
+            "resuelto_por",
+        ),
+        titulo="Escalamiento resuelto en {nivel_actual}",
+        areas_sugeridas=("comercial",),
+        dinamicos_sugeridos=("responsables_del_nivel",),
+        referencia_tipo="escalamiento",
+        clave_referencia="escalamiento_id",
+        clave_actor="resuelto_por",
     ),
 )
 

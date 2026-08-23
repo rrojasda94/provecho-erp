@@ -125,7 +125,7 @@ function DialogoProponer({
       <dialog ref={dialogRef} className="w-full max-w-md rounded-lg p-0 backdrop:bg-dark/40">
         <form ref={formRef} action={formAction} className="flex flex-col gap-4 p-6">
           <input type="hidden" name="empresa_id" value={empresaId} />
-          <h2 className="font-heading text-lg italic uppercase text-dark">
+          <h2 className="font-heading text-lg text-dark">
             Proponer parámetro
           </h2>
           <p className="text-xs text-gray">
@@ -213,7 +213,7 @@ function DialogoResolver({
       </button>
       <dialog ref={dialogRef} className="w-full max-w-md rounded-lg p-0 backdrop:bg-dark/40">
         <div className="flex flex-col gap-4 p-6">
-          <h2 className="font-heading text-lg italic uppercase text-dark">
+          <h2 className="font-heading text-lg text-dark">
             {parametro.modulo} · {parametro.codigo}
           </h2>
           <p className="text-sm text-dark">
@@ -300,7 +300,7 @@ export function ParametrosCliente({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h1 className="font-heading text-xl italic uppercase text-dark">
+        <h1 className="font-heading text-xl text-dark">
           Parámetros operativos
         </h1>
         <DialogoProponer divisas={divisas} empresaId={empresaId} />

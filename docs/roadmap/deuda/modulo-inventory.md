@@ -3,6 +3,16 @@
 Parte del backlog de deuda técnica del proyecto. El índice y las reglas
 de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 
+- ✅ 2026-08-12 **Abastecedor de respaldo** (ADR-040, RN-INV-022,
+  migración `a7c04e3b91d5`): dar de baja el central dejaba a la sucursal sin
+  poder pedir nada.
+- ⬜ **No se puede vaciar un abastecedor ya elegido** (2026-08-12): los
+  `PATCH` de organización tratan `null` como "no tocar" (convención de
+  `users/api/schemas.py`), así que elegir "Ninguno" en el selector no lo
+  limpia — solo lo deja como estaba. Es previo a este cambio y ahora tiene un
+  campo más. Se arregla con un centinela explícito en el `Update`, que es un
+  cambio de contrato para las cinco entidades de organización.
+
 - ✅ 2026-08-03 **Recetas editables** (ADR-023, migración `b6d1e83f47ac`):
   CRUD de receta e ítems, duplicar con "(copy)", escalar por factor y
   aritmética tecleada en la cantidad (`receta_item.expresion`), redondeada
@@ -291,3 +301,134 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   margen de ajuste sin piso—. Reponer y volver a caer avisa de nuevo, que es
   cuando hay que comprar. Sin consumidor todavía (mismo bloqueo de
   notificaciones que `conteo_vencido` y `lote_vencido_detectado`).
+- ✅ 2026-08-13 **Las devoluciones se pueden usar**: la API estaba completa
+  y la pantalla era una tabla de solo lectura, así que registrar una
+  devolución solo se podía llamando al endpoint a mano. Formulario, anular,
+  ficha de detalle y `audit_log` en registrar/anular. Suma
+  `GET /inventory/skus`, que no existía.
+- ⬜ **La devolución se registra de a una línea** (2026-08-13): la API acepta
+  varias desde el primer día y el formulario manda una sola. Es el caso real
+  —vuelve un producto, se decide qué hacer con él— así que ampliarlo es solo
+  pantalla, cuando alguien lo pida.
+- ⬜ **La ficha de devolución muestra el UUID de quien la registró**, no su
+  nombre (2026-08-13). `inventory` no puede leer `usuario`; hace falta un
+  contrato público de `users` tipo `nombres_de_usuarios`, igual que el que
+  `sales` usa para los nombres de artículo en el KDS.
+- ⬜ **La nota de crédito sigue sin pantalla** (`sales/application/notas_credito.py`):
+  es la devolución de una **venta**, no de mercadería, y por eso no entró
+  con esto. Sin ella, deshacer algo ya cobrado no tiene camino por UI.
+- ✅ 2026-08-15 **El importador se puede usar de verdad** (ADR-048). Desde
+  ADR-046 el backend estaba bien y la pantalla no servía para nada: el proxy
+  del navegador (`frontend/app/api/proxy/[...ruta]/route.ts`) decodificaba
+  todo cuerpo a texto y le fijaba `application/json`, así que la plantilla
+  `.xlsx` se bajaba corrupta y con nombre `plantilla.json` —un ZIP no
+  sobrevive un `text()` en UTF-8— y la subida de la fase 1 perdía el
+  `boundary` del `multipart` antes de salir. Ahora el proxy pasa bytes en las
+  dos direcciones y conserva `Content-Type` y `Content-Disposition`.
+  Lo que dejó al descubierto es de dónde venía el agujero: los tests del
+  importador (`tests/test_recetas_variantes.py`) atacan a FastAPI con
+  `TestClient` y **nunca pasan por el proxy**, así que el endpoint podía estar
+  perfecto y llegar roto al navegador. Se cierra con dos pruebas nuevas:
+  `frontend/lib/proxy.test.ts` (8 casos, milisegundos) y
+  `frontend/uso/importador-recetas.spec.ts`, que descarga la plantilla, la
+  abre con openpyxl, la llena, la sube y confirma (ADR-047).
+- ✅ 2026-08-19 **Requerimiento de la jornada** (ADR-051, RN-INV-023/024,
+  migración `b5f27ac41e83`): el local no tenía cómo armar su lista de pedido
+  ni el almacén cómo distinguir urgencia de decisión propia, pese a que la
+  API de solicitudes existía desde el slice 4. `GET
+  /solicitudes/borrador?almacen_id=` arma sola la lista con lo bajo
+  `stock_minimo` y `solicitud_item.bajo_minimo_al_pedir` se estampa al
+  agregar cada ítem. Suma `GET /conteos` (faltaba) y pantallas
+  `/inventario/solicitudes` + `/inventario/conteos`. Deuda que deja abierta:
+  - ⬜ **El borrador no se encadena al cierre de un conteo cíclico**: hoy lee
+    el `stock_minimo` vigente al abrir la pantalla, independiente de
+    ADR-019. El SOP de abastecimiento (`docs/domain/workflows.md`
+    §Abastecimiento de locales, paso 4) describe que el conteo **genera**
+    el borrador; conectar los dos es una decisión de flujo —¿todo cierre de
+    conteo dispara un borrador, o solo el conteo general?— que no se tomó
+    en este slice.
+  - ⬜ **Recortar lo aprobado por SKU sin pantalla**: `SolicitudAprobar.aprobadas`
+    existe desde ADR-020 y la pantalla nueva solo ofrece aprobar tal cual se
+    pidió (`aprobadas: []`). Falta el formulario que deje editar cantidad
+    por ítem al aprobar.
+- ✅ 2026-08-20 **El importador crea el insumo que falta desde el diálogo**
+  (ADR-052). El `<select>` de resolución tiene ahora un botón «Crear» con un
+  formulario en línea —código, unidad y tipo, con el nombre prellenado del
+  archivo— contra `catalogoApi.crearArticulo`, que existía desde ADR-046 y
+  cuyo único llamador era `contrato.test.ts`. Lo que dejó al descubierto: el
+  docstring del componente, el del caso de uso, la hoja de instrucciones de la
+  plantilla y **RN-COM-031** afirmaban desde el 2026-08-13 que eso ya se podía
+  hacer. Cuatro textos describiendo una función que no existía; los cuatro
+  corregidos con la entrega. Mismo patrón aplicado a las **categorías** al
+  importar artículos.
+- ✅ 2026-08-20 **La importación actualiza recetas existentes** (ADR-052,
+  RN-COM-031). La decisión de negocio que faltaba —qué pasa con los
+  ingredientes que el archivo no menciona— se cerró así: **se conservan**, y
+  la revisión deja pedir que se quiten **receta por receta**, mostrando cuántas
+  líneas se pierden antes de confirmar. El defecto no borra porque el modo de
+  falla es asimétrico: subir la hoja equivocada no puede vaciar una receta sin
+  que nadie vea el número. La identidad es la columna `ID` que escribe el
+  export, no el nombre — el nombre es justamente lo que se edita.
+- ⬜ **Los SKU solo se crean por planilla, no se editan** (2026-08-20,
+  ADR-052): no existe `editar_sku` en `catalogo.py`, así que un SKU cuyo
+  código ya existe se informa como omitido y no se toca. Tocarlo a medias sería
+  peor que informarlo, pero corregir un código de barras mal tecleado sigue
+  exigiendo la pantalla de a uno. Se cierra agregando `editar_sku` con las
+  mismas reglas de unicidad que `crear_sku`.
+- ⬜ **`articulo.id_interno` son 4 caracteres únicos en TODO el grupo**
+  (2026-08-20): no por empresa —`UniqueConstraint("id_interno")` sin
+  `empresa_id`—, así que un catálogo de trescientos artículos exige trescientos
+  códigos distintos de cuatro caracteres compartidos entre todas las empresas.
+  El importador lo exige y **valida el largo por fila** en vez de
+  autogenerarlo, porque un código inventado termina tecleado en una orden de
+  compra. Ensancharlo es una migración con datos existentes y no entró acá.
+- ⬜ **Los importadores no tienen carril de pruebas contra Postgres**
+  (2026-08-20): `pytest` corre sobre SQLite con `create_all`, y el job
+  `migraciones` corre Alembic contra Postgres pero **no la suite**
+  (`.github/workflows/ci.yml`). SQLite no aplica el largo de un `VARCHAR`, así
+  que una fila con el código demasiado largo pasa en verde y da
+  `StringDataRightTruncation` en producción. La defensa actual es validar el
+  largo **en el importador** y un test que ata la constante a la columna del
+  modelo (`test_importacion_articulos.py`), pero eso cubre las columnas que
+  alguien se acordó de atar. Se cierra corriendo la suite también contra
+  Postgres en CI.
+
+## ~~Mitad-y-mitad: la regla de Odoo descuenta de menos~~ — SALDADA 2026-08-23
+
+`aplica_a_variante` implementa la regla de Odoo 18 al pie de la letra: se
+agrupan los valores de la condición por atributo y se exige **al menos uno de
+cada grupo**. La consecuencia es que una línea que nombra `Mitad 1` y
+`Mitad 2` en la misma condición —que es como viene el archivo de Charlie's—
+**no aplica** si solo una de las dos mitades califica. Media americana + media
+peperoni no descuenta el jamón.
+
+No es un bug del motor: es el comportamiento del sistema del que salen los
+datos, y cambiarlo haría que importar su catálogo descontara distinto a como
+descuenta hoy en Odoo, que es peor.
+
+**Cómo se salda: con datos, no con código.** Una línea por mitad, a media
+cantidad, cada una condicionada a un solo atributo. Se hace desde la planilla
+(ADR-057) sin tocar el motor. `tests/test_variantes_odoo.py` tiene las dos
+formas lado a lado —el jamón a la manera de Odoo, la piña por mitad— para que
+la diferencia sea visible y para que quien lo arregle sepa contra qué
+comparar.
+
+**Saldada el mismo día**, al aparecer la regla que faltaba: las dos mitades
+tienen que ser **distintas** (RN-COM-038). Con eso, una condición que pide el
+mismo sabor en las dos mitades no es que descuente de menos — es que no se
+cumple nunca. Las 52 líneas del archivo resultaron ser **todas simétricas**, y
+`scripts/odoo/` las parte en una por mitad con la mitad del gramaje. Ver la
+enmienda de ADR-056.
+
+## La condición de una línea no se valida contra el producto (2026-08-23)
+
+`receta_item.aplica_valores` guarda PTAV de `sales`, y `inventory` no puede
+verificar contra su ORM que esos valores pertenezcan al producto que usa la
+receta. Hoy el único guardarraíl es la lectura conservadora: un valor que
+`atributo_de_valores` no reconoce forma su propio grupo y la línea no aplica.
+
+Alcanza para no descontar de más, que es el lado caro, pero deja pasar una
+receta mal armada sin avisar. Cuando se construya el editor de la condición
+(F4/F5) conviene validarla ahí, donde `sales` sí está a mano, y no en el
+camino del descuento.
+

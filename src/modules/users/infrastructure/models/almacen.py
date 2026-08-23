@@ -6,10 +6,17 @@ from sqlalchemy import ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
-from src.core.model_base import SoftDeleteMixin, TimestampMixin, UuidPkMixin
+from src.core.model_base import (
+    SoftDeleteMixin,
+    TimestampMixin,
+    UbicacionMixin,
+    UuidPkMixin,
+)
 
 
-class Almacen(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin):
+class Almacen(
+    Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin, UbicacionMixin
+):
     __tablename__ = "almacen"
 
     empresa_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("empresa.id"))
@@ -26,5 +33,12 @@ class Almacen(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin):
     direccion: Mapped[str | None] = mapped_column(String(255), nullable=True)
     # El central del que se abastece un almacén de sucursal/producción.
     almacen_abastecedor_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("almacen.id"), nullable=True
+    )
+    # A quién se le pide cuando el principal no está disponible. Vive acá y no
+    # en `sucursal` porque el que se abastece es el almacén: una sucursal
+    # puede tener más de uno (salón y cocina) y no todos se abastecen igual.
+    # Poner el par en `sucursal` sería una segunda fuente de la misma verdad.
+    almacen_abastecedor_respaldo_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("almacen.id"), nullable=True
     )

@@ -12,6 +12,7 @@ from src.modules.purchases.infrastructure.models import Proveedor
 from src.modules.purchases.infrastructure.repositories import ProveedorRepo
 from src.modules.users.infrastructure.models import Persona
 from src.shared.integrations.factiliza import razon_social_desde_ruc
+from src.shared.ubicacion import desanclar_si_cambio_el_texto
 
 
 def crear_proveedor(
@@ -24,6 +25,14 @@ def crear_proveedor(
     razon_social: str | None = None,
     ruc: str | None = None,
     contacto: str | None = None,
+    direccion: str | None = None,
+    provincia: str | None = None,
+    pais: str = "PE",
+    ubicacion_place_id: str | None = None,
+    ubicacion_lat: Decimal | None = None,
+    ubicacion_lng: Decimal | None = None,
+    ubicacion_plus_code: str | None = None,
+    ubicacion_distrito: str | None = None,
     formal: bool = True,
     clasificacion: str = "regular",
     plazo_dias_credito: int | None = None,
@@ -61,6 +70,14 @@ def crear_proveedor(
             razon_social=razon_social,
             ruc=ruc,
             contacto=contacto,
+            direccion=direccion,
+            provincia=provincia,
+            pais=pais,
+            ubicacion_place_id=ubicacion_place_id,
+            ubicacion_lat=ubicacion_lat,
+            ubicacion_lng=ubicacion_lng,
+            ubicacion_plus_code=ubicacion_plus_code,
+            ubicacion_distrito=ubicacion_distrito,
             formal=formal,
             clasificacion=clasificacion,
             condicion_pago=condicion_pago,
@@ -82,10 +99,41 @@ def q_proveedores(session: Session, empresa_id: uuid.UUID | None = None):
 
 
 def editar_proveedor(session: Session, proveedor_id: uuid.UUID, **campos) -> Proveedor:
+    """Corrige un proveedor ya dado de alta. Campo `None` = no tocar.
+
+    Las mismas reglas del alta valen acá: los datos de un natural viven en su
+    `persona` y la condición 'credito' no existe sin plazo. Antes era un
+    `setattr` ciego, con lo que un natural podía terminar con razón social
+    propia —dos fuentes para el mismo nombre, que es justo lo que
+    RN-GEN-007 prohíbe—.
+    """
     proveedor = ProveedorRepo(session).get(proveedor_id)
     if proveedor is None:
         raise NoEncontrado("proveedor no encontrado")
+
+    identificacion = campos.get("razon_social") or campos.get("ruc")
+    if identificacion and proveedor.tipo != "juridico":
+        raise ReglaNegocio(
+            "razón social y RUC son del proveedor jurídico; en uno natural "
+            "los datos viven en su persona (RN-GEN-007)"
+        )
+
+    direccion_previa = proveedor.direccion
     for campo, valor in campos.items():
         if valor is not None:
             setattr(proveedor, campo, valor)
+    desanclar_si_cambio_el_texto(
+        proveedor, campos, direccion_previa, "direccion"
+    )
+
+    if proveedor.condicion_pago == "credito" and not proveedor.plazo_dias_credito:
+        raise ReglaNegocio("condición 'credito' requiere plazo_dias_credito")
+
+    # Mismo criterio que el alta: SUNAT manda sobre lo tecleado. Corregir el
+    # RUC es justo el caso en que lo tecleado estaba mal, así que volver a
+    # consultar es el punto del cambio, no un efecto colateral.
+    if identificacion:
+        proveedor.razon_social = razon_social_desde_ruc(
+            proveedor.ruc, proveedor.razon_social
+        )
     return proveedor

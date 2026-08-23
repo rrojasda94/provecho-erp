@@ -12,14 +12,10 @@ import { MODULOS } from "@/lib/modulos";
  * entrando por URL.
  */
 const modulo = MODULOS.find((m) => m.clave === "catalogo")!;
-const submenu = [
-  { label: "Productos", href: "/catalogo/productos" },
-  { label: "Recetas", href: "/catalogo/recetas" },
-];
 
 export default function CatalogoLayout({ children }: { children: React.ReactNode }) {
   return (
-    <ModuloShell modulo={modulo} submenu={submenu}>
+    <ModuloShell modulo={modulo}>
       {children}
     </ModuloShell>
   );

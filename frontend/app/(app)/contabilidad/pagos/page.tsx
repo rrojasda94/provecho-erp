@@ -1,10 +1,17 @@
 import { ApiError, apiFetch, type Pagina } from "@/lib/api";
+import { primeroElDe } from "@/lib/destinos";
 import { obtenerSesion } from "@/lib/sesion";
 
 import { PagosCliente, type Pago, type Proveedor } from "./pagos-cliente";
 
-export default async function PagosPage() {
+export default async function PagosPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ pago?: string }>;
+}) {
   const { token } = await obtenerSesion();
+  // `?pago=<id>` es a donde llega `accounting.pago_requiere_aprobacion`.
+  const { pago } = await searchParams;
 
   let pagos: Pago[];
   try {
@@ -32,5 +39,10 @@ export default async function PagosPage() {
     // silencioso a propósito, ver comentario arriba.
   }
 
-  return <PagosCliente pagos={pagos} proveedores={proveedores} />;
+  return (
+    <PagosCliente
+      pagos={primeroElDe(pagos, pago ?? null, (p) => p.id)}
+      proveedores={proveedores}
+    />
+  );
 }

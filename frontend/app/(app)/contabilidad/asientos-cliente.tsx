@@ -73,7 +73,7 @@ function DialogoNuevoAsiento({ cuentas }: { cuentas: Cuenta[] }) {
       </button>
       <dialog ref={dialogRef} className="w-full max-w-2xl rounded-lg p-0 backdrop:bg-dark/40">
         <form ref={formRef} action={formAction} className="flex flex-col gap-4 p-6">
-          <h2 className="font-heading text-lg italic uppercase text-dark">Asiento manual</h2>
+          <h2 className="font-heading text-lg text-dark">Asiento manual</h2>
           <div className="flex gap-4">
             <label className="flex flex-col gap-1 text-sm font-semibold">
               Fecha
@@ -262,7 +262,7 @@ export function AsientosCliente({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h1 className="font-heading text-xl italic uppercase text-dark">Asientos</h1>
+        <h1 className="font-heading text-xl text-dark">Asientos</h1>
         <DialogoNuevoAsiento cuentas={cuentas} />
       </div>
       <p className="text-sm text-gray">

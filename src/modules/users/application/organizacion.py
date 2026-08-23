@@ -19,6 +19,7 @@ el router, como en el resto del módulo: ADR-004 dice que sale del token.
 
 import uuid
 from datetime import UTC, datetime
+from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
@@ -44,6 +45,8 @@ from src.modules.users.infrastructure.repositories import (
     SucursalRepo,
 )
 from src.shared import auditoria
+from src.shared.ubicacion import CAMPOS as CAMPOS_UBICACION
+from src.shared.ubicacion import desanclar_si_cambio_el_texto
 
 # Tipo de almacén que sí cuelga de un local; el resto (central, producción,
 # activos) no tiene sucursal. Ver data-model §1.
@@ -137,6 +140,11 @@ def crear_empresa(
     zona_tributaria: str = "general",
     contacto: str | None = None,
     config_fiscal: dict | None = None,
+    ubicacion_place_id: str | None = None,
+    ubicacion_lat: Decimal | None = None,
+    ubicacion_lng: Decimal | None = None,
+    ubicacion_plus_code: str | None = None,
+    ubicacion_distrito: str | None = None,
     actor_id: uuid.UUID | None = None,
 ) -> Empresa:
     _get(GrupoRepo(session).get(grupo_id), "grupo")
@@ -153,6 +161,11 @@ def crear_empresa(
             zona_tributaria=zona_tributaria,
             contacto=contacto,
             config_fiscal=config_fiscal,
+            ubicacion_place_id=ubicacion_place_id,
+            ubicacion_lat=ubicacion_lat,
+            ubicacion_lng=ubicacion_lng,
+            ubicacion_plus_code=ubicacion_plus_code,
+            ubicacion_distrito=ubicacion_distrito,
         )
     )
     _auditar(
@@ -180,6 +193,7 @@ EDITABLES_EMPRESA = (
     "tipo",
     "zona_tributaria",
     "config_fiscal",
+    *CAMPOS_UBICACION,
 )
 
 
@@ -200,7 +214,11 @@ def editar_empresa(
         otra = repo.get_by_ruc(ruc_nuevo)
         if otra is not None and otra.id != empresa_id:
             raise Conflicto(f"RUC '{ruc_nuevo}' ya existe")
+    domicilio_previo = empresa.domicilio_fiscal
     antes = _aplicar(empresa, campos, EDITABLES_EMPRESA)
+    antes |= desanclar_si_cambio_el_texto(
+        empresa, campos, domicilio_previo, "domicilio_fiscal"
+    )
     if antes:
         _auditar(
             session, actor_id, "empresa", empresa.id, "editar", antes,
@@ -350,6 +368,11 @@ def crear_sucursal(
     tenencia: str,
     estado: str = "activa",
     horario_atencion: dict | None = None,
+    ubicacion_place_id: str | None = None,
+    ubicacion_lat: Decimal | None = None,
+    ubicacion_lng: Decimal | None = None,
+    ubicacion_plus_code: str | None = None,
+    ubicacion_distrito: str | None = None,
     actor_id: uuid.UUID | None = None,
 ) -> Sucursal:
     _exigir_licencia(session, empresa_id, marca_id)
@@ -362,6 +385,11 @@ def crear_sucursal(
             tenencia=tenencia,
             estado=estado,
             horario_atencion=horario_atencion,
+            ubicacion_place_id=ubicacion_place_id,
+            ubicacion_lat=ubicacion_lat,
+            ubicacion_lng=ubicacion_lng,
+            ubicacion_plus_code=ubicacion_plus_code,
+            ubicacion_distrito=ubicacion_distrito,
         )
     )
     _auditar(
@@ -389,10 +417,22 @@ def editar_sucursal(
     marca_nueva = campos.get("marca_id")
     if marca_nueva and marca_nueva != sucursal.marca_id:
         _exigir_licencia(session, sucursal.empresa_id, marca_nueva)
+    direccion_previa = sucursal.direccion
     antes = _aplicar(
         sucursal,
         campos,
-        ("marca_id", "nombre", "direccion", "estado", "tenencia", "horario_atencion"),
+        (
+            "marca_id",
+            "nombre",
+            "direccion",
+            "estado",
+            "tenencia",
+            "horario_atencion",
+            *CAMPOS_UBICACION,
+        ),
+    )
+    antes |= desanclar_si_cambio_el_texto(
+        sucursal, campos, direccion_previa, "direccion"
     )
     if antes:
         _auditar(
@@ -421,10 +461,23 @@ def crear_almacen(
     sucursal_id: uuid.UUID | None = None,
     direccion: str | None = None,
     almacen_abastecedor_id: uuid.UUID | None = None,
+    almacen_abastecedor_respaldo_id: uuid.UUID | None = None,
+    ubicacion_place_id: str | None = None,
+    ubicacion_lat: Decimal | None = None,
+    ubicacion_lng: Decimal | None = None,
+    ubicacion_plus_code: str | None = None,
+    ubicacion_distrito: str | None = None,
     actor_id: uuid.UUID | None = None,
 ) -> Almacen:
     _get(EmpresaRepo(session).get(empresa_id), "empresa")
-    _validar_almacen(session, empresa_id, tipo, sucursal_id, almacen_abastecedor_id)
+    _validar_almacen(
+        session,
+        empresa_id,
+        tipo,
+        sucursal_id,
+        almacen_abastecedor_id,
+        almacen_abastecedor_respaldo_id,
+    )
     almacen = AlmacenRepo(session).add(
         Almacen(
             empresa_id=empresa_id,
@@ -433,6 +486,12 @@ def crear_almacen(
             tipo=tipo,
             direccion=direccion,
             almacen_abastecedor_id=almacen_abastecedor_id,
+            almacen_abastecedor_respaldo_id=almacen_abastecedor_respaldo_id,
+            ubicacion_place_id=ubicacion_place_id,
+            ubicacion_lat=ubicacion_lat,
+            ubicacion_lng=ubicacion_lng,
+            ubicacion_plus_code=ubicacion_plus_code,
+            ubicacion_distrito=ubicacion_distrito,
         )
     )
     _auditar(
@@ -463,13 +522,31 @@ def editar_almacen(
     abastecedor_id = (
         campos.get("almacen_abastecedor_id") or almacen.almacen_abastecedor_id
     )
-    if abastecedor_id == almacen_id:
+    respaldo_id = (
+        campos.get("almacen_abastecedor_respaldo_id")
+        or almacen.almacen_abastecedor_respaldo_id
+    )
+    if almacen_id in (abastecedor_id, respaldo_id):
         raise ReglaNegocio("un almacén no puede abastecerse a sí mismo")
-    _validar_almacen(session, almacen.empresa_id, tipo, sucursal_id, abastecedor_id)
+    _validar_almacen(
+        session, almacen.empresa_id, tipo, sucursal_id, abastecedor_id, respaldo_id
+    )
+    direccion_previa = almacen.direccion
     antes = _aplicar(
         almacen,
         campos,
-        ("nombre", "tipo", "direccion", "sucursal_id", "almacen_abastecedor_id"),
+        (
+            "nombre",
+            "tipo",
+            "direccion",
+            "sucursal_id",
+            "almacen_abastecedor_id",
+            "almacen_abastecedor_respaldo_id",
+            *CAMPOS_UBICACION,
+        ),
+    )
+    antes |= desanclar_si_cambio_el_texto(
+        almacen, campos, direccion_previa, "direccion"
     )
     if antes:
         _auditar(
@@ -501,6 +578,7 @@ def _validar_almacen(
     tipo: str,
     sucursal_id: uuid.UUID | None,
     almacen_abastecedor_id: uuid.UUID | None,
+    almacen_abastecedor_respaldo_id: uuid.UUID | None = None,
 ) -> None:
     if tipo == TIPO_ALMACEN_DE_SUCURSAL and sucursal_id is None:
         raise ReglaNegocio("un almacén de tipo 'sucursal' exige sucursal_id")
@@ -508,9 +586,29 @@ def _validar_almacen(
         sucursal = _get(SucursalRepo(session).get(sucursal_id), "sucursal")
         if sucursal.empresa_id != empresa_id:
             raise ReglaNegocio("la sucursal pertenece a otra empresa")
-    if almacen_abastecedor_id is not None:
-        abastecedor = _get(
-            AlmacenRepo(session).get(almacen_abastecedor_id), "almacen abastecedor"
+    _exigir_abastecedor(session, empresa_id, almacen_abastecedor_id, "abastecedor")
+    _exigir_abastecedor(
+        session, empresa_id, almacen_abastecedor_respaldo_id, "abastecedor de respaldo"
+    )
+    # Un respaldo que es el principal no respalda nada: el día que el
+    # principal no esté, tampoco estará él (RN-INV-022).
+    if (
+        almacen_abastecedor_respaldo_id is not None
+        and almacen_abastecedor_respaldo_id == almacen_abastecedor_id
+    ):
+        raise ReglaNegocio(
+            "el almacén de respaldo no puede ser el mismo que el principal"
         )
-        if abastecedor.empresa_id != empresa_id:
-            raise ReglaNegocio("el almacén abastecedor pertenece a otra empresa")
+
+
+def _exigir_abastecedor(
+    session: Session,
+    empresa_id: uuid.UUID,
+    abastecedor_id: uuid.UUID | None,
+    que_es: str,
+) -> None:
+    if abastecedor_id is None:
+        return
+    abastecedor = _get(AlmacenRepo(session).get(abastecedor_id), f"almacen {que_es}")
+    if abastecedor.empresa_id != empresa_id:
+        raise ReglaNegocio(f"el almacén {que_es} pertenece a otra empresa")

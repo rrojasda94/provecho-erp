@@ -95,7 +95,7 @@ def avanzar(
     session.commit()
     return schemas.ItemColaOut(
         venta_item_id=str(item.id), producto="", cantidad=str(item.cantidad),
-        estado=item.estado_preparacion,
+        estado=item.estado_preparacion, etapa_kds=item.etapa_kds,
     )
 
 

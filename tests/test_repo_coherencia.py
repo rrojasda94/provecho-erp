@@ -173,3 +173,26 @@ def test_backend_y_frontend_declaran_la_misma_version():
 def test_los_archivos_que_este_test_vigila_existen(archivo):
     """Si alguno se mueve, este test tiene que fallar en vez de no probar nada."""
     assert archivo.is_file(), f"{archivo.relative_to(RAIZ)} ya no está donde este test lo busca"
+
+
+def test_las_descripciones_de_permiso_entran_en_su_columna():
+    """`permiso.descripcion` es VARCHAR(255) y **Postgres lo hace cumplir**.
+
+    SQLite no valida el largo, así que una descripción de más pasa toda la
+    suite y revienta recién al sembrar contra la base real — con el seeder
+    entero abortado y un `StringDataRightTruncation` que no dice qué permiso
+    fue. Pasó con `users.resetear_pin` (260 caracteres, 2026-08-13).
+
+    El tope se lee del modelo y no se escribe acá: si la columna crece,
+    esta prueba acompaña sola.
+    """
+    from src.modules.users.infrastructure.models import Permiso
+    from src.seeders.seed import PERMISOS
+
+    tope = Permiso.__table__.c.descripcion.type.length
+    largos = [
+        f"{codigo}: {len(desc)} > {tope}"
+        for codigo, desc in PERMISOS
+        if desc and len(desc) > tope
+    ]
+    assert not largos, "descripciones de permiso que no entran:\n" + "\n".join(largos)

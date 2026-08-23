@@ -6,9 +6,17 @@ import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
 
 import { TablaDatos } from "@/components/tabla/tabla-datos";
-import { catalogoApi, type Receta, type UnidadMedida } from "@/lib/catalogo";
+import {
+  catalogoApi,
+  type Categoria,
+  type Receta,
+  type UnidadMedida,
+  RUTA_EXPORTAR_RECETAS,
+} from "@/lib/catalogo";
 import { ErrorApi } from "@/lib/cliente-api";
 import { aTitulo } from "@/lib/texto";
+
+import { ImportarRecetas } from "./importar-recetas";
 
 /**
  * Todas las recetas, incluidas las que no cuelgan de ningún producto.
@@ -21,11 +29,30 @@ import { aTitulo } from "@/lib/texto";
 export function RecetasCliente({
   recetas,
   unidades,
+  categorias,
+  tipo,
+  categoria,
 }: {
   recetas: Receta[];
   unidades: UnidadMedida[];
+  categorias: Categoria[];
+  tipo: string;
+  categoria: string;
 }) {
   const router = useRouter();
+
+  /** El filtro vive en la URL: recarga la página, que es la que consulta al
+   * servidor. Filtrar en memoria traería igual las mil recetas. */
+  const filtrar = (clave: "tipo" | "categoria", valor: string) => {
+    const query = new URLSearchParams({ tipo, categoria });
+    query.set(clave, valor);
+    // Una categoría solo tiene sentido sobre subrecetas: un producto de
+    // venta no produce artículo del que sacarla. Elegir una y que el tipo
+    // diga "Producto de venta" daría una lista vacía sin explicar por qué.
+    if (clave === "categoria" && valor) query.set("tipo", "subreceta");
+    for (const [k, v] of [...query]) if (!v) query.delete(k);
+    router.push(query.size ? `/catalogo/recetas?${query}` : "/catalogo/recetas");
+  };
 
   const columnas = useMemo<ColumnDef<Receta>[]>(
     () => [
@@ -60,21 +87,86 @@ export function RecetasCliente({
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-heading text-xl italic uppercase text-dark">Recetas</h1>
+          <h1 className="font-heading text-xl text-dark">Recetas</h1>
           <p className="text-xs text-gray">
             Las de venta se arman en la ficha de su producto; acá están todas,
             incluidas las subrecetas de cocina.
           </p>
         </div>
-        <DialogoNuevaReceta
-          unidades={unidades}
-          onCreada={(id) => router.push(`/catalogo/recetas/${id}`)}
-        />
+        <div className="flex items-center gap-2">
+          {/* La matriz es el camino corto para corregir el mismo gramaje en
+              varias recetas: acá se abre una ficha por vez (ADR-057). */}
+          <Link
+            href="/catalogo/recetas/matriz"
+            className="rounded border border-borde px-4 py-2 text-sm font-bold text-dark hover:bg-fondo"
+          >
+            Ver en matriz
+          </Link>
+          {/* El export se baja con un `<a download>` contra el proxy, que ya
+              pasa bytes y conserva el nombre del archivo (ADR-048). */}
+          <a
+            href={RUTA_EXPORTAR_RECETAS}
+            download
+            className="rounded border border-borde px-4 py-2 text-sm font-bold text-dark hover:bg-fondo"
+          >
+            Exportar
+          </a>
+          <ImportarRecetas onImportadas={() => router.refresh()} />
+          <DialogoNuevaReceta
+            unidades={unidades}
+            onCreada={(id) => router.push(`/catalogo/recetas/${id}`)}
+          />
+        </div>
       </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <label className="flex items-center gap-2 text-xs text-gray">
+          Tipo
+          <select
+            className="rounded border border-borde bg-white px-2 py-1 text-sm text-dark"
+            value={tipo}
+            onChange={(e) => filtrar("tipo", e.target.value)}
+          >
+            <option value="">Todas</option>
+            <option value="subreceta">Subrecetas</option>
+            <option value="producto">Productos de venta</option>
+          </select>
+        </label>
+        <label className="flex items-center gap-2 text-xs text-gray">
+          Categoría
+          <select
+            className="rounded border border-borde bg-white px-2 py-1 text-sm text-dark"
+            value={categoria}
+            onChange={(e) => filtrar("categoria", e.target.value)}
+          >
+            <option value="">Todas</option>
+            {categorias.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.nombre}
+              </option>
+            ))}
+          </select>
+        </label>
+        {(tipo || categoria) && (
+          <button
+            type="button"
+            className="text-xs text-primary underline"
+            onClick={() => router.push("/catalogo/recetas")}
+          >
+            Quitar filtros
+          </button>
+        )}
+      </div>
+
       <TablaDatos
         columnas={columnas}
         datos={recetas}
         placeholderBusqueda="Buscar receta..."
+        vacio={
+          tipo || categoria
+            ? "Ninguna receta coincide con estos filtros."
+            : "Todavía no hay recetas. Créalas una por una o importa tu recetario."
+        }
       />
     </div>
   );
@@ -124,7 +216,7 @@ function DialogoNuevaReceta({
       </button>
       <dialog ref={dialogRef} className="w-full max-w-md rounded-lg p-0 backdrop:bg-dark/40">
         <div className="flex flex-col gap-4 p-6">
-          <h2 className="font-heading text-lg italic uppercase text-dark">Nueva receta</h2>
+          <h2 className="font-heading text-lg text-dark">Nueva receta</h2>
           <p className="-mt-2 text-xs text-gray">
             Los insumos se agregan al abrirla. Si produce una subreceta, se
             indica ahí mismo.

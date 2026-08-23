@@ -41,7 +41,7 @@ from src.modules.inventory.infrastructure.repositories import (
     ConteoRepo,
     StockRepo,
 )
-from src.modules.users.infrastructure.models import Almacen
+from src.modules.users.infrastructure.models import Almacen, Sucursal
 from src.shared import fechas
 
 
@@ -283,12 +283,15 @@ def programa(
     *,
     almacen_id: uuid.UUID | None = None,
     empresa_id: uuid.UUID | None = None,
+    sucursal_id: uuid.UUID | None = None,
+    marca_id: uuid.UUID | None = None,
     hoy: datetime.date | None = None,
 ) -> list[dict]:
     """Calendario derivado: qué categoría toca contar en qué almacén.
 
     Solo entran las categorías con frecuencia configurada — el resto está
-    deliberadamente fuera del ciclo.
+    deliberadamente fuera del ciclo. Sucursal y marca acotan por el almacén,
+    que es donde cuelgan las dos.
     """
     hoy = _hoy(hoy)
     almacenes = select(Almacen).where(Almacen.deleted_at.is_(None))
@@ -296,6 +299,12 @@ def programa(
         almacenes = almacenes.where(Almacen.id == almacen_id)
     if empresa_id is not None:
         almacenes = almacenes.where(Almacen.empresa_id == empresa_id)
+    if sucursal_id is not None:
+        almacenes = almacenes.where(Almacen.sucursal_id == sucursal_id)
+    if marca_id is not None:
+        almacenes = almacenes.join(
+            Sucursal, Sucursal.id == Almacen.sucursal_id
+        ).where(Sucursal.marca_id == marca_id)
 
     filas = []
     for almacen in session.scalars(almacenes):
@@ -331,9 +340,13 @@ def reportar_vencidos(
     almacen_id: uuid.UUID | None = None,
     empresa_id: uuid.UUID | None = None,
     hoy: datetime.date | None = None,
+    usuario_id: uuid.UUID | None = None,
 ) -> list[dict]:
     """Reporta a almacén y gerencia los conteos que no se hicieron en su
     fecha (RN-INV-021). Publica `inventory.conteo_vencido` por cada uno.
+
+    `usuario_id` es quien pidió el barrido a demanda; nulo cuando lo corre el
+    beat, que es el caso normal.
 
     Lo dispara `inventory.reportar_conteos_vencidos` (Celery beat, diario
     06:15 hora Perú) y también el endpoint, a demanda. Diario y no más
@@ -360,9 +373,34 @@ def reportar_vencidos(
                 # El reporte va a las dos áreas: quien debía contar y quien
                 # responde por que se cuente.
                 "dirigido_a": ["almacen", "gerencia"],
+                "usuario_id": str(usuario_id) if usuario_id else None,
             },
         )
     return vencidos
+
+
+def q_listar(
+    session: Session,
+    *,
+    almacen_id: uuid.UUID | None = None,
+    estado: str | None = None,
+    empresa_id: uuid.UUID | None = None,
+    sucursal_id: uuid.UUID | None = None,
+    marca_id: uuid.UUID | None = None,
+):
+    """La consulta sin ejecutar, para que el router la pagine (ADR-026).
+
+    El conteo vive por almacén; sucursal y marca se resuelven por join, igual
+    que en solicitudes. Sin esto no había forma de listar conteos: solo se
+    podía pedir uno por su id, o sea sabiéndolo de antemano.
+    """
+    return ConteoRepo(session).q_list(
+        almacen_id,
+        estado,
+        empresa_id,
+        sucursal_id=sucursal_id,
+        marca_id=marca_id,
+    )
 
 
 def detalle(session: Session, conteo_id: uuid.UUID) -> tuple[Conteo, list[ConteoItem]]:

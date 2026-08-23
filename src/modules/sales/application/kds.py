@@ -1,12 +1,19 @@
-"""Casos de uso del KDS: pantallas configurables, cola por categorías,
-avance de ítems (bump), avance real del pedido y comanda imprimible.
+"""Casos de uso del KDS: pantallas configurables, cadena de estaciones,
+cola, avance de ítems (bump), avance real del pedido y comanda imprimible.
 
 El estado de preparación vive en `venta_item` — fuente única. Cada
 pantalla es solo un FILTRO sobre ese estado, por eso el avance que
 muestra cualquier pantalla siempre es el real. El frontend refresca por
 polling; push (Redis/WebSocket) queda para el slice de tiempo real.
+
+La cadena (armado → horno → despacho) es `kds_pantalla.orden` +
+`venta_item.etapa_kds`, y se resuelve entera en `_estacion()`: la misma
+función dice qué estación le toca a una línea y cuál es la siguiente
+(ADR-044). Un solo lugar, porque cola y avance que discrepen dejarían
+líneas invisibles en cocina.
 """
 
+import textwrap
 import uuid
 
 from sqlalchemy import select
@@ -38,9 +45,11 @@ def crear_pantalla(
     nombre: str,
     tipo: str,
     categoria_ids: list[str] | None = None,
+    orden: int = 0,
 ) -> KdsPantalla:
     if tipo not in TIPOS_PANTALLA:
         raise ReglaNegocio(f"tipo de pantalla inválido: {tipo}")
+    _validar_orden(orden)
     existe = session.scalar(
         select(KdsPantalla).where(
             KdsPantalla.sucursal_id == sucursal_id,
@@ -52,21 +61,30 @@ def crear_pantalla(
         raise Conflicto(f"pantalla '{nombre}' ya existe en la sucursal")
     pantalla = KdsPantalla(
         sucursal_id=sucursal_id, nombre=nombre, tipo=tipo,
-        categoria_ids=categoria_ids,
+        categoria_ids=categoria_ids, orden=orden,
     )
     session.add(pantalla)
     session.flush()
     return pantalla
 
 
+def _validar_orden(orden: int) -> None:
+    """La cadena se recorre hacia adelante y `etapa_kds` nace en 0: un orden
+    negativo sería un eslabón al que nunca se llega."""
+    if orden < 0:
+        raise ReglaNegocio("el orden de la estación no puede ser negativo")
+
+
 def editar_pantalla(session: Session, pantalla_id: uuid.UUID, **campos) -> KdsPantalla:
     pantalla = session.get(KdsPantalla, pantalla_id)
     if pantalla is None:
         raise NoEncontrado("pantalla no encontrada")
-    for campo in ("nombre", "tipo", "categoria_ids", "activo"):
+    for campo in ("nombre", "tipo", "categoria_ids", "activo", "orden"):
         if campo in campos and campos[campo] is not None:
             if campo == "tipo" and campos[campo] not in TIPOS_PANTALLA:
                 raise ReglaNegocio(f"tipo de pantalla inválido: {campos[campo]}")
+            if campo == "orden":
+                _validar_orden(campos[campo])
             setattr(pantalla, campo, campos[campo])
     return pantalla
 
@@ -77,12 +95,14 @@ def listar_pantallas(
     q = select(KdsPantalla).where(KdsPantalla.deleted_at.is_(None))
     if sucursal_id is not None:
         q = q.where(KdsPantalla.sucursal_id == sucursal_id)
-    return list(session.scalars(q.order_by(KdsPantalla.nombre)))
+    # Ordenadas por la cadena: la lista de estaciones ES el recorrido del
+    # pedido, y mostrarla alfabética lo escondería.
+    return list(session.scalars(q.order_by(KdsPantalla.orden, KdsPantalla.nombre)))
 
 
 # --- Cola y avance ------------------------------------------------------------
 def _items_de_venta(session: Session, venta_id: uuid.UUID) -> list[tuple]:
-    """[(item, producto)] de una venta."""
+    """[(item, producto)] de una venta, extras incluidos."""
     return list(
         session.execute(
             select(VentaItem, ProductoComercial)
@@ -93,6 +113,28 @@ def _items_de_venta(session: Session, venta_id: uuid.UUID) -> list[tuple]:
             .where(VentaItem.venta_id == venta_id)
         )
     )
+
+
+def _extras_de(pares: list[tuple]) -> dict[uuid.UUID, list[tuple]]:
+    """`venta_item_id` del plato → los pares de sus extras.
+
+    Un extra es fila propia (`padre_venta_item_id`) porque tiene su receta,
+    su precio y se anula solo. Pero en cocina **no es un plato aparte**: el
+    sabor de una pizza no se prepara en otra estación ni se tacha por su
+    cuenta (RN-CUP-014). Acá se agrupan para que la tarjeta muestre uno y no
+    dos — mismo criterio que `ventas.listar_items` usa para el ticket.
+    """
+    hijos: dict[uuid.UUID, list[tuple]] = {}
+    for item, prod in pares:
+        if item.padre_venta_item_id is not None:
+            hijos.setdefault(item.padre_venta_item_id, []).append((item, prod))
+    return hijos
+
+
+def _familia(pares: list[tuple], item: VentaItem) -> list[VentaItem]:
+    """El plato y sus extras: lo que cocina trata como una sola cosa."""
+    padre_id = item.padre_venta_item_id or item.id
+    return [it for it, _ in pares if it.id == padre_id or it.padre_venta_item_id == padre_id]
 
 
 def _restas_por_item(session: Session, pares: list[tuple]) -> dict[uuid.UUID, list[str]]:
@@ -127,6 +169,80 @@ def _pertenece(pantalla: KdsPantalla, producto: ProductoComercial) -> bool:
     return str(producto.categoria_id) in pantalla.categoria_ids
 
 
+def _cadena(session: Session, sucursal_id: uuid.UUID) -> list[KdsPantalla]:
+    """Estaciones de preparación activas de la sucursal, en orden de recorrido.
+
+    Despacho queda fuera a propósito: no es un eslabón que la línea tenga
+    que atravesar, es lo que mira el pedido cuando ya no le queda ninguno.
+    """
+    return list(
+        session.scalars(
+            select(KdsPantalla)
+            .where(
+                KdsPantalla.sucursal_id == sucursal_id,
+                KdsPantalla.tipo == "preparacion",
+                KdsPantalla.activo.is_(True),
+                KdsPantalla.deleted_at.is_(None),
+            )
+            .order_by(KdsPantalla.orden, KdsPantalla.nombre)
+        )
+    )
+
+
+def _estacion(
+    cadena: list[KdsPantalla], producto: ProductoComercial, desde: int
+) -> KdsPantalla | None:
+    """Primera estación con `orden >= desde` que atiende este producto.
+
+    Es `>=` y no `==` a propósito: si el eslabón exacto de la línea ya no
+    existe —lo desactivaron, le cambiaron las categorías—, la línea cae a
+    la siguiente estación que sí la acepte en vez de quedar invisible.
+    `None` = ya no queda cadena por delante: la línea está lista.
+    """
+    for pantalla in cadena:
+        if pantalla.orden >= desde and _pertenece(pantalla, producto):
+            return pantalla
+    return None
+
+
+def _estacion_de(
+    cadena: list[KdsPantalla], item: VentaItem, producto: ProductoComercial
+) -> KdsPantalla | None:
+    """Estación que le toca AHORA a la línea. `None` = ya terminó cocina."""
+    if item.estado_preparacion in ("listo", "entregado"):
+        return None
+    return _estacion(cadena, producto, item.etapa_kds)
+
+
+def _item_a_dict(
+    item: VentaItem,
+    producto: ProductoComercial,
+    restas: dict[uuid.UUID, list[str]],
+    estacion: KdsPantalla | None,
+    extras: list[tuple] = (),
+) -> dict:
+    return {
+        "venta_item_id": str(item.id),
+        "producto": producto.nombre,
+        "cantidad": str(item.cantidad),
+        "estado": item.estado_preparacion,
+        "sin": restas.get(item.id, []),
+        # Lo que el plato lleva ADEMÁS: el sabor de la pizza, el queso extra.
+        # Van acá dentro y no como líneas sueltas porque son el mismo plato
+        # (RN-CUP-014) — sueltas, la tarjeta decía "1 Pizza Personal" y
+        # "1 Peperoni" y el cocinero leía dos cosas donde hay una.
+        "extras": [
+            {"producto": prod.nombre, "cantidad": str(hijo.cantidad)}
+            for hijo, prod in extras
+        ],
+        "etapa_kds": item.etapa_kds,
+        # Dónde está la línea ahora mismo. Es lo que despacho necesita para
+        # saber si el pedido espera por el horno o por la barra; `None` = ya
+        # no espera por nadie.
+        "estacion": estacion.nombre if estacion else None,
+    }
+
+
 def cola_pantalla(session: Session, pantalla_id: uuid.UUID) -> list[dict]:
     """Pedidos activos de la sucursal, con los ítems que competen a la
     pantalla y el avance REAL del pedido completo (todas las categorías).
@@ -134,6 +250,7 @@ def cola_pantalla(session: Session, pantalla_id: uuid.UUID) -> list[dict]:
     pantalla = session.get(KdsPantalla, pantalla_id)
     if pantalla is None or pantalla.deleted_at is not None:
         raise NoEncontrado("pantalla no encontrada")
+    cadena = _cadena(session, pantalla.sucursal_id)
 
     ventas = session.scalars(
         select(Venta)
@@ -152,36 +269,25 @@ def cola_pantalla(session: Session, pantalla_id: uuid.UUID) -> list[dict]:
         if estados_todos and all(e == "entregado" for e in estados_todos):
             continue
         restas = _restas_por_item(session, pares)
-        mios = [
-            {
-                "venta_item_id": str(it.id),
-                "producto": prod.nombre,
-                "cantidad": str(it.cantidad),
-                "estado": it.estado_preparacion,
-                "sin": restas.get(it.id, []),
-            }
-            for it, prod in pares
-            if _pertenece(pantalla, prod)
-        ]
+        mios, pendiente_aqui = _items_de_pantalla(pantalla, cadena, pares, restas)
         if pantalla.tipo == "preparacion":
-            # La estación ve TODOS sus ítems, incluidos los ya listos: el
-            # ítem tachado tiene que seguir a la vista de quien lo tachó y
-            # de cualquier otra pantalla que muestre el pedido. El pedido
-            # desaparece de esta cola recién cuando la estación terminó
-            # todo lo suyo — no ítem por ítem.
-            if not mios or all(
-                m["estado"] in ("listo", "entregado") for m in mios
-            ):
+            # La estación ve TODOS sus ítems, incluidos los que ya tachó: el
+            # ítem tachado tiene que seguir a la vista de quien lo tachó. El
+            # pedido desaparece de esta cola recién cuando la estación
+            # terminó todo lo suyo — no ítem por ítem.
+            if not mios or not pendiente_aqui:
                 continue
-        else:
+        elif not any(e == "listo" for e in estados_todos):
             # Despacho: muestra pedidos con algo listo o todo listo.
-            if not any(e in ("listo",) for e in estados_todos):
-                continue
+            continue
         cola.append(
             {
                 "venta_id": str(venta.id),
                 "numero_orden": venta.numero_orden,
                 "referencia_atencion": venta.referencia_atencion,
+                # Despacho arma la bolsa mirando esta pantalla: la dirección
+                # va acá y no solo en el papel.
+                "direccion_entrega": venta.direccion_entrega,
                 "modalidad": venta.modalidad,
                 "canal": venta.canal,
                 # La cocina tiene que saber que está preparando comida del
@@ -195,13 +301,56 @@ def cola_pantalla(session: Session, pantalla_id: uuid.UUID) -> list[dict]:
     return cola
 
 
+def _items_de_pantalla(
+    pantalla: KdsPantalla,
+    cadena: list[KdsPantalla],
+    pares: list[tuple],
+    restas: dict[uuid.UUID, list[str]],
+) -> tuple[list[dict], bool]:
+    """Ítems que le competen a la pantalla, y si le queda algo por hacer.
+
+    Recorre **solo los platos** (`padre_venta_item_id is None`): los extras
+    viajan dentro del suyo, y su categoría no rutea nada (RN-CUP-014). Eso
+    además cierra un agujero: un extra sin `categoria_id` no lo atendía
+    ninguna estación filtrada, así que se quedaba `pendiente` para siempre y
+    el pedido nunca llegaba a entregable.
+
+    Una estación ve todos los de sus categorías, incluidos los que ya mandó
+    al eslabón siguiente: el ítem tachado tiene que seguir a la vista de
+    quien lo tachó, y `estacion` dice a dónde se fue. Lo que saca al pedido
+    de esta cola no es que la línea avance, es que a la estación no le
+    quede nada pendiente. Despacho ve el pedido completo.
+    """
+    hijos = _extras_de(pares)
+    platos = [(it, prod) for it, prod in pares if it.padre_venta_item_id is None]
+    if pantalla.tipo != "preparacion":
+        return (
+            [
+                _item_a_dict(
+                    it, prod, restas, _estacion_de(cadena, it, prod), hijos.get(it.id, [])
+                )
+                for it, prod in platos
+            ],
+            True,
+        )
+    mios, pendiente = [], False
+    for it, prod in platos:
+        if not _pertenece(pantalla, prod):
+            continue
+        estacion = _estacion_de(cadena, it, prod)
+        if estacion is not None and estacion.orden == pantalla.orden:
+            pendiente = True
+        mios.append(_item_a_dict(it, prod, restas, estacion, hijos.get(it.id, [])))
+    return mios, pendiente
+
+
 def avanzar_item(
     session: Session, venta_item_id: uuid.UUID, nuevo_estado: str
 ) -> VentaItem:
-    item = session.get(VentaItem, venta_item_id)
-    if item is None:
+    pedido = session.get(VentaItem, venta_item_id)
+    if pedido is None:
         raise NoEncontrado("ítem de venta no encontrado")
-    venta = session.get(Venta, item.venta_id)
+    venta = session.get(Venta, pedido.venta_id)
     if venta.estado == "anulada":
         raise Conflicto("la venta está anulada")
     if nuevo_estado == "entregado":
@@ -210,16 +359,30 @@ def avanzar_item(
         raise ReglaNegocio(
             "la entrega se registra en POST /sales/ventas/{venta_id}/entrega"
         )
+    pares = _items_de_venta(session, pedido.venta_id)
+    # Si llega el id de un extra se opera sobre su plato: en cocina el extra
+    # no existe por su cuenta (RN-CUP-014), así que rechazarlo sería un error
+    # sin salida para un cliente que todavía mande la línea suelta.
+    familia = _familia(pares, pedido)
+    item = next(it for it in familia if it.padre_venta_item_id is None)
+
     if not rules.transicion_preparacion_valida(item.estado_preparacion, nuevo_estado):
         raise ReglaNegocio(
             f"transición inválida: {item.estado_preparacion} → {nuevo_estado}"
         )
-    item.estado_preparacion = nuevo_estado
+    if nuevo_estado == "listo" and _pasar_a_la_siguiente(session, item, venta):
+        # Tachar en una estación intermedia no es "listo": es "listo ACÁ".
+        # La línea sigue en preparación, ahora en el eslabón siguiente.
+        for hijo in familia:
+            hijo.etapa_kds = item.etapa_kds
+        return item
+    # El extra acompaña al plato: si se quedara atrás, `estado_pedido` y
+    # `pedido_entregable` —que suman TODOS los ítems— dejarían el pedido sin
+    # poder entregarse nunca.
+    for hijo in familia:
+        hijo.estado_preparacion = nuevo_estado
 
-    estados = [
-        it.estado_preparacion
-        for it, _ in _items_de_venta(session, item.venta_id)
-    ]
+    estados = [it.estado_preparacion for it, _ in pares]
     if all(e in ("listo", "entregado") for e in estados):
         event_bus.publish(
             "sales.pedido_listo",
@@ -229,6 +392,26 @@ def avanzar_item(
     return item
 
 
+def _pasar_a_la_siguiente(session: Session, item: VentaItem, venta: Venta) -> bool:
+    """Manda la línea al eslabón siguiente. `False` = no quedaba ninguno.
+
+    El siguiente se busca desde la estación que la línea tiene AHORA y no
+    desde `etapa_kds + 1`: si el eslabón exacto ya no existe, `etapa_kds`
+    apunta más atrás que la estación real y sumarle uno devolvería la misma
+    estación — la línea se quedaría rebotando ahí para siempre.
+    """
+    producto = session.get(ProductoComercial, item.producto_comercial_id)
+    cadena = _cadena(session, venta.sucursal_id)
+    actual = _estacion(cadena, producto, item.etapa_kds)
+    if actual is None:
+        return False
+    siguiente = _estacion(cadena, producto, actual.orden + 1)
+    if siguiente is None:
+        return False
+    item.etapa_kds = siguiente.orden
+    return True
+
+
 def avance_venta(session: Session, venta_id: uuid.UUID) -> dict:
     venta = session.get(Venta, venta_id)
     if venta is None:
@@ -236,20 +419,19 @@ def avance_venta(session: Session, venta_id: uuid.UUID) -> dict:
     pares = _items_de_venta(session, venta_id)
     estados = [it.estado_preparacion for it, _ in pares]
     restas = _restas_por_item(session, pares)
+    cadena = _cadena(session, venta.sucursal_id)
+    hijos = _extras_de(pares)
     return {
         "venta_id": str(venta_id),
         "numero_orden": venta.numero_orden,
         "referencia_atencion": venta.referencia_atencion,
         "estado_pedido": rules.estado_pedido(estados),
         "items": [
-            {
-                "venta_item_id": str(it.id),
-                "producto": prod.nombre,
-                "cantidad": str(it.cantidad),
-                "estado": it.estado_preparacion,
-                "sin": restas.get(it.id, []),
-            }
+            _item_a_dict(
+                it, prod, restas, _estacion_de(cadena, it, prod), hijos.get(it.id, [])
+            )
             for it, prod in pares
+            if it.padre_venta_item_id is None
         ],
     }
 
@@ -280,6 +462,13 @@ def comanda(session: Session, venta_id: uuid.UUID) -> dict:
         f"{venta.created_at:%d/%m/%Y %H:%M}".center(ANCHO_COMANDA),
         "*" * ANCHO_COMANDA,
     ]
+    # La dirección se imprime en la comanda porque el papel es lo que sale
+    # con el repartidor: si solo vive en la pantalla, alguien la copia a
+    # mano y la copia es la que se equivoca.
+    if venta.direccion_entrega:
+        lineas.append("ENTREGAR EN:")
+        lineas += textwrap.wrap(venta.direccion_entrega, ANCHO_COMANDA)
+        lineas.append("-" * ANCHO_COMANDA)
     if rules.es_consumo_personal(venta.tipo):
         lineas.append("** CONSUMO PERSONAL **".center(ANCHO_COMANDA))
         lineas.append(f"({venta.consumo_motivo})".center(ANCHO_COMANDA))
@@ -288,11 +477,21 @@ def comanda(session: Session, venta_id: uuid.UUID) -> dict:
         lineas.append("** REIMPRESION **".center(ANCHO_COMANDA))
         lineas.append("-" * ANCHO_COMANDA)
     restas = _restas_por_item(session, pares)
+    hijos = _extras_de(pares)
     for it, prod in pares:
+        # El extra se imprime DENTRO de su plato, no como línea de primer
+        # nivel: en el papel, "1x Pizza Personal" seguido de "1x Peperoni"
+        # se lee como dos pizzas (RN-CUP-014).
+        if it.padre_venta_item_id is not None:
+            continue
         cant = f"{it.cantidad.normalize()}x"
         lineas.append(f"{cant} {prod.nombre}"[:ANCHO_COMANDA])
-        # Sangrada y en mayúsculas: en la cocina la comanda se lee de reojo,
-        # y una resta que pasa desapercibida sale como plato rehecho.
+        # Sangradas y en mayúsculas: en la cocina la comanda se lee de reojo,
+        # y un extra o una resta que pasan desapercibidos salen como plato
+        # rehecho.
+        for hijo, extra in hijos.get(it.id, []):
+            suf = "" if hijo.cantidad == 1 else f"{hijo.cantidad.normalize()}x "
+            lineas.append(f"   + {suf}{extra.nombre.upper()}"[:ANCHO_COMANDA])
         for nombre in restas.get(it.id, []):
             lineas.append(f"   SIN {nombre.upper()}"[:ANCHO_COMANDA])
     lineas.append("*" * ANCHO_COMANDA)

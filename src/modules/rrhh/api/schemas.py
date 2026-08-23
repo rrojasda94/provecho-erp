@@ -3,6 +3,7 @@
 import uuid
 from datetime import date, datetime, time
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -29,10 +30,19 @@ class TrabajadorCreate(BaseModel):
 
 
 class TrabajadorUpdate(BaseModel):
-    cargo: str | None = None
-    area: str | None = None
-    remuneracion_base: Decimal | None = None
-    estado: str | None = None
+    """Campo ausente o `null` = no tocar.
+
+    `estado` no admite `"cesado"`: el cese tiene su propio endpoint
+    (`POST /trabajadores/{id}/cesar`) porque además de cambiar el estado
+    fija la fecha de cese y publica el evento del que cuelga la liquidación.
+    Llegar a `cesado` por este PATCH dejaba un trabajador cesado sin fecha
+    y sin que nadie se enterara.
+    """
+
+    cargo: str | None = Field(default=None, min_length=1, max_length=100)
+    area: str | None = Field(default=None, min_length=1, max_length=100)
+    remuneracion_base: Decimal | None = Field(default=None, ge=0)
+    estado: Literal["activo", "suspendido"] | None = None
 
 
 class TrabajadorCese(BaseModel):
@@ -50,6 +60,9 @@ class TrabajadorOut(BaseModel):
     tipo_vinculo: str
     fecha_ingreso: date
     fecha_cese: date | None
+    # Viaja para que el formulario de corrección pueda precargarla: sin esto
+    # editar el cargo obligaba a reteclear la remuneración de memoria.
+    remuneracion_base: Decimal | None
     registra_asistencia: bool
     estado: str
 
@@ -210,6 +223,10 @@ class PostulanteContratar(BaseModel):
     fecha_ingreso: date
     tipo_documento: str | None = None
     numero_documento: str | None = Field(default=None, max_length=20)
+    # Corregidos por quien contrata tras verlos contra RENIEC. Opcionales:
+    # sin ellos manda lo que el postulante declaró de sí mismo.
+    nombres: str | None = Field(default=None, max_length=100)
+    apellidos: str | None = Field(default=None, max_length=100)
     # Ex-trabajador recontratado: se reusa su `persona`, no se duplica.
     persona_id: uuid.UUID | None = None
     regimen_laboral: str | None = None

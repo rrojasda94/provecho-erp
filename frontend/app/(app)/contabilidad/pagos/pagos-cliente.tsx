@@ -3,6 +3,7 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
 
+import { Insignia } from "@/components/estado/insignia";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
 
 import { ejecutarPagoAction, rechazarPagoAction, type EstadoAsiento } from "../actions";
@@ -51,7 +52,7 @@ function DialogoEjecutar({ pago, proveedor }: { pago: Pago; proveedor: string })
       <dialog ref={dialogRef} className="w-full max-w-sm rounded-lg p-0 backdrop:bg-dark/40">
         <form ref={formRef} action={formAction} className="flex flex-col gap-4 p-6">
           <input type="hidden" name="movimiento_id" value={pago.id} />
-          <h2 className="font-heading text-lg italic uppercase text-dark">Ejecutar pago</h2>
+          <h2 className="font-heading text-lg text-dark">Ejecutar pago</h2>
           <p className="text-sm text-gray">
             {proveedor} · S/ {pago.monto}
             {pago.monto_detraccion && Number(pago.monto_detraccion) > 0 && (
@@ -157,17 +158,12 @@ export function PagosCliente({
         header: "Estado",
         cell: ({ getValue }) => {
           const estado = getValue<string>();
-          const clase =
-            estado === "ejecutado"
-              ? "bg-accent/30 text-dark"
-              : estado === "rechazado"
-                ? "bg-gray/20 text-gray"
-                : "bg-secondary/15 text-secondary";
-          return (
-            <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${clase}`}>
-              {estado}
-            </span>
-          );
+          // Pendiente NO es un error: es plata que todavía se puede detener.
+          // Tenía el rojo de lo destructivo y un pago aprobado se leía igual
+          // que uno rechazado.
+          const tono =
+            estado === "ejecutado" ? "exito" : estado === "rechazado" ? "neutro" : "alerta";
+          return <Insignia tono={tono}>{estado}</Insignia>;
         },
       },
       {
@@ -189,7 +185,7 @@ export function PagosCliente({
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="font-heading text-xl italic uppercase text-dark">Pagos a proveedor</h1>
+      <h1 className="font-heading text-xl text-dark">Pagos a proveedor</h1>
       <p className="text-sm text-gray">
         La cola la llena la conformidad del comprobante en Compras: nada entra acá sin
         haberse recibido y conformado antes. Ejecutar genera el asiento contable.

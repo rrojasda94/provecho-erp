@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { esSinPermiso, type Falla } from "@/lib/carga";
 import {
   api,
   claveIdempotencia,
@@ -19,6 +20,7 @@ import {
 import Catalogo from "./catalogo";
 import {
   DialogoApertura,
+  DialogoAutorizacion,
   DialogoCierre,
   DialogoCliente,
   DialogoCobro,
@@ -37,10 +39,13 @@ import {
 } from "./tipos";
 import { useCajaPdv } from "./use-caja-pdv";
 import { useDatosPdv } from "./use-datos-pdv";
+import { UBICACION_VACIA } from "@/components/direccion/ubicacion";
 
 type Props = {
-  empresaId: string | null;
   sucursalId: string;
+  /** Los del cajero. Solo deciden si se le ofrece traer un documento de
+   * RENIEC/SUNAT: el resto del PDV ya está detrás del permiso de la caja. */
+  permisos: string[];
   puntoVenta: {
     id: string;
     serieBoleta: string;
@@ -60,6 +65,7 @@ function nuevoBorrador(mesa?: MesaEnMapa): Borrador {
     mesaNumero: mesa?.numero ?? null,
     comensales: null,
     direccion: null,
+    ubicacion: UBICACION_VACIA,
     cliente: null,
     lineas: [],
     ventaId: null,
@@ -68,6 +74,19 @@ function nuevoBorrador(mesa?: MesaEnMapa): Borrador {
     consumoMotivo: null,
     consumoAutorizacion: null,
   };
+}
+
+/** Un pedido que todavía no es nada: sin líneas, sin mesa, sin cliente y sin
+ * haber salido a cocina. Se puede cerrar sin preguntar y no vale la pena
+ * abrir otro igual al lado. */
+function estaVacio(b: Borrador): boolean {
+  return (
+    b.lineas.length === 0 &&
+    !b.ventaId &&
+    !b.mesaId &&
+    !b.cliente &&
+    !b.consumoMotivo
+  );
 }
 
 function EstadoCaja({
@@ -90,16 +109,70 @@ function EstadoCaja({
   );
 }
 
+/** El interruptor entre carta y ticket, para el ancho donde no entran los
+ * dos. Lleva el total del pedido activo porque en ese ancho el ticket no
+ * está a la vista y el cajero necesita saber que hay algo cargado. */
+function CambiarPanel({
+  panel,
+  activo,
+  onCambiar,
+}: {
+  panel: "carta" | "ticket";
+  activo: Borrador | null;
+  onCambiar: () => void;
+}) {
+  const total = activo ? totalBorrador(activo) : 0;
+  const monto = panel === "carta" && total > 0 ? ` · ${soles(total)}` : "";
+  return (
+    <button
+      type="button"
+      className="pdv-cambia-panel"
+      data-testid="cambiar-panel"
+      onClick={onCambiar}
+    >
+      {panel === "carta" ? "Pedido" : "Carta"}
+      {monto}
+    </button>
+  );
+}
+
 function tituloComprobante(venta: Venta | null): string {
   return venta ? `Orden #${venta.numero_orden}` : "Comprobante";
 }
 
-export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props) {
-  const datos = useDatosPdv(empresaId, puntoVenta.id, sucursalId);
+/** Qué mostrar en lugar del PDV mientras no se sabe si hay caja abierta, o
+ * `null` para dejar pasar.
+ *
+ * Que no se pueda **preguntar** por la caja no es lo mismo que no haberla:
+ * ofrecer la apertura ahí lleva a pedir la de una caja que quizá ya está
+ * abierta, que el servidor rechaza por duplicada, y el cajero queda sin poder
+ * vender ni entender por qué. */
+function bloqueoDeCaja(resuelta: boolean, falla: Falla | null) {
+  if (!resuelta) return <main className="pdv-vacio">Cargando el punto de venta…</main>;
+  if (!falla) return null;
+  const detalle = esSinPermiso(falla)
+    ? "Tu usuario no puede consultar la caja de esta sucursal. Pídele a un administrador el permiso `accounting.caja_operar`."
+    : "No se pudo consultar el estado de la caja. Reintenta en unos segundos; si sigue, avisa a soporte.";
+  return (
+    <main className="pdv-vacio">
+      <h1>{falla.mensaje}</h1>
+      <p>{detalle}</p>
+    </main>
+  );
+}
+
+export default function PdvCliente({ sucursalId, permisos, puntoVenta }: Props) {
+  const datos = useDatosPdv(puntoVenta.id, sucursalId);
   const [borradores, setBorradores] = useState<Borrador[]>([nuevoBorrador()]);
   const [activoId, setActivoId] = useState<string | null>(null);
   const [seleccion, setSeleccion] = useState<Set<string>>(new Set());
-  const [vista, setVista] = useState<"catalogo" | "mesas" | "cobrados">("catalogo");
+  /** Qué panel ocupa la pantalla cuando no entran los dos: en tablet vertical
+   * y en teléfono la carta y el ticket comparten el mismo lugar. En el ancho
+   * de mostrador este estado no se usa — los dos paneles se ven a la vez. */
+  const [panel, setPanel] = useState<"carta" | "ticket">("carta");
+  const [vista, setVista] = useState<"catalogo" | "mesas" | "abiertas" | "cobrados">(
+    "catalogo",
+  );
   const [dialogo, setDialogo] = useState<
     "cliente" | "tipo" | "cobro" | "cierre" | "consumo" | null
   >(null);
@@ -108,6 +181,10 @@ export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props)
   const [precuentaAVer, setPrecuentaAVer] = useState("");
   const [aviso, setAviso] = useState("");
   const [ocupado, setOcupado] = useState(false);
+  // Solo se enciende si el servidor dijo que a este usuario no le alcanza.
+  const [firmandoAnulacion, setFirmandoAnulacion] = useState(false);
+  // Qué línea espera la firma del supervisor, o `null` si ninguna.
+  const [lineaFirmando, setLineaFirmando] = useState<string | null>(null);
 
   const activo = borradores.find((b) => b.id === activoId) ?? borradores[0] ?? null;
 
@@ -146,7 +223,21 @@ export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props)
     if (activo?.tipo) datos.setModalidad(activo.tipo);
   }, [activo?.tipo, datos]);
 
+  /** Abre un pedido nuevo, o reusa el vacío que ya está abierto.
+   *
+   * Sin esto, cada toque del "+" apilaba una pestaña más: quedaban diez
+   * pedidos vacíos que no se podían cerrar y que hacían ilegible la columna
+   * derecha. Un borrador sin líneas y sin destino no es un pedido distinto de
+   * otro igual — es el mismo pedido sin empezar.
+   */
   const abrirNuevo = (mesa?: MesaEnMapa) => {
+    if (!mesa) {
+      const vacio = borradores.find(estaVacio);
+      if (vacio) {
+        setActivoId(vacio.id);
+        return vacio;
+      }
+    }
     const b = nuevoBorrador(mesa);
     setBorradores((bs) => [...bs, b]);
     setActivoId(b.id);
@@ -168,10 +259,9 @@ export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props)
    * después tocando la línea, que es el mismo trabajo pero en dos pasos. */
   const agregarProducto = (item: ItemDeCarta) => {
     if (!activo) return;
-    if (activo.ventaId) {
-      notificar("Este pedido ya se envió. Usa + para abrir uno nuevo.");
-      return;
-    }
+    // Un pedido ya enviado admite líneas nuevas (RN-COM-029): la mesa que
+    // pide de a poco no tiene por qué terminar con dos cuentas. Se guardan
+    // contra el servidor al confirmar la línea, no al enviar.
     setLineaEnEdicion(lineaDesde(item));
   };
 
@@ -191,6 +281,11 @@ export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props)
       mesa_id: b.mesaId,
       comensales: b.comensales,
       referencia_atencion: b.tipo === "mesa" ? null : (b.cliente?.nombre ?? null),
+      // Solo el delivery lleva dirección; el costo del reparto lo calcula
+      // el servidor y se congela en la venta (ADR-054).
+      ...(b.tipo === "delivery"
+        ? { direccion_entrega: b.direccion, ...b.ubicacion }
+        : {}),
       // Comida del personal: el servidor pone los precios en cero y exige la
       // elevación del encargado (RN-COM-025).
       ...(b.consumoMotivo
@@ -346,6 +441,7 @@ export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props)
         mesaNumero: info.mesaNumero,
         comensales: info.comensales,
         direccion: null,
+        ubicacion: UBICACION_VACIA,
         cliente: null,
         lineas: items.map(lineaDesdeVentaItem),
         ventaId: info.ventaId,
@@ -410,6 +506,71 @@ export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props)
 
   /** Sin línea alguna es un pedido vacío: no hay nada que anular en el
    * servidor, así que descartar la pestaña alcanza. */
+  /** Anula la orden. Sin firma primero: quien tiene `sales.anular` —un
+   * encargado— no debería teclear su propio PIN para anular su pedido. Si el
+   * servidor dice que no le alcanza, recién ahí se pide la del supervisor. */
+  const anularVenta = async (ventaId: string, autorizacion?: string) => {
+    setOcupado(true);
+    try {
+      await api.anularVenta(ventaId, autorizacion);
+      setFirmandoAnulacion(false);
+      cerrarPedido(activo!.id);
+      notificar(`Orden #${activo!.numeroOrden} anulada`);
+      datos.mesas.recargar();
+      datos.abiertas.recargar();
+    } catch (e) {
+      if (e instanceof ErrorApi && e.status === 403 && !autorizacion) {
+        setFirmandoAnulacion(true);
+        return;
+      }
+      notificar(mensajeDe(e, "No se pudo anular el pedido"));
+    } finally {
+      setOcupado(false);
+    }
+  };
+
+  /** Guarda la línea en el borrador; si el pedido ya salió a cocina, la
+   * manda al servidor y recién entonces la incorpora. Al revés —pintarla y
+   * después sincronizar— el ticket mostraría una línea que quizá el servidor
+   * rechazó, que es justo lo que hacía imposible corregir el sabor. */
+  const guardarLinea = async (l: LineaBorrador) => {
+    if (!activo) return;
+    const yaExiste = activo.lineas.some((x) => x.id === l.id);
+    if (activo.ventaId && !yaExiste) {
+      setOcupado(true);
+      try {
+        const venta = await api.agregarLineas(activo.ventaId, [
+          {
+            producto_comercial_id: l.productoId,
+            cantidad: String(l.cantidad),
+            grupo_cobro: l.grupoCobro,
+            extras: l.extras.map((e) => ({
+              producto_comercial_id: e.productoId,
+              cantidad: String(e.cantidad),
+            })),
+            sin_articulo_ids: l.restas.map((r) => r.articuloId),
+          },
+        ]);
+        parchar({ lineas: [...activo.lineas, l] });
+        setLineaEnEdicion(null);
+        notificar(`Agregado a la orden #${venta.numero_orden}`);
+        datos.mesas.recargar();
+        datos.abiertas.recargar();
+      } catch (e) {
+        notificar(mensajeDe(e, "No se pudo agregar a la orden"));
+      } finally {
+        setOcupado(false);
+      }
+      return;
+    }
+    parchar({
+      lineas: yaExiste
+        ? activo.lineas.map((x) => (x.id === l.id ? l : x))
+        : [...activo.lineas, l],
+    });
+    setLineaEnEdicion(null);
+  };
+
   const anularPedido = async () => {
     if (!activo || activo.lineas.length === 0) return;
     if (!activo.ventaId) {
@@ -417,27 +578,10 @@ export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props)
       notificar("Pedido descartado");
       return;
     }
-    setOcupado(true);
-    try {
-      await api.anularVenta(activo.ventaId);
-      cerrarPedido(activo.id);
-      notificar(`Orden #${activo.numeroOrden} anulada`);
-      datos.mesas.recargar();
-      datos.abiertas.recargar();
-    } catch (e) {
-      notificar(mensajeDe(e, "No se pudo anular el pedido"));
-    } finally {
-      setOcupado(false);
-    }
+    await anularVenta(activo.ventaId);
   };
 
-  /** Quitar una línea ya enviada a cocina repone insumo (RN-COM-020): el
-   * PIN que teclea el supervisor es el mismo token de `POST /auth/autorizar`
-   * que verifica `anular-lineas`. */
-  const anularLineaEnviada = async (
-    lineaId: string,
-    encargado: { username: string; pin: string },
-  ) => {
+  const firmarAnulacion = async (encargado: { username: string; pin: string }) => {
     if (!activo?.ventaId) return;
     setOcupado(true);
     try {
@@ -446,10 +590,34 @@ export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props)
         encargado.pin,
         "sales.anular",
       );
+      await anularVenta(activo.ventaId, elevacion.autorizacion);
+    } catch (e) {
+      notificar(mensajeDe(e, "No se pudo autorizar la anulación"));
+    } finally {
+      setOcupado(false);
+    }
+  };
+
+  /** Quitar una línea ya enviada a cocina repone insumo (RN-COM-020): el
+   * PIN que teclea el supervisor es el mismo token de `POST /auth/autorizar`
+   * que verifica `anular-lineas`. */
+  /** Quitar una línea ya enviada repone insumo (RN-COM-020). Dentro de los
+   * 5 minutos lo hace el cajero solo (RN-COM-029); después el servidor pide
+   * la firma del supervisor y recién ahí el diálogo la pide. */
+  const anularLineaEnviada = async (
+    lineaId: string,
+    encargado?: { username: string; pin: string },
+  ) => {
+    if (!activo?.ventaId) return;
+    setOcupado(true);
+    try {
+      const elevacion = encargado
+        ? await api.autorizar(encargado.username, encargado.pin, "sales.anular")
+        : null;
       const venta = await api.anularLineas(activo.ventaId, {
         venta_item_ids: [lineaId],
         motivo: "Anulado desde PDV",
-        autorizacion: elevacion.autorizacion,
+        ...(elevacion ? { autorizacion: elevacion.autorizacion } : {}),
       });
       setLineaEnEdicion(null);
       if (venta.estado === "anulada") {
@@ -460,7 +628,12 @@ export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props)
         notificar("Línea anulada");
       }
       datos.mesas.recargar();
+      datos.abiertas.recargar();
     } catch (e) {
+      if (e instanceof ErrorApi && e.status === 403 && !encargado) {
+        setLineaFirmando(lineaId);
+        return;
+      }
       notificar(mensajeDe(e, "No se pudo anular la línea"));
     } finally {
       setOcupado(false);
@@ -489,9 +662,8 @@ export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props)
     }
   };
 
-  if (!datos.cajaResuelta) {
-    return <main className="pdv-vacio">Cargando el punto de venta…</main>;
-  }
+  const bloqueo = bloqueoDeCaja(datos.cajaResuelta, datos.fallaCaja);
+  if (bloqueo) return bloqueo;
 
   return (
     <main className="pdv">
@@ -502,15 +674,24 @@ export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props)
         </div>
         <EstadoCaja caja={datos.caja} onClick={() => setDialogo("cierre")} />
         <span className="pdv-spacer" />
+        {/* Solo existe en el ancho donde los dos paneles no entran lado a
+            lado (`.pdv-cambia-panel`, `pdv.css`). Antes de esto el ticket
+            simplemente no estaba en una tablet vertical. */}
+        <CambiarPanel
+          panel={panel}
+          activo={activo}
+          onCambiar={() => setPanel((p) => (p === "carta" ? "ticket" : "carta"))}
+        />
         <span className="pdv-meta">{hora()}</span>
       </header>
 
-      <div className="pdv-shell">
+      <div className={`pdv-shell ver-${panel}`}>
         <Catalogo
           carta={datos.carta}
           mesas={datos.mesas}
           cobrados={datos.cobrados}
           abiertas={datos.abiertas}
+          cajaAbierta={!!datos.caja}
           vista={vista}
           onVista={setVista}
           onProducto={agregarProducto}
@@ -525,6 +706,7 @@ export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props)
           ocupado={ocupado || !datos.caja}
           onActivar={setActivoId}
           onNuevo={() => abrirNuevo()}
+          onCerrar={cerrarPedido}
           onLinea={setLineaEnEdicion}
           onAlternarSeleccion={(id) => setSeleccion(alternar(seleccion, id))}
           onLimpiarSeleccion={() => setSeleccion(new Set())}
@@ -556,6 +738,26 @@ export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props)
         onAbrir={abrirCaja}
         ocupado={ocupado}
       />
+      <DialogoAutorizacion
+        abierto={lineaFirmando !== null}
+        titulo="Quitar la línea"
+        detalle="Pasaron más de 5 minutos desde que salió a cocina: el insumo ya se usó, así que reponerlo lo firma un supervisor (RN-COM-020)."
+        ocupado={ocupado}
+        onCerrar={() => setLineaFirmando(null)}
+        onFirmar={async (encargado) => {
+          const id = lineaFirmando;
+          setLineaFirmando(null);
+          if (id) await anularLineaEnviada(id, encargado);
+        }}
+      />
+      <DialogoAutorizacion
+        abierto={firmandoAnulacion}
+        titulo="Anular el pedido"
+        detalle="Ya salió a cocina y el insumo se descontó: anularlo lo repone, y lo firma un supervisor (RN-COM-020)."
+        ocupado={ocupado}
+        onCerrar={() => setFirmandoAnulacion(false)}
+        onFirmar={firmarAnulacion}
+      />
       <DialogoCierre
         abierto={dialogo === "cierre"}
         posVerificados={posDelTurno}
@@ -578,15 +780,7 @@ export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props)
         }
         enviado={Boolean(activo?.ventaId)}
         onCerrar={() => setLineaEnEdicion(null)}
-        onGuardar={(l) => {
-          const yaExiste = activo?.lineas.some((x) => x.id === l.id);
-          parchar({
-            lineas: yaExiste
-              ? (activo?.lineas.map((x) => (x.id === l.id ? l : x)) ?? [])
-              : [...(activo?.lineas ?? []), l],
-          });
-          setLineaEnEdicion(null);
-        }}
+        onGuardar={guardarLinea}
         onQuitar={(id) => {
           parchar({ lineas: activo?.lineas.filter((x) => x.id !== id) ?? [] });
           setLineaEnEdicion(null);
@@ -597,6 +791,7 @@ export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props)
         abierto={dialogo === "tipo"}
         borrador={activo}
         mesas={datos.mesas.datos}
+        sucursalId={sucursalId}
         onCerrar={() => setDialogo(null)}
         onConfirmar={(cambios) => {
           parchar(cambios);
@@ -611,6 +806,7 @@ export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props)
       />
       <DialogoCliente
         abierto={dialogo === "cliente"}
+        permisos={permisos}
         onCerrar={() => setDialogo(null)}
         onBuscar={api.buscarClientes}
         onElegir={(c: ClienteBuscado) => {
@@ -621,6 +817,7 @@ export default function PdvCliente({ empresaId, sucursalId, puntoVenta }: Props)
       />
       <DialogoCobro
         abierto={dialogo === "cobro"}
+        permisos={permisos}
         total={totalACobrar(activo, seleccion)}
         medios={datos.medios}
         ocupado={ocupado}

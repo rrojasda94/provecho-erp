@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+
+import { Rastro } from "@/components/shell/rastro";
 import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
 
@@ -87,14 +89,12 @@ export function FichaProducto({
   return (
     <div className="flex max-w-4xl flex-col gap-6">
       <div>
-        <Link href="/catalogo/productos" className="text-sm text-gray hover:text-primary">
-          ← Productos
-        </Link>
+        <Rastro hoja={producto.nombre} />
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <input
             defaultValue={producto.nombre}
             maxLength={150}
-            className="flex-1 font-heading text-xl italic uppercase text-dark"
+            className="flex-1 font-heading text-xl text-dark"
             aria-label="Nombre del producto"
             onBlur={(e) => {
               const nombre = aTitulo(e.target.value);
@@ -247,7 +247,7 @@ function SeccionSimple({
 }) {
   return (
     <section className="rounded-lg border border-gray/20 bg-white p-4">
-      <h2 className="mb-1 font-heading text-lg italic uppercase text-dark">Receta</h2>
+      <h2 className="mb-1 font-heading text-lg text-dark">Receta</h2>
       <p className="mb-3 text-xs text-gray">
         Se elige entre las que ya existen. Para armarla o corregirla, ve a{" "}
         <Link href="/catalogo/recetas" className="text-primary hover:underline">
@@ -329,7 +329,7 @@ function SeccionPresentaciones({
 
   return (
     <section className="rounded-lg border border-gray/20 bg-white p-4">
-      <h2 className="mb-1 font-heading text-lg italic uppercase text-dark">
+      <h2 className="mb-1 font-heading text-lg text-dark">
         Presentaciones
       </h2>
       <p className="mb-3 text-xs text-gray">
@@ -564,7 +564,7 @@ function SeccionExtras({
 }) {
   return (
     <section className="rounded-lg border border-gray/20 bg-white p-4">
-      <h2 className="mb-1 font-heading text-lg italic uppercase text-dark">
+      <h2 className="mb-1 font-heading text-lg text-dark">
         Extras y opciones
       </h2>
       <p className="mb-3 text-xs text-gray">

@@ -9,7 +9,7 @@ from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
-from src.core.database import SessionLocal
+from src.core.database import SessionLocal, SessionReportes
 from src.core.tenant import Tenant
 from src.modules.users.application import auth, tokens
 from src.modules.users.application.errors import TokenInvalido
@@ -29,10 +29,8 @@ from src.modules.users.infrastructure.security import (
 _bearer = HTTPBearer(auto_error=True)
 
 
-def get_db() -> Iterator[Session]:
-    """La sesión es la Unit of Work; los endpoints hacen commit explícito.
-    Rollback automático ante excepción no controlada."""
-    session = SessionLocal()
+def _sesion(factory) -> Iterator[Session]:
+    session = factory()
     try:
         yield session
     except Exception:
@@ -40,6 +38,25 @@ def get_db() -> Iterator[Session]:
         raise
     finally:
         session.close()
+
+
+def get_db() -> Iterator[Session]:
+    """La sesión es la Unit of Work; los endpoints hacen commit explícito.
+    Rollback automático ante excepción no controlada."""
+    yield from _sesion(SessionLocal)
+
+
+def get_db_reportes() -> Iterator[Session]:
+    """Igual que `get_db`, sobre el engine de plazo largo (`SessionReportes`).
+
+    La usan `src/core/reportes/` y el módulo `reports`, donde viven las
+    consultas que legítimamente tardan (ver `docs/engineering/devops.md` →
+    «Dos engines»). Es una función aparte y no un parámetro de `get_db` porque
+    FastAPI resuelve y sobreescribe dependencias **por callable**: con un
+    parámetro no habría manera de apuntar solo esta a otra base. El costo es
+    que el `env` de un test que toque reportes sobreescribe las dos.
+    """
+    yield from _sesion(SessionReportes)
 
 
 def get_claims(
@@ -70,13 +87,35 @@ def get_claims(
         ) from None
 
 
+# Lo único que se puede hacer con un PIN reseteado: mirarse a uno mismo,
+# cambiarlo, y salir. Todo lo demás espera.
+RUTAS_CON_PIN_TEMPORAL = frozenset(
+    {
+        "/api/v1/users/me",
+        "/api/v1/users/me/pin",
+        "/api/v1/auth/logout",
+    }
+)
+
+
 def get_current_user(
+    request: Request,
     claims: dict = Depends(get_claims),
     session: Session = Depends(get_db),
 ) -> Usuario:
     usuario = UsuarioRepo(session).get(uuid.UUID(claims["sub"]))
     if usuario is None or not usuario.activo:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Usuario inválido")
+    # Se lee de la BD y no de un claim del token: así un reseteo surte efecto
+    # en el request siguiente y no cuando vence el access token. También es lo
+    # que hace que la obligación sea real — todo endpoint del ERP pasa por
+    # acá (verificado: no hay handler con `get_tenant` y sin usuario), así que
+    # no hay puerta lateral que quede abierta.
+    if usuario.debe_cambiar_pin and request.url.path not in RUTAS_CON_PIN_TEMPORAL:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Tu PIN fue reseteado: elige uno nuevo antes de seguir",
+        )
     return usuario
 
 

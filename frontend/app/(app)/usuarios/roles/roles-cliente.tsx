@@ -1,13 +1,10 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useActionState, useMemo, useState, useTransition } from "react";
 
-import {
-  asignarPermisoAction,
-  crearRolAction,
-  quitarPermisoAction,
-  type EstadoRol,
-} from "./actions";
+import { DialogoFormulario, ESTADO_INICIAL } from "@/components/formulario/dialogo-formulario";
+
+import { asignarPermisoAction, crearRolAction, quitarPermisoAction } from "./actions";
 
 export type Rol = { id: string; nombre: string; descripcion: string | null };
 export type Permiso = {
@@ -17,8 +14,6 @@ export type Permiso = {
   restricciones: Record<string, unknown> | null;
 };
 
-const ESTADO_INICIAL: EstadoRol = { error: "", ok: false };
-
 /** Prefijo del código (`sales.cobrar` → `sales`): el catálogo pasa los 90
  * permisos y sin agrupar es una lista imposible de leer. */
 function modulo(codigo: string): string {
@@ -26,61 +21,23 @@ function modulo(codigo: string): string {
 }
 
 function DialogoNuevoRol() {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const formRef = useRef<HTMLFormElement>(null);
-  const [estado, formAction, pendiente] = useActionState(crearRolAction, ESTADO_INICIAL);
-
-  useEffect(() => {
-    if (estado.ok) {
-      formRef.current?.reset();
-      dialogRef.current?.close();
-    }
-  }, [estado.ok]);
-
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => dialogRef.current?.showModal()}
-        className="rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary"
-      >
-        + Nuevo rol
-      </button>
-      <dialog ref={dialogRef} className="w-full max-w-md rounded-lg p-0 backdrop:bg-dark/40">
-        <form ref={formRef} action={formAction} className="flex flex-col gap-4 p-6">
-          <h2 className="font-heading text-lg italic uppercase text-dark">Nuevo rol</h2>
-          <label className="flex flex-col gap-1 text-sm font-semibold">
-            Nombre
-            <input name="nombre" required maxLength={50} placeholder="ej. supervisor_turno" />
-          </label>
-          <label className="flex flex-col gap-1 text-sm font-semibold">
-            Descripción
-            <input name="descripcion" maxLength={200} placeholder="Qué hace quien lo tiene" />
-          </label>
-          {estado.error && (
-            <p role="alert" className="text-sm font-semibold text-secondary">
-              {estado.error}
-            </p>
-          )}
-          <div className="mt-2 flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => dialogRef.current?.close()}
-              className="rounded border border-gray px-4 py-2 text-sm font-semibold text-dark"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={pendiente}
-              className="rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary"
-            >
-              {pendiente ? "Creando..." : "Crear"}
-            </button>
-          </div>
-        </form>
-      </dialog>
-    </>
+    <DialogoFormulario
+      titulo="Nuevo rol"
+      disparador="+ Nuevo rol"
+      etiquetaEnvio="Crear"
+      etiquetaPendiente="Creando..."
+      accion={crearRolAction}
+    >
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Nombre
+        <input name="nombre" required maxLength={50} placeholder="ej. supervisor_turno" />
+      </label>
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Descripción
+        <input name="descripcion" maxLength={200} placeholder="Qué hace quien lo tiene" />
+      </label>
+    </DialogoFormulario>
   );
 }
 
@@ -183,7 +140,7 @@ export function RolesCliente({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h1 className="font-heading text-xl italic uppercase text-dark">Roles</h1>
+        <h1 className="font-heading text-xl text-dark">Roles</h1>
         <DialogoNuevoRol />
       </div>
       <p className="text-sm text-gray">

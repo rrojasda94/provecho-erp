@@ -30,12 +30,20 @@ export type DatosNodo = {
   total?: string;
   onToggle?: () => void;
   onQuitar?: () => void;
+  /** Qué dice el `title` de "quitar" — lo que se retira no es lo mismo en un
+   * extra (se desvincula) que en un grupo (se borra). */
+  quitarAria?: string;
 };
 
+// Los puertos se cablean. Van habilitados en todos los nodos a propósito:
+// `conexiones.ts` rechaza el par que el dominio no admite **explicando qué sí
+// se puede**, y eso solo puede pasar si el arrastre llega a empezar. Con
+// `isConnectable={false}` react-flow ni siquiera dejaba tomar el puerto, así
+// que el lienzo se sentía un dibujo.
 const PUERTOS = (
   <>
-    <Handle type="target" position={Position.Left} isConnectable={false} />
-    <Handle type="source" position={Position.Right} isConnectable={false} />
+    <Handle type="target" position={Position.Left} />
+    <Handle type="source" position={Position.Right} />
   </>
 );
 
@@ -55,7 +63,11 @@ function Tarjeta({
         type="button"
         className={`nodo ${clase}${datos.activo ? " activo" : ""}`}
         aria-pressed={datos.onToggle ? datos.activo : undefined}
-        disabled={!datos.onToggle}
+        // Deshabilitado solo si NO hay nada que hacer con él: un `<button
+        // disabled>` se traga los clicks de todo lo que tiene adentro, y con
+        // eso "quitar" y "receta" quedaban muertos en cualquier nodo que no
+        // se pudiera tocar —el grupo, sin ir más lejos—.
+        disabled={!datos.onToggle && !datos.onQuitar && !datos.recetaId}
         onClick={datos.onToggle}
         aria-label={datos.aria}
         title={datos.aria ?? datos.titulo}
@@ -69,43 +81,50 @@ function Tarjeta({
   );
 }
 
+/** Enlaces del pie del nodo. `<span role="button">` y no `<button>`: esto va
+ * dentro del botón del nodo, y anidar botones es HTML inválido. */
+function Acciones({ datos }: { datos: DatosNodo }) {
+  if (!datos.recetaId && !datos.onQuitar) return null;
+  return (
+    <span className="nodo-acciones">
+      {datos.recetaId && (
+        <Link
+          href={`/catalogo/recetas/${datos.recetaId}`}
+          className="nodo-accion nodrag"
+          onClick={(e) => e.stopPropagation()}
+        >
+          receta
+        </Link>
+      )}
+      {datos.onQuitar && (
+        <span
+          role="button"
+          tabIndex={0}
+          className="nodo-accion riesgo nodrag"
+          title={datos.quitarAria ?? "Deja de ofrecerlo en este producto. El extra no se borra"}
+          onClick={(e) => {
+            e.stopPropagation();
+            datos.onQuitar?.();
+          }}
+          onKeyDown={(e) => {
+            if (e.key !== "Enter" && e.key !== " ") return;
+            e.stopPropagation();
+            e.preventDefault();
+            datos.onQuitar?.();
+          }}
+        >
+          quitar
+        </span>
+      )}
+    </span>
+  );
+}
+
 export function NodoTarjeta({ data }: NodeProps) {
   const datos = data as DatosNodo;
   return (
     <Tarjeta datos={datos} clase="">
-      {(datos.recetaId || datos.onQuitar) && (
-        <span className="nodo-acciones">
-          {datos.recetaId && (
-            <Link
-              href={`/catalogo/recetas/${datos.recetaId}`}
-              className="nodo-accion nodrag"
-              onClick={(e) => e.stopPropagation()}
-            >
-              receta
-            </Link>
-          )}
-          {datos.onQuitar && (
-            <span
-              role="button"
-              tabIndex={0}
-              className="nodo-accion riesgo nodrag"
-              title="Deja de ofrecerlo en este producto. El extra no se borra"
-              onClick={(e) => {
-                e.stopPropagation();
-                datos.onQuitar?.();
-              }}
-              onKeyDown={(e) => {
-                if (e.key !== "Enter" && e.key !== " ") return;
-                e.stopPropagation();
-                e.preventDefault();
-                datos.onQuitar?.();
-              }}
-            >
-              quitar
-            </span>
-          )}
-        </span>
-      )}
+      <Acciones datos={datos} />
     </Tarjeta>
   );
 }
@@ -120,9 +139,16 @@ export function NodoResta({ data }: NodeProps) {
 }
 
 /** Cabecera de una columna de opciones. Existe como nodo para ser el destino
- * de una conexión: colgar un extra ahí es colgarlo DENTRO de ese grupo. */
+ * de una conexión: colgar un extra ahí es colgarlo DENTRO de ese grupo. Y para
+ * poder borrarlo desde donde se lo ve, que es lo que faltaba: sus opciones
+ * siguen ofreciéndose, ya sin mínimo. */
 export function NodoGrupo({ data }: NodeProps) {
-  return <Tarjeta datos={data as DatosNodo} clase="grupo" />;
+  const datos = data as DatosNodo;
+  return (
+    <Tarjeta datos={datos} clase="grupo">
+      <Acciones datos={datos} />
+    </Tarjeta>
+  );
 }
 
 /** Un extra que existe y este producto todavía no ofrece. Se cablea a un
@@ -135,7 +161,7 @@ export function NodoPlato({ data }: NodeProps) {
   const datos = data as DatosNodo;
   return (
     <>
-      <Handle type="target" position={Position.Left} isConnectable={false} />
+      <Handle type="target" position={Position.Left} />
       <div className="nodo plato">
         <span className="nodo-columna">Plato</span>
         <span className="nodo-total">{datos.total ?? "—"}</span>
@@ -151,6 +177,11 @@ export const TIPOS_NODO: Record<TipoNodo, typeof NodoTarjeta> = {
   tamano: NodoTarjeta,
   grupo: NodoGrupo,
   opcion: NodoTarjeta,
+  // El atributo se dibuja como el grupo y el valor como la opción: el gesto
+  // es el mismo —elegir uno de varios— y el lienzo no gana nada inventando
+  // una segunda manera de mostrar lo que ya se sabe mirar (ADR-058).
+  atributo: NodoGrupo,
+  valor: NodoTarjeta,
   disponible: NodoDisponible,
   empaque: NodoTarjeta,
   resta: NodoResta,

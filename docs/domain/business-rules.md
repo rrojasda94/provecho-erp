@@ -69,6 +69,17 @@ de su módulo y se prueban de forma aislada.
 - **RN-POS-013** Durante el conteo de efectivo y la apertura de caja, el
   encargado de tienda/supervisor no puede atender otro proceso o
   actividad.
+- **RN-POS-014** La pantalla del punto de venta se bloquea a los **5
+  minutos** sin actividad y se reabre con el PIN de quien tiene la sesión.
+  El bloqueo **no cierra sesión**: la caja abierta y el pedido a medio
+  armar siguen donde estaban — un bloqueo que hiciera perder el pedido se
+  eludiría dejando la pantalla tocada a propósito. Los PIN del punto de
+  venta se teclean en un teclado numérico sin campo de formulario, para que
+  el navegador no pueda ofrecer guardarlos: un PIN guardado en la caja es
+  la vía por la que un turno entra con la cuenta del anterior y toda la
+  auditoría (RN-AUD-005) nombra a la persona equivocada. Un intento
+  fallido de desbloqueo cuenta contra el mismo bloqueo de cuenta que el
+  ingreso.
 
 ## Central de pedidos
 
@@ -81,7 +92,12 @@ de su módulo y se prueban de forma aislada.
   elige la sucursal.
 - **RN-CTP-004** Todo escalamiento de un pedido (tiempos, calidad,
   problema) genera un reporte de escalamiento y se dirige a un supervisor o
-  encargado de sucursal.
+  encargado de sucursal. **Implementado desde ADR-036**: la cadena es
+  `reporte_escalamiento` y el nivel `supervisor` resuelve al encargado de
+  turno (con roles `supervisor`/`admin` de respaldo si no hay caja abierta).
+  Alcance de hoy: solo se escala lo que el catálogo cerrado emite, así que los
+  motivos `queja`, `error_sistema` y `desistimiento_no_resuelto` se pueden
+  elegir pero ninguna emisión los produce todavía.
 
 ## Canal de venta
 
@@ -119,12 +135,15 @@ de su módulo y se prueban de forma aislada.
 - **RN-MDP-001** Un medio de pago a crédito puede tener una lista de
   precios distinta a la del pago al contado.
 - **RN-MDP-002** El efectivo sigue una cadena de custodia obligatoria:
-  cajero → encargado de tienda/supervisor (al cierre de caja, tras
-  confirmar valores) → área contable (verifica y pone a disposición de la
-  empresa). En la apertura de caja la cadena se recorre en sentido
-  inverso: área contable/encargado de tienda/supervisor → cajero. Cada
-  relevo, en cualquier sentido, exige que quien recibe se autentique con
-  usuario y PIN en el ERP y confirme que los valores son correctos.
+  cajero → encargado de tienda/supervisor → área contable (verifica y pone
+  a disposición de la empresa). En la apertura, el fondo recorre la misma
+  cadena en sentido inverso. **Cada relevo, en cualquier sentido, exige que
+  quien recibe se autentique con usuario y PIN en el ERP y confirme que los
+  valores son correctos.**
+  *Enmendada el 2026-08-15 (RN-MDP-008, ADR-049)*: lo que se firma es **el
+  traspaso del efectivo**, no el acto de abrir o cerrar el turno. Abrir y
+  cerrar son conteos que el cajero hace solo; el relevo firmado ocurre
+  cuando la plata cambia de manos, que puede ser horas después del cierre.
 - **RN-MDP-003** Un pago a crédito con otra empresa lo regulariza el área
   contable.
 - **RN-MDP-004** Ante disconformidad o duplicidad de un cobro, el área
@@ -156,6 +175,19 @@ de su módulo y se prueban de forma aislada.
   autorización de supervisor**; ingresar no, porque meter plata al cajón no
   es la operación de la que hay que desconfiar. Un retiro nunca puede
   exceder el efectivo disponible: el cajón no da crédito.
+- **RN-MDP-008** **El cajero abre y cierra su turno de caja solo.** Le basta
+  su propio permiso de operar caja: no hace falta la firma de un encargado
+  ni de nadie más. Lo que prueba cuánto había en el cajón es el conteo por
+  denominación (RN-POS-003/007), no una firma — y exigir que un encargado
+  viniera a poner su PIN en cada apertura terminaba, en el local, con la
+  sesión del encargado abierta en la caja todo el turno, que es peor que no
+  pedir nada.
+  **Al cerrar, el efectivo queda en el cajón a nombre del cajero.** La
+  entrega al encargado de tienda/supervisor es un acto **posterior y
+  aparte**, y esa sí la firma quien recibe con su usuario y PIN
+  (RN-MDP-002). Mientras no la firme nadie, el responsable del faltante
+  sigue siendo el cajero (RN-MDP-005): dar por entregado lo que sigue en el
+  cajón le atribuiría la plata a alguien que no la tocó.
 
 ## Impuestos
 
@@ -230,6 +262,19 @@ de su módulo y se prueban de forma aislada.
   nombre** — lo que recuerde en el momento
   (`GET /sales/clientes/buscar?q=`). Una misma persona es cliente a lo más
   una vez por grupo: registrarla dos veces partiría su historial.
+- **RN-PTS-007** El padrón **se baja, se edita y se vuelve a subir** en el
+  mismo formato, con revisión en el medio (ADR-051). La identidad de una fila
+  es su `ID` o, si va vacío, su **número de documento**. El tipo sigue sin
+  declararse: lo decide el documento (RN-PTS-002). De un cliente **natural**
+  que ya existe la planilla solo puede **completar el documento**: su nombre,
+  su teléfono y su dirección viven en su `persona` (RN-GEN-007) y se corrigen
+  desde ahí — una fila que los cambie se informa con ese enlace, no se aplica
+  a medias. La carga masiva **no consulta a SUNAT ni a RENIEC**: trescientas
+  filas serían trescientas llamadas externas contra una cuota, así que el
+  nombre del archivo manda; cuando el cliente se edita de a uno, SUNAT vuelve
+  a mandar (RN-PTS-004). Administrar el padrón es un permiso propio
+  (`sales.gestionar_clientes`), distinto del que tiene el cajero para
+  registrar a alguien en el mostrador.
 
 ## Grupo empresarial
 
@@ -738,13 +783,19 @@ producción se hace en cocinas de sucursal. Ver
   escalamiento del ERP. Un solo asiento contable posible por hallazgo,
   según el estadio final: si se desecha, el registro de merma (RN-INV-017)
   es ese asiento; si se reprocesa, no hay merma ni asiento — el reporte
-  solo detalla cómo se corrigió.
+  solo detalla cómo se corrigió. **Implementado desde ADR-036**: el hallazgo
+  emite `production.no_conformidad_detectada` y el escalamiento se abre sobre
+  ese reporte, no sobre la orden — así conserva la foto, el actor y la doble
+  puerta de RN-REP-002.
 - **RN-PRD-015** La destrucción de un lote no conforme se realiza dentro
   del establecimiento, en zona cubierta por cámaras de videovigilancia
   (nunca fuera del local) y dentro del horario laboral. El video de la
   destrucción y el desecho final a la basura son la evidencia adjunta al
   reporte de escalamiento — previene sustracción del producto declarado
-  como merma.
+  como merma. Lo exige `reporte_escalamiento.evidencia_id` cuando el motivo es
+  `no_conformidad_calidad` y la orden terminó en desecho; la validación vive en
+  la capa de aplicación y no en un CHECK porque «terminó en desecho» es un
+  campo de `orden_produccion`, otra tabla de otro módulo (ADR-036).
 - **RN-PRD-016** El inventario de la cocina de producción (insumos,
   subrecetas en elaboración, producto terminado) sigue el mismo esquema
   de conteo cíclico y margen de error que Almacén Central (RN-INV-007/
@@ -828,6 +879,12 @@ producción se hace en cocinas de sucursal. Ver
   desactivado en recetas, requerimientos y ventas.
 - **RN-UDM-004** La creación/edición de categorías de UdM y sus ratios es
   responsabilidad del área de compras y del área contable.
+- **RN-UDM-005** Una **línea de receta** puede expresarse en una UdM distinta
+  a la de su artículo, siempre que sea **de la misma categoría** (RN-UDM-001):
+  el aceite se compra por litros y la receta lleva 30 ml. Al descontar stock y
+  al costear se convierte por el `ratio` de la unidad, y la UdM del artículo
+  sigue siendo la que manda en el almacén. Sin unidad declarada, la línea
+  hereda la del artículo, que es el comportamiento por defecto.
 
 ## Empaques
 
@@ -1023,6 +1080,44 @@ producción se hace en cocinas de sucursal. Ver
   exigía, se genera un reporte dirigido al área de almacén y a gerencia
   (evento `inventory.conteo_vencido`). El día en que vence todavía no es
   atraso; el reporte sale a partir del día siguiente.
+- **RN-INV-022** Un almacén puede declarar un **abastecedor de respaldo**
+  además del principal (ADR-040). Una solicitud que no nombra abastecedor va
+  al principal, y **si el principal está dado de baja va al respaldo**: sin
+  eso, dar de baja el central deja a la sucursal sin poder pedir nada. El
+  respaldo tiene que ser de la misma empresa y **distinto del principal** —el
+  día que el principal no esté, tampoco estaría él—. Una solicitud que **sí**
+  nombra abastecedor no cae al respaldo: quien nombra un almacén está pidiendo
+  a ese, y despachar desde otro en silencio es lo que el que recibe no puede
+  notar hasta contar la mercadería. "No disponible" es estar dado de baja, no
+  estar sin stock: el faltante tiene su propio camino (RN-INV-001/002).
+- **RN-INV-023** Un almacén tiene a lo más **un** requerimiento en estado
+  `borrador` a la vez — la lista que su turno junta durante la jornada
+  (ADR-051). Se crea sola con lo que está bajo mínimo la primera vez que se
+  abre, y volver a abrirla suma lo que cayó bajo mínimo desde entonces sin
+  tocar lo ya tecleado. Enviarla la vuelve `pendiente` y recién ahí cuenta
+  como una solicitud: mientras es borrador no aparece en el listado general
+  ni en el resumen de demanda para negociación con proveedores
+  (`solicitudes_resumen_para_negociacion`), y el hub no la sube offline —
+  todavía no le pidió nada a nadie.
+- **RN-INV-024** Un ítem que estaba bajo su mínimo al momento de agregarse a
+  una solicitud (por sugerencia o a mano) queda marcado como tal; uno que no
+  lo estaba queda marcado como pedido por decisión del local, no por
+  urgencia. La marca se **estampa al agregar el ítem y no se recalcula**
+  después: entre pedir y aprobar el stock se mueve, y recalcularla contaría
+  una historia distinta de la que quien pidió vio. Es lo que le permite al
+  abastecedor priorizar sin adivinar.
+- **RN-INV-025** El catálogo de artículos **se baja, se edita y se vuelve a
+  subir** en el mismo formato, con revisión en el medio (ADR-051). La
+  identidad de una fila es su `ID` o, si va vacío, su **código interno** — el
+  nombre no sirve de clave porque el nombre es justamente lo que se corrige.
+  La **unidad de medida de un artículo que ya existe no se cambia por
+  planilla**: el stock, los movimientos y las recetas ya cargadas están
+  expresados en la unidad actual, así que cambiarla no convierte nada,
+  reinterpreta en silencio todo lo que ya existe; la fila se informa y no
+  entra. Una categoría que el catálogo no reconoce **no frena la fila** —el
+  artículo entra sin categoría— pero se muestra para que alguien la elija o
+  la cree; el importador nunca la crea solo. Una celda vacía significa **no
+  tocar**, no vaciar.
 - **RN-INV-015** Un ajuste es válido, sin generar alarma, solo si está
   dentro de un margen de error definido por las áreas de almacén y
   contabilidad; fuera de ese margen dispara alarma/auditoría. El margen son
@@ -1277,6 +1372,91 @@ producción se hace en cocinas de sucursal. Ver
   por anulación o nota de crédito devuelve solo lo que se consumió. Las
   restas viajan a cocina como parte del pedido (KDS y comanda), no como
   texto libre en la nota.
+- **RN-COM-029** Una orden ya enviada a cocina **sigue viva mientras no se
+  cobre**: admite líneas nuevas y admite que se le quiten.
+  - **Agregar no requiere autorización de nadie** y usa el mismo permiso que
+    crear la orden. Una mesa pide de a poco, y obligar a abrir una orden
+    nueva para la segunda ronda termina en dos cuentas y dos entregas para
+    la misma mesa.
+  - **Quitar** —una línea o la orden entera— es gratis **dentro de los 5
+    minutos** de haber salido a cocina: ahí es corregir un tecleo, el plato
+    todavía no se armó y nadie tuvo tiempo de aprovecharlo. **Pasada esa
+    ventana** lo autoriza un supervisor con su PIN en el mismo terminal
+    (RN-COM-020), porque el insumo ya se usó de verdad y reponerlo es plata
+    que sale del inventario.
+  - La ventana de la **orden** se mide contra su **última línea**, no contra
+    su creación: una mesa que sigue pidiendo tiene la orden abierta desde
+    hace una hora, pero lo último que mandó puede ser de hace un minuto.
+  - Quitar un lote de líneas exige firma si **alguna** salió de la ventana:
+    de lo contrario, acompañar una línea vieja con una recién agregada sería
+    la forma de quitarla sin que nadie firme.
+  - Después del cobro la cuenta está cerrada: lo que venga es otra orden, y
+    deshacer lo cobrado es nota de crédito (RN-CPP-009).
+- **RN-COM-030** El **tipo de una receta se deriva, no se declara**: la que
+  produce un artículo es una **subreceta** —se guarda para usarla en otra— y
+  la que no, es un **producto de venta**. Guardarlo en una columna aparte
+  sería un segundo lugar donde puede estar mal. La categoría por la que se
+  filtra es la del artículo que la receta produce, así que solo alcanza a
+  las subrecetas.
+- **RN-COM-031** El recetario **se baja, se edita y se vuelve a subir**, y la
+  carga es en **dos pasos con revisión en el medio**: primero se dice qué
+  entra y qué no **sin guardar nada**, y recién después de que alguien lo
+  mira se importa. Un insumo que el catálogo no reconoce no cancela la carga:
+  se elige cuál es, **se crea desde el mismo diálogo**, o se omite esa línea
+  **a la vista** — nunca en silencio, y nunca creado solo por el importador
+  (ADR-046). Una fila con la columna `ID` llena **actualiza** esa receta en
+  vez de crear otra; una sin `ID` cuyo nombre ya existe se informa y **no
+  arrastra a las demás**. Al actualizar, los ingredientes que el archivo no
+  menciona **se conservan** salvo que se pida quitarlos **receta por receta**,
+  viendo antes cuántas líneas se pierden: subir una hoja parcial por error no
+  puede vaciar una receta (ADR-051). Lo que la pantalla devuelve se revalida
+  en el servidor: es un dato que el cliente pudo editar.
+
+- **RN-COM-032** Una dirección del ERP son **dos cosas**: el texto que se lee
+  y su punto en el mapa (`place_id`, coordenadas, plus code, distrito). El
+  punto es **opcional**: una dirección escrita a mano es válida —hay calles
+  que Google no conoce y hay locales sin internet— y ninguna alta se bloquea
+  por no tenerlo (ADR-053). Lo que **no** es válido es que las dos cuenten
+  historias distintas: corregir el texto sin volver a elegir en el mapa
+  **borra el punto**, porque un texto que dice una calle con las coordenadas
+  de otra manda el reparto al lugar equivocado.
+- **RN-COM-033** El reparto propio se cobra **tarifa base + precio por
+  kilómetro de manejo real** (no en línea recta: un río en el medio son dos
+  kilómetros de puente). El monto lo calcula el servidor —nunca el navegador,
+  porque define cuánta plata paga el cliente— y se **congela** en la venta al
+  tomar la orden: si la tarifa cambia el mes que viene, el pedido de ayer
+  siguió costando lo que costó (ADR-054).
+- **RN-COM-034** Un pedido que se pasa del **radio de reparto propio** o cae
+  en un **distrito donde el negocio decidió no repartir** se sugiere derivar a
+  una plataforma externa. Es una **sugerencia al cajero, no un bloqueo**:
+  quien decide es la persona que está atendiendo, y si acepta queda registrado
+  en la venta qué plataforma lo llevó.
+- **RN-COM-035** Si no se puede medir la distancia —proveedor caído, sin
+  internet en el local— el pedido **se toma igual**, con la distancia estimada
+  y marcada como aproximada. Cobrar de menos por un kilómetro es preferible a
+  no poder vender (mismo criterio que RN-CPP y ADR-005).
+- **RN-COM-036** Un producto comercial puede declarar **atributos** (Tamaño,
+  Mitad 1, Temperatura) con sus **valores**. Cada atributo decide si sus
+  combinaciones se **materializan** como variante vendible: `siempre` (todas,
+  al vincularlo), `dinámica` (la primera vez que se vende) o `nunca` (ninguna
+  — el valor elegido viaja en la línea de venta y solo cambia lo que se
+  consume). Una variante **hereda** los atributos de su producto padre, igual
+  que hereda sus grupos y extras (RN-COM-023). El sobreprecio de un valor
+  **se suma** al precio de la lista vigente, no lo reemplaza (RN-PRC-003).
+- **RN-COM-037** Una **línea de receta** puede aplicar solo a ciertas
+  combinaciones. La condición se lee agrupando sus valores **por atributo**:
+  la línea cuenta cuando la combinación elegida coincide con **al menos un
+  valor de cada atributo** nombrado. Sin condición, la línea aplica siempre.
+  Es lo que permite que una pizza mitad-y-mitad de 19 sabores sea **una**
+  receta y no 361.
+- **RN-COM-038** Un producto puede declarar **combinaciones que no existen**.
+  El caso que la obliga: en una pizza **mitad y mitad las dos mitades tienen
+  que ser distintas** — media hawaiana y media hawaiana no es una
+  mitad-y-mitad, es una hawaiana entera, que se vende como su propio producto
+  con su receta y su precio. La exclusión se declara una vez y **vale en los
+  dos sentidos**; `«A» + «B»` y `«B» + «A»` son el mismo plato y consumen lo
+  mismo. Se hace cumplir **al confirmar la venta**, no solo en el PDV: el
+  kiosko y la central de pedidos entran por el mismo endpoint.
 
 ## Cumplimiento de pedido
 
@@ -1324,6 +1504,23 @@ preparación, despacho y entrega en las tres modalidades.
   crédito y, si corresponde, devolución — RN-GEN-002. La anulación
   temprana coordinada con la sucursal sigue el límite de la Central de
   Pedidos (5 minutos desde la emisión del pedido).
+- **RN-CUP-013** La cocina de una sucursal se configura como una **cadena
+  de estaciones** ordenadas (armado → horno → …). Cada línea del pedido
+  recorre las estaciones que atienden su categoría, de la primera a la
+  última: marcarla en una estación intermedia la manda a la siguiente, y
+  solo queda `listo` cuando ya no le queda ninguna por delante — una
+  bebida cuya categoría no atiende el horno se lo salta sin configurar
+  nada. La pantalla de despacho no prepara ni marca: muestra el pedido
+  completo, cuántas líneas van y **en qué estación está cada una**, para
+  saber por quién se espera antes de entregarlo (RN-CUP-005).
+- **RN-CUP-014** Un extra (el sabor de una pizza, el queso adicional) **no
+  es un plato aparte en cocina**: se muestra dentro del plato del que
+  cuelga, recorre las estaciones que le tocan a ese plato, se marca cuando
+  se marca el plato y se anula cuando se anula el plato — reponiendo lo que
+  consumió. Sigue siendo una línea propia de la venta porque tiene su
+  receta, su precio y su rastro (RN-COM-021); lo que no tiene es avance
+  propio. Mostrarlo suelto hacía que la comanda y la pantalla dijeran "una
+  pizza" y "un peperoni" como si fueran dos preparaciones.
 
 ## Comercial — estrategia
 
@@ -1458,6 +1655,32 @@ es a dónde va y quién puede abrirlo.
   sucursal es la general de la empresa y **solo aplica donde no hay una
   específica** — si aplicaran las dos, quien esté en ambas recibiría el mismo
   hecho dos veces.
+- **RN-REP-009** Todo reporte dice **quién provocó el hecho**. Cuando lo
+  detecta el sistema —un barrido, un cruce de umbral— el actor queda nulo y se
+  muestra como «Sistema»: inventarle una persona a un hecho que nadie provocó
+  convierte un aviso de proceso en una acusación. Los reportes anteriores a
+  ADR-036 dicen «Sistema» porque el dato nunca se guardó; no se rellenan hacia
+  atrás.
+- **RN-REP-010** Toda emisión que declara `referencia_tipo` tiene un destino
+  montado: un endpoint real donde se mira —y se resuelve— el hecho. Un reporte
+  que informa y no lleva a ninguna parte deja al lector saliendo a buscar el
+  registro a mano, que es lo que el reporte venía a evitar. Lo congela
+  `tests/test_destinos.py` contra las rutas realmente montadas.
+- **RN-REP-011** Un escalamiento ancla a un `reporte_emitido` **con empresa**.
+  Un hecho que no se pudo atribuir a una empresa no tiene área a la que
+  elevarse ni permiso de módulo que lo cubra.
+- **RN-REP-012** La cadena sube **de a un escalón** (supervisor → comercial →
+  gerencia) y su historial es **append-only**: cada nivel agrega qué hizo, y
+  ninguno reescribe lo que dijo el anterior. Saltarse un nivel o pisar su
+  entrada deja el registro como la versión del último que pasó, y ese registro
+  es el insumo de la mejora continua.
+- **RN-REP-013** Un reporte tiene **una sola cadena abierta** a la vez. Dos
+  cadenas sobre el mismo hecho dan dos verdades y dos responsables. Una cadena
+  terminada libera el reporte: un problema que vuelve a pasar se escala de
+  nuevo, y que aparezca dos veces es justamente lo que hay que poder ver.
+- **RN-REP-014** Abrir, accionar, elevar y resolver un escalamiento dejan
+  rastro en `audit_log` (ADR-031), por lo mismo que RN-REP-007: decidir que
+  algo sube de nivel —o que se da por resuelto— es un acto de autoridad.
 
 > Nota: esta lista crece con cada módulo. Al implementar un módulo se agregan
 > aquí sus reglas antes de codificarlas.

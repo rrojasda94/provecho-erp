@@ -3,11 +3,14 @@
 import uuid
 from datetime import date
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.shared.ubicacion import UbicacionMixin
 
-class ProveedorCreate(BaseModel):
+
+class ProveedorCreate(UbicacionMixin):
     # `empresa_id` sale del JWT (ADR-004). Solo un superusuario sin empresa
     # asignada puede indicarla; a cualquier otro usuario, una empresa
     # distinta a la suya le responde 403.
@@ -18,6 +21,12 @@ class ProveedorCreate(BaseModel):
     razon_social: str | None = Field(default=None, max_length=255)
     ruc: str | None = Field(default=None, min_length=11, max_length=11)
     contacto: str | None = Field(default=None, max_length=255)
+    # Domicilio fiscal. Llega prellenado desde `GET /consulta/ruc/{n}`
+    # y sigue siendo editable: SUNAT tiene el domicilio declarado, que
+    # no siempre es el almacén al que uno va a recoger.
+    direccion: str | None = Field(default=None, max_length=255)
+    provincia: str | None = Field(default=None, max_length=100)
+    pais: str = Field(default="PE", max_length=60)
     formal: bool = True
     clasificacion: str = "regular"
     plazo_dias_credito: int | None = None
@@ -26,15 +35,33 @@ class ProveedorCreate(BaseModel):
     porcentaje_deteccion: Decimal | None = None
 
 
-class ProveedorUpdate(BaseModel):
-    contacto: str | None = None
-    clasificacion: str | None = None
+class ProveedorUpdate(UbicacionMixin):
+    """Campo ausente o `null` = no tocar.
+
+    `razon_social`/`ruc` se admiten porque un RUC mal tecleado llega hasta la
+    factura electrónica: sin esto la única corrección era tocar la base. Solo
+    valen sobre un proveedor **jurídico** — en uno natural esos datos viven
+    en su `persona` (RN-GEN-007) y se corrigen allá.
+
+    `tipo` y `persona_id` no son editables: cambiarlos convierte al proveedor
+    en otro y deja sus órdenes de compra apuntando a algo que ya no es.
+    """
+
+    razon_social: str | None = Field(default=None, min_length=1, max_length=255)
+    ruc: str | None = Field(default=None, pattern=r"^\d{11}$")
+    contacto: str | None = Field(default=None, max_length=255)
+    direccion: str | None = Field(default=None, max_length=255)
+    provincia: str | None = Field(default=None, max_length=100)
+    pais: str | None = Field(default=None, max_length=60)
+    # `Literal` y no `str`: las tres columnas son `Enum` con CHECK, así que un
+    # valor fuera de rango moría en el flush con un 500. Acá es un 422.
+    clasificacion: Literal["regular", "preferente"] | None = None
     activo: bool | None = None
-    condicion_pago: str | None = None
-    plazo_dias_credito: int | None = None
+    condicion_pago: Literal["contado", "credito"] | None = None
+    plazo_dias_credito: int | None = Field(default=None, ge=1)
 
 
-class ProveedorOut(BaseModel):
+class ProveedorOut(UbicacionMixin):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     empresa_id: uuid.UUID
@@ -45,6 +72,13 @@ class ProveedorOut(BaseModel):
     persona_id: uuid.UUID | None
     razon_social: str | None
     ruc: str | None
+    # Los dos viajan para que el formulario de edición pueda precargarlos:
+    # un campo que no se lee no se puede corregir sin borrarlo primero.
+    contacto: str | None
+    direccion: str | None
+    provincia: str | None
+    pais: str
+    plazo_dias_credito: int | None
     formal: bool
     clasificacion: str
     condicion_pago: str

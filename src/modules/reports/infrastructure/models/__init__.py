@@ -8,6 +8,9 @@ from src.modules.reports.infrastructure.models.regla_distribucion import (
     ReglaDistribucion,
 )
 from src.modules.reports.infrastructure.models.reporte_emitido import ReporteEmitido
+from src.modules.reports.infrastructure.models.reporte_escalamiento import (
+    ReporteEscalamiento,
+)
 
 __all__ = [
     "Area",
@@ -16,4 +19,5 @@ __all__ = [
     "ReglaDestinatario",
     "ReglaDistribucion",
     "ReporteEmitido",
+    "ReporteEscalamiento",
 ]

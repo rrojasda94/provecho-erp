@@ -57,7 +57,7 @@ function DialogoNuevaPieza({
       </button>
       <dialog ref={dialogRef} className="w-full max-w-md rounded-lg p-0 backdrop:bg-dark/40">
         <form ref={formRef} action={formAction} className="flex flex-col gap-4 p-6">
-          <h2 className="font-heading text-lg italic uppercase text-dark">Nueva pieza</h2>
+          <h2 className="font-heading text-lg text-dark">Nueva pieza</h2>
           <label className="flex flex-col gap-1 text-sm font-semibold">
             Marca
             <select name="marca_id" required defaultValue="">
@@ -258,7 +258,7 @@ export function ContenidoCliente({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h1 className="font-heading text-xl italic uppercase text-dark">Contenido</h1>
+        <h1 className="font-heading text-xl text-dark">Contenido</h1>
         <DialogoNuevaPieza campanas={campanas} marcas={marcas} />
       </div>
       <p className="text-sm text-gray">

@@ -27,10 +27,11 @@ plaga_indicio — bloquea la cocina si algo falla, RN-CDP-005),
 `reporte_produccion` (jornada, visado_por, consolidado automático al
 cierre). Detalle en `docs/architecture/data-model.md` §7.
 
-`reporte_escalamiento` (origen `produccion`) es entidad transversal —
-vive en `shared`, no en un módulo dueño único (`docs/architecture/
-data-model.md` §6) — y `lote` está modelada por `inventory`; `production`
-las reutiliza, no las duplica.
+`reporte_escalamiento` (origen `produccion`) vive en `reports` desde
+ADR-036 — no en `shared`, como decía `data-model.md` §6 antes de que el
+módulo existiera — y `lote` está modelada por `inventory`; `production`
+las reutiliza, no las duplica. La no conformidad se escala **desde el
+reporte** que emite `production.no_conformidad_detectada`, no desde la orden.
 
 ## Estado (slice core implementado 2026-07-25)
 
@@ -65,8 +66,7 @@ y recalcula su `costo_promedio` — mismo listener/patrón que
 Deuda del slice (ver ROADMAP): `plan_produccion`/cronograma (hoy la
 orden se crea sin plan), `checklist_inocuidad_turno` (bloqueo de cocina
 por fallo de inocuidad), `reporte_produccion` consolidado,
-`reporte_escalamiento` real ante no conformidad (hoy solo el evento, sin
-entidad), `inventory.merma_registrada` → `accounting` en desecho (bloqueado
+`inventory.merma_registrada` → `accounting` en desecho (bloqueado
 por `stock_merma`, deuda de inventory), lote/trazabilidad del producto
 terminado (bloqueado por lote/FEFO, deuda de inventory), subrecetas
 anidadas (una orden que consume otra subreceta con su propia orden).
@@ -82,9 +82,9 @@ anidadas (una orden que consume otra subreceta con su propia orden).
   proceso).
 - Control de calidad de la orden antes de habilitar despacho: conforme,
   no conforme reprocesado, o no conforme desechado.
-- No conformidad (cualquier resultado no conforme) genera
-  `reporte_escalamiento` (origen `produccion`); desecho exige evidencia
-  de destrucción adjunta (RN-PRD-015).
+- No conformidad (cualquier resultado no conforme) emite el reporte, y desde
+  ahí se abre el `reporte_escalamiento` (origen `produccion`, ADR-036);
+  desecho exige evidencia de destrucción adjunta (RN-PRD-015).
 - Calcular costo real de la orden automáticamente (insumos consumidos +
   mano de obra) — nunca a mano; el desperdicio real por insumo se
   registra por tipo y peso, contrastado contra el esperado de la receta

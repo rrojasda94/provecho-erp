@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from src.shared.models.decision_gerencial import RESULTADOS, TIPOS
 from src.shared.parametros import MODULOS
+from src.shared.ubicacion import UbicacionMixin
 
 
 # --- Auth ---
@@ -36,6 +37,13 @@ class AutorizacionIn(BaseModel):
     permiso: str
 
 
+class VerificarPinIn(BaseModel):
+    """Desbloqueo de pantalla: solo el PIN. El usuario sale del token —
+    pedirlo en el cuerpo dejaría verificar el PIN de cualquier otro."""
+
+    pin: str
+
+
 class AutorizacionOut(BaseModel):
     autorizacion: str
     autorizado_por: uuid.UUID
@@ -50,10 +58,33 @@ class MeOut(BaseModel):
     sucursales: list[uuid.UUID]
     empresa_id: uuid.UUID | None
     permisos: list[str]
+    # El PIN vigente lo puso otra persona. Viaja acá porque `/users/me` es
+    # de lo poco que la cuenta puede pedir en ese estado, y el shell tiene
+    # que saber que hay que mandarla a cambiarlo.
+    debe_cambiar_pin: bool = False
+    # El frontend las escribe como atributos de `<html>` durante el render en
+    # servidor. Van en `/users/me` y no en un endpoint propio para que no haya
+    # un instante en el que la pantalla ya se dibujó con la paleta equivocada.
+    preferencia_paleta: str
+    preferencia_tamano_fuente: str
+    preferencia_tema: str
+
+
+class PreferenciasIn(BaseModel):
+    """Preferencias de presentación del usuario autenticado.
+
+    Todas opcionales: la barra superior cambia una sola a la vez y mandar las
+    otras dos obligaría al cliente a conocer el estado completo para tocar un
+    campo.
+    """
+
+    paleta: Literal["estandar", "alto_contraste"] | None = None
+    tamano_fuente: Literal["estandar", "grande", "muy_grande", "maximo"] | None = None
+    tema: Literal["claro", "oscuro"] | None = None
 
 
 # --- Persona (party model) ---
-class PersonaCreate(BaseModel):
+class PersonaCreate(UbicacionMixin):
     nombres: str = Field(max_length=100)
     apellidos: str = Field(max_length=100)
     tipo_documento: str
@@ -64,7 +95,7 @@ class PersonaCreate(BaseModel):
     email: str | None = None
 
 
-class PersonaUpdate(BaseModel):
+class PersonaUpdate(UbicacionMixin):
     version: int
     nombres: str | None = None
     apellidos: str | None = None
@@ -76,7 +107,7 @@ class PersonaUpdate(BaseModel):
     email: str | None = None
 
 
-class PersonaOut(BaseModel):
+class PersonaOut(UbicacionMixin):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     nombres: str
@@ -118,7 +149,7 @@ class NotificacionOut(BaseModel):
     created_at: datetime
 
 
-class AlmacenOut(BaseModel):
+class AlmacenOut(UbicacionMixin):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     empresa_id: uuid.UUID
@@ -127,6 +158,9 @@ class AlmacenOut(BaseModel):
     tipo: str
     direccion: str | None
     almacen_abastecedor_id: uuid.UUID | None = None
+    # A quién se le pide cuando el principal no está disponible
+    # (RN-INV-022). Distinto del principal y de la misma empresa.
+    almacen_abastecedor_respaldo_id: uuid.UUID | None = None
 
 
 class MarcaOut(BaseModel):
@@ -137,7 +171,7 @@ class MarcaOut(BaseModel):
     tipo: str
 
 
-class SucursalOut(BaseModel):
+class SucursalOut(UbicacionMixin):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     empresa_id: uuid.UUID
@@ -172,7 +206,7 @@ TipoEmpresa = Literal[
 ZonaTributaria = Literal["amazonia_ley27037", "general"]
 
 
-class EmpresaCreate(BaseModel):
+class EmpresaCreate(UbicacionMixin):
     grupo_id: uuid.UUID
     razon_social: str = Field(min_length=1, max_length=255)
     # 11 dígitos: el RUC peruano no admite otra forma, y un RUC mal formado
@@ -185,7 +219,7 @@ class EmpresaCreate(BaseModel):
     config_fiscal: dict | None = None
 
 
-class EmpresaUpdate(BaseModel):
+class EmpresaUpdate(UbicacionMixin):
     razon_social: str | None = Field(default=None, min_length=1, max_length=255)
     ruc: str | None = Field(default=None, pattern=r"^\d{11}$")
     domicilio_fiscal: str | None = Field(default=None, min_length=1, max_length=255)
@@ -195,7 +229,7 @@ class EmpresaUpdate(BaseModel):
     config_fiscal: dict | None = None
 
 
-class EmpresaOut(BaseModel):
+class EmpresaOut(UbicacionMixin):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     grupo_id: uuid.UUID
@@ -238,7 +272,7 @@ TenenciaSucursal = Literal["propia", "alquilada", "del_grupo"]
 EstadoSucursal = Literal["activa", "inactiva"]
 
 
-class SucursalCreate(BaseModel):
+class SucursalCreate(UbicacionMixin):
     marca_id: uuid.UUID
     # Igual que el resto del ERP: sale del tenant (ADR-004); informarla
     # ajena es 403.
@@ -250,7 +284,7 @@ class SucursalCreate(BaseModel):
     horario_atencion: dict | None = None
 
 
-class SucursalUpdate(BaseModel):
+class SucursalUpdate(UbicacionMixin):
     """Cerrar un local es `estado="inactiva"`; no hay DELETE de sucursal —
     sigue siendo el ancla de sus ventas, cajas y trabajadores."""
 
@@ -262,7 +296,7 @@ class SucursalUpdate(BaseModel):
     horario_atencion: dict | None = None
 
 
-class AlmacenCreate(BaseModel):
+class AlmacenCreate(UbicacionMixin):
     empresa_id: uuid.UUID | None = None
     sucursal_id: uuid.UUID | None = None
     nombre: str = Field(min_length=1, max_length=100)
@@ -270,14 +304,20 @@ class AlmacenCreate(BaseModel):
     tipo: str = Field(min_length=1, max_length=30)
     direccion: str | None = Field(default=None, max_length=255)
     almacen_abastecedor_id: uuid.UUID | None = None
+    # A quién se le pide cuando el principal no está disponible
+    # (RN-INV-022). Distinto del principal y de la misma empresa.
+    almacen_abastecedor_respaldo_id: uuid.UUID | None = None
 
 
-class AlmacenUpdate(BaseModel):
+class AlmacenUpdate(UbicacionMixin):
     nombre: str | None = Field(default=None, min_length=1, max_length=100)
     tipo: str | None = Field(default=None, min_length=1, max_length=30)
     direccion: str | None = Field(default=None, max_length=255)
     sucursal_id: uuid.UUID | None = None
     almacen_abastecedor_id: uuid.UUID | None = None
+    # A quién se le pide cuando el principal no está disponible
+    # (RN-INV-022). Distinto del principal y de la misma empresa.
+    almacen_abastecedor_respaldo_id: uuid.UUID | None = None
 
 
 # --- Tokens de API de agentes (`tipo=agente_ia`) ---
@@ -330,6 +370,14 @@ class UsuarioUpdate(BaseModel):
 
 class PinChange(BaseModel):
     pin: str
+
+
+class PinPropioChange(BaseModel):
+    """Cambio del PIN propio. Pide el actual aunque haya sesión válida: una
+    pantalla que quedó abierta no debería alcanzar para quedarse la cuenta."""
+
+    pin_actual: str
+    pin_nuevo: str
 
 
 class UsuarioOut(BaseModel):

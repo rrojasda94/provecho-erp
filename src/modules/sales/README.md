@@ -94,6 +94,22 @@ cuatro huecos que el punto de venta necesitaba y el modelo no daba.
   teléfono, documento o nombre en `GET /sales/clientes/buscar?q=`
   (RN-PTS-006). **Trabajador y usuario siguen exigiendo documento**: esa
   validación vive en `users.application.admin`, no en el esquema.
+
+  **Qué se corrige de un cliente** (2026-08-10): `PATCH /clientes/{id}` toca
+  razón social, RUC y contacto, y **solo de un jurídico** (409 si no). Es lo
+  único que `cliente` guarda por su cuenta: el nombre, el teléfono, el
+  documento y la dirección de un natural viven en su `persona` (RN-GEN-007,
+  fuente única) y se corrigen desde `PATCH /personas/{id}`. Duplicar esos
+  campos acá sería crear la segunda fuente que esa regla evita, y por eso la
+  pantalla de Clientes enlaza a Personas en vez de ofrecerlos.
+
+  `GET /clientes/listado` es el padrón del grupo para el back-office —
+  paginado (ADR-026), con `q` opcional. Endpoint propio y **no** `GET
+  /clientes`: aquel es el contrato público de análisis, con otro permiso
+  (`sales.leer_clientes_externos`) y `grupo_id` por query. `buscar` y
+  `listado` comparten `clientes.q_listado`: qué es un cliente del grupo y por
+  qué campos se lo encuentra tiene que ser **una sola definición**, o la caja
+  y la pantalla terminan mostrando universos distintos.
 - **Nombre/razón social vía Factiliza en alta nueva** (2026-08-02):
   documento (DNI/RUC) que la persona todavía no tiene registrado consulta
   `FactilizaClient.consultar_dni`/`consultar_ruc` (RENIEC/SUNAT,
@@ -101,6 +117,14 @@ cuatro huecos que el punto de venta necesitaba y el modelo no daba.
   confiar en lo tecleado en caja. Documento ya visto no vuelve a consultar.
   Sin respuesta de Factiliza (o no encontrado) cae a lo tecleado — el alta
   nunca se bloquea.
+- **Y en la pantalla, antes de guardar** (2026-08-22, addendum de ADR-041):
+  el PDV ofrece «Buscar DNI / RUC» en el alta de cliente y en el receptor del
+  comprobante, contra `GET /consulta/{dni,ruc}/{numero}`. El servidor sigue
+  teniendo la última palabra —el fallback de arriba no cambia—; lo que suma
+  es poder **ver** el nombre real antes de cobrar, en vez de descubrir al
+  emitir que SUNAT escribió otro. En caja hay un solo campo para los dos
+  documentos, así que el largo decide el padrón (8 → RENIEC, 11 → SUNAT,
+  RN-CPP-003) y con 11 el cliente nace jurídico.
 
 **Cierre para alfa (2026-07-28, migraciones `f2a8c15e94d7` y `b6d41e07af92`):**
 
@@ -112,6 +136,20 @@ cuatro huecos que el punto de venta necesitaba y el modelo no daba.
   admite qué extra, con tope) y `venta_item.padre_venta_item_id` (de qué
   línea cuelga). Hereda el grupo de cobro del padre y su consumo se
   multiplica por el plato.
+- **La orden enviada sigue viva** (RN-COM-029, ADR-043): `POST
+  /ventas/{id}/items` suma líneas a una venta en `orden`, con `sales.crear` y
+  sin firma de nadie — agregar sube el ticket y no saca nada del inventario.
+  Republica `sales.venta_confirmada` con **el incremento** en `total` y solo
+  las líneas nuevas en `items`: mandar el acumulado haría que `accounting`
+  asentara la venta dos veces. Después del cobro devuelve 409: la cuenta está
+  cerrada y lo que venga es otra orden.
+- **Ventana de corrección de 5 minutos** (RN-COM-029): quitar —una línea o la
+  orden entera— no pide firma dentro de la ventana; fuera de ella sí
+  (`rules.VENTANA_CORRECCION`, `ventas.lineas_en_ventana` /
+  `venta_en_ventana`). La de la orden se mide contra su **última** línea, y
+  un lote exige firma si **alguna** salió de la ventana. Por eso
+  `autorizacion` es opcional en los dos cuerpos: el cliente la manda cuando
+  el servidor la pide.
 - **Anular líneas enviadas** (RN-COM-020):
   `POST /ventas/{id}/anular-lineas`, con autorización de supervisor y
   motivo; publica `sales.lineas_anuladas` → inventory repone. Quitar todas
@@ -142,6 +180,17 @@ ADR-023):**
   el kiosko entra por el mismo endpoint. El replay del hub se exceptúa
   (ADR-009): una venta que ya se cobró no se rechaza por una regla que
   cambió durante el corte.
+  Los grupos pueden colgar del padre **o** de la variante, y una variante
+  **hereda los del padre** (ADR-042): el seeder los deja en la variante y el
+  lienzo en el padre —cuelga "+ grupo" del nodo activo, que es el padre
+  mientras no hay tamaños— y de dónde quedaron no debería decidir si se
+  ofrecen. `grupos_efectivos`/`extras_efectivos`/`admite_extra_efectivo` lo
+  dicen una sola vez, y **el vínculo propio gana** sobre el heredado. La
+  venta usa los mismos, para aceptar exactamente lo que la carta ofreció.
+  Los crudos (`grupos_de`, `extras_de`, `admite_extra`) siguen siendo por
+  producto: los usa la ficha, que edita lo propio y no lo heredado.
+  `GET /carta` devuelve `variantes[].extras[]` además del `extras[]` de
+  nivel producto, que es el de los productos simples.
 - **Ficha del producto**: `GET /productos/{id}` devuelve producto +
   variantes + grupos en una lectura, para editar todo en la misma pantalla
   (patrón Odoo). `GET /marcas` acompaña al alta.
@@ -224,7 +273,9 @@ CRUD de productos comerciales y medios de pago. Capas `domain/rules.py`,
 | POST | `/ventas/{id}/anular` | `sales.anular` |
 | POST/GET/PATCH | `/productos[/{id}]` | `gestionar_catalogo` / `leer` |
 | POST/GET | `/medios-pago` | `gestionar_catalogo` / `leer` |
-| GET | `/clientes?grupo_id=` | `sales.leer_clientes_externos` |
+| GET | `/clientes?grupo_id=` | `sales.leer_clientes_externos` — contrato **público** de análisis, no el padrón del back-office |
+| GET | `/clientes/listado` | `sales.leer` — el padrón del grupo, paginado, con `q` opcional |
+| PATCH | `/clientes/{id}` | `sales.crear` — razón social, RUC y contacto de un **jurídico** |
 
 `GET /ventas` es **uno solo** para el PDV y el back-office (paginado,
 ADR-026): sin parámetros da la jornada de hoy en las sucursales del usuario
@@ -367,17 +418,48 @@ tiempo real (Redis/WebSocket) es deuda declarada.
 
 - **`kds_pantalla`**: sucursal + tipo (`preparacion` | `despacho`) +
   `categoria_ids` (filtro por categorías de producto comercial; vacío =
-  todas). `producto_comercial.categoria_id` (nuevo, reusa `categoria`)
-  rutea cada ítem a su estación (pizzas → horno, bebidas → barra).
+  todas) + `orden` (eslabón en la cadena). `producto_comercial.categoria_id`
+  (reusa `categoria`) rutea cada ítem a su estación (pizzas → horno,
+  bebidas → barra).
+- **Cadena de estaciones** (2026-08-13, ADR-044, RN-CUP-013): las pantallas
+  de preparación están ordenadas por `orden` (armado 0 → horno 1 → …) y
+  cada línea sabe en cuál va (`venta_item.etapa_kds`). Todo lo resuelve
+  `_estacion(cadena, producto, desde)`: la primera estación activa con
+  `orden >= desde` que atiende la categoría del producto. La misma función
+  dice **qué muestra una pantalla** (la línea está acá si su estación cae
+  en este `orden`) y **a dónde va al tacharla** (`actual.orden + 1`); si no
+  queda ninguna, la línea pasa a `listo`. Una bebida se salta el horno sola
+  porque el horno no atiende su categoría. Es `>=` y no `==` para que
+  desactivar una estación no deje pedidos invisibles: caen al eslabón
+  siguiente. Dos pantallas con el mismo `orden` son el mismo eslabón
+  trabajando en paralelo. **`orden` viaja en la réplica del hub** — sin él,
+  durante un corte todas las estaciones caerían al mismo eslabón.
+- **El extra no es un plato aparte** (2026-08-13, RN-CUP-014, enmienda de
+  ADR-044): el sabor viaja **dentro** de su línea (`ItemColaOut.extras`), la
+  cola recorre solo padres, el ruteo mira la categoría del plato y marcarlo
+  marca sus extras. Antes salía como ítem suelto: la tarjeta decía "1 Pizza
+  Personal" y "1 Peperoni" como si fueran dos preparaciones, y un extra sin
+  `categoria_id` no lo atendía ninguna estación filtrada — se quedaba
+  `pendiente` y el pedido no llegaba nunca a entregable. Sigue siendo fila
+  propia por su receta, su precio y su rastro; lo que no tiene es avance
+  propio.
 - **Preparación**: ve **todos** los ítems de sus categorías, incluidos los
-  ya `listo` — el ítem tachado tiene que seguir a la vista de quien lo
-  tachó y de las demás pantallas (corregido 2026-08-03: antes desaparecía
-  al marcarlo, que es justo lo contrario de lo que hace la cocina). El
-  pedido sale de esta cola cuando la estación terminó **todo lo suyo**.
+  ya `listo` y los que ya mandó al eslabón siguiente (con el destino a la
+  vista) — el ítem tachado tiene que seguir a la vista de quien lo tachó y
+  de las demás pantallas (corregido 2026-08-03: antes desaparecía al
+  marcarlo, que es justo lo contrario de lo que hace la cocina). El pedido
+  sale de esta cola cuando a la estación no le queda **nada pendiente**.
   Bump por ítem (`POST /kds/items/{id}/avanzar`).
-- **Despacho**: ve pedidos con ítems listos + `estado_pedido` agregado
-  (el ítem más atrasado manda); al estar todo listo se publica
-  `sales.pedido_listo`.
+- **Despacho**: pantalla propia (`despacho-cliente.tsx`) desde 2026-08-13 —
+  antes era el componente de cocina con otro filtro, así que ofrecía tachar
+  ítems. Una tarjeta por **pedido** con cuántas líneas van, en qué estación
+  está cada una (`estacion` en el payload) y por quién se espera; no marca
+  preparado (eso es de la estación que preparó, RN-CUP-003), solo entrega.
+  **Ya no filtra por `categoria_ids`**: mostraba media orden, que es lo que
+  impide verificar el pedido completo contra la comanda antes de entregarlo
+  (RN-CUP-004); el selector desapareció de su formulario. `estado_pedido`
+  sigue siendo el agregado (el ítem más atrasado manda) y al estar todo
+  listo se publica `sales.pedido_listo`.
 - **Entrega**: `POST /sales/ventas/{id}/entrega` cierra el pedido completo
   y publica `sales.venta_entregada` (disparador de la encuesta de
   marketing, RN-COM-007). Exige todos los ítems en `listo` (RN-CUP-005),
@@ -436,6 +518,156 @@ ninguna entidad de negocio.
   la nube al recibir la venta (empujarlos duplicaría el consumo).
 - `tasks.encolar` es no-op en un hub — la emisión a SUNAT es siempre de la
   nube, después del sync.
+
+## Estado (slice — planilla del padrón, 2026-08-20)
+
+El padrón de clientes se baja, se edita en Excel y se vuelve a subir
+(RN-PTS-007, ADR-052). Endpoints: `GET /sales/clientes/plantilla`,
+`GET /sales/clientes/exportar`, `POST /sales/clientes/importar/validar`
+(multipart) y `POST /sales/clientes/importar`.
+
+| Hoja | Columnas |
+|---|---|
+| `Clientes` | `ID` · `Tipo` (solo salida) · `Nombre / Razón social` · `Tipo de documento` · `Número de documento` · `Teléfono` · `Email` · `Dirección / contacto` · `Fecha de nacimiento` |
+| `Instrucciones` | texto |
+
+- Identidad: `ID`, o el **número de documento** si el `ID` va vacío.
+- `Tipo` es derivado (RN-PTS-002: lo decide el documento). Se exporta para que
+  se lea; al importar se ignora.
+- Una sola columna `Dirección / contacto`: en un jurídico es `cliente.contacto`
+  y en un natural el `domicilio` de su `persona` — dos columnas darían un
+  round-trip con pérdida.
+- De un **natural** que ya existe solo se completa el documento. Nombre,
+  teléfono y dirección viven en `persona` (RN-GEN-007) y `sales` no puede
+  escribirla: la fila se reporta con "se corrige en Personas".
+- **No consulta a Factiliza.** `crear_cliente` y `editar_cliente` reciben
+  `consultar_documento=False`: trescientas filas serían trescientas llamadas
+  externas secuenciales dentro de un request, contra una cuota.
+- Permiso propio **`sales.gestionar_clientes`** para plantilla, validar e
+  importar. Exportar pide `sales.leer`, que es lo que ya cuesta ver el listado.
+- El `grupo_id` se deriva de la empresa del token (RN-PTS-001), nunca llega
+  desde el request.
+
+## Entrega del delivery y su costo (implementado 2026-08-22, ADR-053/054)
+
+Hasta este slice la dirección de un delivery **se perdía**: se tecleaba en el
+PDV, vivía en el borrador del navegador y `venta` no tenía columna que la
+recibiera — `referencia_atencion` es "para quién es el pedido" ("Carlos",
+"Rappi #1042"), no adónde va.
+
+`venta` gana `direccion_entrega`, el `UbicacionMixin` de `core/model_base`
+(place_id, lat/lng, plus code, distrito) y dos columnas de plata:
+`distancia_entrega_km` y `costo_entrega`.
+
+**Lo que cobra, lo calcula el servidor.**
+`application/tarifa_delivery.py` pregunta la distancia de manejo a
+`shared/integrations/google` (Routes API, clave restringida por IP) y decide:
+
+- `costo` = `DELIVERY_TARIFA_BASE` + `DELIVERY_PRECIO_POR_KM` × km.
+- `derivar_a_externo` cuando se pasa de `DELIVERY_DISTANCIA_MAXIMA_KM` o el
+  distrito está en `DELIVERY_DISTRITOS_RESTRINGIDOS`. La zona vetada se evalúa
+  **antes** de medir: no depende de la distancia y preguntarle a Google
+  costaría una llamada por una respuesta que ya se sabe.
+- `aproximada` cuando Google no contestó y se usó la línea recta
+  (haversine × 1,3). El pedido se toma igual — es lo único que funciona en el
+  hub offline (ADR-009).
+
+`POST /sales/ventas/cotizar-delivery` es lo que el PDV muestra antes de
+aceptar, con **cuota por usuario e IP** (mismo mecanismo que la consulta de
+DNI/RUC: es un proveedor pago). El precio que vale es el que el servidor
+recalcula al crear la venta y **congela** en la fila; el replay del hub no
+vuelve a cotizar, porque esa venta ya se cobró.
+
+Derivar a una plataforma externa (DAZ DAZ) es un **aviso al cajero**, no una
+integración: si acepta, se marca `venta.repartidor_externo_plataforma`, que ya
+existía.
+
+Con las tarifas en `0` —el estado de fábrica— nada de esto cobra y el delivery
+funciona como antes. **El costo todavía no suma al total de la venta**: ver la
+deuda del módulo.
+
+## Estado (slice 10 — atributos y variantes generadas, 2026-08-23)
+
+Migración `e2b7c40d91af`, ADR-055/056, RN-COM-036, RN-COM-037.
+
+Tres correcciones sobre el mismo modelo en once días —ADR-035 §5, ADR-038,
+ADR-042— y el catálogo real seguía sin poder cargarse: `Pizza MitadxMitad
+Familiar` con 19 sabores por mitad son **361 filas de producto con 361
+recetas**. La causa no era dónde colgaba el grupo: era que **la combinación
+no fuera una entidad**.
+
+**Seis tablas nuevas**, los nombres de Odoo traducidos:
+
+| Tabla | Odoo | Qué es |
+|---|---|---|
+| `atributo` | `product.attribute` | La dimensión: Tamaño, Mitad 1 |
+| `atributo_valor` | `product.attribute.value` | Familiar, Hawaiana |
+| `producto_atributo_linea` | `product.template.attribute.line` | Qué atributo ofrece un producto |
+| `producto_atributo_valor` (PTAV) | `product.template.attribute.value` | Ese valor **en ese producto**, con su `precio_extra` |
+| `producto_variante_valor` | — | Qué combinación **es** una fila hija |
+| `producto_exclusion` | `product.template.attribute.exclusion` | Combinaciones que no existen |
+
+**La variante generada sigue siendo `producto_comercial`** con
+`producto_padre_id`. No es una concesión: es lo que hace que precio
+server-side (RN-PRC-003), margen, ruteo KDS, `venta_item.precio_unitario`
+congelado, `GET /carta` y la réplica al hub sigan funcionando sin escribir
+una línea. Lo que cambia es quién crea esas filas.
+
+**`atributo.modo_variante`** decide si se materializan: `siempre` /
+`dinamica` / `nunca`, los tres modos de `create_variant` de Odoo. Con
+`siempre`, Mitad 1 × Mitad 2 son las 361 filas del problema; con `nunca`
+son cero filas y una receta condicionada.
+
+**`venta_item.valores_variante_ids`** (JSONB, nullable) guarda los PTAV
+elegidos. Misma forma y mismas razones que `sin_articulo_ids` (ADR-035 §1).
+Viaja en los cinco eventos de venta, de forma **aditiva**.
+
+**Contrato público nuevo**: `atributo_de_valores(session, ids)` →
+`{ptav_id: atributo_id}`. Lo consume `inventory` para evaluar las líneas de
+receta condicionadas (ADR-056); sin él no se puede agrupar la condición por
+atributo.
+
+`valores_ofrecidos(session, producto)` aplica la herencia del padre, misma
+regla que `grupos_efectivos`/`extras_efectivos` (ADR-042).
+
+**Interruptor**: `parametro_empresa` → `sales` / `catalogo.modelo_odoo`,
+default `False`. La migración es solo aditiva, así que la imagen 0.6.0 corre
+contra este esquema sin enterarse: volver atrás es desplegar 0.6.0, sin
+downgrade.
+
+Pruebas: `tests/test_variantes_odoo.py` (integración) y
+`tests/test_receta_condicionada.py` (funciones puras).
+
+## Estado (slice 11 — API de atributos y árbol del producto, 2026-08-23)
+
+ADR-058.
+
+**`GET /sales/productos/{id}/arbol`** trae el producto, sus variantes **con
+sus grupos y extras**, los atributos con sus valores, las exclusiones y las
+combinaciones materializadas. Reemplaza una petición HTTP por variante: con
+tres tamaños y ocho sabores eran 27 idas a la red para dibujar el lienzo.
+Hereda de `ProductoDetalleOut`, así que con el interruptor apagado el lienzo
+sigue viendo exactamente lo de antes.
+
+**CRUD de atributos** en `application/atributos.py`:
+
+| Endpoint | Qué hace |
+|---|---|
+| `GET`/`POST /sales/atributos` | listar y crear |
+| `PATCH /sales/atributos/{id}` | renombrar, cambiar modo o display |
+| `POST /sales/atributos/{id}/valores` | agregar un valor |
+| `POST /sales/productos/{id}/atributos` | el producto pasa a ofrecerlo |
+| `PATCH /sales/atributos/valores/{ptav}` | precio extra en ese producto |
+| `DELETE /sales/atributos/valores/{ptav}` | **retirar** (desactiva, no borra) |
+| `POST`/`DELETE /sales/atributos/exclusiones` | pares que no van juntos |
+
+Las rutas literales van **antes** que las paramétricas: `/atributos/exclusiones`
+entraría como un `atributo_id` que no es UUID.
+
+Un valor retirado se desactiva y no se borra: hay ventas que lo nombran y
+líneas de receta que lo usan como condición.
+
+`producto_comercial.lienzo_pos` pasa a ser editable por `PATCH /productos/{id}`.
 
 ## Casos de uso
 

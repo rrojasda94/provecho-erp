@@ -1,7 +1,16 @@
 # ADR-013 — Arquitectura frontend: Tailwind + shadcn/ui, shell estilo Odoo, gate por permiso
 
 - Estado: aceptado
-- Fecha: 2026-07-27 (actualizado 2026-07-27, misma fecha — ver nota abajo)
+- Fecha: 2026-07-27 (actualizado 2026-07-27 y 2026-08-07 — ver notas abajo)
+
+**Actualización 2026-08-07 — dirección visual revisada**: la sección 8 se
+reescribe. La regla "superficies neutras, color con moderación" se mantiene y
+se endurece; lo que cambia es que el color **sí** codifica algo: el área de
+negocio, en cuatro tonos, y solo en filos e íconos. Cambian además la paleta
+(contraste medido), la tipografía (Archivo en vez de Anton itálica para
+títulos) y se agrega una regla de movimiento. Las decisiones estructurales
+—Tailwind, shadcn/ui, shell estilo Odoo, gate por permiso, sin Radix, sin app
+nativa— no se tocan. `docs/product/ui-ux.md` lleva el detalle.
 
 **Actualización (misma fecha, sesión distinta)**: la sección 2 (primitivas de
 interacción) cambió de Base UI directo a **shadcn/ui** — decisión revisada a
@@ -81,6 +90,9 @@ inventa una paleta paralela, se remapea:
 
 ```css
 /* globals.css — bloque por marca, ej. [data-brand="charlies"] */
+/* Ojo: `--background` pasó a acero en el back office (2026-08-07); el crema
+   quedó como superficie de PDV/Kiosk, que es donde este bloque por marca
+   realmente se pisa. Ver sección 8 y docs/product/ui-ux.md. */
 --background: var(--color-cream);
 --foreground: var(--color-dark);
 --primary: var(--color-primary);
@@ -167,22 +179,26 @@ no hace falta tocar el backend. El home de apps es Server Component: lee
 `permisos` una vez en el layout raíz (tras login) y filtra un registro
 estático módulo → prefijo de permiso:
 
-```ts
-// app/(app)/apps.config.ts
-export const APPS = [
-  { modulo: "sales", nombre: "Ventas / PDV", prefijo: "sales.", icono: PosIcon, color: "primary" },
-  { modulo: "kds", nombre: "Cocina (KDS)", prefijo: "kds.", icono: KdsIcon, color: "accent" },
-  { modulo: "inventory", nombre: "Inventario", prefijo: "inventory.", icono: BoxIcon, color: "dark" },
-  { modulo: "purchases", nombre: "Compras", prefijo: "purchases.", icono: CartIcon, color: "secondary" },
-  { modulo: "production", nombre: "Producción", prefijo: "production.", icono: ChefIcon, color: "accent" },
-  { modulo: "accounting", nombre: "Contabilidad", prefijo: "accounting.", icono: LedgerIcon, color: "dark" },
-  { modulo: "rrhh", nombre: "RRHH", prefijo: "rrhh.", icono: PeopleIcon, color: "primary" },
-] as const;
+El registro se implementó como `frontend/lib/modulos.ts` (no
+`apps.config.ts`), y desde 2026-08-07 cada entrada declara además su **área**
+—de donde sale el color, ver sección 8— y un ícono de `lucide-react`:
 
-export function appsVisibles(permisos: string[]) {
-  return APPS.filter((a) => permisos.some((p) => p === "*" || p.startsWith(a.prefijo)));
-}
+```ts
+// frontend/lib/modulos.ts
+export const MODULOS: Modulo[] = [
+  { clave: "compras", nombre: "Compras", prefijoPermiso: "purchases.",
+    href: "/compras/ordenes-compra", area: "abastecimiento", Icono: ClipboardList,
+    descripcion: "Proveedores y órdenes de compra" },
+  // Cuando ver el módulo ya es un privilegio, `permiso` exacto manda sobre
+  // el prefijo (catálogo: `sales.gestionar_catalogo`).
+];
+
+export function puedeVerModulo(permisos: string[], m: Modulo) { /* lib/permisos.ts */ }
 ```
+
+El home agrupa por área en vez de listar doce fichas planas: un cajero ve dos
+áreas y entiende cuál es su parte; un gerente ve las cuatro en el orden en que
+transcurre el día.
 
 **b) Dentro de un módulo**: sidebar vertical con el submenú del módulo activo
 (Odoo migró de barra horizontal a sidebar vertical desde la v17) +
@@ -279,13 +295,42 @@ touch targets, no con una segunda base de código.
 
 ### 8. Dirección visual: moderno y funcional, color con moderación
 
+*(Reescrita el 2026-08-07. La versión original está en el historial de git;
+lo que sigue reemplaza el párrafo anterior.)*
+
 Ajuste pedido tras la primera propuesta: nada de un color de marca distinto
 por tarjeta/módulo (el mockup inicial pintaba cada ícono del home de un
-color de la paleta — leía recargado). Superficies neutras (blanco/gris/crema)
-por defecto; `--color-primary`/`--color-accent` se reservan para acción
-primaria, ítem activo/seleccionado del sidebar y alertas. La identidad de
-marca queda en tipografía (Anton Italic + Inter) y un acento consistente, no
-en variedad de color de fondo.
+color de la paleta — leía recargado). **Esa regla sigue en pie**: doce
+colores para doce módulos es un arcoíris. Lo que cambió es el nivel al que se
+aplica el color.
+
+**El color codifica el área de negocio, no el módulo.** Cuatro tonos
+—Operación, Comercial, Abastecimiento, Administración— y cada uno aparece en
+tres lugares y en ninguno más: el filo de 2–3 px del ítem activo del sidebar,
+la ficha del ícono, y el borde de la tarjeta al apuntarla. Nunca como relleno
+de una superficie grande. La diferencia con lo que se rechazó es que ahora el
+color **significa** algo que el usuario necesita —en qué estación está
+trabajando— en vez de ser variedad por variedad. Doce módulos en una lista
+plana no se recuerdan; cuatro áreas sí, y coinciden con cómo el grupo divide
+el trabajo y con cómo está escrita la documentación (`docs/compras/`,
+`docs/rrhh/`…).
+
+Superficies: acero (`#F2F4F7`) para el back office, blanco para las tarjetas,
+crema **solo** en PDV/KDS/login. El crema de pared a pared bajaba el
+contraste de las tarjetas blancas justo donde están los números.
+
+Tipografía: **Archivo** (variable en peso y ancho) para títulos y cuerpo,
+IBM Plex Mono para cifras, Anton **solo** para el logotipo. Anton en itálica
+y versales para todos los títulos era la voz de la carta aplicada a pantallas
+de trabajo, y es el ajuste menos escaneable que existe.
+
+Movimiento (regla nueva): una sola curva, `180ms cubic-bezier(.2,.7,.2,1)`,
+para entrada de pantalla, escalonado de grilla, filos de área y estados
+(hover/foco/press). Sin parallax ni animación por scroll; nada que retrase
+una acción. `prefers-reduced-motion: reduce` apaga todo.
+
+El detalle —hex, contrastes medidos, tabla de áreas— vive en
+`docs/product/ui-ux.md`, que es donde el negocio lo edita.
 
 ## Consecuencias
 
@@ -294,9 +339,10 @@ en variedad de color de fondo.
 - ROADMAP: "App Android (15+)" pasa de "evaluar PWA vs nativo" a "PWA
   decidida por ADR-013" — sigue ⬜ (no construida), pero la pregunta ya no
   está abierta.
-- Cada módulo nuevo de frontend agrega una fila a `APPS` en
-  `apps.config.ts` y un `layout.tsx` propio con su guard de permiso — no hay
-  paso manual adicional en el backend, `permisos` ya viaja en `/users/me`.
+- Cada módulo nuevo de frontend agrega una fila a `MODULOS` en
+  `frontend/lib/modulos.ts` —con su **área**, que es lo que le da color— y un
+  `layout.tsx` propio con su guard de permiso. No hay paso manual adicional en
+  el backend: `permisos` ya viaja en `/users/me`.
 - Nuevas dependencias: `tailwindcss`, componentes de shadcn/ui (código
   copiado a `components/ui/`, no una librería instalada — trae consigo
   `@base-ui-components/react`, `class-variance-authority`, `tailwind-merge`

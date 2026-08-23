@@ -30,7 +30,35 @@ from src.modules.inventory.infrastructure.models import (
     TransferenciaItem,
     UnidadMedida,
 )
-from src.modules.users.infrastructure.models import Almacen
+from src.modules.users.infrastructure.models import Almacen, Sucursal
+
+
+def _acotar_por_almacen(
+    q,
+    columna_almacen,
+    empresa_id: uuid.UUID | None,
+    sucursal_id: uuid.UUID | None = None,
+    marca_id: uuid.UUID | None = None,
+):
+    """Acota una consulta por empresa, sucursal o marca a través del almacén.
+
+    Las tres viven arriba del almacén (`almacen.empresa_id`,
+    `almacen.sucursal_id`, `sucursal.marca_id`), así que un solo join
+    responde las tres preguntas y ninguna necesita columna nueva en las
+    tablas que se filtran.
+    """
+    if empresa_id is None and sucursal_id is None and marca_id is None:
+        return q
+    q = q.join(Almacen, Almacen.id == columna_almacen)
+    if empresa_id is not None:
+        q = q.where(Almacen.empresa_id == empresa_id)
+    if sucursal_id is not None:
+        q = q.where(Almacen.sucursal_id == sucursal_id)
+    if marca_id is not None:
+        q = q.join(Sucursal, Sucursal.id == Almacen.sucursal_id).where(
+            Sucursal.marca_id == marca_id
+        )
+    return q
 
 
 class ArticuloRepo:
@@ -76,10 +104,33 @@ class RecetaRepo:
             )
         )
 
-    def list(self, empresa_id: uuid.UUID | None = None) -> list[Receta]:
+    def list(
+        self,
+        empresa_id: uuid.UUID | None = None,
+        *,
+        tipo: str | None = None,
+        categoria_id: uuid.UUID | None = None,
+    ) -> list[Receta]:
+        """`tipo` no es una columna: se **deriva** de `articulo_id`
+        (RN-COM-030). Una receta que produce un artículo es una subreceta —
+        se guarda para usarla en otra—; una que no, es un producto de venta.
+        Agregar la columna sería un segundo lugar donde puede estar mal.
+
+        `categoria_id` filtra por la categoría del artículo que produce, así
+        que solo alcanza a las subrecetas — es lo correcto: un producto de
+        venta no tiene artículo del que sacar categoría.
+        """
         q = select(Receta).order_by(Receta.nombre)
         if empresa_id is not None:
             q = q.where(Receta.empresa_id == empresa_id)
+        if tipo == "subreceta":
+            q = q.where(Receta.articulo_id.is_not(None))
+        elif tipo == "producto":
+            q = q.where(Receta.articulo_id.is_(None))
+        if categoria_id is not None:
+            q = q.join(Articulo, Articulo.id == Receta.articulo_id).where(
+                Articulo.categoria_id == categoria_id
+            )
         return list(self.s.scalars(q))
 
     def add(self, receta: Receta) -> Receta:
@@ -191,6 +242,22 @@ class SkuRepo:
     def get_by_codigo(self, codigo: str) -> Sku | None:
         return self.s.scalar(select(Sku).where(Sku.codigo == codigo))
 
+    def list(self, empresa_id: uuid.UUID | None = None) -> "list[tuple[Sku, Articulo]]":
+        """SKUs con el artículo que representan.
+
+        Van juntos porque el código de un SKU no le dice nada a nadie: para
+        elegir qué se devuelve hay que ver "Queso Mozzarella", no
+        "SKU-I003-Queso Mo".
+        """
+        q = (
+            select(Sku, Articulo)
+            .join(Articulo, Articulo.id == Sku.articulo_id)
+            .order_by(Articulo.nombre)
+        )
+        if empresa_id is not None:
+            q = q.where(Articulo.empresa_id == empresa_id)
+        return list(self.s.execute(q))
+
     def add(self, sku: Sku) -> Sku:
         self.s.add(sku)
         self.s.flush()
@@ -217,10 +284,13 @@ class StockRepo:
         self,
         almacen_id: uuid.UUID | None = None,
         empresa_id: uuid.UUID | None = None,
+        sku_id: uuid.UUID | None = None,
     ):
         q = select(Stock)
         if almacen_id is not None:
             q = q.where(Stock.almacen_id == almacen_id)
+        if sku_id is not None:
+            q = q.where(Stock.sku_id == sku_id)
         if empresa_id is not None:
             # El stock no lleva empresa: la hereda del almacén (ADR-004).
             q = q.join(Almacen, Almacen.id == Stock.almacen_id).where(
@@ -234,8 +304,9 @@ class StockRepo:
         self,
         almacen_id: uuid.UUID | None = None,
         empresa_id: uuid.UUID | None = None,
+        sku_id: uuid.UUID | None = None,
     ) -> list[Stock]:
-        return list(self.s.scalars(self.q_list(almacen_id, empresa_id)))
+        return list(self.s.scalars(self.q_list(almacen_id, empresa_id, sku_id)))
 
     def add(self, stock: Stock) -> Stock:
         self.s.add(stock)
@@ -433,6 +504,30 @@ class SolicitudRepo:
         self.s.flush()
         return item
 
+    def borrador_de(self, almacen_id: uuid.UUID) -> SolicitudInsumos | None:
+        """La lista que el almacén está juntando ahora (RN-INV-023). Uno por
+        almacén, no por usuario: la jornada la levanta el turno completo."""
+        return self.s.scalars(
+            select(SolicitudInsumos).where(
+                SolicitudInsumos.almacen_solicitante_id == almacen_id,
+                SolicitudInsumos.estado == "borrador",
+            )
+        ).first()
+
+    def item(
+        self, solicitud_id: uuid.UUID, sku_id: uuid.UUID
+    ) -> SolicitudItem | None:
+        return self.s.scalar(
+            select(SolicitudItem).where(
+                SolicitudItem.solicitud_id == solicitud_id,
+                SolicitudItem.sku_id == sku_id,
+            )
+        )
+
+    def delete_item(self, item: SolicitudItem) -> None:
+        self.s.delete(item)
+        self.s.flush()
+
     # `list` va al final: nombrar así un método sombrea al builtin dentro
     # del cuerpo de la clase, y cualquier anotación `list[...]` que venga
     # después reventaría al evaluarse.
@@ -441,6 +536,9 @@ class SolicitudRepo:
         almacen_solicitante_id: uuid.UUID | None = None,
         estado: str | None = None,
         empresa_id: uuid.UUID | None = None,
+        sucursal_id: uuid.UUID | None = None,
+        marca_id: uuid.UUID | None = None,
+        incluir_borradores: bool = False,
     ):
         q = select(SolicitudInsumos)
         if almacen_solicitante_id is not None:
@@ -449,10 +547,17 @@ class SolicitudRepo:
             )
         if estado is not None:
             q = q.where(SolicitudInsumos.estado == estado)
-        if empresa_id is not None:
-            q = q.join(
-                Almacen, Almacen.id == SolicitudInsumos.almacen_solicitante_id
-            ).where(Almacen.empresa_id == empresa_id)
+        elif not incluir_borradores:
+            # Un borrador todavía no le pidió nada a nadie: mismo criterio que
+            # la OC en borrador de `purchases`. Se pide por su ruta propia.
+            q = q.where(SolicitudInsumos.estado != "borrador")
+        q = _acotar_por_almacen(
+            q,
+            SolicitudInsumos.almacen_solicitante_id,
+            empresa_id,
+            sucursal_id,
+            marca_id,
+        )
         return q.order_by(SolicitudInsumos.created_at.desc())
 
     def list(
@@ -676,6 +781,28 @@ class ConteoRepo:
         self.s.add(item)
         self.s.flush()
         return item
+
+    def q_list(
+        self,
+        almacen_id: uuid.UUID | None = None,
+        estado: str | None = None,
+        empresa_id: uuid.UUID | None = None,
+        sucursal_id: uuid.UUID | None = None,
+        marca_id: uuid.UUID | None = None,
+    ):
+        """Los conteos del almacén, sucursal o marca. El abierto primero: es
+        el que alguien está contando y el único sobre el que se puede actuar."""
+        q = select(Conteo)
+        if almacen_id is not None:
+            q = q.where(Conteo.almacen_id == almacen_id)
+        if estado is not None:
+            q = q.where(Conteo.estado == estado)
+        q = _acotar_por_almacen(
+            q, Conteo.almacen_id, empresa_id, sucursal_id, marca_id
+        )
+        return q.order_by(
+            (Conteo.estado != "abierto"), Conteo.created_at.desc()
+        )
 
 
 class DevolucionRepo:

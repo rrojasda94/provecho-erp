@@ -18,8 +18,11 @@ from src.core.tenant import FueraDeAlcance, Tenant
 from src.modules.inventory.application import listeners
 from src.modules.inventory.infrastructure.models import (
     Articulo,
+    Categoria,
     CategoriaUdm,
+    Lote,
     Receta,
+    Sku,
     UnidadMedida,
 )
 from src.modules.sales.infrastructure.models import (
@@ -113,7 +116,12 @@ def env(monkeypatch):
         receta = Receta(empresa_id=empresa_a.id, nombre="Pizza",
                         rendimiento_cantidad=Decimal(1),
                         rendimiento_unidad_medida_id=udm.id)
-        s.add_all([art_b, receta])
+        cat_b = Categoria(empresa_id=empresa_b.id, nombre="Lácteos B")
+        s.add_all([art_b, receta, cat_b])
+        s.flush()
+        sku_b = Sku(articulo_id=art_b.id, codigo="SKU-B")
+        lote_b = Lote(articulo_id=art_b.id, codigo="L-B", origen="carga_inicial")
+        s.add_all([sku_b, lote_b])
         s.flush()
         producto = ProductoComercial(id_interno="P001", marca_id=marca.id,
                                      nombre="Pizza", receta_id=receta.id)
@@ -154,6 +162,7 @@ def env(monkeypatch):
             producto=str(producto.id), marca=str(marca.id),
             empresa_a=str(empresa_a.id), empresa_b=str(empresa_b.id),
             art_b=str(art_b.id), persona=str(persona.id),
+            sku_b=str(sku_b.id), lote_b=str(lote_b.id), cat_b=str(cat_b.id),
             receta_a=str(receta.id), udm=str(udm.id),
             cajero_a=str(cajero_a.id),
         )
@@ -223,6 +232,25 @@ def test_articulo_de_otra_empresa_no_se_edita(env):
                      json={"nombre": "Secuestrado"})
     # almacenero no tiene gestionar_catalogo → 403 por permiso, no por tenant.
     assert r.status_code == 403
+
+
+@pytest.mark.parametrize(
+    "ruta",
+    [
+        "/api/v1/inventory/articulos/{art_b}",
+        "/api/v1/inventory/skus/{sku_b}",
+        "/api/v1/inventory/lotes/{lote_b}",
+        "/api/v1/inventory/categorias/{cat_b}",
+    ],
+)
+def test_los_destinos_de_un_reporte_no_cruzan_el_tenant(env, ruta):
+    """Estos GET existen para que un reporte enlace al dato. El enlace no
+    puede convertirse en la puerta trasera al inventario de otra empresa:
+    `exigir_sku` es nuevo y hereda el tenant del artículo, igual que
+    `exigir_lote`."""
+    client, ids = env
+    h = _token(client, "almacenero_a")
+    assert client.get(ruta.format(**ids), headers=h).status_code == 403
 
 
 def test_listado_de_articulos_solo_ve_su_empresa(env):
@@ -350,21 +378,12 @@ def test_cuentas_contables_de_empresa_ajena_403(env):
 def test_abrir_caja_en_punto_venta_ajeno_403(env):
     client, ids = env
     h = _token(client, "cajero_a")
-    # El relevo lo firma contabilidad con su PIN, no el cajero desde su
-    # sesión (RN-MDP-002).
-    autorizacion = client.post(
-        "/api/v1/auth/autorizar",
-        json={
-            "username": "contador_a",
-            "pin": "654321",
-            "permiso": "accounting.caja_relevar",
-        },
-    ).json()["autorizacion"]
+    # La abre el cajero con su sola sesión (RN-MDP-008), así que lo único
+    # que separa su caja de la del otro local es el filtro de tenant.
     body = {
         "punto_venta_id": ids["pv_b"],
         "monto_declarado": "100.00",
         "detalle_denominaciones": {"50": 2},
-        "autorizacion": autorizacion,
     }
     assert client.post("/api/v1/accounting/cajas/apertura",
                        headers=h, json=body).status_code == 403
