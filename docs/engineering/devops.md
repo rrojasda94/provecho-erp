@@ -73,7 +73,8 @@ python -m src.seeders.seed
 ```
 
 El seeder es idempotente y deja la organización del Grupo Majambo más el
-usuario `admin` / PIN `123456`. Los datos de desarrollo se regeneran así:
+los usuarios `admin` (rol admin) y `cajero1` (rol cajero), ambos con PIN
+`123456` y acceso a todas las sucursales. Los datos de desarrollo se regeneran así:
 no se migran a mano entre bases.
 
 ## Entornos
@@ -101,7 +102,16 @@ TLS termina en el proxy; la aplicación nunca escucha en HTTPS directamente.
    con `FORWARDED_ALLOW_IPS=<IP del proxy>`. **Nunca `*`**: permitiría a
    cualquiera falsificar su IP y saltarse el rate limit del login.
 4. `ALLOWED_HOSTS` con el dominio real y `CORS_ORIGINS` con el origen del
-   frontend — ambos exactos, sin comodines.
+   frontend — ambos exactos, sin comodines. **Agregar también `localhost` y
+   `127.0.0.1`** (descubierto al levantar staging, 2026-08-23): el
+   `HEALTHCHECK` del propio contenedor pega a `http://127.0.0.1:8000/health`
+   con ese `Host`, y `TrustedHostMiddleware` lo rechaza con 400 si no está
+   en la lista — el contenedor queda `unhealthy` aunque la API funcione
+   bien desde afuera. Si además el frontend vive en el mismo compose y le
+   habla a la API por el nombre del servicio (`API_INTERNAL_URL=http://api:8000`,
+   como en `docker-compose.staging.yml`), agregar también ese nombre
+   (`api`) — si no, el login falla con 400 aunque el dominio público
+   funcione, porque la llamada nunca sale del compose.
 
 La cabecera `Strict-Transport-Security` la emite la propia aplicación cuando
 `ENVIRONMENT=production` (un año, `includeSubDomains`), junto con
@@ -166,9 +176,16 @@ además la versión exacta (`:1.2.3`, `:1.2`).
 
 ### Despliegue
 
-Manual mientras no exista el servidor. `docker-compose.yml` es **solo
-desarrollo** (monta el código, `--reload`, Postgres con contraseña de
-juguete); producción usa `docker-compose.prod.yml`.
+Manual. `docker-compose.yml` es **solo desarrollo** (monta el código,
+`--reload`, Postgres con contraseña de juguete); producción usa
+`docker-compose.prod.yml`.
+
+**Staging** (desde 2026-08-23) usa `docker-compose.staging.yml` en vez de
+`docker-compose.prod.yml`: trae su propia base de datos y el frontend en el
+mismo compose, con Caddy delante (TLS automático). Ver
+[`docs/engineering/staging.md`](staging.md) para la IP, dominios y bitácora
+del servidor, y `scripts/desplegar.sh` para actualizarlo a una versión
+nueva.
 
 ```bash
 export PROVECHO_IMAGE=ghcr.io/<repo>:1.2.3   # fijar versión, nunca latest
@@ -187,6 +204,55 @@ bucle de reinicio en vez de detenerse con un error legible.
 La base de datos no está en el compose de producción: es gestionada, apuntada
 por `DATABASE_URL`. La API publica solo en `127.0.0.1:8000` y Redis no
 publica puerto — el proxy es la única puerta de entrada.
+
+## Paquete de demo portable
+
+Para que alguien pruebe el ERP en su propia PC, sin servidor, sin internet y
+sin escribir un comando. No reemplaza al despliegue: es material para poner el
+sistema en manos de la gente que va a usarlo.
+
+```bash
+python scripts/empaquetar_demo.py        # ~15 min y ~1 GB de salida
+```
+
+Deja `ZIP_<versión>/provecho-demo-<versión>.zip` (una carpeta por versión, para
+que la que ya repartiste no se pise). Adentro: `docker-compose.demo.yml`,
+`imagenes.tar` con las cuatro imágenes, tres `.bat` —`INICIAR`, `APAGAR`,
+`REINICIAR-DEMO`—, un `LEEME.md` escrito para alguien que no programa y un
+`VERSION.txt` con versión, **commit** y fecha. El commit va porque la versión
+sola no alcanza: un ZIP se puede armar desde un árbol que no es el del tag, y
+sin el commit quien reporta un error no puede decir contra qué probó.
+Requisito en la PC de quien prueba: **Docker Desktop**. Se entra a
+`http://localhost:3000` con `admin` / PIN `123456`.
+
+Diferencias con los otros compose, todas deliberadas:
+
+| | Demo | Producción |
+|---|---|---|
+| Base de datos | En el compose, volumen local | Gestionada, por `DATABASE_URL` |
+| Secretos | Escritos en el archivo, versionados | En `.env` fuera del repo |
+| `ENVIRONMENT` | `demo` → seeders habilitados, `/docs` abierto | `production` → guardas de arranque |
+| Frontend | Incluido (`provecho-demo-web`) | No está en `docker-compose.prod.yml` |
+| Puertos | Solo el 3000 | Solo loopback, detrás del proxy |
+
+**`docker-compose.demo.yml` no sirve para publicar nada en internet.** Los
+secretos son públicos: cualquiera que lea el repo puede firmar un JWT válido.
+
+Dos detalles que no son obvios:
+
+- El compose **no tiene `build:`** — en la PC del tester no hay código fuente.
+  Las imágenes las construye el empaquetador y `INICIAR.bat` levanta con
+  `--no-build`, para que una carga fallida dé un error claro en vez de
+  intentar compilar. `tests/test_repo_coherencia.py` verifica que las
+  imágenes que el compose nombra sean exactamente las que el script exporta.
+- El servicio `init` corre `alembic upgrade head` y los cuatro seeders en cada
+  arranque (son idempotentes). Es lo que convierte el arranque en un solo
+  `up`: acá el paso de migración no puede ser manual como en producción,
+  porque no hay nadie para ejecutarlo.
+
+La imagen del frontend (`frontend/Dockerfile`, etapa `runtime`) es un build de
+producción con `output: "standalone"`. La etapa `dev` es la que usa
+`docker-compose.yml`, y por eso ese servicio necesita `target: dev`.
 
 ## Migraciones
 

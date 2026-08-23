@@ -54,6 +54,7 @@ tras sumar precios y lote/FEFO) que el motor solo ensambla; tabla `sync_watermar
 | Protección de datos personales (Ley 29733) | 🔶 ARCO técnico ✅ 2026-07-26 | `docs/security/proteccion-datos-personales.md`: qué datos trata el ERP y dónde viven (casi todo en `persona`, fuente única — RN-GEN-007; la excepción deliberada es `postulante`, ver 2026-08-01), derechos ARCO, plazos de conservación, medidas de seguridad ya vigentes (referenciadas, no reconstruidas), proceso de brecha. Cancelación implementada como **anonimización irreversible** de `persona`, no `DELETE` — `POST /api/v1/personas/{id}/anonimizar`, permiso dedicado `personas.anonimizar`, migración `dad43729501d` (RN-PER-007, ADR-011). Acceso/Rectificación ya existían (`GET`/`PATCH /personas/{id}`). Pendiente de **acción del usuario, no de código**: registro del banco de datos ante la ANPD, aviso de privacidad público, confirmar plazos de retención con el contador/abogado, jurisdicción de transferencia internacional. Pendiente técnico: ver Deuda técnica. |
 | Contrato OpenAPI de la API | ✅ 2026-07-26 | `docs/architecture/openapi.json` exportado (`python -m src.core.openapi_export`) y verificado en CI — un endpoint que cambia sin regenerar el contrato falla el PR (ADR-010). `TAGS_METADATA` en `src/core/app.py` describe los 15 tags de la API; un tag nuevo sin descripción falla un test. De paso, corregidas dos afirmaciones falsas en `api-guidelines.md`: `idempotency_key` es campo del body, no header; las colecciones devuelven array plano, no `{items,total,page,page_size}` (nunca se implementó paginación). |
 | CI/CD | 🔶 CI + entrega ✅ 2026-07-26 · e2e en CI 2026-08-06 | **Job `e2e`** (2026-08-06): el flujo del dinero de punta a punta sobre chromium, con `test-results/` como artefacto cuando falla — el único job que comprueba que cliente y servidor estén de acuerdo. `ci.yml` gana tres verificaciones que no existían: cabeza única de Alembic (una doble falla en el despliegue, no en el merge que la crea), construcción de la imagen **y arranque real del contenedor** contra `/health`, y `pip-audit` informativo. `release.yml` publica la imagen en GHCR en cada push a `main` (tags `v*` → versión exacta). `docker-compose.prod.yml` nuevo: el compose existente es solo desarrollo y desplegarlo publicaría esa configuración. Dockerfile con usuario sin privilegios y `HEALTHCHECK`. El **despliegue sigue manual** y documentado hasta que exista el VPS (ADR-008). |
+| Paquete de demo portable | ✅ 2026-08-09 | `python scripts/empaquetar_demo.py` → `ZIP_<versión>/provecho-demo-<versión>.zip`: el ERP entero en la PC de quien prueba, sin internet ni servidor, con doble clic en `INICIAR.bat` (`admin` / PIN `123456`). Nace de que no hay VPS todavía y esperar a tenerlo era esperar para poner el sistema frente a la gente que lo va a usar. `docker-compose.demo.yml` **no publica nada en internet** —secretos versionados a propósito— y no tiene `build:` porque en esa PC no hay código fuente; su servicio `init` migra y siembra en cada arranque, que es lo que convierte cuatro comandos de consola en un solo `up`. Trajo dos cosas que faltaban por su cuenta: la **imagen de producción del frontend** (etapa `runtime` con `output: "standalone"`, ~250 MB contra ~1.5 GB del `npm run dev` que era la única que existía) y `COOKIE_SECURE`, sin el cual la sesión moría en silencio al entrar desde la tablet del local por http. Vigilado por `tests/test_repo_coherencia.py` (imágenes del compose == imágenes que el ZIP exporta, y el Node de la imagen == el del CI). De paso destapó que la **versión declarada llevaba tres releases congelada**: `cortar_version.py` cortaba el CHANGELOG pero nunca tocaba `pyproject.toml` ni `frontend/package.json`, que seguían en `0.1.0` con el repo en `v0.4.0` — la versión vivía solo en el tag de git. Ahora el script las escribe y un test las vigila; el ZIP además lleva `VERSION.txt` con el commit exacto. Límites conocidos: un solo usuario, reset manual, y Docker Desktop como requisito duro. Ver `docs/engineering/devops.md#paquete-de-demo-portable`. |
 | Chequeos de salud y alertas | ✅ 2026-07-26 | `src/core/health.py` + `health_router.py`: `/health` (liveness, sin dependencias), `/health/ready` (base de datos crítica → 503; Redis y cola degradan sin sacar de rotación) y `/health/backups` (503 pasadas 26 h — cubre el backup que nunca corrió, que no genera evento de error). El ERP expone estado; **un monitor externo alerta** (ADR-007): construir alertas dentro del servidor que se monitorea deja de avisar justo cuando ese servidor cae. Pendiente: contratar el monitor y dar de alta las sondas. |
 | Observabilidad (métricas, trazas, logs centralizados) | 🔶 logs + errores ✅ 2026-07-26 | `src/core/logging_config.py`: JSON en producción, tres flujos (`app`/`seguridad`/`auditoria`) derivados del nombre del logger, `request_id` por request (respeta `X-Request-ID` entrante, sale en la cabecera y en el cuerpo del error 500), redacción de PIN/tokens/`Authorization`. `src/core/sentry.py`: reporte de errores en `api`, `worker` (señal `celeryd_init`) y `backups`; sirve para Sentry o GlitchTip autoalojado, no-op sin DSN. Pendiente: métricas, trazas y colector de logs — ver Deuda técnica. |
 | UX: menús, buscadores, breadcrumbs, atajos, sidebars, dashboards | ⬜ | Definición pendiente con el usuario |
@@ -202,42 +203,32 @@ contiene, buscando su `[[ COMPLETAR ]]`):
   visión. Sin implementar todavía.
 - ✅ 2026-07-27 Grupo Majambo **no tiene tema propio** — Provecho es el
   único tema fuera de PDV/Kiosk (`docs/product/ui-ux.md`).
-- ⬜ **Cuando haya servidor** (parqueado 2026-08-05 por decisión del
-  usuario). Nada de esto bloquea seguir desarrollando: son cosas que no se
-  pueden hacer —ni probar de verdad— contra una máquina que todavía no
-  existe. Estaban repartidas por seis secciones de este documento; acá
-  quedan juntas para no descubrirlas de a una el día del despliegue.
-
-  **Lo que solo puede hacer el usuario:**
-  1. **Dominio real de producción** → fijar `ALLOWED_HOSTS` y
-     `CORS_ORIGINS` en el `.env` del servidor. Sin esto, la validación de
-     config aborta el arranque en `production`, que es a propósito.
-  2. **Generar el `JWT_SECRET` real en el servidor**:
-     `python -c "import secrets; print(secrets.token_urlsafe(48))"`. Nunca
-     el placeholder `change-me` — y nunca generado acá: un secreto que pasó
-     por una conversación ya no es secreto.
-  3. **Contratar el monitor externo** y dar de alta las tres sondas
-     (`/health`, `/health/ready`, `/health/backups`). **Es lo único que no
-     se puede resolver dentro del VPS** (ADR-007): un monitor que corre en
-     la máquina que vigila deja de avisar justo cuando esa máquina cae.
-  4. **Decidir dónde vive la copia on-premise** de los backups: hoy solo
-     hay dump local + S3 opcional.
-
-  **Lo que Claude escribe cuando exista la máquina** (no antes, porque sin
-  la IP y el dominio reales serían plantillas que hay que reescribir):
-  5. `nginx.conf` concreto: TLS, `proxy_pass`,
-     `X-Forwarded-For`/`X-Forwarded-Proto` y `FORWARDED_ALLOW_IPS` con la IP
-     real del proxy.
-  6. **Cron del host** para las dos tareas que hoy existen y nadie ejecuta:
-     `python -m src.backups.backup` (diario) y
-     `python -m src.modules.rrhh.purga` (anonimiza postulantes vencidos —
-     mientras no corra, el plazo de conservación que el aviso de privacidad
-     promete no se aplica en la práctica).
-  7. **Job de despliegue** en CI y **entorno de staging**: hoy se saltaría
-     de CI a producción directo. Automatizar por SSH contra una máquina
-     inexistente es escribir a ciegas (ADR-008).
-  8. **Stack de observabilidad** (`docker-compose.observabilidad.yml`,
-     GlitchTip + Loki/Alloy/Grafana) levantado en el mismo VPS.
+- ✅ 2026-08-23 **Droplet de staging levantado** (DigitalOcean, ver
+  [`docs/engineering/staging.md`](docs/engineering/staging.md) para IP,
+  dominios y bitácora — nunca secretos ahí). Usuario `app` sin root/password
+  por SSH, firewall, Docker, DNS de `staging.majambo.com.pe` y
+  `api-staging.majambo.com.pe` ya resueltos. Escrito en el repo:
+  `docker-compose.staging.yml`, `Caddyfile` (TLS automático, elegido sobre
+  nginx+certbot para no mantener renovación a mano), `.env.staging.example`,
+  `scripts/desplegar.sh` y `release.yml` publicando también la imagen del
+  frontend (`ghcr.io/rrojasda94/provecho-erp-web`) — antes solo publicaba el
+  backend, staging no habría tenido pantallas.
+- ⬜ **Falta para terminar el primer despliegue de staging:**
+  1. `.env` real en el servidor (`JWT_SECRET`/`POSTGRES_PASSWORD` generados
+     ahí, nunca en una conversación — un secreto que la pasó deja de serlo).
+  2. `docker login ghcr.io` con el token de lectura ya generado.
+  3. Primer `docker compose -f docker-compose.staging.yml up -d` y
+     verificación de `/health/ready`.
+  4. Cron de backup diario (`python -m src.backups.backup`) y purga semanal
+     de postulantes (`python -m src.modules.rrhh.purga`) dados de alta en
+     el droplet.
+  5. Monitor externo (healthchecks.io/UptimeRobot) contra `/health`,
+     `/health/ready`, `/health/backups` — es lo único que no se puede
+     resolver dentro del VPS (ADR-007).
+- ⬜ **Producción sigue parqueada** (decisión 2026-08-05): dominio real,
+  decidir dónde vive la copia on-premise de los backups, y stack de
+  observabilidad (`docker-compose.observabilidad.yml`) — todo eso se retoma
+  cuando exista la máquina de producción, staging no la reemplaza.
 
 ## Deuda técnica pendiente (backlog)
 
