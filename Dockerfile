@@ -5,6 +5,16 @@ COPY pyproject.toml README.md ./
 COPY src ./src
 COPY alembic ./alembic
 COPY alembic.ini ./
+# `scripts/odoo` y nada más de `scripts/`: son los únicos que se corren DENTRO
+# del contenedor, y su README manda hacerlo
+# (`docker compose exec api python -m scripts.odoo.cargar_catalogo`). Sin esta
+# línea ese comando falla con `No module named 'scripts'`, que es exactamente
+# lo que pasó al cargar el catálogo en staging el 2026-08-23.
+#
+# El resto se queda afuera a propósito: `cortar_version.py` y
+# `empaquetar_demo.py` son herramientas de desarrollo y `desplegar.sh` y
+# `backup-staging.sh` corren en el host, no adentro.
+COPY scripts/odoo ./scripts/odoo
 RUN pip install --no-cache-dir .
 
 # Sin privilegios: una vulnerabilidad en la aplicación no debe traer consigo
