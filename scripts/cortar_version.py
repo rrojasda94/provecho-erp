@@ -14,8 +14,10 @@ Uso: `python scripts/cortar_version.py 0.3.0 [--fecha 2026-08-09]`
 
 import argparse
 import datetime
+import os
 import pathlib
 import re
+import subprocess
 import sys
 
 RAIZ = pathlib.Path(__file__).resolve().parent.parent
@@ -83,10 +85,44 @@ def sellar_version(version: str) -> None:
         archivo.write_text(nuevo, encoding="utf-8", newline="")
 
 
+def regenerar_openapi(version: str) -> None:
+    """El contrato exportado lleva la versión adentro (`info.version`).
+
+    Sin este paso, cortar una versión deja `docs/architecture/openapi.json`
+    diciendo la anterior y **el job `backend` del CI falla**: hay un test que
+    compara el archivo commiteado contra una exportación fresca. Pasó en el
+    corte de 0.7.0, y no se ve venir en local — `settings.app_version` sale de
+    la metadata del **paquete instalado**, que en un entorno editable sigue
+    diciendo la versión vieja hasta que alguien reinstala. En el CI la
+    instalación es limpia, así que ahí sí cambia.
+
+    Por eso se fuerza por `APP_VERSION` en vez de confiar en la metadata: lo
+    que vale es la versión que se acaba de sellar, no la que quedó instalada.
+    """
+    entorno = {**os.environ, "APP_VERSION": version}
+    resultado = subprocess.run(
+        [sys.executable, "-m", "src.core.openapi_export"],
+        cwd=RAIZ,
+        env=entorno,
+        capture_output=True,
+        text=True,
+    )
+    if resultado.returncode != 0:
+        raise SystemExit(
+            "No se pudo regenerar docs/architecture/openapi.json:\n"
+            + (resultado.stderr or resultado.stdout)
+        )
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("version", help="versión SemVer sin la 'v', ej. 0.3.0")
     p.add_argument("--fecha", default=datetime.date.today().isoformat())
+    p.add_argument(
+        "--sin-openapi",
+        action="store_true",
+        help="no regenerar el contrato (solo para la autocomprobación)",
+    )
     args = p.parse_args(argv)
 
     por_tipo = leer_fragmentos(FRAGMENTOS)
@@ -103,10 +139,14 @@ def main(argv: list[str] | None = None) -> int:
         if archivo.name != "README.md":
             archivo.unlink()
     sellar_version(args.version)
+    if not args.sin_openapi:
+        regenerar_openapi(args.version)
 
     total = sum(len(v) for v in por_tipo.values())
     print(f"{args.version}: {total} fragmentos en {len(por_tipo)} secciones.")
     print(f"Versión escrita en {PYPROJECT.name} y frontend/{PACKAGE_JSON.name}.")
+    if not args.sin_openapi:
+        print("Contrato OpenAPI regenerado con la versión nueva.")
     return 0
 
 

@@ -12,6 +12,229 @@ editando este archivo chocaban siempre — escribían en la misma línea.
 
 Ver [`changelog.d/`](changelog.d/).
 
+## [0.7.0] - 2026-08-23
+
+### Added
+
+- **El catálogo pasa al modelo de Odoo: atributos, variantes y recetas
+  condicionadas** (ADR-055, ADR-056, migración `e2b7c40d91af`).
+
+  Hasta ahora cada combinación vendible era una fila de producto con su
+  propia receta. Con el catálogo real de Charlie's eso no se sostiene: una
+  `Pizza MitadxMitad Familiar` de 19 sabores por mitad son **361 productos y
+  361 recetas**, y cambiar los gramos de jamón obliga a abrir 361 fichas.
+
+  - **Seis tablas nuevas** en `sales` — `atributo`, `atributo_valor`,
+    `producto_atributo_linea`, `producto_atributo_valor`,
+    `producto_variante_valor`, `producto_exclusion` —, las cuatro primeras
+    calcadas de `product.attribute*` de Odoo 18.
+  - **Los tres modos de `create_variant`**: `siempre` (materializa todas las
+    combinaciones), `dinamica` (al venderse la primera vez) y `nunca` (no
+    genera filas; el valor solo cambia lo que se consume). Elegir bien es lo
+    que hace la diferencia entre 361 filas y ninguna.
+  - **`receta_item.aplica_valores`**: una línea de receta puede aplicar solo
+    a ciertas combinaciones. La regla es la de Odoo —agrupar por atributo y
+    exigir al menos un valor de cada grupo—, así que las 26 líneas del
+    archivo de Charlie's entran como 26 líneas.
+  - **`receta_item.unidad_medida_id`**: una línea puede expresarse en otra
+    UdM de la misma categoría que el artículo (30 ml de aceite sobre un
+    artículo que se lleva en litros) y se convierte por `ratio` al descontar
+    y al costear.
+  - **`receta.es_kit`**, `ref_externa` en artículo, receta, producto y
+    atributo (idempotencia al reimportar desde Odoo), `categoria.padre_id`
+    (categorías jerárquicas) y `producto_comercial.lienzo_pos`.
+  - **Una sola cuenta** de merma y conversión (`consumo_de_linea`) para el
+    descuento de stock y el costeo, que antes estaban escritas distinto.
+
+  **La migración es solo aditiva**: ninguna columna existente cambia de tipo
+  ni de nulabilidad. La imagen 0.6.0 corre contra este esquema sin enterarse,
+  así que volver atrás es desplegar 0.6.0 y no hace falta downgrade.
+
+  Nada del PDV, compras, contabilidad ni almacén cambia de comportamiento
+  mientras no se carguen atributos: las 1537 pruebas de 0.6.0 pasan sin
+  editar una línea.
+
+- **Entorno de staging** (2026-08-23): droplet en DigitalOcean, dominio y
+  TLS automático (Caddy). Nuevo `docker-compose.staging.yml`, `Caddyfile`,
+  `.env.staging.example`, `scripts/desplegar.sh` y `docs/engineering/staging.md`
+  con la bitácora del servidor (sin secretos).
+- **`release.yml` publica también la imagen del frontend** — hasta ahora
+  solo empaquetaba el backend en GHCR; sin la imagen web, staging (y
+  cualquier despliegue futuro) no tenía pantallas.
+
+- **El recetario se edita en grilla** (`/catalogo/recetas/matriz`, ADR-057).
+
+  Insumos en las filas, recetas en las columnas, gramajes en las celdas.
+  Corregir el queso de las tres presentaciones de ocho pizzas eran
+  veinticuatro fichas abiertas de a una.
+
+  - **Se pega un rectángulo desde Excel.** La identidad de una celda es
+    `(receta, insumo, condición)` y no un id de línea, que es lo que hace
+    posible pegar algo que no trae ids: el servidor resuelve solo si es alta,
+    edición o borrado. También se copia, en el mismo formato.
+  - **Vaciar la celda borra la línea**: en una grilla es la forma natural de
+    decir "este insumo no va acá".
+  - **Se guarda por lote y solo lo que cambió.** Cada celda va en su propio
+    `SAVEPOINT`: pegar cuarenta y perderlas todas por una mal escrita es el
+    modo de falla que hace que nadie vuelva a pegar nada.
+  - La celda muestra lo tecleado (`450/3`), no el resultado; el número lo
+    calcula el servidor (RN-COM-024) y la vista previa va debajo.
+
+- **El lienzo dibuja atributos y carga el árbol de una vez** (ADR-058).
+
+  - `GET /sales/productos/{id}/arbol` reemplaza **una petición por variante**:
+    con tres tamaños y ocho sabores eran 27 idas a la red para dibujar un
+    árbol.
+  - El atributo se dibuja como el grupo y el valor como la opción: el gesto es
+    el mismo y el lienzo no gana nada con una segunda forma de mostrarlo.
+  - **Lo excluido se apaga, no se oculta** (RN-COM-038), y elegir un valor
+    suelta los que quedan excluidos por él, para no mostrar un plato que la
+    venta va a rechazar.
+  - **El producto y los tamaños guardan dónde quedaron** (`lienzo_pos`). Es lo
+    que ADR-035 §5 había dejado fuera con un argumento que valía mientras el
+    árbol lo dictaba una topología fija.
+
+- **API de atributos**: crear, agregar valores, ofrecerlos en un producto,
+  fijar el precio extra, retirar un valor —que lo **desactiva**, no lo borra,
+  porque hay ventas que lo nombran— y declarar exclusiones.
+
+- `recetas.editar_item` acepta `unidad_medida_id` y redondea con los decimales
+  de **la unidad de la línea**: quien teclea gramos espera que 24.4 sea 24, no
+  tres decimales de un kilo.
+
+- **El catálogo de Odoo se convierte y se carga** (`scripts/odoo/`).
+
+  Dos comandos: `convertir_catalogo` lee los cuatro exports de Odoo 18
+  (`product.template`, `product.attribute` y dos de `mrp.bom`) y escribe seis
+  libros numerados en el orden en que hay que subirlos, más un `INFORME.md`;
+  `cargar_catalogo --simular` los recorre resolviendo cada referencia y
+  deshace todo al final, para poder decir "esto entra limpio" antes de tocar
+  staging.
+
+  Sobre el catálogo real de Charlie's: 243 artículos, 217 recetas con 523
+  líneas, 28 categorías en árbol, 6 atributos con 72 valores, 214 productos
+  comerciales y 65 precios. Simulación en cero problemas.
+
+  **No inventa datos de negocio**: los 28 gramajes que Odoo trae en cero
+  quedan aparte para que alguien los llene. Sí corrige, y lo escribe todo en
+  el informe: 17 artículos cuya unidad no era la que sus recetas consumen,
+  4 nombres duplicados, 2 categorías cuya hoja chocaba, 28 vendibles sin
+  receta (RN-PRD-001), líneas repetidas del mismo insumo, y los cuatro
+  atributos de mitad que venían marcados para materializar 289 variantes por
+  tamaño.
+
+- **Una línea de receta acepta unidad propia y condición** en
+  `recetas.agregar_item` (`unidad_medida_id`, `aplica_valores`, `orden`). El
+  mismo insumo puede repetirse **si cada línea aplica a otra combinación** —
+  que es lo que hace posible la pizza mitad-y-mitad—; lo que sigue rechazado
+  es la misma condición dos veces. Una unidad de otra categoría de UdM se
+  rechaza con un mensaje que lo dice (RN-UDM-001).
+
+- **Las categorías cuelgan unas de otras** (`crear_categoria(padre_id=...)`),
+  con tope de profundidad: la base no puede impedir un ciclo en una tabla que
+  se apunta a sí misma, y recorrer la cadena sin límite cuelga el request.
+
+- **Las dos mitades de una mitad-y-mitad tienen que ser distintas**
+  (RN-COM-038, enmienda de ADR-056).
+
+  Media hawaiana y media hawaiana no es una mitad-y-mitad: es una hawaiana
+  entera, que ya se vende como su propio producto con su receta y su precio.
+  `producto_exclusion` —creada en ADR-055 y hasta ahora sin usar— declara el
+  par imposible, y `POST /sales/ventas` lo rechaza con 409. Se valida al
+  confirmar la venta y no solo en el PDV: el kiosko y la central de pedidos
+  entran por el mismo endpoint.
+
+  La exclusión se guarda **una vez** y vale en los dos sentidos: el par es
+  simétrico y guardar el espejo sería la misma verdad dos veces.
+
+- **Las líneas condicionadas a las dos mitades se parten en una por mitad.**
+
+  Con la regla de arriba, una condición que pide el mismo sabor en las dos
+  mitades no se cumple nunca, y una que pide un conjunto en las dos deja de
+  descontar en cuanto una mitad se sale. Las 52 líneas del archivo de
+  Charlie's resultaron ser **todas simétricas** —el mismo conjunto de sabores
+  en las dos mitades—, que es lo que dice cuál era la intención: cada mitad
+  aporta lo suyo.
+
+  `scripts/odoo/convertir_catalogo.py` las parte, con la mitad del gramaje y
+  escrito como operación (`(0.025)/2`) para que la planilla muestre de dónde
+  salió el número (RN-COM-024). Se comporta igual que Odoo cuando Odoo
+  acertaba y correctamente cuando no.
+
+  **`A + B` y `B + A` consumen lo mismo por construcción**: con cada línea
+  condicionada a una sola mitad, el total no depende de en qué mitad se
+  eligió cada sabor. No hace falta canonicalizar nada al guardar.
+
+- Las unidades de medida de la carga pasan a **4 decimales**, el máximo que
+  admite `receta_item.cantidad`. Con 3, media línea de 0.025 kg redondea a
+  0.013 y la pizza entera lleva un gramo de más que nadie pidió.
+
+- **Paquete de demo portable** (2026-08-09). `python scripts/empaquetar_demo.py`
+  arma `ZIP_<versión>/provecho-demo-<versión>.zip` con el ERP entero —imágenes
+  incluidas— para que alguien lo pruebe en su PC con doble clic en un `.bat`,
+  sin internet, sin servidor y sin escribir un comando. Existe porque poner el
+  sistema frente a quien lo va a usar no puede depender de que esa persona
+  sepa levantar un compose y correr tres seeders: el servicio `init` migra y
+  siembra en cada arranque (los seeders ya eran idempotentes) y el compose de
+  demo no tiene `build:` porque en esa PC no hay código fuente.
+  `docker-compose.demo.yml` **no sirve para publicar nada**: sus secretos
+  están versionados a propósito.
+- **Imagen de producción del frontend** (`frontend/Dockerfile`, etapa
+  `runtime`, con `output: "standalone"`). La única imagen que existía corría
+  `npm run dev`: ~1.5 GB y compilando cada pantalla la primera vez que alguien
+  la abría, que quien prueba lee como que el sistema es lento. La etapa `dev`
+  se conserva y `docker-compose.yml` la pide con `target: dev`.
+- **`COOKIE_SECURE`** en el frontend. La cookie de sesión seguía a `NODE_ENV`,
+  así que en un build de producción servido por http —la demo abierta desde la
+  tablet del local, `http://192.168.x.x:3000`— el navegador la descartaba y el
+  login fallaba **en silencio**, devolviendo al formulario sin error. Sin la
+  variable el comportamiento no cambia.
+- **Dos coherencias más en `tests/test_repo_coherencia.py`**: que el Node de la
+  imagen del frontend sea el que el CI usa para `next build` (mismo riesgo que
+  ya se vigilaba con Python), y que las imágenes que nombra el compose de la
+  demo sean exactamente las que el empaquetador exporta — si no, el ZIP sale
+  incompleto y el tester solo ve una pantalla que no carga.
+
+### Añadido
+
+- El seeder crea `cajero1` con rol `cajero` (PIN `123456`, todas las sucursales),
+  además de `admin`. Probar el flujo de caja ya no exige crear el usuario a mano.
+
+### Removed
+
+- **Las 34 "Mitad X" sueltas no entran en la carga.** En Odoo, "Mitad Acecina
+  familiar" es un producto con su propia receta y convive con "Pizza
+  MitadxMitad Familiar", que es un Kit cuyas líneas ya dicen qué lleva cada
+  mitad. Son dos formas de decir lo mismo, y desde que las líneas del Kit se
+  parten por mitad la segunda basta: mantener 34 recetas paralelas son 34
+  lugares donde el mismo gramaje se puede desincronizar.
+
+  El filtro es "en la categoría del Kit **y sin receta de Kit**": los dos Kits
+  viven en esa misma categoría y son justamente los que se quedan.
+
+  Verificado antes de sacarlas: ninguna receta las consume, y los 15 insumos
+  que usaban los usa también el Kit, así que ningún artículo queda huérfano.
+
+### Fixed
+
+- **`/health`, `/health/ready` y `/health/backups` rechazaban `HEAD` con 405**
+  (encontrado 2026-08-23 al dar de alta el monitor externo de staging en
+  UptimeRobot, plan gratis, que sondea con `HEAD` y no permite cambiar a
+  `GET`). Causa: la versión instalada de FastAPI dejó de agregar `HEAD`
+  automático a las rutas `GET`. Los tres endpoints ahora registran `HEAD`
+  explícito, fuera del contrato OpenAPI (es implícito en HTTP, no hace
+  falta documentarlo aparte).
+
+- **La versión declarada llevaba tres releases congelada en `0.1.0`**
+  (2026-08-09). `scripts/cortar_version.py` cortaba el `CHANGELOG.md` y
+  borraba los fragmentos, pero nunca tocaba `pyproject.toml` ni
+  `frontend/package.json`: con el repo en `v0.4.0`, los dos seguían diciendo
+  `0.1.0` y la versión real vivía solo en el tag de git. Lo destapó el paquete
+  de demo, que nombra el ZIP con lo que declara el proyecto y salió etiquetado
+  con una versión de hacía un mes. Ahora el script escribe la versión en los
+  dos archivos al cortar, y `tests/test_repo_coherencia.py` falla si vuelven a
+  separarse entre sí.
+
 ## [0.6.0] - 2026-08-23
 
 ### Added
