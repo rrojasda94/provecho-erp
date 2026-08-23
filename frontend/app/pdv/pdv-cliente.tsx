@@ -43,6 +43,9 @@ import { UBICACION_VACIA } from "@/components/direccion/ubicacion";
 
 type Props = {
   sucursalId: string;
+  /** Los del cajero. Solo deciden si se le ofrece traer un documento de
+   * RENIEC/SUNAT: el resto del PDV ya está detrás del permiso de la caja. */
+  permisos: string[];
   puntoVenta: {
     id: string;
     serieBoleta: string;
@@ -158,7 +161,7 @@ function bloqueoDeCaja(resuelta: boolean, falla: Falla | null) {
   );
 }
 
-export default function PdvCliente({ sucursalId, puntoVenta }: Props) {
+export default function PdvCliente({ sucursalId, permisos, puntoVenta }: Props) {
   const datos = useDatosPdv(puntoVenta.id, sucursalId);
   const [borradores, setBorradores] = useState<Borrador[]>([nuevoBorrador()]);
   const [activoId, setActivoId] = useState<string | null>(null);
@@ -803,6 +806,7 @@ export default function PdvCliente({ sucursalId, puntoVenta }: Props) {
       />
       <DialogoCliente
         abierto={dialogo === "cliente"}
+        permisos={permisos}
         onCerrar={() => setDialogo(null)}
         onBuscar={api.buscarClientes}
         onElegir={(c: ClienteBuscado) => {
@@ -813,6 +817,7 @@ export default function PdvCliente({ sucursalId, puntoVenta }: Props) {
       />
       <DialogoCobro
         abierto={dialogo === "cobro"}
+        permisos={permisos}
         total={totalACobrar(activo, seleccion)}
         medios={datos.medios}
         ocupado={ocupado}

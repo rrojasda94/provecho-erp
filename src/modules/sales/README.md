@@ -117,6 +117,14 @@ cuatro huecos que el punto de venta necesitaba y el modelo no daba.
   confiar en lo tecleado en caja. Documento ya visto no vuelve a consultar.
   Sin respuesta de Factiliza (o no encontrado) cae a lo tecleado — el alta
   nunca se bloquea.
+- **Y en la pantalla, antes de guardar** (2026-08-22, addendum de ADR-041):
+  el PDV ofrece «Buscar DNI / RUC» en el alta de cliente y en el receptor del
+  comprobante, contra `GET /consulta/{dni,ruc}/{numero}`. El servidor sigue
+  teniendo la última palabra —el fallback de arriba no cambia—; lo que suma
+  es poder **ver** el nombre real antes de cobrar, en vez de descubrir al
+  emitir que SUNAT escribió otro. En caja hay un solo campo para los dos
+  documentos, así que el largo decide el padrón (8 → RENIEC, 11 → SUNAT,
+  RN-CPP-003) y con 11 el cliente nace jurídico.
 
 **Cierre para alfa (2026-07-28, migraciones `f2a8c15e94d7` y `b6d41e07af92`):**
 
