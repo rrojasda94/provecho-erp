@@ -22,6 +22,7 @@ import type {
   Articulo,
   ExtraDeProducto,
   GrupoOpcion,
+  LineaDeAtributo,
   Producto,
   ProductoDetalle,
   Receta,
@@ -39,6 +40,10 @@ export type Camino = {
   sueltos: string[];
   /** `articulo_id` de lo que el plato NO lleva. */
   restas: string[];
+  /** `producto_atributo_valor.id` elegidos (ADR-055). Lista y no
+   * `Record<atributo, valor>` porque es lo que viaja en la línea de venta:
+   * una sola forma del dato entre la pantalla, el evento y la receta. */
+  valores: string[];
 };
 
 /** Un nodo elegido, ya resuelto contra la ficha: el extra y de qué grupo
@@ -153,6 +158,8 @@ export type TipoNodo =
   | "tamano"
   | "grupo"
   | "opcion"
+  | "atributo"
+  | "valor"
   | "disponible"
   | "empaque"
   | "resta"
@@ -341,6 +348,113 @@ function columnaDeOpciones(
 }
 
 /**
+ * Un atributo y sus valores (ADR-055/058).
+ *
+ * Se dibuja como el grupo de opciones y **no** es lo mismo: un grupo agrupa
+ * extras —productos con su receta y su precio— y un atributo es una
+ * dimensión del plato. Comparten forma porque el gesto es el mismo (elegir
+ * uno de varios), y el lienzo no gana nada inventando una segunda manera de
+ * mostrar lo que ya se sabe mirar.
+ *
+ * `excluidos` apaga los valores que no pueden ir con algo ya elegido
+ * (RN-COM-038). Se apagan en vez de ocultarse: media hawaiana desaparecida
+ * de la segunda mitad se lee como un error de carga; media hawaiana apagada
+ * dice "ya la elegiste".
+ */
+function columnaDeAtributo(
+  linea: LineaDeAtributo,
+  indice: number,
+  activo: ProductoDetalle,
+  camino: Camino,
+  excluidos: Set<string>,
+): Grafo {
+  const visibles = linea.valores.filter((v) => v.activo);
+  const posiciones = apilarColumna(
+    visibles.length,
+    columnaX(indice),
+    MEDIDAS.altoNodo,
+  );
+  const nodos: NodoLienzo[] = visibles.map((v, i) => ({
+    id: `valor:${linea.linea_id}:${v.id}`,
+    tipo: "valor" as const,
+    ...posiciones[i],
+    datos: {
+      titulo: v.nombre,
+      pie:
+        Number(v.precio_extra) > 0 ? `+ S/ ${Number(v.precio_extra).toFixed(2)}` : undefined,
+      activo: camino.valores.includes(v.id),
+      aria: excluidos.has(v.id)
+        ? `${v.nombre} — no se puede con lo ya elegido`
+        : undefined,
+      refId: v.id,
+      grupoId: linea.linea_id,
+      columna: linea.nombre,
+    },
+  }));
+  const aristas: AristaLienzo[] = nodos.map((n) => ({
+    id: `atributo:${linea.linea_id}→${n.id}`,
+    desde: `atributo:${linea.linea_id}`,
+    hasta: n.id,
+    clase: n.datos.activo
+      ? ("camino" as const)
+      : excluidos.has(String(n.datos.refId))
+        ? ("inactiva" as const)
+        : ("posible" as const),
+  }));
+
+  const arriba = Math.min(...posiciones.map((p) => p.y), 0);
+  nodos.push({
+    id: `atributo:${linea.linea_id}`,
+    tipo: "atributo",
+    x: columnaX(indice),
+    y: arriba - (MEDIDAS.altoNodo + MEDIDAS.separacionFila),
+    datos: {
+      titulo: linea.nombre,
+      pie: modoLegible(linea.modo_variante),
+      activo: visibles.some((v) => camino.valores.includes(v.id)),
+      refId: linea.atributo_id,
+      grupoId: linea.linea_id,
+      columna: "Atributo",
+    },
+  });
+  aristas.push({
+    id: `tamano:${activo.id}→atributo:${linea.linea_id}`,
+    desde: `tamano:${activo.id}`,
+    hasta: `atributo:${linea.linea_id}`,
+    clase: "posible",
+  });
+  return { nodos, aristas };
+}
+
+/** Lo que el pie del nodo de atributo dice sin jerga. */
+export function modoLegible(modo: string): string {
+  if (modo === "siempre") return "genera una variante por combinación";
+  if (modo === "dinamica") return "genera la variante al venderse";
+  return "no genera variantes";
+}
+
+/**
+ * Qué valores quedan apagados por lo ya elegido (RN-COM-038).
+ *
+ * Las exclusiones vienen como pares y se leen en los **dos** sentidos: se
+ * guarda una sola fila porque el par es simétrico, así que acá hay que mirar
+ * las dos puntas.
+ */
+export function valoresExcluidos(
+  elegidos: string[],
+  exclusiones: [string, string][],
+): Set<string> {
+  const fuera = new Set<string>();
+  for (const [a, b] of exclusiones) {
+    if (elegidos.includes(a)) fuera.add(b);
+    if (elegidos.includes(b)) fuera.add(a);
+  }
+  // Lo ya elegido nunca se apaga a sí mismo: si no, elegir algo lo tacharía.
+  for (const e of elegidos) fuera.delete(e);
+  return fuera;
+}
+
+/**
  * Los extras que existen y este producto todavía NO ofrece.
  *
  * Están en el lienzo justamente para poder conectarlos: se arrastra de un
@@ -467,6 +581,10 @@ export function armarGrafo(params: {
   modalidad: string;
   /** Extras que existen y este producto todavía no ofrece. */
   disponibles?: { id: string; nombre: string }[];
+  /** Atributos que el producto ofrece (ADR-055). Vacío = catálogo viejo, y
+   * el lienzo dibuja exactamente lo de antes. */
+  atributos?: LineaDeAtributo[];
+  exclusiones?: [string, string][];
 }): Grafo {
   const { padre, variantes, activo, camino, recetas, quitables } = params;
   // Un producto sin tamaños es su propio nodo: "simple" es el árbol de un
@@ -478,6 +596,11 @@ export function armarGrafo(params: {
     columnaTamanos(ramas, padre, camino, recetas),
   ];
   let columna = 2;
+  const excluidos = valoresExcluidos(camino.valores, params.exclusiones ?? []);
+  for (const linea of params.atributos ?? []) {
+    partes.push(columnaDeAtributo(linea, columna, activo, camino, excluidos));
+    columna += subcolumnas(linea.valores.filter((v) => v.activo).length);
+  }
   for (const grupo of activo.grupos) {
     partes.push(
       columnaDeOpciones(grupo.extras, grupo, columna, activo, camino, recetas),
@@ -503,7 +626,9 @@ export function armarGrafo(params: {
   partes.push(nodoEmpaque(activo, params.empaques, params.modalidad, columna));
   columna += 1;
 
-  const nodos = partes.flatMap((p) => p.nodos);
+  const nodos = partes
+    .flatMap((p) => p.nodos)
+    .map((n) => conPosicionGuardada(n, ramas, padre));
   const aristas = partes.flatMap((p) => p.aristas);
   nodos.push({
     id: "plato",
@@ -512,21 +637,41 @@ export function armarGrafo(params: {
     y: 0,
     datos: { titulo: "Plato", activo: true, columna: "Plato" },
   });
-  // El tamaño y cada opción elegida alimentan el plato: es la suma que hace
-  // `fusionar`, dibujada.
-  for (const n of nodos) {
-    const alimenta =
-      (n.tipo === "tamano" || n.tipo === "opcion") && n.datos.activo;
-    if (alimenta) {
-      aristas.push({
-        id: `${n.id}→plato`,
-        desde: n.id,
-        hasta: "plato",
-        clase: "camino",
-      });
-    }
-  }
-  return { nodos, aristas };
+  return { nodos, aristas: [...aristas, ...aristasAlPlato(nodos)] };
+}
+
+/** El tamaño, cada opción y cada valor elegidos alimentan el plato: es la
+ * suma que hace `fusionar`, dibujada. */
+function aristasAlPlato(nodos: NodoLienzo[]): AristaLienzo[] {
+  const ALIMENTAN = new Set<TipoNodo>(["tamano", "opcion", "valor"]);
+  return nodos
+    .filter((n) => ALIMENTAN.has(n.tipo) && n.datos.activo)
+    .map((n) => ({
+      id: `${n.id}→plato`,
+      desde: n.id,
+      hasta: "plato",
+      clase: "camino" as const,
+    }));
+}
+
+/**
+ * Si alguien movió este nodo, ahí va (ADR-058).
+ *
+ * Solo el producto y los tamaños tienen dónde guardarlo: son filas de
+ * `producto_comercial`. El resto lo sigue colocando la topología, que es lo
+ * que ADR-035 decidió y sigue siendo cierto para una columna de dieciocho
+ * extras.
+ */
+function conPosicionGuardada(
+  nodo: NodoLienzo,
+  ramas: ProductoDetalle[],
+  padre: ProductoDetalle,
+): NodoLienzo {
+  const [tipo, id] = nodo.id.split(":");
+  const producto =
+    tipo === "producto" ? padre : ramas.find((r) => r.id === id && tipo === "tamano");
+  const pos = producto?.lienzo_pos;
+  return pos ? { ...nodo, x: pos.x, y: pos.y } : nodo;
 }
 
 // --- Auxiliares -------------------------------------------------------------

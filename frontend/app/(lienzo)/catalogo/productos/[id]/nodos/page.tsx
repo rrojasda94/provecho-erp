@@ -1,8 +1,8 @@
 import { ApiError, apiFetch, type Pagina } from "@/lib/api";
 import type {
+  ArbolProducto,
   Articulo,
   Producto,
-  ProductoDetalle,
   Receta,
   UnidadMedida,
 } from "@/lib/catalogo";
@@ -53,27 +53,25 @@ export default async function NodosPage({
   }
 
   try {
-    const [producto, recetas, unidades, productos, articulos] = await Promise.all([
-      apiFetch<ProductoDetalle>(`/api/v1/sales/productos/${id}`, { token }),
+    // Una sola llamada por el árbol (ADR-058). Antes eran la ficha del padre
+    // **más una por cada variante**: con tres tamaños y ocho sabores, 27 idas
+    // a la red para dibujar un árbol. Cada tamaño sigue trayendo SUS grupos
+    // —"Peperoni" en Personal y en Familiar son dos opciones distintas con
+    // dos recetas distintas—, solo que ahora vienen juntas.
+    const [arbol, recetas, unidades, productos, articulos] = await Promise.all([
+      apiFetch<ArbolProducto>(`/api/v1/sales/productos/${id}/arbol`, { token }),
       apiFetch<Receta[]>("/api/v1/inventory/recetas", { token }),
       apiFetch<UnidadMedida[]>("/api/v1/inventory/unidades-medida", { token }),
       apiFetch<Producto[]>("/api/v1/sales/productos", { token }),
       apiFetch<Pagina<Articulo>>("/api/v1/inventory/articulos", { token }),
     ]);
-    // Cada tamaño trae SUS grupos: "Peperoni" en Personal y en Familiar son
-    // dos opciones distintas con dos recetas distintas (otros gramos), no la
-    // misma opción vista dos veces. Por eso la ficha de la variante, y no
-    // solo la del padre.
-    const variantes = await Promise.all(
-      producto.variantes.map((v) =>
-        apiFetch<ProductoDetalle>(`/api/v1/sales/productos/${v.id}`, { token }),
-      ),
-    );
 
     return (
       <LienzoNodos
-        inicial={producto}
-        variantesIniciales={variantes}
+        inicial={arbol}
+        variantesIniciales={arbol.variantes_detalle}
+        atributos={arbol.atributos}
+        exclusiones={arbol.exclusiones}
         recetas={recetas}
         unidades={unidades}
         extrasDisponibles={productos.filter((p) => p.es_extra)}

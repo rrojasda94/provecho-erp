@@ -19,6 +19,7 @@ from src.config.settings import settings
 from src.core.rate_limit import consumir, ip_de
 from src.core.tenant import Tenant
 from src.modules.sales.api import schemas
+from src.modules.sales.application import atributos as atributos_uc
 from src.modules.sales.application import (
     catalogo,
     clientes,
@@ -681,6 +682,176 @@ def desvincular_extra(
     es un producto comercial con su receta y su precio."""
     catalogo.desvincular_extra(session, producto_id=producto_id, extra_id=extra_id)
     session.commit()
+
+
+# --- Atributos y variantes (ADR-055) -----------------------------------------
+# Las rutas literales van **antes** que las paramétricas: FastAPI resuelve por
+# orden, y "/atributos/exclusiones" entraría como un `atributo_id` que no es
+# UUID. Mismo cuidado que `/recetas/plantilla` en inventory.
+@router.post("/atributos/exclusiones", status_code=201)
+def declarar_exclusion(
+    body: schemas.ExclusionIn,
+    _: Usuario = Depends(require_permission(CATALOGO)),
+    session: Session = Depends(get_db),
+):
+    """Estos dos valores no van juntos (RN-COM-038).
+
+    El caso que la obliga: en una pizza mitad y mitad las dos mitades tienen
+    que ser distintas. Media hawaiana y media hawaiana no es una
+    mitad-y-mitad, es una hawaiana entera — que ya se vende como su propio
+    producto.
+    """
+    atributos_uc.excluir(session, valor_id=body.valor_id, excluye_id=body.excluye_id)
+    session.commit()
+    return {"ok": True}
+
+
+@router.delete("/atributos/exclusiones", status_code=204)
+def quitar_exclusion(
+    body: schemas.ExclusionIn,
+    _: Usuario = Depends(require_permission(CATALOGO)),
+    session: Session = Depends(get_db),
+):
+    atributos_uc.dejar_de_excluir(
+        session, valor_id=body.valor_id, excluye_id=body.excluye_id
+    )
+    session.commit()
+
+
+@router.patch("/atributos/valores/{ptav_id}", response_model=schemas.ValorDeProductoOut)
+def fijar_precio_extra(
+    ptav_id: uuid.UUID,
+    body: schemas.PrecioExtraIn,
+    _: Usuario = Depends(require_permission(CATALOGO)),
+    session: Session = Depends(get_db),
+):
+    """Cuánto suma este valor **en este producto**. La lista de precios sigue
+    mandando sobre el precio base (RN-PRC-003); esto se suma."""
+    ptav = atributos_uc.fijar_precio_extra(
+        session, ptav_id, precio_extra=body.precio_extra
+    )
+    valor = atributos_uc.exigir_valor(session, ptav.atributo_valor_id)
+    session.commit()
+    return {
+        "id": ptav.id,
+        "atributo_valor_id": ptav.atributo_valor_id,
+        "nombre": valor.nombre,
+        "precio_extra": ptav.precio_extra,
+        "activo": ptav.activo,
+    }
+
+
+@router.delete("/atributos/valores/{ptav_id}", status_code=204)
+def retirar_valor_de_producto(
+    ptav_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(CATALOGO)),
+    session: Session = Depends(get_db),
+):
+    """Lo saca de la oferta **sin borrarlo**: hay ventas que lo nombran y
+    líneas de receta que lo usan como condición."""
+    atributos_uc.retirar_valor(session, ptav_id)
+    session.commit()
+
+
+@router.get("/atributos", response_model=list[schemas.AtributoOut])
+def listar_atributos(
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    return atributos_uc.listar_atributos(session, tenant.empresa_id)
+
+
+@router.post("/atributos", response_model=schemas.AtributoOut, status_code=201)
+def crear_atributo(
+    body: schemas.AtributoCreate,
+    _: Usuario = Depends(require_permission(CATALOGO)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    atributo = atributos_uc.crear_atributo(
+        session, empresa_id=tenant.empresa_id, **body.model_dump()
+    )
+    session.commit()
+    return _atributo_dict(session, atributo)
+
+
+@router.patch("/atributos/{atributo_id}", response_model=schemas.AtributoOut)
+def editar_atributo(
+    atributo_id: uuid.UUID,
+    body: schemas.AtributoUpdate,
+    _: Usuario = Depends(require_permission(CATALOGO)),
+    session: Session = Depends(get_db),
+):
+    """Bajar `modo_variante` de `siempre` a `nunca` **no borra** las variantes
+    ya materializadas: puede haber ventas que las nombran. Deja de generar
+    nuevas, que es lo que alguien quiere al descubrir que un atributo de 17
+    valores iba a materializar 289 combinaciones."""
+    atributo = atributos_uc.editar_atributo(session, atributo_id, **body.model_dump())
+    session.commit()
+    return _atributo_dict(session, atributo)
+
+
+@router.post("/atributos/{atributo_id}/valores", response_model=schemas.AtributoOut,
+             status_code=201)
+def agregar_valor_de_atributo(
+    atributo_id: uuid.UUID,
+    body: schemas.AtributoValorCreate,
+    _: Usuario = Depends(require_permission(CATALOGO)),
+    session: Session = Depends(get_db),
+):
+    atributos_uc.agregar_valor(session, atributo_id, **body.model_dump())
+    session.commit()
+    return _atributo_dict(session, atributos_uc.exigir_atributo(session, atributo_id))
+
+
+def _atributo_dict(session: Session, atributo) -> dict:
+    return {
+        "id": atributo.id,
+        "nombre": atributo.nombre,
+        "modo_variante": atributo.modo_variante,
+        "display": atributo.display,
+        "orden": atributo.orden,
+        "valores": [
+            {"id": v.id, "nombre": v.nombre, "orden": v.orden, "activo": v.activo}
+            for v in atributos_uc.valores_de(session, atributo.id)
+        ],
+    }
+
+
+@router.get("/productos/{producto_id}/arbol", response_model=schemas.ArbolProductoOut)
+def ver_arbol_de_producto(
+    producto_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(LEER)),
+    session: Session = Depends(get_db),
+):
+    """El producto entero para el lienzo, en una llamada.
+
+    La versión anterior pedía la ficha del padre y una por cada variante:
+    con tres tamaños y ocho sabores eran veintisiete idas a la red para
+    dibujar un árbol.
+    """
+    return catalogo.arbol_de_producto(session, producto_id)
+
+
+@router.post("/productos/{producto_id}/atributos", response_model=schemas.ArbolProductoOut,
+             status_code=201)
+def ofrecer_atributo(
+    producto_id: uuid.UUID,
+    body: schemas.OfrecerAtributoIn,
+    _: Usuario = Depends(require_permission(CATALOGO)),
+    session: Session = Depends(get_db),
+):
+    """El producto pasa a ofrecer este atributo. Sin `valores`, todos."""
+    atributos_uc.ofrecer_atributo(
+        session,
+        producto_id=producto_id,
+        atributo_id=body.atributo_id,
+        valores=body.valores or None,
+        orden=body.orden,
+    )
+    session.commit()
+    return catalogo.arbol_de_producto(session, producto_id)
 
 
 @router.post("/productos/{producto_id}/grupos", response_model=schemas.GrupoOpcionOut,

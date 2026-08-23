@@ -28,6 +28,7 @@ from src.modules.inventory.application.queries_publicas import (
 )
 from src.modules.sales.application.errors import Conflicto, NoEncontrado, ReglaNegocio
 from src.modules.sales.infrastructure.models import (
+    Atributo,
     AtributoValor,
     MedioPago,
     ProductoAtributoLinea,
@@ -35,6 +36,7 @@ from src.modules.sales.infrastructure.models import (
     ProductoComercial,
     ProductoExclusion,
     ProductoOpcionGrupo,
+    ProductoVarianteValor,
 )
 from src.modules.sales.infrastructure.repositories import (
     MedioPagoRepo,
@@ -245,6 +247,12 @@ def editar_producto(session: Session, producto_id: uuid.UUID, **campos) -> Produ
         prod.receta_id = campos["receta_id"]
     for campo in (
         "activo", "categoria_id", "orden", "empaque_id", "modalidades_empaque",
+        # Dónde quedó el nodo en el lienzo (ADR-058). ADR-035 decidió no
+        # persistirlo —"mover un nodo no dice nada del producto"— y era
+        # cierto mientras el lienzo recolocaba todo en cada cambio de
+        # estructura. Con atributos el árbol deja de rearmarse solo, así que
+        # la posición sobrevive y perderla en cada recarga es trabajo tirado.
+        "lienzo_pos",
     ):
         if campos.get(campo) is not None:
             setattr(prod, campo, campos[campo])
@@ -353,6 +361,111 @@ def detalle_producto(session: Session, producto_id: uuid.UUID) -> dict:
     }
 
 
+def arbol_de_producto(session: Session, producto_id: uuid.UUID) -> dict:
+    """Todo lo que el lienzo necesita, en **una** consulta por tabla.
+
+    La versión anterior de la pantalla pedía la ficha del padre y después una
+    por cada variante, más una receta por nodo al entrar al plato: con tres
+    tamaños y ocho sabores eran veintisiete idas a la red para dibujar un
+    árbol. Acá el árbol viene entero y las recetas se piden aparte, que es lo
+    único que de verdad conviene perezoso — su contenido cambia mientras se
+    edita y su dueño es `inventory`.
+
+    Incluye lo viejo (`grupos`, `extras_sueltos`) además de lo nuevo: con el
+    interruptor `catalogo.modelo_odoo` apagado el lienzo sigue dibujando
+    grupos y extras, y una sola forma de traer los datos evita que las dos
+    pantallas se separen.
+    """
+    repo = ProductoComercialRepo(session)
+    producto = _exigir(repo, producto_id, "producto comercial")
+    variantes = repo.variantes_de(producto_id)
+    de_interes = [producto.id] + [v.id for v in variantes]
+
+    filas = session.execute(
+        select(ProductoAtributoLinea, ProductoAtributoValor, Atributo, AtributoValor)
+        .join(Atributo, ProductoAtributoLinea.atributo_id == Atributo.id)
+        .outerjoin(
+            ProductoAtributoValor,
+            ProductoAtributoValor.linea_id == ProductoAtributoLinea.id,
+        )
+        .outerjoin(
+            AtributoValor, ProductoAtributoValor.atributo_valor_id == AtributoValor.id
+        )
+        .where(ProductoAtributoLinea.producto_comercial_id.in_(de_interes))
+        .order_by(ProductoAtributoLinea.orden, AtributoValor.orden)
+    )
+    lineas: dict[uuid.UUID, dict] = {}
+    for linea, ptav, atributo, valor in filas:
+        entrada = lineas.setdefault(
+            linea.id,
+            {
+                "linea_id": linea.id,
+                "producto_comercial_id": linea.producto_comercial_id,
+                "atributo_id": atributo.id,
+                "nombre": atributo.nombre,
+                "modo_variante": atributo.modo_variante,
+                "display": atributo.display,
+                "orden": linea.orden,
+                "valores": [],
+            },
+        )
+        if ptav is None or valor is None:
+            continue
+        entrada["valores"].append(
+            {
+                "id": ptav.id,
+                "atributo_valor_id": valor.id,
+                "nombre": valor.nombre,
+                "precio_extra": ptav.precio_extra,
+                "activo": ptav.activo,
+            }
+        )
+
+    todos = [v["id"] for linea in lineas.values() for v in linea["valores"]]
+    exclusiones = (
+        session.execute(
+            select(
+                ProductoExclusion.producto_atributo_valor_id,
+                ProductoExclusion.excluye_valor_id,
+            ).where(
+                ProductoExclusion.producto_atributo_valor_id.in_(todos),
+                ProductoExclusion.excluye_valor_id.in_(todos),
+            )
+        )
+        if todos
+        else []
+    )
+    return {
+        **detalle_producto(session, producto_id),
+        # Cada tamaño trae SUS grupos: "Peperoni" en Personal y en Familiar
+        # son dos opciones distintas con dos recetas distintas (otros
+        # gramos), no la misma vista dos veces. Antes esto era una petición
+        # HTTP por variante desde el navegador; ahora son N consultas
+        # locales dentro de una sola.
+        # ponytail: sigue siendo N+1 contra la base. Con tres tamaños no se
+        # nota; si un producto llega a veinte variantes, `grupos_de` y
+        # `extras_de` se baten en dos consultas por marca.
+        "variantes_detalle": [
+            detalle_producto(session, v.id) for v in variantes
+        ],
+        "atributos": list(lineas.values()),
+        # Pares, no un grafo: el lienzo solo necesita saber qué apagar cuando
+        # alguien ya eligió un valor.
+        "exclusiones": [[str(a), str(b)] for a, b in exclusiones],
+        "combinaciones": [
+            {
+                "producto_comercial_id": str(pvv.producto_comercial_id),
+                "producto_atributo_valor_id": str(pvv.producto_atributo_valor_id),
+            }
+            for pvv in session.scalars(
+                select(ProductoVarianteValor).where(
+                    ProductoVarianteValor.producto_comercial_id.in_(de_interes)
+                )
+            )
+        ],
+    }
+
+
 def _producto_dict(p: ProductoComercial) -> dict:
     return {
         "id": p.id,
@@ -367,6 +480,7 @@ def _producto_dict(p: ProductoComercial) -> dict:
         "es_extra": p.es_extra,
         "empaque_id": p.empaque_id,
         "modalidades_empaque": p.modalidades_empaque,
+        "lienzo_pos": p.lienzo_pos,
     }
 
 

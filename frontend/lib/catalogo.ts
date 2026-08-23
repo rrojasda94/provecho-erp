@@ -9,6 +9,8 @@
  * lo que el servidor calculó (el redondeo por UdM se decide allá).
  */
 
+import type { CeldaAGuardar, Grilla } from "./matriz";
+
 import { type Pagina } from "@/lib/api";
 import { pedir, subir } from "@/lib/cliente-api";
 
@@ -179,6 +181,9 @@ export type Producto = {
   es_extra: boolean;
   empaque_id: string | null;
   modalidades_empaque: string[] | null;
+  /** Dónde quedó el nodo en el lienzo (ADR-058). `null` = todavía no se
+   * movió, y el lienzo lo coloca por topología. */
+  lienzo_pos: { x: number; y: number } | null;
 };
 
 export type ExtraDeProducto = {
@@ -332,6 +337,8 @@ export const catalogoApi = {
       /** Artículo de empaque y en qué modalidades se descuenta (RN-EMP-003). */
       empaque_id: string | null;
       modalidades_empaque: string[] | null;
+      /** Dónde quedó el nodo en el lienzo (ADR-058). */
+      lienzo_pos: { x: number; y: number } | null;
     }>,
   ) => pedir<Producto>(`/sales/productos/${id}`, { metodo: "PATCH", cuerpo }),
 
@@ -418,4 +425,124 @@ export const catalogoApi = {
     pedir<RecetaDetalle>(`/inventory/recetas/${recetaId}/items/${itemId}`, {
       metodo: "DELETE",
     }),
+
+  matriz: (recetaIds?: string[]) =>
+    pedir<Grilla>(
+      "/inventory/recetas/matriz" +
+        (recetaIds?.length ? `?receta_ids=${recetaIds.join(",")}` : ""),
+    ),
+
+  guardarMatriz: (celdas: CeldaAGuardar[]) =>
+    pedir<GuardadoMatriz>("/inventory/recetas/matriz", {
+      metodo: "PUT",
+      cuerpo: { celdas },
+    }),
+
+  arbol: (productoId: string) =>
+    pedir<ArbolProducto>(`/sales/productos/${productoId}/arbol`),
+
+  atributos: () => pedir<Atributo[]>("/sales/atributos"),
+
+  crearAtributo: (cuerpo: {
+    nombre: string;
+    modo_variante?: string;
+    display?: string;
+    orden?: number;
+  }) => pedir<Atributo>("/sales/atributos", { metodo: "POST", cuerpo }),
+
+  agregarValorDeAtributo: (atributoId: string, cuerpo: { nombre: string; orden?: number }) =>
+    pedir<Atributo>(`/sales/atributos/${atributoId}/valores`, {
+      metodo: "POST",
+      cuerpo,
+    }),
+
+  ofrecerAtributo: (
+    productoId: string,
+    cuerpo: { atributo_id: string; valores?: string[]; orden?: number },
+  ) =>
+    pedir<ArbolProducto>(`/sales/productos/${productoId}/atributos`, {
+      metodo: "POST",
+      cuerpo,
+    }),
+
+  fijarPrecioExtra: (ptavId: string, precio_extra: string) =>
+    pedir<ValorDeProducto>(`/sales/atributos/valores/${ptavId}`, {
+      metodo: "PATCH",
+      cuerpo: { precio_extra },
+    }),
+
+  retirarValor: (ptavId: string) =>
+    pedir<void>(`/sales/atributos/valores/${ptavId}`, { metodo: "DELETE" }),
+
+  excluir: (valor_id: string, excluye_id: string) =>
+    pedir<{ ok: boolean }>("/sales/atributos/exclusiones", {
+      metodo: "POST",
+      cuerpo: { valor_id, excluye_id },
+    }),
+};
+
+// --- Matriz de recetas y atributos (ADR-055, ADR-057, ADR-058) --------------
+export type { Grilla } from "./matriz";
+
+export type GuardadoMatriz = {
+  resultados: {
+    receta_id: string | null;
+    articulo_id: string | null;
+    accion: "creada" | "actualizada" | "borrada" | "sin_cambio" | "problema";
+    item_id: string | null;
+    cantidad: string | null;
+    detalle: string | null;
+  }[];
+  aplicadas: number;
+  con_problema: number;
+};
+
+export type ValorDeAtributo = {
+  id: string;
+  nombre: string;
+  orden: number;
+  activo: boolean;
+};
+
+export type Atributo = {
+  id: string;
+  nombre: string;
+  /** `siempre` | `dinamica` | `nunca` — el `create_variant` de Odoo. */
+  modo_variante: string;
+  display: string;
+  orden: number;
+  valores: ValorDeAtributo[];
+};
+
+export type ValorDeProducto = {
+  id: string;
+  atributo_valor_id: string;
+  nombre: string;
+  precio_extra: string;
+  activo: boolean;
+};
+
+export type LineaDeAtributo = {
+  linea_id: string;
+  producto_comercial_id: string;
+  atributo_id: string;
+  nombre: string;
+  modo_variante: string;
+  display: string;
+  orden: number;
+  valores: ValorDeProducto[];
+};
+
+export type ArbolProducto = ProductoDetalle & {
+  /** La ficha completa de cada variante, con SUS grupos y extras. Viene acá
+   * y no se pide aparte: era una petición por variante (ADR-058). */
+  variantes_detalle: ProductoDetalle[];
+  atributos: LineaDeAtributo[];
+  /** Pares que no van juntos (RN-COM-038). El lienzo solo necesita saber qué
+   * apagar cuando alguien ya eligió un valor. */
+  exclusiones: [string, string][];
+  combinaciones: {
+    producto_comercial_id: string;
+    producto_atributo_valor_id: string;
+  }[];
 };

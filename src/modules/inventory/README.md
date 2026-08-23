@@ -70,6 +70,28 @@ archivo: sin orden explícito, un diff contra el export anterior no sirve.
 de una por ítem, y `GET /inventory/recetas/{id}` devuelve la unidad **de la
 línea** cuando la línea eligió una.
 
+## Estado (slice 11 — la matriz de recetas, 2026-08-23)
+
+ADR-057. `GET`/`PUT /inventory/recetas/matriz`: el recetario en grilla,
+insumos en las filas y recetas en las columnas.
+
+**La identidad de una celda es `(receta, insumo, condición)`**, no un id de
+línea — es lo que permite pegar un rectángulo desde Excel, que no trae ids.
+La condición entra en la clave porque desde ADR-056 el mismo insumo puede
+estar dos veces en la misma receta si cada línea aplica a otra combinación.
+
+Vaciar la celda borra la línea. Vaciar una que ya estaba vacía **no** es un
+error: pegar un rectángulo con huecos no puede reportar cuarenta problemas.
+
+Cada celda entra en su propio `SAVEPOINT` (mismo criterio que ADR-046) y la
+respuesta dice qué pasó con cada una, en vez de cortar con un 409.
+
+La ruta va declarada **antes** de `/recetas/{receta_id}`: FastAPI resuelve por
+orden y "matriz" entraría como un `receta_id` que no es UUID.
+
+`editar_item` acepta `unidad_medida_id` y redondea con los decimales de **la
+unidad de la línea**, no con los del artículo.
+
 ## Casos de uso
 
 - CRUD de artículos y categorías.

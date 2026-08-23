@@ -74,9 +74,9 @@ productos con 361 recetas.
 |---|---|---|
 | F1 | Modelo, migración aditiva `e2b7c40d91af`, reglas puras | ✅ 2026-08-23 |
 | F2 | Explosión de receta condicionada, venta, eventos, sync | ✅ 2026-08-23 |
-| F3 | Planillas `.xlsx` compatibles con el export de Odoo (4 libros) | ⏳ |
-| F4 | Matriz de recetas (edición masiva tipo hoja de cálculo) | ⏳ |
-| F5 | Lienzo de nodos sobre el modelo nuevo | ⏳ |
+| F3 | Conversor y cargador del catálogo de Odoo (`scripts/odoo/`) | ✅ 2026-08-23 |
+| F4 | Matriz de recetas (ADR-057) | ✅ 2026-08-23 |
+| F5 | Lienzo sobre el modelo de atributos (ADR-058) | ✅ 2026-08-23 |
 | F6 | Seeder desde los `.xlsx` reales, corte 0.7.0 | ⏳ |
 
 **Vuelta atrás**: la migración es solo aditiva, así que la imagen 0.6.0 corre

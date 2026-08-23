@@ -22,6 +22,7 @@ from src.modules.inventory.application import conteos as conteos_uc
 from src.modules.inventory.application import devoluciones as devoluciones_uc
 from src.modules.inventory.application import guias as guias_uc
 from src.modules.inventory.application import lotes as lotes_uc
+from src.modules.inventory.application import matriz as matriz_uc
 from src.modules.inventory.application import merma as merma_uc
 from src.modules.inventory.application import recetas as recetas_uc
 from src.modules.inventory.application import reservas as reservas_uc
@@ -1249,6 +1250,56 @@ def listar_recetas(
     return recetas_uc.listar_recetas(
         session, tenant.filtro_empresa(), tipo=tipo, categoria_id=categoria_id
     )
+
+
+@router.get("/recetas/matriz", response_model=schemas.MatrizOut)
+def ver_matriz_recetas(
+    receta_ids: str | None = None,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """El recetario en grilla: insumos en las filas, recetas en las columnas.
+
+    Declarada **antes** de `/recetas/{receta_id}` por lo mismo que la
+    plantilla: FastAPI resuelve por orden y "matriz" entraría como un
+    `receta_id` que no es UUID.
+
+    `receta_ids` es una lista separada por comas. Sin ella viene el recetario
+    entero, que es lo que quiere quien abre la pantalla a buscar; filtrar es
+    lo que quiere quien ya sabe qué comparar.
+    """
+    ids = (
+        [uuid.UUID(x) for x in receta_ids.split(",") if x.strip()]
+        if receta_ids
+        else None
+    )
+    return matriz_uc.grilla(
+        session, empresa_id=tenant.empresa_id, receta_ids=ids
+    )
+
+
+@router.put("/recetas/matriz", response_model=schemas.GuardarMatrizOut)
+def guardar_matriz_recetas(
+    body: schemas.GuardarMatrizIn,
+    _: Usuario = Depends(require_permission(CATALOGO)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Aplica las celdas que cambiaron, cada una en su propio SAVEPOINT.
+
+    Devuelve qué pasó con cada una en vez de un 409 al primer problema:
+    pegar cuarenta celdas y perderlas todas porque una tenía un insumo mal
+    escrito es el modo de falla que hace que nadie vuelva a pegar nada
+    (mismo criterio que ADR-046 con las recetas).
+    """
+    resultado = matriz_uc.guardar(
+        session,
+        empresa_id=tenant.empresa_id,
+        celdas=[c.model_dump() for c in body.celdas],
+    )
+    session.commit()
+    return resultado
 
 
 @router.get("/recetas/plantilla")

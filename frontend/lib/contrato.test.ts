@@ -465,6 +465,33 @@ const CATALOGO: Caso[] = [
   ),
   caso("editarItem", () => catalogoApi.editarItem(UUID, UUID, { cantidad: "0.30" })),
   caso("eliminarItem", () => catalogoApi.eliminarItem(UUID, UUID)),
+  // --- Matriz de recetas y atributos (ADR-055, ADR-057, ADR-058) ------------
+  caso("matriz", () => catalogoApi.matriz()),
+  caso("guardarMatriz", () =>
+    catalogoApi.guardarMatriz([
+      {
+        receta_id: UUID,
+        articulo_id: UUID,
+        expresion: "450/3",
+        unidad_medida_id: null,
+        aplica_valores: [],
+      },
+    ]),
+  ),
+  caso("arbol", () => catalogoApi.arbol(UUID)),
+  caso("atributos", () => catalogoApi.atributos()),
+  caso("crearAtributo", () =>
+    catalogoApi.crearAtributo({ nombre: "Tamaño", display: "pildoras" }),
+  ),
+  caso("agregarValorDeAtributo", () =>
+    catalogoApi.agregarValorDeAtributo(UUID, { nombre: "Familiar" }),
+  ),
+  caso("ofrecerAtributo", () =>
+    catalogoApi.ofrecerAtributo(UUID, { atributo_id: UUID }),
+  ),
+  caso("fijarPrecioExtra", () => catalogoApi.fijarPrecioExtra(UUID, "8.50")),
+  caso("retirarValor", () => catalogoApi.retirarValor(UUID)),
+  caso("excluir", () => catalogoApi.excluir(UUID, UUID)),
 ];
 
 const KDS: Caso[] = [

@@ -969,3 +969,77 @@ class LoteInventorySyncIn(BaseModel):
     solicitudes: list[SolicitudSyncIn] = []
     recepciones: list[RecepcionSyncIn] = []
     conteos: list[ConteoSyncIn] = []
+
+
+# --- Matriz de recetas (ADR-057) ---------------------------------------------
+class MatrizRecetaOut(BaseModel):
+    id: uuid.UUID
+    nombre: str
+    rendimiento_cantidad: Decimal
+    rendimiento_unidad_medida_id: uuid.UUID
+    es_kit: bool
+
+
+class MatrizInsumoOut(BaseModel):
+    articulo_id: uuid.UUID
+    nombre: str
+    unidad_medida_id: uuid.UUID
+    unidad: str
+    decimales: int
+    costo_promedio: Decimal
+
+
+class MatrizCeldaOut(BaseModel):
+    item_id: uuid.UUID
+    receta_id: uuid.UUID
+    articulo_id: uuid.UUID
+    cantidad: Decimal
+    expresion: str | None
+    merma_pct: Decimal
+    unidad_medida_id: uuid.UUID | None
+    unidad: str
+    decimales: int
+    aplica_valores: list[str]
+    orden: int
+
+
+class MatrizOut(BaseModel):
+    recetas: list[MatrizRecetaOut]
+    insumos: list[MatrizInsumoOut]
+    celdas: list[MatrizCeldaOut]
+
+
+class CeldaIn(BaseModel):
+    """Una celda de la grilla. La identidad es `(receta, insumo, condición)`,
+    no un id de línea: es lo que permite pegar un rectángulo desde Excel, que
+    no trae ids."""
+
+    receta_id: uuid.UUID
+    articulo_id: uuid.UUID
+    # Vacío borra la línea: en una grilla, vaciar la celda es cómo se dice
+    # "este insumo no va en esta receta".
+    expresion: str | None = None
+    merma_pct: Decimal = Decimal(0)
+    unidad_medida_id: uuid.UUID | None = None
+    aplica_valores: list[uuid.UUID] = []
+    orden: int = 0
+
+
+class GuardarMatrizIn(BaseModel):
+    celdas: list[CeldaIn] = Field(min_length=1)
+
+
+class ResultadoCeldaOut(BaseModel):
+    receta_id: uuid.UUID | None = None
+    articulo_id: uuid.UUID | None = None
+    accion: str
+    item_id: uuid.UUID | None = None
+    cantidad: Decimal | None = None
+    detalle: str | None = None
+
+
+class GuardarMatrizOut(BaseModel):
+    resultados: list[ResultadoCeldaOut]
+    aplicadas: int
+    con_problema: int
+
