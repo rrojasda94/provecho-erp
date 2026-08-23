@@ -93,6 +93,17 @@ NO_SON_CATALOGO = {
     "mkt",
 }
 
+#: Categoría cuyos productos quedan **reemplazados por el Kit** que vive en
+#: ella. En Odoo, "Mitad Acecina familiar" es un producto con su propia receta
+#: y convive con "Pizza MitadxMitad Familiar", que es un Kit cuyas líneas ya
+#: dicen qué lleva cada mitad. Son las dos formas de decir lo mismo, y desde
+#: que las líneas del Kit se parten por mitad la segunda basta: mantener 34
+#: recetas paralelas es 34 lugares donde el gramaje se puede desincronizar.
+#:
+#: El filtro es "en esta categoría **y sin receta de Kit**": los dos Kits
+#: viven en la misma categoría y son justamente los que se quedan.
+CATEGORIA_REEMPLAZADA_POR_EL_KIT = "MITADxMITAD"
+
 ALFABETO = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 #: `list_price` de Odoo cuando nadie lo tocó. 113 de los 179 productos del
@@ -399,6 +410,14 @@ class Conversion:
                     "todavía no modela `servicio` en el catálogo."
                 )
                 continue
+            if self._lo_reemplaza_el_kit(clave):
+                self.omitidos.append(
+                    f"«{datos['nombre']}» — su receta la reemplaza el Kit de "
+                    "mitad-y-mitad, que desde ADR-056 declara por línea qué "
+                    "lleva cada mitad. Mantener las dos formas es dos lugares "
+                    "donde el mismo gramaje se puede desincronizar."
+                )
+                continue
 
             vendible = datos["en_pos"] or datos["categoria_odoo"].startswith(
                 "All / Saleable"
@@ -422,6 +441,23 @@ class Conversion:
             clave: self._tipo_de(clave, con_receta, insumo_de_otro)
             for clave in self.articulos
         }
+        sueltas = sorted(
+            self.recetas[c]["nombre"]
+            for c in self.recetas
+            if not self._lo_reemplaza_el_kit(c)
+            and c not in self.productos
+            and c not in insumo_de_otro
+        )
+        if sueltas:
+            self.pendientes.append(
+                f"**Recetas que nadie usa** — {len(sueltas)} recetas del export "
+                "no son de ningún producto vendible ni las consume otra receta: "
+                + ", ".join(f"«{n}»" for n in sueltas)
+                + ". Vienen así de Odoo. Entran igual —no estorban— pero si no "
+                "se usan, conviene borrarlas para que el recetario no crezca "
+                "con cosas que nadie prepara."
+            )
+
         self.codigo_articulo = {
             clave: codigo("I", i)
             for i, clave in enumerate(
@@ -434,6 +470,17 @@ class Conversion:
                 sorted(self.productos, key=lambda c: self.plantillas[c]["nombre"])
             )
         }
+
+    def _lo_reemplaza_el_kit(self, clave: str) -> bool:
+        """Producto de la categoría del Kit que **no** es el Kit.
+
+        Se mira la receta y no el nombre: los dos Kits viven en la misma
+        categoría que las 34 mitades sueltas, y son los que se quedan.
+        """
+        if CATEGORIA_REEMPLAZADA_POR_EL_KIT not in self._ruta_de(clave):
+            return False
+        receta = self.recetas.get(clave)
+        return receta is not None and not receta["es_kit"]
 
     def _tipo_de(self, clave: str, con_receta: set, insumo_de_otro: set) -> str:
         """`articulo.tipo` — enum abierto, ver el modelo.
@@ -746,6 +793,10 @@ class Conversion:
         pendientes: list[list] = []
         for clave in sorted(self.recetas, key=lambda c: self.recetas[c]["nombre"]):
             datos = self.recetas[clave]
+            if self._lo_reemplaza_el_kit(clave):
+                # Su producto no entra, así que su receta tampoco: una receta
+                # que nadie prepara ni consume es ruido en el recetario.
+                continue
             es_kit = bool(datos["es_kit"])
             if kits and not es_kit:
                 continue
@@ -770,6 +821,14 @@ class Conversion:
                     [f"{datos['nombre']} (reventa)", datos["nombre"], 1, 0, "", ""]
                 )
         return libro, pendientes
+
+    @property
+    def recetas_que_entran(self) -> int:
+        """Las del export que llegan al libro: las 34 mitades sueltas quedan
+        fuera porque su producto también (ver `_lo_reemplaza_el_kit`)."""
+        return sum(
+            1 for clave in self.recetas if not self._lo_reemplaza_el_kit(clave)
+        )
 
     @property
     def atributos_que_entran(self) -> dict[str, dict]:
@@ -1063,8 +1122,8 @@ def informe(conversion: Conversion, nombres: list[str], salida: Path) -> None:
             f"{n} {tipo}"
             for tipo, n in sorted(Counter(conversion.tipo_articulo.values()).items())
         ),
-        f"- **{len(conversion.recetas) + len(conversion.recetas_reventa)} recetas** "
-        f"({len(conversion.recetas)} del export y "
+        f"- **{conversion.recetas_que_entran + len(conversion.recetas_reventa)} "
+        f"recetas** ({conversion.recetas_que_entran} del export y "
         f"{len(conversion.recetas_reventa)} de reventa, generadas para que un "
         "producto que se compra y se revende tenga qué descontar)",
         f"- **{len(conversion.categorias)} categorías** en árbol",
@@ -1079,11 +1138,14 @@ def informe(conversion: Conversion, nombres: list[str], salida: Path) -> None:
     ]
 
     def bloque(titulo: str, items: list[str], vacio: str) -> None:
-        lineas.append(f"## {titulo} ({len(items)})")
+        # Deduplicado antes de contar: "línea partida por mitad" pasa 52
+        # veces y decirlo 52 veces no informa más que decirlo una.
+        unicos = list(dict.fromkeys(items))
+        lineas.append(f"## {titulo} ({len(unicos)})")
         lineas.append("")
-        if not items:
+        if not unicos:
             lineas.append(vacio)
-        for item in dict.fromkeys(items):
+        for item in unicos:
             lineas.append(f"- {item}")
         lineas.append("")
 
