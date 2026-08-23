@@ -196,3 +196,29 @@ def test_las_descripciones_de_permiso_entran_en_su_columna():
         if desc and len(desc) > tope
     ]
     assert not largos, "descripciones de permiso que no entran:\n" + "\n".join(largos)
+
+
+def test_la_imagen_lleva_lo_que_se_corre_dentro_del_contenedor() -> None:
+    """`scripts/odoo/README.md` manda correr el cargador **adentro** del
+    contenedor:
+
+        docker compose exec api python -m scripts.odoo.cargar_catalogo ...
+
+    Si el Dockerfile no copia `scripts/odoo`, ese comando falla con
+    `No module named 'scripts'`. Pasó al cargar el catálogo en staging el
+    2026-08-23: la documentación decía una cosa y la imagen tenía otra, y no
+    hay forma de enterarse sin desplegar.
+
+    Se comprueba lo que la imagen **tiene**, no lo que le falta: el resto de
+    `scripts/` se queda afuera a propósito.
+    """
+    dockerfile = DOCKERFILE.read_text(encoding="utf-8")
+    readme = (RAIZ / "scripts" / "odoo" / "README.md").read_text(encoding="utf-8")
+    if "docker compose" not in readme:
+        return  # el README dejó de mandar correrlo adentro
+    assert re.search(r"^COPY\s+scripts/odoo\s", dockerfile, re.M), (
+        "scripts/odoo/README.md manda correr el cargador dentro del "
+        "contenedor, pero el Dockerfile no copia `scripts/odoo`: el comando "
+        "documentado falla con `No module named 'scripts'`"
+    )
+

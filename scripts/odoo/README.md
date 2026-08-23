@@ -68,3 +68,21 @@ defendible —unidades que no son las que las recetas consumen, nombres
 duplicados, categorías cuya hoja choca, vendibles sin receta—. Cada una queda
 escrita en `INFORME.md` con el valor viejo y el nuevo, para poder vetarla
 editando la planilla antes de subir.
+
+## Correrlo dentro del contenedor
+
+La imagen lleva `scripts/odoo` **desde 0.7.1**. Con el contenedor arriba:
+
+```bash
+docker compose -f docker-compose.staging.yml cp <carpeta de salida> api:/tmp/catalogo
+docker compose -f docker-compose.staging.yml exec api     python -m scripts.odoo.cargar_catalogo --origen /tmp/catalogo --simular
+```
+
+En **0.7.0 exactamente** la imagen no la lleva y el comando falla con
+`No module named 'scripts'`. Ahí hay que copiar también la carpeta del script:
+
+```bash
+docker compose -f docker-compose.staging.yml cp scripts/odoo api:/app/scripts/odoo
+```
+
+Solo necesita `openpyxl`, `sqlalchemy` y `src.*`, que la imagen ya tiene.
