@@ -3,6 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 
 import {
+  ConsultaDocumento,
+  type Consulta,
+} from "@/components/consulta/buscar-documento";
+import { documentoValido, LARGO_DNI, LARGO_RUC } from "@/lib/documento";
+import {
   api,
   esAtribucion,
   esCustodia,
@@ -1159,14 +1164,30 @@ export function DialogoConsumoPersonal({
   );
 }
 
+/** El nombre que trajo la consulta, sea de quien sea: una empresa lo tiene
+ * entero en `razon_social` y una persona partido en dos (RENIEC los devuelve
+ * separados). El PDV guarda **un** campo «nombre», así que acá se juntan —es
+ * el único lugar del ERP donde se hace, porque en las fichas de alta hay un
+ * campo para cada uno y partirlos de vuelta perdería información. */
+function nombreDe(datos: Consulta): string {
+  const texto = (clave: string) =>
+    typeof datos[clave] === "string" ? (datos[clave] as string) : "";
+  return (
+    texto("razon_social") ||
+    [texto("nombres"), texto("apellidos")].filter(Boolean).join(" ")
+  );
+}
+
 export function DialogoCliente({
   abierto,
+  permisos,
   onCerrar,
   onBuscar,
   onElegir,
   onCrear,
 }: {
   abierto: boolean;
+  permisos: string[];
   onCerrar: () => void;
   onBuscar: (q: string) => Promise<ClienteBuscado[]>;
   onElegir: (c: ClienteBuscado) => void;
@@ -1218,6 +1239,7 @@ export function DialogoCliente({
           <p className="pdv-etiqueta">Nombre</p>
           <input
             className="pdv-campo"
+            aria-label="Nombre del cliente"
             value={nombre}
             onChange={(e) => setNombre(e.target.value)}
           />
@@ -1225,6 +1247,7 @@ export function DialogoCliente({
           <input
             className="pdv-campo"
             inputMode="tel"
+            aria-label="Teléfono del cliente"
             value={telefono}
             onChange={(e) => setTelefono(e.target.value)}
           />
@@ -1234,11 +1257,16 @@ export function DialogoCliente({
           </p>
           <div className="pdv-dos">
             <div>
-              <p className="pdv-etiqueta">DNI (opcional)</p>
+              <p className="pdv-etiqueta">DNI o RUC (opcional)</p>
+              {/* Los dos en un solo campo, y el largo decide cuál es
+                  (RN-CPP-003): el cliente dicta su número sin decir de qué
+                  padrón es, y con 11 dígitos el servidor lo da de alta como
+                  jurídico —`crear_cliente` deriva solo—. */}
               <input
                 className="pdv-campo"
                 inputMode="numeric"
-                maxLength={8}
+                aria-label="DNI o RUC del cliente"
+                maxLength={LARGO_RUC}
                 value={documento}
                 onChange={(e) => setDocumento(e.target.value.replace(/\D/g, ""))}
               />
@@ -1253,6 +1281,24 @@ export function DialogoCliente({
               />
             </div>
           </div>
+          {/* Prellena, no decide: lo que trae se corrige antes de guardar, y
+              si Factiliza no contesta el alta sigue tecleando (ADR-005). */}
+          <ConsultaDocumento
+            permisos={permisos}
+            numero={documento}
+            className="pdv-boton-sec ancho"
+            onDatos={(datos) => {
+              const traido = nombreDe(datos);
+              if (traido) setNombre(traido);
+              if (typeof datos.direccion === "string" && datos.direccion) {
+                setDireccion(datos.direccion);
+              }
+              if (typeof datos.fecha_nacimiento === "string" && datos.fecha_nacimiento) {
+                setCumpleanos(datos.fecha_nacimiento);
+              }
+            }}
+          />
+
           <p className="pdv-etiqueta">Dirección (opcional)</p>
           <input
             className="pdv-campo"
@@ -1333,10 +1379,14 @@ export function DialogoCliente({
  * pantalla antes de confirmar: enterarse de que salió boleta cuando el
  * cliente quería factura ya es tarde. */
 function leyendaDocumento(doc: string): string {
-  if (doc.length === 11) return "Se emite FACTURA · el documento tiene 11 dígitos";
-  if (doc.length === 8) return "Se emite BOLETA · el documento tiene 8 dígitos";
+  if (doc.length === LARGO_RUC) {
+    return `Se emite FACTURA · el documento tiene ${LARGO_RUC} dígitos`;
+  }
+  if (doc.length === LARGO_DNI) {
+    return `Se emite BOLETA · el documento tiene ${LARGO_DNI} dígitos`;
+  }
   if (doc.length > 0) {
-    return "Documento incompleto: debe tener 8 (DNI) u 11 (RUC) dígitos";
+    return `Documento incompleto: debe tener ${LARGO_DNI} (DNI) u ${LARGO_RUC} (RUC) dígitos`;
   }
   return "Sin documento se emite boleta a nombre de Clientes varios.";
 }
@@ -1374,10 +1424,6 @@ function calcularCobro(
   };
 }
 
-function documentoValido(doc: string): boolean {
-  return [0, 8, 11].includes(doc.length);
-}
-
 function cobroBloqueado(
   ocupado: boolean,
   excede: boolean,
@@ -1405,6 +1451,7 @@ function FilaVueltoRestante({ vuelto, restante }: { vuelto: number; restante: nu
  * para sumar un segundo medio que cubra el faltante del primero. */
 export function DialogoCobro({
   abierto,
+  permisos,
   total,
   medios,
   ocupado,
@@ -1412,6 +1459,7 @@ export function DialogoCobro({
   onConfirmar,
 }: {
   abierto: boolean;
+  permisos: string[];
   total: number;
   medios: MedioPago[];
   ocupado: boolean;
@@ -1547,18 +1595,32 @@ export function DialogoCobro({
             <input
               className="pdv-campo"
               inputMode="numeric"
-              maxLength={11}
-              placeholder="DNI (8) o RUC (11)"
+              aria-label="Documento del receptor"
+              maxLength={LARGO_RUC}
+              placeholder={`DNI (${LARGO_DNI}) o RUC (${LARGO_RUC})`}
               value={doc}
               onChange={(e) => setDoc(e.target.value.replace(/\D/g, ""))}
             />
             <input
               className="pdv-campo"
+              aria-label="Nombre o razón social del receptor"
               placeholder="Nombre / razón social"
               value={nombre}
               onChange={(e) => setNombre(e.target.value)}
             />
           </div>
+          {/* La razón social de una factura la escribía el cajero de oído, y
+              SUNAT rechaza la que no coincide. Acá se trae del padrón que la
+              emite —el largo decide cuál— y queda editable. */}
+          <ConsultaDocumento
+            permisos={permisos}
+            numero={doc}
+            className="pdv-boton-sec ancho"
+            onDatos={(datos) => {
+              const traido = nombreDe(datos);
+              if (traido) setNombre(traido);
+            }}
+          />
           <p className="pdv-nota">{tipoDoc}</p>
         </div>
       </div>

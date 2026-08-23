@@ -2,6 +2,8 @@
 
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 
+import { BuscarDocumento } from "@/components/consulta/buscar-documento";
+
 import {
   avanzarPostulanteAction,
   cerrarConvocatoriaAction,
@@ -155,7 +157,7 @@ function Campo({
   );
 }
 
-function Ficha({ postulante }: { postulante: Postulante }) {
+function Ficha({ postulante, permisos }: { postulante: Postulante; permisos: string[] }) {
   const [pendiente, startTransition] = useTransition();
   const siguiente = siguienteEtapa(postulante.estado);
   const descartado = postulante.estado === DESCARTADO;
@@ -194,7 +196,7 @@ function Ficha({ postulante }: { postulante: Postulante }) {
             </button>
           )}
           {siguiente?.clave === "contratado" && (
-            <DialogoContratar postulante={postulante} />
+            <DialogoContratar postulante={postulante} permisos={permisos} />
           )}
           <DialogoFormulario
             etiqueta="Descartar"
@@ -225,7 +227,13 @@ function Ficha({ postulante }: { postulante: Postulante }) {
   );
 }
 
-function DialogoContratar({ postulante }: { postulante: Postulante }) {
+function DialogoContratar({
+  postulante,
+  permisos,
+}: {
+  postulante: Postulante;
+  permisos: string[];
+}) {
   return (
     <DialogoFormulario
       etiqueta="→ Contratar"
@@ -263,6 +271,31 @@ function DialogoContratar({ postulante }: { postulante: Postulante }) {
         </label>
         <Campo etiqueta="Número" nombre="numero_documento" maxLength={20} />
       </div>
+      {/* El nombre viene precargado con lo que el postulante escribió de sí
+          mismo en el formulario público, y con ese nombre se firma el
+          contrato y se declara a SUNAT: acá se contrasta contra RENIEC antes
+          de que nazca la ficha. El servidor aplica el mismo criterio aunque
+          nadie apriete el botón (RN-PTS-004); esto deja **verlo** antes. */}
+      <div className="grid grid-cols-2 gap-2">
+        <Campo
+          etiqueta="Nombres"
+          nombre="nombres"
+          maxLength={100}
+          defaultValue={postulante.nombres}
+        />
+        <Campo
+          etiqueta="Apellidos"
+          nombre="apellidos"
+          maxLength={100}
+          defaultValue={postulante.apellidos}
+        />
+      </div>
+      <BuscarDocumento
+        permisos={permisos}
+        tipo="dni"
+        campo="numero_documento"
+        rellena={{ nombres: "nombres", apellidos: "apellidos" }}
+      />
       <Campo
         etiqueta="Remuneración base"
         nombre="remuneracion_base"
@@ -274,7 +307,15 @@ function DialogoContratar({ postulante }: { postulante: Postulante }) {
   );
 }
 
-function ColumnaTablero({ etapa, postulantes }: { etapa: (typeof ETAPAS)[number]; postulantes: Postulante[] }) {
+function ColumnaTablero({
+  etapa,
+  postulantes,
+  permisos,
+}: {
+  etapa: (typeof ETAPAS)[number];
+  postulantes: Postulante[];
+  permisos: string[];
+}) {
   return (
     <div className="flex w-64 shrink-0 flex-col gap-2">
       <div className="border-b-2 border-dark pb-1">
@@ -288,7 +329,7 @@ function ColumnaTablero({ etapa, postulantes }: { etapa: (typeof ETAPAS)[number]
       ) : (
         <ul className="flex flex-col gap-2">
           {postulantes.map((p) => (
-            <Ficha key={p.id} postulante={p} />
+            <Ficha key={p.id} postulante={p} permisos={permisos} />
           ))}
         </ul>
       )}
@@ -461,11 +502,15 @@ export function TableroCliente({
   columnas,
   seleccionada,
   enlaceFormulario,
+  permisos,
 }: {
   convocatorias: Convocatoria[];
   columnas: Columna[];
   seleccionada: string | null;
   enlaceFormulario: string | null;
+  /** Los de la sesión. Solo deciden si se ofrece traer el nombre de RENIEC
+   * al contratar: cada consulta gasta cuota de Factiliza. */
+  permisos: string[];
 }) {
   const [verDescartados, setVerDescartados] = useState(false);
   const porEstado = new Map(columnas.map((c) => [c.estado, c.postulantes]));
@@ -517,6 +562,7 @@ export function TableroCliente({
                 key={etapa.clave}
                 etapa={etapa}
                 postulantes={porEstado.get(etapa.clave) ?? []}
+                permisos={permisos}
               />
             ))}
           </div>
@@ -536,7 +582,7 @@ export function TableroCliente({
               <ul className="mt-2 flex flex-wrap gap-2">
                 {descartados.map((p) => (
                   <li key={p.id} className="w-64">
-                    <Ficha postulante={p} />
+                    <Ficha postulante={p} permisos={permisos} />
                   </li>
                 ))}
               </ul>

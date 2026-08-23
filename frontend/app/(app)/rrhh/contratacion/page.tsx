@@ -28,7 +28,7 @@ export default async function ContratacionPage({
 }: {
   searchParams: Params;
 }) {
-  const { token } = await obtenerSesion();
+  const { token, usuario } = await obtenerSesion();
   const filtros = await searchParams;
 
   let convocatorias: Convocatoria[];
@@ -64,6 +64,7 @@ export default async function ContratacionPage({
       columnas={columnas}
       seleccionada={seleccionada}
       enlaceFormulario={enlaceDe(convocatorias.find((c) => c.id === seleccionada))}
+      permisos={usuario.permisos}
     />
   );
 }

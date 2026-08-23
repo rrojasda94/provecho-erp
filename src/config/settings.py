@@ -83,9 +83,12 @@ class Settings(BaseSettings):
     # Facturación electrónica (Factiliza → SUNAT). Por defecto apunta al
     # entorno QA: emitir contra producción exige cambiar la URL a conciencia.
     factiliza_base_url: str = "https://apife-qa.factiliza.com/api/v1"
-    # Consulta RUC/DNI (RENIEC/SUNAT) — producto distinto de la emisión,
-    # mismo token, host propio (no tiene sandbox QA separado).
+    # Consulta RUC/DNI (RENIEC/SUNAT) — producto distinto de la emisión: host
+    # propio (sin sandbox QA separado) **y token propio**. Se contrata y se
+    # regenera por separado en el panel de Factiliza, así que el de emisión
+    # devuelve 401 acá aunque sea válido — comprobado el 2026-08-22.
     factiliza_consulta_base_url: str = "https://api.factiliza.com/v1"
+    factiliza_consulta_documento_token: str = ""
     factiliza_token: str = ""
     factiliza_timeout_segundos: float = 30.0
     igv_porcentaje: Decimal = Decimal("18")

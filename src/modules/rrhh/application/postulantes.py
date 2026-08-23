@@ -20,6 +20,7 @@ from src.modules.rrhh.domain import rules
 from src.modules.rrhh.infrastructure.models import Postulante
 from src.modules.rrhh.infrastructure.repositories import ConvocatoriaRepo, PostulanteRepo
 from src.modules.users.infrastructure.models import Empresa, Persona
+from src.shared.integrations.factiliza import nombres_desde_dni
 
 
 def _nuevo_postulante(**campos) -> Postulante:
@@ -197,6 +198,10 @@ def contratar_postulante(
     fecha_ingreso: date,
     tipo_documento: str | None = None,
     numero_documento: str | None = None,
+    # Lo que revisó quien contrata, si corrigió lo que el postulante declaró
+    # de sí mismo en el formulario público. Vacío = se usa lo declarado.
+    nombres: str | None = None,
+    apellidos: str | None = None,
     persona_id: uuid.UUID | None = None,
     regimen_laboral: str | None = None,
     remuneracion_base: Decimal | None = None,
@@ -220,9 +225,22 @@ def contratar_postulante(
     else:
         if not numero_documento:
             raise ReglaNegocio("el trabajador exige documento de identidad")
+        # El nombre de la planilla lo da RENIEC, no lo que el postulante
+        # escribió de sí mismo en el formulario público (RN-PTS-004, mismo
+        # criterio que el alta de cliente y de proveedor). Importa acá más
+        # que en ningún lado: con ese nombre se firma el contrato y se
+        # declara a SUNAT. Si Factiliza no responde o el documento no figura,
+        # se usa lo revisado por quien contrata —o lo declarado— y la
+        # contratación sigue: nunca se bloquea por un tercero (ADR-005).
+        nombres_finales = nombres or postulante.nombres
+        apellidos_finales = apellidos or postulante.apellidos
+        if (tipo_documento or "dni") == "dni":
+            nombres_finales, apellidos_finales = nombres_desde_dni(
+                numero_documento, nombres_finales, apellidos_finales
+            )
         persona = Persona(
-            nombres=postulante.nombres,
-            apellidos=postulante.apellidos,
+            nombres=nombres_finales,
+            apellidos=apellidos_finales,
             tipo_documento=tipo_documento or "dni",
             numero_documento=numero_documento,
             telefono=postulante.telefono,

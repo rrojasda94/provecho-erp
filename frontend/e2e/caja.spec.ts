@@ -74,8 +74,23 @@ test.describe.serial("Flujo del dinero", () => {
     // --- Cobro -----------------------------------------------------------
     await page.getByRole("button", { name: /^Cobrar$/i }).click();
     await expect(dialogo(page).getByText("Cobrar", { exact: true })).toBeVisible();
-    // Sin tocar nada: el diálogo llega con el medio por defecto y el monto
-    // igual al total, y sin documento se emite boleta a Clientes varios.
+
+    // El botón de consulta está donde se teclea el documento del receptor
+    // (addendum de ADR-041). Con un número a medias **no sale a la red**:
+    // cada consulta gasta cuota de un proveedor pago, así que un largo que
+    // no es ni DNI ni RUC se rechaza acá y no allá.
+    const buscar = dialogo(page).getByRole("button", { name: "Buscar DNI / RUC" });
+    await expect(buscar).toBeVisible();
+    await dialogo(page).getByLabel("Documento del receptor").fill("2061007");
+    await buscar.click();
+    await expect(dialogo(page).getByRole("status")).toContainText(/8 dígitos/);
+    // Y la venta sigue sin documento, que es el caso normal en un mostrador
+    // (RN-PER-005): se limpia y se cobra igual.
+    await dialogo(page).getByLabel("Documento del receptor").fill("");
+
+    // Sin tocar nada más: el diálogo llega con el medio por defecto y el
+    // monto igual al total, y sin documento se emite boleta a Clientes
+    // varios.
     await dialogo(page).getByRole("button", { name: /^Confirmar pago$/ }).click();
     // El comprobante emitido cierra el cobro; sin token de Factiliza queda
     // pendiente de envío, que es justo lo que debe pasar sin proveedor.
