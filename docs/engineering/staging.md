@@ -86,10 +86,8 @@ adentro.**
 
 ## Pendiente
 
-- [ ] **Commitear los archivos de staging al repo** (`docker-compose.staging.yml`,
-      `Caddyfile`, `.env.staging.example`, `scripts/desplegar.sh`, cambios
-      en `release.yml`/`devops.md`/`ROADMAP.md`) vía PR — hoy solo existen
-      en este árbol local y copiados a mano en el servidor
+- [x] Commiteado y en PR: [#91](https://github.com/rrojasda94/provecho-erp/pull/91)
+      — falta merge (CI verde + revisión)
 - [x] Cron de backup diario en el droplet — **no usa `src/backups/backup.py`**
       (la imagen de la API no trae `postgresql-client` ni `boto3`): en su
       lugar `scripts/backup-staging.sh` hace `pg_dump` desde el propio
