@@ -190,6 +190,9 @@ def agregar_item(
     cantidad: Decimal | None = None,
     expresion: str | None = None,
     merma_pct: Decimal = Decimal(0),
+    unidad_medida_id: uuid.UUID | None = None,
+    aplica_valores: list[str] | None = None,
+    orden: int = 0,
 ) -> RecetaItem:
     receta = _exigir(session, receta_id)
     _exigir_articulo_de_la_empresa(session, articulo_id, receta.empresa_id)
@@ -199,10 +202,22 @@ def agregar_item(
             f"'{articulo.nombre}' es lo que la receta produce: no puede ser "
             "también su insumo"
         )
+    udm_linea = _udm_de_linea(session, unidad_medida_id, articulo, udm)
+    condicion = _condicion_normalizada(aplica_valores)
     repo = RecetaRepo(session)
-    if any(i.articulo_id == articulo_id for i in repo.items(receta_id)):
-        raise Conflicto(f"'{articulo.nombre}' ya está en la receta")
-    valor, texto = _resolver_cantidad(cantidad, expresion, udm)
+    # El mismo insumo puede repetirse **si cada línea aplica a otra
+    # combinación** (ADR-056): la pizza mitad-y-mitad lleva jamón en una línea
+    # para unos sabores y en otra para otros. Lo que sigue prohibido es la
+    # misma condición dos veces, que sí es la línea duplicada de siempre.
+    if any(
+        i.articulo_id == articulo_id
+        and _condicion_normalizada(i.aplica_valores) == condicion
+        for i in repo.items(receta_id)
+    ):
+        raise Conflicto(
+            f"'{articulo.nombre}' ya está en la receta con esa misma condición"
+        )
+    valor, texto = _resolver_cantidad(cantidad, expresion, udm_linea)
     _validar_merma(merma_pct)
     return repo.add_item(
         RecetaItem(
@@ -211,8 +226,45 @@ def agregar_item(
             cantidad=valor,
             expresion=texto,
             merma_pct=merma_pct,
+            unidad_medida_id=udm_linea.id if udm_linea is not udm else None,
+            aplica_valores=list(aplica_valores) if aplica_valores else None,
+            orden=orden,
         )
     )
+
+
+def _udm_de_linea(
+    session: Session,
+    unidad_medida_id: uuid.UUID | None,
+    articulo: Articulo,
+    udm_articulo: UnidadMedida,
+) -> UnidadMedida:
+    """La unidad en la que se teclea esta línea (RN-UDM-005).
+
+    Sin unidad propia, la del artículo — que es como funcionó siempre. Con
+    una, tiene que ser de **la misma categoría**: RN-UDM-001 no admite otra
+    cosa, y la conversión por `ratio` solo tiene sentido dentro de una
+    categoría. Se rechaza en vez de ignorarse porque una línea que dice
+    "kilos" sobre un artículo que se lleva por unidad no es un detalle de
+    presentación: es un gramaje que nadie puede interpretar.
+    """
+    if unidad_medida_id is None or unidad_medida_id == udm_articulo.id:
+        return udm_articulo
+    udm = session.get(UnidadMedida, unidad_medida_id)
+    if udm is None:
+        raise NoEncontrado("unidad de medida no encontrada")
+    if udm.categoria_udm_id != udm_articulo.categoria_udm_id:
+        raise ReglaNegocio(
+            f"'{articulo.nombre}' se lleva en {udm_articulo.nombre}: la receta "
+            f"no puede pedirlo en {udm.nombre}, que es de otra categoría de "
+            "unidad de medida"
+        )
+    return udm
+
+
+def _condicion_normalizada(valores: list[str] | None) -> frozenset[str]:
+    """El orden en que se listan los valores no hace a la condición."""
+    return frozenset(str(v) for v in (valores or []))
 
 
 def editar_item(

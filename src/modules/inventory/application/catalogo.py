@@ -40,20 +40,56 @@ def crear_categoria(
     nombre: str,
     asiento_contable_config: dict | None = None,
     frecuencia_conteo: str | None = None,
+    padre_id: uuid.UUID | None = None,
 ) -> Categoria:
     _validar_frecuencia(frecuencia_conteo)
     nombre = a_titulo(nombre)
     repo = CategoriaRepo(session)
     if repo.get_by_nombre(empresa_id, nombre):
         raise Conflicto(f"categoría '{nombre}' ya existe en la empresa")
+    _validar_madre(session, empresa_id, padre_id)
     return repo.add(
         Categoria(
             empresa_id=empresa_id,
             nombre=nombre,
             asiento_contable_config=asiento_contable_config,
             frecuencia_conteo=frecuencia_conteo,
+            padre_id=padre_id,
         )
     )
+
+
+PROFUNDIDAD_MAXIMA_CATEGORIA = 6
+"""Odoo llega a cuatro niveles (`All / Saleable / PoS / PIZZAS / Extras`).
+Seis deja margen y hace de tope duro contra un ciclo que se haya colado por
+otra vía: recorrer la cadena sin límite cuelga el request."""
+
+
+def _validar_madre(
+    session: Session, empresa_id: uuid.UUID, padre_id: uuid.UUID | None
+) -> None:
+    """La madre existe, es de la misma empresa y no arma un ciclo.
+
+    La base no puede impedirlo —es la misma tabla apuntándose a sí misma—,
+    así que lo hace la aplicación, igual que con `producto_padre_id`
+    (ADR-023).
+    """
+    if padre_id is None:
+        return
+    madre = CategoriaRepo(session).get(padre_id)
+    if madre is None or madre.empresa_id != empresa_id:
+        raise NoEncontrado("categoría madre no encontrada")
+    profundidad, actual = 0, madre
+    while actual is not None:
+        profundidad += 1
+        if profundidad > PROFUNDIDAD_MAXIMA_CATEGORIA:
+            raise ReglaNegocio(
+                "la categoría madre cuelga de una cadena demasiado profunda "
+                f"(máximo {PROFUNDIDAD_MAXIMA_CATEGORIA} niveles)"
+            )
+        actual = (
+            CategoriaRepo(session).get(actual.padre_id) if actual.padre_id else None
+        )
 
 
 def _validar_frecuencia(frecuencia: str | None) -> None:

@@ -20,6 +20,13 @@ from sqlalchemy.orm import Session
 
 import src.core.models_registry  # noqa: F401
 from src.core.database import Base
+from src.modules.inventory.application import catalogo as inventario_uc
+from src.modules.inventory.application import recetas as recetas_uc
+from src.modules.inventory.application.errors import (
+    Conflicto,
+    NoEncontrado,
+    ReglaNegocio,
+)
 from src.modules.inventory.application.listeners import _consumos_de_items
 from src.modules.inventory.infrastructure.models import (
     Articulo,
@@ -31,7 +38,7 @@ from src.modules.inventory.infrastructure.models import (
 )
 from src.modules.sales.application import ventas as ventas_uc
 from src.modules.sales.application.catalogo import valores_ofrecidos
-from src.modules.sales.application.errors import ReglaNegocio
+from src.modules.sales.application.errors import ReglaNegocio as ReglaVenta
 from src.modules.sales.infrastructure.models import (
     Atributo,
     AtributoValor,
@@ -460,7 +467,7 @@ def test_no_se_puede_elegir_un_valor_ajeno(session, base):
     otro = Atributo(empresa_id=base["empresa"].id, nombre="Temperatura")
     session.add(otro)
     session.flush()
-    with pytest.raises(ReglaNegocio, match="no ofrece"):
+    with pytest.raises(ReglaVenta, match="no ofrece"):
         ventas_uc.crear_venta(
             session,
             sucursal_id=base["sucursal"].id,
@@ -524,6 +531,125 @@ def test_la_eleccion_viaja_en_el_detalle_del_evento(session, base):
     assert detalle["valores_variante_ids"] == [
         str(base["valores"]["Mitad 1: Hawaiana"])
     ]
+
+
+# --- Alta de línea de receta --------------------------------------------------
+
+
+def test_el_mismo_insumo_dos_veces_con_condiciones_distintas(session, base):
+    """Es el caso que hace posible la mitad-y-mitad: el salame va en una
+    línea para unos sabores y en otra, con otro gramaje, para otros."""
+    salame = base["articulos"]["Peperoni"]
+    recetas_uc.agregar_item(
+        session,
+        base["receta"].id,
+        articulo_id=salame.id,
+        expresion="0.01",
+        aplica_valores=[str(base["valores"]["Mitad 1: Americana"])],
+    )
+    recetas_uc.agregar_item(
+        session,
+        base["receta"].id,
+        articulo_id=salame.id,
+        expresion="0.02",
+        aplica_valores=[str(base["valores"]["Mitad 1: Hawaiana"])],
+    )
+    session.flush()
+
+
+def test_el_mismo_insumo_con_la_misma_condicion_se_rechaza(session, base):
+    """Sigue siendo la línea duplicada de siempre. El orden en que se listan
+    los valores no la hace distinta."""
+    masa = base["articulos"]["Masa"]
+    condicion = [
+        str(base["valores"]["Mitad 1: Americana"]),
+        str(base["valores"]["Mitad 2: Hawaiana"]),
+    ]
+    recetas_uc.agregar_item(
+        session, base["receta"].id, articulo_id=masa.id, expresion="1",
+        aplica_valores=condicion,
+    )
+    session.flush()
+    with pytest.raises(Conflicto, match="esa misma condición"):
+        recetas_uc.agregar_item(
+            session, base["receta"].id, articulo_id=masa.id, expresion="2",
+            aplica_valores=list(reversed(condicion)),
+        )
+
+
+def test_una_unidad_de_otra_categoria_se_rechaza(session, base):
+    """RN-UDM-001. Una línea que dice "kilos" sobre un artículo que se lleva
+    por unidad es un gramaje que nadie puede interpretar."""
+    with pytest.raises(ReglaNegocio, match="otra categoría"):
+        recetas_uc.agregar_item(
+            session,
+            base["receta"].id,
+            articulo_id=base["articulos"]["Masa"].id,
+            expresion="1",
+            unidad_medida_id=base["udm"]["kg"].id,
+        )
+
+
+def test_la_cantidad_se_redondea_con_los_decimales_de_la_linea(session, base):
+    """El artículo se lleva en kg (3 decimales) y la línea se teclea en
+    gramos (0): 24.4 g son 24 g, no 24.4."""
+    item = recetas_uc.agregar_item(
+        session,
+        base["receta"].id,
+        articulo_id=base["articulos"]["Jamón"].id,
+        expresion="24.4",
+        unidad_medida_id=base["udm"]["g"].id,
+    )
+    assert item.cantidad == Decimal("24")
+    assert item.unidad_medida_id == base["udm"]["g"].id
+
+
+# --- Categorías en árbol ------------------------------------------------------
+
+
+def test_una_categoria_cuelga_de_otra(session, base):
+    madre = inventario_uc.crear_categoria(
+        session, empresa_id=base["empresa"].id, nombre="Materia Prima"
+    )
+    session.flush()
+    hija = inventario_uc.crear_categoria(
+        session,
+        empresa_id=base["empresa"].id,
+        nombre="Procesados",
+        padre_id=madre.id,
+    )
+    assert hija.padre_id == madre.id
+
+
+def test_la_madre_tiene_que_ser_de_la_misma_empresa(session, base):
+    """El 404 y no un 403: para esta empresa esa categoría no existe."""
+    with pytest.raises(NoEncontrado):
+        inventario_uc.crear_categoria(
+            session,
+            empresa_id=base["empresa"].id,
+            nombre="Huérfana",
+            padre_id=uuid.uuid4(),
+        )
+
+
+def test_la_cadena_de_categorias_tiene_tope(session, base):
+    """Sin tope, un ciclo que se coló por otra vía cuelga el request."""
+    anterior = None
+    for i in range(inventario_uc.PROFUNDIDAD_MAXIMA_CATEGORIA + 1):
+        anterior = inventario_uc.crear_categoria(
+            session,
+            empresa_id=base["empresa"].id,
+            nombre=f"Nivel {i}",
+            padre_id=anterior.id if anterior else None,
+        )
+        session.flush()
+    with pytest.raises(ReglaNegocio, match="profunda"):
+        inventario_uc.crear_categoria(
+            session,
+            empresa_id=base["empresa"].id,
+            nombre="Una de más",
+            padre_id=anterior.id,
+        )
 
 
 # --- La variante materializada ------------------------------------------------
