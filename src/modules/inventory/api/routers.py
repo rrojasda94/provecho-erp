@@ -14,6 +14,7 @@ from src.modules.inventory.api import schemas
 from src.modules.inventory.application import (
     ajustes,
     catalogo,
+    importacion_articulos,
     importacion_recetas,
     queries_publicas,
 )
@@ -49,12 +50,10 @@ from src.modules.users.api.deps import (
     tiene_permiso,
 )
 from src.modules.users.infrastructure.models import Usuario
+from src.shared import planilla
 from src.shared.paginacion import Pagina, Paginacion, paginacion, paginar
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])
-
-#: MIME de un .xlsx. Sin él el navegador lo baja como binario sin nombre.
-XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 LEER = "inventory.leer"
 CATALOGO = "inventory.gestionar_catalogo"
@@ -73,6 +72,16 @@ RECEPCION = "inventory.recepcion"
 # La guía la emite el área de almacén (RN-GDR-002), no quien despacha ni
 # quien factura: permiso propio.
 EMITIR_GUIA = "inventory.emitir_guia"
+
+
+def _xlsx(contenido: bytes, nombre: str) -> Response:
+    """Una planilla como descarga. El `Content-Disposition` es lo que le da
+    nombre al archivo en el navegador; sin él baja como binario anónimo."""
+    return Response(
+        content=contenido,
+        media_type=planilla.MIME,
+        headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
+    )
 
 
 # --- Categorías -------------------------------------------------------------
@@ -222,6 +231,65 @@ def listar_articulos(
     return paginar(
         session, catalogo.q_articulos(session, tenant.filtro_empresa(empresa_id)), p
     )
+
+
+# Las tres rutas literales van **antes** de `/articulos/{articulo_id}`:
+# FastAPI resuelve por orden y "plantilla" entraría como un id que no es UUID.
+@router.get("/articulos/plantilla")
+def descargar_plantilla_articulos(
+    _: Usuario = Depends(require_permission(CATALOGO)),
+):
+    """La hoja que se llena para cargar el catálogo de golpe (RN-INV-023)."""
+    return _xlsx(importacion_articulos.plantilla(), "plantilla-articulos.xlsx")
+
+
+@router.get("/articulos/exportar")
+def exportar_articulos(
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """El catálogo en la misma plantilla, con los datos adentro (ADR-052)."""
+    return _xlsx(
+        importacion_articulos.exportar(session, empresa_id=tenant.empresa()),
+        "articulos.xlsx",
+    )
+
+
+@router.post("/articulos/importar/validar", response_model=schemas.RevisionArticulosOut)
+async def validar_importacion_articulos(
+    archivo: UploadFile,
+    _: Usuario = Depends(require_permission(CATALOGO)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Dice qué entra, qué actualiza y qué no. **No guarda nada.**"""
+    return importacion_articulos.validar(
+        session,
+        empresa_id=tenant.empresa(),
+        contenido=await archivo.read(),
+    )
+
+
+@router.post(
+    "/articulos/importar",
+    status_code=201,
+    response_model=schemas.ResultadoImportacionOut,
+)
+def importar_articulos(
+    body: schemas.ImportarArticulosIn,
+    _: Usuario = Depends(require_permission(CATALOGO)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Crea y actualiza lo que la pantalla confirmó, revalidando todo."""
+    resultado = importacion_articulos.importar(
+        session,
+        empresa_id=tenant.empresa(),
+        articulos=[a.model_dump() for a in body.articulos],
+    )
+    session.commit()
+    return resultado
 
 
 @router.get("/articulos/{articulo_id}", response_model=schemas.ArticuloOut)
@@ -488,11 +556,15 @@ def crear_solicitud(
 def listar_solicitudes(
     almacen_solicitante_id: uuid.UUID | None = None,
     estado: str | None = None,
+    sucursal_id: uuid.UUID | None = None,
+    marca_id: uuid.UUID | None = None,
     _: Usuario = Depends(require_permission(LEER)),
     tenant: Tenant = Depends(get_tenant),
     p: Paginacion = Depends(paginacion),
     session: Session = Depends(get_db),
 ):
+    """Los borradores no aparecen acá salvo pidiendo `estado=borrador`: una
+    lista que nadie envió todavía no le pidió nada a nadie."""
     if almacen_solicitante_id is not None:
         exigir_almacen(session, almacen_solicitante_id, tenant)
     return paginar(
@@ -502,6 +574,8 @@ def listar_solicitudes(
             almacen_solicitante_id=almacen_solicitante_id,
             estado=estado,
             empresa_id=tenant.filtro_empresa(),
+            sucursal_id=sucursal_id,
+            marca_id=marca_id,
         ),
         p,
     )
@@ -526,6 +600,116 @@ def resumen_solicitudes(
     )
 
 
+def _detalle_solicitud(
+    session: Session, solicitud_id: uuid.UUID
+) -> schemas.SolicitudDetalleOut:
+    solicitud, items = solicitudes_uc.detalle(session, solicitud_id)
+    return schemas.SolicitudDetalleOut(
+        **schemas.SolicitudOut.model_validate(solicitud).model_dump(),
+        items=[schemas.SolicitudItemOut.model_validate(i) for i in items],
+    )
+
+
+# `/solicitudes/borrador` va antes que `/solicitudes/{solicitud_id}`: si no,
+# FastAPI intenta leer "borrador" como UUID (mismo motivo que en conteos).
+@router.get(
+    "/solicitudes/borrador", response_model=schemas.SolicitudDetalleOut
+)
+def borrador_de_solicitud(
+    almacen_id: uuid.UUID,
+    actor: Usuario = Depends(require_permission(SOLICITAR_INSUMOS)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """El requerimiento de la jornada de ese almacén, listo para editar.
+
+    La crea si no existe, ya cargada con lo que está bajo mínimo, y si ya
+    existía le suma lo que cayó desde la última vez (RN-INV-023). Es lo que
+    hay detrás del botón: el personal no arma la lista desde cero.
+    """
+    exigir_almacen(session, almacen_id, tenant)
+    borrador = solicitudes_uc.borrador_del_almacen(
+        session, almacen_id=almacen_id, usuario_id=actor.id
+    )
+    session.commit()
+    return _detalle_solicitud(session, borrador.id)
+
+
+@router.post(
+    "/solicitudes/{solicitud_id}/items",
+    response_model=schemas.SolicitudDetalleOut,
+    status_code=201,
+)
+def agregar_item_solicitud(
+    solicitud_id: uuid.UUID,
+    body: schemas.SolicitudItemAgregarIn,
+    _: Usuario = Depends(require_permission(SOLICITAR_INSUMOS)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Lo que el local decide pedir sin que el stock lo pida. Queda marcado
+    como no urgente si el SKU no estaba bajo mínimo (RN-INV-024)."""
+    exigir_solicitud(session, solicitud_id, tenant)
+    solicitudes_uc.agregar_item(
+        session, solicitud_id, sku_id=body.sku_id, cantidad=body.cantidad
+    )
+    session.commit()
+    return _detalle_solicitud(session, solicitud_id)
+
+
+@router.patch(
+    "/solicitudes/{solicitud_id}/items/{sku_id}",
+    response_model=schemas.SolicitudDetalleOut,
+)
+def cambiar_item_solicitud(
+    solicitud_id: uuid.UUID,
+    sku_id: uuid.UUID,
+    body: schemas.SolicitudItemCantidadIn,
+    _: Usuario = Depends(require_permission(SOLICITAR_INSUMOS)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    exigir_solicitud(session, solicitud_id, tenant)
+    solicitudes_uc.cambiar_cantidad(
+        session, solicitud_id, sku_id=sku_id, cantidad=body.cantidad
+    )
+    session.commit()
+    return _detalle_solicitud(session, solicitud_id)
+
+
+@router.delete(
+    "/solicitudes/{solicitud_id}/items/{sku_id}",
+    response_model=schemas.SolicitudDetalleOut,
+)
+def quitar_item_solicitud(
+    solicitud_id: uuid.UUID,
+    sku_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(SOLICITAR_INSUMOS)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    exigir_solicitud(session, solicitud_id, tenant)
+    solicitudes_uc.quitar_item(session, solicitud_id, sku_id=sku_id)
+    session.commit()
+    return _detalle_solicitud(session, solicitud_id)
+
+
+@router.post(
+    "/solicitudes/{solicitud_id}/enviar", response_model=schemas.SolicitudOut
+)
+def enviar_solicitud(
+    solicitud_id: uuid.UUID,
+    actor: Usuario = Depends(require_permission(SOLICITAR_INSUMOS)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """El borrador pasa a `pendiente` y recién ahí espera aprobación."""
+    exigir_solicitud(session, solicitud_id, tenant)
+    solicitud = solicitudes_uc.enviar_borrador(session, solicitud_id, actor.id)
+    session.commit()
+    return solicitud
+
+
 @router.get(
     "/solicitudes/{solicitud_id}", response_model=schemas.SolicitudDetalleOut
 )
@@ -536,11 +720,7 @@ def ver_solicitud(
     session: Session = Depends(get_db),
 ):
     exigir_solicitud(session, solicitud_id, tenant)
-    solicitud, items = solicitudes_uc.detalle(session, solicitud_id)
-    return schemas.SolicitudDetalleOut(
-        **schemas.SolicitudOut.model_validate(solicitud).model_dump(),
-        items=[schemas.SolicitudItemOut.model_validate(i) for i in items],
-    )
+    return _detalle_solicitud(session, solicitud_id)
 
 
 @router.post(
@@ -789,6 +969,8 @@ def listar_guias(
 @router.get("/conteos/programa", response_model=list[schemas.ProgramaConteoOut])
 def programa_conteos(
     almacen_id: uuid.UUID | None = None,
+    sucursal_id: uuid.UUID | None = None,
+    marca_id: uuid.UUID | None = None,
     _: Usuario = Depends(require_permission(LEER)),
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
@@ -798,7 +980,11 @@ def programa_conteos(
     if almacen_id is not None:
         exigir_almacen(session, almacen_id, tenant)
     return conteos_uc.programa(
-        session, almacen_id=almacen_id, empresa_id=tenant.filtro_empresa()
+        session,
+        almacen_id=almacen_id,
+        empresa_id=tenant.filtro_empresa(),
+        sucursal_id=sucursal_id,
+        marca_id=marca_id,
     )
 
 
@@ -843,6 +1029,39 @@ def abrir_conteo(
     )
     session.commit()
     return conteo
+
+
+@router.get("/conteos", response_model=Pagina[schemas.ConteoOut])
+def listar_conteos(
+    almacen_id: uuid.UUID | None = None,
+    estado: str | None = None,
+    sucursal_id: uuid.UUID | None = None,
+    marca_id: uuid.UUID | None = None,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    p: Paginacion = Depends(paginacion),
+    session: Session = Depends(get_db),
+):
+    """Los conteos del almacén, sucursal o marca, con el abierto primero.
+
+    Faltaba: hasta ahora un conteo solo se podía pedir por su id, o sea
+    sabiéndolo de antemano, y ninguna pantalla podía ofrecer "seguir
+    contando lo que quedó abierto".
+    """
+    if almacen_id is not None:
+        exigir_almacen(session, almacen_id, tenant)
+    return paginar(
+        session,
+        conteos_uc.q_listar(
+            session,
+            almacen_id=almacen_id,
+            estado=estado,
+            empresa_id=tenant.filtro_empresa(),
+            sucursal_id=sucursal_id,
+            marca_id=marca_id,
+        ),
+        p,
+    )
 
 
 @router.get("/conteos/{conteo_id}", response_model=schemas.ConteoDetalleOut)
@@ -1041,24 +1260,35 @@ def descargar_plantilla_recetas(
     Declarada **antes** de `/recetas/{receta_id}`: FastAPI resuelve por orden
     y "plantilla" entraría como un `receta_id` que no es UUID.
     """
-    return Response(
-        content=importacion_recetas.plantilla(),
-        media_type=XLSX,
-        headers={
-            "Content-Disposition": 'attachment; filename="plantilla-recetas.xlsx"'
-        },
+    return _xlsx(importacion_recetas.plantilla(), "plantilla-recetas.xlsx")
+
+
+@router.get("/recetas/exportar")
+def exportar_recetas(
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """El recetario en la misma plantilla, con los datos adentro (ADR-052).
+
+    Pide permiso de **lectura**: son los mismos datos que devuelve el listado,
+    solo empaquetados en un archivo.
+    """
+    return _xlsx(
+        importacion_recetas.exportar(session, empresa_id=tenant.empresa()),
+        "recetas.xlsx",
     )
 
 
-@router.post("/recetas/importar/validar")
+@router.post("/recetas/importar/validar", response_model=schemas.RevisionRecetasOut)
 async def validar_importacion_recetas(
     archivo: UploadFile,
     _: Usuario = Depends(require_permission(CATALOGO)),
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    """Dice qué entra y qué no. **No guarda nada** — la pantalla resuelve los
-    insumos que el catálogo no reconoce y recién ahí se importa."""
+    """Dice qué entra, qué actualiza y qué no. **No guarda nada** — la pantalla
+    resuelve los insumos que el catálogo no reconoce y recién ahí se importa."""
     return importacion_recetas.validar(
         session,
         empresa_id=tenant.empresa(),
@@ -1066,7 +1296,11 @@ async def validar_importacion_recetas(
     )
 
 
-@router.post("/recetas/importar", status_code=201)
+@router.post(
+    "/recetas/importar",
+    status_code=201,
+    response_model=schemas.ResultadoImportacionOut,
+)
 def importar_recetas(
     body: schemas.ImportarRecetasIn,
     _: Usuario = Depends(require_permission(CATALOGO)),

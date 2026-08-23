@@ -20,10 +20,27 @@ Todo esto vive **acá y no en cada prueba** (`docs/engineering/testing-strategy.
 un test que crea sus datos por la UI prueba tres flujos para verificar uno, y
 además cada rama que necesitaba un proveedor terminaba sembrando el suyo.
 
-**El encargado tiene que ser otro usuario**: `abrir_caja` rechaza que el
-cajero se releve a sí mismo (RN-MDP-002), así que un seed con un solo
-usuario no puede abrir caja y la prueba fallaría por el dato, no por el
-código.
+- **Caja y venta simple**: un punto de venta por sucursal, un encargado
+  distinto del cajero, un terminal de tarjeta, y `Pizza E2E` —producto plano,
+  un solo insumo— con precio vigente y stock.
+- **Carta armada** (2026-08-15): `Menú E2E`, un producto **con variantes**,
+  **grupo de opciones obligatorio** y **extras**, que es el modelo de nodos
+  que describe ADR-035/ADR-038 y dibuja el lienzo. `Pizza E2E` no alcanza
+  para eso: es deliberadamente plana, y las pruebas del lienzo dependen de
+  que siga teniendo un único insumo — por eso la carta armada es un producto
+  aparte y no un cambio sobre ella.
+- **Compras** (2026-08-15): un proveedor y una orden de compra en borrador,
+  con stock real en el almacén central.
+
+Todo esto vive **acá y no en cada prueba** (`docs/engineering/testing-strategy.md`):
+un test que crea sus datos por la UI prueba tres flujos para verificar uno, y
+además cada rama que necesitaba un proveedor terminaba sembrando el suyo.
+
+**El encargado sigue siendo otro usuario** aunque la caja ya no le pida
+firma para abrirse (RN-MDP-008, ADR-049): es quien **recibe** el efectivo
+cuando el turno cerró (`en_caja → en_supervisor`, RN-MDP-002), y eso exige
+`accounting.caja_relevar` — permiso que el cajero no tiene ni debe tener.
+Con un solo usuario la cadena de custodia no se puede recorrer.
 
 Idempotente y **prohibido fuera de e2e**: crea un usuario con PIN conocido.
 Correr: `python -m src.seeders.e2e`
@@ -120,6 +137,13 @@ PROVEEDOR_RUC = "20512345678"
 # comprobación aparte.
 OC_IDEMPOTENCY = "seed-e2e-oc-0001"
 
+# Cuenta de sacrificio: la prueba del bloqueo por intentos fallidos (ADR-050)
+# le agota los cinco intentos y la deja inutilizable quince minutos. Gastar
+# para eso al cajero o al encargado dejaría sin sesión a las pruebas que
+# corran después, en un orden que Playwright no promete.
+BLOQUEO_USUARIO = "bloqueo_e2e"
+BLOQUEO_PIN = "222222"
+
 # --- Padrón de clientes -----------------------------------------------------
 # Un cliente **jurídico**: es el que Ventas → Clientes deja corregir, y el
 # diálogo donde vive el botón «Buscar por RUC» (ADR-041). Sin ninguno
@@ -178,10 +202,12 @@ def sembrar_e2e(session: Session) -> dict:
             )
     punto_venta = puntos_venta[0]
 
-    # `supervisor` es quien releva la caja (RN-MDP-002): tiene
-    # `accounting.caja_relevar`, que es el permiso que la apertura exige.
+    # `supervisor` es quien recibe el efectivo del cajón al terminar el
+    # turno (RN-MDP-002): tiene `accounting.caja_relevar`, el permiso que
+    # exige firmar un tramo de la cadena de custodia.
     _usuario_con_rol(session, ENCARGADO_USUARIO, ENCARGADO_PIN, "supervisor", sucursal)
     _usuario_con_rol(session, CAJERO_USUARIO, CAJERO_PIN, "cajero", sucursal)
+    _usuario_con_rol(session, BLOQUEO_USUARIO, BLOQUEO_PIN, "cajero", sucursal)
 
     producto = session.scalar(
         select(ProductoComercial).where(ProductoComercial.nombre == PRODUCTO_NOMBRE)
@@ -202,6 +228,7 @@ def sembrar_e2e(session: Session) -> dict:
     menu = _sembrar_menu(session, empresa, marca)
     compras = _sembrar_compras(session, empresa)
     cliente = _sembrar_cliente(session, empresa)
+    abastecimiento = _sembrar_abastecimiento(session, empresa, sucursal)
 
     return {
         "sucursales": len(puntos_venta),
@@ -210,7 +237,66 @@ def sembrar_e2e(session: Session) -> dict:
         **menu,
         **compras,
         **cliente,
+        **abastecimiento,
     }
+
+
+#: Almacén de local con su punto de reorden. Los dos primeros insumos quedan
+#: **por debajo** del mínimo (el requerimiento de la jornada los trae solo) y
+#: el tercero sobrado, para que "agregar producto" tenga un candidato que no
+#: es urgencia (RN-INV-023/024).
+ALMACEN_LOCAL = "Almacén Tarapoto Centro"
+STOCK_LOCAL: dict[str, tuple[str, str]] = {
+    "Queso E2E": ("2", "10"),
+    "Papa E2E": ("5", "20"),
+    "Lechuga E2E": ("40", "10"),
+}
+
+
+def _sembrar_abastecimiento(
+    session: Session, empresa: Empresa, sucursal: Sucursal
+) -> dict:
+    """El almacén del local, su abastecedor y un stock que ya pide reponerse.
+
+    Sin punto de reorden declarado no hay nada que sugerir, y la pantalla de
+    Requerimientos se vería vacía en la demo por falta de dato y no por falta
+    de código — que es exactamente la confusión que este seeder evita en el
+    resto de los flujos.
+    """
+    central = session.scalar(
+        select(Almacen).where(Almacen.sucursal_id.is_(None), Almacen.tipo == "central")
+    )
+    local = session.scalar(select(Almacen).where(Almacen.nombre == ALMACEN_LOCAL))
+    if local is None:
+        local = Almacen(
+            empresa_id=empresa.id,
+            sucursal_id=sucursal.id,
+            nombre=ALMACEN_LOCAL,
+            tipo="sucursal",
+            almacen_abastecedor_id=central.id if central else None,
+        )
+        session.add(local)
+        session.flush()
+
+    for nombre, (cantidad, minimo) in STOCK_LOCAL.items():
+        sku = session.scalar(
+            select(Sku)
+            .join(Articulo, Articulo.id == Sku.articulo_id)
+            .where(Articulo.nombre == nombre, Articulo.empresa_id == empresa.id)
+        )
+        if sku is None:
+            continue
+        fila = session.scalar(
+            select(Stock).where(Stock.almacen_id == local.id, Stock.sku_id == sku.id)
+        )
+        if fila is None:
+            fila = Stock(almacen_id=local.id, sku_id=sku.id)
+            session.add(fila)
+        # Valor absoluto, igual que `_stock`: el seeder se vuelve a correr.
+        fila.cantidad = Decimal(cantidad)
+        fila.stock_minimo = Decimal(minimo)
+    session.flush()
+    return {"almacen_local_id": str(local.id)}
 
 
 def _sembrar_cliente(session: Session, empresa: Empresa) -> dict:

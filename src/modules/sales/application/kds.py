@@ -13,6 +13,7 @@ función dice qué estación le toca a una línea y cuál es la siguiente
 líneas invisibles en cocina.
 """
 
+import textwrap
 import uuid
 
 from sqlalchemy import select
@@ -284,6 +285,9 @@ def cola_pantalla(session: Session, pantalla_id: uuid.UUID) -> list[dict]:
                 "venta_id": str(venta.id),
                 "numero_orden": venta.numero_orden,
                 "referencia_atencion": venta.referencia_atencion,
+                # Despacho arma la bolsa mirando esta pantalla: la dirección
+                # va acá y no solo en el papel.
+                "direccion_entrega": venta.direccion_entrega,
                 "modalidad": venta.modalidad,
                 "canal": venta.canal,
                 # La cocina tiene que saber que está preparando comida del
@@ -458,6 +462,13 @@ def comanda(session: Session, venta_id: uuid.UUID) -> dict:
         f"{venta.created_at:%d/%m/%Y %H:%M}".center(ANCHO_COMANDA),
         "*" * ANCHO_COMANDA,
     ]
+    # La dirección se imprime en la comanda porque el papel es lo que sale
+    # con el repartidor: si solo vive en la pantalla, alguien la copia a
+    # mano y la copia es la que se equivoca.
+    if venta.direccion_entrega:
+        lineas.append("ENTREGAR EN:")
+        lineas += textwrap.wrap(venta.direccion_entrega, ANCHO_COMANDA)
+        lineas.append("-" * ANCHO_COMANDA)
     if rules.es_consumo_personal(venta.tipo):
         lineas.append("** CONSUMO PERSONAL **".center(ANCHO_COMANDA))
         lineas.append(f"({venta.consumo_motivo})".center(ANCHO_COMANDA))

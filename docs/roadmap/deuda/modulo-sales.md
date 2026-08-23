@@ -3,6 +3,51 @@
 Parte del backlog de deuda técnica del proyecto. El índice y las reglas
 de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 
+- ⬜ **El reparto se calcula y se guarda, pero no se cobra como línea de
+  venta** (2026-08-22, ADR-054): `venta.costo_entrega` queda en la fila y se
+  muestra en caja, pero **no suma al total** ni aparece en el comprobante ni
+  en el asiento contable. Cobrarlo de verdad exige una línea de venta sobre un
+  producto de servicio "Delivery" —con su IGV y su cuenta— y eso toca
+  comprobante, contabilidad y el cálculo del total. Se dejó afuera a propósito:
+  el radio de impacto del cambio es mucho mayor que el resto de este slice y no
+  se puede validar sin decidir antes qué producto y qué cuenta usa.
+- ⬜ **La tarifa de delivery es una sola para todo el grupo** (2026-08-22,
+  ADR-054): `DELIVERY_TARIFA_BASE`, `DELIVERY_PRECIO_POR_KM` y
+  `DELIVERY_DISTANCIA_MAXIMA_KM` viven en `settings`. El día que dos locales
+  necesiten precios distintos —o dos marcas—, pasan a columnas de `sucursal`,
+  que es donde ya vive el resto de lo que distingue a un local.
+- ⬜ **Las zonas de reparto son una lista de distritos, no polígonos**
+  (2026-08-22, ADR-054): `DELIVERY_DISTRITOS_RESTRINGIDOS` compara contra el
+  distrito que devuelve Google. Alcanza para "no repartimos en Belén" y no para
+  "no repartimos del río para allá". Se cierra con PostGIS y una pantalla para
+  dibujar el polígono; hasta que el negocio lo pida, es mucha máquina.
+- ⬜ **DAZ DAZ es un aviso al cajero, no una integración** (2026-08-22,
+  ADR-054): cuando el pedido queda fuera del radio o en zona vetada, el PDV lo
+  sugiere y quien decide es la persona. Mandarles el pedido de verdad exige su
+  API, credenciales y un adaptador propio en `shared/integrations/`.
+- ⬜ **El cliente jurídico no tiene dónde anclar su dirección** (2026-08-22,
+  ADR-053): `Cliente` no tiene columna de dirección — hoy la dirección de uno
+  jurídico termina en `contacto`, que es un campo para el teléfono o el correo
+  de quien coordina. `crear_cliente` recibe la ubicación y la aplica solo al
+  natural (a su `persona`). Se cierra dándole a `Cliente` su propia dirección,
+  que es un cambio de modelo que este slice no necesitaba.
+- ⬜ **Un cliente natural no se actualiza por planilla** (2026-08-20,
+  ADR-052, RN-PTS-007): de uno que ya existe la carga masiva solo puede
+  **completar el documento**. Su nombre, teléfono y domicilio viven en
+  `persona` (RN-GEN-007) y `sales` no puede escribirla — el contrato público
+  de `users` (`queries_publicas`) es de solo lectura. La fila que los cambie se
+  reporta con "se corrige en Personas" y no se aplica a medias, que es lo
+  correcto hoy; lo que falta es poder corregirlos de golpe. Se cierra con un
+  contrato público de **escritura** en `users`, que es un patrón nuevo y no
+  debía inventarse dentro de la carga masiva.
+- ⬜ **La carga masiva de clientes no consulta a SUNAT ni a RENIEC**
+  (2026-08-20, ADR-052): `consultar_documento=False` a propósito — trescientas
+  filas serían trescientas llamadas externas secuenciales dentro de un request,
+  contra una cuota. Consecuencia asumida: una razón social mal tecleada en la
+  planilla entra tal cual, y solo se corrige editando el cliente de a uno. Se
+  cierra encolando la consulta después del commit (una tarea por lote), no
+  dentro del request.
+
 - ✅ 2026-08-12 **La orden enviada sigue viva** (ADR-043, RN-COM-029):
   admite líneas nuevas sin firma de nadie, y quitarlas es gratis dentro de
   los 5 minutos. Antes agregar era imposible y quitar exigía siempre el PIN
@@ -196,8 +241,9 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
     ADR-005 ya lo dejaba previsto). `FactilizaClient.consultar_dni`/
     `consultar_ruc` (host propio, `FACTILIZA_CONSULTA_BASE_URL` —
     `api.factiliza.com`, **distinto** de `FACTILIZA_BASE_URL` que es solo
-    emisión de comprobantes contra la QA `apife-qa.factiliza.com`; mismo
-    token). `nombres_desde_dni`/`razon_social_desde_ruc`
+    emisión de comprobantes contra la QA `apife-qa.factiliza.com`; y **token
+    propio**, `FACTILIZA_CONSULTA_DOCUMENTO_TOKEN` — acá decía "mismo token"
+    y era falso, corregido el 2026-08-22). `nombres_desde_dni`/`razon_social_desde_ruc`
     (`src/shared/integrations/factiliza/`) hacen fallback a lo tecleado si
     Factiliza no responde o no encuentra el documento — el alta nunca se
     bloquea por un proveedor externo caído. Cableado en
@@ -415,14 +461,17 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   `fk_receta_item_receta_id_receta`, que se arregló forzando el orden del
   flush (`recetas.eliminar_receta`) y no en el esquema. Las dos son la misma
   migración y conviene hacerlas juntas, contra un Postgres real.
-- ⬜ **El receptor del comprobante en el PDV no tiene el botón «Buscar por
-  DNI/RUC»** (2026-08-15, ADR-041): es donde más se teclea un documento —el
-  cajero lo pide para emitir la factura— y el único de los cuatro puntos que
-  quedó sin la consulta. El permiso `consulta.documento` se le da al `cajero`
-  justamente por este caso, así que hoy lo tiene y no puede usarlo desde la
-  caja. El campo vive en `frontend/app/pdv/dialogos.tsx`, que otra rama
-  estaba editando al mismo tiempo: se dejó fuera para no chocar, no porque no
-  corresponda. Montarlo no es solo agregar el componente —ya se esconde solo
-  si falta el permiso—: `BuscarDocumento` escribe en el **DOM** del `<form>`
-  que lo contiene, y el PDV no es un formulario no controlado como el
-  back-office, así que primero hay que decidir dónde deja el dato.
+- ✅ **El receptor del comprobante en el PDV no tiene el botón «Buscar por
+  DNI/RUC»** (2026-08-15, ADR-041) — **cerrado el 2026-08-22** (addendum de
+  ADR-041). Era donde más se teclea un documento —el cajero lo pide para
+  emitir la factura— y el único de los cuatro puntos que quedó sin la
+  consulta, con el `cajero` teniendo el permiso justamente por este caso.
+  Lo que quedaba por decidir era dónde deja el dato: `BuscarDocumento`
+  escribe en el **DOM** del `<form>`, y el PDV lleva estado de React. Se
+  resolvió con `ConsultaDocumento`, la misma lógica en versión **controlada**
+  —recibe el número tecleado y devuelve la respuesta cruda por `onDatos`—, en
+  vez de rehacer el diálogo de cobro como formulario no controlado. Quedó en
+  los **dos** puntos del PDV donde se identifica a alguien que aún no existe:
+  el alta de cliente y el receptor del comprobante. Y con modo `auto`: en caja
+  hay un solo campo, así que el largo decide el padrón (RN-CPP-003, regla en
+  `frontend/lib/documento.ts` con su prueba).

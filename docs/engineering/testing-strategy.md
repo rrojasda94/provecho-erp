@@ -117,10 +117,11 @@ nada más. La razón por la que existe no cambió — es un check requerido, cor
 con un solo worker, y cada caso nuevo es tiempo que paga todo merge del repo,
 incluido el arreglo urgente que no toca ninguna pantalla.
 
-El techo es de **categorías, no de casos**: hoy son 13 casos en cuatro
-archivos y los 13 caen en las tres de arriba —el guard del lienzo y el
-bloqueo de pantalla son "candados que solo existen en pantalla"—. Una cuarta
-categoría es lo que no entra.
+El techo es de **categorías, no de casos**: hoy son 16 casos en cuatro
+archivos y los 16 caen en las tres de arriba —el guard del lienzo, el bloqueo
+de pantalla y el login sin campo de contraseña (ADR-050) son "candados que
+solo existen en pantalla": del lado del servidor no hay ninguna diferencia
+entre un PIN escrito y uno tocado—. Una cuarta categoría es lo que no entra.
 
 Lo que cambia es la salida para lo que no entra. Antes había dos: agregarlo
 igual (y romper el techo) o no escribirlo. Ahora hay una tercera, `uso/`, con
@@ -217,16 +218,29 @@ escrito a mano: envejece sin avisar.
 - Dominio y API: **1379 casos** en verde, en CI. Salen de **1041 funciones
   `test_*`** repartidas en **76 archivos** de `tests/`; la diferencia son
   `parametrize`.
-- Unidad de frontend + contrato: **258 casos** (`npm test`), en CI desde
+- Unidad de frontend + contrato: **273 casos** (`npm test`), en CI desde
   2026-08-06 — el job de frontend hacía solo `lint` y `build`. De esos, **186
-  son de contrato** (`lib/contrato.test.ts`) y 7 (2026-08-07,
-  `lib/carga.test.ts`) cubren la clasificación de fallos de carga: que una red
-  caída no se confunda con un 403 ni se dibuje como lista vacía.
-- e2e: **13 casos en verde y en CI** (job `e2e`), sobre PDV, sesión, el gate
-  de módulo, el lienzo de nodos y el bloqueo de pantalla. Los tres puntos de
-  "qué sí justifica un e2e" quedan cubiertos. Ver ROADMAP → Frontend.
-- Uso: **1 caso** (`uso/humo.spec.ts`), que prueba el arnés y no una pantalla.
-  Job `uso`, **no requerido** (ADR-047).
+  son de contrato** (`lib/contrato.test.ts`), 7 (2026-08-07,
+  `lib/carga.test.ts`) cubren la clasificación de fallos de carga —que una red
+  caída no se confunda con un 403 ni se dibuje como lista vacía— y 8
+  (2026-08-15, `lib/proxy.test.ts`) fijan que el proxy del navegador no toque
+  lo que pasa por él en ninguna de las dos direcciones (ADR-048).
+- e2e: **16 casos en verde y en CI** (job `e2e`), sobre PDV, sesión, el gate
+  de módulo, el lienzo de nodos, el bloqueo de pantalla y el login con pinpad
+  (ADR-050). Los tres puntos de "qué sí justifica un e2e" quedan cubiertos.
+  Ver ROADMAP → Frontend.
+- Uso: **7 casos**. `uso/humo.spec.ts` prueba el arnés y no una pantalla;
+  `uso/importador-recetas.spec.ts` (2026-08-15) recorre la carga masiva del
+  recetario de punta a punta —descargar la plantilla, abrirla con openpyxl,
+  llenarla, subirla y confirmar—, que es el camino donde vivía el bug del
+  proxy (ADR-048); `uso/importador-articulos.spec.ts` y
+  `uso/importador-clientes.spec.ts` (2026-08-20, ADR-052) hacen lo mismo con el
+  catálogo y el padrón, y además el **round-trip nulo**: bajar lo que ya está
+  cargado, volver a subirlo sin tocarlo y exigir que todo salga "a actualizar"
+  y nada "nuevo" — es lo único que verifica que el export y el importador
+  hablan el mismo idioma desde el navegador; y `uso/consulta-documento.spec.ts`
+  (2026-08-15) corrige un cliente con el botón de RUC. Job `uso`, **no
+  requerido** (ADR-047).
 
 Los cuatro niveles de la tabla existen y ninguno está vacío. Lo que queda
 abierto, dicho sin adornos: **el cuerpo que arman las pantallas de Compras,
@@ -254,7 +268,14 @@ La diferencia no es teórica: ya dejó pasar bugs.
   compila** — hay que sembrar la fila, que es lo que la base real exige.
 - **Largo de `VARCHAR` y tipos** — SQLite no los valida (ver
   `docs/roadmap/deuda/transversal.md`). Sigue abierto: la única red es probar
-  cada migración contra un Postgres real.
+  cada migración contra un Postgres real. Los importadores de planilla
+  (2026-08-20, ADR-052) le agregan una segunda: **validan el largo ellos
+  mismos**, por fila, para que un `Código = "HARINA"` se reporte como problema
+  en vez de pasar en verde y dar `StringDataRightTruncation` en producción — y
+  `test_importacion_articulos.py` ata la constante a `Articulo.__table__.c
+  .id_interno.type.length`, así que ensanchar la columna sin mover la
+  constante se pone rojo. Cubre las columnas que alguien se acordó de atar,
+  no todas.
 - **`statement_timeout`** — no existe en SQLite. La configuración de los dos
   engines (`docs/engineering/devops.md` → «Dos engines») es inocua ahí, a
   propósito: fuera de Postgres el parámetro no se pasa.

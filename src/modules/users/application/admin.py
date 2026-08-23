@@ -2,6 +2,7 @@
 permisos y asignaciones. Los cambios de roles/permisos se auditan."""
 
 import uuid
+from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
@@ -35,6 +36,7 @@ from src.modules.users.infrastructure.repositories import (
 )
 from src.modules.users.infrastructure.security import hash_pin, verify_pin
 from src.shared import auditoria
+from src.shared.ubicacion import desanclar
 
 
 # --- Usuarios ---------------------------------------------------------------
@@ -176,6 +178,11 @@ def crear_persona(
     domicilio: str | None = None,
     telefono: str | None = None,
     email: str | None = None,
+    ubicacion_place_id: str | None = None,
+    ubicacion_lat: Decimal | None = None,
+    ubicacion_lng: Decimal | None = None,
+    ubicacion_plus_code: str | None = None,
+    ubicacion_distrito: str | None = None,
 ) -> Persona:
     repo = PersonaRepo(session)
     if repo.get_by_documento(numero_documento):
@@ -190,6 +197,11 @@ def crear_persona(
             domicilio=domicilio,
             telefono=telefono,
             email=email,
+            ubicacion_place_id=ubicacion_place_id,
+            ubicacion_lat=ubicacion_lat,
+            ubicacion_lng=ubicacion_lng,
+            ubicacion_plus_code=ubicacion_plus_code,
+            ubicacion_distrito=ubicacion_distrito,
         )
     )
 
@@ -234,11 +246,24 @@ def editar_persona(
         otra = repo.get_by_documento(numero_nuevo)
         if otra is not None and otra.id != persona_id:
             raise Conflicto(f"numero_documento '{numero_nuevo}' ya existe")
+    # Corregir el domicilio sin volver a elegirlo en el mapa desancla el
+    # punto viejo, que ya no es de esa dirección. El borrado va DESPUÉS del
+    # UPDATE y no dentro de `campos`: `actualizar_con_lock` descarta los
+    # `None` —así es como distingue "no tocar"— y un `None` acá no llegaría
+    # nunca a la base.
+    domicilio_nuevo = campos.get("domicilio")
+    desancla = (
+        domicilio_nuevo is not None
+        and domicilio_nuevo != actual.domicilio
+        and not campos.get("ubicacion_place_id")
+    )
     actualizada = repo.actualizar_con_lock(persona_id, version, **campos)
     if actualizada is None:
         raise Conflicto(
             f"version {version} desactualizada (actual {actual.version})"
         )
+    if desancla:
+        desanclar(actualizada)
     return actualizada
 
 

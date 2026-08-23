@@ -14,10 +14,17 @@ from sqlalchemy import Boolean, Enum, ForeignKey, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
-from src.core.model_base import SoftDeleteMixin, TimestampMixin, UuidPkMixin
+from src.core.model_base import (
+    SoftDeleteMixin,
+    TimestampMixin,
+    UbicacionMixin,
+    UuidPkMixin,
+)
 
 
-class Proveedor(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin):
+class Proveedor(
+    Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin, UbicacionMixin
+):
     __tablename__ = "proveedor"
 
     empresa_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("empresa.id"))

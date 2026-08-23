@@ -10,7 +10,6 @@ mañana no reescriba a quién le llegó ayer.
 """
 
 import uuid
-from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
@@ -21,7 +20,6 @@ from sqlalchemy.pool import StaticPool
 import src.core.models_registry  # noqa: F401
 from src.core.app import create_app
 from src.core.database import Base
-from src.modules.accounting.application import caja
 from src.modules.reports.application import destinatarios as resolucion
 from src.modules.reports.application import emision as emision_uc
 from src.modules.reports.application import reglas as reglas_uc
@@ -49,6 +47,7 @@ from src.modules.users.infrastructure.models import (
 )
 from src.modules.users.infrastructure.security import hash_pin
 from src.shared.models import AuditLog
+from tests.conftest import abrir_caja_directa
 
 
 # =============================================================================
@@ -245,14 +244,21 @@ def env():
         }
 
 
-def _abrir_caja(s, ids):
-    apertura = caja.abrir_caja(
+def _abrir_caja(s, ids, *, con_encargado=True):
+    """Turno de caja abierto.
+
+    Por defecto escribe `relevo_encargado_id`, que es lo que dejaban las
+    aperturas **anteriores a ADR-049**: desde entonces el cajero abre solo y
+    la columna queda en NULL. Los resolutores tienen que seguir leyendo bien
+    las filas viejas —existen en cualquier base que ya operó— y caer en el
+    respaldo por rol con las nuevas.
+    """
+    apertura = abrir_caja_directa(
         s,
         punto_venta_id=ids["pv"].id,
         cajero_id=ids["cajero"].id,
-        relevo_encargado_id=ids["encargado"].id,
-        monto_declarado=Decimal("100.00"),
-        detalle_denominaciones={"50": 2},
+        encargado_id=ids["encargado"].id if con_encargado else None,
+        monto="100.00",
     )
     s.flush()
     return apertura
@@ -284,6 +290,19 @@ def test_sin_caja_abierta_el_aviso_cae_en_los_supervisores(env):
     """Local cerrado o caja sin registrar: avisarle a alguien de más es mejor
     que perder el aviso."""
     s, ids = env
+    assert resolucion.de_sucursal(s, ids["sucursal"].id) == [ids["supervisor1"].id]
+
+
+def test_con_apertura_nueva_el_aviso_tambien_cae_en_los_supervisores(env):
+    """Desde ADR-049 la caja abierta no nombra a ningún encargado, así que el
+    respaldo por rol dejó de ser la excepción y pasó a ser el camino normal.
+
+    Se congela acá porque es el efecto colateral de sacarle la firma a la
+    apertura: si mañana alguien vuelve a necesitar un encargado de turno de
+    verdad, va a hacer falta una fuente propia y no la caja.
+    """
+    s, ids = env
+    _abrir_caja(s, ids, con_encargado=False)
     assert resolucion.de_sucursal(s, ids["sucursal"].id) == [ids["supervisor1"].id]
 
 

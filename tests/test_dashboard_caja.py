@@ -131,8 +131,9 @@ def env(monkeypatch):
         )
 
         cajero = Usuario(username="cajero1", pin_hash=hash_pin("111111"), tipo="humano")
-        # La cadena de custodia necesita dos personas: quien entrega el fondo
-        # y quien lo recibe (RN-MDP-002). El encargado firma con su PIN.
+        # La cadena de custodia necesita dos personas: el cajero, que deja
+        # el efectivo contado en el cajón al cerrar, y el encargado, que
+        # firma con su PIN haberlo recibido (RN-MDP-002/008).
         encargado = Usuario(
             username="encargado1", pin_hash=hash_pin("222222"), tipo="humano"
         )
@@ -188,8 +189,13 @@ def _cruzar_segundo() -> None:
 
 
 def _autorizacion(client, permiso, username="encargado1", pin="222222"):
-    """Elevación de PIN del encargado: es quien firma cada relevo del
-    efectivo (RN-MDP-002), no el cajero desde su propia sesión."""
+    """Elevación de PIN del encargado: es quien firma cada tramo de la
+    cadena de custodia (RN-MDP-002), no el cajero desde su propia sesión.
+
+    Abrir y cerrar **ya no la usan** (RN-MDP-008): son actos del cajero con
+    su sola sesión. Queda para entregar el efectivo, autorizar un retiro del
+    cajón y reabrir un cierre.
+    """
     r = client.post(
         "/api/v1/auth/autorizar",
         json={"username": username, "pin": pin, "permiso": permiso},
@@ -206,7 +212,6 @@ def _abrir_caja(client, headers, ids, monto="100.00", declarado=None):
             "punto_venta_id": ids["pv_id"],
             "monto_declarado": declarado or monto,
             "detalle_denominaciones": billetes(monto),
-            "autorizacion": _autorizacion(client, "accounting.caja_relevar"),
         },
     )
 
@@ -218,7 +223,6 @@ def _cerrar_caja(client, headers, apertura_id, monto, **extra):
         json={
             "detalle_denominaciones": billetes(monto),
             "custodia": "local_caja_fuerte",
-            "autorizacion": _autorizacion(client, "accounting.caja_relevar"),
             **extra,
         },
     )

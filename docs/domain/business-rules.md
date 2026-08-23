@@ -135,12 +135,15 @@ de su módulo y se prueban de forma aislada.
 - **RN-MDP-001** Un medio de pago a crédito puede tener una lista de
   precios distinta a la del pago al contado.
 - **RN-MDP-002** El efectivo sigue una cadena de custodia obligatoria:
-  cajero → encargado de tienda/supervisor (al cierre de caja, tras
-  confirmar valores) → área contable (verifica y pone a disposición de la
-  empresa). En la apertura de caja la cadena se recorre en sentido
-  inverso: área contable/encargado de tienda/supervisor → cajero. Cada
-  relevo, en cualquier sentido, exige que quien recibe se autentique con
-  usuario y PIN en el ERP y confirme que los valores son correctos.
+  cajero → encargado de tienda/supervisor → área contable (verifica y pone
+  a disposición de la empresa). En la apertura, el fondo recorre la misma
+  cadena en sentido inverso. **Cada relevo, en cualquier sentido, exige que
+  quien recibe se autentique con usuario y PIN en el ERP y confirme que los
+  valores son correctos.**
+  *Enmendada el 2026-08-15 (RN-MDP-008, ADR-049)*: lo que se firma es **el
+  traspaso del efectivo**, no el acto de abrir o cerrar el turno. Abrir y
+  cerrar son conteos que el cajero hace solo; el relevo firmado ocurre
+  cuando la plata cambia de manos, que puede ser horas después del cierre.
 - **RN-MDP-003** Un pago a crédito con otra empresa lo regulariza el área
   contable.
 - **RN-MDP-004** Ante disconformidad o duplicidad de un cobro, el área
@@ -172,6 +175,19 @@ de su módulo y se prueban de forma aislada.
   autorización de supervisor**; ingresar no, porque meter plata al cajón no
   es la operación de la que hay que desconfiar. Un retiro nunca puede
   exceder el efectivo disponible: el cajón no da crédito.
+- **RN-MDP-008** **El cajero abre y cierra su turno de caja solo.** Le basta
+  su propio permiso de operar caja: no hace falta la firma de un encargado
+  ni de nadie más. Lo que prueba cuánto había en el cajón es el conteo por
+  denominación (RN-POS-003/007), no una firma — y exigir que un encargado
+  viniera a poner su PIN en cada apertura terminaba, en el local, con la
+  sesión del encargado abierta en la caja todo el turno, que es peor que no
+  pedir nada.
+  **Al cerrar, el efectivo queda en el cajón a nombre del cajero.** La
+  entrega al encargado de tienda/supervisor es un acto **posterior y
+  aparte**, y esa sí la firma quien recibe con su usuario y PIN
+  (RN-MDP-002). Mientras no la firme nadie, el responsable del faltante
+  sigue siendo el cajero (RN-MDP-005): dar por entregado lo que sigue en el
+  cajón le atribuiría la plata a alguien que no la tocó.
 
 ## Impuestos
 
@@ -246,6 +262,19 @@ de su módulo y se prueban de forma aislada.
   nombre** — lo que recuerde en el momento
   (`GET /sales/clientes/buscar?q=`). Una misma persona es cliente a lo más
   una vez por grupo: registrarla dos veces partiría su historial.
+- **RN-PTS-007** El padrón **se baja, se edita y se vuelve a subir** en el
+  mismo formato, con revisión en el medio (ADR-051). La identidad de una fila
+  es su `ID` o, si va vacío, su **número de documento**. El tipo sigue sin
+  declararse: lo decide el documento (RN-PTS-002). De un cliente **natural**
+  que ya existe la planilla solo puede **completar el documento**: su nombre,
+  su teléfono y su dirección viven en su `persona` (RN-GEN-007) y se corrigen
+  desde ahí — una fila que los cambie se informa con ese enlace, no se aplica
+  a medias. La carga masiva **no consulta a SUNAT ni a RENIEC**: trescientas
+  filas serían trescientas llamadas externas contra una cuota, así que el
+  nombre del archivo manda; cuando el cliente se edita de a uno, SUNAT vuelve
+  a mandar (RN-PTS-004). Administrar el padrón es un permiso propio
+  (`sales.gestionar_clientes`), distinto del que tiene el cajero para
+  registrar a alguien en el mostrador.
 
 ## Grupo empresarial
 
@@ -1055,6 +1084,34 @@ producción se hace en cocinas de sucursal. Ver
   a ese, y despachar desde otro en silencio es lo que el que recibe no puede
   notar hasta contar la mercadería. "No disponible" es estar dado de baja, no
   estar sin stock: el faltante tiene su propio camino (RN-INV-001/002).
+- **RN-INV-023** Un almacén tiene a lo más **un** requerimiento en estado
+  `borrador` a la vez — la lista que su turno junta durante la jornada
+  (ADR-051). Se crea sola con lo que está bajo mínimo la primera vez que se
+  abre, y volver a abrirla suma lo que cayó bajo mínimo desde entonces sin
+  tocar lo ya tecleado. Enviarla la vuelve `pendiente` y recién ahí cuenta
+  como una solicitud: mientras es borrador no aparece en el listado general
+  ni en el resumen de demanda para negociación con proveedores
+  (`solicitudes_resumen_para_negociacion`), y el hub no la sube offline —
+  todavía no le pidió nada a nadie.
+- **RN-INV-024** Un ítem que estaba bajo su mínimo al momento de agregarse a
+  una solicitud (por sugerencia o a mano) queda marcado como tal; uno que no
+  lo estaba queda marcado como pedido por decisión del local, no por
+  urgencia. La marca se **estampa al agregar el ítem y no se recalcula**
+  después: entre pedir y aprobar el stock se mueve, y recalcularla contaría
+  una historia distinta de la que quien pidió vio. Es lo que le permite al
+  abastecedor priorizar sin adivinar.
+- **RN-INV-025** El catálogo de artículos **se baja, se edita y se vuelve a
+  subir** en el mismo formato, con revisión en el medio (ADR-051). La
+  identidad de una fila es su `ID` o, si va vacío, su **código interno** — el
+  nombre no sirve de clave porque el nombre es justamente lo que se corrige.
+  La **unidad de medida de un artículo que ya existe no se cambia por
+  planilla**: el stock, los movimientos y las recetas ya cargadas están
+  expresados en la unidad actual, así que cambiarla no convierte nada,
+  reinterpreta en silencio todo lo que ya existe; la fila se informa y no
+  entra. Una categoría que el catálogo no reconoce **no frena la fila** —el
+  artículo entra sin categoría— pero se muestra para que alguien la elija o
+  la cree; el importador nunca la crea solo. Una celda vacía significa **no
+  tocar**, no vaciar.
 - **RN-INV-015** Un ajuste es válido, sin generar alarma, solo si está
   dentro de un margen de error definido por las áreas de almacén y
   contabilidad; fuera de ese margen dispara alarma/auditoría. El margen son
@@ -1335,15 +1392,43 @@ producción se hace en cocinas de sucursal. Ver
   sería un segundo lugar donde puede estar mal. La categoría por la que se
   filtra es la del artículo que la receta produce, así que solo alcanza a
   las subrecetas.
-- **RN-COM-031** El recetario **se puede cargar de golpe** desde una hoja de
-  cálculo, y la carga es en **dos pasos con revisión en el medio**: primero
-  se dice qué entra y qué no **sin guardar nada**, y recién después de que
-  alguien lo mira se importa. Un insumo que el catálogo no reconoce no
-  cancela la carga: se elige cuál es, se crea, o se omite esa línea **a la
-  vista** — nunca en silencio. Una receta que no entra (nombre repetido,
-  unidad inexistente) se informa y **no arrastra a las demás**. Lo que la
-  pantalla devuelve se revalida en el servidor: es un dato que el cliente
-  pudo editar.
+- **RN-COM-031** El recetario **se baja, se edita y se vuelve a subir**, y la
+  carga es en **dos pasos con revisión en el medio**: primero se dice qué
+  entra y qué no **sin guardar nada**, y recién después de que alguien lo
+  mira se importa. Un insumo que el catálogo no reconoce no cancela la carga:
+  se elige cuál es, **se crea desde el mismo diálogo**, o se omite esa línea
+  **a la vista** — nunca en silencio, y nunca creado solo por el importador
+  (ADR-046). Una fila con la columna `ID` llena **actualiza** esa receta en
+  vez de crear otra; una sin `ID` cuyo nombre ya existe se informa y **no
+  arrastra a las demás**. Al actualizar, los ingredientes que el archivo no
+  menciona **se conservan** salvo que se pida quitarlos **receta por receta**,
+  viendo antes cuántas líneas se pierden: subir una hoja parcial por error no
+  puede vaciar una receta (ADR-051). Lo que la pantalla devuelve se revalida
+  en el servidor: es un dato que el cliente pudo editar.
+
+- **RN-COM-032** Una dirección del ERP son **dos cosas**: el texto que se lee
+  y su punto en el mapa (`place_id`, coordenadas, plus code, distrito). El
+  punto es **opcional**: una dirección escrita a mano es válida —hay calles
+  que Google no conoce y hay locales sin internet— y ninguna alta se bloquea
+  por no tenerlo (ADR-053). Lo que **no** es válido es que las dos cuenten
+  historias distintas: corregir el texto sin volver a elegir en el mapa
+  **borra el punto**, porque un texto que dice una calle con las coordenadas
+  de otra manda el reparto al lugar equivocado.
+- **RN-COM-033** El reparto propio se cobra **tarifa base + precio por
+  kilómetro de manejo real** (no en línea recta: un río en el medio son dos
+  kilómetros de puente). El monto lo calcula el servidor —nunca el navegador,
+  porque define cuánta plata paga el cliente— y se **congela** en la venta al
+  tomar la orden: si la tarifa cambia el mes que viene, el pedido de ayer
+  siguió costando lo que costó (ADR-054).
+- **RN-COM-034** Un pedido que se pasa del **radio de reparto propio** o cae
+  en un **distrito donde el negocio decidió no repartir** se sugiere derivar a
+  una plataforma externa. Es una **sugerencia al cajero, no un bloqueo**:
+  quien decide es la persona que está atendiendo, y si acepta queda registrado
+  en la venta qué plataforma lo llevó.
+- **RN-COM-035** Si no se puede medir la distancia —proveedor caído, sin
+  internet en el local— el pedido **se toma igual**, con la distancia estimada
+  y marcada como aproximada. Cobrar de menos por un kilómetro es preferible a
+  no poder vender (mismo criterio que RN-CPP y ADR-005).
 
 ## Cumplimiento de pedido
 

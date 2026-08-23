@@ -2,13 +2,16 @@
 
 import type { ColumnDef } from "@tanstack/react-table";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo } from "react";
 
 import { BuscarDocumento } from "@/components/consulta/buscar-documento";
 import { BOTON_FILA, DialogoFormulario } from "@/components/formulario/dialogo-formulario";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
+import { RUTA_EXPORTAR_CLIENTES } from "@/lib/clientes";
 
 import { completarDocumentoAction, editarClienteAction } from "./actions";
+import { ImportarClientes } from "./importar-clientes";
 
 export type Cliente = {
   id: string;
@@ -147,6 +150,9 @@ export function ClientesCliente({
   clientes: Cliente[];
   permisos: string[];
 }) {
+  // La pantalla se renderiza en el servidor: tras importar hay que pedirle
+  // los datos de nuevo, no mantener una copia acá.
+  const router = useRouter();
   const columnas: ColumnDef<Cliente>[] = useMemo(
     () => [
       { accessorKey: "nombre", header: "Cliente" },
@@ -184,7 +190,21 @@ export function ClientesCliente({
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="font-heading text-xl italic uppercase text-dark">Clientes</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="font-heading text-xl italic uppercase text-dark">Clientes</h1>
+        <div className="flex items-center gap-2">
+          {/* El export se baja con un `<a download>` contra el proxy, que ya
+              pasa bytes y conserva el nombre del archivo (ADR-048). */}
+          <a
+            href={RUTA_EXPORTAR_CLIENTES}
+            download
+            className="rounded border border-borde px-4 py-2 text-sm font-bold text-dark hover:bg-fondo"
+          >
+            Exportar
+          </a>
+          <ImportarClientes onImportados={() => router.refresh()} />
+        </div>
+      </div>
       <p className="text-sm text-gray">
         El padrón del grupo (RN-PTS-001): un cliente registrado en una sucursal es el mismo
         en todas. El alta ocurre en caja —registrar es opcional, vender anónimo siempre es

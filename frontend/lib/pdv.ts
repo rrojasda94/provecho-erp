@@ -220,11 +220,36 @@ export type VentaNueva = {
   mesa_id?: string | null;
   comensales?: number | null;
   referencia_atencion?: string | null;
+  /** Adónde va el delivery y su ancla en el mapa. El costo del
+   * reparto NO se manda: lo calcula el servidor (ADR-054), porque un
+   * precio que viaja por el navegador es un precio que se edita. */
+  direccion_entrega?: string | null;
+  ubicacion_place_id?: string | null;
+  ubicacion_lat?: string | number | null;
+  ubicacion_lng?: string | number | null;
+  ubicacion_plus_code?: string | null;
+  ubicacion_distrito?: string | null;
   /** `consumo_personal` arma el pedido en cero y exige `consumo_motivo` +
    * la elevación de PIN del encargado (RN-COM-025). */
   tipo?: string;
   consumo_motivo?: string | null;
   autorizacion?: string;
+};
+
+export type CotizacionDeliveryIn = {
+  sucursal_id: string;
+  ubicacion_lat?: string | number | null;
+  ubicacion_lng?: string | number | null;
+  ubicacion_distrito?: string | null;
+};
+
+export type CotizacionDelivery = {
+  distancia_km: string | null;
+  costo: string;
+  /** La distancia salió de la línea recta porque Google no contestó. */
+  aproximada: boolean;
+  derivar_a_externo: boolean;
+  motivo: string | null;
 };
 
 export type PagoNuevo = {
@@ -247,6 +272,9 @@ export type PosVerificadoNuevo = {
   observacion?: string;
 };
 
+/** Sin `autorizacion`: el turno lo abre el cajero con su propia sesión
+ * (RN-MDP-008, ADR-049). La firma con PIN quedó donde hay una entrega de
+ * efectivo de verdad — la cadena de custodia del cierre. */
 export type AperturaCajaNueva = {
   punto_venta_id: string;
   /** Lo que el encargado dice entregar. Lo que el cajero cuenta va en
@@ -255,7 +283,6 @@ export type AperturaCajaNueva = {
   monto_declarado: string;
   /** Valor del billete → piezas contadas. */
   detalle_denominaciones: Record<string, number>;
-  autorizacion: string;
   pos_verificados?: PosVerificadoNuevo[] | null;
 };
 
@@ -274,10 +301,12 @@ export const esCustodia = (v: string): v is CustodiaDestino =>
 export const esAtribucion = (v: string): v is DescuadreAtribucion =>
   (ATRIBUCIONES as readonly string[]).includes(v);
 
+/** Sin `autorizacion`, igual que la apertura: lo cierra el cajero solo. El
+ * efectivo queda `en_caja` a su nombre y la entrega se firma después, en
+ * `/contabilidad/caja`. */
 export type CierreCajaNuevo = {
   detalle_denominaciones: Record<string, number>;
   custodia: CustodiaDestino;
-  autorizacion: string;
   descuadre_atribucion?: DescuadreAtribucion | null;
   reportes_pos?: {
     pos_tarjeta_id: string;
@@ -337,6 +366,18 @@ export const api = {
 
   crearVenta: (cuerpo: VentaNueva) =>
     pedir<Venta>("/sales/ventas", { metodo: "POST", cuerpo }),
+
+  /** Cuánto sale llevar el pedido a esa dirección, antes de aceptarlo.
+   *
+   * El número lo calcula el servidor con su propia clave de Google: esto
+   * solo lo muestra. Cada llamada gasta cuota de un proveedor pago, así
+   * que se pide al anclar la dirección y no en cada tecla.
+   */
+  cotizarDelivery: (cuerpo: CotizacionDeliveryIn) =>
+    pedir<CotizacionDelivery>("/sales/ventas/cotizar-delivery", {
+      metodo: "POST",
+      cuerpo,
+    }),
 
   itemsDeVenta: (ventaId: string) =>
     pedir<VentaItem[]>(`/sales/ventas/${ventaId}/items`),
@@ -407,7 +448,7 @@ export const api = {
     pedir<PosTarjeta[]>(`/accounting/pos-tarjeta?sucursal_id=${sucursalId}`),
 
   /** `POST /cajas/apertura` devuelve el registro completo de la apertura
-   * (`id`, `relevo_encargado_id`, `diferencia_reportada`...); `GET
+   * (`id`, `diferencia_reportada`, `pos_verificados`...); `GET
    * /cajas/abiertas` devuelve la vista liviana de la lista, con
    * `apertura_caja_id`. Se normaliza acá para que el resto del PDV — que
    * después necesita ese id para cerrar la caja o registrar propinas — no

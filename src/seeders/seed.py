@@ -101,6 +101,11 @@ PERMISOS = [
         "Autorizar la comida del personal, sin precio ni cobro (RN-COM-025)",
     ),
     ("sales.gestionar_mesas", "Configurar las mesas del salón de una sucursal"),
+    (
+        "sales.gestionar_clientes",
+        "Administrar el padrón de clientes del grupo, incluida la carga masiva "
+        "por planilla (RN-PTS-007) — distinto de registrar a alguien en caja",
+    ),
     ("kds.configurar", "Crear y configurar pantallas KDS"),
     ("kds.operar", "Operar KDS: cola, avance de ítems, comanda"),
     (
@@ -157,8 +162,9 @@ PERMISOS = [
     ),
     (
         "accounting.caja_relevar",
-        "Entregar o recibir el efectivo en la cadena de custodia: apertura, "
-        "cierre y traslado a contabilidad (RN-MDP-002)",
+        "Recibir el efectivo en la cadena de custodia: del cajón al "
+        "encargado, del encargado a contabilidad y de ahí a disponible "
+        "(RN-MDP-002). No interviene en abrir ni cerrar (RN-MDP-008)",
     ),
     (
         "accounting.caja_reabrir",
@@ -312,6 +318,9 @@ ROLES = {
         # encargado del turno, no quien la va a comer (RN-COM-025).
         "sales.registrar_consumo_personal",
         "sales.gestionar_mesas",
+        # Reescribir el padrón del grupo desde una planilla no es el mismo
+        # acto que registrar a alguien en el mostrador (ADR-052).
+        "sales.gestionar_clientes",
         "kds.configurar",
         "kds.operar",
         "inventory.leer",
@@ -329,12 +338,13 @@ ROLES = {
         "accounting.pago_aprobar",
         "accounting.arqueo_registrar",
         "accounting.caja_retirar",
-        # También opera caja cuando le toca cubrir el turno; el candado de
-        # que nadie se releve a sí mismo vive en el dominio, no en el rol.
+        # También opera caja cuando le toca cubrir el turno.
         "accounting.caja_operar",
-        # El encargado entrega el fondo al abrir y recibe el efectivo al
-        # cerrar: es la contraparte del cajero en la cadena de custodia
-        # (RN-MDP-002), y quien autoriza recontar un cierre (RN-MDP-005).
+        # El encargado **recibe** el efectivo que el cajero dejó en el cajón
+        # al cerrar (`en_caja → en_supervisor`, RN-MDP-002/008): es la
+        # contraparte del cajero en la cadena de custodia y quien autoriza
+        # recontar un cierre (RN-MDP-005). Ya no interviene en la apertura —
+        # el turno lo abre el cajero solo (ADR-049).
         "accounting.caja_relevar",
         "accounting.caja_reabrir",
         # Marketing arma el brief; quien lo aprueba nunca es quien lo escribe.

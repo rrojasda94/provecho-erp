@@ -74,6 +74,55 @@ def test_consultar_sin_token_configurado_lanza_factiliza_error():
         FactilizaClient(token="").consultar_dni("73632127")
 
 
+def test_la_consulta_manda_su_propio_token_no_el_de_emision(monkeypatch):
+    """Emisión y consulta son dos productos de Factiliza con **dos
+    credenciales**. Mandar el de emisión a `api.factiliza.com` devuelve 401
+    aunque esté vigente — con eso el botón «Buscar» no funcionó nunca, y
+    ADR-005 afirmaba lo contrario hasta el 2026-08-22."""
+    monkeypatch.setattr(settings, "factiliza_token", "el-de-emision")
+    monkeypatch.setattr(settings, "factiliza_consulta_documento_token", "el-de-consulta")
+    visto = {}
+
+    def espiar(url, **kwargs):
+        visto["auth"] = kwargs["headers"]["Authorization"]
+        visto["url"] = url
+        return _RespuestaFalsa(404, "")
+
+    monkeypatch.setattr(httpx, "get", espiar)
+    FactilizaClient().consultar_dni("73632127")
+
+    assert visto["auth"] == "Bearer el-de-consulta"
+    assert visto["url"].startswith(settings.factiliza_consulta_base_url)
+
+
+def test_sin_token_de_consulta_cae_al_de_emision(monkeypatch):
+    """Una cuenta que sí use el mismo para todo no tiene que tocar nada."""
+    monkeypatch.setattr(settings, "factiliza_token", "el-unico")
+    monkeypatch.setattr(settings, "factiliza_consulta_documento_token", "")
+    visto = {}
+
+    def espiar(url, **kwargs):
+        visto["auth"] = kwargs["headers"]["Authorization"]
+        return _RespuestaFalsa(404, "")
+
+    monkeypatch.setattr(httpx, "get", espiar)
+    FactilizaClient().consultar_dni("73632127")
+
+    assert visto["auth"] == "Bearer el-unico"
+
+
+@pytest.mark.parametrize("status", [401, 403])
+def test_token_rechazado_dice_que_es_el_token(monkeypatch, status):
+    """Lo que devuelve el producto de consulta con un token que no le sirve:
+    401 (o 403) **con el cuerpo vacío**. Sin este caso caía en el `.json()`
+    y el mensaje decía "respuesta ilegible", que manda a buscar un error de
+    parseo cuando lo que hay que revisar es la credencial —visto de verdad
+    el 2026-08-22 con un token de rol `consultor` que la API rechazaba—."""
+    monkeypatch.setattr(httpx, "get", lambda *a, **k: _RespuestaFalsa(status, ""))
+    with pytest.raises(FactilizaError, match="rechazó el token"):
+        FactilizaClient(token="t").consultar_dni("73632127")
+
+
 def test_nombres_desde_dni_hace_fallback_si_factiliza_falla(monkeypatch):
     def explota(self, dni):
         raise FactilizaError("caído")

@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { ENCARGADO, contar, dialogo, ingresar, tecleaPin } from "./util";
+import { contar, dialogo, ingresar } from "./util";
 
 /**
  * El flujo del dinero de punta a punta: abrir caja → vender → cobrar →
@@ -11,6 +11,11 @@ import { ENCARGADO, contar, dialogo, ingresar, tecleaPin } from "./util";
  * del PDV mandaban el contrato anterior a ADR-025 y la API respondía 422.
  * Ningún test lo vio porque hasta hoy nada tocaba estas pantallas.
  *
+ * **Sin PIN de nadie** desde ADR-049: abrir y cerrar son actos del cajero
+ * con su propia sesión (RN-MDP-008). La firma del encargado que recibe el
+ * efectivo no está acá porque no está en el PDV — vive en
+ * `/contabilidad/caja` y se recorre en `uso/caja-custodia.spec.ts`.
+ *
  * Datos: `python -m src.seeders.seed` + `python -m src.seeders.e2e` sobre
  * `e2e.db`.
  */
@@ -20,8 +25,6 @@ const PRODUCTO = "Pizza E2E";
 async function abrirCaja(page: Page, { declarado }: { declarado: string }) {
   await contar(page, { "100": 1, "50": 2 }); // 200.00
   await dialogo(page).getByTestId("apertura-declarado").fill(declarado);
-  await dialogo(page).getByTestId("apertura-usuario").fill(ENCARGADO.usuario);
-  await tecleaPin(page, "apertura-pin", ENCARGADO.pin);
   await dialogo(page).getByRole("button", { name: "Abrir caja" }).click();
   await expect(page.getByTestId("estado-caja")).toContainText("Caja abierta", {
     timeout: 15_000,
@@ -52,7 +55,11 @@ test.describe.serial("Flujo del dinero", () => {
     // la prueba pasa por los dos pasos y no por un atajo.
     await page.getByRole("button", { name: new RegExp(PRODUCTO, "i") }).first().click();
     await dialogo(page).getByRole("button", { name: /Guardar/i }).click();
-    await expect(page.getByText(/S\/ 25\.00/).first()).toBeVisible();
+    // Acotado al ticket: el mismo importe aparece también en el botón que
+    // alterna carta/pedido, que existe solo en el ancho angosto y acá está
+    // oculto — un `getByText` suelto lo encontraba primero y esperaba 15 s a
+    // que se hiciera visible algo que en esta medida no se ve.
+    await expect(page.locator(".pdv-der").getByText(/S\/ 25\.00/).first()).toBeVisible();
 
     // --- Tipo de orden ---------------------------------------------------
     // El PDV no deja salir del borrador sin tipo de orden (RN-COM-005), así
@@ -67,8 +74,23 @@ test.describe.serial("Flujo del dinero", () => {
     // --- Cobro -----------------------------------------------------------
     await page.getByRole("button", { name: /^Cobrar$/i }).click();
     await expect(dialogo(page).getByText("Cobrar", { exact: true })).toBeVisible();
-    // Sin tocar nada: el diálogo llega con el medio por defecto y el monto
-    // igual al total, y sin documento se emite boleta a Clientes varios.
+
+    // El botón de consulta está donde se teclea el documento del receptor
+    // (addendum de ADR-041). Con un número a medias **no sale a la red**:
+    // cada consulta gasta cuota de un proveedor pago, así que un largo que
+    // no es ni DNI ni RUC se rechaza acá y no allá.
+    const buscar = dialogo(page).getByRole("button", { name: "Buscar DNI / RUC" });
+    await expect(buscar).toBeVisible();
+    await dialogo(page).getByLabel("Documento del receptor").fill("2061007");
+    await buscar.click();
+    await expect(dialogo(page).getByRole("status")).toContainText(/8 dígitos/);
+    // Y la venta sigue sin documento, que es el caso normal en un mostrador
+    // (RN-PER-005): se limpia y se cobra igual.
+    await dialogo(page).getByLabel("Documento del receptor").fill("");
+
+    // Sin tocar nada más: el diálogo llega con el medio por defecto y el
+    // monto igual al total, y sin documento se emite boleta a Clientes
+    // varios.
     await dialogo(page).getByRole("button", { name: /^Confirmar pago$/ }).click();
     // El comprobante emitido cierra el cobro; sin token de Factiliza queda
     // pendiente de envío, que es justo lo que debe pasar sin proveedor.
@@ -82,8 +104,6 @@ test.describe.serial("Flujo del dinero", () => {
     await contar(page, { "100": 2, "50": 0 });
     await dialogo(page).getByTestId(/^lote-/).first().fill("0");
     await dialogo(page).getByTestId("cierre-custodia").selectOption("local_caja_fuerte");
-    await dialogo(page).getByTestId("cierre-usuario").fill(ENCARGADO.usuario);
-    await tecleaPin(page, "cierre-pin", ENCARGADO.pin);
     await dialogo(page).getByRole("button", { name: "Cerrar caja" }).click();
 
     await expect(page.getByTestId("estado-caja")).toContainText("Caja cerrada", {
@@ -94,22 +114,35 @@ test.describe.serial("Flujo del dinero", () => {
   test("un rechazo del servidor deja el formulario abierto con lo tecleado", async ({
     page,
   }) => {
-    // El candado que solo existe en pantalla: si el PIN del encargado no
-    // valida, el diálogo **no** puede limpiarse. Recontar el cajón entero
-    // porque alguien tecleó mal seis dígitos es la clase de fricción que
-    // termina en un conteo inventado — y el conteo es la evidencia sobre la
-    // que se calcula el descuadre de todo el turno.
+    // El candado que solo existe en pantalla: si el servidor rechaza la
+    // apertura, el diálogo **no** puede limpiarse. Recontar el cajón entero
+    // porque algo falló del otro lado es la clase de fricción que termina en
+    // un conteo inventado — y el conteo es la evidencia sobre la que se
+    // calcula el descuadre de todo el turno.
+    //
+    // El rechazo se simula interceptando la llamada. Antes lo provocaba un
+    // PIN mal tecleado, pero desde ADR-049 la apertura no pide PIN y no
+    // quedó ninguna forma de que el servidor la rechace **desde esta
+    // pantalla**: los montos salen de un conteo por denominaciones fijas y
+    // el diálogo solo aparece cuando no hay caja abierta. Lo que este caso
+    // prueba es el manejo de error del cliente, así que fabricar la
+    // respuesta es exactamente lo que corresponde.
     await ingresar(page);
+    await page.route("**/api/proxy/api/v1/accounting/cajas/apertura", (ruta) =>
+      ruta.fulfill({
+        status: 409,
+        contentType: "application/json",
+        body: JSON.stringify({ detail: "ya hay una caja abierta en este punto de venta" }),
+      }),
+    );
     await page.goto("/pdv");
     await expect(dialogo(page).getByText("Apertura de caja")).toBeVisible();
 
     await contar(page, { "100": 1, "50": 2 });
     await dialogo(page).getByTestId("apertura-declarado").fill("200");
-    await dialogo(page).getByTestId("apertura-usuario").fill(ENCARGADO.usuario);
-    await tecleaPin(page, "apertura-pin", "000000");
     await dialogo(page).getByRole("button", { name: "Abrir caja" }).click();
 
-    await expect(page.getByText(/No se pudo abrir la caja|credencial/i)).toBeVisible({
+    await expect(page.getByText(/No se pudo abrir la caja|ya hay una caja/i)).toBeVisible({
       timeout: 15_000,
     });
     // Lo que importa no es el aviso, es que nada se perdió.
@@ -133,8 +166,6 @@ test.describe.serial("Flujo del dinero", () => {
     await dialogo(page).getByTestId("apertura-declarado").fill("250");
     await expect(dialogo(page).getByText(/difiere en/i)).toBeVisible();
 
-    await dialogo(page).getByTestId("apertura-usuario").fill(ENCARGADO.usuario);
-    await tecleaPin(page, "apertura-pin", ENCARGADO.pin);
     await dialogo(page).getByRole("button", { name: "Abrir caja" }).click();
     await expect(page.getByTestId("estado-caja")).toContainText("Caja abierta", {
       timeout: 15_000,
@@ -149,8 +180,13 @@ test.describe.serial("Flujo del dinero", () => {
     // lector de pantalla. Por eso nadie vio que estos `<input>` tenían solo
     // `placeholder` —que desaparece al escribir y no es nombre accesible—
     // hasta que un agente que navega por el árbol de accesibilidad no
-    // encontró el PIN y no pudo cerrar la caja. Esta prueba busca por
+    // encontró un campo y no pudo cerrar la caja. Esta prueba busca por
     // etiqueta a propósito: falla si el nombre se pierde otra vez.
+    //
+    // Los campos de firma ya no están (ADR-049); lo que queda son los dos
+    // `<select>` del cierre y el monto declarado de la apertura, que son
+    // exactamente los que no tienen `<label>` propio y dependen de su
+    // `aria-label`.
     //
     // Entra con la caja **abierta** —la dejó así la prueba anterior— y la
     // cierra, que es el orden en que este archivo se pasa el estado.
@@ -161,8 +197,6 @@ test.describe.serial("Flujo del dinero", () => {
     await expect(dialogo(page).getByText("Cierre de caja")).toBeVisible();
 
     await expect(dialogo(page).getByLabel("A dónde va el efectivo")).toBeVisible();
-    await expect(dialogo(page).getByLabel("Usuario de quien recibe")).toBeVisible();
-    await expect(dialogo(page).getByLabel("PIN de quien recibe")).toBeVisible();
     await expect(
       dialogo(page).getByLabel("Si hay descuadre, a quién se le atribuye"),
     ).toBeVisible();
@@ -173,16 +207,9 @@ test.describe.serial("Flujo del dinero", () => {
     await dialogo(page)
       .getByLabel("A dónde va el efectivo")
       .selectOption("local_caja_fuerte");
-    await dialogo(page).getByLabel("Usuario de quien recibe").fill(ENCARGADO.usuario);
-    // El PIN ya no es un campo sino un pinpad (ADR-045): se toca dígito por
-    // dígito. Se llega a él por su nombre accesible igual que al resto —lo
-    // que esta prueba cuida es que un lector de pantalla pueda encontrarlo,
-    // y un `role="group"` con `aria-label` lo cumple tan bien como un
-    // `<input>` etiquetado.
-    const pinpad = dialogo(page).getByRole("group", { name: "PIN de quien recibe" });
-    for (const digito of ENCARGADO.pin) {
-      await pinpad.getByRole("button", { name: digito, exact: true }).click();
-    }
+    await dialogo(page)
+      .getByLabel("Si hay descuadre, a quién se le atribuye")
+      .selectOption("cajero");
     await dialogo(page).getByRole("button", { name: "Cerrar caja" }).click();
     await expect(page.getByTestId("estado-caja")).toContainText("Caja cerrada", {
       timeout: 15_000,
@@ -195,7 +222,10 @@ test.describe.serial("Flujo del dinero", () => {
     await expect(
       dialogo(page).getByLabel("El encargado declara entregar"),
     ).toBeVisible();
-    await expect(dialogo(page).getByLabel("Usuario del encargado")).toBeVisible();
-    await expect(dialogo(page).getByLabel("PIN del encargado")).toBeVisible();
+    // Y no queda nada que firmar: la apertura ya no pide credenciales de
+    // nadie (RN-MDP-008). Se afirma la ausencia porque volver a pedirlas
+    // sería una regresión silenciosa — la pantalla seguiría funcionando.
+    await expect(dialogo(page).getByLabel(/^Usuario /)).toHaveCount(0);
+    await expect(dialogo(page).getByLabel(/^PIN /)).toHaveCount(0);
   });
 });

@@ -83,16 +83,17 @@ def abrir_caja_directa(
     """Turno de caja insertado directo, para tests que no prueban la caja.
 
     Los que sí la prueban (`test_caja_ciclo.py`, `test_dashboard_caja.py`)
-    pasan por el endpoint real, con su elevación de PIN y su conteo.
+    pasan por el endpoint real, con su conteo por denominación.
     """
     from src.modules.accounting.infrastructure.models import AperturaCaja
 
     apertura = AperturaCaja(
         punto_venta_id=punto_venta_id,
         cajero_id=cajero_id,
-        # Sin encargado propio se reusa el cajero: la FK tiene que apuntar a
-        # un usuario real, y estos tests no prueban el relevo.
-        relevo_encargado_id=encargado_id or cajero_id,
+        # NULL es lo que escribe la apertura real desde ADR-049: el cajero
+        # abre solo y nadie firma. `encargado_id` sigue disponible para los
+        # tests que necesitan un encargado de turno derivable de la caja.
+        relevo_encargado_id=encargado_id,
         monto_apertura=Decimal(monto),
         detalle_denominaciones=billetes(monto) or None,
     )
@@ -225,6 +226,11 @@ def _listeners_sin_base_real(monkeypatch):
 @pytest.fixture(autouse=True)
 def _sin_token_factiliza_por_defecto(monkeypatch):
     monkeypatch.setattr(settings, "factiliza_token", "")
+    # El de consulta va aparte porque **es** otra credencial (otro producto).
+    # Sin blanquearlo, un `.env` local con el token real haría que un test
+    # olvidado saliera a la red: gastaría cuota de un proveedor pago y traería
+    # datos personales de alguien a un artefacto de CI.
+    monkeypatch.setattr(settings, "factiliza_consulta_documento_token", "")
 
 
 @pytest.fixture(autouse=True)

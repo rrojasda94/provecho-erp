@@ -3,7 +3,10 @@
 - **Estado:** aceptada
 - **Fecha:** 2026-08-13
 - **Contexto:** `inventory` (recetas)
-- **Relacionado:** RN-COM-031, RN-COM-024 (aritmética tecleada), ADR-023
+- **Relacionado:** RN-COM-031, RN-COM-024 (aritmética tecleada), ADR-023,
+  ADR-048 (el proxy pasa bytes), ADR-052 (exportar es la plantilla llena:
+  extiende esta decisión a artículos y clientes, y agrega actualizar lo que
+  ya existe)
 
 ## Contexto
 

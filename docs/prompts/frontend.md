@@ -65,14 +65,28 @@ Leer antes: `/CLAUDE.md`, [product/ui-ux.md](../product/ui-ux.md) y
   sistema los dibuja distinto.
 - Responsive siempre (webapp + Android táctil vía PWA, no app nativa —
   ADR-013); táctil obligatorio en PDV/Kiosk/KDS/Inventario, el resto de
-  módulos es PC-first pero igual responsive.
+  módulos es PC-first pero igual responsive. **Nunca `display: none` por
+  ancho sobre un control**: esconder es quitarle la opción a quien opera
+  desde una tablet en vertical. Si dos paneles no entran juntos, se alternan
+  con un botón que exista solo en ese ancho — es lo que hace el PDV con la
+  carta y el ticket. Ver `docs/product/ui-ux.md` → «Qué significa "no
+  romperse en pantallas chicas"».
 - Accesibilidad: paleta alternativa (daltonismo) y tamaño de fuente
   ajustable, ambos como preferencia del perfil del usuario, combinables
   con el tema de marca activo.
-- **Un PIN dentro del PDV se pide con `Pinpad`, nunca con un `<input>`**
-  (ADR-045). Si el navegador puede ofrecer guardarlo, alguien lo guarda, y
-  el turno siguiente opera con la cuenta del anterior. Los cuatro sitios que
-  ya lo piden usan `FirmaConPin` (usuario + pinpad); uno nuevo también.
+- **Un PIN se pide con `Pinpad` (`components/pinpad/`), nunca con un
+  `<input>`** — en el PDV y fuera de él, login incluido (ADR-045, ADR-050).
+  Si el navegador puede ofrecer guardarlo, alguien lo guarda, y el turno
+  siguiente opera con la cuenta del anterior. Los cuatro sitios del PDV usan
+  `FirmaConPin` (usuario + pinpad); uno nuevo también. Ni siquiera un
+  `<input type="hidden">`: el valor viaja desde el estado de React en el
+  `FormData` que arma el envío, y así "no hay campo" se verifica mirando el
+  DOM — que es lo que hace sostenible la regla.
+- **Una acción que puede fallar se despacha a mano, no por
+  `<form action={...}>`**, y lo que haya que conservar va en campo
+  controlado. React 19 resetea los campos no controlados de un formulario
+  cuando su acción termina, **también cuando devolvió error**: el usuario
+  tecleado se borraba junto con el PIN equivocado.
 - **Un overlay que deba tapar un diálogo abierto tiene que ser otro
   `<dialog>` con `showModal()`**, no un `div` con `z-index`. Los diálogos
   nativos viven en el *top layer* del navegador y ningún `z-index` los
@@ -85,14 +99,34 @@ Leer antes: `/CLAUDE.md`, [product/ui-ux.md](../product/ui-ux.md) y
   estado global mientras `useState`/`useReducer` alcance.
 - TypeScript estricto; componentes en PascalCase; App Router de Next.js.
 - Datos solo de la API REST — sin lógica de negocio en el front. El navegador
-  **nunca** llama a la API directo: sale por `app/api/proxy` (la CSP de
-  `middleware.ts` fija `connect-src 'self'`), y el proceso de Next usa
-  `API_INTERNAL_URL`. No existe `NEXT_PUBLIC_API_URL`.
+  **nunca** llama a la API del ERP directo: sale por `app/api/proxy`, y el
+  proceso de Next usa `API_INTERNAL_URL`. No existe `NEXT_PUBLIC_API_URL`.
+- **La CSP tiene una sola excepción, y es Google Maps** (ADR-053). Desde
+  2026-08-22 `connect-src` no es `'self'` puro: el campo de dirección
+  autocompleta y geocodifica contra Google desde el navegador. Lo que **no**
+  sale del navegador es la distancia de reparto —esa la mide la API con su
+  propia clave (ADR-054)—, así que una llamada a `routes.googleapis.com` en la
+  pestaña de red es señal de que algo se implementó mal. Agregar otro host a
+  la CSP es una decisión de ADR, no un ajuste.
+- Una clave que el navegador necesita se lee server-side y baja **como prop o
+  por contexto** (`components/direccion/config-mapas`), nunca como
+  `NEXT_PUBLIC_*`: esa familia se hornea en el build.
+- **El proxy es transparente** (ADR-048): pasa el cuerpo en bytes y conserva
+  el `Content-Type` y el `Content-Disposition` de los dos lados. Una descarga
+  se hace con un `<a href="/api/proxy/…" download>` sin valor —el nombre lo
+  pone el `Content-Disposition` de la API— y una subida con `subir()` de
+  `lib/cliente-api.ts`, que deja que el navegador escriba el header del
+  `multipart` con su `boundary`. **No se escriben rutas dedicadas por
+  descarga**: es la alternativa descartada, y su costo es una copia del
+  rescate del token por cada endpoint binario.
 
 ## Checklist
 
 - [ ] `npm run lint`, `npm run typecheck`, `npm test` y `npm run build` limpios.
-- [ ] Probado en viewport móvil y desktop.
+- [ ] Probado en viewport móvil y desktop. Si la pantalla es nueva, agregada
+      a `frontend/uso/responsive.spec.ts`, que la recorre en 390×844,
+      820×1180 y 1440×900 afirmando que ningún control quede fuera de un
+      contenedor que lo recorta y que todo modal quede centrado.
 - [ ] Sin colores/tamaños mágicos fuera de los tokens de `globals.css`.
 - [ ] Si el módulo es nuevo: agregado a `frontend/lib/modulos.ts` con su
       prefijo de permiso **y su área**, y `layout.tsx` propio con guard

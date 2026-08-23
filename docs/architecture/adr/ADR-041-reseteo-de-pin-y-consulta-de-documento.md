@@ -179,3 +179,97 @@ reusó `core/rate_limit.py` en vez de escribir otro limitador — con su
 **fail-open**, que acá se sostiene por el mismo motivo que en el login: un
 Redis caído no puede dejar a la caja sin identificar a un cliente, y se acepta
 que durante esa caída la cuota quede sin freno.
+
+## Addendum 2026-08-22 — el largo decide el padrón, y el botón llega a caja
+
+El addendum anterior dejó anotado que faltaba el PDV. Cerrarlo obligó a
+resolver algo que en las fichas de alta no se presenta.
+
+**En caja no hay dos campos, hay uno.** Una ficha de persona tiene un campo
+"DNI" y una de proveedor tiene uno "RUC": el formulario ya sabe a qué padrón le
+va a preguntar. En el mostrador el cliente dicta un número y recién su largo
+dice qué es —8 va a RENIEC, 11 a SUNAT—, que es **exactamente** la regla que ya
+decidía boleta o factura (RN-CPP-003). Se agregó el modo `auto`, que resuelve
+con `tipoPorLargo`. Un largo intermedio **no se consulta**: no está "casi
+bien", no es ninguno de los dos, y una consulta a ciegas gasta cuota para
+volver con un "no encontrado" que no significa nada.
+
+Esa regla vive en `frontend/lib/documento.ts` y no dentro del componente por lo
+mismo que `permisos.ts`: `npm test` corre sobre Node pelado, que hace
+type-stripping pero no transforma JSX. Lo que decide a quién se le pregunta
+tiene que poder probarse sin montar React.
+
+**Dos formas del mismo botón, porque hay dos formas de formulario en el ERP.**
+Las fichas de alta son formularios **no controlados** (`defaultValue` + `name`)
+y `BuscarDocumento` escribe en el DOM del `<form>`. El PDV se dibuja con estado
+de React, un `useState` por campo: ahí `form.elements` no lleva a ningún lado
+—el `value` de un input controlado se pisa en el siguiente render—. Se descartó
+levantar los campos del PDV a formulario no controlado (sería rehacer el
+diálogo de cobro por un botón) y también duplicar el fetch: quedó
+`ConsultaDocumento`, misma lógica, que recibe el número y **devuelve la
+respuesta cruda**. Devuelve el objeto entero y no un mapa `campo → clave`
+porque en `auto` quien llama no sabe de antemano si le va a llegar una persona
+(`nombres`/`apellidos`) o una empresa (`razon_social`/`direccion`).
+
+**Dónde quedó, en el PDV.** En los dos puntos donde se identifica a alguien que
+todavía no está registrado: el alta de cliente y el receptor del comprobante.
+En el alta, el campo de documento pasó a aceptar los dos largos —con 11 el
+cliente nace jurídico, que es lo que `crear_cliente` ya hacía y la pantalla no
+dejaba pedir—. En el cobro llena la razón social, que hasta ahora el cajero
+escribía de oído y SUNAT rechazaba cuando no coincidía.
+
+**No se consulta al tipear.** Se dispara con el botón: cada llamada es plata, y
+un RUC pasa por 8 dígitos mientras se escribe — una consulta por tecla gastaría
+una cuota entera para prellenar con los datos de otra persona.
+
+### RRHH: el mismo criterio, donde más pesa
+
+La contratación quedó fuera del addendum anterior por ser "un trabajador y no
+un cliente". Al montar el botón se vio que el problema ahí era peor que en
+caja: `contratar_postulante` creaba la `persona` con `postulante.nombres` y
+`postulante.apellidos` —lo que el candidato escribió de sí mismo en un
+formulario **público**, sin sesión ni permiso— y con ese nombre se firma el
+contrato y se declara a SUNAT. `sales` y `purchases` ya pasaban el documento
+por `nombres_desde_dni`; RRHH no, sin razón que lo justificara.
+
+Se cerró en los dos lados: el servidor aplica RENIEC aunque nadie apriete el
+botón, y el diálogo de contratar suma **nombres y apellidos editables**
+—precargados con lo declarado— para que el botón tenga dónde escribir y quien
+contrata pueda ver el nombre real antes de que nazca la ficha. La precedencia
+es **RENIEC > lo revisado en pantalla > lo declarado**: prellenar es para ver
+el dato antes de guardar, no para pisar al padrón. Con carné de extranjería o
+pasaporte no se consulta — RENIEC no los tiene.
+
+### Un 401 se llamaba "respuesta ilegible"
+
+Probando con un token real, el producto de consulta devolvió **401 con el
+cuerpo vacío**. `_consultar` solo trataba aparte el 404 vacío y el 5xx, así que
+el 401 caía en `respuesta.json()`, reventaba en el parseo y el operador leía
+"Respuesta ilegible de Factiliza" — un mensaje que manda a buscar un error de
+formato cuando lo que hay que revisar es la credencial. Ahora 401 y 403 se
+nombran: "Factiliza rechazó el token; revisa `FACTILIZA_TOKEN` y que el plan de
+consultas esté activo". El resto de los mensajes ilegibles llevan el código de
+estado, por el mismo motivo.
+
+### Son dos tokens, no uno
+
+El 401 de arriba no era un plan vencido: **emisión y consulta tienen
+credenciales distintas**. ADR-005 afirmaba que los dos productos "comparten
+token" y el ERP mandaba `FACTILIZA_TOKEN` a los dos hosts; contra
+`api.factiliza.com` eso es un 401 aunque el token de emisión esté perfectamente
+vigente. Se agregó `FACTILIZA_CONSULTA_DOCUMENTO_TOKEN` —el nombre que ya
+usaba el `.env` real, para no obligar a reescribirlo— y `_consultar` manda ese.
+Cae al de emisión solo si no hay uno propio configurado: una cuenta que sí use
+el mismo para todo sigue funcionando sin tocar nada.
+
+`conftest.py` blanquea **los dos** por defecto. Con uno solo, un `.env` local
+con el token real dejaba que un test olvidado saliera a la red: gastaría cuota
+de un proveedor pago y traería datos personales de alguien a un artefacto de
+CI que se sube y se guarda.
+
+Verificado contra el proveedor real el 2026-08-22: DNI y RUC devuelven 200 y
+el mapeo entra entero en `ConsultaPersona`/`ConsultaEmpresa`. Anotado de esa
+corrida: **`fecha_nacimiento` llega vacía** en este plan de RENIEC (la clave
+viene, el valor es `""`), que es exactamente el caso que `_fecha` ya convertía
+en `None` y por el que el campo es opcional — el alta no puede depender de un
+dato que el proveedor entrega a veces.

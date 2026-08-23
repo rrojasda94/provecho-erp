@@ -2,12 +2,8 @@
   "components": {
     "schemas": {
       "AbrirCajaIn": {
-        "description": "`monto_declarado` es lo que el encargado dice entregar;\n`detalle_denominaciones` es lo que el cajero cuenta. La diferencia la\ncalcula el servidor (RN-POS-011/012) — nunca se teclea.\n\n`autorizacion` es el token de `POST /auth/autorizar` del encargado que\nreleva: sin su PIN no hay cadena de custodia (RN-MDP-002).",
+        "description": "`monto_declarado` es lo que el encargado dice entregar;\n`detalle_denominaciones` es lo que el cajero cuenta. La diferencia la\ncalcula el servidor (RN-POS-011/012) — nunca se teclea.\n\n**Sin `autorizacion`** desde ADR-049: la abre el cajero con su propia\nsesión (RN-MDP-008). Lo que prueba cuánto había en el cajón es el\nconteo, no una firma; firmar tiene sentido donde hay una entrega de\nefectivo de verdad, y esa es la cadena de custodia del cierre\n(RN-MDP-002).",
         "properties": {
-          "autorizacion": {
-            "title": "Autorizacion",
-            "type": "string"
-          },
           "detalle_denominaciones": {
             "additionalProperties": {
               "type": "integer"
@@ -51,8 +47,7 @@
         "required": [
           "punto_venta_id",
           "monto_declarado",
-          "detalle_denominaciones",
-          "autorizacion"
+          "detalle_denominaciones"
         ],
         "title": "AbrirCajaIn",
         "type": "object"
@@ -548,6 +543,76 @@
             "minLength": 1,
             "title": "Tipo",
             "type": "string"
+          },
+          "ubicacion_distrito": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Distrito"
+          },
+          "ubicacion_lat": {
+            "anyOf": [
+              {
+                "maximum": 90.0,
+                "minimum": -90.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lat"
+          },
+          "ubicacion_lng": {
+            "anyOf": [
+              {
+                "maximum": 180.0,
+                "minimum": -180.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lng"
+          },
+          "ubicacion_place_id": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Place Id"
+          },
+          "ubicacion_plus_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Plus Code"
           }
         },
         "required": [
@@ -623,6 +688,66 @@
           "tipo": {
             "title": "Tipo",
             "type": "string"
+          },
+          "ubicacion_distrito": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Distrito"
+          },
+          "ubicacion_lat": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lat"
+          },
+          "ubicacion_lng": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lng"
+          },
+          "ubicacion_place_id": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Place Id"
+          },
+          "ubicacion_plus_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Plus Code"
           }
         },
         "required": [
@@ -711,6 +836,76 @@
               }
             ],
             "title": "Tipo"
+          },
+          "ubicacion_distrito": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Distrito"
+          },
+          "ubicacion_lat": {
+            "anyOf": [
+              {
+                "maximum": 90.0,
+                "minimum": -90.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lat"
+          },
+          "ubicacion_lng": {
+            "anyOf": [
+              {
+                "maximum": 180.0,
+                "minimum": -180.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lng"
+          },
+          "ubicacion_place_id": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Place Id"
+          },
+          "ubicacion_plus_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Plus Code"
           }
         },
         "title": "AlmacenUpdate",
@@ -956,9 +1151,16 @@
             "type": "string"
           },
           "relevo_encargado_id": {
-            "format": "uuid",
-            "title": "Relevo Encargado Id",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relevo Encargado Id"
           }
         },
         "required": [
@@ -1252,6 +1454,123 @@
         "title": "ArticuloCreate",
         "type": "object"
       },
+      "ArticuloImportadoIn": {
+        "description": "Una fila de la hoja «Artículos», ya revisada por la pantalla.\n\n`unidad_medida_id` puede venir en `None` al actualizar: la unidad de un\nartículo que ya existe no se cambia por planilla (ADR-052).",
+        "properties": {
+          "accion": {
+            "default": "crear",
+            "enum": [
+              "crear",
+              "actualizar",
+              "omitir"
+            ],
+            "title": "Accion",
+            "type": "string"
+          },
+          "archivado": {
+            "default": false,
+            "title": "Archivado",
+            "type": "boolean"
+          },
+          "categoria_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Categoria Id"
+          },
+          "codigo": {
+            "maxLength": 4,
+            "minLength": 1,
+            "title": "Codigo",
+            "type": "string"
+          },
+          "controla_lote": {
+            "default": false,
+            "title": "Controla Lote",
+            "type": "boolean"
+          },
+          "costo_promedio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "default": "0",
+            "title": "Costo Promedio"
+          },
+          "dias_alerta_vencimiento": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dias Alerta Vencimiento"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "nombre": {
+            "maxLength": 150,
+            "minLength": 1,
+            "title": "Nombre",
+            "type": "string"
+          },
+          "skus": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/SkuImportadoIn"
+            },
+            "title": "Skus",
+            "type": "array"
+          },
+          "tipo": {
+            "default": "insumo",
+            "maxLength": 30,
+            "title": "Tipo",
+            "type": "string"
+          },
+          "unidad_medida_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unidad Medida Id"
+          }
+        },
+        "required": [
+          "codigo",
+          "nombre"
+        ],
+        "title": "ArticuloImportadoIn",
+        "type": "object"
+      },
       "ArticuloOut": {
         "properties": {
           "archivado": {
@@ -1332,6 +1651,139 @@
           "dias_alerta_vencimiento"
         ],
         "title": "ArticuloOut",
+        "type": "object"
+      },
+      "ArticuloRevisadoOut": {
+        "properties": {
+          "accion": {
+            "title": "Accion",
+            "type": "string"
+          },
+          "archivado": {
+            "title": "Archivado",
+            "type": "boolean"
+          },
+          "cambios": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Cambios",
+            "type": "array"
+          },
+          "categoria": {
+            "title": "Categoria",
+            "type": "string"
+          },
+          "categoria_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Categoria Id"
+          },
+          "codigo": {
+            "title": "Codigo",
+            "type": "string"
+          },
+          "controla_lote": {
+            "title": "Controla Lote",
+            "type": "boolean"
+          },
+          "costo_promedio": {
+            "title": "Costo Promedio",
+            "type": "string"
+          },
+          "dias_alerta_vencimiento": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dias Alerta Vencimiento"
+          },
+          "fila": {
+            "title": "Fila",
+            "type": "integer"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "problemas": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Problemas",
+            "type": "array"
+          },
+          "skus": {
+            "items": {
+              "$ref": "#/components/schemas/SkuRevisadoOut"
+            },
+            "title": "Skus",
+            "type": "array"
+          },
+          "tipo": {
+            "title": "Tipo",
+            "type": "string"
+          },
+          "unidad": {
+            "title": "Unidad",
+            "type": "string"
+          },
+          "unidad_medida_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unidad Medida Id"
+          }
+        },
+        "required": [
+          "fila",
+          "id",
+          "accion",
+          "codigo",
+          "nombre",
+          "tipo",
+          "unidad",
+          "unidad_medida_id",
+          "categoria",
+          "categoria_id",
+          "costo_promedio",
+          "controla_lote",
+          "dias_alerta_vencimiento",
+          "archivado",
+          "skus",
+          "cambios",
+          "problemas"
+        ],
+        "title": "ArticuloRevisadoOut",
         "type": "object"
       },
       "ArticuloUpdate": {
@@ -1986,6 +2438,34 @@
           "estado"
         ],
         "title": "AvanzarIn",
+        "type": "object"
+      },
+      "Body_validar_importacion_articulos_api_v1_inventory_articulos_importar_validar_post": {
+        "properties": {
+          "archivo": {
+            "contentMediaType": "application/octet-stream",
+            "title": "Archivo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "archivo"
+        ],
+        "title": "Body_validar_importacion_articulos_api_v1_inventory_articulos_importar_validar_post",
+        "type": "object"
+      },
+      "Body_validar_importacion_clientes_api_v1_sales_clientes_importar_validar_post": {
+        "properties": {
+          "archivo": {
+            "contentMediaType": "application/octet-stream",
+            "title": "Archivo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "archivo"
+        ],
+        "title": "Body_validar_importacion_clientes_api_v1_sales_clientes_importar_validar_post",
         "type": "object"
       },
       "Body_validar_importacion_recetas_api_v1_inventory_recetas_importar_validar_post": {
@@ -2754,12 +3234,8 @@
         "type": "object"
       },
       "CerrarCajaIn": {
-        "description": "El monto real sale del conteo por denominación (RN-POS-007), y el\nefectivo se entrega al encargado que firma con su PIN (RN-MDP-002).\n\n`reportes_pos` trae el cierre de lote de cada terminal que abrió\noperativo: sin ellos el cierre no cuadra las tarjetas y se rechaza\n(RN-POS-004). Un local sin POS verificados no manda nada.",
+        "description": "El monto real sale del conteo por denominación (RN-POS-007).\n\n**Sin `autorizacion`** desde ADR-049: lo cierra el cajero solo\n(RN-MDP-008). El efectivo queda `en_caja` a su nombre y la entrega al\nencargado se firma después, en\n`POST /cajas/custodias/{id}/entregar` (RN-MDP-002).\n\n`reportes_pos` trae el cierre de lote de cada terminal que abrió\noperativo: sin ellos el cierre no cuadra las tarjetas y se rechaza\n(RN-POS-004). Un local sin POS verificados no manda nada.",
         "properties": {
-          "autorizacion": {
-            "title": "Autorizacion",
-            "type": "string"
-          },
           "custodia": {
             "pattern": "^(local_caja_fuerte|traslado_contabilidad)$",
             "title": "Custodia",
@@ -2801,8 +3277,7 @@
         },
         "required": [
           "detalle_denominaciones",
-          "custodia",
-          "autorizacion"
+          "custodia"
         ],
         "title": "CerrarCajaIn",
         "type": "object"
@@ -3218,6 +3693,66 @@
           "tipo": {
             "title": "Tipo",
             "type": "string"
+          },
+          "ubicacion_distrito": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Distrito"
+          },
+          "ubicacion_lat": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lat"
+          },
+          "ubicacion_lng": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lng"
+          },
+          "ubicacion_place_id": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Place Id"
+          },
+          "ubicacion_plus_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Plus Code"
           }
         },
         "required": [
@@ -3305,6 +3840,76 @@
             "default": "dni",
             "title": "Tipo Documento",
             "type": "string"
+          },
+          "ubicacion_distrito": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Distrito"
+          },
+          "ubicacion_lat": {
+            "anyOf": [
+              {
+                "maximum": 90.0,
+                "minimum": -90.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lat"
+          },
+          "ubicacion_lng": {
+            "anyOf": [
+              {
+                "maximum": 180.0,
+                "minimum": -180.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lng"
+          },
+          "ubicacion_place_id": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Place Id"
+          },
+          "ubicacion_plus_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Plus Code"
           }
         },
         "required": [
@@ -3332,6 +3937,100 @@
           "numero_documento"
         ],
         "title": "ClienteDocumentoUpdate",
+        "type": "object"
+      },
+      "ClienteImportadoIn": {
+        "description": "Una fila de la hoja «Clientes», ya revisada por la pantalla.\n\n`id` y `accion` no son hechos: son **el permiso que una persona dio**. El\nservidor los vuelve a derivar contra la base antes de escribir.",
+        "properties": {
+          "accion": {
+            "default": "crear",
+            "enum": [
+              "crear",
+              "actualizar",
+              "omitir"
+            ],
+            "title": "Accion",
+            "type": "string"
+          },
+          "contacto": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contacto"
+          },
+          "documento": {
+            "default": "",
+            "maxLength": 11,
+            "title": "Documento",
+            "type": "string"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "fecha_nacimiento": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Nacimiento"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "nombre": {
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Nombre",
+            "type": "string"
+          },
+          "telefono": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Telefono"
+          },
+          "tipo_documento": {
+            "default": "dni",
+            "maxLength": 20,
+            "title": "Tipo Documento",
+            "type": "string"
+          }
+        },
+        "required": [
+          "nombre"
+        ],
+        "title": "ClienteImportadoIn",
         "type": "object"
       },
       "ClienteOut": {
@@ -3431,6 +4130,100 @@
           "contacto"
         ],
         "title": "ClientePublicoOut",
+        "type": "object"
+      },
+      "ClienteRevisadoOut": {
+        "properties": {
+          "accion": {
+            "title": "Accion",
+            "type": "string"
+          },
+          "cambios": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Cambios",
+            "type": "array"
+          },
+          "contacto": {
+            "title": "Contacto",
+            "type": "string"
+          },
+          "documento": {
+            "title": "Documento",
+            "type": "string"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "fecha_nacimiento": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Nacimiento"
+          },
+          "fila": {
+            "title": "Fila",
+            "type": "integer"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "problemas": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Problemas",
+            "type": "array"
+          },
+          "telefono": {
+            "title": "Telefono",
+            "type": "string"
+          },
+          "tipo": {
+            "title": "Tipo",
+            "type": "string"
+          },
+          "tipo_documento": {
+            "title": "Tipo Documento",
+            "type": "string"
+          }
+        },
+        "required": [
+          "fila",
+          "id",
+          "accion",
+          "tipo",
+          "nombre",
+          "tipo_documento",
+          "documento",
+          "telefono",
+          "email",
+          "contacto",
+          "fecha_nacimiento",
+          "cambios",
+          "problemas"
+        ],
+        "title": "ClienteRevisadoOut",
         "type": "object"
       },
       "ClienteUpdate": {
@@ -4749,6 +5542,140 @@
           "fecha_publicacion"
         ],
         "title": "ConvocatoriaPublicar",
+        "type": "object"
+      },
+      "CotizacionDeliveryIn": {
+        "description": "A dónde hay que llevar el pedido, desde qué local.\n\nSe manda el ancla completa y no un `cliente_id`: en caja la mitad de los\ndeliveries son de alguien que todavía no está registrado, y la dirección\nse acaba de escribir en el diálogo.",
+        "properties": {
+          "sucursal_id": {
+            "format": "uuid",
+            "title": "Sucursal Id",
+            "type": "string"
+          },
+          "ubicacion_distrito": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Distrito"
+          },
+          "ubicacion_lat": {
+            "anyOf": [
+              {
+                "maximum": 90.0,
+                "minimum": -90.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lat"
+          },
+          "ubicacion_lng": {
+            "anyOf": [
+              {
+                "maximum": 180.0,
+                "minimum": -180.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lng"
+          },
+          "ubicacion_place_id": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Place Id"
+          },
+          "ubicacion_plus_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Plus Code"
+          }
+        },
+        "required": [
+          "sucursal_id"
+        ],
+        "title": "CotizacionDeliveryIn",
+        "type": "object"
+      },
+      "CotizacionDeliveryOut": {
+        "description": "Lo que el cajero necesita para decidir antes de tomar el pedido.",
+        "properties": {
+          "aproximada": {
+            "title": "Aproximada",
+            "type": "boolean"
+          },
+          "costo": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Costo",
+            "type": "string"
+          },
+          "derivar_a_externo": {
+            "title": "Derivar A Externo",
+            "type": "boolean"
+          },
+          "distancia_km": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distancia Km"
+          },
+          "motivo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Motivo"
+          }
+        },
+        "required": [
+          "distancia_km",
+          "costo",
+          "aproximada",
+          "derivar_a_externo"
+        ],
+        "title": "CotizacionDeliveryOut",
         "type": "object"
       },
       "CriterioIn": {
@@ -6173,6 +7100,76 @@
             "title": "Tipo",
             "type": "string"
           },
+          "ubicacion_distrito": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Distrito"
+          },
+          "ubicacion_lat": {
+            "anyOf": [
+              {
+                "maximum": 90.0,
+                "minimum": -90.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lat"
+          },
+          "ubicacion_lng": {
+            "anyOf": [
+              {
+                "maximum": 180.0,
+                "minimum": -180.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lng"
+          },
+          "ubicacion_place_id": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Place Id"
+          },
+          "ubicacion_plus_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Plus Code"
+          },
           "zona_tributaria": {
             "default": "general",
             "enum": [
@@ -6243,6 +7240,66 @@
           "tipo": {
             "title": "Tipo",
             "type": "string"
+          },
+          "ubicacion_distrito": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Distrito"
+          },
+          "ubicacion_lat": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lat"
+          },
+          "ubicacion_lng": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lng"
+          },
+          "ubicacion_place_id": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Place Id"
+          },
+          "ubicacion_plus_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Plus Code"
           },
           "zona_tributaria": {
             "title": "Zona Tributaria",
@@ -6344,6 +7401,76 @@
               }
             ],
             "title": "Tipo"
+          },
+          "ubicacion_distrito": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Distrito"
+          },
+          "ubicacion_lat": {
+            "anyOf": [
+              {
+                "maximum": 90.0,
+                "minimum": -90.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lat"
+          },
+          "ubicacion_lng": {
+            "anyOf": [
+              {
+                "maximum": 180.0,
+                "minimum": -180.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lng"
+          },
+          "ubicacion_place_id": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Place Id"
+          },
+          "ubicacion_plus_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Plus Code"
           },
           "zona_tributaria": {
             "anyOf": [
@@ -8093,6 +9220,76 @@
         "title": "ImplementacionOut",
         "type": "object"
       },
+      "ImportadaOut": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "nombre"
+        ],
+        "title": "ImportadaOut",
+        "type": "object"
+      },
+      "ImportadoOut": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "nombre"
+        ],
+        "title": "ImportadoOut",
+        "type": "object"
+      },
+      "ImportarArticulosIn": {
+        "properties": {
+          "articulos": {
+            "items": {
+              "$ref": "#/components/schemas/ArticuloImportadoIn"
+            },
+            "title": "Articulos",
+            "type": "array"
+          }
+        },
+        "required": [
+          "articulos"
+        ],
+        "title": "ImportarArticulosIn",
+        "type": "object"
+      },
+      "ImportarClientesIn": {
+        "properties": {
+          "clientes": {
+            "items": {
+              "$ref": "#/components/schemas/ClienteImportadoIn"
+            },
+            "title": "Clientes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "clientes"
+        ],
+        "title": "ImportarClientesIn",
+        "type": "object"
+      },
       "ImportarRecetasIn": {
         "properties": {
           "recetas": {
@@ -8151,6 +9348,55 @@
           "cantidad"
         ],
         "title": "IngredienteImportadoIn",
+        "type": "object"
+      },
+      "IngredienteRevisadoOut": {
+        "properties": {
+          "articulo_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Articulo Id"
+          },
+          "cantidad": {
+            "title": "Cantidad",
+            "type": "string"
+          },
+          "fila": {
+            "title": "Fila",
+            "type": "integer"
+          },
+          "insumo": {
+            "title": "Insumo",
+            "type": "string"
+          },
+          "merma_pct": {
+            "title": "Merma Pct",
+            "type": "string"
+          },
+          "problemas": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Problemas",
+            "type": "array"
+          }
+        },
+        "required": [
+          "fila",
+          "insumo",
+          "articulo_id",
+          "cantidad",
+          "merma_pct",
+          "problemas"
+        ],
+        "title": "IngredienteRevisadoOut",
         "type": "object"
       },
       "ItemColaOut": {
@@ -10704,6 +11950,42 @@
         "title": "NotificacionOut",
         "type": "object"
       },
+      "OmitidaOut": {
+        "properties": {
+          "motivo": {
+            "title": "Motivo",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          }
+        },
+        "required": [
+          "nombre",
+          "motivo"
+        ],
+        "title": "OmitidaOut",
+        "type": "object"
+      },
+      "OmitidoOut": {
+        "properties": {
+          "motivo": {
+            "title": "Motivo",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          }
+        },
+        "required": [
+          "nombre",
+          "motivo"
+        ],
+        "title": "OmitidoOut",
+        "type": "object"
+      },
       "OpcionCreate": {
         "properties": {
           "costo": {
@@ -11463,6 +12745,37 @@
           "page_size"
         ],
         "title": "Pagina[ClienteBuscadoOut]",
+        "type": "object"
+      },
+      "Pagina_ConteoOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ConteoOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "Pagina[ConteoOut]",
         "type": "object"
       },
       "Pagina_EscalamientoOut_": {
@@ -13103,6 +14416,76 @@
           "tipo_documento": {
             "title": "Tipo Documento",
             "type": "string"
+          },
+          "ubicacion_distrito": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Distrito"
+          },
+          "ubicacion_lat": {
+            "anyOf": [
+              {
+                "maximum": 90.0,
+                "minimum": -90.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lat"
+          },
+          "ubicacion_lng": {
+            "anyOf": [
+              {
+                "maximum": 180.0,
+                "minimum": -180.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lng"
+          },
+          "ubicacion_place_id": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Place Id"
+          },
+          "ubicacion_plus_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Plus Code"
           }
         },
         "required": [
@@ -13193,6 +14576,66 @@
           "tipo_documento": {
             "title": "Tipo Documento",
             "type": "string"
+          },
+          "ubicacion_distrito": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Distrito"
+          },
+          "ubicacion_lat": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lat"
+          },
+          "ubicacion_lng": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lng"
+          },
+          "ubicacion_place_id": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Place Id"
+          },
+          "ubicacion_plus_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Plus Code"
           },
           "version": {
             "title": "Version",
@@ -13305,6 +14748,76 @@
               }
             ],
             "title": "Tipo Documento"
+          },
+          "ubicacion_distrito": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Distrito"
+          },
+          "ubicacion_lat": {
+            "anyOf": [
+              {
+                "maximum": 90.0,
+                "minimum": -90.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lat"
+          },
+          "ubicacion_lng": {
+            "anyOf": [
+              {
+                "maximum": 180.0,
+                "minimum": -180.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lng"
+          },
+          "ubicacion_place_id": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Place Id"
+          },
+          "ubicacion_plus_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Plus Code"
           },
           "version": {
             "title": "Version",
@@ -14110,6 +15623,18 @@
             ],
             "title": "Afp Nombre"
           },
+          "apellidos": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Apellidos"
+          },
           "area": {
             "maxLength": 100,
             "title": "Area",
@@ -14139,6 +15664,18 @@
               }
             ],
             "title": "Jornada Horas Semana"
+          },
+          "nombres": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nombres"
           },
           "numero_documento": {
             "anyOf": [
@@ -15635,6 +17172,76 @@
           "tipo": {
             "title": "Tipo",
             "type": "string"
+          },
+          "ubicacion_distrito": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Distrito"
+          },
+          "ubicacion_lat": {
+            "anyOf": [
+              {
+                "maximum": 90.0,
+                "minimum": -90.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lat"
+          },
+          "ubicacion_lng": {
+            "anyOf": [
+              {
+                "maximum": 180.0,
+                "minimum": -180.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lng"
+          },
+          "ubicacion_place_id": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Place Id"
+          },
+          "ubicacion_plus_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Plus Code"
           }
         },
         "required": [
@@ -15757,6 +17364,66 @@
           "tipo": {
             "title": "Tipo",
             "type": "string"
+          },
+          "ubicacion_distrito": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Distrito"
+          },
+          "ubicacion_lat": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lat"
+          },
+          "ubicacion_lng": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lng"
+          },
+          "ubicacion_place_id": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Place Id"
+          },
+          "ubicacion_plus_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Plus Code"
           }
         },
         "required": [
@@ -15907,6 +17574,76 @@
               }
             ],
             "title": "Ruc"
+          },
+          "ubicacion_distrito": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Distrito"
+          },
+          "ubicacion_lat": {
+            "anyOf": [
+              {
+                "maximum": 90.0,
+                "minimum": -90.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lat"
+          },
+          "ubicacion_lng": {
+            "anyOf": [
+              {
+                "maximum": 180.0,
+                "minimum": -180.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lng"
+          },
+          "ubicacion_place_id": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Place Id"
+          },
+          "ubicacion_plus_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Plus Code"
           }
         },
         "title": "ProveedorUpdate",
@@ -16473,7 +18210,18 @@
         "type": "object"
       },
       "RecetaImportadaIn": {
+        "description": "Una fila de la hoja «Recetas», ya revisada por la pantalla.\n\n`id` y `accion` no son hechos: son **el permiso que una persona dio**. El\nservidor los vuelve a derivar contra la base antes de escribir (ADR-052).",
         "properties": {
+          "accion": {
+            "default": "crear",
+            "enum": [
+              "crear",
+              "actualizar",
+              "omitir"
+            ],
+            "title": "Accion",
+            "type": "string"
+          },
           "articulo_producido_id": {
             "anyOf": [
               {
@@ -16486,6 +18234,18 @@
             ],
             "title": "Articulo Producido Id"
           },
+          "id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
           "ingredientes": {
             "default": [],
             "items": {
@@ -16493,6 +18253,15 @@
             },
             "title": "Ingredientes",
             "type": "array"
+          },
+          "ingredientes_ausentes": {
+            "default": "conservar",
+            "enum": [
+              "conservar",
+              "quitar"
+            ],
+            "title": "Ingredientes Ausentes",
+            "type": "string"
           },
           "nombre": {
             "maxLength": 150,
@@ -16788,6 +18557,127 @@
           "criterio_ajuste"
         ],
         "title": "RecetaOut",
+        "type": "object"
+      },
+      "RecetaRevisadaOut": {
+        "properties": {
+          "accion": {
+            "title": "Accion",
+            "type": "string"
+          },
+          "articulo_producido_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Articulo Producido Id"
+          },
+          "cambios": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Cambios",
+            "type": "array"
+          },
+          "fila": {
+            "title": "Fila",
+            "type": "integer"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "ingredientes": {
+            "items": {
+              "$ref": "#/components/schemas/IngredienteRevisadoOut"
+            },
+            "title": "Ingredientes",
+            "type": "array"
+          },
+          "ingredientes_ausentes": {
+            "title": "Ingredientes Ausentes",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "problemas": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Problemas",
+            "type": "array"
+          },
+          "produce": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Produce"
+          },
+          "rendimiento": {
+            "title": "Rendimiento",
+            "type": "string"
+          },
+          "se_quitarian": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Se Quitarian",
+            "type": "array"
+          },
+          "unidad": {
+            "title": "Unidad",
+            "type": "string"
+          },
+          "unidad_medida_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unidad Medida Id"
+          }
+        },
+        "required": [
+          "fila",
+          "id",
+          "accion",
+          "ingredientes_ausentes",
+          "nombre",
+          "rendimiento",
+          "unidad",
+          "unidad_medida_id",
+          "produce",
+          "articulo_producido_id",
+          "ingredientes",
+          "cambios",
+          "se_quitarian",
+          "problemas"
+        ],
+        "title": "RecetaRevisadaOut",
         "type": "object"
       },
       "RecetaUpdate": {
@@ -17671,6 +19561,140 @@
         "title": "RespuestaPublicaIn",
         "type": "object"
       },
+      "RevisionArticulosOut": {
+        "properties": {
+          "a_actualizar": {
+            "title": "A Actualizar",
+            "type": "integer"
+          },
+          "articulos": {
+            "items": {
+              "$ref": "#/components/schemas/ArticuloRevisadoOut"
+            },
+            "title": "Articulos",
+            "type": "array"
+          },
+          "categorias_desconocidas": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Categorias Desconocidas",
+            "type": "array"
+          },
+          "con_problema": {
+            "title": "Con Problema",
+            "type": "integer"
+          },
+          "listas": {
+            "title": "Listas",
+            "type": "integer"
+          },
+          "skus_sin_articulo": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Skus Sin Articulo",
+            "type": "array"
+          },
+          "unidades_desconocidas": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unidades Desconocidas",
+            "type": "array"
+          }
+        },
+        "required": [
+          "articulos",
+          "unidades_desconocidas",
+          "categorias_desconocidas",
+          "skus_sin_articulo",
+          "listas",
+          "a_actualizar",
+          "con_problema"
+        ],
+        "title": "RevisionArticulosOut",
+        "type": "object"
+      },
+      "RevisionClientesOut": {
+        "properties": {
+          "a_actualizar": {
+            "title": "A Actualizar",
+            "type": "integer"
+          },
+          "clientes": {
+            "items": {
+              "$ref": "#/components/schemas/ClienteRevisadoOut"
+            },
+            "title": "Clientes",
+            "type": "array"
+          },
+          "con_problema": {
+            "title": "Con Problema",
+            "type": "integer"
+          },
+          "listas": {
+            "title": "Listas",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "clientes",
+          "listas",
+          "a_actualizar",
+          "con_problema"
+        ],
+        "title": "RevisionClientesOut",
+        "type": "object"
+      },
+      "RevisionRecetasOut": {
+        "description": "Lo que devuelve la fase 1. Declarado para que `openapi.json` lo\ndocumente: sin `response_model` salía como `{}` y los tipos del frontend\nno los verificaba nadie.",
+        "properties": {
+          "a_actualizar": {
+            "title": "A Actualizar",
+            "type": "integer"
+          },
+          "con_problema": {
+            "title": "Con Problema",
+            "type": "integer"
+          },
+          "ingredientes_sin_receta": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Ingredientes Sin Receta",
+            "type": "array"
+          },
+          "insumos_desconocidos": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Insumos Desconocidos",
+            "type": "array"
+          },
+          "listas": {
+            "title": "Listas",
+            "type": "integer"
+          },
+          "recetas": {
+            "items": {
+              "$ref": "#/components/schemas/RecetaRevisadaOut"
+            },
+            "title": "Recetas",
+            "type": "array"
+          }
+        },
+        "required": [
+          "recetas",
+          "insumos_desconocidos",
+          "ingredientes_sin_receta",
+          "listas",
+          "a_actualizar",
+          "con_problema"
+        ],
+        "title": "RevisionRecetasOut",
+        "type": "object"
+      },
       "RolCreate": {
         "properties": {
           "descripcion": {
@@ -17795,6 +19819,32 @@
         "title": "SkuDetalleOut",
         "type": "object"
       },
+      "SkuImportadoIn": {
+        "properties": {
+          "codigo": {
+            "maxLength": 50,
+            "minLength": 1,
+            "title": "Codigo",
+            "type": "string"
+          },
+          "codigo_barras": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Codigo Barras"
+          }
+        },
+        "required": [
+          "codigo"
+        ],
+        "title": "SkuImportadoIn",
+        "type": "object"
+      },
       "SkuListadoOut": {
         "description": "El SKU con el nombre de su artículo: un selector que muestre solo el\ncódigo obliga a adivinar qué es cada cosa.",
         "properties": {
@@ -17883,6 +19933,44 @@
           "activo"
         ],
         "title": "SkuOut",
+        "type": "object"
+      },
+      "SkuRevisadoOut": {
+        "properties": {
+          "codigo": {
+            "title": "Codigo",
+            "type": "string"
+          },
+          "codigo_barras": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Codigo Barras"
+          },
+          "fila": {
+            "title": "Fila",
+            "type": "integer"
+          },
+          "problemas": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Problemas",
+            "type": "array"
+          }
+        },
+        "required": [
+          "fila",
+          "codigo",
+          "codigo_barras",
+          "problemas"
+        ],
+        "title": "SkuRevisadoOut",
         "type": "object"
       },
       "SocioCreate": {
@@ -18184,6 +20272,34 @@
         "title": "SolicitudDetalleOut",
         "type": "object"
       },
+      "SolicitudItemAgregarIn": {
+        "properties": {
+          "cantidad": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Cantidad"
+          },
+          "sku_id": {
+            "format": "uuid",
+            "title": "Sku Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "cantidad",
+          "sku_id"
+        ],
+        "title": "SolicitudItemAgregarIn",
+        "type": "object"
+      },
       "SolicitudItemCantidad": {
         "properties": {
           "cantidad": {
@@ -18210,6 +20326,29 @@
           "cantidad"
         ],
         "title": "SolicitudItemCantidad",
+        "type": "object"
+      },
+      "SolicitudItemCantidadIn": {
+        "description": "Cantidad de un ítem del borrador. Solo el `sku_id` viaja en la ruta.",
+        "properties": {
+          "cantidad": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Cantidad"
+          }
+        },
+        "required": [
+          "cantidad"
+        ],
+        "title": "SolicitudItemCantidadIn",
         "type": "object"
       },
       "SolicitudItemIn": {
@@ -18242,6 +20381,11 @@
       },
       "SolicitudItemOut": {
         "properties": {
+          "bajo_minimo_al_pedir": {
+            "default": false,
+            "title": "Bajo Minimo Al Pedir",
+            "type": "boolean"
+          },
           "cantidad_aprobada": {
             "anyOf": [
               {
@@ -18536,7 +20680,7 @@
           },
           "items": {
             "items": {
-              "$ref": "#/components/schemas/SolicitudItemIn"
+              "$ref": "#/components/schemas/SolicitudSyncItemIn"
             },
             "minItems": 1,
             "title": "Items",
@@ -18567,6 +20711,40 @@
           "items"
         ],
         "title": "SolicitudSyncIn",
+        "type": "object"
+      },
+      "SolicitudSyncItemIn": {
+        "description": "Ítem de una solicitud que se reproduce desde el hub.\n\nTrae la marca de urgencia porque la puso el local contra su propio stock\n(RN-INV-024) y recalcularla en la nube al reproducir el lote contaría\notra cosa. No está en `SolicitudItemIn` a propósito: en el alta normal\nla calcula el servidor, y dejarla entrar por el cuerpo permitiría\ndeclararse urgente a uno mismo.",
+        "properties": {
+          "bajo_minimo_al_pedir": {
+            "default": false,
+            "title": "Bajo Minimo Al Pedir",
+            "type": "boolean"
+          },
+          "cantidad": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Cantidad"
+          },
+          "sku_id": {
+            "format": "uuid",
+            "title": "Sku Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sku_id",
+          "cantidad"
+        ],
+        "title": "SolicitudSyncItemIn",
         "type": "object"
       },
       "StockDeSkuOut": {
@@ -18812,6 +20990,76 @@
             ],
             "title": "Tenencia",
             "type": "string"
+          },
+          "ubicacion_distrito": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Distrito"
+          },
+          "ubicacion_lat": {
+            "anyOf": [
+              {
+                "maximum": 90.0,
+                "minimum": -90.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lat"
+          },
+          "ubicacion_lng": {
+            "anyOf": [
+              {
+                "maximum": 180.0,
+                "minimum": -180.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lng"
+          },
+          "ubicacion_place_id": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Place Id"
+          },
+          "ubicacion_plus_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Plus Code"
           }
         },
         "required": [
@@ -18883,6 +21131,66 @@
               }
             ],
             "title": "Tenencia"
+          },
+          "ubicacion_distrito": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Distrito"
+          },
+          "ubicacion_lat": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lat"
+          },
+          "ubicacion_lng": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lng"
+          },
+          "ubicacion_place_id": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Place Id"
+          },
+          "ubicacion_plus_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Plus Code"
           }
         },
         "required": [
@@ -18978,6 +21286,76 @@
               }
             ],
             "title": "Tenencia"
+          },
+          "ubicacion_distrito": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Distrito"
+          },
+          "ubicacion_lat": {
+            "anyOf": [
+              {
+                "maximum": 90.0,
+                "minimum": -90.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lat"
+          },
+          "ubicacion_lng": {
+            "anyOf": [
+              {
+                "maximum": 180.0,
+                "minimum": -180.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lng"
+          },
+          "ubicacion_place_id": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Place Id"
+          },
+          "ubicacion_plus_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Plus Code"
           }
         },
         "title": "SucursalUpdate",
@@ -20588,6 +22966,18 @@
             ],
             "title": "Consumo Motivo"
           },
+          "direccion_entrega": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direccion Entrega"
+          },
           "id": {
             "anyOf": [
               {
@@ -20656,6 +23046,76 @@
             "default": "venta",
             "title": "Tipo",
             "type": "string"
+          },
+          "ubicacion_distrito": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Distrito"
+          },
+          "ubicacion_lat": {
+            "anyOf": [
+              {
+                "maximum": 90.0,
+                "minimum": -90.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lat"
+          },
+          "ubicacion_lng": {
+            "anyOf": [
+              {
+                "maximum": 180.0,
+                "minimum": -180.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lng"
+          },
+          "ubicacion_place_id": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Place Id"
+          },
+          "ubicacion_plus_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Plus Code"
           }
         },
         "required": [
@@ -20915,6 +23375,18 @@
             ],
             "title": "Consumo Motivo"
           },
+          "costo_entrega": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Costo Entrega"
+          },
           "descuento_modo": {
             "anyOf": [
               {
@@ -20948,6 +23420,29 @@
               }
             ],
             "title": "Descuento Valor"
+          },
+          "direccion_entrega": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direccion Entrega"
+          },
+          "distancia_entrega_km": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distancia Entrega Km"
           },
           "estado": {
             "title": "Estado",
@@ -21078,6 +23573,21 @@
             ],
             "title": "Consumo Motivo"
           },
+          "costo_entrega": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Costo Entrega"
+          },
           "descuento_autorizado_por": {
             "anyOf": [
               {
@@ -21126,6 +23636,33 @@
               }
             ],
             "title": "Descuento Valor"
+          },
+          "direccion_entrega": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direccion Entrega"
+          },
+          "distancia_entrega_km": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distancia Entrega Km"
           },
           "estado": {
             "title": "Estado",
@@ -21410,6 +23947,39 @@
         "title": "CajaAbiertaOut",
         "type": "object"
       },
+      "src__modules__inventory__api__schemas__ResultadoImportacionOut": {
+        "description": "El mismo sobre para las tres entidades: crear, actualizar, omitir.",
+        "properties": {
+          "actualizadas": {
+            "items": {
+              "$ref": "#/components/schemas/ImportadaOut"
+            },
+            "title": "Actualizadas",
+            "type": "array"
+          },
+          "creadas": {
+            "items": {
+              "$ref": "#/components/schemas/ImportadaOut"
+            },
+            "title": "Creadas",
+            "type": "array"
+          },
+          "omitidas": {
+            "items": {
+              "$ref": "#/components/schemas/OmitidaOut"
+            },
+            "title": "Omitidas",
+            "type": "array"
+          }
+        },
+        "required": [
+          "creadas",
+          "actualizadas",
+          "omitidas"
+        ],
+        "title": "ResultadoImportacionOut",
+        "type": "object"
+      },
       "src__modules__purchases__api__schemas__ComprobanteOut": {
         "properties": {
           "compra_id": {
@@ -21641,6 +24211,39 @@
           "tipo"
         ],
         "title": "MarcaOut",
+        "type": "object"
+      },
+      "src__modules__sales__api__schemas__ResultadoImportacionOut": {
+        "description": "El mismo sobre que usa inventory: crear, actualizar, omitir.",
+        "properties": {
+          "actualizadas": {
+            "items": {
+              "$ref": "#/components/schemas/ImportadoOut"
+            },
+            "title": "Actualizadas",
+            "type": "array"
+          },
+          "creadas": {
+            "items": {
+              "$ref": "#/components/schemas/ImportadoOut"
+            },
+            "title": "Creadas",
+            "type": "array"
+          },
+          "omitidas": {
+            "items": {
+              "$ref": "#/components/schemas/OmitidoOut"
+            },
+            "title": "Omitidas",
+            "type": "array"
+          }
+        },
+        "required": [
+          "creadas",
+          "actualizadas",
+          "omitidas"
+        ],
+        "title": "ResultadoImportacionOut",
         "type": "object"
       },
       "src__modules__users__api__schemas__MarcaOut": {
@@ -22118,7 +24721,7 @@
     },
     "/api/v1/accounting/cajas/apertura": {
       "post": {
-        "description": "Abre el turno: el cajero cuenta el fondo, el encargado lo firma con su\nPIN y los POS de tarjeta quedan verificados (RN-MDP-002, RN-POS-003/010).\n\nUn faltante de sencillo o un POS averiado **no impiden abrir**\n(RN-POS-011): quedan reportados y el local abre en su horario.",
+        "description": "Abre el turno: el cajero cuenta el fondo y verifica los POS de tarjeta\n(RN-POS-003/010).\n\n**La abre él solo** (RN-MDP-008): alcanza con `accounting.caja_operar`,\nel permiso que su rol ya tiene. Sin elevación de PIN — exigirla obligaba\na que un encargado viniera a firmar cada apertura, y en el local eso se\nterminaba resolviendo dejando la sesión del encargado abierta en la caja.\n\nUn faltante de sencillo o un POS averiado **no impiden abrir**\n(RN-POS-011): quedan reportados y el local abre en su horario.",
         "operationId": "abrir_caja_api_v1_accounting_cajas_apertura_post",
         "requestBody": {
           "content": {
@@ -22165,7 +24768,7 @@
     },
     "/api/v1/accounting/cajas/apertura/{apertura_caja_id}/cierre": {
       "post": {
-        "description": "Cierra el turno contra el conteo por denominación y entrega el\nefectivo al encargado, que firma con su PIN (RN-POS-007, RN-MDP-002).\n\nSi el cierre venía reabierto, este mismo endpoint lo recalcula sobre el\nregistro existente — un turno tiene un solo cierre, con su historial de\ncorrecciones.",
+        "description": "Cierra el turno contra el conteo por denominación (RN-POS-007).\n\n**Lo cierra el cajero solo** (RN-MDP-008), sin elevación de PIN. El\nefectivo queda `en_caja` a su nombre; entregárselo al encargado es un\nacto aparte y posterior, y ese sí lo firma quien recibe\n(`POST /cajas/custodias/{id}/entregar`, RN-MDP-002).\n\nSi el cierre venía reabierto, este mismo endpoint lo recalcula sobre el\nregistro existente — un turno tiene un solo cierre, con su historial de\ncorrecciones.",
         "operationId": "cerrar_caja_api_v1_accounting_cajas_apertura__apertura_caja_id__cierre_post",
         "parameters": [
           {
@@ -22489,7 +25092,7 @@
     },
     "/api/v1/accounting/cajas/custodias/{custodia_id}/entregar": {
       "post": {
-        "description": "Avanza la cadena de custodia; quien **recibe** firma con su PIN\n(RN-MDP-002).",
+        "description": "Avanza la cadena de custodia; quien **recibe** firma con su PIN\n(RN-MDP-002).\n\nDesde ADR-049 este es el **único** endpoint del ciclo de caja que exige\nla elevación con `accounting.caja_relevar`, y el primer tramo\n(`en_caja → en_supervisor`) es la entrega que antes se daba por hecha al\ncerrar: el efectivo sale del cajón cuando alguien firma que lo recibió,\nno cuando el cajero terminó de contarlo.\n\nLa sesión que opera la pantalla necesita `accounting.caja_operar`; quien\nfirma es otro y aporta solo su PIN. Un cajero puede tener la pantalla\nabierta y **no** puede firmar la recepción: no tiene `caja_relevar`.",
         "operationId": "entregar_custodia_api_v1_accounting_cajas_custodias__custodia_id__entregar_post",
         "parameters": [
           {
@@ -25586,6 +28189,150 @@
         ]
       }
     },
+    "/api/v1/inventory/articulos/exportar": {
+      "get": {
+        "description": "El catálogo en la misma plantilla, con los datos adentro (ADR-052).",
+        "operationId": "exportar_articulos_api_v1_inventory_articulos_exportar_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Exportar Articulos",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/articulos/importar": {
+      "post": {
+        "description": "Crea y actualiza lo que la pantalla confirmó, revalidando todo.",
+        "operationId": "importar_articulos_api_v1_inventory_articulos_importar_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportarArticulosIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/src__modules__inventory__api__schemas__ResultadoImportacionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Importar Articulos",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/articulos/importar/validar": {
+      "post": {
+        "description": "Dice qué entra, qué actualiza y qué no. **No guarda nada.**",
+        "operationId": "validar_importacion_articulos_api_v1_inventory_articulos_importar_validar_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_validar_importacion_articulos_api_v1_inventory_articulos_importar_validar_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevisionArticulosOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Validar Importacion Articulos",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/articulos/plantilla": {
+      "get": {
+        "description": "La hoja que se llena para cargar el catálogo de golpe (RN-INV-023).",
+        "operationId": "descargar_plantilla_articulos_api_v1_inventory_articulos_plantilla_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Descargar Plantilla Articulos",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
     "/api/v1/inventory/articulos/{articulo_id}": {
       "get": {
         "operationId": "obtener_articulo_api_v1_inventory_articulos__articulo_id__get",
@@ -25974,6 +28721,137 @@
       }
     },
     "/api/v1/inventory/conteos": {
+      "get": {
+        "description": "Los conteos del almacén, sucursal o marca, con el abierto primero.\n\nFaltaba: hasta ahora un conteo solo se podía pedir por su id, o sea\nsabiéndolo de antemano, y ninguna pantalla podía ofrecer \"seguir\ncontando lo que quedó abierto\".",
+        "operationId": "listar_conteos_api_v1_inventory_conteos_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "almacen_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Almacen Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "estado",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Estado"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sucursal_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sucursal Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "marca_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Marca Id"
+            }
+          },
+          {
+            "description": "Página, empezando en 1",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "description": "Página, empezando en 1",
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Filas por página (máx. 200)",
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Filas por página (máx. 200)",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pagina_ConteoOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Conteos",
+        "tags": [
+          "inventory"
+        ]
+      },
       "post": {
         "operationId": "abrir_conteo_api_v1_inventory_conteos_post",
         "requestBody": {
@@ -26039,6 +28917,40 @@
                 }
               ],
               "title": "Almacen Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sucursal_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sucursal Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "marca_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Marca Id"
             }
           }
         ],
@@ -27293,6 +30205,31 @@
         ]
       }
     },
+    "/api/v1/inventory/recetas/exportar": {
+      "get": {
+        "description": "El recetario en la misma plantilla, con los datos adentro (ADR-052).\n\nPide permiso de **lectura**: son los mismos datos que devuelve el listado,\nsolo empaquetados en un archivo.",
+        "operationId": "exportar_recetas_api_v1_inventory_recetas_exportar_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Exportar Recetas",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
     "/api/v1/inventory/recetas/importar": {
       "post": {
         "description": "Crea lo que la pantalla confirmó, revalidando todo: lo que llega es un\nJSON que el cliente pudo editar.",
@@ -27311,7 +30248,9 @@
           "201": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/src__modules__inventory__api__schemas__ResultadoImportacionOut"
+                }
               }
             },
             "description": "Successful Response"
@@ -27340,7 +30279,7 @@
     },
     "/api/v1/inventory/recetas/importar/validar": {
       "post": {
-        "description": "Dice qué entra y qué no. **No guarda nada** — la pantalla resuelve los\ninsumos que el catálogo no reconoce y recién ahí se importa.",
+        "description": "Dice qué entra, qué actualiza y qué no. **No guarda nada** — la pantalla\nresuelve los insumos que el catálogo no reconoce y recién ahí se importa.",
         "operationId": "validar_importacion_recetas_api_v1_inventory_recetas_importar_validar_post",
         "requestBody": {
           "content": {
@@ -27356,7 +30295,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/RevisionRecetasOut"
+                }
               }
             },
             "description": "Successful Response"
@@ -28094,6 +31035,7 @@
     },
     "/api/v1/inventory/solicitudes": {
       "get": {
+        "description": "Los borradores no aparecen acá salvo pidiendo `estado=borrador`: una\nlista que nadie envió todavía no le pidió nada a nadie.",
         "operationId": "listar_solicitudes_api_v1_inventory_solicitudes_get",
         "parameters": [
           {
@@ -28127,6 +31069,40 @@
                 }
               ],
               "title": "Estado"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sucursal_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sucursal Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "marca_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Marca Id"
             }
           },
           {
@@ -28229,6 +31205,55 @@
           }
         ],
         "summary": "Crear Solicitud",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/solicitudes/borrador": {
+      "get": {
+        "description": "El requerimiento de la jornada de ese almacén, listo para editar.\n\nLa crea si no existe, ya cargada con lo que está bajo mínimo, y si ya\nexistía le suma lo que cayó desde la última vez (RN-INV-023). Es lo que\nhay detrás del botón: el personal no arma la lista desde cero.",
+        "operationId": "borrador_de_solicitud_api_v1_inventory_solicitudes_borrador_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "almacen_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Almacen Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SolicitudDetalleOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Borrador De Solicitud",
         "tags": [
           "inventory"
         ]
@@ -28472,6 +31497,238 @@
           }
         ],
         "summary": "Cancelar Solicitud",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/solicitudes/{solicitud_id}/enviar": {
+      "post": {
+        "description": "El borrador pasa a `pendiente` y recién ahí espera aprobación.",
+        "operationId": "enviar_solicitud_api_v1_inventory_solicitudes__solicitud_id__enviar_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "solicitud_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Solicitud Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SolicitudOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Enviar Solicitud",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/solicitudes/{solicitud_id}/items": {
+      "post": {
+        "description": "Lo que el local decide pedir sin que el stock lo pida. Queda marcado\ncomo no urgente si el SKU no estaba bajo mínimo (RN-INV-024).",
+        "operationId": "agregar_item_solicitud_api_v1_inventory_solicitudes__solicitud_id__items_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "solicitud_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Solicitud Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SolicitudItemAgregarIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SolicitudDetalleOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Agregar Item Solicitud",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/solicitudes/{solicitud_id}/items/{sku_id}": {
+      "delete": {
+        "operationId": "quitar_item_solicitud_api_v1_inventory_solicitudes__solicitud_id__items__sku_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "solicitud_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Solicitud Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "sku_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sku Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SolicitudDetalleOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Quitar Item Solicitud",
+        "tags": [
+          "inventory"
+        ]
+      },
+      "patch": {
+        "operationId": "cambiar_item_solicitud_api_v1_inventory_solicitudes__solicitud_id__items__sku_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "solicitud_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Solicitud Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "sku_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sku Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SolicitudItemCantidadIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SolicitudDetalleOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Cambiar Item Solicitud",
         "tags": [
           "inventory"
         ]
@@ -38020,6 +41277,125 @@
         ]
       }
     },
+    "/api/v1/sales/clientes/exportar": {
+      "get": {
+        "description": "El padrón en la misma plantilla, con los datos adentro (ADR-052).\n\nPide permiso de **lectura**: son los mismos datos que devuelve el listado\nde back-office, solo empaquetados en un archivo.",
+        "operationId": "exportar_clientes_api_v1_sales_clientes_exportar_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Exportar Clientes",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/clientes/importar": {
+      "post": {
+        "description": "Crea y actualiza lo que la pantalla confirmó, revalidando todo.",
+        "operationId": "importar_clientes_api_v1_sales_clientes_importar_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportarClientesIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/src__modules__sales__api__schemas__ResultadoImportacionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Importar Clientes",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/clientes/importar/validar": {
+      "post": {
+        "description": "Dice qué entra, qué actualiza y qué no. **No guarda nada.**",
+        "operationId": "validar_importacion_clientes_api_v1_sales_clientes_importar_validar_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_validar_importacion_clientes_api_v1_sales_clientes_importar_validar_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevisionClientesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Validar Importacion Clientes",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
     "/api/v1/sales/clientes/listado": {
       "get": {
         "description": "El padrón de clientes del grupo, para la pantalla de back-office.\n\nEndpoint propio y no `GET /clientes`: ese es el contrato público de\nanálisis (`sales.leer_clientes_externos`, `grupo_id` por query), pensado\npara que marketing lea desde afuera. Pedirle a quien administra el padrón\nde su propio grupo el permiso de lectura externa sería abrirle de paso\nlos clientes que no le tocan.\n\nTampoco es `/clientes/buscar`: aquella corta en 20 y exige `q` porque en\ncaja se busca a alguien concreto; acá se recorre el padrón entero.",
@@ -38097,6 +41473,31 @@
           }
         ],
         "summary": "Listar Clientes Backoffice",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/clientes/plantilla": {
+      "get": {
+        "description": "La hoja que se llena para cargar el padrón de golpe (RN-PTS-007).",
+        "operationId": "descargar_plantilla_clientes_api_v1_sales_clientes_plantilla_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Descargar Plantilla Clientes",
         "tags": [
           "sales"
         ]
@@ -39674,6 +43075,53 @@
           }
         ],
         "summary": "Crear Venta",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/ventas/cotizar-delivery": {
+      "post": {
+        "description": "Cuánto sale llevar este pedido, y si conviene derivarlo (ADR-054).\n\n**Con cuota, como la consulta de documento**: cada llamada gasta una\nmedición de un proveedor pago, y un bucle mal escrito en el PDV se come\nel plan del mes. Se cuenta por usuario y por IP por la misma razón que\nen `core/consulta_router.py` — todas las cajas del local salen por la\nmisma IP, y limitar solo por ahí castiga al equipo por uno solo.\n\nNo decide nada: el precio que se cobra lo vuelve a calcular el servidor\nal crear la venta, y es el que queda congelado en la fila. Esto es lo que\nel cajero ve antes de aceptar.",
+        "operationId": "cotizar_delivery_api_v1_sales_ventas_cotizar_delivery_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CotizacionDeliveryIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CotizacionDeliveryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Cotizar Delivery",
         "tags": [
           "sales"
         ]

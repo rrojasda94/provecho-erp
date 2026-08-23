@@ -6,7 +6,13 @@ import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
 
 import { TablaDatos } from "@/components/tabla/tabla-datos";
-import { catalogoApi, type Categoria, type Receta, type UnidadMedida } from "@/lib/catalogo";
+import {
+  catalogoApi,
+  type Categoria,
+  type Receta,
+  type UnidadMedida,
+  RUTA_EXPORTAR_RECETAS,
+} from "@/lib/catalogo";
 import { ErrorApi } from "@/lib/cliente-api";
 import { aTitulo } from "@/lib/texto";
 
@@ -88,6 +94,15 @@ export function RecetasCliente({
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {/* El export se baja con un `<a download>` contra el proxy, que ya
+              pasa bytes y conserva el nombre del archivo (ADR-048). */}
+          <a
+            href={RUTA_EXPORTAR_RECETAS}
+            download
+            className="rounded border border-borde px-4 py-2 text-sm font-bold text-dark hover:bg-fondo"
+          >
+            Exportar
+          </a>
           <ImportarRecetas onImportadas={() => router.refresh()} />
           <DialogoNuevaReceta
             unidades={unidades}

@@ -254,6 +254,31 @@ y `--secondary` pasa de rescoldo a `#E5484D`.
   touch (tablet): sin interacciones hover-only, touch targets de tamaño
   adecuado.
 
+### Qué significa "no romperse en pantallas chicas"
+
+Dos reglas, y las dos se verifican solas en `frontend/uso/responsive.spec.ts`
+sobre tres medidas (teléfono 390×844, tablet vertical 820×1180, PC 1440×900):
+
+1. **Ninguna opción desaparece al angostar la pantalla.** Un control puede
+   cambiar de lugar, entrar en un panel que se alterna o quedar detrás de un
+   scroll; lo que no puede es dejar de existir ni quedar dibujado fuera de un
+   contenedor que lo recorta. `display: none` por ancho es la forma más fácil
+   de romper esto: fue lo que escondió el ticket entero del PDV —pedido,
+   totales, «Enviar» y «Cobrar»— en toda tablet en vertical.
+2. **Todo diálogo modal queda centrado en la pantalla**, en cualquier ancho.
+   El centrado lo da el navegador (`margin: auto` sobre los `inset: 0` del
+   `<dialog>` modal) y es más frágil de lo que parece: el preflight de
+   Tailwind lo pisa con `margin: 0`, y cualquier ancestro con un `transform`
+   distinto de `none` —incluida una animación con `animation-fill-mode: both`
+   cuyo último fotograma es `transform: none`, que computa a la matriz
+   identidad— se vuelve bloque contenedor del diálogo y lo clava en su esquina
+   superior izquierda. Por eso las animaciones de entrada del ERP usan
+   `backwards` y no `both`.
+
+En el PDV y el KDS, además, el ancho de mostrador (≥ 60rem) muestra los dos
+paneles a la vez; por debajo se alternan con un botón que solo existe en ese
+ancho. Alternar es aceptable, esconder no.
+
 ## Flujos clave de UI
 
 ### PDV — selección de producto → dialog de personalización

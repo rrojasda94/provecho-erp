@@ -20,6 +20,7 @@ programa. El nombre y los datos siguen viviendo en `persona`, fuente única
 
 import uuid
 from datetime import date
+from decimal import Decimal
 
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
@@ -67,6 +68,7 @@ def _completar_persona(
     telefono: str | None,
     direccion: str | None,
     fecha_nacimiento: date | None,
+    ubicacion: dict | None = None,
 ) -> None:
     """Rellena solo lo que falte: la persona ya existía por otro motivo
     (trabajador, otro registro) y no se pisa lo que ya dio."""
@@ -76,6 +78,12 @@ def _completar_persona(
         persona.domicilio = direccion
     if fecha_nacimiento and not persona.fecha_nacimiento:
         persona.fecha_nacimiento = fecha_nacimiento
+    # La ubicación se escribe solo si vino la dirección con ella: anclar
+    # un punto sin haber tocado el texto dejaría los dos contando
+    # historias distintas.
+    if direccion and ubicacion and not persona.ubicacion_place_id:
+        for campo, valor in ubicacion.items():
+            setattr(persona, campo, valor)
 
 
 def crear_cliente(
@@ -89,11 +97,30 @@ def crear_cliente(
     direccion: str | None = None,
     fecha_nacimiento: date | None = None,
     tipo_documento: str = "dni",
+    ubicacion_place_id: str | None = None,
+    ubicacion_lat: Decimal | None = None,
+    ubicacion_lng: Decimal | None = None,
+    ubicacion_plus_code: str | None = None,
+    ubicacion_distrito: str | None = None,
+    consultar_documento: bool = True,
 ) -> Cliente:
     """RUC de 11 dígitos crea un cliente jurídico; el resto, uno natural con
     su `persona`. El tipo NO se pide al cajero: lo decide el documento,
     igual que el tipo de comprobante (RN-CPP-003).
+
+    `consultar_documento=False` salta la consulta a SUNAT/RENIEC y usa el
+    nombre tal cual viene. Lo usa la carga masiva (ADR-052): una planilla de
+    trescientos clientes serían trescientas llamadas externas secuenciales
+    dentro de un solo request, contra una cuota. Cuando el cliente se edita de
+    a uno, SUNAT vuelve a mandar.
     """
+    ubicacion = {
+        "ubicacion_place_id": ubicacion_place_id,
+        "ubicacion_lat": ubicacion_lat,
+        "ubicacion_lng": ubicacion_lng,
+        "ubicacion_plus_code": ubicacion_plus_code,
+        "ubicacion_distrito": ubicacion_distrito,
+    }
     nombre = (nombre or "").strip()
     telefono = (telefono or "").strip() or None
     numero_documento = (numero_documento or "").strip() or None
@@ -104,7 +131,18 @@ def crear_cliente(
 
     repo = ClienteRepo(session)
     if numero_documento and len(numero_documento) == rules.LARGO_RUC:
-        return _crear_juridico(repo, grupo_id, nombre, numero_documento, direccion, telefono)
+        # Sin `ubicacion`: el cliente jurídico no tiene columna de
+        # dirección —hoy termina en `contacto`— y por lo tanto tampoco
+        # dónde anclarla. Queda anotado en la deuda del ROADMAP.
+        return _crear_juridico(
+            repo,
+            grupo_id,
+            nombre,
+            numero_documento,
+            direccion,
+            telefono,
+            consultar_documento,
+        )
 
     # Natural: el teléfono sustituye al documento como forma de encontrarlo
     # después. Sin ninguno de los dos el registro no sirve para nada.
@@ -118,7 +156,11 @@ def crear_cliente(
     persona = _persona_por_documento(session, numero_documento) if numero_documento else None
     if persona is None:
         nombres, apellidos = _partir_nombre(nombre)
-        if numero_documento and len(numero_documento) == rules.LARGO_DNI:
+        if (
+            consultar_documento
+            and numero_documento
+            and len(numero_documento) == rules.LARGO_DNI
+        ):
             nombres, apellidos = nombres_desde_dni(numero_documento, nombres, apellidos)
         persona = Persona(
             nombres=nombres,
@@ -133,6 +175,7 @@ def crear_cliente(
             email=email,
             domicilio=direccion,
             fecha_nacimiento=fecha_nacimiento,
+            **ubicacion,
         )
         session.add(persona)
         session.flush()
@@ -140,7 +183,9 @@ def crear_cliente(
         # `persona` es única por documento y la comparten users/rrhh: si ya
         # existe (un trabajador que compra, por ejemplo) se reutiliza en vez
         # de duplicarla, y se completa lo que le falte.
-        _completar_persona(persona, telefono, direccion, fecha_nacimiento)
+        _completar_persona(
+            persona, telefono, direccion, fecha_nacimiento, ubicacion
+        )
         existente = repo.por_persona(grupo_id, persona.id)
         if existente is not None:
             raise Conflicto("esa persona ya está registrada como cliente")
@@ -157,11 +202,13 @@ def _crear_juridico(
     ruc: str,
     direccion: str | None,
     telefono: str | None,
+    consultar_documento: bool = True,
 ) -> Cliente:
     existente = repo.por_ruc(grupo_id, ruc)
     if existente is not None:
         raise Conflicto(f"ya existe un cliente con RUC {ruc}")
-    razon_social = razon_social_desde_ruc(ruc, razon_social)
+    if consultar_documento:
+        razon_social = razon_social_desde_ruc(ruc, razon_social)
     return repo.add(
         Cliente(
             grupo_id=grupo_id,
@@ -214,7 +261,13 @@ def actualizar_documento(
     return cliente
 
 
-def editar_cliente(session: Session, cliente_id: uuid.UUID, **campos) -> Cliente:
+def editar_cliente(
+    session: Session,
+    cliente_id: uuid.UUID,
+    *,
+    consultar_documento: bool = True,
+    **campos,
+) -> Cliente:
     """Corrige un cliente **jurídico**. Campo `None` = no tocar.
 
     Solo jurídico porque es lo único que `cliente` guarda por su cuenta: en
@@ -250,8 +303,9 @@ def editar_cliente(session: Session, cliente_id: uuid.UUID, **campos) -> Cliente
         cliente.razon_social = razon_social
     if campos.get("contacto") is not None:
         cliente.contacto = campos["contacto"].strip() or None
-    # Mismo criterio que el alta: SUNAT manda sobre lo tecleado.
-    if ruc or razon_social:
+    # Mismo criterio que el alta: SUNAT manda sobre lo tecleado — salvo en la
+    # carga masiva, que no puede consultar una vez por fila (ADR-052).
+    if consultar_documento and (ruc or razon_social):
         cliente.razon_social = razon_social_desde_ruc(cliente.ruc, cliente.razon_social)
     return cliente
 

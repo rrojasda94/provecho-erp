@@ -73,6 +73,90 @@ fecha_vencimiento, condiciones de almacenamiento), `conteo`, `ajuste`
   "quién sacó esto del almacén". La pantalla estuvo en solo lectura hasta
   esa fecha, así que la API completa era inalcanzable por UI.
 
+## Estado (slice 9 — planillas de catálogo, 2026-08-20)
+
+Exportar es la plantilla con los datos adentro (ADR-052): lo que baja se edita
+en Excel y se vuelve a subir. La E/S de `.xlsx` vive en `src/shared/planilla.py`
+—abrir, mapear cabecera, filas, celda→texto/número/fecha/uuid, escribir— y la
+lógica de cada entidad en su propio archivo de `application/`.
+
+**Recetario** (`GET /recetas/exportar`)
+
+| Hoja | Columnas |
+|---|---|
+| `Recetas` | `ID` · `Receta` · `Rendimiento` · `Unidad` · `Produce el artículo` |
+| `Ingredientes` | `Receta` · `Insumo` · `Cantidad` · `Merma %` |
+| `Instrucciones` | texto |
+
+- La columna `ID` decide alta o actualización. Recetas se actualizan **solo
+  por `ID`**: su única clave natural es el nombre, y el nombre es lo que se
+  edita.
+- `Ingredientes` **no lleva `ID`** a propósito: la identidad de una línea es
+  `(receta, insumo)` y el dominio ya la hace única. Una columna con
+  `receta_item.id` sería una segunda verdad que no sobrevive un copiar-pegar.
+- `Cantidad` se exporta como `expresion or cantidad`: exportar `150` donde
+  alguien escribió `450/3` perdería lo que RN-COM-024 existe para conservar.
+- Al actualizar, **los ingredientes que el archivo no menciona se conservan**
+  salvo que la revisión pida `quitar` para esa receta, con el número de líneas
+  a la vista (RN-COM-031).
+- El insumo que falta **se crea desde el diálogo**, con `catalogoApi.crearArticulo`
+  — lo crea una persona, no el importador (ADR-046).
+
+**Catálogo de artículos** (`/articulos/plantilla`, `/articulos/exportar`,
+`/articulos/importar/validar`, `/articulos/importar` — RN-INV-023)
+
+| Hoja | Columnas |
+|---|---|
+| `Artículos` | `ID` · `Código` · `Nombre` · `Tipo` · `Unidad` · `Categoría` · `Costo promedio` · `Controla lote` · `Días alerta vencimiento` · `Archivado` |
+| `SKUs` | `Artículo` (código interno) · `Código` · `Código de barras` · `Activo` |
+| `Instrucciones` | texto |
+
+- Identidad: `ID`, o `Código` (`id_interno`) si el `ID` va vacío.
+- **La unidad de un artículo existente no se cambia**: `editar_articulo` la
+  excluye a propósito, y una fila que la cambie se reporta como problema en vez
+  de ignorarse en silencio.
+- El largo de `id_interno` (4) se valida **en el importador**: SQLite no aplica
+  el largo de un `VARCHAR`, así que sin eso la fila pasa en verde y revienta
+  contra Postgres. Un test ata la constante a la columna del modelo.
+- Los SKU **solo se crean**; uno con código ya usado se informa. Ver deuda.
+
+Exportar pide permiso de **lectura** (`inventory.leer`): son los mismos datos
+que el listado, solo empaquetados. Plantilla, validar e importar piden
+`inventory.gestionar_catalogo`. Las rutas literales van declaradas **antes** de
+`/{id}`, o FastAPI las toma como un id que no es UUID.
+## Estado (slice 8 — requerimiento de la jornada, 2026-08-19)
+
+`solicitud_insumos` gana el estado `borrador` y `solicitud_item` la columna
+`bajo_minimo_al_pedir` (ADR-051, RN-INV-023/024, migración `b5f27ac41e83`).
+
+- **`borrador`**: la lista que el turno junta durante la jornada. Uno por
+  almacén, no por usuario —dos listas paralelas del mismo almacén se
+  solapan y ninguna queda completa—; `GET /solicitudes/borrador?almacen_id=`
+  la crea si no existe (ya cargada con lo que está bajo `stock_minimo`) y si
+  existía le suma lo que cayó bajo mínimo desde la última vez, **sin tocar
+  lo ya tecleado**. No aparece en `GET /solicitudes` salvo pidiendo
+  `estado=borrador`, ni en `solicitudes_resumen_para_negociacion`, ni sube
+  al hub: todavía no le pidió nada a nadie.
+- **`bajo_minimo_al_pedir`**: si el SKU estaba bajo mínimo cuando entró a la
+  lista. Se **estampa al agregar el ítem**, nunca se recalcula —entre pedir
+  y aprobar el stock se mueve, y recalcularla contaría otra historia—. Es lo
+  que le dice al abastecedor qué es urgencia real y qué es decisión del
+  local (ambas preguntas que hasta ahora no tenían dónde vivir).
+- `POST/PATCH/DELETE /solicitudes/{id}/items[/{sku_id}]` editan el borrador;
+  `POST /solicitudes/{id}/enviar` lo pasa a `pendiente` y **re-resuelve** el
+  abastecedor (RN-INV-022 pudo cambiar mientras la lista estaba abierta).
+- `GET /conteos` (paginado, faltaba: solo se podía pedir un conteo por su
+  `id`) y `GET /solicitudes` / `GET /conteos/programa` ganan `sucursal_id` /
+  `marca_id`, resueltos por join a través del almacén — las dos entidades
+  van por almacén y sucursal/marca cuelgan de él.
+- Pantallas nuevas: `/inventario/solicitudes` (la lista de la jornada +
+  aprobar/rechazar/cancelar) y `/inventario/conteos` (abrir, contar a
+  ciegas, cerrar viendo los ajustes generados, anular con motivo).
+
+Tests: `tests/test_solicitudes_borrador.py` (10 casos) y los agregados a
+`tests/test_conteos.py`. Recorrido de uso:
+`frontend/uso/requerimientos.spec.ts`.
+
 ## Estado (slice 7 — carga masiva de recetas, 2026-08-13)
 
 - `GET /inventory/skus`: no existía listado y ninguna pantalla podía ofrecer
@@ -204,6 +288,9 @@ supervisor aprueba y reserva, el central despacha, el local recibe.
 | GET | `/reservas?almacen_id&sku_id` | `leer` |
 | POST | `/reservas/{id}/liberar` | `liberar_reserva` |
 | POST/GET | `/solicitudes` | `solicitar_insumos` / `leer` |
+| GET | `/solicitudes/borrador?almacen_id=` | `solicitar_insumos` |
+| POST/PATCH/DELETE | `/solicitudes/{id}/items[/{sku_id}]` | `solicitar_insumos` |
+| POST | `/solicitudes/{id}/enviar` | `solicitar_insumos` |
 | GET | `/solicitudes/resumen` | `leer_solicitudes_externas` |
 | GET | `/solicitudes/{id}` | `leer` |
 | POST | `/solicitudes/{id}/aprobar` \| `/rechazar` | `aprobar_solicitud` |

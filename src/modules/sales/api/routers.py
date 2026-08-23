@@ -4,9 +4,19 @@ import uuid
 from datetime import date
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Request,
+    Response,
+    UploadFile,
+    status,
+)
 from sqlalchemy.orm import Session
 
+from src.config.settings import settings
+from src.core.rate_limit import consumir, ip_de
 from src.core.tenant import Tenant
 from src.modules.sales.api import schemas
 from src.modules.sales.application import (
@@ -14,11 +24,13 @@ from src.modules.sales.application import (
     clientes,
     comprobantes,
     cumplimiento,
+    importacion_clientes,
     mesas,
     notas_credito,
     precios,
     precuenta,
     queries_publicas,
+    tarifa_delivery,
     tasks,
     ventas,
 )
@@ -41,7 +53,7 @@ from src.modules.users.application import autorizacion
 from src.modules.users.application import queries_publicas as usuarios_queries
 from src.modules.users.application.errors import TokenInvalido
 from src.modules.users.infrastructure.models import Usuario
-from src.shared import fechas
+from src.shared import fechas, planilla
 from src.shared.integrations.factiliza import FactilizaError
 from src.shared.paginacion import Pagina, Paginacion, paginacion, paginar
 
@@ -60,11 +72,25 @@ DESCONTAR = "sales.aplicar_descuento"
 CONSUMO_PERSONAL = "sales.registrar_consumo_personal"
 GESTIONAR_MESAS = "sales.gestionar_mesas"
 LEER_CLIENTES_EXTERNOS = "sales.leer_clientes_externos"
+# Administrar el padron del grupo no es el mismo acto que registrar a
+# alguien en el mostrador, que es lo que hace el cajero con `sales.crear`.
+GESTIONAR_CLIENTES = "sales.gestionar_clientes"
 EMITIR = "sales.emitir_comprobante"
 # Acreditar una venta cobrada devuelve plata: permiso propio, no el del
 # cajero que emitió (RN-CPP-009).
 NOTA_CREDITO = "sales.emitir_nota_credito"
 ENTREGAR = "sales.entregar_pedido"
+
+
+def _xlsx(contenido: bytes, nombre: str) -> Response:
+    """Una planilla como descarga. El `Content-Disposition` es lo que le da
+    nombre al archivo en el navegador."""
+    return Response(
+        content=contenido,
+        media_type=planilla.MIME,
+        headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
+    )
+
 
 
 # --- Venta ------------------------------------------------------------------
@@ -105,6 +131,12 @@ def crear_venta(
         items=[it.model_dump() for it in body.items],
         cliente_id=body.cliente_id,
         referencia_atencion=body.referencia_atencion,
+        direccion_entrega=body.direccion_entrega,
+        ubicacion_place_id=body.ubicacion_place_id,
+        ubicacion_lat=body.ubicacion_lat,
+        ubicacion_lng=body.ubicacion_lng,
+        ubicacion_plus_code=body.ubicacion_plus_code,
+        ubicacion_distrito=body.ubicacion_distrito,
         mesa_id=body.mesa_id,
         comensales=body.comensales,
         id=body.id,
@@ -114,6 +146,52 @@ def crear_venta(
     )
     session.commit()
     return venta
+
+
+@router.post("/ventas/cotizar-delivery", response_model=schemas.CotizacionDeliveryOut)
+def cotizar_delivery(
+    body: schemas.CotizacionDeliveryIn,
+    request: Request,
+    actor: Usuario = Depends(require_permission(CREAR)),
+    session: Session = Depends(get_db),
+):
+    """Cuánto sale llevar este pedido, y si conviene derivarlo (ADR-054).
+
+    **Con cuota, como la consulta de documento**: cada llamada gasta una
+    medición de un proveedor pago, y un bucle mal escrito en el PDV se come
+    el plan del mes. Se cuenta por usuario y por IP por la misma razón que
+    en `core/consulta_router.py` — todas las cajas del local salen por la
+    misma IP, y limitar solo por ahí castiga al equipo por uno solo.
+
+    No decide nada: el precio que se cobra lo vuelve a calcular el servidor
+    al crear la venta, y es el que queda congelado en la fila. Esto es lo que
+    el cajero ve antes de aceptar.
+    """
+    ventana = settings.consulta_documento_ventana_segundos
+    consumir(
+        "cotizar_delivery_usuario",
+        str(actor.id),
+        settings.consulta_documento_intentos_usuario,
+        ventana,
+    )
+    consumir(
+        "cotizar_delivery_ip",
+        ip_de(request),
+        settings.consulta_documento_intentos_ip,
+        ventana,
+    )
+    cotizacion = tarifa_delivery.cotizar(
+        tarifa_delivery.origen_de_sucursal(session, body.sucursal_id),
+        tarifa_delivery.coordenada(body.ubicacion_lat, body.ubicacion_lng),
+        body.ubicacion_distrito,
+    )
+    return schemas.CotizacionDeliveryOut(
+        distancia_km=cotizacion.distancia_km,
+        costo=cotizacion.costo,
+        aproximada=cotizacion.aproximada,
+        derivar_a_externo=cotizacion.derivar_a_externo,
+        motivo=cotizacion.motivo,
+    )
 
 
 @router.get("/ventas", response_model=Pagina[schemas.VentaOut])
@@ -974,6 +1052,69 @@ def listar_clientes_backoffice(
             _cliente_buscado(c, personas.get(c.persona_id)) for c in pagina["items"]
         ],
     }
+
+
+# Las cuatro rutas literales van **antes** de `/clientes/{cliente_id}`:
+# FastAPI resuelve por orden y "plantilla" entraría como un id que no es UUID.
+@router.get("/clientes/plantilla")
+def descargar_plantilla_clientes(
+    _: Usuario = Depends(require_permission(GESTIONAR_CLIENTES)),
+):
+    """La hoja que se llena para cargar el padrón de golpe (RN-PTS-007)."""
+    return _xlsx(importacion_clientes.plantilla(), "plantilla-clientes.xlsx")
+
+
+@router.get("/clientes/exportar")
+def exportar_clientes(
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """El padrón en la misma plantilla, con los datos adentro (ADR-052).
+
+    Pide permiso de **lectura**: son los mismos datos que devuelve el listado
+    de back-office, solo empaquetados en un archivo.
+    """
+    grupo_id = clientes.grupo_de_empresa(session, tenant.empresa())
+    return _xlsx(
+        importacion_clientes.exportar(session, grupo_id=grupo_id), "clientes.xlsx"
+    )
+
+
+@router.post("/clientes/importar/validar", response_model=schemas.RevisionClientesOut)
+async def validar_importacion_clientes(
+    archivo: UploadFile,
+    _: Usuario = Depends(require_permission(GESTIONAR_CLIENTES)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Dice qué entra, qué actualiza y qué no. **No guarda nada.**"""
+    grupo_id = clientes.grupo_de_empresa(session, tenant.empresa())
+    return importacion_clientes.validar(
+        session, grupo_id=grupo_id, contenido=await archivo.read()
+    )
+
+
+@router.post(
+    "/clientes/importar",
+    status_code=201,
+    response_model=schemas.ResultadoImportacionOut,
+)
+def importar_clientes(
+    body: schemas.ImportarClientesIn,
+    _: Usuario = Depends(require_permission(GESTIONAR_CLIENTES)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Crea y actualiza lo que la pantalla confirmó, revalidando todo."""
+    grupo_id = clientes.grupo_de_empresa(session, tenant.empresa())
+    resultado = importacion_clientes.importar(
+        session,
+        grupo_id=grupo_id,
+        clientes=[c.model_dump() for c in body.clientes],
+    )
+    session.commit()
+    return resultado
 
 
 @router.patch("/clientes/{cliente_id}", response_model=schemas.ClienteOut)

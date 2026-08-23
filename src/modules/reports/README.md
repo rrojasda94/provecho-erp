@@ -193,7 +193,10 @@ olvide lo caza `tests/test_arquitectura.py`.
   `destinatarios` (lista de `usuario_id`).
 - **Consume el contrato público de**: `accounting.queries_publicas.encargado_de_turno`
   (quién está a cargo del local ahora) — el resolutor dinámico que se mudó
-  desde `users/application/notificaciones.py`.
+  desde `users/application/notificaciones.py`. **Devuelve `None` para toda
+  apertura posterior a ADR-049**: el cajero abre solo y la caja ya no nombra
+  a ningún encargado, así que el respaldo por rol (`supervisor`/`admin` de
+  la sucursal) dejó de ser la excepción y pasó a ser el camino normal.
 - Lee `users.infrastructure.models` (`Rol`, `UsuarioRol`, `UsuarioSucursal`,
   `Sucursal`, `Almacen`) para resolver destinatarios — organización
   transversal, excepción `"*"` de `tests/test_arquitectura.py`.

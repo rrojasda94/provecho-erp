@@ -6,10 +6,17 @@ from sqlalchemy import ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
-from src.core.model_base import SoftDeleteMixin, TimestampMixin, UuidPkMixin
+from src.core.model_base import (
+    SoftDeleteMixin,
+    TimestampMixin,
+    UbicacionMixin,
+    UuidPkMixin,
+)
 
 
-class Almacen(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin):
+class Almacen(
+    Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin, UbicacionMixin
+):
     __tablename__ = "almacen"
 
     empresa_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("empresa.id"))

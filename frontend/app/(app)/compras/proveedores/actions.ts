@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import type { EstadoFormulario } from "@/components/formulario/dialogo-formulario";
 import { ApiError, apiFetch } from "@/lib/api";
 import { COOKIE_TOKEN } from "@/lib/auth";
+import { ubicacionDe } from "@/lib/ubicacion-form";
 
 export type EstadoProveedor = EstadoFormulario;
 
@@ -72,6 +73,7 @@ function domicilio(formData: FormData) {
     direccion: texto(formData, "direccion") || undefined,
     provincia: texto(formData, "provincia") || undefined,
     pais: texto(formData, "pais") || undefined,
+    ...ubicacionDe(formData),
   };
 }
 

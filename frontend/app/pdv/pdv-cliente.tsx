@@ -39,9 +39,13 @@ import {
 } from "./tipos";
 import { useCajaPdv } from "./use-caja-pdv";
 import { useDatosPdv } from "./use-datos-pdv";
+import { UBICACION_VACIA } from "@/components/direccion/ubicacion";
 
 type Props = {
   sucursalId: string;
+  /** Los del cajero. Solo deciden si se le ofrece traer un documento de
+   * RENIEC/SUNAT: el resto del PDV ya está detrás del permiso de la caja. */
+  permisos: string[];
   puntoVenta: {
     id: string;
     serieBoleta: string;
@@ -61,6 +65,7 @@ function nuevoBorrador(mesa?: MesaEnMapa): Borrador {
     mesaNumero: mesa?.numero ?? null,
     comensales: null,
     direccion: null,
+    ubicacion: UBICACION_VACIA,
     cliente: null,
     lineas: [],
     ventaId: null,
@@ -104,6 +109,33 @@ function EstadoCaja({
   );
 }
 
+/** El interruptor entre carta y ticket, para el ancho donde no entran los
+ * dos. Lleva el total del pedido activo porque en ese ancho el ticket no
+ * está a la vista y el cajero necesita saber que hay algo cargado. */
+function CambiarPanel({
+  panel,
+  activo,
+  onCambiar,
+}: {
+  panel: "carta" | "ticket";
+  activo: Borrador | null;
+  onCambiar: () => void;
+}) {
+  const total = activo ? totalBorrador(activo) : 0;
+  const monto = panel === "carta" && total > 0 ? ` · ${soles(total)}` : "";
+  return (
+    <button
+      type="button"
+      className="pdv-cambia-panel"
+      data-testid="cambiar-panel"
+      onClick={onCambiar}
+    >
+      {panel === "carta" ? "Pedido" : "Carta"}
+      {monto}
+    </button>
+  );
+}
+
 function tituloComprobante(venta: Venta | null): string {
   return venta ? `Orden #${venta.numero_orden}` : "Comprobante";
 }
@@ -129,11 +161,15 @@ function bloqueoDeCaja(resuelta: boolean, falla: Falla | null) {
   );
 }
 
-export default function PdvCliente({ sucursalId, puntoVenta }: Props) {
+export default function PdvCliente({ sucursalId, permisos, puntoVenta }: Props) {
   const datos = useDatosPdv(puntoVenta.id, sucursalId);
   const [borradores, setBorradores] = useState<Borrador[]>([nuevoBorrador()]);
   const [activoId, setActivoId] = useState<string | null>(null);
   const [seleccion, setSeleccion] = useState<Set<string>>(new Set());
+  /** Qué panel ocupa la pantalla cuando no entran los dos: en tablet vertical
+   * y en teléfono la carta y el ticket comparten el mismo lugar. En el ancho
+   * de mostrador este estado no se usa — los dos paneles se ven a la vez. */
+  const [panel, setPanel] = useState<"carta" | "ticket">("carta");
   const [vista, setVista] = useState<"catalogo" | "mesas" | "abiertas" | "cobrados">(
     "catalogo",
   );
@@ -245,6 +281,11 @@ export default function PdvCliente({ sucursalId, puntoVenta }: Props) {
       mesa_id: b.mesaId,
       comensales: b.comensales,
       referencia_atencion: b.tipo === "mesa" ? null : (b.cliente?.nombre ?? null),
+      // Solo el delivery lleva dirección; el costo del reparto lo calcula
+      // el servidor y se congela en la venta (ADR-054).
+      ...(b.tipo === "delivery"
+        ? { direccion_entrega: b.direccion, ...b.ubicacion }
+        : {}),
       // Comida del personal: el servidor pone los precios en cero y exige la
       // elevación del encargado (RN-COM-025).
       ...(b.consumoMotivo
@@ -400,6 +441,7 @@ export default function PdvCliente({ sucursalId, puntoVenta }: Props) {
         mesaNumero: info.mesaNumero,
         comensales: info.comensales,
         direccion: null,
+        ubicacion: UBICACION_VACIA,
         cliente: null,
         lineas: items.map(lineaDesdeVentaItem),
         ventaId: info.ventaId,
@@ -632,10 +674,18 @@ export default function PdvCliente({ sucursalId, puntoVenta }: Props) {
         </div>
         <EstadoCaja caja={datos.caja} onClick={() => setDialogo("cierre")} />
         <span className="pdv-spacer" />
+        {/* Solo existe en el ancho donde los dos paneles no entran lado a
+            lado (`.pdv-cambia-panel`, `pdv.css`). Antes de esto el ticket
+            simplemente no estaba en una tablet vertical. */}
+        <CambiarPanel
+          panel={panel}
+          activo={activo}
+          onCambiar={() => setPanel((p) => (p === "carta" ? "ticket" : "carta"))}
+        />
         <span className="pdv-meta">{hora()}</span>
       </header>
 
-      <div className="pdv-shell">
+      <div className={`pdv-shell ver-${panel}`}>
         <Catalogo
           carta={datos.carta}
           mesas={datos.mesas}
@@ -741,6 +791,7 @@ export default function PdvCliente({ sucursalId, puntoVenta }: Props) {
         abierto={dialogo === "tipo"}
         borrador={activo}
         mesas={datos.mesas.datos}
+        sucursalId={sucursalId}
         onCerrar={() => setDialogo(null)}
         onConfirmar={(cambios) => {
           parchar(cambios);
@@ -755,6 +806,7 @@ export default function PdvCliente({ sucursalId, puntoVenta }: Props) {
       />
       <DialogoCliente
         abierto={dialogo === "cliente"}
+        permisos={permisos}
         onCerrar={() => setDialogo(null)}
         onBuscar={api.buscarClientes}
         onElegir={(c: ClienteBuscado) => {
@@ -765,6 +817,7 @@ export default function PdvCliente({ sucursalId, puntoVenta }: Props) {
       />
       <DialogoCobro
         abierto={dialogo === "cobro"}
+        permisos={permisos}
         total={totalACobrar(activo, seleccion)}
         medios={datos.medios}
         ocupado={ocupado}

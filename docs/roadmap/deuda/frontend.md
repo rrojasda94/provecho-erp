@@ -185,7 +185,10 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   se revisa si alguna de las tres deja de ser una pantalla de una sola tarea.
 - ⬜ **Login y PDV siguen sin migrar a shadcn**: el login conserva sus
   clases `.login-*` en `@layer components` y el PDV su CSS propio. Funcionan;
-  se migran cuando se los toque, no antes.
+  se migran cuando se los toque, no antes. (El login se tocó el 2026-08-15
+  por ADR-050 y **no** se migró: cambiar la forma de pedir el PIN y la
+  librería de componentes en el mismo diff dejaba imposible revisar cuál de
+  las dos cosas rompió qué.)
 - ⬜ **`components/ui/**` exento del límite de complejidad de ESLint**: es
   código generado por el CLI y se regenera en cada `shadcn add`. Si alguna
   vez se edita a mano de forma sustancial, deja de ser generado y el override
@@ -559,3 +562,41 @@ backend que todavía no llega a pantalla.
   5 minutos aparece de golpe. Quien está contando efectivo al lado de la
   caja no toca la pantalla y se la encuentra bloqueada sin haber podido
   evitarlo. Un aviso a los 4:30 con "seguir aquí" lo resuelve.
+
+- ✅ 2026-08-15 **El login se teclea en el pinpad** (ADR-050, enmienda a
+  ADR-045). `app/login/page.tsx` seguía pidiendo el PIN en un
+  `<input type="password" autocomplete="current-password">`: el patrón exacto
+  que ADR-045 había eliminado dentro del PDV, en la pantalla que más veces se
+  cruza y desde la misma tablet de la caja. El pinpad salió de `app/pdv/` a
+  `components/pinpad/` y su CSS de `pdv.css` a `globals.css`, pidiendo los
+  colores a los tokens `--pdv-*` **con respaldo** en los del back office
+  (`var(--pdv-rojo, var(--primary))`): una sola regla sirve a la paleta
+  oscura del mostrador y al modo claro/oscuro de ADR-037. De paso, el login
+  dejó de tratar igual al 401, al 423 y al 429.
+  - **Deuda que deja, dos puntos concretos:**
+    - ⬜ **`frontend/app/pdv/pinpad.tsx` quedó como re-export de una línea.**
+      Es un puente a propósito: había otra rama trabajando sobre
+      `app/pdv/dialogos.tsx` (900 líneas) y cambiarle el `import` desde acá
+      era un conflicto garantizado sobre un archivo que este cambio no tenía
+      por qué tocar. **Se borra** cambiando los dos `import Pinpad from
+      "./pinpad"` de `dialogos.tsx` y `bloqueo.tsx` a
+      `@/components/pinpad/pinpad`, en la rama que los toque.
+    - ✅ **El overlay de bloqueo del PDV se pinta con tokens que no existen
+      ahí** (encontrado al mover el CSS; resuelto 2026-08-18 con respaldo en
+      cada `var()`, igual que las reglas del pinpad). `BloqueoPorInactividad` se monta
+      como **hermano** de `<main className="pdv">` en `app/pdv/page.tsx`, no
+      dentro, y los `--pdv-*` están definidos en `.pdv`/`.pdv-vacio`: cada
+      `var(--pdv-bg)` / `var(--pdv-texto)` de `.pdv-bloqueo` es inválido al
+      calcular y la declaración entera queda en `unset`, o sea overlay con el
+      fondo blanco del navegador en vez de la paleta oscura del PDV. El
+      pinpad de adentro ya no lo sufre —sus reglas llevan respaldo—, el
+      overlay sí. Se arregla montándolo dentro de `.pdv` o repitiendo los
+      tokens en `.pdv-bloqueo`; no se hizo acá porque cambia cómo se ve una
+      pantalla que este cambio no venía a tocar y merece su verificación.
+    - ⬜ **`frontend/app/cambiar-pin/` sigue con tres
+      `<input type="password">`** (PIN actual, nuevo y repetido). Es el
+      último PIN del ERP que se escribe en un campo. No entró acá porque es
+      otro flujo y otra decisión de diseño —tres pinpads en una pantalla, o
+      uno con tres pasos— y mezclarla dejaba un cambio imposible de revisar.
+      Mientras tanto es un campo `type="password"` que el navegador ofrece
+      guardar, con el mismo defecto que ADR-045 describe.
