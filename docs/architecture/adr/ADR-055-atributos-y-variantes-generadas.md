@@ -58,6 +58,13 @@ Se agregan dos más: `producto_variante_valor` (qué combinación **es** una
 fila hija) y `producto_exclusion` (combinaciones que no existen —
 `product.template.attribute.exclusion`).
 
+`producto_exclusion` no entra por completitud: el catálogo real la necesita el
+primer día. En una pizza **mitad y mitad las dos mitades tienen que ser
+distintas** (RN-COM-038) — media hawaiana y media hawaiana no es una
+mitad-y-mitad, es una hawaiana entera, que ya se vende como su propio producto
+con su receta y su precio. Sin la exclusión el PDV deja armar una combinación
+que no existe y la venta la acepta.
+
 ### 2. La variante generada **sigue siendo** `producto_comercial`
 
 No es una concesión al modelo viejo: es lo que hace que precio server-side
@@ -147,9 +154,10 @@ falta downgrade para volver a operar.
 - `venta_item.valores_variante_ids` (JSONB, nullable) guarda los PTAV
   elegidos. Misma forma y mismas razones que `sin_articulo_ids` (ADR-035 §1):
   columna y no tabla, NULL y no `[]` para lo vendido antes de la migración.
-- `POST /sales/ventas` puede rechazar con 409 un caso nuevo: elegir un valor
-  que el producto —o su padre— no ofrece. Se exceptúa el replay del hub
-  (ADR-009), igual que las restas.
+- `POST /sales/ventas` puede rechazar con 409 dos casos nuevos: elegir un
+  valor que el producto —o su padre— no ofrece, y elegir una combinación
+  que `producto_exclusion` declara imposible (RN-COM-038). Se exceptúa el
+  replay del hub (ADR-009), igual que las restas.
 - Los cinco eventos de venta llevan `valores_variante_ids` en cada ítem. Es
   **aditivo**: un consumidor que lo ignore se comporta como antes.
 - `producto_comercial.lienzo_pos` cierra la deuda que ADR-035 §5 dejó abierta.

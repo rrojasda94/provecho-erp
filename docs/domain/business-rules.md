@@ -1449,6 +1449,14 @@ producción se hace en cocinas de sucursal. Ver
   valor de cada atributo** nombrado. Sin condición, la línea aplica siempre.
   Es lo que permite que una pizza mitad-y-mitad de 19 sabores sea **una**
   receta y no 361.
+- **RN-COM-038** Un producto puede declarar **combinaciones que no existen**.
+  El caso que la obliga: en una pizza **mitad y mitad las dos mitades tienen
+  que ser distintas** — media hawaiana y media hawaiana no es una
+  mitad-y-mitad, es una hawaiana entera, que se vende como su propio producto
+  con su receta y su precio. La exclusión se declara una vez y **vale en los
+  dos sentidos**; `«A» + «B»` y `«B» + «A»` son el mismo plato y consumen lo
+  mismo. Se hace cumplir **al confirmar la venta**, no solo en el PDV: el
+  kiosko y la central de pedidos entran por el mismo endpoint.
 
 ## Cumplimiento de pedido
 

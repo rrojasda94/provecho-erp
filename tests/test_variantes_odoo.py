@@ -36,6 +36,7 @@ from src.modules.inventory.infrastructure.models import (
     RecetaItem,
     UnidadMedida,
 )
+from src.modules.sales.application import catalogo as valores_uc
 from src.modules.sales.application import ventas as ventas_uc
 from src.modules.sales.application.catalogo import valores_ofrecidos
 from src.modules.sales.application.errors import ReglaNegocio as ReglaVenta
@@ -45,6 +46,7 @@ from src.modules.sales.infrastructure.models import (
     ProductoAtributoLinea,
     ProductoAtributoValor,
     ProductoComercial,
+    ProductoExclusion,
     ProductoVarianteValor,
     PuntoVenta,
 )
@@ -531,6 +533,65 @@ def test_la_eleccion_viaja_en_el_detalle_del_evento(session, base):
     assert detalle["valores_variante_ids"] == [
         str(base["valores"]["Mitad 1: Hawaiana"])
     ]
+
+
+# --- Las dos mitades tienen que ser distintas (RN-COM-038) --------------------
+
+
+def _excluir(session, base, atributo_a, atributo_b, sabor):
+    session.add(
+        ProductoExclusion(
+            producto_atributo_valor_id=base["valores"][f"{atributo_a}: {sabor}"],
+            excluye_valor_id=base["valores"][f"{atributo_b}: {sabor}"],
+        )
+    )
+    session.flush()
+
+
+def test_no_se_puede_elegir_el_mismo_sabor_en_las_dos_mitades(session, base):
+    """Media hawaiana y media hawaiana no es una mitad-y-mitad: es una
+    hawaiana entera, que se vende como su propio producto con su propia
+    receta y su propio precio."""
+    _excluir(session, base, "Mitad 1", "Mitad 2", "Hawaiana")
+    with pytest.raises(ReglaVenta, match="dos mitades distintas"):
+        _vender(session, base, ("Mitad 1: Hawaiana", "Mitad 2: Hawaiana"))
+
+
+def test_la_exclusion_se_guarda_una_vez_y_vale_en_los_dos_sentidos(session, base):
+    """Guardar el par simétrico sería la misma verdad dos veces, y la primera
+    en desincronizarse."""
+    _excluir(session, base, "Mitad 1", "Mitad 2", "Americana")
+    izquierda = str(base["valores"]["Mitad 1: Americana"])
+    derecha = str(base["valores"]["Mitad 2: Americana"])
+    assert valores_uc.combinacion_excluida(session, [izquierda, derecha])
+    assert valores_uc.combinacion_excluida(session, [derecha, izquierda])
+
+
+def test_dos_sabores_distintos_si_se_venden(session, base):
+    _excluir(session, base, "Mitad 1", "Mitad 2", "Hawaiana")
+    venta = _vender(session, base, ("Mitad 1: Hawaiana", "Mitad 2: Americana"))
+    session.flush()
+    assert VentaRepo(session).items(venta.id)[0].valores_variante_ids
+
+
+def test_un_solo_valor_nunca_choca(session, base):
+    """La consulta corta antes de ir a la base: no hay par que excluir."""
+    assert valores_uc.combinacion_excluida(session, []) is None
+    assert (
+        valores_uc.combinacion_excluida(
+            session, [str(base["valores"]["Mitad 1: Hawaiana"])]
+        )
+        is None
+    )
+
+
+def test_el_orden_de_las_mitades_no_cambia_lo_que_se_consume(session, base):
+    """«A + B» y «B + A» son el mismo plato. Con las líneas condicionadas a
+    **una** mitad cada una, la simetría sale del modelo y no de ordenar nada
+    al guardar."""
+    ida = _consumos(session, base, "Mitad 1: Hawaiana", "Mitad 2: Peperoni")
+    vuelta = _consumos(session, base, "Mitad 1: Peperoni", "Mitad 2: Hawaiana")
+    assert ida == vuelta
 
 
 # --- Alta de línea de receta --------------------------------------------------

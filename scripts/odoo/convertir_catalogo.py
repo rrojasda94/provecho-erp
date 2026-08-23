@@ -50,13 +50,20 @@ ARCHIVOS = {
 
 # Categoría de UdM y ratio de cada unidad que aparece en el export. El ratio es
 # contra la unidad base de su categoría (`unidad_medida.ratio`).
-# `decimales` va en 3 para **todas**, incluidas las que se cuentan de a una.
-# No es descuido: 40 líneas del recetario consumen media unidad —"Pizza base
-# familiar" 0.5 en cada mitad, 0.2 de una botella de Ginger Ale— y con 0
-# decimales el servidor las redondea a cero y rechaza la línea. Que una unidad
-# no se *venda* partida no significa que no se *consuma* partida; el propio
-# catálogo tiene un artículo llamado "Ginger Ale abierta".
-DECIMALES = 3
+# `decimales` va en 4 para **todas**, incluidas las que se cuentan de a una.
+# Dos razones, y ninguna es descuido:
+#
+# 1. 40 líneas del recetario consumen media unidad —"Pizza base familiar" 0.5
+#    en cada mitad, 0.2 de una botella de Ginger Ale— y con 0 decimales el
+#    servidor las redondea a cero y rechaza la línea. Que una unidad no se
+#    *venda* partida no significa que no se *consuma* partida; el propio
+#    catálogo tiene un artículo llamado "Ginger Ale abierta".
+# 2. Partir una línea de mitad-y-mitad en dos mitades divide el gramaje por
+#    dos: 0.025 kg de jamón son 0.0125 por mitad. Con 3 decimales cada mitad
+#    redondea a 0.013 y la pizza entera pasa a llevar 0.026 — un gramo de más
+#    por plato que nadie pidió. 4 es el máximo que admite
+#    `receta_item.cantidad` (Numeric 12,4) y hace la división exacta.
+DECIMALES = 4
 UNIDADES = {
     "Unidades": ("Unidades", "1", DECIMALES),
     "Cientos": ("Unidades", "100", DECIMALES),
@@ -106,6 +113,19 @@ TAMANOS = ("personal", "mediana", "familiar")
 _SUFIJO_TAMANO = re.compile(
     r"\s+(" + "|".join(TAMANOS) + r")\s*$", re.IGNORECASE
 )
+
+
+def _es_cero(cantidad: object) -> bool:
+    """Una cantidad puede venir como número o como operación ("0.025/2").
+
+    Solo se manda al libro de pendientes lo que es cero de verdad; una
+    expresión que no se puede leer acá se deja pasar y la evalúa el servidor,
+    que es quien manda (RN-COM-024).
+    """
+    try:
+        return Decimal(str(cantidad)) <= 0
+    except (ArithmeticError, ValueError):
+        return False
 
 
 def normalizar(texto: object) -> str:
@@ -591,25 +611,29 @@ class Conversion:
             if insumo is None:
                 continue
             unidad = self._unidad_de_linea(linea)
-            condicion = self._condicion(linea) if con_condicion else ""
-            llave = (linea["insumo"], unidad, condicion)
-            cantidad = Decimal(str(linea["cantidad"] or 0))
-            if llave in agrupadas:
-                agrupadas[llave][2] += cantidad
-                self.correcciones.append(
-                    f"**Línea repetida sumada** — «{datos['nombre']}» traía "
-                    f"«{insumo['nombre']}» en más de una línea con la misma "
-                    "condición. Se suman las cantidades: dos líneas iguales del "
-                    "mismo insumo no son dos insumos."
-                )
-                continue
-            agrupadas[llave] = [
-                datos["nombre"], insumo["nombre"], cantidad, 0, unidad, condicion
-            ]
+            trozos = (
+                self._partir_por_mitad(linea, datos["nombre"])
+                if con_condicion and linea["condicion"]
+                else [("", str(linea["cantidad"] or 0))]
+            )
+            for condicion, cantidad in trozos:
+                llave = (linea["insumo"], unidad, condicion)
+                if llave in agrupadas:
+                    agrupadas[llave][2] = f"({agrupadas[llave][2]})+({cantidad})"
+                    self.correcciones.append(
+                        f"**Línea repetida sumada** — «{datos['nombre']}» traía "
+                        f"«{insumo['nombre']}» en más de una línea con la misma "
+                        "condición. Se suman las cantidades: dos líneas iguales "
+                        "del mismo insumo no son dos insumos."
+                    )
+                    continue
+                agrupadas[llave] = [
+                    datos["nombre"], insumo["nombre"], cantidad, 0, unidad, condicion
+                ]
 
         buenas, pendientes = [], []
         for fila in agrupadas.values():
-            (pendientes if fila[2] <= 0 else buenas).append(fila)
+            (pendientes if _es_cero(fila[2]) else buenas).append(fila)
         return buenas, pendientes
 
     def _unidad_de_linea(self, linea: dict) -> str:
@@ -633,9 +657,68 @@ class Conversion:
             return ""
         return unidad
 
-    def _condicion(self, linea: dict) -> str:
-        """`Mitad 1 F: Americana F, ...` — tal cual sale de Odoo."""
-        return linea["condicion"]
+    @staticmethod
+    def _por_atributo(condicion: str) -> dict[str, list[str]]:
+        """`"A: x, A: y, B: x"` → `{"A": ["A: x", "A: y"], "B": ["B: x"]}`."""
+        grupos: dict[str, list[str]] = defaultdict(list)
+        for parte in (p.strip() for p in condicion.split(",") if p.strip()):
+            atributo, _, _valor = parte.partition(":")
+            grupos[atributo.strip()].append(parte)
+        return grupos
+
+    def _partir_por_mitad(self, linea: dict, receta: str) -> list[tuple[str, str]]:
+        """Una línea condicionada a las dos mitades → una línea por mitad.
+
+        **Este es el arreglo que hace que la mitad-y-mitad funcione.** Odoo
+        escribe la condición como `Mitad 1 ∈ S y Mitad 2 ∈ S`, y su regla exige
+        que coincidan **las dos** (`_skip_for_no_variant`). Con la regla del
+        negocio —las dos mitades tienen que ser **distintas**— esa condición no
+        se cumple casi nunca: media hawaiana y media americana no descontaría la
+        piña, y media hawaiana con media hawaiana está prohibido. La línea
+        quedaba muerta.
+
+        Que las 52 líneas del archivo sean **simétricas** —el mismo conjunto de
+        sabores en las dos mitades, verificado— dice cuál era la intención:
+        cada mitad aporta lo suyo. Así que la línea se parte en dos, cada una
+        condicionada a **una** mitad y con la mitad del gramaje.
+
+        Se comporta igual que Odoo cuando Odoo acertaba (las dos mitades
+        califican → gramaje entero) y correctamente cuando no (una sola
+        califica → medio gramaje, que antes era cero).
+
+        La cantidad se escribe como `0.025/2` y no como `0.0125`: el servidor
+        evalúa la operación y guarda las dos cosas (RN-COM-024), así que la
+        planilla muestra de dónde salió el número en vez de un decimal caído
+        del cielo.
+        """
+        grupos = self._por_atributo(linea["condicion"])
+        if len(grupos) < 2:
+            return [(linea["condicion"], str(linea["cantidad"] or 0))]
+
+        valores = [
+            {p.split(":", 1)[1].strip() for p in partes} for partes in grupos.values()
+        ]
+        if any(v != valores[0] for v in valores[1:]):
+            self.pendientes.append(
+                f"**Condición asimétrica** — «{receta}» / «{linea['insumo_nombre']}» "
+                "pide conjuntos distintos en cada mitad, así que no se puede "
+                "partir por mitad y se sube tal cual. Con la regla de Odoo "
+                "(coinciden las dos o no aplica) esta línea casi nunca va a "
+                "descontar. Revisar."
+            )
+            return [(linea["condicion"], str(linea["cantidad"] or 0))]
+
+        self.correcciones.append(
+            f"**Línea partida por mitad** — la condición nombraba las "
+            f"{len(grupos)} mitades a la vez, y con la regla de Odoo eso exige "
+            "que coincidan las dos. Como las dos mitades tienen que ser "
+            "**distintas**, la línea nunca descontaría. Se parte en una línea "
+            "por mitad, a la mitad del gramaje, que es lo que el archivo quería "
+            "decir: cada mitad aporta lo suyo."
+        )
+        cantidad = str(linea["cantidad"] or 0)
+        return [(", ".join(partes), f"({cantidad})/{len(grupos)}")
+                for partes in grupos.values()]
 
     def libro_recetas(self, kits: bool) -> tuple[Workbook, list[list]]:
         """El libro 3 lleva **todas** las cabeceras de receta; el 6, solo las
@@ -771,6 +854,8 @@ class Conversion:
         precios = libro.create_sheet("Precios")
         precios.append(["Lista", "Producto", "Monto"])
         sin_precio: list[str] = []
+        exclusiones = libro.create_sheet("Exclusiones")
+        exclusiones.append(["Producto", "Atributo A", "Valor A", "Atributo B", "Valor B"])
 
         con_receta = set(self.recetas)
         for base in sorted(self.padres):
@@ -830,6 +915,7 @@ class Conversion:
                 "Catálogo → Listas de precio."
             )
 
+        por_producto: dict[str, list[str]] = defaultdict(list)
         for nombre, datos in self.atributos.items():
             if normalizar(nombre) == "quitar ingrediente":
                 continue
@@ -840,7 +926,48 @@ class Conversion:
                 atributos.append(
                     [plantilla["nombre"], nombre, ", ".join(datos["valores"])]
                 )
+                por_producto[plantilla["nombre"]].append(nombre)
+
+        for fila in self._exclusiones(por_producto):
+            exclusiones.append(fila)
         return libro
+
+    def _exclusiones(self, por_producto: dict[str, list[str]]) -> list[list]:
+        """Las combinaciones que el negocio no vende.
+
+        Hoy hay una sola clase y es la que motiva la tabla: **las dos mitades
+        de una mitad-y-mitad tienen que ser distintas**. Media hawaiana y
+        media hawaiana no es una mitad-y-mitad, es una hawaiana entera — que
+        ya se vende como su propio producto, con su receta y su precio.
+
+        Se detecta por la forma, no por el nombre: dos atributos del mismo
+        producto que ofrecen **exactamente los mismos valores** son dos
+        elecciones de lo mismo, y elegir dos veces lo mismo no es una
+        combinación. Buscar la palabra "Mitad" ataría el conversor al
+        vocabulario de una carta.
+
+        Solo el par (A de la primera, A de la segunda), no todos contra
+        todos: media hawaiana con media americana es exactamente lo que el
+        producto existe para vender.
+        """
+        filas: list[list] = []
+        for producto, nombres in sorted(por_producto.items()):
+            if len(nombres) != 2:
+                continue
+            primero, segundo = nombres
+            valores = self.atributos[primero]["valores"]
+            if set(valores) != set(self.atributos[segundo]["valores"]):
+                continue
+            for valor in valores:
+                filas.append([producto, primero, valor, segundo, valor])
+            self.correcciones.append(
+                f"**Mitades distintas** — «{producto}»: se generan "
+                f"{len(valores)} exclusiones para que «{primero}» y "
+                f"«{segundo}» no puedan tener el mismo valor. Dos mitades "
+                "iguales son la pizza entera, que ya se vende aparte. Sin "
+                "esto el PDV deja armar una combinación que no existe."
+            )
+        return filas
 
     def libro_pendientes(self, filas: list[list]) -> Workbook:
         libro = Workbook()

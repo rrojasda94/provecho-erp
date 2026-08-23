@@ -48,6 +48,7 @@ from src.modules.sales.infrastructure.models import (
     ProductoAtributoLinea,
     ProductoAtributoValor,
     ProductoComercial,
+    ProductoExclusion,
 )
 from src.modules.users.infrastructure.models import Empresa, Marca
 from src.shared import fechas
@@ -424,7 +425,42 @@ class Carga:
             self.session.flush()
 
         self._lineas_de_atributo(ruta)
+        self._exclusiones(ruta)
         self._precios(ruta)
+
+    def _exclusiones(self, ruta: Path) -> None:
+        """Las combinaciones que no existen — hoy, las dos mitades iguales.
+
+        Va después de las líneas de atributo porque una exclusión une dos
+        `producto_atributo_valor`, y ésos nacen ahí.
+        """
+        valores = self._valores()
+        vistos = {
+            (e.producto_atributo_valor_id, e.excluye_valor_id)
+            for e in self.session.query(ProductoExclusion)
+        }
+        for fila in filas(ruta, "Exclusiones"):
+            izquierda = valores.get(f"{fila['Atributo A']}: {fila['Valor A']}".lower())
+            derecha = valores.get(f"{fila['Atributo B']}: {fila['Valor B']}".lower())
+            if izquierda is None or derecha is None:
+                self.problemas.append(
+                    f"[productos] exclusión de «{fila['Producto']}»: no existe "
+                    f"«{fila['Atributo A']}: {fila['Valor A']}» o "
+                    f"«{fila['Atributo B']}: {fila['Valor B']}»"
+                )
+                continue
+            # Una sola fila: el par se lee en los dos sentidos. Guardar el
+            # simétrico sería la misma verdad dos veces.
+            if (izquierda, derecha) in vistos or (derecha, izquierda) in vistos:
+                continue
+            self.session.add(
+                ProductoExclusion(
+                    producto_atributo_valor_id=izquierda, excluye_valor_id=derecha
+                )
+            )
+            vistos.add((izquierda, derecha))
+            self.contar("exclusiones")
+        self.session.flush()
 
     def _lineas_de_atributo(self, ruta: Path) -> None:
         productos = self._productos()

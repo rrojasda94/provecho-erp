@@ -135,6 +135,14 @@ def _resolver_valores_variante(
     Rechazar en vez de ignorar: un valor ajeno no es inocuo, porque puede
     activar líneas de receta condicionadas y mover stock que nadie pidió.
 
+    Y se rechaza también la **combinación imposible** que declara
+    `producto_exclusion`: media hawaiana y media hawaiana no es una
+    mitad-y-mitad, es una hawaiana entera —que ya se vende como su propio
+    producto, con su receta y su precio—. Que la pantalla no la ofrezca no
+    alcanza: el kiosko y la central de pedidos entran por este mismo
+    endpoint, y una regla que solo vive en una pantalla no es una regla
+    (mismo criterio que `_validar_grupos`, ADR-023 §2).
+
     `exigir=False` en el replay del hub (ADR-009), mismo criterio que las
     restas: esa venta ya se preparó y se cobró, y el catálogo pudo cambiar
     durante el corte.
@@ -150,6 +158,17 @@ def _resolver_valores_variante(
         raise ReglaNegocio(
             f"'{prod.nombre}' no ofrece {len(ajenos)} de los valores "
             "elegidos: solo se puede elegir lo que el producto declara"
+        )
+    choque = catalogo.combinacion_excluida(session, ids)
+    if choque:
+        izquierda, derecha = choque
+        if izquierda == derecha:
+            raise ReglaNegocio(
+                f"'{prod.nombre}' lleva dos mitades distintas: «{izquierda}» "
+                "no se puede elegir en las dos"
+            )
+        raise ReglaNegocio(
+            f"'{prod.nombre}' no admite «{izquierda}» junto con «{derecha}»"
         )
     return ids
 

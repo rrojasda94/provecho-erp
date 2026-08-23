@@ -54,16 +54,19 @@ Vive en `inventory/domain/rules.aplica_a_variante`, pura y con prueba de
 tabla. Es la única función de este cambio cuyo error mueve stock, así que no
 comparte archivo con nada que tenga base de datos delante.
 
-> **Consecuencia conocida y aceptada.** Con esta regla, media Americana +
-> media Peperoni **no** descuenta el jamón: la condición exige que los dos
-> grupos coincidan. Es el comportamiento de Odoo y el que el archivo de
-> Charlie's ya asume, así que se implementa así y no "mejor" — importar sus
-> datos y que descuenten distinto sería peor que el bug.
+> **Consecuencia, y por qué el motor igual es el correcto.** Con esta regla,
+> una línea que nombra las dos mitades solo aplica si las dos califican: media
+> Americana + media Peperoni **no** descuenta el jamón. Es el comportamiento
+> de Odoo, y por eso se implementa así — importar los datos de Charlie's y que
+> descontaran distinto sería peor que el bug.
 >
-> La corrección es de **datos, no de motor**: una línea por mitad, a media
-> cantidad, cada una condicionada a un solo atributo. `test_variantes_odoo.py`
-> prueba las dos formas una al lado de la otra para que la diferencia sea
-> visible. Anotado en Deuda técnica; se salda desde la planilla.
+> Lo que quedó claro al cargar el archivo real es que **el dato estaba mal, no
+> el motor**, y que además estaba muerto: si las dos mitades tienen que ser
+> distintas (RN-COM-038), una condición que pide la misma en las dos nunca se
+> cumple. La corrección es de datos y la aplica `scripts/odoo/`: cada línea
+> simétrica se parte en **una por mitad, con la mitad del gramaje**. Se
+> comporta igual que Odoo cuando Odoo acertaba —las dos mitades califican,
+> gramaje entero— y correctamente cuando no. Ver la enmienda al pie.
 
 ### 3. Un valor huérfano forma su propio grupo
 
@@ -152,3 +155,65 @@ a redondear dos veces.
 - `costo_linea` gana dos parámetros opcionales y `ratios_de_linea` los
   resuelve. Sin línea con unidad propia no hay consulta extra.
 - El camino del descuento lee `unidad_medida.ratio` por primera vez.
+
+
+## Enmienda (2026-08-23) — las dos mitades son distintas, y eso parte las líneas
+
+El usuario corrigió una premisa al ver la primera carga: *"no puede haber
+hawaiana + hawaiana. Puedes elegir 2 diferentes solamente. «sabor a» + «sabor
+b» = «sabor b» + «sabor a»"*.
+
+Cambia dos cosas.
+
+### 1. La combinación de mitades iguales no existe, y el servidor la rechaza
+
+Se usa `producto_exclusion` (ADR-055), que hasta ahora estaba creada y sin
+usar. Una fila por sabor: `Mitad 1: Hawaiana` excluye `Mitad 2: Hawaiana`.
+
+**Una sola fila, leída en los dos sentidos.** El par es simétrico; guardar el
+espejo sería la misma verdad dos veces y la primera en desincronizarse.
+
+Se valida en `_resolver_valores_variante`, al confirmar la venta, y no solo en
+el PDV: el kiosko y la central de pedidos entran por el mismo endpoint, y una
+regla que solo vive en una pantalla no es una regla — el mismo criterio con el
+que ADR-023 §2 puso `_validar_grupos` en la venta.
+
+### 2. Las 52 líneas condicionadas del archivo estaban muertas, y se parten
+
+Verificado sobre el archivo real: **las 52 condiciones son simétricas**, el
+mismo conjunto de sabores en las dos mitades. Con la regla nueva, una
+condición que pide `Mitad 1 ∈ S` **y** `Mitad 2 ∈ S` con S de un solo sabor no
+se cumple jamás; y con S de varios, deja de descontar en cuanto una mitad se
+sale del conjunto.
+
+Que sean simétricas dice cuál era la intención: **cada mitad aporta lo suyo**.
+Así que cada línea se parte en dos, condicionada a una sola mitad y con la
+mitad del gramaje:
+
+```
+antes:  Jamón | Mitad 1 ∈ {Ame,Haw,Rús,Mix} y Mitad 2 ∈ {Ame,Haw,Rús,Mix} | 0.025
+después: Jamón | Mitad 1 ∈ {Ame,Haw,Rús,Mix} | (0.025)/2
+         Jamón | Mitad 2 ∈ {Ame,Haw,Rús,Mix} | (0.025)/2
+```
+
+Igual que antes cuando las dos mitades calificaban (0.0125 × 2 = 0.025), y
+correcto cuando solo califica una (0.0125, que antes era cero).
+
+**La simetría `A+B == B+A` sale del modelo, no de ordenar nada al guardar.**
+Con cada línea condicionada a una sola mitad, el total no depende de en qué
+mitad se eligió cada sabor. No hace falta canonicalizar
+`venta_item.valores_variante_ids` ni inventar una clave de combinación.
+
+**La cantidad se escribe `(0.025)/2` y no `0.0125`.** El servidor evalúa la
+operación y guarda las dos cosas (RN-COM-024), así que la planilla y la ficha
+muestran de dónde salió el número. Es exactamente para lo que
+`receta_item.expresion` existe.
+
+**Las unidades pasan a 4 decimales**, el máximo que admite
+`receta_item.cantidad` (`Numeric(12,4)`). Con 3, cada mitad de 0.025 redondea
+a 0.013 y la pizza entera pasa a llevar 0.026 — un gramo de más por plato que
+nadie pidió.
+
+**Esto NO revierte la regla de §2.** El motor sigue siendo el de Odoo, y una
+condición que nombra dos atributos sigue exigiendo los dos. Lo que cambió es
+el **dato**, que es donde estaba el error.

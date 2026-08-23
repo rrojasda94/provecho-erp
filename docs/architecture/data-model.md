@@ -471,8 +471,10 @@ cambian. Lo que se agrega es de dónde salen esas filas y qué las identifica.
 - **producto_variante_valor**: producto_comercial_id (la fila **hija**),
   producto_atributo_valor_id — qué combinación *es* esa variante.
 - **producto_exclusion**: producto_atributo_valor_id, excluye_valor_id —
-  combinaciones que no existen. Se guarda una fila y se lee en los dos
-  sentidos.
+  combinaciones que no existen (RN-COM-038). Se guarda una fila y se lee en
+  los dos sentidos: el par es simétrico y guardar el espejo sería la misma
+  verdad dos veces. El caso que la obliga es la pizza mitad-y-mitad, donde
+  las dos mitades tienen que ser **distintas**.
 
 `venta_item.valores_variante_ids` (JSONB, nullable) guarda los PTAV elegidos
 en la línea. Misma forma y mismas razones que `sin_articulo_ids`.

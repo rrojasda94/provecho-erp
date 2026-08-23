@@ -393,7 +393,7 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   alguien se acordó de atar. Se cierra corriendo la suite también contra
   Postgres en CI.
 
-## Mitad-y-mitad: la regla de Odoo descuenta de menos (2026-08-23, ADR-056)
+## ~~Mitad-y-mitad: la regla de Odoo descuenta de menos~~ — SALDADA 2026-08-23
 
 `aplica_a_variante` implementa la regla de Odoo 18 al pie de la letra: se
 agrupan los valores de la condición por atributo y se exige **al menos uno de
@@ -413,8 +413,12 @@ formas lado a lado —el jamón a la manera de Odoo, la piña por mitad— para 
 la diferencia sea visible y para que quien lo arregle sepa contra qué
 comparar.
 
-Queda abierta a propósito hasta que el catálogo real esté cargado: recién ahí
-se sabe cuántas líneas de las 526 están en esta forma.
+**Saldada el mismo día**, al aparecer la regla que faltaba: las dos mitades
+tienen que ser **distintas** (RN-COM-038). Con eso, una condición que pide el
+mismo sabor en las dos mitades no es que descuente de menos — es que no se
+cumple nunca. Las 52 líneas del archivo resultaron ser **todas simétricas**, y
+`scripts/odoo/` las parte en una por mitad con la mitad del gramaje. Ver la
+enmienda de ADR-056.
 
 ## La condición de una línea no se valida contra el producto (2026-08-23)
 
