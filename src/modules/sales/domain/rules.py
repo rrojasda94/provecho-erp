@@ -314,3 +314,34 @@ def pedido_entregado(estados_items: list[str]) -> bool:
     return bool(estados_items) and all(
         estado == "entregado" for estado in estados_items
     )
+
+
+# --- Atributos y variantes (ADR-055) -----------------------------------------
+
+MODOS_VARIANTE = {"siempre", "dinamica", "nunca"}
+"""Si la combinación se materializa como fila hija de `producto_comercial`.
+
+Es el `create_variant` de `product.attribute` en Odoo
+(`always` | `dynamic` | `no_variant`), y elegir mal es lo que rompe un
+catálogo de pizzas:
+
+- `siempre` — se generan todas las combinaciones al vincular el atributo.
+  Hace falta cuando cada una tiene precio o receta propios (Tamaño).
+- `dinamica` — la fila se crea la primera vez que se vende esa combinación.
+- `nunca` — no se genera fila. El valor viaja en la línea de venta y solo
+  filtra líneas de receta. Es lo correcto para Mitad 1 / Mitad 2: con
+  `siempre` serían 19 x 19 = 361 filas de producto por tamaño.
+"""
+
+DISPLAYS_ATRIBUTO = {"radio", "pildoras", "select", "color"}
+"""Cómo lo dibuja el PDV. No cambia ninguna aritmética — igual que
+`producto_opcion_grupo` no tiene `tipo` (ADR-035 §5) — pero 19 valores en
+botones de radio es una pantalla inusable y en desplegable no."""
+
+
+def combinaciones_a_generar(modo_variante: str) -> bool:
+    """¿Este atributo materializa filas de producto al vincularse?
+
+    Solo `siempre`. `dinamica` las crea al vender y `nunca` no las crea.
+    """
+    return modo_variante == "siempre"

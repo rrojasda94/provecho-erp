@@ -447,6 +447,53 @@ descuenta stock vía la receta (ver [../domain/domain-model.md](../domain/domain
   delivery usa por distancia; RN-SRV-001..003), archivado (bool — oculta
   de listados, nunca se elimina). No referencia receta_id.
 
+### Atributos y variantes generadas (ADR-055, implementado 2026-08-23)
+
+El modelo de `product.attribute*` de Odoo 18, traducido. Reemplaza la
+alternativa que ADR-023 había descartado —"atributos con recargo"— sin
+revertirla: la variante **sigue siendo** una fila de `producto_comercial`
+con `producto_padre_id`, y por eso precio, margen, KDS, carta y réplica no
+cambian. Lo que se agrega es de dónde salen esas filas y qué las identifica.
+
+- **atributo**: empresa_id, nombre, `modo_variante`
+  (`siempre` | `dinamica` | `nunca` — el `create_variant` de Odoo),
+  `display` (`radio` | `pildoras` | `select` | `color`), orden,
+  ref_externa. UNIQUE(empresa_id, nombre).
+- **atributo_valor**: atributo_id, nombre, orden, activo.
+  UNIQUE(atributo_id, nombre).
+- **producto_atributo_linea**: producto_comercial_id, atributo_id, orden —
+  qué atributo ofrece un producto. UNIQUE(producto_comercial_id, atributo_id).
+- **producto_atributo_valor** (**PTAV**): linea_id, atributo_valor_id,
+  `precio_extra` (se **suma** al precio de la lista vigente, RN-PRC-003),
+  activo. Es la pieza a la que apuntan tanto la variante materializada como
+  la línea de receta condicionada: "Familiar" es una idea, "Familiar en la
+  Pizza Peperoni" tiene sobreprecio propio.
+- **producto_variante_valor**: producto_comercial_id (la fila **hija**),
+  producto_atributo_valor_id — qué combinación *es* esa variante.
+- **producto_exclusion**: producto_atributo_valor_id, excluye_valor_id —
+  combinaciones que no existen. Se guarda una fila y se lee en los dos
+  sentidos.
+
+`venta_item.valores_variante_ids` (JSONB, nullable) guarda los PTAV elegidos
+en la línea. Misma forma y mismas razones que `sin_articulo_ids`.
+
+### La línea de receta se condiciona y elige unidad (ADR-056, 2026-08-23)
+
+- `receta_item.aplica_valores` (JSONB, nullable): array de PTAV. NULL o `[]`
+  = aplica siempre. La regla agrupa los valores **por atributo** y exige al
+  menos uno de cada grupo (RN-COM-037) — es lo que convierte 361 recetas de
+  mitad-y-mitad en una de 26 líneas.
+- `receta_item.unidad_medida_id` (FK, nullable): NULL = la del artículo. Si
+  viene, es de la misma categoría de UdM y se convierte por `ratio`
+  (RN-UDM-005).
+- `receta_item.orden`: para que exportar dos veces dé el mismo archivo.
+- `receta.es_kit` (bool): el `type` de `mrp.bom` (`normal` | `phantom`).
+- `categoria.padre_id`: jerarquía. La ruta completa
+  ("MATERIA PRIMA / Procesados / PIZZAS") se **calcula al leer**.
+- `ref_externa` en `articulo`, `receta`, `producto_comercial` y `atributo`:
+  el identificador del sistema de origen, para que reimportar la misma
+  planilla actualice en vez de duplicar.
+
 ## 4. Inventario (módulo inventory)
 
 - **stock**: almacen_id, sku_id, cantidad (en la UdM del artículo),

@@ -28,6 +28,8 @@ from src.modules.inventory.application.queries_publicas import (
 from src.modules.sales.application.errors import Conflicto, NoEncontrado, ReglaNegocio
 from src.modules.sales.infrastructure.models import (
     MedioPago,
+    ProductoAtributoLinea,
+    ProductoAtributoValor,
     ProductoComercial,
     ProductoOpcionGrupo,
 )
@@ -394,3 +396,33 @@ def listar_medios_pago(
     session: Session, empresa_id: uuid.UUID | None = None
 ) -> list[MedioPago]:
     return MedioPagoRepo(session).list(empresa_id)
+
+
+def valores_ofrecidos(session: Session, producto: ProductoComercial) -> set[str]:
+    """`producto_atributo_valor.id` (texto) que este producto puede recibir.
+
+    **Lo propio más lo del padre**, exactamente como `grupos_efectivos` y
+    `extras_efectivos` (ADR-042). La razón es la misma y ya costó dos
+    correcciones: quien arma un producto a mano cuelga el atributo del padre
+    —porque cuando lo crea todavía no hay variantes—, y el importador lo
+    cuelga donde diga la planilla. Mientras el lugar importe, siempre hay
+    una mitad de los catálogos rota.
+
+    Solo valores activos: retirar un valor tiene que sacarlo de la oferta sin
+    romper las ventas viejas que lo nombran.
+    """
+    productos = [producto.id]
+    if producto.producto_padre_id is not None:
+        productos.append(producto.producto_padre_id)
+    filas = session.scalars(
+        select(ProductoAtributoValor.id)
+        .join(
+            ProductoAtributoLinea,
+            ProductoAtributoValor.linea_id == ProductoAtributoLinea.id,
+        )
+        .where(
+            ProductoAtributoLinea.producto_comercial_id.in_(productos),
+            ProductoAtributoValor.activo.is_(True),
+        )
+    )
+    return {str(v) for v in filas}

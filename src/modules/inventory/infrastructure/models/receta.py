@@ -10,7 +10,7 @@ ambos a la vez.
 import uuid
 from decimal import Decimal
 
-from sqlalchemy import Boolean, ForeignKey, Numeric, String
+from sqlalchemy import Boolean, ForeignKey, Numeric, String, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -38,4 +38,29 @@ class Receta(Base, UuidPkMixin, TimestampMixin):
     # nullable: NULL si la receta es de un producto_comercial de venta directa.
     articulo_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("articulo.id"), nullable=True
+    )
+    # El `type` de `mrp.bom` en Odoo: `normal` (fabricar) vs `phantom` (Kit).
+    #
+    # False: `production` puede abrir una orden que la fabrique y guardar el
+    # resultado como stock de `articulo_id`. Es la salsa que se prepara el
+    # lunes para toda la semana.
+    # True (kit): nunca se fabrica ni se stockea; se explota en el momento de
+    # vender. Es la pizza mitad-y-mitad, que no existe hasta que alguien la
+    # pide.
+    #
+    # Booleano y no un `tipo` de tres valores: Odoo tiene además
+    # `subcontract` y acá nadie lo pidió — y `recetas.TIPOS_RECETA` ya
+    # significa otra cosa (`subreceta` | `producto`, para filtrar el
+    # listado). Dos columnas llamadas "tipo de receta" con ejes distintos es
+    # cómo alguien filtra por una creyendo que filtra por la otra.
+    #
+    # Por defecto False: es lo que hacen todas las recetas de hoy y la
+    # migración no puede cambiarle el comportamiento a ninguna.
+    es_kit: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=text("false"), nullable=False
+    )
+    # Identificador del sistema de origen ("__export__.mrp_bom_3001_871387aa").
+    # Hace idempotente reimportar la misma planilla (ADR-057).
+    ref_externa: Mapped[str | None] = mapped_column(
+        String(120), nullable=True, unique=True
     )

@@ -23,13 +23,16 @@ from src.core.events import event_bus
 from src.modules.inventory.application import lotes as lotes_uc
 from src.modules.inventory.application import stock as stock_uc
 from src.modules.inventory.application.errors import StockInsuficiente
+from src.modules.inventory.domain import rules
 from src.modules.inventory.infrastructure.models import (
     Articulo,
     IncidenciaInventario,
     RecetaItem,
     Sku,
+    UnidadMedida,
 )
 from src.modules.inventory.infrastructure.repositories import StockRepo
+from src.modules.sales.application.queries_publicas import atributo_de_valores
 
 # Almacén/Sucursal son organización transversal (data-model §1); viven en
 # users/infrastructure por historia. Import de modelo (no dominio) permitido.
@@ -104,9 +107,94 @@ def _sku_de_articulo(session: Session, articulo_id: uuid.UUID) -> uuid.UUID | No
     )
 
 
+def _lineas_por_receta(
+    session: Session, items: list[dict]
+) -> dict[uuid.UUID, list[RecetaItem]]:
+    """Las líneas de cada receta nombrada por la venta, una consulta por
+    receta distinta. Dos platos de la misma pizza no la piden dos veces."""
+    lineas: dict[uuid.UUID, list[RecetaItem]] = {}
+    for it in items:
+        receta_id = uuid.UUID(it["receta_id"])
+        if receta_id not in lineas:
+            lineas[receta_id] = list(
+                session.scalars(
+                    select(RecetaItem)
+                    .where(RecetaItem.receta_id == receta_id)
+                    .order_by(RecetaItem.orden)
+                )
+            )
+    return lineas
+
+
+def _atributos_de_condiciones(
+    session: Session, lineas: dict[uuid.UUID, list[RecetaItem]]
+) -> dict[str, str]:
+    """Mapa valor → atributo para todas las condiciones de esta venta.
+
+    Una sola consulta al contrato público de `sales`, y ninguna cuando no
+    hay líneas condicionadas — que es toda receta anterior a ADR-056.
+    """
+    valores = {
+        v
+        for items in lineas.values()
+        for ri in items
+        for v in (ri.aplica_valores or [])
+    }
+    if not valores:
+        return {}
+    return atributo_de_valores(session, sorted(valores))
+
+
+def _ratios_de_unidades(
+    session: Session, lineas: dict[uuid.UUID, list[RecetaItem]]
+) -> tuple[dict[uuid.UUID, uuid.UUID], dict[uuid.UUID, Decimal]]:
+    """`articulo → su UdM` y `UdM → ratio`, solo para las líneas que
+    eligieron una unidad distinta a la de su artículo (RN-UDM-005).
+
+    Dos consultas y nada cuando ninguna línea la eligió, que es el caso de
+    todo lo cargado hasta hoy: el camino del descuento no leía `ratio` en
+    ninguna parte y sigue sin leerlo mientras nadie lo use.
+    """
+    con_unidad = [
+        ri for items in lineas.values() for ri in items if ri.unidad_medida_id
+    ]
+    if not con_unidad:
+        return {}, {}
+    udm_del_articulo = {
+        articulo_id: udm_id
+        for articulo_id, udm_id in session.execute(
+            select(Articulo.id, Articulo.unidad_medida_id).where(
+                Articulo.id.in_({ri.articulo_id for ri in con_unidad})
+            )
+        )
+    }
+    udm_ids = {ri.unidad_medida_id for ri in con_unidad} | set(
+        udm_del_articulo.values()
+    )
+    ratios = {
+        udm_id: ratio
+        for udm_id, ratio in session.execute(
+            select(UnidadMedida.id, UnidadMedida.ratio).where(
+                UnidadMedida.id.in_(udm_ids)
+            )
+        )
+    }
+    return udm_del_articulo, ratios
+
+
 def _consumos_de_items(session: Session, items: list[dict]) -> list[tuple[uuid.UUID, Decimal]]:
-    """Expande items de venta → [(articulo_id, cantidad_a_consumir)]."""
+    """Expande items de venta → [(articulo_id, cantidad_a_consumir)].
+
+    Tres filtros en orden, y el orden importa: primero lo que el cliente
+    pidió quitar, después lo que la combinación elegida no lleva, y recién
+    entonces la conversión de unidad. Convertir algo que después se descarta
+    es trabajo tirado, y descartar después de convertir invita a redondear
+    dos veces.
+    """
     consumos: list[tuple[uuid.UUID, Decimal]] = []
+    lineas = _lineas_por_receta(session, items)
+    atributo_de = _atributos_de_condiciones(session, lineas)
+    udm_del_articulo, ratios = _ratios_de_unidades(session, lineas)
     for it in items:
         cantidad_vendida = Decimal(it["cantidad"])
         # Restas de la línea ("sin cebolla", RN-PRD-004): el insumo quitado
@@ -115,14 +203,25 @@ def _consumos_de_items(session: Session, items: list[dict]) -> list[tuple[uuid.U
         # inventario: si no, la cebolla que quedó en la cámara aparece como
         # faltante en el conteo del mes.
         sin = {str(a) for a in (it.get("sin_articulo_ids") or [])}
-        for ri in session.scalars(
-            select(RecetaItem).where(RecetaItem.receta_id == uuid.UUID(it["receta_id"]))
-        ):
+        # Valores de atributo elegidos en la línea (ADR-056). Ausente en
+        # toda venta anterior a la migración, y ausente da lo mismo que
+        # antes: sin condiciones que evaluar, ninguna línea se salta.
+        elegidos = [str(v) for v in (it.get("valores_variante_ids") or [])]
+        for ri in lineas[uuid.UUID(it["receta_id"])]:
             if str(ri.articulo_id) in sin:
                 continue
-            # Consumo = cantidad de receta × vendido × (1 + merma%).
+            if not rules.aplica_a_variante(ri.aplica_valores, elegidos, atributo_de):
+                continue
+            ratio_linea = ratio_articulo = None
+            if ri.unidad_medida_id:
+                ratio_linea = ratios.get(ri.unidad_medida_id)
+                ratio_articulo = ratios.get(udm_del_articulo.get(ri.articulo_id))
+            # Consumo = cantidad de receta × (1 + merma%) × vendido.
             consumo = (
-                ri.cantidad * cantidad_vendida * (1 + ri.merma_pct / 100)
+                rules.consumo_de_linea(
+                    ri.cantidad, ri.merma_pct, ratio_linea, ratio_articulo
+                )
+                * cantidad_vendida
             )
             consumos.append((ri.articulo_id, consumo))
         if it.get("empaque_articulo_id"):

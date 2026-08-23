@@ -131,7 +131,12 @@ def costo_unitario_de_recetas(
             articulo = session.get(Articulo, item.articulo_id)
             if articulo is None:
                 continue
-            total += recetas_uc.costo_linea(item, articulo)
+            ratio_linea, ratio_articulo = recetas_uc.ratios_de_linea(
+                session, item, articulo
+            )
+            total += recetas_uc.costo_linea(
+                item, articulo, ratio_linea, ratio_articulo
+            )
         costos[receta.id] = total / receta.rendimiento_cantidad
     return costos
 

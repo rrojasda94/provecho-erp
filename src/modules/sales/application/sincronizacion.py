@@ -287,9 +287,11 @@ def _items_a_dict(filas: list) -> list[dict]:
             "precio_unitario": str(it.precio_unitario),
             "descuento": str(it.descuento),
             "grupo_cobro": it.grupo_cobro,
-            # Las restas viajan con la línea: sin ellas el replay en la nube
-            # descontaría insumos que la sucursal nunca usó.
+            # Las restas y la combinación viajan con la línea: sin ellas
+            # el replay en la nube descontaría insumos que la sucursal nunca
+            # usó.
             "sin_articulo_ids": it.sin_articulo_ids or [],
+            "valores_variante_ids": it.valores_variante_ids or [],
         }
 
     hijos: dict = {}

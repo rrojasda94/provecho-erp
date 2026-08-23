@@ -63,6 +63,27 @@ tras sumar precios y lote/FEFO) que el motor solo ensambla; tabla `sync_watermar
 | Skins multi-marca (PDV/Kiosk por marca vs **Provecho** en el resto — Majambo no tiene tema propio, decidido 2026-07-27), accesibilidad (2 paletas + 4 niveles de tamaño de fuente, catálogo definido 2026-07-27) y plataformas por módulo (táctil Android en PDV/Kiosk/KDS/Inventario, PC-first en el resto) | 🔶 accesibilidad ✅ 2026-08-12 | **Accesibilidad implementada (ADR-037)**: paleta de alto contraste (Okabe-Ito, cubre el par rojo-verde), escala de letra en cuatro niveles y modo oscuro, las tres en el perfil del usuario y no en el dispositivo — en un local la misma tablet la usan tres turnos. Se resuelven en el servidor (`class="dark"`, `data-escala`, `data-paleta` en `<html>`): `next-themes` exigiría un script inline que la CSP con nonce tendría que autorizar. Paleta y tema se combinan. `Insignia` ata el ícono al tono, que es lo que hace cumplible «ningún estado solo por color». Pendiente: resolver de tema por marca para PDV/Kiosk |
 | F2 — Arquitectura de frontend (documento maestro) | ✅ spec 2026-07-27 | `docs/product/frontend-architecture.md` — 31 secciones (tokens, componentes base/especializados, layout, navegación, estado, tablas, formularios, tiempo real, permisos visuales por rol, etc.) con estado por sección y los 6 puntos a cerrar antes de los diseños finales del alfa (layout general, componentes base, tablas, permisos visuales, arquitectura de carpetas, decisión de estado). Solo especificado — ver detalle en Deuda técnica → Frontend |
 
+## Catálogo modelo Odoo (0.7.0, en curso desde 2026-08-23)
+
+Rama `feat/catalogo-odoo`, sobre v0.6.0. El catálogo pasa al modelo de
+atributos y variantes de Odoo 18 porque el actual no soporta el carta real de
+Charlie's: una `Pizza MitadxMitad Familiar` de 19 sabores por mitad son 361
+productos con 361 recetas.
+
+| Fase | Qué | Estado |
+|---|---|---|
+| F1 | Modelo, migración aditiva `e2b7c40d91af`, reglas puras | ✅ 2026-08-23 |
+| F2 | Explosión de receta condicionada, venta, eventos, sync | ✅ 2026-08-23 |
+| F3 | Planillas `.xlsx` compatibles con el export de Odoo (4 libros) | ⏳ |
+| F4 | Matriz de recetas (edición masiva tipo hoja de cálculo) | ⏳ |
+| F5 | Lienzo de nodos sobre el modelo nuevo | ⏳ |
+| F6 | Seeder desde los `.xlsx` reales, corte 0.7.0 | ⏳ |
+
+**Vuelta atrás**: la migración es solo aditiva, así que la imagen 0.6.0 corre
+contra este esquema sin enterarse. Volver a operar es
+`./scripts/desplegar.sh 0.6.0`; el `alembic downgrade` solo hace falta si
+además se quiere el esquema idéntico, y borra lo cargado con el modelo nuevo.
+
 ## Pendientes de decisión (registro vivo)
 
 Marcar aquí cuando cada uno se resuelva (y actualizar el doc que lo

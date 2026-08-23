@@ -22,6 +22,8 @@ from src.modules.sales.infrastructure.models import (
     Cliente,
     MedioPago,
     Pago,
+    ProductoAtributoLinea,
+    ProductoAtributoValor,
     ProductoComercial,
     PuntoVenta,
     Venta,
@@ -556,3 +558,38 @@ def productos_que_usan_receta(session: Session, receta_id: uuid.UUID) -> list[st
             .order_by(ProductoComercial.nombre)
         )
     )
+
+
+def atributo_de_valores(
+    session: Session, valor_ids: Sequence[uuid.UUID | str]
+) -> dict[str, str]:
+    """`producto_atributo_valor.id` → `atributo.id`, los dos como texto.
+
+    Lo consulta `inventory` para decidir si una línea de receta condicionada
+    le toca a la combinación vendida: la regla agrupa los valores **por
+    atributo** y exige uno de cada grupo (RN-COM-037), así que sin saber a
+    qué atributo pertenece cada valor no se puede aplicar.
+
+    Va por el contrato público y no metiendo el atributo dentro de
+    `receta_item.aplica_valores`: la condición nombra valores que el cliente
+    **no** eligió —"aplica si la mitad es Americana u Hawaiana"—, así que el
+    dato no puede viajar en el evento de la venta, que solo lleva lo
+    elegido. Denormalizarlo en la columna sería una segunda copia de algo
+    que ya es único por construcción (un valor pertenece a una línea, y la
+    línea a un atributo).
+
+    Una consulta, no una por valor. Los ids que no existan simplemente no
+    salen en el mapa, y `aplica_a_variante` los trata como huérfanos.
+    """
+    ids = [uuid.UUID(str(v)) for v in valor_ids]
+    if not ids:
+        return {}
+    filas = session.execute(
+        select(ProductoAtributoValor.id, ProductoAtributoLinea.atributo_id)
+        .join(
+            ProductoAtributoLinea,
+            ProductoAtributoValor.linea_id == ProductoAtributoLinea.id,
+        )
+        .where(ProductoAtributoValor.id.in_(ids))
+    )
+    return {str(valor_id): str(atributo_id) for valor_id, atributo_id in filas}

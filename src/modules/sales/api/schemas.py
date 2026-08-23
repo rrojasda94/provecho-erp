@@ -31,6 +31,10 @@ class VentaItemIn(BaseModel):
     # RN-PRD-004). Solo admite artículos que la receta usa; no cambian el
     # precio, sí el descuento de inventario.
     sin_articulo_ids: list[uuid.UUID] = []
+    # Valores de atributo elegidos (ADR-055): `producto_atributo_valor.id`.
+    # Deciden qué líneas condicionadas de la receta se descuentan
+    # (RN-COM-037). Solo admite valores que el producto o su padre ofrecen.
+    valores_variante_ids: list[uuid.UUID] = []
 
 
 class VentaCreate(UbicacionMixin):
@@ -387,6 +391,9 @@ class VentaItemSyncIn(BaseModel):
     # esa venta no quitó nada. No se revalidan contra la receta —la venta ya
     # se preparó y la receta pudo cambiar durante el corte (ADR-009).
     sin_articulo_ids: list[uuid.UUID] = []
+    # Valores de atributo de la línea. Ausentes en lotes emitidos antes de
+    # ADR-055. Tampoco se revalidan contra el catálogo, por lo mismo.
+    valores_variante_ids: list[uuid.UUID] = []
 
 
 class VentaSyncIn(BaseModel):

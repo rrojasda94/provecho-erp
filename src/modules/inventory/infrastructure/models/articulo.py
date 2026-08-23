@@ -38,3 +38,10 @@ class Articulo(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin):
     dias_alerta_vencimiento: Mapped[int | None] = mapped_column(
         Integer, nullable=True
     )
+    # Identificador del sistema de origen ("__export__.product_template_1308_...").
+    # `id_interno` son 4 caracteres que la gente teclea; esto es la clave del
+    # otro sistema, que puede tener cualquier forma. Reimportar la misma
+    # planilla actualiza en vez de duplicar (ADR-057).
+    ref_externa: Mapped[str | None] = mapped_column(
+        String(120), nullable=True, unique=True
+    )
