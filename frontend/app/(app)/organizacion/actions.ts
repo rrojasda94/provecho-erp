@@ -213,3 +213,51 @@ export async function guardarAlmacenAction(
     "el almacén",
   );
 }
+
+// --- Punto de venta ---------------------------------------------------------
+
+/**
+ * La caja de una sucursal. Vive acá y no en Ventas porque asignarle series
+ * SUNAT es identidad fiscal de la empresa, del mismo orden que fundar el
+ * local — el backend la gatea con `organizacion.gestionar` (ADR-059).
+ */
+export async function guardarPuntoVentaAction(
+  _previo: EstadoOrganizacion,
+  formData: FormData,
+): Promise<EstadoOrganizacion> {
+  const sucursalId = texto(formData, "sucursal_id");
+  const serieBoleta = texto(formData, "serie_boleta");
+  const serieFactura = texto(formData, "serie_factura");
+  const editando = Boolean(texto(formData, "id"));
+
+  if (!editando && !sucursalId) {
+    return { error: "Elige la sucursal a la que pertenece la caja.", ok: false };
+  }
+  if (!serieBoleta || !serieFactura) {
+    return { error: "Las series de boleta y factura son obligatorias.", ok: false };
+  }
+
+  // Sin ninguna marcada el backend rechaza la lista vacía; `undefined` es lo
+  // que significa "las tres" (RN-MDC-001).
+  const modalidades = formData.getAll("modalidades_habilitadas").map(String);
+
+  return guardar(
+    "/api/v1/sales/puntos-venta",
+    "/organizacion/puntos-venta",
+    formData,
+    {
+      // La caja no se muda de local: sus comprobantes y aperturas cuelgan de
+      // ahí, así que al editar ni se manda.
+      ...(editando ? {} : { sucursal_id: sucursalId }),
+      canal: texto(formData, "canal"),
+      politica_pago: texto(formData, "politica_pago"),
+      serie_boleta: serieBoleta,
+      serie_factura: serieFactura,
+      serie_nc_boleta: texto(formData, "serie_nc_boleta") || null,
+      serie_nc_factura: texto(formData, "serie_nc_factura") || null,
+      hardware_id: texto(formData, "hardware_id") || null,
+      modalidades_habilitadas: modalidades.length ? modalidades : null,
+    },
+    "el punto de venta",
+  );
+}

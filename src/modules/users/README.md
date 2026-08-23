@@ -154,6 +154,12 @@ Grupo, empresa, marca, licencia de marca, sucursal y almacén. Hasta ahora
 solo los escribía el seeder: dar de alta un local obligaba a correr un
 script contra la base.
 
+El **punto de venta** (la caja del local) también se administra con este
+permiso desde 2026-08-23, pero sus endpoints viven en `sales` porque el
+modelo es de ese módulo: `POST`/`PATCH /api/v1/sales/puntos-venta`. El
+porqué del permiso cruzado está en ADR-059 — asignar una serie SUNAT es
+identidad fiscal de la empresa, no configuración del salón.
+
 `organizacion.gestionar` es un permiso **aparte** de `users.gestionar`:
 quien crea cajeros no tiene por qué poder fundar sucursales ni cambiar el
 RUC de la empresa.

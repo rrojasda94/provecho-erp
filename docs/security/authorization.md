@@ -59,7 +59,8 @@ Los tres caminos con PIN responden preguntas distintas y no se sustituyen:
 | Rol | Permisos base |
 |-----|---------------|
 | admin | `*` (todo, solo entornos internos) |
-| — | `organizacion.gestionar`: CRUD de grupo, empresas, marcas, licencias, sucursales y almacenes. **Aparte de `users.gestionar`**: quien crea cajeros no funda sucursales. Fundar un grupo o una empresa exige además `*` — el recurso nuevo todavía no pertenece a la empresa de nadie |
+| — | `organizacion.gestionar`: CRUD de grupo, empresas, marcas, licencias, sucursales, almacenes y **puntos de venta**. **Aparte de `users.gestionar`**: quien crea cajeros no funda sucursales. Fundar un grupo o una empresa exige además `*` — el recurso nuevo todavía no pertenece a la empresa de nadie |
+| — | El **punto de venta** (la caja del local) vive en `sales` pero se administra con este permiso y no con uno `sales.*` (ADR-059): asignarle una serie SUNAT es identidad fiscal de la empresa, del mismo orden que fundar el local, no configurar el salón. `GET /sales/puntos-venta` acepta **`sales.leer` o `organizacion.gestionar`** — el cajero necesita leerlo para abrir el PDV, y quien da de alta las cajas puede no tener ningún permiso de venta |
 | supervisor | `inventory.*`, `purchases.aprobar`, `sales.leer`, aprueba solicitudes |
 | almacenero | `inventory.transferir`, `inventory.recepcion`, `inventory.ajustar` |
 | cajero | `sales.crear`, `sales.cobrar`, `sales.leer`, `sales.entregar_pedido`, `kds.operar`, `accounting.caja_operar` (su sucursal) |
