@@ -1,0 +1,16 @@
+# Proxy de staging. Caddy saca y renueva el certificado TLS solo (Let's
+# Encrypt) — nada que configurar a mano ni cron de renovación, a diferencia
+# de nginx+certbot. Ver docs/engineering/staging.md.
+#
+# Los dos dominios (sustituir por los reales si el servidor cambia) van a
+# servicios internos DISTINTOS del compose: el frontend habla con la API por
+# la red interna de Docker (API_INTERNAL_URL), así que el navegador solo
+# necesita HTTPS hacia cada uno por separado.
+
+staging.majambo.com.pe {
+	reverse_proxy web:3000
+}
+
+api-staging.majambo.com.pe {
+	reverse_proxy api:8000
+}

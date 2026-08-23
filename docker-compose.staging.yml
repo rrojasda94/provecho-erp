@@ -1,0 +1,149 @@
+# Staging: réplica del ERP en internet, con dominio y TLS, para ensayo antes
+# de producción. Ver docs/engineering/staging.md (datos del servidor) y
+# devops.md#despliegue (criterios generales).
+#
+# Diferencias deliberadas contra `docker-compose.prod.yml`:
+# - Trae su propia base de datos (Postgres en el compose, no gestionada):
+#   los datos de staging son desechables, no vale la pena pagar un Postgres
+#   aparte para eso.
+# - Incluye el frontend (`web`) y el proxy (`caddy`) — producción los sirve
+#   distinto (ver ROADMAP cuando se defina el compose real de producción).
+# - Un servicio `init` migra y siembra al arrancar (igual que
+#   docker-compose.demo.yml): en staging nadie se conecta a correr
+#   `alembic upgrade head` a mano cada vez que se prueba una versión nueva.
+#
+# Uso:
+#   cp .env.staging.example .env
+#   docker compose -f docker-compose.staging.yml up -d
+#
+# Actualizar a una versión nueva: ver scripts/desplegar.sh
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: provecho
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: provecho
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U provecho"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --save 60 1 --appendonly no
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # Corre una vez y termina. Idempotente — repetirlo en cada `up` no
+  # duplica nada (mismo criterio que docker-compose.demo.yml).
+  init:
+    image: ${PROVECHO_IMAGE:-ghcr.io/rrojasda94/provecho-erp:latest}
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://provecho:${POSTGRES_PASSWORD}@db:5432/provecho
+      REDIS_URL: redis://redis:6379/0
+    command: sh -c "alembic upgrade head && python -m src.seeders.seed"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    image: ${PROVECHO_IMAGE:-ghcr.io/rrojasda94/provecho-erp:latest}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://provecho:${POSTGRES_PASSWORD}@db:5432/provecho
+      REDIS_URL: redis://redis:6379/0
+    # Solo loopback: Caddy es la única puerta de entrada desde fuera; el
+    # loopback queda para health checks y depuración desde el servidor.
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  worker:
+    image: ${PROVECHO_IMAGE:-ghcr.io/rrojasda94/provecho-erp:latest}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://provecho:${POSTGRES_PASSWORD}@db:5432/provecho
+      REDIS_URL: redis://redis:6379/0
+    command: celery -A src.core.celery_app worker --loglevel=info
+    # El HEALTHCHECK de la imagen pega a /health, que este proceso no sirve
+    # (no levanta servidor HTTP) — ver docker-compose.prod.yml.
+    healthcheck:
+      disable: true
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  beat:
+    image: ${PROVECHO_IMAGE:-ghcr.io/rrojasda94/provecho-erp:latest}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://provecho:${POSTGRES_PASSWORD}@db:5432/provecho
+      REDIS_URL: redis://redis:6379/0
+    # Una sola instancia por despliegue: dos programadores encolarían cada
+    # tarea dos veces.
+    command: celery -A src.core.celery_app beat --loglevel=info
+    healthcheck:
+      disable: true
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  web:
+    image: ${PROVECHO_WEB_IMAGE:-ghcr.io/rrojasda94/provecho-erp-web:latest}
+    restart: unless-stopped
+    environment:
+      # Vista del navegador: fuera de los contenedores, por el dominio real.
+      NEXT_PUBLIC_API_URL: https://api-staging.majambo.com.pe
+      # Vista del proceso de Next (Server Actions): dentro de la red de
+      # Docker, nombre del servicio.
+      API_INTERNAL_URL: http://api:8000
+      COOKIE_SECURE: "true"
+    depends_on:
+      - api
+
+  # TLS automático (Let's Encrypt) y proxy hacia web/api. Único servicio
+  # con puertos publicados al exterior.
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+      - api
+
+volumes:
+  pgdata:
+  redisdata:
+  caddy_data:
+  caddy_config:

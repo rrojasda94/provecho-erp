@@ -127,12 +127,12 @@ def test_rbac_deny_por_defecto_403(client):
     r = client.post(
         "/api/v1/users",
         headers=_auth(admin_token),
-        json={"username": "cajero1", "pin": "654321"},
+        json={"username": "cajero_test", "pin": "654321"},
     )
     assert r.status_code == 201
 
     # Ese usuario, sin permisos, no puede usar endpoints admin.
-    token = _login(client, "cajero1", "654321").json()["access_token"]
+    token = _login(client, "cajero_test", "654321").json()["access_token"]
     assert client.get("/api/v1/users", headers=_auth(token)).status_code == 403
     # Pero sí puede ver su propio perfil.
     assert client.get("/api/v1/users/me", headers=_auth(token)).status_code == 200

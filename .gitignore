@@ -20,6 +20,11 @@ frontend/out/
 .env.*
 !.env.example
 !.env.hub.example
+!.env.staging.example
+
+# Paquetes de demo portable (`scripts/empaquetar_demo.py`): ~1 GB de imágenes
+# de Docker por versión. Se reparten a mano, no se versionan.
+ZIP_*/
 
 # Backups de la base (nunca versionados: son datos reales del negocio).
 # Anclado a la raíz: sin la barra inicial también tapaba `src/backups/`,
@@ -59,6 +64,7 @@ frontend/blob-report/
 
 # Scratch de TestSprite: credenciales del runner y salida de cada corrida.
 testsprite_tests/tmp/
+testsprite_tests/tmp/config.json
 
 # Planillas generadas por scripts/odoo/convertir_catalogo.py. Son datos reales
 # del negocio derivados de un export privado: se generan cuando se necesitan y

@@ -4,6 +4,11 @@ Existe para que `CHANGELOG.md` deje de ser un punto de inserción compartido:
 cada cambio escribe su propio archivo y el conflicto entre ramas paralelas
 deja de ser posible. Ver `changelog.d/README.md`.
 
+También escribe la versión en `pyproject.toml` y `frontend/package.json`. No
+lo hacía, y para el 2026-08-09 el repo iba por `v0.4.0` con los dos archivos
+declarando `0.1.0`: la versión vivía solo en el tag de git, así que cualquier
+cosa que la leyera del proyecto —el paquete de demo, por ejemplo— mentía.
+
 Uso: `python scripts/cortar_version.py 0.3.0 [--fecha 2026-08-09]`
 """
 
@@ -17,10 +22,14 @@ RAIZ = pathlib.Path(__file__).resolve().parent.parent
 CHANGELOG = RAIZ / "CHANGELOG.md"
 FRAGMENTOS = RAIZ / "changelog.d"
 PYPROJECT = RAIZ / "pyproject.toml"
+PACKAGE_JSON = RAIZ / "frontend" / "package.json"
 
-#: La línea de `[project]`. Anclada al principio de línea a propósito:
-#: `target-version` y las de las dependencias no empiezan con "version".
-_VERSION_TOML = re.compile(r'^version = "[^"]+"', re.MULTILINE)
+#: archivo -> patrón de la línea que declara la versión. El `count=1` de abajo
+#: importa: `package.json` menciona versiones de dependencias más abajo.
+_VERSION_EN = {
+    PYPROJECT: re.compile(r'^(version = ")[^"]+(")', re.M),
+    PACKAGE_JSON: re.compile(r'^(\s*"version":\s*")[^"]+(")', re.M),
+}
 
 #: Orden de Keep a Changelog. El prefijo del nombre del archivo decide la
 #: sección, así que un tipo fuera de esta lista es un error de nombre.
@@ -64,19 +73,14 @@ def cortar(texto: str, seccion: str) -> str:
     return f"{cabeza}{_ENCABEZADO}\n\nVer [`changelog.d/`](changelog.d/).\n\n{seccion}\n## {resto}"
 
 
-def subir_version(texto: str, version: str) -> str:
-    """Mueve `version` de `[project]` en pyproject.toml.
-
-    Sin esto el paquete se quedó en 0.1.0 mientras el CHANGELOG y los tags
-    iban por 0.5.0: la versión se tecleaba tres veces —argumento, mensaje de
-    commit y tag— y no aterrizaba en ningún archivo salvo el CHANGELOG. De ahí
-    salen el `release` de GlitchTip y la versión de `/docs`, así que todos los
-    errores de cuatro releases cayeron en el mismo balde.
-    """
-    nuevo, cambios = _VERSION_TOML.subn(f'version = "{version}"', texto, count=1)
-    if cambios != 1:
-        raise SystemExit("No encontré la línea 'version = ...' en pyproject.toml.")
-    return nuevo
+def sellar_version(version: str) -> None:
+    """Deja la versión escrita en los dos archivos que la declaran."""
+    for archivo, patron in _VERSION_EN.items():
+        texto = archivo.read_text(encoding="utf-8")
+        nuevo, cambios = patron.subn(rf"\g<1>{version}\g<2>", texto, count=1)
+        if not cambios:
+            raise SystemExit(f"No encontré la línea de versión en {archivo.name}.")
+        archivo.write_text(nuevo, encoding="utf-8", newline="")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -95,23 +99,25 @@ def main(argv: list[str] | None = None) -> int:
         encoding="utf-8",
         newline="",
     )
-    PYPROJECT.write_text(
-        subir_version(PYPROJECT.read_text(encoding="utf-8"), args.version),
-        encoding="utf-8",
-        newline="",
-    )
     for archivo in FRAGMENTOS.glob("*.md"):
         if archivo.name != "README.md":
             archivo.unlink()
+    sellar_version(args.version)
 
     total = sum(len(v) for v in por_tipo.values())
     print(f"{args.version}: {total} fragmentos en {len(por_tipo)} secciones.")
-    print("pyproject.toml actualizado. Reinstalar en dev: pip install -e '.[dev]'")
+    print(f"Versión escrita en {PYPROJECT.name} y frontend/{PACKAGE_JSON.name}.")
     return 0
 
 
 def _autocomprobacion() -> None:
-    """Lo único que puede romperse en silencio es dónde se inserta la sección."""
+    """Lo que puede romperse en silencio: dónde se inserta y qué se sella."""
+    for archivo, patron in _VERSION_EN.items():
+        texto = archivo.read_text(encoding="utf-8")
+        nuevo, cambios = patron.subn(r"\g<1>9.9.9\g<2>", texto, count=1)
+        assert cambios == 1, f"{archivo.name}: el patrón de versión ya no engancha"
+        assert '"9.9.9"' in nuevo or "9.9.9" in nuevo, f"{archivo.name}: no reemplazó"
+
     antes = (
         "# Changelog\n\n## [Unreleased]\n\nVer [`changelog.d/`](changelog.d/).\n\n"
         "## [0.2.0] - 2026-08-08\n\n### Added\n\n- algo viejo\n"
@@ -121,14 +127,6 @@ def _autocomprobacion() -> None:
     assert "- algo viejo" in nuevo, "no se pierde lo anterior"
     assert "### Fixed\n\n- algo nuevo" in nuevo, "el tipo arma su encabezado"
     assert nuevo.count(_ENCABEZADO) == 1, "[Unreleased] queda una sola vez"
-
-    toml = (
-        '[project]\nname = "provecho"\nversion = "0.4.0"\n\n'
-        '[tool.ruff]\ntarget-version = "py312"\n'
-    )
-    subido = subir_version(toml, "0.5.0")
-    assert 'version = "0.5.0"' in subido, "mueve la versión de [project]"
-    assert 'target-version = "py312"' in subido, "no toca target-version de ruff"
     print("autocomprobación ok")
 
 

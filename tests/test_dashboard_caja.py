@@ -130,7 +130,7 @@ def env(monkeypatch):
             )
         )
 
-        cajero = Usuario(username="cajero1", pin_hash=hash_pin("111111"), tipo="humano")
+        cajero = Usuario(username="cajero_test", pin_hash=hash_pin("111111"), tipo="humano")
         # La cadena de custodia necesita dos personas: el cajero, que deja
         # el efectivo contado en el cajón al cerrar, y el encargado, que
         # firma con su PIN haberlo recibido (RN-MDP-002/008).
@@ -355,7 +355,7 @@ def test_cajero_puede_abrir_su_propia_caja(env):
     """El permiso `accounting.caja_operar` (rol cajero) alcanza — no exige
     permisos de administración general."""
     client, ids, _ = env
-    h = _token(client, username="cajero1", pin="111111")
+    h = _token(client, username="cajero_test", pin="111111")
     assert _abrir_caja(client, h, ids).status_code == 201
 
 
@@ -451,7 +451,7 @@ def test_dashboard_venta_anulada_no_cuenta(env):
 
 def test_dashboard_sin_permiso_403(env):
     client, ids, _ = env
-    h = _token(client, username="cajero1", pin="111111")
+    h = _token(client, username="cajero_test", pin="111111")
     r = client.get(
         f"/api/v1/dashboard/resumen?empresa_id={ids['empresa_id']}", headers=h
     )
@@ -529,7 +529,7 @@ def test_el_cajero_ve_la_caja_abierta_de_su_sucursal(env):
     admin = _token(client)
     abierta = _abrir_caja(client, admin, ids).json()
 
-    cajero = _token(client, "cajero1", "111111")
+    cajero = _token(client, "cajero_test", "111111")
     suya = client.get(
         f"/api/v1/accounting/cajas/abiertas?sucursal_id={ids['sucursal_id']}",
         headers=cajero,
@@ -559,7 +559,7 @@ def test_no_se_ve_la_caja_de_una_sucursal_ajena(env):
         s.commit()
         ajena_id = str(otra.id)
 
-    cajero = _token(client, "cajero1", "111111")
+    cajero = _token(client, "cajero_test", "111111")
     r = client.get(
         f"/api/v1/accounting/cajas/abiertas?sucursal_id={ajena_id}", headers=cajero
     )
@@ -582,7 +582,7 @@ def test_el_cajero_anula_lo_recien_enviado_y_despues_necesita_firma(env):
     from src.modules.sales.infrastructure.models import VentaItem
 
     client, ids, TestSession = env
-    cajero = _token(client, "cajero1", "111111")
+    cajero = _token(client, "cajero_test", "111111")
 
     def vender(key):
         r = client.post(
@@ -635,7 +635,7 @@ def test_el_supervisor_anula_sin_tener_que_firmarse_a_si_mismo(env):
     # La venta la crea el cajero: `supervisor` no tiene `sales.crear` ni
     # `sales.cobrar`. Que los dos roles sean disjuntos es justamente por qué
     # el endpoint acepta uno **u** otro y no los dos.
-    cajero = _token(client, "cajero1", "111111")
+    cajero = _token(client, "cajero_test", "111111")
     supervisor = _token(client, "encargado1", "222222")
     venta = client.post(
         "/api/v1/sales/ventas",
@@ -665,7 +665,7 @@ def test_una_orden_enviada_admite_lineas_nuevas_sin_permiso_extra(env):
     client, ids, TestSession = env
     publicados: list[dict] = []
     event_bus.subscribe("sales.venta_confirmada", publicados.append)
-    cajero = _token(client, "cajero1", "111111")
+    cajero = _token(client, "cajero_test", "111111")
     venta = client.post(
         "/api/v1/sales/ventas",
         headers=cajero,
@@ -738,7 +738,7 @@ def test_quitar_una_linea_vieja_exige_firma_y_una_reciente_no(env):
     from src.modules.sales.infrastructure.models import VentaItem
 
     client, ids, TestSession = env
-    cajero = _token(client, "cajero1", "111111")
+    cajero = _token(client, "cajero_test", "111111")
     venta = client.post(
         "/api/v1/sales/ventas",
         headers=cajero,

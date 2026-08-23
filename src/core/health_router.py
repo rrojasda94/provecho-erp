@@ -46,6 +46,20 @@ def health_backups(respuesta: Response) -> dict:
     return resultado
 
 
+# HEAD aparte y fuera del schema, no vía el auto-agregado de Starlette/
+# FastAPI a `@router.get(...)`: dejó de funcionar en la versión instalada
+# (descubierto 2026-08-23, monitor UptimeRobot en plan gratis, que sondea
+# con HEAD y no permite cambiar a GET). `include_in_schema=False` porque
+# HEAD es implícito en HTTP para cualquier GET — documentarlo aparte solo
+# duplicaría el operation ID en el contrato OpenAPI.
+for _ruta, _vista in (
+    ("/health", health),
+    ("/health/ready", health_ready),
+    ("/health/backups", health_backups),
+):
+    router.add_api_route(_ruta, _vista, methods=["HEAD"], include_in_schema=False)
+
+
 @router.get("/health/sync")
 def health_sync() -> dict:
     """Solo tiene sentido en un hub (ADR-009): si este proceso es la nube,

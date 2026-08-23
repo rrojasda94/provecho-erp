@@ -59,7 +59,7 @@ def env():
         contador = Usuario(
             username="contador1", pin_hash=hash_pin("333333"), tipo="humano"
         )
-        cajero = Usuario(username="cajero1", pin_hash=hash_pin("111111"), tipo="humano")
+        cajero = Usuario(username="cajero_test", pin_hash=hash_pin("111111"), tipo="humano")
         s.add_all([contador, cajero])
         s.flush()
         for usuario, rol_nombre in ((contador, "contador"), (cajero, "cajero")):
@@ -165,7 +165,7 @@ def test_alcance_de_tenant_al_listar(env):
 
 def test_listar_exige_permiso(env):
     client, _, _ = env
-    r = client.get("/api/v1/auditoria", headers=_token(client, "cajero1", "111111"))
+    r = client.get("/api/v1/auditoria", headers=_token(client, "cajero_test", "111111"))
     assert r.status_code == 403
 
 

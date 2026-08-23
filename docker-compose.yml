@@ -108,8 +108,9 @@ services:
     build:
       context: ./frontend
       # La imagen del frontend es multietapa: `dev` corre `next dev`, `runner`
-      # sirve el build de producción. Sin `target`, docker construye la última
-      # etapa —producción— y este servicio dejaría de recargar al editar.
+      # sirve el build de producción (el que se reparte en la demo). Sin
+      # `target`, docker construye la última etapa y este servicio dejaría de
+      # recargar al editar.
       target: dev
     restart: unless-stopped
     ports:

@@ -38,6 +38,17 @@ docker compose exec api python -m src.seeders.seed
 > `docker-compose.prod.yml` — ver
 > [devops.md](docs/engineering/devops.md#despliegue).
 
+### Demo portable
+
+```bash
+python scripts/empaquetar_demo.py
+```
+
+Arma `ZIP_<versión>/provecho-demo-<versión>.zip`: el ERP entero para que
+alguien lo pruebe en su PC con doble clic, sin internet ni consola. Solo pide
+Docker Desktop. Detalle en
+[devops.md](docs/engineering/devops.md#paquete-de-demo-portable).
+
 - API: http://localhost:8000 — docs OpenAPI en http://localhost:8000/docs
   (deshabilitadas en producción)
 - Web: http://localhost:3000 — login por PIN + dashboard gerencial
