@@ -192,9 +192,7 @@ def test_el_dni_trae_la_fecha_de_nacimiento_cuando_el_plan_la_incluye(monkeypatc
         }
         # `c=cuerpo`: la lambda se evalúa después del bucle, y sin fijarlo
         # las cuatro corridas leerían el último valor.
-        monkeypatch.setattr(
-            httpx, "get", lambda *a, c=cuerpo, **k: _RespuestaFalsa(200, "x", c)
-        )
+        monkeypatch.setattr(httpx, "get", lambda *a, c=cuerpo, **k: _RespuestaFalsa(200, "x", c))
         assert FactilizaClient(token="t").consultar_dni("73632127").fecha_nacimiento == esperada
 
 
@@ -316,9 +314,7 @@ def test_el_comprador_consulta_un_ruc_y_recibe_el_domicilio(api, monkeypatch):
         },
     }
     monkeypatch.setattr(httpx, "get", lambda *a, **k: _RespuestaFalsa(200, "x", cuerpo))
-    r = api.get(
-        "/api/v1/consulta/ruc/20610077782", headers=_tok(api, "compras1", "654321")
-    )
+    r = api.get("/api/v1/consulta/ruc/20610077782", headers=_tok(api, "compras1", "654321"))
     assert r.status_code == 200, r.text
     assert r.json()["razon_social"] == "SERVICIOS RENTAURANT S.A.C"
     assert r.json()["provincia"] == "SAN MARTIN"
@@ -338,9 +334,7 @@ def test_la_consulta_no_devuelve_la_respuesta_cruda(api, monkeypatch):
         },
     }
     monkeypatch.setattr(httpx, "get", lambda *a, **k: _RespuestaFalsa(200, "x", cuerpo))
-    r = api.get(
-        "/api/v1/consulta/dni/73632127", headers=_tok(api, "compras1", "654321")
-    )
+    r = api.get("/api/v1/consulta/dni/73632127", headers=_tok(api, "compras1", "654321"))
     assert r.status_code == 200, r.text
     assert set(r.json()) == {
         "encontrado",
@@ -372,25 +366,20 @@ def test_un_documento_mal_formado_no_llega_al_proveedor(api, monkeypatch):
 def test_el_proveedor_caido_es_502_y_no_500(api, monkeypatch):
     """El que falló es un tercero, y la diferencia importa: un 500 manda a
     revisar este servidor, que está bien."""
+
     def _cae(*a, **k):
         raise httpx.ConnectError("sin red")
 
     monkeypatch.setattr(httpx, "get", _cae)
-    r = api.get(
-        "/api/v1/consulta/ruc/20610077782", headers=_tok(api, "compras1", "654321")
-    )
+    r = api.get("/api/v1/consulta/ruc/20610077782", headers=_tok(api, "compras1", "654321"))
     assert r.status_code == 502, r.text
 
 
 def test_documento_no_encontrado_no_es_error(api, monkeypatch):
     """El alta puede seguir tecleando el nombre: que RENIEC no lo tenga no
     es una falla del ERP."""
-    monkeypatch.setattr(
-        httpx, "get", lambda *a, **k: _RespuestaFalsa(404, "", None)
-    )
-    r = api.get(
-        "/api/v1/consulta/dni/73632127", headers=_tok(api, "compras1", "654321")
-    )
+    monkeypatch.setattr(httpx, "get", lambda *a, **k: _RespuestaFalsa(404, "", None))
+    r = api.get("/api/v1/consulta/dni/73632127", headers=_tok(api, "compras1", "654321"))
     assert r.status_code == 200, r.text
     assert r.json()["encontrado"] is False
 
@@ -498,3 +487,58 @@ def test_con_redis_caido_la_consulta_no_se_bloquea(api, monkeypatch):
     codigos = [api.get(DNI, headers=h).status_code for _ in range(4)]
 
     assert codigos == [200, 200, 200, 200]
+
+
+# --- Dos tokens: emisión y consulta son productos distintos -----------------
+# Factiliza cobra por separado la emisión de comprobantes y la consulta
+# RUC/DNI, y entrega una credencial por cada una. Mandar el token de emisión
+# al host de consulta devuelve 401 y el buscador de DNI del mostrador queda
+# muerto sin que nadie sepa por qué — el síntoma es un 502 genérico.
+
+
+def _capturar_authorization(monkeypatch, metodo="get"):
+    """Reemplaza `httpx.get`/`httpx.post` y devuelve la lista donde van
+    cayendo los Bearer que se enviaron."""
+    enviados: list[str] = []
+
+    def espia(*a, **k):
+        enviados.append(k["headers"]["Authorization"])
+        return _RespuestaFalsa(200, "x", {"success": True, "data": {}})
+
+    monkeypatch.setattr(httpx, metodo, espia)
+    return enviados
+
+
+def test_la_consulta_usa_su_propio_token(monkeypatch):
+    monkeypatch.setattr(settings, "factiliza_token", "el-de-emision")
+    monkeypatch.setattr(settings, "factiliza_consulta_documento_token", "el-de-consulta")
+    enviados = _capturar_authorization(monkeypatch)
+    FactilizaClient().consultar_dni("73632127")
+    assert enviados == ["Bearer el-de-consulta"]
+
+
+def test_la_emision_nunca_usa_el_token_de_consulta(monkeypatch):
+    """El cruce inverso: un comprobante enviado con la credencial de consulta
+    lo rechaza SUNAT, y eso sí se ve en la caja."""
+    monkeypatch.setattr(settings, "factiliza_token", "el-de-emision")
+    monkeypatch.setattr(settings, "factiliza_consulta_documento_token", "el-de-consulta")
+    enviados = _capturar_authorization(monkeypatch, metodo="post")
+    FactilizaClient().enviar_comprobante({})
+    assert enviados == ["Bearer el-de-emision"]
+
+
+def test_sin_token_de_consulta_se_reusa_el_de_emision(monkeypatch):
+    """Compatibilidad: quien tenga un solo token —plan que cubre ambos
+    productos— no configura nada nuevo y sigue andando."""
+    monkeypatch.setattr(settings, "factiliza_token", "el-unico")
+    monkeypatch.setattr(settings, "factiliza_consulta_documento_token", "")
+    enviados = _capturar_authorization(monkeypatch)
+    FactilizaClient().consultar_ruc("20610077782")
+    assert enviados == ["Bearer el-unico"]
+
+
+def test_sin_ninguno_de_los_dos_la_consulta_falla_antes_de_salir_a_la_red(monkeypatch):
+    monkeypatch.setattr(settings, "factiliza_token", "")
+    monkeypatch.setattr(settings, "factiliza_consulta_documento_token", "")
+    with pytest.raises(FactilizaError, match="FACTILIZA_CONSULTA_DOCUMENTO_TOKEN"):
+        FactilizaClient().consultar_dni("73632127")

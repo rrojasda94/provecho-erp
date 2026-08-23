@@ -10,11 +10,17 @@ Uso: `python scripts/cortar_version.py 0.3.0 [--fecha 2026-08-09]`
 import argparse
 import datetime
 import pathlib
+import re
 import sys
 
 RAIZ = pathlib.Path(__file__).resolve().parent.parent
 CHANGELOG = RAIZ / "CHANGELOG.md"
 FRAGMENTOS = RAIZ / "changelog.d"
+PYPROJECT = RAIZ / "pyproject.toml"
+
+#: La línea de `[project]`. Anclada al principio de línea a propósito:
+#: `target-version` y las de las dependencias no empiezan con "version".
+_VERSION_TOML = re.compile(r'^version = "[^"]+"', re.MULTILINE)
 
 #: Orden de Keep a Changelog. El prefijo del nombre del archivo decide la
 #: sección, así que un tipo fuera de esta lista es un error de nombre.
@@ -58,6 +64,21 @@ def cortar(texto: str, seccion: str) -> str:
     return f"{cabeza}{_ENCABEZADO}\n\nVer [`changelog.d/`](changelog.d/).\n\n{seccion}\n## {resto}"
 
 
+def subir_version(texto: str, version: str) -> str:
+    """Mueve `version` de `[project]` en pyproject.toml.
+
+    Sin esto el paquete se quedó en 0.1.0 mientras el CHANGELOG y los tags
+    iban por 0.5.0: la versión se tecleaba tres veces —argumento, mensaje de
+    commit y tag— y no aterrizaba en ningún archivo salvo el CHANGELOG. De ahí
+    salen el `release` de GlitchTip y la versión de `/docs`, así que todos los
+    errores de cuatro releases cayeron en el mismo balde.
+    """
+    nuevo, cambios = _VERSION_TOML.subn(f'version = "{version}"', texto, count=1)
+    if cambios != 1:
+        raise SystemExit("No encontré la línea 'version = ...' en pyproject.toml.")
+    return nuevo
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("version", help="versión SemVer sin la 'v', ej. 0.3.0")
@@ -74,12 +95,18 @@ def main(argv: list[str] | None = None) -> int:
         encoding="utf-8",
         newline="",
     )
+    PYPROJECT.write_text(
+        subir_version(PYPROJECT.read_text(encoding="utf-8"), args.version),
+        encoding="utf-8",
+        newline="",
+    )
     for archivo in FRAGMENTOS.glob("*.md"):
         if archivo.name != "README.md":
             archivo.unlink()
 
     total = sum(len(v) for v in por_tipo.values())
     print(f"{args.version}: {total} fragmentos en {len(por_tipo)} secciones.")
+    print("pyproject.toml actualizado. Reinstalar en dev: pip install -e '.[dev]'")
     return 0
 
 
@@ -94,6 +121,14 @@ def _autocomprobacion() -> None:
     assert "- algo viejo" in nuevo, "no se pierde lo anterior"
     assert "### Fixed\n\n- algo nuevo" in nuevo, "el tipo arma su encabezado"
     assert nuevo.count(_ENCABEZADO) == 1, "[Unreleased] queda una sola vez"
+
+    toml = (
+        '[project]\nname = "provecho"\nversion = "0.4.0"\n\n'
+        '[tool.ruff]\ntarget-version = "py312"\n'
+    )
+    subido = subir_version(toml, "0.5.0")
+    assert 'version = "0.5.0"' in subido, "mueve la versión de [project]"
+    assert 'target-version = "py312"' in subido, "no toca target-version de ruff"
     print("autocomprobación ok")
 
 

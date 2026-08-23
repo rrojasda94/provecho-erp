@@ -1,6 +1,9 @@
 [project]
 name = "provecho"
-version = "0.1.0"
+# La fuente de verdad de la versión. `settings.app_version` la lee de acá (vía
+# metadata del paquete instalado) y `scripts/cortar_version.py` la mueve al
+# cortar cada release — no se toca a mano.
+version = "0.5.0"
 description = "ERP modular para grupo de restaurantes"
 requires-python = ">=3.12"
 dependencies = [
@@ -83,4 +86,12 @@ testpaths = ["tests"]
 # `loadfile` y no el reparto por test: varios archivos tocan estado de módulo
 # (el corta-circuito del rate limit, la config de Celery) y así cada archivo
 # vive entero en un proceso. Para depurar en serie: `pytest -n0`.
-addopts = "-n auto --dist loadfile"
+# `-m "not red"`: el suite normal NO sale a internet. Los tests marcados `red`
+# pegan contra un proveedor pago y dependen de que RENIEC/SUNAT estén arriba —
+# un suite que se pone rojo por eso deja de significar "el código está mal".
+# Se corren a mano con `pytest -m red` (la bandera de la línea de comandos gana
+# sobre esta).
+addopts = "-n auto --dist loadfile -m 'not red'"
+markers = [
+    "red: sale a internet contra un proveedor externo y gasta cuota real",
+]
