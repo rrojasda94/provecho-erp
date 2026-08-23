@@ -475,3 +475,25 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   el alta de cliente y el receptor del comprobante. Y con modo `auto`: en caja
   hay un solo campo, así que el largo decide el padrón (RN-CPP-003, regla en
   `frontend/lib/documento.ts` con su prueba).
+
+## Lo que el lienzo y la matriz todavía no hacen (2026-08-23, ADR-057/058)
+
+Lo que entró con el modelo de atributos deja tres huecos, todos con su API ya
+lista y su pantalla pendiente:
+
+- **Crear un atributo desde el lienzo.** `POST /sales/atributos` existe; el
+  popover no. Hoy se crea por API o por planilla, y el lienzo lo dibuja apenas
+  el producto lo ofrece.
+- **Materializar combinaciones.** `modo_variante = siempre` está en el modelo
+  y validado, pero el generador que crea las filas hijas no se escribió: hoy
+  todo entra como `nunca`, que es lo que el catálogo de Charlie's necesita.
+  El árbol ya devuelve `combinaciones` para cuando exista.
+- **Multi-selección y "aplicar a todos los tamaños".** Es el pedido detrás de
+  "editar 18 sabores", y la matriz lo cubre por otro camino (una columna por
+  tamaño, una mirada). Vale la pena medir si sigue haciendo falta en el
+  lienzo antes de escribirlo.
+
+Y uno de la matriz: **editar la condición de una celda**. `aplica_valores`
+viaja y se ve, pero se edita en el lienzo, que es donde los valores tienen
+nombre. Una columna de la grilla con dieciocho UUID no ayuda a nadie.
+

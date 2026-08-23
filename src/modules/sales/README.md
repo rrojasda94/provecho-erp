@@ -638,6 +638,37 @@ downgrade.
 Pruebas: `tests/test_variantes_odoo.py` (integración) y
 `tests/test_receta_condicionada.py` (funciones puras).
 
+## Estado (slice 11 — API de atributos y árbol del producto, 2026-08-23)
+
+ADR-058.
+
+**`GET /sales/productos/{id}/arbol`** trae el producto, sus variantes **con
+sus grupos y extras**, los atributos con sus valores, las exclusiones y las
+combinaciones materializadas. Reemplaza una petición HTTP por variante: con
+tres tamaños y ocho sabores eran 27 idas a la red para dibujar el lienzo.
+Hereda de `ProductoDetalleOut`, así que con el interruptor apagado el lienzo
+sigue viendo exactamente lo de antes.
+
+**CRUD de atributos** en `application/atributos.py`:
+
+| Endpoint | Qué hace |
+|---|---|
+| `GET`/`POST /sales/atributos` | listar y crear |
+| `PATCH /sales/atributos/{id}` | renombrar, cambiar modo o display |
+| `POST /sales/atributos/{id}/valores` | agregar un valor |
+| `POST /sales/productos/{id}/atributos` | el producto pasa a ofrecerlo |
+| `PATCH /sales/atributos/valores/{ptav}` | precio extra en ese producto |
+| `DELETE /sales/atributos/valores/{ptav}` | **retirar** (desactiva, no borra) |
+| `POST`/`DELETE /sales/atributos/exclusiones` | pares que no van juntos |
+
+Las rutas literales van **antes** que las paramétricas: `/atributos/exclusiones`
+entraría como un `atributo_id` que no es UUID.
+
+Un valor retirado se desactiva y no se borra: hay ventas que lo nombran y
+líneas de receta que lo usan como condición.
+
+`producto_comercial.lienzo_pos` pasa a ser editable por `PATCH /productos/{id}`.
+
 ## Casos de uso
 
 - CRUD de productos comerciales y recetas (separados de artículos inventariables).

@@ -274,12 +274,24 @@ def editar_item(
     cantidad: Decimal | None = None,
     expresion: str | None = None,
     merma_pct: Decimal | None = None,
+    unidad_medida_id: uuid.UUID | None = None,
 ) -> RecetaItem:
     item = RecetaRepo(session).get_item(item_id)
     if item is None:
         raise NoEncontrado("ítem de receta no encontrado")
+    articulo, udm_articulo = _articulo_y_udm(session, item.articulo_id)
+    if unidad_medida_id is not None:
+        udm = _udm_de_linea(session, unidad_medida_id, articulo, udm_articulo)
+        item.unidad_medida_id = udm.id if udm is not udm_articulo else None
     if cantidad is not None or expresion is not None:
-        _, udm = _articulo_y_udm(session, item.articulo_id)
+        # Se redondea con los decimales de **la unidad de la línea**, no con
+        # los del artículo: quien teclea gramos espera que 24.4 sea 24, no
+        # que se guarden tres decimales de un kilo (RN-UDM-005).
+        udm = (
+            session.get(UnidadMedida, item.unidad_medida_id)
+            if item.unidad_medida_id
+            else udm_articulo
+        ) or udm_articulo
         item.cantidad, item.expresion = _resolver_cantidad(cantidad, expresion, udm)
     if merma_pct is not None:
         _validar_merma(merma_pct)

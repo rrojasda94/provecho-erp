@@ -94,6 +94,14 @@ export function RecetasCliente({
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {/* La matriz es el camino corto para corregir el mismo gramaje en
+              varias recetas: acá se abre una ficha por vez (ADR-057). */}
+          <Link
+            href="/catalogo/recetas/matriz"
+            className="rounded border border-borde px-4 py-2 text-sm font-bold text-dark hover:bg-fondo"
+          >
+            Ver en matriz
+          </Link>
           {/* El export se baja con un `<a download>` contra el proxy, que ya
               pasa bytes y conserva el nombre del archivo (ADR-048). */}
           <a

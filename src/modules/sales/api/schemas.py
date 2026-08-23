@@ -535,6 +535,8 @@ class ProductoUpdate(BaseModel):
     orden: int | None = None
     empaque_id: uuid.UUID | None = None
     modalidades_empaque: list[str] | None = None
+    # Dónde quedó el nodo en el lienzo (ADR-058): `{"x": 120, "y": 40}`.
+    lienzo_pos: dict | None = None
 
 
 class ProductoOut(BaseModel):
@@ -551,6 +553,7 @@ class ProductoOut(BaseModel):
     es_extra: bool = False
     empaque_id: uuid.UUID | None = None
     modalidades_empaque: list[str] | None = None
+    lienzo_pos: dict | None = None
 
 
 class ProductoDetalleOut(ProductoOut):
@@ -752,3 +755,104 @@ class EntregaOut(BaseModel):
     modalidad: str
     estado_pedido: str
     ya_entregado: bool
+
+
+# --- Atributos y variantes (ADR-055) -----------------------------------------
+class AtributoCreate(BaseModel):
+    """`modo_variante` decide si las combinaciones se materializan como
+    variante vendible. `nunca` no genera ninguna fila: el valor viaja en la
+    línea de venta y solo decide qué líneas de receta se descuentan."""
+
+    nombre: str = Field(min_length=1, max_length=80)
+    modo_variante: str = "nunca"
+    display: str = "radio"
+    orden: int = 0
+
+
+class AtributoUpdate(BaseModel):
+    nombre: str | None = Field(default=None, min_length=1, max_length=80)
+    modo_variante: str | None = None
+    display: str | None = None
+    orden: int | None = None
+
+
+class AtributoValorCreate(BaseModel):
+    nombre: str = Field(min_length=1, max_length=80)
+    orden: int = 0
+
+
+class AtributoValorOut(BaseModel):
+    id: uuid.UUID
+    nombre: str
+    orden: int
+    activo: bool
+
+
+class AtributoOut(BaseModel):
+    id: uuid.UUID
+    nombre: str
+    modo_variante: str
+    display: str
+    orden: int
+    valores: list[AtributoValorOut]
+
+
+class OfrecerAtributoIn(BaseModel):
+    """Lista vacía = **todos** los valores del atributo, que es lo que quiere
+    quien acaba de crearlo."""
+
+    atributo_id: uuid.UUID
+    valores: list[uuid.UUID] = []
+    orden: int = 0
+
+
+class PrecioExtraIn(BaseModel):
+    precio_extra: Decimal = Field(ge=0)
+
+
+class ExclusionIn(BaseModel):
+    """Los dos valores no van juntos (RN-COM-038). Se guarda una sola fila:
+    el par es simétrico y se lee en los dos sentidos."""
+
+    valor_id: uuid.UUID
+    excluye_id: uuid.UUID
+
+
+class ValorDeProductoOut(BaseModel):
+    id: uuid.UUID
+    atributo_valor_id: uuid.UUID
+    nombre: str
+    precio_extra: Decimal
+    activo: bool
+
+
+class LineaDeAtributoOut(BaseModel):
+    linea_id: uuid.UUID
+    producto_comercial_id: uuid.UUID
+    atributo_id: uuid.UUID
+    nombre: str
+    modo_variante: str
+    display: str
+    orden: int
+    valores: list[ValorDeProductoOut]
+
+
+class CombinacionOut(BaseModel):
+    producto_comercial_id: str
+    producto_atributo_valor_id: str
+
+
+class ArbolProductoOut(ProductoDetalleOut):
+    """Todo lo que el lienzo necesita en una sola llamada.
+
+    Hereda de `ProductoDetalleOut` a propósito: con el interruptor
+    `catalogo.modelo_odoo` apagado el lienzo sigue dibujando grupos y extras,
+    y una sola forma de traer los datos evita que las dos pantallas se
+    separen.
+    """
+
+    variantes_detalle: list[ProductoDetalleOut]
+    atributos: list[LineaDeAtributoOut]
+    exclusiones: list[list[str]]
+    combinaciones: list[CombinacionOut]
+

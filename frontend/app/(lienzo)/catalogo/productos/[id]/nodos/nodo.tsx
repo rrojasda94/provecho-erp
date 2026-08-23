@@ -177,6 +177,11 @@ export const TIPOS_NODO: Record<TipoNodo, typeof NodoTarjeta> = {
   tamano: NodoTarjeta,
   grupo: NodoGrupo,
   opcion: NodoTarjeta,
+  // El atributo se dibuja como el grupo y el valor como la opción: el gesto
+  // es el mismo —elegir uno de varios— y el lienzo no gana nada inventando
+  // una segunda manera de mostrar lo que ya se sabe mirar (ADR-058).
+  atributo: NodoGrupo,
+  valor: NodoTarjeta,
   disponible: NodoDisponible,
   empaque: NodoTarjeta,
   resta: NodoResta,

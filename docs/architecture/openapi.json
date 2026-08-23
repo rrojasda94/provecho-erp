@@ -1177,6 +1177,185 @@
         "title": "AperturaCajaOut",
         "type": "object"
       },
+      "ArbolProductoOut": {
+        "description": "Todo lo que el lienzo necesita en una sola llamada.\n\nHereda de `ProductoDetalleOut` a propósito: con el interruptor\n`catalogo.modelo_odoo` apagado el lienzo sigue dibujando grupos y extras,\ny una sola forma de traer los datos evita que las dos pantallas se\nseparen.",
+        "properties": {
+          "activo": {
+            "title": "Activo",
+            "type": "boolean"
+          },
+          "atributos": {
+            "items": {
+              "$ref": "#/components/schemas/LineaDeAtributoOut"
+            },
+            "title": "Atributos",
+            "type": "array"
+          },
+          "categoria_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Categoria Id"
+          },
+          "combinaciones": {
+            "items": {
+              "$ref": "#/components/schemas/CombinacionOut"
+            },
+            "title": "Combinaciones",
+            "type": "array"
+          },
+          "empaque_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Empaque Id"
+          },
+          "es_extra": {
+            "default": false,
+            "title": "Es Extra",
+            "type": "boolean"
+          },
+          "exclusiones": {
+            "items": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "title": "Exclusiones",
+            "type": "array"
+          },
+          "extras_sueltos": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ExtraDeProductoOut"
+            },
+            "title": "Extras Sueltos",
+            "type": "array"
+          },
+          "grupos": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/GrupoOpcionOut"
+            },
+            "title": "Grupos",
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "id_interno": {
+            "title": "Id Interno",
+            "type": "string"
+          },
+          "lienzo_pos": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lienzo Pos"
+          },
+          "marca_id": {
+            "format": "uuid",
+            "title": "Marca Id",
+            "type": "string"
+          },
+          "modalidades_empaque": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modalidades Empaque"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "orden": {
+            "default": 0,
+            "title": "Orden",
+            "type": "integer"
+          },
+          "producto_padre_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Producto Padre Id"
+          },
+          "receta_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receta Id"
+          },
+          "variantes": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ProductoOut"
+            },
+            "title": "Variantes",
+            "type": "array"
+          },
+          "variantes_detalle": {
+            "items": {
+              "$ref": "#/components/schemas/ProductoDetalleOut"
+            },
+            "title": "Variantes Detalle",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "id_interno",
+          "marca_id",
+          "nombre",
+          "activo",
+          "variantes_detalle",
+          "atributos",
+          "exclusiones",
+          "combinaciones"
+        ],
+        "title": "ArbolProductoOut",
+        "type": "object"
+      },
       "AreaCreate": {
         "properties": {
           "codigo": {
@@ -2216,6 +2395,180 @@
         "title": "AsistenciaOut",
         "type": "object"
       },
+      "AtributoCreate": {
+        "description": "`modo_variante` decide si las combinaciones se materializan como\nvariante vendible. `nunca` no genera ninguna fila: el valor viaja en la\nlínea de venta y solo decide qué líneas de receta se descuentan.",
+        "properties": {
+          "display": {
+            "default": "radio",
+            "title": "Display",
+            "type": "string"
+          },
+          "modo_variante": {
+            "default": "nunca",
+            "title": "Modo Variante",
+            "type": "string"
+          },
+          "nombre": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Nombre",
+            "type": "string"
+          },
+          "orden": {
+            "default": 0,
+            "title": "Orden",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "nombre"
+        ],
+        "title": "AtributoCreate",
+        "type": "object"
+      },
+      "AtributoOut": {
+        "properties": {
+          "display": {
+            "title": "Display",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "modo_variante": {
+            "title": "Modo Variante",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "orden": {
+            "title": "Orden",
+            "type": "integer"
+          },
+          "valores": {
+            "items": {
+              "$ref": "#/components/schemas/AtributoValorOut"
+            },
+            "title": "Valores",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "nombre",
+          "modo_variante",
+          "display",
+          "orden",
+          "valores"
+        ],
+        "title": "AtributoOut",
+        "type": "object"
+      },
+      "AtributoUpdate": {
+        "properties": {
+          "display": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display"
+          },
+          "modo_variante": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modo Variante"
+          },
+          "nombre": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nombre"
+          },
+          "orden": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orden"
+          }
+        },
+        "title": "AtributoUpdate",
+        "type": "object"
+      },
+      "AtributoValorCreate": {
+        "properties": {
+          "nombre": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Nombre",
+            "type": "string"
+          },
+          "orden": {
+            "default": 0,
+            "title": "Orden",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "nombre"
+        ],
+        "title": "AtributoValorCreate",
+        "type": "object"
+      },
+      "AtributoValorOut": {
+        "properties": {
+          "activo": {
+            "title": "Activo",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "orden": {
+            "title": "Orden",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "nombre",
+          "orden",
+          "activo"
+        ],
+        "title": "AtributoValorOut",
+        "type": "object"
+      },
       "AuditLogOut": {
         "properties": {
           "accion": {
@@ -3231,6 +3584,77 @@
           }
         },
         "title": "CategoriaUpdate",
+        "type": "object"
+      },
+      "CeldaIn": {
+        "description": "Una celda de la grilla. La identidad es `(receta, insumo, condición)`,\nno un id de línea: es lo que permite pegar un rectángulo desde Excel, que\nno trae ids.",
+        "properties": {
+          "aplica_valores": {
+            "default": [],
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Aplica Valores",
+            "type": "array"
+          },
+          "articulo_id": {
+            "format": "uuid",
+            "title": "Articulo Id",
+            "type": "string"
+          },
+          "expresion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expresion"
+          },
+          "merma_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "default": "0",
+            "title": "Merma Pct"
+          },
+          "orden": {
+            "default": 0,
+            "title": "Orden",
+            "type": "integer"
+          },
+          "receta_id": {
+            "format": "uuid",
+            "title": "Receta Id",
+            "type": "string"
+          },
+          "unidad_medida_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unidad Medida Id"
+          }
+        },
+        "required": [
+          "receta_id",
+          "articulo_id"
+        ],
+        "title": "CeldaIn",
         "type": "object"
       },
       "CerrarCajaIn": {
@@ -4329,6 +4753,24 @@
           "texto"
         ],
         "title": "ComandaOut",
+        "type": "object"
+      },
+      "CombinacionOut": {
+        "properties": {
+          "producto_atributo_valor_id": {
+            "title": "Producto Atributo Valor Id",
+            "type": "string"
+          },
+          "producto_comercial_id": {
+            "title": "Producto Comercial Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "producto_comercial_id",
+          "producto_atributo_valor_id"
+        ],
+        "title": "CombinacionOut",
         "type": "object"
       },
       "CompletarOrdenIn": {
@@ -8221,6 +8663,27 @@
         "title": "EvaluacionOut",
         "type": "object"
       },
+      "ExclusionIn": {
+        "description": "Los dos valores no van juntos (RN-COM-038). Se guarda una sola fila:\nel par es simétrico y se lee en los dos sentidos.",
+        "properties": {
+          "excluye_id": {
+            "format": "uuid",
+            "title": "Excluye Id",
+            "type": "string"
+          },
+          "valor_id": {
+            "format": "uuid",
+            "title": "Valor Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "valor_id",
+          "excluye_id"
+        ],
+        "title": "ExclusionIn",
+        "type": "object"
+      },
       "ExtraColaOut": {
         "properties": {
           "cantidad": {
@@ -8576,6 +9039,49 @@
           }
         },
         "title": "GrupoUpdate",
+        "type": "object"
+      },
+      "GuardarMatrizIn": {
+        "properties": {
+          "celdas": {
+            "items": {
+              "$ref": "#/components/schemas/CeldaIn"
+            },
+            "minItems": 1,
+            "title": "Celdas",
+            "type": "array"
+          }
+        },
+        "required": [
+          "celdas"
+        ],
+        "title": "GuardarMatrizIn",
+        "type": "object"
+      },
+      "GuardarMatrizOut": {
+        "properties": {
+          "aplicadas": {
+            "title": "Aplicadas",
+            "type": "integer"
+          },
+          "con_problema": {
+            "title": "Con Problema",
+            "type": "integer"
+          },
+          "resultados": {
+            "items": {
+              "$ref": "#/components/schemas/ResultadoCeldaOut"
+            },
+            "title": "Resultados",
+            "type": "array"
+          }
+        },
+        "required": [
+          "resultados",
+          "aplicadas",
+          "con_problema"
+        ],
+        "title": "GuardarMatrizOut",
         "type": "object"
       },
       "GuiaDevolucionCreate": {
@@ -9726,6 +10232,60 @@
         "title": "LicenciaMarcaOut",
         "type": "object"
       },
+      "LineaDeAtributoOut": {
+        "properties": {
+          "atributo_id": {
+            "format": "uuid",
+            "title": "Atributo Id",
+            "type": "string"
+          },
+          "display": {
+            "title": "Display",
+            "type": "string"
+          },
+          "linea_id": {
+            "format": "uuid",
+            "title": "Linea Id",
+            "type": "string"
+          },
+          "modo_variante": {
+            "title": "Modo Variante",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "orden": {
+            "title": "Orden",
+            "type": "integer"
+          },
+          "producto_comercial_id": {
+            "format": "uuid",
+            "title": "Producto Comercial Id",
+            "type": "string"
+          },
+          "valores": {
+            "items": {
+              "$ref": "#/components/schemas/ValorDeProductoOut"
+            },
+            "title": "Valores",
+            "type": "array"
+          }
+        },
+        "required": [
+          "linea_id",
+          "producto_comercial_id",
+          "atributo_id",
+          "nombre",
+          "modo_variante",
+          "display",
+          "orden",
+          "valores"
+        ],
+        "title": "LineaDeAtributoOut",
+        "type": "object"
+      },
       "LiquidacionBssCreate": {
         "properties": {
           "cts_pendiente": {
@@ -10425,6 +10985,92 @@
         "title": "MarcaUpdate",
         "type": "object"
       },
+      "MatrizCeldaOut": {
+        "properties": {
+          "aplica_valores": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Aplica Valores",
+            "type": "array"
+          },
+          "articulo_id": {
+            "format": "uuid",
+            "title": "Articulo Id",
+            "type": "string"
+          },
+          "cantidad": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Cantidad",
+            "type": "string"
+          },
+          "decimales": {
+            "title": "Decimales",
+            "type": "integer"
+          },
+          "expresion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expresion"
+          },
+          "item_id": {
+            "format": "uuid",
+            "title": "Item Id",
+            "type": "string"
+          },
+          "merma_pct": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Merma Pct",
+            "type": "string"
+          },
+          "orden": {
+            "title": "Orden",
+            "type": "integer"
+          },
+          "receta_id": {
+            "format": "uuid",
+            "title": "Receta Id",
+            "type": "string"
+          },
+          "unidad": {
+            "title": "Unidad",
+            "type": "string"
+          },
+          "unidad_medida_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unidad Medida Id"
+          }
+        },
+        "required": [
+          "item_id",
+          "receta_id",
+          "articulo_id",
+          "cantidad",
+          "expresion",
+          "merma_pct",
+          "unidad_medida_id",
+          "unidad",
+          "decimales",
+          "aplica_valores",
+          "orden"
+        ],
+        "title": "MatrizCeldaOut",
+        "type": "object"
+      },
       "MatrizDestinatarioOut": {
         "properties": {
           "etiqueta": {
@@ -10512,6 +11158,115 @@
           "hueco"
         ],
         "title": "MatrizFilaOut",
+        "type": "object"
+      },
+      "MatrizInsumoOut": {
+        "properties": {
+          "articulo_id": {
+            "format": "uuid",
+            "title": "Articulo Id",
+            "type": "string"
+          },
+          "costo_promedio": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Costo Promedio",
+            "type": "string"
+          },
+          "decimales": {
+            "title": "Decimales",
+            "type": "integer"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "unidad": {
+            "title": "Unidad",
+            "type": "string"
+          },
+          "unidad_medida_id": {
+            "format": "uuid",
+            "title": "Unidad Medida Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "articulo_id",
+          "nombre",
+          "unidad_medida_id",
+          "unidad",
+          "decimales",
+          "costo_promedio"
+        ],
+        "title": "MatrizInsumoOut",
+        "type": "object"
+      },
+      "MatrizOut": {
+        "properties": {
+          "celdas": {
+            "items": {
+              "$ref": "#/components/schemas/MatrizCeldaOut"
+            },
+            "title": "Celdas",
+            "type": "array"
+          },
+          "insumos": {
+            "items": {
+              "$ref": "#/components/schemas/MatrizInsumoOut"
+            },
+            "title": "Insumos",
+            "type": "array"
+          },
+          "recetas": {
+            "items": {
+              "$ref": "#/components/schemas/MatrizRecetaOut"
+            },
+            "title": "Recetas",
+            "type": "array"
+          }
+        },
+        "required": [
+          "recetas",
+          "insumos",
+          "celdas"
+        ],
+        "title": "MatrizOut",
+        "type": "object"
+      },
+      "MatrizRecetaOut": {
+        "properties": {
+          "es_kit": {
+            "title": "Es Kit",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "rendimiento_cantidad": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Rendimiento Cantidad",
+            "type": "string"
+          },
+          "rendimiento_unidad_medida_id": {
+            "format": "uuid",
+            "title": "Rendimiento Unidad Medida Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "nombre",
+          "rendimiento_cantidad",
+          "rendimiento_unidad_medida_id",
+          "es_kit"
+        ],
+        "title": "MatrizRecetaOut",
         "type": "object"
       },
       "MatrizReglaOut": {
@@ -11948,6 +12703,35 @@
           "created_at"
         ],
         "title": "NotificacionOut",
+        "type": "object"
+      },
+      "OfrecerAtributoIn": {
+        "description": "Lista vacía = **todos** los valores del atributo, que es lo que quiere\nquien acaba de crearlo.",
+        "properties": {
+          "atributo_id": {
+            "format": "uuid",
+            "title": "Atributo Id",
+            "type": "string"
+          },
+          "orden": {
+            "default": 0,
+            "title": "Orden",
+            "type": "integer"
+          },
+          "valores": {
+            "default": [],
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Valores",
+            "type": "array"
+          }
+        },
+        "required": [
+          "atributo_id"
+        ],
+        "title": "OfrecerAtributoIn",
         "type": "object"
       },
       "OmitidaOut": {
@@ -16194,6 +16978,28 @@
         "title": "PrecioCreate",
         "type": "object"
       },
+      "PrecioExtraIn": {
+        "properties": {
+          "precio_extra": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Precio Extra"
+          }
+        },
+        "required": [
+          "precio_extra"
+        ],
+        "title": "PrecioExtraIn",
+        "type": "object"
+      },
       "PrecioOut": {
         "properties": {
           "id": {
@@ -16695,6 +17501,18 @@
             "title": "Id Interno",
             "type": "string"
           },
+          "lienzo_pos": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lienzo Pos"
+          },
           "marca_id": {
             "format": "uuid",
             "title": "Marca Id",
@@ -16810,6 +17628,18 @@
             "title": "Id Interno",
             "type": "string"
           },
+          "lienzo_pos": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lienzo Pos"
+          },
           "marca_id": {
             "format": "uuid",
             "title": "Marca Id",
@@ -16909,6 +17739,18 @@
               }
             ],
             "title": "Empaque Id"
+          },
+          "lienzo_pos": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lienzo Pos"
           },
           "modalidades_empaque": {
             "anyOf": [
@@ -19559,6 +20401,78 @@
           "valor"
         ],
         "title": "RespuestaPublicaIn",
+        "type": "object"
+      },
+      "ResultadoCeldaOut": {
+        "properties": {
+          "accion": {
+            "title": "Accion",
+            "type": "string"
+          },
+          "articulo_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Articulo Id"
+          },
+          "cantidad": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cantidad"
+          },
+          "detalle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detalle"
+          },
+          "item_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Item Id"
+          },
+          "receta_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receta Id"
+          }
+        },
+        "required": [
+          "accion"
+        ],
+        "title": "ResultadoCeldaOut",
         "type": "object"
       },
       "RevisionArticulosOut": {
@@ -22873,6 +23787,42 @@
           "type"
         ],
         "title": "ValidationError",
+        "type": "object"
+      },
+      "ValorDeProductoOut": {
+        "properties": {
+          "activo": {
+            "title": "Activo",
+            "type": "boolean"
+          },
+          "atributo_valor_id": {
+            "format": "uuid",
+            "title": "Atributo Valor Id",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "precio_extra": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Precio Extra",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "atributo_valor_id",
+          "nombre",
+          "precio_extra",
+          "activo"
+        ],
+        "title": "ValorDeProductoOut",
         "type": "object"
       },
       "VarianteDeCartaOut": {
@@ -30337,6 +31287,106 @@
           }
         ],
         "summary": "Validar Importacion Recetas",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/recetas/matriz": {
+      "get": {
+        "description": "El recetario en grilla: insumos en las filas, recetas en las columnas.\n\nDeclarada **antes** de `/recetas/{receta_id}` por lo mismo que la\nplantilla: FastAPI resuelve por orden y \"matriz\" entraría como un\n`receta_id` que no es UUID.\n\n`receta_ids` es una lista separada por comas. Sin ella viene el recetario\nentero, que es lo que quiere quien abre la pantalla a buscar; filtrar es\nlo que quiere quien ya sabe qué comparar.",
+        "operationId": "ver_matriz_recetas_api_v1_inventory_recetas_matriz_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "receta_ids",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Receta Ids"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatrizOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Ver Matriz Recetas",
+        "tags": [
+          "inventory"
+        ]
+      },
+      "put": {
+        "description": "Aplica las celdas que cambiaron, cada una en su propio SAVEPOINT.\n\nDevuelve qué pasó con cada una en vez de un 409 al primer problema:\npegar cuarenta celdas y perderlas todas porque una tenía un insumo mal\nescrito es el modo de falla que hace que nadie vuelva a pegar nada\n(mismo criterio que ADR-046 con las recetas).",
+        "operationId": "guardar_matriz_recetas_api_v1_inventory_recetas_matriz_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GuardarMatrizIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuardarMatrizOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Guardar Matriz Recetas",
         "tags": [
           "inventory"
         ]
@@ -41042,6 +42092,378 @@
         ]
       }
     },
+    "/api/v1/sales/atributos": {
+      "get": {
+        "operationId": "listar_atributos_api_v1_sales_atributos_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AtributoOut"
+                  },
+                  "title": "Response Listar Atributos Api V1 Sales Atributos Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Atributos",
+        "tags": [
+          "sales"
+        ]
+      },
+      "post": {
+        "operationId": "crear_atributo_api_v1_sales_atributos_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AtributoCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtributoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Atributo",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/atributos/exclusiones": {
+      "delete": {
+        "operationId": "quitar_exclusion_api_v1_sales_atributos_exclusiones_delete",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExclusionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Quitar Exclusion",
+        "tags": [
+          "sales"
+        ]
+      },
+      "post": {
+        "description": "Estos dos valores no van juntos (RN-COM-038).\n\nEl caso que la obliga: en una pizza mitad y mitad las dos mitades tienen\nque ser distintas. Media hawaiana y media hawaiana no es una\nmitad-y-mitad, es una hawaiana entera — que ya se vende como su propio\nproducto.",
+        "operationId": "declarar_exclusion_api_v1_sales_atributos_exclusiones_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExclusionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Declarar Exclusion",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/atributos/valores/{ptav_id}": {
+      "delete": {
+        "description": "Lo saca de la oferta **sin borrarlo**: hay ventas que lo nombran y\nlíneas de receta que lo usan como condición.",
+        "operationId": "retirar_valor_de_producto_api_v1_sales_atributos_valores__ptav_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ptav_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Ptav Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Retirar Valor De Producto",
+        "tags": [
+          "sales"
+        ]
+      },
+      "patch": {
+        "description": "Cuánto suma este valor **en este producto**. La lista de precios sigue\nmandando sobre el precio base (RN-PRC-003); esto se suma.",
+        "operationId": "fijar_precio_extra_api_v1_sales_atributos_valores__ptav_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ptav_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Ptav Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrecioExtraIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValorDeProductoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Fijar Precio Extra",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/atributos/{atributo_id}": {
+      "patch": {
+        "description": "Bajar `modo_variante` de `siempre` a `nunca` **no borra** las variantes\nya materializadas: puede haber ventas que las nombran. Deja de generar\nnuevas, que es lo que alguien quiere al descubrir que un atributo de 17\nvalores iba a materializar 289 combinaciones.",
+        "operationId": "editar_atributo_api_v1_sales_atributos__atributo_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "atributo_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Atributo Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AtributoUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtributoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Editar Atributo",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/atributos/{atributo_id}/valores": {
+      "post": {
+        "operationId": "agregar_valor_de_atributo_api_v1_sales_atributos__atributo_id__valores_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "atributo_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Atributo Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AtributoValorCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtributoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Agregar Valor De Atributo",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
     "/api/v1/sales/carta": {
       "get": {
         "description": "Catálogo vendible con el precio ya resuelto — lo que el PDV renderiza\nen vez de traer un precio propio.",
@@ -42556,6 +43978,114 @@
           }
         ],
         "summary": "Editar Producto",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/productos/{producto_id}/arbol": {
+      "get": {
+        "description": "El producto entero para el lienzo, en una llamada.\n\nLa versión anterior pedía la ficha del padre y una por cada variante:\ncon tres tamaños y ocho sabores eran veintisiete idas a la red para\ndibujar un árbol.",
+        "operationId": "ver_arbol_de_producto_api_v1_sales_productos__producto_id__arbol_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "producto_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Producto Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArbolProductoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Ver Arbol De Producto",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/productos/{producto_id}/atributos": {
+      "post": {
+        "description": "El producto pasa a ofrecer este atributo. Sin `valores`, todos.",
+        "operationId": "ofrecer_atributo_api_v1_sales_productos__producto_id__atributos_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "producto_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Producto Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OfrecerAtributoIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArbolProductoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Ofrecer Atributo",
         "tags": [
           "sales"
         ]
