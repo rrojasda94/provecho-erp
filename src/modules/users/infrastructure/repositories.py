@@ -97,6 +97,22 @@ class UsuarioRepo:
             )
         )
 
+    def sucursales_de(self, usuario_id: uuid.UUID) -> list[Sucursal]:
+        """Las sucursales de su alcance, enteras — `sucursal_ids` alcanza para
+        los claims del token, pero la pantalla de administración tiene que
+        mostrar el nombre y poder quitarlas."""
+        return list(
+            self.s.scalars(
+                select(Sucursal)
+                .join(UsuarioSucursal, UsuarioSucursal.sucursal_id == Sucursal.id)
+                .where(
+                    UsuarioSucursal.usuario_id == usuario_id,
+                    Sucursal.deleted_at.is_(None),
+                )
+                .order_by(Sucursal.nombre)
+            )
+        )
+
     def permiso_codigos(self, usuario_id: uuid.UUID) -> set[str]:
         return set(
             self.s.scalars(

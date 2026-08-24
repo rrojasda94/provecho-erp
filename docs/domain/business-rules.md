@@ -628,6 +628,12 @@ de su módulo y se prueban de forma aislada.
   tiempo pagado) para beneficio personal. Extiende la confidencialidad de
   RN-EMP-002/RN-GRP-004 y el criterio de conflicto de interés de
   RN-GER-004 al personal operativo; su infracción es falta grave.
+- **RN-RRHH-019** El centro de labores de un trabajador (`trabajador.sucursal_id`)
+  tiene que ser una sucursal de su misma empresa. Es opcional —gerencia y
+  administración no están en ningún local—, pero no puede apuntar al local de
+  otra empresa del grupo: la planilla la paga la empresa del trabajador.
+  Distinto del alcance de datos de su cuenta de usuario, que vive en
+  `usuario_sucursal` y se administra aparte (ADR-062).
 
 ## Auditoría
 

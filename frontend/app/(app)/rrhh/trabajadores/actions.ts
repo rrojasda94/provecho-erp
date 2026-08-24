@@ -32,6 +32,7 @@ export async function crearTrabajadorAction(
   const area = texto(formData, "area");
   const tipoVinculo = String(formData.get("tipo_vinculo") ?? "planilla");
   const fechaIngreso = texto(formData, "fecha_ingreso");
+  const sucursalId = texto(formData, "sucursal_id");
 
   if (!personaId) return { error: "Elegir la persona.", ok: false };
   if (!cargo || !area) return { error: "Cargo y área son obligatorios.", ok: false };
@@ -47,6 +48,7 @@ export async function crearTrabajadorAction(
         area,
         tipo_vinculo: tipoVinculo,
         fecha_ingreso: fechaIngreso,
+        sucursal_id: sucursalId || null,
         // Locación de servicios nunca marca asistencia (RN-PER-002) — el
         // backend lo exige, así que no se manda una casilla que confundiría.
         registra_asistencia: tipoVinculo !== "locacion_servicios",
@@ -77,6 +79,7 @@ export async function editarTrabajadorAction(
   if (!cargo || !area) return { error: "Cargo y área son obligatorios.", ok: false };
 
   const remuneracion = texto(formData, "remuneracion_base");
+  const sucursalId = texto(formData, "sucursal_id");
 
   try {
     await apiFetch(`/api/v1/rrhh/trabajadores/${id}`, {
@@ -87,6 +90,9 @@ export async function editarTrabajadorAction(
         area,
         remuneracion_base: remuneracion === "" ? undefined : remuneracion,
         estado: String(formData.get("estado") ?? "activo"),
+        // Vacío = sin local asignado, y el backend lo entiende como borrarlo:
+        // dejar de estar en una sucursal es un cambio posible, no un olvido.
+        sucursal_id: sucursalId || null,
       },
     });
   } catch (e) {

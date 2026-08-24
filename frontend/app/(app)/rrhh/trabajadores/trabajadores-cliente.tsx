@@ -16,6 +16,7 @@ import {
 export type Trabajador = {
   id: string;
   persona_id: string;
+  sucursal_id: string | null;
   cargo: string;
   area: string;
   tipo_vinculo: string;
@@ -24,6 +25,7 @@ export type Trabajador = {
   remuneracion_base: string | null;
   estado: string;
 };
+export type Sucursal = { id: string; nombre: string };
 export type Persona = {
   id: string;
   nombres: string;
@@ -33,7 +35,32 @@ export type Persona = {
 
 const TIPOS_VINCULO = ["planilla", "practicante", "locacion_servicios"] as const;
 
-function DialogoNuevoTrabajador() {
+/** El local donde trabaja, no a qué datos accede: el alcance de la cuenta se
+ * reparte en Usuarios → Cuentas (ADR-062). Vacío es válido — gerencia y
+ * administración no están en ninguna sucursal. */
+function CampoSucursal({
+  sucursales,
+  valor,
+}: {
+  sucursales: Sucursal[];
+  valor?: string | null;
+}) {
+  return (
+    <label className="flex flex-col gap-1 text-sm font-semibold">
+      Sucursal donde trabaja
+      <select name="sucursal_id" defaultValue={valor ?? ""}>
+        <option value="">Sin sucursal asignada</option>
+        {sucursales.map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.nombre}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function DialogoNuevoTrabajador({ sucursales }: { sucursales: Sucursal[] }) {
   return (
     <DialogoFormulario
       titulo="Nuevo trabajador"
@@ -68,6 +95,7 @@ function DialogoNuevoTrabajador() {
         Fecha de ingreso
         <input name="fecha_ingreso" type="date" required />
       </label>
+      <CampoSucursal sucursales={sucursales} />
     </DialogoFormulario>
   );
 }
@@ -78,7 +106,13 @@ function DialogoNuevoTrabajador() {
  * (RN-GEN-007); el tipo de vínculo y la fecha de ingreso tampoco, porque
  * cambiarlos reescribe la historia laboral —eso es un contrato nuevo, no una
  * corrección—. */
-function DialogoEditarTrabajador({ trabajador }: { trabajador: Trabajador }) {
+function DialogoEditarTrabajador({
+  trabajador,
+  sucursales,
+}: {
+  trabajador: Trabajador;
+  sucursales: Sucursal[];
+}) {
   return (
     <DialogoFormulario
       titulo="Editar trabajador"
@@ -107,6 +141,7 @@ function DialogoEditarTrabajador({ trabajador }: { trabajador: Trabajador }) {
           placeholder="O subvención, si es practicante"
         />
       </label>
+      <CampoSucursal sucursales={sucursales} valor={trabajador.sucursal_id} />
       <label className="flex flex-col gap-1 text-sm font-semibold">
         Estado
         <select name="estado" defaultValue={trabajador.estado}>
@@ -142,13 +177,19 @@ function DialogoCesarTrabajador({ trabajador }: { trabajador: Trabajador }) {
 export function TrabajadoresCliente({
   trabajadores,
   personas,
+  sucursales,
 }: {
   trabajadores: Trabajador[];
   personas: Persona[];
+  sucursales: Sucursal[];
 }) {
   const nombrePersona = useMemo(
     () => new Map(personas.map((p) => [p.id, `${p.apellidos}, ${p.nombres}`])),
     [personas],
+  );
+  const nombreSucursal = useMemo(
+    () => new Map(sucursales.map((s) => [s.id, s.nombre])),
+    [sucursales],
   );
 
   const columnas: ColumnDef<Trabajador>[] = useMemo(
@@ -160,6 +201,11 @@ export function TrabajadoresCliente({
       },
       { accessorKey: "cargo", header: "Cargo" },
       { accessorKey: "area", header: "Área" },
+      {
+        id: "sucursal",
+        header: "Sucursal",
+        accessorFn: (t) => (t.sucursal_id ? nombreSucursal.get(t.sucursal_id) ?? "—" : "—"),
+      },
       {
         accessorKey: "tipo_vinculo",
         header: "Vínculo",
@@ -189,20 +235,20 @@ export function TrabajadoresCliente({
         cell: ({ row }) =>
           row.original.estado === "cesado" ? null : (
             <div className="flex gap-1.5">
-              <DialogoEditarTrabajador trabajador={row.original} />
+              <DialogoEditarTrabajador trabajador={row.original} sucursales={sucursales} />
               <DialogoCesarTrabajador trabajador={row.original} />
             </div>
           ),
       },
     ],
-    [nombrePersona],
+    [nombrePersona, nombreSucursal, sucursales],
   );
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h1 className="font-heading text-xl text-dark">Trabajadores</h1>
-        <DialogoNuevoTrabajador />
+        <DialogoNuevoTrabajador sucursales={sucursales} />
       </div>
       <TablaDatos
         columnas={columnas}

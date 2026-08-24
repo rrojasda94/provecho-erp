@@ -7,6 +7,7 @@ import {
   BOTON_FILA,
   DialogoFormulario,
   ESTADO_INICIAL,
+  type EstadoFormulario,
 } from "@/components/formulario/dialogo-formulario";
 import { PersonaPicker } from "@/components/persona-picker/persona-picker";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
@@ -14,10 +15,12 @@ import { tienePermiso } from "@/lib/permisos";
 
 import {
   asignarRolAction,
+  asignarSucursalAction,
   cambiarActivoAction,
   crearUsuarioAction,
   editarUsuarioAction,
   quitarRolAction,
+  quitarSucursalAction,
   resetearPinAction,
 } from "./actions";
 
@@ -31,6 +34,7 @@ export type Usuario = {
   activo: boolean;
 };
 export type Rol = { id: string; nombre: string; descripcion: string | null };
+export type Sucursal = { id: string; nombre: string };
 
 function DialogoNuevaCuenta() {
   return (
@@ -116,38 +120,46 @@ function DialogoEditarCuenta({ usuario }: { usuario: Usuario }) {
   );
 }
 
-/** Roles de una cuenta: los muestra, los quita y agrega el que falte.
+/** Lo que una cuenta tiene asignado —roles o sucursales—: lo muestra, lo quita
+ * y agrega lo que falte.
  *
- * Vive en la fila y no en un diálogo aparte porque asignar un rol es la
- * operación que más se hace en esta pantalla — un modal por cada cambio
- * sería un clic de más cada vez. */
-function CeldaRoles({
+ * Vive en la fila y no en un diálogo aparte porque asignar es la operación que
+ * más se hace en esta pantalla — un modal por cada cambio sería un clic de más
+ * cada vez. */
+function CeldaAsignaciones({
   usuario,
-  roles,
   asignados,
+  disponibles,
+  campo,
+  singular,
+  accionAsignar,
+  quitar,
 }: {
   usuario: Usuario;
-  roles: Rol[];
-  asignados: Rol[];
+  asignados: { id: string; nombre: string }[];
+  disponibles: { id: string; nombre: string }[];
+  campo: string;
+  singular: string;
+  accionAsignar: (previo: EstadoFormulario, datos: FormData) => Promise<EstadoFormulario>;
+  quitar: (usuarioId: string, id: string) => Promise<unknown>;
 }) {
-  const [estado, formAction] = useActionState(asignarRolAction, ESTADO_INICIAL);
+  const [estado, formAction] = useActionState(accionAsignar, ESTADO_INICIAL);
   const [pendiente, startTransition] = useTransition();
-  const disponibles = roles.filter((r) => !asignados.some((a) => a.id === r.id));
 
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      {asignados.map((rol) => (
+      {asignados.map((item) => (
         <span
-          key={rol.id}
+          key={item.id}
           className="flex items-center gap-1 rounded-full bg-accent/30 px-2 py-0.5 text-xs font-semibold text-dark"
         >
-          {rol.nombre}
+          {item.nombre}
           <button
             type="button"
-            aria-label={`Quitar rol ${rol.nombre} a ${usuario.username}`}
-            title="Quitar rol"
+            aria-label={`Quitar ${singular} ${item.nombre} a ${usuario.username}`}
+            title={`Quitar ${singular}`}
             disabled={pendiente}
-            onClick={() => startTransition(() => void quitarRolAction(usuario.id, rol.id))}
+            onClick={() => startTransition(() => void quitar(usuario.id, item.id))}
             className="text-gray hover:text-secondary"
           >
             ×
@@ -158,17 +170,17 @@ function CeldaRoles({
         <form action={formAction} className="flex items-center gap-1">
           <input type="hidden" name="usuario_id" value={usuario.id} />
           <select
-            name="rol_id"
+            name={campo}
             defaultValue=""
-            aria-label={`Agregar rol a ${usuario.username}`}
+            aria-label={`Agregar ${singular} a ${usuario.username}`}
             className="rounded border border-gray/40 px-1 py-0.5 text-xs"
           >
             <option value="" disabled>
-              + rol
+              + {singular}
             </option>
-            {disponibles.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.nombre}
+            {disponibles.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.nombre}
               </option>
             ))}
           </select>
@@ -180,6 +192,10 @@ function CeldaRoles({
       {estado.error && <span className="text-xs text-secondary">{estado.error}</span>}
     </div>
   );
+}
+
+function faltantes<T extends { id: string }>(todos: T[], asignados: T[]): T[] {
+  return todos.filter((t) => !asignados.some((a) => a.id === t.id));
 }
 
 function BotonActivo({ usuario }: { usuario: Usuario }) {
@@ -249,11 +265,15 @@ export function UsuariosCliente({
   usuarios,
   roles,
   rolesPorUsuario,
+  sucursales,
+  sucursalesPorUsuario,
   permisos,
 }: {
   usuarios: Usuario[];
   roles: Rol[];
   rolesPorUsuario: Record<string, Rol[]>;
+  sucursales: Sucursal[];
+  sucursalesPorUsuario: Record<string, Sucursal[]>;
   permisos: string[];
 }) {
   // El botón se oculta a quien no puede: dejarlo visible para chocar con un
@@ -284,13 +304,38 @@ export function UsuariosCliente({
         header: "Roles",
         // Sin `accessorFn`: el buscador de la tabla filtra por texto y estos
         // son controles, no texto.
-        cell: ({ row }) => (
-          <CeldaRoles
-            usuario={row.original}
-            roles={roles}
-            asignados={rolesPorUsuario[row.original.id] ?? []}
-          />
-        ),
+        cell: ({ row }) => {
+          const asignados = rolesPorUsuario[row.original.id] ?? [];
+          return (
+            <CeldaAsignaciones
+              usuario={row.original}
+              asignados={asignados}
+              disponibles={faltantes(roles, asignados)}
+              campo="rol_id"
+              singular="rol"
+              accionAsignar={asignarRolAction}
+              quitar={quitarRolAction}
+            />
+          );
+        },
+      },
+      {
+        id: "sucursales",
+        header: "Sucursales",
+        cell: ({ row }) => {
+          const asignadas = sucursalesPorUsuario[row.original.id] ?? [];
+          return (
+            <CeldaAsignaciones
+              usuario={row.original}
+              asignados={asignadas}
+              disponibles={faltantes(sucursales, asignadas)}
+              campo="sucursal_id"
+              singular="sucursal"
+              accionAsignar={asignarSucursalAction}
+              quitar={quitarSucursalAction}
+            />
+          );
+        },
       },
       {
         accessorKey: "activo",
@@ -308,7 +353,7 @@ export function UsuariosCliente({
         ),
       },
     ],
-    [roles, rolesPorUsuario, puedeResetear],
+    [roles, rolesPorUsuario, sucursales, sucursalesPorUsuario, puedeResetear],
   );
 
   return (
@@ -319,7 +364,10 @@ export function UsuariosCliente({
       </div>
       <p className="text-sm text-gray">
         Quién entra al ERP y con qué rol. Una cuenta sin rol entra pero no ve nada: el
-        RBAC deniega por defecto.
+        RBAC deniega por defecto. Las sucursales acotan qué datos alcanza —un
+        supervisor lleva las que tenga a cargo—; no son dónde trabaja la persona, eso
+        se registra en RRHH → Trabajadores. Un cambio de sucursales le aplica cuando
+        esa cuenta vuelva a entrar.
       </p>
       <label className="flex w-64 flex-col gap-1 text-sm font-semibold">
         Filtrar por rol
