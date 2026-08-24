@@ -135,7 +135,7 @@ roles siguen diciendo *qué puede* (RN-GEN-004).
 | POST | `/api/v1/users/{id}/pin/reset` | Devolver al PIN por defecto y obligar a cambiarlo (`users.resetear_pin`, ADR-041) |
 | POST | `/api/v1/users/me/pin` | Cambiar el PIN propio (sin permiso; exige el actual) |
 | POST/DELETE | `/api/v1/users/{id}/roles[/{rol_id}]` | Asignar / quitar rol |
-| POST/DELETE | `/api/v1/users/{id}/sucursales[/{suc_id}]` | Asignar / quitar sucursal (alcance) |
+| GET/POST/DELETE | `/api/v1/users/{id}/sucursales[/{suc_id}]` | Listar / asignar / quitar sucursal (**alcance de datos**). Exigen que la sucursal sea de la empresa de quien administra —el superusuario administra el grupo entero— y quedan en `audit_log`. Un supervisor sobre varios locales son varias filas: no hay entidad "grupo de sucursales" (ADR-061). El alcance viaja en el token, así que le aplica a esa cuenta cuando su sesión renueve. **No es** dónde trabaja la persona: eso es `rrhh.trabajador.sucursal_id` |
 | POST/GET | `/api/v1/roles` | Crear / listar roles |
 | POST/DELETE | `/api/v1/roles/{id}/permisos[/{permiso_id}]` | Asignar / quitar permiso a rol |
 | POST/GET | `/api/v1/permisos` | Crear / listar permisos |

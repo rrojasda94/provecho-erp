@@ -23016,6 +23016,18 @@
             ],
             "title": "Sistema Pensiones"
           },
+          "sucursal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sucursal Id"
+          },
           "tiene_poderes": {
             "default": false,
             "title": "Tiene Poderes",
@@ -23110,6 +23122,18 @@
             ],
             "title": "Remuneracion Base"
           },
+          "sucursal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sucursal Id"
+          },
           "tipo_vinculo": {
             "title": "Tipo Vinculo",
             "type": "string"
@@ -23132,6 +23156,7 @@
           "empresa_id",
           "persona_id",
           "usuario_id",
+          "sucursal_id",
           "cargo",
           "area",
           "tipo_vinculo",
@@ -23145,7 +23170,7 @@
         "type": "object"
       },
       "TrabajadorUpdate": {
-        "description": "Campo ausente o `null` = no tocar.\n\n`estado` no admite `\"cesado\"`: el cese tiene su propio endpoint\n(`POST /trabajadores/{id}/cesar`) porque además de cambiar el estado\nfija la fecha de cese y publica el evento del que cuelga la liquidación.\nLlegar a `cesado` por este PATCH dejaba un trabajador cesado sin fecha\ny sin que nadie se enterara.",
+        "description": "Campo ausente = no tocar.\n\n`sucursal_id` es la excepción: mandarlo en `null` **borra** el centro de\nlabores, porque quedarse sin local asignado es un estado válido y no había\notra forma de volver a él. Para el resto, `null` sigue siendo \"no tocar\".\n\n`estado` no admite `\"cesado\"`: el cese tiene su propio endpoint\n(`POST /trabajadores/{id}/cesar`) porque además de cambiar el estado\nfija la fecha de cese y publica el evento del que cuelga la liquidación.\nLlegar a `cesado` por este PATCH dejaba un trabajador cesado sin fecha\ny sin que nadie se enterara.",
         "properties": {
           "area": {
             "anyOf": [
@@ -23203,6 +23228,18 @@
               }
             ],
             "title": "Remuneracion Base"
+          },
+          "sucursal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sucursal Id"
           }
         },
         "title": "TrabajadorUpdate",
@@ -46722,7 +46759,59 @@
       }
     },
     "/api/v1/users/{usuario_id}/sucursales": {
+      "get": {
+        "description": "El alcance por sucursal de una cuenta. `/users/me` devuelve el del\ntoken —el propio—; esto es el de cualquier otra, que es lo que la pantalla\nde administración tiene que poder mirar y corregir.",
+        "operationId": "listar_sucursales_de_usuario_api_v1_users__usuario_id__sucursales_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "usuario_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Usuario Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SucursalOut"
+                  },
+                  "title": "Response Listar Sucursales De Usuario Api V1 Users  Usuario Id  Sucursales Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Sucursales De Usuario",
+        "tags": [
+          "users-admin"
+        ]
+      },
       "post": {
+        "description": "Suma un local al alcance de la cuenta. Un supervisor a cargo de varias\nsucursales se arma llamando esto una vez por local (ADR-061).\n\nEl alcance viaja en el token: le aplica a esa persona cuando su sesión\nrenueve, no en el acto.",
         "operationId": "asignar_sucursal_api_v1_users__usuario_id__sucursales_post",
         "parameters": [
           {

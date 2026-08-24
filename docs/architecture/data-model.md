@@ -1260,7 +1260,10 @@ un trabajador puede o no tener usuario, y no todo usuario es trabajador
 (tenant) y se archivan/resguardan por el área correspondiente.
 
 - **trabajador**: empresa_id, persona_id (datos personales — nombres,
-  documento, domicilio, etc.), usuario_id (opcional), cargo, area,
+  documento, domicilio, etc.), usuario_id (opcional), sucursal_id (opcional —
+  **centro de labores**: dónde trabaja, migración `b6d29f10c47e`, ADR-061. No
+  es el alcance de datos de su cuenta, que vive en `usuario_sucursal`; y tiene
+  que ser una sucursal de su misma empresa, RN-RRHH-019), cargo, area,
   tipo_vinculo (`planilla` | `practicante` | `locacion_servicios`),
   regimen_laboral, fecha_ingreso, fecha_cese (nullable), remuneracion_base
   (o subvención si `practicante`, RN-PER-001), sistema_pensiones (`onp` |

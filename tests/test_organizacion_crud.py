@@ -7,6 +7,8 @@ como requisito de una sucursal, la coherencia de empresa en los almacenes,
 la baja negada con dependientes vivos y el alcance por tenant (ADR-004).
 """
 
+import uuid
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, select
@@ -18,6 +20,7 @@ from src.core.app import create_app
 from src.core.database import Base
 from src.modules.users.api.deps import get_db
 from src.modules.users.infrastructure.models import Empresa, Grupo, Sucursal
+from src.shared.models.audit_log import AuditLog
 from tests.conftest import auth_headers
 
 
@@ -344,22 +347,30 @@ def test_almacen_de_sucursal_de_otra_empresa_409(env):
 
 
 # --- Permisos y alcance por tenant (ADR-004) --------------------------------
-def _usuario_de_empresa(client, headers, TestSession, ids, username="jefe_local"):
-    """Usuario con `organizacion.gestionar` y alcance a una sucursal: su
+def _usuario_de_empresa(
+    client,
+    headers,
+    TestSession,
+    ids,
+    username="jefe_local",
+    codigos=("organizacion.gestionar",),
+):
+    """Usuario con los permisos que se le pidan y alcance a una sucursal: su
     token trae `empresa_id`, así que NO es superusuario."""
     permisos = client.get("/api/v1/permisos", headers=headers).json()
-    permiso_id = next(p["id"] for p in permisos if p["codigo"] == "organizacion.gestionar")
     rol = client.post(
-        "/api/v1/roles", headers=headers, json={"nombre": "jefe_organizacion"}
+        "/api/v1/roles", headers=headers, json={"nombre": f"rol_{username}"}
     ).json()
-    assert (
-        client.post(
-            f"/api/v1/roles/{rol['id']}/permisos",
-            headers=headers,
-            json={"permiso_id": permiso_id},
-        ).status_code
-        == 204
-    )
+    for codigo in codigos:
+        permiso_id = next(p["id"] for p in permisos if p["codigo"] == codigo)
+        assert (
+            client.post(
+                f"/api/v1/roles/{rol['id']}/permisos",
+                headers=headers,
+                json={"permiso_id": permiso_id},
+            ).status_code
+            == 204
+        )
     usuario = client.post(
         "/api/v1/users",
         headers=headers,
@@ -461,3 +472,156 @@ def test_no_se_puede_crear_sucursal_en_empresa_ajena(env):
         },
     )
     assert r.status_code == 403
+
+
+# --- Alcance por sucursal de una cuenta (usuario_sucursal, ADR-061) ----------
+def _nueva_sucursal(client, headers, nombre):
+    marca_id = client.get("/api/v1/sucursales", headers=headers).json()[0]["marca_id"]
+    r = client.post(
+        "/api/v1/sucursales",
+        headers=headers,
+        json={
+            "marca_id": marca_id,
+            "nombre": nombre,
+            "direccion": f"Av. {nombre} 100",
+            "tenencia": "alquilada",
+        },
+    )
+    assert r.status_code == 201, r.text
+    return r.json()["id"]
+
+
+def _sucursal_de_otra_empresa(TestSession, ids):
+    """Directo a la BD: el alta por API exige licencia de marca para esa
+    empresa (`test_sucursal_exige_licencia`) y acá lo que se prueba es otra
+    cosa — el alcance de una cuenta, no el alta del local."""
+    with TestSession() as s:
+        otra = Empresa(
+            grupo_id=uuid.UUID(ids["grupo_id"]),
+            razon_social="Majambo Ajena SAC",
+            ruc="20600000009",
+            domicilio_fiscal="Jr. Ajeno 100",
+            tipo="operativa",
+        )
+        s.add(otra)
+        s.flush()
+        sucursal = Sucursal(
+            marca_id=s.scalar(select(Sucursal.marca_id)),
+            empresa_id=otra.id,
+            nombre="Local ajeno",
+            direccion="Jr. Ajeno 100",
+            tenencia="alquilada",
+        )
+        s.add(sucursal)
+        s.commit()
+        return str(sucursal.id)
+
+
+def _cuenta(client, headers, username):
+    return client.post(
+        "/api/v1/users",
+        headers=headers,
+        json={"username": username, "pin": "123456", "tipo": "humano"},
+    ).json()["id"]
+
+
+def test_alcance_por_sucursal_se_asigna_lista_y_quita(env):
+    client, headers, ids, TestSession = env
+    usuario_id = _cuenta(client, headers, "cajera_ch1")
+    url = f"/api/v1/users/{usuario_id}/sucursales"
+
+    assert client.get(url, headers=headers).json() == []
+
+    assert client.post(
+        url, headers=headers, json={"sucursal_id": ids["sucursal_id"]}
+    ).status_code == 204
+    asignadas = client.get(url, headers=headers).json()
+    assert [s["id"] for s in asignadas] == [ids["sucursal_id"]]
+    assert asignadas[0]["nombre"]
+
+    # Repetir no duplica ni falla: la pantalla puede reintentar.
+    assert client.post(
+        url, headers=headers, json={"sucursal_id": ids["sucursal_id"]}
+    ).status_code == 204
+    assert len(client.get(url, headers=headers).json()) == 1
+
+    assert client.delete(f"{url}/{ids['sucursal_id']}", headers=headers).status_code == 204
+    assert client.get(url, headers=headers).json() == []
+
+    # Repartir y sacar acceso a datos deja rastro: sin esto no había forma de
+    # responder quién podía ver ese local y desde cuándo.
+    with TestSession() as s:
+        acciones = set(
+            s.scalars(
+                select(AuditLog.accion).where(AuditLog.entidad == "usuario_sucursal")
+            )
+        )
+    assert acciones == {"asignar_sucursal", "quitar_sucursal"}
+
+
+def test_supervisor_alcanza_varias_sucursales(env):
+    """Un supervisor sobre varios locales son varias filas, no una entidad
+    nueva (ADR-061): `usuario_sucursal` ya es N a N."""
+    client, headers, ids, TestSession = env
+    segunda = _nueva_sucursal(client, headers, "CH2")
+    usuario_id = _cuenta(client, headers, "supervisor_zona")
+    url = f"/api/v1/users/{usuario_id}/sucursales"
+
+    for sucursal_id in (ids["sucursal_id"], segunda):
+        assert client.post(
+            url, headers=headers, json={"sucursal_id": sucursal_id}
+        ).status_code == 204
+
+    assert {s["id"] for s in client.get(url, headers=headers).json()} == {
+        ids["sucursal_id"],
+        segunda,
+    }
+
+    # El alcance recién le llega a esa persona cuando su sesión emite token.
+    with TestSession() as s:
+        supervisor = auth_headers(s, "supervisor_zona")
+    yo = client.get("/api/v1/users/me", headers=supervisor).json()
+    assert set(yo["sucursales"]) == {ids["sucursal_id"], segunda}
+
+
+def test_no_se_asigna_sucursal_de_empresa_ajena(env):
+    """Sin el chequeo de tenant, quien administra las cuentas de su empresa
+    podía darle acceso a los datos del local de otra empresa del grupo."""
+    client, headers, ids, TestSession = env
+    ajena = _sucursal_de_otra_empresa(TestSession, ids)
+
+    admin_local = _usuario_de_empresa(
+        client,
+        headers,
+        TestSession,
+        ids,
+        username="jefe_cuentas",
+        codigos=("users.gestionar", "organizacion.gestionar"),
+    )
+    usuario_id = _cuenta(client, headers, "cajera_ajena")
+
+    r = client.post(
+        f"/api/v1/users/{usuario_id}/sucursales",
+        headers=admin_local,
+        json={"sucursal_id": ajena},
+    )
+    assert r.status_code == 403
+
+    # La cuenta de administración del grupo sí puede: administra todas las
+    # empresas, igual que en el alta de sucursales.
+    assert client.post(
+        f"/api/v1/users/{usuario_id}/sucursales",
+        headers=headers,
+        json={"sucursal_id": ajena},
+    ).status_code == 204
+
+
+def test_asignar_sucursal_inexistente_404(env):
+    client, headers, ids, _ = env
+    usuario_id = _cuenta(client, headers, "cajera_fantasma")
+    r = client.post(
+        f"/api/v1/users/{usuario_id}/sucursales",
+        headers=headers,
+        json={"sucursal_id": "00000000-0000-0000-0000-000000000001"},
+    )
+    assert r.status_code == 404

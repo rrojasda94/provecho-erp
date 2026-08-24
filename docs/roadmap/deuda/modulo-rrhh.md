@@ -82,3 +82,11 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 - ⬜ **`boleta_pago`/`liquidacion_bss` sin cálculo automático de PLAME**: la
   API recibe `ingresos`/`descuentos`/montos ya calculados (por el contador
   externo) — no hay motor de cálculo de renta 5ta/ONP/AFP/EsSalud en el ERP.
+- ⬜ **El centro de labores todavía no lo consume nadie** (declarado el
+  2026-08-24 con ADR-061). `trabajador.sucursal_id` ya se registra y se edita,
+  pero `asistencia` no lo hereda para reportar por local, el contrato laboral
+  no lo imprime y el reemplazo entre sucursales (RN-RRHH-011) sigue sin
+  modelo. La columna es el prerrequisito de esas tres, no su solución.
+- ⬜ **Los trabajadores que ya existían quedaron sin sucursal**: la migración
+  `b6d29f10c47e` es aditiva y nullable, sin backfill — no hay dato del que
+  deducir el local. Hay que asignárselos a mano desde RRHH → Trabajadores.

@@ -477,6 +477,22 @@ def listar_roles_de_usuario(
     return admin.roles_de_usuario(session, usuario_id)
 
 
+@router.get(
+    "/users/{usuario_id}/sucursales",
+    response_model=list[schemas.SucursalOut],
+    tags=["users-admin"],
+)
+def listar_sucursales_de_usuario(
+    usuario_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(GESTIONAR)),
+    session: Session = Depends(get_db),
+):
+    """El alcance por sucursal de una cuenta. `/users/me` devuelve el del
+    token —el propio—; esto es el de cualquier otra, que es lo que la pantalla
+    de administración tiene que poder mirar y corregir."""
+    return admin.sucursales_de_usuario(session, usuario_id)
+
+
 @router.get("/users", response_model=Pagina[schemas.UsuarioOut], tags=["users-admin"])
 def listar_usuarios(
     _: Usuario = Depends(require_permission(GESTIONAR)),
@@ -588,10 +604,16 @@ def quitar_rol(
 def asignar_sucursal(
     usuario_id: uuid.UUID,
     body: schemas.SucursalIdIn,
-    _: Usuario = Depends(require_permission(GESTIONAR)),
+    actor: Usuario = Depends(require_permission(GESTIONAR)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    admin.asignar_sucursal(session, usuario_id, body.sucursal_id)
+    """Suma un local al alcance de la cuenta. Un supervisor a cargo de varias
+    sucursales se arma llamando esto una vez por local (ADR-061).
+
+    El alcance viaja en el token: le aplica a esa persona cuando su sesión
+    renueve, no en el acto."""
+    admin.asignar_sucursal(session, usuario_id, body.sucursal_id, tenant, actor.id)
     session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -606,10 +628,11 @@ def asignar_sucursal(
 def quitar_sucursal(
     usuario_id: uuid.UUID,
     sucursal_id: uuid.UUID,
-    _: Usuario = Depends(require_permission(GESTIONAR)),
+    actor: Usuario = Depends(require_permission(GESTIONAR)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    admin.quitar_sucursal(session, usuario_id, sucursal_id)
+    admin.quitar_sucursal(session, usuario_id, sucursal_id, tenant, actor.id)
     session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 

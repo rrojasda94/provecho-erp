@@ -2,6 +2,7 @@
 override de get_db, mismo patrón que test_purchases.py.
 """
 
+import uuid
 from decimal import Decimal
 
 import pytest
@@ -14,7 +15,14 @@ import src.core.models_registry  # noqa: F401
 from src.core.app import create_app
 from src.core.database import Base
 from src.modules.users.api.deps import get_db
-from src.modules.users.infrastructure.models import Empresa, Persona, Rol, Usuario, UsuarioRol
+from src.modules.users.infrastructure.models import (
+    Empresa,
+    Persona,
+    Rol,
+    Sucursal,
+    Usuario,
+    UsuarioRol,
+)
 from src.modules.users.infrastructure.security import hash_pin
 
 
@@ -32,6 +40,7 @@ def env():
     with TestSession() as s:
         seed(s)
         empresa = s.scalar(select(Empresa))
+        sucursal = s.scalar(select(Sucursal))
         admin = s.scalar(select(Usuario).where(Usuario.username == "admin"))
         persona = Persona(
             nombres="Ana", apellidos="Torres", tipo_documento="dni", numero_documento="20000001"
@@ -47,6 +56,9 @@ def env():
 
         ids.update(
             empresa_id=str(empresa.id),
+            sucursal_id=str(sucursal.id),
+            marca_id=str(sucursal.marca_id),
+            grupo_id=str(empresa.grupo_id),
             admin_usuario_id=str(admin.id),
             persona_id=str(persona.id),
         )
@@ -90,6 +102,85 @@ def test_crear_trabajador_planilla(env):
     r = _crear_trabajador(client, h, ids)
     assert r.status_code == 201
     assert r.json()["registra_asistencia"] is True
+
+
+# --- Centro de labores (ADR-061, RN-RRHH-019) --------------------------------
+def _sucursal_ajena(TestSession, ids):
+    """Sucursal de OTRA empresa del mismo grupo: el caso que la regla ataja."""
+    with TestSession() as s:
+        otra = Empresa(
+            grupo_id=uuid.UUID(ids["grupo_id"]),
+            razon_social="Otra SAC",
+            ruc="20999999991",
+            domicilio_fiscal="Av. Otra 100",
+            tipo="operativa",
+        )
+        s.add(otra)
+        s.flush()
+        sucursal = Sucursal(
+            marca_id=uuid.UUID(ids["marca_id"]),
+            empresa_id=otra.id,
+            nombre="Local ajeno",
+            direccion="Av. Otra 100",
+            tenencia="alquilada",
+        )
+        s.add(sucursal)
+        s.commit()
+        return str(sucursal.id)
+
+
+def test_trabajador_se_asigna_a_su_sucursal(env):
+    client, ids, _ = env
+    h = _token(client)
+    r = _crear_trabajador(client, h, ids, sucursal_id=ids["sucursal_id"])
+    assert r.status_code == 201
+    assert r.json()["sucursal_id"] == ids["sucursal_id"]
+
+
+def test_trabajador_sin_sucursal_es_valido(env):
+    """Gerencia y administración no están en ningún local."""
+    client, ids, _ = env
+    r = _crear_trabajador(client, _token(client), ids)
+    assert r.status_code == 201
+    assert r.json()["sucursal_id"] is None
+
+
+def test_no_se_asigna_a_sucursal_de_otra_empresa(env):
+    client, ids, TestSession = env
+    h = _token(client)
+    ajena = _sucursal_ajena(TestSession, ids)
+
+    r = _crear_trabajador(client, h, ids, sucursal_id=ajena)
+    assert r.status_code == 409
+    assert "RN-RRHH-019" in r.json()["detail"]
+
+    trabajador_id = _crear_trabajador(client, h, ids).json()["id"]
+    patch = client.patch(
+        f"/api/v1/rrhh/trabajadores/{trabajador_id}",
+        headers=h,
+        json={"sucursal_id": ajena},
+    )
+    assert patch.status_code == 409
+
+
+def test_patch_cambia_y_borra_el_centro_de_labores(env):
+    client, ids, _ = env
+    h = _token(client)
+    trabajador_id = _crear_trabajador(client, h, ids).json()["id"]
+    url = f"/api/v1/rrhh/trabajadores/{trabajador_id}"
+
+    asignar = client.patch(url, headers=h, json={"sucursal_id": ids["sucursal_id"]})
+    assert asignar.status_code == 200
+    assert asignar.json()["sucursal_id"] == ids["sucursal_id"]
+
+    # Un PATCH de otro campo no puede tirar abajo la sucursal ya asignada.
+    otro = client.patch(url, headers=h, json={"cargo": "Cajero"})
+    assert otro.json()["sucursal_id"] == ids["sucursal_id"]
+
+    # `null` explícito sí la borra: quedarse sin local es un estado válido.
+    borrar = client.patch(url, headers=h, json={"sucursal_id": None})
+    assert borrar.status_code == 200
+    assert borrar.json()["sucursal_id"] is None
 
 
 def test_locacion_servicios_fuerza_no_registra_asistencia(env):

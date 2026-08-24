@@ -142,6 +142,49 @@ export async function quitarRolAction(
   return { error: "", ok: true };
 }
 
+/** Suma un local al alcance de la cuenta.
+ *
+ * Un supervisor a cargo de varias sucursales son varias llamadas a esto: no
+ * hay entidad "grupo de sucursales" y no hace falta (ADR-061). El alcance
+ * viaja en el token, así que a esa persona le aplica cuando su sesión
+ * renueve, no en el acto. */
+export async function asignarSucursalAction(
+  _previo: EstadoUsuario,
+  formData: FormData,
+): Promise<EstadoUsuario> {
+  const usuarioId = String(formData.get("usuario_id") ?? "");
+  const sucursalId = String(formData.get("sucursal_id") ?? "");
+  if (!usuarioId || !sucursalId) return { error: "Elegir la sucursal.", ok: false };
+
+  try {
+    await apiFetch(`/api/v1/users/${usuarioId}/sucursales`, {
+      token: await token(),
+      metodo: "POST",
+      cuerpo: { sucursal_id: sucursalId },
+    });
+  } catch (e) {
+    return { error: mensajeDe(e, "No se pudo asignar la sucursal."), ok: false };
+  }
+  revalidatePath("/usuarios");
+  return { error: "", ok: true };
+}
+
+export async function quitarSucursalAction(
+  usuarioId: string,
+  sucursalId: string,
+): Promise<EstadoUsuario> {
+  try {
+    await apiFetch(`/api/v1/users/${usuarioId}/sucursales/${sucursalId}`, {
+      token: await token(),
+      metodo: "DELETE",
+    });
+  } catch (e) {
+    return { error: mensajeDe(e, "No se pudo quitar la sucursal."), ok: false };
+  }
+  revalidatePath("/usuarios");
+  return { error: "", ok: true };
+}
+
 /**
  * Devuelve la cuenta al PIN por defecto y la obliga a cambiarlo al entrar.
  *

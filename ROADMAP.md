@@ -227,6 +227,21 @@ contiene, buscando su `[[ COMPLETAR ]]`):
   visión. Sin implementar todavía.
 - ✅ 2026-07-27 Grupo Majambo **no tiene tema propio** — Provecho es el
   único tema fuera de PDV/Kiosk (`docs/product/ui-ux.md`).
+- ✅ 2026-08-24 **Dónde trabaja alguien y qué datos alcanza son dos cosas**
+  (ADR-061, migración `b6d29f10c47e`, RN-RRHH-019). No se podía asignar un
+  trabajador a una sucursal ni un supervisor a varias: `trabajador` no tenía
+  local (la asistencia no tenía a qué sucursal atribuirse) y `usuario_sucursal`
+  tenía endpoints desde el slice inicial **pero ninguna pantalla** — fuera del
+  seeder nadie repartía alcance. Ahora `trabajador.sucursal_id` (nullable) es
+  el **centro de labores**, un hecho laboral de RRHH, y `usuario_sucursal`
+  sigue siendo el **alcance de datos** de la cuenta; se editan por separado en
+  RRHH → Trabajadores y Usuarios → Cuentas. Un supervisor sobre varios locales
+  son **varias filas**: se descartó una tabla `zona` porque hoy ningún reporte,
+  permiso ni regla la nombra —sería una entidad con tenant, seeder y CRUD para
+  ahorrar dos clics—. De paso se cerraron dos agujeros del endpoint que ya
+  existía: no validaba tenant (se podía dar acceso al local de otra empresa del
+  grupo) y no auditaba. Nuevo `GET /users/{id}/sucursales`. Tests en
+  `tests/test_rrhh.py` y `tests/test_organizacion_crud.py`.
 - ✅ 2026-08-23 **Droplet de staging levantado** (DigitalOcean, ver
   [`docs/engineering/staging.md`](docs/engineering/staging.md) para IP,
   dominios y bitácora — nunca secretos ahí). Usuario `app` sin root/password
@@ -269,7 +284,7 @@ nombre del archivo.
 | Área | Archivo | ⬜ abiertos | ✅ cerrados |
 | --- | --- | --- | --- |
 | Transversal | [`transversal.md`](docs/roadmap/deuda/transversal.md) | 5 | 22 |
-| Seguridad (tras el endurecimiento base de 2026-07-26) | [`seguridad.md`](docs/roadmap/deuda/seguridad.md) | 8 | 3 |
+| Seguridad (tras el endurecimiento base de 2026-07-26) | [`seguridad.md`](docs/roadmap/deuda/seguridad.md) | 12 | 6 |
 | Dashboard y caja (tras la implementación de 2026-07-26 — ADR-012) | [`dashboard-y-caja.md`](docs/roadmap/deuda/dashboard-y-caja.md) | 6 | 17 |
 | Protección de datos personales (tras la implementación de 2026-07-26 — ADR-011) | [`proteccion-de-datos-personales.md`](docs/roadmap/deuda/proteccion-de-datos-personales.md) | 8 | 1 |
 | Contrato de API (tras la implementación de 2026-07-26 — ADR-010) | [`contrato-de-api.md`](docs/roadmap/deuda/contrato-de-api.md) | 6 | 1 |
@@ -282,7 +297,7 @@ nombre del archivo.
 | Módulo purchases (slices siguientes) | [`modulo-purchases.md`](docs/roadmap/deuda/modulo-purchases.md) | 6 | 2 |
 | Módulo production (slices siguientes) | [`modulo-production.md`](docs/roadmap/deuda/modulo-production.md) | 8 | 1 |
 | Módulo accounting (slices siguientes) | [`modulo-accounting.md`](docs/roadmap/deuda/modulo-accounting.md) | 8 | 3 |
-| Módulo rrhh (slice completo — deuda declarada) | [`modulo-rrhh.md`](docs/roadmap/deuda/modulo-rrhh.md) | 9 | 4 |
+| Módulo rrhh (slice completo — deuda declarada) | [`modulo-rrhh.md`](docs/roadmap/deuda/modulo-rrhh.md) | 11 | 4 |
 | Módulo marketing (slice core — deuda declarada) | [`modulo-marketing.md`](docs/roadmap/deuda/modulo-marketing.md) | 5 | 2 |
 | Frontend (F2 — arquitectura y UX, documento 2026-07-27, actualizado tras ADR-013) | [`frontend.md`](docs/roadmap/deuda/frontend.md) | 11 | 24 |
 

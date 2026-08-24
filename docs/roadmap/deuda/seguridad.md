@@ -131,3 +131,15 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   mucho tránsito puede querer menos y uno de mesa larga, más. Va a
   `parametro_empresa` (ADR-014) cuando alguien lo pida — hoy sería un campo
   de configuración que nadie tocó nunca.
+- ⬜ **`quitar_rol` sigue sin auditar** (declarado el 2026-08-24 con ADR-061).
+  Asignar un rol deja rastro en `audit_log` desde el slice inicial; quitarlo,
+  no. Es la otra mitad de "quién pudo hacer esto y hasta cuándo", y sin ella
+  un rol que estuvo puesto tres días y se sacó no dejó huella. El alcance por
+  sucursal ya se audita en las dos direcciones (`asignar_sucursal` /
+  `quitar_sucursal`); esto es cerrar la misma brecha en los roles.
+- ⬜ **No hay alcance de marca real en el JWT** (declarado el 2026-08-24 con
+  ADR-061). `docs/security/authorization.md` lista "Marca" como nivel de
+  alcance, pero el token solo lleva `empresa_id` y `sucursales`: un supervisor
+  de marca se arma con una fila de `usuario_sucursal` por local. Alcanza
+  mientras sean pocos locales por supervisor; con un grupo grande, cada
+  sucursal nueva obliga a repartirla a mano en cada cuenta.

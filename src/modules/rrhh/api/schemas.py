@@ -27,10 +27,16 @@ class TrabajadorCreate(BaseModel):
     tiene_poderes: bool = False
     registra_asistencia: bool = True
     jornada_horas_semana: Decimal | None = None
+    # Centro de labores (ADR-061). Opcional: gerencia no está en un local.
+    sucursal_id: uuid.UUID | None = None
 
 
 class TrabajadorUpdate(BaseModel):
-    """Campo ausente o `null` = no tocar.
+    """Campo ausente = no tocar.
+
+    `sucursal_id` es la excepción: mandarlo en `null` **borra** el centro de
+    labores, porque quedarse sin local asignado es un estado válido y no había
+    otra forma de volver a él. Para el resto, `null` sigue siendo "no tocar".
 
     `estado` no admite `"cesado"`: el cese tiene su propio endpoint
     (`POST /trabajadores/{id}/cesar`) porque además de cambiar el estado
@@ -43,6 +49,7 @@ class TrabajadorUpdate(BaseModel):
     area: str | None = Field(default=None, min_length=1, max_length=100)
     remuneracion_base: Decimal | None = Field(default=None, ge=0)
     estado: Literal["activo", "suspendido"] | None = None
+    sucursal_id: uuid.UUID | None = None
 
 
 class TrabajadorCese(BaseModel):
@@ -55,6 +62,7 @@ class TrabajadorOut(BaseModel):
     empresa_id: uuid.UUID
     persona_id: uuid.UUID
     usuario_id: uuid.UUID | None
+    sucursal_id: uuid.UUID | None
     cargo: str
     area: str
     tipo_vinculo: str

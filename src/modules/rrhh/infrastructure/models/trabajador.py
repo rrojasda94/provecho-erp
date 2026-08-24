@@ -20,6 +20,12 @@ class Trabajador(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin):
 
     empresa_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("empresa.id"))
     persona_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("persona.id"))
+    # Centro de labores: dónde trabaja, no qué datos alcanza (ADR-061). El
+    # alcance de acceso vive en `usuario_sucursal`, del lado de la cuenta.
+    # Nullable: gerencia y administración no están en ningún local.
+    sucursal_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("sucursal.id"), nullable=True
+    )
     usuario_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("usuario.id"), nullable=True
     )
