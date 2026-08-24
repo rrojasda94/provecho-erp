@@ -25,6 +25,7 @@ from src.modules.sales.application import (
     clientes,
     comprobantes,
     cumplimiento,
+    cupones,
     importacion_clientes,
     mesas,
     notas_credito,
@@ -81,6 +82,9 @@ EMITIR = "sales.emitir_comprobante"
 # cajero que emitió (RN-CPP-009).
 NOTA_CREDITO = "sales.emitir_nota_credito"
 ENTREGAR = "sales.entregar_pedido"
+# Terminar una campaña de cupón le quita un beneficio prometido a todo el
+# padrón: no es del cajero que canjea ni de quien da de alta clientes.
+GESTIONAR_PROMOCIONES = "sales.gestionar_promociones"
 
 
 def _xlsx(contenido: bytes, nombre: str) -> Response:
@@ -286,6 +290,78 @@ def aplicar_descuento(
     )
     session.commit()
     return venta
+
+
+# --- Cupón de promoción (ADR-059) --------------------------------------------
+@router.post("/ventas/{venta_id}/cupon", response_model=schemas.CuponCanjeadoOut)
+def canjear_cupon(
+    venta_id: uuid.UUID,
+    body: schemas.CanjeCuponIn,
+    actor: Usuario = Depends(require_permission(COBRAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Aplica el cupón del cliente y lo apaga para siempre.
+
+    Va con `sales.cobrar` y **sin PIN de supervisor**, a diferencia de
+    `POST /ventas/{id}/descuento`: ahí el margen se regala a criterio de
+    alguien y por eso hace falta que un supervisor firme (RN-COM-017); acá
+    el descuento ya estaba prometido y el cupón *es* la autorización. Pedir
+    un supervisor por cada cupón haría que la caja deje de canjearlos.
+    """
+    exigir_venta(session, venta_id, tenant)
+    cupon, monto = cupones.canjear(
+        session, venta_id=venta_id, codigo=body.codigo, actor_id=actor.id
+    )
+    session.commit()
+    return {
+        "codigo": cupon.codigo,
+        "monto_descuento": monto,
+        "venta": VentaRepo(session).get(venta_id),
+    }
+
+
+@router.get("/promociones-cupon", response_model=list[schemas.PromocionCuponOut])
+def listar_promociones_cupon(
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Array plano y no paginado: son campañas contadas con los dedos de una
+    mano, no una colección que crece con la operación (ADR-026).
+
+    Se escopa por **grupo** y no por empresa: el cupón es del cliente, y el
+    cliente es del grupo (RN-PTS-001).
+    """
+    empresa_id = tenant.filtro_empresa(None)
+    grupo_id = (
+        clientes.grupo_de_empresa(session, empresa_id)
+        if empresa_id is not None
+        else None
+    )
+    return cupones.listar_promociones(session, grupo_id=grupo_id)
+
+
+@router.post(
+    "/promociones-cupon/{promocion_id}/termino",
+    response_model=schemas.PromocionCuponOut,
+)
+def terminar_promocion_cupon(
+    promocion_id: uuid.UUID,
+    actor: Usuario = Depends(require_permission(GESTIONAR_PROMOCIONES)),
+    session: Session = Depends(get_db),
+):
+    """El derecho reservado de cortar la promoción en cualquier momento.
+
+    Deja de emitir cupones nuevos; los ya emitidos siguen valiendo hasta su
+    fecha. Quien alcanzó a registrarse cumplió su parte del trato, y
+    quitárselo después sería cambiarlo a mitad de camino.
+    """
+    promocion = cupones.terminar(
+        session, promocion_id=promocion_id, actor_id=actor.id
+    )
+    session.commit()
+    return promocion
 
 
 @router.get("/ventas/{venta_id}", response_model=schemas.VentaOut)

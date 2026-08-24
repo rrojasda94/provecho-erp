@@ -3272,6 +3272,21 @@
         "title": "CampanaOut",
         "type": "object"
       },
+      "CanjeCuponIn": {
+        "properties": {
+          "codigo": {
+            "maxLength": 20,
+            "minLength": 1,
+            "title": "Codigo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "codigo"
+        ],
+        "title": "CanjeCuponIn",
+        "type": "object"
+      },
       "CartaItemOut": {
         "properties": {
           "categoria_id": {
@@ -4988,6 +5003,50 @@
         "title": "ConsultaPersonaOut",
         "type": "object"
       },
+      "ConsultaPublicaIn": {
+        "properties": {
+          "numero_documento": {
+            "anyOf": [
+              {
+                "maxLength": 8,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Numero Documento"
+          },
+          "telefono": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Telefono"
+          }
+        },
+        "title": "ConsultaPublicaIn",
+        "type": "object"
+      },
+      "ConsultaPublicaOut": {
+        "description": "Un booleano y nada más.\n\nQuien pregunta no está autenticado. Devolverle el nombre, el teléfono o\nla fecha del cupón convertiría este endpoint en un buscador del padrón\npara cualquiera que sepa un DNI.",
+        "properties": {
+          "registrado": {
+            "title": "Registrado",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "registrado"
+        ],
+        "title": "ConsultaPublicaOut",
+        "type": "object"
+      },
       "ConsumoCreate": {
         "properties": {
           "items": {
@@ -6288,6 +6347,60 @@
           }
         },
         "title": "CuentaContableUpdate",
+        "type": "object"
+      },
+      "CuponCanjeadoOut": {
+        "properties": {
+          "codigo": {
+            "title": "Codigo",
+            "type": "string"
+          },
+          "monto_descuento": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Monto Descuento",
+            "type": "string"
+          },
+          "venta": {
+            "$ref": "#/components/schemas/VentaOut"
+          }
+        },
+        "required": [
+          "codigo",
+          "monto_descuento",
+          "venta"
+        ],
+        "title": "CuponCanjeadoOut",
+        "type": "object"
+      },
+      "CuponPublicoOut": {
+        "description": "Lo que la landing le muestra al cliente al terminar.",
+        "properties": {
+          "codigo": {
+            "title": "Codigo",
+            "type": "string"
+          },
+          "descuento_porcentaje": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Descuento Porcentaje",
+            "type": "string"
+          },
+          "vigente_hasta": {
+            "format": "date",
+            "title": "Vigente Hasta",
+            "type": "string"
+          },
+          "ya_estaba_registrado": {
+            "title": "Ya Estaba Registrado",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "codigo",
+          "vigente_hasta",
+          "descuento_porcentaje",
+          "ya_estaba_registrado"
+        ],
+        "title": "CuponPublicoOut",
         "type": "object"
       },
       "CustodiaEfectivoOut": {
@@ -12533,6 +12646,23 @@
         "title": "NodoPublicoOut",
         "type": "object"
       },
+      "NombrePublicoOut": {
+        "description": "El nombre de RENIEC para que el cliente lo confirme en pantalla.\n\nVacío cuando el proveedor no contesta o no está configurado: el\nformulario deja escribirlo a mano y sigue (RN-PTS-004).",
+        "properties": {
+          "apellidos": {
+            "default": "",
+            "title": "Apellidos",
+            "type": "string"
+          },
+          "nombres": {
+            "default": "",
+            "title": "Nombres",
+            "type": "string"
+          }
+        },
+        "title": "NombrePublicoOut",
+        "type": "object"
+      },
       "NotaCreditoCreate": {
         "description": "Acredita un comprobante ya aceptado (RN-CPP-009).\n\n`motivo` es del catálogo 09 de SUNAT: 01 anulación de la operación, 02\nanulación por error en el RUC, 03 corrección por error en la\ndescripción, 06 devolución total, 07 devolución por ítem.\n\nSin `detalle` la nota es **total**. Con `detalle`, acredita solo esas\nlíneas y esas cantidades.\n\n`repone_stock` es explícito porque no hay respuesta universal: un plato\ndevuelto en cocina rara vez devuelve el insumo, y corregir el RUC de una\nfactura no toca el inventario.",
         "properties": {
@@ -17868,6 +17998,78 @@
         "title": "ProgramaConteoOut",
         "type": "object"
       },
+      "PromocionCuponOut": {
+        "properties": {
+          "descuento_porcentaje": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Descuento Porcentaje",
+            "type": "string"
+          },
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "vigencia_cupon_dias": {
+            "title": "Vigencia Cupon Dias",
+            "type": "integer"
+          },
+          "vigente_hasta": {
+            "format": "date",
+            "title": "Vigente Hasta",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "nombre",
+          "descuento_porcentaje",
+          "vigente_hasta",
+          "vigencia_cupon_dias",
+          "estado"
+        ],
+        "title": "PromocionCuponOut",
+        "type": "object"
+      },
+      "PromocionPublicaOut": {
+        "description": "Lo que la landing necesita para dibujarse: nada de la campaña interna\n(presupuesto, KPI, quién la aprobó) sale por acá.",
+        "properties": {
+          "descuento_porcentaje": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Descuento Porcentaje",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "vigencia_cupon_dias": {
+            "title": "Vigencia Cupon Dias",
+            "type": "integer"
+          },
+          "vigente_hasta": {
+            "format": "date",
+            "title": "Vigente Hasta",
+            "type": "string"
+          }
+        },
+        "required": [
+          "nombre",
+          "descuento_porcentaje",
+          "vigente_hasta",
+          "vigencia_cupon_dias"
+        ],
+        "title": "PromocionPublicaOut",
+        "type": "object"
+      },
       "ProveedorCreate": {
         "properties": {
           "afecto_igv": {
@@ -19646,6 +19848,137 @@
           "refresh_token"
         ],
         "title": "RefreshIn",
+        "type": "object"
+      },
+      "RegistroPublicoIn": {
+        "description": "Lo que la landing pública manda al registrar a un cliente.\n\nEl nombre viaja aunque RENIEC lo haya completado en el navegador: si el\nproveedor no contesta, el cliente lo escribe a mano y el alta **no se\nbloquea** (RN-PTS-004). El servidor vuelve a consultar por su cuenta —\nlo que llega de una página pública no decide qué nombre queda guardado.\n\n`acepta_terminos` es obligatorio y tiene que venir en `true`: el\nconsentimiento del titular es lo que habilita el uso comercial del dato\n(Ley 29733), y sin dejarlo registrado la promoción no tendría con qué\nsostenerlo.",
+        "properties": {
+          "acepta_terminos": {
+            "const": true,
+            "title": "Acepta Terminos",
+            "type": "boolean"
+          },
+          "direccion": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direccion"
+          },
+          "fecha_nacimiento": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Nacimiento"
+          },
+          "nombre": {
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Nombre",
+            "type": "string"
+          },
+          "numero_documento": {
+            "maxLength": 8,
+            "minLength": 8,
+            "pattern": "^\\d{8}$",
+            "title": "Numero Documento",
+            "type": "string"
+          },
+          "telefono": {
+            "maxLength": 20,
+            "minLength": 6,
+            "title": "Telefono",
+            "type": "string"
+          },
+          "ubicacion_distrito": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Distrito"
+          },
+          "ubicacion_lat": {
+            "anyOf": [
+              {
+                "maximum": 90.0,
+                "minimum": -90.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lat"
+          },
+          "ubicacion_lng": {
+            "anyOf": [
+              {
+                "maximum": 180.0,
+                "minimum": -180.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lng"
+          },
+          "ubicacion_place_id": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Place Id"
+          },
+          "ubicacion_plus_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Plus Code"
+          }
+        },
+        "required": [
+          "numero_documento",
+          "nombre",
+          "telefono",
+          "acepta_terminos"
+        ],
+        "title": "RegistroPublicoIn",
         "type": "object"
       },
       "ReglaAsientoCreate": {
@@ -44364,6 +44697,234 @@
         ]
       }
     },
+    "/api/v1/sales/promociones-cupon": {
+      "get": {
+        "description": "Array plano y no paginado: son campañas contadas con los dedos de una\nmano, no una colección que crece con la operación (ADR-026).\n\nSe escopa por **grupo** y no por empresa: el cupón es del cliente, y el\ncliente es del grupo (RN-PTS-001).",
+        "operationId": "listar_promociones_cupon_api_v1_sales_promociones_cupon_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PromocionCuponOut"
+                  },
+                  "title": "Response Listar Promociones Cupon Api V1 Sales Promociones Cupon Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Promociones Cupon",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/promociones-cupon/{promocion_id}/termino": {
+      "post": {
+        "description": "El derecho reservado de cortar la promoción en cualquier momento.\n\nDeja de emitir cupones nuevos; los ya emitidos siguen valiendo hasta su\nfecha. Quien alcanzó a registrarse cumplió su parte del trato, y\nquitárselo después sería cambiarlo a mitad de camino.",
+        "operationId": "terminar_promocion_cupon_api_v1_sales_promociones_cupon__promocion_id__termino_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "promocion_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Promocion Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PromocionCuponOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Terminar Promocion Cupon",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/publico/reconocerte/consulta": {
+      "post": {
+        "operationId": "consultar_api_v1_sales_publico_reconocerte_consulta_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsultaPublicaIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsultaPublicaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Consultar",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/publico/reconocerte/dni/{numero_documento}/nombre": {
+      "get": {
+        "description": "El nombre de RENIEC, para que el cliente confirme que es él.\n\nDevuelve vacío —y no un error— cuando el proveedor no contesta o no\nestá configurado: el formulario deja escribirlo a mano y el registro\nsigue (RN-PTS-004). Un 502 acá dejaría al cliente parado frente a un\nformulario que no puede completar por algo que no es asunto suyo.",
+        "operationId": "nombre_de_dni_api_v1_sales_publico_reconocerte_dni__numero_documento__nombre_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "numero_documento",
+            "required": true,
+            "schema": {
+              "title": "Numero Documento",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NombrePublicoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Nombre De Dni",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/publico/reconocerte/promocion": {
+      "get": {
+        "description": "Si la campaña sigue viva y con qué descuento.\n\nLa landing pregunta esto antes de dibujar el formulario: la empresa se\nreserva el derecho de terminar la promoción en cualquier momento, y\ndejar que el cliente llene seis campos para recién ahí decirle que no\nhay nada sería la peor forma de contárselo.",
+        "operationId": "ver_promocion_api_v1_sales_publico_reconocerte_promocion_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PromocionPublicaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Ver Promocion",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/publico/reconocerte/registro": {
+      "post": {
+        "description": "Registra al cliente (si hace falta) y le entrega su cupón.\n\nCommitea acá y no en el caso de uso, como todo router del módulo. Si\nalgo falla antes, `get_db` revierte y el cliente ve el error real: la\npágina tiene que poder decirle si su registro entró o no, y un cupón\nmostrado sobre una transacción que se cayó sería la peor respuesta\nposible.",
+        "operationId": "registrar_api_v1_sales_publico_reconocerte_registro_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegistroPublicoIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CuponPublicoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Registrar",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
     "/api/v1/sales/puntos-venta": {
       "get": {
         "description": "Las cajas de la sucursal. El PDV lo necesita al arrancar: sin saber\nqué punto de venta es, no puede abrir caja ni emitir con la serie\ncorrecta.",
@@ -44898,6 +45459,65 @@
           }
         ],
         "summary": "Ver Comprobante",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/ventas/{venta_id}/cupon": {
+      "post": {
+        "description": "Aplica el cupón del cliente y lo apaga para siempre.\n\nVa con `sales.cobrar` y **sin PIN de supervisor**, a diferencia de\n`POST /ventas/{id}/descuento`: ahí el margen se regala a criterio de\nalguien y por eso hace falta que un supervisor firme (RN-COM-017); acá\nel descuento ya estaba prometido y el cupón *es* la autorización. Pedir\nun supervisor por cada cupón haría que la caja deje de canjearlos.",
+        "operationId": "canjear_cupon_api_v1_sales_ventas__venta_id__cupon_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "venta_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Venta Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CanjeCuponIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CuponCanjeadoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Canjear Cupon",
         "tags": [
           "sales"
         ]

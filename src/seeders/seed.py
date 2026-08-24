@@ -24,6 +24,7 @@ from src.modules.reports.infrastructure.models import (
     ReglaDestinatario,
     ReglaDistribucion,
 )
+from src.modules.sales.infrastructure.models import PromocionCupon
 from src.modules.users.infrastructure.models import (
     Almacen,
     Empresa,
@@ -111,6 +112,11 @@ PERMISOS = [
     (
         "sales.entregar_pedido",
         "Registrar la entrega del pedido al cliente (PROC-OPE-002)",
+    ),
+    (
+        "sales.gestionar_promociones",
+        "Terminar una campaña de cupón (ADR-059) — le quita a todo el padrón "
+        "un beneficio ya prometido, así que no es del cajero que canjea",
     ),
     ("sales.crear_pedido", "Crear pedido (canal agente IA)"),
     ("inventory.transferir", "Despachar una transferencia entre almacenes"),
@@ -321,6 +327,9 @@ ROLES = {
         # Reescribir el padrón del grupo desde una planilla no es el mismo
         # acto que registrar a alguien en el mostrador (ADR-052).
         "sales.gestionar_clientes",
+        # Cortar la campaña de cupón: el derecho que la empresa se reserva
+        # en los términos de la landing (ADR-059).
+        "sales.gestionar_promociones",
         "kds.configurar",
         "kds.operar",
         "inventory.leer",
@@ -736,6 +745,32 @@ def _seed_encuesta(session: Session, creado_por) -> None:
         )
 
 
+def _seed_promocion_cupon(session: Session) -> None:
+    """La campaña «Queremos RE-conocerte» (ADR-059).
+
+    Va en el seeder y no en la migración porque es un dato de negocio, no
+    de esquema: una migración que inserta la campaña la resucitaría en cada
+    `downgrade`/`upgrade`, incluso después de que alguien la terminó a
+    propósito. `_get_or_create` no toca la fila si ya existe, así que
+    re-sembrar una base donde la promoción se cortó no la vuelve a prender.
+    """
+    grupo = session.scalar(select(Grupo).where(Grupo.nombre == GRUPO))
+    if grupo is None:
+        return
+    _get_or_create(
+        session,
+        PromocionCupon,
+        grupo_id=grupo.id,
+        nombre=settings.sales_promocion_cupon_nombre,
+        defaults=dict(
+            descuento_porcentaje=settings.sales_promocion_cupon_porcentaje,
+            vigente_hasta=settings.sales_promocion_cupon_fin,
+            vigencia_cupon_dias=settings.sales_promocion_cupon_vigencia_dias,
+            estado="activa",
+        ),
+    )
+
+
 def seed(session: Session) -> None:
     _seed_organizacion(session)
 
@@ -796,6 +831,7 @@ def seed(session: Session) -> None:
 
     _seed_encuesta(session, admin.id)
     _seed_distribucion(session, roles)
+    _seed_promocion_cupon(session)
 
     session.commit()
     print("Seed OK (idempotente). Usuarios PIN 123456: " + ", ".join(

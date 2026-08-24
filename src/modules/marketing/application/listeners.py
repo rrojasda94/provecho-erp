@@ -1,6 +1,7 @@
 """Listeners de marketing: los de `sales` y **los propios**.
 
-De `sales` escucha `venta_confirmada` para la atribución lead→venta. Los
+De `sales` escucha `venta_confirmada` para la atribución lead→venta y
+`cliente_registrado_en_promocion` para el lead que deja la landing del QR. Los
 otros seis son de marketing sobre marketing, y eso no es un rodeo: los
 eventos que el módulo publicaba (`campana_lanzada`, `lead_generado`) no
 tenían consumidor y se perdían. El acumulado de campaña
@@ -22,8 +23,8 @@ import uuid
 
 from src.core.database import SessionLocal
 from src.core.events import event_bus
-from src.modules.marketing.application import metricas
-from src.modules.marketing.infrastructure.repositories import LeadRepo
+from src.modules.marketing.application import leads, metricas
+from src.modules.marketing.infrastructure.repositories import CampanaRepo, LeadRepo
 
 log = logging.getLogger(__name__)
 
@@ -126,6 +127,51 @@ def on_encuesta_respondida(payload: dict) -> None:
     )
 
 
+def on_cliente_registrado_en_promocion(payload: dict) -> None:
+    """Un registro desde la landing del QR es un lead de campaña.
+
+    Empareja por **nombre** con una campaña en curso: `marketing` no puede
+    leer `promocion_cupon`, que es una tabla de `sales`, y el nombre es lo
+    que el negocio usa para hablar de las dos («Queremos RE-conocerte»).
+
+    Sin campaña en curso con ese nombre no pasa nada, y está bien: el lead
+    es cómo Marketing mide, no parte de lo que se le prometió al cliente.
+    Bloquear el registro porque nadie abrió el brief dejaría a la gente sin
+    su cupón por un trámite interno.
+    """
+    nombre = payload.get("promocion_nombre")
+    cliente_id = payload.get("cliente_id")
+    if not nombre or not cliente_id:
+        return
+    try:
+        with session_factory() as session:
+            campanas = [
+                c
+                for c in CampanaRepo(session).listar(None, estado="en_curso")
+                if c.nombre == nombre
+            ]
+            if len(campanas) != 1:
+                log.info(
+                    "registro en promoción %r: %s campañas en curso, sin lead",
+                    nombre,
+                    len(campanas),
+                )
+                return
+            leads.registrar_lead(
+                session,
+                campana_id=campanas[0].id,
+                canal="qr",
+                tipo="registro",
+                # Un cupón por cliente y por promoción: la clave lo espeja,
+                # así que un reintento del formulario no genera dos leads.
+                idempotency_key=f"promocion:{payload['promocion_id']}:{cliente_id}",
+                cliente_id=uuid.UUID(cliente_id),
+            )
+            session.commit()
+    except Exception:
+        log.exception("fallo registrando el lead del registro en promoción (%s)", payload)
+
+
 def _acumular(payload: dict, accion) -> None:
     try:
         with session_factory() as session:
@@ -139,6 +185,7 @@ _registrado = False
 
 _SUSCRIPCIONES = (
     ("sales.venta_confirmada", on_venta_confirmada),
+    ("sales.cliente_registrado_en_promocion", on_cliente_registrado_en_promocion),
     ("marketing.campana_lanzada", on_campana_lanzada),
     ("marketing.lead_generado", on_lead_generado),
     ("marketing.lead_atribuido", on_lead_atribuido),

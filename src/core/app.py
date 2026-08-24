@@ -33,6 +33,7 @@ from src.modules.reports.api.routers import router as reports_router
 from src.modules.reports.application import listeners as reports_listeners
 from src.modules.rrhh.api.routers import router as rrhh_router
 from src.modules.sales.api.kds_routers import router as kds_router
+from src.modules.sales.api.publico_routers import router as sales_publico_router
 from src.modules.sales.api.routers import router as sales_router
 from src.modules.sales.application import listeners as sales_listeners
 from src.modules.users.api import error_handlers as users_error_handlers
@@ -295,6 +296,11 @@ def create_app() -> FastAPI:
     # del ERP, y Meta tampoco. Cada uno trae su propia credencial — el token
     # del enlace y la firma HMAC del webhook.
     app.include_router(marketing_publico_router, prefix="/api/v1")
+    # Tampoco lleva JWT, y este ni siquiera trae token: la landing del QR es
+    # abierta a propósito —el cliente escanea y se registra— así que lo único
+    # que la protege es el rate limit por IP. A cambio, escribe pero no borra
+    # y no devuelve más que un booleano (ADR-059).
+    app.include_router(sales_publico_router, prefix="/api/v1")
     app.include_router(marketing_webhook_router, prefix="/api/v1")
     app.include_router(sync_router, prefix="/api/v1")
     app.include_router(reports_router, prefix="/api/v1")

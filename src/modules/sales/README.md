@@ -10,7 +10,8 @@ Nubefact).
 ## Entidades
 
 `producto_comercial`, `receta`, `receta_item`, `lista_precio`, `venta`,
-`venta_item`, `pago`, `comprobante`, `cliente`. Detalle en `docs/architecture/data-model.md` §3, §6.
+`venta_item`, `pago`, `comprobante`, `cliente`, `promocion_cupon`, `cupon`.
+Detalle en `docs/architecture/data-model.md` §3, §6.
 
 **Estado de implementación (2026-07-20):** modelado el núcleo del slice
 Venta — `cliente`, `punto_venta`, `producto_comercial`, `venta`,
@@ -669,6 +670,73 @@ líneas de receta que lo usan como condición.
 
 `producto_comercial.lienzo_pos` pasa a ser editable por `PATCH /productos/{id}`.
 
+## Cupón de promoción y landing pública (implementado 2026-08-24, ADR-059)
+
+La campaña **«Queremos RE-conocerte»**: un QR en la mesa lleva a una landing
+donde el cliente deja DNI, cumpleaños, dirección y teléfono, y recibe un cupón
+de 10 % para su siguiente compra. Un cupón por persona, de un solo uso, válido
+un mes.
+
+**Por qué vive acá y no en `marketing`.** Las dos cosas que hace son
+escrituras en `sales`: crear o encontrar un `cliente` y descontar una `venta`.
+Un módulo solo entra a otro por `api.deps` o `queries_publicas`
+(`tests/test_arquitectura.py`), y ninguno de los dos sirve para escribir.
+Marketing se entera por evento y crea su `lead` — igual que con
+`sales.venta_confirmada`. Todo el razonamiento está en ADR-059.
+
+**Entidades.** `promocion_cupon` (la campaña: porcentaje, fin, vigencia por
+cupón, estado `activa`/`terminada`) y `cupon` (uno por cliente: código,
+estado, vencimiento, `venta_id` al canjear). Las dos cuelgan del **grupo**,
+como `cliente` (RN-PTS-001). El código del cupón **es el DNI**: el cliente no
+tiene nada que guardar, y el costo de que sea adivinable está acotado y
+anotado en el ADR.
+
+**El caso de uso reusa `clientes.crear_cliente`**, con su consulta a RENIEC y
+su fallback (RN-PTS-004). Si el cliente ya existe por documento o por
+teléfono, se lo reconoce y se le completa lo que falte en vez de duplicarlo.
+El teléfono, eso sí, solo completa el documento de quien **no tiene ninguno**:
+si no, saber un teléfono ajeno alcanzaría para cambiarle el DNI a su dueño
+desde una página pública.
+
+**El canje** (`POST /sales/ventas/{id}/cupon`) escribe `venta.descuento_*` con
+motivo `cupon` y **sin PIN de supervisor** — a diferencia de
+`POST /sales/ventas/{id}/descuento` (RN-COM-017), acá el descuento ya estaba
+prometido y el cupón es la autorización.
+
+### La superficie pública (sin JWT)
+
+| Endpoint | Devuelve | Límite por IP |
+|---|---|---|
+| `GET /sales/publico/reconocerte/promocion` | nombre, porcentaje, vigencias | 20/h |
+| `POST /sales/publico/reconocerte/consulta` | **solo** `{registrado: bool}` | 20/h |
+| `GET /sales/publico/reconocerte/dni/{dni}/nombre` | nombre de RENIEC (vacío si no contesta) | **5/h** |
+| `POST /sales/publico/reconocerte/registro` | código, vencimiento, si ya estaba | 10/h |
+
+Tres reglas que la definen, y que el test las verifica:
+
+- **Ningún `DELETE`.** La baja de datos se atiende por `hola@majambo.com.pe`
+  con asunto «BORRAR DATOS» y se resuelve por la anonimización de ADR-011,
+  nunca desde una página abierta a internet.
+- **La consulta es un booleano.** Con cualquier cosa más sería un buscador del
+  padrón para quien sepa un DNI.
+- **El `grupo_id` sale de la promoción activa, nunca del request** — uno de
+  afuera sería permiso para escribir en otro tenant (ADR-004).
+
+El de RENIEC lleva el límite más duro porque es el único que convierte un DNI
+en un nombre; es el costo aceptado de que el cliente confirme en vez de
+teclear.
+
+### Administración
+
+`GET /sales/promociones-cupon` (con `sales.leer`) y
+`POST /sales/promociones-cupon/{id}/termino` (con `sales.gestionar_promociones`,
+que el seeder da a `supervisor`). Terminar es el derecho reservado en los
+términos: deja de emitir y **no toca los cupones ya entregados**. No hay
+pantalla — se opera por API (decisión del usuario, 2026-08-24).
+
+El frontend público vive en `frontend/app/(publico)/reconocerte/`, fuera del
+shell `(app)` y sin guard de sesión.
+
 ## Casos de uso
 
 - CRUD de productos comerciales y recetas (separados de artículos inventariables).
@@ -720,6 +788,10 @@ con 100% de descuento**:
 - Cambio de precio regular pasa por `lista_precio` nueva versión, nunca
   edición directa del precio vigente (auditable, igual que OC en
   `purchases`); ligado a la ficha de evaluación de margen de Comercial.
+- Un cupón se emite una vez por cliente y se canjea una sola vez; terminar la
+  promoción no toca los ya entregados (RN-PRM-003/004/005).
+- Cupón y descuento manual no se acumulan sobre la misma orden: el descuento
+  de la orden es uno solo (RN-PRM-006).
 
 ## Flujo
 
@@ -735,7 +807,9 @@ Producto comercial → receta → confirmar venta → evento `sales.venta_confir
   que ya no se prepara), `sales.carrito_abandonado` (analítica de embudo,
   RN-COM-013), `sales.pedido_demorado` (el pedido superó su tiempo en
   cocina — ver abajo), `sales.consumo_personal_registrado` (comida del
-  personal, RN-COM-025 — inventory descuenta como `consumo_interno`).
+  personal, RN-COM-025 — inventory descuenta como `consumo_interno`),
+  `sales.cliente_registrado_en_promocion` (marketing lo convierte en `lead`
+  de campaña) y `sales.cupon_canjeado` (ADR-059).
 - Escucha: **`sales.venta_confirmada`, de sí mismo**
   (`application/listeners.py`). Es el único listener del módulo y no hace
   trabajo: encola la revisión de demora y vuelve. El bus es síncrono y en

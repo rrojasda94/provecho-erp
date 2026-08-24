@@ -3,6 +3,38 @@
 Parte del backlog de deuda técnica del proyecto. El índice y las reglas
 de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 
+- ⬜ **La promoción de cupón no es la `promocion` de §6** (2026-08-24,
+  ADR-059). `promocion_cupon` hace una sola cosa —un porcentaje, una vigencia
+  y un interruptor— y **no** liga lista de precios, material promocional,
+  guion de atención ni capacitación, que es lo que `data-model.md` §6
+  especifica para `promocion` (RN-PRM-001/002). Las dos van a convivir el día
+  que la segunda se construya, y quien lo haga tiene que decidir si son la
+  misma entidad con más campos o dos cosas distintas. **No unificar antes de
+  tener el caso real**: hoy sería especificar de más algo que el negocio no
+  usa.
+- ⬜ **Un cupón no se puede anular ni reemitir** (2026-08-24, ADR-059). Si un
+  cajero lo canjea por error, no hay camino de vuelta: la venta se anula pero
+  el cupón queda `canjeado`. Se dejó afuera porque un "descanjear" es
+  exactamente la puerta por la que el descuento de un solo uso deja de serlo,
+  y merece su propia decisión —quién lo autoriza, qué se audita— y no una
+  columna más. Mientras tanto se resuelve emitiendo uno nuevo a mano.
+- ⬜ **El vencimiento de un cupón no genera ningún aviso** (2026-08-24). El
+  cliente se entera de que venció cuando lo rechazan en caja. Un recordatorio
+  a los pocos días de vencer es exactamente lo que haría rendir la campaña, y
+  el teléfono ya está en `persona`: falta el canal (el cliente de WhatsApp ya
+  existe en `shared/integrations`) y decidir con el negocio si se manda.
+- ⬜ **No hay pantalla de la promoción ni QR generado por el ERP**
+  (2026-08-24, decisión del usuario). Crearla y terminarla se hace por API
+  (`GET`/`POST /sales/promociones-cupon`), y el QR se arma con cualquier
+  herramienta externa apuntando a `/reconocerte`. Lo que falta cuando haya
+  pantalla: cuántos cupones se emitieron, cuántos se canjearon y cuánto
+  margen costó — hoy eso sale de consultar la base a mano.
+- ⬜ **El código del cupón es adivinable** (2026-08-24, ADR-059). Es el DNI,
+  lo pidió el negocio, y el riesgo está acotado —el canje exige que la venta
+  sea de ese mismo cliente— pero no eliminado. Si alguna vez pesa más que la
+  comodidad de no tener nada que guardar, el cambio es un código aleatorio en
+  `cupon.codigo` (la columna ya es independiente del documento) más una forma
+  de que el cliente lo recupere.
 - ⬜ **El reparto se calcula y se guarda, pero no se cobra como línea de
   venta** (2026-08-22, ADR-054): `venta.costo_entrega` queda en la fila y se
   muestra en caja, pero **no suma al total** ni aparece en el comprobante ni
