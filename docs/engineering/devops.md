@@ -210,7 +210,7 @@ La cabecera `Strict-Transport-Security` la emite la propia aplicación cuando
 En producción `/docs` y `/openapi.json` quedan deshabilitados: el mapa de la
 API expone esquemas y nombres de permisos.
 
-## Desplegar desde GitHub (ADR-059)
+## Desplegar desde GitHub (ADR-060)
 
 El despliegue se dispara desde **Actions → Desplegar → Run workflow**: se
 elige la versión (`0.7.1`, o `latest`) y opcionalmente se pide la simulación

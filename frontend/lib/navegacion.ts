@@ -55,6 +55,9 @@ export const SUBMENUS: Record<string, ItemSubmenu[]> = {
     { label: "Empresas", href: "/organizacion/empresas" },
     { label: "Marcas", href: "/organizacion/marcas" },
     { label: "Sucursales", href: "/organizacion/sucursales" },
+    // Después de Sucursales porque es el paso siguiente: un local sin caja no
+    // vende — el PDV arranca pidiendo el punto de venta (ADR-059).
+    { label: "Puntos de venta", href: "/organizacion/puntos-venta" },
     { label: "Almacenes", href: "/organizacion/almacenes" },
   ],
   produccion: [{ label: "Órdenes", href: "/produccion" }],

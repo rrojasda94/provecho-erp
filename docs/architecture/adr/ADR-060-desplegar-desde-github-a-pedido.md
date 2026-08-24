@@ -1,4 +1,4 @@
-# ADR-059 — Desplegar desde GitHub, a pedido
+# ADR-060 — Desplegar desde GitHub, a pedido
 
 - Estado: aceptado
 - Fecha: 2026-08-23

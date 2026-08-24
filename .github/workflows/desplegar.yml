@@ -1,6 +1,6 @@
 name: Desplegar
 
-# Despliegue a staging desde GitHub, a pedido (ADR-059).
+# Despliegue a staging desde GitHub, a pedido (ADR-060).
 #
 # ADR-008 decidió automatizar la **entrega** (la imagen) y dejar el
 # **despliegue** manual "hasta que exista el VPS". El VPS ya existe, y lo que

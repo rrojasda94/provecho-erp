@@ -1,4 +1,4 @@
-- **Staging se despliega desde GitHub** (ADR-059). Actions → *Desplegar* → Run
+- **Staging se despliega desde GitHub** (ADR-060). Actions → *Desplegar* → Run
   workflow, se elige la versión y listo. Se puede desde un teléfono.
 
   ADR-008 había dejado el despliegue manual "hasta que exista el VPS". El VPS
