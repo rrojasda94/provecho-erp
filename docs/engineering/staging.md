@@ -96,6 +96,11 @@ adentro.**
       vía `docker compose exec api`)
 - [x] Monitor externo (UptimeRobot) dado de alta contra `/health`,
       `/health/ready`, `/health/backups`
+- [ ] **`scripts/desplegar.sh` no está en el droplet** (2026-08-24): el repo
+      nunca se clonó ahí, así que el script que este runbook manda correr no
+      existe y el despliegue falla con `No such file or directory`. Mientras
+      tanto, desplegar con el `docker compose` equivalente (ver Despliegue,
+      abajo). Anotado en [`deuda/ci-cd.md`](../roadmap/deuda/ci-cd.md).
 - [ ] **Errores de backend encontrados probando staging** — se están
       revisando en otra sesión de trabajo, no repetir el diagnóstico acá
 - [ ] **Cambio de recetas en camino** (mencionado 2026-08-23, sin detalle
@@ -116,4 +121,20 @@ Ver estado del stack (una vez levantado):
 ```bash
 docker compose -f docker-compose.staging.yml ps
 docker compose -f docker-compose.staging.yml logs -f api
+```
+
+Desplegar una versión nueva. `scripts/desplegar.sh` haría esto mismo y
+además esperaría a `/health/ready`, pero **el repo no está en el droplet**
+(ver Pendiente), así que hoy va a mano desde la carpeta del compose:
+
+```bash
+PROVECHO_IMAGE=ghcr.io/rrojasda94/provecho-erp:0.7.2 PROVECHO_WEB_IMAGE=ghcr.io/rrojasda94/provecho-erp-web:0.7.2 docker compose -f docker-compose.staging.yml up -d --pull always
+```
+
+El servicio `init` corre `alembic upgrade head` antes de que arranque `api`
+(`depends_on: service_completed_successfully`), así que la migración no
+necesita paso aparte. Después, confirmar:
+
+```bash
+curl -fsS https://api-staging.majambo.com.pe/health/ready && echo OK
 ```

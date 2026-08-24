@@ -3,6 +3,18 @@
 Parte del backlog de deuda técnica del proyecto. El índice y las reglas
 de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 
+- ⬜ **El droplet de staging no tiene `scripts/desplegar.sh`** (2026-08-24):
+  `docs/engineering/staging.md` manda correr `./scripts/desplegar.sh <version>`
+  en el servidor, pero ahí nunca se clonó el repo — solo se copiaron a mano
+  `docker-compose.staging.yml` y el `Caddyfile` (ver el setup del
+  2026-08-23). Desplegar la 0.7.2 falló con `No such file or directory` y hubo
+  que correr el `docker compose up -d --pull always` equivalente. Es el mismo
+  patrón que el fix de la 0.7.1 con `scripts/odoo`: el README manda correr algo
+  que no está donde dice. Se cierra copiando el script al servidor y
+  corrigiendo la ruta en el runbook, o sacándolo del runbook y dejando
+  escritos los comandos que se usan de verdad — con la salvedad de que así se
+  pierde la espera de `/health/ready` que el script hace. Decidir cuál al
+  escribir el job de despliegue (siguiente punto), porque lo resuelve de raíz.
 - ⬜ **Job de despliegue** (ver *Cuando haya servidor*, punto 7): hoy el despliegue es manual y documentado. Se
   escribe cuando exista el VPS — automatizar por SSH contra una máquina que
   no existe da automatización no probada (ADR-008).
