@@ -1043,3 +1043,345 @@ dialog:modal {
         font-weight: 600;
     }
 }
+
+/* Landing pública «Queremos RE-conocerte» (ADR-061).
+
+   La única superficie del sistema que ve un cliente del restaurante, no un
+   trabajador. Por eso se viste con la voz de la marca —crema, brasa,
+   logotipo en Anton— y no con el acero del back office: es el mismo criterio
+   por el que el login, el PDV y el KDS la usan y las pantallas de trabajo no
+   (ver el bloque «mise en place» de arriba).
+
+   Todo sale de los tokens `--marca-*` y de los roles semánticos. Ni un hex
+   suelto: cambiar el color de la marca tiene que seguir siendo tocar el
+   bloque 1 y nada más.
+
+   Sin la clase `.erp`, así que los `input`/`label` no heredan los estilos de
+   diálogo del back office y se visten acá. A propósito: los controles de una
+   landing que se llena a pulgar en un teléfono son más grandes que los de una
+   grilla de escritorio, y compartirlos habría terminado en `!important`. */
+@layer components {
+    .publico {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        background:
+            radial-gradient(
+                120% 70% at 50% 0%,
+                var(--marca-cream) 0%,
+                color-mix(in srgb, var(--marca-cream) 60%, var(--background)) 60%,
+                var(--background) 100%
+            );
+    }
+
+    .publico-main {
+        flex: 1;
+        width: 100%;
+        /* 34rem y no 40: el ancho de una columna de texto que se lee de
+           corrido. En el teléfono manda el padding. */
+        max-width: 34rem;
+        margin: 0 auto;
+        padding: 2rem 1.25rem 3rem;
+    }
+
+    /* --- Cabecera de la landing ------------------------------------------ */
+    .reconocerte-hero {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+
+    .reconocerte-marca {
+        width: 190px;
+        max-width: 60%;
+        height: auto;
+        margin: 0 auto 1.5rem;
+        color: var(--marca-dark);
+    }
+
+    .reconocerte-titulo {
+        font-family: var(--fuente-logo), sans-serif;
+        text-transform: uppercase;
+        font-size: clamp(2rem, 9vw, 3rem);
+        line-height: 1.05;
+        letter-spacing: 0.01em;
+        color: var(--marca-dark);
+        margin-bottom: 0.75rem;
+    }
+
+    /* El «RE» en brasa: es la palabra que hace el chiste del nombre —volver a
+       conocerse— y es lo único que se colorea en el título. */
+    .reconocerte-re {
+        color: var(--primary);
+    }
+
+    .reconocerte-bajada {
+        font-size: 1.0625rem;
+        line-height: 1.5;
+        color: var(--foreground);
+    }
+
+    /* --- Los tres pasos --------------------------------------------------- */
+    .reconocerte-pasos {
+        display: grid;
+        gap: 0.75rem;
+        margin-bottom: 2rem;
+        list-style: none;
+    }
+
+    .reconocerte-pasos li {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        font-size: 0.9375rem;
+        color: var(--muted-foreground);
+    }
+
+    .reconocerte-paso-n {
+        flex: none;
+        display: grid;
+        place-items: center;
+        width: 1.75rem;
+        height: 1.75rem;
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--primary) 14%, transparent);
+        color: var(--primary);
+        font-weight: 700;
+        font-size: 0.875rem;
+    }
+
+    /* --- Formulario ------------------------------------------------------- */
+    .reconocerte-form {
+        display: grid;
+        gap: 1.125rem;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: calc(var(--radius) * 2);
+        padding: 1.75rem 1.5rem;
+        box-shadow: var(--sombra-2);
+    }
+
+    /* El peso va en la etiqueta y los campos lo resetean, en vez de al revés:
+       `CampoDireccion` pone su texto suelto dentro del `<label>` (sin `span`)
+       y con la regla al revés ese rótulo quedaría en peso normal. */
+    .reconocerte-campo {
+        display: grid;
+        gap: 0.375rem;
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--foreground);
+    }
+
+    /* `.reconocerte-input` es para `CampoDireccion`: su prop `claseCampo` va
+       al `<input>`, no al contenedor, así que un descendiente no lo alcanza. */
+    .reconocerte-campo input,
+    .reconocerte-campo select,
+    .reconocerte-input {
+        width: 100%;
+        /* 16px exactos: por debajo de eso Safari en iOS hace zoom al enfocar
+           un campo y descuadra la página entera. */
+        font-size: 1rem;
+        /* 44px de alto: el mínimo táctil. La landing se llena a pulgar. */
+        min-height: 2.75rem;
+        padding: 0.5rem 0.75rem;
+        font-weight: 400;
+        color: var(--foreground);
+        background: var(--background);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        transition: border-color var(--transicion), box-shadow var(--transicion);
+    }
+
+    .reconocerte-campo input:focus-visible,
+    .reconocerte-input:focus-visible {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 22%, transparent);
+    }
+
+    .reconocerte-campo small {
+        font-size: 0.75rem;
+        font-weight: 400;
+        color: var(--muted-foreground);
+    }
+
+    .reconocerte-terminos {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.625rem;
+        font-size: 0.8125rem;
+        line-height: 1.45;
+        color: var(--muted-foreground);
+    }
+
+    .reconocerte-terminos input {
+        flex: none;
+        width: 1.125rem;
+        height: 1.125rem;
+        margin-top: 0.125rem;
+        accent-color: var(--primary);
+    }
+
+    .reconocerte-terminos a {
+        color: var(--primary);
+        text-decoration: underline;
+    }
+
+    .reconocerte-boton {
+        min-height: 3rem;
+        font-size: 1rem;
+        font-weight: 700;
+        color: var(--primary-foreground);
+        background: var(--primary);
+        border: none;
+        border-radius: var(--radius);
+        cursor: pointer;
+        transition: background var(--transicion), transform var(--transicion);
+    }
+
+    .reconocerte-boton:not(:disabled):hover {
+        background: color-mix(in srgb, var(--primary) 88%, var(--marca-dark));
+    }
+
+    .reconocerte-boton:not(:disabled):active {
+        transform: translateY(1px);
+    }
+
+    .reconocerte-boton:disabled {
+        opacity: 0.65;
+        cursor: default;
+    }
+
+    .reconocerte-error {
+        color: var(--destructive);
+        font-size: 0.875rem;
+        font-weight: 600;
+    }
+
+    .reconocerte-letra-chica {
+        font-size: 0.75rem;
+        color: var(--muted-foreground);
+        text-align: center;
+    }
+
+    /* --- El cupón entregado ----------------------------------------------- */
+    .reconocerte-cupon {
+        text-align: center;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: calc(var(--radius) * 2);
+        padding: 2rem 1.5rem;
+        box-shadow: var(--sombra-2);
+        animation: revelar 320ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    }
+
+    .reconocerte-cupon-saludo {
+        font-size: 1.0625rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+    }
+
+    /* El código, en grande y con el borde discontinuo de un ticket. Es lo
+       único que el cliente vino a buscar. */
+    .reconocerte-codigo {
+        display: inline-block;
+        padding: 0.75rem 1.5rem;
+        font-size: clamp(1.75rem, 8vw, 2.5rem);
+        font-weight: 600;
+        letter-spacing: 0.12em;
+        color: var(--primary);
+        background: color-mix(in srgb, var(--primary) 8%, transparent);
+        border: 2px dashed var(--primary);
+        border-radius: var(--radius);
+    }
+
+    .reconocerte-cupon-detalle {
+        margin-top: 1rem;
+        font-weight: 600;
+    }
+
+    .reconocerte-cupon-nota {
+        margin-top: 0.5rem;
+        font-size: 0.8125rem;
+        color: var(--muted-foreground);
+    }
+
+    /* --- Términos y condiciones ------------------------------------------- */
+    .publico-legal h1 {
+        font-size: 1.75rem;
+        font-weight: 700;
+        margin-bottom: 1rem;
+    }
+
+    .publico-legal h2 {
+        font-size: 1.0625rem;
+        font-weight: 700;
+        margin: 1.75rem 0 0.5rem;
+    }
+
+    .publico-legal p,
+    .publico-legal li {
+        font-size: 0.9375rem;
+        line-height: 1.6;
+        color: var(--foreground);
+    }
+
+    .publico-legal p + p {
+        margin-top: 0.75rem;
+    }
+
+    .publico-legal ul {
+        margin-top: 0.5rem;
+        padding-left: 1.25rem;
+        list-style: disc;
+    }
+
+    .publico-legal a {
+        color: var(--primary);
+        text-decoration: underline;
+    }
+
+    .publico-legal-intro {
+        color: var(--muted-foreground);
+    }
+
+    .publico-volver {
+        margin-bottom: 1.5rem;
+        font-size: 0.875rem;
+    }
+
+    .publico-volver a {
+        color: var(--primary);
+    }
+
+    /* --- Pie: acá firma el grupo ------------------------------------------ */
+    .publico-pie {
+        text-align: center;
+        padding: 2rem 1.25rem 2.5rem;
+        border-top: 1px solid var(--border);
+    }
+
+    .publico-pie-logo {
+        width: 150px;
+        max-width: 50%;
+        height: auto;
+        margin: 0 auto 0.75rem;
+        color: var(--muted-foreground);
+    }
+
+    .publico-pie-legal,
+    .publico-pie-enlaces {
+        font-size: 0.75rem;
+        color: var(--muted-foreground);
+    }
+
+    .publico-pie-enlaces {
+        margin-top: 0.5rem;
+        display: flex;
+        justify-content: center;
+        gap: 0.5rem;
+    }
+
+    .publico-pie-enlaces a {
+        color: var(--primary);
+    }
+}

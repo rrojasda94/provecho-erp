@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 72" role="img" aria-label="Charlie's Pizzas">
+  <title>Charlie's Pizzas</title>
+  <!-- PROVISIONAL, mismo criterio que majambo.svg. -->
+  <text x="4" y="34" font-family="Anton, Impact, 'Arial Narrow', sans-serif"
+        font-size="30" letter-spacing="1" fill="#c6390f"
+        transform="skewX(-8)">CHARLIE'S</text>
+  <text x="4" y="62" font-family="Anton, Impact, 'Arial Narrow', sans-serif"
+        font-size="30" letter-spacing="6" fill="currentColor"
+        transform="skewX(-8)">PIZZAS</text>
+</svg>
