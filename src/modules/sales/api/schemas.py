@@ -894,3 +894,98 @@ class ArbolProductoOut(ProductoDetalleOut):
     exclusiones: list[list[str]]
     combinaciones: list[CombinacionOut]
 
+
+
+# --- Cupón de promoción (ADR-061) --------------------------------------------
+class RegistroPublicoIn(UbicacionMixin):
+    """Lo que la landing pública manda al registrar a un cliente.
+
+    El nombre viaja aunque RENIEC lo haya completado en el navegador: si el
+    proveedor no contesta, el cliente lo escribe a mano y el alta **no se
+    bloquea** (RN-PTS-004). El servidor vuelve a consultar por su cuenta —
+    lo que llega de una página pública no decide qué nombre queda guardado.
+
+    `acepta_terminos` es obligatorio y tiene que venir en `true`: el
+    consentimiento del titular es lo que habilita el uso comercial del dato
+    (Ley 29733), y sin dejarlo registrado la promoción no tendría con qué
+    sostenerlo.
+    """
+
+    numero_documento: str = Field(min_length=8, max_length=8, pattern=r"^\d{8}$")
+    nombre: str = Field(min_length=1, max_length=255)
+    telefono: str = Field(min_length=6, max_length=20)
+    fecha_nacimiento: date | None = None
+    direccion: str | None = Field(default=None, max_length=255)
+    acepta_terminos: Literal[True]
+
+
+class PromocionPublicaOut(BaseModel):
+    """Lo que la landing necesita para dibujarse: nada de la campaña interna
+    (presupuesto, KPI, quién la aprobó) sale por acá."""
+
+    nombre: str
+    descuento_porcentaje: Decimal
+    vigente_hasta: date
+    vigencia_cupon_dias: int
+
+
+class ConsultaPublicaIn(BaseModel):
+    numero_documento: str | None = Field(default=None, max_length=8)
+    telefono: str | None = Field(default=None, max_length=20)
+
+
+class ConsultaPublicaOut(BaseModel):
+    """Un booleano y nada más.
+
+    Quien pregunta no está autenticado. Devolverle el nombre, el teléfono o
+    la fecha del cupón convertiría este endpoint en un buscador del padrón
+    para cualquiera que sepa un DNI.
+    """
+
+    registrado: bool
+
+
+class NombrePublicoOut(BaseModel):
+    """El nombre de RENIEC para que el cliente lo confirme en pantalla.
+
+    Vacío cuando el proveedor no contesta o no está configurado: el
+    formulario deja escribirlo a mano y sigue (RN-PTS-004).
+    """
+
+    nombres: str = ""
+    apellidos: str = ""
+
+
+class CuponPublicoOut(BaseModel):
+    """Lo que la landing le muestra al cliente al terminar."""
+
+    codigo: str
+    vigente_hasta: date
+    descuento_porcentaje: Decimal
+    # Para que la pantalla sepa si decir «te registramos» o «ya te
+    # conocíamos». Los dos son éxito; contarlos igual dejaría al cliente sin
+    # saber si su registro entró o no, que es justo lo que pidió saber.
+    ya_estaba_registrado: bool
+
+
+class PromocionCuponOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    nombre: str
+    descuento_porcentaje: Decimal
+    vigente_hasta: date
+    vigencia_cupon_dias: int
+    estado: str
+
+
+class CanjeCuponIn(BaseModel):
+    codigo: str = Field(min_length=1, max_length=20)
+
+
+class CuponCanjeadoOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    codigo: str
+    monto_descuento: Decimal
+    venta: VentaOut

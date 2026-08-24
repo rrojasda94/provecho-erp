@@ -1,3 +1,4 @@
+from datetime import date
 from decimal import Decimal
 from importlib import metadata
 from typing import Annotated
@@ -170,6 +171,17 @@ class Settings(BaseSettings):
     # Base pública del formulario de encuesta (canal `link` y el enlace que
     # viaja en el WhatsApp). Vacío = se envía solo el texto, sin enlace.
     marketing_url_publica: str = ""
+    # --- Promoción de cupón «Queremos RE-conocerte» (ADR-061) ----------------
+    # Valores con los que el seeder crea la campaña. Son semilla, no fuente de
+    # verdad: una vez creada, la fila manda —terminarla es un `POST`, no un
+    # despliegue— porque la empresa se reserva el derecho de cortarla en
+    # cualquier momento y esperar un deploy para eso no sirve.
+    sales_promocion_cupon_nombre: str = "Queremos RE-conocerte"
+    sales_promocion_cupon_porcentaje: Decimal = Decimal("10")
+    # Fin de campaña: «a finales de este año».
+    sales_promocion_cupon_fin: date = date(2026, 12, 31)
+    # Cada cupón vale un mes desde que se emite.
+    sales_promocion_cupon_vigencia_dias: int = 30
     # Cola de emisión de comprobantes (Celery). Por defecto reusa Redis.
     celery_broker_url: str = ""
     # --- Observabilidad -----------------------------------------------------

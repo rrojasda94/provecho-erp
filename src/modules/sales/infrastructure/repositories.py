@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from src.modules.sales.infrastructure.models import (
     Cliente,
+    Cupon,
     ListaPrecio,
     MedioPago,
     Mesa,
@@ -18,6 +19,7 @@ from src.modules.sales.infrastructure.models import (
     ProductoComercial,
     ProductoComercialExtra,
     ProductoOpcionGrupo,
+    PromocionCupon,
     PuntoVenta,
     Venta,
     VentaItem,
@@ -379,6 +381,73 @@ class ClienteRepo:
                 Cliente.deleted_at.is_(None),
             )
         )
+
+
+class PromocionCuponRepo:
+    def __init__(self, session: Session) -> None:
+        self.s = session
+
+    def get(self, promocion_id: uuid.UUID) -> PromocionCupon | None:
+        return self.s.get(PromocionCupon, promocion_id)
+
+    def activas(self, grupo_id: uuid.UUID | None = None) -> list[PromocionCupon]:
+        """Las promociones activas, sin elegir por su cuenta cuál gana.
+
+        Devuelve la lista y no la primera a propósito: hoy el negocio corre
+        una campaña de cupón a la vez, y el día que haya dos, cuál aplica es
+        una decisión del negocio y no un `ORDER BY` escondido acá. El caso
+        de uso corta con un 409 que se lee, en vez de repartir descuentos
+        contra una promoción elegida al azar.
+
+        Sin `grupo_id` son todas: la landing pública no tiene tenant del que
+        sacarlo — el cliente que escanea el QR no es usuario del ERP.
+        """
+        stmt = select(PromocionCupon).where(PromocionCupon.estado == "activa")
+        if grupo_id is not None:
+            stmt = stmt.where(PromocionCupon.grupo_id == grupo_id)
+        return list(self.s.scalars(stmt.order_by(PromocionCupon.created_at)))
+
+    def listar(self, grupo_id: uuid.UUID | None = None) -> list[PromocionCupon]:
+        stmt = select(PromocionCupon)
+        if grupo_id is not None:
+            stmt = stmt.where(PromocionCupon.grupo_id == grupo_id)
+        return list(self.s.scalars(stmt.order_by(PromocionCupon.created_at.desc())))
+
+    def add(self, promocion: PromocionCupon) -> PromocionCupon:
+        self.s.add(promocion)
+        self.s.flush()
+        return promocion
+
+
+class CuponRepo:
+    def __init__(self, session: Session) -> None:
+        self.s = session
+
+    def get(self, cupon_id: uuid.UUID) -> Cupon | None:
+        return self.s.get(Cupon, cupon_id)
+
+    def por_cliente(
+        self, promocion_id: uuid.UUID, cliente_id: uuid.UUID
+    ) -> Cupon | None:
+        return self.s.scalar(
+            select(Cupon).where(
+                Cupon.promocion_id == promocion_id,
+                Cupon.cliente_id == cliente_id,
+            )
+        )
+
+    def por_codigo(self, promocion_id: uuid.UUID, codigo: str) -> Cupon | None:
+        return self.s.scalar(
+            select(Cupon).where(
+                Cupon.promocion_id == promocion_id,
+                Cupon.codigo == codigo,
+            )
+        )
+
+    def add(self, cupon: Cupon) -> Cupon:
+        self.s.add(cupon)
+        self.s.flush()
+        return cupon
 
 
 class MesaRepo:
