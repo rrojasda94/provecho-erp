@@ -121,7 +121,11 @@ def actualizar_trabajador(
     session: Session = Depends(get_db),
 ):
     exigir_trabajador(session, trabajador_id, tenant)
-    trabajador = trabajadores.actualizar_trabajador(session, trabajador_id, **body.model_dump())
+    # `exclude_unset`: lo que no vino no se toca, y un `sucursal_id: null`
+    # explícito sí llega para poder borrar el centro de labores.
+    trabajador = trabajadores.actualizar_trabajador(
+        session, trabajador_id, **body.model_dump(exclude_unset=True)
+    )
     session.commit()
     return trabajador
 

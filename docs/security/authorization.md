@@ -27,7 +27,7 @@ alcance del usuario.
 | Nivel | Ejemplo de restricción |
 |-------|------------------------|
 | Empresa | El usuario solo opera una empresa del grupo |
-| Marca | Supervisor de una sola marca |
+| Marca | Supervisor de una sola marca. **No es un claim del token**: hoy se expresa como varias filas de `usuario_sucursal` — el supervisor lleva los locales que tenga a cargo, uno por fila (ADR-062) |
 | Sucursal | Cajero atado a su(s) local(es) (`usuario_sucursal`) |
 | Almacén | Almacenero limitado al almacén central |
 | Módulo | Rol sin acceso al módulo de contabilidad |
@@ -35,6 +35,14 @@ alcance del usuario.
 ## Reglas de autorización
 
 - **Deny por defecto**: sin permiso explícito, la acción se rechaza (403).
+- El alcance por sucursal **viaja en el token** (claim `sucursales`): asignar o
+  quitar un local (`POST`/`DELETE /users/{id}/sucursales`) no le cambia nada a
+  una sesión ya abierta hasta que renueve (refresh o login). Las dos
+  operaciones exigen que la sucursal sea de la empresa de quien administra
+  —salvo el superusuario, que administra el grupo— y quedan en `audit_log`.
+- El alcance de una cuenta **no es** el centro de labores del trabajador
+  (`trabajador.sucursal_id`, ADR-062): dónde trabaja alguien es un hecho
+  laboral de RRHH, qué datos alcanza es autorización.
 - El alcance sale de los claims del JWT + asignaciones del usuario, nunca del
   body del request sin verificar.
 - Un permiso sin restricción aplica a todo el alcance del usuario; con

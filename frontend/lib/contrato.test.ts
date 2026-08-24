@@ -767,6 +767,7 @@ const RUTAS_EXPANDIDAS: Record<string, string[]> = {
     "lanzamiento",
     "cierre",
   ],
+  "/api/v1/users/${u.id}/${recurso}": ["roles", "sucursales"],
 };
 
 const TODAS = fuentes(RAIZ).flatMap(llamadasEn);
