@@ -12,6 +12,196 @@ editando este archivo chocaban siempre — escribían en la misma línea.
 
 Ver [`changelog.d/`](changelog.d/).
 
+## [0.7.3] - 2026-08-24
+
+### Added
+
+- **Ya se puede decir dónde trabaja alguien y qué locales alcanza su cuenta**
+  (2026-08-24, ADR-062, migración `b6d29f10c47e`). Eran dos huecos que desde
+  la pantalla se veían como uno: `trabajador` no tenía sucursal —la asistencia
+  no tenía a qué local atribuirse y el reemplazo entre sucursales
+  (RN-RRHH-011) no era representable— y `usuario_sucursal` tenía endpoints
+  desde el slice inicial **pero ninguna pantalla**, así que fuera del seeder
+  nadie repartía alcance. Ahora `trabajador.sucursal_id` (nullable) es el
+  centro de labores, un hecho laboral que vive en RRHH → Trabajadores, y el
+  alcance de datos se reparte en Usuarios → Cuentas con la misma celda de
+  chips que ya se usaba para los roles. Un supervisor a cargo de varios
+  locales son **varias filas** de `usuario_sucursal`: se descartó una tabla
+  `zona` porque hoy ningún reporte, permiso ni regla la nombra — sería una
+  entidad con su tenant, su seeder y su CRUD para ahorrar dos clics. El costo
+  aceptado: el alcance viaja en el token, así que un cambio le aplica a esa
+  cuenta recién cuando su sesión renueve; la pantalla lo advierte en vez de
+  invalidar tokens vivos.
+- **`GET /users/{id}/sucursales`**: el alcance de una cuenta ajena no se podía
+  leer. `/users/me` devolvía el propio, que no sirve para administrar a otro.
+
+- **Staging se despliega desde GitHub** (ADR-060). Actions → *Desplegar* → Run
+  workflow, se elige la versión y listo. Se puede desde un teléfono.
+
+  ADR-008 había dejado el despliegue manual "hasta que exista el VPS". El VPS
+  existe, y lo que quedó no era un despliegue manual sino uno **atado a una
+  máquina**: hace falta esa PC, con esa llave, y la llave tiene passphrase —
+  así que tampoco sirve desde un shell no interactivo. Eso dejó staging sin
+  actualizar con 0.7.1 ya publicada, porque quien tenía que desplegar estaba
+  en otra ubicación.
+
+  Sigue siendo un **acto explícito** (`workflow_dispatch`, no `on: push`), que
+  es lo que ADR-008 protegía. Lo que cambia es que ese alguien puede estar en
+  cualquier parte.
+
+  - El script de despliegue **viaja del repo al servidor** en cada corrida, en
+    vez de asumir que allá hay una copia: una copia vieja es un despliegue que
+    hace algo distinto de lo que dice el repo.
+  - La huella del servidor va en un secreto, no `StrictHostKeyChecking=no`.
+  - Se comprueba la versión **desde afuera**, contra el dominio público: que
+    el contenedor arranque no significa que el proxy lo esté sirviendo.
+  - La carga del catálogo solo se ofrece **en simulación**, que no escribe
+    nada. La de verdad se hace a mano mirando ese resultado.
+
+  Requiere dos secretos, documentados en `docs/engineering/devops.md`.
+
+- **Landing pública «Queremos RE-conocerte» y cupón de 10 %** (2026-08-24,
+  ADR-061). Un QR en la mesa lleva a `/reconocerte`, donde un cliente de
+  Charlie's deja DNI, cumpleaños, dirección y teléfono sin necesidad de
+  cuenta, y recibe un cupón de un solo uso para su siguiente compra. La caja
+  lo canjea con `POST /sales/ventas/{id}/cupon`, y ahí queda desactivado para
+  siempre.
+- **El cupón vive en `sales`, no en `marketing`.** Registrar al cliente y
+  descontar la venta son dos escrituras dentro de `sales`, y un módulo solo
+  entra a otro por `api.deps` o `queries_publicas` — ninguno de los dos sirve
+  para escribir. Ponerlo en `marketing` habría exigido ampliar la lista de
+  excepciones cruzadas de `tests/test_arquitectura.py`, que es justo la deuda
+  que esa lista existe para no seguir acumulando. Marketing se entera por
+  `sales.cliente_registrado_en_promocion` y crea su `lead`, igual que ya hace
+  con `sales.venta_confirmada`.
+- **El descuento reusa `venta.descuento_*` con un motivo nuevo, `cupon`.** El
+  costo aceptado: esas columnas eran del descuento manual, y ahora comparten
+  tabla con uno que nadie autorizó. Se paga porque la alternativa —un canal de
+  descuento paralelo— obligaba a tocar `total_a_cobrar`, el prorrateo que
+  SUNAT exige en el comprobante y las notas de crédito, que es la parte que
+  maneja dinero y ya funciona. El motivo propio deja al reporte de descuentos
+  separar el margen regalado a criterio del prometido en campaña, que era la
+  auditabilidad que ADR-018 protege. **El motor de promociones condicionales
+  sigue sin poder reusarlas**: ahí no interviene nadie.
+- **El canje no pide PIN de supervisor**, a diferencia del descuento manual
+  (RN-COM-017). El cupón ya era del cliente y el cupón es la autorización;
+  pedir un supervisor por cada uno haría que la caja deje de canjearlos, que
+  es la forma más segura de romper la promesa de la campaña.
+- **La superficie pública escribe pero no borra, y solo lee un booleano.** No
+  hay ningún `DELETE` —la baja de datos se atiende por `hola@majambo.com.pe`
+  con la anonimización de ADR-011, nunca desde una página abierta a internet—,
+  la consulta devuelve `{registrado: bool}` y nada más, y el `grupo_id` sale
+  de la promoción activa y jamás del request. Lo único que la protege es el
+  rate limit por IP, en tres niveles según lo que cuesta cada llamada: el más
+  duro (5/hora) es el que convierte un DNI en un nombre, porque es el que
+  permitiría enumerar documentos. Es el costo aceptado de que el cliente
+  confirme su nombre en vez de teclearlo.
+- **El código del cupón es el DNI** (lo pidió el negocio). El cliente no tiene
+  nada que recordar ni guardar, y devolverlo en la respuesta no filtra nada
+  porque es el número que él mismo acaba de escribir. A cambio, quien conozca
+  un DNI ajeno podría intentar su cupón: se acota atándolo al cliente de la
+  venta, no se elimina.
+- **La empresa puede terminar la promoción en cualquier momento** con
+  `POST /sales/promociones-cupon/{id}/termino` (`sales.gestionar_promociones`,
+  del rol `supervisor`). Deja de emitir cupones nuevos y **no toca los ya
+  entregados**: quien alcanzó a registrarse cumplió su parte del trato.
+- **Los logotipos de `frontend/public/marcas/` son provisionales.** Están
+  armados con tipografía y los colores de marca, no con los originales. Para
+  poner los definitivos alcanza con reemplazar el archivo conservando el
+  nombre — ningún componente cambia. Ver `frontend/public/marcas/README.md`.
+- **El teléfono reconoce a un cliente, pero no reescribe su identidad.** Se
+  le completa el documento solo a quien no tiene ninguno: sin ese candado,
+  saber un teléfono ajeno alcanzaba para cambiarle el DNI a su dueño desde
+  una página abierta a internet, y quedarse con su historial de compras. Un
+  teléfono que ya es de alguien identificado se ignora y el registro entra
+  como cliente nuevo — dos fichas con el mismo teléfono se limpian, una
+  identidad pisada no. Apareció probando el flujo contra la API real; los
+  tests no lo cubrían.
+
+### Fixed
+
+- **La receta de la mitad-y-mitad se veía en plano, sin decir qué mitad lleva
+  cada insumo** (enmienda de ADR-056). Con el catálogo de Charlie's cargado,
+  el lienzo de `Pizza MitadxMitad Familiar` listaba sus 26 líneas seguidas
+  —`Salame Picado` tres veces— y el nodo `Americana F` respondía "no tiene
+  receta todavía", que es falso: sus insumos son líneas condicionadas de la
+  receta del tamaño.
+
+  El dato estaba bien. `receta_item.aplica_valores` existe desde ADR-056 y el
+  motor de descuento lo respeta; lo que faltaba era que la API de la receta
+  lo devolviera y lo aceptara. Hasta ahora solo lo tocaba la matriz, y la
+  matriz muestra UUID.
+
+  - `GET /inventory/recetas/{id}` devuelve la condición de cada línea, como
+    **lista de texto y siempre lista, nunca `null`**: el editor no tiene que
+    distinguir dos formas de "sin condición".
+  - `POST`/`PATCH .../items` la aceptan. En el `PATCH` los tres estados
+    importan: ausente no toca la condición, `[]` la borra y una lista la
+    reemplaza. Sin distinguir "no lo edito" de "lo limpio", cambiar un
+    gramaje habría borrado la condición de rebote.
+  - Tocar el nodo de un sabor abre **sus** líneas y agrega las nuevas ya
+    condicionadas a él. En el nodo del tamaño, cada línea muestra su
+    condición con nombre ("Mitad 1 F: Americana, Hawaiana") y se edita ahí
+    mismo, con casillas agrupadas por atributo y un botón "Aplicar" — un
+    `PATCH` por casilla podía dejar el cambio a medias en un 409.
+  - El mismo insumo ya se puede repetir con **otra** condición desde el
+    editor, que es el caso que todo el modelo existe para resolver: el jamón
+    en la Mitad 1 y en la Mitad 2 son dos líneas de la misma receta.
+
+- **Duplicar una receta perdía la condición de sus líneas** (encontrado al
+  hacer lo anterior). `duplicar_receta` copiaba artículo, cantidad, expresión
+  y merma, y dejaba afuera `aplica_valores`, `unidad_medida_id` y `orden`.
+  Duplicar la mitad-y-mitad daba 26 líneas sin condición: una receta que
+  descuenta todos los insumos de todas las mitades, siempre, sin que nada lo
+  diga hasta cuadrar el mes.
+
+- **La pestaña "Plato" también sumaba las líneas condicionadas como si
+  aplicaran siempre** (misma enmienda). El costo simulado del plato quedaba
+  por encima del real, y con las condiciones ya visibles en la otra pestaña
+  el contraste se notaba más que antes.
+
+  `fusionar()` ahora usa `aplicaAVariante` — un puerto literal de la regla
+  del servidor (`inventory/domain/rules.aplica_a_variante`, RN-COM-037):
+  mismo agrupado por atributo, mismo Y entre grupos y O dentro de cada uno.
+  Es la duplicación que ADR-056 §5 evitó en el backend, aceptada acá a
+  propósito — la alternativa era un endpoint nuevo por cada clic en un
+  sabor, para un número que ya es una simulación. Las dos implementaciones
+  se prueban con los mismos casos, para que un día que diverjan se note en
+  la suite.
+
+- **Desplegar dejaba el dominio público en 502 con la API sana.** Caddy
+  resuelve `reverse_proxy api:8000` una sola vez, al arrancar; recrear el
+  contenedor `api` le da una IP nueva en la red de Docker y Caddy sigue
+  hablándole a la vieja. Pasó desplegando la 0.7.2, y cuesta más
+  diagnosticarlo que arreglarlo: `api` figura `Up (healthy)`, `init` termina
+  en 0 y el `curl` al loopback responde, así que todo apunta a otro lado. Lo
+  único que lo delata es el `CREATED` del `docker compose ps -a` — Caddy con
+  horas de vida y `api` con minutos.
+- `scripts/desplegar.sh` reinicia Caddy después del `up -d`, así que todo
+  despliegue lo cubre, incluido el workflow de ADR-060 — que si no habría
+  fallado siempre: su último paso comprueba la versión contra el dominio
+  público, justo lo que el 502 rompe. El script tampoco se conforma ya con el
+  loopback: espera a `/health/ready` **por el dominio**, que es lo único que
+  prueba que el proxy está sirviendo, y si falla ahí dice que mire los logs
+  del proxy y no los de la API.
+- La solución de fondo —los upstreams dinámicos de Caddy, que re-resuelven el
+  DNS— queda en `docs/roadmap/deuda/ci-cd.md` con la configuración escrita: un
+  reinicio de proxy por despliegue es un corte de segundos que staging se
+  banca y producción no, pero un `Caddyfile` inválido deja staging sin proxy y
+  eso hay que validarlo contra el servidor antes de aplicarlo.
+
+### Security
+
+- **Asignar un local al alcance de una cuenta no validaba tenant ni dejaba
+  rastro** (2026-08-24). `POST/DELETE /users/{id}/sucursales` aceptaba
+  cualquier `sucursal_id`: quien administraba las cuentas de su empresa podía
+  colgar un usuario a la sucursal de **otra empresa del grupo** y darle acceso
+  a datos ajenos, sin que quedara escrito. Ahora las dos operaciones exigen
+  que la sucursal sea de la empresa de quien administra —el superusuario sigue
+  operando sobre todo el grupo, igual que en el alta de sucursales— y las dos
+  quedan en `audit_log`. Se audita también el quite porque es la otra mitad de
+  "quién podía ver este local y desde cuándo".
+
 ## [0.7.2] - 2026-08-23
 
 ### Added
