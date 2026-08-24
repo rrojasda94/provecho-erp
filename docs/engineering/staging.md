@@ -21,7 +21,7 @@ general del despliegue.
 | Dominio frontend | `staging.majambo.com.pe` |
 | Dominio API | `api-staging.majambo.com.pe` |
 | Usuario de la app | `app` (sudo, sin login root, sin login por contraseña) |
-| Llave SSH | `renato-provecho` — privada en `~/.ssh/provecho_droplet` (tu PC, nunca en el repo) |
+| Llave SSH | `renato-provecho` — privada en `~/.ssh/provecho_droplet` (tu PC, nunca en el repo). **Con passphrase**: sirve para entrar a mano y no desde un shell no interactivo — para eso está la llave de despliegue de ADR-060, ver `devops.md` |
 
 > La IP puede cambiar si el droplet se recrea (ya pasó una vez durante el
 > setup inicial, 2026-08-23). Si cambia: actualizar los dos registros A del
@@ -84,6 +84,31 @@ Ya corregido en `.env.staging.example` y documentado en
 criterio si algún día se arma un compose de producción con el frontend
 adentro.**
 
+## Bug encontrado y resuelto (2026-08-24)
+
+**Caddy cachea la IP del upstream y devuelve 502 después de cada redeploy.**
+`reverse_proxy api:8000` resuelve el nombre en la red de Docker **una vez, al
+arrancar**. Un `docker compose up -d` que recrea `api` le asigna una IP nueva,
+y Caddy —que no se recreó— sigue hablándole a la vieja. El síntoma es un 502
+en `https://api-staging.majambo.com.pe` con la API perfectamente sana:
+`api` figura `Up (healthy)` y `curl http://127.0.0.1:8000/health/ready`
+responde. Pasó desplegando la 0.7.2.
+
+Lo delata el `docker compose ps -a`: `caddy` con 21 horas de vida y `api` con
+4 minutos.
+
+Parche: `scripts/desplegar.sh` reinicia Caddy después del `up -d`, así que
+todo despliegue lo cubre —incluido el workflow de ADR-060, que si no habría
+fallado siempre: su último paso comprueba la versión **contra el dominio
+público**, justo lo que el 502 rompe. El script, además, dejó de conformarse
+con el loopback: ahora espera a `/health/ready` por el dominio, que es lo
+único que prueba que el proxy está sirviendo.
+
+**La solución de fondo es que Caddy re-resuelva el DNS solo** (`dynamic a` en
+el `Caddyfile`), anotada en [`deuda/ci-cd.md`](../roadmap/deuda/ci-cd.md): no
+se aplicó de una porque un `Caddyfile` inválido deja staging sin proxy —peor
+que el 502— y hay que validarlo contra el servidor antes de recargarlo.
+
 ## Pendiente
 
 - [x] Commiteado y en PR: [#91](https://github.com/rrojasda94/provecho-erp/pull/91)
@@ -96,6 +121,10 @@ adentro.**
       vía `docker compose exec api`)
 - [x] Monitor externo (UptimeRobot) dado de alta contra `/health`,
       `/health/ready`, `/health/backups`
+- [x] **`scripts/desplegar.sh` no estaba en el droplet** (2026-08-24): el repo
+      nunca se clonó ahí, así que el script que este runbook mandaba correr no
+      existía y desplegar la 0.7.2 falló con `No such file or directory`. Lo
+      cerró ADR-060: el workflow hace `scp` del script en cada despliegue.
 - [ ] **Errores de backend encontrados probando staging** — se están
       revisando en otra sesión de trabajo, no repetir el diagnóstico acá
 - [ ] **Cambio de recetas en camino** (mencionado 2026-08-23, sin detalle
@@ -117,3 +146,24 @@ Ver estado del stack (una vez levantado):
 docker compose -f docker-compose.staging.yml ps
 docker compose -f docker-compose.staging.yml logs -f api
 ```
+
+**Desplegar una versión nueva no se hace desde acá**: se corre el workflow
+*Desplegar* en GitHub → Actions, con la versión como entrada (ADR-060). El
+workflow lleva `scripts/desplegar.sh` al servidor por `scp` y lo ejecuta, así
+que en el droplet nunca queda una copia vieja del procedimiento.
+
+Si hiciera falta desplegar a mano —el workflow caído, o depurando en el
+servidor—, es el mismo script:
+
+```bash
+cd ~/provecho-staging && ./desplegar.sh 0.7.2
+```
+
+El servicio `init` corre `alembic upgrade head` antes de que arranque `api`
+(`depends_on: service_completed_successfully`), así que la migración no
+necesita paso aparte. El script reinicia Caddy y comprueba **el dominio
+público**, no solo el loopback — ver el bug de abajo.
+
+Si alguna vez ves un 502 con la API sana, el diagnóstico es de una línea:
+comparar el `CREATED` de `caddy` contra el de `api` en
+`docker compose ps -a`. Si Caddy es mucho más viejo, es esto.

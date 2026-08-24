@@ -3,6 +3,42 @@
 Parte del backlog de deuda técnica del proyecto. El índice y las reglas
 de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 
+- ✅ 2026-08-24 **El droplet de staging no tenía `scripts/desplegar.sh`**:
+  `staging.md` mandaba correr `./scripts/desplegar.sh <version>` en el
+  servidor, pero ahí nunca se clonó el repo — solo se habían copiado a mano
+  `docker-compose.staging.yml` y el `Caddyfile`. Desplegar la 0.7.2 falló con
+  `No such file or directory`, el mismo patrón que el fix de la 0.7.1 con
+  `scripts/odoo`. Lo cerró ADR-060 por el camino correcto: el workflow
+  `desplegar.yml` hace `scp` del script **en cada despliegue**, así que en el
+  servidor nunca hay una copia que se pueda desincronizar del repo.
+- ⬜ **Caddy no re-resuelve el DNS del upstream** (2026-08-24): `reverse_proxy
+  api:8000` en el `Caddyfile` resuelve el nombre una sola vez, al arrancar, así
+  que todo `docker compose up -d` que recree `api` o `web` deja a Caddy
+  apuntando a una IP muerta y el dominio público devuelve 502 con la API sana.
+  Hoy se tapa con un `docker compose restart caddy` que hace
+  `scripts/desplegar.sh`, que es por donde pasa todo despliegue desde ADR-060.
+  Es un reinicio de proxy en cada despliegue: unos segundos de corte que
+  staging se banca y producción no. El arreglo de fondo son los upstreams
+  dinámicos de Caddy:
+
+  ```
+  api-staging.majambo.com.pe {
+  	reverse_proxy {
+  		dynamic a {
+  			name api
+  			port 8000
+  			refresh 30s
+  		}
+  	}
+  }
+  ```
+
+  No se aplicó de una porque un `Caddyfile` inválido deja staging sin proxy —
+  peor que el 502— y no hay Docker local para validarlo. Se cierra corriendo
+  `docker compose exec caddy caddy validate --config /etc/caddy/Caddyfile` en
+  el servidor **antes** del `reload`, con el archivo viejo a mano para volver.
+  El `Caddyfile` del repo, además, tiene los dominios de staging escritos
+  literales, así que este cambio se piensa junto con el compose de producción.
 - ⬜ **Job de despliegue** (ver *Cuando haya servidor*, punto 7): hoy el despliegue es manual y documentado. Se
   escribe cuando exista el VPS — automatizar por SSH contra una máquina que
   no existe da automatización no probada (ADR-008).
