@@ -6,6 +6,7 @@ from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
+from src.core.tenant import Tenant
 from src.modules.users.application.errors import (
     Conflicto,
     NoEncontrado,
@@ -356,22 +357,71 @@ def quitar_permiso(session: Session, rol_id: uuid.UUID, permiso_id: uuid.UUID) -
         session.delete(fila)
 
 
-def asignar_sucursal(
-    session: Session, usuario_id: uuid.UUID, sucursal_id: uuid.UUID
-) -> None:
+def sucursales_de_usuario(session: Session, usuario_id: uuid.UUID) -> list[Sucursal]:
     _get(UsuarioRepo(session).get(usuario_id), "usuario")
+    return UsuarioRepo(session).sucursales_de(usuario_id)
+
+
+def asignar_sucursal(
+    session: Session,
+    usuario_id: uuid.UUID,
+    sucursal_id: uuid.UUID,
+    tenant: Tenant,
+    actor_id: uuid.UUID | None = None,
+) -> None:
+    """Suma un local al alcance de la cuenta.
+
+    Un supervisor sobre varios locales son varias filas acá: `usuario_sucursal`
+    ya es N a N y no hace falta agrupar nada (ADR-062).
+
+    El alcance viaja en el token, así que el cambio recién le aplica a esa
+    persona cuando su sesión renueve (refresh o login)."""
+    _get(UsuarioRepo(session).get(usuario_id), "usuario")
+    sucursal = _get(SucursalRepo(session).get(sucursal_id), "sucursal")
+    _exigir_empresa(tenant, sucursal.empresa_id)
     if session.get(UsuarioSucursal, (usuario_id, sucursal_id)) is None:
         session.add(
             UsuarioSucursal(usuario_id=usuario_id, sucursal_id=sucursal_id)
         )
+        auditoria.registrar(
+            session, usuario_id=actor_id, entidad="usuario_sucursal",
+            entidad_id=usuario_id, accion="asignar_sucursal",
+            datos_despues={"sucursal_id": str(sucursal_id)},
+        )
 
 
 def quitar_sucursal(
-    session: Session, usuario_id: uuid.UUID, sucursal_id: uuid.UUID
+    session: Session,
+    usuario_id: uuid.UUID,
+    sucursal_id: uuid.UUID,
+    tenant: Tenant,
+    actor_id: uuid.UUID | None = None,
 ) -> None:
+    """Quitar alcance también se audita: es la mitad de la pregunta "quién
+    podía ver esto y desde cuándo", y sin el rastro la respuesta se pierde."""
+    sucursal = _get(SucursalRepo(session).get(sucursal_id), "sucursal")
+    _exigir_empresa(tenant, sucursal.empresa_id)
     fila = session.get(UsuarioSucursal, (usuario_id, sucursal_id))
     if fila is not None:
         session.delete(fila)
+        auditoria.registrar(
+            session, usuario_id=actor_id, entidad="usuario_sucursal",
+            entidad_id=usuario_id, accion="quitar_sucursal",
+            datos_antes={"sucursal_id": str(sucursal_id)},
+        )
+
+
+def _exigir_empresa(tenant: Tenant, empresa_id: uuid.UUID) -> None:
+    """Sin esto se podía ampliar el alcance de una cuenta a la sucursal de otra
+    empresa del grupo: repartir acceso a datos ajenos desde la pantalla de
+    administración de la propia empresa.
+
+    El superusuario queda afuera por el mismo motivo que en el alta de
+    sucursales (`routers._exigir_empresa`): administra el grupo entero y el
+    seeder lo ata a una empresa solo para que el resto del ERP le funcione."""
+    if tenant.superusuario:
+        return
+    tenant.exigir_empresa(empresa_id)
 
 
 def _get(obj, nombre: str):

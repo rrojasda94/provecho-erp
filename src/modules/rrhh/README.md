@@ -184,6 +184,12 @@ escuchar `trabajador_cesado`. Ver ROADMAP.
   se llenan al contratar; `postulante.convocatoria_id` es nulo si la
   postulación fue espontánea o por referido, fuera de una búsqueda abierta.
 - `postulante.cv_archivo_id` liga con `shared.archivo`.
+- `trabajador.sucursal_id` (opcional) es el **centro de labores**: dónde
+  trabaja la persona (migración `b6d29f10c47e`, ADR-062). Tiene que ser una
+  sucursal de su misma empresa (RN-RRHH-019) y es nullable a propósito —
+  gerencia y administración no están en ningún local. **No es** el alcance de
+  datos de su cuenta: eso vive en `users.usuario_sucursal` y se administra en
+  Usuarios → Cuentas. Un supervisor trabaja en un local y ve varios.
 - `convocatoria.sucursal_id` (opcional) indica dónde se necesita cubrir.
 - Consumido por `sales` para el ranking de ventas por trabajador
   (`tests/test_venta_slice.py`).

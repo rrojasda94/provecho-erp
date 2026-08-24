@@ -16,7 +16,7 @@ from src.modules.rrhh.application.errors import Conflicto, NoEncontrado, ReglaNe
 from src.modules.rrhh.domain import rules
 from src.modules.rrhh.infrastructure.models import Trabajador
 from src.modules.rrhh.infrastructure.repositories import TrabajadorRepo
-from src.modules.users.infrastructure.models import Empresa, Persona
+from src.modules.users.infrastructure.models import Empresa, Persona, Sucursal
 
 
 def crear_trabajador(
@@ -36,6 +36,7 @@ def crear_trabajador(
     tiene_poderes: bool = False,
     registra_asistencia: bool = True,
     jornada_horas_semana: Decimal | None = None,
+    sucursal_id: uuid.UUID | None = None,
 ) -> Trabajador:
     if tipo_vinculo not in rules.TIPOS_VINCULO:
         raise ReglaNegocio(f"tipo_vinculo inválido: {tipo_vinculo}")
@@ -43,6 +44,7 @@ def crear_trabajador(
         raise NoEncontrado(f"empresa {empresa_id} no encontrada")
     if session.get(Persona, persona_id) is None:
         raise NoEncontrado(f"persona {persona_id} no encontrada")
+    _exigir_sucursal_de_empresa(session, sucursal_id, empresa_id)
 
     if tipo_vinculo == "locacion_servicios":
         registra_asistencia = False
@@ -77,6 +79,7 @@ def crear_trabajador(
             afp_nombre=afp_nombre,
             tiene_poderes=tiene_poderes,
             registra_asistencia=registra_asistencia,
+            sucursal_id=sucursal_id,
         )
     )
 
@@ -90,14 +93,39 @@ def q_trabajadores(session: Session, empresa_id: uuid.UUID | None = None):
     return TrabajadorRepo(session).q_list(empresa_id)
 
 
+# Campos que sí se pueden dejar en blanco: un `None` explícito los borra en vez
+# de significar "no tocar". Para el resto, `None` sigue siendo "no tocar" —
+# mandar `cargo: null` no puede vaciar una columna obligatoria.
+BORRABLES = frozenset({"sucursal_id"})
+
+
 def actualizar_trabajador(session: Session, trabajador_id: uuid.UUID, **campos) -> Trabajador:
     trabajador = TrabajadorRepo(session).get(trabajador_id)
     if trabajador is None:
         raise NoEncontrado("trabajador no encontrado")
+    if "sucursal_id" in campos:
+        _exigir_sucursal_de_empresa(session, campos["sucursal_id"], trabajador.empresa_id)
     for campo, valor in campos.items():
-        if valor is not None:
+        if valor is not None or campo in BORRABLES:
             setattr(trabajador, campo, valor)
     return trabajador
+
+
+def _exigir_sucursal_de_empresa(
+    session: Session, sucursal_id: uuid.UUID | None, empresa_id: uuid.UUID
+) -> None:
+    """El centro de labores tiene que ser un local de la misma empresa
+    (RN-RRHH-019). Sin esto, un trabajador de una empresa del grupo podía
+    quedar asignado al local de otra y arrastrar su planilla ahí."""
+    if sucursal_id is None:
+        return
+    sucursal = session.get(Sucursal, sucursal_id)
+    if sucursal is None or sucursal.deleted_at is not None:
+        raise NoEncontrado(f"sucursal {sucursal_id} no encontrada")
+    if sucursal.empresa_id != empresa_id:
+        raise ReglaNegocio(
+            "la sucursal no es de la empresa del trabajador (RN-RRHH-019)"
+        )
 
 
 def cesar_trabajador(
