@@ -17,7 +17,9 @@ import test from "node:test";
 import {
   alternar,
   apilarColumna,
+  agruparCondicion,
   armarGrafo,
+  atributoDeValores,
   armarPartes,
   elegidosDelCamino,
   elegirEnGrupo,
@@ -33,6 +35,8 @@ import {
   tituloDelPlato,
   type Camino,
   modoLegible,
+  condicionLegible,
+  indiceDeValores,
   valoresExcluidos,
 } from "./lienzo.ts";
 
@@ -387,3 +391,99 @@ test("el modo de variante se dice sin jerga", () => {
   assert.equal(modoLegible("otro"), "no genera variantes");
 });
 
+
+
+// --- La condición de una línea de receta, con nombres (RN-COM-037) ---------
+// Dos atributos como los del archivo real de Charlie's: cada mitad es un
+// atributo y cada sabor un `producto_atributo_valor`.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const valor = (id: string, nombre: string, activo = true): any => ({
+  id,
+  atributo_valor_id: `av-${id}`,
+  nombre,
+  precio_extra: "0",
+  activo,
+});
+
+const ATRIBUTOS = [
+  {
+    linea_id: "l1",
+    producto_comercial_id: "fam",
+    atributo_id: "a1",
+    nombre: "Mitad 1 F",
+    modo_variante: "nunca",
+    display: "pildoras",
+    orden: 0,
+    valores: [
+      valor("m1_ame", "Americana"),
+      valor("m1_haw", "Hawaiana"),
+      // Retirada: sigue en el índice porque una receta puede nombrarla.
+      valor("m1_ret", "Retirada", false),
+    ],
+  },
+  {
+    linea_id: "l2",
+    producto_comercial_id: "fam",
+    atributo_id: "a2",
+    nombre: "Mitad 2 F",
+    modo_variante: "nunca",
+    display: "pildoras",
+    orden: 1,
+    valores: [valor("m2_pep", "Peperoni")],
+  },
+] as never;
+
+const INDICE = indiceDeValores(ATRIBUTOS);
+
+test("sin condición la línea aplica siempre, y se dice así", () => {
+  assert.equal(condicionLegible([], INDICE), "Siempre");
+  assert.equal(condicionLegible(null, INDICE), "Siempre");
+  assert.equal(condicionLegible(undefined, INDICE), "Siempre");
+});
+
+test("la condición se lee agrupada por atributo", () => {
+  // Entre grupos es Y, dentro de un grupo es O (RN-COM-037): el texto tiene
+  // que dejar ver esa estructura, no una lista plana de seis sabores.
+  assert.equal(
+    condicionLegible(["m2_pep", "m1_ame", "m1_haw"], INDICE),
+    "Mitad 2 F: Peperoni · Mitad 1 F: Americana, Hawaiana",
+  );
+  assert.deepEqual(agruparCondicion(["m1_ame", "m1_haw"], INDICE), [
+    { atributo: "Mitad 1 F", valores: ["Americana", "Hawaiana"] },
+  ]);
+});
+
+test("un valor retirado sigue teniendo nombre", () => {
+  // Retirar un valor lo desactiva, no lo borra (ADR-058 §5), y una receta
+  // que lo nombra tiene que seguir diciendo a qué apunta.
+  assert.equal(condicionLegible(["m1_ret"], INDICE), "Mitad 1 F: Retirada");
+});
+
+test("un valor huérfano se muestra, no se traga", () => {
+  // Es la lectura conservadora de ADR-056 §3 vuelta visible: una condición
+  // rota tiene que verse rota, no vacía — vacía se lee "aplica siempre",
+  // que es justo lo contrario de lo que el servidor va a hacer.
+  const texto = condicionLegible(["fantasma"], INDICE);
+  assert.match(texto, /fantasma/);
+  assert.notEqual(texto, "Siempre");
+});
+
+test("el nodo de un valor abre la receta del tamaño, condicionada", () => {
+  // Un sabor no tiene receta propia: sus insumos son líneas condicionadas de
+  // la receta del plato. Sin esto el panel decía "no tiene receta todavía".
+  const { nodos } = grafo({ atributos: ATRIBUTOS });
+  const americana = nodos.find((n) => n.datos.refId === "m1_ame");
+  assert.ok(americana);
+  assert.equal(americana.tipo, "valor");
+  assert.equal(americana.datos.recetaId, "r-fam");
+  assert.equal(americana.datos.ptavId, "m1_ame");
+  assert.equal(americana.datos.condicionNombre, "Mitad 1 F: Americana");
+});
+
+
+test("atributoDeValores mapea PTAV al id del atributo, no al nombre", () => {
+  const indice = atributoDeValores(ATRIBUTOS);
+  assert.equal(indice.get("m1_ame"), "a1");
+  assert.equal(indice.get("m2_pep"), "a2");
+  assert.equal(indice.get("no-existe"), undefined);
+});

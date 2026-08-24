@@ -183,6 +183,12 @@ export type NodoLienzo = {
     refId?: string;
     recetaId?: string | null;
     grupoId?: string | null;
+    /** El `producto_atributo_valor` que este nodo representa. Solo en nodos
+     * `valor`: es la condición que el editor de receta va a poner en las
+     * líneas que se agreguen desde acá (RN-COM-037). */
+    ptavId?: string | null;
+    /** "Mitad 1 F: Americana" — cómo se llama esa condición. */
+    condicionNombre?: string;
     columna: string;
   };
 };
@@ -387,6 +393,13 @@ function columnaDeAtributo(
         ? `${v.nombre} — no se puede con lo ya elegido`
         : undefined,
       refId: v.id,
+      // La receta del **tamaño activo**: un valor no tiene receta propia,
+      // sus insumos son líneas condicionadas de la receta del plato
+      // (ADR-056). Sin esto el panel decía "no tiene receta todavía", que
+      // es falso.
+      recetaId: activo.receta_id,
+      ptavId: v.id,
+      condicionNombre: `${linea.nombre}: ${v.nombre}`,
       grupoId: linea.linea_id,
       columna: linea.nombre,
     },
@@ -424,6 +437,75 @@ function columnaDeAtributo(
     clase: "posible",
   });
   return { nodos, aristas };
+}
+
+/**
+ * PTAV → el atributo y el valor que nombra, para poder leer una condición.
+ *
+ * Se arma sobre **todos** los valores, sin filtrar `activo`: retirar un valor
+ * lo desactiva pero no lo borra (ADR-058 §5), y una línea de receta que lo
+ * nombra tiene que seguir diciendo a qué apunta. El filtro `v.activo` de
+ * `columnaDeAtributo` es para dibujar columnas, no para nombrar.
+ */
+export function indiceDeValores(
+  atributos: LineaDeAtributo[],
+): Map<string, { atributo: string; valor: string }> {
+  const indice = new Map<string, { atributo: string; valor: string }>();
+  for (const linea of atributos) {
+    for (const v of linea.valores) {
+      indice.set(v.id, { atributo: linea.nombre, valor: v.nombre });
+    }
+  }
+  return indice;
+}
+
+/**
+ * La condición agrupada **por atributo**, que es como se lee (RN-COM-037):
+ * entre grupos es Y, dentro de un grupo es O.
+ *
+ * Un valor que el índice no conoce forma su propio grupo y **se muestra
+ * igual**, no se descarta: es la misma lectura conservadora que hace
+ * `aplica_a_variante` en el servidor (ADR-056 §3), acá vuelta visible — una
+ * condición rota tiene que verse rota, no vacía.
+ */
+/**
+ * PTAV → id del atributo que lo declara. Es el `atributo_de` que
+ * `aplica_a_variante` recibe en el servidor (`inventory/domain/rules.py`):
+ * agrupar por **id** y no por nombre evita que dos atributos con el mismo
+ * nombre en dos productos distintos se confundan al agrupar la condición.
+ */
+export function atributoDeValores(
+  atributos: LineaDeAtributo[],
+): Map<string, string> {
+  const indice = new Map<string, string>();
+  for (const linea of atributos) {
+    for (const v of linea.valores) indice.set(v.id, linea.atributo_id);
+  }
+  return indice;
+}
+
+export function agruparCondicion(
+  aplicaValores: readonly string[] | null | undefined,
+  indice: Map<string, { atributo: string; valor: string }>,
+): { atributo: string; valores: string[] }[] {
+  const grupos = new Map<string, string[]>();
+  for (const id of aplicaValores ?? []) {
+    const conocido = indice.get(id);
+    const clave = conocido?.atributo ?? "?";
+    const nombre = conocido?.valor ?? id;
+    grupos.set(clave, [...(grupos.get(clave) ?? []), nombre]);
+  }
+  return [...grupos].map(([atributo, valores]) => ({ atributo, valores }));
+}
+
+/** "Siempre" · "Mitad 1 F: Americana, Hawaiana · Mitad 2 F: Peperoni". */
+export function condicionLegible(
+  aplicaValores: readonly string[] | null | undefined,
+  indice: Map<string, { atributo: string; valor: string }>,
+): string {
+  const grupos = agruparCondicion(aplicaValores, indice);
+  if (grupos.length === 0) return "Siempre";
+  return grupos.map((g) => `${g.atributo}: ${g.valores.join(", ")}`).join(" · ");
 }
 
 /** Lo que el pie del nodo de atributo dice sin jerga. */

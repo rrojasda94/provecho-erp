@@ -9,6 +9,7 @@ import {
   copiar,
   costo,
   escribir,
+  firmaDeCondicion,
   haySinGuardar,
   leerPegado,
   pegar,
@@ -84,6 +85,16 @@ const GRILLA: Grilla = {
 test("la clave no depende del orden de la condición", () => {
   assert.equal(clave("r", "a", ["x", "y"]), clave("r", "a", ["y", "x"]));
   assert.notEqual(clave("r", "a", ["x"]), clave("r", "a", ["x", "y"]));
+});
+
+test("la firma de una condición es la de un conjunto", () => {
+  // La misma definición que `_condicion_normalizada` del servidor: el lienzo
+  // la usa para saber si dos líneas chocarían antes de mandar el PATCH.
+  assert.equal(firmaDeCondicion(["y", "x"]), firmaDeCondicion(["x", "y"]));
+  assert.notEqual(firmaDeCondicion(["x"]), firmaDeCondicion(["x", "y"]));
+  // Sin condición, vacío y nulo son lo mismo — como NULL y [] en la columna.
+  assert.equal(firmaDeCondicion([]), firmaDeCondicion(null));
+  assert.equal(firmaDeCondicion(undefined), "");
 });
 
 test("se muestra lo tecleado, no el resultado", () => {

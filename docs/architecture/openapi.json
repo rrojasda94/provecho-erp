@@ -19597,6 +19597,15 @@
       "RecetaItemCreate": {
         "description": "`cantidad` o `expresion`, no ambas obligatorias: si viene la\noperación (\"1000/3\"), el servidor la evalúa y el número que mande el\ncliente se ignora.",
         "properties": {
+          "aplica_valores": {
+            "default": [],
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Aplica Valores",
+            "type": "array"
+          },
           "articulo_id": {
             "format": "uuid",
             "title": "Articulo Id",
@@ -19643,6 +19652,23 @@
             ],
             "default": "0",
             "title": "Merma Pct"
+          },
+          "orden": {
+            "default": 0,
+            "title": "Orden",
+            "type": "integer"
+          },
+          "unidad_medida_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unidad Medida Id"
           }
         },
         "required": [
@@ -19653,6 +19679,13 @@
       },
       "RecetaItemOut": {
         "properties": {
+          "aplica_valores": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Aplica Valores",
+            "type": "array"
+          },
           "articulo_id": {
             "format": "uuid",
             "title": "Articulo Id",
@@ -19722,6 +19755,7 @@
           "cantidad",
           "expresion",
           "merma_pct",
+          "aplica_valores",
           "costo_unitario",
           "costo_linea"
         ],
@@ -19729,7 +19763,23 @@
         "type": "object"
       },
       "RecetaItemUpdate": {
+        "description": "`aplica_valores` tiene tres estados y los tres importan: ausente (o\n`null`) no toca la condición, `[]` la **borra** —la línea vuelve a\naplicar siempre— y una lista la reemplaza entera.\n\nEs una convención local y no `exclude_unset=True` en el router: eso\ncambiaría de golpe la semántica de los otros cuatro campos, que hoy\ntratan `None` como \"no tocar\", para resolver un solo caso.",
         "properties": {
+          "aplica_valores": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Aplica Valores"
+          },
           "cantidad": {
             "anyOf": [
               {
@@ -19773,6 +19823,18 @@
               }
             ],
             "title": "Merma Pct"
+          },
+          "unidad_medida_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unidad Medida Id"
           }
         },
         "title": "RecetaItemUpdate",

@@ -46,6 +46,10 @@ export type RecetaItem = {
   cantidad: string;
   expresion: string | null;
   merma_pct: string;
+  /** A qué combinaciones aplica la línea: ids de `producto_atributo_valor`
+   * (RN-COM-037). Vacío = aplica siempre. El servidor siempre manda lista,
+   * nunca `null`. */
+  aplica_valores: string[];
   costo_unitario: string;
   costo_linea: string;
 };
@@ -400,7 +404,10 @@ export const catalogoApi = {
     }),
 
   /** `expresion` viaja cuando el usuario tecleó una operación; el servidor
-   * la evalúa y devuelve la cantidad ya redondeada a la UdM del insumo. */
+   * la evalúa y devuelve la cantidad ya redondeada a la UdM del insumo.
+   *
+   * `aplica_valores` condiciona la línea a ciertas combinaciones
+   * (RN-COM-037). Omitirlo o mandarlo vacío = la línea aplica siempre. */
   agregarItem: (
     recetaId: string,
     cuerpo: {
@@ -408,13 +415,22 @@ export const catalogoApi = {
       cantidad?: string | null;
       expresion?: string | null;
       merma_pct?: string;
+      aplica_valores?: string[];
     },
   ) => pedir<RecetaDetalle>(`/inventory/recetas/${recetaId}/items`, { metodo: "POST", cuerpo }),
 
+  /** `aplica_valores` distingue tres cosas: omitirlo no toca la condición,
+   * `[]` la borra —la línea vuelve a aplicar siempre— y una lista la
+   * reemplaza entera. */
   editarItem: (
     recetaId: string,
     itemId: string,
-    cuerpo: { cantidad?: string | null; expresion?: string | null; merma_pct?: string },
+    cuerpo: {
+      cantidad?: string | null;
+      expresion?: string | null;
+      merma_pct?: string;
+      aplica_valores?: string[];
+    },
   ) =>
     pedir<RecetaDetalle>(`/inventory/recetas/${recetaId}/items/${itemId}`, {
       metodo: "PATCH",

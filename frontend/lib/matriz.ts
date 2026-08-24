@@ -66,14 +66,27 @@ export type Modelo = {
   celdas: Map<string, Celda>;
 };
 
-/** La clave de una celda. La condición va ordenada: es un conjunto, y el
- * orden en que se listan sus valores no hace a la celda. */
+/**
+ * La firma de una condición: es un **conjunto**, así que el orden en que se
+ * listan sus valores no la cambia. Es lo mismo que `_condicion_normalizada`
+ * del servidor, y por eso vive acá una sola vez: el lienzo la usa para saber
+ * si dos líneas chocarían (y evitar el 409 antes de mandarlo) y la matriz
+ * para identificar la celda.
+ */
+export function firmaDeCondicion(
+  valores?: readonly string[] | null,
+): string {
+  return [...(valores ?? [])].sort().join("+");
+}
+
+/** La clave de una celda: `(receta, insumo, condición)`, que es lo que
+ * permite pegar un rectángulo desde Excel, que no trae ids. */
 export function clave(
   recetaId: string,
   articuloId: string,
   aplicaValores: string[] = [],
 ): string {
-  return [recetaId, articuloId, [...aplicaValores].sort().join("+")].join("|");
+  return [recetaId, articuloId, firmaDeCondicion(aplicaValores)].join("|");
 }
 
 /**

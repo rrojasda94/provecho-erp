@@ -525,9 +525,19 @@ lista y su pantalla pendiente:
   tamaño, una mirada). Vale la pena medir si sigue haciendo falta en el
   lienzo antes de escribirlo.
 
-Y uno de la matriz: **editar la condición de una celda**. `aplica_valores`
-viaja y se ve, pero se edita en el lienzo, que es donde los valores tienen
-nombre. Una columna de la grilla con dieciocho UUID no ayuda a nadie.
+Y uno de la matriz: **la grilla no muestra las líneas condicionadas**
+(amendado 2026-08-24). Editar la condición ya se puede, pero en el lienzo,
+que es donde los valores tienen nombre (enmienda de ADR-056) — una columna de
+la grilla con dieciocho UUID no ayuda a nadie.
+
+Debajo hay un segundo problema, y es el que se ve primero:
+`matriz-cliente.tsx` busca cada celda con `clave(receta.id, insumo.articulo_id)`
+**sin la condición**, mientras el servidor la identifica por
+`(receta, insumo, condición)`. Una línea condicionada cae en una clave que la
+grilla nunca consulta, así que con la mitad-y-mitad cargada esa columna se ve
+vacía. Arreglarlo pide decidir antes cómo se dibuja un insumo con tres
+condiciones en una sola fila (¿tres filas?, ¿una celda que se despliega?),
+que es una decisión de pantalla y no un bug de una línea.
 
 ## Lo que el alta de puntos de venta dejó afuera (2026-08-23, ADR-059)
 

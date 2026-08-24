@@ -23,6 +23,7 @@ Dos decisiones que se repiten en todo el archivo:
 
 import re
 import uuid
+from collections.abc import Sequence
 from decimal import Decimal
 
 from sqlalchemy.orm import Session
@@ -175,6 +176,10 @@ def detalle_receta(session: Session, receta_id: uuid.UUID) -> dict:
                 "cantidad": item.cantidad,
                 "expresion": item.expresion,
                 "merma_pct": item.merma_pct,
+                # Siempre lista, nunca NULL: el editor no tiene que
+                # distinguir "sin condición" de "no vino el campo", y es lo
+                # que ya devuelve la matriz (`MatrizCeldaOut`).
+                "aplica_valores": [str(v) for v in (item.aplica_valores or [])],
                 "costo_unitario": articulo.costo_promedio,
                 "costo_linea": costo_linea_valor,
             }
@@ -191,7 +196,7 @@ def agregar_item(
     expresion: str | None = None,
     merma_pct: Decimal = Decimal(0),
     unidad_medida_id: uuid.UUID | None = None,
-    aplica_valores: list[str] | None = None,
+    aplica_valores: Sequence[uuid.UUID | str] | None = None,
     orden: int = 0,
 ) -> RecetaItem:
     receta = _exigir(session, receta_id)
@@ -227,7 +232,9 @@ def agregar_item(
             expresion=texto,
             merma_pct=merma_pct,
             unidad_medida_id=udm_linea.id if udm_linea is not udm else None,
-            aplica_valores=list(aplica_valores) if aplica_valores else None,
+            # A texto acá y en ningún otro lado: la columna es JSONB y el
+            # esquema de la API valida `uuid.UUID`, que no es serializable.
+            aplica_valores=[str(v) for v in (aplica_valores or ())] or None,
             orden=orden,
         )
     )
@@ -262,9 +269,35 @@ def _udm_de_linea(
     return udm
 
 
-def _condicion_normalizada(valores: list[str] | None) -> frozenset[str]:
+def _condicion_normalizada(
+    valores: Sequence[uuid.UUID | str] | None,
+) -> frozenset[str]:
     """El orden en que se listan los valores no hace a la condición."""
     return frozenset(str(v) for v in (valores or []))
+
+
+def _cambiar_condicion(
+    repo: RecetaRepo,
+    item: RecetaItem,
+    articulo: Articulo,
+    aplica_valores: Sequence[uuid.UUID | str],
+) -> None:
+    """El mismo 409 que `agregar_item`: dos líneas del mismo insumo con la
+    misma condición son la línea duplicada de siempre. Se saltea cuando la
+    condición no cambió, para que reafirmarla siga siendo idempotente."""
+    condicion = _condicion_normalizada(aplica_valores)
+    if condicion == _condicion_normalizada(item.aplica_valores):
+        return
+    if any(
+        otro.id != item.id
+        and otro.articulo_id == item.articulo_id
+        and _condicion_normalizada(otro.aplica_valores) == condicion
+        for otro in repo.items(item.receta_id)
+    ):
+        raise Conflicto(
+            f"'{articulo.nombre}' ya está en la receta con esa misma condición"
+        )
+    item.aplica_valores = [str(v) for v in aplica_valores] or None
 
 
 def editar_item(
@@ -275,11 +308,19 @@ def editar_item(
     expresion: str | None = None,
     merma_pct: Decimal | None = None,
     unidad_medida_id: uuid.UUID | None = None,
+    aplica_valores: Sequence[uuid.UUID | str] | None = None,
 ) -> RecetaItem:
-    item = RecetaRepo(session).get_item(item_id)
+    """`aplica_valores` distingue tres cosas: `None` es "no se mandó" y no
+    toca nada; `[]` **borra** la condición y la línea vuelve a aplicar
+    siempre; una lista la reemplaza entera. No hay "agregar un valor" porque
+    la condición es un conjunto, igual que en la matriz (ADR-056 §1)."""
+    repo = RecetaRepo(session)
+    item = repo.get_item(item_id)
     if item is None:
         raise NoEncontrado("ítem de receta no encontrado")
     articulo, udm_articulo = _articulo_y_udm(session, item.articulo_id)
+    if aplica_valores is not None:
+        _cambiar_condicion(repo, item, articulo, aplica_valores)
     if unidad_medida_id is not None:
         udm = _udm_de_linea(session, unidad_medida_id, articulo, udm_articulo)
         item.unidad_medida_id = udm.id if udm is not udm_articulo else None
@@ -335,6 +376,12 @@ def duplicar_receta(session: Session, receta_id: uuid.UUID) -> Receta:
                 cantidad=item.cantidad,
                 expresion=item.expresion,
                 merma_pct=item.merma_pct,
+                # La condición viaja con la línea: una copia sin ella
+                # descontaría **todos** los insumos de todas las mitades,
+                # siempre, y nadie lo vería hasta cuadrar el mes (ADR-056).
+                unidad_medida_id=item.unidad_medida_id,
+                aplica_valores=list(item.aplica_valores or ()) or None,
+                orden=item.orden,
             )
         )
     return copia

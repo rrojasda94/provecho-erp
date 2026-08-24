@@ -236,7 +236,7 @@ def _aplicar(session: Session, celda: dict, recetas: dict, existentes: dict) -> 
             expresion=expresion,
             merma_pct=merma,
             unidad_medida_id=uuid.UUID(str(unidad)) if unidad else None,
-            aplica_valores=[str(v) for v in condicion] or None,
+            aplica_valores=condicion or None,
             orden=int(celda.get("orden") or 0),
         )
         existentes[clave] = nuevo

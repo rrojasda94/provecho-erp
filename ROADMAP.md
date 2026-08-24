@@ -79,6 +79,7 @@ productos con 361 recetas.
 | F4 | Matriz de recetas (ADR-057) | ✅ 2026-08-23 |
 | F5 | Lienzo sobre el modelo de atributos (ADR-058) | ✅ 2026-08-23 |
 | F6 | Seeder desde los `.xlsx` reales, corte 0.7.0 | ⏳ |
+| F7 | La condición de una línea se lee y se edita en el lienzo | ✅ 2026-08-24 |
 
 **Vuelta atrás**: la migración es solo aditiva, así que la imagen 0.6.0 corre
 contra este esquema sin enterarse. Volver a operar es

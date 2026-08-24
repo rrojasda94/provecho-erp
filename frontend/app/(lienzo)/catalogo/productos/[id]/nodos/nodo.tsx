@@ -24,6 +24,12 @@ export type DatosNodo = {
   activo: boolean;
   columna: string;
   recetaId?: string | null;
+  /** El `producto_atributo_valor` del nodo, si es un `valor`: con él, el
+   * editor abre las líneas condicionadas a ese sabor y agrega las nuevas ya
+   * condicionadas. */
+  ptavId?: string | null;
+  /** "Mitad 1 F: Americana" — el nombre de esa condición. */
+  condicionNombre?: string;
   /** Total del plato armado, **ya formateado** — solo lo usa el nodo
    * `plato`. Llega hecho para que el nodo no vuelva a formatear un texto
    * que ya lo estaba. */
