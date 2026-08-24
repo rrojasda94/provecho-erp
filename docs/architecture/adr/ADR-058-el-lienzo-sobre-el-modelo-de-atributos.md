@@ -119,6 +119,10 @@ líneas de receta que lo usan como condición.
   `NodoTarjeta`.
 - `ProductoOut` gana `lienzo_pos`, y `ProductoUpdate` lo acepta.
 - El árbol devuelve `variantes_detalle`: es lo que antes eran N peticiones.
+- El nodo de un **valor** abre las líneas de receta condicionadas a él, y las
+  que se agreguen desde ahí nacen con esa condición puesta (enmienda de
+  ADR-056, 2026-08-24). Un sabor no tiene receta propia: sus insumos son
+  líneas de la receta del tamaño, así que el nodo apunta a esa.
 - Queda pendiente: crear un atributo **desde** el lienzo (hoy la API existe y
   la pantalla todavía no tiene el popover), materializar combinaciones, y
   multi-selección para "aplicar a todos los tamaños". Ver Deuda técnica.

@@ -232,6 +232,147 @@ def test_duplicar_agrega_copy_y_clona_las_lineas(env):
     assert tercera.json()["nombre"] == "Pizza Personal (copy) 3"
 
 
+# --- La condición de una línea, por la API de la receta (ADR-056) -----------
+# Los ids son PTAV de `sales`: `inventory` no los valida contra su ORM (es
+# deuda conocida), así que acá alcanza con que sean UUID bien formados. Los
+# nombres siguen el archivo real: "m1_ame" se lee "Mitad 1: Americana".
+M1_AME = str(uuid.uuid4())
+M1_HAW = str(uuid.uuid4())
+M2_AME = str(uuid.uuid4())
+
+
+def _item(client, h, receta_id, articulo_id, **extra):
+    r = client.post(f"/api/v1/inventory/recetas/{receta_id}/items", headers=h, json={
+        "articulo_id": articulo_id, "cantidad": "10", **extra,
+    })
+    return r
+
+
+def test_el_detalle_devuelve_la_condicion_de_cada_linea(env):
+    """Sin esto el editor no puede decir a qué mitad va cada línea, que es
+    todo el problema de la pizza mitad-y-mitad."""
+    client, ids = env
+    h = _token(client)
+    receta_id = _receta(client, h, ids, nombre="Pizza MitadxMitad Familiar")
+    assert _item(client, h, receta_id, ids["queso_id"]).status_code == 201
+    assert _item(
+        client, h, receta_id, ids["masa_id"], aplica_valores=[M1_AME, M1_HAW]
+    ).status_code == 201
+
+    r = client.get(f"/api/v1/inventory/recetas/{receta_id}", headers=h)
+    assert r.status_code == 200, r.text
+    por_articulo = {i["articulo_id"]: i for i in r.json()["items"]}
+    # Lista vacía y no `null`: el editor no distingue dos formas de "sin
+    # condición".
+    assert por_articulo[ids["queso_id"]]["aplica_valores"] == []
+    assert sorted(por_articulo[ids["masa_id"]]["aplica_valores"]) == sorted(
+        [M1_AME, M1_HAW]
+    )
+
+
+def test_el_mismo_insumo_dos_veces_con_condiciones_distintas_entra(env):
+    """La razón de ser de todo esto: el jamón en la Mitad 1 y en la Mitad 2
+    son dos líneas de la misma receta, no dos recetas."""
+    client, ids = env
+    h = _token(client)
+    receta_id = _receta(client, h, ids, nombre="Pizza MitadxMitad Familiar")
+    assert _item(
+        client, h, receta_id, ids["queso_id"], aplica_valores=[M1_AME]
+    ).status_code == 201
+    r = _item(client, h, receta_id, ids["queso_id"], aplica_valores=[M2_AME])
+    assert r.status_code == 201, r.text
+    assert len(r.json()["items"]) == 2
+
+
+def test_el_mismo_insumo_con_la_misma_condicion_es_conflicto(env):
+    client, ids = env
+    h = _token(client)
+    receta_id = _receta(client, h, ids)
+    assert _item(
+        client, h, receta_id, ids["queso_id"], aplica_valores=[M1_AME]
+    ).status_code == 201
+    # El orden no hace a la condición: es un conjunto.
+    r = _item(client, h, receta_id, ids["queso_id"], aplica_valores=[M1_AME])
+    assert r.status_code == 409, r.text
+
+
+def test_editar_cambia_la_condicion_y_la_lista_vacia_la_borra(env):
+    """Los tres estados en una prueba, que es donde vive la decisión:
+    ausente no toca, lista reemplaza, `[]` borra."""
+    client, ids = env
+    h = _token(client)
+    receta_id = _receta(client, h, ids)
+    item_id = _item(
+        client, h, receta_id, ids["queso_id"], aplica_valores=[M1_AME]
+    ).json()["items"][0]["id"]
+    ruta = f"/api/v1/inventory/recetas/{receta_id}/items/{item_id}"
+
+    r = client.patch(ruta, headers=h, json={"aplica_valores": [M2_AME]})
+    assert r.status_code == 200, r.text
+    assert r.json()["items"][0]["aplica_valores"] == [M2_AME]
+
+    # Editar otra cosa no puede borrar la condición de rebote.
+    r = client.patch(ruta, headers=h, json={"expresion": "20"})
+    assert r.json()["items"][0]["aplica_valores"] == [M2_AME]
+
+    r = client.patch(ruta, headers=h, json={"aplica_valores": []})
+    assert r.status_code == 200, r.text
+    assert r.json()["items"][0]["aplica_valores"] == []
+
+
+def test_reafirmar_la_misma_condicion_no_es_conflicto(env):
+    """El PATCH tiene que ser idempotente: sin esta prueba, el filtro que
+    excluye la propia línea del chequeo se borra en un refactor y nadie se
+    entera hasta que un usuario no puede guardar."""
+    client, ids = env
+    h = _token(client)
+    receta_id = _receta(client, h, ids)
+    item_id = _item(
+        client, h, receta_id, ids["queso_id"], aplica_valores=[M1_AME, M1_HAW]
+    ).json()["items"][0]["id"]
+
+    r = client.patch(
+        f"/api/v1/inventory/recetas/{receta_id}/items/{item_id}",
+        headers=h,
+        json={"aplica_valores": [M1_HAW, M1_AME]},
+    )
+    assert r.status_code == 200, r.text
+
+
+def test_cambiar_a_una_condicion_ya_tomada_es_conflicto(env):
+    client, ids = env
+    h = _token(client)
+    receta_id = _receta(client, h, ids)
+    _item(client, h, receta_id, ids["queso_id"], aplica_valores=[M1_AME])
+    segunda = _item(
+        client, h, receta_id, ids["queso_id"], aplica_valores=[M2_AME]
+    ).json()["items"]
+    item_id = [i["id"] for i in segunda if i["aplica_valores"] == [M2_AME]][0]
+
+    r = client.patch(
+        f"/api/v1/inventory/recetas/{receta_id}/items/{item_id}",
+        headers=h,
+        json={"aplica_valores": [M1_AME]},
+    )
+    assert r.status_code == 409, r.text
+
+
+def test_duplicar_conserva_la_condicion_de_cada_linea(env):
+    """Una copia sin condición descuenta todos los insumos de todas las
+    mitades, siempre, y nadie lo ve hasta cuadrar el mes."""
+    client, ids = env
+    h = _token(client)
+    receta_id = _receta(client, h, ids, nombre="Pizza MitadxMitad Familiar")
+    _item(client, h, receta_id, ids["queso_id"], aplica_valores=[M1_AME])
+    _item(client, h, receta_id, ids["masa_id"])
+
+    r = client.post(f"/api/v1/inventory/recetas/{receta_id}/duplicar", headers=h)
+    assert r.status_code == 201, r.text
+    copiadas = {i["articulo_id"]: i["aplica_valores"] for i in r.json()["items"]}
+    assert copiadas[ids["queso_id"]] == [M1_AME]
+    assert copiadas[ids["masa_id"]] == []
+
+
 def test_nombre_de_articulo_y_categoria_tambien_van_en_formato_titulo(env):
     client, ids = env
     h = _token(client)

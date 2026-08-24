@@ -92,6 +92,36 @@ orden y "matriz" entraría como un `receta_id` que no es UUID.
 `editar_item` acepta `unidad_medida_id` y redondea con los decimales de **la
 unidad de la línea**, no con los del artículo.
 
+## Estado (slice 12 — la condición se lee y se escribe, 2026-08-24)
+
+Enmienda a ADR-056. La columna existía desde el slice 10 y movía stock, pero
+**la API de la receta no la exponía**: solo la matriz la tocaba, y la matriz
+muestra UUID. Con el catálogo real cargado, el lienzo listaba las 26 líneas
+de la mitad-y-mitad en plano, sin decir de qué mitad era cada una.
+
+`GET /inventory/recetas/{id}` devuelve `aplica_valores` por línea: **lista de
+texto y siempre lista, nunca `null`** — el editor no distingue dos formas de
+"sin condición". Es lo que ya devolvía `MatrizCeldaOut`.
+
+`POST /recetas/{id}/items` acepta `aplica_valores`, y también
+`unidad_medida_id` y `orden`, que `agregar_item` recibía desde ADR-056 y
+ningún cliente podía usar. Se valida `uuid.UUID` (como `CeldaIn`) y el paso a
+texto vive en un solo lugar, `agregar_item`.
+
+`PATCH .../items/{id}` acepta `aplica_valores` con **tres estados**: ausente
+o `null` no toca la condición, `[]` la borra —la línea vuelve a aplicar
+siempre— y una lista la reemplaza entera. Sin distinguir "no lo edito" de
+"lo limpio", cambiar un gramaje borraría la condición de rebote.
+
+Cambiarla tiene el **mismo 409** que crearla: el mismo insumo con la misma
+condición es la línea duplicada de siempre. Se saltea el chequeo si la
+condición no cambió y se excluye la propia línea, para que reafirmarla sea
+idempotente.
+
+`duplicar_receta` **conserva** condición, unidad y orden. Antes los perdía:
+duplicar la mitad-y-mitad daba 26 líneas sin condición, o sea una receta que
+descuenta todos los insumos de todas las mitades, siempre.
+
 ## Casos de uso
 
 - CRUD de artículos y categorías.

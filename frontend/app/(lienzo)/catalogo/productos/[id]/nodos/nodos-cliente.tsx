@@ -33,7 +33,9 @@ import {
   armarPartes,
   elegidosDelCamino,
   elegirEnGrupo,
+  atributoDeValores,
   faltantesDeGrupos,
+  indiceDeValores,
   recetasDelLienzo,
   resolverEmpaque,
   sinVincular,
@@ -178,6 +180,14 @@ function Lienzo({
     () => elegidosDelCamino(activo, camino.elegidas, camino.sueltos),
     [activo, camino.elegidas, camino.sueltos],
   );
+  // Los nombres de los valores, para leer y editar la condición de una línea
+  // de receta. Se arma una vez: son las mismas líneas del árbol en cada
+  // repintado del panel.
+  const indiceValores = useMemo(() => indiceDeValores(atributos), [atributos]);
+  const atributoDePorValor = useMemo(
+    () => atributoDeValores(atributos),
+    [atributos],
+  );
   const inspeccionada = seleccion?.recetaId ?? null;
   const idsDeRecetas = useMemo(
     () => recetasDelLienzo(activo, elegidos, inspeccionada),
@@ -190,8 +200,8 @@ function Lienzo({
     [activo, padre.nombre, elegidos, cache],
   );
   const fusion = useMemo(
-    () => fusionar(partes, camino.restas),
-    [partes, camino.restas],
+    () => fusionar(partes, camino.restas, camino.valores, atributoDePorValor),
+    [partes, camino.restas, camino.valores, atributoDePorValor],
   );
 
   const { empaque, aplica: empaqueAplica, costo: costoEmpaque } =
@@ -338,6 +348,8 @@ function Lienzo({
             seleccion={seleccion}
             cache={cache}
             articulos={empaques}
+            atributos={atributos}
+            indice={indiceValores}
             onActualizada={setCache}
             onError={setError}
           />
@@ -353,12 +365,16 @@ function EditorDeNodo({
   seleccion,
   cache,
   articulos,
+  atributos,
+  indice,
   onActualizada,
   onError,
 }: {
   seleccion: DatosNodo | null;
   cache: Record<string, RecetaDetalle>;
   articulos: Articulo[];
+  atributos: LineaDeAtributo[];
+  indice: Map<string, { atributo: string; valor: string }>;
   onActualizada: React.Dispatch<
     React.SetStateAction<Record<string, RecetaDetalle>>
   >;
@@ -370,6 +386,13 @@ function EditorDeNodo({
       titulo={seleccion.titulo}
       receta={seleccion.recetaId ? (cache[seleccion.recetaId] ?? null) : null}
       articulos={articulos}
+      atributos={atributos}
+      indice={indice}
+      condicion={
+        seleccion.ptavId
+          ? { ptavId: seleccion.ptavId, nombre: seleccion.condicionNombre ?? seleccion.titulo }
+          : null
+      }
       onActualizada={(r) => onActualizada((p) => ({ ...p, [r.id]: r }))}
       onError={onError}
     />

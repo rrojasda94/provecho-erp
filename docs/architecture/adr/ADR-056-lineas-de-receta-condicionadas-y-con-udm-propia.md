@@ -217,3 +217,127 @@ nadie pidió.
 **Esto NO revierte la regla de §2.** El motor sigue siendo el de Odoo, y una
 condición que nombra dos atributos sigue exigiendo los dos. Lo que cambió es
 el **dato**, que es donde estaba el error.
+
+## Enmienda (2026-08-24) — la condición se lee, se escribe y se llama por su nombre
+
+ADR-056 puso la condición en el modelo y la hizo mover stock. Le faltaba la
+otra mitad: **por la API de la receta no se podía ni ver ni escribir**. Solo
+la matriz (ADR-057) la tocaba, y la matriz muestra UUID.
+
+El síntoma se vio con el catálogo real cargado: el lienzo de
+`Pizza MitadxMitad Familiar` listaba las 26 líneas en plano —`Salame Picado`
+tres veces, sin decir de qué mitad era cada una— y el nodo `Americana F`
+respondía *"no tiene receta todavía"*, que es falso: sus insumos son líneas
+condicionadas de la receta del tamaño.
+
+### 1. El contrato: `list[str]` a la salida, `list[uuid.UUID]` a la entrada
+
+`RecetaItemOut.aplica_valores` sale como lista de texto y **siempre lista,
+nunca `null`** — el editor no tiene que distinguir dos formas de "sin
+condición". Es lo que ya hacía `MatrizCeldaOut`, y las dos pantallas leen lo
+mismo.
+
+A la entrada se valida `uuid.UUID`, como `CeldaIn`: un id mal formado no
+tiene por qué llegar al JSONB. La conversión a texto vive en **un solo
+lugar**, `agregar_item`, igual que hay un solo lector (`_condicion_normalizada`).
+
+`RecetaItemCreate` gana además `unidad_medida_id` y `orden`, que
+`agregar_item` aceptaba desde este mismo ADR y que ningún cliente podía usar.
+
+### 2. `None` = no se mandó; `[]` = borrar la condición
+
+Los tres estados de `RecetaItemUpdate.aplica_valores` y por qué hacen falta
+los tres: sin distinguir "no lo edito" de "lo limpio", cambiar el gramaje de
+una línea le borraría la condición de rebote.
+
+> Alternativa descartada: `model_dump(exclude_unset=True)` en el router. Es
+> más correcto en general y no rompe nada, pero cambia de golpe la semántica
+> de los otros cuatro campos —que hoy tratan `None` como "no tocar"— para
+> resolver un solo caso. La convención queda local y documentada en el
+> esquema, y es la misma que ya vive en la columna: `NULL ≡ []`.
+
+### 3. Cambiar la condición tiene el mismo 409 que crearla
+
+Dos líneas del mismo insumo con la misma condición son la línea duplicada de
+siempre, se llegue por `POST` o por `PATCH`. Con dos guardas: se saltea el
+chequeo si la condición no cambió, y se excluye la propia línea. Sin eso,
+reafirmar la condición actual devolvería 409 y el editor no podría guardar
+dos veces seguidas.
+
+### 4. `duplicar_receta` copiaba las líneas sin su condición
+
+Bug encontrado al escribir esto, no reportado: la copia se llevaba
+`articulo_id`, `cantidad`, `expresion` y `merma_pct`, y dejaba afuera
+`unidad_medida_id`, `aplica_valores` y `orden`. Duplicar la mitad-y-mitad
+daba 26 líneas **sin condición** — una receta que descuenta todos los
+insumos de todas las mitades, siempre, sin que nada lo diga hasta cuadrar el
+mes. Entró acá porque el error es de este ADR y son tres campos.
+
+### 5. El nodo de un valor abre la receta del tamaño, filtrada
+
+`columnaDeAtributo` pone `recetaId` (el del tamaño activo), `ptavId` y
+`condicionNombre` en el nodo `valor`. Tocar `Americana F` muestra las líneas
+que la nombran y `+ insumo` crea las nuevas ya condicionadas a ella.
+
+**Pertenencia y no igualdad de conjunto**: la línea del jamón dice
+"Mitad 1 ∈ {Americana, Hawaiana}" y tiene que salir igual al pedir la
+Americana. Es la vista de "qué pone este sabor", no la decisión de si la
+línea aplica al plato — eso lo sigue calculando el servidor.
+
+Consecuencia aceptada: con `recetaId` puesto, el nodo de valor muestra su
+enlace a la receta, apuntando a la del tamaño. Es correcto —ahí viven esas
+líneas— y es lo que hace que tocarlo abra el editor sin una segunda rama.
+
+### 6. El chip: `<details>` con casillas, y se guarda con "Aplicar"
+
+Un `<select multiple>` con dieciocho opciones sin agrupar por atributo no se
+puede leer, y agruparlo pide `<optgroup>` más `Ctrl+click`, que nadie
+descubre. HTML plano, accesible por teclado, sin librería nueva — el mismo
+criterio de ADR-057 §1.
+
+**Un PATCH al aplicar y no uno por casilla**, aunque el resto del lienzo
+guarde en cada `onBlur`. Acá el estado intermedio puede ser inválido:
+destildar los cuatro sabores de una mitad para tildar otros cuatro pasa por
+"Siempre", y si ya existe una línea sin condición del mismo insumo el
+servidor devuelve 409 con la mitad del cambio hecho.
+
+### 7. El mismo insumo repetido dejó de estar bloqueado en el editor
+
+El filtro que ofrecía solo los insumos ausentes hacía imposible el caso que
+todo este ADR existe para resolver: el jamón en la Mitad 1 y en la Mitad 2
+son dos líneas de la misma receta. Ahora se filtra por
+`(insumo, condición)` —la misma identidad del 409 y de la celda de la
+matriz—, así que la opción desaparece del `<select>` solo cuando repetirla
+fallaría de verdad.
+
+### 8. `fusionar()` también aprendió la regla — segunda enmienda, mismo día
+
+La primera versión de este cambio dejaba `fusionar()` sumando las 26 líneas
+completas: la pestaña "Plato" mostraba un costo por encima del real, y el
+contraste con la pestaña del tamaño —que ya distinguía las mitades— lo hacía
+más visible que antes. Se cerró el mismo día.
+
+`nodos.aplicaAVariante` es un **puerto literal** de `aplica_a_variante`:
+mismo agrupado por atributo, mismo Y entre grupos y O dentro de cada uno,
+mismo tratamiento del valor huérfano (RN-COM-037). Es la duplicación que §5
+evitó en el backend, aceptada acá a propósito — la alternativa era que el
+servidor calculara el costo del camino elegido, y eso pedía un endpoint
+nuevo por cada clic en un sabor para un número que ya es una simulación
+(`nodos.ts` lo dice en su cabecera).
+
+`lienzo.atributoDeValores` mapea PTAV → `atributo_id` desde `arbol.atributos`,
+que ya estaba en memoria; `camino.valores` es lo mismo que viaja a la venta.
+No hay petición nueva.
+
+Con dos implementaciones de la misma regla, la prueba de cada una recorre los
+mismos casos —incluida la asimetría de media Americana + media Peperoni— para
+que un día que diverjan se note en la suite y no en una pantalla.
+
+### Lo que **no** entró, y por qué está anotado
+
+- **La matriz no muestra las líneas condicionadas**: busca la celda sin la
+  condición en la clave, así que caen en una clave que la grilla nunca
+  consulta.
+- **La ficha de receta suelta** (`/catalogo/recetas/[id]`) no cambió: no
+  sabe qué producto usa la receta, así que solo podría mostrar UUID — que es
+  lo que ADR-057 ya descartó para la matriz.

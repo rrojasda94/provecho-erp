@@ -432,3 +432,50 @@ receta mal armada sin avisar. Cuando se construya el editor de la condición
 (F4/F5) conviene validarla ahí, donde `sales` sí está a mano, y no en el
 camino del descuento.
 
+**Sigue abierta** (2026-08-24). El editor del lienzo ya existe (enmienda de
+ADR-056) y solo ofrece las casillas de los valores del producto abierto, con
+lo que el caso malo se reduce a un cliente que llame la API a mano o a una
+carga masiva. Pero el servidor sigue sin verificar nada: la validación tiene
+que vivir en `inventory/api`, contra el contrato público de `sales`.
+
+## ~~`fusionar()` sumaba las líneas condicionadas como si aplicaran siempre~~ — SALDADA 2026-08-24
+
+`frontend/lib/nodos.ts::fusionar` recorría `receta.items` sin mirar
+`aplica_valores`, así que la pestaña "Plato" del lienzo sumaba las 26 líneas
+de la mitad-y-mitad completas, mientras el servidor descontaba solo las que
+calificaban para los valores elegidos. El costo simulado quedaba por encima
+del real.
+
+**Cómo se saldó**: `nodos.aplicaAVariante` es un puerto literal de
+`inventory/domain/rules.aplica_a_variante` — mismo agrupado por atributo,
+mismo Y entre grupos y O dentro de cada uno, mismo tratamiento del valor
+huérfano. `fusionar` la usa para saltar la línea que no aplica antes de
+acumularla. El atributo de cada PTAV llega por `lienzo.atributoDeValores`
+(PTAV → `atributo_id`, construido desde `arbol.atributos`, ya en memoria) y
+`camino.valores` es lo mismo que ya viajaba a la venta — no hay petición
+nueva.
+
+Es la duplicación que ADR-056 §5 quería evitar, aceptada a propósito:
+la alternativa —que el servidor devuelva el costo del camino elegido— pedía
+un endpoint nuevo por cada cambio de selección, y acá el número es una
+simulación (`nodos.ts` lo declara en su cabecera), no lo que se cobra. Con
+dos implementaciones de la misma regla, `tests/test_receta_condicionada.py`
+(Python) y `lib/nodos.test.ts` (`aplicaAVariante`) prueban los mismos casos
+—incluida la asimetría de media Americana + media Peperoni— para que
+divergir sea visible en la suite antes que en una pantalla.
+
+## La ficha de receta suelta no muestra la condición (2026-08-24)
+
+`frontend/components/catalogo/receta-editor.tsx` (montado desde
+`/catalogo/recetas/[id]`) lista las líneas planas: con la mitad-y-mitad se
+ven veintiséis filas, varias del mismo insumo, sin decir por qué.
+
+No se cambió porque ese editor no tiene los nombres de los valores —está
+montado sobre una receta suelta, sin saber qué producto la usa— y mostrar
+dieciocho UUID es lo que ADR-057 ya descartó para la matriz. Si alguna vez se
+resuelve, va por el mismo dato que consume el lienzo
+(`GET /sales/productos/{id}/arbol`), no por un endpoint nuevo.
+
+Su bloqueo de insumo repetido (`yaUsados`) queda como está: sin poder poner
+condición, permitir repetir el insumo solo produciría un 409.
+

@@ -693,12 +693,30 @@ class RecetaItemCreate(BaseModel):
     cantidad: Decimal | None = None
     expresion: str | None = Field(default=None, max_length=60)
     merma_pct: Decimal = Field(default=Decimal(0), ge=0, lt=100)
+    # UdM propia de la línea: NULL = la del artículo (RN-UDM-005, ADR-056 §4).
+    unidad_medida_id: uuid.UUID | None = None
+    # A qué combinaciones aplica la línea (RN-COM-037). Vacío = a todas.
+    # `uuid.UUID` y no `str` por lo mismo que `CeldaIn`: todo input de
+    # cliente se valida, y un id mal formado no debe llegar al JSONB.
+    aplica_valores: list[uuid.UUID] = []
+    orden: int = 0
 
 
 class RecetaItemUpdate(BaseModel):
+    """`aplica_valores` tiene tres estados y los tres importan: ausente (o
+    `null`) no toca la condición, `[]` la **borra** —la línea vuelve a
+    aplicar siempre— y una lista la reemplaza entera.
+
+    Es una convención local y no `exclude_unset=True` en el router: eso
+    cambiaría de golpe la semántica de los otros cuatro campos, que hoy
+    tratan `None` como "no tocar", para resolver un solo caso.
+    """
+
     cantidad: Decimal | None = None
     expresion: str | None = Field(default=None, max_length=60)
     merma_pct: Decimal | None = Field(default=None, ge=0, lt=100)
+    unidad_medida_id: uuid.UUID | None = None
+    aplica_valores: list[uuid.UUID] | None = None
 
 
 class RecetaEscalarIn(BaseModel):
@@ -715,6 +733,9 @@ class RecetaItemOut(BaseModel):
     cantidad: Decimal
     expresion: str | None
     merma_pct: Decimal
+    # Ids de `producto_atributo_valor`. Lista vacía = la línea aplica
+    # siempre; el editor no tiene que distinguir vacío de nulo.
+    aplica_valores: list[str]
     costo_unitario: Decimal
     costo_linea: Decimal
 
