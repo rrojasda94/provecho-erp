@@ -764,6 +764,15 @@ costo todavía **no** suma al total de la venta (ver deuda de `sales`).
   errores_sistema, clics_completar_pedido, satisfaccion, upsell,
   ticket_promedio; ambos: tasa_registro_clientes,
   venta_productos_promocionales, RN-CNV-002/003).
+  Se administra con `organizacion.gestionar` desde **Organización → Puntos de
+  venta**, no con un permiso de `sales` (ADR-059). **Sin `nombre`, `activo` ni
+  `deleted_at` a propósito**: una caja se rotula por sucursal y serie
+  (`"CH1 · B001"`, `puntos_venta_rotulados`), y la baja abre una pregunta de
+  negocio que todavía no se respondió (qué pasa con la serie liberada). La
+  unicidad de serie es **por empresa** (RN-CPP-007) y se alcanza por
+  `sucursal.empresa_id`: no hay UNIQUE en la tabla —`punto_venta` no tiene
+  `empresa_id` y la regla abarca las cuatro columnas de serie—, la valida el
+  caso de uso y el candado real es el de `comprobante`.
 - **central_pedidos**: nombre. Asociada a N marcas/sucursales/ciudades vía
   **central_pedidos_sucursal** (N:N). Canal de origen del pedido (`whatsapp`
   | `mensajeria` | `llamada` | `email`), agente_id (humano o `agente_ia`),

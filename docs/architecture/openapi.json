@@ -18720,11 +18720,123 @@
         "title": "PullOut",
         "type": "object"
       },
+      "PuntoVentaCreate": {
+        "description": "La caja de una sucursal. `serie_nc_*` son opcionales porque las cajas\nque ya existían no las tenían, pero sin ellas el ERP no emite notas de\ncrédito de ese tipo y lo dice (RN-CPP-009).\n\n`modalidades_habilitadas=None` significa las tres (RN-MDC-001); una lista\nvacía no es \"ninguna\", es un error — una caja que no atiende de ninguna\nforma no tiene para qué existir.",
+        "properties": {
+          "canal": {
+            "enum": [
+              "trabajador",
+              "web",
+              "kiosko"
+            ],
+            "title": "Canal",
+            "type": "string"
+          },
+          "hardware_id": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hardware Id"
+          },
+          "modalidades_habilitadas": {
+            "anyOf": [
+              {
+                "items": {
+                  "enum": [
+                    "mesa",
+                    "takeout",
+                    "delivery"
+                  ],
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modalidades Habilitadas"
+          },
+          "politica_pago": {
+            "enum": [
+              "adelantado",
+              "al_finalizar"
+            ],
+            "title": "Politica Pago",
+            "type": "string"
+          },
+          "serie_boleta": {
+            "maxLength": 10,
+            "title": "Serie Boleta",
+            "type": "string"
+          },
+          "serie_factura": {
+            "maxLength": 10,
+            "title": "Serie Factura",
+            "type": "string"
+          },
+          "serie_nc_boleta": {
+            "anyOf": [
+              {
+                "maxLength": 10,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Serie Nc Boleta"
+          },
+          "serie_nc_factura": {
+            "anyOf": [
+              {
+                "maxLength": 10,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Serie Nc Factura"
+          },
+          "sucursal_id": {
+            "format": "uuid",
+            "title": "Sucursal Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sucursal_id",
+          "canal",
+          "politica_pago",
+          "serie_boleta",
+          "serie_factura"
+        ],
+        "title": "PuntoVentaCreate",
+        "type": "object"
+      },
       "PuntoVentaOut": {
         "properties": {
           "canal": {
             "title": "Canal",
             "type": "string"
+          },
+          "hardware_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hardware Id"
           },
           "id": {
             "format": "uuid",
@@ -18755,6 +18867,28 @@
             "title": "Serie Factura",
             "type": "string"
           },
+          "serie_nc_boleta": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Serie Nc Boleta"
+          },
+          "serie_nc_factura": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Serie Nc Factura"
+          },
           "sucursal_id": {
             "format": "uuid",
             "title": "Sucursal Id",
@@ -18767,10 +18901,130 @@
           "canal",
           "serie_boleta",
           "serie_factura",
+          "serie_nc_boleta",
+          "serie_nc_factura",
+          "hardware_id",
           "modalidades_habilitadas",
           "politica_pago"
         ],
         "title": "PuntoVentaOut",
+        "type": "object"
+      },
+      "PuntoVentaUpdate": {
+        "description": "No lleva `sucursal_id`: la caja es del local donde se dio de alta, y\nsus comprobantes y aperturas cuelgan de ahí.",
+        "properties": {
+          "canal": {
+            "anyOf": [
+              {
+                "enum": [
+                  "trabajador",
+                  "web",
+                  "kiosko"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canal"
+          },
+          "hardware_id": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hardware Id"
+          },
+          "modalidades_habilitadas": {
+            "anyOf": [
+              {
+                "items": {
+                  "enum": [
+                    "mesa",
+                    "takeout",
+                    "delivery"
+                  ],
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modalidades Habilitadas"
+          },
+          "politica_pago": {
+            "anyOf": [
+              {
+                "enum": [
+                  "adelantado",
+                  "al_finalizar"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Politica Pago"
+          },
+          "serie_boleta": {
+            "anyOf": [
+              {
+                "maxLength": 10,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Serie Boleta"
+          },
+          "serie_factura": {
+            "anyOf": [
+              {
+                "maxLength": 10,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Serie Factura"
+          },
+          "serie_nc_boleta": {
+            "anyOf": [
+              {
+                "maxLength": 10,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Serie Nc Boleta"
+          },
+          "serie_nc_factura": {
+            "anyOf": [
+              {
+                "maxLength": 10,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Serie Nc Factura"
+          }
+        },
+        "title": "PuntoVentaUpdate",
         "type": "object"
       },
       "PushIn": {
@@ -25619,7 +25873,7 @@
   "info": {
     "description": "ERP modular para grupo de restaurantes multi-marca. Convenciones de la API: docs/engineering/api-guidelines.md.",
     "title": "Provecho ERP",
-    "version": "0.7.1"
+    "version": "0.7.2"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -44927,17 +45181,41 @@
     },
     "/api/v1/sales/puntos-venta": {
       "get": {
-        "description": "Las cajas de la sucursal. El PDV lo necesita al arrancar: sin saber\nqué punto de venta es, no puede abrir caja ni emitir con la serie\ncorrecta.",
+        "description": "Con `sucursal_id`, las cajas de esa sucursal: el PDV lo necesita al\narrancar, porque sin saber qué punto de venta es no puede abrir caja ni\nemitir con la serie correcta. Sin él, las de la empresa — que es lo que\npide la pantalla de administración.\n\nBasta con `sales.leer` **o** `organizacion.gestionar`: el cajero tiene el\nprimero y el administrador que da de alta las cajas puede no tener\nninguno de los permisos de venta.",
         "operationId": "listar_puntos_venta_api_v1_sales_puntos_venta_get",
         "parameters": [
           {
             "in": "query",
             "name": "sucursal_id",
-            "required": true,
+            "required": false,
             "schema": {
-              "format": "uuid",
-              "title": "Sucursal Id",
-              "type": "string"
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sucursal Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "empresa_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Empresa Id"
             }
           }
         ],
@@ -44975,6 +45253,112 @@
         "summary": "Listar Puntos Venta",
         "tags": [
           "sales"
+        ]
+      },
+      "post": {
+        "description": "Da de alta una caja. Antes esto solo existía en el seeder, así que una\nsucursal nueva no vendía hasta que alguien corriera un script contra la\nbase: el PDV arranca pidiendo el punto de venta y sin él se bloquea.",
+        "operationId": "crear_punto_venta_api_v1_sales_puntos_venta_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PuntoVentaCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PuntoVentaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Punto Venta",
+        "tags": [
+          "sales",
+          "organizacion"
+        ]
+      }
+    },
+    "/api/v1/sales/puntos-venta/{punto_venta_id}": {
+      "patch": {
+        "description": "Corregir una serie mal tecleada no reescribe lo ya emitido:\n`comprobante.serie` es una copia congelada al emitir.",
+        "operationId": "editar_punto_venta_api_v1_sales_puntos_venta__punto_venta_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "punto_venta_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Punto Venta Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PuntoVentaUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PuntoVentaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Editar Punto Venta",
+        "tags": [
+          "sales",
+          "organizacion"
         ]
       }
     },

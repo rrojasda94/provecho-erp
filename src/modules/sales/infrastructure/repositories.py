@@ -503,11 +503,51 @@ class PuntoVentaRepo:
     def get(self, punto_venta_id: uuid.UUID) -> PuntoVenta | None:
         return self.s.get(PuntoVenta, punto_venta_id)
 
+    def add(self, punto: PuntoVenta) -> PuntoVenta:
+        self.s.add(punto)
+        self.s.flush()
+        return punto
+
     def de_sucursal(self, sucursal_id: uuid.UUID) -> list[PuntoVenta]:
         return list(
             self.s.scalars(
                 select(PuntoVenta).where(PuntoVenta.sucursal_id == sucursal_id)
             )
+        )
+
+    def de_empresa(self, empresa_id: uuid.UUID | None = None) -> list[PuntoVenta]:
+        """`empresa_id=None` = sin filtro, para el superusuario sin empresa
+        asignada (`Tenant.filtro_empresa`)."""
+        stmt = select(PuntoVenta).join(Sucursal, Sucursal.id == PuntoVenta.sucursal_id)
+        if empresa_id is not None:
+            stmt = stmt.where(Sucursal.empresa_id == empresa_id)
+        return list(self.s.scalars(stmt.order_by(PuntoVenta.serie_boleta)))
+
+    def series_en_uso(
+        self, empresa_id: uuid.UUID, excluir_id: uuid.UUID | None = None
+    ) -> set[str]:
+        """Todas las series ocupadas por las cajas de la empresa, sin separar
+        boleta de factura ni de sus notas de crédito: el correlativo es único
+        por `(empresa, serie)` (RN-CPP-007/008), así que dos cajas que
+        compartan cualquiera de las cuatro chocarían al emitir.
+
+        `excluir_id` deja fuera la caja que se está editando — si no, guardar
+        una caja sin tocarle la serie se rechazaría contra sí misma.
+        """
+        stmt = select(
+            PuntoVenta.serie_boleta,
+            PuntoVenta.serie_factura,
+            PuntoVenta.serie_nc_boleta,
+            PuntoVenta.serie_nc_factura,
+        ).join(Sucursal, Sucursal.id == PuntoVenta.sucursal_id)
+        stmt = stmt.where(Sucursal.empresa_id == empresa_id)
+        if excluir_id is not None:
+            stmt = stmt.where(PuntoVenta.id != excluir_id)
+        return {serie for fila in self.s.execute(stmt) for serie in fila if serie}
+
+    def empresa_de_sucursal(self, sucursal_id: uuid.UUID) -> uuid.UUID | None:
+        return self.s.scalar(
+            select(Sucursal.empresa_id).where(Sucursal.id == sucursal_id)
         )
 
 

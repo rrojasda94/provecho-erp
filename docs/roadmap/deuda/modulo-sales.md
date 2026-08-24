@@ -529,3 +529,44 @@ Y uno de la matriz: **editar la condición de una celda**. `aplica_valores`
 viaja y se ve, pero se edita en el lienzo, que es donde los valores tienen
 nombre. Una columna de la grilla con dieciocho UUID no ayuda a nadie.
 
+## Lo que el alta de puntos de venta dejó afuera (2026-08-23, ADR-059)
+
+- ⬜ **La unicidad de serie por empresa no tiene constraint** (2026-08-23,
+  ADR-059): RN-CPP-007 se valida en `sales/application/puntos_venta.py` y no
+  en el esquema. `punto_venta` no tiene `empresa_id` —se alcanza por
+  `sucursal`— y la regla abarca cuatro columnas des-pivoteadas, así que un
+  UNIQUE real exige denormalizar la empresa o una tabla hija de series. El
+  candado que sí impide emitir un duplicado ya existe en el otro extremo:
+  `UNIQUE(comprobante.empresa_id, serie, correlativo)`. Lo que queda abierto
+  es que una escritura directa a la base meta una serie duplicada y nadie la
+  ataje hasta el momento de emitir.
+- ⬜ **Una caja no se puede dar de baja ni desactivar** (2026-08-23,
+  ADR-059): no hay columna `activo` ni `deleted_at`, y agregarla es migración
+  más una decisión de negocio sin responder — qué pasa con la serie liberada
+  (¿se puede reusar en otra caja?, ¿nunca?) y con los comprobantes,
+  aperturas y cierres que cuelgan de esa caja. Hoy una caja que dejó de
+  usarse simplemente no se abre.
+- ⬜ **No existe la "caja principal" de la sucursal** (2026-08-23, ADR-059):
+  RN-POS-008 dice que el link de pago se computa en la caja principal cuando
+  la sucursal tiene más de una. No hay campo, y el link de pago no lo usa
+  hoy. Sumarlo es migración más la exclusión mutua por sucursal (una sola
+  principal), que es donde está la parte difícil.
+- ⬜ **`datos_minimos_por_modalidad` y `kpis` no tienen pantalla**
+  (2026-08-23, ADR-059): las dos columnas JSONB existen y viajan en el
+  modelo, pero no las escribe ni las lee nadie. RN-MDC-002 (delivery exige
+  dirección) está hoy resuelto en el PDV y no por esta configuración. Un
+  formulario para un dato que ningún consumidor mira es peor que no tenerlo:
+  se escribe cuando exista quien lo use.
+- ⬜ **`serie_nc_*` no viaja en la réplica offline** (2026-08-23, ADR-059):
+  `sincronizacion.py` lista los campos de `punto_venta` que se replican al
+  hub de sucursal y las dos series de nota de crédito quedaron fuera desde
+  que se agregaron. Son dos strings, pero tocan el contrato del hub — se
+  decide junto con la fase 2 del offline y no de refilón acá.
+- ⬜ **La pantalla de puntos de venta no tiene spec e2e** (2026-08-23,
+  ADR-059): es una copia estructural de `organizacion/almacenes` sobre
+  `DialogoFormulario` y una Server Action, plomería que la suite de Playwright
+  ya ejercita en otras pantallas; el riesgo real —que el contrato de la ruta
+  cambie— lo caza `lib/contrato.test.ts`. Queda anotado para que sea una
+  decisión visible y no un olvido: si el formulario crece (validación en
+  vivo, dependencia entre canal y política), el spec deja de ser redundante.
+

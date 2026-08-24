@@ -31,6 +31,7 @@ from src.modules.sales.application import (
     notas_credito,
     precios,
     precuenta,
+    puntos_venta,
     queries_publicas,
     tarifa_delivery,
     tasks,
@@ -73,6 +74,10 @@ DESCONTAR = "sales.aplicar_descuento"
 # un encargado, igual que un descuento (RN-COM-025).
 CONSUMO_PERSONAL = "sales.registrar_consumo_personal"
 GESTIONAR_MESAS = "sales.gestionar_mesas"
+# Dar de alta una caja es asignarle series SUNAT a la empresa: identidad
+# fiscal, no configuración del salón. Por eso lo firma quien administra la
+# organización y no quien acomoda mesas — ADR-059.
+ORGANIZACION = "organizacion.gestionar"
 LEER_CLIENTES_EXTERNOS = "sales.leer_clientes_externos"
 # Administrar el padron del grupo no es el mismo acto que registrar a
 # alguien en el mostrador, que es lo que hace el cajero con `sales.crear`.
@@ -1113,18 +1118,81 @@ def carta(
     )
 
 
-@router.get("/puntos-venta", response_model=list[schemas.PuntoVentaOut])
-def listar_puntos_venta(
-    sucursal_id: uuid.UUID,
-    _: Usuario = Depends(require_permission(LEER)),
+# --- Puntos de venta (la caja de la sucursal) — ADR-059 ---------------------
+@router.post(
+    "/puntos-venta",
+    response_model=schemas.PuntoVentaOut,
+    status_code=status.HTTP_201_CREATED,
+    tags=["organizacion"],
+)
+def crear_punto_venta(
+    body: schemas.PuntoVentaCreate,
+    actor: Usuario = Depends(require_permission(ORGANIZACION)),
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    """Las cajas de la sucursal. El PDV lo necesita al arrancar: sin saber
-    qué punto de venta es, no puede abrir caja ni emitir con la serie
-    correcta."""
-    tenant.exigir_sucursal(sucursal_id)
-    return PuntoVentaRepo(session).de_sucursal(sucursal_id)
+    """Da de alta una caja. Antes esto solo existía en el seeder, así que una
+    sucursal nueva no vendía hasta que alguien corriera un script contra la
+    base: el PDV arranca pidiendo el punto de venta y sin él se bloquea."""
+    tenant.exigir_sucursal(body.sucursal_id)
+    punto = puntos_venta.crear_punto_venta(
+        session, actor_id=actor.id, **body.model_dump()
+    )
+    session.commit()
+    return punto
+
+
+@router.patch(
+    "/puntos-venta/{punto_venta_id}",
+    response_model=schemas.PuntoVentaOut,
+    tags=["organizacion"],
+)
+def editar_punto_venta(
+    punto_venta_id: uuid.UUID,
+    body: schemas.PuntoVentaUpdate,
+    actor: Usuario = Depends(require_permission(ORGANIZACION)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Corregir una serie mal tecleada no reescribe lo ya emitido:
+    `comprobante.serie` es una copia congelada al emitir."""
+    punto = PuntoVentaRepo(session).get(punto_venta_id)
+    if punto is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "punto de venta no encontrado")
+    tenant.exigir_sucursal(punto.sucursal_id)
+    punto = puntos_venta.editar_punto_venta(
+        session,
+        punto_venta_id,
+        actor_id=actor.id,
+        **body.model_dump(exclude_unset=True),
+    )
+    session.commit()
+    return punto
+
+
+@router.get("/puntos-venta", response_model=list[schemas.PuntoVentaOut])
+def listar_puntos_venta(
+    sucursal_id: uuid.UUID | None = None,
+    empresa_id: uuid.UUID | None = None,
+    usuario: Usuario = Depends(get_current_user),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Con `sucursal_id`, las cajas de esa sucursal: el PDV lo necesita al
+    arrancar, porque sin saber qué punto de venta es no puede abrir caja ni
+    emitir con la serie correcta. Sin él, las de la empresa — que es lo que
+    pide la pantalla de administración.
+
+    Basta con `sales.leer` **o** `organizacion.gestionar`: el cajero tiene el
+    primero y el administrador que da de alta las cajas puede no tener
+    ninguno de los permisos de venta.
+    """
+    check_permission(session, usuario, LEER, ORGANIZACION)
+    repo = PuntoVentaRepo(session)
+    if sucursal_id is not None:
+        tenant.exigir_sucursal(sucursal_id)
+        return repo.de_sucursal(sucursal_id)
+    return repo.de_empresa(tenant.filtro_empresa(empresa_id))
 
 
 # --- Mesas del salón --------------------------------------------------------

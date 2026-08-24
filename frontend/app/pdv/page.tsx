@@ -78,7 +78,7 @@ async function resolverContexto(token: string): Promise<Contexto> {
       ok: false,
       titulo: "La sucursal no tiene puntos de venta",
       detalle:
-        "Configura al menos una caja para esta sucursal antes de abrir el punto de venta.",
+        "Pídele a un administrador que dé de alta la caja de esta sucursal en Organización → Puntos de venta.",
     };
   }
   return { ok: true, sucursalId, empresaId: claims.empresa_id, punto };

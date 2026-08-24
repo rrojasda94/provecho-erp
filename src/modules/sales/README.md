@@ -670,6 +670,58 @@ líneas de receta que lo usan como condición.
 
 `producto_comercial.lienzo_pos` pasa a ser editable por `PATCH /productos/{id}`.
 
+## Alta de puntos de venta (implementado 2026-08-23, ADR-059)
+
+La caja de una sucursal solo existía en el seeder, así que un local nuevo no
+vendía hasta que alguien corriera un script contra la base: el PDV arranca
+pidiendo el punto de venta y sin él se bloquea. En staging eso significaba no
+poder vender.
+
+| Método | Ruta | Permiso |
+|--------|------|---------|
+| POST | `/puntos-venta` | `organizacion.gestionar` |
+| PATCH | `/puntos-venta/{id}` | `organizacion.gestionar` |
+| GET | `/puntos-venta?sucursal_id=&empresa_id=` | `sales.leer` **o** `organizacion.gestionar` |
+
+El alta la firma `organizacion.gestionar` y no un permiso de este módulo:
+asignar una serie SUNAT es identidad fiscal de la empresa, del mismo orden
+que fundar el local — no es configurar el salón, que es lo que hace
+`sales.gestionar_mesas`. Por eso la pantalla vive en **Organización → Puntos
+de venta**, entre Sucursales y Almacenes. El `GET` acepta cualquiera de los
+dos porque el cajero (`sales.leer`) lo necesita para abrir el PDV y quien da
+de alta las cajas puede no tener ningún permiso de venta.
+
+`GET` sin `sucursal_id` devuelve las cajas de la empresa. Antes el parámetro
+era obligatorio, y un administrador sin `usuario_sucursal` no podía listarlas.
+
+Reglas que el seeder daba por buenas porque tipeaba las series a mano y ahora
+se validan en `application/puntos_venta.py`:
+
+- **La serie no se repite dentro de la empresa** (RN-CPP-007) → 409. El
+  correlativo es único por `(empresa, serie)`, así que dos cajas que
+  compartan cualquiera de sus cuatro series se pisan al emitir. **No hay
+  UNIQUE en la tabla**: `punto_venta` no tiene `empresa_id` y la regla abarca
+  cuatro columnas des-pivoteadas; el candado que de verdad impide emitir un
+  duplicado ya existe en `comprobante`. Ver ADR-059.
+- **Las cuatro series de una caja son distintas entre sí** (RN-CPP-009): la
+  nota de crédito numera aparte del documento que corrige.
+- **Formato de serie** `^[BF][A-Z0-9]{3}$`, normalizado a mayúsculas. `B`
+  cubre boleta y su NC (`B001`, `BC01`); `F`, factura y la suya.
+- **Autoatención cobra por adelantado** (RN-POS-005): `web` y `kiosko` no
+  pueden quedar en `al_finalizar`.
+- **`hardware_id` se rechaza en canal `web`** en vez de anularse en silencio:
+  quien lo mandó cree que tiene una caja física y no la tiene.
+- **Modalidades**: subconjunto no vacío de `mesa|takeout|delivery`
+  (RN-MDC-001); `null` sigue significando las tres.
+- **La sucursal se verifica explícitamente** aunque haya FK: en SQLite la FK
+  no se valida, así que sin ese chequeo el test pasa en verde y Postgres
+  devuelve un 500.
+
+Corregir una serie **no** reescribe lo ya emitido: `comprobante.serie` es una
+copia congelada al emitir, y el correlativo nuevo arranca en el máximo de la
+serie nueva. Lo que no se permite es mudar una caja de sucursal — sus
+comprobantes, aperturas y cierres cuelgan de ese local.
+
 ## Cupón de promoción y landing pública (implementado 2026-08-24, ADR-060)
 
 La campaña **«Queremos RE-conocerte»**: un QR en la mesa lleva a una landing
@@ -740,6 +792,7 @@ shell `(app)` y sin guard de sesión.
 ## Casos de uso
 
 - CRUD de productos comerciales y recetas (separados de artículos inventariables).
+- Dar de alta y corregir puntos de venta (la caja de cada local, ADR-059).
 - Crear venta (carrito) → confirmar → cobrar → emitir comprobante.
 - Venta por agente de IA: mismo contrato API, usuario tipo `agente_ia`.
 - Anulación / nota de crédito (con permiso y auditoría).
