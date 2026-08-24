@@ -15,6 +15,31 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   escritos los comandos que se usan de verdad — con la salvedad de que así se
   pierde la espera de `/health/ready` que el script hace. Decidir cuál al
   escribir el job de despliegue (siguiente punto), porque lo resuelve de raíz.
+- ⬜ **Caddy no re-resuelve el DNS del upstream** (2026-08-24): `reverse_proxy
+  api:8000` en el `Caddyfile` resuelve el nombre una sola vez, al arrancar, así
+  que todo `docker compose up -d` que recree `api` o `web` deja a Caddy
+  apuntando a una IP muerta y el dominio público devuelve 502 con la API sana.
+  Hoy se tapa con `docker compose restart caddy` en cada despliegue (ya está en
+  el runbook). El arreglo de fondo son los upstreams dinámicos de Caddy:
+
+  ```
+  api-staging.majambo.com.pe {
+  	reverse_proxy {
+  		dynamic a {
+  			name api
+  			port 8000
+  			refresh 30s
+  		}
+  	}
+  }
+  ```
+
+  No se aplicó de una porque un `Caddyfile` inválido deja staging sin proxy —
+  peor que el 502— y no hay Docker local para validarlo. Se cierra corriendo
+  `docker compose exec caddy caddy validate --config /etc/caddy/Caddyfile` en
+  el servidor **antes** del `reload`, con el archivo viejo a mano para volver.
+  El `Caddyfile` del repo, además, tiene los dominios de staging escritos
+  literales, así que este cambio se piensa junto con el compose de producción.
 - ⬜ **Job de despliegue** (ver *Cuando haya servidor*, punto 7): hoy el despliegue es manual y documentado. Se
   escribe cuando exista el VPS — automatizar por SSH contra una máquina que
   no existe da automatización no probada (ADR-008).

@@ -274,7 +274,7 @@ nombre del archivo.
 | Protección de datos personales (tras la implementación de 2026-07-26 — ADR-011) | [`proteccion-de-datos-personales.md`](docs/roadmap/deuda/proteccion-de-datos-personales.md) | 8 | 1 |
 | Contrato de API (tras la implementación de 2026-07-26 — ADR-010) | [`contrato-de-api.md`](docs/roadmap/deuda/contrato-de-api.md) | 6 | 1 |
 | Modo offline del PDV (tras la fase 2 de 2026-07-27 — ADR-009) | [`modo-offline-del-pdv.md`](docs/roadmap/deuda/modo-offline-del-pdv.md) | 10 | 3 |
-| CI/CD (tras la implementación de 2026-07-26) | [`ci-cd.md`](docs/roadmap/deuda/ci-cd.md) | 6 | 4 |
+| CI/CD (tras la implementación de 2026-07-26) | [`ci-cd.md`](docs/roadmap/deuda/ci-cd.md) | 7 | 4 |
 | Observabilidad y salud (tras las implementaciones de 2026-07-26) | [`observabilidad-y-salud.md`](docs/roadmap/deuda/observabilidad-y-salud.md) | 3 | 6 |
 | Backups (tras la implementación de 2026-07-26) | [`backups.md`](docs/roadmap/deuda/backups.md) | 4 | 1 |
 | Módulo inventory (slices siguientes) | [`modulo-inventory.md`](docs/roadmap/deuda/modulo-inventory.md) | 4 | 32 |

@@ -84,6 +84,26 @@ Ya corregido en `.env.staging.example` y documentado en
 criterio si algún día se arma un compose de producción con el frontend
 adentro.**
 
+## Bug encontrado y resuelto (2026-08-24)
+
+**Caddy cachea la IP del upstream y devuelve 502 después de cada redeploy.**
+`reverse_proxy api:8000` resuelve el nombre en la red de Docker **una vez, al
+arrancar**. Un `docker compose up -d` que recrea `api` le asigna una IP nueva,
+y Caddy —que no se recreó— sigue hablándole a la vieja. El síntoma es un 502
+en `https://api-staging.majambo.com.pe` con la API perfectamente sana:
+`api` figura `Up (healthy)` y `curl http://127.0.0.1:8000/health/ready`
+responde. Pasó desplegando la 0.7.2.
+
+Lo delata el `docker compose ps -a`: `caddy` con 21 horas de vida y `api` con
+4 minutos.
+
+Parche de hoy: `docker compose restart caddy` después de cada despliegue, ya
+incorporado al comando de arriba. **La solución de fondo es que Caddy
+re-resuelva el DNS solo** (`dynamic a` en el `Caddyfile`), anotada en
+[`deuda/ci-cd.md`](../roadmap/deuda/ci-cd.md) — no se aplicó de una porque un
+`Caddyfile` inválido deja staging sin proxy, y hay que validarlo contra el
+servidor antes de recargarlo.
+
 ## Pendiente
 
 - [x] Commiteado y en PR: [#91](https://github.com/rrojasda94/provecho-erp/pull/91)
@@ -129,12 +149,18 @@ además esperaría a `/health/ready`, pero **el repo no está en el droplet**
 
 ```bash
 PROVECHO_IMAGE=ghcr.io/rrojasda94/provecho-erp:0.7.2 PROVECHO_WEB_IMAGE=ghcr.io/rrojasda94/provecho-erp-web:0.7.2 docker compose -f docker-compose.staging.yml up -d --pull always
+docker compose -f docker-compose.staging.yml restart caddy
 ```
 
 El servicio `init` corre `alembic upgrade head` antes de que arranque `api`
 (`depends_on: service_completed_successfully`), así que la migración no
-necesita paso aparte. Después, confirmar:
+necesita paso aparte. **El `restart caddy` no es opcional** — ver el bug de
+abajo. Después, confirmar:
 
 ```bash
 curl -fsS https://api-staging.majambo.com.pe/health/ready && echo OK
 ```
+
+Si eso da 502, el diagnóstico es de una línea: comparar el `CREATED`/`STATUS`
+de `caddy` contra el de `api` en `docker compose ps -a`. Si Caddy es mucho
+más viejo, es esto.
