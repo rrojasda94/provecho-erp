@@ -97,12 +97,17 @@ responde. Pasó desplegando la 0.7.2.
 Lo delata el `docker compose ps -a`: `caddy` con 21 horas de vida y `api` con
 4 minutos.
 
-Parche de hoy: `docker compose restart caddy` después de cada despliegue, ya
-incorporado al comando de arriba. **La solución de fondo es que Caddy
-re-resuelva el DNS solo** (`dynamic a` en el `Caddyfile`), anotada en
-[`deuda/ci-cd.md`](../roadmap/deuda/ci-cd.md) — no se aplicó de una porque un
-`Caddyfile` inválido deja staging sin proxy, y hay que validarlo contra el
-servidor antes de recargarlo.
+Parche: `scripts/desplegar.sh` reinicia Caddy después del `up -d`, así que
+todo despliegue lo cubre —incluido el workflow de ADR-060, que si no habría
+fallado siempre: su último paso comprueba la versión **contra el dominio
+público**, justo lo que el 502 rompe. El script, además, dejó de conformarse
+con el loopback: ahora espera a `/health/ready` por el dominio, que es lo
+único que prueba que el proxy está sirviendo.
+
+**La solución de fondo es que Caddy re-resuelva el DNS solo** (`dynamic a` en
+el `Caddyfile`), anotada en [`deuda/ci-cd.md`](../roadmap/deuda/ci-cd.md): no
+se aplicó de una porque un `Caddyfile` inválido deja staging sin proxy —peor
+que el 502— y hay que validarlo contra el servidor antes de recargarlo.
 
 ## Pendiente
 
@@ -116,11 +121,10 @@ servidor antes de recargarlo.
       vía `docker compose exec api`)
 - [x] Monitor externo (UptimeRobot) dado de alta contra `/health`,
       `/health/ready`, `/health/backups`
-- [ ] **`scripts/desplegar.sh` no está en el droplet** (2026-08-24): el repo
-      nunca se clonó ahí, así que el script que este runbook manda correr no
-      existe y el despliegue falla con `No such file or directory`. Mientras
-      tanto, desplegar con el `docker compose` equivalente (ver Despliegue,
-      abajo). Anotado en [`deuda/ci-cd.md`](../roadmap/deuda/ci-cd.md).
+- [x] **`scripts/desplegar.sh` no estaba en el droplet** (2026-08-24): el repo
+      nunca se clonó ahí, así que el script que este runbook mandaba correr no
+      existía y desplegar la 0.7.2 falló con `No such file or directory`. Lo
+      cerró ADR-060: el workflow hace `scp` del script en cada despliegue.
 - [ ] **Errores de backend encontrados probando staging** — se están
       revisando en otra sesión de trabajo, no repetir el diagnóstico acá
 - [ ] **Cambio de recetas en camino** (mencionado 2026-08-23, sin detalle
@@ -143,24 +147,23 @@ docker compose -f docker-compose.staging.yml ps
 docker compose -f docker-compose.staging.yml logs -f api
 ```
 
-Desplegar una versión nueva. `scripts/desplegar.sh` haría esto mismo y
-además esperaría a `/health/ready`, pero **el repo no está en el droplet**
-(ver Pendiente), así que hoy va a mano desde la carpeta del compose:
+**Desplegar una versión nueva no se hace desde acá**: se corre el workflow
+*Desplegar* en GitHub → Actions, con la versión como entrada (ADR-060). El
+workflow lleva `scripts/desplegar.sh` al servidor por `scp` y lo ejecuta, así
+que en el droplet nunca queda una copia vieja del procedimiento.
+
+Si hiciera falta desplegar a mano —el workflow caído, o depurando en el
+servidor—, es el mismo script:
 
 ```bash
-PROVECHO_IMAGE=ghcr.io/rrojasda94/provecho-erp:0.7.2 PROVECHO_WEB_IMAGE=ghcr.io/rrojasda94/provecho-erp-web:0.7.2 docker compose -f docker-compose.staging.yml up -d --pull always
-docker compose -f docker-compose.staging.yml restart caddy
+cd ~/provecho-staging && ./desplegar.sh 0.7.2
 ```
 
 El servicio `init` corre `alembic upgrade head` antes de que arranque `api`
 (`depends_on: service_completed_successfully`), así que la migración no
-necesita paso aparte. **El `restart caddy` no es opcional** — ver el bug de
-abajo. Después, confirmar:
+necesita paso aparte. El script reinicia Caddy y comprueba **el dominio
+público**, no solo el loopback — ver el bug de abajo.
 
-```bash
-curl -fsS https://api-staging.majambo.com.pe/health/ready && echo OK
-```
-
-Si eso da 502, el diagnóstico es de una línea: comparar el `CREATED`/`STATUS`
-de `caddy` contra el de `api` en `docker compose ps -a`. Si Caddy es mucho
-más viejo, es esto.
+Si alguna vez ves un 502 con la API sana, el diagnóstico es de una línea:
+comparar el `CREATED` de `caddy` contra el de `api` en
+`docker compose ps -a`. Si Caddy es mucho más viejo, es esto.

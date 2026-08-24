@@ -3,24 +3,23 @@
 Parte del backlog de deuda técnica del proyecto. El índice y las reglas
 de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 
-- ⬜ **El droplet de staging no tiene `scripts/desplegar.sh`** (2026-08-24):
-  `docs/engineering/staging.md` manda correr `./scripts/desplegar.sh <version>`
-  en el servidor, pero ahí nunca se clonó el repo — solo se copiaron a mano
-  `docker-compose.staging.yml` y el `Caddyfile` (ver el setup del
-  2026-08-23). Desplegar la 0.7.2 falló con `No such file or directory` y hubo
-  que correr el `docker compose up -d --pull always` equivalente. Es el mismo
-  patrón que el fix de la 0.7.1 con `scripts/odoo`: el README manda correr algo
-  que no está donde dice. Se cierra copiando el script al servidor y
-  corrigiendo la ruta en el runbook, o sacándolo del runbook y dejando
-  escritos los comandos que se usan de verdad — con la salvedad de que así se
-  pierde la espera de `/health/ready` que el script hace. Decidir cuál al
-  escribir el job de despliegue (siguiente punto), porque lo resuelve de raíz.
+- ✅ 2026-08-24 **El droplet de staging no tenía `scripts/desplegar.sh`**:
+  `staging.md` mandaba correr `./scripts/desplegar.sh <version>` en el
+  servidor, pero ahí nunca se clonó el repo — solo se habían copiado a mano
+  `docker-compose.staging.yml` y el `Caddyfile`. Desplegar la 0.7.2 falló con
+  `No such file or directory`, el mismo patrón que el fix de la 0.7.1 con
+  `scripts/odoo`. Lo cerró ADR-060 por el camino correcto: el workflow
+  `desplegar.yml` hace `scp` del script **en cada despliegue**, así que en el
+  servidor nunca hay una copia que se pueda desincronizar del repo.
 - ⬜ **Caddy no re-resuelve el DNS del upstream** (2026-08-24): `reverse_proxy
   api:8000` en el `Caddyfile` resuelve el nombre una sola vez, al arrancar, así
   que todo `docker compose up -d` que recree `api` o `web` deja a Caddy
   apuntando a una IP muerta y el dominio público devuelve 502 con la API sana.
-  Hoy se tapa con `docker compose restart caddy` en cada despliegue (ya está en
-  el runbook). El arreglo de fondo son los upstreams dinámicos de Caddy:
+  Hoy se tapa con un `docker compose restart caddy` que hace
+  `scripts/desplegar.sh`, que es por donde pasa todo despliegue desde ADR-060.
+  Es un reinicio de proxy en cada despliegue: unos segundos de corte que
+  staging se banca y producción no. El arreglo de fondo son los upstreams
+  dinámicos de Caddy:
 
   ```
   api-staging.majambo.com.pe {
