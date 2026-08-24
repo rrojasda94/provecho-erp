@@ -171,6 +171,31 @@ async function prepararEscenario(page: Page): Promise<string[]> {
     .evaluateAll((as) => as.map((a) => (a as HTMLAnchorElement).getAttribute("href")!));
 }
 
+/** La landing del QR y sus términos. Van en un test aparte y **sin
+ * `ingresar()`** a propósito: la abre un cliente del restaurante desde su
+ * teléfono, sin cuenta, y auditarla con sesión no probaría lo que importa —
+ * que no rebote al login. El teléfono es su medida principal, no una más. */
+const RUTAS_PUBLICAS = ["/reconocerte", "/reconocerte/terminos"];
+
+test("la landing pública se usa sin cuenta en las tres medidas", async ({ page }) => {
+  test.setTimeout(300_000);
+  const fallas: Falla[] = [];
+
+  for (const medida of MEDIDAS) {
+    await page.setViewportSize({ width: medida.width, height: medida.height });
+    for (const ruta of RUTAS_PUBLICAS) {
+      await page.goto(ruta);
+      await esperarCarga(page);
+      // Sin sesión y sin redirección: es la única superficie del front que
+      // tiene que responder igual a alguien que nunca inició sesión.
+      expect(new URL(page.url()).pathname).toBe(ruta);
+      await revisar(page, `${ruta} @ ${medida.nombre}`, fallas);
+    }
+  }
+
+  expect(fallas.map((f) => `${f.donde} · ${f.clase}: ${f.detalle}`)).toEqual([]);
+});
+
 test("toda pantalla se puede usar en teléfono, tablet y PC", async ({ page }) => {
   test.setTimeout(1_800_000);
   await ingresar(page);

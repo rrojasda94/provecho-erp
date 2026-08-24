@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 64" role="img" aria-label="Grupo Majambo">
+  <title>Grupo Majambo</title>
+  <!-- PROVISIONAL. Logotipo tipográfico armado con los colores de marca de
+       globals.css (brasa #c6390f, tinta currentColor). Reemplazar este archivo
+       por el original de Majambo: la landing lo referencia por ruta y no hay
+       que tocar ningún componente. Ver public/marcas/README.md. -->
+  <rect x="0" y="18" width="10" height="28" rx="2" fill="#c6390f"/>
+  <text x="22" y="43" font-family="Anton, Impact, 'Arial Narrow', sans-serif"
+        font-size="34" letter-spacing="1.5" fill="currentColor">MAJAMBO</text>
+</svg>

@@ -229,6 +229,33 @@ de su módulo y se prueban de forma aislada.
   capacitación del personal, y un tiempo de duración definido.
 - **RN-PRM-002** Una promoción debe estar dentro del guion de atención
   del personal de atención al cliente.
+- **RN-PRM-003** Una promoción de cupón emite **un cupón por cliente**: quien
+  ya está registrado —por documento o por teléfono— obtiene igualmente el
+  suyo, siempre que no lo haya usado antes. El registro nunca duplica al
+  cliente: se lo reconoce por cualquiera de los dos datos y se completa lo
+  que le falte (extiende RN-PTS-006).
+- **RN-PRM-004** El cupón es **de un solo uso**: al aplicarse en una venta
+  queda desactivado de forma permanente y no vuelve a emitirse. Es nominal —
+  se canjea contra el cliente al que se le emitió— y vale desde su emisión
+  por el plazo que declare la promoción; vencido, caduca aunque no se haya
+  usado.
+- **RN-PRM-005** La empresa puede **terminar una promoción en cualquier
+  momento**. Terminarla deja de emitir cupones nuevos y **no afecta a los ya
+  entregados**, que valen hasta su propia fecha: quien alcanzó a registrarse
+  cumplió su parte del trato.
+- **RN-PRM-006** Un cupón **no se acumula** con un descuento manual sobre la
+  misma orden. El descuento de la orden es uno solo (ADR-018), y el canje se
+  rechaza si ya hay otro puesto.
+- **RN-PRM-007** El canje de un cupón **no requiere autorización de
+  supervisor** —a diferencia del descuento manual (RN-COM-017)—: el descuento
+  ya estaba prometido al cliente y el cupón es la autorización. Se registra
+  con motivo propio (`cupon`), distinguible en el reporte de descuentos del
+  margen que se regaló a criterio de alguien.
+- **RN-PRM-008** El registro a una promoción desde un canal público exige el
+  **consentimiento expreso** del titular para el uso comercial de sus datos
+  (Ley 29733). La baja se atiende por el canal declarado en los términos y se
+  resuelve con la anonimización de RN-PER-007, nunca con un borrado desde el
+  canal público.
 
 ## Programa de puntos
 

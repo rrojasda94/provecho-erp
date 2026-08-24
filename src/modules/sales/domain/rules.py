@@ -1,6 +1,6 @@
 """Reglas de negocio de venta y cobro. Puras, sin infraestructura."""
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
 CANALES = {"pdv", "agente_ia", "delivery"}
@@ -99,7 +99,20 @@ def pagos_cubren_total(pagos_confirmados: list[Decimal], total: Decimal) -> bool
 MODOS_DESCUENTO = {"porcentaje", "monto"}
 # Un descuento sin motivo no es auditable: el reporte necesita saber por qué
 # se regaló margen, no solo cuánto.
-MOTIVOS_DESCUENTO = {"cortesia", "reclamo", "colaborador", "promocion", "convenio"}
+# `cupon` es el único motivo que NO nace de la discreción de un supervisor:
+# lo trae el cliente y el cajero solo lo teclea (ADR-061). Está en el mismo
+# conjunto para que `venta.total` siga siendo uno solo, y separado como
+# motivo para que el reporte de descuentos pueda distinguir el margen que se
+# regaló a criterio del que se había prometido en una campaña.
+MOTIVOS_DESCUENTO = {
+    "cortesia",
+    "reclamo",
+    "colaborador",
+    "promocion",
+    "convenio",
+    "cupon",
+}
+MOTIVO_CUPON = "cupon"
 
 
 def monto_descuento(
@@ -345,3 +358,37 @@ def combinaciones_a_generar(modo_variante: str) -> bool:
     Solo `siempre`. `dinamica` las crea al vender y `nunca` no las crea.
     """
     return modo_variante == "siempre"
+
+
+# --- Cupón de promoción (ADR-061) --------------------------------------------
+ESTADOS_CUPON = {"activo", "canjeado"}
+
+
+def vencimiento_cupon(emitido: date, dias: int) -> date:
+    """Hasta cuándo vale un cupón emitido hoy.
+
+    El último día cuenta entero: un cupón de 30 días emitido el 1 vale
+    hasta el 30 inclusive, que es como lo lee quien lo tiene en la mano.
+    """
+    return emitido + timedelta(days=max(dias, 1) - 1)
+
+
+def cupon_vigente(estado: str, vigente_hasta: date, hoy: date) -> bool:
+    """Vencer no es un estado que alguien registre, es una comparación.
+
+    Guardarlo como estado obligaría a una tarea periódica que barra los
+    vencidos, y el día que esa tarea no corra la base diría que un cupón de
+    hace tres meses sigue vivo.
+    """
+    return estado == "activo" and vigente_hasta >= hoy
+
+
+def promocion_emite(estado: str, vigente_hasta: date, hoy: date) -> bool:
+    """¿La promoción todavía emite cupones nuevos?
+
+    `terminada` es el derecho que la empresa se reserva de cortarla en
+    cualquier momento. No toca los cupones ya emitidos: quien alcanzó a
+    registrarse cumplió su parte, y retirarle el beneficio después sería
+    cambiar el trato a mitad de camino.
+    """
+    return estado == "activa" and vigente_hasta >= hoy
