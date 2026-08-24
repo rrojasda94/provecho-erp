@@ -194,6 +194,41 @@ class PagoOut(BaseModel):
     estado: str
 
 
+class PuntoVentaCreate(BaseModel):
+    """La caja de una sucursal. `serie_nc_*` son opcionales porque las cajas
+    que ya existían no las tenían, pero sin ellas el ERP no emite notas de
+    crédito de ese tipo y lo dice (RN-CPP-009).
+
+    `modalidades_habilitadas=None` significa las tres (RN-MDC-001); una lista
+    vacía no es "ninguna", es un error — una caja que no atiende de ninguna
+    forma no tiene para qué existir.
+    """
+
+    sucursal_id: uuid.UUID
+    canal: Literal["trabajador", "web", "kiosko"]
+    politica_pago: Literal["adelantado", "al_finalizar"]
+    serie_boleta: str = Field(max_length=10)
+    serie_factura: str = Field(max_length=10)
+    serie_nc_boleta: str | None = Field(default=None, max_length=10)
+    serie_nc_factura: str | None = Field(default=None, max_length=10)
+    hardware_id: str | None = Field(default=None, max_length=50)
+    modalidades_habilitadas: list[Literal["mesa", "takeout", "delivery"]] | None = None
+
+
+class PuntoVentaUpdate(BaseModel):
+    """No lleva `sucursal_id`: la caja es del local donde se dio de alta, y
+    sus comprobantes y aperturas cuelgan de ahí."""
+
+    canal: Literal["trabajador", "web", "kiosko"] | None = None
+    politica_pago: Literal["adelantado", "al_finalizar"] | None = None
+    serie_boleta: str | None = Field(default=None, max_length=10)
+    serie_factura: str | None = Field(default=None, max_length=10)
+    serie_nc_boleta: str | None = Field(default=None, max_length=10)
+    serie_nc_factura: str | None = Field(default=None, max_length=10)
+    hardware_id: str | None = Field(default=None, max_length=50)
+    modalidades_habilitadas: list[Literal["mesa", "takeout", "delivery"]] | None = None
+
+
 class PuntoVentaOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
@@ -201,6 +236,9 @@ class PuntoVentaOut(BaseModel):
     canal: str
     serie_boleta: str
     serie_factura: str
+    serie_nc_boleta: str | None
+    serie_nc_factura: str | None
+    hardware_id: str | None
     modalidades_habilitadas: list | None
     politica_pago: str
 
