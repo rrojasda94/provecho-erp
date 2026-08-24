@@ -1,5 +1,5 @@
 - **Ya se puede decir dónde trabaja alguien y qué locales alcanza su cuenta**
-  (2026-08-24, ADR-061, migración `b6d29f10c47e`). Eran dos huecos que desde
+  (2026-08-24, ADR-062, migración `b6d29f10c47e`). Eran dos huecos que desde
   la pantalla se veían como uno: `trabajador` no tenía sucursal —la asistencia
   no tenía a qué local atribuirse y el reemplazo entre sucursales
   (RN-RRHH-011) no era representable— y `usuario_sucursal` tenía endpoints

@@ -474,7 +474,7 @@ def test_no_se_puede_crear_sucursal_en_empresa_ajena(env):
     assert r.status_code == 403
 
 
-# --- Alcance por sucursal de una cuenta (usuario_sucursal, ADR-061) ----------
+# --- Alcance por sucursal de una cuenta (usuario_sucursal, ADR-062) ----------
 def _nueva_sucursal(client, headers, nombre):
     marca_id = client.get("/api/v1/sucursales", headers=headers).json()[0]["marca_id"]
     r = client.post(
@@ -561,7 +561,7 @@ def test_alcance_por_sucursal_se_asigna_lista_y_quita(env):
 
 def test_supervisor_alcanza_varias_sucursales(env):
     """Un supervisor sobre varios locales son varias filas, no una entidad
-    nueva (ADR-061): `usuario_sucursal` ya es N a N."""
+    nueva (ADR-062): `usuario_sucursal` ya es N a N."""
     client, headers, ids, TestSession = env
     segunda = _nueva_sucursal(client, headers, "CH2")
     usuario_id = _cuenta(client, headers, "supervisor_zona")

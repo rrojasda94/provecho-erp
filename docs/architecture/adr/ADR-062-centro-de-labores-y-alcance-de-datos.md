@@ -1,4 +1,4 @@
-# ADR-061 — El centro de labores no es el alcance de datos
+# ADR-062 — El centro de labores no es el alcance de datos
 
 - Estado: aceptado
 - Fecha: 2026-08-24

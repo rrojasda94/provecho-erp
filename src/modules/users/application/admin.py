@@ -372,7 +372,7 @@ def asignar_sucursal(
     """Suma un local al alcance de la cuenta.
 
     Un supervisor sobre varios locales son varias filas acá: `usuario_sucursal`
-    ya es N a N y no hace falta agrupar nada (ADR-061).
+    ya es N a N y no hace falta agrupar nada (ADR-062).
 
     El alcance viaja en el token, así que el cambio recién le aplica a esa
     persona cuando su sesión renueve (refresh o login)."""

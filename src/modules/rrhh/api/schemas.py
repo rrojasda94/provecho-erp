@@ -27,7 +27,7 @@ class TrabajadorCreate(BaseModel):
     tiene_poderes: bool = False
     registra_asistencia: bool = True
     jornada_horas_semana: Decimal | None = None
-    # Centro de labores (ADR-061). Opcional: gerencia no está en un local.
+    # Centro de labores (ADR-062). Opcional: gerencia no está en un local.
     sucursal_id: uuid.UUID | None = None
 
 

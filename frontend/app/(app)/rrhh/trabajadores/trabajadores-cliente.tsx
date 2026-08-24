@@ -36,7 +36,7 @@ export type Persona = {
 const TIPOS_VINCULO = ["planilla", "practicante", "locacion_servicios"] as const;
 
 /** El local donde trabaja, no a qué datos accede: el alcance de la cuenta se
- * reparte en Usuarios → Cuentas (ADR-061). Vacío es válido — gerencia y
+ * reparte en Usuarios → Cuentas (ADR-062). Vacío es válido — gerencia y
  * administración no están en ninguna sucursal. */
 function CampoSucursal({
   sucursales,

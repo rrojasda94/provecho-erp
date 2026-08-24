@@ -145,7 +145,7 @@ export async function quitarRolAction(
 /** Suma un local al alcance de la cuenta.
  *
  * Un supervisor a cargo de varias sucursales son varias llamadas a esto: no
- * hay entidad "grupo de sucursales" y no hace falta (ADR-061). El alcance
+ * hay entidad "grupo de sucursales" y no hace falta (ADR-062). El alcance
  * viaja en el token, así que a esa persona le aplica cuando su sesión
  * renueve, no en el acto. */
 export async function asignarSucursalAction(

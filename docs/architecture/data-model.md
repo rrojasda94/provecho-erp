@@ -823,7 +823,7 @@ Solicitud.
   **comensales** (nullable), y el descuento manual de la orden (ADR-018):
   **descuento_modo** (`porcentaje` | `monto`), **descuento_valor**,
   **descuento_motivo** (`cortesia` | `reclamo` | `colaborador` |
-  `promocion` | `convenio`), **descuento_autorizado_por** (usuario_id del
+  `promocion` | `convenio` | `cupon`), **descuento_autorizado_por** (usuario_id del
   supervisor — RN-COM-017; el permiso `sales.aplicar_descuento` está
   separado de `sales.cobrar` para que el cajero no se autorice a sí mismo).
   Y el consumo de personal (ADR-034): **tipo** (`venta` |
@@ -834,6 +834,13 @@ Solicitud.
   `sales.registrar_consumo_personal`). Un `consumo_personal` nace con todas
   sus líneas en cero y no admite cobro, comprobante ni descuento
   (RN-COM-025/026/027).
+  El motivo `cupon` se sumó el 2026-08-24 (ADR-062): el canje de un cupón
+  escribe estos mismos campos —para que `venta.total` siga siendo uno solo y
+  el prorrateo al comprobante no cambie— y el motivo propio es lo que deja al
+  reporte de descuentos separar el margen regalado a criterio del que se
+  había prometido en una campaña. **No autoriza a que el motor de promociones
+  condicionales reuse estas columnas**: eso sigue prohibido (ADR-018 →
+  «frontera explícita»), porque ahí no interviene nadie.
 - **mesa** (ADR-018): sucursal_id, numero (único por sucursal), zona
   (`Salón`, `Terraza`, `Barra`... libre), capacidad (nullable), activa.
   Vive en `sales` y no en `users` porque quien le da sentido es la toma de
@@ -1080,6 +1087,27 @@ Solicitud.
   `sales/application/queries_publicas.py::listar_clientes_para_analisis`
   (`GET /api/v1/sales/clientes`, permiso `sales.leer_clientes_externos`) —
   ver [events.md#eventos-vs-contratos-públicos-de-lectura](events.md).
+- **promocion_cupon** (implementada 2026-08-24, migración `a7c3e1f508b2`,
+  ADR-062): grupo_id, nombre (único por grupo), descuento_porcentaje,
+  vigente_hasta (fin de campaña), vigencia_cupon_dias, estado
+  (`activa` | `terminada`), terminada_at, terminada_por. Cuelga del **grupo**
+  y no de la empresa porque el cupón se le da a un `cliente`, que es
+  transversal al grupo (RN-PTS-001): uno por empresa dejaría al cliente sin
+  poder usarlo en el local de al lado. `estado` es el derecho reservado de
+  cortar la campaña en cualquier momento (RN-PRM-005) — cambia una fila, no
+  un despliegue. **No es** la `promocion` de más abajo: no liga lista de
+  precios, material ni guion de atención.
+- **cupon** (misma migración): promocion_id, cliente_id, codigo, estado
+  (`activo` | `canjeado`), vigente_hasta, venta_id (al canjear), canjeado_at,
+  canjeado_por. Dos únicos, **con nombre explícito** porque los dos empiezan
+  por `promocion_id` y la convención los llamaría igual:
+  `uq_cupon_promocion_cliente` sostiene «un cupón por cliente» en la base —no
+  solo en código, que no cubre dos registros simultáneos— y
+  `uq_cupon_promocion_codigo`, la búsqueda en caja. `vencido` **no** es un
+  estado: es `vigente_hasta` comparado con el día de negocio
+  (`rules.cupon_vigente`), porque un estado obligaría a un barrido periódico
+  y el día que no corra la base mentiría. Sin `deleted_at`: un cupón no se
+  borra, se canjea o vence.
 - **cuenta_puntos**: cliente_id, saldo. Un solo saldo válido en todas las
   marcas/empresas del grupo (RN-PTS-001).
 - **puntos_movimiento**: cuenta_puntos_id, tipo (`acumulacion` | `canje` |
@@ -1261,7 +1289,7 @@ un trabajador puede o no tener usuario, y no todo usuario es trabajador
 
 - **trabajador**: empresa_id, persona_id (datos personales — nombres,
   documento, domicilio, etc.), usuario_id (opcional), sucursal_id (opcional —
-  **centro de labores**: dónde trabaja, migración `b6d29f10c47e`, ADR-061. No
+  **centro de labores**: dónde trabaja, migración `b6d29f10c47e`, ADR-062. No
   es el alcance de datos de su cuenta, que vive en `usuario_sucursal`; y tiene
   que ser una sucursal de su misma empresa, RN-RRHH-019), cargo, area,
   tipo_vinculo (`planilla` | `practicante` | `locacion_servicios`),

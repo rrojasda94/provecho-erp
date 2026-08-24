@@ -104,7 +104,7 @@ def test_crear_trabajador_planilla(env):
     assert r.json()["registra_asistencia"] is True
 
 
-# --- Centro de labores (ADR-061, RN-RRHH-019) --------------------------------
+# --- Centro de labores (ADR-062, RN-RRHH-019) --------------------------------
 def _sucursal_ajena(TestSession, ids):
     """Sucursal de OTRA empresa del mismo grupo: el caso que la regla ataja."""
     with TestSession() as s:

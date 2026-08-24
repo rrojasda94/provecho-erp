@@ -609,7 +609,7 @@ def asignar_sucursal(
     session: Session = Depends(get_db),
 ):
     """Suma un local al alcance de la cuenta. Un supervisor a cargo de varias
-    sucursales se arma llamando esto una vez por local (ADR-061).
+    sucursales se arma llamando esto una vez por local (ADR-062).
 
     El alcance viaja en el token: le aplica a esa persona cuando su sesión
     renueve, no en el acto."""

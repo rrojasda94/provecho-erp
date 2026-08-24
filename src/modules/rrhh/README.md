@@ -185,7 +185,7 @@ escuchar `trabajador_cesado`. Ver ROADMAP.
   postulación fue espontánea o por referido, fuera de una búsqueda abierta.
 - `postulante.cv_archivo_id` liga con `shared.archivo`.
 - `trabajador.sucursal_id` (opcional) es el **centro de labores**: dónde
-  trabaja la persona (migración `b6d29f10c47e`, ADR-061). Tiene que ser una
+  trabaja la persona (migración `b6d29f10c47e`, ADR-062). Tiene que ser una
   sucursal de su misma empresa (RN-RRHH-019) y es nullable a propósito —
   gerencia y administración no están en ningún local. **No es** el alcance de
   datos de su cuenta: eso vive en `users.usuario_sucursal` y se administra en
