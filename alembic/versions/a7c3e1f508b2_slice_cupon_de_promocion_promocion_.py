@@ -4,7 +4,7 @@ Revision ID: a7c3e1f508b2
 Revises: e2b7c40d91af
 Create Date: 2026-08-24 10:00:00.000000
 
-Las dos tablas de la campaña «Queremos RE-conocerte» (ADR-060): la landing
+Las dos tablas de la campaña «Queremos RE-conocerte» (ADR-061): la landing
 pública del QR registra al cliente y le emite un cupón de un solo uso, que
 la caja canjea contra su siguiente venta.
 

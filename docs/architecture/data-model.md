@@ -834,7 +834,7 @@ Solicitud.
   `sales.registrar_consumo_personal`). Un `consumo_personal` nace con todas
   sus líneas en cero y no admite cobro, comprobante ni descuento
   (RN-COM-025/026/027).
-  El motivo `cupon` se sumó el 2026-08-24 (ADR-060): el canje de un cupón
+  El motivo `cupon` se sumó el 2026-08-24 (ADR-061): el canje de un cupón
   escribe estos mismos campos —para que `venta.total` siga siendo uno solo y
   el prorrateo al comprobante no cambie— y el motivo propio es lo que deja al
   reporte de descuentos separar el margen regalado a criterio del que se
@@ -1088,7 +1088,7 @@ Solicitud.
   (`GET /api/v1/sales/clientes`, permiso `sales.leer_clientes_externos`) —
   ver [events.md#eventos-vs-contratos-públicos-de-lectura](events.md).
 - **promocion_cupon** (implementada 2026-08-24, migración `a7c3e1f508b2`,
-  ADR-060): grupo_id, nombre (único por grupo), descuento_porcentaje,
+  ADR-061): grupo_id, nombre (único por grupo), descuento_porcentaje,
   vigente_hasta (fin de campaña), vigencia_cupon_dias, estado
   (`activa` | `terminada`), terminada_at, terminada_por. Cuelga del **grupo**
   y no de la empresa porque el cupón se le da a un `cliente`, que es

@@ -299,7 +299,7 @@ def create_app() -> FastAPI:
     # Tampoco lleva JWT, y este ni siquiera trae token: la landing del QR es
     # abierta a propósito —el cliente escanea y se registra— así que lo único
     # que la protege es el rate limit por IP. A cambio, escribe pero no borra
-    # y no devuelve más que un booleano (ADR-060).
+    # y no devuelve más que un booleano (ADR-061).
     app.include_router(sales_publico_router, prefix="/api/v1")
     app.include_router(marketing_webhook_router, prefix="/api/v1")
     app.include_router(sync_router, prefix="/api/v1")

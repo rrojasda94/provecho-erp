@@ -16,7 +16,7 @@ Qué significa «lo mínimo» acá, en concreto:
 - El `grupo_id` sale de la promoción activa y jamás del request. Uno que
   viniera de afuera sería permiso para escribir en otro tenant.
 
-El código del cupón **es el DNI** (decisión del usuario, ADR-060): que la
+El código del cupón **es el DNI** (decisión del usuario, ADR-061): que la
 respuesta lo repita no filtra nada, porque es el número que quien pregunta
 acaba de teclear.
 """
@@ -43,7 +43,7 @@ _limite_consulta = rate_limit("reconocerte_consulta", 20, 3600)
 
 # El más duro de los tres, y el que más importa: es el único que convierte
 # un DNI en un nombre. Sin este techo, la landing sería un padrón de RENIEC
-# consultable a discreción y gratis (ver ADR-060 → «lo que se acepta»).
+# consultable a discreción y gratis (ver ADR-061 → «lo que se acepta»).
 _limite_nombre = rate_limit("reconocerte_dni", 5, 3600)
 
 

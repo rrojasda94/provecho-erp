@@ -1,4 +1,4 @@
-"""Tests del slice de cupón de promoción (ADR-060): la landing pública del
+"""Tests del slice de cupón de promoción (ADR-061): la landing pública del
 QR emite, la caja canjea.
 
 Mismo patrón que `test_sales.py` — SQLite en memoria, seeder real (para que
@@ -583,7 +583,7 @@ def test_cupon_vencido_no_se_canjea(env):
 def test_el_cupon_es_nominal(env):
     """El código es el DNI, así que quien conozca uno ajeno podría
     intentarlo. Atarlo al cliente de la venta es lo que acota ese costo
-    (ADR-060)."""
+    (ADR-061)."""
     client, ids, TestSession = env
     client.post(f"{PUBLICO}/registro", json=_registro())
     client.post(

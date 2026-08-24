@@ -39,7 +39,7 @@ class Cupon(Base, UuidPkMixin, TimestampMixin):
     cliente_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("cliente.id"))
     # El número de documento del cliente (decisión del usuario, 2026-08-24).
     # Que el código sea algo que el cliente ya sabe es lo que hace que no
-    # tenga nada que recordar ni guardar; el costo está anotado en ADR-060.
+    # tenga nada que recordar ni guardar; el costo está anotado en ADR-061.
     codigo: Mapped[str] = mapped_column(String(20))
     estado: Mapped[str] = mapped_column(
         Enum("activo", "canjeado", name="estado_cupon", native_enum=False),

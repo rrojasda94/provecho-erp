@@ -151,7 +151,7 @@ encuesta a los clientes que la campaña trajo → cierre y medición
 
 - Escucha de `sales`: `sales.cliente_registrado_en_promocion` → crea el `lead`
   de quien se registró en la landing pública del QR (tipo `registro`, canal
-  `qr`, ADR-060). Empareja **por nombre** con una campaña `en_curso`: el cupón
+  `qr`, ADR-061). Empareja **por nombre** con una campaña `en_curso`: el cupón
   vive en `sales` y marketing no puede leer `promocion_cupon`. Sin campaña
   abierta con ese nombre no hay lead, y está bien — el lead es cómo Marketing
   mide, no parte de lo que se le prometió al cliente; frenar el registro por

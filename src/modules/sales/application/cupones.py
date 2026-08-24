@@ -2,7 +2,7 @@
 
 Dos superficies muy distintas y un solo cupón entre las dos:
 
-- **Emitir** lo hace el cliente, sin cuenta, desde su teléfono (ADR-060).
+- **Emitir** lo hace el cliente, sin cuenta, desde su teléfono (ADR-061).
   Nadie lo autenticó, así que este archivo no confía en nada de lo que
   llega salvo el número que el cliente teclea, y no devuelve más que un
   booleano y el código que él mismo acaba de escribir.
@@ -398,7 +398,7 @@ def canjear(
     if cupon is None:
         raise NoEncontrado("ese código no corresponde a ningún cupón")
     # El cupón es nominal. Sin esto, quien conozca un DNI ajeno se lleva el
-    # descuento de otro — que es justo el costo que ADR-060 acota atándolo
+    # descuento de otro — que es justo el costo que ADR-061 acota atándolo
     # al cliente de la venta.
     if cupon.cliente_id != venta.cliente_id:
         raise ReglaNegocio("ese cupón es de otro cliente")

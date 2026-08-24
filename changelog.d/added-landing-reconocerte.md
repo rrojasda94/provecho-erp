@@ -1,5 +1,5 @@
 - **Landing pública «Queremos RE-conocerte» y cupón de 10 %** (2026-08-24,
-  ADR-060). Un QR en la mesa lleva a `/reconocerte`, donde un cliente de
+  ADR-061). Un QR en la mesa lleva a `/reconocerte`, donde un cliente de
   Charlie's deja DNI, cumpleaños, dirección y teléfono sin necesidad de
   cuenta, y recibe un cupón de un solo uso para su siguiente compra. La caja
   lo canjea con `POST /sales/ventas/{id}/cupon`, y ahí queda desactivado para
