@@ -1,0 +1,103 @@
+name: Desplegar
+
+# Despliegue a staging desde GitHub, a pedido (ADR-060).
+#
+# ADR-008 decidió automatizar la **entrega** (la imagen) y dejar el
+# **despliegue** manual "hasta que exista el VPS". El VPS ya existe, y lo que
+# quedó no es un despliegue manual sino uno atado a una laptop: hace falta
+# esa PC, con esa llave, y la llave tiene passphrase. El 2026-08-23 eso dejó
+# staging sin actualizar porque quien tenía que desplegar estaba en otro lado.
+#
+# `workflow_dispatch` y no `push`: el despliegue sigue siendo un **acto
+# explícito** —alguien elige la versión y le da a Run—, que es lo que ADR-008
+# protegía. Lo que cambia es que ese alguien puede estar en cualquier parte.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Versión a desplegar (ej. 0.7.1, o latest)"
+        required: true
+        default: latest
+      cargar_catalogo:
+        description: "Simular la carga del catálogo después de desplegar"
+        type: boolean
+        default: false
+
+# Un despliegue a la vez. Dos corriendo juntos se pisan el `up -d` y dejan el
+# servidor en un estado que no es ninguna de las dos versiones.
+concurrency:
+  group: desplegar-staging
+  cancel-in-progress: false
+
+jobs:
+  staging:
+    runs-on: ubuntu-latest
+    # Environment de GitHub: es donde se le ponen revisores obligatorios si
+    # algún día hace falta aprobar antes de tocar el servidor. Vacío no
+    # estorba, y agregarlo después no obliga a tocar este archivo.
+    environment: staging
+    permissions:
+      contents: read
+    env:
+      SERVIDOR: ${{ vars.STAGING_HOST || '165.227.120.112' }}
+      USUARIO: ${{ vars.STAGING_USER || 'app' }}
+      CARPETA: ${{ vars.STAGING_DIR || 'provecho-staging' }}
+      DOMINIO_API: ${{ vars.STAGING_API || 'https://api-staging.majambo.com.pe' }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Preparar SSH
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          echo "${{ secrets.STAGING_SSH_KEY }}" > ~/.ssh/id_despliegue
+          chmod 600 ~/.ssh/id_despliegue
+          # La huella del servidor va en un secreto, no se acepta a ciegas:
+          # con `StrictHostKeyChecking=no`, cualquiera que se meta en el medio
+          # se lleva una sesión con permiso de desplegar.
+          echo "${{ secrets.STAGING_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      # El script viaja del repo al servidor en cada despliegue en vez de
+      # asumir que allá hay una copia: una copia vieja en el servidor es un
+      # despliegue que hace algo distinto de lo que dice el repo, y nadie se
+      # entera hasta que falla.
+      - name: Llevar el script de despliegue
+        run: |
+          scp -i ~/.ssh/id_despliegue scripts/desplegar.sh \
+            "$USUARIO@$SERVIDOR:~/$CARPETA/desplegar.sh"
+          ssh -i ~/.ssh/id_despliegue "$USUARIO@$SERVIDOR" \
+            "chmod +x ~/$CARPETA/desplegar.sh"
+
+      - name: Desplegar ${{ inputs.version }}
+        run: |
+          ssh -i ~/.ssh/id_despliegue "$USUARIO@$SERVIDOR" \
+            "cd ~/$CARPETA && ./desplegar.sh '${{ inputs.version }}'"
+
+      # Se comprueba desde afuera, contra el dominio público: que el
+      # contenedor arranque no significa que el proxy lo esté sirviendo.
+      - name: Comprobar qué versión quedó
+        run: |
+          desplegada=$(curl -fsS "$DOMINIO_API/openapi.json" \
+            | python3 -c 'import json,sys; print(json.load(sys.stdin)["info"]["version"])')
+          echo "staging responde $desplegada"
+          echo "### Staging en \`$desplegada\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Simular la carga del catálogo
+        if: ${{ inputs.cargar_catalogo }}
+        run: |
+          # `--simular` deshace todo al final: esto no escribe nada. La carga
+          # de verdad se corre a mano, mirando primero este resultado.
+          ssh -i ~/.ssh/id_despliegue "$USUARIO@$SERVIDOR" \
+            "cd ~/$CARPETA && docker compose -f docker-compose.staging.yml exec -T api \
+             python -m scripts.odoo.cargar_catalogo --origen /tmp/catalogo --simular" \
+            | tee /tmp/simulacion.txt
+          {
+            echo "### Simulación de carga"
+            echo '```'
+            cat /tmp/simulacion.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Borrar la llave
+        if: always()
+        run: rm -f ~/.ssh/id_despliegue
