@@ -7,7 +7,7 @@ Alcance: `venta`/`venta_item` (PROC-COM-001), `cliente`, `punto_venta`,
 Precio server-side: `lista_precio` + `precio` (RN-PRC-003).
 Variantes: `producto_comercial.producto_padre_id` (tamaños con receta y
 precio propios) + `producto_opcion_grupo` (qué grupos de extras son
-obligatorios). Cupón de promoción: `promocion_cupon` + `cupon` (ADR-059).
+obligatorios). Cupón de promoción: `promocion_cupon` + `cupon` (ADR-060).
 Diferido a un slice posterior: combo, la `promocion` ligada a lista de
 precios de §6, carrito, central_pedidos, cuenta_puntos, carta_disputa_pago.
 """

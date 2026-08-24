@@ -292,7 +292,7 @@ def aplicar_descuento(
     return venta
 
 
-# --- Cupón de promoción (ADR-059) --------------------------------------------
+# --- Cupón de promoción (ADR-060) --------------------------------------------
 @router.post("/ventas/{venta_id}/cupon", response_model=schemas.CuponCanjeadoOut)
 def canjear_cupon(
     venta_id: uuid.UUID,

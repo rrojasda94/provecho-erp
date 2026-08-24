@@ -858,7 +858,7 @@ class ArbolProductoOut(ProductoDetalleOut):
 
 
 
-# --- Cupón de promoción (ADR-059) --------------------------------------------
+# --- Cupón de promoción (ADR-060) --------------------------------------------
 class RegistroPublicoIn(UbicacionMixin):
     """Lo que la landing pública manda al registrar a un cliente.
 

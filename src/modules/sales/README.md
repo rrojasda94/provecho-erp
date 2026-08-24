@@ -670,7 +670,7 @@ líneas de receta que lo usan como condición.
 
 `producto_comercial.lienzo_pos` pasa a ser editable por `PATCH /productos/{id}`.
 
-## Cupón de promoción y landing pública (implementado 2026-08-24, ADR-059)
+## Cupón de promoción y landing pública (implementado 2026-08-24, ADR-060)
 
 La campaña **«Queremos RE-conocerte»**: un QR en la mesa lleva a una landing
 donde el cliente deja DNI, cumpleaños, dirección y teléfono, y recibe un cupón
@@ -682,7 +682,7 @@ escrituras en `sales`: crear o encontrar un `cliente` y descontar una `venta`.
 Un módulo solo entra a otro por `api.deps` o `queries_publicas`
 (`tests/test_arquitectura.py`), y ninguno de los dos sirve para escribir.
 Marketing se entera por evento y crea su `lead` — igual que con
-`sales.venta_confirmada`. Todo el razonamiento está en ADR-059.
+`sales.venta_confirmada`. Todo el razonamiento está en ADR-060.
 
 **Entidades.** `promocion_cupon` (la campaña: porcentaje, fin, vigencia por
 cupón, estado `activa`/`terminada`) y `cupon` (uno por cliente: código,
@@ -809,7 +809,7 @@ Producto comercial → receta → confirmar venta → evento `sales.venta_confir
   cocina — ver abajo), `sales.consumo_personal_registrado` (comida del
   personal, RN-COM-025 — inventory descuenta como `consumo_interno`),
   `sales.cliente_registrado_en_promocion` (marketing lo convierte en `lead`
-  de campaña) y `sales.cupon_canjeado` (ADR-059).
+  de campaña) y `sales.cupon_canjeado` (ADR-060).
 - Escucha: **`sales.venta_confirmada`, de sí mismo**
   (`application/listeners.py`). Es el único listener del módulo y no hace
   trabajo: encola la revisión de demora y vuelve. El bus es síncrono y en

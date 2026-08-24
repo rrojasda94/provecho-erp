@@ -1,4 +1,4 @@
-# ADR-059 — El cupón de la landing pública vive en `sales`, y el descuento reusa el de la orden
+# ADR-060 — El cupón de la landing pública vive en `sales`, y el descuento reusa el de la orden
 
 - **Estado:** aceptada
 - **Fecha:** 2026-08-24

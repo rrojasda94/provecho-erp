@@ -4,7 +4,7 @@ Parte del backlog de deuda técnica del proyecto. El índice y las reglas
 de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 
 - ⬜ **La promoción de cupón no es la `promocion` de §6** (2026-08-24,
-  ADR-059). `promocion_cupon` hace una sola cosa —un porcentaje, una vigencia
+  ADR-060). `promocion_cupon` hace una sola cosa —un porcentaje, una vigencia
   y un interruptor— y **no** liga lista de precios, material promocional,
   guion de atención ni capacitación, que es lo que `data-model.md` §6
   especifica para `promocion` (RN-PRM-001/002). Las dos van a convivir el día
@@ -12,7 +12,7 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   misma entidad con más campos o dos cosas distintas. **No unificar antes de
   tener el caso real**: hoy sería especificar de más algo que el negocio no
   usa.
-- ⬜ **Un cupón no se puede anular ni reemitir** (2026-08-24, ADR-059). Si un
+- ⬜ **Un cupón no se puede anular ni reemitir** (2026-08-24, ADR-060). Si un
   cajero lo canjea por error, no hay camino de vuelta: la venta se anula pero
   el cupón queda `canjeado`. Se dejó afuera porque un "descanjear" es
   exactamente la puerta por la que el descuento de un solo uso deja de serlo,
@@ -29,7 +29,7 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   herramienta externa apuntando a `/reconocerte`. Lo que falta cuando haya
   pantalla: cuántos cupones se emitieron, cuántos se canjearon y cuánto
   margen costó — hoy eso sale de consultar la base a mano.
-- ⬜ **El código del cupón es adivinable** (2026-08-24, ADR-059). Es el DNI,
+- ⬜ **El código del cupón es adivinable** (2026-08-24, ADR-060). Es el DNI,
   lo pidió el negocio, y el riesgo está acotado —el canje exige que la venta
   sea de ese mismo cliente— pero no eliminado. Si alguna vez pesa más que la
   comodidad de no tener nada que guardar, el cambio es un código aleatorio en

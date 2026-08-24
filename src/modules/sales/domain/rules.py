@@ -100,7 +100,7 @@ MODOS_DESCUENTO = {"porcentaje", "monto"}
 # Un descuento sin motivo no es auditable: el reporte necesita saber por qué
 # se regaló margen, no solo cuánto.
 # `cupon` es el único motivo que NO nace de la discreción de un supervisor:
-# lo trae el cliente y el cajero solo lo teclea (ADR-059). Está en el mismo
+# lo trae el cliente y el cajero solo lo teclea (ADR-060). Está en el mismo
 # conjunto para que `venta.total` siga siendo uno solo, y separado como
 # motivo para que el reporte de descuentos pueda distinguir el margen que se
 # regaló a criterio del que se había prometido en una campaña.
@@ -360,7 +360,7 @@ def combinaciones_a_generar(modo_variante: str) -> bool:
     return modo_variante == "siempre"
 
 
-# --- Cupón de promoción (ADR-059) --------------------------------------------
+# --- Cupón de promoción (ADR-060) --------------------------------------------
 ESTADOS_CUPON = {"activo", "canjeado"}
 
 

@@ -115,7 +115,7 @@ PERMISOS = [
     ),
     (
         "sales.gestionar_promociones",
-        "Terminar una campaña de cupón (ADR-059) — le quita a todo el padrón "
+        "Terminar una campaña de cupón (ADR-060) — le quita a todo el padrón "
         "un beneficio ya prometido, así que no es del cajero que canjea",
     ),
     ("sales.crear_pedido", "Crear pedido (canal agente IA)"),
@@ -328,7 +328,7 @@ ROLES = {
         # acto que registrar a alguien en el mostrador (ADR-052).
         "sales.gestionar_clientes",
         # Cortar la campaña de cupón: el derecho que la empresa se reserva
-        # en los términos de la landing (ADR-059).
+        # en los términos de la landing (ADR-060).
         "sales.gestionar_promociones",
         "kds.configurar",
         "kds.operar",
@@ -746,7 +746,7 @@ def _seed_encuesta(session: Session, creado_por) -> None:
 
 
 def _seed_promocion_cupon(session: Session) -> None:
-    """La campaña «Queremos RE-conocerte» (ADR-059).
+    """La campaña «Queremos RE-conocerte» (ADR-060).
 
     Va en el seeder y no en la migración porque es un dato de negocio, no
     de esquema: una migración que inserta la campaña la resucitaría en cada

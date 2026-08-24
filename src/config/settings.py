@@ -171,7 +171,7 @@ class Settings(BaseSettings):
     # Base pública del formulario de encuesta (canal `link` y el enlace que
     # viaja en el WhatsApp). Vacío = se envía solo el texto, sin enlace.
     marketing_url_publica: str = ""
-    # --- Promoción de cupón «Queremos RE-conocerte» (ADR-059) ----------------
+    # --- Promoción de cupón «Queremos RE-conocerte» (ADR-060) ----------------
     # Valores con los que el seeder crea la campaña. Son semilla, no fuente de
     # verdad: una vez creada, la fila manda —terminarla es un `POST`, no un
     # despliegue— porque la empresa se reserva el derecho de cortarla en
