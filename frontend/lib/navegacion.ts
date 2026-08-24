@@ -18,6 +18,7 @@ export type ItemSubmenu = { label: string; href: string };
 export const SUBMENUS: Record<string, ItemSubmenu[]> = {
   catalogo: [
     { label: "Productos", href: "/catalogo/productos" },
+    { label: "Atributos", href: "/catalogo/atributos" },
     { label: "Recetas", href: "/catalogo/recetas" },
   ],
   compras: [

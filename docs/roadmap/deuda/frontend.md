@@ -180,9 +180,10 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   ficha construida y solo se alcanzan tecleando la URL o desde el botón de
   destino de un reporte. El listado de artículos no abre la ficha de ninguna
   de sus filas.
-- ⬜ **El rastro no llega al PDV, al KDS ni al lienzo**: viven fuera de
-  `(app)` y tienen su propia barra. Es decisión tomada (ADR-039), no olvido;
-  se revisa si alguna de las tres deja de ser una pantalla de una sola tarea.
+- ⬜ **El rastro no llega al PDV ni al KDS**: viven fuera de `(app)` y tienen
+  su propia barra. Es decisión tomada (ADR-039), no olvido; se revisa si
+  alguna de las dos deja de ser una pantalla de una sola tarea. (El lienzo,
+  que también estaba en esta lista, se borró en ADR-063.)
 - ⬜ **Login y PDV siguen sin migrar a shadcn**: el login conserva sus
   clases `.login-*` en `@layer components` y el PDV su CSS propio. Funcionan;
   se migran cuando se los toque, no antes. (El login se tocó el 2026-08-15

@@ -185,9 +185,6 @@ export type Producto = {
   es_extra: boolean;
   empaque_id: string | null;
   modalidades_empaque: string[] | null;
-  /** Dónde quedó el nodo en el lienzo (ADR-058). `null` = todavía no se
-   * movió, y el lienzo lo coloca por topología. */
-  lienzo_pos: { x: number; y: number } | null;
 };
 
 export type ExtraDeProducto = {
@@ -341,8 +338,6 @@ export const catalogoApi = {
       /** Artículo de empaque y en qué modalidades se descuenta (RN-EMP-003). */
       empaque_id: string | null;
       modalidades_empaque: string[] | null;
-      /** Dónde quedó el nodo en el lienzo (ADR-058). */
-      lienzo_pos: { x: number; y: number } | null;
     }>,
   ) => pedir<Producto>(`/sales/productos/${id}`, { metodo: "PATCH", cuerpo }),
 
@@ -466,9 +461,36 @@ export const catalogoApi = {
     orden?: number;
   }) => pedir<Atributo>("/sales/atributos", { metodo: "POST", cuerpo }),
 
+  editarAtributo: (
+    atributoId: string,
+    cuerpo: Partial<{
+      nombre: string;
+      modo_variante: string;
+      display: string;
+      orden: number;
+    }>,
+  ) => pedir<Atributo>(`/sales/atributos/${atributoId}`, { metodo: "PATCH", cuerpo }),
+
+  /** Solo si ningún producto lo ofrece; si alguno lo ofrece, 409 nombrándolo. */
+  borrarAtributo: (atributoId: string) =>
+    pedir<void>(`/sales/atributos/${atributoId}`, { metodo: "DELETE" }),
+
   agregarValorDeAtributo: (atributoId: string, cuerpo: { nombre: string; orden?: number }) =>
     pedir<Atributo>(`/sales/atributos/${atributoId}/valores`, {
       metodo: "POST",
+      cuerpo,
+    }),
+
+  /** Del **catálogo**: renombrar, reordenar o retirarlo para que ningún
+   * producto nuevo pueda ofrecerlo. Sacarlo de un producto puntual es
+   * `fijarPrecioExtra` sobre el PTAV, que es otro nivel. */
+  editarValorDeAtributo: (
+    atributoId: string,
+    valorId: string,
+    cuerpo: Partial<{ nombre: string; orden: number; activo: boolean }>,
+  ) =>
+    pedir<Atributo>(`/sales/atributos/${atributoId}/valores/${valorId}`, {
+      metodo: "PATCH",
       cuerpo,
     }),
 
@@ -481,10 +503,22 @@ export const catalogoApi = {
       cuerpo,
     }),
 
-  fijarPrecioExtra: (ptavId: string, precio_extra: string) =>
+  /** 409 si algún valor ya lo materializa una variante, lo nombra una
+   * exclusión, lo eligió una venta o condiciona una línea de receta. */
+  quitarAtributoDelProducto: (productoId: string, atributoId: string) =>
+    pedir<void>(`/sales/productos/${productoId}/atributos/${atributoId}`, {
+      metodo: "DELETE",
+    }),
+
+  /** `precio_extra` y `activo` son independientes: mandar solo uno no toca
+   * el otro. `activo: true` es lo que **reofrece** un valor retirado. */
+  fijarPrecioExtra: (
+    ptavId: string,
+    cuerpo: Partial<{ precio_extra: string; activo: boolean }>,
+  ) =>
     pedir<ValorDeProducto>(`/sales/atributos/valores/${ptavId}`, {
       metodo: "PATCH",
-      cuerpo: { precio_extra },
+      cuerpo,
     }),
 
   retirarValor: (ptavId: string) =>
@@ -495,6 +529,25 @@ export const catalogoApi = {
       metodo: "POST",
       cuerpo: { valor_id, excluye_id },
     }),
+
+  dejarDeExcluir: (valor_id: string, excluye_id: string) =>
+    pedir<void>("/sales/atributos/exclusiones", {
+      metodo: "DELETE",
+      cuerpo: { valor_id, excluye_id },
+    }),
+
+  /** Materializa las combinaciones de los atributos en modo `siempre`.
+   * Idempotente: repetirlo después de agregar un sabor crea solo lo que
+   * falta y nunca borra ni desactiva lo que ya existe (RN-COM-039). */
+  generarVariantes: (productoId: string) =>
+    pedir<VariantesGeneradas>(`/sales/productos/${productoId}/variantes`, {
+      metodo: "POST",
+    }),
+
+  /** Con qué se puede condicionar una línea de esta receta (ADR-056).
+   * `[]` = ningún producto la usa, y el editor esconde la columna. */
+  atributosDeReceta: (recetaId: string) =>
+    pedir<EjeDeCondicion[]>(`/sales/recetas/${recetaId}/atributos`),
 };
 
 // --- Matriz de recetas y atributos (ADR-055, ADR-057, ADR-058) --------------
@@ -549,13 +602,30 @@ export type LineaDeAtributo = {
   valores: ValorDeProducto[];
 };
 
+export type VariantesGeneradas = {
+  creadas: number;
+  /** Nombres de las variantes recién creadas que no figuran en ninguna
+   * lista de precios: `GET /carta` las descarta en silencio, así que sin
+   * este aviso alguien genera doce combinaciones y no ve ninguna en el PDV. */
+  sin_precio: string[];
+  arbol: ArbolProducto;
+};
+
+export type ValorSimple = { id: string; nombre: string };
+
+export type EjeDeCondicion = {
+  id: string;
+  nombre: string;
+  valores: ValorSimple[];
+};
+
 export type ArbolProducto = ProductoDetalle & {
   /** La ficha completa de cada variante, con SUS grupos y extras. Viene acá
    * y no se pide aparte: era una petición por variante (ADR-058). */
   variantes_detalle: ProductoDetalle[];
   atributos: LineaDeAtributo[];
-  /** Pares que no van juntos (RN-COM-038). El lienzo solo necesita saber qué
-   * apagar cuando alguien ya eligió un valor. */
+  /** Pares que no van juntos (RN-COM-038): la ficha del producto los lista
+   * y ofrece deshacerlos. */
   exclusiones: [string, string][];
   combinaciones: {
     producto_comercial_id: string;

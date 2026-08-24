@@ -1490,6 +1490,14 @@ producción se hace en cocinas de sucursal. Ver
   dos sentidos**; `«A» + «B»` y `«B» + «A»` son el mismo plato y consumen lo
   mismo. Se hace cumplir **al confirmar la venta**, no solo en el PDV: el
   kiosko y la central de pedidos entran por el mismo endpoint.
+- **RN-COM-039** Un atributo en modo `siempre` **materializa** sus
+  combinaciones como productos comerciales hijos, uno por combinación válida.
+  Nunca se materializa una combinación que RN-COM-038 declara excluida.
+  Generar es **idempotente**: repetirlo después de agregar un valor crea solo
+  las combinaciones nuevas, nunca duplica las que ya existen. Retirar un
+  valor o bajar un atributo de `siempre` a `nunca` **nunca borra ni desactiva**
+  una variante ya generada — puede tener ventas que la nombran; solo deja de
+  generarse hacia adelante.
 
 ## Cumplimiento de pedido
 

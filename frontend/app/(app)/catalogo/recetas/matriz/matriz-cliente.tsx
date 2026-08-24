@@ -32,9 +32,9 @@ import {
  *
  * Tres decisiones que se notan al usarla:
  *
- * - **Se guarda por lote, con un botón.** El lienzo guarda en cada `onBlur`
- *   y eso es una ida a la red por celda; en una grilla sería una por
- *   tabulación. Acá se edita todo y se manda lo que cambió.
+ * - **Se guarda por lote, con un botón.** Guardar en cada `onBlur` (como el
+ *   editor de receta) sería una ida a la red por celda; en una grilla sería
+ *   una por tabulación. Acá se edita todo y se manda lo que cambió.
  * - **Se puede pegar desde Excel.** Es el gesto que la gente ya tiene, y sin
  *   él la grilla es una tabla de inputs más.
  * - **La celda muestra lo tecleado, no el resultado.** Quien escribió

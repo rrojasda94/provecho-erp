@@ -77,14 +77,24 @@ productos con 361 recetas.
 | F2 | Explosión de receta condicionada, venta, eventos, sync | ✅ 2026-08-23 |
 | F3 | Conversor y cargador del catálogo de Odoo (`scripts/odoo/`) | ✅ 2026-08-23 |
 | F4 | Matriz de recetas (ADR-057) | ✅ 2026-08-23 |
-| F5 | Lienzo sobre el modelo de atributos (ADR-058) | ✅ 2026-08-23 |
+| F5 | Lienzo sobre el modelo de atributos (ADR-058) | ⛔ superada 2026-08-24 (ADR-063) |
 | F6 | Seeder desde los `.xlsx` reales, corte 0.7.0 | ⏳ |
-| F7 | La condición de una línea se lee y se edita en el lienzo | ✅ 2026-08-24 |
+| F7 | La condición de una línea se lee y se edita en el lienzo | ⛔ superada 2026-08-24 (ADR-063) |
+| F8 | Los atributos vuelven a la tabla: pantallas + generador de variantes (ADR-063) | ✅ 2026-08-24 |
 
-**Vuelta atrás**: la migración es solo aditiva, así que la imagen 0.6.0 corre
-contra este esquema sin enterarse. Volver a operar es
-`./scripts/desplegar.sh 0.6.0`; el `alembic downgrade` solo hace falta si
-además se quiere el esquema idéntico, y borra lo cargado con el modelo nuevo.
+**F5 y F7 quedaron sin efecto el mismo día que se cerraron**: el lienzo no
+resultó un lugar de trabajo usable — el usuario seguía sin poder ver ni crear
+atributos — y se reemplazó entero por `/catalogo/atributos` + la sección
+«Atributos» de la ficha del producto + la columna «Condición» del editor de
+receta. F8 cubre lo mismo que F5/F7 prometían, con tablas, y suma el
+generador de combinaciones que F5 había dejado pendiente (`modo_variante =
+'siempre'`; `'dinamica'` sigue sin construirse, ver deuda técnica).
+
+**Vuelta atrás**: la migración de F1-F4 es solo aditiva, así que la imagen
+0.6.0 corre contra ese esquema sin enterarse. F8 rompe esa promesa para
+`producto_comercial.lienzo_pos` (migración `ce32c6610eb7`, la borra): volver
+a una versión anterior a F8 exige `alembic downgrade` explícito, ya no basta
+con `./scripts/desplegar.sh 0.6.0`.
 
 ## Pendientes de decisión (registro vivo)
 

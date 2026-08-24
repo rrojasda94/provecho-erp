@@ -1,5 +1,5 @@
-import { ApiError, apiFetch } from "@/lib/api";
-import type { Producto, ProductoDetalle, Receta, UnidadMedida } from "@/lib/catalogo";
+import { ApiError, apiFetch, type Pagina } from "@/lib/api";
+import type { ArbolProducto, Articulo, Producto, Receta, UnidadMedida } from "@/lib/catalogo";
 import { obtenerSesion } from "@/lib/sesion";
 
 import { FichaProducto, type ListaPrecio } from "./ficha-cliente";
@@ -13,14 +13,15 @@ export default async function ProductoPage({
   const { token } = await obtenerSesion();
 
   try {
-    // Todo lo que la ficha necesita para elegir sin volver al servidor por
-    // cada desplegable. Las recetas se **eligen** acá, no se editan: eso
-    // vive en Catálogo → Recetas y duplicarlo confundía más que ayudar.
-    const [producto, recetas, unidades, productos] = await Promise.all([
-      apiFetch<ProductoDetalle>(`/api/v1/sales/productos/${id}`, { token }),
+    // El árbol trae de una sola vez lo que antes eran dos llamadas —la
+    // ficha y los atributos— y es lo mismo que la sección de atributos
+    // necesita para dibujarse sin pedir nada aparte.
+    const [producto, recetas, unidades, productos, articulos] = await Promise.all([
+      apiFetch<ArbolProducto>(`/api/v1/sales/productos/${id}/arbol`, { token }),
       apiFetch<Receta[]>("/api/v1/inventory/recetas", { token }),
       apiFetch<UnidadMedida[]>("/api/v1/inventory/unidades-medida", { token }),
       apiFetch<Producto[]>("/api/v1/sales/productos", { token }),
+      apiFetch<Pagina<Articulo>>("/api/v1/inventory/articulos", { token }),
     ]);
     const listas = await apiFetch<ListaPrecio[]>(
       `/api/v1/sales/listas-precio?marca_id=${producto.marca_id}`,
@@ -32,6 +33,7 @@ export default async function ProductoPage({
         recetas={recetas}
         unidades={unidades}
         extrasDisponibles={productos.filter((p) => p.es_extra)}
+        empaques={articulos.items.filter((a) => !a.archivado)}
         listas={listas}
       />
     );
