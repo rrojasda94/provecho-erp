@@ -57,14 +57,37 @@ jobs:
           echo "${{ secrets.STAGING_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
-      # El script viaja del repo al servidor en cada despliegue en vez de
-      # asumir que allá hay una copia: una copia vieja en el servidor es un
-      # despliegue que hace algo distinto de lo que dice el repo, y nadie se
-      # entera hasta que falla.
-      - name: Llevar el script de despliegue
+      # Qué se va a pisar, ANTES de pisarlo. El compose y el Caddyfile se
+      # copiaron a mano al montar el servidor (2026-08-23) y pudieron haberse
+      # editado ahí desde entonces; el diff queda en el resumen del run para
+      # que la divergencia se vea una vez y no se descubra por un 502.
+      - name: Ver qué difiere en el servidor
         run: |
-          scp -i ~/.ssh/id_despliegue scripts/desplegar.sh \
-            "$USUARIO@$SERVIDOR:~/$CARPETA/desplegar.sh"
+          {
+            echo "### Configuración que se lleva al servidor"
+            for archivo in desplegar.sh docker-compose.staging.yml Caddyfile; do
+              case "$archivo" in
+                desplegar.sh) origen="scripts/desplegar.sh" ;;
+                *) origen="$archivo" ;;
+              esac
+              echo "#### $archivo"
+              echo '```diff'
+              ssh -i ~/.ssh/id_despliegue "$USUARIO@$SERVIDOR" \
+                "cat ~/$CARPETA/$archivo 2>/dev/null" | diff - "$origen" || true
+              echo '```'
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Viajan del repo al servidor en cada despliegue en vez de asumir que
+      # allá hay una copia: una copia vieja en el servidor es un despliegue que
+      # hace algo distinto de lo que dice el repo, y nadie se entera hasta que
+      # falla. Ya pasó con `desplegar.sh` (ADR-060), y el compose es el mismo
+      # riesgo: la clave de Google que el frontend necesita se declara ahí.
+      - name: Llevar el script y la configuración del stack
+        run: |
+          scp -i ~/.ssh/id_despliegue \
+            scripts/desplegar.sh docker-compose.staging.yml Caddyfile \
+            "$USUARIO@$SERVIDOR:~/$CARPETA/"
           ssh -i ~/.ssh/id_despliegue "$USUARIO@$SERVIDOR" \
             "chmod +x ~/$CARPETA/desplegar.sh"
 

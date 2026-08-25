@@ -88,7 +88,8 @@ function inicial(u: Ubicacion | null | undefined): Ubicacion {
   return u ?? UBICACION_VACIA;
 }
 
-/** El mapa solo existe con SDK cargado, y solo se ve con el pin puesto. */
+/** El contenedor existe siempre —el SDK necesita un nodo donde dibujar—
+    y solo se ve con el pin puesto. */
 function Mapa({
   contenedor,
   visible,
@@ -305,7 +306,13 @@ export function CampoDireccion({
 
   return (
     <div className="flex flex-col gap-1.5">
-      {conMapa && <div ref={buscadorRef} className="w-full" />}
+      {/* Se renderiza SIEMPRE, oculto hasta que el SDK cargue. Estuvo
+          condicionado a `conMapa` y eso era un bloqueo mutuo: el efecto que
+          carga el SDK necesita este `ref` para montar el buscador, y solo
+          entonces pone `conMapa` en true — pero sin `conMapa` el div no
+          existía, el `ref` era null y el efecto salía antes de encenderlo.
+          El mapa no aparecía nunca, con clave o sin ella. */}
+      <div ref={buscadorRef} className={conMapa ? "w-full" : "hidden"} />
 
       <CampoTexto
         {...presentacion}
@@ -321,7 +328,8 @@ export function CampoDireccion({
 
       <CamposOcultos ancla={ancla} />
 
-      {conMapa && <Mapa contenedor={mapaRef} visible={anclada} />}
+      {/* Mismo motivo: `moverPin` necesita este contenedor para dibujar. */}
+      <Mapa contenedor={mapaRef} visible={conMapa && anclada} />
 
       <p className="text-xs text-muted-foreground" role="status">
         {mensaje(aviso, anclada, conMapa)}

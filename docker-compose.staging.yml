@@ -117,12 +117,24 @@ services:
     image: ${PROVECHO_WEB_IMAGE:-ghcr.io/rrojasda94/provecho-erp-web:latest}
     restart: unless-stopped
     environment:
-      # Vista del navegador: fuera de los contenedores, por el dominio real.
-      NEXT_PUBLIC_API_URL: https://api-staging.majambo.com.pe
-      # Vista del proceso de Next (Server Actions): dentro de la red de
-      # Docker, nombre del servicio.
+      # Vista del proceso de Next (Server Actions, Server Components y el
+      # proxy `/api/proxy`): dentro de la red de Docker, nombre del servicio.
+      #
+      # No hay `NEXT_PUBLIC_API_URL`: el navegador NUNCA habla con la API
+      # directo (la CSP de `middleware.ts` fija `connect-src 'self'`), y por
+      # ser `NEXT_PUBLIC_*` se hornea en el build — acá no habría funcionado
+      # ni queriendo. Ver devops.md#docker.
       API_INTERNAL_URL: http://api:8000
       COOKIE_SECURE: "true"
+      # Clave de Google Maps del NAVEGADOR (mapa + autocompletado de
+      # direcciones). Se declaran una por una y no con `env_file: .env` para
+      # que este contenedor vea esa clave y NO la del servidor: la que calcula
+      # el cobro del delivery (`GOOGLE_MAPS_SERVER_KEY`) no tiene nada que
+      # hacer en el proceso que sirve el frontend. La interpolación `${...}`
+      # la resuelve el CLI de compose desde el mismo `.env` de esta carpeta.
+      GOOGLE_MAPS_BROWSER_KEY: ${GOOGLE_MAPS_BROWSER_KEY:-}
+      GOOGLE_MAPS_MAP_ID: ${GOOGLE_MAPS_MAP_ID:-DEMO_MAP_ID}
+      GOOGLE_MAPS_PAIS: ${GOOGLE_MAPS_PAIS:-pe}
     depends_on:
       - api
 

@@ -39,6 +39,14 @@ general del despliegue.
   gestionado aparte. Ver `docker-compose.staging.yml`.
 - **Proxy/TLS:** Caddy (certificado HTTPS automático), no nginx+certbot a
   mano.
+- **Google Maps: solo la clave del navegador** (2026-08-25). Restringida por
+  referente a `https://staging.majambo.com.pe/*`, con las tres APIs del mapa
+  (Maps JavaScript, Places (New), Geocoding) y su cuota diaria.
+  `GOOGLE_MAPS_SERVER_KEY` queda **vacía a propósito**: sin ella la Routes API
+  no se llama nunca, la distancia de reparto se estima en línea recta ×1,3 y la
+  cotización se marca «aproximada» — un estado soportado y probado
+  (`integraciones-google.md §7`). Se agrega cuando haga falta medir de verdad,
+  restringida por la IP del droplet.
 
 ## Setup ya hecho (2026-08-23)
 
@@ -109,6 +117,66 @@ el `Caddyfile`), anotada en [`deuda/ci-cd.md`](../roadmap/deuda/ci-cd.md): no
 se aplicó de una porque un `Caddyfile` inválido deja staging sin proxy —peor
 que el 502— y hay que validarlo contra el servidor antes de recargarlo.
 
+## Bug encontrado y resuelto (2026-08-25)
+
+**La clave de Google en el `.env` no llegaba al frontend.** El servicio `web`
+no tiene `env_file: .env` —es a propósito, así nunca ve
+`GOOGLE_MAPS_SERVER_KEY`, la que define cuánta plata paga el cliente—, así que
+recibe únicamente las variables declaradas una por una en su `environment:`. El
+`docker-compose.yml` de desarrollo declaraba las tres del mapa; el de staging
+(y el de producción) no. Resultado: pegar la clave en `~/provecho-staging/.env`
+no encendía nada y no había ningún error que mirar — ni en la consola del
+navegador ni en los logs.
+
+Se comprueba en un comando, y es el paso 0 de la verificación de
+`integraciones-google.md §8`:
+
+```bash
+docker compose -f docker-compose.staging.yml exec web env | grep GOOGLE
+```
+
+De paso salió lo que lo hacía difícil de ver: `.env.staging.example` documentaba
+`GOOGLE_API_KEY`, un nombre que se había renombrado a `GOOGLE_MAPS_BROWSER_KEY`
+y que `Settings` descarta en silencio (`extra="ignore"`). Ahora
+`tests/test_settings.py` prueba también el sentido inverso —que toda variable
+del ejemplo de staging la lea alguien—, que es lo que dejó pasar esto.
+
+**Y un tercero, de proceso:** el workflow *Desplegar* copiaba solo
+`scripts/desplegar.sh`. `docker-compose.staging.yml` y el `Caddyfile` se
+copiaron a mano el 2026-08-23 y nadie los volvía a sincronizar, así que el
+arreglo de arriba no habría llegado al servidor nunca. Ahora los tres viajan en
+cada despliegue, con un paso previo que deja el `diff` contra lo que hay en el
+droplet en el resumen del run — mismo criterio que ADR-060 ya había aplicado al
+script.
+
+## Lo que encontró encender Google (2026-08-25)
+
+Staging hizo lo que se compró que hiciera: **el primer uso real de una
+integración encontró un bug que ninguna prueba veía**. La clave del navegador
+estaba bien, las restricciones también, el SDK cargaba — y el mapa no aparecía
+nunca, tampoco en desarrollo. Era un bloqueo mutuo en
+`components/direccion/campo-direccion.tsx` (detalle en el CHANGELOG): la
+integración de ADR-053 estuvo muerta desde que se escribió.
+
+Vale la pena registrar el orden en que se descartaron las hipótesis, porque
+las tres primeras eran razonables y ninguna era:
+
+1. *La variable no llega al contenedor* — cierto al principio y arreglado, pero
+   no era la causa. Se descarta con `docker inspect ... .Config.Env`, no con
+   `docker compose exec env`: compose inyecta el `environment:` del archivo en
+   el proceso que lanza, así que ese comando puede decir que sí cuando el
+   proceso que sirve las páginas arrancó sin la variable.
+2. *Turbopack inlinea `process.env` en el build* — habría anulado toda la razón
+   de no usar `NEXT_PUBLIC_*`. Se descarta buscando el nombre de la variable en
+   el bundle servido: si sobrevivió, la lectura es en runtime.
+3. *Restricciones mal puestas en la consola de Google* — se descarta desde la
+   consola del navegador: `window.google` existe e `importLibrary("places")`
+   responde.
+
+Recién ahí quedaba el código. Lo que lo escondió fue un `catch` vacío con un
+comentario que decía «silencio deliberado»: por ahí no salía ninguna excepción
+—salía un `return` limpio— y no había nada que mirar en ninguna consola.
+
 ## Pendiente
 
 - [x] Commiteado y en PR: [#91](https://github.com/rrojasda94/provecho-erp/pull/91)
@@ -125,6 +193,12 @@ que el 502— y hay que validarlo contra el servidor antes de recargarlo.
       nunca se clonó ahí, así que el script que este runbook mandaba correr no
       existía y desplegar la 0.7.2 falló con `No such file or directory`. Lo
       cerró ADR-060: el workflow hace `scp` del script en cada despliegue.
+- [ ] **Poner la clave de Google en el `.env` del servidor** y desplegar: la
+      clave del navegador va en `GOOGLE_MAPS_BROWSER_KEY`, se pega por SSH
+      (nunca en un chat ni en el repo) y se verifica con los 8 pasos de
+      `integraciones-google.md §8`. El paso 4 —consola sin violaciones de CSP—
+      cierra además la deuda «la CSP no se probó contra el mapa real»
+      (`deuda/transversal.md`).
 - [ ] **Errores de backend encontrados probando staging** — se están
       revisando en otra sesión de trabajo, no repetir el diagnóstico acá
 - [ ] **Cambio de recetas en camino** (mencionado 2026-08-23, sin detalle

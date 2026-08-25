@@ -152,7 +152,14 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   **sin `'unsafe-eval'`**, que Google recomienda por las dudas. Falta la
   verificación en el navegador con clave puesta: si un mapa muere con un error
   de `eval` en consola, esa es la línea que falta y la decisión hay que volver a
-  tomarla a conciencia, no agregarla de reflejo.
+  tomarla a conciencia, no agregarla de reflejo. **2026-08-25**: se probó por
+  primera vez con clave real en staging y el mapa no aparecía — no era la CSP
+  sino un bloqueo mutuo en `campo-direccion.tsx` (ver el CHANGELOG). La lista
+  de hosts queda parcialmente cubierta por `uso/direccion-con-mapa.spec.ts`,
+  que carga el SDK desde `maps.googleapis.com` bajo la CSP real; lo que sigue
+  sin verificarse es el mapa dibujando de verdad —tiles, workers, `eval`—,
+  porque ese recorrido usa un SDK de mentira. Se cierra mirando la consola en
+  staging con el mapa encendido, paso 4 de `integraciones-google.md §8`.
 - ⬜ Los tests de `conteos` comparan contra `date.today()` local mientras
   `created_at` usa `CURRENT_TIMESTAMP` (UTC): corriendo después de las
   19:00 hora Perú fallan cuatro casos por un día de diferencia. Falla

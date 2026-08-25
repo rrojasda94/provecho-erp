@@ -263,6 +263,12 @@ jobs:
         working-directory: frontend
       - run: npm run test:uso
         working-directory: frontend
+      # Arranque aparte porque necesita el Next con clave de Google puesta, y
+      # dársela al servidor compartido haría que cada pantalla con un campo de
+      # dirección saliera a pedirle el SDK a Google en cada corrida. Ver
+      # `frontend/e2e/uso-mapas.mjs`.
+      - run: npm run test:uso:mapas
+        working-directory: frontend
       # `always()` y no `failure()`, al revés que en `e2e`: acá la corrida
       # verde es la que hay que poder mirar. Un artefacto que solo aparece
       # cuando algo falla convierte esta suite en un e2e lento y nada más.

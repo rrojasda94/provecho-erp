@@ -54,6 +54,7 @@ sea correcta y el crédito gratuito esté disponible.
 2. *Editar clave* → **Restricciones de aplicación** → **Sitios web (referentes
    HTTP)**, y agregar:
    - `http://localhost:3000/*`
+   - `https://staging.majambo.com.pe/*`
    - `https://<dominio-de-produccion>/*`
 3. **Restricciones de API** → *Restringir clave* → marcar **solo** Maps
    JavaScript API, Places API (New) y Geocoding API.
@@ -67,7 +68,9 @@ la restricción por dominio y la cuota diaria del paso 5, no el secreto.
 
 1. Crear una **segunda** clave, `provecho-servidor`.
 2. **Restricciones de aplicación** → **Direcciones IP** → la IP pública del VPS
-   donde corre la API (y la del entorno de pruebas, si aplica).
+   donde corre la API. Para staging es la del droplet, `165.227.120.112`
+   (`docs/engineering/staging.md`); si el droplet se recrea, la IP cambia y hay
+   que actualizarla acá también.
 3. **Restricciones de API** → *Restringir clave* → **solo Routes API**.
 
 Esta clave nunca se pasa al contenedor `web` (ver *Variables de entorno*).
@@ -97,14 +100,30 @@ reparten así:
 El servicio `web` no: recibe solo la variable que se le declara explícitamente,
 y por eso la clave del servidor no llega ahí.
 
+**Ese "explícitamente" hay que hacerlo en cada compose.** `web` no tiene
+`env_file`, así que pegar la clave en el `.env` del servidor **no alcanza**: si
+el compose de ese entorno no declara `GOOGLE_MAPS_BROWSER_KEY`,
+`GOOGLE_MAPS_MAP_ID` y `GOOGLE_MAPS_PAIS` en su `environment:`, el mapa queda
+apagado sin ningún error visible. Pasó en staging (2026-08-25). Están declaradas
+en `docker-compose.yml`, `docker-compose.staging.yml` y `docker-compose.prod.yml`;
+un compose nuevo las necesita también. Se comprueba en un comando:
+
+```bash
+docker compose -f docker-compose.staging.yml exec web env | grep GOOGLE
+```
+
 **No es `NEXT_PUBLIC_*`.** Esa familia de variables se hornea en el build de
 Next.js —la misma razón por la que se eliminó `NEXT_PUBLIC_API_URL`, ver
 [devops.md](devops.md#docker)—. La clave la lee un Server Component en tiempo de
 ejecución y baja al componente del mapa como prop.
 
 Resto de la configuración (`GOOGLE_ROUTES_BASE_URL`, `GOOGLE_TIMEOUT_SEGUNDOS`,
-`GOOGLE_MAPS_PAIS` y el bloque `DELIVERY_*`) está documentada línea por línea en
-`.env.example`.
+`GOOGLE_MAPS_PAIS`) está documentada línea por línea en `.env.example`.
+
+**La tarifa del reparto ya no se configura acá.** Los `DELIVERY_*` de `.env` son
+el valor de arranque; lo que se cobra lo aprueba Gerencia por empresa en
+`/gerencia/parametros` (ADR-014 + addendum de ADR-054). Cambiar un precio no
+requiere tocar el servidor.
 
 ## 7. Qué pasa si falta cada clave
 
@@ -122,6 +141,9 @@ un pedido (mismo criterio que ADR-005 y ADR-041).
 
 ## 8. Verificar que quedó bien
 
+0. **La clave está dentro del contenedor**: `docker compose exec web env | grep
+   GOOGLE`. Es lo que distingue "falta la clave" de "falta pasarla", que son dos
+   fallas idénticas desde el navegador.
 1. `docker compose up` y abrir *Organización → Sucursales* → editar una.
 2. Escribir tres letras de una calle: tienen que aparecer sugerencias.
 3. Elegir una: el mapa centra el pin y la ficha guarda coordenadas.

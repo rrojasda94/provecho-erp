@@ -111,6 +111,25 @@ def test_toda_variable_de_settings_esta_documentada():
     assert not faltan, f"sin documentar en .env.example: {sorted(faltan)}"
 
 
+# Variables que el `.env` de staging alimenta al CLI de compose, no a la app:
+# no son campos de `Settings` y no tienen por qué estar en `.env.example`.
+_SOLO_DEL_COMPOSE = {"POSTGRES_PASSWORD", "PROVECHO_IMAGE", "PROVECHO_WEB_IMAGE"}
+
+
+def test_el_ejemplo_de_staging_no_inventa_variables():
+    """El otro sentido de la sincronía. `.env.staging.example` arrastró un
+    `GOOGLE_API_KEY=` durante dos meses: el nombre se había renombrado a
+    `GOOGLE_MAPS_BROWSER_KEY` y `extra="ignore"` lo descartaba en silencio, así
+    que el servidor tenía una clave puesta y el mapa apagado.
+
+    Se compara contra `.env.example` y no contra `Settings.model_fields` porque
+    ahí viven también los placeholders declarados de antemano (`IZIPAY_API_KEY`)
+    y las que solo lee el compose."""
+    conocidas = _variables(".env.example") | _SOLO_DEL_COMPOSE
+    sobran = _variables(".env.staging.example") - conocidas
+    assert not sobran, f"nadie lee estas variables: {sorted(sobran)}"
+
+
 def test_el_ejemplo_no_lleva_secretos_de_verdad():
     """`.env.example` SÍ se commitea. Un JWT o una API key de Google copiados
     del `.env` real quedan en el historial de git para siempre, y rotarlos

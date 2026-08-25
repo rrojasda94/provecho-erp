@@ -80,6 +80,13 @@ services:
       # Por eso acá basta el nombre del servicio y la API puede seguir
       # escuchando solo en loopback del host.
       API_INTERNAL_URL: http://api:8000
+      # Clave de Google Maps del NAVEGADOR. Declaradas una por una y no con
+      # `env_file: .env` a propósito: así este contenedor NO ve
+      # `GOOGLE_MAPS_SERVER_KEY`, que es la que define cuánta plata paga el
+      # cliente y solo tiene que existir en `api`/`worker`.
+      GOOGLE_MAPS_BROWSER_KEY: ${GOOGLE_MAPS_BROWSER_KEY:-}
+      GOOGLE_MAPS_MAP_ID: ${GOOGLE_MAPS_MAP_ID:-DEMO_MAP_ID}
+      GOOGLE_MAPS_PAIS: ${GOOGLE_MAPS_PAIS:-pe}
     # Solo loopback: el proxy es la única puerta de entrada desde fuera.
     ports:
       - "127.0.0.1:3000:3000"

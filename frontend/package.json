@@ -12,7 +12,8 @@
         "test:reportes": "node --test lib/reportes.test.ts",
         "test": "node --test lib/*.test.ts",
         "test:e2e": "node e2e/preparar-bd.mjs && playwright test",
-        "test:uso": "node e2e/preparar-bd.mjs && playwright test --config playwright.uso.config.ts"
+        "test:uso": "node e2e/preparar-bd.mjs && playwright test --config playwright.uso.config.ts",
+        "test:uso:mapas": "node e2e/preparar-bd.mjs && node e2e/uso-mapas.mjs"
     },
     "dependencies": {
         "@base-ui/react": "^1.7.0",
