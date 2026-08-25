@@ -339,6 +339,34 @@ def test_insumos_de_receta_devuelve_id_y_nombre(session, base):
     assert all(i["articulo_id"] for i in insumos)
 
 
+def test_insumos_de_receta_no_repite_insumo_con_lineas_condicionadas(session, base):
+    """MitadXMitad (ADR-056): el mismo insumo aparece en una línea por cada
+    mitad ("aplica_valores" distinto). "Sin cebolla" tiene que salir una sola
+    vez, no una por cada línea condicionada que lo usa."""
+    cebolla = base["articulos"]["Cebolla"]
+    session.add(
+        RecetaItem(
+            receta_id=base["receta"].id,
+            articulo_id=cebolla.id,
+            cantidad=Decimal(1),
+            aplica_valores=["valor-mitad-izquierda"],
+        )
+    )
+    session.add(
+        RecetaItem(
+            receta_id=base["receta"].id,
+            articulo_id=cebolla.id,
+            cantidad=Decimal(1),
+            aplica_valores=["valor-mitad-derecha"],
+        )
+    )
+    session.flush()
+
+    insumos = insumos_de_receta(session, base["receta"].id)
+    nombres = [i["nombre"] for i in insumos]
+    assert nombres.count("Cebolla") == 1
+
+
 # --- Estructura: quitar extras y borrar grupos (deuda de ADR-023) ------------
 def _extra(session, base, nombre, id_interno):
     extra = ProductoComercial(
