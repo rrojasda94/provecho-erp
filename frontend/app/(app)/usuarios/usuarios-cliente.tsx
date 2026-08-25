@@ -71,10 +71,21 @@ function DialogoNuevaCuenta() {
         <input name="email" type="email" placeholder="Opcional" />
       </label>
       <label className="flex flex-col gap-1 text-sm font-semibold">
+        Persona vinculada
+        <PersonaPicker name="persona_id" />
+        <span className="text-xs font-normal text-gray">
+          Quién es esta cuenta en la vida real. Hace falta para que el trabajador
+          pueda marcar asistencia con su PIN.
+        </span>
+      </label>
+      <label className="flex flex-col gap-1 text-sm font-semibold">
         Tipo
+        {/* "Servicio" no existe: la columna solo admite `humano` y
+            `agente_ia`, así que elegirlo devolvía un 500 del ORM en vez de un
+            error entendible. Una cuenta de integración es `agente_ia` y entra
+            por token, no por PIN (ADR-032). */}
         <select name="tipo" defaultValue="humano">
           <option value="humano">Humano</option>
-          <option value="servicio">Servicio</option>
           <option value="agente_ia">Agente IA</option>
         </select>
       </label>

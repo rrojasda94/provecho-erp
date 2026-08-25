@@ -17,6 +17,7 @@ export type Trabajador = {
   id: string;
   persona_id: string;
   sucursal_id: string | null;
+  usuario_id: string | null;
   cargo: string;
   area: string;
   tipo_vinculo: string;
@@ -26,6 +27,12 @@ export type Trabajador = {
   estado: string;
 };
 export type Sucursal = { id: string; nombre: string };
+export type Cuenta = {
+  id: string;
+  username: string;
+  tipo: string;
+  nombre_display: string | null;
+};
 export type Persona = {
   id: string;
   nombres: string;
@@ -60,7 +67,41 @@ function CampoSucursal({
   );
 }
 
-function DialogoNuevoTrabajador({ sucursales }: { sucursales: Sucursal[] }) {
+/** La cuenta con la que marca asistencia. Sin ella el pad lo rechaza: el PIN
+ * que firma la marcación es el de esta cuenta (RN-RRHH-020), no un dato del
+ * trabajador. Vacío es válido — quien no ficha en el pad no necesita una, y
+ * su asistencia la registra RRHH por back-office. */
+function CampoCuenta({ cuentas, valor }: { cuentas: Cuenta[]; valor?: string | null }) {
+  const humanas = cuentas.filter((c) => c.tipo === "humano");
+  return (
+    <label className="flex flex-col gap-1 text-sm font-semibold">
+      Cuenta para marcar asistencia
+      {humanas.length === 0 ? (
+        <p className="text-sm font-normal text-secondary">
+          No se pudieron listar las cuentas: hace falta permiso de administración
+          de usuarios. Pídelo a quien administre Usuarios → Cuentas.
+        </p>
+      ) : (
+        <select name="usuario_id" defaultValue={valor ?? ""}>
+          <option value="">Sin cuenta (marca por back-office)</option>
+          {humanas.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.nombre_display ? `${c.nombre_display} — ${c.username}` : c.username}
+            </option>
+          ))}
+        </select>
+      )}
+    </label>
+  );
+}
+
+function DialogoNuevoTrabajador({
+  sucursales,
+  cuentas,
+}: {
+  sucursales: Sucursal[];
+  cuentas: Cuenta[];
+}) {
   return (
     <DialogoFormulario
       titulo="Nuevo trabajador"
@@ -96,6 +137,7 @@ function DialogoNuevoTrabajador({ sucursales }: { sucursales: Sucursal[] }) {
         <input name="fecha_ingreso" type="date" required />
       </label>
       <CampoSucursal sucursales={sucursales} />
+      <CampoCuenta cuentas={cuentas} />
     </DialogoFormulario>
   );
 }
@@ -109,9 +151,11 @@ function DialogoNuevoTrabajador({ sucursales }: { sucursales: Sucursal[] }) {
 function DialogoEditarTrabajador({
   trabajador,
   sucursales,
+  cuentas,
 }: {
   trabajador: Trabajador;
   sucursales: Sucursal[];
+  cuentas: Cuenta[];
 }) {
   return (
     <DialogoFormulario
@@ -142,6 +186,7 @@ function DialogoEditarTrabajador({
         />
       </label>
       <CampoSucursal sucursales={sucursales} valor={trabajador.sucursal_id} />
+      <CampoCuenta cuentas={cuentas} valor={trabajador.usuario_id} />
       <label className="flex flex-col gap-1 text-sm font-semibold">
         Estado
         <select name="estado" defaultValue={trabajador.estado}>
@@ -178,10 +223,12 @@ export function TrabajadoresCliente({
   trabajadores,
   personas,
   sucursales,
+  cuentas,
 }: {
   trabajadores: Trabajador[];
   personas: Persona[];
   sucursales: Sucursal[];
+  cuentas: Cuenta[];
 }) {
   const nombrePersona = useMemo(
     () => new Map(personas.map((p) => [p.id, `${p.apellidos}, ${p.nombres}`])),
@@ -212,6 +259,13 @@ export function TrabajadoresCliente({
         cell: ({ getValue }) => getValue<string>().replace("_", " "),
       },
       { accessorKey: "fecha_ingreso", header: "Ingreso" },
+      // Quién puede fichar en el pad se ve de un vistazo: sin cuenta, la
+      // marcación la tiene que cargar RRHH a mano.
+      {
+        id: "cuenta",
+        header: "Marca",
+        accessorFn: (t) => (t.usuario_id ? "sí" : "no"),
+      },
       {
         accessorKey: "estado",
         header: "Estado",
@@ -235,20 +289,24 @@ export function TrabajadoresCliente({
         cell: ({ row }) =>
           row.original.estado === "cesado" ? null : (
             <div className="flex gap-1.5">
-              <DialogoEditarTrabajador trabajador={row.original} sucursales={sucursales} />
+              <DialogoEditarTrabajador
+                trabajador={row.original}
+                sucursales={sucursales}
+                cuentas={cuentas}
+              />
               <DialogoCesarTrabajador trabajador={row.original} />
             </div>
           ),
       },
     ],
-    [nombrePersona, nombreSucursal, sucursales],
+    [nombrePersona, nombreSucursal, sucursales, cuentas],
   );
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h1 className="font-heading text-xl text-dark">Trabajadores</h1>
-        <DialogoNuevoTrabajador sucursales={sucursales} />
+        <DialogoNuevoTrabajador sucursales={sucursales} cuentas={cuentas} />
       </div>
       <TablaDatos
         columnas={columnas}
