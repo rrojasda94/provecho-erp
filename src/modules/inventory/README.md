@@ -537,7 +537,7 @@ Endpoints `/api/v1/inventory`:
 | POST | `/unidades-medida` | `gestionar_catalogo` — CRUD antes diferido (ADR-014 Addendum b); requiere `categoria_udm_id` existente |
 | PATCH | `/unidades-medida/{id}` | `gestionar_catalogo` — corrige `decimales` (RN-GER-010) sin recrear la unidad |
 | GET/POST | `/categorias-udm` | `leer` / `gestionar_catalogo` |
-| POST/GET/PATCH | `/articulos[/{id}]` | `gestionar_catalogo` / `leer` — el PATCH corrige `id_interno`, **nunca** `unidad_medida_id` (ver abajo) |
+| POST/GET/PATCH | `/articulos[/{id}]` | `gestionar_catalogo` / `leer` — el PATCH corrige `id_interno`, **nunca** `unidad_medida_id` (ver abajo). El GET acepta `?tipo=` (ej. `empaque`): filtra en la base porque la lista viene paginada y una pantalla que filtre lo recibido se queda sin opciones en cuanto el catálogo pasa de una página |
 | POST | `/skus` | `gestionar_catalogo` |
 | GET | `/stock` | `leer` |
 | POST | `/movimientos` | `registrar_movimiento` |
@@ -656,9 +656,17 @@ entre `aprobada` y `despachada` no cambia qué se puede hacer (ADR-020).
   `purchases` negocie volumen — ver `docs/architecture/events.md`) y
   `costo_unitario_de_recetas` (costo de **una unidad de rendimiento**, con
   merma, para que el reporte de margen del tablero no tenga que conocer el
-  modelo de recetas). Mismo criterio que `sales.queries_publicas`: devuelve
+  modelo de recetas) y `articulo_resumen` (identidad y **tipo** de un
+  artículo, para que quien lo recibe valide que sirve: lo usa `sales` antes
+  de guardar `producto_comercial.empaque_id`, que solo admite tipo `empaque`
+  — RN-EMP-003). Mismo criterio que `sales.queries_publicas`: devuelve
   dicts, nunca el ORM, y nadie importa `inventory.infrastructure` desde
   afuera.
+
+  `articulo_resumen` devuelve el tipo **crudo** y no un booleano
+  `es_empaque`: qué tipo hace falta lo decide quien pregunta, que es el que
+  conoce su propia regla. Un predicado por caso de uso convertiría el
+  contrato en una lista de preguntas ajenas.
 
   `costo_unitario_de_recetas` reusa `recetas.costo_linea` en vez de
   recalcular con otro criterio —dos pantallas del ERP no pueden mostrar

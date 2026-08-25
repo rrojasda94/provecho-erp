@@ -574,3 +574,78 @@ def _articulo(session, base):
         unidad_medida_id=_unidad(session).id,
         tipo="insumo",
     )
+
+
+# --- El empaque tiene que ser un empaque (RN-EMP-003) --------------------------
+def _articulo_tipo(session, base, tipo, nombre, id_interno):
+    from src.modules.inventory.application import catalogo as inv_catalogo
+
+    return inv_catalogo.crear_articulo(
+        session,
+        empresa_id=base["empresa"].id,
+        id_interno=id_interno,
+        nombre=nombre,
+        unidad_medida_id=_unidad(session).id,
+        tipo=tipo,
+    )
+
+
+def test_el_empaque_de_un_producto_nuevo_tiene_que_ser_de_tipo_empaque(session, base):
+    """`data-model.md` declaraba «FK articulo tipo=empaque» y nada lo hacía
+    cumplir: el desplegable ofrecía el catálogo entero, así que `empaque_id`
+    terminaba en un insumo y cada venta descontaba harina como si fuera una
+    caja de pizza."""
+    insumo = _articulo_tipo(session, base, "insumo", "Harina", "A100")
+
+    with pytest.raises(ReglaNegocio, match="no empaque"):
+        catalogo_uc.crear_producto(
+            session,
+            id_interno="P900",
+            marca_id=base["marca"].id,
+            nombre="Pizza Con Empaque Malo",
+            empaque_id=insumo.id,
+        )
+
+
+def test_el_empaque_de_verdad_se_acepta(session, base):
+    caja = _articulo_tipo(session, base, "empaque", "Caja Pizza Familiar", "A101")
+
+    producto = catalogo_uc.crear_producto(
+        session,
+        id_interno="P901",
+        marca_id=base["marca"].id,
+        nombre="Pizza Para Llevar",
+        empaque_id=caja.id,
+    )
+
+    assert producto.empaque_id == caja.id
+
+
+def test_el_patch_tampoco_deja_poner_un_empaque_que_no_lo_es(session, base):
+    """El `PATCH` metía `empaque_id` en un bucle `setattr` genérico, así que
+    la validación del alta no servía de nada: bastaba crear el producto y
+    editarlo."""
+    repuesto = _articulo_tipo(session, base, "repuesto", "Resistencia Horno", "A102")
+
+    with pytest.raises(ReglaNegocio, match="no empaque"):
+        catalogo_uc.editar_producto(
+            session, base["producto"].id, empaque_id=repuesto.id
+        )
+
+
+def test_un_empaque_archivado_no_se_asigna(session, base):
+    """Archivar es como se retira algo del catálogo sin borrar su historia:
+    volver a elegirlo desde otra pantalla lo revive por la puerta de atrás."""
+    caja = _articulo_tipo(session, base, "empaque", "Caja Descontinuada", "A103")
+    caja.archivado = True
+    session.flush()
+
+    with pytest.raises(ReglaNegocio, match="archivado"):
+        catalogo_uc.editar_producto(session, base["producto"].id, empaque_id=caja.id)
+
+
+def test_un_empaque_inexistente_es_404_y_no_un_500(session, base):
+    with pytest.raises(NoEncontrado):
+        catalogo_uc.editar_producto(
+            session, base["producto"].id, empaque_id=uuid.uuid4()
+        )

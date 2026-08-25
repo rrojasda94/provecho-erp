@@ -30091,6 +30091,24 @@
             }
           },
           {
+            "description": "Filtra por tipo de artículo (ej. `empaque`)",
+            "in": "query",
+            "name": "tipo",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filtra por tipo de artículo (ej. `empaque`)",
+              "title": "Tipo"
+            }
+          },
+          {
             "description": "Página, empezando en 1",
             "in": "query",
             "name": "page",
