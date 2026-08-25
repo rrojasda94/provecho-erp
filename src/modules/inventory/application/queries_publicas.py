@@ -67,11 +67,17 @@ def insumos_de_receta(session: Session, receta_id: uuid.UUID) -> list[dict]:
 
     Devuelve el nombre además del id porque el KDS tiene que imprimir "SIN
     CEBOLLA" y `sales` no puede leer `articulo` por su cuenta.
+
+    `distinct()`: con líneas condicionadas (ADR-056) el mismo insumo puede
+    aparecer en varias condiciones de la receta (ej. una mitad y la otra de
+    una pizza MitadXMitad) — sin esto, "sin aceitunas" saldría repetido una
+    vez por condición.
     """
     filas = session.execute(
         select(Articulo.id, Articulo.nombre)
         .join(RecetaItem, RecetaItem.articulo_id == Articulo.id)
         .where(RecetaItem.receta_id == receta_id)
+        .distinct()
         .order_by(Articulo.nombre)
     )
     return [{"articulo_id": fila.id, "nombre": fila.nombre} for fila in filas]
