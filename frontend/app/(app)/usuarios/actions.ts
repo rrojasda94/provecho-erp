@@ -25,6 +25,10 @@ function leerCuenta(formData: FormData) {
     username: String(formData.get("username") ?? "").trim(),
     pin: String(formData.get("pin") ?? "").trim(),
     tipo: String(formData.get("tipo") ?? "humano"),
+    // Se puede vincular desde el alta: antes solo estaba en «Editar cuenta»,
+    // así que dar de alta a alguien que iba a marcar asistencia obligaba a
+    // crear la cuenta y volver a abrirla para asociarle la persona.
+    persona_id: String(formData.get("persona_id") ?? "").trim() || undefined,
     nombre_display: String(formData.get("nombre_display") ?? "").trim() || undefined,
     email: String(formData.get("email") ?? "").trim() || undefined,
   };
