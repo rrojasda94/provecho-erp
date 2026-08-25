@@ -1128,3 +1128,114 @@ def test_anular_el_plato_se_lleva_su_extra_y_repone_los_dos(session, base):
     # Dos recetas repuestas: la del plato y la del extra. Con una sola, el
     # queso del sabor se queda descontado sin haberse preparado.
     assert len(repuestos[0]["items"]) == 2
+
+
+# --- El reparto se cobra (RN-COM-040, ADR-066) ------------------------------
+@pytest.fixture
+def con_tarifa(monkeypatch):
+    """Enciende el cobro del delivery. La sucursal de `base` no está anclada
+    en el mapa, así que la cotización es la tarifa base sin distancia — que
+    es justo el caso que interesa: el flete se cobra igual."""
+    from src.config.settings import settings
+
+    monkeypatch.setattr(settings, "delivery_tarifa_base", Decimal("5.00"))
+    monkeypatch.setattr(settings, "delivery_precio_por_km", Decimal("0"))
+
+
+def test_el_delivery_cobra_el_reparto_en_el_total(session, base, con_tarifa):
+    venta = _crear(
+        session,
+        base,
+        [_item(base["productos"][0], cantidad=2, precio="40.00")],
+        modalidad="delivery",
+        direccion_entrega="Jr. Lima 200",
+    )
+    assert venta.costo_entrega == Decimal("5.00")
+    assert venta.total == Decimal("85.00")
+    assert ventas_uc.total_a_cobrar(session, venta) == Decimal("85.00")
+
+
+def test_un_takeout_cobra_exactamente_lo_de_siempre(session, base, con_tarifa):
+    """Nada de lo agregado puede cambiar el total de una venta que no se
+    lleva a ningún lado."""
+    venta = _crear(
+        session,
+        base,
+        [_item(base["productos"][0], cantidad=2, precio="40.00")],
+        modalidad="takeout",
+    )
+    assert venta.costo_entrega is None
+    assert venta.total == Decimal("80.00")
+
+
+def test_el_descuento_manual_no_regala_el_flete(session, base, con_tarifa):
+    """El encargado autoriza un descuento sobre lo que el cliente consumió.
+    Descontar el reparto al mismo tiempo no es lo que aprobó."""
+    venta = _crear(
+        session,
+        base,
+        [_item(base["productos"][0], cantidad=2, precio="40.00")],
+        modalidad="delivery",
+        direccion_entrega="Jr. Lima 200",
+    )
+    ventas_uc.aplicar_descuento(
+        session,
+        venta_id=venta.id,
+        modo="porcentaje",
+        valor=Decimal("10"),
+        motivo="cortesia",
+        autorizado_por=base["usuario"].id,
+    )
+    # 80 − 10 % = 72, más los 5 del reparto.
+    assert venta.total == Decimal("77.00")
+
+
+def test_un_consumo_de_personal_no_paga_reparto(session, base, con_tarifa):
+    """Vale cero entero: cobrarle el flete a un trabajador emitiría un
+    comprobante por el reparto solo."""
+    venta = _crear(
+        session,
+        base,
+        [_item(base["productos"][0], cantidad=1, precio="40.00")],
+        modalidad="delivery",
+        direccion_entrega="Jr. Lima 200",
+        tipo="consumo_personal",
+        consumo_motivo="fin_semana",
+        consumo_autorizado_por=base["usuario"].id,
+    )
+    assert venta.total == Decimal("0.00")
+    assert ventas_uc.total_a_cobrar(session, venta) == Decimal("0.00")
+
+
+def test_el_delivery_de_una_sola_cuenta_se_cobra_completo(session, base, con_tarifa):
+    """El cobro normal del PDV pasa por `grupo_cobro=1`, no por la venta
+    entera: si el flete solo entrara en el camino sin grupo, el reparto no se
+    cobraría nunca."""
+    venta = _crear(
+        session,
+        base,
+        [_item(base["productos"][0], cantidad=2, precio="40.00", grupo_cobro=1)],
+        modalidad="delivery",
+        direccion_entrega="Jr. Lima 200",
+    )
+    assert ventas_uc.total_a_cobrar(session, venta, 1) == Decimal("85.00")
+
+
+def test_con_la_cuenta_dividida_el_flete_lo_paga_la_primera(session, base, con_tarifa):
+    """No se prorratea, pero la suma de las cuentas tiene que dar el total de
+    la venta: si no, la orden no se puede terminar de cobrar."""
+    venta = _crear(
+        session,
+        base,
+        [
+            _item(base["productos"][0], cantidad=1, precio="40.00", grupo_cobro=1),
+            _item(base["productos"][0], cantidad=1, precio="40.00", grupo_cobro=2),
+        ],
+        modalidad="delivery",
+        direccion_entrega="Jr. Lima 200",
+    )
+    primera = ventas_uc.total_a_cobrar(session, venta, 1)
+    segunda = ventas_uc.total_a_cobrar(session, venta, 2)
+    assert primera == Decimal("45.00")
+    assert segunda == Decimal("40.00")
+    assert primera + segunda == ventas_uc.total_a_cobrar(session, venta)

@@ -571,9 +571,9 @@ recibiera — `referencia_atencion` es "para quién es el pedido" ("Carlos",
 `application/tarifa_delivery.py` pregunta la distancia de manejo a
 `shared/integrations/google` (Routes API, clave restringida por IP) y decide:
 
-- `costo` = `DELIVERY_TARIFA_BASE` + `DELIVERY_PRECIO_POR_KM` × km.
-- `derivar_a_externo` cuando se pasa de `DELIVERY_DISTANCIA_MAXIMA_KM` o el
-  distrito está en `DELIVERY_DISTRITOS_RESTRINGIDOS`. La zona vetada se evalúa
+- `costo` = tarifa base + precio por km × km.
+- `derivar_a_externo` cuando se pasa del radio máximo o el
+  distrito está entre los vetados. La zona vetada se evalúa
   **antes** de medir: no depende de la distancia y preguntarle a Google
   costaría una llamada por una respuesta que ya se sabe.
 - `aproximada` cuando Google no contestó y se usó la línea recta
@@ -591,8 +591,39 @@ integración: si acepta, se marca `venta.repartidor_externo_plataforma`, que ya
 existía.
 
 Con las tarifas en `0` —el estado de fábrica— nada de esto cobra y el delivery
-funciona como antes. **El costo todavía no suma al total de la venta**: ver la
-deuda del módulo.
+funciona como antes.
+
+### Quién fija la tarifa, y quién la cobra (2026-08-25, ADR-066, RN-COM-040)
+
+Los cuatro números **no salen del `.env`**: son `parametro_empresa` del módulo
+`sales` (`delivery_tarifa_base`, `delivery_precio_por_km`,
+`delivery_radio_km`, `delivery_distritos_restringidos`) y los fija Gerencia en
+`/gerencia/delivery`. `settings.delivery_*` queda como **semilla** — lo que
+cotiza una empresa que todavía no aprobó ninguno. Como cualquier parámetro de
+ADR-014, **el valor nuevo no cobra hasta que Gerencia lo aprueba**
+(RN-GER-009).
+
+`tarifa_de(session, empresa_id)` resuelve los cuatro de una vez y devuelve un
+`Tarifa` inmutable; `contexto_de_sucursal` saca de la misma fila el origen del
+reparto y la empresa de la que es la tarifa. Un parámetro mal formado cobra la
+semilla en vez de reventar: es un JSON que pasó por un formulario, y un 500 en
+caja es peor que cobrar el precio anterior.
+
+**El reparto entra al total** (RN-COM-040): `total_a_cobrar` lo suma después
+del descuento manual, un consumo de personal no lo paga, y no se prorratea
+entre cuentas separadas —va entero en la primera, que es además por donde
+pasa el cobro normal del PDV (`grupo_cobro=1`)—. Sin línea de venta: la columna `costo_entrega` ya
+sobrevive al comprobante, y crear un producto de servicio «Delivery» para
+mover un número que ya tiene su columna es trabajo que no compra nada hoy.
+
+`GET /sales/delivery/configuracion` devuelve la tarifa **efectiva** más dos
+banderas (`activa`, `rutas_reales`) que es lo que hace que la pantalla de
+Gerencia no mienta cuando falta una clave de Google.
+
+El PDV cotiza **también sin ancla**: una dirección escrita a mano no se puede
+medir, pero sí tiene tarifa base, y desde que el flete se cobra callarla sería
+mostrarle al cajero un total menor que el que se va a cobrar. Sin destino
+`cotizar` devuelve la base y no llama a Google, así que no cuesta cuota.
 
 ## Estado (slice 10 — atributos y variantes generadas, 2026-08-23)
 

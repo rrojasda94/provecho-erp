@@ -91,6 +91,26 @@ class CotizacionDeliveryOut(BaseModel):
     motivo: str | None = None
 
 
+class DeliveryConfiguracionOut(BaseModel):
+    """Con qué números está cotizando el ERP **ahora mismo**, y qué le falta.
+
+    Las dos banderas existen porque la degradación de ADR-053/054 es
+    silenciosa por diseño —sin claves el ERP se comporta como antes— y eso,
+    que del lado del cajero es lo correcto, del lado de Gerencia es una
+    pantalla que miente: mostraría una tarifa que nadie está usando.
+    """
+
+    tarifa_base: Decimal
+    precio_por_km: Decimal
+    radio_km: Decimal
+    distritos_restringidos: list[str]
+    # False = base y precio por km en cero: el reparto no se cobra.
+    activa: bool
+    # False = sin `GOOGLE_MAPS_SERVER_KEY`: toda distancia sale de la línea
+    # recta y se cobra marcada «aprox.».
+    rutas_reales: bool
+
+
 class VentaOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID

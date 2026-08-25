@@ -169,3 +169,119 @@ def test_la_segunda_cotizacion_no_vuelve_a_preguntar(monkeypatch):
     cotizar(PLAZA, AEROPUERTO)
     cotizar(PLAZA, AEROPUERTO)
     assert len(llamadas) == 1
+
+
+# --- Quién fija la tarifa (ADR-066) -----------------------------------------
+@pytest.fixture()
+def empresa():
+    """Una empresa real con su admin: `parametro_empresa` tiene FK a las dos.
+
+    Se siembra con el seeder en vez de armar las filas a mano porque lo que
+    se prueba es la lectura del parámetro, no el alta de una empresa.
+    """
+    from sqlalchemy import create_engine, select
+    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.pool import StaticPool
+
+    import src.core.models_registry  # noqa: F401
+    from src.core.database import Base
+    from src.modules.users.infrastructure.models import Empresa, Usuario
+    from src.seeders.seed import seed
+
+    engine = create_engine(
+        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
+    )
+    Base.metadata.create_all(engine)
+    Sesion = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+    with Sesion() as s:
+        seed(s)
+        s.commit()
+        yield s, s.scalar(select(Empresa)).id, s.scalar(
+            select(Usuario).where(Usuario.username == "admin")
+        ).id
+
+
+def _aprobar(session, empresa_id, admin_id, codigo: str, valor: dict) -> None:
+    from src.shared.models import ParametroEmpresa
+
+    session.add(
+        ParametroEmpresa(
+            empresa_id=empresa_id,
+            modulo="sales",
+            codigo=codigo,
+            valor=valor,
+            estado="vigente",
+            propuesto_por_id=admin_id,
+        )
+    )
+    session.flush()
+
+
+def test_sin_parametro_aprobado_manda_la_semilla_del_env(empresa):
+    """El día del despliegue no hay ningún parámetro aprobado y el ERP tiene
+    que seguir cobrando exactamente lo de antes."""
+    session, empresa_id, _ = empresa
+    t = tarifa_delivery.tarifa_de(session, empresa_id)
+    assert t.base == Decimal("3")
+    assert t.por_km == Decimal("1.50")
+    assert t.distritos_restringidos == ("Belén",)
+
+
+def test_lo_que_aprueba_gerencia_manda_sobre_el_env(empresa, monkeypatch):
+    session, empresa_id, admin_id = empresa
+    _aprobar(session, empresa_id, admin_id, "delivery_precio_por_km",
+             {"monto": "2.50", "divisa": "PEN"})
+    _aprobar(session, empresa_id, admin_id, "delivery_tarifa_base",
+             {"monto": "4.00", "divisa": "PEN"})
+    _aprobar(session, empresa_id, admin_id, "delivery_distritos_restringidos",
+             {"distritos": ["Morales"]})
+
+    _google_dice(monkeypatch, "4.00")
+    c = cotizar(PLAZA, AEROPUERTO, tarifa=tarifa_delivery.tarifa_de(session, empresa_id))
+    # 4 de base + 4 km × 2,50 — nada de lo que dice el `.env`.
+    assert c.costo == Decimal("14.00")
+    # Y el distrito vetado también salió del parámetro, no del `.env`.
+    aprobada = tarifa_delivery.tarifa_de(session, empresa_id)
+    assert cotizar(PLAZA, AEROPUERTO, "Morales", aprobada).motivo == (
+        MOTIVO_ZONA_RESTRINGIDA
+    )
+    assert cotizar(PLAZA, AEROPUERTO, "Belén", aprobada).motivo is None
+
+
+def test_una_propuesta_sin_aprobar_no_cobra_nada(empresa):
+    """Todo el mecanismo de ADR-014: el valor no surte efecto hasta que
+    Gerencia lo aprueba (RN-GER-009)."""
+    from src.shared.models import ParametroEmpresa
+
+    session, empresa_id, admin_id = empresa
+    session.add(
+        ParametroEmpresa(
+            empresa_id=empresa_id,
+            modulo="sales",
+            codigo="delivery_precio_por_km",
+            valor={"monto": "99.00", "divisa": "PEN"},
+            estado="propuesto",
+            propuesto_por_id=admin_id,
+        )
+    )
+    session.flush()
+    assert tarifa_delivery.tarifa_de(session, empresa_id).por_km == Decimal("1.50")
+
+
+def test_un_parametro_mal_formado_cobra_la_semilla(empresa):
+    """El valor es un JSON que pasó por un formulario. Cobrar la semilla es
+    peor que cobrar lo aprobado, pero infinitamente mejor que un 500 en caja."""
+    session, empresa_id, admin_id = empresa
+    _aprobar(session, empresa_id, admin_id, "delivery_precio_por_km",
+             {"monto": "no es un número", "divisa": "PEN"})
+    assert tarifa_delivery.tarifa_de(session, empresa_id).por_km == Decimal("1.50")
+
+
+def test_una_sucursal_inexistente_no_rompe_la_cotizacion(empresa):
+    session, _, _ = empresa
+    import uuid as _uuid
+
+    origen, empresa_id = tarifa_delivery.contexto_de_sucursal(session, _uuid.uuid4())
+    assert origen is None and empresa_id is None
+    # Y sin empresa se usa la semilla, que es el comportamiento de siempre.
+    assert tarifa_delivery.tarifa_de(session, None) == tarifa_delivery.tarifa_semilla()

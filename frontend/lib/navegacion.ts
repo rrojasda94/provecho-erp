@@ -34,6 +34,7 @@ export const SUBMENUS: Record<string, ItemSubmenu[]> = {
   ],
   gerencia: [
     { label: "Parámetros", href: "/gerencia/parametros" },
+    { label: "Delivery", href: "/gerencia/delivery" },
     { label: "Decisiones", href: "/gerencia/decisiones" },
     { label: "Divisas", href: "/gerencia/divisas" },
   ],

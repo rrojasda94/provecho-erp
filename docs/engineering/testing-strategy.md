@@ -242,9 +242,15 @@ escrito a mano: envejece sin avisar.
   catálogo y el padrón, y además el **round-trip nulo**: bajar lo que ya está
   cargado, volver a subirlo sin tocarlo y exigir que todo salga "a actualizar"
   y nada "nuevo" — es lo único que verifica que el export y el importador
-  hablan el mismo idioma desde el navegador; y `uso/consulta-documento.spec.ts`
-  (2026-08-15) corrige un cliente con el botón de RUC. Job `uso`, **no
-  requerido** (ADR-047).
+  hablan el mismo idioma desde el navegador; `uso/consulta-documento.spec.ts`
+  (2026-08-15) corrige un cliente con el botón de RUC; y
+  `uso/delivery-gerencia.spec.ts` (2026-08-25, ADR-066) fija el precio del
+  delivery por kilómetro desde Gerencia y lo aprueba — es el recorrido que no
+  existía y por el cual la función quedó tres meses apagada. Como
+  `direccion.spec.ts`, corre **sin claves de Google** a propósito: parte de lo
+  que verifica es que la pantalla *diga* que faltan, que es toda la diferencia
+  entre «no está construido» y «falta una clave». Job `uso`, **no requerido**
+  (ADR-047).
 
 Los cuatro niveles de la tabla existen y ninguno está vacío. Lo que queda
 abierto, dicho sin adornos: **el cuerpo que arman las pantallas de Compras,

@@ -35,22 +35,26 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   comodidad de no tener nada que guardar, el cambio es un código aleatorio en
   `cupon.codigo` (la columna ya es independiente del documento) más una forma
   de que el cliente lo recupere.
-- ⬜ **El reparto se calcula y se guarda, pero no se cobra como línea de
-  venta** (2026-08-22, ADR-054): `venta.costo_entrega` queda en la fila y se
-  muestra en caja, pero **no suma al total** ni aparece en el comprobante ni
-  en el asiento contable. Cobrarlo de verdad exige una línea de venta sobre un
-  producto de servicio "Delivery" —con su IGV y su cuenta— y eso toca
-  comprobante, contabilidad y el cálculo del total. Se dejó afuera a propósito:
-  el radio de impacto del cambio es mucho mayor que el resto de este slice y no
-  se puede validar sin decidir antes qué producto y qué cuenta usa.
-- ⬜ **La tarifa de delivery es una sola para todo el grupo** (2026-08-22,
-  ADR-054): `DELIVERY_TARIFA_BASE`, `DELIVERY_PRECIO_POR_KM` y
-  `DELIVERY_DISTANCIA_MAXIMA_KM` viven en `settings`. El día que dos locales
-  necesiten precios distintos —o dos marcas—, pasan a columnas de `sucursal`,
-  que es donde ya vive el resto de lo que distingue a un local.
+- ✅ **El reparto se cobra** (2026-08-25, ADR-066, RN-COM-040):
+  `total_a_cobrar` suma `venta.costo_entrega`, después del descuento manual,
+  sin cobrárselo a un consumo de personal y sin prorratearlo entre cuentas
+  separadas. **Sin la línea de venta** que esta deuda daba por necesaria: la
+  columna ya sobrevive al comprobante, y crear un producto de servicio
+  "Delivery" con su receta, su categoría y su cuenta contable para mover un
+  número que ya tiene su columna no compra nada hoy. Lo que **sigue abierto**
+  es que el reparto aparezca **desglosado en el comprobante y en el asiento**:
+  hoy viaja dentro del total. Se cierra el día que facturación o contabilidad
+  lo pidan por separado, y es un cambio de emisión, no de cobro.
+- ⬜ **La tarifa de delivery es una sola para toda la empresa** (2026-08-22,
+  ADR-054; actualizada 2026-08-25, ADR-066): ya no vive en `settings` sino en
+  `parametro_empresa`, y la fija Gerencia en `/gerencia/delivery` sin
+  redesplegar. Sigue siendo **una por empresa**: el día que dos locales
+  necesiten precios distintos —o dos marcas—, o el parámetro gana alcance de
+  sucursal, o pasa a columnas de `sucursal`, que es donde ya vive el resto de
+  lo que distingue a un local.
 - ⬜ **Las zonas de reparto son una lista de distritos, no polígonos**
-  (2026-08-22, ADR-054): `DELIVERY_DISTRITOS_RESTRINGIDOS` compara contra el
-  distrito que devuelve Google. Alcanza para "no repartimos en Belén" y no para
+  (2026-08-22, ADR-054): el parámetro `delivery_distritos_restringidos`
+  compara contra el distrito que devuelve Google. Alcanza para "no repartimos en Belén" y no para
   "no repartimos del río para allá". Se cierra con PostGIS y una pantalla para
   dibujar el polígono; hasta que el negocio lo pida, es mucha máquina.
 - ⬜ **DAZ DAZ es un aviso al cajero, no una integración** (2026-08-22,

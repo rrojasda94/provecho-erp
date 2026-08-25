@@ -6,6 +6,10 @@
 - **Relacionado:** ADR-005 (integraciones que prellenan), ADR-009 (hub
   offline), ADR-041 (cuota de un proveedor pago), ADR-053 (la dirección se
   elige en el mapa)
+- **Superado en parte por ADR-066** (2026-08-25): la tarifa ya **no sale del
+  `.env`** —la fija Gerencia en `parametro_empresa`, y `settings.delivery_*`
+  queda solo como semilla— y el reparto **sí se suma al total de la venta**
+  (RN-COM-040). Todo lo demás de esta ADR sigue vigente tal cual.
 
 ## Contexto
 
@@ -119,6 +123,12 @@ misma IP, y limitar solo por ahí castiga al equipo por uno solo.
 cobrando como antes hasta que el negocio defina la tarifa. Nada se enciende
 solo.
 
+> **ADR-066:** esos tres valores pasaron a ser la **semilla**. La tarifa que
+> manda la fija Gerencia en `/gerencia/delivery` y vive en
+> `parametro_empresa`. Sigue arrancando apagada, pero ya no hace falta
+> redesplegar para encenderla — que es la razón por la que en tres meses
+> nadie la encendió.
+
 ## Alternativas descartadas
 
 - **Calcular en el navegador con la clave del mapa.** Menos código y ninguna
@@ -129,8 +139,13 @@ solo.
   pero exige una línea de venta (producto de servicio "Delivery") para que
   aparezca en el comprobante y en contabilidad. Queda en la deuda: por ahora
   el costo se calcula, se guarda y se muestra.
+  **Resuelto por ADR-066 (2026-08-25)**, y sin la línea de venta: el flete
+  entra al total desde su propia columna. Desde caja, «se calcula y no se
+  cobra» se leía como que el PDV estaba roto.
 - **Tarifa por sucursal o por marca.** Arranca global en `settings`. Cuando
   dos locales necesiten precios distintos, pasa a columnas de `sucursal`.
+  Con ADR-066 pasó a ser **por empresa** (`parametro_empresa`); por sucursal
+  sigue diferida.
 
 ## Consecuencias
 

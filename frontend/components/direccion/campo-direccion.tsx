@@ -305,7 +305,15 @@ export function CampoDireccion({
 
   return (
     <div className="flex flex-col gap-1.5">
-      {conMapa && <div ref={buscadorRef} className="w-full" />}
+      {/* Sin condicionar a `conMapa`: el efecto que activa `conMapa` necesita
+          que este `<div>` ya exista para engancharle el buscador
+          (`buscadorRef.current`). Condicionarlo era un huevo-y-gallina que
+          dejaba el mapa sin encenderse nunca, con clave o sin ella — el
+          contenedor solo aparecía cuando `conMapa` era `true`, y `conMapa`
+          solo se volvía `true` si el contenedor ya existía. Vacío no ocupa
+          espacio visible, así que no hay nada que mostrar de más mientras el
+          SDK no cargó. */}
+      <div ref={buscadorRef} className="w-full" />
 
       <CampoTexto
         {...presentacion}

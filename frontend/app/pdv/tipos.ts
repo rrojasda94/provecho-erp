@@ -45,6 +45,11 @@ export type Borrador = {
   mesaNumero: number | null;
   comensales: number | null;
   direccion: string | null;
+  /** Lo que sale el reparto, cotizado por el servidor al anclar la dirección
+   * (ADR-054). `null` = todavía no se cotizó o el pedido no se lleva. Es
+   * informativo: el monto que se cobra lo recalcula la API al crear la venta,
+   * y es el que queda congelado en la fila. */
+  costoEntrega: number | null;
   /** El punto en el mapa de esa dirección, cuando se eligió con el
    * buscador. Sin él el pedido se toma igual y el reparto se cobra a
    * tarifa base (ADR-054). */
@@ -78,9 +83,15 @@ export const totalLinea = (l: LineaBorrador): number =>
   l.extras.reduce((a, e) => a + e.precio * e.cantidad * l.cantidad, 0);
 
 /** El consumo de personal no tiene precio: mostrar el de la carta haría
- * creer que hay algo que cobrar (RN-COM-025). */
+ * creer que hay algo que cobrar (RN-COM-025).
+ *
+ * El reparto suma al final y no por línea (RN-COM-040): es del pedido, no de
+ * lo que se comió. El número que manda es el que recalcula el servidor —esto
+ * es lo que el cajero le dice al cliente antes de cobrar. */
 export const totalBorrador = (b: Borrador): number =>
-  esConsumoPersonal(b) ? 0 : b.lineas.reduce((a, l) => a + totalLinea(l), 0);
+  esConsumoPersonal(b)
+    ? 0
+    : b.lineas.reduce((a, l) => a + totalLinea(l), 0) + (b.costoEntrega ?? 0);
 
 export const etiquetaTipo = (b: Borrador): string => {
   if (b.tipo === "mesa") return `Mesa ${b.mesaNumero ?? "?"}`;

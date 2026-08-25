@@ -248,12 +248,21 @@ function BarraSeleccion({
 
 function Totales({ borrador }: { borrador: Borrador }) {
   const total = totalBorrador(borrador);
+  // El reparto es del pedido, no de lo que se comió: va en su propia fila y
+  // no repartido entre las líneas (RN-COM-040). Sin delivery no aparece.
+  const reparto = borrador.costoEntrega ?? 0;
   return (
     <div className="pdv-totales">
       <div className="pdv-total-fila">
         <span>Subtotal</span>
-        <span>{soles(total)}</span>
+        <span>{soles(total - reparto)}</span>
       </div>
+      {reparto > 0 && (
+        <div className="pdv-total-fila">
+          <span>Reparto</span>
+          <span>{soles(reparto)}</span>
+        </div>
+      )}
       <div className="pdv-total-fila grande">
         <span>Total</span>
         <span>{soles(total)}</span>

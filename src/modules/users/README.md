@@ -241,6 +241,18 @@ o con `src.shared.aprobaciones.umbral_vigente(...)` si el valor es un monto
 que se compara como `Decimal`. Ambos devuelven solo el valor aprobado.
 Catálogo de módulos válidos: `src.shared.parametros.MODULOS`.
 
+**Parámetros con pantalla propia.** El listado de `/gerencia/parametros` sirve
+para cualquier código, pero su formulario solo sabe expresar **un** número con
+su unidad. Cuando un área necesita configurar varios valores que se leen
+juntos, la sección propia gana: hoy es la **tarifa del delivery**
+(`/gerencia/delivery`, ADR-066), con los cuatro códigos de `sales`
+—`delivery_tarifa_base`, `delivery_precio_por_km`, `delivery_radio_km`,
+`delivery_distritos_restringidos`— en un solo formulario, la lista de
+distritos vetados (que el formulario genérico no puede expresar) y el
+diagnóstico de si las claves de Google están puestas. Escribe por
+`POST /api/v1/parametros` como todo el mundo: **no hay atajo que saltee la
+aprobación**.
+
 ## Estado (implementado 2026-07-25)
 
 Slice auth + RBAC + CRUD operativo. Capas: `domain/rules.py` (formato de PIN,
