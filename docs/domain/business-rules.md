@@ -634,6 +634,18 @@ de su módulo y se prueban de forma aislada.
   otra empresa del grupo: la planilla la paga la empresa del trabajador.
   Distinto del alcance de datos de su cuenta de usuario, que vive en
   `usuario_sucursal` y se administra aparte (ADR-062).
+- **RN-RRHH-020** La marcación de asistencia en el pad del local la firma el
+  **PIN del propio trabajador**: nadie marca por otro. El pad se abre con la
+  cuenta de servicio de la sucursal, que por sí sola no registra ninguna
+  marcación, y solo muestra a quienes tienen su centro de labores ahí. El PIN
+  va contra el mismo lockout que el login (ADR-065).
+- **RN-RRHH-021** Un trabajador que marcó entrada y no marca salida antes de
+  la `hora_limite_salida` de su turno recibe un aviso, y con él el encargado
+  del local y RRHH. El aviso **no cierra la jornada**: la marcación sigue
+  faltando hasta que se registre o RRHH la corrija (ADR-064).
+- **RN-RRHH-022** La marcación nunca genera horas extra. Quedarse pasada la
+  hora de salida produce el aviso de RN-RRHH-021 y nada más; la hora extra se
+  autoriza antes y la registra RRHH a mano.
 
 ## Auditoría
 

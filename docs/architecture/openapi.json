@@ -2369,6 +2369,18 @@
             "format": "uuid",
             "title": "Trabajador Id",
             "type": "string"
+          },
+          "turno_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turno Id"
           }
         },
         "required": [
@@ -2377,6 +2389,7 @@
           "fecha",
           "hora_entrada",
           "hora_salida",
+          "turno_id",
           "tardanza_min",
           "horas_extra"
         ],
@@ -13502,6 +13515,44 @@
         "title": "PactoPermanenciaOut",
         "type": "object"
       },
+      "PadMarcacionOut": {
+        "properties": {
+          "asistencia": {
+            "$ref": "#/components/schemas/AsistenciaOut"
+          },
+          "tipo": {
+            "title": "Tipo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tipo",
+          "asistencia"
+        ],
+        "title": "PadMarcacionOut",
+        "type": "object"
+      },
+      "PadMarcarIn": {
+        "properties": {
+          "pin": {
+            "maxLength": 12,
+            "minLength": 4,
+            "title": "Pin",
+            "type": "string"
+          },
+          "trabajador_id": {
+            "format": "uuid",
+            "title": "Trabajador Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "trabajador_id",
+          "pin"
+        ],
+        "title": "PadMarcarIn",
+        "type": "object"
+      },
       "Pagina_AjusteOut_": {
         "properties": {
           "items": {
@@ -23138,6 +23189,36 @@
         "title": "TarjetaIn",
         "type": "object"
       },
+      "TarjetaOut": {
+        "description": "La tarjeta del pad: nombre y nada más. La pantalla está a la vista de\ntodo el que pase por la cocina — cargo, documento y sueldo no van acá.",
+        "properties": {
+          "marco_entrada": {
+            "title": "Marco Entrada",
+            "type": "boolean"
+          },
+          "marco_salida": {
+            "title": "Marco Salida",
+            "type": "boolean"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "trabajador_id": {
+            "format": "uuid",
+            "title": "Trabajador Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "trabajador_id",
+          "nombre",
+          "marco_entrada",
+          "marco_salida"
+        ],
+        "title": "TarjetaOut",
+        "type": "object"
+      },
       "TokenAgenteCreado": {
         "description": "El único momento en que el token en claro existe fuera de quien lo\nusa: después solo queda su SHA-256, y perderlo obliga a emitir otro.",
         "properties": {
@@ -24169,6 +24250,182 @@
           "correcciones"
         ],
         "title": "TurnoCerradoOut",
+        "type": "object"
+      },
+      "TurnoCreate": {
+        "properties": {
+          "hora_fin": {
+            "format": "time",
+            "title": "Hora Fin",
+            "type": "string"
+          },
+          "hora_inicio": {
+            "format": "time",
+            "title": "Hora Inicio",
+            "type": "string"
+          },
+          "hora_limite_salida": {
+            "format": "time",
+            "title": "Hora Limite Salida",
+            "type": "string"
+          },
+          "nombre": {
+            "maxLength": 50,
+            "title": "Nombre",
+            "type": "string"
+          },
+          "sucursal_id": {
+            "format": "uuid",
+            "title": "Sucursal Id",
+            "type": "string"
+          },
+          "tolerancia_min": {
+            "default": 5,
+            "maximum": 120.0,
+            "minimum": 0.0,
+            "title": "Tolerancia Min",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "sucursal_id",
+          "nombre",
+          "hora_inicio",
+          "hora_fin",
+          "hora_limite_salida"
+        ],
+        "title": "TurnoCreate",
+        "type": "object"
+      },
+      "TurnoOut": {
+        "properties": {
+          "activo": {
+            "title": "Activo",
+            "type": "boolean"
+          },
+          "hora_fin": {
+            "format": "time",
+            "title": "Hora Fin",
+            "type": "string"
+          },
+          "hora_inicio": {
+            "format": "time",
+            "title": "Hora Inicio",
+            "type": "string"
+          },
+          "hora_limite_salida": {
+            "format": "time",
+            "title": "Hora Limite Salida",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "sucursal_id": {
+            "format": "uuid",
+            "title": "Sucursal Id",
+            "type": "string"
+          },
+          "tolerancia_min": {
+            "title": "Tolerancia Min",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "sucursal_id",
+          "nombre",
+          "hora_inicio",
+          "hora_fin",
+          "hora_limite_salida",
+          "tolerancia_min",
+          "activo"
+        ],
+        "title": "TurnoOut",
+        "type": "object"
+      },
+      "TurnoUpdate": {
+        "properties": {
+          "activo": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activo"
+          },
+          "hora_fin": {
+            "anyOf": [
+              {
+                "format": "time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hora Fin"
+          },
+          "hora_inicio": {
+            "anyOf": [
+              {
+                "format": "time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hora Inicio"
+          },
+          "hora_limite_salida": {
+            "anyOf": [
+              {
+                "format": "time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hora Limite Salida"
+          },
+          "nombre": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nombre"
+          },
+          "tolerancia_min": {
+            "anyOf": [
+              {
+                "maximum": 120.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tolerancia Min"
+          }
+        },
+        "title": "TurnoUpdate",
         "type": "object"
       },
       "UnidadMedidaCreate": {
@@ -34348,6 +34605,45 @@
       }
     },
     "/api/v1/kds/pantallas/{pantalla_id}": {
+      "delete": {
+        "operationId": "eliminar_pantalla_api_v1_kds_pantallas__pantalla_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pantalla_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Pantalla Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Eliminar Pantalla",
+        "tags": [
+          "kds"
+        ]
+      },
       "patch": {
         "operationId": "editar_pantalla_api_v1_kds_pantallas__pantalla_id__patch",
         "parameters": [
@@ -40582,6 +40878,118 @@
         ]
       }
     },
+    "/api/v1/rrhh/asistencia/terminal/marcar": {
+      "post": {
+        "description": "Registra la marcación firmada con el PIN del propio trabajador.\n\nEl límite se cuenta **por trabajador** y no por IP: en un local todas\nlas tabletas salen por la misma dirección y el cambio de turno son diez\npersonas marcando seguido — un límite por IP castigaría a la cola por\nculpa de quien se equivocó de tarjeta.",
+        "operationId": "marcar_en_el_pad_api_v1_rrhh_asistencia_terminal_marcar_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "sucursal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sucursal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PadMarcarIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PadMarcacionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Marcar En El Pad",
+        "tags": [
+          "rrhh"
+        ]
+      }
+    },
+    "/api/v1/rrhh/asistencia/terminal/tarjetas": {
+      "get": {
+        "description": "Los nombres que se muestran en el pad de esa sucursal, y si ya\nmarcaron. Solo el centro de labores del trabajador (ADR-062) decide qué\ntarjeta aparece dónde: el pad de un local no marca por gente de otro.",
+        "operationId": "tarjetas_del_pad_api_v1_rrhh_asistencia_terminal_tarjetas_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "sucursal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sucursal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TarjetaOut"
+                  },
+                  "title": "Response Tarjetas Del Pad Api V1 Rrhh Asistencia Terminal Tarjetas Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Tarjetas Del Pad",
+        "tags": [
+          "rrhh"
+        ]
+      }
+    },
     "/api/v1/rrhh/boletas-pago": {
       "post": {
         "operationId": "emitir_boleta_pago_api_v1_rrhh_boletas_pago_post",
@@ -42852,6 +43260,170 @@
           }
         ],
         "summary": "Ver Legajo",
+        "tags": [
+          "rrhh"
+        ]
+      }
+    },
+    "/api/v1/rrhh/turnos": {
+      "get": {
+        "operationId": "listar_turnos_api_v1_rrhh_turnos_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "sucursal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sucursal Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "solo_activos",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Solo Activos",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TurnoOut"
+                  },
+                  "title": "Response Listar Turnos Api V1 Rrhh Turnos Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Turnos",
+        "tags": [
+          "rrhh"
+        ]
+      },
+      "post": {
+        "operationId": "crear_turno_api_v1_rrhh_turnos_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TurnoCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TurnoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Turno",
+        "tags": [
+          "rrhh"
+        ]
+      }
+    },
+    "/api/v1/rrhh/turnos/{turno_id}": {
+      "patch": {
+        "operationId": "editar_turno_api_v1_rrhh_turnos__turno_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "turno_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Turno Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TurnoUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TurnoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Editar Turno",
         "tags": [
           "rrhh"
         ]

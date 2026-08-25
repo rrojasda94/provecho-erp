@@ -53,7 +53,7 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   postulaciones por el endpoint público → avanzar cuatro columnas →
   contratar (creó a Rosa Pinedo como Cocinera) → descartar con motivo.
   **Lo que sigue sin pantalla y por qué**: boletas, liquidaciones,
-  memorándums, amonestaciones, actas, permisos, pactos y asistencia solo
+  memorándums, amonestaciones, actas, permisos y pactos solo
   tienen `POST` y `GET /{id}` en la API — **no hay endpoint de listado**,
   así que no se pueden dibujar sin agregarlos primero. El legajo del
   trabajador es el slice que los junta, y necesita backend antes que
@@ -82,11 +82,31 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 - ⬜ **`boleta_pago`/`liquidacion_bss` sin cálculo automático de PLAME**: la
   API recibe `ingresos`/`descuentos`/montos ya calculados (por el contador
   externo) — no hay motor de cálculo de renta 5ta/ONP/AFP/EsSalud en el ERP.
-- ⬜ **El centro de labores todavía no lo consume nadie** (declarado el
-  2026-08-24 con ADR-062). `trabajador.sucursal_id` ya se registra y se edita,
-  pero `asistencia` no lo hereda para reportar por local, el contrato laboral
-  no lo imprime y el reemplazo entre sucursales (RN-RRHH-011) sigue sin
-  modelo. La columna es el prerrequisito de esas tres, no su solución.
+- 🔶 **El centro de labores ya lo consume la asistencia** (2026-08-24,
+  ADR-064/064): el pad del local muestra a quienes tienen ahí su centro de
+  labores y el aviso de salida sin marcar se atribuye a esa sucursal.
+  Siguen sin consumirlo el **contrato laboral** (no lo imprime) y el
+  **reemplazo entre sucursales** (RN-RRHH-011, sin modelo).
+- ✅ 2026-08-24 **Turno de trabajo y pad de asistencia** (ADR-064, ADR-065,
+  migración `c4d17b93e0af`): `turno_sucursal` es la primera entidad de
+  **horario laboral** del ERP —el glosario lo nombraba desde el principio y
+  nada lo modelaba—, y con ella `tardanza_min` pasa a ser algo que el
+  servidor calcula en vez de un número que el cliente informaba. El pad
+  (`frontend/app/asistencia/`) se abre con una cuenta de servicio por local y
+  cada marcación la firma el PIN del trabajador, contra el mismo lockout del
+  login. Barrido horario de salidas sin marcar → aviso al trabajador en su
+  campana + `rrhh.salida_sin_marcar` al encargado y a RRHH. **Nunca genera
+  horas extra** (RN-RRHH-022).
+- ⬜ **Nadie tiene un turno asignado**: el turno de una marcación se **infiere**
+  de la hora (`turnos.turno_vigente`). Alcanza para medir tardanza y
+  vencimiento, y no alcanza para armar un rol de turnos ni para detectar
+  **al que no vino** — sin turno asignado no hay ausencia que reportar, solo
+  falta de fila. Es el siguiente paso si RRHH quiere el reporte de
+  inasistencias.
+- ⬜ **Marcar exige usuario con PIN**: `trabajador.usuario_id` es nullable, y
+  quien no tiene cuenta no puede marcar en el pad (409 explícito). Su
+  asistencia la registra RRHH a mano hasta que se le cree una. Crear la
+  cuenta al contratar cerraría el hueco.
 - ⬜ **Los trabajadores que ya existían quedaron sin sucursal**: la migración
   `b6d29f10c47e` es aditiva y nullable, sin backfill — no hay dato del que
   deducir el local. Hay que asignárselos a mano desde RRHH → Trabajadores.

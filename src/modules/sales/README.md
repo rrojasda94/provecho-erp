@@ -473,15 +473,26 @@ tiempo real (Redis/WebSocket) es deuda declarada.
 
 | Método | Ruta | Permiso |
 |--------|------|---------|
-| POST/PATCH | `/kds/pantallas[/{id}]` | `kds.configurar` |
-| GET | `/kds/pantallas` \| `/{id}/cola` | `kds.operar` |
+| POST/PATCH/DELETE | `/kds/pantallas[/{id}]` | `kds.configurar` |
+| GET | `/kds/pantallas` | `kds.operar` **o** `kds.configurar` |
+| GET | `/kds/pantallas/{id}/cola` | `kds.operar` |
 | POST | `/kds/items/{id}/avanzar` | `kds.operar` |
 | GET | `/kds/ventas/{id}/avance` | `kds.operar` |
 | POST | `/kds/ventas/{id}/comanda` | `kds.operar` |
 | POST | `/sales/ventas/{id}/entrega` | `sales.entregar_pedido` |
 
 Roles seed: `cocinero` (kds.operar, **no** entrega), `despachador`
-(kds.operar + entrega), cajero opera y entrega; supervisor configura.
+(kds.operar + entrega), cajero opera y entrega, supervisor opera. **Configurar
+es de administración desde 2026-08-24** (ADR-065): montar, renombrar o borrar
+una estación cambia por dónde pasa la comanda de todos los turnos, no solo del
+que está en el local esa tarde — es alta de infraestructura, igual que el
+punto de venta (ADR-059).
+
+`DELETE /kds/pantallas/{id}` es baja lógica (`deleted_at`) y **409 si la
+pantalla tiene cola**: borrarla con pedidos encima dejaría esas líneas sin
+dónde tacharse. `activo=false` sigue siendo otra cosa — apaga la estación y la
+deja volver. El `UNIQUE (sucursal_id, nombre)` es **parcial** sobre las vivas,
+así el nombre de una borrada queda libre.
 
 **Pantalla** (2026-08-03): `frontend/app/kds/` — pantalla completa táctil
 fuera del shell, una tarjeta por pedido, un toque tacha el ítem preparado
@@ -489,7 +500,7 @@ fuera del shell, una tarjeta por pedido, un toque tacha el ítem preparado
 estado). Refresca la cola cada 3 s: como el estado vive en `venta_item`,
 ese intervalo es lo que tarda una pantalla en ver lo que tachó otra. La
 estación va en la URL (`/kds?pantalla=<id>`); `/kds` sin parámetro es el
-tablero de estaciones, que además crea/edita/desactiva pantallas con
+tablero de estaciones, que además crea/edita/desactiva/borra pantallas con
 `kds.configurar`. Diseño e interacción en
 [ui-ux.md](../../../docs/product/ui-ux.md#kds--tarjeta-de-pedido-tachar-ítem-por-ítem-implementado-2026-08-03).
 

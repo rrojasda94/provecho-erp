@@ -21,7 +21,8 @@ la postulación recibida al fin del periodo de prueba.
 `convocatoria`, `trabajador`, `contrato_laboral`, `postulante`, `socio`,
 `boleta_pago`, `liquidacion_bss`, `memorandum`, `amonestacion`, `acta`,
 `certificado_trabajo`, `solicitud_permiso`, `pacto_permanencia`,
-`asistencia`. Detalle en `docs/architecture/data-model.md` §8b.
+`asistencia`, `turno_sucursal`. Detalle en
+`docs/architecture/data-model.md` §8b.
 
 ## Tablero de contratación
 
@@ -130,6 +131,25 @@ versión genérica.
   reembolso proporcional al tiempo de permanencia no cumplido (RN-RRHH-006).
 - **`application/asistencia.py`**: marcar entrada/salida; bloqueado
   (`ReglaNegocio`) si `trabajador.registra_asistencia=false` (RN-PER-002).
+  Es la vía del **back-office** (`rrhh.asistencia_marcar`): registrar o
+  corregir la marcación de alguien. La vía del local es el pad.
+- **`application/turnos.py`** (2026-08-24): CRUD de `turno_sucursal` y
+  `turno_vigente` — qué turno le toca a una marcación, por proximidad de
+  `hora_inicio` y con la ventana ya corrida por la tolerancia (ADR-064). La
+  única lógica no trivial del archivo, y por eso la que lleva test propio.
+- **`application/pad_asistencia.py`** (2026-08-24): el pad del local
+  (ADR-065). Las tarjetas (nombre y estado del día, nada más) y la marcación
+  firmada con el PIN del trabajador. El servidor decide hora, día laboral
+  (corta a las 05:00), si es entrada o salida y la tardanza; `horas_extra` es
+  siempre 0 (RN-RRHH-022). El PIN se verifica por el contrato público
+  `users.application.queries_publicas.verificar_pin_de`, contra el **mismo
+  lockout del login**.
+- **`application/avisos_asistencia.py`** + **`application/tasks.py`**
+  (2026-08-24): barrido horario de salidas sin marcar. Avisa al trabajador en
+  su campana y emite `rrhh.salida_sin_marcar` para el encargado y RRHH — dos
+  caminos porque el trabajador no tiene `rrhh.leer` y un reporte que no puede
+  abrir no es un aviso (RN-REP-002). Idempotente por
+  `asistencia.reporte_salida_en`.
 - **`application/legajo.py`** (2026-08-05): el **file personal** en una sola
   lectura (`GET /trabajadores/{id}/legajo`) — contratos, amonestaciones,
   memorándums, certificados, permisos y pactos. Es un endpoint y no ocho
@@ -169,7 +189,8 @@ Publicados, **sin listener cruzado todavía** (mismo estado en que nació
 `trabajador` sin capa `application/`): `rrhh.trabajador_cesado`,
 `rrhh.contrato_laboral_firmado`, `rrhh.boleta_pago_emitida`,
 `rrhh.liquidacion_bss_pagada`, `rrhh.solicitud_permiso_aprobada`,
-`rrhh.amonestacion_emitida`. Candidatos a futuro enganche: `accounting`
+`rrhh.amonestacion_emitida`. Con listener: `rrhh.salida_sin_marcar`, que
+consume `reports` (encargado del local + área RRHH). Candidatos a futuro enganche: `accounting`
 podría generar asiento al escuchar `boleta_pago_emitida`/
 `liquidacion_bss_pagada`; `users` podría desactivar el `usuario` ligado al
 escuchar `trabajador_cesado`. Ver ROADMAP.

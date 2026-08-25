@@ -24,6 +24,7 @@ celery_app = Celery(
         "src.core.tasks_salud",
         "src.modules.inventory.application.tasks",
         "src.modules.marketing.application.tasks",
+        "src.modules.rrhh.application.tasks",
         "src.modules.sales.application.tasks",
     ],
 )
@@ -80,6 +81,16 @@ celery_app.conf.beat_schedule = {
     "reportar-conteos-vencidos": {
         "task": "inventory.reportar_conteos_vencidos",
         "schedule": crontab(hour=6, minute=15),
+    },
+    # Salidas sin marcar: cada hora y no una vez al día. La hora límite es
+    # de cada turno —el de mañana vence a media tarde, el de noche de
+    # madrugada—, así que un barrido diario le avisaría al turno mañana
+    # medio día tarde. El aviso es idempotente
+    # (`asistencia.reporte_salida_en`), así que correrlo seguido no repite
+    # nada.
+    "avisar-salidas-sin-marcar": {
+        "task": "rrhh.avisar_salidas_sin_marcar",
+        "schedule": crontab(minute=5),
     },
     # Red de seguridad de la emisión electrónica: recoge lo que nunca llegó
     # a la cola (emitido sin `FACTILIZA_TOKEN`, con el broker caído o con el
