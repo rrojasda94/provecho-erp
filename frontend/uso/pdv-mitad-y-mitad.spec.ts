@@ -33,7 +33,10 @@ test("la pizza mitad y mitad pide un sabor por mitad", async ({ page }, testInfo
     timeout: 15_000,
   });
 
-  await page.getByRole("button", { name: PRODUCTO, exact: true }).click();
+  // Sin `exact`: el botón del catálogo lleva el precio dentro, así que su
+  // nombre accesible es «Mitad y Mitad E2E S/ 30.00». Mismo criterio que
+  // `e2e/caja.spec.ts`.
+  await page.getByRole("button", { name: new RegExp(PRODUCTO, "i") }).first().click();
   await expect(dialogo(page)).toBeVisible();
   await capturar(page, testInfo, "configurador");
 
@@ -53,8 +56,10 @@ test("la pizza mitad y mitad pide un sabor por mitad", async ({ page }, testInfo
 
   // Elegido «Queso E2E» en la primera mitad, el mismo sabor queda apagado en
   // la segunda: media y media del mismo sabor es una pizza entera.
-  const mitad1 = dialogo(page).locator("div", { hasText: /^Mitad 1 E2E · obligatorio/ }).last();
-  const mitad2 = dialogo(page).locator("div", { hasText: /^Mitad 2 E2E · obligatorio/ }).last();
+  const bloque = (nombre: string) =>
+    dialogo(page).getByTestId("pdv-atributo").filter({ hasText: nombre });
+  const mitad1 = bloque("Mitad 1 E2E");
+  const mitad2 = bloque("Mitad 2 E2E");
   await mitad1.getByRole("button", { name: "Queso E2E" }).click();
   await expect(mitad2.getByRole("button", { name: "Queso E2E" })).toBeDisabled();
   await capturar(page, testInfo, "sabor-repetido-apagado");

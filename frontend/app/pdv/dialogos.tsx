@@ -894,7 +894,7 @@ function AtributosDeLinea({
   return (
     <>
       {atributos.map((atributo) => (
-        <div key={atributo.atributo_id}>
+        <div key={atributo.atributo_id} data-testid="pdv-atributo">
           <p className="pdv-etiqueta">{atributo.nombre} · obligatorio</p>
           <div className="pdv-chips">
             {atributo.valores.map((valor) => {
