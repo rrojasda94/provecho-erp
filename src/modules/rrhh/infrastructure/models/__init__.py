@@ -14,6 +14,7 @@ from src.modules.rrhh.infrastructure.models.postulante import Postulante
 from src.modules.rrhh.infrastructure.models.socio import Socio
 from src.modules.rrhh.infrastructure.models.solicitud_permiso import SolicitudPermiso
 from src.modules.rrhh.infrastructure.models.trabajador import Trabajador
+from src.modules.rrhh.infrastructure.models.turno_sucursal import TurnoSucursal
 
 __all__ = [
     "Acta",
@@ -30,4 +31,5 @@ __all__ = [
     "Socio",
     "SolicitudPermiso",
     "Trabajador",
+    "TurnoSucursal",
 ]

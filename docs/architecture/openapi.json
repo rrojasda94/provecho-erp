@@ -1178,7 +1178,7 @@
         "type": "object"
       },
       "ArbolProductoOut": {
-        "description": "Todo lo que el lienzo necesita en una sola llamada.\n\nHereda de `ProductoDetalleOut` a propósito: con el interruptor\n`catalogo.modelo_odoo` apagado el lienzo sigue dibujando grupos y extras,\ny una sola forma de traer los datos evita que las dos pantallas se\nseparen.",
+        "description": "Todo lo que la ficha del producto necesita en una sola llamada.\n\nHereda de `ProductoDetalleOut` a propósito: la ficha sigue dibujando\ngrupos y extras además de los atributos, y una sola forma de traer los\ndatos evita que las dos mitades de la pantalla se separen.",
         "properties": {
           "activo": {
             "title": "Activo",
@@ -1261,18 +1261,6 @@
           "id_interno": {
             "title": "Id Interno",
             "type": "string"
-          },
-          "lienzo_pos": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Lienzo Pos"
           },
           "marca_id": {
             "format": "uuid",
@@ -2381,6 +2369,18 @@
             "format": "uuid",
             "title": "Trabajador Id",
             "type": "string"
+          },
+          "turno_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turno Id"
           }
         },
         "required": [
@@ -2389,6 +2389,7 @@
           "fecha",
           "hora_entrada",
           "hora_salida",
+          "turno_id",
           "tardanza_min",
           "horas_extra"
         ],
@@ -2567,6 +2568,48 @@
           "activo"
         ],
         "title": "AtributoValorOut",
+        "type": "object"
+      },
+      "AtributoValorUpdate": {
+        "description": "`activo` acá es del **catálogo**: el valor deja de poder ofrecerse en\nproductos nuevos. Sacarlo de un producto concreto es\n`PATCH /atributos/valores/{ptav_id}`, que es otro nivel.",
+        "properties": {
+          "activo": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activo"
+          },
+          "nombre": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nombre"
+          },
+          "orden": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orden"
+          }
+        },
+        "title": "AtributoValorUpdate",
         "type": "object"
       },
       "AuditLogOut": {
@@ -7502,6 +7545,34 @@
           }
         },
         "title": "DivisaUpdate",
+        "type": "object"
+      },
+      "EjeDeCondicionOut": {
+        "description": "Con qué se puede condicionar una línea de esta receta (ADR-056).\n\n`valores[].id` es el **PTAV**, que es lo que viaja en\n`receta_item.aplica_valores`. El nombre va al lado para que el editor\nmuestre \"Mitad 1: Americana\" y no un UUID.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "valores": {
+            "items": {
+              "$ref": "#/components/schemas/ValorSimpleOut"
+            },
+            "title": "Valores",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "nombre",
+          "valores"
+        ],
+        "title": "EjeDeCondicionOut",
         "type": "object"
       },
       "EjecutarPagoIn": {
@@ -13444,6 +13515,44 @@
         "title": "PactoPermanenciaOut",
         "type": "object"
       },
+      "PadMarcacionOut": {
+        "properties": {
+          "asistencia": {
+            "$ref": "#/components/schemas/AsistenciaOut"
+          },
+          "tipo": {
+            "title": "Tipo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tipo",
+          "asistencia"
+        ],
+        "title": "PadMarcacionOut",
+        "type": "object"
+      },
+      "PadMarcarIn": {
+        "properties": {
+          "pin": {
+            "maxLength": 12,
+            "minLength": 4,
+            "title": "Pin",
+            "type": "string"
+          },
+          "trabajador_id": {
+            "format": "uuid",
+            "title": "Trabajador Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "trabajador_id",
+          "pin"
+        ],
+        "title": "PadMarcarIn",
+        "type": "object"
+      },
       "Pagina_AjusteOut_": {
         "properties": {
           "items": {
@@ -17109,7 +17218,19 @@
         "type": "object"
       },
       "PrecioExtraIn": {
+        "description": "Ambos campos opcionales: `None` = no tocar.\n\n`activo` es lo que permite **volver a ofrecer** un valor retirado por\nerror. Sin él, `DELETE /atributos/valores/{ptav_id}` era de ida y la única\nvuelta era colgar el atributo entero otra vez.",
         "properties": {
+          "activo": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activo"
+          },
           "precio_extra": {
             "anyOf": [
               {
@@ -17119,14 +17240,14 @@
               {
                 "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
+              },
+              {
+                "type": "null"
               }
             ],
             "title": "Precio Extra"
           }
         },
-        "required": [
-          "precio_extra"
-        ],
         "title": "PrecioExtraIn",
         "type": "object"
       },
@@ -17631,18 +17752,6 @@
             "title": "Id Interno",
             "type": "string"
           },
-          "lienzo_pos": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Lienzo Pos"
-          },
           "marca_id": {
             "format": "uuid",
             "title": "Marca Id",
@@ -17758,18 +17867,6 @@
             "title": "Id Interno",
             "type": "string"
           },
-          "lienzo_pos": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Lienzo Pos"
-          },
           "marca_id": {
             "format": "uuid",
             "title": "Marca Id",
@@ -17869,18 +17966,6 @@
               }
             ],
             "title": "Empaque Id"
-          },
-          "lienzo_pos": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Lienzo Pos"
           },
           "modalidades_empaque": {
             "anyOf": [
@@ -23104,6 +23189,36 @@
         "title": "TarjetaIn",
         "type": "object"
       },
+      "TarjetaOut": {
+        "description": "La tarjeta del pad: nombre y nada más. La pantalla está a la vista de\ntodo el que pase por la cocina — cargo, documento y sueldo no van acá.",
+        "properties": {
+          "marco_entrada": {
+            "title": "Marco Entrada",
+            "type": "boolean"
+          },
+          "marco_salida": {
+            "title": "Marco Salida",
+            "type": "boolean"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "trabajador_id": {
+            "format": "uuid",
+            "title": "Trabajador Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "trabajador_id",
+          "nombre",
+          "marco_entrada",
+          "marco_salida"
+        ],
+        "title": "TarjetaOut",
+        "type": "object"
+      },
       "TokenAgenteCreado": {
         "description": "El único momento en que el token en claro existe fuera de quien lo\nusa: después solo queda su SHA-256, y perderlo obliga a emitir otro.",
         "properties": {
@@ -24137,6 +24252,182 @@
         "title": "TurnoCerradoOut",
         "type": "object"
       },
+      "TurnoCreate": {
+        "properties": {
+          "hora_fin": {
+            "format": "time",
+            "title": "Hora Fin",
+            "type": "string"
+          },
+          "hora_inicio": {
+            "format": "time",
+            "title": "Hora Inicio",
+            "type": "string"
+          },
+          "hora_limite_salida": {
+            "format": "time",
+            "title": "Hora Limite Salida",
+            "type": "string"
+          },
+          "nombre": {
+            "maxLength": 50,
+            "title": "Nombre",
+            "type": "string"
+          },
+          "sucursal_id": {
+            "format": "uuid",
+            "title": "Sucursal Id",
+            "type": "string"
+          },
+          "tolerancia_min": {
+            "default": 5,
+            "maximum": 120.0,
+            "minimum": 0.0,
+            "title": "Tolerancia Min",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "sucursal_id",
+          "nombre",
+          "hora_inicio",
+          "hora_fin",
+          "hora_limite_salida"
+        ],
+        "title": "TurnoCreate",
+        "type": "object"
+      },
+      "TurnoOut": {
+        "properties": {
+          "activo": {
+            "title": "Activo",
+            "type": "boolean"
+          },
+          "hora_fin": {
+            "format": "time",
+            "title": "Hora Fin",
+            "type": "string"
+          },
+          "hora_inicio": {
+            "format": "time",
+            "title": "Hora Inicio",
+            "type": "string"
+          },
+          "hora_limite_salida": {
+            "format": "time",
+            "title": "Hora Limite Salida",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "sucursal_id": {
+            "format": "uuid",
+            "title": "Sucursal Id",
+            "type": "string"
+          },
+          "tolerancia_min": {
+            "title": "Tolerancia Min",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "sucursal_id",
+          "nombre",
+          "hora_inicio",
+          "hora_fin",
+          "hora_limite_salida",
+          "tolerancia_min",
+          "activo"
+        ],
+        "title": "TurnoOut",
+        "type": "object"
+      },
+      "TurnoUpdate": {
+        "properties": {
+          "activo": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activo"
+          },
+          "hora_fin": {
+            "anyOf": [
+              {
+                "format": "time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hora Fin"
+          },
+          "hora_inicio": {
+            "anyOf": [
+              {
+                "format": "time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hora Inicio"
+          },
+          "hora_limite_salida": {
+            "anyOf": [
+              {
+                "format": "time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hora Limite Salida"
+          },
+          "nombre": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nombre"
+          },
+          "tolerancia_min": {
+            "anyOf": [
+              {
+                "maximum": 120.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tolerancia Min"
+          }
+        },
+        "title": "TurnoUpdate",
+        "type": "object"
+      },
       "UnidadMedidaCreate": {
         "properties": {
           "categoria_udm_id": {
@@ -24511,6 +24802,25 @@
         "title": "ValorDeProductoOut",
         "type": "object"
       },
+      "ValorSimpleOut": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "nombre"
+        ],
+        "title": "ValorSimpleOut",
+        "type": "object"
+      },
       "VarianteDeCartaOut": {
         "description": "Tamaño/presentación del producto, con precio propio y completo — no\nun recargo sobre el padre (RN-COM-022). Elegir una es obligatorio.",
         "properties": {
@@ -24548,6 +24858,32 @@
           "orden"
         ],
         "title": "VarianteDeCartaOut",
+        "type": "object"
+      },
+      "VariantesGeneradasOut": {
+        "description": "Lo generado, más el árbol repintado para no pedirlo aparte.\n\n`sin_precio` son las variantes que todavía no tienen precio en ninguna\nlista vigente: `GET /carta` las descarta en silencio, así que sin este\naviso alguien genera doce combinaciones y ninguna aparece en el PDV.",
+        "properties": {
+          "arbol": {
+            "$ref": "#/components/schemas/ArbolProductoOut"
+          },
+          "creadas": {
+            "title": "Creadas",
+            "type": "integer"
+          },
+          "sin_precio": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sin Precio",
+            "type": "array"
+          }
+        },
+        "required": [
+          "creadas",
+          "sin_precio",
+          "arbol"
+        ],
+        "title": "VariantesGeneradasOut",
         "type": "object"
       },
       "VentaCreate": {
@@ -34269,6 +34605,45 @@
       }
     },
     "/api/v1/kds/pantallas/{pantalla_id}": {
+      "delete": {
+        "operationId": "eliminar_pantalla_api_v1_kds_pantallas__pantalla_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pantalla_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Pantalla Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Eliminar Pantalla",
+        "tags": [
+          "kds"
+        ]
+      },
       "patch": {
         "operationId": "editar_pantalla_api_v1_kds_pantallas__pantalla_id__patch",
         "parameters": [
@@ -40503,6 +40878,118 @@
         ]
       }
     },
+    "/api/v1/rrhh/asistencia/terminal/marcar": {
+      "post": {
+        "description": "Registra la marcación firmada con el PIN del propio trabajador.\n\nEl límite se cuenta **por trabajador** y no por IP: en un local todas\nlas tabletas salen por la misma dirección y el cambio de turno son diez\npersonas marcando seguido — un límite por IP castigaría a la cola por\nculpa de quien se equivocó de tarjeta.",
+        "operationId": "marcar_en_el_pad_api_v1_rrhh_asistencia_terminal_marcar_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "sucursal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sucursal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PadMarcarIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PadMarcacionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Marcar En El Pad",
+        "tags": [
+          "rrhh"
+        ]
+      }
+    },
+    "/api/v1/rrhh/asistencia/terminal/tarjetas": {
+      "get": {
+        "description": "Los nombres que se muestran en el pad de esa sucursal, y si ya\nmarcaron. Solo el centro de labores del trabajador (ADR-062) decide qué\ntarjeta aparece dónde: el pad de un local no marca por gente de otro.",
+        "operationId": "tarjetas_del_pad_api_v1_rrhh_asistencia_terminal_tarjetas_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "sucursal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sucursal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TarjetaOut"
+                  },
+                  "title": "Response Tarjetas Del Pad Api V1 Rrhh Asistencia Terminal Tarjetas Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Tarjetas Del Pad",
+        "tags": [
+          "rrhh"
+        ]
+      }
+    },
     "/api/v1/rrhh/boletas-pago": {
       "post": {
         "operationId": "emitir_boleta_pago_api_v1_rrhh_boletas_pago_post",
@@ -42778,6 +43265,170 @@
         ]
       }
     },
+    "/api/v1/rrhh/turnos": {
+      "get": {
+        "operationId": "listar_turnos_api_v1_rrhh_turnos_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "sucursal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sucursal Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "solo_activos",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Solo Activos",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TurnoOut"
+                  },
+                  "title": "Response Listar Turnos Api V1 Rrhh Turnos Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Turnos",
+        "tags": [
+          "rrhh"
+        ]
+      },
+      "post": {
+        "operationId": "crear_turno_api_v1_rrhh_turnos_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TurnoCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TurnoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Turno",
+        "tags": [
+          "rrhh"
+        ]
+      }
+    },
+    "/api/v1/rrhh/turnos/{turno_id}": {
+      "patch": {
+        "operationId": "editar_turno_api_v1_rrhh_turnos__turno_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "turno_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Turno Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TurnoUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TurnoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Editar Turno",
+        "tags": [
+          "rrhh"
+        ]
+      }
+    },
     "/api/v1/sales/atributos": {
       "get": {
         "operationId": "listar_atributos_api_v1_sales_atributos_get",
@@ -43034,6 +43685,46 @@
       }
     },
     "/api/v1/sales/atributos/{atributo_id}": {
+      "delete": {
+        "description": "Solo si ningún producto lo ofrece; si alguno lo ofrece, 409 nombrándolo.\n\nNo hay desactivar: es para deshacer un alta recién tecleada, y en cuanto\nun producto lo usa el camino correcto es quitárselo a ese producto — que\nobliga a mirar qué se está desarmando.",
+        "operationId": "borrar_atributo_api_v1_sales_atributos__atributo_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "atributo_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Atributo Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Borrar Atributo",
+        "tags": [
+          "sales"
+        ]
+      },
       "patch": {
         "description": "Bajar `modo_variante` de `siempre` a `nunca` **no borra** las variantes\nya materializadas: puede haber ventas que las nombran. Deja de generar\nnuevas, que es lo que alguien quiere al descubrir que un atributo de 17\nvalores iba a materializar 289 combinaciones.",
         "operationId": "editar_atributo_api_v1_sales_atributos__atributo_id__patch",
@@ -43145,6 +43836,75 @@
           }
         ],
         "summary": "Agregar Valor De Atributo",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/atributos/{atributo_id}/valores/{valor_id}": {
+      "patch": {
+        "description": "Renombrar, reordenar o retirar un valor **del catálogo**. Sacarlo de un\nproducto concreto es `PATCH /atributos/valores/{ptav_id}`.",
+        "operationId": "editar_valor_de_atributo_api_v1_sales_atributos__atributo_id__valores__valor_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "atributo_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Atributo Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "valor_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Valor Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AtributoValorUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtributoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Editar Valor De Atributo",
         "tags": [
           "sales"
         ]
@@ -44671,7 +45431,7 @@
     },
     "/api/v1/sales/productos/{producto_id}/arbol": {
       "get": {
-        "description": "El producto entero para el lienzo, en una llamada.\n\nLa versión anterior pedía la ficha del padre y una por cada variante:\ncon tres tamaños y ocho sabores eran veintisiete idas a la red para\ndibujar un árbol.",
+        "description": "El producto entero para la ficha, en una llamada.\n\nLa versión anterior pedía la ficha del padre y una por cada variante:\ncon tres tamaños y ocho sabores eran veintisiete idas a la red para\ndibujar un árbol.",
         "operationId": "ver_arbol_de_producto_api_v1_sales_productos__producto_id__arbol_get",
         "parameters": [
           {
@@ -44772,6 +45532,58 @@
           }
         ],
         "summary": "Ofrecer Atributo",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/productos/{producto_id}/atributos/{atributo_id}": {
+      "delete": {
+        "description": "El producto deja de ofrecer el atributo.\n\nDevuelve 409 si alguno de sus valores ya lo materializa una variante, lo\nnombra una exclusión, lo eligió una venta o condiciona una línea de\nreceta. El último es el caro: un valor huérfano forma su propio grupo\n(ADR-056 §3), o sea que la línea **deja de descontar en silencio**.",
+        "operationId": "quitar_atributo_del_producto_api_v1_sales_productos__producto_id__atributos__atributo_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "producto_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Producto Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "atributo_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Atributo Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Quitar Atributo Del Producto",
         "tags": [
           "sales"
         ]
@@ -45045,6 +45857,55 @@
           }
         ],
         "summary": "Quitables",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/productos/{producto_id}/variantes": {
+      "post": {
+        "description": "Materializa las combinaciones de los atributos en modo `siempre`.\n\nEs idempotente: volver a llamarlo después de agregar un sabor crea solo\nlas que faltan. Nunca borra ni desactiva lo que ya existe, porque puede\nhaber ventas que lo nombran (RN-COM-039).",
+        "operationId": "generar_variantes_api_v1_sales_productos__producto_id__variantes_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "producto_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Producto Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VariantesGeneradasOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Generar Variantes",
         "tags": [
           "sales"
         ]
@@ -45458,6 +46319,59 @@
         "tags": [
           "sales",
           "organizacion"
+        ]
+      }
+    },
+    "/api/v1/sales/recetas/{receta_id}/atributos": {
+      "get": {
+        "description": "Con qué se pueden condicionar las líneas de esta receta (ADR-056).\n\nVive en `sales` y no en `inventory` porque `producto_comercial.receta_id`\nes una columna de `sales`: el camino de la receta al producto que la usa,\ny de ahí a lo que ofrece, no cruza ningún dominio.\n\nLista vacía = ninguna ficha de producto usa esta receta, y el editor\nesconde la columna en vez de ofrecer una condición sin nombres.",
+        "operationId": "atributos_de_receta_api_v1_sales_recetas__receta_id__atributos_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "receta_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Receta Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/EjeDeCondicionOut"
+                  },
+                  "title": "Response Atributos De Receta Api V1 Sales Recetas  Receta Id  Atributos Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Atributos De Receta",
+        "tags": [
+          "sales"
         ]
       }
     },

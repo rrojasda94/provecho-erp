@@ -69,9 +69,8 @@ export type Modelo = {
 /**
  * La firma de una condición: es un **conjunto**, así que el orden en que se
  * listan sus valores no la cambia. Es lo mismo que `_condicion_normalizada`
- * del servidor, y por eso vive acá una sola vez: el lienzo la usa para saber
- * si dos líneas chocarían (y evitar el 409 antes de mandarlo) y la matriz
- * para identificar la celda.
+ * del servidor, y por eso vive acá una sola vez: la matriz la usa para
+ * identificar la celda.
  */
 export function firmaDeCondicion(
   valores?: readonly string[] | null,

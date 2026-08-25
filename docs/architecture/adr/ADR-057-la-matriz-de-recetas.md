@@ -118,7 +118,8 @@ herramienta.
 - `frontend/lib/matriz.ts` es puro y tiene 15 pruebas: el pegado y el diff se
   prueban sin montar un navegador.
 - Queda pendiente: editar la **condición** de una celda desde la matriz.
-  Desde el lienzo ya se edita (enmienda de ADR-056, 2026-08-24), que es donde
-  los valores tienen nombre; en la grilla no, y hay un segundo problema
-  debajo — la celda se busca sin la condición en la clave, así que una línea
-  condicionada cae donde la grilla nunca mira. Anotado en Deuda técnica.
+  Se edita en el editor de receta (ADR-063, 2026-08-24 — reemplazó al lienzo),
+  que es donde los valores tienen nombre; en la grilla no, y hay un segundo
+  problema debajo — la celda se busca sin la condición en la clave, así que
+  una línea condicionada cae donde la grilla nunca mira. Anotado en Deuda
+  técnica.

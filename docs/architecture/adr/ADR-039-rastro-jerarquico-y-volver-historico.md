@@ -115,9 +115,9 @@ donde ese nivel existe.
 - `<Rastro volverA>` existe para el único caso donde el padre no alcanza: la
   ficha de venta vuelve a la jornada **de su sucursal y su fecha**, que sin
   los query params se abriría en el día de hoy.
-- El PDV, el KDS y el lienzo **no lo usan**: viven fuera de `(app)`, son
-  pantallas de una sola tarea y ya tienen su propia barra con enlaces de
-  vuelta.
+- El PDV y el KDS **no lo usan**: viven fuera de `(app)`, son pantallas de
+  una sola tarea y ya tienen su propia barra con enlaces de vuelta. (El
+  lienzo, que también vivía fuera de `(app)`, se borró en ADR-063.)
 - Costo asumido: un contador de navegaciones en un módulo del bundle. Es
   estado global, con lo que eso implica —no se puede aislar por pestaña de
   React ni resetear entre pruebas sin exportar un `reiniciarHistorial()`—,

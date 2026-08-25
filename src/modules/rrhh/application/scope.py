@@ -28,6 +28,7 @@ from src.modules.rrhh.infrastructure.models import (
     Postulante,
     SolicitudPermiso,
     Trabajador,
+    TurnoSucursal,
 )
 
 
@@ -139,3 +140,13 @@ def exigir_acta(session: Session, acta_id: uuid.UUID, tenant: Tenant) -> Acta:
         raise NoEncontrado("acta no encontrada")
     tenant.exigir_empresa(acta.empresa_id)
     return acta
+
+
+def exigir_turno(
+    session: Session, turno_id: uuid.UUID, tenant: Tenant
+) -> TurnoSucursal:
+    turno = session.get(TurnoSucursal, turno_id)
+    if turno is None or turno.deleted_at is not None:
+        raise NoEncontrado("turno no encontrado")
+    tenant.exigir_sucursal(turno.sucursal_id)
+    return turno

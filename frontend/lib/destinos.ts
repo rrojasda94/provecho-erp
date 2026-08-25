@@ -27,6 +27,7 @@ const RUTAS: Record<string, (id: string) => string> = {
   movimiento_dinero: (id) => `/contabilidad/pagos?pago=${id}`,
   orden_produccion: (id) => `/produccion?orden=${id}`,
   escalamiento: (id) => `/reportes/escalamientos/${id}`,
+  trabajador: (id) => `/rrhh/trabajadores?trabajador=${id}`,
 };
 
 export function rutaDestino(
