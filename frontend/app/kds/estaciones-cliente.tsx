@@ -107,6 +107,19 @@ export default function EstacionesCliente({
     }
   };
 
+  /** Borrar sí borra: la estación se va de la lista y su nombre queda
+   * libre. Se pregunta porque no tiene deshacer, y la API la rechaza si
+   * todavía tiene pedidos en cola. */
+  const borrar = async (pantalla: Pantalla) => {
+    if (!confirm(`¿Borrar la estación «${pantalla.nombre}»?`)) return;
+    try {
+      await apiKds.eliminarPantalla(pantalla.id);
+      setPantallas(await apiKds.pantallas(sucursalId));
+    } catch (e) {
+      setError(e instanceof ErrorApi ? e.message : "No se pudo borrar la pantalla");
+    }
+  };
+
   const alternarCategoria = (id: string) =>
     setForm((f) => {
       const actuales = f.categoria_ids ?? [];
@@ -131,7 +144,7 @@ export default function EstacionesCliente({
           La sucursal todavía no tiene pantallas.
           {puedeConfigurar
             ? " Crea la primera con el botón de abajo."
-            : " Pídele a un supervisor que configure al menos una."}
+            : " Pídele a un administrador que configure al menos una."}
         </p>
       )}
 
@@ -156,6 +169,9 @@ export default function EstacionesCliente({
                 </button>
                 <button type="button" onClick={() => alternarActiva(p)}>
                   {p.activo ? "Desactivar" : "Activar"}
+                </button>
+                <button type="button" onClick={() => borrar(p)}>
+                  Borrar
                 </button>
               </div>
             )}

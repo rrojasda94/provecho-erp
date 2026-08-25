@@ -162,9 +162,10 @@ con fecha de vencimiento — se borra cuando esas pantallas migren al molde.
 - `@custom-variant dark` es obligatorio en `globals.css`. Sin esa línea las
   clases `dark:` de `components/ui/**` vuelven a ser código muerto, y el
   síntoma solo se ve en el navegador.
-- El PDV, el KDS y el lienzo **no se tocan**. Tienen su propia paleta oscura
-  scoped por clase raíz, están validados en uso y están en el camino del
-  dinero. Migrarlos es su propia entrega.
+- El PDV y el KDS **no se tocan**. Tienen su propia paleta oscura scoped por
+  clase raíz, están validados en uso y están en el camino del dinero.
+  Migrarlos es su propia entrega. (El lienzo, que también estaba en esta
+  lista, se borró en ADR-063.)
 - Tres columnas nuevas en `usuario` y un endpoint sin permiso
   (`PATCH /users/me/preferencias`): no hay privilegio que otorgar en elegir el
   tamaño de la propia letra, y exigir uno dejaría la accesibilidad fuera del

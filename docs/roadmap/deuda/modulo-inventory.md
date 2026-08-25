@@ -432,50 +432,42 @@ receta mal armada sin avisar. Cuando se construya el editor de la condición
 (F4/F5) conviene validarla ahí, donde `sales` sí está a mano, y no en el
 camino del descuento.
 
-**Sigue abierta** (2026-08-24). El editor del lienzo ya existe (enmienda de
-ADR-056) y solo ofrece las casillas de los valores del producto abierto, con
-lo que el caso malo se reduce a un cliente que llame la API a mano o a una
-carga masiva. Pero el servidor sigue sin verificar nada: la validación tiene
-que vivir en `inventory/api`, contra el contrato público de `sales`.
+**Sigue abierta** (2026-08-24, ADR-063). El editor de receta —hoy
+`components/catalogo/receta-editor.tsx`, antes el lienzo— solo ofrece las
+casillas de los valores del producto abierto, con lo que el caso malo se
+reduce a un cliente que llame la API a mano o a una carga masiva. Pero el
+servidor sigue sin verificar nada: la validación tiene que vivir en
+`inventory/api`, contra el contrato público de `sales`.
 
-## ~~`fusionar()` sumaba las líneas condicionadas como si aplicaran siempre~~ — SALDADA 2026-08-24
+## ~~`fusionar()` sumaba las líneas condicionadas como si aplicaran siempre~~ — VOID 2026-08-24 (ADR-063)
 
-`frontend/lib/nodos.ts::fusionar` recorría `receta.items` sin mirar
-`aplica_valores`, así que la pestaña "Plato" del lienzo sumaba las 26 líneas
-de la mitad-y-mitad completas, mientras el servidor descontaba solo las que
-calificaban para los valores elegidos. El costo simulado quedaba por encima
-del real.
+Describía un bug de `frontend/lib/nodos.ts::fusionar`, dentro del lienzo. El
+lienzo se borró entero en ADR-063 y con él ese archivo, `nodos.aplicaAVariante`
+y `lib/nodos.test.ts`. La regla que portaba a JS —agrupar por atributo, Y
+entre grupos, O dentro de cada uno, valor huérfano en su propio grupo— sigue
+viviendo, y solo, en `inventory/domain/rules.aplica_a_variante`
+(`tests/test_receta_condicionada.py`), que es lo único que hoy decide qué
+descuenta una venta. No hay una segunda implementación en el cliente que
+mantener sincronizada.
 
-**Cómo se saldó**: `nodos.aplicaAVariante` es un puerto literal de
-`inventory/domain/rules.aplica_a_variante` — mismo agrupado por atributo,
-mismo Y entre grupos y O dentro de cada uno, mismo tratamiento del valor
-huérfano. `fusionar` la usa para saltar la línea que no aplica antes de
-acumularla. El atributo de cada PTAV llega por `lienzo.atributoDeValores`
-(PTAV → `atributo_id`, construido desde `arbol.atributos`, ya en memoria) y
-`camino.valores` es lo mismo que ya viajaba a la venta — no hay petición
-nueva.
+## ~~La ficha de receta suelta no muestra la condición~~ — SALDADA 2026-08-24 (ADR-063)
 
-Es la duplicación que ADR-056 §5 quería evitar, aceptada a propósito:
-la alternativa —que el servidor devuelva el costo del camino elegido— pedía
-un endpoint nuevo por cada cambio de selección, y acá el número es una
-simulación (`nodos.ts` lo declara en su cabecera), no lo que se cobra. Con
-dos implementaciones de la misma regla, `tests/test_receta_condicionada.py`
-(Python) y `lib/nodos.test.ts` (`aplicaAVariante`) prueban los mismos casos
-—incluida la asimetría de media Americana + media Peperoni— para que
-divergir sea visible en la suite antes que en una pantalla.
+`frontend/components/catalogo/receta-editor.tsx` listaba las líneas planas:
+con la mitad-y-mitad se veían veintiséis filas, varias del mismo insumo, sin
+decir por qué.
 
-## La ficha de receta suelta no muestra la condición (2026-08-24)
+**Cómo se saldó**: `GET /sales/recetas/{id}/atributos` (ADR-063 §4) resuelve
+el camino inverso receta → producto → atributos, con herencia del padre
+(ADR-042) — el dato que faltaba y que este documento ya anotaba como
+solución correcta ("va por el mismo dato que consume el lienzo",
+`GET /sales/productos/{id}/arbol`, aunque terminó siendo un endpoint propio
+y no el árbol entero). El editor pide esos ejes una vez al montar y dibuja
+una columna «Condición» con casillas agrupadas por atributo; lista vacía =
+ningún producto usa esta receta, y la columna no se dibuja.
 
-`frontend/components/catalogo/receta-editor.tsx` (montado desde
-`/catalogo/recetas/[id]`) lista las líneas planas: con la mitad-y-mitad se
-ven veintiséis filas, varias del mismo insumo, sin decir por qué.
-
-No se cambió porque ese editor no tiene los nombres de los valores —está
-montado sobre una receta suelta, sin saber qué producto la usa— y mostrar
-dieciocho UUID es lo que ADR-057 ya descartó para la matriz. Si alguna vez se
-resuelve, va por el mismo dato que consume el lienzo
-(`GET /sales/productos/{id}/arbol`), no por un endpoint nuevo.
-
-Su bloqueo de insumo repetido (`yaUsados`) queda como está: sin poder poner
-condición, permitir repetir el insumo solo produciría un 409.
+**El bloqueo de insumo repetido (`yaUsados`) también se corrigió**, y no era
+solo cosmético: filtraba por `articulo_id` a secas, así que era **imposible**
+poner el jamón en la Mitad 1 y en la Mitad 2 — el caso exacto por el que
+existe ADR-056. Ahora filtra por `(insumo, condición)`, la misma identidad
+del 409 del servidor y de la celda de la matriz.
 

@@ -224,23 +224,19 @@ es un grupo obligatorio de una sola opción con receta propia (RN-COM-021/023).
 - **Cocina las ve**: KDS (`sin: [...]` en cada ítem) y comanda impresa
   (`SIN CEBOLLA`, sangrada). `sales` resuelve los nombres por el contrato
   público de `inventory` (`nombres_de_articulos`), sin tocar su ORM.
-- **Estructura editable desde el lienzo**: se agregan
+- **Estructura editable desde la ficha del producto**:
   `DELETE /productos/{id}/extras/{extra_id}` y
   `DELETE /productos/{id}/grupos/{grupo_id}`, la deuda que ADR-023 dejó
   anotada. Borrar un grupo **suelta** sus extras (siguen ofreciéndose, ya
   sin mínimo): el extra es un producto con su receta y su precio.
-- **El árbol se recorre en `/catalogo/productos/{id}/nodos`** (frontend):
-  un canvas oscuro a pantalla completa (`@xyflow/react`) con producto →
-  tamaños → grupos → extras → restas → empaque → PLATO, que simula en vivo
-  la receta fusionada, el costo y el margen de una combinación. La fusión
-  la calcula el cliente y **no se guarda**: lo que se descuenta de verdad
-  sale del servidor al confirmar la venta. Vive fuera del shell del módulo
-  (como PDV y KDS) y por eso hace su propio guard de `sales.gestionar_catalogo`.
-  **Se edita desde ahí**: la receta del nodo tocado (cantidades, merma,
-  agregar/quitar insumo) y la estructura por cableado — arrastrar de un grupo
-  a un extra disponible lo vincula en ese grupo, cortar la arista lo
-  desvincula. La topología tamaño → sabor → plato la sigue dictando
-  RN-PRD-004 y no se cablea a mano.
+- **El árbol se recorre en `/catalogo/productos/{id}`** (frontend), en la
+  ficha del producto. Hasta 2026-08-24 existió un canvas aparte
+  (`/catalogo/productos/{id}/nodos`, `@xyflow/react`) para lo mismo — se
+  borró (ADR-063) porque nunca resultó un lugar de trabajo usable y porque
+  el modelo de atributos (ver más abajo) necesitaba tablas, no un dibujo.
+  La ficha edita producto, presentaciones, extras/grupos, atributos y
+  exclusiones; la receta se edita en `components/catalogo/receta-editor.tsx`,
+  reusado también por la ficha de receta suelta.
 
 Diferido a un slice posterior: `combo`, `promocion`, `carrito`,
 `central_pedidos`, `cuenta_puntos`/`puntos_movimiento`,
@@ -477,15 +473,26 @@ tiempo real (Redis/WebSocket) es deuda declarada.
 
 | Método | Ruta | Permiso |
 |--------|------|---------|
-| POST/PATCH | `/kds/pantallas[/{id}]` | `kds.configurar` |
-| GET | `/kds/pantallas` \| `/{id}/cola` | `kds.operar` |
+| POST/PATCH/DELETE | `/kds/pantallas[/{id}]` | `kds.configurar` |
+| GET | `/kds/pantallas` | `kds.operar` **o** `kds.configurar` |
+| GET | `/kds/pantallas/{id}/cola` | `kds.operar` |
 | POST | `/kds/items/{id}/avanzar` | `kds.operar` |
 | GET | `/kds/ventas/{id}/avance` | `kds.operar` |
 | POST | `/kds/ventas/{id}/comanda` | `kds.operar` |
 | POST | `/sales/ventas/{id}/entrega` | `sales.entregar_pedido` |
 
 Roles seed: `cocinero` (kds.operar, **no** entrega), `despachador`
-(kds.operar + entrega), cajero opera y entrega; supervisor configura.
+(kds.operar + entrega), cajero opera y entrega, supervisor opera. **Configurar
+es de administración desde 2026-08-24** (ADR-065): montar, renombrar o borrar
+una estación cambia por dónde pasa la comanda de todos los turnos, no solo del
+que está en el local esa tarde — es alta de infraestructura, igual que el
+punto de venta (ADR-059).
+
+`DELETE /kds/pantallas/{id}` es baja lógica (`deleted_at`) y **409 si la
+pantalla tiene cola**: borrarla con pedidos encima dejaría esas líneas sin
+dónde tacharse. `activo=false` sigue siendo otra cosa — apaga la estación y la
+deja volver. El `UNIQUE (sucursal_id, nombre)` es **parcial** sobre las vivas,
+así el nombre de una borrada queda libre.
 
 **Pantalla** (2026-08-03): `frontend/app/kds/` — pantalla completa táctil
 fuera del shell, una tarjeta por pedido, un toque tacha el ítem preparado
@@ -493,7 +500,7 @@ fuera del shell, una tarjeta por pedido, un toque tacha el ítem preparado
 estado). Refresca la cola cada 3 s: como el estado vive en `venta_item`,
 ese intervalo es lo que tarda una pantalla en ver lo que tachó otra. La
 estación va en la URL (`/kds?pantalla=<id>`); `/kds` sin parámetro es el
-tablero de estaciones, que además crea/edita/desactiva pantallas con
+tablero de estaciones, que además crea/edita/desactiva/borra pantallas con
 `kds.configurar`. Diseño e interacción en
 [ui-ux.md](../../../docs/product/ui-ux.md#kds--tarjeta-de-pedido-tachar-ítem-por-ítem-implementado-2026-08-03).
 
@@ -631,24 +638,23 @@ atributo.
 `valores_ofrecidos(session, producto)` aplica la herencia del padre, misma
 regla que `grupos_efectivos`/`extras_efectivos` (ADR-042).
 
-**Interruptor**: `parametro_empresa` → `sales` / `catalogo.modelo_odoo`,
-default `False`. La migración es solo aditiva, así que la imagen 0.6.0 corre
-contra este esquema sin enterarse: volver atrás es desplegar 0.6.0, sin
-downgrade.
+La migración es solo aditiva, así que la imagen 0.6.0 corre contra este
+esquema sin enterarse: volver atrás es desplegar 0.6.0, sin downgrade. Esta
+promesa se rompe recién con `producto_comercial.lienzo_pos` (ver más abajo).
 
 Pruebas: `tests/test_variantes_odoo.py` (integración) y
 `tests/test_receta_condicionada.py` (funciones puras).
 
-## Estado (slice 11 — API de atributos y árbol del producto, 2026-08-23)
+## Estado (slice 11 — API de atributos, árbol del producto y tablas, 2026-08-23/24)
 
-ADR-058.
+ADR-058 (superada por ADR-063), ADR-063.
 
 **`GET /sales/productos/{id}/arbol`** trae el producto, sus variantes **con
 sus grupos y extras**, los atributos con sus valores, las exclusiones y las
 combinaciones materializadas. Reemplaza una petición HTTP por variante: con
-tres tamaños y ocho sabores eran 27 idas a la red para dibujar el lienzo.
-Hereda de `ProductoDetalleOut`, así que con el interruptor apagado el lienzo
-sigue viendo exactamente lo de antes.
+tres tamaños y ocho sabores eran 27 idas a la red para dibujar el árbol.
+Hereda de `ProductoDetalleOut`. Nació para el lienzo (ADR-058); tras
+ADR-063 lo consume la ficha del producto.
 
 **CRUD de atributos** en `application/atributos.py`:
 
@@ -656,19 +662,29 @@ sigue viendo exactamente lo de antes.
 |---|---|
 | `GET`/`POST /sales/atributos` | listar y crear |
 | `PATCH /sales/atributos/{id}` | renombrar, cambiar modo o display |
+| `DELETE /sales/atributos/{id}` | borrar (409 si algún producto lo ofrece) |
 | `POST /sales/atributos/{id}/valores` | agregar un valor |
+| `PATCH /sales/atributos/{id}/valores/{valor}` | renombrar/reordenar/retirar del catálogo |
 | `POST /sales/productos/{id}/atributos` | el producto pasa a ofrecerlo |
-| `PATCH /sales/atributos/valores/{ptav}` | precio extra en ese producto |
+| `DELETE /sales/productos/{id}/atributos/{atributo}` | quitárselo (409 si variante/exclusión/venta/receta lo usan) |
+| `POST /sales/productos/{id}/variantes` | generar combinaciones (`modo_variante='siempre'`, RN-COM-039) |
+| `PATCH /sales/atributos/valores/{ptav}` | precio extra y/o reactivar en ese producto |
 | `DELETE /sales/atributos/valores/{ptav}` | **retirar** (desactiva, no borra) |
 | `POST`/`DELETE /sales/atributos/exclusiones` | pares que no van juntos |
+| `GET /sales/recetas/{id}/atributos` | ejes de condición de una receta (ADR-063 §4) |
 
 Las rutas literales van **antes** que las paramétricas: `/atributos/exclusiones`
 entraría como un `atributo_id` que no es UUID.
 
 Un valor retirado se desactiva y no se borra: hay ventas que lo nombran y
-líneas de receta que lo usan como condición.
+líneas de receta que lo usan como condición. `PATCH /atributos/valores/{ptav}`
+acepta `activo: true` para reofrecerlo — sin eso, retirar un valor por error
+era irreversible.
 
-`producto_comercial.lienzo_pos` pasa a ser editable por `PATCH /productos/{id}`.
+`producto_comercial.lienzo_pos` (el nodo de la posición en el canvas) se
+borró con el lienzo — migración `ce32c6610eb7` (ADR-063). Es la excepción a
+"la migración es solo aditiva": volver a 0.7.x anterior exige
+`alembic downgrade`.
 
 ## Alta de puntos de venta (implementado 2026-08-23, ADR-059)
 

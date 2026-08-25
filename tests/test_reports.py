@@ -90,6 +90,11 @@ SIN_ACTOR = {
     # cocina pasado el umbral», no «alguien tomó el pedido»: atribuírselo al
     # mozo sería acusarlo de algo que no hizo (RN-REP-009).
     "sales.pedido_demorado",
+    # Mismo caso: lo detecta el barrido de asistencia. El hecho es «falta la
+    # marcación de salida», no «el trabajador hizo algo». El recordatorio le
+    # llega a él por su propia bandeja; ponerlo como actor de un reporte que
+    # leen su encargado y RRHH lo convertiría en un cargo (RN-RRHH-021).
+    "rrhh.salida_sin_marcar",
 }
 
 

@@ -102,9 +102,17 @@ class Carga:
         self.marca = marca
         self.problemas: list[str] = []
         self.creado: dict[str, int] = {}
+        self.omitidos: dict[str, list[str]] = {}
 
     def contar(self, que: str, cuantos: int = 1) -> None:
         self.creado[que] = self.creado.get(que, 0) + cuantos
+
+    def omitir(self, que: str, nombre: str) -> None:
+        """Ya existía (o ya se vio en esta misma corrida): no se toca, no se
+        crea de nuevo. Sin esto, una carga sobre una base con datos de
+        prueba homónimos se ve idéntica a una carga limpia — nadie nota
+        que la fila real nunca entró."""
+        self.omitidos.setdefault(que, []).append(nombre)
 
     def fallo(self, libro: str, fila: dict, error: Exception) -> None:
         etiqueta = fila.get("Nombre") or fila.get("Receta") or fila.get("Insumo") or "?"
@@ -170,6 +178,7 @@ class Carga:
         }
         for fila in filas(ruta, "Categorías UdM"):
             if fila["Nombre"].lower() in existentes:
+                self.omitir("categorías de UdM", fila["Nombre"])
                 continue
             inv_uc.crear_categoria_udm(self.session, nombre=fila["Nombre"])
             self.contar("categorías de UdM")
@@ -180,6 +189,7 @@ class Carga:
         udms = self._udms()
         for fila in filas(ruta, "Unidades"):
             if fila["Nombre"].lower() in udms:
+                self.omitir("unidades de medida", fila["Nombre"])
                 continue
             categoria = cats.get(fila["Categoría UdM"].lower())
             if categoria is None:
@@ -215,6 +225,7 @@ class Carga:
         for fila in filas(ruta, "Categorías"):
             existentes = self._categorias()
             if clave(fila["Nombre"]) in existentes:
+                self.omitir("categorías", fila["Nombre"])
                 continue
             madre = existentes.get(clave(fila.get("Categoría madre", "")))
             try:
@@ -238,6 +249,7 @@ class Carga:
         }
         for fila in filas(self.origen / LIBROS["articulos"], "Artículos"):
             if fila["Código"].lower() in existentes:
+                self.omitir("artículos", fila["Nombre"])
                 continue
             udm = udms.get(fila["Unidad"].lower())
             if udm is None:
@@ -270,6 +282,7 @@ class Carga:
         udms = self._udms()
         for fila in filas(ruta, "Recetas"):
             if clave(fila["Receta"]) in self._recetas():
+                self.omitir("recetas", fila["Receta"])
                 continue
             udm = udms.get(fila["Unidad"].lower())
             if udm is None:
@@ -351,6 +364,7 @@ class Carga:
         }
         for fila in filas(ruta, "Atributos"):
             if fila["Nombre"].lower() in existentes:
+                self.omitir("atributos", fila["Nombre"])
                 continue
             atributo = Atributo(
                 empresa_id=self.empresa.id,
@@ -378,6 +392,7 @@ class Carga:
                 )
                 continue
             if (atributo.id, fila["Valor"].lower()) in vistos:
+                self.omitir("valores de atributo", f"{fila['Atributo']}: {fila['Valor']}")
                 continue
             self.session.add(
                 AtributoValor(
@@ -397,6 +412,7 @@ class Carga:
         for fila in filas(ruta, "Productos"):
             existentes = self._productos()
             if clave(fila["Nombre"]) in existentes:
+                self.omitir("productos comerciales", fila["Nombre"])
                 continue
             receta = recetas.get(clave(fila.get("Receta", "")))
             if fila.get("Receta") and receta is None:
@@ -452,6 +468,10 @@ class Carga:
             # Una sola fila: el par se lee en los dos sentidos. Guardar el
             # simétrico sería la misma verdad dos veces.
             if (izquierda, derecha) in vistos or (derecha, izquierda) in vistos:
+                self.omitir(
+                    "exclusiones",
+                    f"{fila['Producto']}: {fila['Valor A']} × {fila['Valor B']}",
+                )
                 continue
             self.session.add(
                 ProductoExclusion(
@@ -510,6 +530,7 @@ class Carga:
                     )
                     continue
                 if valor.id in ya:
+                    self.omitir("valores por producto", f"{fila['Producto']}: {nombre}")
                     continue
                 self.session.add(
                     ProductoAtributoValor(linea_id=linea.id, atributo_valor_id=valor.id)
@@ -522,6 +543,14 @@ class Carga:
         for fila in filas(ruta, "Precios"):
             producto = productos.get(clave(fila["Producto"]))
             if producto is None:
+                # A diferencia de todos los demás lookups de este archivo,
+                # este no avisaba nada: un precio para un producto que no
+                # se pudo crear (o mal tecleado) desaparecía sin dejar
+                # rastro. Mismo criterio que el resto — se reporta.
+                self.problemas.append(
+                    f"[productos] precio de «{fila['Producto']}»: producto no "
+                    "encontrado"
+                )
                 continue
             lista = (
                 self.session.query(ListaPrecio)
@@ -588,6 +617,19 @@ def main() -> None:
         print(f"empresa: {empresa.razon_social} | marca: {marca.nombre}")
         for que, cuantos in carga.creado.items():
             print(f"  {cuantos:5d}  {que}")
+        if carga.omitidos:
+            total_omitido = sum(len(nombres) for nombres in carga.omitidos.values())
+            print(f"\n{total_omitido} omitidos (ya existían por nombre/código):")
+            for que, nombres in carga.omitidos.items():
+                print(f"  {len(nombres):5d}  {que}")
+                # Los primeros 20 nombres, para poder distinguir de un
+                # vistazo "chocó con mis datos de prueba" de "esto ya se
+                # había cargado bien la vez pasada" — sin volcar los 163
+                # productos completos si la corrida es la segunda de verdad.
+                for nombre in nombres[:20]:
+                    print(f"           - {nombre}")
+                if len(nombres) > 20:
+                    print(f"           …y {len(nombres) - 20} más")
         if carga.problemas:
             print(f"\n{len(carga.problemas)} problemas:")
             for problema in carga.problemas:

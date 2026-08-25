@@ -37,6 +37,7 @@ from src.modules.sales.application import (
     tasks,
     ventas,
 )
+from src.modules.sales.application import variantes as variantes_uc
 from src.modules.sales.application.scope import exigir_cliente, exigir_venta
 from src.modules.sales.domain import rules
 from src.modules.sales.infrastructure.repositories import (
@@ -809,7 +810,7 @@ def fijar_precio_extra(
     """Cuánto suma este valor **en este producto**. La lista de precios sigue
     mandando sobre el precio base (RN-PRC-003); esto se suma."""
     ptav = atributos_uc.fijar_precio_extra(
-        session, ptav_id, precio_extra=body.precio_extra
+        session, ptav_id, precio_extra=body.precio_extra, activo=body.activo
     )
     valor = atributos_uc.exigir_valor(session, ptav.atributo_valor_id)
     session.commit()
@@ -873,6 +874,22 @@ def editar_atributo(
     return _atributo_dict(session, atributo)
 
 
+@router.delete("/atributos/{atributo_id}", status_code=204)
+def borrar_atributo(
+    atributo_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(CATALOGO)),
+    session: Session = Depends(get_db),
+):
+    """Solo si ningún producto lo ofrece; si alguno lo ofrece, 409 nombrándolo.
+
+    No hay desactivar: es para deshacer un alta recién tecleada, y en cuanto
+    un producto lo usa el camino correcto es quitárselo a ese producto — que
+    obliga a mirar qué se está desarmando.
+    """
+    atributos_uc.eliminar_atributo(session, atributo_id)
+    session.commit()
+
+
 @router.post("/atributos/{atributo_id}/valores", response_model=schemas.AtributoOut,
              status_code=201)
 def agregar_valor_de_atributo(
@@ -884,6 +901,41 @@ def agregar_valor_de_atributo(
     atributos_uc.agregar_valor(session, atributo_id, **body.model_dump())
     session.commit()
     return _atributo_dict(session, atributos_uc.exigir_atributo(session, atributo_id))
+
+
+@router.patch(
+    "/atributos/{atributo_id}/valores/{valor_id}", response_model=schemas.AtributoOut
+)
+def editar_valor_de_atributo(
+    atributo_id: uuid.UUID,
+    valor_id: uuid.UUID,
+    body: schemas.AtributoValorUpdate,
+    _: Usuario = Depends(require_permission(CATALOGO)),
+    session: Session = Depends(get_db),
+):
+    """Renombrar, reordenar o retirar un valor **del catálogo**. Sacarlo de un
+    producto concreto es `PATCH /atributos/valores/{ptav_id}`."""
+    atributos_uc.editar_valor(session, valor_id, **body.model_dump())
+    session.commit()
+    return _atributo_dict(session, atributos_uc.exigir_atributo(session, atributo_id))
+
+
+@router.get("/recetas/{receta_id}/atributos", response_model=list[schemas.EjeDeCondicionOut])
+def atributos_de_receta(
+    receta_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(LEER)),
+    session: Session = Depends(get_db),
+):
+    """Con qué se pueden condicionar las líneas de esta receta (ADR-056).
+
+    Vive en `sales` y no en `inventory` porque `producto_comercial.receta_id`
+    es una columna de `sales`: el camino de la receta al producto que la usa,
+    y de ahí a lo que ofrece, no cruza ningún dominio.
+
+    Lista vacía = ninguna ficha de producto usa esta receta, y el editor
+    esconde la columna en vez de ofrecer una condición sin nombres.
+    """
+    return atributos_uc.atributos_de_receta(session, receta_id)
 
 
 def _atributo_dict(session: Session, atributo) -> dict:
@@ -906,7 +958,7 @@ def ver_arbol_de_producto(
     _: Usuario = Depends(require_permission(LEER)),
     session: Session = Depends(get_db),
 ):
-    """El producto entero para el lienzo, en una llamada.
+    """El producto entero para la ficha, en una llamada.
 
     La versión anterior pedía la ficha del padre y una por cada variante:
     con tres tamaños y ocho sabores eran veintisiete idas a la red para
@@ -933,6 +985,52 @@ def ofrecer_atributo(
     )
     session.commit()
     return catalogo.arbol_de_producto(session, producto_id)
+
+
+@router.delete("/productos/{producto_id}/atributos/{atributo_id}", status_code=204)
+def quitar_atributo_del_producto(
+    producto_id: uuid.UUID,
+    atributo_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(CATALOGO)),
+    session: Session = Depends(get_db),
+):
+    """El producto deja de ofrecer el atributo.
+
+    Devuelve 409 si alguno de sus valores ya lo materializa una variante, lo
+    nombra una exclusión, lo eligió una venta o condiciona una línea de
+    receta. El último es el caro: un valor huérfano forma su propio grupo
+    (ADR-056 §3), o sea que la línea **deja de descontar en silencio**.
+    """
+    atributos_uc.quitar_linea(
+        session, producto_id=producto_id, atributo_id=atributo_id
+    )
+    session.commit()
+
+
+@router.post(
+    "/productos/{producto_id}/variantes",
+    response_model=schemas.VariantesGeneradasOut,
+    status_code=201,
+)
+def generar_variantes(
+    producto_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(CATALOGO)),
+    session: Session = Depends(get_db),
+):
+    """Materializa las combinaciones de los atributos en modo `siempre`.
+
+    Es idempotente: volver a llamarlo después de agregar un sabor crea solo
+    las que faltan. Nunca borra ni desactiva lo que ya existe, porque puede
+    haber ventas que lo nombran (RN-COM-039).
+    """
+    creadas = variantes_uc.generar_variantes(session, producto_id)
+    faltan_precio = variantes_uc.sin_precio(session, creadas)
+    session.commit()
+    return {
+        "creadas": len(creadas),
+        "sin_precio": faltan_precio,
+        "arbol": catalogo.arbol_de_producto(session, producto_id),
+    }
 
 
 @router.post("/productos/{producto_id}/grupos", response_model=schemas.GrupoOpcionOut,

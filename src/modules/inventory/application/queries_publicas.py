@@ -83,6 +83,34 @@ def insumos_de_receta(session: Session, receta_id: uuid.UUID) -> list[dict]:
     return [{"articulo_id": fila.id, "nombre": fila.nombre} for fila in filas]
 
 
+def ptav_usados_en_condiciones(
+    session: Session, ptav_ids: Sequence[uuid.UUID]
+) -> set[str]:
+    """Cuáles de estos PTAV condicionan alguna línea de receta
+    (`receta_item.aplica_valores`, ADR-056 §1).
+
+    Lo pregunta `sales` antes de sacarle un atributo a un producto. Sin este
+    chequeo el valor se borraría y la condición quedaría apuntando a nada:
+    ADR-056 §3 hace que un valor huérfano forme su propio grupo, o sea que la
+    línea **deja de descontar en silencio** y el inventario descuadra recién
+    al cerrar el mes, cuando ya nadie puede atar el faltante a este clic.
+
+    Se comparan en Python y no en SQL porque `aplica_valores` es JSONB y las
+    líneas condicionadas son pocas —52 en el catálogo real— mientras que la
+    consulta equivalente se escribe distinto en SQLite y en Postgres, que es
+    exactamente el tipo de diferencia que las pruebas no ven venir.
+    """
+    if not ptav_ids:
+        return set()
+    buscados = {str(identificador) for identificador in ptav_ids}
+    usados: set[str] = set()
+    for condicion in session.scalars(
+        select(RecetaItem.aplica_valores).where(RecetaItem.aplica_valores.isnot(None))
+    ):
+        usados |= buscados & {str(valor) for valor in condicion or []}
+    return usados
+
+
 def nombres_de_articulos(
     session: Session, articulo_ids: Sequence[uuid.UUID]
 ) -> dict[uuid.UUID, str]:

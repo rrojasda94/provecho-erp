@@ -247,12 +247,6 @@ def editar_producto(session: Session, producto_id: uuid.UUID, **campos) -> Produ
         prod.receta_id = campos["receta_id"]
     for campo in (
         "activo", "categoria_id", "orden", "empaque_id", "modalidades_empaque",
-        # Dónde quedó el nodo en el lienzo (ADR-058). ADR-035 decidió no
-        # persistirlo —"mover un nodo no dice nada del producto"— y era
-        # cierto mientras el lienzo recolocaba todo en cada cambio de
-        # estructura. Con atributos el árbol deja de rearmarse solo, así que
-        # la posición sobrevive y perderla en cada recarga es trabajo tirado.
-        "lienzo_pos",
     ):
         if campos.get(campo) is not None:
             setattr(prod, campo, campos[campo])
@@ -362,7 +356,8 @@ def detalle_producto(session: Session, producto_id: uuid.UUID) -> dict:
 
 
 def arbol_de_producto(session: Session, producto_id: uuid.UUID) -> dict:
-    """Todo lo que el lienzo necesita, en **una** consulta por tabla.
+    """Todo lo que la ficha del producto necesita, en **una** consulta por
+    tabla.
 
     La versión anterior de la pantalla pedía la ficha del padre y después una
     por cada variante, más una receta por nodo al entrar al plato: con tres
@@ -371,10 +366,10 @@ def arbol_de_producto(session: Session, producto_id: uuid.UUID) -> dict:
     único que de verdad conviene perezoso — su contenido cambia mientras se
     edita y su dueño es `inventory`.
 
-    Incluye lo viejo (`grupos`, `extras_sueltos`) además de lo nuevo: con el
-    interruptor `catalogo.modelo_odoo` apagado el lienzo sigue dibujando
-    grupos y extras, y una sola forma de traer los datos evita que las dos
-    pantallas se separen.
+    Incluye lo viejo (`grupos`, `extras_sueltos`) además de lo nuevo
+    (`atributos`, `exclusiones`, `combinaciones`): son dos generaciones del
+    mismo catálogo y una sola forma de traer los datos evita que las dos
+    mitades de la ficha se separen.
     """
     repo = ProductoComercialRepo(session)
     producto = _exigir(repo, producto_id, "producto comercial")
@@ -480,7 +475,6 @@ def _producto_dict(p: ProductoComercial) -> dict:
         "es_extra": p.es_extra,
         "empaque_id": p.empaque_id,
         "modalidades_empaque": p.modalidades_empaque,
-        "lienzo_pos": p.lienzo_pos,
     }
 
 

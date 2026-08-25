@@ -88,10 +88,3 @@ class ProductoComercial(Base, UuidPkMixin, TimestampMixin):
     ref_externa: Mapped[str | None] = mapped_column(
         String(120), nullable=True, unique=True
     )
-    # Dónde quedó el nodo en el lienzo: `{"x": 120, "y": 40}`.
-    # ADR-035 decidió NO persistirlo —"mover un nodo no dice nada del
-    # producto"— y era cierto mientras el lienzo recolocaba todo en cada
-    # cambio de estructura. Con el modelo de atributos el árbol deja de
-    # rearmarse solo, así que la posición sí sobrevive y perderla en cada
-    # recarga es trabajo tirado.
-    lienzo_pos: Mapped[dict | None] = mapped_column(JsonB, nullable=True)

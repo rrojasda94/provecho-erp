@@ -132,8 +132,9 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   la pantalla mintiendo por omisión en los dos sentidos: el padre no muestra
   los grupos que viven en sus variantes, y la variante no muestra los que
   hereda, aunque el PDV se los ofrezca. Lo que falta es que lo diga: "hereda 1
-  grupo de Pizza" con enlace al lienzo, que es el lugar de trabajo de esa
-  estructura (ADR-035).
+  grupo de Pizza" con enlace a la ficha del padre (el lienzo que era el lugar
+  de trabajo de esta estructura se borró en ADR-063; hoy es la misma ficha
+  de producto).
 - ⬜ **Los seeders de demo corridos fuera de orden no avisan nada**
   (encontrado 2026-08-12 al verificar la carta). `pizzas_demo._precio` hace
   `if lista is None: return` y envuelve el resto en un `except Exception`
@@ -214,8 +215,7 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   extras en vez de borrarlos, porque el extra es un producto con su receta y
   su precio. Queda ⬜ **reordenar por arrastre**: el campo de dominio `orden`
   se sigue tecleando. `@dnd-kit` ya está instalado (se usa en el tablero de
-  reportes), así que es trabajo de pantalla, no de contrato. **No confundirlo
-  con arrastrar nodos en el lienzo**, que es posición visual y no se guarda.
+  reportes), así que es trabajo de pantalla, no de contrato.
 - ⬜ **`receta_item.quitable`** (2026-08-09, ADR-035 §2): hoy **todo** insumo
   de la receta se puede pedir "sin". Se evaluó un flag para que Producción
   vetara restas absurdas ("pizza sin masa") y se descartó por ser una segunda
@@ -228,19 +228,14 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   `GET /ventas/{id}/items` no las devuelve— y las muestra vacías. Hoy
   corregir lo enviado es anular la línea y crear otra (RN-COM-020), así que
   no se pierde nada, pero el contrato debería devolverlas igual.
-- ⬜ **La columna de "disponibles" del lienzo lista los sabores de los otros
-  tamaños** (2026-08-09). Es correcto según el modelo —para *este* tamaño no
-  están vinculados— pero con seis sabores por tres tamaños son dieciocho
-  nodos apagados. Se envuelve en subcolumnas y no se monta sobre nada, pero
-  conviene filtrarlo (por ejemplo, esconder lo que ya está vinculado a otra
-  variante del mismo padre).
-- ⬜ **Reabrir una receta editada desde otro nodo no refresca el costo de los
-  demás nodos** hasta cambiar de camino: el cache se actualiza por receta, no
-  se recalcula el grafo entero. No da un número incorrecto —el nodo editado
-  sí se actualiza— pero el pie de otro nodo puede quedar viejo.
-- ⬜ **Confirmación al borrar un grupo de opciones**: `DELETE .../grupos/{id}`
-  no pregunta nada. Es destructivo y hoy vive detrás de un menú `⋯`; agregar
-  el diálogo es cambio de comportamiento, así que va aparte.
+- ⛔ **La columna de "disponibles" del lienzo lista los sabores de los otros
+  tamaños** (2026-08-09). Void: el lienzo se borró en ADR-063 y con él el
+  nodo que tenía este problema.
+- ⛔ **Reabrir una receta editada desde otro nodo no refresca el costo de los
+  demás nodos**. Void por la misma razón: no hay "otro nodo" desde ADR-063.
+- ✅ 2026-08-24 **Confirmación al borrar un grupo de opciones**: la ficha del
+  producto pregunta antes de `DELETE .../grupos/{id}` (encontrado al reponer
+  el borrado de grupos y extras que solo vivía en el lienzo, ADR-063).
 - ✅ 2026-08-03 **Convertir un producto simple en uno con presentaciones**
   (`quitar_receta`) y **borrar presentaciones y recetas** con las dos
   negativas que importan: un producto ya vendido se descontinúa en vez de
@@ -508,27 +503,26 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   hay un solo campo, así que el largo decide el padrón (RN-CPP-003, regla en
   `frontend/lib/documento.ts` con su prueba).
 
-## Lo que el lienzo y la matriz todavía no hacen (2026-08-23, ADR-057/058)
+## Lo que la tabla de atributos y la matriz todavía no hacen (2026-08-24, ADR-063)
 
-Lo que entró con el modelo de atributos deja tres huecos, todos con su API ya
-lista y su pantalla pendiente:
+El lienzo se borró (ADR-063); sus tres huecos pendientes se resolvieron o
+cambiaron de forma:
 
-- **Crear un atributo desde el lienzo.** `POST /sales/atributos` existe; el
-  popover no. Hoy se crea por API o por planilla, y el lienzo lo dibuja apenas
-  el producto lo ofrece.
-- **Materializar combinaciones.** `modo_variante = siempre` está en el modelo
-  y validado, pero el generador que crea las filas hijas no se escribió: hoy
-  todo entra como `nunca`, que es lo que el catálogo de Charlie's necesita.
-  El árbol ya devuelve `combinaciones` para cuando exista.
-- **Multi-selección y "aplicar a todos los tamaños".** Es el pedido detrás de
-  "editar 18 sabores", y la matriz lo cubre por otro camino (una columna por
-  tamaño, una mirada). Vale la pena medir si sigue haciendo falta en el
-  lienzo antes de escribirlo.
+- ✅ **Crear/editar un atributo desde una pantalla.** `/catalogo/atributos`
+  cubre lo que el popover del lienzo nunca llegó a tener.
+- ✅ **Materializar combinaciones.** `POST /sales/productos/{id}/variantes`
+  (ADR-063 §3, RN-COM-039) genera las filas hijas de un atributo
+  `modo_variante = siempre`. Sigue sin escribirse `dinamica` (materializar en
+  la primera venta): tocar el camino de la venta quedó fuera a propósito.
+- ⬜ **Multi-selección y "aplicar a todos los tamaños".** Sigue sin pantalla
+  propia; la matriz lo cubre por otro camino (una columna por tamaño, una
+  mirada) para cantidades, no para atributos.
 
-Y uno de la matriz: **la grilla no muestra las líneas condicionadas**
-(amendado 2026-08-24). Editar la condición ya se puede, pero en el lienzo,
-que es donde los valores tienen nombre (enmienda de ADR-056) — una columna de
-la grilla con dieciocho UUID no ayuda a nadie.
+Y uno de la matriz, que **no cambió con ADR-063**: **la grilla no muestra las
+líneas condicionadas**. Editar la condición ya se puede, pero en el editor de
+receta (`components/catalogo/receta-editor.tsx`), que es donde los valores
+tienen nombre (ADR-063 §4) — una columna de la grilla con dieciocho UUID no
+ayuda a nadie.
 
 Debajo hay un segundo problema, y es el que se ve primero:
 `matriz-cliente.tsx` busca cada celda con `clave(receta.id, insumo.articulo_id)`
@@ -580,3 +574,41 @@ que es una decisión de pantalla y no un bug de una línea.
   decisión visible y no un olvido: si el formulario crece (validación en
   vivo, dependencia entre canal y política), el spec deja de ser redundante.
 
+- ⬜ **El punto de venta no se puede dar de baja** (2026-08-24, ADR-065): al
+  KDS se le agregó `DELETE /kds/pantallas/{id}`; a `punto_venta` no. Tiene
+  series SUNAT asignadas y darlo de baja es un acto de identidad fiscal —
+  qué pasa con los comprobantes emitidos, con la caja abierta y con el
+  correlativo se decide con contabilidad, no de refilón junto a una pantalla
+  de cocina. Hoy una caja que ya no se usa se queda en la lista.
+
+## Deuda nueva de ADR-063 (2026-08-24)
+
+- ⬜ **`modo_variante = 'dinamica'` no genera nada.** El generador
+  (`variantes.py`) solo materializa `siempre`. `dinamica` (crear la fila en
+  la primera venta) exige tocar `ventas._resolver_valores_variante`, que es
+  justo el camino que había que dejar intacto para este cambio. Hoy un
+  atributo en `dinamica` se comporta como `nunca`: no genera nada, nunca.
+- ⬜ **La regla de exclusión está escrita dos veces.**
+  `variantes._pares_excluidos` (para generar) y `catalogo.combinacion_excluida`
+  (para vender) codifican la misma regla simétrica de RN-COM-038 por caminos
+  distintos, sin una prueba que las compare. Si RN-COM-038 cambia, hay que
+  acordarse de tocar las dos.
+- ⬜ **`SelectorCondicion` y `CondicionCelda` duplican el mismo picker**
+  (`receta-editor.tsx`): mismo `<details>` con casillas por atributo, uno
+  para una línea nueva (guarda al tocar la casilla) y otro para una
+  existente (guarda al tocar «Aplicar»). Ya divergieron una vez:
+  `CondicionCelda` respeta `disabled` en sus casillas y `SelectorCondicion`
+  no. Un componente parametrizado por cuándo confirma reemplazaría a los dos.
+- ⬜ **`ptav_usados_en_condiciones` y `_alguno_vendido` escanean en Python
+  toda la tabla, sin filtrar por empresa.** Barato hoy (decenas de líneas
+  condicionadas en el catálogo real), sin cota si el catálogo crece. Acotar
+  por receta o por empresa antes de escanear.
+- ⬜ **Ningún guardarraíl de FK-cascade en el árbol de atributos.**
+  `Atributo`, `AtributoValor`, `ProductoAtributoLinea`, `ProductoAtributoValor`
+  no declaran `relationship()`: `eliminar_atributo` y `quitar_linea` necesitan
+  un `session.flush()` manual entre borrar hijos y borrar el padre. Cualquier
+  camino de borrado futuro sobre estas cuatro tablas que no copie ese flush
+  choca con la misma `IntegrityError` de orden de FK.
+- ⬜ **Crear un atributo nuevo solo se puede desde `/catalogo/atributos`.**
+  La ficha del producto no tiene un atajo "+ Nuevo atributo" inline; hay que
+  ir y volver.
