@@ -1,4 +1,4 @@
-- **El personal marca su propia asistencia** (2026-08-24, ADR-064/064,
+- **El personal marca su propia asistencia** (2026-08-24, ADR-064/065,
   migración `c4d17b93e0af`). La asistencia tenía backend desde julio y
   ninguna pantalla, y marcar exigía `rrhh.asistencia_marcar` — es decir, se
   marcaba *por* la gente, no *la* gente. Ahora hay un pad a pantalla completa

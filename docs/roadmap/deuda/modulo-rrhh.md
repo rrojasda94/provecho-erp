@@ -83,7 +83,7 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   API recibe `ingresos`/`descuentos`/montos ya calculados (por el contador
   externo) — no hay motor de cálculo de renta 5ta/ONP/AFP/EsSalud en el ERP.
 - 🔶 **El centro de labores ya lo consume la asistencia** (2026-08-24,
-  ADR-064/064): el pad del local muestra a quienes tienen ahí su centro de
+  ADR-064/065): el pad del local muestra a quienes tienen ahí su centro de
   labores y el aviso de salida sin marcar se atribuye a esa sucursal.
   Siguen sin consumirlo el **contrato laboral** (no lo imprime) y el
   **reemplazo entre sucursales** (RN-RRHH-011, sin modelo).
