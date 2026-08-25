@@ -1,6 +1,9 @@
 # ADR-058 — El lienzo dibuja atributos, y carga el árbol de una vez
 
-- Estado: aceptado
+- Estado: **superado por ADR-063** (2026-08-24) — el lienzo se borró; los
+  atributos se editan en `/catalogo/atributos` y en la ficha del producto.
+  `GET /sales/productos/{id}/arbol` (§1) sigue en pie: la ficha nueva lo usa
+  igual que lo usaba el lienzo.
 - Fecha: 2026-08-23
 - Contexto: `sales` (catálogo), frontend
 - Relacionado: ADR-035 (el lienzo de nodos), ADR-042 (la variante hereda),

@@ -1178,7 +1178,7 @@
         "type": "object"
       },
       "ArbolProductoOut": {
-        "description": "Todo lo que el lienzo necesita en una sola llamada.\n\nHereda de `ProductoDetalleOut` a propósito: con el interruptor\n`catalogo.modelo_odoo` apagado el lienzo sigue dibujando grupos y extras,\ny una sola forma de traer los datos evita que las dos pantallas se\nseparen.",
+        "description": "Todo lo que la ficha del producto necesita en una sola llamada.\n\nHereda de `ProductoDetalleOut` a propósito: la ficha sigue dibujando\ngrupos y extras además de los atributos, y una sola forma de traer los\ndatos evita que las dos mitades de la pantalla se separen.",
         "properties": {
           "activo": {
             "title": "Activo",
@@ -1261,18 +1261,6 @@
           "id_interno": {
             "title": "Id Interno",
             "type": "string"
-          },
-          "lienzo_pos": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Lienzo Pos"
           },
           "marca_id": {
             "format": "uuid",
@@ -2567,6 +2555,48 @@
           "activo"
         ],
         "title": "AtributoValorOut",
+        "type": "object"
+      },
+      "AtributoValorUpdate": {
+        "description": "`activo` acá es del **catálogo**: el valor deja de poder ofrecerse en\nproductos nuevos. Sacarlo de un producto concreto es\n`PATCH /atributos/valores/{ptav_id}`, que es otro nivel.",
+        "properties": {
+          "activo": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activo"
+          },
+          "nombre": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nombre"
+          },
+          "orden": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orden"
+          }
+        },
+        "title": "AtributoValorUpdate",
         "type": "object"
       },
       "AuditLogOut": {
@@ -7502,6 +7532,34 @@
           }
         },
         "title": "DivisaUpdate",
+        "type": "object"
+      },
+      "EjeDeCondicionOut": {
+        "description": "Con qué se puede condicionar una línea de esta receta (ADR-056).\n\n`valores[].id` es el **PTAV**, que es lo que viaja en\n`receta_item.aplica_valores`. El nombre va al lado para que el editor\nmuestre \"Mitad 1: Americana\" y no un UUID.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "valores": {
+            "items": {
+              "$ref": "#/components/schemas/ValorSimpleOut"
+            },
+            "title": "Valores",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "nombre",
+          "valores"
+        ],
+        "title": "EjeDeCondicionOut",
         "type": "object"
       },
       "EjecutarPagoIn": {
@@ -17109,7 +17167,19 @@
         "type": "object"
       },
       "PrecioExtraIn": {
+        "description": "Ambos campos opcionales: `None` = no tocar.\n\n`activo` es lo que permite **volver a ofrecer** un valor retirado por\nerror. Sin él, `DELETE /atributos/valores/{ptav_id}` era de ida y la única\nvuelta era colgar el atributo entero otra vez.",
         "properties": {
+          "activo": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activo"
+          },
           "precio_extra": {
             "anyOf": [
               {
@@ -17119,14 +17189,14 @@
               {
                 "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
+              },
+              {
+                "type": "null"
               }
             ],
             "title": "Precio Extra"
           }
         },
-        "required": [
-          "precio_extra"
-        ],
         "title": "PrecioExtraIn",
         "type": "object"
       },
@@ -17631,18 +17701,6 @@
             "title": "Id Interno",
             "type": "string"
           },
-          "lienzo_pos": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Lienzo Pos"
-          },
           "marca_id": {
             "format": "uuid",
             "title": "Marca Id",
@@ -17758,18 +17816,6 @@
             "title": "Id Interno",
             "type": "string"
           },
-          "lienzo_pos": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Lienzo Pos"
-          },
           "marca_id": {
             "format": "uuid",
             "title": "Marca Id",
@@ -17869,18 +17915,6 @@
               }
             ],
             "title": "Empaque Id"
-          },
-          "lienzo_pos": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Lienzo Pos"
           },
           "modalidades_empaque": {
             "anyOf": [
@@ -24511,6 +24545,25 @@
         "title": "ValorDeProductoOut",
         "type": "object"
       },
+      "ValorSimpleOut": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "nombre"
+        ],
+        "title": "ValorSimpleOut",
+        "type": "object"
+      },
       "VarianteDeCartaOut": {
         "description": "Tamaño/presentación del producto, con precio propio y completo — no\nun recargo sobre el padre (RN-COM-022). Elegir una es obligatorio.",
         "properties": {
@@ -24548,6 +24601,32 @@
           "orden"
         ],
         "title": "VarianteDeCartaOut",
+        "type": "object"
+      },
+      "VariantesGeneradasOut": {
+        "description": "Lo generado, más el árbol repintado para no pedirlo aparte.\n\n`sin_precio` son las variantes que todavía no tienen precio en ninguna\nlista vigente: `GET /carta` las descarta en silencio, así que sin este\naviso alguien genera doce combinaciones y ninguna aparece en el PDV.",
+        "properties": {
+          "arbol": {
+            "$ref": "#/components/schemas/ArbolProductoOut"
+          },
+          "creadas": {
+            "title": "Creadas",
+            "type": "integer"
+          },
+          "sin_precio": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sin Precio",
+            "type": "array"
+          }
+        },
+        "required": [
+          "creadas",
+          "sin_precio",
+          "arbol"
+        ],
+        "title": "VariantesGeneradasOut",
         "type": "object"
       },
       "VentaCreate": {
@@ -43034,6 +43113,46 @@
       }
     },
     "/api/v1/sales/atributos/{atributo_id}": {
+      "delete": {
+        "description": "Solo si ningún producto lo ofrece; si alguno lo ofrece, 409 nombrándolo.\n\nNo hay desactivar: es para deshacer un alta recién tecleada, y en cuanto\nun producto lo usa el camino correcto es quitárselo a ese producto — que\nobliga a mirar qué se está desarmando.",
+        "operationId": "borrar_atributo_api_v1_sales_atributos__atributo_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "atributo_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Atributo Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Borrar Atributo",
+        "tags": [
+          "sales"
+        ]
+      },
       "patch": {
         "description": "Bajar `modo_variante` de `siempre` a `nunca` **no borra** las variantes\nya materializadas: puede haber ventas que las nombran. Deja de generar\nnuevas, que es lo que alguien quiere al descubrir que un atributo de 17\nvalores iba a materializar 289 combinaciones.",
         "operationId": "editar_atributo_api_v1_sales_atributos__atributo_id__patch",
@@ -43145,6 +43264,75 @@
           }
         ],
         "summary": "Agregar Valor De Atributo",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/atributos/{atributo_id}/valores/{valor_id}": {
+      "patch": {
+        "description": "Renombrar, reordenar o retirar un valor **del catálogo**. Sacarlo de un\nproducto concreto es `PATCH /atributos/valores/{ptav_id}`.",
+        "operationId": "editar_valor_de_atributo_api_v1_sales_atributos__atributo_id__valores__valor_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "atributo_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Atributo Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "valor_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Valor Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AtributoValorUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtributoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Editar Valor De Atributo",
         "tags": [
           "sales"
         ]
@@ -44671,7 +44859,7 @@
     },
     "/api/v1/sales/productos/{producto_id}/arbol": {
       "get": {
-        "description": "El producto entero para el lienzo, en una llamada.\n\nLa versión anterior pedía la ficha del padre y una por cada variante:\ncon tres tamaños y ocho sabores eran veintisiete idas a la red para\ndibujar un árbol.",
+        "description": "El producto entero para la ficha, en una llamada.\n\nLa versión anterior pedía la ficha del padre y una por cada variante:\ncon tres tamaños y ocho sabores eran veintisiete idas a la red para\ndibujar un árbol.",
         "operationId": "ver_arbol_de_producto_api_v1_sales_productos__producto_id__arbol_get",
         "parameters": [
           {
@@ -44772,6 +44960,58 @@
           }
         ],
         "summary": "Ofrecer Atributo",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/productos/{producto_id}/atributos/{atributo_id}": {
+      "delete": {
+        "description": "El producto deja de ofrecer el atributo.\n\nDevuelve 409 si alguno de sus valores ya lo materializa una variante, lo\nnombra una exclusión, lo eligió una venta o condiciona una línea de\nreceta. El último es el caro: un valor huérfano forma su propio grupo\n(ADR-056 §3), o sea que la línea **deja de descontar en silencio**.",
+        "operationId": "quitar_atributo_del_producto_api_v1_sales_productos__producto_id__atributos__atributo_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "producto_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Producto Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "atributo_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Atributo Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Quitar Atributo Del Producto",
         "tags": [
           "sales"
         ]
@@ -45045,6 +45285,55 @@
           }
         ],
         "summary": "Quitables",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/productos/{producto_id}/variantes": {
+      "post": {
+        "description": "Materializa las combinaciones de los atributos en modo `siempre`.\n\nEs idempotente: volver a llamarlo después de agregar un sabor crea solo\nlas que faltan. Nunca borra ni desactiva lo que ya existe, porque puede\nhaber ventas que lo nombran (RN-COM-039).",
+        "operationId": "generar_variantes_api_v1_sales_productos__producto_id__variantes_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "producto_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Producto Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VariantesGeneradasOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Generar Variantes",
         "tags": [
           "sales"
         ]
@@ -45458,6 +45747,59 @@
         "tags": [
           "sales",
           "organizacion"
+        ]
+      }
+    },
+    "/api/v1/sales/recetas/{receta_id}/atributos": {
+      "get": {
+        "description": "Con qué se pueden condicionar las líneas de esta receta (ADR-056).\n\nVive en `sales` y no en `inventory` porque `producto_comercial.receta_id`\nes una columna de `sales`: el camino de la receta al producto que la usa,\ny de ahí a lo que ofrece, no cruza ningún dominio.\n\nLista vacía = ninguna ficha de producto usa esta receta, y el editor\nesconde la columna en vez de ofrecer una condición sin nombres.",
+        "operationId": "atributos_de_receta_api_v1_sales_recetas__receta_id__atributos_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "receta_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Receta Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/EjeDeCondicionOut"
+                  },
+                  "title": "Response Atributos De Receta Api V1 Sales Recetas  Receta Id  Atributos Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Atributos De Receta",
+        "tags": [
+          "sales"
         ]
       }
     },

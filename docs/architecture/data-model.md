@@ -484,9 +484,9 @@ en la línea. Misma forma y mismas razones que `sin_articulo_ids`.
 - `receta_item.aplica_valores` (JSONB, nullable): array de PTAV. NULL o `[]`
   = aplica siempre. La regla agrupa los valores **por atributo** y exige al
   menos uno de cada grupo (RN-COM-037) — es lo que convierte 361 recetas de
-  mitad-y-mitad en una de 26 líneas. Se lee y se edita desde el lienzo, donde
-  los valores tienen nombre (enmienda de ADR-056, 2026-08-24); la API la
-  devuelve como lista de texto y nunca `null`.
+  mitad-y-mitad en una de 26 líneas. Se lee y se edita en el editor de receta
+  (`components/catalogo/receta-editor.tsx`, ADR-063), donde los valores
+  tienen nombre; la API la devuelve como lista de texto y nunca `null`.
 - `receta_item.unidad_medida_id` (FK, nullable): NULL = la del artículo. Si
   viene, es de la misma categoría de UdM y se convierte por `ratio`
   (RN-UDM-005).

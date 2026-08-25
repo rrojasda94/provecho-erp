@@ -483,15 +483,30 @@ const CATALOGO: Caso[] = [
   caso("crearAtributo", () =>
     catalogoApi.crearAtributo({ nombre: "Tamaño", display: "pildoras" }),
   ),
+  caso("editarAtributo", () =>
+    catalogoApi.editarAtributo(UUID, { modo_variante: "siempre" }),
+  ),
+  caso("borrarAtributo", () => catalogoApi.borrarAtributo(UUID)),
   caso("agregarValorDeAtributo", () =>
     catalogoApi.agregarValorDeAtributo(UUID, { nombre: "Familiar" }),
+  ),
+  caso("editarValorDeAtributo", () =>
+    catalogoApi.editarValorDeAtributo(UUID, UUID, { nombre: "Familiar XL" }),
   ),
   caso("ofrecerAtributo", () =>
     catalogoApi.ofrecerAtributo(UUID, { atributo_id: UUID }),
   ),
-  caso("fijarPrecioExtra", () => catalogoApi.fijarPrecioExtra(UUID, "8.50")),
+  caso("quitarAtributoDelProducto", () =>
+    catalogoApi.quitarAtributoDelProducto(UUID, UUID),
+  ),
+  caso("fijarPrecioExtra", () =>
+    catalogoApi.fijarPrecioExtra(UUID, { precio_extra: "8.50" }),
+  ),
   caso("retirarValor", () => catalogoApi.retirarValor(UUID)),
   caso("excluir", () => catalogoApi.excluir(UUID, UUID)),
+  caso("dejarDeExcluir", () => catalogoApi.dejarDeExcluir(UUID, UUID)),
+  caso("generarVariantes", () => catalogoApi.generarVariantes(UUID)),
+  caso("atributosDeReceta", () => catalogoApi.atributosDeReceta(UUID)),
 ];
 
 const KDS: Caso[] = [

@@ -232,9 +232,10 @@ nadie lo notaría en la revisión.
 
 ### Modo oscuro (nuevo 2026-08-12, ADR-037)
 
-El brandboard nunca contempló pantallas oscuras fuera del PDV, el KDS y el
-lienzo. Se agrega para el resto del ERP: la oficina a las 3 p.m. y la cocina
-a las 6 a.m. no son la misma luz, y el turno de cierre trabaja de noche.
+El brandboard nunca contempló pantallas oscuras fuera del PDV y el KDS (y,
+hasta que se borró en ADR-063, el lienzo). Se agrega para el resto del ERP:
+la oficina a las 3 p.m. y la cocina a las 6 a.m. no son la misma luz, y el
+turno de cierre trabaja de noche.
 
 Remapea **roles**, nunca los `--marca-*`. Dos colores se recalculan por
 contraste medido: `--primary` vuelve al naranja original `#F4511E` (la brasa
