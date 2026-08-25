@@ -23,6 +23,18 @@ function texto(formData: FormData, campo: string): string {
   return String(formData.get(campo) ?? "").trim();
 }
 
+/** La cuenta que se manda al backend, distinguiendo "vacío" de "ausente".
+ *
+ * `undefined` (campo ausente) el backend lo lee como "no tocar"; `null` como
+ * "desvincular". Importa porque el selector de cuenta no se dibuja cuando
+ * quien edita no tiene permiso para listarlas: sin esta distinción, corregir
+ * un cargo desde un rol de RRHH puro le quitaría la cuenta al trabajador y lo
+ * dejaría sin poder fichar. */
+function cuentaElegida(formData: FormData): string | null | undefined {
+  if (!formData.has("usuario_id")) return undefined;
+  return texto(formData, "usuario_id") || null;
+}
+
 export async function crearTrabajadorAction(
   _previo: EstadoTrabajador,
   formData: FormData,
@@ -49,6 +61,9 @@ export async function crearTrabajadorAction(
         tipo_vinculo: tipoVinculo,
         fecha_ingreso: fechaIngreso,
         sucursal_id: sucursalId || null,
+        // La cuenta con la que fichará en el pad. Vacío = sin cuenta, que es
+        // válido: su asistencia la carga RRHH por back-office.
+        usuario_id: cuentaElegida(formData) ?? null,
         // Locación de servicios nunca marca asistencia (RN-PER-002) — el
         // backend lo exige, así que no se manda una casilla que confundiría.
         registra_asistencia: tipoVinculo !== "locacion_servicios",
@@ -93,6 +108,9 @@ export async function editarTrabajadorAction(
         // Vacío = sin local asignado, y el backend lo entiende como borrarlo:
         // dejar de estar en una sucursal es un cambio posible, no un olvido.
         sucursal_id: sucursalId || null,
+        // Mismo criterio para la cuenta: vacío la desvincula, y con eso el
+        // trabajador deja de poder fichar en el pad. Ausente = no tocar.
+        usuario_id: cuentaElegida(formData),
       },
     });
   } catch (e) {

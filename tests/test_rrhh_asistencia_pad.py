@@ -303,6 +303,82 @@ def test_sin_usuario_no_hay_firma(env):
     assert "PIN" in r.json()["detail"]
 
 
+def test_asignarle_la_cuenta_despues_lo_habilita_a_marcar(env):
+    """El caso que estaba roto: el trabajador se da de alta sin cuenta —que
+    es lo que hace la pantalla— y recién después RRHH le crea el acceso. Sin
+    `usuario_id` en el PATCH no había forma de vincularlo, así que el pad lo
+    rechazaba para siempre."""
+    client, ids, _ = env
+    h = _token(client)
+    trabajador_id = _crear_trabajador(client, h, ids, usuario_id=None)
+    _crear_turno(client, h, ids)
+    hterm = _token(client, "pad-castilla", "999999")
+    assert _marcar(client, hterm, ids, trabajador_id).status_code == 409
+
+    r = client.patch(
+        f"/api/v1/rrhh/trabajadores/{trabajador_id}",
+        headers=h,
+        json={"usuario_id": ids["usuario_trabajador_id"]},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["usuario_id"] == ids["usuario_trabajador_id"]
+    assert _marcar(client, hterm, ids, trabajador_id).status_code == 200
+
+
+def test_quitarle_la_cuenta_lo_deja_sin_marcar(env):
+    """`null` explícito desvincula: quien dejó de usar su acceso vuelve a
+    marcar por back-office. Omitir el campo, en cambio, no lo toca."""
+    client, ids, _ = env
+    h = _token(client)
+    trabajador_id = _crear_trabajador(client, h, ids)
+
+    r = client.patch(
+        f"/api/v1/rrhh/trabajadores/{trabajador_id}",
+        headers=h,
+        json={"cargo": "Jefe de cocina"},
+    )
+    assert r.json()["usuario_id"] == ids["usuario_trabajador_id"]
+
+    r = client.patch(
+        f"/api/v1/rrhh/trabajadores/{trabajador_id}",
+        headers=h,
+        json={"usuario_id": None},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["usuario_id"] is None
+
+
+def test_una_cuenta_no_es_de_dos_trabajadores(env):
+    """Dos trabajadores con la misma cuenta comparten PIN, y entonces el pad
+    no puede saber cuál de los dos fichó."""
+    client, ids, _ = env
+    h = _token(client)
+    _crear_trabajador(client, h, ids)
+    otro_id = _crear_trabajador(client, h, ids, usuario_id=None)
+
+    r = client.patch(
+        f"/api/v1/rrhh/trabajadores/{otro_id}",
+        headers=h,
+        json={"usuario_id": ids["usuario_trabajador_id"]},
+    )
+    assert r.status_code == 409, r.text
+    assert "otro trabajador" in r.json()["detail"]
+
+
+def test_la_cuenta_del_pad_no_se_le_asigna_a_un_trabajador(env):
+    """Una cuenta inexistente no se asigna. (La de agente tampoco, pero esa
+    se cubre en el caso de uso: el enum ya no deja crearla desde la API.)"""
+    client, ids, _ = env
+    h = _token(client)
+    trabajador_id = _crear_trabajador(client, h, ids, usuario_id=None)
+    r = client.patch(
+        f"/api/v1/rrhh/trabajadores/{trabajador_id}",
+        headers=h,
+        json={"usuario_id": str(uuid.uuid4())},
+    )
+    assert r.status_code == 404, r.text
+
+
 def test_locacion_de_servicios_no_marca_ni_aparece(env):
     """RN-PER-002: registrar asistencia a un RHE es desnaturalizar el
     vínculo. Ni sale en el pad ni se puede forzar."""
