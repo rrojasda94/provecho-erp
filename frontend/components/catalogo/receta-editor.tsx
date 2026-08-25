@@ -1,17 +1,27 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { evaluar, formatear } from "@/lib/aritmetica";
 import {
   catalogoApi,
   type Articulo,
+  type EjeDeCondicion,
   type RecetaDetalle,
   type RecetaItem,
   type UnidadMedida,
 } from "@/lib/catalogo";
 import { ErrorApi } from "@/lib/cliente-api";
+import { firmaDeCondicion } from "@/lib/matriz";
 import { aTitulo } from "@/lib/texto";
+
+/** Identidad de una línea de receta: mismo insumo y misma condición son la
+ * línea duplicada de siempre (matriz.py `_clave`), y por eso el jamón puede
+ * repetirse una vez por mitad — cada vez con **otra** condición. Misma firma
+ * que usa la matriz para identificar la celda (`lib/matriz.ts`). */
+function claveLinea(articuloId: string, aplicaValores: string[]): string {
+  return `${articuloId}|${firmaDeCondicion(aplicaValores)}`;
+}
 
 /**
  * Receta editada dentro de la ficha del producto (patrón Odoo): no se sale
@@ -41,14 +51,20 @@ export function RecetaEditor({
   // Empezar una receta desde cero para un producto que ya tiene otra: sin
   // esto, la única salida era duplicar la existente.
   const [creandoOtra, setCreandoOtra] = useState(false);
+  // Con qué se puede condicionar una línea (ADR-056). `[]` = ningún
+  // producto usa esta receta, y la columna «Condición» ni se dibuja — es
+  // más honesto que ofrecer una condición sin nombres.
+  const [ejes, setEjes] = useState<EjeDeCondicion[]>([]);
 
   useEffect(() => {
     if (!recetaId) {
       setReceta(null);
+      setEjes([]);
       return;
     }
     setCreandoOtra(false);
     catalogoApi.receta(recetaId).then(setReceta).catch(() => setReceta(null));
+    catalogoApi.atributosDeReceta(recetaId).then(setEjes).catch(() => setEjes([]));
   }, [recetaId]);
 
   const correr = useCallback(async (accion: () => Promise<RecetaDetalle>) => {
@@ -126,6 +142,7 @@ export function RecetaEditor({
             <th className="py-1 w-40">Cantidad</th>
             <th className="py-1 w-24">Unidad</th>
             <th className="py-1 w-24">Merma %</th>
+            {ejes.length > 0 && <th className="py-1 w-40">Condición</th>}
             <th className="py-1 w-24 text-right">Costo</th>
             <th className="py-1 w-8" />
           </tr>
@@ -164,6 +181,20 @@ export function RecetaEditor({
                   }}
                 />
               </td>
+              {ejes.length > 0 && (
+                <td className="py-1.5">
+                  <CondicionCelda
+                    item={item}
+                    ejes={ejes}
+                    deshabilitado={ocupado}
+                    onGuardar={(aplica_valores) =>
+                      correr(() =>
+                        catalogoApi.editarItem(receta.id, item.id, { aplica_valores }),
+                      )
+                    }
+                  />
+                </td>
+              )}
               <td className="py-1.5 text-right">
                 S/ {Number(item.costo_linea).toFixed(2)}
               </td>
@@ -184,7 +215,7 @@ export function RecetaEditor({
           ))}
           {receta.items.length === 0 && (
             <tr>
-              <td colSpan={6} className="py-3 text-gray">
+              <td colSpan={ejes.length > 0 ? 7 : 6} className="py-3 text-gray">
                 Todavía no tiene insumos.
               </td>
             </tr>
@@ -195,7 +226,8 @@ export function RecetaEditor({
       <NuevaLinea
         articulos={articulos}
         unidades={unidades}
-        yaUsados={receta.items.map((i) => i.articulo_id)}
+        ejes={ejes}
+        itemsExistentes={receta.items}
         deshabilitado={ocupado}
         onAgregar={(cuerpo) => correr(() => catalogoApi.agregarItem(receta.id, cuerpo))}
       />
@@ -339,26 +371,49 @@ function CampoCantidad({
 function NuevaLinea({
   articulos,
   unidades,
-  yaUsados,
+  ejes,
+  itemsExistentes,
   deshabilitado,
   onAgregar,
 }: {
   articulos: Articulo[];
   unidades: UnidadMedida[];
-  yaUsados: string[];
+  ejes: EjeDeCondicion[];
+  itemsExistentes: RecetaItem[];
   deshabilitado: boolean;
   onAgregar: (cuerpo: {
     articulo_id: string;
     cantidad?: string;
     expresion?: string;
     merma_pct?: string;
+    aplica_valores?: string[];
   }) => void;
 }) {
-  const disponibles = articulos.filter(
-    (a) => !a.archivado && !yaUsados.includes(a.id),
-  );
   const [articuloId, setArticuloId] = useState("");
   const [texto, setTexto] = useState("");
+  const [condicion, setCondicion] = useState<string[]>([]);
+
+  // La identidad de una línea es (insumo, condición): el mismo insumo puede
+  // repetirse una vez por cada mitad. Filtrar por insumo a secas hacía
+  // imposible poner el jamón en la Mitad 1 y en la Mitad 2, que es el caso
+  // por el que existe esta columna (ADR-056 §7).
+  const usadas = new Set(
+    itemsExistentes.map((i) => claveLinea(i.articulo_id, i.aplica_valores)),
+  );
+  const disponibles = articulos.filter(
+    (a) => !a.archivado && !usadas.has(claveLinea(a.id, condicion)),
+  );
+
+  // Cambiar la condición puede convertir el insumo ya elegido en una línea
+  // duplicada de otra existente (ADR-056 §7): sin esto, el `<select>` queda
+  // mostrando un valor que ya no está entre sus opciones y "Agregar" manda
+  // igual el insumo viejo, en silencio.
+  useEffect(() => {
+    if (articuloId && !disponibles.some((a) => a.id === articuloId)) {
+      setArticuloId("");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo cuando cambia la condición
+  }, [condicion]);
 
   const articulo = disponibles.find((a) => a.id === articuloId);
   // La unidad la pone el insumo: la receta no la elige (RN-UDM-001).
@@ -371,9 +426,11 @@ function NuevaLinea({
     onAgregar({
       articulo_id: articuloId,
       ...(esOperacion ? { expresion: texto.trim() } : { cantidad: texto.trim() }),
+      ...(condicion.length > 0 ? { aplica_valores: condicion } : {}),
     });
     setArticuloId("");
     setTexto("");
+    setCondicion([]);
   }
 
   return (
@@ -405,6 +462,12 @@ function NuevaLinea({
           className="w-36"
         />
       </label>
+      {ejes.length > 0 && (
+        <div className="flex flex-col gap-1 text-xs font-semibold">
+          Condición
+          <SelectorCondicion ejes={ejes} valor={condicion} onCambiar={setCondicion} />
+        </div>
+      )}
       {previa !== null && udm && (
         <span className="pb-2 text-xs text-gray">
           = {formatear(previa, udm.decimales)} {udm.nombre}
@@ -419,6 +482,135 @@ function NuevaLinea({
         Agregar insumo
       </button>
     </div>
+  );
+}
+
+/** Nombre plano de cada valor, para la celda cerrada y para el aria-label. */
+function nombresDeCondicion(ejes: EjeDeCondicion[]): Map<string, string> {
+  return new Map(
+    ejes.flatMap((eje) => eje.valores.map((v) => [v.id, `${eje.nombre}: ${v.nombre}`] as const)),
+  );
+}
+
+/**
+ * A qué combinaciones aplica una línea (RN-COM-037): casillas agrupadas
+ * por atributo dentro de un `<details>`, HTML plano y accesible por
+ * teclado — el mismo criterio de ADR-057 §1 para no traer una librería
+ * nueva por un selector múltiple.
+ */
+function SelectorCondicion({
+  ejes,
+  valor,
+  onCambiar,
+}: {
+  ejes: EjeDeCondicion[];
+  valor: string[];
+  onCambiar: (valores: string[]) => void;
+}) {
+  const nombres = nombresDeCondicion(ejes);
+  const etiqueta =
+    valor.length === 0 ? "Siempre" : valor.map((id) => nombres.get(id) ?? "?").join(", ");
+
+  function alternar(id: string, marcado: boolean) {
+    onCambiar(marcado ? [...valor, id] : valor.filter((v) => v !== id));
+  }
+
+  return (
+    <details className="relative">
+      <summary className="w-40 cursor-pointer list-none rounded border border-gray/40 px-2 py-1 text-xs font-normal text-dark">
+        {etiqueta}
+      </summary>
+      <div className="absolute z-10 mt-1 w-56 rounded border border-gray/30 bg-white p-2 shadow-lg">
+        {ejes.map((eje) => (
+          <fieldset key={eje.id} className="mb-2">
+            <legend className="text-xs font-semibold text-dark">{eje.nombre}</legend>
+            {eje.valores.map((v) => (
+              <label key={v.id} className="flex items-center gap-1.5 text-xs font-normal">
+                <input
+                  type="checkbox"
+                  checked={valor.includes(v.id)}
+                  onChange={(e) => alternar(v.id, e.target.checked)}
+                />
+                {v.nombre}
+              </label>
+            ))}
+          </fieldset>
+        ))}
+      </div>
+    </details>
+  );
+}
+
+/**
+ * La condición de una línea ya existente. A diferencia de `SelectorCondicion`
+ * —que solo junta el estado local de una fila nueva— acá el cambio recién
+ * sale a la red al tocar «Aplicar»: el estado intermedio puede ser inválido
+ * (destildar los cuatro sabores de una mitad para tildar otros cuatro pasa
+ * por «Siempre») y guardar casilla por casilla devolvería un 409 con la
+ * mitad del cambio hecho (ADR-058 §6, mismo razonamiento fuera del lienzo).
+ */
+function CondicionCelda({
+  item,
+  ejes,
+  deshabilitado,
+  onGuardar,
+}: {
+  item: RecetaItem;
+  ejes: EjeDeCondicion[];
+  deshabilitado: boolean;
+  onGuardar: (aplicaValores: string[]) => void;
+}) {
+  const detailsRef = useRef<HTMLDetailsElement>(null);
+  const [seleccion, setSeleccion] = useState<string[]>(item.aplica_valores);
+  useEffect(() => setSeleccion(item.aplica_valores), [item.aplica_valores]);
+
+  const nombres = nombresDeCondicion(ejes);
+  const etiqueta =
+    item.aplica_valores.length === 0
+      ? "Siempre"
+      : item.aplica_valores.map((id) => nombres.get(id) ?? "?").join(", ");
+
+  function alternar(id: string, marcado: boolean) {
+    setSeleccion((s) => (marcado ? [...s, id] : s.filter((v) => v !== id)));
+  }
+
+  function aplicar() {
+    onGuardar(seleccion);
+    detailsRef.current?.removeAttribute("open");
+  }
+
+  return (
+    <details ref={detailsRef} className="relative">
+      <summary className="w-full cursor-pointer list-none text-xs text-dark hover:underline">
+        {etiqueta}
+      </summary>
+      <div className="absolute z-10 mt-1 w-56 rounded border border-gray/30 bg-white p-2 shadow-lg">
+        {ejes.map((eje) => (
+          <fieldset key={eje.id} className="mb-2">
+            <legend className="text-xs font-semibold text-dark">{eje.nombre}</legend>
+            {eje.valores.map((v) => (
+              <label key={v.id} className="flex items-center gap-1.5 text-xs font-normal">
+                <input
+                  type="checkbox"
+                  checked={seleccion.includes(v.id)}
+                  disabled={deshabilitado}
+                  onChange={(e) => alternar(v.id, e.target.checked)}
+                />
+                {v.nombre}
+              </label>
+            ))}
+          </fieldset>
+        ))}
+        <button
+          type="button"
+          onClick={aplicar}
+          disabled={deshabilitado}
+          className="mt-1 rounded bg-primary px-2 py-1 text-xs font-bold text-white disabled:opacity-50"
+        >
+          Aplicar
+        </button>
+      </div>
+    </details>
   );
 }
 

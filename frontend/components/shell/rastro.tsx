@@ -71,8 +71,7 @@ export function Rastro({
                 {i === migas.length - 1 ? (
                   <BreadcrumbPage>{miga.label}</BreadcrumbPage>
                 ) : (
-                  // `render` y no `asChild`: este shadcn está sobre Base UI,
-                  // igual que el `PopoverTrigger` del lienzo.
+                  // `render` y no `asChild`: este shadcn está sobre Base UI.
                   <BreadcrumbLink render={<Link href={miga.href}>{miga.label}</Link>} />
                 )}
               </BreadcrumbItem>

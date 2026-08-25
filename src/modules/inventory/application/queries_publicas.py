@@ -67,14 +67,48 @@ def insumos_de_receta(session: Session, receta_id: uuid.UUID) -> list[dict]:
 
     Devuelve el nombre además del id porque el KDS tiene que imprimir "SIN
     CEBOLLA" y `sales` no puede leer `articulo` por su cuenta.
+
+    `distinct()`: con líneas condicionadas (ADR-056) el mismo insumo puede
+    aparecer en varias condiciones de la receta (ej. una mitad y la otra de
+    una pizza MitadXMitad) — sin esto, "sin aceitunas" saldría repetido una
+    vez por condición.
     """
     filas = session.execute(
         select(Articulo.id, Articulo.nombre)
         .join(RecetaItem, RecetaItem.articulo_id == Articulo.id)
         .where(RecetaItem.receta_id == receta_id)
+        .distinct()
         .order_by(Articulo.nombre)
     )
     return [{"articulo_id": fila.id, "nombre": fila.nombre} for fila in filas]
+
+
+def ptav_usados_en_condiciones(
+    session: Session, ptav_ids: Sequence[uuid.UUID]
+) -> set[str]:
+    """Cuáles de estos PTAV condicionan alguna línea de receta
+    (`receta_item.aplica_valores`, ADR-056 §1).
+
+    Lo pregunta `sales` antes de sacarle un atributo a un producto. Sin este
+    chequeo el valor se borraría y la condición quedaría apuntando a nada:
+    ADR-056 §3 hace que un valor huérfano forme su propio grupo, o sea que la
+    línea **deja de descontar en silencio** y el inventario descuadra recién
+    al cerrar el mes, cuando ya nadie puede atar el faltante a este clic.
+
+    Se comparan en Python y no en SQL porque `aplica_valores` es JSONB y las
+    líneas condicionadas son pocas —52 en el catálogo real— mientras que la
+    consulta equivalente se escribe distinto en SQLite y en Postgres, que es
+    exactamente el tipo de diferencia que las pruebas no ven venir.
+    """
+    if not ptav_ids:
+        return set()
+    buscados = {str(identificador) for identificador in ptav_ids}
+    usados: set[str] = set()
+    for condicion in session.scalars(
+        select(RecetaItem.aplica_valores).where(RecetaItem.aplica_valores.isnot(None))
+    ):
+        usados |= buscados & {str(valor) for valor in condicion or []}
+    return usados
 
 
 def nombres_de_articulos(

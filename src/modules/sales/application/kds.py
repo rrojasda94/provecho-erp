@@ -15,6 +15,7 @@ líneas invisibles en cocina.
 
 import textwrap
 import uuid
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -66,6 +67,28 @@ def crear_pantalla(
     session.add(pantalla)
     session.flush()
     return pantalla
+
+
+def eliminar_pantalla(session: Session, pantalla_id: uuid.UUID) -> None:
+    """Baja definitiva de una estación (`deleted_at`), no de un turno.
+
+    `activo=False` ya existe y es la baja temporal — la pantalla se apaga y
+    vuelve. Esto es lo otro: la estación deja de existir y su nombre queda
+    libre para otra.
+
+    Con la cola cargada no se borra: las líneas que están pasando por esa
+    estación se quedarían sin dónde tacharse y el pedido se volvería
+    invisible en cocina. Primero se vacía, después se borra.
+    """
+    pantalla = session.get(KdsPantalla, pantalla_id)
+    if pantalla is None or pantalla.deleted_at is not None:
+        raise NoEncontrado("pantalla no encontrada")
+    if cola_pantalla(session, pantalla_id):
+        raise Conflicto(
+            "la pantalla tiene pedidos en cola: desactívala o termina la cola "
+            "antes de borrarla"
+        )
+    pantalla.deleted_at = datetime.now(UTC)
 
 
 def _validar_orden(orden: int) -> None:

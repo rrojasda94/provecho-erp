@@ -82,6 +82,11 @@ DESTINOS: dict[str, Destino] = {
     "escalamiento": Destino(
         "/reports/escalamientos/{id}", "reports.leer", "Ver el escalamiento"
     ),
+    # La falta de marcación se resuelve en la ficha del trabajador, que es
+    # donde se ve su asistencia del mes y se corrige la marcación.
+    "trabajador": Destino(
+        "/rrhh/trabajadores/{id}", "rrhh.leer", "Ver al trabajador"
+    ),
 }
 
 

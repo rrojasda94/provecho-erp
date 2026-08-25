@@ -485,8 +485,63 @@ class AsistenciaOut(BaseModel):
     fecha: date
     hora_entrada: time | None
     hora_salida: time | None
+    turno_id: uuid.UUID | None
     tardanza_min: int
     horas_extra: Decimal
+
+
+# --- Turno de trabajo ------------------------------------------------------------
+class TurnoCreate(BaseModel):
+    sucursal_id: uuid.UUID
+    nombre: str = Field(max_length=50)
+    hora_inicio: time
+    hora_fin: time
+    hora_limite_salida: time
+    tolerancia_min: int = Field(default=5, ge=0, le=120)
+
+
+class TurnoUpdate(BaseModel):
+    nombre: str | None = Field(default=None, max_length=50)
+    hora_inicio: time | None = None
+    hora_fin: time | None = None
+    hora_limite_salida: time | None = None
+    tolerancia_min: int | None = Field(default=None, ge=0, le=120)
+    activo: bool | None = None
+
+
+class TurnoOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    sucursal_id: uuid.UUID
+    nombre: str
+    hora_inicio: time
+    hora_fin: time
+    hora_limite_salida: time
+    tolerancia_min: int
+    activo: bool
+
+
+# --- Pad de marcación ------------------------------------------------------------
+class TarjetaOut(BaseModel):
+    """La tarjeta del pad: nombre y nada más. La pantalla está a la vista de
+    todo el que pase por la cocina — cargo, documento y sueldo no van acá."""
+
+    model_config = ConfigDict(from_attributes=True)
+    trabajador_id: uuid.UUID
+    nombre: str
+    marco_entrada: bool
+    marco_salida: bool
+
+
+class PadMarcarIn(BaseModel):
+    trabajador_id: uuid.UUID
+    # Ni fecha ni hora ni tipo: los pone el servidor (ADR-065).
+    pin: str = Field(min_length=4, max_length=12)
+
+
+class PadMarcacionOut(BaseModel):
+    tipo: str  # "entrada" | "salida"
+    asistencia: AsistenciaOut
 
 
 # --- Legajo (file personal) ------------------------------------------------------

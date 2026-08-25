@@ -18,6 +18,7 @@ export type ItemSubmenu = { label: string; href: string };
 export const SUBMENUS: Record<string, ItemSubmenu[]> = {
   catalogo: [
     { label: "Productos", href: "/catalogo/productos" },
+    { label: "Atributos", href: "/catalogo/atributos" },
     { label: "Recetas", href: "/catalogo/recetas" },
   ],
   compras: [
@@ -70,6 +71,11 @@ export const SUBMENUS: Record<string, ItemSubmenu[]> = {
   rrhh: [
     { label: "Contratación", href: "/rrhh/contratacion" },
     { label: "Trabajadores", href: "/rrhh/trabajadores" },
+    { label: "Turnos", href: "/rrhh/turnos" },
+    // El pad es pantalla completa fuera del shell, como el PDV: se abre en
+    // la tablet del local con la cuenta del terminal, no desde acá. El
+    // enlace existe para poder probarlo y dejarlo en favoritos.
+    { label: "Pad de asistencia", href: "/asistencia" },
   ],
   usuarios: [
     { label: "Cuentas", href: "/usuarios" },

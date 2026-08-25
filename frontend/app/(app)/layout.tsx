@@ -23,8 +23,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     // `erp`: raíz del back office. La usa `globals.css` para vestir los
     // `<dialog>` y campos nativos que trece pantallas todavía escriben a mano,
-    // sin que esos estilos alcancen al PDV, al KDS ni al lienzo — que viven
-    // fuera de este layout y tienen su propia paleta oscura.
+    // sin que esos estilos alcancen al PDV ni al KDS — que viven fuera de
+    // este layout y tienen su propia paleta oscura.
     <div className="erp flex min-h-screen flex-col bg-background">
       {/* Acá y no en cada ficha: cuenta las navegaciones del shell desde que
           se entra, que es lo que decide si el `←` puede volver o tiene que

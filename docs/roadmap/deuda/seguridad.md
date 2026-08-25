@@ -119,13 +119,13 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   de ADR-050 porque es otro flujo y otra decisión de diseño —tres pinpads en
   una pantalla, o uno con tres pasos— y mezclarla dejaba un cambio imposible
   de revisar.
-- ⬜ **El bloqueo del PDV no cubre el KDS ni el lienzo** (2026-08-13,
-  ADR-045): son las otras dos pantallas táctiles fuera del shell. El KDS no
-  cobra ni anula, así que el riesgo es menor, pero sí avanza pedidos con la
-  sesión de alguien. Extenderlo es mover `BloqueoPorInactividad` a
-  `components/` y montarlo en sus `page.tsx` — se dejó fuera porque el
-  encargo pedía el PDV y sumar pantallas sin pedirlo cambia la operación de
-  cocina sin avisarle a nadie.
+- ⬜ **El bloqueo del PDV no cubre el KDS** (2026-08-13, ADR-045): es la otra
+  pantalla táctil fuera del shell (el lienzo, que también estaba en esta
+  lista, se borró en ADR-063). El KDS no cobra ni anula, así que el riesgo es
+  menor, pero sí avanza pedidos con la sesión de alguien. Extenderlo es mover
+  `BloqueoPorInactividad` a `components/` y montarlo en su `page.tsx` — se
+  dejó fuera porque el encargo pedía el PDV y sumar pantallas sin pedirlo
+  cambia la operación de cocina sin avisarle a nadie.
 - ⬜ **El plazo de bloqueo es una constante, no un parámetro de empresa**
   (2026-08-13): 5 minutos fijos en `app/pdv/bloqueo.tsx`. Un local con
   mucho tránsito puede querer menos y uno de mesa larga, más. Va a

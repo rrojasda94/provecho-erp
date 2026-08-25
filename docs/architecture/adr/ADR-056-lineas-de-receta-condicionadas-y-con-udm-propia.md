@@ -341,3 +341,18 @@ que un día que diverjan se note en la suite y no en una pantalla.
 - **La ficha de receta suelta** (`/catalogo/recetas/[id]`) no cambió: no
   sabe qué producto usa la receta, así que solo podría mostrar UUID — que es
   lo que ADR-057 ya descartó para la matriz.
+
+## Enmienda (2026-08-24) — el lienzo se borró; la condición vive en el editor
+
+ADR-063 borró el lienzo entero. Todo lo que §5 y §8 describían sobre cómo el
+nodo de un valor abría la receta condicionada, o cómo `nodos.aplicaAVariante`
+portaba la regla al cliente para simular el costo, describe una pantalla que
+ya no existe.
+
+Lo que sobrevive: **la condición ahora se edita en
+`components/catalogo/receta-editor.tsx`**, con una columna «Condición» que
+resuelve el mismo hueco que §"Enmienda (2026-08-24)" del cuerpo de este ADR
+había dejado anotado —"la ficha de receta suelta no sabe qué producto usa la
+receta"—, mediante `GET /sales/recetas/{id}/atributos` (ADR-063 §4), que
+cubre tanto la ficha del producto como la receta suelta con el mismo camino.
+`nodos.aplicaAVariante` se borró con el lienzo: no tiene consumidor nuevo.

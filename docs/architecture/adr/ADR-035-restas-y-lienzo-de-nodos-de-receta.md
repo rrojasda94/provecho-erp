@@ -1,6 +1,8 @@
 # ADR-035 — Restas ("sin X") y lienzo de nodos de receta
 
-- Estado: aceptado
+- Estado: aceptado — **la parte del lienzo está superada por ADR-063**
+  (2026-08-24, borrado). Las restas (`venta_item.sin_articulo_ids`) siguen
+  vigentes tal cual este ADR las decidió.
 - Fecha: 2026-08-08
 
 ## Contexto

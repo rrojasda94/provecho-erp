@@ -19,7 +19,7 @@ es donde cae la línea cuando ya no queda estación por delante.
 
 import uuid
 
-from sqlalchemy import Boolean, Enum, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import Boolean, Enum, ForeignKey, Index, Integer, String, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -28,7 +28,20 @@ from src.core.model_base import JsonB, SoftDeleteMixin, TimestampMixin, UuidPkMi
 
 class KdsPantalla(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "kds_pantalla"
-    __table_args__ = (UniqueConstraint("sucursal_id", "nombre"),)
+    __table_args__ = (
+        # Único entre las vivas, no entre todas: una estación borrada
+        # (`deleted_at`) libera su nombre. Con un UNIQUE plano, borrar
+        # «Horno» por un error de tipeo dejaba el nombre ocupado para
+        # siempre — mismo patrón que `parametro_empresa`.
+        Index(
+            "uq_kds_pantalla_viva",
+            "sucursal_id",
+            "nombre",
+            unique=True,
+            sqlite_where=text("deleted_at IS NULL"),
+            postgresql_where=text("deleted_at IS NULL"),
+        ),
+    )
 
     sucursal_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("sucursal.id"))
     nombre: Mapped[str] = mapped_column(String(100))

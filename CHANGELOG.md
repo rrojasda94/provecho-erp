@@ -12,6 +12,98 @@ editando este archivo chocaban siempre — escribían en la misma línea.
 
 Ver [`changelog.d/`](changelog.d/).
 
+## [0.7.4] - 2026-08-25
+
+### Added
+
+- **El personal marca su propia asistencia** (2026-08-24, ADR-064/065,
+  migración `c4d17b93e0af`). La asistencia tenía backend desde julio y
+  ninguna pantalla, y marcar exigía `rrhh.asistencia_marcar` — es decir, se
+  marcaba *por* la gente, no *la* gente. Ahora hay un pad a pantalla completa
+  (`/asistencia`) que se abre con una **cuenta de servicio por local** (rol
+  `terminal_asistencia`, un solo permiso): se toca la tarjeta con el nombre y
+  se teclea el PIN propio en el mismo pinpad del PDV. La tarjeta muestra el
+  nombre y nada más —la pantalla está a la vista de toda la cocina—, y el
+  servidor decide la hora, el día laboral (corta a las 05:00, así el turno
+  noche no se parte), si es entrada o salida y la tardanza. El PIN va contra
+  el **mismo lockout del login**, con el límite contado por trabajador y no
+  por IP: en un local todas las tabletas salen por la misma dirección y el
+  cambio de turno son diez personas seguidas.
+- **Turno de trabajo: la primera entidad de horario laboral del ERP**
+  (2026-08-24, ADR-064). El glosario lo nombraba desde el principio y nada lo
+  modelaba: `asistencia.tardanza_min` la mandaba **el cliente**, porque no
+  había contra qué calcularla. `turno_sucursal` (nombre, entrada, salida,
+  tolerancia, hora límite de marcaje de salida) se administra en RRHH →
+  Turnos con `rrhh.turno_gestionar`. No fue a `parametro_empresa`: ese índice
+  es por empresa y meter la sucursal en el `codigo` pierde la FK — el mismo
+  precedente de `categoria.frecuencia_conteo`. Una hora de salida menor que
+  la de entrada significa que el turno cruza la medianoche; no hay bandera de
+  «nocturno» que pueda contradecir a los datos que la rodean.
+- **Aviso de salida sin marcar** (2026-08-24, RN-RRHH-021). Un barrido horario
+  encuentra las entradas sin salida cuya hora límite ya pasó y avisa por dos
+  caminos: al **trabajador** en su propia campana, y al **encargado del local
+  y a RRHH** con la emisión `rrhh.salida_sin_marcar`. Son dos y no uno porque
+  abrir un reporte exige el permiso del módulo dueño (RN-REP-002) y un
+  cocinero no tiene `rrhh.leer`: hacerlo destinatario habría sido entregarle
+  algo que no puede abrir. La emisión va **sin actor**, como
+  `sales.pedido_demorado` — el hecho es «falta una marcación», no «alguien
+  hizo algo mal». **No se generan horas extra en ningún caso**
+  (RN-RRHH-022): quedarse de más produce el aviso y nada más.
+
+### Changed
+
+- **Los atributos vuelven a la tabla** (2026-08-24, ADR-063). El lienzo
+  —el canvas que dibujaba tamaños, atributos y recetas— se borró entero: no
+  resultó un lugar de trabajo usable, y quien reportaba que no podía ver ni
+  crear extras ni mitades tenía razón, aunque la API existía desde ADR-055.
+  En su lugar: una pantalla `/catalogo/atributos` para el vocabulario
+  (nombre, modo de variante, valores), una sección «Atributos» en la ficha
+  del producto (qué ofrece, con qué sobreprecio, sus exclusiones) y una
+  columna «Condición» en el editor de receta, que resuelve de paso el hueco
+  que ADR-058 había dejado anotado: la ficha de receta suelta ahora sabe qué
+  producto la usa y muestra nombres, no UUID.
+- **Nuevo generador de combinaciones** (`POST
+  /sales/productos/{id}/variantes`, RN-COM-039): materializa las variantes de
+  un atributo en modo `siempre`, respeta las exclusiones declaradas
+  (RN-COM-038), es idempotente y nunca borra ni desactiva una variante ya
+  generada. `modo_variante = 'dinamica'` queda fuera de este cambio a
+  propósito, por no tocar el camino de la venta.
+- **Se corrige un bug del editor de receta anterior al lienzo**: el filtro de
+  insumos ya usados comparaba solo por artículo, así que era imposible poner
+  el mismo insumo en dos líneas con condición distinta — el caso exacto de la
+  pizza mitad-y-mitad que motivó ADR-056. Ahora filtra por
+  `(insumo, condición)`.
+- No afecta al PDV: verificado que `GET /carta` y el camino de venta no leen
+  nada del lienzo ni de las pantallas nuevas.
+
+- **Montar una pantalla de cocina pasa a ser acto de administración**
+  (2026-08-24, ADR-065). `kds.configurar` sale del rol `supervisor`: dar de
+  alta, renombrar o borrar una estación cambia por dónde pasa la comanda de
+  **todos** los turnos, no solo del que está en el local esa tarde. Es alta de
+  infraestructura, igual que el punto de venta (ADR-059). El supervisor
+  conserva `kds.operar` y opera lo que ya está montado; la pantalla de
+  estaciones ahora dice «pídele a un administrador».
+- **Una pantalla KDS por fin se puede borrar** (2026-08-24). El modelo tenía
+  `deleted_at` desde que nació y **ningún camino lo escribía**: una estación
+  creada con un error de tipeo se quedaba para siempre. `DELETE
+  /kds/pantallas/{id}` es baja lógica, exige `kds.configurar` y devuelve 409
+  si la pantalla tiene cola —borrarla con pedidos encima dejaría esas líneas
+  sin dónde tacharse—. `activo=false` sigue siendo otra cosa: apaga la
+  estación y la deja volver. El `UNIQUE (sucursal_id, nombre)` pasa a ser
+  parcial sobre las vivas, así el nombre de una borrada queda libre.
+- **`GET /kds/pantallas` acepta `kds.operar` o `kds.configurar`**
+  (2026-08-24). Un administrador que solo tuviera el permiso de configurar no
+  podía **listar lo que administra** — el mismo patrón que ya usaba
+  `GET /sales/puntos-venta`.
+
+### Fixed
+
+- Corregido: en un producto con líneas de receta condicionadas (ADR-056,
+  ej. una pizza MitadXMitad), `GET /productos/{id}/quitables` devolvía el
+  mismo insumo una vez por cada línea condicionada que lo usaba ("sin
+  aceitunas" repetido varias veces en el PDV). Se agregó `distinct()` a la
+  consulta de `insumos_de_receta`.
+
 ## [0.7.3] - 2026-08-24
 
 ### Added

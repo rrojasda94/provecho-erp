@@ -484,9 +484,9 @@ en la línea. Misma forma y mismas razones que `sin_articulo_ids`.
 - `receta_item.aplica_valores` (JSONB, nullable): array de PTAV. NULL o `[]`
   = aplica siempre. La regla agrupa los valores **por atributo** y exige al
   menos uno de cada grupo (RN-COM-037) — es lo que convierte 361 recetas de
-  mitad-y-mitad en una de 26 líneas. Se lee y se edita desde el lienzo, donde
-  los valores tienen nombre (enmienda de ADR-056, 2026-08-24); la API la
-  devuelve como lista de texto y nunca `null`.
+  mitad-y-mitad en una de 26 líneas. Se lee y se edita en el editor de receta
+  (`components/catalogo/receta-editor.tsx`, ADR-063), donde los valores
+  tienen nombre; la API la devuelve como lista de texto y nunca `null`.
 - `receta_item.unidad_medida_id` (FK, nullable): NULL = la del artículo. Si
   viene, es de la misma categoría de UdM y se convierte por `ratio`
   (RN-UDM-005).
@@ -1367,7 +1367,18 @@ un trabajador puede o no tener usuario, y no todo usuario es trabajador
   (meses), formula_reembolso (proporcional al tiempo no cumplido), fecha
   inicio, fecha_fin_compromiso. Razonable y proporcional (RN-RRHH-006).
 - **asistencia**: trabajador_id, fecha, marcaciones (entrada/salida),
-  tardanza_min, horas_extra. Registro de control de asistencia obligatorio.
+  turno_id, tardanza_min, horas_extra, reporte_salida_en. Registro de control
+  de asistencia obligatorio. Una fila por trabajador y día
+  (`UNIQUE (trabajador_id, fecha)`); el día laboral corta a las 05:00, así el
+  turno noche no se parte en dos. `tardanza_min` lo **calcula el servidor**
+  contra el turno (ADR-064); `horas_extra` solo lo escribe RRHH a mano — el
+  pad manda siempre 0 (RN-RRHH-022). `reporte_salida_en` sella el aviso de
+  salida sin marcar para que el barrido no repita.
+- **turno_sucursal**: empresa_id, sucursal_id, nombre, hora_inicio, hora_fin,
+  tolerancia_min, hora_limite_salida, activo. El **horario laboral** del local
+  (ADR-064), distinto del turno de caja y del horario de atención. Único por
+  `(sucursal_id, nombre)`. `hora_fin`/`hora_limite_salida` menores que
+  `hora_inicio` significan que el turno cruza la medianoche.
 
 Los documentos de RRHH que son cartas/actas usan plantillas versionadas
 (ver `docs/templates/rrhh/`), rellenadas con datos del ERP + campos

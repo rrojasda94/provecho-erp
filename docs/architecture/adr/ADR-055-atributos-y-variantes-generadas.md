@@ -113,17 +113,24 @@ cuelga el atributo del **padre** —cuando lo crea todavía no hay variantes— 
 el importador lo cuelga donde diga la planilla. **Mientras el lugar importe,
 siempre hay una mitad de los catálogos rota.**
 
-### 6. Interruptor, y qué significa apagarlo
+### 6. La migración es solo aditiva
 
-`parametro_empresa` → `sales` / `catalogo.modelo_odoo`, default `False`
-(ADR-014). Con él apagado la carta, la validación de grupos y el PDV se
-comportan exactamente como en 0.6.0.
+Ninguna columna existente cambia de tipo ni de nulabilidad, y todo lo nuevo
+nace NULL o con default. La consecuencia práctica es la que importa: **la
+imagen 0.6.0 corre contra este esquema sin enterarse**, así que volver atrás
+es `./scripts/desplegar.sh 0.6.0` y no hace falta downgrade para volver a
+operar.
 
-**La migración es solo aditiva**: ninguna columna existente cambia de tipo ni
-de nulabilidad, y todo lo nuevo nace NULL o con default. La consecuencia
-práctica es la que importa: **la imagen 0.6.0 corre contra este esquema sin
-enterarse**, así que volver atrás es `./scripts/desplegar.sh 0.6.0` y no hace
-falta downgrade para volver a operar.
+Esta promesa deja de valer a partir de ADR-063 (2026-08-24): la migración que
+borra `producto_comercial.lienzo_pos` sí exige `alembic downgrade` explícito
+para volver a una versión anterior. Sigue valiendo para todo lo demás de este
+ADR y de ADR-056.
+
+> **Nota (2026-08-24)**: este ADR documentó acá un interruptor
+> `parametro_empresa` → `sales` / `catalogo.modelo_odoo` que nunca se llegó a
+> leer en ningún lugar del código — ni la carta, ni el PDV, ni la validación
+> de grupos lo consultaban. Se retira la afirmación en vez de construir un
+> interruptor que nadie usó (ver ADR-063 §6).
 
 ## Alternativas descartadas
 

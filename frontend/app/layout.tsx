@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Anton, Archivo, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
+import { PiePagina } from "@/components/shell/pie-pagina";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { obtenerPreferencias } from "@/lib/sesion";
@@ -70,6 +71,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                     proveedor los coordina — el primero espera, los
                     siguientes abren al instante. */}
                 <TooltipProvider delay={350}>{children}</TooltipProvider>
+                {/* Fijo y no en el flujo: el login, el PDV y el KDS reclaman
+                    `100vh`/`100dvh` para sí solos (pantalla completa,
+                    a propósito), así que un pie normal quedaría siempre
+                    debajo del borde — visible solo scrolleando, que es
+                    exactamente lo que "siempre visible" pedía evitar. */}
+                <PiePagina />
                 {/* Avisos flotantes (guardado, alertas de cocina). Vive en el
                     layout raíz para que cualquier pantalla pueda emitirlos. */}
                 <Toaster richColors closeButton />

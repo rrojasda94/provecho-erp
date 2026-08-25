@@ -4,11 +4,15 @@ import Link from "next/link";
 
 import { Rastro } from "@/components/shell/rastro";
 import { useRouter } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import {
   catalogoApi,
+  type ArbolProducto,
+  type Articulo,
+  type Atributo,
   type GrupoOpcion,
+  type LineaDeAtributo,
   type Producto,
   type ProductoDetalle,
   type Receta,
@@ -47,12 +51,14 @@ export function FichaProducto({
   recetas,
   unidades,
   extrasDisponibles,
+  empaques,
   listas,
 }: {
-  inicial: ProductoDetalle;
+  inicial: ArbolProducto;
   recetas: Receta[];
   unidades: UnidadMedida[];
   extrasDisponibles: Producto[];
+  empaques: Articulo[];
   listas: ListaPrecio[];
 }) {
   const router = useRouter();
@@ -61,7 +67,7 @@ export function FichaProducto({
 
   const recargar = useCallback(async () => {
     try {
-      setProducto(await catalogoApi.producto(inicial.id));
+      setProducto(await catalogoApi.arbol(inicial.id));
       // También el servidor: crear una presentación crea su receta, y sin
       // esto la receta nueva no aparecía en el desplegable que la debe
       // mostrar.
@@ -107,15 +113,6 @@ export function FichaProducto({
           <span className="rounded bg-cream px-2 py-1 text-xs font-semibold text-gray">
             {producto.id_interno}
           </span>
-          {!producto.es_extra && (
-            <Link
-              href={`/catalogo/productos/${producto.id}/nodos`}
-              className="rounded border border-primary px-2 py-1 text-xs font-semibold text-primary hover:bg-primary/10"
-              title="El árbol completo: tamaños, sabores, extras, restas y empaque, con el costo de cada combinación"
-            >
-              Ver nodos
-            </Link>
-          )}
           <label className="flex items-center gap-2 text-sm font-semibold">
             <input
               type="checkbox"
@@ -149,6 +146,7 @@ export function FichaProducto({
           producto={producto}
           recetas={recetas}
           listas={listas}
+          empaques={empaques}
           onElegirReceta={(recetaId) =>
             correr(() =>
               catalogoApi.editarProducto(producto.id, { receta_id: recetaId }),
@@ -159,6 +157,9 @@ export function FichaProducto({
               catalogoApi.editarProducto(producto.id, { quitar_receta: true }),
             )
           }
+          onEditarEmpaque={(cuerpo) =>
+            correr(() => catalogoApi.editarProducto(producto.id, cuerpo))
+          }
           onError={setError}
         />
       )}
@@ -168,6 +169,7 @@ export function FichaProducto({
           producto={producto}
           recetas={recetas}
           unidades={unidades}
+          empaques={empaques}
           listas={listas}
           onCambio={recargar}
           onError={setError}
@@ -184,6 +186,20 @@ export function FichaProducto({
           onCrearGrupo={(cuerpo) =>
             correr(() => catalogoApi.crearGrupo(producto.id, cuerpo))
           }
+          onBorrarGrupo={(grupoId) =>
+            correr(() => catalogoApi.borrarGrupo(producto.id, grupoId))
+          }
+          onDesvincularExtra={(extraId) =>
+            correr(() => catalogoApi.desvincularExtra(producto.id, extraId))
+          }
+        />
+      )}
+
+      {!producto.es_extra && (
+        <SeccionAtributos
+          producto={producto}
+          onCambio={setProducto}
+          onError={setError}
         />
       )}
     </div>
@@ -234,15 +250,22 @@ function SeccionSimple({
   producto,
   recetas,
   listas,
+  empaques,
   onElegirReceta,
   onQuitarReceta,
+  onEditarEmpaque,
   onError,
 }: {
   producto: ProductoDetalle;
   recetas: Receta[];
   listas: ListaPrecio[];
+  empaques: Articulo[];
   onElegirReceta: (recetaId: string) => void;
   onQuitarReceta: () => void;
+  onEditarEmpaque: (cuerpo: {
+    empaque_id: string | null;
+    modalidades_empaque: string[] | null;
+  }) => void;
   onError: (mensaje: string) => void;
 }) {
   return (
@@ -275,7 +298,80 @@ function SeccionSimple({
       {producto.receta_id && (
         <Precio producto={producto} listas={listas} onError={onError} />
       )}
+      {producto.receta_id && (
+        <SelectorEmpaque producto={producto} empaques={empaques} onEditar={onEditarEmpaque} />
+      )}
     </section>
+  );
+}
+
+const MODALIDADES = ["mesa", "takeout", "delivery"] as const;
+
+/** Qué empaque consume este producto y en qué modalidades se descuenta
+ * (RN-EMP-003). Vive donde el producto ya vende —receta propia o
+ * presentación— porque un padre sin receta nunca se vende por sí mismo. */
+function SelectorEmpaque({
+  producto,
+  empaques,
+  onEditar,
+  compacto,
+}: {
+  producto: Producto;
+  empaques: Articulo[];
+  onEditar: (cuerpo: {
+    empaque_id: string | null;
+    modalidades_empaque: string[] | null;
+  }) => void;
+  compacto?: boolean;
+}) {
+  const marcadas = producto.modalidades_empaque ?? [];
+  return (
+    <div
+      className={
+        compacto
+          ? "flex flex-wrap items-center gap-2"
+          : "mt-3 flex flex-wrap items-center gap-3 border-t border-gray/10 pt-3"
+      }
+    >
+      <label className="flex items-center gap-2 text-xs font-semibold">
+        Empaque
+        <select
+          value={producto.empaque_id ?? ""}
+          className="min-w-40"
+          onChange={(e) =>
+            onEditar({
+              empaque_id: e.target.value || null,
+              modalidades_empaque: e.target.value ? marcadas : null,
+            })
+          }
+        >
+          <option value="">Sin empaque</option>
+          {empaques.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.nombre}
+            </option>
+          ))}
+        </select>
+      </label>
+      {producto.empaque_id &&
+        MODALIDADES.map((m) => (
+          <label key={m} className="flex items-center gap-1 text-xs">
+            <input
+              type="checkbox"
+              checked={marcadas.includes(m)}
+              onChange={(e) =>
+                onEditar({
+                  empaque_id: producto.empaque_id,
+                  modalidades_empaque: e.target.checked
+                    ? [...marcadas, m]
+                    : marcadas.filter((x) => x !== m),
+                })
+              }
+            />
+            {m}
+          </label>
+        ))}
+    </div>
   );
 }
 
@@ -289,6 +385,7 @@ function SeccionPresentaciones({
   producto,
   recetas,
   unidades,
+  empaques,
   listas,
   onCambio,
   onError,
@@ -296,6 +393,7 @@ function SeccionPresentaciones({
   producto: ProductoDetalle;
   recetas: Receta[];
   unidades: UnidadMedida[];
+  empaques: Articulo[];
   listas: ListaPrecio[];
   onCambio: () => void;
   onError: (mensaje: string) => void;
@@ -352,6 +450,7 @@ function SeccionPresentaciones({
               <th className="py-1">Receta</th>
               <th className="py-1 w-20">Orden</th>
               <th className="py-1 w-56">Precio</th>
+              <th className="py-1 w-56">Empaque</th>
               <th className="py-1 w-8" />
             </tr>
           </thead>
@@ -397,6 +496,14 @@ function SeccionPresentaciones({
                 </td>
                 <td className="py-2">
                   <Precio producto={v} listas={listas} onError={onError} compacto />
+                </td>
+                <td className="py-2">
+                  <SelectorEmpaque
+                    producto={v}
+                    empaques={empaques}
+                    onEditar={(cuerpo) => editarVariante(v.id, cuerpo)}
+                    compacto
+                  />
                 </td>
                 <td className="py-2 text-right">
                   <button
@@ -552,6 +659,8 @@ function SeccionExtras({
   extrasDisponibles,
   onVincular,
   onCrearGrupo,
+  onBorrarGrupo,
+  onDesvincularExtra,
 }: {
   producto: ProductoDetalle;
   extrasDisponibles: Producto[];
@@ -561,6 +670,8 @@ function SeccionExtras({
     minimo: number;
     maximo: number | null;
   }) => void;
+  onBorrarGrupo: (grupoId: string) => void;
+  onDesvincularExtra: (extraId: string) => void;
 }) {
   return (
     <section className="rounded-lg border border-gray/20 bg-white p-4">
@@ -578,13 +689,27 @@ function SeccionExtras({
           extrasDisponibles={extrasDisponibles}
           yaVinculados={vinculados(producto)}
           onVincular={onVincular}
+          onBorrar={() => onBorrarGrupo(grupo.id)}
+          onDesvincularExtra={onDesvincularExtra}
         />
       ))}
       <NuevoGrupo onCrear={onCrearGrupo} />
       {producto.extras_sueltos.length > 0 && (
         <p className="mt-3 text-xs text-gray">
           Sin grupo (siempre opcionales):{" "}
-          {producto.extras_sueltos.map((e) => e.nombre).join(", ")}
+          {producto.extras_sueltos.map((e) => (
+            <span key={e.extra_id}>
+              {e.nombre}{" "}
+              <button
+                type="button"
+                onClick={() => onDesvincularExtra(e.extra_id)}
+                className="text-secondary hover:underline"
+                aria-label={`Desvincular ${e.nombre}`}
+              >
+                ×
+              </button>{" "}
+            </span>
+          ))}
         </p>
       )}
     </section>
@@ -596,27 +721,49 @@ function GrupoEditor({
   extrasDisponibles,
   yaVinculados,
   onVincular,
+  onBorrar,
+  onDesvincularExtra,
 }: {
   grupo: GrupoOpcion;
   extrasDisponibles: Producto[];
   yaVinculados: string[];
   onVincular: (cuerpo: { extra_id: string; grupo_id: string }) => void;
+  onBorrar: () => void;
+  onDesvincularExtra: (extraId: string) => void;
 }) {
   const disponibles = extrasDisponibles.filter((e) => !yaVinculados.includes(e.id));
   return (
     <div className="border-t border-gray/20 py-3">
-      <p className="font-semibold text-dark">
+      <p className="flex items-center gap-2 font-semibold text-dark">
         {grupo.nombre}{" "}
         <span className="text-xs font-normal text-gray">
           {grupo.minimo >= 1 ? `obligatorio · elige ${grupo.minimo}` : "opcional"}
           {grupo.maximo ? ` · hasta ${grupo.maximo}` : ""}
         </span>
+        <button
+          type="button"
+          onClick={() => {
+            if (window.confirm(`¿Borrar el grupo "${grupo.nombre}"?`)) onBorrar();
+          }}
+          className="ml-auto text-xs text-secondary hover:underline"
+          aria-label={`Borrar grupo ${grupo.nombre}`}
+        >
+          Borrar grupo
+        </button>
       </p>
       <ul className="ml-4 list-disc text-sm text-dark">
         {grupo.extras.map((e) => (
           <li key={e.extra_id}>
             {e.nombre}
-            {e.maximo ? ` (hasta ${e.maximo} por plato)` : ""}
+            {e.maximo ? ` (hasta ${e.maximo} por plato)` : ""}{" "}
+            <button
+              type="button"
+              onClick={() => onDesvincularExtra(e.extra_id)}
+              className="text-xs text-secondary hover:underline"
+              aria-label={`Desvincular ${e.nombre}`}
+            >
+              quitar
+            </button>
           </li>
         ))}
       </ul>
@@ -704,6 +851,370 @@ function NuevoGrupo({
       >
         Crear grupo
       </button>
+    </div>
+  );
+}
+
+/**
+ * Qué atributos ofrece este producto —Tamaño, Mitad 1— y con qué
+ * sobreprecio, más el botón que materializa las combinaciones (ADR-063).
+ *
+ * El vocabulario ("Tamaño" existe, con qué valores) se declara una vez en
+ * Catálogo → Atributos; acá solo se elige cuáles de esos valores **este**
+ * producto ofrece y cuánto suma cada uno — el mismo criterio que separa
+ * receta (se elige) de receta (se edita, en otra pantalla).
+ */
+function SeccionAtributos({
+  producto,
+  onCambio,
+  onError,
+}: {
+  producto: ArbolProducto;
+  onCambio: (arbol: ArbolProducto) => void;
+  onError: (mensaje: string) => void;
+}) {
+  const [catalogo, setCatalogo] = useState<Atributo[]>([]);
+  const [generando, setGenerando] = useState(false);
+  const [aviso, setAviso] = useState<string | null>(null);
+
+  useEffect(() => {
+    catalogoApi.atributos().then(setCatalogo).catch(() => setCatalogo([]));
+  }, []);
+
+  const ofrecidosIds = new Set(producto.atributos.map((l) => l.atributo_id));
+  const disponibles = catalogo.filter((a) => !ofrecidosIds.has(a.id));
+  const nombreDeValor = new Map(
+    producto.atributos.flatMap((l) => l.valores.map((v) => [v.id, v.nombre] as const)),
+  );
+  const generable = producto.atributos.some((l) => l.modo_variante === "siempre");
+
+  async function correr(accion: () => Promise<ArbolProducto>) {
+    onError("");
+    try {
+      onCambio(await accion());
+    } catch (e) {
+      onError(e instanceof ErrorApi ? e.message : "No se pudo guardar el cambio.");
+    }
+  }
+
+  async function ofrecer(atributoId: string) {
+    await correr(() =>
+      catalogoApi.ofrecerAtributo(producto.id, { atributo_id: atributoId }),
+    );
+  }
+
+  async function quitar(linea: LineaDeAtributo) {
+    if (!window.confirm(`¿Quitarle "${linea.nombre}" a este producto?`)) return;
+    onError("");
+    try {
+      await catalogoApi.quitarAtributoDelProducto(producto.id, linea.atributo_id);
+      onCambio(await catalogoApi.arbol(producto.id));
+    } catch (e) {
+      // El 409 dice exactamente qué lo está bloqueando —variante, exclusión,
+      // venta o receta— así que se muestra tal cual.
+      onError(e instanceof ErrorApi ? e.message : "No se pudo quitar el atributo.");
+    }
+  }
+
+  async function alternarValor(
+    linea: LineaDeAtributo,
+    valorGlobalId: string,
+    marcado: boolean,
+  ) {
+    const yaOfrecido = linea.valores.find((v) => v.atributo_valor_id === valorGlobalId);
+    if (marcado) {
+      if (yaOfrecido && !yaOfrecido.activo) {
+        await correr(() =>
+          catalogoApi
+            .fijarPrecioExtra(yaOfrecido.id, { activo: true })
+            .then(() => catalogoApi.arbol(producto.id)),
+        );
+      } else if (!yaOfrecido) {
+        await correr(() =>
+          catalogoApi.ofrecerAtributo(producto.id, {
+            atributo_id: linea.atributo_id,
+            valores: [valorGlobalId],
+          }),
+        );
+      }
+    } else if (yaOfrecido) {
+      await correr(() =>
+        catalogoApi.retirarValor(yaOfrecido.id).then(() => catalogoApi.arbol(producto.id)),
+      );
+    }
+  }
+
+  async function generar() {
+    setGenerando(true);
+    setAviso(null);
+    onError("");
+    try {
+      const resultado = await catalogoApi.generarVariantes(producto.id);
+      onCambio(resultado.arbol);
+      setAviso(
+        resultado.creadas === 0
+          ? "No había combinaciones nuevas: ya estaban todas generadas."
+          : `Se generaron ${resultado.creadas} variante(s).` +
+              (resultado.sin_precio.length
+                ? ` Sin precio todavía (no aparecen en el PDV): ${resultado.sin_precio.join(", ")}.`
+                : ""),
+      );
+    } catch (e) {
+      onError(e instanceof ErrorApi ? e.message : "No se pudieron generar las variantes.");
+    } finally {
+      setGenerando(false);
+    }
+  }
+
+  return (
+    <section className="rounded-lg border border-gray/20 bg-white p-4">
+      <h2 className="mb-1 font-heading text-lg text-dark">Atributos</h2>
+      <p className="mb-3 text-xs text-gray">
+        Para crear un atributo nuevo o agregarle valores, ve a{" "}
+        <Link href="/catalogo/atributos" className="text-primary hover:underline">
+          Catálogo → Atributos
+        </Link>
+        .
+      </p>
+
+      {producto.atributos.length === 0 ? (
+        <p className="text-sm text-gray">Este producto no ofrece ningún atributo.</p>
+      ) : (
+        <div className="flex flex-col gap-4">
+          {producto.atributos.map((linea) => {
+            const delCatalogo = catalogo.find((a) => a.id === linea.atributo_id);
+            const valores = delCatalogo?.valores ?? [];
+            return (
+              <div key={linea.linea_id} className="border-t border-gray/20 pt-3">
+                <p className="flex items-center gap-2 font-semibold text-dark">
+                  {linea.nombre}
+                  <span className="text-xs font-normal text-gray">
+                    modo: {linea.modo_variante}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => quitar(linea)}
+                    className="ml-auto text-xs text-secondary hover:underline"
+                    aria-label={`Quitar ${linea.nombre}`}
+                  >
+                    Quitar atributo
+                  </button>
+                </p>
+                <table className="mt-2 w-full max-w-lg text-sm">
+                  <thead className="text-left text-xs uppercase text-gray">
+                    <tr>
+                      <th className="w-8 py-1" />
+                      <th className="py-1">Valor</th>
+                      <th className="w-28 py-1">Sobreprecio</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {valores.map((valorGlobal) => {
+                      const ofrecido = linea.valores.find(
+                        (v) => v.atributo_valor_id === valorGlobal.id && v.activo,
+                      );
+                      return (
+                        <tr key={valorGlobal.id} className="border-t border-gray/10">
+                          <td className="py-1.5">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(ofrecido)}
+                              aria-label={`Ofrecer ${valorGlobal.nombre}`}
+                              onChange={(e) =>
+                                alternarValor(linea, valorGlobal.id, e.target.checked)
+                              }
+                            />
+                          </td>
+                          <td className="py-1.5">{valorGlobal.nombre}</td>
+                          <td className="py-1.5">
+                            {ofrecido && (
+                              <input
+                                // La `key` fuerza el remontaje cuando el
+                                // servidor cambia el precio por fuera de este
+                                // campo (otra pestaña, otro admin): sin ella
+                                // `defaultValue` no se refresca y el input
+                                // se queda mostrando un número viejo — mismo
+                                // criterio que `Encabezado` en receta-editor.
+                                key={`${ofrecido.id}-${ofrecido.precio_extra}`}
+                                defaultValue={ofrecido.precio_extra}
+                                inputMode="decimal"
+                                className="w-20"
+                                aria-label={`Sobreprecio de ${valorGlobal.nombre}`}
+                                onBlur={(e) => {
+                                  if (e.target.value !== ofrecido.precio_extra) {
+                                    correr(() =>
+                                      catalogoApi
+                                        .fijarPrecioExtra(ofrecido.id, {
+                                          precio_extra: e.target.value,
+                                        })
+                                        .then(() => catalogoApi.arbol(producto.id)),
+                                    );
+                                  }
+                                }}
+                              />
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {disponibles.length > 0 && (
+        <select
+          defaultValue=""
+          className="mt-3 text-sm"
+          onChange={(e) => {
+            if (!e.target.value) return;
+            ofrecer(e.target.value);
+            e.target.value = "";
+          }}
+        >
+          <option value="">+ Ofrecer atributo...</option>
+          {disponibles.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.nombre}
+            </option>
+          ))}
+        </select>
+      )}
+
+      <SeccionExclusiones
+        producto={producto}
+        nombreDeValor={nombreDeValor}
+        onCambio={onCambio}
+        onError={onError}
+      />
+
+      <div className="mt-4 border-t border-gray/20 pt-3">
+        <button
+          type="button"
+          onClick={generar}
+          disabled={!generable || generando}
+          className="rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary disabled:opacity-50"
+          title={
+            generable
+              ? undefined
+              : "Ningún atributo de este producto está en modo 'siempre'"
+          }
+        >
+          {generando ? "Generando..." : "Generar variantes"}
+        </button>
+        <p className="mt-1 text-xs text-gray">
+          Materializa las combinaciones de los atributos en modo &quot;siempre&quot;.
+          Una variante sin precio en la lista vigente no aparece en la carta.
+        </p>
+        {aviso && <p className="mt-1 text-xs text-primary">{aviso}</p>}
+      </div>
+    </section>
+  );
+}
+
+/** Pares de valores que no van juntos (RN-COM-038): declarados una vez,
+ * válidos en los dos sentidos. */
+function SeccionExclusiones({
+  producto,
+  nombreDeValor,
+  onCambio,
+  onError,
+}: {
+  producto: ArbolProducto;
+  nombreDeValor: Map<string, string>;
+  onCambio: (arbol: ArbolProducto) => void;
+  onError: (mensaje: string) => void;
+}) {
+  const [a, setA] = useState("");
+  const [b, setB] = useState("");
+
+  const todosLosValores = producto.atributos.flatMap((linea) =>
+    linea.valores
+      .filter((v) => v.activo)
+      .map((v) => ({ id: v.id, etiqueta: `${linea.nombre}: ${v.nombre}` })),
+  );
+
+  async function agregar() {
+    if (!a || !b || a === b) return;
+    onError("");
+    try {
+      await catalogoApi.excluir(a, b);
+      onCambio(await catalogoApi.arbol(producto.id));
+      setA("");
+      setB("");
+    } catch (e) {
+      onError(e instanceof ErrorApi ? e.message : "No se pudo declarar la exclusión.");
+    }
+  }
+
+  async function quitar(par: [string, string]) {
+    onError("");
+    try {
+      await catalogoApi.dejarDeExcluir(par[0], par[1]);
+      onCambio(await catalogoApi.arbol(producto.id));
+    } catch (e) {
+      onError(e instanceof ErrorApi ? e.message : "No se pudo deshacer la exclusión.");
+    }
+  }
+
+  if (todosLosValores.length < 2 && producto.exclusiones.length === 0) return null;
+
+  return (
+    <div className="mt-4 border-t border-gray/20 pt-3">
+      <p className="mb-2 text-sm font-semibold text-dark">
+        Combinaciones que no existen
+      </p>
+      <p className="mb-2 text-xs text-gray">
+        Ej.: en una mitad-y-mitad, las dos mitades no pueden ser el mismo
+        sabor (RN-COM-038).
+      </p>
+      {producto.exclusiones.length > 0 && (
+        <ul className="mb-2 text-sm text-dark">
+          {producto.exclusiones.map((par) => (
+            <li key={par.join("-")} className="flex items-center gap-2">
+              {nombreDeValor.get(par[0]) ?? par[0]} + {nombreDeValor.get(par[1]) ?? par[1]}
+              <button
+                type="button"
+                onClick={() => quitar(par)}
+                className="text-xs text-secondary hover:underline"
+              >
+                deshacer
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {todosLosValores.length >= 2 && (
+        <div className="flex items-end gap-2">
+          <select value={a} onChange={(e) => setA(e.target.value)} className="text-sm">
+            <option value="">Valor A...</option>
+            {todosLosValores.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.etiqueta}
+              </option>
+            ))}
+          </select>
+          <select value={b} onChange={(e) => setB(e.target.value)} className="text-sm">
+            <option value="">Valor B...</option>
+            {todosLosValores.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.etiqueta}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={agregar}
+            disabled={!a || !b || a === b}
+            className="rounded border border-gray px-3 py-1.5 text-xs font-semibold text-dark disabled:opacity-50"
+          >
+            Excluir
+          </button>
+        </div>
+      )}
     </div>
   );
 }

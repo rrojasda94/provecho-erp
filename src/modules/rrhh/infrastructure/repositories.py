@@ -21,6 +21,7 @@ from src.modules.rrhh.infrastructure.models import (
     Socio,
     SolicitudPermiso,
     Trabajador,
+    TurnoSucursal,
 )
 
 
@@ -402,7 +403,62 @@ class AsistenciaRepo:
             q = q.where(Asistencia.fecha <= hasta)
         return q.order_by(Asistencia.fecha.desc())
 
+    def sin_salida(self, fecha: date) -> list[tuple[Asistencia, Trabajador]]:
+        """Quién entró ese día, no marcó salida y todavía no fue avisado.
+
+        Devuelve el trabajador junto a la marcación porque el aviso necesita
+        su centro de labores y su usuario, y volver a pedirlos fila por fila
+        sería una consulta por trabajador.
+        """
+        return list(
+            self.s.execute(
+                select(Asistencia, Trabajador)
+                .join(Trabajador, Trabajador.id == Asistencia.trabajador_id)
+                .where(
+                    Asistencia.fecha == fecha,
+                    Asistencia.hora_entrada.is_not(None),
+                    Asistencia.hora_salida.is_(None),
+                    Asistencia.reporte_salida_en.is_(None),
+                )
+                .order_by(Asistencia.created_at)
+            ).all()
+        )
+
     def add(self, asistencia: Asistencia) -> Asistencia:
         self.s.add(asistencia)
         self.s.flush()
         return asistencia
+
+
+class TurnoSucursalRepo:
+    def __init__(self, session: Session) -> None:
+        self.s = session
+
+    def get(self, turno_id: uuid.UUID) -> TurnoSucursal | None:
+        turno = self.s.get(TurnoSucursal, turno_id)
+        return None if turno is None or turno.deleted_at is not None else turno
+
+    def list_de_sucursal(
+        self, sucursal_id: uuid.UUID, solo_activos: bool = False
+    ) -> list[TurnoSucursal]:
+        q = select(TurnoSucursal).where(
+            TurnoSucursal.sucursal_id == sucursal_id,
+            TurnoSucursal.deleted_at.is_(None),
+        )
+        if solo_activos:
+            q = q.where(TurnoSucursal.activo.is_(True))
+        return list(self.s.scalars(q.order_by(TurnoSucursal.hora_inicio)))
+
+    def por_nombre(self, sucursal_id: uuid.UUID, nombre: str) -> TurnoSucursal | None:
+        return self.s.scalar(
+            select(TurnoSucursal).where(
+                TurnoSucursal.sucursal_id == sucursal_id,
+                TurnoSucursal.nombre == nombre,
+                TurnoSucursal.deleted_at.is_(None),
+            )
+        )
+
+    def add(self, turno: TurnoSucursal) -> TurnoSucursal:
+        self.s.add(turno)
+        self.s.flush()
+        return turno

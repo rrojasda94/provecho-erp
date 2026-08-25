@@ -573,8 +573,6 @@ class ProductoUpdate(BaseModel):
     orden: int | None = None
     empaque_id: uuid.UUID | None = None
     modalidades_empaque: list[str] | None = None
-    # Dónde quedó el nodo en el lienzo (ADR-058): `{"x": 120, "y": 40}`.
-    lienzo_pos: dict | None = None
 
 
 class ProductoOut(BaseModel):
@@ -591,7 +589,6 @@ class ProductoOut(BaseModel):
     es_extra: bool = False
     empaque_id: uuid.UUID | None = None
     modalidades_empaque: list[str] | None = None
-    lienzo_pos: dict | None = None
 
 
 class ProductoDetalleOut(ProductoOut):
@@ -819,6 +816,16 @@ class AtributoValorCreate(BaseModel):
     orden: int = 0
 
 
+class AtributoValorUpdate(BaseModel):
+    """`activo` acá es del **catálogo**: el valor deja de poder ofrecerse en
+    productos nuevos. Sacarlo de un producto concreto es
+    `PATCH /atributos/valores/{ptav_id}`, que es otro nivel."""
+
+    nombre: str | None = Field(default=None, min_length=1, max_length=80)
+    orden: int | None = None
+    activo: bool | None = None
+
+
 class AtributoValorOut(BaseModel):
     id: uuid.UUID
     nombre: str
@@ -845,7 +852,15 @@ class OfrecerAtributoIn(BaseModel):
 
 
 class PrecioExtraIn(BaseModel):
-    precio_extra: Decimal = Field(ge=0)
+    """Ambos campos opcionales: `None` = no tocar.
+
+    `activo` es lo que permite **volver a ofrecer** un valor retirado por
+    error. Sin él, `DELETE /atributos/valores/{ptav_id}` era de ida y la única
+    vuelta era colgar el atributo entero otra vez.
+    """
+
+    precio_extra: Decimal | None = Field(default=None, ge=0)
+    activo: bool | None = None
 
 
 class ExclusionIn(BaseModel):
@@ -881,18 +896,48 @@ class CombinacionOut(BaseModel):
 
 
 class ArbolProductoOut(ProductoDetalleOut):
-    """Todo lo que el lienzo necesita en una sola llamada.
+    """Todo lo que la ficha del producto necesita en una sola llamada.
 
-    Hereda de `ProductoDetalleOut` a propósito: con el interruptor
-    `catalogo.modelo_odoo` apagado el lienzo sigue dibujando grupos y extras,
-    y una sola forma de traer los datos evita que las dos pantallas se
-    separen.
+    Hereda de `ProductoDetalleOut` a propósito: la ficha sigue dibujando
+    grupos y extras además de los atributos, y una sola forma de traer los
+    datos evita que las dos mitades de la pantalla se separen.
     """
 
     variantes_detalle: list[ProductoDetalleOut]
     atributos: list[LineaDeAtributoOut]
     exclusiones: list[list[str]]
     combinaciones: list[CombinacionOut]
+
+
+class ValorSimpleOut(BaseModel):
+    id: uuid.UUID
+    nombre: str
+
+
+class EjeDeCondicionOut(BaseModel):
+    """Con qué se puede condicionar una línea de esta receta (ADR-056).
+
+    `valores[].id` es el **PTAV**, que es lo que viaja en
+    `receta_item.aplica_valores`. El nombre va al lado para que el editor
+    muestre "Mitad 1: Americana" y no un UUID.
+    """
+
+    id: uuid.UUID
+    nombre: str
+    valores: list[ValorSimpleOut]
+
+
+class VariantesGeneradasOut(BaseModel):
+    """Lo generado, más el árbol repintado para no pedirlo aparte.
+
+    `sin_precio` son las variantes que todavía no tienen precio en ninguna
+    lista vigente: `GET /carta` las descarta en silencio, así que sin este
+    aviso alguien genera doce combinaciones y ninguna aparece en el PDV.
+    """
+
+    creadas: int
+    sin_precio: list[str]
+    arbol: ArbolProductoOut
 
 
 

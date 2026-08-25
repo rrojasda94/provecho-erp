@@ -47,6 +47,7 @@ AREAS_BASE = (
     ("cocina", "Cocina"),
     ("caja", "Caja"),
     ("contabilidad", "Contabilidad"),
+    ("rrhh", "Recursos Humanos"),
 )
 
 # Resolutores dinámicos: destinatarios que no se pueden listar de antemano
@@ -485,6 +486,42 @@ CATALOGO: tuple[Emision, ...] = (
         referencia_tipo="escalamiento",
         clave_referencia="escalamiento_id",
         clave_actor="elevado_por",
+    ),
+    # --- rrhh -----------------------------------------------------------------
+    Emision(
+        codigo="rrhh.salida_sin_marcar",
+        nombre="Salida sin marcar",
+        descripcion=(
+            "Alguien marcó su entrada y pasó la hora límite de su turno sin "
+            "marcar la salida. El aviso pide que la marquen; no cierra la "
+            "jornada ni genera horas extra (RN-RRHH-021, RN-RRHH-022)."
+        ),
+        permiso="rrhh.leer",
+        nivel="aviso",
+        ambito="sucursal",
+        campos=(
+            "trabajador_id",
+            "sucursal_id",
+            "trabajador",
+            "fecha",
+            "turno",
+            "hora_entrada",
+            "hora_limite",
+        ),
+        titulo="Falta marcar la salida: {trabajador}",
+        cuerpo=(
+            "Entró {hora_entrada} del {fecha} en el turno {turno} y no marcó "
+            "salida antes de {hora_limite}."
+        ),
+        areas_sugeridas=("rrhh",),
+        dinamicos_sugeridos=("encargado_de_turno",),
+        referencia_tipo="trabajador",
+        clave_referencia="trabajador_id",
+        # Sin actor, por lo mismo que `sales.pedido_demorado`: lo detecta un
+        # barrido y el hecho es «falta una marcación», no «alguien hizo algo
+        # mal». Poner ahí al trabajador convertiría un recordatorio en un
+        # cargo — y el recordatorio le llega a él por su propia bandeja.
+        clave_actor="",
     ),
     Emision(
         codigo="reports.escalamiento_resuelto",

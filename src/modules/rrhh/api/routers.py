@@ -3,10 +3,10 @@
 import uuid
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
-from src.core.rate_limit import rate_limit
+from src.core.rate_limit import consumir, ip_de, rate_limit
 from src.core.tenant import Tenant
 from src.modules.rrhh.api import schemas
 from src.modules.rrhh.application import (
@@ -18,11 +18,13 @@ from src.modules.rrhh.application import (
     convocatorias,
     disciplina,
     nomina,
+    pad_asistencia,
     permisos,
     postulantes,
     privacidad,
     socios,
     trabajadores,
+    turnos,
 )
 from src.modules.rrhh.application import (
     legajo as legajo_uc,
@@ -40,11 +42,17 @@ from src.modules.rrhh.application.scope import (
     exigir_postulante,
     exigir_solicitud_permiso,
     exigir_trabajador,
+    exigir_turno,
 )
 from src.modules.users.api.deps import get_db, get_tenant, require_permission
-from src.modules.users.application.queries_publicas import tiene_permiso
+from src.modules.users.application.queries_publicas import (
+    PIN_BLOQUEADO,
+    PIN_OK,
+    tiene_permiso,
+    verificar_pin_de,
+)
 from src.modules.users.infrastructure.models import Usuario
-from src.shared import fechas
+from src.shared import auditoria, fechas
 from src.shared.paginacion import Pagina, Paginacion, paginacion, paginar
 
 router = APIRouter(prefix="/rrhh", tags=["rrhh"])
@@ -60,6 +68,11 @@ DISCIPLINA_GESTIONAR = "rrhh.disciplina_gestionar"
 PERMISO_SOLICITAR = "rrhh.permiso_solicitar"
 PERMISO_APROBAR = "rrhh.permiso_aprobar"
 ASISTENCIA_MARCAR = "rrhh.asistencia_marcar"
+# Abrir el pad del local es otra cosa que corregir una marcación desde el
+# back-office: el pad no marca por nadie, solo presenta la firma del
+# trabajador (ADR-065).
+ASISTENCIA_TERMINAL = "rrhh.asistencia_terminal"
+TURNO_GESTIONAR = "rrhh.turno_gestionar"
 CAPACITACION_GESTIONAR = "rrhh.capacitacion_gestionar"
 # Misma capacidad legal que sobre `persona` (Ley 29733): un permiso nuevo
 # solo agregaría matriz que mantener.
@@ -818,3 +831,106 @@ def marcar_salida(
     asistencia = asistencia_uc.marcar_salida(session, **body.model_dump())
     session.commit()
     return asistencia
+
+
+# --- Turno de trabajo ------------------------------------------------------------
+@router.post("/turnos", response_model=schemas.TurnoOut, status_code=201)
+def crear_turno(
+    body: schemas.TurnoCreate,
+    _: Usuario = Depends(require_permission(TURNO_GESTIONAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    tenant.exigir_sucursal(body.sucursal_id)
+    turno = turnos.crear_turno(session, **body.model_dump())
+    session.commit()
+    return turno
+
+
+@router.get("/turnos", response_model=list[schemas.TurnoOut])
+def listar_turnos(
+    sucursal_id: uuid.UUID,
+    solo_activos: bool = False,
+    _: Usuario = Depends(require_permission(TURNO_GESTIONAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    tenant.exigir_sucursal(sucursal_id)
+    return turnos.listar_turnos(session, sucursal_id, solo_activos)
+
+
+@router.patch("/turnos/{turno_id}", response_model=schemas.TurnoOut)
+def editar_turno(
+    turno_id: uuid.UUID,
+    body: schemas.TurnoUpdate,
+    _: Usuario = Depends(require_permission(TURNO_GESTIONAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    exigir_turno(session, turno_id, tenant)
+    turno = turnos.editar_turno(session, turno_id, **body.model_dump())
+    session.commit()
+    return turno
+
+
+# --- Pad de marcación del local --------------------------------------------------
+@router.get("/asistencia/terminal/tarjetas", response_model=list[schemas.TarjetaOut])
+def tarjetas_del_pad(
+    sucursal_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(ASISTENCIA_TERMINAL)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Los nombres que se muestran en el pad de esa sucursal, y si ya
+    marcaron. Solo el centro de labores del trabajador (ADR-062) decide qué
+    tarjeta aparece dónde: el pad de un local no marca por gente de otro."""
+    tenant.exigir_sucursal(sucursal_id)
+    return pad_asistencia.tarjetas(session, sucursal_id)
+
+
+@router.post("/asistencia/terminal/marcar", response_model=schemas.PadMarcacionOut)
+def marcar_en_el_pad(
+    body: schemas.PadMarcarIn,
+    request: Request,
+    sucursal_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(ASISTENCIA_TERMINAL)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Registra la marcación firmada con el PIN del propio trabajador.
+
+    El límite se cuenta **por trabajador** y no por IP: en un local todas
+    las tabletas salen por la misma dirección y el cambio de turno son diez
+    personas marcando seguido — un límite por IP castigaría a la cola por
+    culpa de quien se equivocó de tarjeta.
+    """
+    tenant.exigir_sucursal(sucursal_id)
+    exigir_trabajador(session, body.trabajador_id, tenant)
+    if pad_asistencia.sucursal_de(session, body.trabajador_id) != sucursal_id:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "el trabajador no tiene su centro de labores en esta sucursal",
+        )
+    consumir("asistencia_pad", str(body.trabajador_id), 10, 300)
+
+    usuario_id = pad_asistencia.usuario_que_firma(session, body.trabajador_id)
+    resultado = verificar_pin_de(session, usuario_id, body.pin, ip_de(request))
+    if resultado != PIN_OK:
+        session.commit()  # persistir el intento fallido y el lockout
+        if resultado == PIN_BLOQUEADO:
+            raise HTTPException(
+                status.HTTP_423_LOCKED, "Usuario bloqueado por intentos fallidos"
+            )
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Credenciales inválidas")
+
+    asistencia, tipo = pad_asistencia.marcar(session, trabajador_id=body.trabajador_id)
+    auditoria.registrar(
+        session,
+        usuario_id=usuario_id,
+        entidad="asistencia",
+        entidad_id=asistencia.id,
+        accion=f"marcar_{tipo}",
+        ip=ip_de(request),
+    )
+    session.commit()
+    return {"tipo": tipo, "asistencia": asistencia}

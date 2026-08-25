@@ -25,7 +25,7 @@ def _get_trabajador_habilitado(session: Session, trabajador_id: uuid.UUID):
 
 def marcar_entrada(
     session: Session, *, trabajador_id: uuid.UUID, fecha: date, hora_entrada: time,
-    tardanza_min: int = 0,
+    tardanza_min: int = 0, turno_id: uuid.UUID | None = None,
 ) -> Asistencia:
     _get_trabajador_habilitado(session, trabajador_id)
     repo = AsistenciaRepo(session)
@@ -37,11 +37,14 @@ def marcar_entrada(
                 fecha=fecha,
                 hora_entrada=hora_entrada,
                 tardanza_min=tardanza_min,
+                turno_id=turno_id,
             )
         )
     else:
         asistencia.hora_entrada = hora_entrada
         asistencia.tardanza_min = tardanza_min
+        if turno_id is not None:
+            asistencia.turno_id = turno_id
     return asistencia
 
 
@@ -49,6 +52,8 @@ def marcar_salida(
     session: Session, *, trabajador_id: uuid.UUID, fecha: date, hora_salida: time,
     horas_extra: Decimal = Decimal(0),
 ) -> Asistencia:
+    """`horas_extra` llega en 0 salvo que RRHH la escriba a mano: quedarse
+    de más no genera horas extra (RN-RRHH-022), y el pad nunca la manda."""
     _get_trabajador_habilitado(session, trabajador_id)
     repo = AsistenciaRepo(session)
     asistencia = repo.get_por_trabajador_fecha(trabajador_id, fecha)
