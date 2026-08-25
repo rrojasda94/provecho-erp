@@ -111,6 +111,30 @@ def ptav_usados_en_condiciones(
     return usados
 
 
+def articulo_resumen(session: Session, articulo_id: uuid.UUID) -> dict | None:
+    """Identidad y **tipo** de un artículo, para que otro módulo valide que el
+    que le mandaron sirve para lo que va a usarlo. `None` si no existe.
+
+    Lo pide `sales` antes de guardar `producto_comercial.empaque_id`: el
+    modelo de datos dice «FK articulo tipo=empaque» y hasta ahora eso vivía
+    solo en la documentación, así que el campo terminaba apuntando a un
+    insumo y la venta descontaba harina como si fuera una caja de pizza.
+
+    Devuelve el tipo crudo (`insumo`, `subreceta`, `mercaderia`, `empaque`,
+    `repuesto`, `suministro`): qué tipo hace falta lo decide quien pregunta,
+    que es el que conoce su propia regla.
+    """
+    articulo = session.scalar(select(Articulo).where(Articulo.id == articulo_id))
+    if articulo is None:
+        return None
+    return {
+        "id": articulo.id,
+        "nombre": articulo.nombre,
+        "tipo": articulo.tipo,
+        "archivado": articulo.archivado,
+    }
+
+
 def nombres_de_articulos(
     session: Session, articulo_ids: Sequence[uuid.UUID]
 ) -> dict[uuid.UUID, str]:
