@@ -17,6 +17,18 @@ export type RestaEnLinea = {
   nombre: string;
 };
 
+/** Un valor de atributo elegido en la línea: qué mitad lleva qué.
+ *
+ * Guarda el nombre además del id —igual que `RestaEnLinea`— para poder
+ * dibujar el ticket sin volver a buscar en la carta. `precioExtra` ya está
+ * sumado en `LineaBorrador.precio`; viaja para poder mostrarlo desglosado. */
+export type ValorEnLinea = {
+  ptavId: string;
+  atributoId: string;
+  nombre: string;
+  precioExtra: number;
+};
+
 export type LineaBorrador = {
   /** Identificador local: la línea no existe en la base hasta enviar. */
   id: string;
@@ -30,6 +42,10 @@ export type LineaBorrador = {
    * el descuento de inventario (RN-PRD-004). Por eso no entran en
    * `totalLinea`. */
   restas: RestaEnLinea[];
+  /** Qué se eligió en cada atributo (los sabores de la mitad-y-mitad). A
+   * diferencia de las restas, esto sí puede mover el total: el recargo del
+   * valor ya viene sumado en `precio` (RN-COM-036). */
+  valores: ValorEnLinea[];
   grupoCobro: number;
 };
 

@@ -12,6 +12,7 @@ dos"; con tres, sí.
 """
 
 import uuid
+from datetime import date
 from decimal import Decimal
 
 import pytest
@@ -37,6 +38,7 @@ from src.modules.inventory.infrastructure.models import (
     UnidadMedida,
 )
 from src.modules.sales.application import catalogo as valores_uc
+from src.modules.sales.application import precios as precios_uc
 from src.modules.sales.application import ventas as ventas_uc
 from src.modules.sales.application.catalogo import valores_ofrecidos
 from src.modules.sales.application.errors import ReglaNegocio as ReglaVenta
@@ -455,10 +457,40 @@ def test_la_eleccion_se_guarda_con_la_linea(session, base):
     ]
 
 
-def test_sin_eleccion_la_columna_queda_en_null(session, base):
-    """NULL y no `[]`: es lo que vale para todo lo vendido antes de la
-    migración, sin backfill."""
-    venta = _vender(session, base)
+def test_no_se_vende_sin_elegir_los_atributos_que_ofrece(session, base):
+    """RN-COM-040. Antes esto pasaba en silencio y era el bug caro: la línea
+    se cobraba, ninguna condición de la receta se activaba y **no se
+    descontaba ningún insumo**. El faltante recién aparecía en el conteo del
+    mes, cuando ya nadie podía atarlo a esta venta."""
+    with pytest.raises(ReglaVenta, match="falta elegir"):
+        _vender(session, base)
+
+
+def test_el_replay_del_hub_sigue_aceptando_la_linea_sin_eleccion(session, base):
+    """La columna en NULL es lo que vale para todo lo vendido antes de la
+    migración, y para lo que entró por el hub durante un corte: esa venta ya
+    se preparó y se cobró (ADR-009). Rechazarla ahora perdería una venta
+    real."""
+    venta = ventas_uc.crear_venta(
+        session,
+        sucursal_id=base["sucursal"].id,
+        punto_venta_id=base["punto_venta"].id,
+        canal="pdv",
+        modalidad="mesa",
+        usuario_id=base["usuario"].id,
+        idempotency_key=f"key-{uuid.uuid4()}",
+        # `numero_orden` es lo que marca el replay: la venta ya trae su
+        # número porque se lo dio el hub durante el corte.
+        numero_orden=1,
+        fecha_orden=date.today(),
+        items=[
+            {
+                "producto_comercial_id": base["producto"].id,
+                "cantidad": Decimal(1),
+                "precio_unitario": Decimal("45.00"),
+            }
+        ],
+    )
     session.flush()
     assert VentaRepo(session).items(venta.id)[0].valores_variante_ids is None
 
@@ -746,3 +778,91 @@ def test_una_variante_sabe_que_combinacion_es(session, base):
         str(base["valores"]["Mitad 1: Americana"]),
         str(base["valores"]["Mitad 2: Hawaiana"]),
     }
+
+
+# --- Lo que la carta le ofrece al PDV (RN-COM-040) -----------------------------
+def _ofrecidos(session, base):
+    return valores_uc.atributos_ofrecidos(session, [base["producto"]])[
+        base["producto"].id
+    ]
+
+
+def test_la_carta_ofrece_los_atributos_del_producto(session, base):
+    """El bug de origen: la carta solo leía `producto_opcion_grupo` —vacío en
+    el catálogo real— así que el configurador del PDV no mostraba ninguna
+    opción y la pizza se podía cobrar sin sabores."""
+    ofrecidos = _ofrecidos(session, base)
+
+    assert [a["nombre"] for a in ofrecidos] == ["Mitad 1", "Mitad 2"]
+    assert {v["nombre"] for v in ofrecidos[0]["valores"]} == set(SABORES)
+
+
+def test_la_carta_no_ofrece_un_valor_retirado(session, base):
+    """Hermano del de `valores_ofrecidos`, pero del lado de la carta: son dos
+    consumidores del mismo criterio y tienen que coincidir, porque lo que la
+    pantalla ofrece es lo que el servidor va a exigir."""
+    ptav = session.get(ProductoAtributoValor, base["valores"]["Mitad 1: Peperoni"])
+    ptav.activo = False
+    session.flush()
+
+    ofrecidos = _ofrecidos(session, base)
+
+    assert "Peperoni" not in {v["nombre"] for v in ofrecidos[0]["valores"]}
+    assert "Peperoni" in {v["nombre"] for v in ofrecidos[1]["valores"]}
+
+
+def test_un_atributo_siempre_no_se_pregunta(session, base):
+    """`modo_variante='siempre'` ya se materializó como variantes: volver a
+    preguntarlo sería pedir dos veces la misma elección."""
+    session.query(Atributo).filter_by(nombre="Mitad 1").one().modo_variante = "siempre"
+    session.flush()
+
+    assert [a["nombre"] for a in _ofrecidos(session, base)] == ["Mitad 2"]
+
+
+def test_la_variante_hereda_los_atributos_del_padre(session, base):
+    """Dónde quedó colgado el atributo no puede decidir nada (ADR-042): el
+    que arma una persona cuelga del padre, el que genera el importador cuelga
+    de la variante."""
+    hija = ProductoComercial(
+        id_interno="P010",
+        marca_id=base["marca"].id,
+        nombre="Pizza MitadxMitad Familiar (Gruesa)",
+        receta_id=base["receta"].id,
+        producto_padre_id=base["producto"].id,
+    )
+    session.add(hija)
+    session.flush()
+
+    ofrecidos = valores_uc.atributos_ofrecidos(session, [hija])[hija.id]
+
+    assert [a["nombre"] for a in ofrecidos] == ["Mitad 1", "Mitad 2"]
+
+
+def test_las_exclusiones_viajan_y_valen_en_los_dos_sentidos(session, base):
+    """La fila se guarda una vez: quien la dibuje tiene que comparar en ambas
+    direcciones o la mitad de las pastillas quedaría habilitada."""
+    izquierda = base["valores"]["Mitad 1: Peperoni"]
+    derecha = base["valores"]["Mitad 2: Peperoni"]
+    session.add(
+        ProductoExclusion(
+            producto_atributo_valor_id=izquierda, excluye_valor_id=derecha
+        )
+    )
+    session.flush()
+
+    pares = valores_uc.exclusiones_entre(session, [izquierda, derecha])
+
+    assert pares == [(izquierda, derecha)]
+
+
+def test_el_precio_extra_del_valor_se_cobra(session, base):
+    """RN-COM-036 lo prometía en cuatro lugares y nada lo sumaba: era una
+    columna editable desde la ficha que no cobraba."""
+    ptav = session.get(ProductoAtributoValor, base["valores"]["Mitad 1: Peperoni"])
+    ptav.precio_extra = Decimal("3.50")
+    session.flush()
+
+    recargo = precios_uc.recargo_de_valores(session, [str(ptav.id)])
+
+    assert recargo == Decimal("3.50")

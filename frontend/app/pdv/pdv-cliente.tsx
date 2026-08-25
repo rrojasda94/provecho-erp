@@ -11,6 +11,7 @@ import {
   type CajaAbierta,
   type ClienteBuscado,
   type ItemDeCarta,
+  type ItemDeVentaNueva,
   type MesaEnMapa,
   type Venta,
   type VentaItem,
@@ -87,6 +88,29 @@ function estaVacio(b: Borrador): boolean {
     !b.cliente &&
     !b.consumoMotivo
   );
+}
+
+/**
+ * La línea del borrador, tal como la espera el servidor.
+ *
+ * Una sola función porque hay **dos** caminos que mandan líneas —confirmar
+ * el pedido y agregar a una orden ya enviada— y armaban el cuerpo cada uno
+ * por su lado. Con el cuerpo duplicado, agregar un campo en un solo sitio
+ * significa que sumar una pizza a una mesa abierta la manda sin sabores y
+ * el 409 aparece recién ahí, cuando el cajero ya cree que terminó.
+ */
+function cuerpoLinea(l: LineaBorrador): ItemDeVentaNueva {
+  return {
+    producto_comercial_id: l.productoId,
+    cantidad: String(l.cantidad),
+    grupo_cobro: l.grupoCobro,
+    extras: l.extras.map((e) => ({
+      producto_comercial_id: e.productoId,
+      cantidad: String(e.cantidad),
+    })),
+    sin_articulo_ids: l.restas.map((r) => r.articuloId),
+    valores_variante_ids: l.valores.map((v) => v.ptavId),
+  };
 }
 
 function EstadoCaja({
@@ -295,16 +319,7 @@ export default function PdvCliente({ sucursalId, permisos, puntoVenta }: Props) 
             autorizacion: b.consumoAutorizacion ?? undefined,
           }
         : {}),
-      items: b.lineas.map((l) => ({
-        producto_comercial_id: l.productoId,
-        cantidad: String(l.cantidad),
-        grupo_cobro: l.grupoCobro,
-        extras: l.extras.map((e) => ({
-          producto_comercial_id: e.productoId,
-          cantidad: String(e.cantidad),
-        })),
-        sin_articulo_ids: l.restas.map((r) => r.articuloId),
-      })),
+      items: b.lineas.map(cuerpoLinea),
     };
   };
 
@@ -539,18 +554,7 @@ export default function PdvCliente({ sucursalId, permisos, puntoVenta }: Props) 
     if (activo.ventaId && !yaExiste) {
       setOcupado(true);
       try {
-        const venta = await api.agregarLineas(activo.ventaId, [
-          {
-            producto_comercial_id: l.productoId,
-            cantidad: String(l.cantidad),
-            grupo_cobro: l.grupoCobro,
-            extras: l.extras.map((e) => ({
-              producto_comercial_id: e.productoId,
-              cantidad: String(e.cantidad),
-            })),
-            sin_articulo_ids: l.restas.map((r) => r.articuloId),
-          },
-        ]);
+        const venta = await api.agregarLineas(activo.ventaId, [cuerpoLinea(l)]);
         parchar({ lineas: [...activo.lineas, l] });
         setLineaEnEdicion(null);
         notificar(`Agregado a la orden #${venta.numero_orden}`);
@@ -866,6 +870,7 @@ function lineaDesde(item: ItemDeCarta): LineaBorrador {
     nota: "",
     extras: [],
     restas: [],
+    valores: [],
     grupoCobro: 1,
   };
 }
@@ -892,6 +897,11 @@ function lineaDesdeVentaItem(item: VentaItem): LineaBorrador {
     // `anular-lineas` + línea nueva es el camino de corregir lo enviado
     // (RN-COM-020), no un PATCH de la línea original.
     restas: [],
+    // Ídem para los valores de atributo: `VentaItemOut` no los devuelve, así
+    // que reabrir una línea ya enviada no puede recuperarlos. Con RN-COM-040
+    // eso ahora es un 409 explícito al reenviarla —falla ruidosa— en vez de
+    // una venta que se cobra sin descontar. Anotado como deuda.
+    valores: [],
     grupoCobro: item.grupo_cobro,
   };
 }
