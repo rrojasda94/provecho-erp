@@ -26786,7 +26786,7 @@
   "info": {
     "description": "ERP modular para grupo de restaurantes multi-marca. Convenciones de la API: docs/engineering/api-guidelines.md.",
     "title": "Provecho ERP",
-    "version": "0.7.4"
+    "version": "0.7.5"
   },
   "openapi": "3.1.0",
   "paths": {
