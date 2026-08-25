@@ -28,6 +28,7 @@ from src.modules.sales.infrastructure.repositories import (
     PuntoVentaRepo,
     VentaRepo,
 )
+from src.shared import fechas
 from src.shared.integrations import factiliza
 from src.shared.models import Comprobante
 
@@ -124,6 +125,29 @@ def crear_comprobante_pendiente(
     return comprobante
 
 
+def fecha_emision(comprobante: Comprobante) -> datetime:
+    """La fecha que el documento declara, en hora del negocio.
+
+    Es el instante del cobro (`created_at`) y no "ahora": un comprobante que
+    se quedó en la cola —proveedor caído, worker muerto, `FACTILIZA_TOKEN`
+    sin configurar— y sale al día siguiente sigue documentando la venta de
+    ayer. Con `now()` el barrido de pendientes le ponía al papel una fecha
+    que la venta nunca tuvo.
+
+    Y se lee en `America/Lima`: una venta de las 20:00 en Tarapoto es del
+    día 25 aunque en UTC ya sea 26. Es la misma trampa que documenta
+    `shared.fechas`.
+
+    La base guarda `created_at` con zona, pero SQLite la pierde en el viaje
+    de ida y vuelta; un instante sin zona se lee como UTC, que es lo que la
+    columna guarda.
+    """
+    nacido = comprobante.created_at or datetime.now(UTC)
+    if nacido.tzinfo is None:
+        nacido = nacido.replace(tzinfo=UTC)
+    return nacido.astimezone(fechas.zona())
+
+
 def documento_de(session: Session, comprobante: Comprobante) -> factiliza.Documento:
     """El documento tal como se envió (o se enviaría) a SUNAT.
 
@@ -184,7 +208,7 @@ def _documento(session: Session, comprobante: Comprobante) -> factiliza.Document
         ),
         serie=comprobante.serie,
         correlativo=comprobante.correlativo,
-        fecha_emision=datetime.now(UTC),
+        fecha_emision=fecha_emision(comprobante),
         cliente=_receptor_para_sunat(session, comprobante, venta),
         items=items,
         # Ley 27037: las empresas de Amazonía venden exoneradas de IGV

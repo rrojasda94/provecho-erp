@@ -1,6 +1,10 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+/* Papel térmico de 80 mm: hoja de impresión y `@page` (ADR-066). Vive
+   aparte porque no comparte nada con la pantalla — ni tokens de tema ni
+   modo oscuro: la impresora tiene un color de tinta y uno de papel. */
+@import "./impresion.css";
 
 /* Tailwind v4 no trae la variante `dark` por estrategia de clase: hay que
    declararla. Sin esta línea, las decenas de clases `dark:` que `shadcn add`

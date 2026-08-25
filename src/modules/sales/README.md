@@ -57,6 +57,23 @@ cuatro huecos que el punto de venta necesitaba y el modelo no daba.
   Factiliza en el momento y no se archivan — su copia es la buena mientras
   el proveedor siga activo — y los bytes vuelven sin tocar, porque
   reescribir un XML firmado lo invalida.
+- **Ticket de 80 mm del comprobante** (2026-08-25, ADR-066,
+  `GET /sales/comprobantes/{id}/ticket`): la representación impresa que el
+  cliente se lleva en caja — membrete de marca, ítems con precio, desglose de
+  impuestos, total en letras y el **QR de la RS 097-2012**
+  (`domain/qr_sunat.py`). **No recalcula nada**: lee el mismo payload que se
+  le manda a Factiliza (`documento_de` + `construir_payload`), así que el
+  papel y el XML no pueden discrepar en un céntimo de redondeo. Sale aunque
+  el comprobante siga `pendiente` —la emisión es asíncrona a propósito
+  (RN-COM-003)— con la franja `PENDIENTE DE ENVÍO A SUNAT`. La **nota de
+  crédito** todavía no: su documento se arma con las líneas acreditadas (ver
+  Deuda técnica). Acepta `sales.leer` **o** `accounting.leer`.
+- **Registro de ventas** (`GET /sales/comprobantes`): los comprobantes
+  emitidos, filtrables por fecha, tipo y estado de emisión; base de la
+  pestaña Contabilidad → Comprobantes. El importe de cada fila sale de los
+  **pagos confirmados** de esa cuenta —el comprobante nace cuando la cuenta
+  queda pagada— y no de un recálculo de líneas, que repetiría el prorrateo
+  del descuento de la orden por cada fila. Mismo par de permisos.
 - **Nota de crédito** (RN-CPP-009, `application/notas_credito.py`,
   `POST /sales/comprobantes/{id}/nota-credito`): una venta ya cobrada no se
   anula, se acredita. Total o **parcial por ítem**, con motivo del catálogo
@@ -158,6 +175,7 @@ cuatro huecos que el punto de venta necesitaba y el modelo no daba.
   por acá.
 - **Precuenta** (RN-COM-019): `GET /ventas/{id}/precuenta`, documento **no
   fiscal**, opcionalmente por cuenta. No cambia el estado ni se audita.
+  Texto de 48 columnas + membrete, igual que la comanda (ADR-066).
 - **Autorización de supervisor** (RN-AUD-005): `POST /auth/autorizar`
   (módulo `users`) verifica PIN + permiso y devuelve una elevación de 3
   minutos acotada a esa acción. Descuento y anulación de líneas la exigen;
@@ -394,10 +412,14 @@ credencial exista.
 | Método | Ruta | Permiso |
 |--------|------|---------|
 | GET | `/ventas/{id}/comprobante` | `sales.leer` |
+| GET | `/comprobantes` | `sales.leer` **o** `accounting.leer` |
+| GET | `/comprobantes/{id}/ticket` | `sales.leer` **o** `accounting.leer` |
+| GET | `/comprobantes/{id}/descargar/{pdf\|xml\|cdr}` | `sales.leer` |
 | POST | `/comprobantes/{id}/reintentar` | `sales.emitir_comprobante` |
+| POST | `/comprobantes/{id}/nota-credito` | `sales.emitir_nota_credito` |
 
-Diferido: nota de crédito (`/note/send`), descarga de PDF/XML/CDR,
-guía de remisión (`/despatch-*`), consulta de estado en SUNAT.
+Diferido: consulta de estado en SUNAT, representación impresa de la nota de
+crédito, reenvío del comprobante al cliente por WhatsApp/correo.
 
 ## Cumplimiento de pedido — KDS y entrega (implementado 2026-07-25/27)
 
@@ -463,9 +485,11 @@ tiempo real (Redis/WebSocket) es deuda declarada.
   permiso propio distinto del de cocina (RN-CUP-006) y es idempotente:
   repetirla no reemite el evento. Por eso el bump del KDS **no** llega a
   `entregado` — devuelve 409 apuntando a este endpoint.
-- **Comanda**: `POST /kds/ventas/{id}/comanda` → texto plano 32 cols
-  (térmica 58 mm) + contador `comanda_impresa_veces` (reimpresión
-  marcada y auditable).
+- **Comanda**: `POST /kds/ventas/{id}/comanda` → texto plano **48 cols**
+  (térmica 80 mm, `shared/impresion.py`) + membrete de la marca + contador
+  `comanda_impresa_veces` (reimpresión marcada y auditable). Desde
+  2026-08-25 (ADR-066) el ancho es el mismo para comanda, precuenta y ticket
+  del comprobante: eran 32, 40 y ninguno.
 - **`venta.referencia_atencion`** ("Mesa 5", "Carlos", "Rappi #1042"):
   texto libre que el PDV envía al crear la venta — visible en toda
   tarjeta KDS y en la comanda, para aclarar de quién es el pedido sin

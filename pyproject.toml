@@ -34,6 +34,11 @@ dependencies = [
     "openpyxl>=3.1",
     # FastAPI lo necesita para leer `UploadFile` (multipart/form-data).
     "python-multipart>=0.0.9",
+    # Código QR de la representación impresa del comprobante (SUNAT lo
+    # exige, RS 097-2012). Python puro y sin dependencias: no arrastra
+    # Pillow ni una toolchain de imagen a la API, y devuelve SVG, que es lo
+    # que la ticketera y el navegador pintan sin perder nitidez.
+    "segno>=1.6",
 ]
 
 [project.optional-dependencies]

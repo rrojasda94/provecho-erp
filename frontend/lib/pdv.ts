@@ -7,6 +7,11 @@
  * no como un `undefined` silencioso en medio de un cobro.
  */
 
+import type {
+  TicketComprobante,
+  TicketTexto,
+} from "@/components/impresion/tipos";
+
 import { pedir } from "./cliente-api";
 
 export { ErrorApi, claveIdempotencia } from "./cliente-api";
@@ -430,10 +435,27 @@ export const api = {
     }),
 
   precuenta: (ventaId: string) =>
-    pedir<{ texto: string; total: string }>(`/sales/ventas/${ventaId}/precuenta`),
+    pedir<TicketTexto & { total: string }>(`/sales/ventas/${ventaId}/precuenta`),
 
   comprobante: (ventaId: string) =>
-    pedir<Record<string, unknown>>(`/sales/ventas/${ventaId}/comprobante`),
+    pedir<{ id: string; tipo: string; serie: string; correlativo: number }>(
+      `/sales/ventas/${ventaId}/comprobante`,
+    ),
+
+  /** Lo que se manda a la ticketera de 80 mm (ADR-066). Existe aunque el
+   * comprobante siga `pendiente` de llegar a SUNAT: el cliente se lleva su
+   * papel en caja y no espera a un tercero (RN-COM-003). */
+  ticketComprobante: (comprobanteId: string) =>
+    pedir<TicketComprobante>(`/sales/comprobantes/${comprobanteId}/ticket`),
+
+  /** POST y no GET a propósito: **cuenta** la impresión. La segunda y las
+   * siguientes son reimpresiones y quedan auditadas — por eso el botón de
+   * "Cuentas" reusa este endpoint en vez de uno de solo lectura. */
+  comanda: (ventaId: string) =>
+    pedir<TicketTexto & { numero_orden: number; reimpresion: boolean }>(
+      `/kds/ventas/${ventaId}/comanda`,
+      { metodo: "POST" },
+    ),
 
   /** Por **sucursal** y no por empresa: es lo que el PDV necesita saber (¿mi
    * caja está abierta?) y lo único que el servidor le deja ver a quien opera

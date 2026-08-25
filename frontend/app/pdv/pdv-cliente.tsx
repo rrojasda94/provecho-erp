@@ -38,6 +38,7 @@ import {
   type LineaBorrador,
 } from "./tipos";
 import { useCajaPdv } from "./use-caja-pdv";
+import { useImpresionPdv } from "./use-impresion-pdv";
 import { useDatosPdv } from "./use-datos-pdv";
 import { UBICACION_VACIA } from "@/components/direccion/ubicacion";
 
@@ -202,6 +203,8 @@ export default function PdvCliente({ sucursalId, permisos, puntoVenta }: Props) 
     setAviso(texto);
     setTimeout(() => setAviso(""), 3500);
   }, []);
+
+  const impresion = useImpresionPdv({ setOcupado, notificar, mensajeDe });
 
   const parchar = useCallback(
     (cambios: Partial<Borrador>) => {
@@ -698,6 +701,7 @@ export default function PdvCliente({ sucursalId, permisos, puntoVenta }: Props) 
           onMesa={elegirMesa}
           onOrdenAbierta={verOrdenAbierta}
           onVerCobrado={verCobrado}
+          onImprimirComanda={impresion.imprimirComanda}
         />
         <Ticket
           borradores={borradores}
@@ -830,7 +834,13 @@ export default function PdvCliente({ sucursalId, permisos, puntoVenta }: Props) 
         onCerrar={() => setCobradoAVer(null)}
       >
         <pre className="pdv-precuenta">{precuentaAVer || "Cargando…"}</pre>
+        <PieCobrado
+          venta={cobradoAVer}
+          ocupado={ocupado}
+          onImprimir={impresion.imprimirComprobante}
+        />
       </Dialogo>
+      {impresion.hoja}
     </main>
   );
 }
@@ -914,4 +924,31 @@ function totalACobrar(activo: Borrador | null, seleccion: Set<string>): number {
 
 function mensajeDe(e: unknown, porDefecto: string): string {
   return e instanceof ErrorApi ? e.message : porDefecto;
+}
+
+/** Pie del diálogo de una cuenta cobrada. Componente aparte y no un bloque
+ * más dentro de `PdvCliente`: la pantalla ya carga con quince
+ * responsabilidades y el linter corta la complejidad en diez. */
+function PieCobrado({
+  venta,
+  ocupado,
+  onImprimir,
+}: {
+  venta: Venta | null;
+  ocupado: boolean;
+  onImprimir: (venta: Venta) => void;
+}) {
+  if (!venta) return null;
+  return (
+    <footer className="pdv-dialogo-pie">
+      <button
+        type="button"
+        className="pdv-boton-pri"
+        disabled={ocupado}
+        onClick={() => onImprimir(venta)}
+      >
+        Imprimir comprobante
+      </button>
+    </footer>
+  );
 }

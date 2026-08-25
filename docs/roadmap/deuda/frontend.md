@@ -601,3 +601,26 @@ backend que todavía no llega a pantalla.
       uno con tres pasos— y mezclarla dejaba un cambio imposible de revisar.
       Mientras tanto es un campo `type="password"` que el navegador ofrece
       guardar, con el mismo defecto que ADR-045 describe.
+
+## Impresión térmica (2026-08-25, ADR-066)
+
+- ⬜ **La hoja de impresión no tiene prueba automatizada.** El ancho de 80 mm,
+  que las 48 columnas del texto entren sin partirse, y que `@media print`
+  esconda el resto de la página (incluido un `dialog[open]`, que vive en el
+  top layer) se verificaron a mano con Playwright y `emulateMedia({media:
+  "print"})` sobre una hoja armada aparte. Falta el caso en `frontend/uso/`
+  que lo fije: abrir un cobrado en el PDV, tocar "Imprimir comprobante" y
+  afirmar que `.impresion-hoja` mide 80 mm y que nada más queda visible. No
+  entró acá porque `uso/` levanta la base de datos y el recorrido completo, y
+  la verificación que sí se hizo no la necesitaba.
+- ⬜ **`--kiosk-printing` no se puede comprobar desde la aplicación.** Si la
+  tablet quedó lanzada sin la bandera, el cajero ve el diálogo del navegador
+  y no hay forma de que el ERP lo detecte ni lo avise. Es una limitación del
+  navegador, no un olvido: `window.print()` no informa cómo se resolvió. La
+  salida real es el agente ESC/POS (deuda de `modulo-sales.md`).
+- ⬜ **El logo del ticket sale de `public/marcas/` por convención.** La ruta
+  la escribe quien configura `marca.skins["ticket"].logo` y nada valida que
+  el archivo exista: si no está, el ticket sale con un `<img>` roto en vez de
+  caer al nombre de la marca. Falta pantalla de configuración de marca que
+  ofrezca los archivos disponibles en vez de un campo de texto libre.
+

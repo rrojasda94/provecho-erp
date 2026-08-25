@@ -7,6 +7,11 @@ recién al cobrar.
 
 Se imprime tantas veces como haga falta y no se audita: pedirla dos veces
 es normal, no una señal de nada.
+
+Sale por la misma ticketera de 80 mm que la comanda y el comprobante, así
+que el ancho lo pone `shared.impresion` (ADR-066) y viaja con el mismo
+encabezado de marca: el cliente tiene que reconocer de qué local es el papel
+que le dejaron en la mesa.
 """
 
 import uuid
@@ -16,6 +21,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.modules.sales.application.errors import NoEncontrado
+from src.modules.sales.application.impresion import encabezado
 from src.modules.sales.domain import rules
 from src.modules.sales.infrastructure.models import (
     Mesa,
@@ -23,14 +29,8 @@ from src.modules.sales.infrastructure.models import (
     Venta,
     VentaItem,
 )
-
-ANCHO = 40
-
-
-def _linea_monto(etiqueta: str, monto: Decimal) -> str:
-    """Etiqueta a la izquierda, monto pegado al borde derecho."""
-    texto = f"S/ {monto:.2f}"
-    return f"{etiqueta}{texto.rjust(ANCHO - len(etiqueta))}"
+from src.shared.impresion import ANCHO
+from src.shared.impresion import monto as _linea_monto
 
 
 def generar(session: Session, venta_id: uuid.UUID, grupo_cobro: int | None = None) -> dict:
@@ -48,17 +48,17 @@ def generar(session: Session, venta_id: uuid.UUID, grupo_cobro: int | None = Non
         consulta = consulta.where(VentaItem.grupo_cobro == grupo_cobro)
     pares = list(session.execute(consulta))
 
-    encabezado = f"ORDEN #{venta.numero_orden}"
+    titulo = f"ORDEN #{venta.numero_orden}"
     if venta.mesa_id:
         mesa = session.get(Mesa, venta.mesa_id)
         if mesa is not None:
-            encabezado += f" - MESA {mesa.numero}"
+            titulo += f" - MESA {mesa.numero}"
     if grupo_cobro is not None:
-        encabezado += f" - CUENTA {grupo_cobro}"
+        titulo += f" - CUENTA {grupo_cobro}"
 
     lineas = [
         "=" * ANCHO,
-        encabezado.center(ANCHO),
+        titulo.center(ANCHO),
         "PRECUENTA".center(ANCHO),
         "NO ES COMPROBANTE DE PAGO".center(ANCHO),
         f"{venta.created_at:%d/%m/%Y %H:%M}".center(ANCHO),
@@ -69,7 +69,7 @@ def generar(session: Session, venta_id: uuid.UUID, grupo_cobro: int | None = Non
         importe = it.cantidad * it.precio_unitario - it.descuento
         subtotal += importe
         lineas.append(
-            _linea_monto(f"{it.cantidad.normalize()}x {prod.nombre}"[:26], importe)
+            _linea_monto(f"{it.cantidad.normalize()}x {prod.nombre}", importe)
         )
     lineas.append("-" * ANCHO)
     lineas.append(_linea_monto("Subtotal", subtotal))
@@ -100,5 +100,6 @@ def generar(session: Session, venta_id: uuid.UUID, grupo_cobro: int | None = Non
         "venta_id": str(venta_id),
         "grupo_cobro": grupo_cobro,
         "total": subtotal - descuento,
+        "encabezado": encabezado(session, venta.sucursal_id),
         "texto": "\n".join(lineas),
     }

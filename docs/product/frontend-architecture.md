@@ -447,20 +447,41 @@ personalizados: diferible.
 
 ## F2.23 Impresión
 
-⬜ **Sin empezar en frontend.** El backend ya genera comanda de KDS
-imprimible (texto 32 columnas, contador de reimpresiones) y comprobante vía
-Factiliza (boleta/factura), pero **la descarga de PDF/XML/CDR del
-comprobante emitido no está implementada** (deuda ya declarada en
-`ROADMAP.md` → `sales`). El frontend no puede ofrecer "vista previa /
-imprimir factura" hasta que ese endpoint exista.
+✅ **2026-08-25 (ADR-066).** Rollo de **80 mm** para los tres documentos que
+salen del local — comanda de cocina, precuenta y ticket del comprobante —, a
+**48 columnas**, con el mismo membrete de marca y el QR de SUNAT en el
+comprobante.
+
+- `components/impresion/` — `hoja.tsx` (portal + `useImpresion`),
+  `ticket-comprobante.tsx` (el comprobante y el envoltorio de los documentos
+  de texto), `tipos.ts` (espejo de los DTOs).
+- `app/impresion.css` — `@page { size: 80mm auto }` y toda la hoja. Importado
+  desde `globals.css` y **sin variante oscura a propósito**: la impresora
+  tiene un color de tinta y un color de papel, y un token que cambia con el
+  modo del sistema solo puede empeorarlo.
+- La hoja se monta en un portal colgado de `<body>` y `@media print` esconde
+  todo lo demás, incluido `dialog[open]` — un modal abierto con `showModal()`
+  vive en el top layer y no lo alcanza un selector de hijos de `<body>`, así
+  que imprimir desde un diálogo del PDV sacaba el diálogo encima del ticket.
+- Puntos de entrada: PDV → Cobrados (comprobante), PDV → Cuentas (comanda,
+  que cuenta como reimpresión) y Contabilidad → Comprobantes (reimpresión y
+  descarga de PDF/XML).
+- **Sin diálogo** solo con `--kiosk-printing` en el navegador de la caja: es
+  una bandera, no código (`docs/engineering/impresion-termica.md`).
+
+Falta: caso de `frontend/uso/` que fije el ancho y el aislamiento de la hoja
+(ver Deuda técnica → Frontend → Impresión térmica).
 
 ## F2.24 Integración con hardware
 
-⬜ **Sin decidir.** Impresora térmica ESC/POS para KDS: deuda ya declarada
-en `ROADMAP.md` (puente por red o agente local, sin construir). Lectores
-QR/código de barras, balanzas, tablets, kioskos: sin especificar todavía —
-se define cuando exista el primer cliente PDV real, no antes (evitar
-diseñar hardware para un flujo que aún no tiene pantalla).
+🔶 **Parcial.** La ticketera de 80 mm ya imprime, pero **a través del
+navegador** (ADR-066): eso alcanza para papel y no para corte automático,
+cajón portamonedas ni campana de cocina, que solo se accionan por ESC/POS.
+El puente ESC/POS (por red al 9100 o agente local) sigue siendo deuda
+declarada en `ROADMAP.md`; el trabajo de ADR-066 lo habilita, porque la
+comanda y la precuenta ya son texto de 48 columnas. Lectores QR/código de
+barras y balanzas: sin especificar todavía — se define cuando el flujo tenga
+pantalla, no antes.
 
 ## F2.25 Testing
 

@@ -296,7 +296,22 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
     nombre (`GET /sales/clientes/buscar`, RN-PTS-006). Trabajador y usuario
     siguen exigiendo documento — validación en `users.application.admin`.
   - ⬜ **Reenvío del comprobante al cliente** (WhatsApp/correo) desde la
-    pestaña de cobrados: falta el adaptador de notificaciones.
+    pestaña de cobrados: falta el adaptador de notificaciones. Imprimirlo ya
+    se puede (ADR-066); mandarlo, no.
+  - ⬜ **La nota de crédito no tiene representación impresa** (2026-08-25,
+    ADR-066): el ticket de 80 mm cubre boleta y factura. La NC se entrega en
+    el PDF de Factiliza porque su documento se arma con las **líneas
+    acreditadas** —no con las del comprobante— y ese armado hoy es privado de
+    `notas_credito._documento_de_nota`, que además necesita las filas y las
+    cantidades. Hacerlo es sacar esa función a la superficie pública del
+    módulo, como ya se hizo con `comprobantes.documento_de`.
+  - ⬜ **El ticket no muestra el descuento como línea propia** (2026-08-25):
+    el descuento manual de la orden se prorratea dentro del precio unitario
+    antes de llegar al comprobante (lo exige el endpoint de Factiliza, que no
+    recibe descuento por línea), así que el papel muestra el precio ya neto y
+    no dice cuánto se descontó. La precuenta sí lo muestra. Para el
+    comprobante habría que declarar el descuento global en el payload SUNAT,
+    que es un cambio de mapeo tributario, no de impresión.
   - ⬜ `grupo_cobro` es un entero sin entidad detrás: nada impide un grupo 7
     sin grupos 1-6. Se valida en el caso de uso, no en el esquema.
   - ✅ 2026-07-28 **Frontend del PDV** en `frontend/app/pdv/`, contra los
@@ -427,9 +442,16 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 - ⬜ **KDS aviso de anulación**: si anulan un pedido ya en preparación, la
   tarjeta solo desaparece al refrescar — falta aviso explícito "ANULADO"
   (llega natural con el push de tiempo real).
-- ⬜ **KDS impresión física**: la comanda sale como texto 32 cols; falta
-  puente a impresora térmica (ESC/POS por red o agente local) y comanda
-  automática al confirmar venta (hoy es bajo demanda).
+- ⬜ **Impresión física sin navegador** (actualizado 2026-08-25, ADR-066):
+  la comanda, la precuenta y el ticket del comprobante ya salen por la
+  ticketera de 80 mm, pero pasando por `window.print()` — sin diálogo solo si
+  el navegador se lanzó con `--kiosk-printing`
+  (`docs/engineering/impresion-termica.md`). Falta el puente **ESC/POS**
+  (por red al 9100 o agente local), que es lo único que puede accionar corte
+  automático, cajón portamonedas y campana de cocina. El trabajo de ADR-066
+  lo habilita: comanda y precuenta ya son texto de 48 columnas, que es lo que
+  un ESC/POS consume. Falta además la **comanda automática** al confirmar la
+  venta (hoy es bajo demanda).
 - ⬜ **KDS tiempos**: alertas por pedido demorado (umbral por pantalla) y
   métricas de tiempo de preparación (base: `venta_item.updated_at`). Con la
   cadena de ADR-044 esto se vuelve **tiempo por estación**, que es lo que
