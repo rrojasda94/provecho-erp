@@ -88,6 +88,11 @@ export const apiKds = {
   editarPantalla: (pantallaId: string, cuerpo: Partial<PantallaEnvio> & { activo?: boolean }) =>
     pedir<Pantalla>(`/kds/pantallas/${pantallaId}`, { metodo: "PATCH", cuerpo }),
 
+  /** Baja definitiva. `activo: false` apaga la estación y la deja volver;
+   * esto la saca y libera su nombre. La API la rechaza si tiene cola. */
+  eliminarPantalla: (pantallaId: string) =>
+    pedir<void>(`/kds/pantallas/${pantallaId}`, { metodo: "DELETE" }),
+
   categorias: () => pedir<Categoria[]>("/inventory/categorias"),
 
   avanzar: (ventaItemId: string, estado: EstadoItem) =>

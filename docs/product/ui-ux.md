@@ -338,10 +338,29 @@ el problema y se descarta lo que choca con las reglas ya decididas.
   favoritos.
 - **`/kds` sin estación = tablero de estaciones**: la misma lista sirve para
   elegir dónde queda la tablet y para **configurar las pantallas** (crear,
-  editar, activar/desactivar; filtro por categorías) con `kds.configurar`.
+  editar, activar/desactivar, borrar; filtro por categorías) con
+  `kds.configurar`, que desde 2026-08-24 es solo de administración (ADR-064).
   Van juntas a propósito — es la misma lista, y quien configura una estación
-  lo hace mirando el tablero que la cocina usa. Desactivar es baja lógica:
-  la pantalla deja de aparecer en cocina, no se borra.
+  lo hace mirando el tablero que la cocina usa. **Desactivar y borrar no son
+  lo mismo**: desactivar la apaga y la deja volver; borrar la saca de la lista
+  y libera su nombre, y se rechaza si todavía tiene cola. Quien solo opera ve
+  la lista sin los botones y el texto le dice a quién pedirle una pantalla.
+
+### Pad de asistencia — tarjeta con tu nombre y tu PIN (implementado 2026-08-24)
+
+- Pantalla completa fuera del shell, misma paleta oscura del PDV y del KDS y
+  por la misma razón: es una tablet colgada en un pasillo y se lee de paso.
+- **Dos toques y nada más**: se toca la tarjeta con el nombre, se teclea el
+  PIN en el mismo `<Pinpad>` del PDV (ADR-045/050, sin `<input>`), y el acuse
+  ocupa la pantalla entera tres segundos antes de volver a la grilla. La cola
+  del cambio de turno no puede esperar a que alguien confirme nada.
+- **La tarjeta dice qué va a pasar** («marcar entrada» / «marcar salida»),
+  pero no lo decide: eso sale del estado del día en el servidor. La tarjeta de
+  quien ya cerró su jornada queda apagada y no se puede tocar.
+- **Solo el nombre.** Ni cargo, ni documento, ni sueldo: la pantalla está a la
+  vista de todo el que pase por la cocina.
+- Un PIN errado borra lo tecleado entero en vez de dejarlo escrito — dejarlo
+  invita a probar el siguiente dígito en vez de volver a empezar.
 
 ### Navegación — breadcrumbs por ruta de usuario, no por jerarquía
 

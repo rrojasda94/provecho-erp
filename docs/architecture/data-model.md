@@ -1367,7 +1367,18 @@ un trabajador puede o no tener usuario, y no todo usuario es trabajador
   (meses), formula_reembolso (proporcional al tiempo no cumplido), fecha
   inicio, fecha_fin_compromiso. Razonable y proporcional (RN-RRHH-006).
 - **asistencia**: trabajador_id, fecha, marcaciones (entrada/salida),
-  tardanza_min, horas_extra. Registro de control de asistencia obligatorio.
+  turno_id, tardanza_min, horas_extra, reporte_salida_en. Registro de control
+  de asistencia obligatorio. Una fila por trabajador y día
+  (`UNIQUE (trabajador_id, fecha)`); el día laboral corta a las 05:00, así el
+  turno noche no se parte en dos. `tardanza_min` lo **calcula el servidor**
+  contra el turno (ADR-063); `horas_extra` solo lo escribe RRHH a mano — el
+  pad manda siempre 0 (RN-RRHH-022). `reporte_salida_en` sella el aviso de
+  salida sin marcar para que el barrido no repita.
+- **turno_sucursal**: empresa_id, sucursal_id, nombre, hora_inicio, hora_fin,
+  tolerancia_min, hora_limite_salida, activo. El **horario laboral** del local
+  (ADR-063), distinto del turno de caja y del horario de atención. Único por
+  `(sucursal_id, nombre)`. `hora_fin`/`hora_limite_salida` menores que
+  `hora_inicio` significan que el turno cruza la medianoche.
 
 Los documentos de RRHH que son cartas/actas usan plantillas versionadas
 (ver `docs/templates/rrhh/`), rellenadas con datos del ERP + campos

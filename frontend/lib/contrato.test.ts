@@ -69,6 +69,7 @@ const { api } = await import("./pdv.ts");
 const { catalogoApi } = await import("./catalogo.ts");
 const { clientesApi } = await import("./clientes.ts");
 const { apiKds } = await import("./kds.ts");
+const { apiAsistencia } = await import("./asistencia.ts");
 const reportes = await import("./reportes.ts");
 
 // --- El contrato ------------------------------------------------------------
@@ -509,6 +510,12 @@ const KDS: Caso[] = [
   caso("categorias", () => apiKds.categorias()),
   caso("avanzar", () => apiKds.avanzar(UUID, "en_preparacion")),
   caso("entregar", () => apiKds.entregar(UUID)),
+  caso("eliminarPantalla", () => apiKds.eliminarPantalla(UUID)),
+];
+
+const ASISTENCIA: Caso[] = [
+  caso("tarjetas", () => apiAsistencia.tarjetas(UUID)),
+  caso("marcar", () => apiAsistencia.marcar(UUID, UUID, "123456")),
 ];
 
 /** `lib/reportes.ts` exporta funciones sueltas, no un objeto `api`, así que
@@ -581,6 +588,7 @@ const MODULOS: { nombre: string; casos: Caso[]; superficie?: object }[] = [
   { nombre: "pdv", casos: PDV, superficie: api },
   { nombre: "catalogo", casos: CATALOGO, superficie: catalogoApi },
   { nombre: "kds", casos: KDS, superficie: apiKds },
+  { nombre: "asistencia", casos: ASISTENCIA, superficie: apiAsistencia },
   { nombre: "clientes", casos: CLIENTES, superficie: clientesApi },
   { nombre: "reportes", casos: REPORTES },
 ];

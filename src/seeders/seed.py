@@ -289,7 +289,21 @@ PERMISOS = [
     ),
     ("rrhh.permiso_solicitar", "Solicitar vacaciones, licencias y permisos"),
     ("rrhh.permiso_aprobar", "Aprobar o rechazar solicitudes de permiso"),
-    ("rrhh.asistencia_marcar", "Marcar entrada y salida de asistencia"),
+    (
+        "rrhh.asistencia_marcar",
+        "Registrar o corregir a mano la asistencia de un trabajador desde el "
+        "back-office — distinto de marcar en el pad del local",
+    ),
+    (
+        "rrhh.asistencia_terminal",
+        "Abrir el pad de marcación de asistencia de una sucursal — el pad no "
+        "marca por nadie: cada marcación la firma el PIN del trabajador",
+    ),
+    (
+        "rrhh.turno_gestionar",
+        "Configurar los turnos de trabajo de una sucursal y su hora límite de "
+        "marcaje de salida",
+    ),
     ("rrhh.capacitacion_gestionar", "Administrar pactos de permanencia por capacitación"),
     ("sync.leer", "Descargar catálogo, stock y RBAC de la sucursal hacia su hub"),
     ("sync.empujar", "Reproducir en la nube las ventas y cobros de un hub offline"),
@@ -330,7 +344,11 @@ ROLES = {
         # Cortar la campaña de cupón: el derecho que la empresa se reserva
         # en los términos de la landing (ADR-061).
         "sales.gestionar_promociones",
-        "kds.configurar",
+        # **No configura pantallas KDS** (decisión 2026-08-24): dar de alta,
+        # renombrar o borrar una estación cambia por dónde pasa la comanda de
+        # todos los turnos, no solo del suyo. Es alta de infraestructura del
+        # local, como el punto de venta (ADR-059), y la firma un
+        # administrador. El supervisor opera lo que ya está montado.
         "kds.operar",
         "inventory.leer",
         "inventory.gestionar_catalogo",
@@ -399,6 +417,12 @@ ROLES = {
     # replicar hacia abajo y reproducir hacia arriba. Nada de gestión de
     # catálogo, RRHH ni contabilidad — un hub robado no es un admin.
     "hub_sucursal": ["sync.leer", "sync.empujar"],
+    # Cuenta de servicio del pad de asistencia (ADR-064): la tablet del
+    # comedor queda logueada con esto y nada más. Lo único que puede hacer es
+    # listar los nombres de quienes marcan en ese local y registrar una
+    # marcación firmada con el PIN del trabajador — una tablet robada no
+    # marca por nadie ni ve un sueldo.
+    "terminal_asistencia": ["rrhh.asistencia_terminal"],
     "comprador": [
         "purchases.crear",
         "purchases.leer",
@@ -447,6 +471,9 @@ ROLES = {
         "rrhh.permiso_solicitar",
         "rrhh.permiso_aprobar",
         "rrhh.asistencia_marcar",
+        # El horario laboral es de RRHH, no del local: el turno define contra
+        # qué hora se mide la tardanza y hasta cuándo hay que marcar salida.
+        "rrhh.turno_gestionar",
         "rrhh.capacitacion_gestionar",
     ],
     # Marketing atrae demanda y cuida la marca; no se aprueba su propio
@@ -529,6 +556,7 @@ ROLES_POR_AREA = {
     "cocina": ("jefe_cocina", "cocinero"),
     "caja": ("cajero",),
     "contabilidad": ("contador",),
+    "rrhh": ("rrhh_admin",),
 }
 
 # Usuarios de desarrollo (username, rol). Todos con PIN 123456 y acceso a todas

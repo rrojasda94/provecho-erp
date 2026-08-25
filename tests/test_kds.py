@@ -102,10 +102,13 @@ def env(monkeypatch):
                            tipo="humano")
         despachador = Usuario(username="despacho1", pin_hash=hash_pin("333444"),
                               tipo="humano")
-        s.add_all([pizza, bebida, medio, cocinero, despachador])
+        supervisor = Usuario(username="super1", pin_hash=hash_pin("555666"),
+                             tipo="humano")
+        s.add_all([pizza, bebida, medio, cocinero, despachador, supervisor])
         s.flush()
         for usuario, nombre_rol in ((cocinero, "cocinero"),
-                                    (despachador, "despachador")):
+                                    (despachador, "despachador"),
+                                    (supervisor, "supervisor")):
             rol = s.scalar(select(Rol).where(Rol.nombre == nombre_rol))
             s.add(UsuarioRol(usuario_id=usuario.id, rol_id=rol.id))
             # Sin sucursal asignada el JWT no lleva empresa y el contexto de
@@ -304,6 +307,63 @@ def test_rbac_cocinero_opera_pero_no_configura(env):
         "sucursal_id": ids["sucursal_id"], "nombre": "Pirata",
         "tipo": "preparacion",
     }).status_code == 403
+
+
+def test_el_supervisor_opera_pero_ya_no_configura(env):
+    """Decisión 2026-08-24 (ADR-064): dar de alta o borrar una estación es
+    alta de infraestructura del local, no una tarea de turno."""
+    client, ids = env
+    h_admin = _token(client)
+    horno, _, _, _ = _setup_pantallas_y_venta(client, ids, h_admin)
+    h_sup = _token(client, "super1", "555666")
+
+    # Sigue viendo y operando la cocina.
+    assert client.get("/api/v1/kds/pantallas", headers=h_sup).status_code == 200
+    assert client.get(
+        f"/api/v1/kds/pantallas/{horno['id']}/cola", headers=h_sup
+    ).status_code == 200
+
+    # Pero no la monta ni la desmonta.
+    assert client.post("/api/v1/kds/pantallas", headers=h_sup, json={
+        "sucursal_id": ids["sucursal_id"], "nombre": "Pirata",
+        "tipo": "preparacion",
+    }).status_code == 403
+    assert client.patch(
+        f"/api/v1/kds/pantallas/{horno['id']}", headers=h_sup,
+        json={"nombre": "Otro"},
+    ).status_code == 403
+    assert client.delete(
+        f"/api/v1/kds/pantallas/{horno['id']}", headers=h_sup
+    ).status_code == 403
+
+
+def test_borrar_una_pantalla_exige_que_la_cola_este_vacia(env):
+    """Borrarla con pedidos encima dejaría esas líneas sin dónde tacharse."""
+    client, ids = env
+    h = _token(client)
+    horno, _, _, _ = _setup_pantallas_y_venta(client, ids, h)
+
+    assert client.delete(
+        f"/api/v1/kds/pantallas/{horno['id']}", headers=h
+    ).status_code == 409
+
+    libre = client.post("/api/v1/kds/pantallas", headers=h, json={
+        "sucursal_id": ids["sucursal_id"], "nombre": "Postres",
+        "tipo": "preparacion", "categoria_ids": [], "orden": 5,
+    }).json()
+    assert client.delete(
+        f"/api/v1/kds/pantallas/{libre['id']}", headers=h
+    ).status_code == 204
+
+    nombres = [
+        p["nombre"] for p in client.get("/api/v1/kds/pantallas", headers=h).json()
+    ]
+    assert "Postres" not in nombres
+    # El nombre queda libre: la baja es definitiva, no un apagado.
+    assert client.post("/api/v1/kds/pantallas", headers=h, json={
+        "sucursal_id": ids["sucursal_id"], "nombre": "Postres",
+        "tipo": "preparacion", "orden": 5,
+    }).status_code == 201
 
 
 def _dejar_pedido_listo(client, h, horno, barra):

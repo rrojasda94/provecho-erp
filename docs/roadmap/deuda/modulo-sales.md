@@ -580,3 +580,9 @@ que es una decisión de pantalla y no un bug de una línea.
   decisión visible y no un olvido: si el formulario crece (validación en
   vivo, dependencia entre canal y política), el spec deja de ser redundante.
 
+- ⬜ **El punto de venta no se puede dar de baja** (2026-08-24, ADR-064): al
+  KDS se le agregó `DELETE /kds/pantallas/{id}`; a `punto_venta` no. Tiene
+  series SUNAT asignadas y darlo de baja es un acto de identidad fiscal —
+  qué pasa con los comprobantes emitidos, con la caja abierta y con el
+  correlativo se decide con contabilidad, no de refilón junto a una pantalla
+  de cocina. Hoy una caja que ya no se usa se queda en la lista.

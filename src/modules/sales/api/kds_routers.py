@@ -1,8 +1,9 @@
 """Router del KDS: configuración de pantallas, cola, bump, avance y comanda.
 
-Permisos: `kds.configurar` (crear/editar pantallas — admin/supervisor),
-`kds.operar` (cocina: cola, bump, comanda). Consultar avance solo exige
-operar o leer ventas.
+Permisos: `kds.configurar` (crear, editar y borrar pantallas — solo
+administración desde 2026-08-24, ADR-064), `kds.operar` (cocina: cola,
+bump, comanda). Listar pantallas acepta cualquiera de los dos: quien las
+administra tiene que poder ver lo que administra sin operar la cocina.
 """
 
 import uuid
@@ -18,7 +19,13 @@ from src.modules.sales.application.scope import (
     exigir_venta,
     exigir_venta_item,
 )
-from src.modules.users.api.deps import get_db, get_tenant, require_permission
+from src.modules.users.api.deps import (
+    check_permission,
+    get_current_user,
+    get_db,
+    get_tenant,
+    require_permission,
+)
 from src.modules.users.infrastructure.models import Usuario
 
 router = APIRouter(prefix="/kds", tags=["kds"])
@@ -44,10 +51,11 @@ def crear_pantalla(
 @router.get("/pantallas", response_model=list[schemas.PantallaOut])
 def listar_pantallas(
     sucursal_id: uuid.UUID | None = None,
-    _: Usuario = Depends(require_permission(OPERAR)),
+    usuario: Usuario = Depends(get_current_user),
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
+    check_permission(session, usuario, OPERAR, CONFIGURAR)
     if sucursal_id is not None:
         tenant.exigir_sucursal(sucursal_id)
     pantallas = kds.listar_pantallas(session, sucursal_id)
@@ -68,6 +76,18 @@ def editar_pantalla(
     pantalla = kds.editar_pantalla(session, pantalla_id, **body.model_dump())
     session.commit()
     return pantalla
+
+
+@router.delete("/pantallas/{pantalla_id}", status_code=204)
+def eliminar_pantalla(
+    pantalla_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(CONFIGURAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    exigir_pantalla(session, pantalla_id, tenant)
+    kds.eliminar_pantalla(session, pantalla_id)
+    session.commit()
 
 
 # --- Operación ------------------------------------------------------------------

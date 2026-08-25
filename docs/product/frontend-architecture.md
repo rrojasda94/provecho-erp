@@ -215,7 +215,10 @@ reintentos seguros cuando se necesiten.
 El KDS (2026-08-03) agrega el patrón de **cliente desde el navegador**:
 `lib/cliente-api.ts` (fetch + error tipado vía el proxy que adjunta el
 token) compartido por PDV y KDS, con `lib/pdv.ts`/`lib/kds.ts` aportando
-solo tipos y rutas.
+solo tipos y rutas. El **pad de asistencia** (`app/asistencia/`, 2026-08-24,
+ADR-064) es la tercera pantalla táctil fuera del shell y entra por la misma
+puerta: `lib/asistencia.ts` son tipos y rutas, y el pinpad es el mismo
+componente del PDV.
 
 ⬜ **Sin decidir**: WebSockets/SSE. El KDS ya está en producción de código
 con **polling cada 3 s** (`REFRESCO_MS`, pausado con la pestaña oculta) —

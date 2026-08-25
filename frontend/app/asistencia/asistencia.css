@@ -1,0 +1,136 @@
+/* Pad de marcación de asistencia.
+   Misma paleta oscura del PDV y del KDS, por la misma razón: es una tablet
+   colgada en un pasillo, se lee de pie y de paso. Tarjetas grandes porque
+   se tocan con las manos mojadas o con guantes. */
+
+.asistencia-pad,
+.asistencia-vacio,
+.asistencia-acuse {
+    --as-bg: #0d0d0f;
+    --as-surface: #18181b;
+    --as-surface-alta: #202024;
+    --as-borde: rgba(255, 255, 255, 0.1);
+    --as-texto: #f4f4f2;
+    --as-muted: #9a9a9f;
+    --as-verde: #22c55e;
+    --as-ambar: #fbbf24;
+    --as-rojo: #f87171;
+
+    min-height: 100dvh;
+    background: var(--as-bg);
+    color: var(--as-texto);
+    padding: 2.5rem;
+    user-select: none;
+}
+
+.asistencia-vacio,
+.asistencia-acuse {
+    display: grid;
+    gap: 0.75rem;
+    align-content: center;
+    justify-items: center;
+    text-align: center;
+    max-width: 44rem;
+    margin: 0 auto;
+}
+
+.asistencia-pad > p,
+.asistencia-nota {
+    color: var(--as-muted);
+}
+
+.asistencia-grilla {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+    gap: 1rem;
+    margin-top: 1.5rem;
+}
+
+.asistencia-tarjeta {
+    display: grid;
+    gap: 0.35rem;
+    padding: 1.5rem 1.25rem;
+    text-align: left;
+    background: var(--as-surface);
+    border: 1px solid var(--as-borde);
+    border-radius: 0.75rem;
+    color: inherit;
+    font: inherit;
+    /* Alto mínimo generoso: el objetivo táctil es toda la tarjeta, no el
+       texto. */
+    min-height: 6rem;
+    cursor: pointer;
+}
+
+.asistencia-tarjeta strong {
+    font-size: 1.35rem;
+    line-height: 1.2;
+}
+
+.asistencia-tarjeta em {
+    font-style: normal;
+    font-size: 0.9rem;
+    color: var(--as-muted);
+}
+
+.asistencia-tarjeta:hover:not(:disabled),
+.asistencia-tarjeta:focus-visible {
+    background: var(--as-surface-alta);
+}
+
+.asistencia-tarjeta.cerrada {
+    opacity: 0.45;
+    cursor: default;
+}
+
+.asistencia-dialogo {
+    background: var(--as-surface);
+    color: var(--as-texto);
+    border: 1px solid var(--as-borde);
+    border-radius: 0.9rem;
+    padding: 1.5rem;
+    min-width: min(22rem, 92vw);
+}
+
+.asistencia-dialogo::backdrop {
+    background: rgba(0, 0, 0, 0.65);
+}
+
+.asistencia-dialogo header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.asistencia-dialogo header button {
+    background: none;
+    border: 0;
+    color: var(--as-muted);
+    font-size: 1.25rem;
+    cursor: pointer;
+}
+
+.asistencia-error {
+    color: var(--as-rojo);
+    margin-bottom: 0.75rem;
+}
+
+.asistencia-acuse h1 {
+    color: var(--as-verde);
+}
+
+.asistencia-acuse-nombre {
+    font-size: 1.5rem;
+}
+
+.asistencia-acuse-hora {
+    font-size: 4rem;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+}
+
+.asistencia-acuse-tardanza {
+    color: var(--as-ambar);
+}
