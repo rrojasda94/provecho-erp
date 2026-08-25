@@ -564,11 +564,11 @@ recibiera — `referencia_atencion` es "para quién es el pedido" ("Carlos",
 `application/tarifa_delivery.py` pregunta la distancia de manejo a
 `shared/integrations/google` (Routes API, clave restringida por IP) y decide:
 
-- `costo` = `DELIVERY_TARIFA_BASE` + `DELIVERY_PRECIO_POR_KM` × km.
-- `derivar_a_externo` cuando se pasa de `DELIVERY_DISTANCIA_MAXIMA_KM` o el
-  distrito está en `DELIVERY_DISTRITOS_RESTRINGIDOS`. La zona vetada se evalúa
-  **antes** de medir: no depende de la distancia y preguntarle a Google
-  costaría una llamada por una respuesta que ya se sabe.
+- `costo` = tarifa base + precio por kilómetro × km.
+- `derivar_a_externo` cuando se pasa de la distancia máxima o el distrito está
+  en `DELIVERY_DISTRITOS_RESTRINGIDOS`. La zona vetada se evalúa **antes** de
+  medir: no depende de la distancia y preguntarle a Google costaría una llamada
+  por una respuesta que ya se sabe.
 - `aproximada` cuando Google no contestó y se usó la línea recta
   (haversine × 1,3). El pedido se toma igual — es lo único que funciona en el
   hub offline (ADR-009).
@@ -583,9 +583,25 @@ Derivar a una plataforma externa (DAZ DAZ) es un **aviso al cajero**, no una
 integración: si acepta, se marca `venta.repartidor_externo_plataforma`, que ya
 existía.
 
-Con las tarifas en `0` —el estado de fábrica— nada de esto cobra y el delivery
-funciona como antes. **El costo todavía no suma al total de la venta**: ver la
-deuda del módulo.
+**La tarifa la aprueba Gerencia, no el `.env`** (2026-08-25, ADR-014 sobre
+ADR-054). Los tres números son parámetros por empresa —`sales/`
+`delivery_tarifa_base`, `delivery_precio_por_km`, `delivery_distancia_maxima_km`—
+que se proponen y se aprueban en `/gerencia/parametros`. `tarifa_de_sucursal()`
+salta de la sucursal a su empresa (igual que `alertas.py`) y resuelve los tres
+con `shared/parametros.valor_vigente`; las variables `DELIVERY_*` de `settings`
+quedan como **valor de arranque**: rigen mientras Gerencia no apruebe el suyo.
+Cobrar el reparto es un precio, y un precio no puede depender de quién tiene
+acceso al servidor.
+
+Son tres parámetros simples y no uno compuesto porque el formulario de
+propuesta arma un solo valor por vez: un compuesto solo se podría sembrar, y el
+punto es justamente que la tarifa se cambie desde la pantalla.
+`DELIVERY_DISTRITOS_RESTRINGIDOS` sigue en `settings` por lo mismo — es una
+lista, y el formulario no arma listas (ver la deuda del módulo).
+
+Con las tarifas en `0` y nada aprobado —el estado de fábrica— nada de esto
+cobra y el delivery funciona como antes. **El costo todavía no suma al total de
+la venta**: ver la deuda del módulo.
 
 ## Estado (slice 10 — atributos y variantes generadas, 2026-08-23)
 

@@ -39,7 +39,7 @@ Registro de lo construido y lo pendiente. Actualizar en cada cambio relevante.
 | Supervisión, CRM, tesorería, activos, proyectos, BI/reportes | 🔶 revisada 2026-08-05 | **Cuatro de los siete ya no son futuros y dos no van a ser módulos.** **BI/reportes** ✅ 2026-08-04: `src/core/reportes/` (ADR-024) con catálogo cerrado de 13 reportes, tableros guardados por usuario y compartidos por rol, filtros y exportación a CSV. **Desde 2026-08-08 hay una segunda mitad**, y son cosas distintas: `core/reportes` es la **consulta** (el usuario pide, se calcula) y el módulo `reports` (ADR-033) es la **emisión y distribución** (pasa un hecho, se genera, se guarda y se reparte). ADR-024 descartó un módulo porque el *motor de consulta* no tiene dominio propio; la distribución sí lo tiene —áreas, reglas, emisiones, entregas— así que paga sus siete registros de alta. **Tesorería** ✅ 2026-07-25: vive **dentro de `accounting`** por decisión explícita del usuario —pago a proveedor, `movimiento_dinero`, caja y custodia— y separarla al salir de REMYPE es un pendiente de organización, no de código. **Supervisión** no es módulo: es el rol RBAC `supervisor` más la matriz de aprobaciones de Gerencia (`parametro_empresa` + `decision_gerencial`); un módulo "supervisión" sería un permiso disfrazado de dominio. **CRM** parcial: `sales.cliente` (con contrato público de lectura) y `marketing.lead`/`campana`/`encuesta_satisfaccion` con atribución lead→venta ya cubren captar y medir; falta historial de interacciones y segmentación, sin caso hasta que haya campañas reales corriendo. **Activos** ⬜ pero **ya tiene dueño**: se compran en `purchases` (OC tipo `activo` + `requerimiento_activo`, deuda declarada) y se deprecian en `accounting` (activo fijo/depreciación, PROC-CTB-007/010) — partirlos en un tercer módulo cortaría el ciclo de compra en dos. **Proyectos** ⬜ sin caso: el grupo no ejecuta obra ni proyectos facturables hoy. |
 | Integración de facturación electrónica (**Factiliza**) | 🔶 boleta/factura ✅ 2026-07-26 | **Reemplaza a Nubefact** (decisión del usuario). Adaptador en `src/shared/integrations/factiliza/`; cola Celery + servicio `worker`; migración `b3d7f21ac094`. Emite boleta/factura con IGV desglosado y exoneración de Amazonía (RN-IMP-001). Nota de crédito, PDF/XML/CDR ✅ 2026-08-04. **Guía de remisión ✅ 2026-08-05** (ADR-027) — construida en `inventory`, no en `sales`: declara un traslado entre almacenes, no una venta. |
 | Integración Izipay | ⬜ | Proveedor decidido (ADR-003) |
-| Integraciones Google / Meta | 🔶 Maps ✅ 2026-08-22 | **Google Maps — la dirección se ancla y el delivery se cobra por kilómetro** (ADR-053, ADR-054; migraciones `c3d8b1f47a95` y `d41f6a2c98b7`). Una dirección era `String(255)` en seis lugares y nada más: nadie validaba que existiera, nadie podía navegar hacia ella, y **la dirección de delivery que el cajero tecleaba se perdía** — vivía solo en el borrador del navegador y `venta` no tenía columna que la recibiera. Ahora `UbicacionMixin` suma `place_id` + lat/lng + plus code + distrito a `sucursal`, `almacen`, `empresa`, `persona`, `proveedor` y `venta`, con un campo único (`components/direccion/campo-direccion.tsx`) que autocompleta con Places y deja arrastrar el pin. **Editar el texto a mano suelta el ancla** en las dos puntas (`shared/ubicacion.py` manda; el frontend solo acompaña): un texto que diga una calle con las coordenadas de otra manda el reparto al lugar equivocado. El mapa lo dibuja el navegador con clave restringida por dominio —los tokens de sesión de Places son lo que abarata la factura y no tienen versión server-side—, y por eso la CSP suma hosts de Google por primera vez. **Lo que define plata NO sale del servidor**: la distancia de reparto la mide la Routes API con una segunda clave restringida por IP, con cuota por usuario e IP como la consulta de documento, y el costo se **congela** en la venta. Pasado el radio o en distrito vetado se sugiere **DAZ DAZ** sobre el campo `repartidor_externo_plataforma` que ya existía — cero tablas nuevas. Google caído cae a haversine×1,3 marcado «aprox.» y el pedido se toma igual; sin claves el ERP se comporta exactamente como antes (lo verifica `frontend/uso/direccion.spec.ts`, que corre **sin** clave a propósito). Paso a paso de la consola en [`docs/engineering/integraciones-google.md`](docs/engineering/integraciones-google.md). Tests: `tests/test_ubicaciones.py`, `tests/test_tarifa_delivery.py`. Diferido: cobrar el reparto como línea de venta (hoy se calcula, se guarda y se muestra), tarifa por sucursal, zonas por polígono. Meta sigue ⬜. |
+| Integraciones Google / Meta | 🔶 Maps ✅ 2026-08-22 | **Google Maps — la dirección se ancla y el delivery se cobra por kilómetro** (ADR-053, ADR-054; migraciones `c3d8b1f47a95` y `d41f6a2c98b7`). Una dirección era `String(255)` en seis lugares y nada más: nadie validaba que existiera, nadie podía navegar hacia ella, y **la dirección de delivery que el cajero tecleaba se perdía** — vivía solo en el borrador del navegador y `venta` no tenía columna que la recibiera. Ahora `UbicacionMixin` suma `place_id` + lat/lng + plus code + distrito a `sucursal`, `almacen`, `empresa`, `persona`, `proveedor` y `venta`, con un campo único (`components/direccion/campo-direccion.tsx`) que autocompleta con Places y deja arrastrar el pin. **Editar el texto a mano suelta el ancla** en las dos puntas (`shared/ubicacion.py` manda; el frontend solo acompaña): un texto que diga una calle con las coordenadas de otra manda el reparto al lugar equivocado. El mapa lo dibuja el navegador con clave restringida por dominio —los tokens de sesión de Places son lo que abarata la factura y no tienen versión server-side—, y por eso la CSP suma hosts de Google por primera vez. **Lo que define plata NO sale del servidor**: la distancia de reparto la mide la Routes API con una segunda clave restringida por IP, con cuota por usuario e IP como la consulta de documento, y el costo se **congela** en la venta. Pasado el radio o en distrito vetado se sugiere **DAZ DAZ** sobre el campo `repartidor_externo_plataforma` que ya existía — cero tablas nuevas. Google caído cae a haversine×1,3 marcado «aprox.» y el pedido se toma igual; sin claves el ERP se comporta exactamente como antes (lo verifica `frontend/uso/direccion.spec.ts`, que corre **sin** clave a propósito). Paso a paso de la consola en [`docs/engineering/integraciones-google.md`](docs/engineering/integraciones-google.md). Tests: `tests/test_ubicaciones.py`, `tests/test_tarifa_delivery.py`. **2026-08-25 — encendido en staging y la tarifa salió del `.env`**: el servicio `web` no recibía la clave (no tiene `env_file`, y el compose de staging no la declaraba), así que la clave puesta en el servidor dejaba el mapa apagado sin ningún error visible; el workflow *Desplegar* ahora lleva también el compose y el `Caddyfile`. En staging va **solo la clave del navegador**: sin la del servidor la distancia se estima en línea recta ×1,3 y se marca «aproximada». Los tres números de la tarifa pasaron a `parametro_empresa` por empresa (addendum de ADR-054): un precio no puede depender de quién tiene la llave SSH. Diferido: cobrar el reparto como línea de venta (hoy se calcula, se guarda y se muestra), tarifa por sucursal, zonas por polígono, distritos vetados editables desde la pantalla. Meta sigue ⬜. |
 | Agentes IA para pedidos | ⬜ | |
 | Notificaciones | ✅ 2026-08-08 | **Resueltas como distribución, no como transporte** (ADR-033). El problema real no era el canal: era que de 52 eventos publicados solo 4 llegaban a alguien, cableados en `users/application/listeners.py`, y no había forma de ver ni cambiar quién recibía qué sin un deploy. El módulo `reports` lo vuelve administrable: catálogo cerrado de 13 emisiones, áreas, reglas por (empresa, emisión, sucursal) y una matriz que marca **huecos** (el hecho ocurre y no se entera nadie) y **fugas** (regla que no llega a nadie). El transporte sigue siendo la bandeja in-app existente; correo y WhatsApp son un slice aparte (el campo `canal` ya está en el modelo). Migración `9a1c4e7b2d30`. |
 | Auditoría (audit_log) | ✅ 2026-08-08 | Transversal (ADR-031): `src/shared/auditoria.py` es el único escritor, `GET /api/v1/auditoria` (permiso `auditoria.leer`) el lector. Cinco módulos nuevos dejan rastro; `empresa_id` + índices en migración `b3d9f1c2a077`. Pendiente la purga por antigüedad (ver Deuda técnica → Protección de datos) |
@@ -113,7 +113,8 @@ contiene, buscando su `[[ COMPLETAR ]]`):
   **Propuestos 2026-08-05** con su sustento en
   `docs/gerencia/propuesta-parametros-operativos.md` y cargados como
   `estado='propuesto'` (`python -m src.seeders.parametros`, idempotente):
-  13 filas esperando en `/gerencia/parametros`. Cada propuesta declara de
+  13 filas esperando en `/gerencia/parametros` (16 desde 2026-08-25, con la
+  tarifa del delivery). Cada propuesta declara de
   dónde sale el número, **qué pasa si está mal** y cuándo revisarlo — un
   parámetro mal puesto no rompe nada, distorsiona una decisión diaria
   durante meses sin que nadie lo note.
@@ -130,6 +131,11 @@ contiene, buscando su `[[ COMPLETAR ]]`):
     ruido la alerta. El piso **exige código**, ver deuda de inventory.
   - 🔶 `purchases/monto_caja_chica` — propuesto S/ 500 con reposición al
     bajar de S/ 150.
+  - 🔶 `sales/delivery_tarifa_base` / `delivery_precio_por_km` /
+    `delivery_distancia_maxima_km` (2026-08-25, addendum de ADR-054) —
+    propuestos S/ 5.00 + S/ 1.50/km, radio 8 km. **Son los únicos que cambian
+    lo que paga el cliente**: hoy el reparto sale gratis y aprobarlos lo
+    enciende. Vivían en el `.env` y cambiarlos exigía SSH.
   - 🔶 `accounting/plazo_envio_comprobante` — propuesto 5 días hábiles
     desde el cierre. Es plazo **interno**: el vencimiento real de SUNAT
     depende del último dígito del RUC.
@@ -253,6 +259,30 @@ contiene, buscando su `[[ COMPLETAR ]]`):
   `scripts/desplegar.sh` y `release.yml` publicando también la imagen del
   frontend (`ghcr.io/rrojasda94/provecho-erp-web`) — antes solo publicaba el
   backend, staging no habría tenido pantallas.
+- ✅ 2026-08-25 **Google Maps encendido en staging, y la tarifa del reparto
+  sacada del `.env`.** Tres cosas que se veían como una: (a) el servicio `web`
+  no recibía `GOOGLE_MAPS_BROWSER_KEY` —no tiene `env_file: .env` a propósito,
+  para no ver nunca la clave del servidor, y `docker-compose.staging.yml` /
+  `.prod.yml` nunca la declararon en su `environment:`—, así que la clave
+  puesta en el servidor dejaba el mapa apagado **sin ningún error visible**;
+  (b) `.env.staging.example` documentaba `GOOGLE_API_KEY`, un nombre muerto
+  desde el renombre a `GOOGLE_MAPS_BROWSER_KEY`, y `extra="ignore"` lo
+  descartaba en silencio — ahora `tests/test_settings.py` prueba el sentido
+  inverso de la sincronía, que es el que faltaba; y (c) el workflow *Desplegar*
+  copiaba solo `scripts/desplegar.sh`, así que el arreglo no habría llegado al
+  droplet: ahora lleva también el compose y el `Caddyfile`, con un `diff`
+  previo contra el servidor en el resumen del run (ADR-060 había resuelto esto
+  para el script y se le escapó el compose). Decidido: en staging va **solo la
+  clave del navegador**; sin la del servidor la distancia se estima en línea
+  recta ×1,3 y la cotización se marca «aproximada», que es un estado soportado.
+  Y de paso, **la tarifa del delivery pasó a `parametro_empresa`** (addendum de
+  ADR-054): era configuración de despliegue para algo que es un precio, y
+  ADR-014 ya había rechazado eso explícitamente. Códigos
+  `sales/delivery_tarifa_base`, `delivery_precio_por_km` y
+  `delivery_distancia_maxima_km`, aprobables en `/gerencia/parametros`; cero
+  migraciones y cero pantallas nuevas. Diferido: los distritos vetados siguen
+  en `settings` (son una lista y el formulario arma un valor) y la tarifa es
+  una por empresa, no por sucursal.
 - ⬜ **Falta para terminar el primer despliegue de staging:**
   1. `.env` real en el servidor (`JWT_SECRET`/`POSTGRES_PASSWORD` generados
      ahí, nunca en una conversación — un secreto que la pasó deja de serlo).

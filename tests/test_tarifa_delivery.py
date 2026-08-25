@@ -18,8 +18,10 @@ from src.modules.sales.application.tarifa_delivery import (
     MOTIVO_FUERA_DE_RADIO,
     MOTIVO_ZONA_RESTRINGIDA,
     Cotizacion,
+    Tarifa,
     cotizar,
     linea_recta_km,
+    tarifa_de_empresa,
 )
 from src.shared.integrations.google import Coordenada, RutasError
 
@@ -169,3 +171,52 @@ def test_la_segunda_cotizacion_no_vuelve_a_preguntar(monkeypatch):
     cotizar(PLAZA, AEROPUERTO)
     cotizar(PLAZA, AEROPUERTO)
     assert len(llamadas) == 1
+
+
+# --- La tarifa la aprueba Gerencia, `settings` es solo el arranque ---------
+
+
+def test_sin_empresa_rige_el_valor_de_arranque():
+    """Una sucursal que no resolvió su dueño no deja al cajero sin poder
+    cotizar: se cobra lo que dice `settings` hasta que haya a quién
+    preguntarle. `session=None` prueba que ni siquiera se consulta la base."""
+    assert tarifa_de_empresa(None, None) == Tarifa(
+        base=Decimal("3"), por_km=Decimal("1.50"), maxima_km=Decimal("8")
+    )
+
+
+@pytest.mark.parametrize(
+    "aprobado",
+    [None, {}, {"monto": None}, {"monto": "no es un número"}, "3.00", 7],
+    ids=["sin fila", "vacío", "nulo", "texto", "no es dict", "número suelto"],
+)
+def test_un_parametro_con_otra_forma_cae_al_arranque(monkeypatch, aprobado):
+    """Un código reusado o una propuesta vieja no pueden reventar la venta:
+    peor que cobrar el reparto de más es no poder tomar el pedido."""
+    monkeypatch.setattr(tarifa_delivery, "valor_vigente", lambda *a, **k: aprobado)
+    assert tarifa_de_empresa(None, "empresa-cualquiera").por_km == Decimal("1.50")
+
+
+def test_lo_aprobado_le_gana_al_arranque(monkeypatch):
+    aprobados = {
+        tarifa_delivery.CODIGO_TARIFA_BASE: {"monto": "5.00", "divisa": "PEN"},
+        tarifa_delivery.CODIGO_PRECIO_POR_KM: {"monto": "2.00", "divisa": "PEN"},
+        tarifa_delivery.CODIGO_DISTANCIA_MAXIMA: {"kilometros": "12"},
+    }
+    monkeypatch.setattr(
+        tarifa_delivery,
+        "valor_vigente",
+        lambda _s, _e, _m, codigo: aprobados[codigo],
+    )
+    t = tarifa_de_empresa(None, "empresa-cualquiera")
+    assert (t.base, t.por_km, t.maxima_km) == (
+        Decimal("5.00"),
+        Decimal("2.00"),
+        Decimal("12"),
+    )
+    # El radio aprobado manda: con 12 km, un pedido a 10 ya no se deriva
+    # (con el arranque de 8 sí se derivaría).
+    _google_dice(monkeypatch, "10.00")
+    c = cotizar(PLAZA, AEROPUERTO, None, t)
+    assert c.derivar_a_externo is False
+    assert c.costo == Decimal("25.00")  # 5 + 2 × 10

@@ -4,6 +4,7 @@ valor nuevo.
 """
 
 import uuid
+from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
@@ -245,3 +246,45 @@ def test_aprobar_reemplaza_el_vigente_anterior(env):
     }
     assert estados[primero] == "reemplazado"
     assert estados[segundo] == "vigente"
+
+
+def test_la_tarifa_de_delivery_se_cambia_sin_tocar_el_servidor(env):
+    """El caso que motivó traer la tarifa acá: cobrar el reparto es un precio,
+    y un precio no puede depender de quién tiene la llave SSH. Se propone,
+    Gerencia aprueba, y la siguiente cotización cobra distinto — sin editar el
+    `.env` ni reiniciar un contenedor."""
+    from src.modules.sales.application import tarifa_delivery
+    from src.modules.users.infrastructure.models import Sucursal
+
+    client, empresa_id, TestSession = env
+    h = _token(client)
+
+    with TestSession() as s:
+        sucursal_id = s.scalar(
+            select(Sucursal.id).where(Sucursal.empresa_id == uuid.UUID(empresa_id))
+        )
+        assert sucursal_id is not None
+        # De fábrica el reparto no cobra: rige el 0 de `settings`.
+        assert tarifa_delivery.tarifa_de_sucursal(s, sucursal_id).por_km == Decimal("0")
+
+    r = client.post(
+        "/api/v1/parametros",
+        headers=h,
+        json={
+            "empresa_id": empresa_id,
+            "modulo": "sales",
+            "codigo": tarifa_delivery.CODIGO_PRECIO_POR_KM,
+            "valor": {"monto": "1.50", "divisa": "PEN"},
+            "motivo": "subió el combustible",
+        },
+    )
+    assert r.status_code == 201, r.text
+    aprobada = client.post(
+        f"/api/v1/parametros/{r.json()['id']}/aprobar", headers=h, json={}
+    )
+    assert aprobada.status_code == 200, aprobada.text
+
+    with TestSession() as s:
+        tarifa = tarifa_delivery.tarifa_de_sucursal(s, sucursal_id)
+    assert tarifa.por_km == Decimal("1.50")
+    assert tarifa_delivery.costo_de(Decimal("4"), tarifa) == Decimal("6.00")

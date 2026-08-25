@@ -101,6 +101,37 @@ PROPUESTAS: list[tuple[str, str, dict, str | None, str]] = [
         "venta que igual iba a ocurrir. Requiere aprobación conjunta de "
         "Comercial + RRHH + Gerencia (política comercial §3).",
     ),
+    (
+        "sales",
+        "delivery_tarifa_base",
+        {"monto": "5.00", "divisa": "PEN"},
+        "S/ 5.00",
+        "Lo que cuesta salir, independiente de la distancia: el tiempo del "
+        "repartidor y el desgaste de la moto se pagan aunque el pedido sea de "
+        "tres cuadras. S/ 5.00 es lo que cobra la plataforma externa por el "
+        "tramo mínimo en Tarapoto — cobrar menos hace que convenga derivar "
+        "todo. **Aprobar esto enciende el cobro del reparto**, que hoy es 0.",
+    ),
+    (
+        "sales",
+        "delivery_precio_por_km",
+        {"monto": "1.50", "divisa": "PEN"},
+        "S/ 1.50",
+        "El tramo variable, sobre kilómetros de manejo real medidos por la "
+        "ruta, no en línea recta. S/ 1.50 cubre combustible y el tiempo de ida "
+        "y vuelta a velocidad urbana. Revisar cuando cambie el precio del "
+        "combustible: es el único insumo que lo mueve.",
+    ),
+    (
+        "sales",
+        "delivery_distancia_maxima_km",
+        {"kilometros": "8"},
+        "8 km",
+        "Pasado este radio se le sugiere al cajero derivar a la plataforma "
+        "externa (DAZ DAZ): más lejos, el repartidor propio pasa media hora "
+        "fuera y el local se queda sin reparto para los pedidos cercanos. 8 km "
+        "cubre la ciudad y deja fuera los caseríos. En 0 no hay radio máximo.",
+    ),
 ]
 
 PROPUESTAS += [

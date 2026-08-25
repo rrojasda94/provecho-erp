@@ -271,6 +271,41 @@ claro.
 
 ---
 
+## 8. Tarifa del delivery propio
+
+Tres parámetros que se aprueban juntos aunque sean filas distintas:
+`sales/delivery_tarifa_base`, `sales/delivery_precio_por_km` y
+`sales/delivery_distancia_maxima_km`.
+
+**Hoy el reparto no se cobra**: los tres valen 0 y el delivery sale gratis para
+el cliente. Aprobar esto **enciende el cobro**, así que es la única propuesta de
+esta lista que cambia lo que paga el cliente el día que se acepta.
+
+| Parámetro | Propuesta | De dónde sale |
+|---|---|---|
+| `delivery_tarifa_base` | S/ 5.00 | Lo que cuesta **salir**, sin importar la distancia: tiempo del repartidor y desgaste de la moto se pagan aunque el pedido sea de tres cuadras. Es lo que cobra la plataforma externa por el tramo mínimo en Tarapoto — cobrar menos hace que convenga derivar todo. |
+| `delivery_precio_por_km` | S/ 1.50 | El tramo variable, sobre kilómetros de **manejo real** medidos por la ruta, no en línea recta. Cubre combustible y el tiempo de ida y vuelta a velocidad urbana. |
+| `delivery_distancia_maxima_km` | 8 km | Pasado ese radio el cajero ve la sugerencia de derivar a DAZ DAZ: más lejos, el repartidor propio pasa media hora fuera y el local se queda sin reparto para los pedidos cercanos. 8 km cubre la ciudad y deja fuera los caseríos. |
+
+**Un pedido típico a 3 km paga S/ 9.50**; uno a 7 km, S/ 15.50. Conviene mirar
+esos dos números antes de aprobar: son los que el cliente va a ver.
+
+**Si está mal:** cobrar de más manda los pedidos a la plataforma externa, que
+cobra comisión sobre el ticket completo y se queda con el cliente. Cobrar de
+menos hace que el reparto propio pierda plata en cada viaje largo sin que se
+note, porque el costo del delivery todavía **no suma al total de la venta** (ver
+la deuda del módulo): hoy se calcula, se guarda y se muestra.
+
+**Cuándo revisarlo:** el precio por kilómetro cuando cambie el combustible —es
+el único insumo que lo mueve—; el radio, después de un mes de pedidos reales,
+mirando cuántos cayeron fuera.
+
+**Nota técnica:** hasta 2026-08-25 estos tres números vivían en el `.env` del
+servidor y cambiarlos exigía SSH. Ya no: son parámetros de empresa como el
+resto (ADR-054 addendum).
+
+---
+
 ## Resumen para aprobar
 
 | Parámetro | Propuesta | Confianza |
@@ -282,6 +317,13 @@ claro.
 | `accounting/plazo_envio_comprobante` | 5 días hábiles | Alta — el plazo es interno |
 | `rrhh/rango_salarial_*` (7) | 1.00 – 2.80 RMV según perfil | **Baja** — falta contraste de mercado local |
 | Incentivo por meta | Bono grupal, 3 % del excedente | Media — decisión de tres áreas |
+| `sales/delivery_tarifa_base` | S/ 5.00 | Media — referencia de la plataforma externa |
+| `sales/delivery_precio_por_km` | S/ 1.50 | Media — combustible + tiempo urbano |
+| `sales/delivery_distancia_maxima_km` | 8 km | Media — cubre la ciudad, revisar con pedidos reales |
 
 Los dos de confianza baja son los que conviene aprobar **como provisionales
 y con fecha de revisión**, no como definitivos.
+
+Los tres del delivery son los únicos que **cambian lo que paga el cliente**: hoy
+el reparto sale gratis y aprobarlos lo enciende. Se pueden aprobar de a uno —el
+radio sin las tarifas, por ejemplo— y el efecto es parcial.

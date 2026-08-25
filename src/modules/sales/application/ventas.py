@@ -415,6 +415,7 @@ def _cotizar_entrega(
         tarifa_delivery.origen_de_sucursal(session, sucursal_id),
         tarifa_delivery.coordenada(lat, lng),
         distrito,
+        tarifa_delivery.tarifa_de_sucursal(session, sucursal_id),
     )
 
 

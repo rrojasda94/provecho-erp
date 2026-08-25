@@ -131,6 +131,7 @@ solo.
   el costo se calcula, se guarda y se muestra.
 - **Tarifa por sucursal o por marca.** Arranca global en `settings`. Cuando
   dos locales necesiten precios distintos, pasa a columnas de `sucursal`.
+  *(Superado en parte por el addendum de abajo: hoy es por empresa.)*
 
 ## Consecuencias
 
@@ -140,3 +141,41 @@ solo.
   las lleva.
 - Con las claves vacías todo esto queda inerte: distancia aproximada, costo
   cero, nada que derivar.
+
+## Addendum 2026-08-25 — la tarifa la aprueba Gerencia, no el `.env`
+
+Esta decisión dejó los tres números en `settings`, y eso los volvió
+configuración de **despliegue**: cambiar el precio del reparto exigía entrar al
+servidor por SSH, editar el `.env` y reiniciar contenedores. Es un precio: lo
+decide Gerencia, y Gerencia no tiene —ni debe tener— la llave del servidor.
+
+Es además lo que ADR-014 ya había rechazado de plano al elegir dónde viven los
+valores operativos: *«config por archivo/env var, editable solo por quien
+despliega… rompe además el principio de multi-empresa (un `.env` es global al
+deploy, no por `empresa_id`)»*. La tarifa se le escapó a ese criterio porque
+nació junto a las claves de Google, que sí son configuración de despliegue.
+
+**Los tres pasan a `parametro_empresa` (ADR-014), por empresa**, con los
+códigos `sales/delivery_tarifa_base`, `sales/delivery_precio_por_km` y
+`sales/delivery_distancia_maxima_km`. `settings` deja de ser la regla y queda
+como **valor de arranque**, mismo criterio que `inventory/margen_error_ajuste`.
+
+Cero infraestructura nueva: la tabla, el flujo proponer/aprobar/rechazar, el
+RBAC por módulo (`sales.proponer_parametro`) y la pantalla `/gerencia/parametros`
+ya existían. `tarifa_de_sucursal()` salta de la sucursal a su empresa —el mismo
+salto que ya hacía `sales/alertas.py`— y resuelve los tres valores; `cotizar()`
+los recibe como argumento en vez de ir a buscarlos a la configuración global,
+que es lo que le impedía cobrarle distinto a dos empresas.
+
+**Tres parámetros simples y no uno compuesto**: el formulario de propuesta arma
+un solo valor por vez (monto+divisa, cantidad+UdM, o una clave libre), así que
+un compuesto solo se podría sembrar desde el código — justo lo contrario del
+objetivo. `delivery_distancia_maxima_km` va como clave libre `kilometros`: el
+catálogo de unidades de medida es de insumos y no tiene el kilómetro de
+recorrido, y la clave nombra su propia unidad (igual que `porcentaje`).
+
+`DELIVERY_DISTRITOS_RESTRINGIDOS` **no** se migra: es una lista de nombres y el
+formulario arma un solo número. Sigue en `settings` y queda en la deuda del
+módulo, junto con la tarifa por sucursal —que este addendum no resuelve: dos
+locales de la *misma* empresa siguen cobrando igual.
+

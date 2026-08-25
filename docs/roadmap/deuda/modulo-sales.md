@@ -43,11 +43,23 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   comprobante, contabilidad y el cálculo del total. Se dejó afuera a propósito:
   el radio de impacto del cambio es mucho mayor que el resto de este slice y no
   se puede validar sin decidir antes qué producto y qué cuenta usa.
-- ⬜ **La tarifa de delivery es una sola para todo el grupo** (2026-08-22,
-  ADR-054): `DELIVERY_TARIFA_BASE`, `DELIVERY_PRECIO_POR_KM` y
-  `DELIVERY_DISTANCIA_MAXIMA_KM` viven en `settings`. El día que dos locales
-  necesiten precios distintos —o dos marcas—, pasan a columnas de `sucursal`,
-  que es donde ya vive el resto de lo que distingue a un local.
+- ✅ **La tarifa de delivery se cambia sin tocar el servidor** (2026-08-25,
+  ADR-054 addendum): los tres números pasaron a `parametro_empresa` (ADR-014)
+  con los códigos `sales/delivery_tarifa_base`, `delivery_precio_por_km` y
+  `delivery_distancia_maxima_km`; se proponen y se aprueban en
+  `/gerencia/parametros` y `settings` quedó como valor de arranque. Era
+  configuración de despliegue para algo que es un precio.
+- ⬜ **La tarifa sigue siendo una sola por empresa** (2026-08-22, ADR-054):
+  lo de arriba la resolvió por `empresa_id`, no por local. El día que dos
+  sucursales de la *misma* empresa necesiten precios distintos —un local en la
+  ciudad y otro en carretera— pasan a columnas de `sucursal`, que es donde ya
+  vive el resto de lo que distingue a un local.
+- ⬜ **Los distritos vetados no se editan desde la pantalla** (2026-08-25):
+  `DELIVERY_DISTRITOS_RESTRINGIDOS` se quedó en `settings` cuando la tarifa se
+  fue a `parametro_empresa`, porque es una lista de nombres y el formulario de
+  propuesta arma un solo valor (`gerencia/actions.ts::armarValor`). Se cierra
+  cuando ese formulario sepa proponer una lista — o antes, si el negocio veta
+  un distrito y hay que entrar por SSH para escribirlo.
 - ⬜ **Las zonas de reparto son una lista de distritos, no polígonos**
   (2026-08-22, ADR-054): `DELIVERY_DISTRITOS_RESTRINGIDOS` compara contra el
   distrito que devuelve Google. Alcanza para "no repartimos en Belén" y no para

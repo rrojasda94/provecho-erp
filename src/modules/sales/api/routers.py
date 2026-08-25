@@ -194,6 +194,7 @@ def cotizar_delivery(
         tarifa_delivery.origen_de_sucursal(session, body.sucursal_id),
         tarifa_delivery.coordenada(body.ubicacion_lat, body.ubicacion_lng),
         body.ubicacion_distrito,
+        tarifa_delivery.tarifa_de_sucursal(session, body.sucursal_id),
     )
     return schemas.CotizacionDeliveryOut(
         distancia_km=cotizacion.distancia_km,
