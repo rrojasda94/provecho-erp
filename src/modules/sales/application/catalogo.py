@@ -23,6 +23,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, aliased
 
 from src.modules.inventory.application.queries_publicas import (
+    articulo_resumen,
     insumos_de_receta,
     receta_resumen,
 )
@@ -74,6 +75,8 @@ def crear_producto(
         _validar_padre(padre, receta_id, es_extra)
         marca_id = padre.marca_id
         categoria_id = categoria_id or padre.categoria_id
+    if empaque_id is not None:
+        _exigir_empaque(session, empaque_id)
     return repo.add(
         ProductoComercial(
             id_interno=id_interno,
@@ -88,6 +91,29 @@ def crear_producto(
             es_extra=es_extra,
         )
     )
+
+
+def _exigir_empaque(session: Session, empaque_id: uuid.UUID) -> None:
+    """Lo que se guarda en `empaque_id` tiene que ser un artículo de tipo
+    empaque (RN-EMP-003).
+
+    `data-model.md` lo declaraba desde siempre —«FK articulo tipo=empaque»—
+    pero nada lo hacía cumplir: el `PATCH` metía el campo en un bucle
+    `setattr` genérico, así que el producto terminaba con un insumo de
+    empaque y cada venta descontaba harina como si fuera una caja de pizza.
+    El faltante recién aparecía en el conteo del mes.
+
+    Se lee por el contrato público de `inventory`, no por su ORM.
+    """
+    articulo = articulo_resumen(session, empaque_id)
+    if articulo is None:
+        raise NoEncontrado("empaque no encontrado")
+    if articulo["tipo"] != "empaque":
+        raise ReglaNegocio(
+            f"'{articulo['nombre']}' es de tipo {articulo['tipo']}, no empaque"
+        )
+    if articulo["archivado"]:
+        raise ReglaNegocio(f"'{articulo['nombre']}' está archivado")
 
 
 def _validar_padre(
@@ -245,6 +271,8 @@ def editar_producto(session: Session, producto_id: uuid.UUID, **campos) -> Produ
                 f"'{prod.nombre}' tiene variantes: la receta va en cada una"
             )
         prod.receta_id = campos["receta_id"]
+    if campos.get("empaque_id") is not None:
+        _exigir_empaque(session, campos["empaque_id"])
     for campo in (
         "activo", "categoria_id", "orden", "empaque_id", "modalidades_empaque",
     ):

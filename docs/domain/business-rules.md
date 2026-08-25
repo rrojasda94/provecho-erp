@@ -940,6 +940,12 @@ producción se hace en cocinas de sucursal. Ver
 - **RN-EMP-003** El consumo de empaque en una venta depende de la
   configuración del producto comercial (`empaque_id` + modalidades mesa/
   takeout/delivery marcadas); no se incluye en la receta.
+  `empaque_id` solo acepta un artículo de **tipo `empaque`** y no archivado:
+  se valida al crear y al editar el producto. Antes no lo validaba nadie —la
+  restricción vivía solo en `data-model.md`— y la pantalla ofrecía el
+  catálogo entero, así que un producto podía quedar descontando harina por
+  cada venta como si fuera una caja de pizza. Por la misma regla, el editor
+  de recetas no ofrece empaques como insumo: se descontarían dos veces.
 - **RN-EMP-004** El empaque consumido junto a una venta no aparece en el
   comprobante, salvo que se venda como producto comercial independiente.
 

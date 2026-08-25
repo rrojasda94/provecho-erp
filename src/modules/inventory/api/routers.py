@@ -6,7 +6,7 @@ Reusa las dependencias de auth/RBAC del módulo users (mecanismo transversal).
 import uuid
 from datetime import date
 
-from fastapi import APIRouter, Depends, Response, UploadFile
+from fastapi import APIRouter, Depends, Query, Response, UploadFile
 from sqlalchemy.orm import Session
 
 from src.core.tenant import Tenant
@@ -224,13 +224,18 @@ def crear_articulo(
 @router.get("/articulos", response_model=Pagina[schemas.ArticuloOut])
 def listar_articulos(
     empresa_id: uuid.UUID | None = None,
+    tipo: str | None = Query(
+        None, description="Filtra por tipo de artículo (ej. `empaque`)"
+    ),
     _: Usuario = Depends(require_permission(LEER)),
     tenant: Tenant = Depends(get_tenant),
     p: Paginacion = Depends(paginacion),
     session: Session = Depends(get_db),
 ):
     return paginar(
-        session, catalogo.q_articulos(session, tenant.filtro_empresa(empresa_id)), p
+        session,
+        catalogo.q_articulos(session, tenant.filtro_empresa(empresa_id), tipo),
+        p,
     )
 
 

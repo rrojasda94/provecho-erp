@@ -21,7 +21,13 @@ export default async function ProductoPage({
       apiFetch<Receta[]>("/api/v1/inventory/recetas", { token }),
       apiFetch<UnidadMedida[]>("/api/v1/inventory/unidades-medida", { token }),
       apiFetch<Producto[]>("/api/v1/sales/productos", { token }),
-      apiFetch<Pagina<Articulo>>("/api/v1/inventory/articulos", { token }),
+      // `?tipo=empaque` y no un filtro en el cliente: la lista viene
+      // paginada, así que filtrar lo que llegó deja el desplegable vacío en
+      // cuanto el catálogo pasa de una página — y un desplegable vacío no
+      // dice "faltan", parece que no hay empaques.
+      apiFetch<Pagina<Articulo>>("/api/v1/inventory/articulos?tipo=empaque", {
+        token,
+      }),
     ]);
     const listas = await apiFetch<ListaPrecio[]>(
       `/api/v1/sales/listas-precio?marca_id=${producto.marca_id}`,
@@ -33,6 +39,8 @@ export default async function ProductoPage({
         recetas={recetas}
         unidades={unidades}
         extrasDisponibles={productos.filter((p) => p.es_extra)}
+        // Ya vienen filtrados por tipo desde el servidor; acá solo se cae lo
+        // archivado, que es como se retira un empaque sin borrar su historia.
         empaques={articulos.items.filter((a) => !a.archivado)}
         listas={listas}
       />

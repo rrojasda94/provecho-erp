@@ -23746,7 +23746,7 @@
         "type": "object"
       },
       "TrabajadorUpdate": {
-        "description": "Campo ausente = no tocar.\n\n`sucursal_id` es la excepción: mandarlo en `null` **borra** el centro de\nlabores, porque quedarse sin local asignado es un estado válido y no había\notra forma de volver a él. Para el resto, `null` sigue siendo \"no tocar\".\n\n`estado` no admite `\"cesado\"`: el cese tiene su propio endpoint\n(`POST /trabajadores/{id}/cesar`) porque además de cambiar el estado\nfija la fecha de cese y publica el evento del que cuelga la liquidación.\nLlegar a `cesado` por este PATCH dejaba un trabajador cesado sin fecha\ny sin que nadie se enterara.",
+        "description": "Campo ausente = no tocar.\n\n`sucursal_id` y `usuario_id` son la excepción: mandarlos en `null`\n**borran** el valor, porque quedarse sin local asignado —o sin cuenta— es\nun estado válido y no había otra forma de volver a él. Para el resto,\n`null` sigue siendo \"no tocar\".\n\n`usuario_id` faltaba acá y era la razón por la que nadie podía marcar en\nel pad de asistencia: `TrabajadorCreate` sí lo aceptaba, pero un\ntrabajador ya dado de alta no tenía ninguna forma de recibir su cuenta, y\n`pad_asistencia.usuario_que_firma` exige justamente ese campo para llegar\nal PIN.\n\n`estado` no admite `\"cesado\"`: el cese tiene su propio endpoint\n(`POST /trabajadores/{id}/cesar`) porque además de cambiar el estado\nfija la fecha de cese y publica el evento del que cuelga la liquidación.\nLlegar a `cesado` por este PATCH dejaba un trabajador cesado sin fecha\ny sin que nadie se enterara.",
         "properties": {
           "area": {
             "anyOf": [
@@ -23816,6 +23816,18 @@
               }
             ],
             "title": "Sucursal Id"
+          },
+          "usuario_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usuario Id"
           }
         },
         "title": "TrabajadorUpdate",
@@ -24658,6 +24670,10 @@
           },
           "tipo": {
             "default": "humano",
+            "enum": [
+              "humano",
+              "agente_ia"
+            ],
             "title": "Tipo",
             "type": "string"
           },
@@ -30192,6 +30208,24 @@
                 }
               ],
               "title": "Empresa Id"
+            }
+          },
+          {
+            "description": "Filtra por tipo de artículo (ej. `empaque`)",
+            "in": "query",
+            "name": "tipo",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filtra por tipo de artículo (ej. `empaque`)",
+              "title": "Tipo"
             }
           },
           {

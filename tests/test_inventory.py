@@ -370,6 +370,29 @@ def test_los_destinos_de_un_reporte_devuelven_el_dato_completo(env):
     assert Decimal(cuerpo["stock"][0]["cantidad"]) == Decimal("12")
 
 
+def test_listar_articulos_filtra_por_tipo(env):
+    """El filtro vive en la base y no en la pantalla porque la lista viene
+    paginada: quien solo quiere empaques y filtra lo que le llegó se queda
+    sin ninguno en cuanto el catálogo pasa de una página."""
+    client, ids, _ = env
+    h = _token(client)
+    r = client.post("/api/v1/inventory/articulos", headers=h, json={
+        "id_interno": "A900", "nombre": "Caja Pizza Familiar",
+        "unidad_medida_id": ids["udm_id"], "tipo": "empaque",
+    })
+    assert r.status_code == 201, r.text
+
+    empaques = client.get("/api/v1/inventory/articulos?tipo=empaque", headers=h)
+    assert empaques.status_code == 200
+    nombres = [a["nombre"] for a in empaques.json()["items"]]
+    assert nombres == ["Caja Pizza Familiar"]
+
+    # Sin el filtro sigue viniendo todo: el parámetro es opcional y nadie más
+    # tiene que cambiar por esto.
+    todos = client.get("/api/v1/inventory/articulos", headers=h)
+    assert "Harina" in [a["nombre"] for a in todos.json()["items"]]
+
+
 def test_ajustes_se_pueden_listar_y_abrir(env):
     """Antes solo se podían crear y aprobar: `inventory.ajuste_fuera_margen`
     reportaba un hecho que no se podía ir a mirar."""

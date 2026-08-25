@@ -42,6 +42,16 @@ class TrabajadorRepo:
     def list(self, empresa_id: uuid.UUID | None = None) -> list[Trabajador]:
         return list(self.s.scalars(self.q_list(empresa_id)))
 
+    def por_usuario(self, usuario_id: uuid.UUID) -> Trabajador | None:
+        """Quién usa esa cuenta, si alguien. Una cuenta marca asistencia con
+        un PIN: si dos trabajadores la comparten, el pad no puede saber cuál
+        de los dos fichó."""
+        return self.s.scalars(
+            select(Trabajador)
+            .where(Trabajador.usuario_id == usuario_id)
+            .where(Trabajador.deleted_at.is_(None))
+        ).first()
+
     def add(self, trabajador: Trabajador) -> Trabajador:
         self.s.add(trabajador)
         self.s.flush()
