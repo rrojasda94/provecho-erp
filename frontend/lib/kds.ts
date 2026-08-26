@@ -50,6 +50,9 @@ export type PedidoCola = {
   venta_id: string;
   numero_orden: number;
   referencia_atencion: string | null;
+  /** Dirección del delivery. Despacho arma la bolsa mirando la pantalla, así
+   * que la ve acá y no solo en la comanda impresa. `null` fuera de delivery. */
+  direccion_entrega: string | null;
   modalidad: string;
   canal: string;
   /** `venta` | `consumo_personal` (RN-COM-025): la cocina prioriza distinto
