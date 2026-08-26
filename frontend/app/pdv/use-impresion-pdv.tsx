@@ -14,7 +14,7 @@ import type {
 import { api, type Venta } from "@/lib/pdv";
 
 /**
- * Lo que la caja manda al rollo de 80 mm (ADR-066): el comprobante de una
+ * Lo que la caja manda al rollo de 80 mm (ADR-067): el comprobante de una
  * cuenta cobrada y la comanda de una cuenta abierta.
  *
  * Sale de `pdv-cliente.tsx` porque ahí ya viven quince responsabilidades y

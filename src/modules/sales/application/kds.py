@@ -30,7 +30,10 @@ from src.modules.sales.application.errors import (
 from src.modules.sales.application.impresion import encabezado as encabezado_de
 from src.modules.sales.domain import rules
 from src.modules.sales.infrastructure.models import (
+    Atributo,
+    AtributoValor,
     KdsPantalla,
+    ProductoAtributoValor,
     ProductoComercial,
     Venta,
     VentaItem,
@@ -187,6 +190,39 @@ def _restas_por_item(session: Session, pares: list[tuple]) -> dict[uuid.UUID, li
     }
 
 
+def _valores_por_item(session: Session, pares: list[tuple]) -> dict[uuid.UUID, list[str]]:
+    """`venta_item_id` → ["Mitad 1: Americana", "Mitad 2: Hawaiana"].
+
+    Espejo de `_restas_por_item` y por el mismo motivo: cocina necesita
+    nombres, no ids. Antes el sabor era un extra y salía impreso solo; desde
+    que vive en `producto_atributo_valor` la comanda de una MitadXMitad
+    dejaría de decir **qué mitades es**, que es justo lo único que el
+    pizzero necesita saber de ese plato.
+
+    El atributo va delante del valor porque "Americana" a secas no dice de
+    qué mitad es, y en una mitad-y-mitad esa es toda la información.
+    """
+    ids = {
+        uuid.UUID(str(v)) for it, _ in pares for v in (it.valores_variante_ids or [])
+    }
+    if not ids:
+        return {}
+    filas = session.execute(
+        select(ProductoAtributoValor.id, Atributo.nombre, AtributoValor.nombre)
+        .join(AtributoValor, ProductoAtributoValor.atributo_valor_id == AtributoValor.id)
+        .join(Atributo, AtributoValor.atributo_id == Atributo.id)
+        .where(ProductoAtributoValor.id.in_(ids))
+    )
+    etiqueta = {ptav: f"{atributo}: {valor}" for ptav, atributo, valor in filas}
+    return {
+        it.id: [
+            etiqueta.get(uuid.UUID(str(v)), "—") for v in it.valores_variante_ids
+        ]
+        for it, _ in pares
+        if it.valores_variante_ids
+    }
+
+
 def _pertenece(pantalla: KdsPantalla, producto: ProductoComercial) -> bool:
     """¿La pantalla atiende la categoría de este producto? NULL/[] = todas."""
     if not pantalla.categoria_ids:
@@ -245,6 +281,7 @@ def _item_a_dict(
     restas: dict[uuid.UUID, list[str]],
     estacion: KdsPantalla | None,
     extras: list[tuple] = (),
+    valores: dict[uuid.UUID, list[str]] | None = None,
 ) -> dict:
     return {
         "venta_item_id": str(item.id),
@@ -252,6 +289,10 @@ def _item_a_dict(
         "cantidad": str(item.cantidad),
         "estado": item.estado_preparacion,
         "sin": restas.get(item.id, []),
+        # QUÉ es el plato: las dos mitades de una MitadXMitad. Distinto de
+        # `extras`, que es lo que se le agrega — acá no hay línea cobrada, la
+        # elección cambia la receta que se prepara (ADR-056).
+        "valores": (valores or {}).get(item.id, []),
         # Lo que el plato lleva ADEMÁS: el sabor de la pizza, el queso extra.
         # Van acá dentro y no como líneas sueltas porque son el mismo plato
         # (RN-CUP-014) — sueltas, la tarjeta decía "1 Pizza Personal" y
@@ -294,7 +335,10 @@ def cola_pantalla(session: Session, pantalla_id: uuid.UUID) -> list[dict]:
         if estados_todos and all(e == "entregado" for e in estados_todos):
             continue
         restas = _restas_por_item(session, pares)
-        mios, pendiente_aqui = _items_de_pantalla(pantalla, cadena, pares, restas)
+        valores = _valores_por_item(session, pares)
+        mios, pendiente_aqui = _items_de_pantalla(
+            pantalla, cadena, pares, restas, valores
+        )
         if pantalla.tipo == "preparacion":
             # La estación ve TODOS sus ítems, incluidos los que ya tachó: el
             # ítem tachado tiene que seguir a la vista de quien lo tachó. El
@@ -331,6 +375,7 @@ def _items_de_pantalla(
     cadena: list[KdsPantalla],
     pares: list[tuple],
     restas: dict[uuid.UUID, list[str]],
+    valores: dict[uuid.UUID, list[str]] | None = None,
 ) -> tuple[list[dict], bool]:
     """Ítems que le competen a la pantalla, y si le queda algo por hacer.
 
@@ -352,7 +397,8 @@ def _items_de_pantalla(
         return (
             [
                 _item_a_dict(
-                    it, prod, restas, _estacion_de(cadena, it, prod), hijos.get(it.id, [])
+                    it, prod, restas, _estacion_de(cadena, it, prod),
+                    hijos.get(it.id, []), valores,
                 )
                 for it, prod in platos
             ],
@@ -444,6 +490,7 @@ def avance_venta(session: Session, venta_id: uuid.UUID) -> dict:
     pares = _items_de_venta(session, venta_id)
     estados = [it.estado_preparacion for it, _ in pares]
     restas = _restas_por_item(session, pares)
+    valores = _valores_por_item(session, pares)
     cadena = _cadena(session, venta.sucursal_id)
     hijos = _extras_de(pares)
     return {
@@ -453,7 +500,8 @@ def avance_venta(session: Session, venta_id: uuid.UUID) -> dict:
         "estado_pedido": rules.estado_pedido(estados),
         "items": [
             _item_a_dict(
-                it, prod, restas, _estacion_de(cadena, it, prod), hijos.get(it.id, [])
+                it, prod, restas, _estacion_de(cadena, it, prod),
+                hijos.get(it.id, []), valores,
             )
             for it, prod in pares
             if it.padre_venta_item_id is None
@@ -463,9 +511,39 @@ def avance_venta(session: Session, venta_id: uuid.UUID) -> dict:
 
 # --- Comanda ------------------------------------------------------------------
 # El ancho lo pone el papel, y todas las ticketeras del grupo son de 80 mm
-# (ADR-066). Antes eran 32 columnas —58 mm— y la misma comanda salía con un
+# (ADR-067). Antes eran 32 columnas —58 mm— y la misma comanda salía con un
 # tercio del rollo en blanco y los nombres largos cortados sin necesidad.
 ANCHO_COMANDA = impresion.ANCHO
+
+
+def _platos_en_papel(session: Session, pares: list[tuple]) -> list[str]:
+    """Los platos de la comanda, cada uno con lo que lo define y lo modifica.
+
+    Todo sangrado y en mayúsculas: en la cocina el papel se lee de reojo, y
+    un extra o una resta que pasan desapercibidos salen como plato rehecho.
+    """
+    restas = _restas_por_item(session, pares)
+    valores = _valores_por_item(session, pares)
+    hijos = _extras_de(pares)
+    lineas: list[str] = []
+    for it, prod in pares:
+        # El extra se imprime DENTRO de su plato, no como línea de primer
+        # nivel: en el papel, "1x Pizza Personal" seguido de "1x Peperoni"
+        # se lee como dos pizzas (RN-CUP-014).
+        if it.padre_venta_item_id is not None:
+            continue
+        cant = f"{it.cantidad.normalize()}x"
+        lineas.append(f"{cant} {prod.nombre}"[:ANCHO_COMANDA])
+        # Los valores van primero porque dicen QUÉ es el plato —qué mitades
+        # lleva la pizza—, mientras que extras y restas lo modifican.
+        for etiqueta in valores.get(it.id, []):
+            lineas.append(f"   > {etiqueta.upper()}"[:ANCHO_COMANDA])
+        for hijo, extra in hijos.get(it.id, []):
+            suf = "" if hijo.cantidad == 1 else f"{hijo.cantidad.normalize()}x "
+            lineas.append(f"   + {suf}{extra.nombre.upper()}"[:ANCHO_COMANDA])
+        for nombre in restas.get(it.id, []):
+            lineas.append(f"   SIN {nombre.upper()}"[:ANCHO_COMANDA])
+    return lineas
 
 
 def comanda(session: Session, venta_id: uuid.UUID) -> dict:
@@ -504,24 +582,7 @@ def comanda(session: Session, venta_id: uuid.UUID) -> dict:
     if reimpresion:
         lineas.append("** REIMPRESION **".center(ANCHO_COMANDA))
         lineas.append("-" * ANCHO_COMANDA)
-    restas = _restas_por_item(session, pares)
-    hijos = _extras_de(pares)
-    for it, prod in pares:
-        # El extra se imprime DENTRO de su plato, no como línea de primer
-        # nivel: en el papel, "1x Pizza Personal" seguido de "1x Peperoni"
-        # se lee como dos pizzas (RN-CUP-014).
-        if it.padre_venta_item_id is not None:
-            continue
-        cant = f"{it.cantidad.normalize()}x"
-        lineas.append(f"{cant} {prod.nombre}"[:ANCHO_COMANDA])
-        # Sangradas y en mayúsculas: en la cocina la comanda se lee de reojo,
-        # y un extra o una resta que pasan desapercibidos salen como plato
-        # rehecho.
-        for hijo, extra in hijos.get(it.id, []):
-            suf = "" if hijo.cantidad == 1 else f"{hijo.cantidad.normalize()}x "
-            lineas.append(f"   + {suf}{extra.nombre.upper()}"[:ANCHO_COMANDA])
-        for nombre in restas.get(it.id, []):
-            lineas.append(f"   SIN {nombre.upper()}"[:ANCHO_COMANDA])
+    lineas += _platos_en_papel(session, pares)
     lineas.append("*" * ANCHO_COMANDA)
     return {
         "venta_id": str(venta_id),

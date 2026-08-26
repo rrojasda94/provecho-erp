@@ -57,7 +57,7 @@ cuatro huecos que el punto de venta necesitaba y el modelo no daba.
   Factiliza en el momento y no se archivan — su copia es la buena mientras
   el proveedor siga activo — y los bytes vuelven sin tocar, porque
   reescribir un XML firmado lo invalida.
-- **Ticket de 80 mm del comprobante** (2026-08-25, ADR-066,
+- **Ticket de 80 mm del comprobante** (2026-08-25, ADR-067,
   `GET /sales/comprobantes/{id}/ticket`): la representación impresa que el
   cliente se lleva en caja — membrete de marca, ítems con precio, desglose de
   impuestos, total en letras y el **QR de la RS 097-2012**
@@ -175,7 +175,7 @@ cuatro huecos que el punto de venta necesitaba y el modelo no daba.
   por acá.
 - **Precuenta** (RN-COM-019): `GET /ventas/{id}/precuenta`, documento **no
   fiscal**, opcionalmente por cuenta. No cambia el estado ni se audita.
-  Texto de 48 columnas + membrete, igual que la comanda (ADR-066).
+  Texto de 48 columnas + membrete, igual que la comanda (ADR-067).
 - **Autorización de supervisor** (RN-AUD-005): `POST /auth/autorizar`
   (módulo `users`) verifica PIN + permiso y devuelve una elevación de 3
   minutos acotada a esa acción. Descuento y anulación de líneas la exigen;
@@ -210,6 +210,21 @@ ADR-023):**
   producto: los usa la ficha, que edita lo propio y no lo heredado.
   `GET /carta` devuelve `variantes[].extras[]` además del `extras[]` de
   nivel producto, que es el de los productos simples.
+- **Atributos en la carta** (ADR-067, RN-COM-040): `GET /carta` devuelve
+  además `atributos[]` y `exclusiones[]`, por producto y por variante. Es el
+  modelo **nuevo** (ADR-055/056), distinto de los grupos de extras de arriba:
+  un valor de atributo no crea línea ni se cobra aparte — cambia *qué se
+  prepara*, activando las líneas condicionadas de la receta, y viaja de vuelta
+  en `valores_variante_ids`.
+  Ofrecido **es** obligatorio y de a uno: `ventas._validar_atributos` lo hace
+  cumplir al confirmar, con la misma excepción del replay. Se ofrece lo que el
+  producto o su padre declaran, con PTAV y valor activos, salvo los atributos
+  en `modo_variante='siempre'` —esos ya son variantes—.
+  **La carta y el validador salen de la misma función**
+  (`catalogo.atributos_ofrecidos`): escrito dos veces, la pantalla dejaría de
+  ofrecer lo que el servidor exige y el producto quedaría invendible.
+  Las exclusiones viajan como ayuda de pantalla; quien manda sigue siendo
+  `catalogo.combinacion_excluida` al confirmar.
 - **Ficha del producto**: `GET /productos/{id}` devuelve producto +
   variantes + grupos en una lectura, para editar todo en la misma pantalla
   (patrón Odoo). `GET /marcas` acompaña al alta.
@@ -488,7 +503,7 @@ tiempo real (Redis/WebSocket) es deuda declarada.
 - **Comanda**: `POST /kds/ventas/{id}/comanda` → texto plano **48 cols**
   (térmica 80 mm, `shared/impresion.py`) + membrete de la marca + contador
   `comanda_impresa_veces` (reimpresión marcada y auditable). Desde
-  2026-08-25 (ADR-066) el ancho es el mismo para comanda, precuenta y ticket
+  2026-08-25 (ADR-067) el ancho es el mismo para comanda, precuenta y ticket
   del comprobante: eran 32, 40 y ninguno.
 - **`venta.referencia_atencion`** ("Mesa 5", "Carlos", "Rappi #1042"):
   texto libre que el PDV envía al crear la venta — visible en toda

@@ -161,8 +161,15 @@ RECURSOS = (
             "receta_id",
             "articulo_id",
             "cantidad",
+            "unidad_medida_id",
             "merma_pct",
             "expresion",
+            # Sin la condición, la línea se replica pero se evalúa como
+            # incondicional: durante un corte el hub descontaría los cuatro
+            # sabores de una MitadXMitad en vez de los dos elegidos
+            # (ADR-056). Se replicaba `expresion` y no esto, que es lo que
+            # decide si el insumo sale del almacén.
+            "aplica_valores",
             "updated_at",
         ),
         # Cuelga de la receta: se acota por las de la empresa, no por sí

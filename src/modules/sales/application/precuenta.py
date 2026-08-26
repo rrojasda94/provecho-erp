@@ -9,7 +9,7 @@ Se imprime tantas veces como haga falta y no se audita: pedirla dos veces
 es normal, no una señal de nada.
 
 Sale por la misma ticketera de 80 mm que la comanda y el comprobante, así
-que el ancho lo pone `shared.impresion` (ADR-066) y viaja con el mismo
+que el ancho lo pone `shared.impresion` (ADR-067) y viaja con el mismo
 encabezado de marca: el cliente tiene que reconocer de qué local es el papel
 que le dejaron en la mesa.
 """

@@ -602,7 +602,7 @@ backend que todavía no llega a pantalla.
       Mientras tanto es un campo `type="password"` que el navegador ofrece
       guardar, con el mismo defecto que ADR-045 describe.
 
-## Impresión térmica (2026-08-25, ADR-066)
+## Impresión térmica (2026-08-25, ADR-067)
 
 - ⬜ **La hoja de impresión no tiene prueba automatizada.** El ancho de 80 mm,
   que las 48 columnas del texto entren sin partirse, y que `@media print`

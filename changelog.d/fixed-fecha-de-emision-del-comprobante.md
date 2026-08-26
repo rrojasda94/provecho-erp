@@ -1,5 +1,5 @@
 - **El comprobante declaraba la fecha de cuando se envió, no la del cobro**
-  (2026-08-25, ADR-066 §7). `_documento()` ponía `datetime.now(UTC)` como
+  (2026-08-25, ADR-067 §7). `_documento()` ponía `datetime.now(UTC)` como
   `fecha_Emision`, con dos errores encimados: un comprobante que se quedó en la
   cola —proveedor caído, worker muerto, `FACTILIZA_TOKEN` sin configurar— y
   salía al día siguiente le declaraba a SUNAT **una fecha que la venta nunca

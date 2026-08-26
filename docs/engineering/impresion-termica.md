@@ -3,7 +3,7 @@
 Cómo sale el papel en el local: qué imprime el ERP, cómo se configura la
 ticketera, y cómo se quita el diálogo del navegador.
 
-Decisiones detrás de esto: **ADR-066**.
+Decisiones detrás de esto: **ADR-067**.
 
 ## Qué se imprime
 
@@ -95,7 +95,7 @@ nadie se queda sin poder imprimir por no haberla configurado.
 Un **agente ESC/POS local** (o impresión directa por red al puerto 9100) sacaría
 el navegador del camino: corte automático, cajón portamonedas y campana de
 cocina, que el `window.print()` no puede accionar. No está hecho —ver Deuda
-técnica en `docs/roadmap/deuda/modulo-sales.md`— y el trabajo de ADR-066 lo
+técnica en `docs/roadmap/deuda/modulo-sales.md`— y el trabajo de ADR-067 lo
 habilita: la comanda y la precuenta ya son texto de 48 columnas, que es
 exactamente lo que un ESC/POS consume.
 

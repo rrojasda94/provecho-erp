@@ -699,7 +699,7 @@ def ticket_comprobante(
     usuario: Usuario = Depends(get_current_user),
     session: Session = Depends(get_db),
 ):
-    """Lo que se imprime en la ticketera de 80 mm (ADR-066).
+    """Lo que se imprime en la ticketera de 80 mm (ADR-067).
 
     Es la representación impresa que el cliente se lleva en caja, no el PDF
     de Factiliza: sale **al momento del cobro**, sin esperar a que SUNAT

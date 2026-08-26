@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
 /**
- * Cómo sale el papel (ADR-066).
+ * Cómo sale el papel (ADR-067).
  *
  * El contenido a imprimir se monta en un portal colgado de `<body>` y el CSS
  * de `@media print` esconde todo lo demás. Se descartaron las dos

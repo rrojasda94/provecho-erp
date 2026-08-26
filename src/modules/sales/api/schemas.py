@@ -165,7 +165,7 @@ class AnularVentaIn(BaseModel):
 
 
 class EncabezadoImpresionOut(BaseModel):
-    """Membrete del rollo de 80 mm: quién emite (ADR-066).
+    """Membrete del rollo de 80 mm: quién emite (ADR-067).
 
     Lo comparten comanda, precuenta y ticket del comprobante — el papel de un
     mismo local tiene que verse igual salga por donde salga.
@@ -746,6 +746,46 @@ class ExtraDeCartaOut(BaseModel):
     grupo_maximo: int | None = None
 
 
+class ValorDeCartaOut(BaseModel):
+    """Un valor elegible de un atributo (ej. «Hawaiana» para «Mitad 1»)."""
+
+    #: `producto_atributo_valor.id`. Es lo que viaja de vuelta en
+    #: `valores_variante_ids` y lo que nombra la condición de la receta
+    #: (`receta_item.aplica_valores`, RN-COM-037): de este id depende que la
+    #: línea condicionada se active y descuente.
+    id: uuid.UUID
+    nombre: str
+    #: Se **suma** al precio de la línea (RN-COM-036). Normalmente 0.
+    precio_extra: Decimal = Decimal(0)
+
+
+class AtributoDeCartaOut(BaseModel):
+    """Una elección que hay que hacer para vender el producto.
+
+    Distinto de un grupo de extras: el extra es un `producto_comercial` que
+    nace como línea propia y se cobra aparte, mientras que un valor de
+    atributo no crea línea — cambia **qué** se prepara, activando las líneas
+    condicionadas de la receta. Por eso viaja por `valores_variante_ids` y no
+    como un extra más.
+
+    Ofrecido = obligatorio, y exactamente uno: con cero elegidos la receta no
+    dispara ninguna condición y el plato se prepara sin descontar nada
+    (RN-COM-040).
+    """
+
+    atributo_id: uuid.UUID
+    nombre: str
+    #: `radio` | `select`. Cosmético: no cambia ni la aritmética ni la regla.
+    display: str
+    orden: int
+    valores: list[ValorDeCartaOut] = []
+
+
+#: Par de PTAV que no pueden ir juntos. Se guarda una sola fila y vale en los
+#: dos sentidos, así que quien lo dibuje compara en ambas direcciones.
+ParExcluido = tuple[uuid.UUID, uuid.UUID]
+
+
 class VarianteDeCartaOut(BaseModel):
     """Tamaño/presentación del producto, con precio propio y completo — no
     un recargo sobre el padre (RN-COM-022). Elegir una es obligatorio."""
@@ -759,6 +799,10 @@ class VarianteDeCartaOut(BaseModel):
     # ofrecen los mismos sabores. Elegida la variante, estos mandan sobre
     # los del padre.
     extras: list[ExtraDeCartaOut] = []
+    # Ídem para los atributos (ADR-038 §2): en MitadXMitad las líneas cuelgan
+    # de «Pizza MitadxMitad Familiar», no del padre.
+    atributos: list[AtributoDeCartaOut] = []
+    exclusiones: list[ParExcluido] = []
 
 
 class CartaItemOut(BaseModel):
@@ -774,6 +818,8 @@ class CartaItemOut(BaseModel):
     # Los del padre. Un producto con variantes normalmente los tiene vacíos
     # (cuelgan de cada variante); se conserva para los productos simples.
     extras: list[ExtraDeCartaOut] = []
+    atributos: list[AtributoDeCartaOut] = []
+    exclusiones: list[ParExcluido] = []
 
 
 class VentaItemExtraOut(BaseModel):

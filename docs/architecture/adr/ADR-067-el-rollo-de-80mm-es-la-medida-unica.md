@@ -1,4 +1,4 @@
-# ADR-066 — El rollo de 80 mm es la medida única, y el ticket lo arma el ERP
+# ADR-067 — El rollo de 80 mm es la medida única, y el ticket lo arma el ERP
 
 - Estado: aceptado
 - Fecha: 2026-08-25

@@ -1,4 +1,4 @@
-/** Contratos de impresión (ADR-066). Espejo de `sales/api/schemas.py`:
+/** Contratos de impresión (ADR-067). Espejo de `sales/api/schemas.py`:
  * `EncabezadoImpresionOut` y `TicketComprobanteOut`.
  *
  * Los importes viajan como string —son `Decimal` en el servidor— y se

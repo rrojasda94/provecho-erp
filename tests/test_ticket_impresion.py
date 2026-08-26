@@ -1,4 +1,4 @@
-"""Representación impresa en ticketera de 80 mm (ADR-066).
+"""Representación impresa en ticketera de 80 mm (ADR-067).
 
 Lo que se prueba acá es que el papel y el XML digan lo mismo: los totales
 del ticket salen del mismo payload que se le manda a Factiliza, el QR

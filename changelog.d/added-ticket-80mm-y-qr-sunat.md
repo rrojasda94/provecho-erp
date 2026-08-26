@@ -1,4 +1,4 @@
-- **La boleta y la factura se imprimen desde el ERP** (2026-08-25, ADR-066). No
+- **La boleta y la factura se imprimen desde el ERP** (2026-08-25, ADR-067). No
   había ningún modelo de comprobante: lo único imprimible era el PDF de
   Factiliza, cuyo diseño decide el proveedor y que hay que bajar y abrir en un
   visor. Ahora `GET /sales/comprobantes/{id}/ticket` devuelve la

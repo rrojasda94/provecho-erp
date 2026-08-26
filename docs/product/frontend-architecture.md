@@ -447,7 +447,7 @@ personalizados: diferible.
 
 ## F2.23 Impresión
 
-✅ **2026-08-25 (ADR-066).** Rollo de **80 mm** para los tres documentos que
+✅ **2026-08-25 (ADR-067).** Rollo de **80 mm** para los tres documentos que
 salen del local — comanda de cocina, precuenta y ticket del comprobante —, a
 **48 columnas**, con el mismo membrete de marca y el QR de SUNAT en el
 comprobante.
@@ -475,10 +475,10 @@ Falta: caso de `frontend/uso/` que fije el ancho y el aislamiento de la hoja
 ## F2.24 Integración con hardware
 
 🔶 **Parcial.** La ticketera de 80 mm ya imprime, pero **a través del
-navegador** (ADR-066): eso alcanza para papel y no para corte automático,
+navegador** (ADR-067): eso alcanza para papel y no para corte automático,
 cajón portamonedas ni campana de cocina, que solo se accionan por ESC/POS.
 El puente ESC/POS (por red al 9100 o agente local) sigue siendo deuda
-declarada en `ROADMAP.md`; el trabajo de ADR-066 lo habilita, porque la
+declarada en `ROADMAP.md`; el trabajo de ADR-067 lo habilita, porque la
 comanda y la precuenta ya son texto de 48 columnas. Lectores QR/código de
 barras y balanzas: sin especificar todavía — se define cuando el flujo tenga
 pantalla, no antes.

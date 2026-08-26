@@ -1,5 +1,5 @@
 """Lo que se manda a la ticketera de 80 mm: encabezado de marca y ticket del
-comprobante (ADR-066).
+comprobante (ADR-067).
 
 Dos piezas:
 

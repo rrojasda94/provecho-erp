@@ -23,6 +23,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, aliased
 
 from src.modules.inventory.application.queries_publicas import (
+    articulo_resumen,
     insumos_de_receta,
     receta_resumen,
 )
@@ -74,6 +75,8 @@ def crear_producto(
         _validar_padre(padre, receta_id, es_extra)
         marca_id = padre.marca_id
         categoria_id = categoria_id or padre.categoria_id
+    if empaque_id is not None:
+        _exigir_empaque(session, empaque_id)
     return repo.add(
         ProductoComercial(
             id_interno=id_interno,
@@ -88,6 +91,29 @@ def crear_producto(
             es_extra=es_extra,
         )
     )
+
+
+def _exigir_empaque(session: Session, empaque_id: uuid.UUID) -> None:
+    """Lo que se guarda en `empaque_id` tiene que ser un artículo de tipo
+    empaque (RN-EMP-003).
+
+    `data-model.md` lo declaraba desde siempre —«FK articulo tipo=empaque»—
+    pero nada lo hacía cumplir: el `PATCH` metía el campo en un bucle
+    `setattr` genérico, así que el producto terminaba con un insumo de
+    empaque y cada venta descontaba harina como si fuera una caja de pizza.
+    El faltante recién aparecía en el conteo del mes.
+
+    Se lee por el contrato público de `inventory`, no por su ORM.
+    """
+    articulo = articulo_resumen(session, empaque_id)
+    if articulo is None:
+        raise NoEncontrado("empaque no encontrado")
+    if articulo["tipo"] != "empaque":
+        raise ReglaNegocio(
+            f"'{articulo['nombre']}' es de tipo {articulo['tipo']}, no empaque"
+        )
+    if articulo["archivado"]:
+        raise ReglaNegocio(f"'{articulo['nombre']}' está archivado")
 
 
 def _validar_padre(
@@ -245,6 +271,8 @@ def editar_producto(session: Session, producto_id: uuid.UUID, **campos) -> Produ
                 f"'{prod.nombre}' tiene variantes: la receta va en cada una"
             )
         prod.receta_id = campos["receta_id"]
+    if campos.get("empaque_id") is not None:
+        _exigir_empaque(session, campos["empaque_id"])
     for campo in (
         "activo", "categoria_id", "orden", "empaque_id", "modalidades_empaque",
     ):
@@ -541,6 +569,125 @@ def valores_ofrecidos(session: Session, producto: ProductoComercial) -> set[str]
         )
     )
     return {str(v) for v in filas}
+
+
+def atributos_ofrecidos(
+    session: Session, productos: Sequence[ProductoComercial]
+) -> dict[uuid.UUID, list[dict]]:
+    """Qué atributos hay que preguntar al vender cada uno de estos productos.
+
+    **Es la única fuente**: la consumen la carta (`precios.carta`, para
+    dibujar los grupos) y el validador de la venta
+    (`ventas._validar_atributos`, para exigirlos). Si el filtro se escribiera
+    dos veces y las copias se separaran, la pantalla no ofrecería lo que el
+    servidor exige y el producto quedaría invendible — el peor desenlace
+    posible de este camino, y el único que nadie notaría hasta el mostrador.
+
+    Se resuelve **por lote** y no producto por producto: la carta recorre el
+    catálogo entero y `_extras_de` ya hace una consulta por nodo. Sumarle
+    otras cuatro por variante convertiría abrir el PDV en cientos de idas a
+    la base.
+
+    Un valor se ofrece si su PTAV está activo, su `atributo_valor` está
+    activo, y el atributo **no** es `modo_variante='siempre'` — esos ya se
+    materializaron como variantes y volver a preguntarlos sería pedir dos
+    veces la misma elección. `dinamica` sí se pregunta: hoy se comporta como
+    `nunca` (deuda de ADR-063) y `valores_ofrecidos` no filtra por modo, así
+    que excluirla dejaría un atributo que el servidor acepta y la pantalla
+    nunca muestra.
+
+    La herencia padre→variante es la de `valores_ofrecidos` y por el mismo
+    motivo (ADR-042): quien arma un producto a mano cuelga el atributo del
+    padre, el importador lo cuelga donde diga la planilla, y mientras el
+    lugar importe siempre hay una mitad de los catálogos rota.
+    """
+    if not productos:
+        return {}
+    de_interes: set[uuid.UUID] = set()
+    for p in productos:
+        de_interes.add(p.id)
+        if p.producto_padre_id is not None:
+            de_interes.add(p.producto_padre_id)
+
+    filas = session.execute(
+        select(ProductoAtributoLinea, ProductoAtributoValor, Atributo, AtributoValor)
+        .join(Atributo, ProductoAtributoLinea.atributo_id == Atributo.id)
+        .join(
+            ProductoAtributoValor,
+            ProductoAtributoValor.linea_id == ProductoAtributoLinea.id,
+        )
+        .join(
+            AtributoValor, ProductoAtributoValor.atributo_valor_id == AtributoValor.id
+        )
+        .where(
+            ProductoAtributoLinea.producto_comercial_id.in_(de_interes),
+            ProductoAtributoValor.activo.is_(True),
+            AtributoValor.activo.is_(True),
+            Atributo.modo_variante != "siempre",
+        )
+        .order_by(ProductoAtributoLinea.orden, Atributo.nombre, AtributoValor.orden)
+    )
+
+    #: producto donde cuelga la línea → {atributo_id: atributo con valores}
+    colgados: dict[uuid.UUID, dict[uuid.UUID, dict]] = {}
+    for linea, ptav, atributo, valor in filas:
+        entrada = colgados.setdefault(linea.producto_comercial_id, {}).setdefault(
+            atributo.id,
+            {
+                "atributo_id": atributo.id,
+                "nombre": atributo.nombre,
+                "display": atributo.display,
+                "orden": linea.orden,
+                "valores": [],
+            },
+        )
+        entrada["valores"].append(
+            {
+                "id": ptav.id,
+                "nombre": valor.nombre,
+                "precio_extra": ptav.precio_extra or Decimal(0),
+            }
+        )
+
+    resultado: dict[uuid.UUID, list[dict]] = {}
+    for p in productos:
+        # Lo del padre primero y lo propio encima: si la variante declara el
+        # mismo atributo, manda el suyo (ADR-038 §2).
+        efectivos: dict[uuid.UUID, dict] = {}
+        if p.producto_padre_id is not None:
+            efectivos.update(colgados.get(p.producto_padre_id, {}))
+        efectivos.update(colgados.get(p.id, {}))
+        if efectivos:
+            resultado[p.id] = sorted(
+                efectivos.values(), key=lambda a: (a["orden"], a["nombre"])
+            )
+    return resultado
+
+
+def exclusiones_entre(
+    session: Session, ptav_ids: Sequence[uuid.UUID]
+) -> list[tuple[uuid.UUID, uuid.UUID]]:
+    """Pares de PTAV que no pueden elegirse juntos, acotados a estos ids.
+
+    La fila se guarda una vez y vale en los dos sentidos (son el mismo
+    hecho), así que quien la dibuje tiene que comparar en ambas direcciones.
+    Va a la carta como **ayuda de pantalla**: quien manda sigue siendo
+    `combinacion_excluida` al confirmar. Sin esto, el cajero se entera de que
+    no puede repetir sabor recién cuando manda el pedido entero, con la pizza
+    ya fuera de la vista.
+    """
+    if not ptav_ids:
+        return []
+    filas = session.execute(
+        select(
+            ProductoExclusion.producto_atributo_valor_id,
+            ProductoExclusion.excluye_valor_id,
+        ).where(
+            ProductoExclusion.producto_atributo_valor_id.in_(ptav_ids),
+            ProductoExclusion.excluye_valor_id.in_(ptav_ids),
+        )
+    )
+    return [(a, b) for a, b in filas]
 
 
 def combinacion_excluida(

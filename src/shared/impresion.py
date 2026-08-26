@@ -2,7 +2,7 @@
 
 Todas las ticketeras del grupo son de 80 mm, así que el ancho es **uno solo**
 y vive acá: la comanda de cocina, la precuenta y el ticket del comprobante lo
-comparten (ADR-066). Cuando cada documento traía el suyo —32 columnas la
+comparten (ADR-067). Cuando cada documento traía el suyo —32 columnas la
 comanda, 40 la precuenta— el mismo rollo salía con tres márgenes distintos y
 la comanda desperdiciaba un tercio del papel.
 

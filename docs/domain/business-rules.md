@@ -940,6 +940,12 @@ producción se hace en cocinas de sucursal. Ver
 - **RN-EMP-003** El consumo de empaque en una venta depende de la
   configuración del producto comercial (`empaque_id` + modalidades mesa/
   takeout/delivery marcadas); no se incluye en la receta.
+  `empaque_id` solo acepta un artículo de **tipo `empaque`** y no archivado:
+  se valida al crear y al editar el producto. Antes no lo validaba nadie —la
+  restricción vivía solo en `data-model.md`— y la pantalla ofrecía el
+  catálogo entero, así que un producto podía quedar descontando harina por
+  cada venta como si fuera una caja de pizza. Por la misma regla, el editor
+  de recetas no ofrece empaques como insumo: se descontarían dos veces.
 - **RN-EMP-004** El empaque consumido junto a una venta no aparece en el
   comprobante, salvo que se venda como producto comercial independiente.
 
@@ -1510,6 +1516,20 @@ producción se hace en cocinas de sucursal. Ver
   valor o bajar un atributo de `siempre` a `nunca` **nunca borra ni desactiva**
   una variante ya generada — puede tener ventas que la nombran; solo deja de
   generarse hacia adelante.
+- **RN-COM-040** Un producto que **ofrece atributos** no se vende sin elegir
+  un valor de cada uno. Se ofrece lo que el producto o su padre declaran, con
+  el valor y su atributo activos, y sin contar los de modo `siempre` —esos ya
+  son variantes (RN-COM-039)—. Se hace cumplir **al confirmar la venta** y no
+  solo en el PDV: el kiosko y la central de pedidos entran por el mismo
+  endpoint. Excepción: el replay del hub de sucursal (ADR-009), donde la
+  venta ya se preparó y se cobró durante el corte.
+  La razón es el descuento: los valores elegidos son lo que activa las líneas
+  condicionadas de la receta (RN-COM-037), así que una línea sin ellos se
+  cobra y se prepara **sin descontar ningún insumo**, y el faltante aparece
+  recién en el conteo del mes, cuando ya nadie puede atarlo a esa venta.
+  La carta ofrece exactamente lo que esta regla exige —misma función en el
+  servidor—: si divergieran, la pantalla no mostraría lo que el validador
+  pide y el producto quedaría invendible.
 
 ## Cumplimiento de pedido
 

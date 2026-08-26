@@ -90,6 +90,6 @@ class ComandaOut(BaseModel):
     reimpresion: bool
     impresa_veces: int
     # Membrete de la marca: en un local multimarca todas las cocinas
-    # imprimen en el mismo rollo (ADR-066).
+    # imprimen en el mismo rollo (ADR-067).
     encabezado: EncabezadoImpresionOut
     texto: str

@@ -70,11 +70,16 @@ from src.modules.sales.application import catalogo as catalogo_uc
 from src.modules.sales.application import clientes as clientes_uc
 from src.modules.sales.application import precios as precios_uc
 from src.modules.sales.infrastructure.models import (
+    Atributo,
+    AtributoValor,
     Cliente,
     ListaPrecio,
     MedioPago,
     Precio,
+    ProductoAtributoLinea,
+    ProductoAtributoValor,
     ProductoComercial,
+    ProductoExclusion,
     PuntoVenta,
 )
 from src.modules.sales.infrastructure.repositories import ProductoComercialRepo
@@ -127,6 +132,22 @@ INSUMOS_MENU: dict[str, tuple[str, str, str]] = {
     "Lechuga E2E": ("EI02", "0.011", "3000"),
     "Queso E2E": ("EI03", "0.028", "4000"),
 }
+
+# --- Mitad y mitad: atributos + receta condicionada (ADR-055/056) ------------
+# El modelo NUEVO de opciones, que es otro que el de `Menú E2E`: acá el sabor
+# no es un extra que se cobra aparte, es un valor de atributo que cambia
+# **qué se prepara** activando líneas condicionadas de la receta. Existe
+# sembrado porque sin él ninguna prueba recorre ese camino — y ese fue
+# exactamente el hueco: el PDV no mostraba estas opciones, la venta pasaba
+# sin sabores y no descontaba nada, con toda la suite en verde.
+#
+# Dos sabores por mitad alcanzan para lo que hay que distinguir: elegir,
+# repetir el mismo en las dos (excluido) y descontar solo lo elegido.
+#: `EX..` ya lo usan los extras y `EG..` las guarniciones: `EZ00` está libre.
+MITADES_CODIGO = "EZ00"
+MITADES_NOMBRE = "Mitad y Mitad E2E"
+MITADES_ATRIBUTOS = ("Mitad 1 E2E", "Mitad 2 E2E")
+MITADES_SABORES = ("Queso E2E", "Papa E2E")
 
 # --- Compras ----------------------------------------------------------------
 PROVEEDOR_RAZON = "Distribuidora E2E SAC"
@@ -608,12 +629,109 @@ def _sembrar_menu(session: Session, empresa: Empresa, marca: Marca) -> dict:
         _grupo_obligatorio(session, ctx)
         _extras_sueltos(session, ctx)
 
+    mitades = _sembrar_mitades(session, empresa, marca, udm, lista, insumos)
+
     return {
         "menu": MENU_NOMBRE,
         "menu_id": str(padre.id),
         "variantes": len(MENU_VARIANTES),
         "guarniciones": len(MENU_GUARNICIONES),
         "extras": len(MENU_EXTRAS),
+        **mitades,
+    }
+
+
+def _sembrar_mitades(
+    session: Session,
+    empresa: Empresa,
+    marca: Marca,
+    udm: UnidadMedida,
+    lista: ListaPrecio,
+    insumos: dict,
+) -> dict:
+    """`Mitad y Mitad E2E`: atributos, exclusión y receta condicionada.
+
+    La forma del catálogo real de Charlie's, reducida a lo mínimo: dos
+    atributos —una mitad cada uno— con los mismos dos sabores, una línea de
+    receta por (mitad, sabor) a media cantidad, y la exclusión que prohíbe el
+    mismo sabor en las dos mitades (media hawaiana y media hawaiana es una
+    hawaiana entera, que se vende como su propio producto).
+
+    Idempotente como el resto del seeder: si el producto ya está, se devuelve.
+    """
+    producto = session.scalar(
+        select(ProductoComercial).where(ProductoComercial.id_interno == MITADES_CODIGO)
+    )
+    if producto is None:
+        receta = _receta(session, empresa, udm, f"Base {MITADES_NOMBRE}", [])
+        producto = _producto(
+            session,
+            MITADES_CODIGO,
+            marca_id=marca.id,
+            nombre=MITADES_NOMBRE,
+            receta_id=receta.id,
+        )
+        _precio(session, lista, producto, "30.00")
+
+        #: (atributo, sabor) → el PTAV, que es lo que nombra la condición.
+        ptav_de: dict[tuple[str, str], ProductoAtributoValor] = {}
+        for orden, nombre_attr in enumerate(MITADES_ATRIBUTOS):
+            atributo = Atributo(
+                empresa_id=empresa.id,
+                nombre=nombre_attr,
+                # `nunca`: la combinación se resuelve al vender. Materializarla
+                # sería una fila de producto por cada par de sabores.
+                modo_variante="nunca",
+                display="radio",
+                orden=orden,
+            )
+            session.add(atributo)
+            session.flush()
+            linea = ProductoAtributoLinea(
+                producto_comercial_id=producto.id,
+                atributo_id=atributo.id,
+                orden=orden,
+            )
+            session.add(linea)
+            session.flush()
+            for i, sabor in enumerate(MITADES_SABORES):
+                valor = AtributoValor(atributo_id=atributo.id, nombre=sabor, orden=i)
+                session.add(valor)
+                session.flush()
+                ptav = ProductoAtributoValor(
+                    linea_id=linea.id, atributo_valor_id=valor.id
+                )
+                session.add(ptav)
+                session.flush()
+                ptav_de[(nombre_attr, sabor)] = ptav
+
+        # Una línea por (mitad, sabor), a media cantidad: es la forma correcta
+        # de modelar una mitad-y-mitad. Sin la condición, las cuatro líneas
+        # descontarían siempre y la pizza consumiría los dos sabores enteros.
+        for (_, sabor), ptav in ptav_de.items():
+            session.add(
+                RecetaItem(
+                    receta_id=receta.id,
+                    articulo_id=insumos[sabor].id,
+                    cantidad=Decimal("0.025"),
+                    aplica_valores=[str(ptav.id)],
+                )
+            )
+
+        # El mismo sabor en las dos mitades no es una mitad-y-mitad.
+        for sabor in MITADES_SABORES:
+            session.add(
+                ProductoExclusion(
+                    producto_atributo_valor_id=ptav_de[(MITADES_ATRIBUTOS[0], sabor)].id,
+                    excluye_valor_id=ptav_de[(MITADES_ATRIBUTOS[1], sabor)].id,
+                )
+            )
+        session.flush()
+
+    return {
+        "mitades": MITADES_NOMBRE,
+        "mitades_id": str(producto.id),
+        "mitades_sabores": len(MITADES_SABORES),
     }
 
 

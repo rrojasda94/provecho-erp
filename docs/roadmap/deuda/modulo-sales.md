@@ -297,9 +297,9 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
     siguen exigiendo documento — validación en `users.application.admin`.
   - ⬜ **Reenvío del comprobante al cliente** (WhatsApp/correo) desde la
     pestaña de cobrados: falta el adaptador de notificaciones. Imprimirlo ya
-    se puede (ADR-066); mandarlo, no.
+    se puede (ADR-067); mandarlo, no.
   - ⬜ **La nota de crédito no tiene representación impresa** (2026-08-25,
-    ADR-066): el ticket de 80 mm cubre boleta y factura. La NC se entrega en
+    ADR-067): el ticket de 80 mm cubre boleta y factura. La NC se entrega en
     el PDF de Factiliza porque su documento se arma con las **líneas
     acreditadas** —no con las del comprobante— y ese armado hoy es privado de
     `notas_credito._documento_de_nota`, que además necesita las filas y las
@@ -442,13 +442,13 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 - ⬜ **KDS aviso de anulación**: si anulan un pedido ya en preparación, la
   tarjeta solo desaparece al refrescar — falta aviso explícito "ANULADO"
   (llega natural con el push de tiempo real).
-- ⬜ **Impresión física sin navegador** (actualizado 2026-08-25, ADR-066):
+- ⬜ **Impresión física sin navegador** (actualizado 2026-08-25, ADR-067):
   la comanda, la precuenta y el ticket del comprobante ya salen por la
   ticketera de 80 mm, pero pasando por `window.print()` — sin diálogo solo si
   el navegador se lanzó con `--kiosk-printing`
   (`docs/engineering/impresion-termica.md`). Falta el puente **ESC/POS**
   (por red al 9100 o agente local), que es lo único que puede accionar corte
-  automático, cajón portamonedas y campana de cocina. El trabajo de ADR-066
+  automático, cajón portamonedas y campana de cocina. El trabajo de ADR-067
   lo habilita: comanda y precuenta ya son texto de 48 columnas, que es lo que
   un ESC/POS consume. Falta además la **comanda automática** al confirmar la
   venta (hoy es bajo demanda).
@@ -605,11 +605,24 @@ que es una decisión de pantalla y no un bug de una línea.
 
 ## Deuda nueva de ADR-063 (2026-08-24)
 
+- ✅ 2026-08-25 **El PDV lee los atributos** (ADR-066, RN-COM-040): `GET /carta`
+  devuelve `atributos` y `exclusiones`, el configurador los ofrece y la venta
+  los exige. Cierra el hueco que dejó ADR-063 al no tocar el camino de la
+  venta: en el catálogo real `producto_opcion_grupo` está **vacío**, así que
+  MitadXMitad se cobraba sin sabores y **no descontaba ningún insumo**. Entra
+  también la réplica offline de las cinco tablas + `receta_item.aplica_valores`,
+  y el cobro de `precio_extra`, que nadie sumaba.
+- ⬜ **Reabrir una línea ya enviada pierde los valores de atributo.**
+  `VentaItemOut` no devuelve `valores_variante_ids`, así que
+  `lineaDesdeVentaItem` la reconstruye sin sabores. Con RN-COM-040 eso ahora
+  es un 409 explícito al reenviarla —falla ruidosa, no un descuento
+  silencioso—, pero el cajero tiene que volver a elegirlos. Se cierra
+  devolviendo el campo en el contrato de la línea.
 - ⬜ **`modo_variante = 'dinamica'` no genera nada.** El generador
   (`variantes.py`) solo materializa `siempre`. `dinamica` (crear la fila en
   la primera venta) exige tocar `ventas._resolver_valores_variante`, que es
-  justo el camino que había que dejar intacto para este cambio. Hoy un
-  atributo en `dinamica` se comporta como `nunca`: no genera nada, nunca.
+  justo el camino que había que dejar intacto para ADR-063. Hoy un atributo
+  en `dinamica` **se pregunta** como `nunca` (ADR-066) pero no genera nada.
 - ⬜ **La regla de exclusión está escrita dos veces.**
   `variantes._pares_excluidos` (para generar) y `catalogo.combinacion_excluida`
   (para vender) codifican la misma regla simétrica de RN-COM-038 por caminos
