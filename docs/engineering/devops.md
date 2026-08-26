@@ -138,7 +138,9 @@ python -m src.seeders.seed
 
 El seeder es idempotente y deja la organización del Grupo Majambo más el
 los usuarios `admin` (rol admin) y `cajero1` (rol cajero), ambos con PIN
-`123456` y acceso a todas las sucursales. Los datos de desarrollo se regeneran así:
+`123456` y acceso a todas las sucursales. Siembra también los medios de
+pago (Efectivo, Yape, Tarjeta): sin al menos uno el PDV no ofrece con qué
+cobrar, y es el único seeder que corre `docker-compose.staging.yml`. Los datos de desarrollo se regeneran así:
 no se migran a mano entre bases.
 
 ### Datos de demo (solo desarrollo)

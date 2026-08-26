@@ -308,6 +308,20 @@ transferencias que entran al local). Decisiones finas dentro de eso:
   sucursal, y sin ella todas las estaciones del local caerían al mismo
   eslabón durante un corte — el ruteo se rompería justo cuando no hay red
   para arreglarlo.
+- **Lo que la línea eligió también viaja** (corregido 2026-08-26): además
+  del precio, cada ítem del lote lleva sus `sin_articulo_ids` (restas,
+  RN-PRD-004) y sus `valores_variante_ids` (ADR-055/056), **y sus extras
+  llevan los suyos**. Es lo que decide qué descuenta inventory: sin las
+  restas la nube consume el insumo que el plato no llevó, y sin los valores
+  una receta condicionada no activa ninguna línea, así que una
+  mitad-y-mitad se descuenta mal. El lote ya los emitía; era el replay el
+  que los ignoraba al rearmar el ítem.
+  Tampoco se revalidan —igual que los grupos y los atributos—: el replay
+  entra con `numero_orden`, es decir `exigir_opciones=False`, y eso ahora
+  **alcanza también al extra** (que la carta lo siga ofreciendo, su tope
+  por línea y su `es_extra`). Antes esas tres se comprobaban siempre, así
+  que desvincular un extra durante el corte hacía que la nube rechazara una
+  venta ya cobrada — exactamente lo que la excepción existe para evitar.
 - **El precio cobrado sí viaja** (agregado 2026-07-27, con el precio
   server-side): el lote ascendente usa `VentaItemSyncIn`, que lleva
   `precio_unitario` y `descuento`, mientras el PDV en línea

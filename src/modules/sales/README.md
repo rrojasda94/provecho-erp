@@ -198,7 +198,9 @@ ADR-023):**
   `ventas._validar_grupos` lo hace cumplir al confirmar, no solo en el PDV:
   el kiosko entra por el mismo endpoint. El replay del hub se exceptúa
   (ADR-009): una venta que ya se cobró no se rechaza por una regla que
-  cambió durante el corte.
+  cambió durante el corte. La excepción cubre también el vínculo del extra
+  con su plato, su tope por línea y su `es_extra`: desvincular un extra
+  durante el corte no puede tumbar una venta que la sucursal ya cobró.
   Los grupos pueden colgar del padre **o** de la variante, y una variante
   **hereda los del padre** (ADR-042): el seeder los deja en la variante y el
   lienzo en el padre —cuelga "+ grupo" del nodo activo, que es el padre
@@ -290,7 +292,10 @@ Diferido a un slice posterior: `combo`, `promocion`, `carrito`,
 Operativo en `/api/v1/sales`: crear venta (= confirmar orden, con
 correlativo por sucursal+día e idempotencia), cobrar (pagos parciales;
 al cubrir el total → `pagada`), anular orden no pagada (repone stock),
-CRUD de productos comerciales y medios de pago. Capas `domain/rules.py`,
+CRUD de productos comerciales y medios de pago (`seeders.seed` deja
+Efectivo, Yape y Tarjeta dados de alta: sin ninguno el PDV no puede
+cobrar; se administran en Catálogo → Medios de pago). Capas
+`domain/rules.py`,
 `infrastructure/repositories.py`, `application/` (`ventas.py`,
 `catalogo.py`), `api/`. Sin migración — esquema ya existía.
 
@@ -302,7 +307,8 @@ CRUD de productos comerciales y medios de pago. Capas `domain/rules.py`,
 | POST | `/ventas/{id}/pagos` | `sales.cobrar` |
 | POST | `/ventas/{id}/anular` | `sales.anular` |
 | POST/GET/PATCH | `/productos[/{id}]` | `gestionar_catalogo` / `leer` |
-| POST/GET | `/medios-pago` | `gestionar_catalogo` / `leer` |
+| POST/GET | `/medios-pago?direccion=&incluir_inactivos=` | `gestionar_catalogo` / `leer` |
+| PATCH | `/medios-pago/{id}` | `gestionar_catalogo` |
 | GET | `/clientes?grupo_id=` | `sales.leer_clientes_externos` — contrato **público** de análisis, no el padrón del back-office |
 | GET | `/clientes/listado` | `sales.leer` — el padrón del grupo, paginado, con `q` opcional |
 | PATCH | `/clientes/{id}` | `sales.crear` — razón social, RUC y contacto de un **jurídico** |
@@ -378,6 +384,12 @@ precio ya resuelto, en vez de que el cliente traiga uno propio.
 cobrada conserva el precio al que se cobró; recotizarla en la nube
 cambiaría el monto si la promoción venció entre el corte y la
 sincronización.
+
+Ese mismo ítem lleva `sin_articulo_ids` y `valores_variante_ids`, y sus
+extras los llevan también: son lo que decide qué descuenta inventory al
+reproducir la venta. Sin las restas la nube consume el insumo que el plato
+no llevó; sin los valores, una receta condicionada (ADR-056) no activa
+ninguna línea y la mitad-y-mitad se descuenta mal.
 
 **Pendiente para el modo offline del PDV** (ADR-009, ver
 `docs/architecture/adr/ADR-009-modo-offline-pdv.md`): `crear_venta`/

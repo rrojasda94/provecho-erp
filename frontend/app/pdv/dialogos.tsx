@@ -35,6 +35,7 @@ import {
   type Quitable,
   type VarianteDeCarta,
 } from "@/lib/pdv";
+import { calcularCobro, cobroBloqueado } from "@/lib/cobro";
 
 import {
   MOTIVOS_CONSUMO,
@@ -1554,49 +1555,6 @@ function leyendaDocumento(doc: string): string {
   return "Sin documento se emite boleta a nombre de Clientes varios.";
 }
 
-/** Todo el aritmético del cobro en un solo lugar, fuera del componente:
- * mezclarlo con el JSX es lo que hacía ilegible cuánto pesaba cada rama. */
-function calcularCobro(
-  total: number,
-  pagos: Array<{ medioId: string; monto: number }>,
-  monto: string,
-  medioId: string,
-  medios: MedioPago[],
-) {
-  const confirmado = pagos.reduce((a, p) => a + p.monto, 0);
-  const enCurso = Math.max(0, Number(monto) || 0);
-  const falta = Math.max(0, total - confirmado);
-  // El vuelto solo existe en efectivo: en tarjeta o Yape no hay cajón que
-  // devuelva plata, así que ahí un monto de más es un error de tecleo, no
-  // un cobro válido (se bloquea en vez de registrarse).
-  const esEfectivo = medios.find((m) => m.id === medioId)?.tipo === "efectivo";
-  const excede = enCurso > falta && !esEfectivo;
-  // Lo que realmente se le acredita a la venta nunca pasa del saldo — el
-  // backend lo rechazaría igual (RN-COM-002) — el resto es vuelto físico,
-  // no un pago de más.
-  const aplicado = Math.min(enCurso, falta);
-  const pagado = confirmado + aplicado;
-  return {
-    enCurso,
-    falta,
-    excede,
-    aplicado,
-    pagado,
-    restante: Math.max(0, total - pagado),
-    vuelto: esEfectivo ? Math.max(0, enCurso - falta) : 0,
-  };
-}
-
-function cobroBloqueado(
-  ocupado: boolean,
-  excede: boolean,
-  pagado: number,
-  total: number,
-  docValido: boolean,
-): boolean {
-  return ocupado || excede || pagado < total || !docValido;
-}
-
 function FilaVueltoRestante({ vuelto, restante }: { vuelto: number; restante: number }) {
   const hayVuelto = vuelto > 0;
   return (
@@ -1692,6 +1650,15 @@ export function DialogoCobro({
               </button>
             ))}
           </div>
+          {/* Sin medios el cobro no puede salir. Se dice acá y no al
+              confirmar: el cajero no puede crear uno desde el PDV, así que
+              lo que necesita es saber a quién pedírselo. */}
+          {medios.length === 0 && (
+            <p className="pdv-nota rojo">
+              No llegó ningún medio de pago: sin uno dado de alta no se puede
+              cobrar. Pídeselo a administración.
+            </p>
+          )}
           <div className="pdv-chips">
             <button type="button" className="pdv-chip" onClick={() => setMonto(falta.toFixed(2))}>
               Exacto · {soles(falta)}
@@ -1720,7 +1687,7 @@ export function DialogoCobro({
             <button
               type="button"
               className="pdv-boton-sec"
-              disabled={enCurso <= 0 || excede}
+              disabled={enCurso <= 0 || excede || !medio}
               onClick={() => {
                 setPagos([...pagos, { medioId: medio, monto: aplicado }]);
                 setMonto(Math.max(0, falta - aplicado).toFixed(2));
@@ -1793,7 +1760,7 @@ export function DialogoCobro({
         <button
           type="button"
           className="pdv-boton-pri"
-          disabled={cobroBloqueado(ocupado, excede, pagado, total, docValido)}
+          disabled={cobroBloqueado(ocupado, excede, pagado, total, docValido, medio)}
           onClick={() =>
             onConfirmar(
               aplicado > 0 ? [...pagos, { medioId: medio, monto: aplicado }] : pagos,

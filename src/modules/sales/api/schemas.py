@@ -700,14 +700,41 @@ class ProductoDetalleOut(ProductoOut):
     extras_sueltos: list[ExtraDeProductoOut] = []
 
 
+#: El vocabulario de la columna, escrito una vez (`rules.TIPOS_MEDIO_PAGO`)
+#: y traído acá como `Literal` para que el 422 lo diga en el borde y no
+#: reviente al hacer flush contra el CHECK.
+TipoMedioPago = Literal[
+    "efectivo",
+    "tarjeta_credito",
+    "tarjeta_debito",
+    "billetera_digital",
+    "transferencia",
+    "cheque",
+    "credito_empresarial",
+]
+
+
 class MedioPagoCreate(BaseModel):
     # Derivado del JWT (ADR-004); solo un superusuario sin empresa asignada
     # puede indicarlo.
     empresa_id: uuid.UUID | None = None
     nombre: str = Field(min_length=1, max_length=50)
-    direccion: str = "cobro"
-    tipo: str
-    comision_pct: Decimal = Decimal(0)
+    direccion: Literal["cobro", "pago", "ambos"] = "cobro"
+    tipo: TipoMedioPago
+    comision_pct: Decimal = Field(default=Decimal(0), ge=0, le=100)
+
+
+class MedioPagoUpdate(BaseModel):
+    """Campo ausente o `null` = no tocar.
+
+    Sin `direccion`: de qué lado del mostrador se usa un medio no es una
+    corrección, es otro medio. Sin baja: `activo=False` lo saca del PDV sin
+    tocar los cobros que ya lo nombran."""
+
+    nombre: str | None = Field(default=None, min_length=1, max_length=50)
+    tipo: TipoMedioPago | None = None
+    comision_pct: Decimal | None = Field(default=None, ge=0, le=100)
+    activo: bool | None = None
 
 
 # --- Precios (server-side, RN-PRC-003) ---
@@ -875,6 +902,7 @@ class MedioPagoOut(BaseModel):
     id: uuid.UUID
     empresa_id: uuid.UUID
     nombre: str
+    direccion: str
     tipo: str
     comision_pct: Decimal
     activo: bool

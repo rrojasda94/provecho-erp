@@ -372,6 +372,28 @@ def combinaciones_a_generar(modo_variante: str) -> bool:
     return modo_variante == "siempre"
 
 
+# --- Medios de pago (RN-MDP-001) ---------------------------------------------
+
+TIPOS_MEDIO_PAGO = {
+    "efectivo",
+    "tarjeta_credito",
+    "tarjeta_debito",
+    "billetera_digital",
+    "transferencia",
+    "cheque",
+    "credito_empresarial",
+}
+"""Con qué paga el cliente. El tipo no es cosmética: `efectivo` es el único
+que tiene cajón detrás —da vuelto y entra a la cadena de custodia
+(RN-MDP-002)— y `credito_empresarial` es el único que puede cotizar contra
+otra lista de precios (RN-MDP-001)."""
+
+DIRECCIONES_MEDIO_PAGO = {"cobro", "pago", "ambos"}
+"""De qué lado del mostrador se usa. El PDV solo ofrece los de `cobro` (y
+`ambos`): un medio con el que se le paga a un proveedor no es una forma de
+cobrarle a un comensal."""
+
+
 # --- Cupón de promoción (ADR-061) --------------------------------------------
 ESTADOS_CUPON = {"activo", "canjeado"}
 
