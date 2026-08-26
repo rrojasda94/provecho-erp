@@ -107,6 +107,28 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   quien no tiene cuenta no puede marcar en el pad (409 explícito). Su
   asistencia la registra RRHH a mano hasta que se le cree una. Crear la
   cuenta al contratar cerraría el hueco.
+  - ✅ 2026-08-25 **la cuenta ya se puede asignar**: `usuario_id` estaba en
+    `TrabajadorCreate` pero no en `TrabajadorUpdate`, y ninguna pantalla lo
+    ofrecía, así que desde la UI el campo era NULL para siempre y **nadie**
+    podía marcar — el 409 no era el caso de borde documentado sino el único
+    caso posible. Ahora se elige la cuenta en el alta y en la edición del
+    trabajador, y `null` la desvincula. Falta todavía crearla sola al
+    contratar.
+  - ⬜ **Una cuenta por trabajador se valida en la aplicación, no en la base**:
+    `trabajador.usuario_id` no tiene índice único. El caso de uso rechaza la
+    cuenta ya usada por otro, pero dos peticiones simultáneas podrían colarse.
+    Cerrarlo es un índice único parcial (`WHERE deleted_at IS NULL`) y su
+    migración probada contra Postgres.
+- ⬜ **No hay forma de desvincular la persona de una cuenta**:
+  `admin.editar_usuario` trata `None` como «no tocar», así que `persona_id`
+  solo se puede cambiar por otra, nunca vaciar. Mismo patrón que ya resolvió
+  `BORRABLES` en `rrhh.trabajadores`.
+- ⬜ **`crear_usuario` no valida la persona**: acepta un `persona_id`
+  inexistente y no exige persona cuando el tipo es `humano`, aunque el
+  comentario de `persona.py` promete que esa validación vive «en sus casos de
+  uso». Hoy no está en ninguno.
+- ⬜ **Fijar un PIN concreto no tiene pantalla**: `POST /users/{id}/pin` existe
+  y nadie lo llama; desde la UI solo se puede resetear al PIN por defecto.
 - ⬜ **Los trabajadores que ya existían quedaron sin sucursal**: la migración
   `b6d29f10c47e` es aditiva y nullable, sin backfill — no hay dato del que
   deducir el local. Hay que asignárselos a mano desde RRHH → Trabajadores.

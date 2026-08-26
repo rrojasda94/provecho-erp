@@ -355,7 +355,10 @@ class AnonimizarPersonaIn(BaseModel):
 class UsuarioCreate(BaseModel):
     username: str = Field(min_length=3, max_length=50)
     pin: str
-    tipo: str = "humano"
+    # `Literal` y no `str`: la columna es un Enum de dos valores, así que un
+    # tipo inventado no llegaba a ser un 422 sino un 500 de SQLAlchemy al
+    # hacer flush — el error salía del ORM, sin decir qué campo lo causó.
+    tipo: Literal["humano", "agente_ia"] = "humano"
     persona_id: uuid.UUID | None = None
     nombre_display: str | None = None
     email: str | None = None

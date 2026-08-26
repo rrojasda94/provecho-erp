@@ -112,5 +112,10 @@ algo mal». Poner ahí al trabajador convertiría un recordatorio en un cargo.
 - Marcar en el pad exige que el trabajador tenga usuario con PIN. Quien no lo
   tenga recibe un 409 explícito («el trabajador no tiene usuario con PIN») y su
   asistencia la registra RRHH a mano hasta que se le cree la cuenta.
+  - **Corregido el 2026-08-25**: crear la cuenta no alcanzaba, porque nada la
+    ataba al trabajador. `usuario_id` viajaba en el alta pero no en
+    `TrabajadorUpdate`, y la pantalla de trabajadores nunca lo ofrecía, así que
+    desde la UI el campo era NULL para siempre y **ningún** trabajador podía
+    marcar. Ahora se asigna y se quita desde la ficha del trabajador.
 - Aparece un tipo de cuenta más para administrar: una por local. Se crea desde
   `/usuarios` como cualquier otra; el seeder solo siembra el rol.

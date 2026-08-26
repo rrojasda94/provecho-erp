@@ -198,7 +198,14 @@ escuchar `trabajador_cesado`. Ver ROADMAP.
 ## Relaciones
 
 - `trabajador.usuario_id` (opcional) liga con `users.usuario` — un
-  trabajador puede o no tener usuario de login.
+  trabajador puede o no tener usuario de login. Se asigna al crearlo y también
+  después (`PATCH /trabajadores/{id}`, `usuario_id`); mandarlo en `null` lo
+  desvincula. **De este campo cuelga el pad de asistencia**: el PIN que firma
+  la marcación es el de esa cuenta (RN-RRHH-020), así que un trabajador sin
+  ella recibe un 409 y su asistencia la carga RRHH a mano. La cuenta tiene que
+  ser de tipo `humano`, estar activa y no ser ya de otro trabajador — dos
+  trabajadores con la misma cuenta comparten PIN, y el pad no podría saber
+  cuál de los dos fichó.
 - `trabajador.persona_id`/`socio.persona_id` ligan con `users.persona` (party
   model, RN-GEN-007) — nombres/documento nunca se duplican aquí.
 - `postulante.persona_id`/`trabajador_id` son **nulos mientras es candidato** y

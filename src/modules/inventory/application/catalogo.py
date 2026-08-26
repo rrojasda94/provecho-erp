@@ -247,9 +247,11 @@ def listar_articulos(
     return ArticuloRepo(session).list(empresa_id)
 
 
-def q_articulos(session: Session, empresa_id: uuid.UUID | None = None):
+def q_articulos(
+    session: Session, empresa_id: uuid.UUID | None = None, tipo: str | None = None
+):
     """La consulta sin ejecutar, para que el router la pagine (ADR-026)."""
-    return ArticuloRepo(session).q_list(empresa_id)
+    return ArticuloRepo(session).q_list(empresa_id, tipo)
 
 
 def listar_skus(session: Session, empresa_id: uuid.UUID | None = None) -> list[dict]:

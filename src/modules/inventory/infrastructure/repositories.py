@@ -71,11 +71,19 @@ class ArticuloRepo:
     def get_by_id_interno(self, id_interno: str) -> Articulo | None:
         return self.s.scalar(select(Articulo).where(Articulo.id_interno == id_interno))
 
-    def q_list(self, empresa_id: uuid.UUID | None = None):
-        """La consulta, sin ejecutar: el router la pagina (ADR-026)."""
+    def q_list(self, empresa_id: uuid.UUID | None = None, tipo: str | None = None):
+        """La consulta, sin ejecutar: el router la pagina (ADR-026).
+
+        `tipo` filtra en la base y no en el cliente porque la lista viene
+        paginada: una pantalla que solo quiere empaques y filtra lo que le
+        llegó se queda sin ninguno en cuanto el catálogo pasa de una página
+        —y no muestra "faltan", muestra un desplegable vacío.
+        """
         q = select(Articulo).where(Articulo.deleted_at.is_(None))
         if empresa_id is not None:
             q = q.where(Articulo.empresa_id == empresa_id)
+        if tipo is not None:
+            q = q.where(Articulo.tipo == tipo)
         return q.order_by(Articulo.nombre)
 
     def list(self, empresa_id: uuid.UUID | None = None) -> list[Articulo]:

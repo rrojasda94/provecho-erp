@@ -34,9 +34,16 @@ class TrabajadorCreate(BaseModel):
 class TrabajadorUpdate(BaseModel):
     """Campo ausente = no tocar.
 
-    `sucursal_id` es la excepción: mandarlo en `null` **borra** el centro de
-    labores, porque quedarse sin local asignado es un estado válido y no había
-    otra forma de volver a él. Para el resto, `null` sigue siendo "no tocar".
+    `sucursal_id` y `usuario_id` son la excepción: mandarlos en `null`
+    **borran** el valor, porque quedarse sin local asignado —o sin cuenta— es
+    un estado válido y no había otra forma de volver a él. Para el resto,
+    `null` sigue siendo "no tocar".
+
+    `usuario_id` faltaba acá y era la razón por la que nadie podía marcar en
+    el pad de asistencia: `TrabajadorCreate` sí lo aceptaba, pero un
+    trabajador ya dado de alta no tenía ninguna forma de recibir su cuenta, y
+    `pad_asistencia.usuario_que_firma` exige justamente ese campo para llegar
+    al PIN.
 
     `estado` no admite `"cesado"`: el cese tiene su propio endpoint
     (`POST /trabajadores/{id}/cesar`) porque además de cambiar el estado
@@ -50,6 +57,7 @@ class TrabajadorUpdate(BaseModel):
     remuneracion_base: Decimal | None = Field(default=None, ge=0)
     estado: Literal["activo", "suspendido"] | None = None
     sucursal_id: uuid.UUID | None = None
+    usuario_id: uuid.UUID | None = None
 
 
 class TrabajadorCese(BaseModel):
