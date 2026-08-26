@@ -482,6 +482,13 @@ const CATALOGO: Caso[] = [
     ]),
   ),
   caso("arbol", () => catalogoApi.arbol(UUID)),
+  caso("mediosPago", () => catalogoApi.mediosPago()),
+  caso("crearMedioPago", () =>
+    catalogoApi.crearMedioPago({ nombre: "Yape", tipo: "billetera_digital" }),
+  ),
+  caso("editarMedioPago", () =>
+    catalogoApi.editarMedioPago(UUID, { comision_pct: "3.50", activo: false }),
+  ),
   caso("atributos", () => catalogoApi.atributos()),
   caso("crearAtributo", () =>
     catalogoApi.crearAtributo({ nombre: "Tamaño", display: "pildoras" }),

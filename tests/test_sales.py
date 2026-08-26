@@ -106,11 +106,10 @@ def env(monkeypatch):
             id_interno="P001", marca_id=marca.id, nombre="Pizza Clásica",
             receta_id=receta.id,
         )
-        medio = MedioPago(
-            empresa_id=empresa.id, nombre="Efectivo", direccion="cobro",
-            tipo="efectivo",
-        )
-        s.add_all([producto, medio])
+        # El efectivo ya lo dejó `seed`: sin ningún medio de pago no se
+        # puede cobrar, así que ninguna instalación arranca sin él.
+        medio = s.scalar(select(MedioPago).where(MedioPago.tipo == "efectivo"))
+        s.add(producto)
         s.flush()
         # Precio server-side (RN-PRC-003): sin lista vigente no hay venta.
         lista = ListaPrecio(marca_id=marca.id, nombre="Regular",
@@ -165,6 +164,61 @@ def _venta_body(ids, key="test-venta-0001", cantidad="2"):
 def _stock(ids, TestSession):
     with TestSession() as s:
         return s.scalar(select(Stock)).cantidad
+
+
+def test_el_pdv_solo_ve_los_medios_con_los_que_se_cobra(env):
+    """Un medio con el que se le paga a un proveedor no es una forma de
+    cobrarle a un comensal: sin el filtro aparecía como pastilla en la caja."""
+    client, ids, _ = env
+    h = _token(client)
+    r = client.post(
+        "/api/v1/sales/medios-pago", headers=h,
+        json={"nombre": "Transferencia BCP", "direccion": "pago",
+              "tipo": "transferencia"},
+    )
+    assert r.status_code == 201, r.text
+
+    del_pdv = client.get("/api/v1/sales/medios-pago?direccion=cobro", headers=h)
+    nombres = {m["nombre"] for m in del_pdv.json()}
+    assert "Transferencia BCP" not in nombres
+    assert "Efectivo" in nombres, "con lo sembrado por `seed` ya se puede cobrar"
+    # El catálogo, que es quien los administra, sí los ve todos.
+    todos = {m["nombre"] for m in client.get("/api/v1/sales/medios-pago", headers=h).json()}
+    assert "Transferencia BCP" in todos
+
+
+def test_un_medio_de_pago_se_apaga_pero_no_se_borra(env):
+    client, ids, _ = env
+    h = _token(client)
+    medio_id = ids["medio_id"]
+
+    r = client.patch(
+        f"/api/v1/sales/medios-pago/{medio_id}", headers=h,
+        json={"nombre": "Efectivo caja", "comision_pct": "1.50", "activo": False},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["nombre"] == "Efectivo caja"
+    assert Decimal(r.json()["comision_pct"]) == Decimal("1.50")
+
+    vivos = client.get("/api/v1/sales/medios-pago", headers=h).json()
+    assert medio_id not in {m["id"] for m in vivos}
+    # Sigue existiendo: los cobros que lo nombran no pueden quedar huérfanos.
+    con_apagados = client.get(
+        "/api/v1/sales/medios-pago?incluir_inactivos=true", headers=h
+    ).json()
+    apagado = next(m for m in con_apagados if m["id"] == medio_id)
+    assert apagado["activo"] is False
+
+
+def test_un_tipo_de_medio_de_pago_inventado_se_rechaza(env):
+    """El vocabulario lo valida el borde: sin el `Literal`, el valor llegaba
+    hasta el flush y reventaba contra el CHECK de la columna."""
+    client, _, _ = env
+    r = client.post(
+        "/api/v1/sales/medios-pago", headers=_token(client),
+        json={"nombre": "Trueque", "tipo": "trueque"},
+    )
+    assert r.status_code == 422
 
 
 def test_venta_descuenta_stock_por_receta(env):

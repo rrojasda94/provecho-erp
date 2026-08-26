@@ -624,3 +624,21 @@ backend que todavía no llega a pantalla.
   caer al nombre de la marca. Falta pantalla de configuración de marca que
   ofrezca los archivos disponibles en vez de un campo de texto libre.
 
+
+## Catálogo de medios de pago (2026-08-26)
+
+- ✅ 2026-08-26 **Pantalla de medios de pago** (`/catalogo/medios-pago`):
+  alta con tipo, dirección y comisión, y edición en línea de nombre, tipo,
+  comisión y activo. `PATCH /sales/medios-pago/{id}` es nuevo; `GET` acepta
+  `direccion` e `incluir_inactivos`, y el PDV pide `direccion=cobro`.
+- ⬜ **Quedan dos campos del modelo sin pantalla.** `activa_promocion` y
+  `lista_precio_credito_id` (RN-MDP-001: un medio a crédito puede cotizar
+  contra otra lista) siguen siendo `curl`. No entraron porque ninguno tiene
+  todavía consumidor en el PDV, y una casilla que no cambia nada visible es
+  peor que no tenerla. Cuando el motor de promociones use la primera, la
+  fila de la tabla se amplía.
+- ⬜ **`direccion` no se puede corregir.** Es deliberado —de qué lado del
+  mostrador se usa un medio no es una corrección, es otro medio— pero
+  significa que una fila creada con la dirección equivocada solo se puede
+  apagar y rehacer. Si esto pasa más de una vez, es señal de que la pantalla
+  la tiene que ofrecer con una confirmación.

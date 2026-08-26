@@ -536,9 +536,32 @@ def crear_medio_pago(
 
 
 def listar_medios_pago(
-    session: Session, empresa_id: uuid.UUID | None = None
+    session: Session,
+    empresa_id: uuid.UUID | None = None,
+    direccion: str | None = None,
+    incluir_inactivos: bool = False,
 ) -> list[MedioPago]:
-    return MedioPagoRepo(session).list(empresa_id)
+    return MedioPagoRepo(session).list(empresa_id, direccion, incluir_inactivos)
+
+
+def obtener_medio_pago(session: Session, medio_pago_id: uuid.UUID) -> MedioPago:
+    medio = MedioPagoRepo(session).get(medio_pago_id)
+    if medio is None:
+        raise NoEncontrado("medio de pago no encontrado")
+    return medio
+
+
+def editar_medio_pago(session: Session, medio: MedioPago, **campos) -> MedioPago:
+    """Corrige un medio de pago. Campo ausente o `None` = no tocar.
+
+    **No se borra**: apagarlo (`activo=False`) lo saca del PDV y deja en pie
+    los cobros que lo nombran, que es lo que pide un catálogo con historia
+    (mismo criterio que descontinuar un producto)."""
+    for campo in ("nombre", "tipo", "comision_pct", "activo"):
+        if campos.get(campo) is not None:
+            setattr(medio, campo, campos[campo])
+    session.flush()
+    return medio
 
 
 def valores_ofrecidos(session: Session, producto: ProductoComercial) -> set[str]:

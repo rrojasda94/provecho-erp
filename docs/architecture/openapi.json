@@ -11908,6 +11908,8 @@
           "comision_pct": {
             "anyOf": [
               {
+                "maximum": 100.0,
+                "minimum": 0.0,
                 "type": "number"
               },
               {
@@ -11920,6 +11922,11 @@
           },
           "direccion": {
             "default": "cobro",
+            "enum": [
+              "cobro",
+              "pago",
+              "ambos"
+            ],
             "title": "Direccion",
             "type": "string"
           },
@@ -11942,6 +11949,15 @@
             "type": "string"
           },
           "tipo": {
+            "enum": [
+              "efectivo",
+              "tarjeta_credito",
+              "tarjeta_debito",
+              "billetera_digital",
+              "transferencia",
+              "cheque",
+              "credito_empresarial"
+            ],
             "title": "Tipo",
             "type": "string"
           }
@@ -11962,6 +11978,10 @@
           "comision_pct": {
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Comision Pct",
+            "type": "string"
+          },
+          "direccion": {
+            "title": "Direccion",
             "type": "string"
           },
           "empresa_id": {
@@ -11987,11 +12007,80 @@
           "id",
           "empresa_id",
           "nombre",
+          "direccion",
           "tipo",
           "comision_pct",
           "activo"
         ],
         "title": "MedioPagoOut",
+        "type": "object"
+      },
+      "MedioPagoUpdate": {
+        "description": "Campo ausente o `null` = no tocar.\n\nSin `direccion`: de qué lado del mostrador se usa un medio no es una\ncorrección, es otro medio. Sin baja: `activo=False` lo saca del PDV sin\ntocar los cobros que ya lo nombran.",
+        "properties": {
+          "activo": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activo"
+          },
+          "comision_pct": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comision Pct"
+          },
+          "nombre": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nombre"
+          },
+          "tipo": {
+            "anyOf": [
+              {
+                "enum": [
+                  "efectivo",
+                  "tarjeta_credito",
+                  "tarjeta_debito",
+                  "billetera_digital",
+                  "transferencia",
+                  "cheque",
+                  "credito_empresarial"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tipo"
+          }
+        },
+        "title": "MedioPagoUpdate",
         "type": "object"
       },
       "MemorandumCreate": {
@@ -45809,6 +45898,7 @@
     },
     "/api/v1/sales/medios-pago": {
       "get": {
+        "description": "`direccion=cobro` es lo que pide el PDV: con qué se le cobra al\ncomensal. Sin filtro salen todos, que es lo que administra el catálogo.",
         "operationId": "listar_medios_pago_api_v1_sales_medios_pago_get",
         "parameters": [
           {
@@ -45826,6 +45916,37 @@
                 }
               ],
               "title": "Empresa Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "direccion",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "cobro",
+                    "pago",
+                    "ambos"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Direccion"
+            }
+          },
+          {
+            "in": "query",
+            "name": "incluir_inactivos",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Incluir Inactivos",
+              "type": "boolean"
             }
           }
         ],
@@ -45905,6 +46026,65 @@
           }
         ],
         "summary": "Crear Medio Pago",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/medios-pago/{medio_pago_id}": {
+      "patch": {
+        "description": "Sin DELETE: un medio de pago que ya cobró no se borra, se apaga con\n`activo=false` (queda fuera del PDV y los cobros siguen nombrándolo).",
+        "operationId": "editar_medio_pago_api_v1_sales_medios_pago__medio_pago_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "medio_pago_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Medio Pago Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MedioPagoUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MedioPagoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Editar Medio Pago",
         "tags": [
           "sales"
         ]

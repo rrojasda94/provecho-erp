@@ -20,6 +20,7 @@ export const SUBMENUS: Record<string, ItemSubmenu[]> = {
     { label: "Productos", href: "/catalogo/productos" },
     { label: "Atributos", href: "/catalogo/atributos" },
     { label: "Recetas", href: "/catalogo/recetas" },
+    { label: "Medios de pago", href: "/catalogo/medios-pago" },
   ],
   compras: [
     { label: "Órdenes de compra", href: "/compras/ordenes-compra" },

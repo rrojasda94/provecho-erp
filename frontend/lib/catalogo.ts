@@ -452,6 +452,30 @@ export const catalogoApi = {
   arbol: (productoId: string) =>
     pedir<ArbolProducto>(`/sales/productos/${productoId}/arbol`),
 
+  mediosPago: () =>
+    pedir<MedioDePago[]>("/sales/medios-pago?incluir_inactivos=true"),
+
+  crearMedioPago: (cuerpo: {
+    nombre: string;
+    tipo: string;
+    direccion?: string;
+    comision_pct?: string;
+  }) => pedir<MedioDePago>("/sales/medios-pago", { metodo: "POST", cuerpo }),
+
+  editarMedioPago: (
+    medioPagoId: string,
+    cuerpo: Partial<{
+      nombre: string;
+      tipo: string;
+      comision_pct: string;
+      activo: boolean;
+    }>,
+  ) =>
+    pedir<MedioDePago>(`/sales/medios-pago/${medioPagoId}`, {
+      metodo: "PATCH",
+      cuerpo,
+    }),
+
   atributos: () => pedir<Atributo[]>("/sales/atributos"),
 
   crearAtributo: (cuerpo: {
@@ -570,6 +594,18 @@ export type ValorDeAtributo = {
   id: string;
   nombre: string;
   orden: number;
+  activo: boolean;
+};
+
+/** Con qué se cobra (o se paga). `direccion` decide de qué lado del
+ * mostrador se usa: el PDV solo pide los de `cobro`. */
+export type MedioDePago = {
+  id: string;
+  empresa_id: string;
+  nombre: string;
+  direccion: string;
+  tipo: string;
+  comision_pct: string;
   activo: boolean;
 };
 

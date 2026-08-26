@@ -37,7 +37,6 @@ from src.modules.inventory.infrastructure.models import (
 )
 from src.modules.sales.infrastructure.models import (
     ListaPrecio,
-    MedioPago,
     Mesa,
     Precio,
     ProductoComercial,
@@ -63,13 +62,6 @@ PERSONAS_DEMO = [
     ("Rosa", "Mendoza Vela", "70011223"),
     ("Carlos", "Ríos Pinedo", "70011224"),
 ]
-
-MEDIOS = [
-    ("Efectivo", "efectivo"),
-    ("Yape", "billetera_digital"),
-    ("Tarjeta", "tarjeta_debito"),
-]
-
 
 def _obtener_o_crear(session: Session, modelo, filtros: dict, **campos):
     fila = session.scalar(
@@ -173,15 +165,6 @@ def sembrar(session: Session) -> None:
         modalidades_habilitadas=["mesa", "takeout", "delivery"],
     )
 
-    for nombre, tipo in MEDIOS:
-        _obtener_o_crear(
-            session,
-            MedioPago,
-            {"empresa_id": empresa.id, "nombre": nombre},
-            direccion="cobro",
-            tipo=tipo,
-        )
-
     for numero in range(1, 13):
         _obtener_o_crear(
             session,
@@ -246,7 +229,7 @@ def sembrar(session: Session) -> None:
     session.commit()
     print(
         f"PDV listo: sucursal {sucursal.nombre}, caja {punto.serie_boleta}, "
-        f"{len(CARTA)} productos, {len(MEDIOS)} medios de pago, 12 mesas."
+        f"{len(CARTA)} productos, 12 mesas."
     )
 
 

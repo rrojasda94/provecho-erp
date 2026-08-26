@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 import src.core.models_registry  # noqa: F401
 from src.core.database import Base
+from src.modules.sales.infrastructure.models import MedioPago
 from src.modules.users.infrastructure.models import (
     Almacen,
     Empresa,
@@ -24,7 +25,7 @@ from src.modules.users.infrastructure.models import (
     UsuarioRol,
     UsuarioSucursal,
 )
-from src.seeders.seed import USUARIOS_SEMILLA, seed
+from src.seeders.seed import MEDIOS_PAGO, USUARIOS_SEMILLA, seed
 from src.shared.parametros import MODULOS
 
 SEDE_CASTILLA = "Jr. Ramón Castilla 248 - Tarapoto"
@@ -141,6 +142,22 @@ def test_seed_es_idempotente(sembrado):
     for modelo in (Grupo, Empresa, Marca, LicenciaMarca, Almacen):
         assert sembrado.scalar(select(func.count()).select_from(modelo)) == 1
     assert sembrado.scalar(select(func.count()).select_from(Sucursal)) == 2
+    assert sembrado.scalar(
+        select(func.count()).select_from(MedioPago)
+    ) == len(MEDIOS_PAGO)
+
+
+def test_medios_de_pago_para_poder_cobrar_desde_el_primer_arranque(sembrado):
+    """Sin ninguno el PDV no ofrece medio, el cobro sale con
+    `medio_pago_id` vacío y el cajero recibe un error de UUID que no puede
+    corregir. `docker-compose.staging.yml` corre solo este seeder."""
+    medios = list(sembrado.scalars(select(MedioPago)))
+    assert {m.nombre for m in medios} == {n for n, _ in MEDIOS_PAGO}
+    assert all(m.direccion == "cobro" and m.activo for m in medios)
+    # El vuelto solo existe si hay un medio en efectivo (hay cajón detrás).
+    assert any(m.tipo == "efectivo" for m in medios)
+    empresa = sembrado.scalar(select(Empresa))
+    assert all(m.empresa_id == empresa.id for m in medios)
 
 
 def test_seed_actualiza_el_domicilio_fiscal_de_una_empresa_ya_sembrada(session):
