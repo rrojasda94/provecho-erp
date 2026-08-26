@@ -26,6 +26,32 @@ export type ExtraDeCarta = {
   grupo_maximo: number | null;
 };
 
+/** Un valor elegible de un atributo (ej. «Hawaiana» para «Mitad 1»). */
+export type ValorDeCarta = {
+  /** `producto_atributo_valor.id`: lo que viaja de vuelta en
+   * `valores_variante_ids` y lo que nombra la condición de la receta. De este
+   * id depende que la línea condicionada se active y descuente. */
+  id: string;
+  nombre: string;
+  /** Se suma al precio de la línea (RN-COM-036). Normalmente "0". */
+  precio_extra: string;
+};
+
+/** Una elección obligatoria para vender el producto (ADR-055/056).
+ *
+ * Distinto de un grupo de extras: el extra es un producto que nace como línea
+ * cobrada aparte; un valor de atributo no crea línea — cambia qué se prepara,
+ * activando las líneas condicionadas de la receta. Se elige exactamente uno
+ * (RN-COM-040). */
+export type AtributoDeCarta = {
+  atributo_id: string;
+  nombre: string;
+  /** `radio` | `select`. Cosmético. */
+  display: string;
+  orden: number;
+  valores: ValorDeCarta[];
+};
+
 /** Un insumo que el plato admite quitar ("sin cebolla"). No cambia el
  * precio; sí deja de descontarse del almacén (RN-PRD-004). */
 export type Quitable = {
@@ -44,6 +70,12 @@ export type VarianteDeCarta = {
    * presentaciones ese es la variante: los sabores de la Familiar no son los
    * de la Personal. Elegida la variante, estos mandan sobre los del padre. */
   extras: ExtraDeCarta[];
+  /** Ídem para los atributos: en MitadXMitad las líneas cuelgan de «Pizza
+   * MitadxMitad Familiar», no del padre. */
+  atributos: AtributoDeCarta[];
+  /** Pares de valores que no pueden ir juntos. Se guarda una fila y vale en
+   * los dos sentidos, así que hay que comparar en ambas direcciones. */
+  exclusiones: [string, string][];
 };
 
 export type ItemDeCarta = {
@@ -56,6 +88,8 @@ export type ItemDeCarta = {
   precio_unitario: string;
   variantes: VarianteDeCarta[];
   extras: ExtraDeCarta[];
+  atributos: AtributoDeCarta[];
+  exclusiones: [string, string][];
 };
 
 export type ExtraDeVentaItem = {
@@ -206,6 +240,10 @@ export type ItemDeVentaNueva = {
   /** Insumos que esta línea NO lleva. El servidor rechaza los que la receta
    * no pone: no se puede quitar lo que el plato nunca tuvo. */
   sin_articulo_ids?: string[];
+  /** Los valores de atributo elegidos (`producto_atributo_valor.id`): qué
+   * mitades lleva la pizza. Es lo que activa las líneas condicionadas de la
+   * receta, así que sin esto la venta se cobra sin descontar (RN-COM-040). */
+  valores_variante_ids?: string[];
 };
 
 export type VentaNueva = {

@@ -8,6 +8,15 @@ import {
 } from "@/components/consulta/buscar-documento";
 import { documentoValido, LARGO_DNI, LARGO_RUC } from "@/lib/documento";
 import {
+  agruparExtras,
+  elegidosEn,
+  opcionesOfrecidas,
+  ptavExcluidos,
+  queFalta,
+  recargoDe,
+  type GrupoDeExtras,
+} from "@/lib/opciones-pdv";
+import {
   api,
   esAtribucion,
   esCustodia,
@@ -16,6 +25,7 @@ import {
   type CotizacionDelivery,
   type CustodiaDestino,
   type DescuadreAtribucion,
+  type AtributoDeCarta,
   type ExtraDeCarta,
   type ItemDeCarta,
   type MedioPago,
@@ -492,22 +502,6 @@ export function DialogoCierre({
 
 const NOTAS_RAPIDAS = ["Sin cebolla", "Sin ají", "Bien cocida", "Para llevar aparte"];
 
-/** Qué extras ofrece esta línea.
- *
- * Los grupos y extras cuelgan del producto que se prepara, y con
- * presentaciones ese es la variante: el servidor solo acepta lo vinculado a
- * ELLA (`admite_extra(prod.id, …)`), así que mezclar los del padre armaría
- * líneas que van a fallar recién al enviar el pedido. Sin presentaciones, el
- * producto es el que se prepara y los suyos son los que valen. */
-function extrasOfrecidos(
-  item: ItemDeCarta | null,
-  variante: VarianteDeCarta | undefined,
-): ExtraDeCarta[] {
-  if (!item) return [];
-  if (item.variantes.length === 0) return item.extras;
-  return variante ? variante.extras : [];
-}
-
 /**
  * Configuración de la línea: variante, cantidad, nota a cocina y extras.
  * Todo sale de la carta (`item`), ya con precios resueltos para esta
@@ -548,6 +542,9 @@ export function DialogoProducto({
   const [nota, setNota] = useState("");
   const [extras, setExtras] = useState<Record<string, number>>({});
   const [restas, setRestas] = useState<RestaEnLinea[]>([]);
+  // `atributo_id` → `producto_atributo_valor.id` elegido. Exactamente uno
+  // por atributo (RN-COM-040), así que un objeto plano alcanza.
+  const [valores, setValores] = useState<Record<string, string>>({});
   const [varianteId, setVarianteId] = useState("");
 
   useEffect(() => {
@@ -557,6 +554,9 @@ export function DialogoProducto({
     setRestas(linea.restas);
     setExtras(
       Object.fromEntries(linea.extras.map((e) => [e.productoId, e.cantidad])),
+    );
+    setValores(
+      Object.fromEntries(linea.valores.map((v) => [v.atributoId, v.ptavId])),
     );
     // Al reabrir una línea ya armada, su producto ES la variante elegida.
     setVarianteId(
@@ -570,16 +570,19 @@ export function DialogoProducto({
 
   const variantes = item?.variantes ?? [];
   const variante = variantes.find((v) => v.producto_comercial_id === varianteId);
-  const ofrecidos = extrasOfrecidos(item, variante);
-  const grupos = agruparExtras(ofrecidos);
-  const falta = queFalta(variantes, variante, grupos, extras);
+  const ofrecido = opcionesOfrecidas(item, variante);
+  const grupos = agruparExtras(ofrecido.extras);
+  const apagados = ptavExcluidos(ofrecido.exclusiones, valores);
+  const falta = queFalta(
+    variantes, variante, grupos, extras, ofrecido.atributos, valores,
+  );
   // Lo quitable sale de la receta del producto que realmente se prepara: la
   // variante si hay, el producto si no.
   const preparadoId = idDeLoQueSePrepara(linea, variantes, variante);
 
   const guardar = () => {
     if (falta) return;
-    const elegidos = ofrecidos
+    const elegidos = ofrecido.extras
       .filter((e) => (extras[e.producto_comercial_id] ?? 0) > 0)
       .map((e) => ({
         productoId: e.producto_comercial_id,
@@ -593,11 +596,29 @@ export function DialogoProducto({
       // que viajan al servidor, no los del padre.
       productoId: variante?.producto_comercial_id ?? linea.productoId,
       nombre: variante?.nombre ?? linea.nombre,
-      precio: variante ? Number(variante.precio_unitario) : linea.precio,
+      // El recargo del valor elegido entra en el precio de la línea
+      // (RN-COM-036). El servidor lo recalcula al confirmar —es él quien fija
+      // el precio (RN-PRC-003)—; acá se suma para que el ticket muestre el
+      // mismo número que se va a cobrar.
+      precio:
+        (variante ? Number(variante.precio_unitario) : linea.precio) +
+        recargoDe(ofrecido.atributos, valores),
       cantidad,
       nota: nota.trim(),
       extras: elegidos,
       restas,
+      valores: ofrecido.atributos.flatMap((a) => {
+        const ptavId = valores[a.atributo_id];
+        const valor = a.valores.find((v) => v.id === ptavId);
+        return valor
+          ? [{
+              ptavId: valor.id,
+              atributoId: a.atributo_id,
+              nombre: `${a.nombre}: ${valor.nombre}`,
+              precioExtra: Number(valor.precio_extra),
+            }]
+          : [];
+      }),
     });
   };
 
@@ -614,6 +635,10 @@ export function DialogoProducto({
           if (id === varianteId) return;
           setVarianteId(id);
           setExtras({});
+          // Los sabores de la Familiar no son los de la Mediana: son otros
+          // PTAV, y arrastrar los del tamaño anterior mandaría al servidor
+          // valores que el nuevo producto no ofrece.
+          setValores({});
         }}
       />
 
@@ -627,6 +652,15 @@ export function DialogoProducto({
           +
         </button>
       </div>
+
+      <AtributosDeLinea
+        atributos={ofrecido.atributos}
+        elegidos={valores}
+        apagados={apagados}
+        onElegir={(atributoId, ptavId) =>
+          setValores({ ...valores, [atributoId]: ptavId })
+        }
+      />
 
       <GruposDeExtras grupos={grupos} elegidos={extras} onCambiar={setExtras} />
 
@@ -802,8 +836,16 @@ function Restas({
     );
 
   return (
-    <>
-      <p className="pdv-etiqueta">Sin… · no cambia el precio</p>
+    // Colapsado de entrada: una pizza puede tener veinte insumos, y abiertos
+    // empujan fuera de la vista los sabores y los extras —que es lo que el
+    // cajero viene a elegir—. Quitar un insumo es la excepción, no el paso
+    // normal, así que se pide tocando. `<details>` nativo y no un estado
+    // propio: el mismo patrón que la ficha de reporte ya usa.
+    <details className="pdv-plegable" open={elegidas.length > 0}>
+      <summary className="pdv-etiqueta">
+        Sin… · no cambia el precio ({quitables.length})
+        {elegidas.length > 0 ? ` · ${elegidas.length} quitado(s)` : ""}
+      </summary>
       <div className="pdv-chips">
         {quitables.map((q) => {
           const marcado = elegidas.some((r) => r.articuloId === q.articulo_id);
@@ -820,6 +862,64 @@ function Restas({
           );
         })}
       </div>
+    </details>
+  );
+}
+
+/**
+ * Las elecciones que definen QUÉ se prepara: los sabores de cada mitad.
+ *
+ * Siempre obligatorias y de a una (RN-COM-040): sin ellas la receta no
+ * activa ninguna línea condicionada, la pizza sale igual y no se descuenta
+ * nada del almacén.
+ *
+ * Un valor excluido se dibuja apagado y no se esconde: una opción que
+ * desaparece de la pantalla se reporta como "falta el sabor", mientras que
+ * una apagada dice por qué no se puede. El servidor sigue siendo quien
+ * manda —`combinacion_excluida` rechaza al confirmar—; esto solo evita que
+ * el cajero se entere recién al mandar el pedido entero.
+ */
+function AtributosDeLinea({
+  atributos,
+  elegidos,
+  apagados,
+  onElegir,
+}: {
+  atributos: AtributoDeCarta[];
+  elegidos: Record<string, string>;
+  apagados: Set<string>;
+  onElegir: (atributoId: string, ptavId: string) => void;
+}) {
+  if (atributos.length === 0) return null;
+  return (
+    <>
+      {atributos.map((atributo) => (
+        <div key={atributo.atributo_id} data-testid="pdv-atributo">
+          <p className="pdv-etiqueta">{atributo.nombre} · obligatorio</p>
+          <div className="pdv-chips">
+            {atributo.valores.map((valor) => {
+              const puesto = elegidos[atributo.atributo_id] === valor.id;
+              const bloqueado = !puesto && apagados.has(valor.id);
+              const recargo = Number(valor.precio_extra);
+              return (
+                <button
+                  key={valor.id}
+                  type="button"
+                  className={`pdv-chip${puesto ? " on" : ""}`}
+                  aria-pressed={puesto}
+                  aria-disabled={bloqueado}
+                  disabled={bloqueado}
+                  title={bloqueado ? "Ya está elegido en la otra mitad" : undefined}
+                  onClick={() => onElegir(atributo.atributo_id, valor.id)}
+                >
+                  {valor.nombre}
+                  {recargo > 0 ? ` +${soles(valor.precio_extra)}` : ""}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ))}
     </>
   );
 }
@@ -902,58 +1002,6 @@ function FilaExtra({
       </div>
     </div>
   );
-}
-
-type GrupoDeExtras = {
-  id: string | null;
-  nombre: string | null;
-  minimo: number;
-  maximo: number | null;
-  extras: ExtraDeCarta[];
-};
-
-/** Los extras vienen planos del backend con su grupo adentro; acá se
- * agrupan para dibujarlos. Los sueltos (sin grupo) caen al final, siempre
- * opcionales. */
-function agruparExtras(extras: ExtraDeCarta[]): GrupoDeExtras[] {
-  const grupos: GrupoDeExtras[] = [];
-  for (const extra of extras) {
-    const existente = grupos.find((g) => g.id === extra.grupo_id);
-    if (existente) {
-      existente.extras.push(extra);
-      continue;
-    }
-    grupos.push({
-      id: extra.grupo_id,
-      nombre: extra.grupo_nombre,
-      minimo: extra.grupo_minimo,
-      maximo: extra.grupo_maximo,
-      extras: [extra],
-    });
-  }
-  return grupos.sort((a, b) => Number(a.id === null) - Number(b.id === null));
-}
-
-function elegidosEn(grupo: GrupoDeExtras, extras: Record<string, number>): number {
-  return grupo.extras.filter((e) => (extras[e.producto_comercial_id] ?? 0) > 0).length;
-}
-
-/** Qué le falta a la línea para poder guardarse. Mismo criterio que valida
- * el servidor al confirmar la venta, dicho en el momento en que se puede
- * corregir. */
-function queFalta(
-  variantes: VarianteDeCarta[],
-  variante: VarianteDeCarta | undefined,
-  grupos: GrupoDeExtras[],
-  extras: Record<string, number>,
-): string | null {
-  if (variantes.length > 0 && !variante) return "Elige una presentación";
-  for (const grupo of grupos) {
-    if (elegidosEn(grupo, extras) < grupo.minimo) {
-      return `Elige ${grupo.minimo} en ${grupo.nombre ?? "Extras"}`;
-    }
-  }
-  return null;
 }
 
 const TIPOS = [

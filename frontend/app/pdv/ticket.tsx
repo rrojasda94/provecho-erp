@@ -401,6 +401,12 @@ function Linea({
       <span className="pdv-linea-nombre">
         {linea.nombre}
         {linea.nota && <em>{linea.nota}</em>}
+        {/* Qué mitades lleva la pizza. Van antes que los extras porque dicen
+            QUÉ es el plato, no qué se le agregó — y sin esto dos MitadXMitad
+            distintas se ven idénticas en el ticket. */}
+        {linea.valores.map((v) => (
+          <em key={v.ptavId}>{v.nombre}</em>
+        ))}
         {linea.extras.map((e) => (
           <em key={e.productoId}>
             + {e.cantidad > 1 ? `${e.cantidad}× ` : ""}

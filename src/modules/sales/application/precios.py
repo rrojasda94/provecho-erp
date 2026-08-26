@@ -6,10 +6,11 @@ precio de cada ítem contra las listas vigentes para
 """
 
 import uuid
+from collections.abc import Sequence
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 # `categoria` es la misma tabla a la que `producto_comercial.categoria_id`
@@ -17,6 +18,7 @@ from sqlalchemy.orm import Session
 # lógica de dominio propia. Leer su nombre acá no es cruzar el dominio de
 # inventory, es seguir la referencia que sales ya tiene.
 from src.modules.inventory.infrastructure.models.categoria import Categoria
+from src.modules.sales.application import catalogo
 from src.modules.sales.application.errors import (
     Conflicto,
     NoEncontrado,
@@ -26,6 +28,7 @@ from src.modules.sales.domain import rules
 from src.modules.sales.infrastructure.models import (
     ListaPrecio,
     Precio,
+    ProductoAtributoValor,
     ProductoComercial,
 )
 from src.modules.sales.infrastructure.repositories import (
@@ -196,6 +199,14 @@ def carta(
 
     Cada variante trae **sus propios** extras: una Familiar y una Personal no
     ofrecen los mismos sabores ni los mismos agregados.
+
+    Trae además los **atributos** del modelo nuevo (ADR-055/056/063) con sus
+    exclusiones. Sin esto el PDV solo sabía leer `producto_opcion_grupo`, que
+    en el catálogo real de Charlie's está vacío: la pizza MitadXMitad guarda
+    sus sabores en `producto_atributo_valor` y la carta no los consultaba, así
+    que el configurador no mostraba nada y la línea se podía cobrar sin
+    sabores —sin activar ninguna línea condicionada de la receta, o sea sin
+    descontar nada del almacén—.
     """
     repo = ProductoComercialRepo(session)
     precio_de = {}
@@ -221,6 +232,10 @@ def carta(
             select(Categoria).where(Categoria.id.in_(categoria_ids))
         )
     }
+    # Los atributos se resuelven de una vez para todo el catálogo: por nodo
+    # serían cuatro consultas más sobre un N+1 que ya existe (`_extras_de`).
+    atributos_de = catalogo.atributos_ofrecidos(session, productos)
+
     items = []
     for producto in productos:
         if producto.es_extra or producto.producto_padre_id is not None:
@@ -232,6 +247,7 @@ def carta(
                 "precio_unitario": precio_de[v.id],
                 "orden": v.orden,
                 "extras": _extras_de(repo, v, por_id, precio_de),
+                **_atributos_de(session, atributos_de.get(v.id, [])),
             }
             for v in repo.variantes_de(producto.id)
             if v.id in precio_de
@@ -254,6 +270,47 @@ def carta(
                 "precio_unitario": precio,
                 "variantes": sorted(variantes, key=lambda v: (v["orden"], v["nombre"])),
                 "extras": extras,
+                **_atributos_de(session, atributos_de.get(producto.id, [])),
             }
         )
     return items
+
+
+def recargo_de_valores(session: Session, valor_ids: Sequence[str] | None) -> Decimal:
+    """Cuánto suman al precio de la línea los valores elegidos (RN-COM-036).
+
+    `producto_atributo_valor.precio_extra` estaba documentado como sumando en
+    cuatro lugares —el modelo, ADR-055 §4, RN-COM-036 y `data-model.md`— y
+    **nada lo sumaba**: era una columna editable desde la ficha que no
+    cobraba. Un recargo que alguien teclea y el ERP ignora es peor que no
+    tenerlo, porque nadie se entera hasta que cuadra la caja.
+
+    Devuelve 0 cuando no hay valores o ninguno tiene recargo, que es el caso
+    normal: en el catálogo real los 68 valores están todos en 0.
+    """
+    if not valor_ids:
+        return Decimal(0)
+    ids = [uuid.UUID(str(v)) for v in valor_ids]
+    total = session.scalar(
+        select(func.coalesce(func.sum(ProductoAtributoValor.precio_extra), 0)).where(
+            ProductoAtributoValor.id.in_(ids)
+        )
+    )
+    return Decimal(str(total or 0))
+
+
+def _atributos_de(session: Session, atributos: list[dict]) -> dict:
+    """Los atributos de un nodo de la carta y las exclusiones **entre ellos**.
+
+    Las exclusiones van a nivel de nodo y no dentro del atributo porque lo
+    que prohíben cruza atributos: «Mitad 1 = Hawaiana» con «Mitad 2 =
+    Hawaiana» son dos atributos distintos, y esa es justamente la
+    combinación que hay que apagar.
+    """
+    if not atributos:
+        return {"atributos": [], "exclusiones": []}
+    ptav_ids = [v["id"] for a in atributos for v in a["valores"]]
+    return {
+        "atributos": atributos,
+        "exclusiones": catalogo.exclusiones_entre(session, ptav_ids),
+    }

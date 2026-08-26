@@ -30,13 +30,18 @@ from src.core.sync.tiempo import a_utc, para_dialecto
 from src.modules.sales.application import ventas as ventas_uc
 from src.modules.sales.application.errors import AppError
 from src.modules.sales.infrastructure.models import (
+    Atributo,
+    AtributoValor,
     KdsPantalla,
     ListaPrecio,
     MedioPago,
     Pago,
     Precio,
+    ProductoAtributoLinea,
+    ProductoAtributoValor,
     ProductoComercial,
     ProductoComercialExtra,
+    ProductoExclusion,
     ProductoOpcionGrupo,
     PuntoVenta,
     Venta,
@@ -113,6 +118,88 @@ RECURSOS = (
         motivo=(
             "Qué grupo de extras es obligatorio: sin esto el hub aceptaría "
             "durante el corte pedidos que la nube rechaza (RN-COM-023)."
+        ),
+    ),
+    # --- Atributos (ADR-055/056/063) ------------------------------------------
+    # Van detrás de `producto_comercial` porque las FK mandan el orden de
+    # aplicación. Sin estos cinco el hub no puede ofrecer los sabores de una
+    # MitadXMitad ni evaluar sus líneas de receta condicionadas, y con
+    # RN-COM-040 encima **rechazaría toda venta del producto durante un
+    # corte**: el único caso que el modo offline existe para evitar.
+    RecursoSync(
+        nombre="atributo",
+        modelo=Atributo,
+        campos=("id", "empresa_id", "nombre", "modo_variante", "display",
+                "orden", "ref_externa", "updated_at"),
+        filtro=lambda q, a: q.where(
+            Atributo.empresa_id.in_(
+                select(Sucursal.empresa_id).where(Sucursal.id == a.sucursal_id)
+            )
+        ),
+        motivo=(
+            "Qué hay que elegir para vender el producto (RN-COM-040): sin esto "
+            "el hub no sabe que una MitadXMitad lleva dos sabores."
+        ),
+    ),
+    RecursoSync(
+        nombre="atributo_valor",
+        modelo=AtributoValor,
+        campos=("id", "atributo_id", "nombre", "orden", "activo", "updated_at"),
+        filtro=lambda q, a: q.join(
+            Atributo, Atributo.id == AtributoValor.atributo_id
+        ).where(
+            Atributo.empresa_id.in_(
+                select(Sucursal.empresa_id).where(Sucursal.id == a.sucursal_id)
+            )
+        ),
+        motivo="Los valores elegibles de cada atributo (los 19 sabores).",
+    ),
+    RecursoSync(
+        nombre="producto_atributo_linea",
+        modelo=ProductoAtributoLinea,
+        campos=("id", "producto_comercial_id", "atributo_id", "orden",
+                "updated_at"),
+        filtro=lambda q, a: q.join(
+            ProductoComercial,
+            ProductoComercial.id == ProductoAtributoLinea.producto_comercial_id,
+        ).where(ProductoComercial.marca_id.in_(_marca_de_la_sucursal(a))),
+        motivo="Qué atributo ofrece cada producto de la carta del local.",
+    ),
+    RecursoSync(
+        nombre="producto_atributo_valor",
+        modelo=ProductoAtributoValor,
+        campos=("id", "linea_id", "atributo_valor_id", "precio_extra", "activo",
+                "updated_at"),
+        filtro=lambda q, a: q.join(
+            ProductoAtributoLinea,
+            ProductoAtributoLinea.id == ProductoAtributoValor.linea_id,
+        ).join(
+            ProductoComercial,
+            ProductoComercial.id == ProductoAtributoLinea.producto_comercial_id,
+        ).where(ProductoComercial.marca_id.in_(_marca_de_la_sucursal(a))),
+        motivo=(
+            "El id que viaja en `valores_variante_ids` y que nombra la condición "
+            "de la receta (RN-COM-037): sin él la línea condicionada no dispara."
+        ),
+    ),
+    RecursoSync(
+        nombre="producto_exclusion",
+        modelo=ProductoExclusion,
+        campos=("id", "producto_atributo_valor_id", "excluye_valor_id",
+                "updated_at"),
+        filtro=lambda q, a: q.join(
+            ProductoAtributoValor,
+            ProductoAtributoValor.id == ProductoExclusion.producto_atributo_valor_id,
+        ).join(
+            ProductoAtributoLinea,
+            ProductoAtributoLinea.id == ProductoAtributoValor.linea_id,
+        ).join(
+            ProductoComercial,
+            ProductoComercial.id == ProductoAtributoLinea.producto_comercial_id,
+        ).where(ProductoComercial.marca_id.in_(_marca_de_la_sucursal(a))),
+        motivo=(
+            "Las combinaciones imposibles: sin esto el hub aceptaría durante el "
+            "corte una mitad-y-mitad con el mismo sabor en las dos mitades."
         ),
     ),
     RecursoSync(

@@ -2427,6 +2427,44 @@
         "title": "AtributoCreate",
         "type": "object"
       },
+      "AtributoDeCartaOut": {
+        "description": "Una elección que hay que hacer para vender el producto.\n\nDistinto de un grupo de extras: el extra es un `producto_comercial` que\nnace como línea propia y se cobra aparte, mientras que un valor de\natributo no crea línea — cambia **qué** se prepara, activando las líneas\ncondicionadas de la receta. Por eso viaja por `valores_variante_ids` y no\ncomo un extra más.\n\nOfrecido = obligatorio, y exactamente uno: con cero elegidos la receta no\ndispara ninguna condición y el plato se prepara sin descontar nada\n(RN-COM-040).",
+        "properties": {
+          "atributo_id": {
+            "format": "uuid",
+            "title": "Atributo Id",
+            "type": "string"
+          },
+          "display": {
+            "title": "Display",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "orden": {
+            "title": "Orden",
+            "type": "integer"
+          },
+          "valores": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ValorDeCartaOut"
+            },
+            "title": "Valores",
+            "type": "array"
+          }
+        },
+        "required": [
+          "atributo_id",
+          "nombre",
+          "display",
+          "orden"
+        ],
+        "title": "AtributoDeCartaOut",
+        "type": "object"
+      },
       "AtributoOut": {
         "properties": {
           "display": {
@@ -3332,6 +3370,14 @@
       },
       "CartaItemOut": {
         "properties": {
+          "atributos": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/AtributoDeCartaOut"
+            },
+            "title": "Atributos",
+            "type": "array"
+          },
           "categoria_id": {
             "anyOf": [
               {
@@ -3354,6 +3400,26 @@
               }
             ],
             "title": "Categoria Nombre"
+          },
+          "exclusiones": {
+            "default": [],
+            "items": {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              ],
+              "type": "array"
+            },
+            "title": "Exclusiones",
+            "type": "array"
           },
           "extras": {
             "default": [],
@@ -24782,6 +24848,32 @@
         "title": "ValidationError",
         "type": "object"
       },
+      "ValorDeCartaOut": {
+        "description": "Un valor elegible de un atributo (ej. «Hawaiana» para «Mitad 1»).",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "precio_extra": {
+            "default": "0",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Precio Extra",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "nombre"
+        ],
+        "title": "ValorDeCartaOut",
+        "type": "object"
+      },
       "ValorDeProductoOut": {
         "properties": {
           "activo": {
@@ -24840,6 +24932,34 @@
       "VarianteDeCartaOut": {
         "description": "Tamaño/presentación del producto, con precio propio y completo — no\nun recargo sobre el padre (RN-COM-022). Elegir una es obligatorio.",
         "properties": {
+          "atributos": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/AtributoDeCartaOut"
+            },
+            "title": "Atributos",
+            "type": "array"
+          },
+          "exclusiones": {
+            "default": [],
+            "items": {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              ],
+              "type": "array"
+            },
+            "title": "Exclusiones",
+            "type": "array"
+          },
           "extras": {
             "default": [],
             "items": {

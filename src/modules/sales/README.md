@@ -192,6 +192,21 @@ ADR-023):**
   producto: los usa la ficha, que edita lo propio y no lo heredado.
   `GET /carta` devuelve `variantes[].extras[]` además del `extras[]` de
   nivel producto, que es el de los productos simples.
+- **Atributos en la carta** (ADR-066, RN-COM-040): `GET /carta` devuelve
+  además `atributos[]` y `exclusiones[]`, por producto y por variante. Es el
+  modelo **nuevo** (ADR-055/056), distinto de los grupos de extras de arriba:
+  un valor de atributo no crea línea ni se cobra aparte — cambia *qué se
+  prepara*, activando las líneas condicionadas de la receta, y viaja de vuelta
+  en `valores_variante_ids`.
+  Ofrecido **es** obligatorio y de a uno: `ventas._validar_atributos` lo hace
+  cumplir al confirmar, con la misma excepción del replay. Se ofrece lo que el
+  producto o su padre declaran, con PTAV y valor activos, salvo los atributos
+  en `modo_variante='siempre'` —esos ya son variantes—.
+  **La carta y el validador salen de la misma función**
+  (`catalogo.atributos_ofrecidos`): escrito dos veces, la pantalla dejaría de
+  ofrecer lo que el servidor exige y el producto quedaría invendible.
+  Las exclusiones viajan como ayuda de pantalla; quien manda sigue siendo
+  `catalogo.combinacion_excluida` al confirmar.
 - **Ficha del producto**: `GET /productos/{id}` devuelve producto +
   variantes + grupos en una lectura, para editar todo en la misma pantalla
   (patrón Odoo). `GET /marcas` acompaña al alta.
