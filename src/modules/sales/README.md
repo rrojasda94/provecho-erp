@@ -192,6 +192,21 @@ ADR-023):**
   producto: los usa la ficha, que edita lo propio y no lo heredado.
   `GET /carta` devuelve `variantes[].extras[]` además del `extras[]` de
   nivel producto, que es el de los productos simples.
+- **Atributos en la carta** (ADR-066, RN-COM-040): `GET /carta` devuelve
+  además `atributos[]` y `exclusiones[]`, por producto y por variante. Es el
+  modelo **nuevo** (ADR-055/056), distinto de los grupos de extras de arriba:
+  un valor de atributo no crea línea ni se cobra aparte — cambia *qué se
+  prepara*, activando las líneas condicionadas de la receta, y viaja de vuelta
+  en `valores_variante_ids`.
+  Ofrecido **es** obligatorio y de a uno: `ventas._validar_atributos` lo hace
+  cumplir al confirmar, con la misma excepción del replay. Se ofrece lo que el
+  producto o su padre declaran, con PTAV y valor activos, salvo los atributos
+  en `modo_variante='siempre'` —esos ya son variantes—.
+  **La carta y el validador salen de la misma función**
+  (`catalogo.atributos_ofrecidos`): escrito dos veces, la pantalla dejaría de
+  ofrecer lo que el servidor exige y el producto quedaría invendible.
+  Las exclusiones viajan como ayuda de pantalla; quien manda sigue siendo
+  `catalogo.combinacion_excluida` al confirmar.
 - **Ficha del producto**: `GET /productos/{id}` devuelve producto +
   variantes + grupos en una lectura, para editar todo en la misma pantalla
   (patrón Odoo). `GET /marcas` acompaña al alta.
@@ -593,7 +608,7 @@ existía.
 Con las tarifas en `0` —el estado de fábrica— nada de esto cobra y el delivery
 funciona como antes.
 
-### Quién fija la tarifa, y quién la cobra (2026-08-25, ADR-066, RN-COM-040)
+### Quién fija la tarifa, y quién la cobra (2026-08-25, ADR-067, RN-COM-040)
 
 Los cuatro números **no salen del `.env`**: son `parametro_empresa` del módulo
 `sales` (`delivery_tarifa_base`, `delivery_precio_por_km`,
@@ -609,7 +624,7 @@ reparto y la empresa de la que es la tarifa. Un parámetro mal formado cobra la
 semilla en vez de reventar: es un JSON que pasó por un formulario, y un 500 en
 caja es peor que cobrar el precio anterior.
 
-**El reparto entra al total** (RN-COM-040): `total_a_cobrar` lo suma después
+**El reparto entra al total** (RN-COM-041): `total_a_cobrar` lo suma después
 del descuento manual, un consumo de personal no lo paga, y no se prorratea
 entre cuentas separadas —va entero en la primera, que es además por donde
 pasa el cobro normal del PDV (`grupo_cobro=1`)—. Sin línea de venta: la columna `costo_entrega` ya

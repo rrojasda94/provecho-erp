@@ -15,7 +15,7 @@ const CODIGOS = [
   "delivery_distritos_restringidos",
 ];
 
-/** Tarifa del delivery (ADR-066).
+/** Tarifa del delivery (ADR-067).
  *
  * Dos llamadas y no una: `/sales/delivery/configuracion` dice con qué números
  * se está **cobrando** (lo aprobado, o la semilla del `.env`), y

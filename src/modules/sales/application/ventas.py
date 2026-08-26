@@ -73,6 +73,14 @@ def _armar_item(
     cantidad = Decimal(str(it["cantidad"]))
     if cantidad <= 0:
         raise ReglaNegocio("cantidad de ítem debe ser > 0")
+    restas = _resolver_restas(
+        session, prod, it.get("sin_articulo_ids"), exigir=exigir_opciones
+    )
+    # Se resuelve antes del precio porque el recargo del valor elegido entra
+    # en él (RN-COM-036).
+    valores = _resolver_valores_variante(
+        session, prod, it.get("valores_variante_ids"), exigir=exigir_opciones
+    )
     if gratis:
         precio_unitario = Decimal(0)
     elif it.get("precio_unitario") is None:
@@ -83,18 +91,14 @@ def _armar_item(
             canal=canal,
             modalidad=modalidad,
             fecha=dia,
-        )
+        ) + precios.recargo_de_valores(session, valores)
     else:
+        # Precio provisto: el replay del hub trae lo que YA se cobró y no se
+        # recotiza (ADR-009). Sumarle el recargo acá lo cobraría dos veces.
         precio_unitario = Decimal(str(it["precio_unitario"]))
     grupo = int(it.get("grupo_cobro") or rules.GRUPO_COBRO_UNICO)
     if grupo < 1:
         raise ReglaNegocio("grupo_cobro debe ser >= 1")
-    restas = _resolver_restas(
-        session, prod, it.get("sin_articulo_ids"), exigir=exigir_opciones
-    )
-    valores = _resolver_valores_variante(
-        session, prod, it.get("valores_variante_ids"), exigir=exigir_opciones
-    )
     fila = VentaItem(
         producto_comercial_id=prod.id,
         cantidad=cantidad,
@@ -302,6 +306,36 @@ def _validar_grupos(
             )
 
 
+def _validar_atributos(session: Session, prod, valores: list[str] | None) -> None:
+    """Un producto que ofrece atributos no se vende sin elegir un valor de
+    cada uno (RN-COM-040).
+
+    Importa porque la elección es lo que activa las líneas condicionadas de
+    la receta (`receta_item.aplica_valores`, RN-COM-037): una MitadXMitad
+    cobrada sin sabores se prepara igual pero **no descuenta ningún insumo**,
+    y el faltante recién aparece en el conteo del mes. Antes esto pasaba en
+    silencio — `_resolver_valores_variante` devuelve `None` cuando no llega
+    nada, que es correcto para una venta vieja pero no para una nueva.
+
+    Se hace cumplir acá y no solo en el PDV porque el kiosko, la central de
+    pedidos y cualquier integración futura entran por el mismo endpoint.
+
+    La oferta sale de `catalogo.atributos_ofrecidos`, **la misma** función que
+    alimenta la carta: si el filtro se escribiera dos veces, la pantalla no
+    ofrecería lo que este validador exige y el producto quedaría invendible.
+    """
+    ofrecidos = catalogo.atributos_ofrecidos(session, [prod]).get(prod.id)
+    if not ofrecidos:
+        return
+    elegidos = {str(v) for v in (valores or [])}
+    for atributo in ofrecidos:
+        posibles = {str(v["id"]) for v in atributo["valores"]}
+        if not posibles & elegidos:
+            raise ReglaNegocio(
+                f"'{prod.nombre}': falta elegir {atributo['nombre']}"
+            )
+
+
 def _armar_lineas(
     session: Session,
     items: list[dict],
@@ -334,6 +368,7 @@ def _armar_lineas(
         )
         if exigir_opciones:
             _validar_grupos(productos, prod, it.get("extras") or [])
+            _validar_atributos(session, prod, it.get("valores_variante_ids"))
         hijos, dets_hijos = _armar_extras(
             session, fila, prod, it.get("extras") or [],
             productos=productos, sucursal_id=sucursal_id,
@@ -515,7 +550,7 @@ def crear_venta(
         ya_cotizado=costo_entrega is not None,
     )
     reparto = cotizacion.costo if cotizacion else costo_entrega
-    # El flete entra al total desde el minuto cero (RN-COM-040). Acá se suma
+    # El flete entra al total desde el minuto cero (RN-COM-041). Acá se suma
     # a mano porque la fila todavía no existe y `total_a_cobrar` necesita una:
     # es el único lugar donde el total se arma sin pasar por esa función.
     flete = (reparto or Decimal("0")) if rules.admite_cobro(tipo) else Decimal("0")
@@ -641,7 +676,7 @@ def _subtotal(items: list[VentaItem]) -> Decimal:
 
 
 def reparto_a_cobrar(venta: Venta) -> Decimal:
-    """El flete que entra al total (RN-COM-040).
+    """El flete que entra al total (RN-COM-041).
 
     Un consumo de personal vale cero entero: cobrarle el reparto a un
     trabajador que se lleva su almuerzo emitiría un comprobante por el flete
@@ -657,7 +692,7 @@ def total_a_cobrar(session: Session, venta: Venta, grupo_cobro: int | None = Non
     del descuento manual que le corresponde, más el reparto. Sin
     `grupo_cobro` es la venta entera; con él, solo esa cuenta.
 
-    **El reparto se suma después del descuento** (RN-COM-040): el descuento
+    **El reparto se suma después del descuento** (RN-COM-041): el descuento
     manual lo autoriza un encargado sobre lo que el cliente consumió, y
     regalar el flete al mismo tiempo no es lo que se aprobó.
     """

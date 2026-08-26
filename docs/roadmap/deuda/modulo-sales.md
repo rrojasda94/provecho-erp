@@ -35,7 +35,7 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   comodidad de no tener nada que guardar, el cambio es un código aleatorio en
   `cupon.codigo` (la columna ya es independiente del documento) más una forma
   de que el cliente lo recupere.
-- ✅ **El reparto se cobra** (2026-08-25, ADR-066, RN-COM-040):
+- ✅ **El reparto se cobra** (2026-08-25, ADR-067, RN-COM-040):
   `total_a_cobrar` suma `venta.costo_entrega`, después del descuento manual,
   sin cobrárselo a un consumo de personal y sin prorratearlo entre cuentas
   separadas. **Sin la línea de venta** que esta deuda daba por necesaria: la
@@ -46,7 +46,7 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   hoy viaja dentro del total. Se cierra el día que facturación o contabilidad
   lo pidan por separado, y es un cambio de emisión, no de cobro.
 - ⬜ **La tarifa de delivery es una sola para toda la empresa** (2026-08-22,
-  ADR-054; actualizada 2026-08-25, ADR-066): ya no vive en `settings` sino en
+  ADR-054; actualizada 2026-08-25, ADR-067): ya no vive en `settings` sino en
   `parametro_empresa`, y la fija Gerencia en `/gerencia/delivery` sin
   redesplegar. Sigue siendo **una por empresa**: el día que dos locales
   necesiten precios distintos —o dos marcas—, o el parámetro gana alcance de
@@ -587,11 +587,24 @@ que es una decisión de pantalla y no un bug de una línea.
 
 ## Deuda nueva de ADR-063 (2026-08-24)
 
+- ✅ 2026-08-25 **El PDV lee los atributos** (ADR-066, RN-COM-040): `GET /carta`
+  devuelve `atributos` y `exclusiones`, el configurador los ofrece y la venta
+  los exige. Cierra el hueco que dejó ADR-063 al no tocar el camino de la
+  venta: en el catálogo real `producto_opcion_grupo` está **vacío**, así que
+  MitadXMitad se cobraba sin sabores y **no descontaba ningún insumo**. Entra
+  también la réplica offline de las cinco tablas + `receta_item.aplica_valores`,
+  y el cobro de `precio_extra`, que nadie sumaba.
+- ⬜ **Reabrir una línea ya enviada pierde los valores de atributo.**
+  `VentaItemOut` no devuelve `valores_variante_ids`, así que
+  `lineaDesdeVentaItem` la reconstruye sin sabores. Con RN-COM-040 eso ahora
+  es un 409 explícito al reenviarla —falla ruidosa, no un descuento
+  silencioso—, pero el cajero tiene que volver a elegirlos. Se cierra
+  devolviendo el campo en el contrato de la línea.
 - ⬜ **`modo_variante = 'dinamica'` no genera nada.** El generador
   (`variantes.py`) solo materializa `siempre`. `dinamica` (crear la fila en
   la primera venta) exige tocar `ventas._resolver_valores_variante`, que es
-  justo el camino que había que dejar intacto para este cambio. Hoy un
-  atributo en `dinamica` se comporta como `nunca`: no genera nada, nunca.
+  justo el camino que había que dejar intacto para ADR-063. Hoy un atributo
+  en `dinamica` **se pregunta** como `nunca` (ADR-067) pero no genera nada.
 - ⬜ **La regla de exclusión está escrita dos veces.**
   `variantes._pares_excluidos` (para generar) y `catalogo.combinacion_excluida`
   (para vender) codifican la misma regla simétrica de RN-COM-038 por caminos

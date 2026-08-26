@@ -1,4 +1,4 @@
-# ADR-066 — La tarifa del delivery la fija Gerencia, y el reparto se cobra
+# ADR-067 — La tarifa del delivery la fija Gerencia, y el reparto se cobra
 
 - **Estado:** aceptada
 - **Fecha:** 2026-08-25
@@ -70,7 +70,7 @@ Un parámetro **mal formado cobra la semilla** en vez de reventar: el valor es
 un JSON que pasó por un formulario y por una pantalla de aprobación, y un 500
 en caja es peor que cobrar el precio anterior.
 
-### El reparto entra al total (RN-COM-040)
+### El reparto entra al total (RN-COM-041)
 
 `total_a_cobrar` suma `venta.costo_entrega`. Tres reglas alrededor:
 

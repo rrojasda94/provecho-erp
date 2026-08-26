@@ -1516,14 +1516,28 @@ producción se hace en cocinas de sucursal. Ver
   valor o bajar un atributo de `siempre` a `nunca` **nunca borra ni desactiva**
   una variante ya generada — puede tener ventas que la nombran; solo deja de
   generarse hacia adelante.
-- **RN-COM-040** El **reparto medido se cobra**: `venta.costo_entrega` entra
-  al total de la venta (ADR-054, ADR-066). Se suma **después** del descuento
+- **RN-COM-040** Un producto que **ofrece atributos** no se vende sin elegir
+  un valor de cada uno. Se ofrece lo que el producto o su padre declaran, con
+  el valor y su atributo activos, y sin contar los de modo `siempre` —esos ya
+  son variantes (RN-COM-039)—. Se hace cumplir **al confirmar la venta** y no
+  solo en el PDV: el kiosko y la central de pedidos entran por el mismo
+  endpoint. Excepción: el replay del hub de sucursal (ADR-009), donde la
+  venta ya se preparó y se cobró durante el corte.
+  La razón es el descuento: los valores elegidos son lo que activa las líneas
+  condicionadas de la receta (RN-COM-037), así que una línea sin ellos se
+  cobra y se prepara **sin descontar ningún insumo**, y el faltante aparece
+  recién en el conteo del mes, cuando ya nadie puede atarlo a esa venta.
+  La carta ofrece exactamente lo que esta regla exige —misma función en el
+  servidor—: si divergieran, la pantalla no mostraría lo que el validador
+  pide y el producto quedaría invendible.
+- **RN-COM-041** El **reparto medido se cobra**: `venta.costo_entrega` entra
+  al total de la venta (ADR-054, ADR-067). Se suma **después** del descuento
   manual —el descuento se autoriza sobre lo que el cliente consumió, no sobre
   el flete—, **no lo paga un consumo de personal** (RN-COM-025: vale cero
   entero) y **no se prorratea entre cuentas separadas**: va entero en la
   primera cuenta —una mesa dividida no es un delivery—, de modo que la suma
   de las cuentas sigue dando el total de la venta. La
-  tarifa con la que se calcula la fija Gerencia (ADR-066); el monto se
+  tarifa con la que se calcula la fija Gerencia (ADR-067); el monto se
   congela en la fila al tomar la orden y no se recotiza.
 
 ## Cumplimiento de pedido

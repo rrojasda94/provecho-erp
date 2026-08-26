@@ -249,7 +249,7 @@ function BarraSeleccion({
 function Totales({ borrador }: { borrador: Borrador }) {
   const total = totalBorrador(borrador);
   // El reparto es del pedido, no de lo que se comió: va en su propia fila y
-  // no repartido entre las líneas (RN-COM-040). Sin delivery no aparece.
+  // no repartido entre las líneas (RN-COM-041). Sin delivery no aparece.
   const reparto = borrador.costoEntrega ?? 0;
   return (
     <div className="pdv-totales">
@@ -410,6 +410,12 @@ function Linea({
       <span className="pdv-linea-nombre">
         {linea.nombre}
         {linea.nota && <em>{linea.nota}</em>}
+        {/* Qué mitades lleva la pizza. Van antes que los extras porque dicen
+            QUÉ es el plato, no qué se le agregó — y sin esto dos MitadXMitad
+            distintas se ven idénticas en el ticket. */}
+        {linea.valores.map((v) => (
+          <em key={v.ptavId}>{v.nombre}</em>
+        ))}
         {linea.extras.map((e) => (
           <em key={e.productoId}>
             + {e.cantidad > 1 ? `${e.cantidad}× ` : ""}

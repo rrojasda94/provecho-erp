@@ -1,6 +1,6 @@
 /**
  * Único check de la aritmética del reparto en el ticket del PDV
- * (RN-COM-040). Es plata en pantalla: si el total que el cajero le dice al
+ * (RN-COM-041). Es plata en pantalla: si el total que el cajero le dice al
  * cliente no incluye el flete, el cobro y el ticket cuentan historias
  * distintas. El monto que manda es el que recalcula el servidor
  * (`total_a_cobrar`, con sus propias pruebas) — esto verifica que la vista

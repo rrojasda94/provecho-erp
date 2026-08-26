@@ -1,5 +1,5 @@
 - **El delivery por kilómetro estaba construido y nadie podía usarlo**
-  (2026-08-25, ADR-066, RN-COM-040, sin migración). Tres meses después de
+  (2026-08-25, ADR-067, RN-COM-041, sin migración). Tres meses después de
   mergear ADR-053/054 la respuesta del negocio seguía siendo «eso no está
   disponible», y ninguna de las tres causas era de dominio: **la tarifa vivía
   en el `.env`**, así que cambiarla exigía editar el servidor y redesplegar —
@@ -23,7 +23,7 @@
   Un parámetro mal formado cobra la semilla en vez de reventar: es un JSON que
   pasó por un formulario, y un 500 en caja es peor que cobrar el precio
   anterior.
-- **El reparto entra al total de la venta** (RN-COM-040). Se suma **después**
+- **El reparto entra al total de la venta** (RN-COM-041). Se suma **después**
   del descuento manual —el encargado autoriza descontar lo que el cliente
   consumió, no el flete—, **un consumo de personal no lo paga** (vale cero
   entero, RN-COM-025) y **no se prorratea entre cuentas separadas**: va entero
