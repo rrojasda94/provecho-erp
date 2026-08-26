@@ -10440,6 +10440,14 @@
             "title": "Sin",
             "type": "array"
           },
+          "valores": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Valores",
+            "type": "array"
+          },
           "venta_item_id": {
             "title": "Venta Item Id",
             "type": "string"

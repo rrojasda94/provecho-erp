@@ -411,7 +411,11 @@ def _items_de_pantalla(
         estacion = _estacion_de(cadena, it, prod)
         if estacion is not None and estacion.orden == pantalla.orden:
             pendiente = True
-        mios.append(_item_a_dict(it, prod, restas, estacion, hijos.get(it.id, [])))
+        mios.append(
+            _item_a_dict(
+                it, prod, restas, estacion, hijos.get(it.id, []), valores,
+            )
+        )
     return mios, pendiente
 
 

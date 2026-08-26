@@ -435,7 +435,11 @@
    en ámbar. Una resta es una advertencia —lo que el plato NO lleva— y un
    extra es parte del plato; pintarlos igual haría que la advertencia dejara
    de destacar (RN-CUP-014). */
-.kds-extra {
+/* El valor de variante comparte la caja del extra: en el papel se
+   distinguen por el prefijo ("> " vs "+ ") y no por el color, y la pantalla
+   no tiene por qué contradecir a la comanda (ADR-056). */
+.kds-extra,
+.kds-valor {
     display: block;
     margin-top: 0.125rem;
     color: var(--kds-texto);
@@ -445,7 +449,8 @@
     letter-spacing: 0.02em;
 }
 
-.kds-item.hecho .kds-extra {
+.kds-item.hecho .kds-extra,
+.kds-item.hecho .kds-valor {
     text-decoration: none;
     opacity: 0.6;
 }
