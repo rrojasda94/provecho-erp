@@ -6986,6 +6986,51 @@
         "title": "DecisionGerencialOut",
         "type": "object"
       },
+      "DeliveryConfiguracionOut": {
+        "description": "Con qué números está cotizando el ERP **ahora mismo**, y qué le falta.\n\nLas dos banderas existen porque la degradación de ADR-053/054 es\nsilenciosa por diseño —sin claves el ERP se comporta como antes— y eso,\nque del lado del cajero es lo correcto, del lado de Gerencia es una\npantalla que miente: mostraría una tarifa que nadie está usando.",
+        "properties": {
+          "activa": {
+            "title": "Activa",
+            "type": "boolean"
+          },
+          "distritos_restringidos": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Distritos Restringidos",
+            "type": "array"
+          },
+          "precio_por_km": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Precio Por Km",
+            "type": "string"
+          },
+          "radio_km": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Radio Km",
+            "type": "string"
+          },
+          "rutas_reales": {
+            "title": "Rutas Reales",
+            "type": "boolean"
+          },
+          "tarifa_base": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Tarifa Base",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tarifa_base",
+          "precio_por_km",
+          "radio_km",
+          "distritos_restringidos",
+          "activa",
+          "rutas_reales"
+        ],
+        "title": "DeliveryConfiguracionOut",
+        "type": "object"
+      },
       "DescuentoCreate": {
         "description": "`modo=None` quita el descuento. Motivo y autorizador son obligatorios\nal aplicarlo: el reporte de descuentos necesita saber por qué y quién.\n\n`autorizacion` es el token que devuelve `POST /auth/autorizar` cuando el\nsupervisor teclea su PIN en el terminal del cajero. **Quién autorizó sale\nde ahí, nunca del cuerpo**: un id suelto en el request sería una firma\nfalsificable y el reporte de descuentos dejaría de valer (RN-AUD-005).",
         "properties": {
@@ -45509,6 +45554,63 @@
         "summary": "Ticket Comprobante",
         "tags": [
           "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/delivery/configuracion": {
+      "get": {
+        "description": "La tarifa con la que se está cotizando, resuelta (ADR-068).\n\nNo es el contenido de `parametro_empresa` —eso ya lo devuelve\n`GET /parametros`— sino **el resultado**: lo aprobado, o la semilla del\n`.env` donde Gerencia todavía no aprobó nada. Es la única forma de que la\npantalla muestre el número que el PDV va a cobrar y no el que alguien\npropuso.",
+        "operationId": "configuracion_delivery_api_v1_sales_delivery_configuracion_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "empresa_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Empresa Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryConfiguracionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Configuracion Delivery",
+        "tags": [
+          "sales",
+          "gerencia"
         ]
       }
     },

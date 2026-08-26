@@ -97,6 +97,24 @@ reparten así:
 El servicio `web` no: recibe solo la variable que se le declara explícitamente,
 y por eso la clave del servidor no llega ahí.
 
+**Dos formas de tener la clave puesta y que no sirva de nada**, las dos
+encontradas el 2026-08-25 y las dos corregidas:
+
+- **Con el nombre viejo.** `.env.staging.example` traía un `GOOGLE_API_KEY=`
+  que **ningún código lee** —quedó de una integración que nunca se escribió—.
+  Los nombres que se buscan son exactamente `GOOGLE_MAPS_BROWSER_KEY` y
+  `GOOGLE_MAPS_SERVER_KEY`. Una clave con el nombre viejo no enciende nada y
+  no hay error que lo avise.
+- **En el `.env` correcto pero sin llegar al contenedor.**
+  `docker-compose.staging.yml` y `docker-compose.prod.yml` **no le pasaban
+  ninguna** `GOOGLE_MAPS_*` al servicio `web`: el `.env` del servidor podía
+  tenerla y el proceso de Next no la veía. Solo el compose de desarrollo la
+  declaraba.
+
+Por eso la comprobación que vale es la de `/gerencia/delivery` (ADR-068) y no
+mirar el `.env`: la pantalla dice lo que el **proceso** tiene, no lo que el
+archivo dice.
+
 **No es `NEXT_PUBLIC_*`.** Esa familia de variables se hornea en el build de
 Next.js —la misma razón por la que se eliminó `NEXT_PUBLIC_API_URL`, ver
 [devops.md](devops.md#docker)—. La clave la lee un Server Component en tiempo de
@@ -104,7 +122,18 @@ ejecución y baja al componente del mapa como prop.
 
 Resto de la configuración (`GOOGLE_ROUTES_BASE_URL`, `GOOGLE_TIMEOUT_SEGUNDOS`,
 `GOOGLE_MAPS_PAIS` y el bloque `DELIVERY_*`) está documentada línea por línea en
-`.env.example`.
+`.env.example`. Los `DELIVERY_*` son solo la **semilla**: la tarifa que se
+cobra la fija Gerencia en `/gerencia/delivery` y vive en la base (ADR-068).
+
+**Fuera de Docker** (`npm run dev` en `frontend/`) el `.env` de la raíz no se
+lee: hay que copiar `frontend/.env.example` a `frontend/.env.local`. Sin eso
+el campo de dirección se ve como un cuadro de texto y parece que la
+integración no existe.
+
+**En staging** las mismas variables van en el `.env` del droplet — ver
+`.env.staging.example`. La clave del navegador se restringe al **dominio de
+staging**, no a `localhost`: una clave restringida al dominio equivocado se
+comporta igual que una clave ausente, y el SDK falla en silencio.
 
 ## 7. Qué pasa si falta cada clave
 
@@ -120,6 +149,12 @@ un pedido (mismo criterio que ADR-005 y ADR-041).
 - **Con las dos vacías**: el sistema se comporta exactamente como antes de esta
   integración.
 
+Esa degradación silenciosa es correcta frente al cajero —una venta no se
+pierde porque un tercero no contestó— y engañosa frente a Gerencia: parece que
+la función nunca se construyó. Por eso **`/gerencia/delivery` dice cuál de las
+dos claves falta** (ADR-068). Ante un «el mapa no aparece» o «las rutas no
+están», esa pantalla es el primer lugar donde mirar, antes que el `.env`.
+
 ## 8. Verificar que quedó bien
 
 1. `docker compose up` y abrir *Organización → Sucursales* → editar una.
@@ -132,6 +167,13 @@ un pedido (mismo criterio que ADR-005 y ADR-041).
    cliente y el cobro del delivery es manipulable.
 6. En Google Cloud, *APIs y servicios* → *Panel*: el tráfico tiene que
    aparecer en las APIs esperadas y en ninguna otra.
+7. *Gerencia → Delivery*: los tres renglones de arriba tienen que estar en
+   verde. Es la comprobación que no exige abrir la consola de Google ni el
+   `.env` del servidor, y la única que puede hacer alguien que no es de
+   sistemas.
+8. Con la tarifa aprobada, tomar un delivery en el PDV con dirección anclada:
+   los kilómetros tienen que salir **sin** «aprox.» (prueba de que Routes
+   contestó) y el ticket tiene que mostrar la fila *Reparto*.
 
 ## Rotación
 

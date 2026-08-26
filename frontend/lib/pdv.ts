@@ -413,8 +413,10 @@ export const api = {
   /** Cuánto sale llevar el pedido a esa dirección, antes de aceptarlo.
    *
    * El número lo calcula el servidor con su propia clave de Google: esto
-   * solo lo muestra. Cada llamada gasta cuota de un proveedor pago, así
-   * que se pide al anclar la dirección y no en cada tecla.
+   * solo lo muestra. La **medición** gasta cuota de un proveedor pago, así
+   * que se pide al cambiar el punto y no en cada tecla; sin ancla el servidor
+   * devuelve la tarifa base sin preguntarle nada a Google, y hay que pedirla
+   * igual: desde RN-COM-041 el reparto entra al total.
    */
   cotizarDelivery: (cuerpo: CotizacionDeliveryIn) =>
     pedir<CotizacionDelivery>("/sales/ventas/cotizar-delivery", {

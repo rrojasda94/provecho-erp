@@ -1019,18 +1019,27 @@ const MOTIVO_DERIVACION: Record<string, string> = {
  * Lo que sale llevar el pedido, y el aviso de cuándo conviene no llevarlo.
  *
  * Lo calcula el servidor y no el navegador: este número define cuánta plata
- * paga el cliente (ADR-054). Se pide al ANCLAR la dirección y no en cada
- * tecla — cada llamada gasta cuota de un proveedor pago.
+ * paga el cliente (ADR-054). Se pide al cambiar el punto y no en cada tecla —
+ * cada medición gasta cuota de un proveedor pago.
  *
- * Sin ancla no se cotiza: una dirección escrita a mano no se puede medir, y
- * el pedido se toma igual con la tarifa base.
+ * **También se cotiza sin ancla**, aunque no haya nada que medir: desde que
+ * el reparto entra al total (RN-COM-041) callarse la tarifa base sería
+ * mostrarle al cajero un total menor que el que el servidor va a cobrar. Esa
+ * llamada no le cuesta nada a Google —sin destino, `cotizar` devuelve la base
+ * y ni pregunta— y es el caso normal cuando no hay clave de Maps o la calle
+ * no está en Google.
  */
 function CotizacionEntrega({
   sucursalId,
   ubicacion,
+  onCotizado,
 }: {
   sucursalId: string;
   ubicacion: Ubicacion;
+  /** El costo sube al borrador para que el ticket lo sume (RN-COM-041).
+   * `null` = sin ancla o sin poder cotizar: la venta se crea igual y el
+   * servidor pone el número que corresponda. */
+  onCotizado: (costo: number | null) => void;
 }) {
   const [cotizacion, setCotizacion] = useState<CotizacionDelivery | null>(null);
   const [error, setError] = useState("");
@@ -1038,24 +1047,26 @@ function CotizacionEntrega({
   const lng = ubicacion.ubicacion_lng;
 
   useEffect(() => {
-    if (lat === null || lat === undefined) {
-      setCotizacion(null);
-      return;
-    }
     let vivo = true;
     api
       .cotizarDelivery({
         sucursal_id: sucursalId,
-        ubicacion_lat: lat,
-        ubicacion_lng: lng,
+        // `null` los dos: media coordenada no es un punto, y el schema del
+        // servidor rechaza mandar una sola.
+        ubicacion_lat: lat ?? null,
+        ubicacion_lng: lat === null || lat === undefined ? null : lng,
         ubicacion_distrito: ubicacion.ubicacion_distrito,
       })
       .then((c) => {
-        if (vivo) setCotizacion(c);
+        if (!vivo) return;
+        setCotizacion(c);
+        onCotizado(Number(c.costo));
       })
       // El pedido se toma igual: no poder cotizar no es no poder vender.
       .catch(() => {
-        if (vivo) setError("No se pudo calcular el reparto.");
+        if (!vivo) return;
+        setError("No se pudo calcular el reparto.");
+        onCotizado(null);
       });
     return () => {
       vivo = false;
@@ -1066,6 +1077,9 @@ function CotizacionEntrega({
 
   if (error) return <p className="pdv-nota">{error}</p>;
   if (!cotizacion) return null;
+  // Tarifa apagada (el estado de fábrica) y nada que derivar: no hay reparto
+  // del que hablar, y un «Reparto S/ 0.00» sería ruido en cada delivery.
+  if (Number(cotizacion.costo) === 0 && !cotizacion.derivar_a_externo) return null;
 
   const detalle = cotizacion.distancia_km
     ? `${cotizacion.distancia_km} km${cotizacion.aproximada ? " aprox." : ""} · reparto S/ ${cotizacion.costo}`
@@ -1107,6 +1121,7 @@ export function DialogoTipo({
   const [comensales, setComensales] = useState(2);
   const [direccion, setDireccion] = useState("");
   const [ubicacion, setUbicacion] = useState<Ubicacion>(UBICACION_VACIA);
+  const [costoEntrega, setCostoEntrega] = useState<number | null>(null);
 
   useEffect(() => {
     if (!borrador) return;
@@ -1117,6 +1132,7 @@ export function DialogoTipo({
     // tiene ninguna.
     setDireccion(borrador.direccion ?? borrador.cliente?.direccion ?? "");
     setUbicacion(borrador.ubicacion ?? UBICACION_VACIA);
+    setCostoEntrega(borrador.costoEntrega);
   }, [borrador]);
 
   const listo = tipo !== null && (tipo !== "mesa" || mesaId !== null);
@@ -1187,7 +1203,11 @@ export function DialogoTipo({
               setUbicacion(punto);
             }}
           />
-          <CotizacionEntrega sucursalId={sucursalId} ubicacion={ubicacion} />
+          <CotizacionEntrega
+            sucursalId={sucursalId}
+            ubicacion={ubicacion}
+            onCotizado={setCostoEntrega}
+          />
           <p className="pdv-nota">
             {borrador?.cliente
               ? borrador.cliente.direccion
@@ -1211,6 +1231,7 @@ export function DialogoTipo({
               mesaNumero: tipo === "mesa" ? (mesa?.numero ?? null) : null,
               comensales: tipo === "mesa" ? comensales : null,
               direccion: tipo === "delivery" ? direccion.trim() : null,
+              costoEntrega: tipo === "delivery" ? costoEntrega : null,
               ubicacion: tipo === "delivery" ? ubicacion : UBICACION_VACIA,
             })
           }

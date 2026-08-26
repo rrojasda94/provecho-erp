@@ -446,10 +446,12 @@ def _cotizar_entrega(
     """
     if ya_cotizado or modalidad != "delivery" or not direccion_entrega:
         return None
+    origen, empresa_id = tarifa_delivery.contexto_de_sucursal(session, sucursal_id)
     return tarifa_delivery.cotizar(
-        tarifa_delivery.origen_de_sucursal(session, sucursal_id),
+        origen,
         tarifa_delivery.coordenada(lat, lng),
         distrito,
+        tarifa_delivery.tarifa_de(session, empresa_id),
     )
 
 
@@ -547,6 +549,11 @@ def crear_venta(
         ubicacion_distrito,
         ya_cotizado=costo_entrega is not None,
     )
+    reparto = cotizacion.costo if cotizacion else costo_entrega
+    # El flete entra al total desde el minuto cero (RN-COM-041). Acá se suma
+    # a mano porque la fila todavía no existe y `total_a_cobrar` necesita una:
+    # es el único lugar donde el total se arma sin pasar por esa función.
+    flete = (reparto or Decimal("0")) if rules.admite_cobro(tipo) else Decimal("0")
 
     venta = Venta(
         id=id or uuid.uuid4(),
@@ -564,7 +571,8 @@ def crear_venta(
                 (f.cantidad, f.precio_unitario, f.descuento)
                 for f in [*filas, *(h for hijos in extras_por_padre for h in hijos)]
             ]
-        ),
+        )
+        + flete,
         idempotency_key=idempotency_key,
         referencia_atencion=referencia_atencion,
         direccion_entrega=direccion_entrega,
@@ -576,7 +584,7 @@ def crear_venta(
         distancia_entrega_km=(
             cotizacion.distancia_km if cotizacion else distancia_entrega_km
         ),
-        costo_entrega=cotizacion.costo if cotizacion else costo_entrega,
+        costo_entrega=reparto,
         mesa_id=mesa_id,
         comensales=comensales,
         tipo=tipo,
@@ -667,21 +675,52 @@ def _subtotal(items: list[VentaItem]) -> Decimal:
     )
 
 
+def reparto_a_cobrar(venta: Venta) -> Decimal:
+    """El flete que entra al total (RN-COM-041).
+
+    Un consumo de personal vale cero entero: cobrarle el reparto a un
+    trabajador que se lleva su almuerzo emitiría un comprobante por el flete
+    solo, que es peor que no cobrarlo.
+    """
+    if not rules.admite_cobro(venta.tipo):
+        return Decimal("0")
+    return venta.costo_entrega or Decimal("0")
+
+
 def total_a_cobrar(session: Session, venta: Venta, grupo_cobro: int | None = None):
     """Lo que realmente debe pagarse: subtotal de las líneas menos la parte
-    del descuento manual que le corresponde. Sin `grupo_cobro` es la venta
-    entera; con él, solo esa cuenta.
+    del descuento manual que le corresponde, más el reparto. Sin
+    `grupo_cobro` es la venta entera; con él, solo esa cuenta.
+
+    **El reparto se suma después del descuento** (RN-COM-041): el descuento
+    manual lo autoriza un encargado sobre lo que el cliente consumió, y
+    regalar el flete al mismo tiempo no es lo que se aprobó.
     """
     todos = VentaRepo(session).items(venta.id)
     base = _subtotal(todos)
+    reparto = reparto_a_cobrar(venta)
     if grupo_cobro is None:
-        return base - rules.monto_descuento(
+        neto = base - rules.monto_descuento(
             venta.descuento_modo, venta.descuento_valor, base
         )
+        return neto + reparto
     filas = [f for f in todos if f.grupo_cobro == grupo_cobro]
     parcial = _subtotal(filas)
-    return parcial - rules.descuento_prorrateado(
-        venta.descuento_modo, venta.descuento_valor, base, parcial
+    # El flete **no se prorratea**: va entero en la primera cuenta. Repartir
+    # un reparto entre comensales es un caso que nadie pidió, pero omitirlo
+    # sí rompía algo real — el cobro normal del PDV pasa por acá con
+    # `grupo_cobro=1`, así que sin esto el delivery de una sola cuenta no se
+    # cobraba nunca. La suma de las cuentas tiene que dar el total de la
+    # venta, o `pagos_cubren_total` deja la orden sin poder cerrarse.
+    grupos = VentaRepo(session).grupos_de_cobro(venta.id)
+    if grupo_cobro != min(grupos, default=rules.GRUPO_COBRO_UNICO):
+        reparto = Decimal("0")
+    return (
+        parcial
+        - rules.descuento_prorrateado(
+            venta.descuento_modo, venta.descuento_valor, base, parcial
+        )
+        + reparto
     )
 
 

@@ -72,6 +72,101 @@ export async function proponerParametroAction(
   return { error: "", ok: true };
 }
 
+/** Los cuatro números con los que se cobra un reparto (ADR-068). El código
+ * y la forma del valor los define `sales/application/tarifa_delivery.py`:
+ * cambiar uno acá sin cambiarlo allá deja el parámetro huérfano. */
+const TARIFA_DELIVERY = [
+  { campo: "tarifa_base", codigo: "delivery_tarifa_base", clave: "monto" },
+  { campo: "precio_por_km", codigo: "delivery_precio_por_km", clave: "monto" },
+  { campo: "radio_km", codigo: "delivery_radio_km", clave: "km" },
+] as const;
+
+const CODIGO_DISTRITOS = "delivery_distritos_restringidos";
+
+/** «Belén, Morales» → `["Belén","Morales"]`. Una coma es lo que la gente
+ * escribe sin que nadie se lo explique; un JSON no. */
+function listaDe(texto: string): string[] {
+  return texto
+    .split(",")
+    .map((d) => d.trim())
+    .filter(Boolean);
+}
+
+type PropuestaTarifa = { codigo: string; valor: Record<string, unknown> };
+
+/** Las propuestas de los tres números, o `null` si alguno vino negativo.
+ *
+ * Vive aparte de la Server Action por el límite de complejidad del lint: el
+ * bucle con sus tres guardas la dejaba en 13.
+ */
+function tarifaCambiada(
+  campo: (clave: string) => string,
+  divisa: string,
+): PropuestaTarifa[] | null {
+  const propuestas: PropuestaTarifa[] = [];
+  for (const { campo: nombre, codigo, clave } of TARIFA_DELIVERY) {
+    const nuevo = campo(nombre);
+    if (!nuevo || Number(nuevo) === Number(campo(`actual_${nombre}`))) continue;
+    if (Number(nuevo) < 0) return null;
+    propuestas.push({
+      codigo,
+      valor: clave === "monto" ? { monto: nuevo, divisa } : { [clave]: nuevo },
+    });
+  }
+  return propuestas;
+}
+
+/**
+ * Propone la tarifa del delivery: una fila de `parametro_empresa` por número
+ * que **cambió** (ADR-068).
+ *
+ * Solo lo que cambió, y no los cuatro siempre, porque cada propuesta es una
+ * fila que Gerencia tiene que resolver a mano: reproponer un valor idéntico
+ * es pedirle que apruebe lo que ya aprobó.
+ *
+ * Los `actual_*` vienen de `GET /sales/delivery/configuracion` — la tarifa
+ * **efectiva**, no la propuesta — porque es contra lo que el PDV está
+ * cobrando hoy que tiene sentido comparar.
+ */
+export async function proponerTarifaDeliveryAction(
+  _previo: EstadoGerencia,
+  formData: FormData,
+): Promise<EstadoGerencia> {
+  const campo = (clave: string) => String(formData.get(clave) ?? "").trim();
+  const empresaId = campo("empresa_id");
+  if (!empresaId) return { error: "Falta la empresa.", ok: false };
+
+  const propuestas = tarifaCambiada(campo, campo("divisa") || "PEN");
+  if (propuestas === null) {
+    return { error: "Ningún valor de la tarifa puede ser negativo.", ok: false };
+  }
+
+  const distritos = listaDe(campo("distritos"));
+  if (distritos.join("|") !== listaDe(campo("actual_distritos")).join("|")) {
+    propuestas.push({ codigo: CODIGO_DISTRITOS, valor: { distritos } });
+  }
+  if (propuestas.length === 0) return { error: "No cambió ningún valor.", ok: false };
+
+  const motivo = campo("motivo") || "Tarifa de delivery fijada desde Gerencia";
+  const jwt = await token();
+  try {
+    for (const { codigo, valor } of propuestas) {
+      await apiFetch("/api/v1/parametros", {
+        token: jwt,
+        metodo: "POST",
+        cuerpo: { empresa_id: empresaId, modulo: "sales", codigo, valor, motivo },
+      });
+    }
+  } catch (e) {
+    // Sin transacción a propósito: son propuestas independientes y las que
+    // entraron quedan a la vista abajo, esperando aprobación. Reintentar
+    // vuelve a proponer solo lo que siga distinto.
+    return { error: mensajeDe(e, "No se pudo proponer la tarifa."), ok: false };
+  }
+  revalidatePath("/gerencia/delivery");
+  return { error: "", ok: true };
+}
+
 export async function aprobarParametroAction(
   _previo: EstadoGerencia,
   formData: FormData,
@@ -92,6 +187,7 @@ export async function aprobarParametroAction(
     return { error: mensajeDe(e, "No se pudo aprobar el parámetro."), ok: false };
   }
   revalidatePath("/gerencia/parametros");
+  revalidatePath("/gerencia/delivery");
   return { error: "", ok: true };
 }
 

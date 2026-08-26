@@ -65,6 +65,9 @@ from src.shared.paginacion import Pagina, Paginacion, paginacion, paginar
 
 router = APIRouter(prefix="/sales", tags=["sales"])
 
+# La tarifa del delivery la fija Gerencia (ADR-068), así que la pantalla que
+# la muestra pide el permiso de Gerencia y no uno de `sales`.
+GESTIONAR_PARAMETROS = "gerencia.gestionar_parametros_empresa"
 CREAR = "sales.crear"
 COBRAR = "sales.cobrar"
 LEER = "sales.leer"
@@ -193,10 +196,12 @@ def cotizar_delivery(
         settings.consulta_documento_intentos_ip,
         ventana,
     )
+    origen, empresa_id = tarifa_delivery.contexto_de_sucursal(session, body.sucursal_id)
     cotizacion = tarifa_delivery.cotizar(
-        tarifa_delivery.origen_de_sucursal(session, body.sucursal_id),
+        origen,
         tarifa_delivery.coordenada(body.ubicacion_lat, body.ubicacion_lng),
         body.ubicacion_distrito,
+        tarifa_delivery.tarifa_de(session, empresa_id),
     )
     return schemas.CotizacionDeliveryOut(
         distancia_km=cotizacion.distancia_km,
@@ -204,6 +209,36 @@ def cotizar_delivery(
         aproximada=cotizacion.aproximada,
         derivar_a_externo=cotizacion.derivar_a_externo,
         motivo=cotizacion.motivo,
+    )
+
+
+@router.get(
+    "/delivery/configuracion",
+    response_model=schemas.DeliveryConfiguracionOut,
+    tags=["gerencia"],
+)
+def configuracion_delivery(
+    empresa_id: uuid.UUID | None = None,
+    _: Usuario = Depends(require_permission(GESTIONAR_PARAMETROS)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """La tarifa con la que se está cotizando, resuelta (ADR-068).
+
+    No es el contenido de `parametro_empresa` —eso ya lo devuelve
+    `GET /parametros`— sino **el resultado**: lo aprobado, o la semilla del
+    `.env` donde Gerencia todavía no aprobó nada. Es la única forma de que la
+    pantalla muestre el número que el PDV va a cobrar y no el que alguien
+    propuso.
+    """
+    tarifa = tarifa_delivery.tarifa_de(session, tenant.filtro_empresa(empresa_id))
+    return schemas.DeliveryConfiguracionOut(
+        tarifa_base=tarifa.base,
+        precio_por_km=tarifa.por_km,
+        radio_km=tarifa.radio_km,
+        distritos_restringidos=list(tarifa.distritos_restringidos),
+        activa=tarifa.activa,
+        rutas_reales=bool(settings.google_maps_server_key),
     )
 
 

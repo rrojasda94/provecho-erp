@@ -24,14 +24,19 @@ test("la pizza mitad y mitad pide un sabor por mitad", async ({ page }, testInfo
   await page.goto("/pdv");
 
   // Sin caja abierta el PDV no muestra la carta: el candado es parte del
-  // diseño (ADR-025), así que el recorrido pasa por la apertura.
-  await expect(dialogo(page).getByText("Apertura de caja")).toBeVisible();
-  await contar(page, { "100": 1, "50": 2 });
-  await dialogo(page).getByTestId("apertura-declarado").fill("200");
-  await dialogo(page).getByRole("button", { name: "Abrir caja" }).click();
-  await expect(page.getByTestId("estado-caja")).toContainText("Caja abierta", {
-    timeout: 15_000,
-  });
+  // diseño (ADR-025), así que el recorrido pasa por la apertura. Pero puede
+  // venir abierta de otro recorrido de la misma suite —la caja es del punto
+  // de venta y vive en el servidor, no en el navegador— así que no se asume
+  // cerrada: se abre solo si hace falta (mismo patrón que
+  // `delivery-gerencia.spec.ts`).
+  const caja = page.getByTestId("estado-caja");
+  await expect(caja).toBeVisible({ timeout: 30_000 });
+  if ((await caja.textContent())?.includes("cerrada")) {
+    await contar(page, { "100": 1, "50": 2 });
+    await dialogo(page).getByTestId("apertura-declarado").fill("200");
+    await dialogo(page).getByRole("button", { name: "Abrir caja" }).click();
+  }
+  await expect(caja).toContainText("Caja abierta", { timeout: 30_000 });
 
   // Sin `exact`: el botón del catálogo lleva el precio dentro, así que su
   // nombre accesible es «Mitad y Mitad E2E S/ 30.00». Mismo criterio que
