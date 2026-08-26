@@ -24,7 +24,8 @@ from src.modules.sales.infrastructure.models import (
     Venta,
     VentaItem,
 )
-from src.modules.users.infrastructure.models import Empresa, Persona, Sucursal
+from src.modules.users.infrastructure.models import Empresa, Marca, Persona, Sucursal
+from src.shared import fechas
 from src.shared.models import Comprobante
 
 
@@ -644,6 +645,62 @@ class ComprobanteRepo:
     def empresa_de_sucursal(self, sucursal_id: uuid.UUID) -> Empresa | None:
         sucursal = self.s.get(Sucursal, sucursal_id)
         return self.s.get(Empresa, sucursal.empresa_id) if sucursal else None
+
+    def sucursal(self, sucursal_id: uuid.UUID | None) -> Sucursal | None:
+        return self.s.get(Sucursal, sucursal_id) if sucursal_id else None
+
+    def marca(self, marca_id: uuid.UUID | None) -> Marca | None:
+        return self.s.get(Marca, marca_id) if marca_id else None
+
+    def emitidos(
+        self,
+        *,
+        empresa_id: uuid.UUID | None = None,
+        desde: date | None = None,
+        hasta: date | None = None,
+        tipo: str | None = None,
+        estado_emision: str | None = None,
+    ):
+        """Los comprobantes que emitimos, del más nuevo al más viejo.
+
+        Consulta sin `limit`: la pagina `src.shared.paginacion`. `desde`/
+        `hasta` son fechas del **negocio** y se traducen a instantes UTC con
+        `shared.fechas` — comparar un `created_at` UTC contra una fecha
+        local corre el corte cinco horas y deja la última noche del rango
+        fuera del reporte del contador.
+        """
+        q = select(Comprobante).where(Comprobante.direccion == "emitido")
+        if empresa_id is not None:
+            q = q.where(Comprobante.empresa_id == empresa_id)
+        if desde is not None:
+            q = q.where(Comprobante.created_at >= fechas.inicio_dia_utc(desde))
+        if hasta is not None:
+            q = q.where(Comprobante.created_at <= fechas.fin_dia_utc(hasta))
+        if tipo is not None:
+            q = q.where(Comprobante.tipo == tipo)
+        if estado_emision is not None:
+            q = q.where(Comprobante.estado_emision == estado_emision)
+        return q.order_by(Comprobante.created_at.desc(), Comprobante.correlativo.desc())
+
+    def cobrado_por_cuenta(
+        self, venta_ids: Collection[uuid.UUID]
+    ) -> dict[tuple[uuid.UUID, int], Decimal]:
+        """Cuánto se cobró en cada `(venta, grupo)`, en una sola consulta.
+
+        El importe del comprobante se lee de los pagos confirmados de su
+        cuenta y no se recalcula de las líneas: el comprobante nace cuando la
+        cuenta queda pagada, así que los pagos **son** su total, y sacarlo de
+        ahí evita repetir el prorrateo del descuento de la orden por cada
+        fila de un listado.
+        """
+        if not venta_ids:
+            return {}
+        filas = self.s.execute(
+            select(Pago.venta_id, Pago.grupo_cobro, func.sum(Pago.monto))
+            .where(Pago.venta_id.in_(venta_ids), Pago.estado == "confirmado")
+            .group_by(Pago.venta_id, Pago.grupo_cobro)
+        )
+        return {(v, g): total for v, g, total in filas}
 
     def persona(self, persona_id: uuid.UUID | None) -> Persona | None:
         return self.s.get(Persona, persona_id) if persona_id else None

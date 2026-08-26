@@ -27,6 +27,7 @@ from src.modules.sales.application.errors import (
     NoEncontrado,
     ReglaNegocio,
 )
+from src.modules.sales.application.impresion import encabezado as encabezado_de
 from src.modules.sales.domain import rules
 from src.modules.sales.infrastructure.models import (
     Atributo,
@@ -37,6 +38,7 @@ from src.modules.sales.infrastructure.models import (
     Venta,
     VentaItem,
 )
+from src.shared import impresion
 
 TIPOS_PANTALLA = {"preparacion", "despacho"}
 
@@ -508,7 +510,10 @@ def avance_venta(session: Session, venta_id: uuid.UUID) -> dict:
 
 
 # --- Comanda ------------------------------------------------------------------
-ANCHO_COMANDA = 32  # impresora térmica 58 mm
+# El ancho lo pone el papel, y todas las ticketeras del grupo son de 80 mm
+# (ADR-067). Antes eran 32 columnas —58 mm— y la misma comanda salía con un
+# tercio del rollo en blanco y los nombres largos cortados sin necesidad.
+ANCHO_COMANDA = impresion.ANCHO
 
 
 def _platos_en_papel(session: Session, pares: list[tuple]) -> list[str]:
@@ -584,5 +589,9 @@ def comanda(session: Session, venta_id: uuid.UUID) -> dict:
         "numero_orden": venta.numero_orden,
         "reimpresion": reimpresion,
         "impresa_veces": venta.comanda_impresa_veces,
+        # La cocina de un local multimarca imprime en el mismo rollo lo de
+        # todas: sin membrete, de qué marca es el pedido se deduce leyendo
+        # los platos.
+        "encabezado": encabezado_de(session, venta.sucursal_id),
         "texto": "\n".join(lineas),
     }

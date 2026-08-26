@@ -1,0 +1,226 @@
+/* Papel térmico de 80 mm (ADR-066).
+   ---------------------------------------------------------------------------
+   Una sola hoja para los tres documentos que salen del rollo: comanda de
+   cocina, precuenta y ticket del comprobante. El ancho de columna del texto
+   plano lo pone el servidor (`src/shared/impresion.py`, 48 columnas) y este
+   archivo tiene que cortar en la misma medida — el mismo documento no puede
+   leerse distinto según por dónde salga.
+
+   La hoja vive en un portal colgado de `<body>` (`components/impresion/`) y
+   está oculta en pantalla. Al imprimir se esconde TODO lo demás en vez de
+   mostrarla dentro de la página: si se imprimiera en su lugar del árbol,
+   heredaría el fondo oscuro del PDV y los anchos del shell, y una térmica no
+   imprime fondos — saldría el texto sobre blanco pero con la maquetación de
+   una pantalla de 1440 px.
+
+   No hay variante oscura: la impresora tiene un color de tinta y un color de
+   papel. Los valores van en negro y blanco literales, no en tokens de tema —
+   un token que cambia con el modo del sistema aquí solo puede empeorar. */
+
+@page {
+    size: 80mm auto;
+    margin: 0;
+}
+
+.impresion-hoja {
+    display: none;
+}
+
+@media print {
+    /* El `:not()` deja en pie únicamente el portal. `dialog[open]` va aparte
+       porque un modal abierto con `showModal()` se pinta en el top layer y
+       ahí no llega el selector de hijos de `<body>` — imprimir desde un
+       diálogo del PDV sacaba el diálogo encima del ticket. */
+    body > *:not(.impresion-portal) {
+        display: none !important;
+    }
+
+    dialog[open] {
+        display: none !important;
+    }
+
+    html,
+    body {
+        margin: 0;
+        padding: 0;
+        background: #fff;
+    }
+
+    .impresion-hoja {
+        display: block;
+        /* Explícito y no heredado del preflight de Tailwind: el ancho del
+           papel no puede depender de que una hoja de estilos ajena siga
+           declarando `border-box` el día de mañana. */
+        box-sizing: border-box;
+        width: 80mm;
+        margin: 0;
+        padding: 3mm 3mm 8mm;
+        background: #fff;
+        color: #000;
+        /* Monoespaciada en todo el documento: la comanda y la precuenta
+           vienen del servidor alineadas por columnas y cualquier tipografía
+           proporcional deshace esa alineación. */
+        font-family: "Courier New", ui-monospace, monospace;
+        font-size: 10pt;
+        line-height: 1.25;
+    }
+
+    .tk-membrete {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: 0.5mm;
+        padding-bottom: 2mm;
+        border-bottom: 1px dashed #000;
+    }
+
+    .tk-logo {
+        max-width: 45mm;
+        max-height: 18mm;
+        /* La térmica es de un solo color: un logo a color sale como una
+           mancha gris. En blanco y negro sale como dibujo. */
+        filter: grayscale(1) contrast(1.6);
+    }
+
+    .tk-marca {
+        font-size: 12pt;
+    }
+
+    .tk-titulo {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        padding: 2mm 0;
+    }
+
+    .tk-aviso {
+        margin: 0 0 2mm;
+        padding: 1mm;
+        text-align: center;
+        font-weight: 700;
+        border: 1px solid #000;
+    }
+
+    .tk-datos,
+    .tk-totales {
+        margin: 0;
+        padding: 2mm 0;
+        border-top: 1px dashed #000;
+    }
+
+    .tk-datos > div,
+    .tk-totales > div {
+        display: flex;
+        justify-content: space-between;
+        gap: 2mm;
+    }
+
+    .tk-datos dt,
+    .tk-datos dd,
+    .tk-totales dt,
+    .tk-totales dd {
+        margin: 0;
+    }
+
+    .tk-datos dd {
+        text-align: right;
+        /* Un nombre de razón social largo parte de línea en vez de empujar
+           el ancho del rollo. */
+        overflow-wrap: anywhere;
+    }
+
+    .tk-total {
+        font-size: 12pt;
+        font-weight: 700;
+    }
+
+    .tk-items {
+        width: 100%;
+        border-collapse: collapse;
+        border-top: 1px dashed #000;
+        margin-top: 2mm;
+    }
+
+    .tk-items th,
+    .tk-items td {
+        padding: 0.5mm 0;
+        text-align: right;
+        vertical-align: top;
+        /* Los importes no parten de línea: "S/" arriba y "78.00" abajo se
+           lee como dos números. La que cede ancho es la descripción. */
+        white-space: nowrap;
+    }
+
+    /* Las tres columnas de números miden lo que miden; el resto del rollo es
+       de la descripción. */
+    .tk-items th:not(:nth-child(2)),
+    .tk-items td:not(:nth-child(2)) {
+        width: 1%;
+        padding-left: 2mm;
+    }
+
+    .tk-items th:nth-child(2),
+    .tk-items td:nth-child(2) {
+        width: auto;
+        text-align: left;
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
+
+    .tk-items th:first-child,
+    .tk-items td:first-child {
+        text-align: left;
+        padding-left: 0;
+        padding-right: 2mm;
+    }
+
+    .tk-items thead th {
+        border-bottom: 1px solid #000;
+    }
+
+    .tk-letras {
+        margin: 2mm 0;
+        text-align: center;
+    }
+
+    .tk-pie {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: 1mm;
+        padding-top: 2mm;
+        border-top: 1px dashed #000;
+        font-size: 8pt;
+    }
+
+    .tk-qr {
+        width: 30mm;
+        height: 30mm;
+    }
+
+    .tk-hash {
+        overflow-wrap: anywhere;
+    }
+
+    /* Comanda y precuenta vienen del servidor alineadas a 48 columnas y esas
+       48 columnas tienen que entrar en el ancho útil del rollo — si no, el
+       navegador parte cada línea por la mitad y la alineación que el servidor
+       calculó no significa nada.
+
+       El cuerpo se deriva, no se elige a ojo: ancho útil (80 mm menos los dos
+       márgenes de 3 mm) ÷ 48 columnas ÷ el avance por carácter de una
+       monoespaciada (0.6 em). Cambiar el margen del rollo reajusta el texto
+       solo. */
+    .tk-texto {
+        --columnas: 48;
+        --avance: 0.6;
+        margin: 2mm 0 0;
+        white-space: pre-wrap;
+        font-family: inherit;
+        font-size: calc(74mm / var(--columnas) / var(--avance));
+        line-height: 1.2;
+    }
+}

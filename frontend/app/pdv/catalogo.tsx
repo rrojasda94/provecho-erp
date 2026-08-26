@@ -1,5 +1,6 @@
 "use client";
 
+import { Printer } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import type { Falla, Lista } from "@/lib/carga";
@@ -30,6 +31,10 @@ type Props = {
   onMesa: (mesa: MesaEnMapa) => void;
   onOrdenAbierta: (venta: Venta) => void;
   onVerCobrado: (venta: Venta) => void;
+  /** Reimprime la comanda de una cuenta abierta. Cuenta como reimpresión —
+   * es el mismo endpoint que usa cocina— y por eso el botón está separado
+   * de la fila: tocarlo al querer abrir el pedido sacaría papel de más. */
+  onImprimirComanda: (venta: Venta) => void;
 };
 
 /** Panel izquierdo: qué se vende, cómo está el salón y qué se cobró hoy. */
@@ -121,7 +126,11 @@ export default function Catalogo(props: Props) {
         />
       )}
       {vista === "abiertas" && (
-        <Abiertas ventas={abiertas} onVer={props.onOrdenAbierta} />
+        <Abiertas
+          ventas={abiertas}
+          onVer={props.onOrdenAbierta}
+          onImprimir={props.onImprimirComanda}
+        />
       )}
       {vista === "cobrados" && (
         <Cobrados ventas={cobrados} onVer={props.onVerCobrado} />
@@ -308,9 +317,11 @@ function MapaMesas({
 function Abiertas({
   ventas,
   onVer,
+  onImprimir,
 }: {
   ventas: Lista<Venta>;
   onVer: (v: Venta) => void;
+  onImprimir: (v: Venta) => void;
 }) {
   if (ventas.falla) {
     return (
@@ -333,7 +344,7 @@ function Abiertas({
       </div>
       <ul>
         {ventas.datos.map((v) => (
-          <li key={v.id}>
+          <li key={v.id} className="pdv-abierta-fila">
             <button type="button" onClick={() => onVer(v)}>
               <span className="pdv-cobrado-orden">#{v.numero_orden}</span>
               <span className="pdv-cobrado-modalidad">
@@ -341,6 +352,15 @@ function Abiertas({
                 {v.referencia_atencion ? ` · ${v.referencia_atencion}` : ""}
               </span>
               <strong>{soles(v.total)}</strong>
+            </button>
+            <button
+              type="button"
+              className="pdv-abierta-imprimir"
+              title="Reimprimir comanda"
+              aria-label={`Reimprimir comanda del pedido ${v.numero_orden}`}
+              onClick={() => onImprimir(v)}
+            >
+              <Printer aria-hidden size={18} />
             </button>
           </li>
         ))}

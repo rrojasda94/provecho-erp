@@ -1,7 +1,7 @@
 """DTOs (pydantic) del módulo sales."""
 
 import uuid
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Literal
 
@@ -184,11 +184,91 @@ class AnularVentaIn(BaseModel):
     autorizacion: str | None = None
 
 
+class EncabezadoImpresionOut(BaseModel):
+    """Membrete del rollo de 80 mm: quién emite (ADR-067).
+
+    Lo comparten comanda, precuenta y ticket del comprobante — el papel de un
+    mismo local tiene que verse igual salga por donde salga.
+    """
+
+    marca: str
+    # Ruta de `frontend/public/marcas/`, configurada en `marca.skins.ticket`.
+    logo: str | None
+    razon_social: str
+    ruc: str
+    domicilio_fiscal: str
+    contacto: str | None
+    sucursal: str
+    direccion: str
+    pie: list[str]
+
+
 class PrecuentaOut(BaseModel):
     venta_id: uuid.UUID
     grupo_cobro: int | None
     total: Decimal
+    encabezado: EncabezadoImpresionOut
     texto: str
+
+
+class TicketItemOut(BaseModel):
+    """Precio e importe **con IGV**: es lo que el cliente compara contra la
+    carta. La base imponible y el impuesto van en el bloque de totales."""
+
+    cantidad: Decimal
+    descripcion: str
+    precio_unitario: Decimal
+    importe: Decimal
+
+
+class TicketDocumentoOut(BaseModel):
+    tipo: str
+    titulo: str
+    serie: str
+    correlativo: int
+    serie_correlativo: str
+    fecha_emision: datetime
+    grupo_cobro: int
+    estado_emision: str
+    # Franja que el papel muestra mientras SUNAT no lo acepte. `None` cuando
+    # ya está aceptado: un ticket sin avisos es uno limpio.
+    aviso: str | None
+
+
+class TicketReceptorOut(BaseModel):
+    tipo_doc: str
+    num_doc: str
+    nombre: str
+    direccion: str
+
+
+class TicketTotalesOut(BaseModel):
+    gravadas: Decimal
+    exoneradas: Decimal
+    igv: Decimal
+    igv_porcentaje: Decimal
+    total: Decimal
+    en_letras: str
+
+
+class TicketPieOut(BaseModel):
+    # Los nueve campos que SUNAT exige en el QR, tal como se codifican.
+    qr_texto: str
+    # `data:image/svg+xml` — el navegador lo pinta con `<img>`, que no puede
+    # ejecutar nada.
+    qr_imagen: str
+    hash: str | None
+
+
+class TicketComprobanteOut(BaseModel):
+    comprobante_id: uuid.UUID
+    venta_id: uuid.UUID | None
+    encabezado: EncabezadoImpresionOut
+    documento: TicketDocumentoOut
+    receptor: TicketReceptorOut
+    items: list[TicketItemOut]
+    totales: TicketTotalesOut
+    pie: TicketPieOut
 
 
 class PagoCreate(BaseModel):
@@ -848,6 +928,31 @@ class ComprobanteOut(BaseModel):
     motivo_nc: str | None = None
     motivo_nc_descripcion: str | None = None
     anulado_por_nc_id: uuid.UUID | None = None
+
+
+class ComprobanteEmitidoOut(BaseModel):
+    """Fila del listado de comprobantes emitidos (pestaña de Contabilidad).
+
+    Lleva `total` —los pagos confirmados de esa cuenta— porque un registro de
+    ventas sin importes no sirve para cuadrar nada, y `fecha_emision` en hora
+    del negocio: el listado del contador se corta por día de Lima, no por día
+    UTC.
+    """
+
+    id: uuid.UUID
+    venta_id: uuid.UUID | None
+    tipo: str
+    serie: str
+    correlativo: int
+    serie_correlativo: str
+    grupo_cobro: int
+    fecha_emision: datetime
+    receptor_num_doc: str | None
+    receptor_nombre: str | None
+    estado_emision: str
+    detalle_emision: str | None
+    total: Decimal
+    anulado_por_nc_id: uuid.UUID | None
 
 
 class EntregaOut(BaseModel):

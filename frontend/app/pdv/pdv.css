@@ -1279,3 +1279,35 @@
 .pdv-firma .pdv-campo {
     width: 100%;
 }
+
+/* Cuentas abiertas: la fila abre el pedido y el botón de al lado reimprime
+   su comanda. Van separados porque tocar la fila entera para imprimir
+   sacaría papel cada vez que alguien quiere ver qué falta cobrar. */
+.pdv-abierta-fila {
+    display: flex;
+    align-items: stretch;
+    gap: 0.5rem;
+}
+
+.pdv-abierta-fila > button:first-child {
+    flex: 1;
+    min-width: 0;
+}
+
+.pdv-abierta-imprimir {
+    flex: 0 0 auto;
+    display: grid;
+    place-items: center;
+    /* 44 px: el mínimo táctil. La caja se opera con el pulgar sobre una
+       tablet, no con un mouse. */
+    min-width: 44px;
+    border: 1px solid var(--pdv-borde, currentColor);
+    border-radius: var(--radius, 0.5rem);
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+}
+
+.pdv-abierta-imprimir:hover {
+    background: color-mix(in oklab, currentColor 12%, transparent);
+}

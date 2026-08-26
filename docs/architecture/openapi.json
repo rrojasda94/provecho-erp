@@ -4848,6 +4848,9 @@
       },
       "ComandaOut": {
         "properties": {
+          "encabezado": {
+            "$ref": "#/components/schemas/EncabezadoImpresionOut"
+          },
           "impresa_veces": {
             "title": "Impresa Veces",
             "type": "integer"
@@ -4874,6 +4877,7 @@
           "numero_orden",
           "reimpresion",
           "impresa_veces",
+          "encabezado",
           "texto"
         ],
         "title": "ComandaOut",
@@ -4978,6 +4982,125 @@
           "resultado"
         ],
         "title": "CompletarOrdenIn",
+        "type": "object"
+      },
+      "ComprobanteEmitidoOut": {
+        "description": "Fila del listado de comprobantes emitidos (pestaña de Contabilidad).\n\nLleva `total` —los pagos confirmados de esa cuenta— porque un registro de\nventas sin importes no sirve para cuadrar nada, y `fecha_emision` en hora\ndel negocio: el listado del contador se corta por día de Lima, no por día\nUTC.",
+        "properties": {
+          "anulado_por_nc_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anulado Por Nc Id"
+          },
+          "correlativo": {
+            "title": "Correlativo",
+            "type": "integer"
+          },
+          "detalle_emision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detalle Emision"
+          },
+          "estado_emision": {
+            "title": "Estado Emision",
+            "type": "string"
+          },
+          "fecha_emision": {
+            "format": "date-time",
+            "title": "Fecha Emision",
+            "type": "string"
+          },
+          "grupo_cobro": {
+            "title": "Grupo Cobro",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "receptor_nombre": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receptor Nombre"
+          },
+          "receptor_num_doc": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receptor Num Doc"
+          },
+          "serie": {
+            "title": "Serie",
+            "type": "string"
+          },
+          "serie_correlativo": {
+            "title": "Serie Correlativo",
+            "type": "string"
+          },
+          "tipo": {
+            "title": "Tipo",
+            "type": "string"
+          },
+          "total": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total",
+            "type": "string"
+          },
+          "venta_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Venta Id"
+          }
+        },
+        "required": [
+          "id",
+          "venta_id",
+          "tipo",
+          "serie",
+          "correlativo",
+          "serie_correlativo",
+          "grupo_cobro",
+          "fecha_emision",
+          "receptor_num_doc",
+          "receptor_nombre",
+          "estado_emision",
+          "detalle_emision",
+          "total",
+          "anulado_por_nc_id"
+        ],
+        "title": "ComprobanteEmitidoOut",
         "type": "object"
       },
       "ConformidadComprobanteCreate": {
@@ -6863,51 +6986,6 @@
         "title": "DecisionGerencialOut",
         "type": "object"
       },
-      "DeliveryConfiguracionOut": {
-        "description": "Con qué números está cotizando el ERP **ahora mismo**, y qué le falta.\n\nLas dos banderas existen porque la degradación de ADR-053/054 es\nsilenciosa por diseño —sin claves el ERP se comporta como antes— y eso,\nque del lado del cajero es lo correcto, del lado de Gerencia es una\npantalla que miente: mostraría una tarifa que nadie está usando.",
-        "properties": {
-          "activa": {
-            "title": "Activa",
-            "type": "boolean"
-          },
-          "distritos_restringidos": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Distritos Restringidos",
-            "type": "array"
-          },
-          "precio_por_km": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-            "title": "Precio Por Km",
-            "type": "string"
-          },
-          "radio_km": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-            "title": "Radio Km",
-            "type": "string"
-          },
-          "rutas_reales": {
-            "title": "Rutas Reales",
-            "type": "boolean"
-          },
-          "tarifa_base": {
-            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-            "title": "Tarifa Base",
-            "type": "string"
-          }
-        },
-        "required": [
-          "tarifa_base",
-          "precio_por_km",
-          "radio_km",
-          "distritos_restringidos",
-          "activa",
-          "rutas_reales"
-        ],
-        "title": "DeliveryConfiguracionOut",
-        "type": "object"
-      },
       "DescuentoCreate": {
         "description": "`modo=None` quita el descuento. Motivo y autorizador son obligatorios\nal aplicarlo: el reporte de descuentos necesita saber por qué y quién.\n\n`autorizacion` es el token que devuelve `POST /auth/autorizar` cuando el\nsupervisor teclea su PIN en el terminal del cajero. **Quién autorizó sale\nde ahí, nunca del cuerpo**: un id suelto en el request sería una firma\nfalsificable y el reporte de descuentos dejaría de valer (RN-AUD-005).",
         "properties": {
@@ -8226,6 +8304,77 @@
           }
         },
         "title": "EmpresaUpdate",
+        "type": "object"
+      },
+      "EncabezadoImpresionOut": {
+        "description": "Membrete del rollo de 80 mm: quién emite (ADR-067).\n\nLo comparten comanda, precuenta y ticket del comprobante — el papel de un\nmismo local tiene que verse igual salga por donde salga.",
+        "properties": {
+          "contacto": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contacto"
+          },
+          "direccion": {
+            "title": "Direccion",
+            "type": "string"
+          },
+          "domicilio_fiscal": {
+            "title": "Domicilio Fiscal",
+            "type": "string"
+          },
+          "logo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Logo"
+          },
+          "marca": {
+            "title": "Marca",
+            "type": "string"
+          },
+          "pie": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Pie",
+            "type": "array"
+          },
+          "razon_social": {
+            "title": "Razon Social",
+            "type": "string"
+          },
+          "ruc": {
+            "title": "Ruc",
+            "type": "string"
+          },
+          "sucursal": {
+            "title": "Sucursal",
+            "type": "string"
+          }
+        },
+        "required": [
+          "marca",
+          "logo",
+          "razon_social",
+          "ruc",
+          "domicilio_fiscal",
+          "contacto",
+          "sucursal",
+          "direccion",
+          "pie"
+        ],
+        "title": "EncabezadoImpresionOut",
         "type": "object"
       },
       "EncuestaConNodoOut": {
@@ -13881,6 +14030,37 @@
         "title": "Pagina[ClienteBuscadoOut]",
         "type": "object"
       },
+      "Pagina_ComprobanteEmitidoOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ComprobanteEmitidoOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "Pagina[ComprobanteEmitidoOut]",
+        "type": "object"
+      },
       "Pagina_ConteoOut_": {
         "properties": {
           "items": {
@@ -17396,6 +17576,9 @@
       },
       "PrecuentaOut": {
         "properties": {
+          "encabezado": {
+            "$ref": "#/components/schemas/EncabezadoImpresionOut"
+          },
           "grupo_cobro": {
             "anyOf": [
               {
@@ -17426,6 +17609,7 @@
           "venta_id",
           "grupo_cobro",
           "total",
+          "encabezado",
           "texto"
         ],
         "title": "PrecuentaOut",
@@ -23328,6 +23512,255 @@
           "marco_salida"
         ],
         "title": "TarjetaOut",
+        "type": "object"
+      },
+      "TicketComprobanteOut": {
+        "properties": {
+          "comprobante_id": {
+            "format": "uuid",
+            "title": "Comprobante Id",
+            "type": "string"
+          },
+          "documento": {
+            "$ref": "#/components/schemas/TicketDocumentoOut"
+          },
+          "encabezado": {
+            "$ref": "#/components/schemas/EncabezadoImpresionOut"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TicketItemOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "pie": {
+            "$ref": "#/components/schemas/TicketPieOut"
+          },
+          "receptor": {
+            "$ref": "#/components/schemas/TicketReceptorOut"
+          },
+          "totales": {
+            "$ref": "#/components/schemas/TicketTotalesOut"
+          },
+          "venta_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Venta Id"
+          }
+        },
+        "required": [
+          "comprobante_id",
+          "venta_id",
+          "encabezado",
+          "documento",
+          "receptor",
+          "items",
+          "totales",
+          "pie"
+        ],
+        "title": "TicketComprobanteOut",
+        "type": "object"
+      },
+      "TicketDocumentoOut": {
+        "properties": {
+          "aviso": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Aviso"
+          },
+          "correlativo": {
+            "title": "Correlativo",
+            "type": "integer"
+          },
+          "estado_emision": {
+            "title": "Estado Emision",
+            "type": "string"
+          },
+          "fecha_emision": {
+            "format": "date-time",
+            "title": "Fecha Emision",
+            "type": "string"
+          },
+          "grupo_cobro": {
+            "title": "Grupo Cobro",
+            "type": "integer"
+          },
+          "serie": {
+            "title": "Serie",
+            "type": "string"
+          },
+          "serie_correlativo": {
+            "title": "Serie Correlativo",
+            "type": "string"
+          },
+          "tipo": {
+            "title": "Tipo",
+            "type": "string"
+          },
+          "titulo": {
+            "title": "Titulo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tipo",
+          "titulo",
+          "serie",
+          "correlativo",
+          "serie_correlativo",
+          "fecha_emision",
+          "grupo_cobro",
+          "estado_emision",
+          "aviso"
+        ],
+        "title": "TicketDocumentoOut",
+        "type": "object"
+      },
+      "TicketItemOut": {
+        "description": "Precio e importe **con IGV**: es lo que el cliente compara contra la\ncarta. La base imponible y el impuesto van en el bloque de totales.",
+        "properties": {
+          "cantidad": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Cantidad",
+            "type": "string"
+          },
+          "descripcion": {
+            "title": "Descripcion",
+            "type": "string"
+          },
+          "importe": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Importe",
+            "type": "string"
+          },
+          "precio_unitario": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Precio Unitario",
+            "type": "string"
+          }
+        },
+        "required": [
+          "cantidad",
+          "descripcion",
+          "precio_unitario",
+          "importe"
+        ],
+        "title": "TicketItemOut",
+        "type": "object"
+      },
+      "TicketPieOut": {
+        "properties": {
+          "hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hash"
+          },
+          "qr_imagen": {
+            "title": "Qr Imagen",
+            "type": "string"
+          },
+          "qr_texto": {
+            "title": "Qr Texto",
+            "type": "string"
+          }
+        },
+        "required": [
+          "qr_texto",
+          "qr_imagen",
+          "hash"
+        ],
+        "title": "TicketPieOut",
+        "type": "object"
+      },
+      "TicketReceptorOut": {
+        "properties": {
+          "direccion": {
+            "title": "Direccion",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "num_doc": {
+            "title": "Num Doc",
+            "type": "string"
+          },
+          "tipo_doc": {
+            "title": "Tipo Doc",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tipo_doc",
+          "num_doc",
+          "nombre",
+          "direccion"
+        ],
+        "title": "TicketReceptorOut",
+        "type": "object"
+      },
+      "TicketTotalesOut": {
+        "properties": {
+          "en_letras": {
+            "title": "En Letras",
+            "type": "string"
+          },
+          "exoneradas": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Exoneradas",
+            "type": "string"
+          },
+          "gravadas": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Gravadas",
+            "type": "string"
+          },
+          "igv": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Igv",
+            "type": "string"
+          },
+          "igv_porcentaje": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Igv Porcentaje",
+            "type": "string"
+          },
+          "total": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total",
+            "type": "string"
+          }
+        },
+        "required": [
+          "gravadas",
+          "exoneradas",
+          "igv",
+          "igv_porcentaje",
+          "total",
+          "en_letras"
+        ],
+        "title": "TicketTotalesOut",
         "type": "object"
       },
       "TokenAgenteCreado": {
@@ -44706,6 +45139,166 @@
         ]
       }
     },
+    "/api/v1/sales/comprobantes": {
+      "get": {
+        "description": "Registro de ventas: los comprobantes que la empresa emitió.\n\nAcepta `sales.leer` **o** `accounting.leer`. El contador tiene que poder\nver el documento fuente del asiento —es literalmente lo que declara— y\nno tiene `sales.leer` ni le corresponde: darle el módulo de ventas\nentero para que vea sus propias boletas sería el problema al revés.\n\nPor defecto, el día de hoy del negocio. El alcance sale del tenant\n(ADR-004): `empresa_id` solo lo puede fijar quien no tiene empresa\nasignada, es decir el superusuario.",
+        "operationId": "listar_comprobantes_api_v1_sales_comprobantes_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "desde",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Desde"
+            }
+          },
+          {
+            "in": "query",
+            "name": "hasta",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Hasta"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tipo",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "boleta",
+                    "factura",
+                    "nc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tipo"
+            }
+          },
+          {
+            "in": "query",
+            "name": "estado_emision",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "pendiente",
+                    "aceptado",
+                    "rechazado",
+                    "error"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Estado Emision"
+            }
+          },
+          {
+            "in": "query",
+            "name": "empresa_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Empresa Id"
+            }
+          },
+          {
+            "description": "Página, empezando en 1",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "description": "Página, empezando en 1",
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Filas por página (máx. 200)",
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Filas por página (máx. 200)",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pagina_ComprobanteEmitidoOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Comprobantes",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
     "/api/v1/sales/comprobantes/{comprobante_id}/descargar/{formato}": {
       "get": {
         "description": "Baja el PDF que se entrega al cliente, o el XML firmado y el CDR que\nson el respaldo ante SUNAT.\n\nSe piden a Factiliza en el momento y no se archivan: su copia es la\nbuena mientras el proveedor siga activo. Devuelve los bytes tal cual —\nreescribir un XML firmado lo invalida.",
@@ -44870,26 +45463,19 @@
         ]
       }
     },
-    "/api/v1/sales/delivery/configuracion": {
+    "/api/v1/sales/comprobantes/{comprobante_id}/ticket": {
       "get": {
-        "description": "La tarifa con la que se está cotizando, resuelta (ADR-068).\n\nNo es el contenido de `parametro_empresa` —eso ya lo devuelve\n`GET /parametros`— sino **el resultado**: lo aprobado, o la semilla del\n`.env` donde Gerencia todavía no aprobó nada. Es la única forma de que la\npantalla muestre el número que el PDV va a cobrar y no el que alguien\npropuso.",
-        "operationId": "configuracion_delivery_api_v1_sales_delivery_configuracion_get",
+        "description": "Lo que se imprime en la ticketera de 80 mm (ADR-067).\n\nEs la representación impresa que el cliente se lleva en caja, no el PDF\nde Factiliza: sale **al momento del cobro**, sin esperar a que SUNAT\nconteste, y por eso también existe cuando el comprobante todavía está\n`pendiente` — la franja del ticket lo dice.\n\nMismo par de permisos que el listado: el contador reimprime desde su\npestaña sin tener el módulo de ventas.",
+        "operationId": "ticket_comprobante_api_v1_sales_comprobantes__comprobante_id__ticket_get",
         "parameters": [
           {
-            "in": "query",
-            "name": "empresa_id",
-            "required": false,
+            "in": "path",
+            "name": "comprobante_id",
+            "required": true,
             "schema": {
-              "anyOf": [
-                {
-                  "format": "uuid",
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Empresa Id"
+              "format": "uuid",
+              "title": "Comprobante Id",
+              "type": "string"
             }
           }
         ],
@@ -44898,7 +45484,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DeliveryConfiguracionOut"
+                  "$ref": "#/components/schemas/TicketComprobanteOut"
                 }
               }
             },
@@ -44920,10 +45506,9 @@
             "HTTPBearer": []
           }
         ],
-        "summary": "Configuracion Delivery",
+        "summary": "Ticket Comprobante",
         "tags": [
-          "sales",
-          "gerencia"
+          "sales"
         ]
       }
     },
