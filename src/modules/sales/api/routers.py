@@ -63,7 +63,7 @@ from src.shared.paginacion import Pagina, Paginacion, paginacion, paginar
 
 router = APIRouter(prefix="/sales", tags=["sales"])
 
-# La tarifa del delivery la fija Gerencia (ADR-067), así que la pantalla que
+# La tarifa del delivery la fija Gerencia (ADR-068), así que la pantalla que
 # la muestra pide el permiso de Gerencia y no uno de `sales`.
 GESTIONAR_PARAMETROS = "gerencia.gestionar_parametros_empresa"
 CREAR = "sales.crear"
@@ -221,7 +221,7 @@ def configuracion_delivery(
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    """La tarifa con la que se está cotizando, resuelta (ADR-067).
+    """La tarifa con la que se está cotizando, resuelta (ADR-068).
 
     No es el contenido de `parametro_empresa` —eso ya lo devuelve
     `GET /parametros`— sino **el resultado**: lo aprobado, o la semilla del

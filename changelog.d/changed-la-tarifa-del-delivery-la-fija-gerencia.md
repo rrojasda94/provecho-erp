@@ -1,5 +1,5 @@
 - **El delivery por kilómetro estaba construido y nadie podía usarlo**
-  (2026-08-25, ADR-067, RN-COM-041, sin migración). Tres meses después de
+  (2026-08-25, ADR-068, RN-COM-041, sin migración). Tres meses después de
   mergear ADR-053/054 la respuesta del negocio seguía siendo «eso no está
   disponible», y ninguna de las tres causas era de dominio: **la tarifa vivía
   en el `.env`**, así que cambiarla exigía editar el servidor y redesplegar —

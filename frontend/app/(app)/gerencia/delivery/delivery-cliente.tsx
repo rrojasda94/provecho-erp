@@ -127,7 +127,7 @@ function Pendiente({ propuesta }: { propuesta: PropuestaDelivery }) {
 }
 
 /**
- * Tarifa del delivery propio (ADR-054, ADR-067).
+ * Tarifa del delivery propio (ADR-054, ADR-068).
  *
  * Escribe sobre `parametro_empresa` como cualquier otro valor operativo, así
  * que **el cambio no llega al PDV hasta que se aprueba** (ADR-014,

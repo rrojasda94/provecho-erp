@@ -1,4 +1,4 @@
-# ADR-067 — La tarifa del delivery la fija Gerencia, y el reparto se cobra
+# ADR-068 — La tarifa del delivery la fija Gerencia, y el reparto se cobra
 
 - **Estado:** aceptada
 - **Fecha:** 2026-08-25

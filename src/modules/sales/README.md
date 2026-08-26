@@ -608,7 +608,7 @@ existía.
 Con las tarifas en `0` —el estado de fábrica— nada de esto cobra y el delivery
 funciona como antes.
 
-### Quién fija la tarifa, y quién la cobra (2026-08-25, ADR-067, RN-COM-040)
+### Quién fija la tarifa, y quién la cobra (2026-08-25, ADR-068, RN-COM-040)
 
 Los cuatro números **no salen del `.env`**: son `parametro_empresa` del módulo
 `sales` (`delivery_tarifa_base`, `delivery_precio_por_km`,

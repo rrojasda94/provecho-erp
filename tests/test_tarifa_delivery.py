@@ -171,7 +171,7 @@ def test_la_segunda_cotizacion_no_vuelve_a_preguntar(monkeypatch):
     assert len(llamadas) == 1
 
 
-# --- Quién fija la tarifa (ADR-067) -----------------------------------------
+# --- Quién fija la tarifa (ADR-068) -----------------------------------------
 @pytest.fixture()
 def empresa():
     """Una empresa real con su admin: `parametro_empresa` tiene FK a las dos.

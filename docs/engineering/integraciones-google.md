@@ -111,7 +111,7 @@ encontradas el 2026-08-25 y las dos corregidas:
   tenerla y el proceso de Next no la veía. Solo el compose de desarrollo la
   declaraba.
 
-Por eso la comprobación que vale es la de `/gerencia/delivery` (ADR-067) y no
+Por eso la comprobación que vale es la de `/gerencia/delivery` (ADR-068) y no
 mirar el `.env`: la pantalla dice lo que el **proceso** tiene, no lo que el
 archivo dice.
 
@@ -123,7 +123,7 @@ ejecución y baja al componente del mapa como prop.
 Resto de la configuración (`GOOGLE_ROUTES_BASE_URL`, `GOOGLE_TIMEOUT_SEGUNDOS`,
 `GOOGLE_MAPS_PAIS` y el bloque `DELIVERY_*`) está documentada línea por línea en
 `.env.example`. Los `DELIVERY_*` son solo la **semilla**: la tarifa que se
-cobra la fija Gerencia en `/gerencia/delivery` y vive en la base (ADR-067).
+cobra la fija Gerencia en `/gerencia/delivery` y vive en la base (ADR-068).
 
 **Fuera de Docker** (`npm run dev` en `frontend/`) el `.env` de la raíz no se
 lee: hay que copiar `frontend/.env.example` a `frontend/.env.local`. Sin eso
@@ -152,7 +152,7 @@ un pedido (mismo criterio que ADR-005 y ADR-041).
 Esa degradación silenciosa es correcta frente al cajero —una venta no se
 pierde porque un tercero no contestó— y engañosa frente a Gerencia: parece que
 la función nunca se construyó. Por eso **`/gerencia/delivery` dice cuál de las
-dos claves falta** (ADR-067). Ante un «el mapa no aparece» o «las rutas no
+dos claves falta** (ADR-068). Ante un «el mapa no aparece» o «las rutas no
 están», esa pantalla es el primer lugar donde mirar, antes que el `.env`.
 
 ## 8. Verificar que quedó bien

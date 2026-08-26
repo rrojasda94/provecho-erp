@@ -245,7 +245,7 @@ Catálogo de módulos válidos: `src.shared.parametros.MODULOS`.
 para cualquier código, pero su formulario solo sabe expresar **un** número con
 su unidad. Cuando un área necesita configurar varios valores que se leen
 juntos, la sección propia gana: hoy es la **tarifa del delivery**
-(`/gerencia/delivery`, ADR-067), con los cuatro códigos de `sales`
+(`/gerencia/delivery`, ADR-068), con los cuatro códigos de `sales`
 —`delivery_tarifa_base`, `delivery_precio_por_km`, `delivery_radio_km`,
 `delivery_distritos_restringidos`— en un solo formulario, la lista de
 distritos vetados (que el formulario genérico no puede expresar) y el

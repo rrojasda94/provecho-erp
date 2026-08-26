@@ -7,7 +7,7 @@ import { capturar } from "./util";
  * Recorrido: Gerencia pone el precio del delivery por kilómetro.
  *
  * Es el recorrido que no existía y por el cual la función quedó apagada tres
- * meses (ADR-067): la tarifa vivía en el `.env`, así que la única forma de
+ * meses (ADR-068): la tarifa vivía en el `.env`, así que la única forma de
  * cambiarla era editar el servidor y redesplegar. Lo que se afirma acá es que
  * el número se pone **desde la app**, y que no cobra hasta que se aprueba
  * (ADR-014, RN-GER-009).

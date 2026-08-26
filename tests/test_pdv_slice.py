@@ -1130,7 +1130,7 @@ def test_anular_el_plato_se_lleva_su_extra_y_repone_los_dos(session, base):
     assert len(repuestos[0]["items"]) == 2
 
 
-# --- El reparto se cobra (RN-COM-041, ADR-067) ------------------------------
+# --- El reparto se cobra (RN-COM-041, ADR-068) ------------------------------
 @pytest.fixture
 def con_tarifa(monkeypatch):
     """Enciende el cobro del delivery. La sucursal de `base` no está anclada

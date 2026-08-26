@@ -244,7 +244,7 @@ escrito a mano: envejece sin avisar.
   y nada "nuevo" — es lo único que verifica que el export y el importador
   hablan el mismo idioma desde el navegador; `uso/consulta-documento.spec.ts`
   (2026-08-15) corrige un cliente con el botón de RUC; y
-  `uso/delivery-gerencia.spec.ts` (2026-08-25, ADR-067) fija el precio del
+  `uso/delivery-gerencia.spec.ts` (2026-08-25, ADR-068) fija el precio del
   delivery por kilómetro desde Gerencia y lo aprueba — es el recorrido que no
   existía y por el cual la función quedó tres meses apagada. Como
   `direccion.spec.ts`, corre **sin claves de Google** a propósito: parte de lo

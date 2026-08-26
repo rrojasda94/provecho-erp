@@ -72,7 +72,7 @@ export async function proponerParametroAction(
   return { error: "", ok: true };
 }
 
-/** Los cuatro números con los que se cobra un reparto (ADR-067). El código
+/** Los cuatro números con los que se cobra un reparto (ADR-068). El código
  * y la forma del valor los define `sales/application/tarifa_delivery.py`:
  * cambiar uno acá sin cambiarlo allá deja el parámetro huérfano. */
 const TARIFA_DELIVERY = [
@@ -118,7 +118,7 @@ function tarifaCambiada(
 
 /**
  * Propone la tarifa del delivery: una fila de `parametro_empresa` por número
- * que **cambió** (ADR-067).
+ * que **cambió** (ADR-068).
  *
  * Solo lo que cambió, y no los cuatro siempre, porque cada propuesta es una
  * fila que Gerencia tiene que resolver a mano: reproponer un valor idéntico

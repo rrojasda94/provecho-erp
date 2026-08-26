@@ -1531,13 +1531,13 @@ producción se hace en cocinas de sucursal. Ver
   servidor—: si divergieran, la pantalla no mostraría lo que el validador
   pide y el producto quedaría invendible.
 - **RN-COM-041** El **reparto medido se cobra**: `venta.costo_entrega` entra
-  al total de la venta (ADR-054, ADR-067). Se suma **después** del descuento
+  al total de la venta (ADR-054, ADR-068). Se suma **después** del descuento
   manual —el descuento se autoriza sobre lo que el cliente consumió, no sobre
   el flete—, **no lo paga un consumo de personal** (RN-COM-025: vale cero
   entero) y **no se prorratea entre cuentas separadas**: va entero en la
   primera cuenta —una mesa dividida no es un delivery—, de modo que la suma
   de las cuentas sigue dando el total de la venta. La
-  tarifa con la que se calcula la fija Gerencia (ADR-067); el monto se
+  tarifa con la que se calcula la fija Gerencia (ADR-068); el monto se
   congela en la fila al tomar la orden y no se recotiza.
 
 ## Cumplimiento de pedido

@@ -12,7 +12,7 @@ Tres respuestas en una sola pregunta:
   dirección, y no con polígonos: PostGIS es mucha máquina para una lista de
   cuatro nombres.
 
-**Los cuatro números los fija Gerencia, no el `.env`** (ADR-067): viven en
+**Los cuatro números los fija Gerencia, no el `.env`** (ADR-068): viven en
 `parametro_empresa` y cambiarlos es aprobar una propuesta, no redesplegar.
 `settings.delivery_*` queda como **semilla** — el valor con el que arranca
 una empresa que todavía no aprobó ninguno.

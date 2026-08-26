@@ -44872,7 +44872,7 @@
     },
     "/api/v1/sales/delivery/configuracion": {
       "get": {
-        "description": "La tarifa con la que se está cotizando, resuelta (ADR-067).\n\nNo es el contenido de `parametro_empresa` —eso ya lo devuelve\n`GET /parametros`— sino **el resultado**: lo aprobado, o la semilla del\n`.env` donde Gerencia todavía no aprobó nada. Es la única forma de que la\npantalla muestre el número que el PDV va a cobrar y no el que alguien\npropuso.",
+        "description": "La tarifa con la que se está cotizando, resuelta (ADR-068).\n\nNo es el contenido de `parametro_empresa` —eso ya lo devuelve\n`GET /parametros`— sino **el resultado**: lo aprobado, o la semilla del\n`.env` donde Gerencia todavía no aprobó nada. Es la única forma de que la\npantalla muestre el número que el PDV va a cobrar y no el que alguien\npropuso.",
         "operationId": "configuracion_delivery_api_v1_sales_delivery_configuracion_get",
         "parameters": [
           {

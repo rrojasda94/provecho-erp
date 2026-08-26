@@ -35,7 +35,7 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   comodidad de no tener nada que guardar, el cambio es un código aleatorio en
   `cupon.codigo` (la columna ya es independiente del documento) más una forma
   de que el cliente lo recupere.
-- ✅ **El reparto se cobra** (2026-08-25, ADR-067, RN-COM-040):
+- ✅ **El reparto se cobra** (2026-08-25, ADR-068, RN-COM-040):
   `total_a_cobrar` suma `venta.costo_entrega`, después del descuento manual,
   sin cobrárselo a un consumo de personal y sin prorratearlo entre cuentas
   separadas. **Sin la línea de venta** que esta deuda daba por necesaria: la
@@ -46,7 +46,7 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   hoy viaja dentro del total. Se cierra el día que facturación o contabilidad
   lo pidan por separado, y es un cambio de emisión, no de cobro.
 - ⬜ **La tarifa de delivery es una sola para toda la empresa** (2026-08-22,
-  ADR-054; actualizada 2026-08-25, ADR-067): ya no vive en `settings` sino en
+  ADR-054; actualizada 2026-08-25, ADR-068): ya no vive en `settings` sino en
   `parametro_empresa`, y la fija Gerencia en `/gerencia/delivery` sin
   redesplegar. Sigue siendo **una por empresa**: el día que dos locales
   necesiten precios distintos —o dos marcas—, o el parámetro gana alcance de
@@ -604,7 +604,7 @@ que es una decisión de pantalla y no un bug de una línea.
   (`variantes.py`) solo materializa `siempre`. `dinamica` (crear la fila en
   la primera venta) exige tocar `ventas._resolver_valores_variante`, que es
   justo el camino que había que dejar intacto para ADR-063. Hoy un atributo
-  en `dinamica` **se pregunta** como `nunca` (ADR-067) pero no genera nada.
+  en `dinamica` **se pregunta** como `nunca` (ADR-068) pero no genera nada.
 - ⬜ **La regla de exclusión está escrita dos veces.**
   `variantes._pares_excluidos` (para generar) y `catalogo.combinacion_excluida`
   (para vender) codifican la misma regla simétrica de RN-COM-038 por caminos
