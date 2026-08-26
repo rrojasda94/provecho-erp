@@ -505,6 +505,27 @@ tiempo real (Redis/WebSocket) es deuda declarada.
   `comanda_impresa_veces` (reimpresión marcada y auditable). Desde
   2026-08-25 (ADR-067) el ancho es el mismo para comanda, precuenta y ticket
   del comprobante: eran 32, 40 y ninguno.
+- **Lo que cada línea muestra**: además del producto y la cantidad, el
+  payload de la cola trae `sin` (las restas, RN-COM-028), `extras` (lo que
+  el plato lleva además, anidados y no como líneas sueltas, RN-CUP-014) y
+  `valores` (**qué es** el plato: las mitades de una MitadXMitad ya
+  resueltas a `"Mitad 1: Americana"`, ADR-056). Los tres los pinta
+  `nombre-linea.tsx`, compartido por estación y despacho para que las dos
+  pantallas no puedan divergir. `valores` llegó tarde (2026-08-26): se
+  calculaba y se imprimía en la comanda pero el schema no lo declaraba, así
+  que el pizzero que trabajaba solo con la pantalla no sabía de qué mitades
+  era la pizza.
+- **El schema no puede comerse un campo en silencio**: FastAPI descarta al
+  serializar todo lo que el `response_model` no declara —sin error y sin
+  warning—, y ya pasó tres veces (`tipo`/`consumo_motivo` en ADR-044,
+  `direccion_entrega`, `valores`).
+  `test_el_response_model_no_se_come_ningun_campo_de_la_cola`
+  (`tests/test_kds.py`) contrasta las claves que `cola_pantalla`,
+  `_item_a_dict`, `avance_venta` y `comanda` construyen contra los campos de
+  sus schemas: el próximo campo huérfano falla en su propio commit.
+- **`venta.direccion_entrega`**: viaja en el pedido de la cola y la tarjeta
+  de despacho la muestra solo en `modalidad = delivery`. Despacho arma la
+  bolsa mirando la pantalla, no la comanda impresa.
 - **`venta.referencia_atencion`** ("Mesa 5", "Carlos", "Rappi #1042"):
   texto libre que el PDV envía al crear la venta — visible en toda
   tarjeta KDS y en la comanda, para aclarar de quién es el pedido sin

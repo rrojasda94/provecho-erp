@@ -5,6 +5,9 @@ real compartido entre pantallas, comanda y RBAC.
 Etapa 2 — entrega: cierre del pedido, idempotencia y permiso propio.
 """
 
+import ast
+import inspect
+import textwrap
 from datetime import date
 from decimal import Decimal
 
@@ -25,10 +28,16 @@ from src.modules.inventory.infrastructure.models import (
     Receta,
     UnidadMedida,
 )
+from src.modules.sales.api import kds_schemas
+from src.modules.sales.application import kds as kds_app
 from src.modules.sales.infrastructure.models import (
+    Atributo,
+    AtributoValor,
     ListaPrecio,
     MedioPago,
     Precio,
+    ProductoAtributoLinea,
+    ProductoAtributoValor,
     ProductoComercial,
     PuntoVenta,
 )
@@ -120,6 +129,39 @@ def env(monkeypatch):
             # Sin sucursal asignada el JWT no lleva empresa y el contexto de
             # tenant (ADR-004) le niega todo.
             s.add(UsuarioSucursal(usuario_id=usuario.id, sucursal_id=sucursal.id))
+        # Una MitadXMitad aparte y no atributos sobre la Pizza Clásica:
+        # RN-COM-040 exige elegir un valor de cada atributo ofrecido, así que
+        # colgárselos a la pizza de siempre volvería invendible al resto de
+        # los tests.
+        receta_m = Receta(empresa_id=empresa.id, nombre="MitadXMitad",
+                          rendimiento_cantidad=Decimal(1),
+                          rendimiento_unidad_medida_id=udm.id)
+        s.add(receta_m)
+        s.flush()
+        mxm = ProductoComercial(id_interno="P002", marca_id=marca.id,
+                                nombre="Pizza MitadXMitad", receta_id=receta_m.id,
+                                categoria_id=cat_pizzas.id)
+        s.add(mxm)
+        s.flush()
+        variantes = {}
+        for mitad in ("Mitad 1", "Mitad 2"):
+            atributo = Atributo(empresa_id=empresa.id, nombre=mitad,
+                                modo_variante="nunca", display="radio")
+            s.add(atributo)
+            s.flush()
+            linea_attr = ProductoAtributoLinea(producto_comercial_id=mxm.id,
+                                               atributo_id=atributo.id)
+            s.add(linea_attr)
+            s.flush()
+            for sabor in ("Americana", "Hawaiana"):
+                valor = AtributoValor(atributo_id=atributo.id, nombre=sabor)
+                s.add(valor)
+                s.flush()
+                ptav = ProductoAtributoValor(linea_id=linea_attr.id,
+                                             atributo_valor_id=valor.id)
+                s.add(ptav)
+                s.flush()
+                variantes[f"{mitad}: {sabor}"] = str(ptav.id)
         # Precio server-side (RN-PRC-003): sin lista vigente no hay venta.
         lista = ListaPrecio(marca_id=marca.id, nombre="Regular",
                             vigente_desde=date(2020, 1, 1))
@@ -130,12 +172,15 @@ def env(monkeypatch):
                    monto=Decimal("25.00")),
             Precio(lista_precio_id=lista.id, producto_comercial_id=bebida.id,
                    monto=Decimal("5.00")),
+            Precio(lista_precio_id=lista.id, producto_comercial_id=mxm.id,
+                   monto=Decimal("32.00")),
         ])
         ids.update(
             sucursal_id=str(sucursal.id), sucursal_b=str(sucursal_b.id),
             pv_id=str(pv.id),
             cat_pizzas=str(cat_pizzas.id), cat_bebidas=str(cat_bebidas.id),
             pizza_id=str(pizza.id), bebida_id=str(bebida.id),
+            mxm_id=str(mxm.id), variantes=variantes,
             marca_id=str(marca.id), receta_pizza=str(receta_p.id),
             lista_precio=str(lista.id),
         )
@@ -1017,3 +1062,99 @@ def test_la_comanda_sangra_el_extra_bajo_su_plato(env):
     # En el papel, "1x Pizza" seguido de "2x Peperoni" al mismo nivel se lee
     # como dos platos distintos.
     assert lineas == ["1x Pizza Clásica", "   + 2x PEPERONI"]
+
+
+def _venta_mitad_y_mitad(client, ids, h, clave="kds-mxm-1"):
+    return client.post("/api/v1/sales/ventas", headers=h, json={
+        "sucursal_id": ids["sucursal_id"], "punto_venta_id": ids["pv_id"],
+        "canal": "pdv", "modalidad": "mesa", "idempotency_key": clave,
+        "referencia_atencion": "Mesa 9",
+        "items": [{
+            "producto_comercial_id": ids["mxm_id"], "cantidad": "1",
+            "valores_variante_ids": [
+                ids["variantes"]["Mitad 1: Americana"],
+                ids["variantes"]["Mitad 2: Hawaiana"],
+            ],
+        }],
+    }).json()
+
+
+def test_la_estacion_ve_de_que_mitades_es_la_pizza(env):
+    """Un pizzero que trabaja solo con la pantalla tiene que ver las mitades:
+    en una MitadXMitad son lo único que dice qué se prepara (ADR-056)."""
+    client, ids = env
+    h = _token(client)
+    horno, _barra, _despacho, _venta = _setup_pantallas_y_venta(client, ids, h)
+    mxm = _venta_mitad_y_mitad(client, ids, h)
+
+    pedido = next(p for p in _cola(client, h, horno["id"])
+                  if p["venta_id"] == mxm["id"])
+    assert pedido["items"][0]["valores"] == [
+        "Mitad 1: Americana", "Mitad 2: Hawaiana"
+    ]
+
+
+def test_despacho_tambien_ve_las_mitades(env):
+    """La misma línea vista desde la otra pantalla: si solo una de las dos
+    ramas de `_items_de_pantalla` pasa los valores, el plato se contrasta
+    contra la comanda con menos información de la que trae el papel."""
+    client, ids = env
+    h = _token(client)
+    horno, _barra, despacho, _venta = _setup_pantallas_y_venta(client, ids, h)
+    mxm = _venta_mitad_y_mitad(client, ids, h)
+
+    linea = next(p for p in _cola(client, h, horno["id"])
+                 if p["venta_id"] == mxm["id"])["items"][0]
+    _tachar(client, h, linea["venta_item_id"])
+
+    pedido = next(p for p in _cola(client, h, despacho["id"])
+                  if p["venta_id"] == mxm["id"])
+    assert pedido["items"][0]["valores"] == [
+        "Mitad 1: Americana", "Mitad 2: Hawaiana"
+    ]
+
+
+def test_la_pizza_de_siempre_no_inventa_mitades(env):
+    """Un producto sin atributos no trae `valores`: la lista vacía es lo que
+    hace que la tarjeta no muestre un bloque en blanco."""
+    client, ids = env
+    h = _token(client)
+    horno, _barra, _despacho, _venta = _setup_pantallas_y_venta(client, ids, h)
+    assert _cola(client, h, horno["id"])[0]["items"][0]["valores"] == []
+
+
+def _claves_emitidas(funcion) -> set[str]:
+    """Las claves literales de los dicts que la función construye."""
+    arbol = ast.parse(textwrap.dedent(inspect.getsource(funcion)))
+    return {
+        clave.value
+        for nodo in ast.walk(arbol)
+        if isinstance(nodo, ast.Dict)
+        for clave in nodo.keys
+        if isinstance(clave, ast.Constant) and isinstance(clave.value, str)
+    }
+
+
+def test_el_response_model_no_se_come_ningun_campo_de_la_cola():
+    """El agujero de ADR-044, cerrado de raíz: un campo que el caso de uso
+    calcula y mete en el dict pero el schema no declara lo filtra FastAPI en
+    silencio —sin error, sin warning, sin campo en la pantalla—. Pasó con
+    `tipo`/`consumo_motivo`, volvió a pasar con `direccion_entrega` y
+    `valores`. Este test falla en el commit que lo repita, sin importar qué
+    campo sea.
+    """
+    declarados = {
+        kds_app.cola_pantalla: set(kds_schemas.PedidoColaOut.model_fields)
+        | set(kds_schemas.ItemColaOut.model_fields),
+        kds_app._item_a_dict: set(kds_schemas.ItemColaOut.model_fields)
+        | set(kds_schemas.ExtraColaOut.model_fields),
+        kds_app.avance_venta: set(kds_schemas.AvanceOut.model_fields)
+        | set(kds_schemas.ItemColaOut.model_fields),
+        kds_app.comanda: set(kds_schemas.ComandaOut.model_fields),
+    }
+    for funcion, campos in declarados.items():
+        sobrantes = _claves_emitidas(funcion) - campos
+        assert not sobrantes, (
+            f"{funcion.__name__} emite {sorted(sobrantes)} y el schema no lo "
+            f"declara: el response_model los va a filtrar en silencio"
+        )

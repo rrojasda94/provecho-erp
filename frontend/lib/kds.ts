@@ -37,6 +37,11 @@ export type ItemCola = {
    * va completo. Es lo que hasta ahora se escribía en la nota libre, y que
    * ahora además deja de descontarse del almacén. */
   sin: string[];
+  /** QUÉ es el plato: las mitades de una MitadXMitad, ya resueltas a
+   * "Mitad 1: Americana" (ADR-056). No es lo mismo que `extras`: acá no hay
+   * línea cobrada, la elección cambia la receta que se prepara. Vacío = el
+   * plato no se elige por partes. */
+  valores: string[];
   /** Lo que el plato lleva ADEMÁS: el sabor de la pizza, el queso extra.
    * Vienen anidados y no como ítems propios porque en cocina son el mismo
    * plato (RN-CUP-014) — sueltos, la tarjeta mostraba "1 Pizza Personal" y

@@ -53,6 +53,11 @@ class ItemColaOut(BaseModel):
     # Restas de la línea, ya resueltas a nombre: ["Cebolla"] → "SIN CEBOLLA"
     # en pantalla (RN-COM-028). Lista vacía = el plato va completo.
     sin: list[str] = []
+    # QUÉ es el plato: las mitades de una MitadXMitad, ya resueltas a
+    # "Mitad 1: Americana" (ADR-056). Distinto de `extras` —acá no hay línea
+    # cobrada, la elección cambia la receta— y sin esto el pizzero que solo
+    # mira la pantalla no sabe de qué mitades es la pizza.
+    valores: list[str] = []
     # Lo que el plato lleva además (el sabor de la pizza, el queso extra).
     # Anidados y no como ítems propios: en cocina son el mismo plato
     # (RN-CUP-014).
