@@ -198,7 +198,9 @@ ADR-023):**
   `ventas._validar_grupos` lo hace cumplir al confirmar, no solo en el PDV:
   el kiosko entra por el mismo endpoint. El replay del hub se exceptúa
   (ADR-009): una venta que ya se cobró no se rechaza por una regla que
-  cambió durante el corte.
+  cambió durante el corte. La excepción cubre también el vínculo del extra
+  con su plato, su tope por línea y su `es_extra`: desvincular un extra
+  durante el corte no puede tumbar una venta que la sucursal ya cobró.
   Los grupos pueden colgar del padre **o** de la variante, y una variante
   **hereda los del padre** (ADR-042): el seeder los deja en la variante y el
   lienzo en el padre —cuelga "+ grupo" del nodo activo, que es el padre
@@ -290,7 +292,10 @@ Diferido a un slice posterior: `combo`, `promocion`, `carrito`,
 Operativo en `/api/v1/sales`: crear venta (= confirmar orden, con
 correlativo por sucursal+día e idempotencia), cobrar (pagos parciales;
 al cubrir el total → `pagada`), anular orden no pagada (repone stock),
-CRUD de productos comerciales y medios de pago. Capas `domain/rules.py`,
+CRUD de productos comerciales y medios de pago (`seeders.seed` deja
+Efectivo, Yape y Tarjeta dados de alta: sin ninguno el PDV no puede
+cobrar; se administran en Catálogo → Medios de pago). Capas
+`domain/rules.py`,
 `infrastructure/repositories.py`, `application/` (`ventas.py`,
 `catalogo.py`), `api/`. Sin migración — esquema ya existía.
 
@@ -302,7 +307,8 @@ CRUD de productos comerciales y medios de pago. Capas `domain/rules.py`,
 | POST | `/ventas/{id}/pagos` | `sales.cobrar` |
 | POST | `/ventas/{id}/anular` | `sales.anular` |
 | POST/GET/PATCH | `/productos[/{id}]` | `gestionar_catalogo` / `leer` |
-| POST/GET | `/medios-pago` | `gestionar_catalogo` / `leer` |
+| POST/GET | `/medios-pago?direccion=&incluir_inactivos=` | `gestionar_catalogo` / `leer` |
+| PATCH | `/medios-pago/{id}` | `gestionar_catalogo` |
 | GET | `/clientes?grupo_id=` | `sales.leer_clientes_externos` — contrato **público** de análisis, no el padrón del back-office |
 | GET | `/clientes/listado` | `sales.leer` — el padrón del grupo, paginado, con `q` opcional |
 | PATCH | `/clientes/{id}` | `sales.crear` — razón social, RUC y contacto de un **jurídico** |
@@ -378,6 +384,12 @@ precio ya resuelto, en vez de que el cliente traiga uno propio.
 cobrada conserva el precio al que se cobró; recotizarla en la nube
 cambiaría el monto si la promoción venció entre el corte y la
 sincronización.
+
+Ese mismo ítem lleva `sin_articulo_ids` y `valores_variante_ids`, y sus
+extras los llevan también: son lo que decide qué descuenta inventory al
+reproducir la venta. Sin las restas la nube consume el insumo que el plato
+no llevó; sin los valores, una receta condicionada (ADR-056) no activa
+ninguna línea y la mitad-y-mitad se descuenta mal.
 
 **Pendiente para el modo offline del PDV** (ADR-009, ver
 `docs/architecture/adr/ADR-009-modo-offline-pdv.md`): `crear_venta`/
@@ -505,6 +517,27 @@ tiempo real (Redis/WebSocket) es deuda declarada.
   `comanda_impresa_veces` (reimpresión marcada y auditable). Desde
   2026-08-25 (ADR-067) el ancho es el mismo para comanda, precuenta y ticket
   del comprobante: eran 32, 40 y ninguno.
+- **Lo que cada línea muestra**: además del producto y la cantidad, el
+  payload de la cola trae `sin` (las restas, RN-COM-028), `extras` (lo que
+  el plato lleva además, anidados y no como líneas sueltas, RN-CUP-014) y
+  `valores` (**qué es** el plato: las mitades de una MitadXMitad ya
+  resueltas a `"Mitad 1: Americana"`, ADR-056). Los tres los pinta
+  `nombre-linea.tsx`, compartido por estación y despacho para que las dos
+  pantallas no puedan divergir. `valores` llegó tarde (2026-08-26): se
+  calculaba y se imprimía en la comanda pero el schema no lo declaraba, así
+  que el pizzero que trabajaba solo con la pantalla no sabía de qué mitades
+  era la pizza.
+- **El schema no puede comerse un campo en silencio**: FastAPI descarta al
+  serializar todo lo que el `response_model` no declara —sin error y sin
+  warning—, y ya pasó tres veces (`tipo`/`consumo_motivo` en ADR-044,
+  `direccion_entrega`, `valores`).
+  `test_el_response_model_no_se_come_ningun_campo_de_la_cola`
+  (`tests/test_kds.py`) contrasta las claves que `cola_pantalla`,
+  `_item_a_dict`, `avance_venta` y `comanda` construyen contra los campos de
+  sus schemas: el próximo campo huérfano falla en su propio commit.
+- **`venta.direccion_entrega`**: viaja en el pedido de la cola y la tarjeta
+  de despacho la muestra solo en `modalidad = delivery`. Despacho arma la
+  bolsa mirando la pantalla, no la comanda impresa.
 - **`venta.referencia_atencion`** ("Mesa 5", "Carlos", "Rappi #1042"):
   texto libre que el PDV envía al crear la venta — visible en toda
   tarjeta KDS y en la comanda, para aclarar de quién es el pedido sin
@@ -515,6 +548,9 @@ tiempo real (Redis/WebSocket) es deuda declarada.
 | POST/PATCH/DELETE | `/kds/pantallas[/{id}]` | `kds.configurar` |
 | GET | `/kds/pantallas` | `kds.operar` **o** `kds.configurar` |
 | GET | `/kds/pantallas/{id}/cola` | `kds.operar` |
+| GET | `/kds/pantallas/{id}/historial` | `kds.operar` — lo entregado del día |
+| GET | `/kds/configuracion` | `kds.operar` — semáforo resuelto (umbrales + colores) |
+| POST | `/kds/items/{id}/retroceder` | `kds.operar` — deshace un paso |
 | POST | `/kds/items/{id}/avanzar` | `kds.operar` |
 | GET | `/kds/ventas/{id}/avance` | `kds.operar` |
 | POST | `/kds/ventas/{id}/comanda` | `kds.operar` |
@@ -533,14 +569,39 @@ dónde tacharse. `activo=false` sigue siendo otra cosa — apaga la estación y 
 deja volver. El `UNIQUE (sucursal_id, nombre)` es **parcial** sobre las vivas,
 así el nombre de una borrada queda libre.
 
+`PATCH /kds/pantallas/{id}` acepta `sucursal_id`: **una estación se muda de
+local** (2026-08-26) sin recrearla ni perder su configuración —la tablet que
+se lleva a la sucursal nueva—. Dos guardas: 409 con pedidos en cola (mismo
+motivo que borrarla) y 409 si el destino ya tiene una pantalla con ese
+nombre, que si no sale como un `IntegrityError` del índice único.
+
 **Pantalla** (2026-08-03): `frontend/app/kds/` — pantalla completa táctil
-fuera del shell, una tarjeta por pedido, un toque tacha el ítem preparado
-(encadena `en_preparacion` → `listo`, porque la API solo avanza de a un
-estado). Refresca la cola cada 3 s: como el estado vive en `venta_item`,
+fuera del shell, una tarjeta por pedido. **Dos toques** mueven el ítem
+(2026-08-26): el primero lo marca `en_preparacion` —lo que ven las otras
+pantallas mientras tanto— y el segundo lo manda a la estación siguiente. Uno
+solo encadenaba los dos pasos y el roce de un delantal contra la tablet
+despachaba un plato que nadie había empezado; «Todo listo» sobre la tarjeta
+sigue haciendo los dos de una. Cada línea lleva su **deshacer** (`↶`), y el
+enlace «Historial» muestra lo entregado del día con la vuelta a despacho.
+
+**Semáforo de espera** (2026-08-26, `application/kds_semaforo.py`): cada
+tarjeta muestra cuánto lleva el pedido y cambia de color al pasar dos
+umbrales. Los cinco valores —dos umbrales, tres colores— los fija Gerencia por
+empresa vía `parametro_empresa` (`kds_minutos_ambar`, `kds_minutos_rojo`,
+`kds_color_*`), con semilla en el módulo; la pantalla de Gerencia vive en
+`/gerencia/kds`. El reloj lo corre el navegador a partir de `creado_en`, que
+la cola ahora manda: un cronómetro servidor obligaría a reenviar la cola
+entera cada segundo. Un valor mal aprobado (color inválido, umbral fuera de
+rango, rojo antes que el ámbar) cae a la semilla en vez de romper el CSS de
+la cocina. Refresca la cola cada 3 s: como el estado vive en `venta_item`,
 ese intervalo es lo que tarda una pantalla en ver lo que tachó otra. La
 estación va en la URL (`/kds?pantalla=<id>`); `/kds` sin parámetro es el
 tablero de estaciones, que además crea/edita/desactiva/borra pantallas con
-`kds.configurar`. Diseño e interacción en
+`kds.configurar`. **La sucursal va por el mismo camino** (`?sucursal=<id>`,
+2026-08-26): antes era siempre `usuario.sucursales[0]` y quien tenía dos
+locales asignados no podía llegar al segundo. Lo que viene en la URL se valida
+contra las sucursales del usuario antes de pedir nada, y el selector solo
+aparece si tiene más de una. Diseño e interacción en
 [ui-ux.md](../../../docs/product/ui-ux.md#kds--tarjeta-de-pedido-tachar-ítem-por-ítem-implementado-2026-08-03).
 
 ## Sincronización con el hub de sucursal (implementado 2026-07-27)

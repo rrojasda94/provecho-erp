@@ -501,8 +501,10 @@ def crear_almacen(
     return almacen
 
 
-def obtener_almacen(session: Session, almacen_id: uuid.UUID) -> Almacen:
-    return _get(AlmacenRepo(session).get(almacen_id), "almacen")
+def obtener_almacen(
+    session: Session, almacen_id: uuid.UUID, incluir_baja: bool = False
+) -> Almacen:
+    return _get(AlmacenRepo(session).get(almacen_id, incluir_baja), "almacen")
 
 
 def editar_almacen(
@@ -569,6 +571,22 @@ def dar_de_baja_almacen(
         raise Conflicto("otros almacenes se abastecen de este")
     almacen.deleted_at = datetime.now(UTC)
     _auditar(session, actor_id, "almacen", almacen.id, "baja")
+    return almacen
+
+
+def reactivar_almacen(
+    session: Session, almacen_id: uuid.UUID, *, actor_id: uuid.UUID | None = None
+) -> Almacen:
+    """La vuelta de `dar_de_baja_almacen`, y la razón por la que esa baja no
+    es un daño irreversible: como no mira el stock, la única red posible es
+    poder deshacerla. Idempotente — reactivar uno que nunca se dio de baja no
+    es un error, es un no-op."""
+    repo = AlmacenRepo(session)
+    almacen = _get(repo.get(almacen_id, incluir_baja=True), "almacen")
+    if almacen.deleted_at is None:
+        return almacen
+    almacen.deleted_at = None
+    _auditar(session, actor_id, "almacen", almacen.id, "reactivar")
     return almacen
 
 

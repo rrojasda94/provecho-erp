@@ -482,6 +482,13 @@ const CATALOGO: Caso[] = [
     ]),
   ),
   caso("arbol", () => catalogoApi.arbol(UUID)),
+  caso("mediosPago", () => catalogoApi.mediosPago()),
+  caso("crearMedioPago", () =>
+    catalogoApi.crearMedioPago({ nombre: "Yape", tipo: "billetera_digital" }),
+  ),
+  caso("editarMedioPago", () =>
+    catalogoApi.editarMedioPago(UUID, { comision_pct: "3.50", activo: false }),
+  ),
   caso("atributos", () => catalogoApi.atributos()),
   caso("crearAtributo", () =>
     catalogoApi.crearAtributo({ nombre: "Tamaño", display: "pildoras" }),
@@ -525,8 +532,12 @@ const KDS: Caso[] = [
   ),
   caso("editarPantalla", () => apiKds.editarPantalla(UUID, { nombre: "Cocina 2", activo: true })),
   caso("categorias", () => apiKds.categorias()),
+  caso("configuracion", () => apiKds.configuracion(UUID)),
   caso("avanzar", () => apiKds.avanzar(UUID, "en_preparacion")),
   caso("entregar", () => apiKds.entregar(UUID)),
+  caso("retroceder", () => apiKds.retroceder(UUID)),
+  caso("historial", () => apiKds.historial(UUID)),
+  caso("deshacerEntrega", () => apiKds.deshacerEntrega(UUID)),
   caso("eliminarPantalla", () => apiKds.eliminarPantalla(UUID)),
 ];
 

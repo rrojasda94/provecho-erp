@@ -391,7 +391,9 @@ export const api = {
   crearCliente: (cuerpo: ClienteNuevo) =>
     pedir<{ id: string }>("/sales/clientes", { metodo: "POST", cuerpo }),
 
-  mediosPago: () => pedir<MedioPago[]>("/sales/medios-pago"),
+  // `direccion=cobro`: con lo que se le paga a un proveedor no se le cobra
+  // a un comensal, y sin el filtro salía como pastilla en la caja.
+  mediosPago: () => pedir<MedioPago[]>("/sales/medios-pago?direccion=cobro"),
 
   /** El endpoint devuelve el sobre paginado de ADR-026; el PDV quiere la
    * jornada entera y se le desenvuelve acá. `page_size` al techo (200): una

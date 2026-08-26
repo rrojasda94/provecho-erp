@@ -618,6 +618,25 @@ def registrar_entrega(
     return resultado
 
 
+@router.post("/ventas/{venta_id}/deshacer-entrega", response_model=schemas.EntregaOut)
+def deshacer_entrega(
+    venta_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(ENTREGAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Devuelve el pedido de `entregado` a `listo`: el toque equivocado sobre
+    la tarjeta de al lado en despacho.
+
+    Mismo permiso que entregar y no uno nuevo: quien puede dar por entregado
+    un pedido es exactamente quien tiene que poder corregirse. Deshacer algo
+    que no está entregado es un no-op, no un error."""
+    exigir_venta(session, venta_id, tenant)
+    resultado = cumplimiento.deshacer_entrega(session, venta_id)
+    session.commit()
+    return resultado
+
+
 # --- Comprobante electrónico ------------------------------------------------
 @router.get("/ventas/{venta_id}/comprobante", response_model=schemas.ComprobanteOut)
 def ver_comprobante(
@@ -1267,11 +1286,34 @@ def crear_medio_pago(
 @router.get("/medios-pago", response_model=list[schemas.MedioPagoOut])
 def listar_medios_pago(
     empresa_id: uuid.UUID | None = None,
+    direccion: Literal["cobro", "pago", "ambos"] | None = None,
+    incluir_inactivos: bool = False,
     _: Usuario = Depends(require_permission(LEER)),
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    return catalogo.listar_medios_pago(session, tenant.filtro_empresa(empresa_id))
+    """`direccion=cobro` es lo que pide el PDV: con qué se le cobra al
+    comensal. Sin filtro salen todos, que es lo que administra el catálogo."""
+    return catalogo.listar_medios_pago(
+        session, tenant.filtro_empresa(empresa_id), direccion, incluir_inactivos
+    )
+
+
+@router.patch("/medios-pago/{medio_pago_id}", response_model=schemas.MedioPagoOut)
+def editar_medio_pago(
+    medio_pago_id: uuid.UUID,
+    body: schemas.MedioPagoUpdate,
+    _: Usuario = Depends(require_permission(CATALOGO)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Sin DELETE: un medio de pago que ya cobró no se borra, se apaga con
+    `activo=false` (queda fuera del PDV y los cobros siguen nombrándolo)."""
+    medio = catalogo.obtener_medio_pago(session, medio_pago_id)
+    tenant.exigir_empresa(medio.empresa_id)
+    catalogo.editar_medio_pago(session, medio, **body.model_dump(exclude_unset=True))
+    session.commit()
+    return medio
 
 
 # --- Precios (server-side, RN-PRC-003) --------------------------------------

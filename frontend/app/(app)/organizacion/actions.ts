@@ -214,6 +214,47 @@ export async function guardarAlmacenAction(
   );
 }
 
+/**
+ * Dar de baja **no borra**: el almacén sale de los selectores del resto del
+ * ERP (compras, inventario, producción) y se puede recuperar. Existe porque
+ * crear un almacén por error no tenía deshacer, y el registro se quedaba en
+ * la lista para siempre.
+ *
+ * La API niega la baja con 409 si otros almacenes se abastecen de este, y ese
+ * mensaje nombra el motivo: se muestra tal cual, es lo que hace falta para
+ * desatascarse.
+ */
+export async function darDeBajaAlmacenAction(id: string): Promise<EstadoOrganizacion> {
+  return llamarAlmacen(
+    `/api/v1/almacenes/${id}`,
+    "DELETE",
+    "No se pudo dar de baja el almacén.",
+  );
+}
+
+/** La vuelta: sin esto una baja equivocada sería definitiva. */
+export async function reactivarAlmacenAction(id: string): Promise<EstadoOrganizacion> {
+  return llamarAlmacen(
+    `/api/v1/almacenes/${id}/reactivar`,
+    "POST",
+    "No se pudo reactivar el almacén.",
+  );
+}
+
+async function llamarAlmacen(
+  ruta: string,
+  metodo: string,
+  porDefecto: string,
+): Promise<EstadoOrganizacion> {
+  try {
+    await apiFetch(ruta, { token: await token(), metodo });
+  } catch (e) {
+    return { error: mensajeDe(e, porDefecto), ok: false };
+  }
+  revalidatePath("/organizacion/almacenes");
+  return { error: "", ok: true };
+}
+
 // --- Punto de venta ---------------------------------------------------------
 
 /**

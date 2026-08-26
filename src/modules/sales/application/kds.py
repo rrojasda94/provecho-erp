@@ -15,7 +15,7 @@ líneas invisibles en cocina.
 
 import textwrap
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -38,7 +38,7 @@ from src.modules.sales.infrastructure.models import (
     Venta,
     VentaItem,
 )
-from src.shared import impresion
+from src.shared import fechas, impresion
 
 TIPOS_PANTALLA = {"preparacion", "despacho"}
 
@@ -107,6 +107,9 @@ def editar_pantalla(session: Session, pantalla_id: uuid.UUID, **campos) -> KdsPa
     pantalla = session.get(KdsPantalla, pantalla_id)
     if pantalla is None:
         raise NoEncontrado("pantalla no encontrada")
+    destino = campos.get("sucursal_id")
+    if destino is not None and destino != pantalla.sucursal_id:
+        _mudar_de_sucursal(session, pantalla, destino)
     for campo in ("nombre", "tipo", "categoria_ids", "activo", "orden"):
         if campo in campos and campos[campo] is not None:
             if campo == "tipo" and campos[campo] not in TIPOS_PANTALLA:
@@ -115,6 +118,39 @@ def editar_pantalla(session: Session, pantalla_id: uuid.UUID, **campos) -> KdsPa
                 _validar_orden(campos[campo])
             setattr(pantalla, campo, campos[campo])
     return pantalla
+
+
+def _mudar_de_sucursal(
+    session: Session, pantalla: KdsPantalla, destino: uuid.UUID
+) -> None:
+    """Mover una estación a otra sucursal.
+
+    Con la cola cargada, no: las líneas que están pasando por esta estación
+    quedarían esperando en una cocina que ya no las mira, y el pedido se
+    vuelve invisible sin que nadie se entere. Mismo criterio que borrarla
+    —primero se vacía—.
+
+    El nombre tiene que estar libre allá: el índice único es
+    `(sucursal_id, nombre)` entre las vivas, y un IntegrityError crudo no le
+    dice a nadie qué hacer.
+    """
+    if cola_pantalla(session, pantalla.id):
+        raise Conflicto(
+            "la pantalla tiene pedidos en cola: termina la cola antes de "
+            "moverla de sucursal"
+        )
+    choca = session.scalar(
+        select(KdsPantalla).where(
+            KdsPantalla.sucursal_id == destino,
+            KdsPantalla.nombre == pantalla.nombre,
+            KdsPantalla.deleted_at.is_(None),
+        )
+    )
+    if choca:
+        raise Conflicto(
+            f"la sucursal destino ya tiene una pantalla '{pantalla.nombre}'"
+        )
+    pantalla.sucursal_id = destino
 
 
 def listar_pantallas(
@@ -364,10 +400,90 @@ def cola_pantalla(session: Session, pantalla_id: uuid.UUID) -> list[dict]:
                 "tipo": venta.tipo,
                 "consumo_motivo": venta.consumo_motivo,
                 "estado_pedido": rules.estado_pedido(estados_todos),
+                # Desde cuándo espera. Sin esto la pantalla no puede saber si
+                # un pedido lleva cuatro minutos o cuarenta, y los dos se ven
+                # exactamente igual.
+                "creado_en": venta.created_at,
                 "items": mios,
             }
         )
     return cola
+
+
+# El historial es para desatascar un error de hace un rato —«¿este pedido
+# salió?»— y no para auditar la semana: eso lo responde el módulo de
+# reportes, con sus filtros y sus permisos. Por eso se cuenta en días de
+# negocio y arranca en el de hoy.
+DIAS_HISTORIAL = 1
+TOPE_HISTORIAL = 200
+
+
+def historial_pantalla(
+    session: Session, pantalla_id: uuid.UUID, dias: int = DIAS_HISTORIAL
+) -> list[dict]:
+    """Lo contrario de `cola_pantalla`: los pedidos que YA se entregaron.
+
+    La cola los descarta en cuanto se cierran, y hasta ahora eso era todo lo
+    que la cocina podía ver: un pedido entregado por error desaparecía de la
+    pantalla sin dejar rastro y no había dónde ir a buscarlo. Acá están, con
+    la hora en que se cerraron y —si hace falta— el botón para deshacerlo.
+
+    La hora sale de `venta_item.updated_at` y no de una columna propia: el
+    último cambio de un ítem entregado **es** su entrega. Una columna nueva
+    para mostrar una hora en una pantalla de cocina no se paga sola.
+    """
+    pantalla = session.get(KdsPantalla, pantalla_id)
+    if pantalla is None or pantalla.deleted_at is not None:
+        raise NoEncontrado("pantalla no encontrada")
+    cadena = _cadena(session, pantalla.sucursal_id)
+    # `fecha_orden` es una fecha de calendario del negocio, no un instante:
+    # se compara contra `fechas.hoy()` y no contra el reloj del servidor, que
+    # en UTC ya está en el día siguiente desde las 19:00 hora Perú.
+    desde = fechas.hoy() - timedelta(days=dias - 1)
+
+    ventas = session.scalars(
+        select(Venta)
+        .where(
+            Venta.sucursal_id == pantalla.sucursal_id,
+            # `anulada` no: un pedido anulado no se entregó, se canceló.
+            Venta.estado.in_(("orden", "pagada", "facturada", "cerrada")),
+            Venta.fecha_orden >= desde,
+        )
+        .order_by(Venta.fecha_orden.desc(), Venta.numero_orden.desc())
+    )
+
+    historial = []
+    for venta in ventas:
+        pares = _items_de_venta(session, venta.id)
+        estados_todos = [it.estado_preparacion for it, _ in pares]
+        if not rules.pedido_entregado(estados_todos):
+            continue
+        restas = _restas_por_item(session, pares)
+        valores = _valores_por_item(session, pares)
+        mios, _ = _items_de_pantalla(pantalla, cadena, pares, restas, valores)
+        # Una estación de preparación solo ve lo que pasó por ella; despacho
+        # ve el pedido entero, igual que en la cola.
+        if pantalla.tipo == "preparacion" and not mios:
+            continue
+        historial.append(
+            {
+                "venta_id": str(venta.id),
+                "numero_orden": venta.numero_orden,
+                "referencia_atencion": venta.referencia_atencion,
+                "direccion_entrega": venta.direccion_entrega,
+                "modalidad": venta.modalidad,
+                "canal": venta.canal,
+                "tipo": venta.tipo,
+                "consumo_motivo": venta.consumo_motivo,
+                "estado_pedido": "entregado",
+                "creado_en": venta.created_at,
+                "entregado_en": max(it.updated_at for it, _ in pares),
+                "items": mios,
+            }
+        )
+        if len(historial) >= TOPE_HISTORIAL:
+            break
+    return historial
 
 
 def _items_de_pantalla(
@@ -411,31 +527,48 @@ def _items_de_pantalla(
         estacion = _estacion_de(cadena, it, prod)
         if estacion is not None and estacion.orden == pantalla.orden:
             pendiente = True
-        mios.append(_item_a_dict(it, prod, restas, estacion, hijos.get(it.id, [])))
+        mios.append(
+            _item_a_dict(
+                it, prod, restas, estacion, hijos.get(it.id, []), valores,
+            )
+        )
     return mios, pendiente
 
 
-def avanzar_item(
-    session: Session, venta_item_id: uuid.UUID, nuevo_estado: str
-) -> VentaItem:
+def _linea_operable(
+    session: Session, venta_item_id: uuid.UUID
+) -> tuple[VentaItem, list[VentaItem], Venta, list[tuple]]:
+    """El plato sobre el que se opera, su familia y su venta.
+
+    Si llega el id de un extra se opera sobre su plato: en cocina el extra no
+    existe por su cuenta (RN-CUP-014), así que rechazarlo sería un error sin
+    salida para un cliente que todavía mande la línea suelta. El extra
+    acompaña al plato en todo —si se quedara atrás, `estado_pedido` y
+    `pedido_entregable`, que suman TODOS los ítems, dejarían el pedido sin
+    poder entregarse nunca—.
+    """
     pedido = session.get(VentaItem, venta_item_id)
     if pedido is None:
         raise NoEncontrado("ítem de venta no encontrado")
     venta = session.get(Venta, pedido.venta_id)
     if venta.estado == "anulada":
         raise Conflicto("la venta está anulada")
+    pares = _items_de_venta(session, pedido.venta_id)
+    familia = _familia(pares, pedido)
+    item = next(it for it in familia if it.padre_venta_item_id is None)
+    return item, familia, venta, pares
+
+
+def avanzar_item(
+    session: Session, venta_item_id: uuid.UUID, nuevo_estado: str
+) -> VentaItem:
     if nuevo_estado == "entregado":
         # La entrega cierra el pedido completo y exige su propio permiso
         # (RN-CUP-005/006) — no se marca ítem por ítem desde cocina.
         raise ReglaNegocio(
             "la entrega se registra en POST /sales/ventas/{venta_id}/entrega"
         )
-    pares = _items_de_venta(session, pedido.venta_id)
-    # Si llega el id de un extra se opera sobre su plato: en cocina el extra
-    # no existe por su cuenta (RN-CUP-014), así que rechazarlo sería un error
-    # sin salida para un cliente que todavía mande la línea suelta.
-    familia = _familia(pares, pedido)
-    item = next(it for it in familia if it.padre_venta_item_id is None)
+    item, familia, venta, pares = _linea_operable(session, venta_item_id)
 
     if not rules.transicion_preparacion_valida(item.estado_preparacion, nuevo_estado):
         raise ReglaNegocio(
@@ -447,9 +580,6 @@ def avanzar_item(
         for hijo in familia:
             hijo.etapa_kds = item.etapa_kds
         return item
-    # El extra acompaña al plato: si se quedara atrás, `estado_pedido` y
-    # `pedido_entregable` —que suman TODOS los ítems— dejarían el pedido sin
-    # poder entregarse nunca.
     for hijo in familia:
         hijo.estado_preparacion = nuevo_estado
 
@@ -461,6 +591,73 @@ def avanzar_item(
             session=session,
         )
     return item
+
+
+def retroceder_item(session: Session, venta_item_id: uuid.UUID) -> VentaItem:
+    """Deshace **un** paso del avance de una línea (RN-CUP-002, 2026-08-26).
+
+    Existe porque el avance se hace tocando una pantalla con las manos
+    ocupadas y el toque equivocado no tenía vuelta: una línea mandada a la
+    estación siguiente por error se quedaba allá, y en despacho un pedido
+    marcado antes de tiempo no se podía devolver a la cocina.
+
+    Deshace exactamente lo que hizo el toque anterior, que no siempre es lo
+    mismo. El avance tiene dos ejes —`estado_preparacion` y `etapa_kds`— y
+    tacharla en una estación intermedia mueve el segundo sin tocar el
+    primero (ADR-044). Así que:
+
+    1. `listo` vuelve a `en_preparacion`, en la misma estación.
+    2. Si la línea fue empujada a un eslabón posterior, vuelve al anterior.
+    3. `en_preparacion` en la primera estación vuelve a `pendiente`.
+
+    `entregado` no se deshace acá: la entrega es un acto de la venta
+    completa, con su propio permiso, y se deshace en
+    `POST /sales/ventas/{venta_id}/deshacer-entrega`.
+    """
+    item, familia, venta, _ = _linea_operable(session, venta_item_id)
+    if item.estado_preparacion == "entregado":
+        raise ReglaNegocio(
+            "el pedido ya se entregó: usa "
+            "POST /sales/ventas/{venta_id}/deshacer-entrega"
+        )
+    if item.estado_preparacion == "listo":
+        for hijo in familia:
+            hijo.estado_preparacion = "en_preparacion"
+        return item
+
+    anterior = _estacion_anterior(session, item, venta)
+    if anterior is not None:
+        for hijo in familia:
+            hijo.etapa_kds = anterior.orden
+        return item
+
+    previo = rules.paso_anterior(item.estado_preparacion)
+    if previo is None:
+        raise Conflicto("la línea no tiene ningún avance que deshacer")
+    for hijo in familia:
+        hijo.estado_preparacion = previo
+    return item
+
+
+def _estacion_anterior(
+    session: Session, item: VentaItem, venta: Venta
+) -> KdsPantalla | None:
+    """El eslabón previo de ESTA línea, o `None` si está en el primero.
+
+    Se busca entre las estaciones que atienden su categoría, no entre todas:
+    una bebida que se saltó el horno sola tiene que volver a la barra, no al
+    horno por el que nunca pasó.
+    """
+    producto = session.get(ProductoComercial, item.producto_comercial_id)
+    cadena = _cadena(session, venta.sucursal_id)
+    actual = _estacion(cadena, producto, item.etapa_kds)
+    suyas = [p for p in cadena if _pertenece(p, producto)]
+    if actual is None:
+        # Sin estación por delante la línea ya salió de cocina: su último
+        # eslabón es el final de su cadena.
+        return suyas[-1] if suyas else None
+    previas = [p for p in suyas if p.orden < actual.orden]
+    return previas[-1] if previas else None
 
 
 def _pasar_a_la_siguiente(session: Session, item: VentaItem, venta: Venta) -> bool:

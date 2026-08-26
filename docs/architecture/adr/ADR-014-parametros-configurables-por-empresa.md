@@ -255,3 +255,29 @@ del seeder. `decimales` es configurable *en el dato*; editarlo desde la UI
 llega con el slice de catálogo de `inventory` y con el de divisas si alguna
 vez hay una segunda moneda. Construir dos CRUD ahora para un catálogo de una
 fila (PEN) sería andamiaje sin usuario.
+
+## Addendum 2026-08-26 — un parámetro que no es una magnitud: el semáforo del KDS
+
+Los `kds_*` (`kds_minutos_ambar`, `kds_minutos_rojo`, `kds_color_normal`,
+`kds_color_ambar`, `kds_color_rojo`) son el primer parámetro que **no** es
+plata ni cantidad: dos enteros de minutos y tres colores hexadecimales. Nada
+cambia en el mecanismo —`valor` es JSON libre por código, `valor_display` sale
+`null` por adimensional— pero deja tres cosas anotadas.
+
+**La validación de rango vive en el módulo dueño, no en Gerencia.** `sales`
+sabe que un umbral de cero pinta todo de rojo desde el primer segundo —y apaga
+el semáforo sin decirlo— y que un color que no es `#rrggbb` rompe el CSS de
+toda la cocina. Gerencia aprueba lo que un área propone; no tiene por qué
+saber qué es un umbral válido para un horno.
+
+**Un valor mal aprobado cae a la semilla, no rompe la pantalla.** Igual que la
+tarifa del delivery: el valor pasó por un formulario y por una pantalla de
+aprobación, no por un compilador. Con una diferencia — cuando el rojo queda
+antes que el ámbar, caen **los dos** a la semilla. Corregir uno contra el otro
+dejaría corriendo una combinación que nadie aprobó.
+
+**El parámetro lo lee quien opera, no quien lo aprueba.**
+`GET /kds/configuracion` pide `kds.operar` y no `gerencia.gestionar_parametros_empresa`:
+la cocina necesita leer el valor resuelto para pintar. Leer un parámetro
+aprobado y decidirlo son dos permisos distintos, y confundirlos habría dejado
+al cocinero sin colores o con acceso a la matriz de aprobaciones.

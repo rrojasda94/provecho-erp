@@ -312,10 +312,13 @@ el problema y se descarta lo que choca con las reglas ya decididas.
   estado agregado del pedido. El borde superior colorea ese estado
   (gris pendiente → ámbar en preparación → verde listo) para leerlo a
   distancia.
-- **Un toque sobre el ítem lo tacha** (`line-through` + check + fondo
-  verde): así lo hace Odoo y así se opera con las manos ocupadas. El toque
-  lleva el ítem hasta `listo`, encadenando `en_preparacion` si venía en
-  `pendiente` — la API solo acepta avanzar de a un estado.
+- **Dos toques mueven el ítem** (revisado 2026-08-26). El primero lo marca
+  `en_preparacion` —lo que ven las otras pantallas mientras tanto— y el
+  segundo lo tacha (`line-through` + check + fondo verde) y lo manda a la
+  estación siguiente. Odoo lo hace en un toque y así se construyó, pero en
+  una cocina real el roce de un delantal contra la tablet alcanzaba para
+  despachar un plato que nadie había empezado: con dos toques el error
+  necesita dos.
 - **Botón "Todo listo"** = el "click en la tarjeta" de Odoo: marca de una
   vez todos los ítems que faltan.
 - **El ítem tachado se queda a la vista**, no desaparece: la tarjeta sale
@@ -327,16 +330,35 @@ el problema y se descarta lo que choca con las reglas ya decididas.
   en `venta_item.estado_preparacion` (RN-CUP-003) y cada pantalla es un
   filtro sobre él. Hoy la propagación es por **polling cada 3 s**; el push
   en vivo es deuda declarada (`ROADMAP.md`).
-- **No se replica el "recall"** (deshacer/retroceder) de Odoo: RN-CUP-002
-  prohíbe el retroceso de estado. Tocar un ítem ya tachado no lo devuelve,
-  avisa que el avance no se deshace.
+- **Sí se replica el "recall"** de Odoo (desde 2026-08-26, RN-CUP-002
+  enmendada): cada línea lleva su botón de deshacer (`↶`) y devuelve **un**
+  paso — el estado, o la estación a la que se la mandó por error. Se
+  construyó al revés al principio, remitiendo la corrección a una incidencia
+  que nunca existió; en una pantalla que se opera de pie y con las manos
+  ocupadas el toque equivocado es parte de la operación normal, no una
+  excepción a documentar aparte.
+- **Reloj y semáforo por tarjeta** (2026-08-26): cuánto lleva esperando el
+  pedido, y el borde superior cambia de color a los minutos que **Gerencia**
+  fija en `/gerencia/kds` (dos umbrales, tres colores). Antes el color era
+  solo el estado, que dice en qué anda el pedido pero no si lleva cuatro
+  minutos o cuarenta: uno olvidado se veía igual que uno recién tomado. Un
+  pedido ya `listo` se queda verde por más que espere — ese no espera por la
+  cocina, espera por quien despacha.
+- **Historial de entregas**: enlace en la barra superior, muestra lo
+  despachado del día atenuado y con su hora. La cola descarta los pedidos
+  entregados en cuanto se cierran, así que sin esto uno entregado por error
+  desaparecía sin dónde buscarlo. Desde ahí se lo devuelve a despacho, con el
+  mismo permiso que entregar.
 - **La entrega no se marca ítem por ítem**: en pantallas de tipo
   `despacho`, y solo con `sales.entregar_pedido` (RN-CUP-006), la tarjeta
   muestra "Entregar" cuando el pedido completo está listo.
 - Pantalla completa fuera del shell (como el PDV), paleta oscura, objetivos
   táctiles ≥ 3 rem, sin interacciones hover-only. La estación elegida viaja
-  en la URL (`/kds?pantalla=<id>`) para que cada tablet la deje en
-  favoritos.
+  en la URL (`/kds?pantalla=<id>&sucursal=<id>`) para que cada tablet la deje
+  en favoritos. **La sucursal viaja por el mismo camino** desde 2026-08-26:
+  antes era siempre la primera del usuario y quien tenía dos locales
+  asignados no podía llegar al segundo. Lo que llega por la URL se valida
+  contra sus sucursales, y el selector aparece solo si tiene más de una.
 - **`/kds` sin estación = tablero de estaciones**: la misma lista sirve para
   elegir dónde queda la tablet y para **configurar las pantallas** (crear,
   editar, activar/desactivar, borrar; filtro por categorías) con
@@ -344,7 +366,10 @@ el problema y se descarta lo que choca con las reglas ya decididas.
   Van juntas a propósito — es la misma lista, y quien configura una estación
   lo hace mirando el tablero que la cocina usa. **Desactivar y borrar no son
   lo mismo**: desactivar la apaga y la deja volver; borrar la saca de la lista
-  y libera su nombre, y se rechaza si todavía tiene cola. Quien solo opera ve
+  y libera su nombre, y se rechaza si todavía tiene cola. Una estación también
+  se **muda de sucursal** desde el mismo diálogo (la tablet que se lleva al
+  local nuevo), con las dos mismas guardas: nada de mudarla con pedidos en
+  cola ni a una sucursal donde el nombre ya esté tomado. Quien solo opera ve
   la lista sin los botones y el texto le dice a quién pedirle una pantalla.
 
 ### Pad de asistencia — tarjeta con tu nombre y tu PIN (implementado 2026-08-24)

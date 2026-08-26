@@ -1,6 +1,7 @@
 """DTOs (pydantic) del KDS."""
 
 import uuid
+from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -17,6 +18,10 @@ class PantallaCreate(BaseModel):
 
 
 class PantallaUpdate(BaseModel):
+    # Mudar una estación de sucursal: una tablet que se lleva al local nuevo
+    # no tiene por qué obligar a recrear la estación y perder su historia.
+    # El router valida que la sucursal destino sea del tenant.
+    sucursal_id: uuid.UUID | None = None
     nombre: str | None = None
     tipo: str | None = None
     categoria_ids: list[str] | None = None
@@ -48,6 +53,11 @@ class ItemColaOut(BaseModel):
     # Restas de la línea, ya resueltas a nombre: ["Cebolla"] → "SIN CEBOLLA"
     # en pantalla (RN-COM-028). Lista vacía = el plato va completo.
     sin: list[str] = []
+    # QUÉ es el plato: las mitades de una MitadXMitad, ya resueltas a
+    # "Mitad 1: Americana" (ADR-056). Distinto de `extras` —acá no hay línea
+    # cobrada, la elección cambia la receta— y sin esto el pizzero que solo
+    # mira la pantalla no sabe de qué mitades es la pizza.
+    valores: list[str] = []
     # Lo que el plato lleva además (el sabor de la pizza, el queso extra).
     # Anidados y no como ítems propios: en cocina son el mismo plato
     # (RN-CUP-014).
@@ -72,7 +82,30 @@ class PedidoColaOut(BaseModel):
     tipo: str = "venta"
     consumo_motivo: str | None = None
     estado_pedido: str
+    # Cuándo se tomó el pedido. El cronómetro lo corre el navegador —el
+    # servidor no tiene por qué reenviar la cola entera cada segundo— y esto
+    # es su punto de partida.
+    creado_en: datetime
     items: list[ItemColaOut]
+
+
+class SemaforoOut(BaseModel):
+    """Umbrales y colores con los que la pantalla pinta el tiempo de espera.
+    Son los **resueltos** —lo que Gerencia aprobó o la semilla del módulo—,
+    no el contenido crudo de `parametro_empresa`."""
+
+    minutos_ambar: int
+    minutos_rojo: int
+    color_normal: str
+    color_ambar: str
+    color_rojo: str
+
+
+class PedidoHistorialOut(PedidoColaOut):
+    """Un pedido ya entregado. Lo mismo que en la cola más la hora en que se
+    cerró — que es lo que se lee para saber si «este» era el que salió."""
+
+    entregado_en: datetime
 
 
 class AvanzarIn(BaseModel):

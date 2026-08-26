@@ -292,6 +292,69 @@ def test_almacen_con_abastecedor_y_baja_encadenada(env):
     assert client.delete(f"/api/v1/almacenes/{central['id']}", headers=headers).status_code == 204
 
 
+def test_un_almacen_dado_de_baja_se_puede_recuperar(env):
+    """La baja no mira el stock —frontera de módulos—, así que la única red
+    posible es poder deshacerla. Sin esto, dar de baja el almacén equivocado
+    lo borra de la interfaz para siempre: los repos filtran `deleted_at`."""
+    client, headers, ids, _ = env
+    almacen = client.post(
+        "/api/v1/almacenes",
+        headers=headers,
+        json={
+            "empresa_id": ids["empresa_id"],
+            "sucursal_id": ids["sucursal_id"],
+            "nombre": "Creado por error",
+            "tipo": "sucursal",
+        },
+    ).json()
+
+    assert client.delete(
+        f"/api/v1/almacenes/{almacen['id']}", headers=headers
+    ).status_code == 204
+
+    # De baja: desaparece del catálogo que consumen los demás módulos...
+    normal = client.get("/api/v1/almacenes", headers=headers).json()
+    assert almacen["id"] not in [a["id"] for a in normal]
+
+    # ...pero no de la pantalla que puede recuperarlo.
+    con_baja = client.get("/api/v1/almacenes?incluir_baja=true", headers=headers).json()
+    fila = next(a for a in con_baja if a["id"] == almacen["id"])
+    assert fila["de_baja"] is True
+
+    r = client.post(f"/api/v1/almacenes/{almacen['id']}/reactivar", headers=headers)
+    assert r.status_code == 200, r.text
+    assert r.json()["de_baja"] is False
+    assert almacen["id"] in [
+        a["id"] for a in client.get("/api/v1/almacenes", headers=headers).json()
+    ]
+
+
+def test_reactivar_uno_que_nunca_se_dio_de_baja_no_es_un_error(env):
+    """Idempotente a propósito: dos clicks del mismo botón, o dos pestañas
+    abiertas, no tienen por qué producir un 409 que no significa nada."""
+    client, headers, _, _ = env
+    central = client.get("/api/v1/almacenes", headers=headers).json()[0]
+    r = client.post(f"/api/v1/almacenes/{central['id']}/reactivar", headers=headers)
+    assert r.status_code == 200, r.text
+    assert r.json()["de_baja"] is False
+
+
+def test_ver_los_de_baja_exige_administrar_la_organizacion(env):
+    """El catálogo plano lo lee cualquiera —compras necesita elegir destino—,
+    pero un almacén de baja no puede aparecer en un selector: si aparece,
+    alguien le manda una orden de compra."""
+    client, headers, ids, TestSession = env
+    ajeno = _usuario_de_empresa(
+        client, headers, TestSession, ids, username="cajero_catalogo",
+        codigos=("users.gestionar",),
+    )
+    assert client.get("/api/v1/almacenes", headers=ajeno).status_code == 200
+    assert (
+        client.get("/api/v1/almacenes?incluir_baja=true", headers=ajeno).status_code
+        == 403
+    )
+
+
 def test_editar_almacen_de_sucursal_sin_repetir_la_sucursal(env):
     """Un PATCH que solo renombra no menciona `sucursal_id`, y eso no puede
     hacer que el almacén deje de cumplir su propia regla de tipo."""

@@ -293,7 +293,7 @@ def tipo_comprobante_por_documento(num_doc: str | None) -> str:
 
 
 # --- Cumplimiento de pedido (PROC-OPE-002) -----------------------------------
-# Secuencia estricta, sin retroceso (RN-CUP-002): el avance mostrado en
+# Secuencia estricta de a un paso (RN-CUP-002): el avance mostrado en
 # todas las pantallas es la verdad única del ítem (RN-CUP-003).
 ORDEN_PREPARACION = ["pendiente", "en_preparacion", "listo", "entregado"]
 
@@ -304,6 +304,18 @@ def transicion_preparacion_valida(actual: str, nuevo: str) -> bool:
         nuevo in ORDEN_PREPARACION
         and ORDEN_PREPARACION.index(nuevo) == ORDEN_PREPARACION.index(actual) + 1
     )
+
+
+def paso_anterior(actual: str) -> str | None:
+    """De dónde viene el ítem. `None` en `pendiente`: no hay nada que deshacer.
+
+    Deshacer es explícito y de a un paso, nunca un salto a un estado
+    arbitrario: por eso no hay una `transicion_valida` simétrica —una función
+    que acepte ir para los dos lados dejaría a `avanzar_item` aceptando
+    retrocesos por la puerta de avanzar (RN-CUP-002, enmendada 2026-08-26).
+    """
+    indice = ORDEN_PREPARACION.index(actual)
+    return ORDEN_PREPARACION[indice - 1] if indice > 0 else None
 
 
 def estado_pedido(estados_items: list[str]) -> str:
@@ -358,6 +370,28 @@ def combinaciones_a_generar(modo_variante: str) -> bool:
     Solo `siempre`. `dinamica` las crea al vender y `nunca` no las crea.
     """
     return modo_variante == "siempre"
+
+
+# --- Medios de pago (RN-MDP-001) ---------------------------------------------
+
+TIPOS_MEDIO_PAGO = {
+    "efectivo",
+    "tarjeta_credito",
+    "tarjeta_debito",
+    "billetera_digital",
+    "transferencia",
+    "cheque",
+    "credito_empresarial",
+}
+"""Con qué paga el cliente. El tipo no es cosmética: `efectivo` es el único
+que tiene cajón detrás —da vuelto y entra a la cadena de custodia
+(RN-MDP-002)— y `credito_empresarial` es el único que puede cotizar contra
+otra lista de precios (RN-MDP-001)."""
+
+DIRECCIONES_MEDIO_PAGO = {"cobro", "pago", "ambos"}
+"""De qué lado del mostrador se usa. El PDV solo ofrece los de `cobro` (y
+`ambos`): un medio con el que se le paga a un proveedor no es una forma de
+cobrarle a un comensal."""
 
 
 # --- Cupón de promoción (ADR-061) --------------------------------------------

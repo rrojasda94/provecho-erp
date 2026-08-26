@@ -648,6 +648,11 @@
             ],
             "title": "Almacen Abastecedor Respaldo Id"
           },
+          "de_baja": {
+            "default": false,
+            "title": "De Baja",
+            "type": "boolean"
+          },
           "direccion": {
             "anyOf": [
               {
@@ -10440,6 +10445,14 @@
             "title": "Sin",
             "type": "array"
           },
+          "valores": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Valores",
+            "type": "array"
+          },
           "venta_item_id": {
             "title": "Venta Item Id",
             "type": "string"
@@ -11908,6 +11921,8 @@
           "comision_pct": {
             "anyOf": [
               {
+                "maximum": 100.0,
+                "minimum": 0.0,
                 "type": "number"
               },
               {
@@ -11920,6 +11935,11 @@
           },
           "direccion": {
             "default": "cobro",
+            "enum": [
+              "cobro",
+              "pago",
+              "ambos"
+            ],
             "title": "Direccion",
             "type": "string"
           },
@@ -11942,6 +11962,15 @@
             "type": "string"
           },
           "tipo": {
+            "enum": [
+              "efectivo",
+              "tarjeta_credito",
+              "tarjeta_debito",
+              "billetera_digital",
+              "transferencia",
+              "cheque",
+              "credito_empresarial"
+            ],
             "title": "Tipo",
             "type": "string"
           }
@@ -11962,6 +11991,10 @@
           "comision_pct": {
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Comision Pct",
+            "type": "string"
+          },
+          "direccion": {
+            "title": "Direccion",
             "type": "string"
           },
           "empresa_id": {
@@ -11987,11 +12020,80 @@
           "id",
           "empresa_id",
           "nombre",
+          "direccion",
           "tipo",
           "comision_pct",
           "activo"
         ],
         "title": "MedioPagoOut",
+        "type": "object"
+      },
+      "MedioPagoUpdate": {
+        "description": "Campo ausente o `null` = no tocar.\n\nSin `direccion`: de qué lado del mostrador se usa un medio no es una\ncorrección, es otro medio. Sin baja: `activo=False` lo saca del PDV sin\ntocar los cobros que ya lo nombran.",
+        "properties": {
+          "activo": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activo"
+          },
+          "comision_pct": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comision Pct"
+          },
+          "nombre": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nombre"
+          },
+          "tipo": {
+            "anyOf": [
+              {
+                "enum": [
+                  "efectivo",
+                  "tarjeta_credito",
+                  "tarjeta_debito",
+                  "billetera_digital",
+                  "transferencia",
+                  "cheque",
+                  "credito_empresarial"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tipo"
+          }
+        },
+        "title": "MedioPagoUpdate",
         "type": "object"
       },
       "MemorandumCreate": {
@@ -15219,6 +15321,18 @@
             ],
             "title": "Orden"
           },
+          "sucursal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sucursal Id"
+          },
           "tipo": {
             "anyOf": [
               {
@@ -15445,6 +15559,11 @@
             ],
             "title": "Consumo Motivo"
           },
+          "creado_en": {
+            "format": "date-time",
+            "title": "Creado En",
+            "type": "string"
+          },
           "direccion_entrega": {
             "anyOf": [
               {
@@ -15503,9 +15622,103 @@
           "modalidad",
           "canal",
           "estado_pedido",
+          "creado_en",
           "items"
         ],
         "title": "PedidoColaOut",
+        "type": "object"
+      },
+      "PedidoHistorialOut": {
+        "description": "Un pedido ya entregado. Lo mismo que en la cola más la hora en que se\ncerró — que es lo que se lee para saber si «este» era el que salió.",
+        "properties": {
+          "canal": {
+            "title": "Canal",
+            "type": "string"
+          },
+          "consumo_motivo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consumo Motivo"
+          },
+          "creado_en": {
+            "format": "date-time",
+            "title": "Creado En",
+            "type": "string"
+          },
+          "direccion_entrega": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direccion Entrega"
+          },
+          "entregado_en": {
+            "format": "date-time",
+            "title": "Entregado En",
+            "type": "string"
+          },
+          "estado_pedido": {
+            "title": "Estado Pedido",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ItemColaOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "modalidad": {
+            "title": "Modalidad",
+            "type": "string"
+          },
+          "numero_orden": {
+            "title": "Numero Orden",
+            "type": "integer"
+          },
+          "referencia_atencion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referencia Atencion"
+          },
+          "tipo": {
+            "default": "venta",
+            "title": "Tipo",
+            "type": "string"
+          },
+          "venta_id": {
+            "title": "Venta Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "venta_id",
+          "numero_orden",
+          "referencia_atencion",
+          "modalidad",
+          "canal",
+          "estado_pedido",
+          "creado_en",
+          "items",
+          "entregado_en"
+        ],
+        "title": "PedidoHistorialOut",
         "type": "object"
       },
       "PeriodoContableCreate": {
@@ -21732,6 +21945,40 @@
         "title": "RolIdIn",
         "type": "object"
       },
+      "SemaforoOut": {
+        "description": "Umbrales y colores con los que la pantalla pinta el tiempo de espera.\nSon los **resueltos** —lo que Gerencia aprobó o la semilla del módulo—,\nno el contenido crudo de `parametro_empresa`.",
+        "properties": {
+          "color_ambar": {
+            "title": "Color Ambar",
+            "type": "string"
+          },
+          "color_normal": {
+            "title": "Color Normal",
+            "type": "string"
+          },
+          "color_rojo": {
+            "title": "Color Rojo",
+            "type": "string"
+          },
+          "minutos_ambar": {
+            "title": "Minutos Ambar",
+            "type": "integer"
+          },
+          "minutos_rojo": {
+            "title": "Minutos Rojo",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "minutos_ambar",
+          "minutos_rojo",
+          "color_normal",
+          "color_ambar",
+          "color_rojo"
+        ],
+        "title": "SemaforoOut",
+        "type": "object"
+      },
       "SkuCreate": {
         "properties": {
           "articulo_id": {
@@ -26978,7 +27225,7 @@
   "info": {
     "description": "ERP modular para grupo de restaurantes multi-marca. Convenciones de la API: docs/engineering/api-guidelines.md.",
     "title": "Provecho ERP",
-    "version": "0.7.5"
+    "version": "0.7.6"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -28780,7 +29027,7 @@
     },
     "/api/v1/almacenes": {
       "get": {
-        "description": "Lista de referencia (nombre/tipo de almacén, no dato sensible) — abierta\na cualquier usuario autenticado, la necesita cualquiera que tenga que\nelegir un destino (ej. compras crea una OC). Sin `require_permission`\na propósito: no es un recurso a proteger, es un catálogo de apoyo. Sí\nescopada por tenant — un almacén de otra empresa no es \"no sensible\".",
+        "description": "Lista de referencia (nombre/tipo de almacén, no dato sensible) — abierta\na cualquier usuario autenticado, la necesita cualquiera que tenga que\nelegir un destino (ej. compras crea una OC). Sin `require_permission`\na propósito: no es un recurso a proteger, es un catálogo de apoyo. Sí\nescopada por tenant — un almacén de otra empresa no es \"no sensible\".\n\n`incluir_baja` sí exige `organizacion.gestionar`: los selectores del resto\ndel ERP no deben poder ofrecer un almacén dado de baja ni por descuido, y\nquien los ve es solo quien puede reactivarlos.",
         "operationId": "listar_almacenes_api_v1_almacenes_get",
         "parameters": [
           {
@@ -28798,6 +29045,16 @@
                 }
               ],
               "title": "Empresa Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "incluir_baja",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Incluir Baja",
+              "type": "boolean"
             }
           }
         ],
@@ -29021,6 +29278,55 @@
           }
         ],
         "summary": "Editar Almacen",
+        "tags": [
+          "organizacion"
+        ]
+      }
+    },
+    "/api/v1/almacenes/{almacen_id}/reactivar": {
+      "post": {
+        "description": "Deshace la baja. Existe porque la baja no mira el stock: sin vuelta,\nequivocarse sería definitivo y el almacén desaparecería de la interfaz\npara siempre —los repos filtran `deleted_at`—.",
+        "operationId": "reactivar_almacen_api_v1_almacenes__almacen_id__reactivar_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "almacen_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Almacen Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlmacenOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Reactivar Almacen",
         "tags": [
           "organizacion"
         ]
@@ -35131,6 +35437,62 @@
         ]
       }
     },
+    "/api/v1/kds/configuracion": {
+      "get": {
+        "description": "Umbrales y colores del semáforo, ya resueltos.\n\nPermiso de cocina y no de Gerencia: la pantalla necesita **leerlos** para\npintar, aprobarlos es otra cosa (`POST /parametros`). `sucursal_id` es\npara superusuarios sin empresa en el token — el parámetro es por empresa,\nasí que se usa solo para resolver de cuál.",
+        "operationId": "configuracion_api_v1_kds_configuracion_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "sucursal_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sucursal Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SemaforoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Configuracion",
+        "tags": [
+          "kds"
+        ]
+      }
+    },
     "/api/v1/kds/items/{venta_item_id}/avanzar": {
       "post": {
         "operationId": "avanzar_api_v1_kds_items__venta_item_id__avanzar_post",
@@ -35184,6 +35546,55 @@
           }
         ],
         "summary": "Avanzar",
+        "tags": [
+          "kds"
+        ]
+      }
+    },
+    "/api/v1/kds/items/{venta_item_id}/retroceder": {
+      "post": {
+        "description": "Deshace un paso del avance de la línea (RN-CUP-002, enmendada\n2026-08-26). Sin cuerpo: no se salta a un estado arbitrario, se deshace\nlo último que se hizo. `kds.operar` y no un permiso nuevo — quien se\nequivoca tachando es quien tiene que poder corregirlo, en el momento.",
+        "operationId": "retroceder_api_v1_kds_items__venta_item_id__retroceder_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "venta_item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Venta Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemColaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Retroceder",
         "tags": [
           "kds"
         ]
@@ -35436,6 +35847,71 @@
           }
         ],
         "summary": "Cola",
+        "tags": [
+          "kds"
+        ]
+      }
+    },
+    "/api/v1/kds/pantallas/{pantalla_id}/historial": {
+      "get": {
+        "description": "Lo que esta pantalla ya despachó. La cola descarta los pedidos\nentregados y hasta ahora eso era todo: uno entregado por error\ndesaparecía sin dejar dónde buscarlo.",
+        "operationId": "historial_api_v1_kds_pantallas__pantalla_id__historial_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pantalla_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Pantalla Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "dias",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "maximum": 7,
+              "minimum": 1,
+              "title": "Dias",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PedidoHistorialOut"
+                  },
+                  "title": "Response Historial Api V1 Kds Pantallas  Pantalla Id  Historial Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Historial",
         "tags": [
           "kds"
         ]
@@ -45820,6 +46296,7 @@
     },
     "/api/v1/sales/medios-pago": {
       "get": {
+        "description": "`direccion=cobro` es lo que pide el PDV: con qué se le cobra al\ncomensal. Sin filtro salen todos, que es lo que administra el catálogo.",
         "operationId": "listar_medios_pago_api_v1_sales_medios_pago_get",
         "parameters": [
           {
@@ -45837,6 +46314,37 @@
                 }
               ],
               "title": "Empresa Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "direccion",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "cobro",
+                    "pago",
+                    "ambos"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Direccion"
+            }
+          },
+          {
+            "in": "query",
+            "name": "incluir_inactivos",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Incluir Inactivos",
+              "type": "boolean"
             }
           }
         ],
@@ -45916,6 +46424,65 @@
           }
         ],
         "summary": "Crear Medio Pago",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/medios-pago/{medio_pago_id}": {
+      "patch": {
+        "description": "Sin DELETE: un medio de pago que ya cobró no se borra, se apaga con\n`activo=false` (queda fuera del PDV y los cobros siguen nombrándolo).",
+        "operationId": "editar_medio_pago_api_v1_sales_medios_pago__medio_pago_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "medio_pago_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Medio Pago Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MedioPagoUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MedioPagoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Editar Medio Pago",
         "tags": [
           "sales"
         ]
@@ -47928,6 +48495,55 @@
           }
         ],
         "summary": "Aplicar Descuento",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/ventas/{venta_id}/deshacer-entrega": {
+      "post": {
+        "description": "Devuelve el pedido de `entregado` a `listo`: el toque equivocado sobre\nla tarjeta de al lado en despacho.\n\nMismo permiso que entregar y no uno nuevo: quien puede dar por entregado\nun pedido es exactamente quien tiene que poder corregirse. Deshacer algo\nque no está entregado es un no-op, no un error.",
+        "operationId": "deshacer_entrega_api_v1_sales_ventas__venta_id__deshacer_entrega_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "venta_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Venta Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntregaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Deshacer Entrega",
         "tags": [
           "sales"
         ]

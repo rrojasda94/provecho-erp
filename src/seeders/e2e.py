@@ -74,7 +74,6 @@ from src.modules.sales.infrastructure.models import (
     AtributoValor,
     Cliente,
     ListaPrecio,
-    MedioPago,
     Precio,
     ProductoAtributoLinea,
     ProductoAtributoValor,
@@ -235,16 +234,6 @@ def sembrar_e2e(session: Session) -> dict:
     )
     if producto is None:
         producto = _crear_producto_vendible(session, empresa, marca)
-
-    if session.scalar(select(MedioPago)) is None:
-        session.add(
-            MedioPago(
-                empresa_id=empresa.id,
-                nombre="Efectivo",
-                direccion="cobro",
-                tipo="efectivo",
-            )
-        )
 
     menu = _sembrar_menu(session, empresa, marca)
     compras = _sembrar_compras(session, empresa)

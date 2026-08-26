@@ -167,6 +167,69 @@ export async function proponerTarifaDeliveryAction(
   return { error: "", ok: true };
 }
 
+/** Los cinco valores del semáforo del KDS, y con qué clave viaja cada uno
+ * dentro del `valor` JSON del parámetro (`kds_semaforo.py`). */
+const SEMAFORO_KDS = [
+  { campo: "minutos_ambar", codigo: "kds_minutos_ambar", clave: "minutos" },
+  { campo: "minutos_rojo", codigo: "kds_minutos_rojo", clave: "minutos" },
+  { campo: "color_normal", codigo: "kds_color_normal", clave: "color" },
+  { campo: "color_ambar", codigo: "kds_color_ambar", clave: "color" },
+  { campo: "color_rojo", codigo: "kds_color_rojo", clave: "color" },
+] as const;
+
+/**
+ * Propone los umbrales y colores del KDS: una fila de `parametro_empresa` por
+ * valor que **cambió**, igual que la tarifa del delivery.
+ *
+ * Solo lo que cambió porque cada propuesta es algo que Gerencia resuelve a
+ * mano, y reproponer un valor idéntico es pedirle que apruebe lo que ya
+ * aprobó. Los `actual_*` vienen de `GET /kds/configuracion` —el semáforo
+ * efectivo, con el que la cocina está pintando ahora mismo—.
+ */
+export async function proponerSemaforoKdsAction(
+  _previo: EstadoGerencia,
+  formData: FormData,
+): Promise<EstadoGerencia> {
+  const campo = (clave: string) => String(formData.get(clave) ?? "").trim();
+  const empresaId = campo("empresa_id");
+  if (!empresaId) return { error: "Falta la empresa.", ok: false };
+
+  const ambar = Number(campo("minutos_ambar"));
+  const rojo = Number(campo("minutos_rojo"));
+  if (!(ambar >= 1 && rojo > ambar && rojo <= 240)) {
+    return {
+      error: "El rojo tiene que ser mayor que el ámbar, y ambos entre 1 y 240 minutos.",
+      ok: false,
+    };
+  }
+
+  const propuestas = SEMAFORO_KDS.filter(
+    ({ campo: nombre }) => campo(nombre) && campo(nombre) !== campo(`actual_${nombre}`),
+  ).map(({ campo: nombre, codigo, clave }) => ({
+    codigo,
+    valor: { [clave]: clave === "minutos" ? Number(campo(nombre)) : campo(nombre) },
+  }));
+  if (propuestas.length === 0) return { error: "No cambió ningún valor.", ok: false };
+
+  const motivo = campo("motivo") || "Semáforo del KDS fijado desde Gerencia";
+  const jwt = await token();
+  try {
+    for (const { codigo, valor } of propuestas) {
+      await apiFetch("/api/v1/parametros", {
+        token: jwt,
+        metodo: "POST",
+        cuerpo: { empresa_id: empresaId, modulo: "sales", codigo, valor, motivo },
+      });
+    }
+  } catch (e) {
+    // Sin transacción, igual que la tarifa: son propuestas independientes y
+    // las que entraron quedan a la vista esperando aprobación.
+    return { error: mensajeDe(e, "No se pudo proponer el semáforo."), ok: false };
+  }
+  revalidatePath("/gerencia/kds");
+  return { error: "", ok: true };
+}
+
 export async function aprobarParametroAction(
   _previo: EstadoGerencia,
   formData: FormData,
@@ -188,6 +251,7 @@ export async function aprobarParametroAction(
   }
   revalidatePath("/gerencia/parametros");
   revalidatePath("/gerencia/delivery");
+  revalidatePath("/gerencia/kds");
   return { error: "", ok: true };
 }
 

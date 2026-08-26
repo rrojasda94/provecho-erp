@@ -1,8 +1,9 @@
 import type { ItemCola } from "@/lib/kds";
 
 /**
- * El plato con todo lo que hay que saber de él: sus extras y sus restas
- * colgando debajo (RN-CUP-014).
+ * El plato con todo lo que hay que saber de él: de qué está hecho
+ * —los valores de una MitadXMitad, ADR-056— y sus extras y restas colgando
+ * debajo (RN-CUP-014).
  *
  * Vive aparte porque lo usan las dos pantallas —estación y despacho— y son
  * tres líneas que no pueden divergir: si una cocina muestra el sabor y la
@@ -12,6 +13,15 @@ export default function NombreDeLinea({ item }: { item: ItemCola }) {
   return (
     <span className="kds-nombre">
       {item.producto}
+      {/* Primero los valores porque dicen QUÉ es el plato —de qué mitades
+          es la pizza—, mientras que extras y restas lo modifican. Mismo
+          orden que la comanda impresa: la pantalla y el papel no pueden
+          leerse distinto (ADR-056). */}
+      {item.valores?.map((valor) => (
+        <em key={valor} className="kds-valor">
+          &gt; {valor.toUpperCase()}
+        </em>
+      ))}
       {/* El extra ES el plato: una "Pizza Personal" sin su "+ PEPERONI" es
           una pizza distinta. Va acá dentro y no como ítem suelto. */}
       {item.extras?.map((e) => (

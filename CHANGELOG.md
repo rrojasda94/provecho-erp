@@ -12,6 +12,402 @@ editando este archivo chocaban siempre — escribían en la misma línea.
 
 Ver [`changelog.d/`](changelog.d/).
 
+## [0.7.6] - 2026-08-26
+
+### Added
+
+- **Un almacén creado por error ya se puede quitar** (2026-08-26). El endpoint
+  `DELETE /almacenes/{id}` existía desde 2026-08-08 y hacía lo correcto —baja
+  lógica, auditada, negada con 409 si otros almacenes se abastecen de este—,
+  pero **ninguna pantalla lo llamaba**: quien se equivocaba al crear uno se
+  quedaba con el registro en la lista y en todos los selectores de compras,
+  inventario y producción para siempre. Ahora hay botón «Dar de baja» en
+  Organización → Almacenes.
+- **Y la vuelta: `POST /almacenes/{id}/reactivar`.** La baja no mira el stock
+  —vive en `inventory` y `users` no importa el dominio de otro módulo—, así
+  que la única red posible es poder deshacerla. Sin ella el problema se
+  repetía al revés: `AlmacenRepo.get/list` filtran `deleted_at`, de modo que
+  un almacén dado de baja por error desaparecía de la interfaz **para
+  siempre**. Es idempotente: reactivar uno que nunca se dio de baja no es un
+  error, es un no-op —dos clicks del mismo botón no tienen por qué producir un
+  409 que no significa nada—.
+- **`GET /almacenes?incluir_baja=true`**, y solo con `organizacion.gestionar`.
+  El catálogo plano sigue abierto a cualquier usuario autenticado —compras
+  necesita elegir un destino—, pero un almacén de baja no puede aparecer en un
+  selector: si aparece, alguien termina mandándole una orden de compra. Los
+  dados de baja se ven tachados y con su botón de recuperación únicamente en
+  la pantalla de Organización, que es la única que puede recuperarlos.
+
+- **Un toque ya no despacha el plato: hacen falta dos** (2026-08-26). Tachar un
+  ítem encadenaba `pendiente → en_preparacion → listo` y lo mandaba a la
+  estación siguiente de una sola vez. En una cocina eso es un problema físico:
+  el roce de un delantal contra la tablet despachaba algo que nadie había
+  empezado. Ahora el primer toque marca la línea **en preparación** —que es lo
+  que las demás pantallas ven mientras tanto— y el segundo es el que la manda
+  a la siguiente. El botón «Todo listo» sigue haciendo los dos pasos de una:
+  es el atajo de quien sí terminó el pedido entero.
+- **Se puede deshacer un paso** (`POST /kds/items/{id}/retroceder`, enmienda a
+  RN-CUP-002). Deshace exactamente lo que hizo el toque anterior, que no
+  siempre es lo mismo: el avance tiene dos ejes —`estado_preparacion` y
+  `etapa_kds`— y tachar en una estación intermedia mueve el segundo sin tocar
+  el primero. Así que `listo` vuelve a `en_preparacion` en la misma estación;
+  una línea empujada al eslabón siguiente vuelve al anterior; y
+  `en_preparacion` en la primera estación vuelve a `pendiente`. La cadena que
+  recorre son solo las estaciones que atienden **su** categoría: deshacer una
+  bebida no la manda a un horno por el que nunca pasó.
+- **Historial de entregas** (`GET /kds/pantallas/{id}/historial`). La cola
+  descarta los pedidos en cuanto se entregan, y hasta ahora eso era todo lo
+  que la cocina podía ver: uno entregado por error desaparecía de la pantalla
+  sin dejar dónde buscarlo. La vista muestra lo despachado del día de negocio
+  con su hora, atenuado —está para consultarse, no para trabajarse—. No hace
+  polling: el historial no cambia solo.
+- **Deshacer una entrega** (`POST /sales/ventas/{id}/deshacer-entrega`). El
+  toque sobre la tarjeta de al lado en despacho: el pedido desaparecía y el
+  que sí salió seguía ahí, y el único arreglo era anular la venta —que es otra
+  cosa completamente—. Devuelve los ítems a `listo` y reabre el consumo de
+  personal que la entrega había cerrado. Mismo permiso que entregar
+  (`sales.entregar_pedido`) y no uno nuevo: quien puede dar por entregado un
+  pedido es exactamente quien tiene que poder corregirse. **No mira el
+  comprobante a propósito**: se emite al cobrar, no al entregar, y bloquear el
+  deshacer cuando hay boleta apagaría esto justo para el delivery pagado por
+  adelantado, que es donde más se usa.
+
+- **Catálogo → Medios de pago** (`/catalogo/medios-pago`): la pantalla que
+  faltaba para dar de alta con qué se cobra. Hasta ahora el backend tenía
+  `POST /sales/medios-pago` desde el primer slice y el frontend solo los
+  leía, así que un local que empezaba a cobrar con otra billetera dependía
+  de quien tuviera acceso a la API. Alta con tipo (el vocabulario de
+  `rules.TIPOS_MEDIO_PAGO`), dirección y comisión; edición en línea de
+  nombre, tipo, comisión y activo, con el mismo gate
+  `sales.gestionar_catalogo` que el resto del catálogo. Suma
+  `PATCH /sales/medios-pago/{id}`; el `GET` acepta `direccion` e
+  `incluir_inactivos`.
+- **No hay borrar, hay apagar.** Un medio que ya cobró no se puede quitar
+  sin dejar cobros huérfanos: `activo=false` lo saca del PDV y lo deja en
+  pie en el histórico, igual que descontinuar un producto. La pantalla los
+  sigue mostrando (`incluir_inactivos=true`) porque quien apagó tiene que
+  poder reactivar, y avisa cuando no queda ninguno activo de cobro: sin eso
+  el PDV no puede cerrar una venta, y hasta ahora eso se descubría recién
+  en la caja.
+- **El PDV pide `direccion=cobro`.** Con lo que se le paga a un proveedor no
+  se le cobra a un comensal, y sin el filtro el primer medio de dirección
+  `pago` habría salido como pastilla en la pantalla del cajero. El
+  vocabulario de `tipo` y `direccion` pasa a validarse en el borde
+  (`Literal` en el esquema): antes un valor inventado llegaba hasta el
+  flush y reventaba contra el CHECK de la columna.
+
+- **La cocina ahora sabe cuánto lleva esperando cada pedido** (2026-08-26). El
+  KDS no tenía **ninguna** noción de tiempo: los colores de la tarjeta eran el
+  estado (`en_preparacion` ámbar, `listo` verde), que dice en qué anda el
+  pedido pero no si lleva cuatro minutos o cuarenta. Un pedido olvidado se veía
+  exactamente igual que uno recién tomado. Cada tarjeta muestra ahora su reloj
+  y cambia de color al pasar dos umbrales. Un pedido ya `listo` se queda verde
+  por más que espere: ese no espera por la cocina, espera por quien despacha.
+- **Los umbrales y los colores los fija Gerencia**, en
+  **Gerencia → Tiempos del KDS**, con el mismo mecanismo de aprobación que la
+  tarifa del delivery (ADR-014 Addendum): nada llega a la cocina hasta que se
+  aprueba. Se configura y no se fija en el código porque ocho minutos son una
+  eternidad para una barra de bebidas y nada para un horno de pizza a leña — el
+  número correcto lo sabe quien mira la cocina. Los colores se eligen con el
+  `<input type="color">` del navegador, y la pantalla de aprobación muestra la
+  muestra de color: aprobar un `#f87171` sin verlo es aprobar un código
+  hexadecimal.
+- **El reloj lo corre el navegador.** El backend suma `creado_en` a la cola y
+  expone los umbrales en `GET /kds/configuracion`; un cronómetro servidor
+  obligaría a recalcular y reenviar la cola entera cada segundo por algo que la
+  pantalla ya sabe. El reloj avanza con el refresco que ya existía, sin
+  temporizador propio.
+- **Un valor mal aprobado no deja la cocina sin pantalla.** Un color que no es
+  un color, un umbral de cero —que pintaría todo de rojo desde el primer
+  segundo y apagaría el semáforo sin decirlo— o un rojo anterior al ámbar caen
+  a los valores de fábrica. En el último caso caen **los dos**: corregir uno
+  contra el otro dejaría una combinación que nadie aprobó.
+
+- **La boleta y la factura se imprimen desde el ERP** (2026-08-25, ADR-067). No
+  había ningún modelo de comprobante: lo único imprimible era el PDF de
+  Factiliza, cuyo diseño decide el proveedor y que hay que bajar y abrir en un
+  visor. Ahora `GET /sales/comprobantes/{id}/ticket` devuelve la
+  representación impresa para rollo de 80 mm —membrete de marca, ítems con
+  precio, desglose de impuestos, total en letras y el **QR que exige SUNAT**
+  (nueve campos de la RS 097-2012)— y sale **aunque SUNAT todavía no haya
+  contestado**, con su franja `PENDIENTE DE ENVÍO A SUNAT`: la emisión es
+  asíncrona a propósito (RN-COM-003) y hacer esperar al cliente en caja es lo
+  que esa decisión evita. El ticket **no recalcula nada**: lee el mismo payload
+  que se le manda a Factiliza, así que el papel y el XML no pueden discrepar en
+  un céntimo de redondeo. El PDF sigue a un click y sigue siendo la copia
+  formal.
+- **Un solo ancho de papel: 48 columnas.** Todas las ticketeras del grupo son
+  de 80 mm, pero la comanda salía a 32 columnas (58 mm) y la precuenta a 40:
+  tres documentos del mismo local con tres márgenes, y un tercio del rollo en
+  blanco en cocina. El ancho vive ahora en `src/shared/impresion.py` y lo
+  comparten los tres, junto con el mismo membrete.
+- **El membrete se configura por marca, no por local.** Logo y líneas de
+  cortesía en `marca.skins["ticket"]` —la columna JSONB que ya existía para el
+  branding del PDV, sin migración—; razón social, RUC, domicilio fiscal y
+  sucursal salen del padrón y no se teclean: un local que escribe su propio
+  encabezado termina imprimiendo el RUC de la empresa equivocada.
+- **Botones de impresión donde se necesitan**: PDV → Cobrados (comprobante) y
+  PDV → Cuentas (comanda, que cuenta como reimpresión y queda auditada), y una
+  pestaña nueva **Contabilidad → Comprobantes** con el registro de ventas del
+  día o del rango, importe, estado ante SUNAT, reimpresión y descarga de
+  PDF/XML. El listado (`GET /sales/comprobantes`) acepta `sales.leer` **o**
+  `accounting.leer`: el contador tiene que ver el documento fuente del asiento
+  sin que haya que darle el módulo de ventas entero.
+- **Impresión sin diálogo**: no es código de la aplicación sino la bandera
+  `--kiosk-printing` del navegador. Documentado en
+  `docs/engineering/impresion-termica.md` junto con la configuración de la
+  ticketera. Sin la bandera todo funciona igual, con el diálogo de por medio.
+
+### Changed
+
+- **El reparto se cobra en múltiplos de S/ 0.50** (2026-08-26, RN-COM-042,
+  addendum a ADR-054). Base más precio por kilómetro daba el monto exacto —S/
+  8.71, S/ 8.89— y el monto exacto es incómodo: el repartidor no lleva monedas
+  de un céntimo, el cajero redondea de cabeza, y a partir de ahí el ticket dice
+  una cosa y la caja tiene otra. Ahora se redondea **por cercanía**: 8.71 →
+  8.50, 8.76 → 9.00, y el empate exacto (x.25, x.75) sube. Se eligió
+  `ROUND_HALF_UP` y no el redondeo bancario que `decimal` trae por defecto:
+  sobre medio sol, el bancario caería a veces para arriba y a veces para abajo
+  sin que nadie que mire el ticket pueda anticiparlo.
+- **Se redondea el monto, no la distancia.** `distancia_entrega_km` sigue en
+  dos decimales: es una medición, y redondearla al medio kilómetro cambiaría el
+  cobro por un motivo que no tiene nada que ver con la plata.
+- **Y se redondea en las cuatro salidas.** Las tres ramas «sin distancia»
+  —sucursal sin anclar en el mapa, dirección escrita a mano, zona restringida—
+  devolvían `tarifa.base` crudo, sin pasar siquiera por `quantize`: una base
+  aprobada por error como `3.456` llegaba con tres decimales hasta el ticket.
+  Las cuatro pasan ahora por `costo_de`.
+
+- **El delivery por kilómetro estaba construido y nadie podía usarlo**
+  (2026-08-25, ADR-068, RN-COM-041, sin migración). Tres meses después de
+  mergear ADR-053/054 la respuesta del negocio seguía siendo «eso no está
+  disponible», y ninguna de las tres causas era de dominio: **la tarifa vivía
+  en el `.env`**, así que cambiarla exigía editar el servidor y redesplegar —
+  motivo por el cual los tres valores nunca salieron de `0` y la función
+  quedó apagada desde el día uno—; **el reparto se calculaba, se congelaba en
+  `venta.costo_entrega` y no se cobraba**, que desde caja se lee como que el
+  PDV está roto (el cajero ve «reparto S/ 5» y el ticket cobra S/ 0); y **sin
+  claves de Google todo se degrada en silencio**, que frente al cajero es lo
+  correcto —una venta no se pierde porque un tercero no contestó— y frente a
+  Gerencia es una pantalla que parece andar y no anda.
+- **La tarifa la fija Gerencia, no un archivo del servidor.** Los cuatro
+  números pasan a ser `parametro_empresa` del módulo `sales`
+  (`delivery_tarifa_base`, `delivery_precio_por_km`, `delivery_radio_km`,
+  `delivery_distritos_restringidos`) y se editan en la sección nueva
+  **`/gerencia/delivery`**. `settings.delivery_*` queda como **semilla**: el
+  valor con el que cotiza una empresa que todavía no aprobó ninguno, así que
+  el día del despliegue no cambia de precio ni una venta. Como cualquier
+  parámetro de ADR-014, **el valor nuevo no cobra hasta que Gerencia lo
+  aprueba** (RN-GER-009) — acá se define cuánta plata paga el cliente, y el
+  mismo mecanismo que audita el umbral de una orden de compra vale para esto.
+  Un parámetro mal formado cobra la semilla en vez de reventar: es un JSON que
+  pasó por un formulario, y un 500 en caja es peor que cobrar el precio
+  anterior.
+- **El reparto entra al total de la venta** (RN-COM-041). Se suma **después**
+  del descuento manual —el encargado autoriza descontar lo que el cliente
+  consumió, no el flete—, **un consumo de personal no lo paga** (vale cero
+  entero, RN-COM-025) y **no se prorratea entre cuentas separadas**: va entero
+  en la primera cuenta, porque una mesa dividida no es un delivery pero la
+  suma de las cuentas sí tiene que dar el total de la venta. Sin línea de venta, contra lo que ADR-054 dejó
+  anotado: crear un producto de servicio «Delivery» con su receta, su
+  categoría y su cuenta contable para mover un número que ya tiene su columna
+  no compra nada hoy, y `costo_entrega` sobrevive al comprobante igual. El
+  ticket del PDV muestra el reparto en su propia fila. El PDV además pasa a
+  cotizar **aunque la dirección no tenga ancla en el mapa**: hasta ahora no se
+  pedía porque no había nada que medir, y desde que el flete se cobra eso
+  dejaba al cajero diciéndole al cliente un total menor que el cobrado — que
+  es el caso normal mientras no haya clave de Maps, no el raro. Esa llamada no
+  toca a Google: sin destino, la cotización devuelve la tarifa base y no
+  pregunta.
+- **La pantalla de Gerencia dice qué falta.** `GET
+  /sales/delivery/configuracion` devuelve la tarifa **efectiva** —lo aprobado,
+  o la semilla— y no lo propuesto, más `activa` y `rutas_reales`: la sección
+  avisa si el reparto no se está cobrando, si falta `GOOGLE_MAPS_SERVER_KEY`
+  (toda distancia sale de la línea recta y se cobra «aprox.») y si falta
+  `GOOGLE_MAPS_BROWSER_KEY` (no hay buscador ni pin, y sin punto no hay
+  distancia que medir). Es la comprobación que puede hacer alguien que no es
+  de sistemas, sin abrir la consola de Google ni el `.env` del servidor.
+- **La clave del mapa no llegaba al frontend fuera de desarrollo**, y ese era
+  el otro motivo real del «no está disponible». `docker-compose.staging.yml` y
+  `docker-compose.prod.yml` **no le declaraban ninguna `GOOGLE_MAPS_*` al
+  servicio `web`**: solo el compose de desarrollo lo hacía, así que el `.env`
+  del servidor podía tener la clave correcta y el proceso de Next no verla
+  nunca — sin buscador, sin mapa y, por lo tanto, sin punto que medir para
+  cobrar el reparto. Se declaran ahora en los tres, igual que en desarrollo, y
+  la del servidor sigue sin pasar al `web` (llega por `env_file: .env` al
+  `api`, que es la separación de ADR-054).
+- **Y la plantilla de staging invitaba a ponerla con el nombre equivocado**:
+  `.env.staging.example` traía `GOOGLE_API_KEY=`, que **ningún código lee**,
+  y ninguna de las `GOOGLE_MAPS_*` que sí se leen. Ahora están las cuatro, con
+  el nombre viejo marcado como muerto. Se suma `frontend/.env.example`, que no
+  existía: quien corre `npm run dev` fuera de Docker no tenía forma de
+  enterarse de que el campo de dirección necesita una clave para ser algo más
+  que un cuadro de texto.
+
+### Fixed
+
+- **Una cuenta impaga se leía como «Ese DNI no figura»** (2026-08-26). El
+  producto de consulta de Factiliza devuelve **405** con
+  `{"success": false, "message": "Token con falta de pago…", "plan": 0}`
+  cuando el plan no está al día. Ese código no era 404, ni 401/403, ni ≥ 500
+  —los tres únicos que `_consultar` sabía nombrar—, así que el cuerpo se
+  parseaba como si fuera bueno, `success: false` salía como
+  `encontrado: false`, y el cajero leía **«Ese DNI no figura. Completa los
+  datos a mano.»** para todos los documentos del mundo. Un problema de
+  facturación disfrazado de RENIEC vacío es un problema que nadie va a ir a
+  buscar donde está. Ahora la regla es la general y no una lista: **cualquier
+  estado ≥ 400 que no sea el 404-vacío es fallo del proveedor**, y se nombra
+  con el `message` que él mismo manda. Un `success: false` con 200 tampoco
+  pasa por resultado. El alta sigue siendo posible tecleando, como siempre —lo
+  que cambia es que ahora se puede saber por qué.
+- **El motivo del fallo va al log, no a la pantalla de caja.** El 502
+  concatenaba `str(e)` en el `detail`, así que al cajero le llegaban nombres de
+  variables de entorno y el WhatsApp de soporte del proveedor. Ahora lee «No se
+  pudo consultar el documento. Completa los datos a mano.» y el detalle
+  completo queda en el log del servidor, que es donde lo busca quien puede
+  hacer algo con él.
+- **Timeout propio para la consulta: 8 s en vez de 30.** Compartía número con
+  la emisión, que corre en cola y puede tardar lo que SUNAT tarde. La consulta
+  la espera una persona con el botón deshabilitado y un cliente en el
+  mostrador: medio minuto ahí no es lentitud, es un cuelgue. Nuevo
+  `FACTILIZA_CONSULTA_TIMEOUT_SEGUNDOS`.
+
+- **El buscador de Google en el campo de dirección no podía encenderse nunca**,
+  con clave o sin ella (ADR-053, desde 0.6.0). El `<div>` donde se monta el
+  buscador solo se dibujaba si `conMapa` ya era `true`
+  (`{conMapa && <div ref={buscadorRef} ... />}`), pero el efecto que activa
+  `conMapa` necesita que **ese mismo `<div>`** ya exista para engancharle el
+  widget (`if (!buscadorRef.current) return;`). Huevo y gallina: el
+  contenedor solo aparecía cuando el mapa ya estaba encendido, y el mapa solo
+  se encendía si el contenedor ya existía — nunca pasaba. Se detectó
+  depurando por qué staging seguía mostrando "El mapa no está disponible" con
+  la clave de Google puesta, el SDK cargando en `200` y `window.google.maps`
+  poblado en la consola: el fallo no era de configuración, era del
+  componente. `frontend/components/direccion/campo-direccion.tsx`: el `<div>`
+  del buscador pasa a renderizarse siempre (vacío mientras el SDK no
+  responde, sin ocupar espacio visible). `frontend/uso/direccion.spec.ts`
+  sigue en verde: prueba a propósito el camino **sin** clave, y ese no
+  cambió.
+
+- **El KDS mostraba siempre la primera sucursal del usuario** (2026-08-26). La
+  pantalla de cocina resolvía su local con `usuario.sucursales[0]` y nada más:
+  un jefe de cocina asignado a dos locales veía uno solo, y **no tenía ninguna
+  forma de llegar al otro** —ni por URL—. El backend nunca tuvo el problema:
+  `kds_pantalla.sucursal_id` existe desde el primer día y toda la cadena de
+  estaciones se resuelve por sucursal. Ahora la sucursal viaja en la URL
+  (`/kds?sucursal=<id>`), igual que la estación, así que la tablet se la lleva
+  en su enlace de favoritos; lo que llega por ahí **se valida contra las
+  sucursales del usuario** antes de pedir nada, porque la URL la escribe
+  cualquiera. El selector solo aparece con más de una sucursal asignada.
+- **Una estación se puede mudar de sucursal** (`PATCH /kds/pantallas/{id}` con
+  `sucursal_id`). Una tablet que se lleva al local nuevo obligaba a recrear la
+  estación allá y perder su configuración. Con dos guardas: **no se muda con
+  pedidos en cola** —quedarían esperando en una cocina que ya no los mira,
+  mismo criterio que borrarla— y **no se muda si el nombre ya existe en el
+  destino**, que si no salía como un `IntegrityError` del índice único
+  `(sucursal_id, nombre)` sin decirle a nadie qué hacer.
+
+- **El PDV no podía cobrar en un entorno recién levantado.** `seeders.seed`
+  no daba de alta **ningún medio de pago** —solo lo hacía `pdv_demo`, y
+  `docker-compose.staging.yml` corre únicamente el seeder base—, así que el
+  diálogo de cobro no dibujaba ninguna pastilla de medio, no había forma de
+  elegirlo, tampoco había vuelto (solo lo da un medio de tipo `efectivo`) y
+  «Confirmar pago» mandaba `medio_pago_id: ""`. Lo que el cajero veía era
+  `Input should be a valid UUID, invalid length: expected length 32 for
+  simple format, found 0`, un error que no se puede entender ni corregir
+  desde esa pantalla. Tres cambios:
+  - `seeders.seed` siembra Efectivo, Yape y Tarjeta por empresa
+    (`direccion="cobro"`), idempotente y por la misma razón que ya sembraba
+    `usuario_sucursal`: una instalación nueva tiene que quedar operable.
+    `pdv_demo` y `e2e` dejan de duplicarlo.
+  - El diálogo de cobro **bloquea** «Agregar» y «Confirmar pago» sin medio
+    elegido, y dice que no llegó ninguno en vez de dejar mandar el vacío.
+  - La aritmética del cobro sale del JSX a `frontend/lib/cobro.ts`
+    (`calcularCobro`, `cobroBloqueado`) con pruebas en `node --test`: el
+    vuelto en efectivo, el bloqueo del exceso en un medio sin cajón, el
+    segundo medio que cubre el faltante y el medio vacío.
+  Pendiente, anotado en `docs/roadmap/deuda/frontend.md`: no existe pantalla
+  para dar de alta medios de pago; el alta sigue siendo por API.
+
+- **El comprobante declaraba la fecha de cuando se envió, no la del cobro**
+  (2026-08-25, ADR-067 §7). `_documento()` ponía `datetime.now(UTC)` como
+  `fecha_Emision`, con dos errores encimados: un comprobante que se quedó en la
+  cola —proveedor caído, worker muerto, `FACTILIZA_TOKEN` sin configurar— y
+  salía al día siguiente le declaraba a SUNAT **una fecha que la venta nunca
+  tuvo**; y `now(UTC)` corría el calendario, porque una venta de las 20:00 en
+  Tarapoto es del día 25 pero en UTC ya es 26 (la misma trampa que documenta
+  `shared.fechas`). Ahora es `comprobante.created_at` leído en `America/Lima`.
+  Salió a la luz al armar el QR: la cadena codifica la fecha de emisión, y con
+  dos fechas distintas el papel y el XML no se pueden contrastar, que es
+  justamente para lo que el fiscalizador escanea el QR.
+
+- **La dirección del delivery nunca llegaba a la pantalla de despacho.**
+  `cola_pantalla` (`src/modules/sales/application/kds.py`) la emitía en el
+  dict de cada pedido —con un comentario explícito de que despacho arma la
+  bolsa mirando esa pantalla—, pero `PedidoColaOut`
+  (`src/modules/sales/api/kds_schemas.py`) no declaraba el campo, así que
+  pydantic lo descartaba al serializar `GET /kds/pantallas/{id}/cola` y el
+  navegador nunca lo veía. Mismo fallo que `ItemColaOut.valores` (ADR-067):
+  dato emitido y schema que no lo declara. `PedidoColaOut` gana
+  `direccion_entrega: str | None`, el tipo `PedidoCola` de
+  `frontend/lib/kds.ts` lo espeja y la tarjeta de despacho
+  (`frontend/app/kds/despacho-cliente.tsx`) lo muestra solo cuando la
+  modalidad es `delivery`. Cubierto por
+  `test_despacho_ve_la_direccion_del_delivery` en `tests/test_kds.py`, y el
+  contrato en `docs/architecture/openapi.json` quedó regenerado.
+
+- **Las mitades de una MitadXMitad nunca llegaban a ninguna pantalla del
+  KDS.** `_valores_por_item` (`src/modules/sales/application/kds.py`) las
+  resolvía a `"Mitad 1: Americana"` y `_item_a_dict` las emitía, pero
+  `ItemColaOut` (`src/modules/sales/api/kds_schemas.py`) no declaraba el
+  campo, así que pydantic las descartaba al serializar la cola; y encima la
+  rama de **preparación** de `_items_de_pantalla` ni siquiera se las pasaba,
+  con lo cual el bug tenía dos capas. Salían en la comanda impresa y en
+  ningún otro lado: un pizzero que trabajara solo con la pantalla veía
+  "1 Pizza MitadXMitad" sin saber de qué mitades era, que es lo único que
+  hay que saber de ese plato (ADR-056). `ItemColaOut` gana
+  `valores: list[str]`, el tipo `ItemCola` de `frontend/lib/kds.ts` lo
+  espeja y `frontend/app/kds/nombre-linea.tsx` lo dibuja delante de extras y
+  restas —mismo orden que el papel, porque los valores dicen QUÉ es el plato
+  y lo demás solo lo modifica—.
+- **Un campo que el KDS calcula y el schema no declara ahora rompe el CI.**
+  Es la tercera vez que pasa lo mismo: `tipo`/`consumo_motivo` (ADR-044),
+  después `direccion_entrega` y ahora `valores`. FastAPI filtra el campo al
+  serializar sin error, sin warning y sin nada en la pantalla, así que el
+  fallo solo se descubre en el local. `test_el_response_model_no_se_come_ningun_campo_de_la_cola`
+  (`tests/test_kds.py`) compara las claves que `cola_pantalla`,
+  `_item_a_dict`, `avance_venta` y `comanda` construyen contra los campos
+  que sus schemas declaran, así que el próximo campo huérfano falla en el
+  commit que lo agrega, sea cual sea. El contrato en
+  `docs/architecture/openapi.json` quedó regenerado.
+
+- **La venta que el hub tomó durante un corte llegaba a la nube sin sus restas
+  ni sus valores de variante** (ADR-009). El lote sí las llevaba —
+  `_items_a_dict` emite `sin_articulo_ids` y `valores_variante_ids` por línea,
+  y `VentaItemSyncIn` las declara —, pero al reproducirla `_crear`
+  (`src/modules/sales/application/sincronizacion.py`) armaba el ítem sin esas
+  dos claves y `crear_venta` las leía como ausentes. Consecuencia: la nube
+  descontaba el insumo que el plato no llevó (una "sin cebolla" quedaba
+  cobrada pero no restada, RN-PRD-004) y una receta condicionada (ADR-056) no
+  activaba ninguna línea, así que la mitad-y-mitad se descontaba mal. Las dos
+  claves se pasan ahora con `it.get(...) or []`, porque los lotes emitidos
+  antes de RN-PRD-004 / ADR-055 no las traen. No se revalidan contra receta ni
+  catálogo: el replay entra con `numero_orden`, es decir `exigir_opciones=
+  False`, y esa venta ya se preparó y se cobró. Prueba nueva en
+  `tests/test_sync_motor.py`: un lote con resta y valor conserva ambos en la
+  fila de la nube, y el stock replicado respeta la resta.
+- **Lo mismo en los extras del ítem**, que el replay también rearmaba sin
+  esas dos claves. Para poder pasarlas hizo falta propagar
+  `exigir_opciones` hasta `_armar_extras` (`ventas.py`), que hasta ahora
+  revalidaba el extra siempre. De paso se arregla un rechazo que ya
+  existía: si alguien desvinculaba un extra, le bajaba el tope o le quitaba
+  `es_extra` durante el corte, la nube rechazaba la venta entera —
+  `"Pizza Clásica no admite el extra ..."` — pese a que la sucursal ya la
+  había preparado y cobrado. Esas tres comprobaciones ahora corren solo con
+  `exigir_opciones=True`, igual que los grupos (RN-COM-023) y los atributos
+  (RN-COM-040), que ya se exceptuaban. Prueba nueva: el extra conserva su
+  resta y la venta se reproduce aunque el vínculo ya no exista en la nube.
+
 ## [0.7.5] - 2026-08-26
 
 ### Fixed

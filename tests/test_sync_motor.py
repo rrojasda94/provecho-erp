@@ -41,6 +41,8 @@ from src.modules.inventory.infrastructure.models import (
     TransferenciaItem,
     UnidadMedida,
 )
+from src.modules.sales.application import atributos as atributos_uc
+from src.modules.sales.application import catalogo as catalogo_uc
 from src.modules.sales.application import sincronizacion as sales_sync
 from src.modules.sales.application import ventas as ventas_uc
 from src.modules.sales.infrastructure.models import (
@@ -53,6 +55,7 @@ from src.modules.sales.infrastructure.models import (
     Venta,
     VentaItem,
 )
+from src.modules.sales.infrastructure.repositories import ProductoComercialRepo
 from src.modules.users.api.deps import get_db
 from src.modules.users.infrastructure.models import (
     Almacen,
@@ -132,11 +135,12 @@ def _poblar_nube(Session) -> dict:
             id_interno="P001", marca_id=marca.id, nombre="Pizza Clásica",
             receta_id=receta.id,
         )
-        medio = MedioPago(
-            empresa_id=empresa.id, nombre="Efectivo", direccion="cobro",
-            tipo="efectivo",
+        # El efectivo lo siembra `seed`: cobrar sin ningún medio de pago no
+        # es un escenario posible ni en la nube ni en el hub.
+        medio = s.scalar(
+            select(MedioPago).where(MedioPago.tipo == "efectivo")
         )
-        s.add_all([producto, medio])
+        s.add(producto)
         s.flush()
         # El precio lo fija el servidor (RN-PRC-003): el hub necesita la
         # lista replicada para poder cotizar durante el corte.
@@ -317,7 +321,9 @@ def test_carga_inicial_replica_catalogo_stock_y_rbac(entorno):
 
     with entorno.HubSession() as s:
         assert s.scalar(select(func.count()).select_from(ProductoComercial)) == 1
-        assert s.scalar(select(func.count()).select_from(MedioPago)) == 1
+        with entorno.NubeSession() as nube:
+            medios = nube.scalar(select(func.count()).select_from(MedioPago))
+        assert s.scalar(select(func.count()).select_from(MedioPago)) == medios
         assert s.scalar(select(func.count()).select_from(PuntoVenta)) == 1
         assert s.scalar(select(func.count()).select_from(RecetaItem)) == 1
         # Sin lista de precios el hub no puede cotizar una venta offline.
@@ -588,6 +594,136 @@ def test_consumo_de_personal_offline_llega_a_la_nube_como_consumo(entorno):
         assert replicada.consumo_motivo == "feriado"
         assert replicada.consumo_autorizado_por == entorno.ids["cajero_id"]
         assert replicada.total == Decimal(0)
+
+
+def _catalogo_de_opciones(entorno) -> dict:
+    """Un extra vinculado a la pizza y un atributo ofrecido, creados **en la
+    nube** para que el hub los replique en el primer ciclo — igual que en
+    producción: el catálogo se arma arriba y baja al local."""
+    ids = entorno.ids
+    with entorno.NubeSession() as s:
+        harina_id = s.scalar(select(Sku)).articulo_id
+        receta = Receta(
+            empresa_id=ids["empresa_id"], nombre="Queso extra",
+            rendimiento_cantidad=Decimal(1),
+            rendimiento_unidad_medida_id=s.scalar(select(UnidadMedida)).id,
+        )
+        s.add(receta)
+        s.flush()
+        s.add(RecetaItem(receta_id=receta.id, articulo_id=harina_id,
+                         cantidad=Decimal("0.10")))
+        extra = catalogo_uc.crear_producto(
+            s, id_interno="P002", marca_id=ids["marca_id"], nombre="Queso Extra",
+            receta_id=receta.id, es_extra=True,
+        )
+        catalogo_uc.vincular_extra(
+            s, producto_id=ids["producto_id"], extra_id=extra.id
+        )
+        atributo = atributos_uc.crear_atributo(
+            s, empresa_id=ids["empresa_id"], nombre="Mitad"
+        )
+        atributos_uc.agregar_valor(s, atributo.id, nombre="Hawaiana")
+        linea = atributos_uc.ofrecer_atributo(
+            s, producto_id=ids["producto_id"], atributo_id=atributo.id
+        )
+        ptav, = atributos_uc.ptav_de_linea(s, linea.id)
+        s.commit()
+        return {"extra_id": extra.id, "ptav_id": ptav.id, "harina_id": harina_id}
+
+
+def test_las_restas_y_los_valores_de_la_linea_viajan_a_la_nube(entorno):
+    """Sin ellos la nube descontaría la cebolla que el plato no llevó y una
+    receta condicionada (ADR-056) no activaría ninguna línea: la
+    mitad-y-mitad se descontaría mal."""
+    cat = _catalogo_de_opciones(entorno)
+    entorno.ciclo()
+    with entorno.listeners_en("hub"), entorno.HubSession() as s:
+        venta = ventas_uc.crear_venta(
+            s,
+            sucursal_id=entorno.ids["sucursal_id"],
+            punto_venta_id=entorno.ids["pv_id"],
+            canal="pdv", modalidad="takeout",
+            usuario_id=entorno.ids["cajero_id"],
+            idempotency_key="venta-con-restas",
+            items=[{
+                "producto_comercial_id": entorno.ids["producto_id"],
+                "cantidad": Decimal("2"),
+                "precio_unitario": Decimal("25.00"),
+                "sin_articulo_ids": [cat["harina_id"]],
+                "valores_variante_ids": [cat["ptav_id"]],
+            }],
+        )
+        s.commit()
+        venta_id = venta.id
+    # La resta es del único insumo de la receta: el hub no descontó nada.
+    assert _stock(entorno.HubSession, entorno.ids["almacen_id"]) == Decimal("10")
+
+    resumen = entorno.ciclo()
+    assert resumen["push"]["errores"] == []
+
+    with entorno.NubeSession() as s:
+        fila = s.scalar(select(VentaItem).where(VentaItem.venta_id == venta_id))
+        assert fila.sin_articulo_ids == [str(cat["harina_id"])]
+        assert fila.valores_variante_ids == [str(cat["ptav_id"])]
+    # Y el consumo replicado respeta la resta: la nube tampoco descuenta.
+    assert _stock(entorno.NubeSession, entorno.ids["almacen_id"]) == Decimal("10")
+
+
+def test_las_restas_del_extra_tambien_viajan_aunque_se_desvincule(entorno):
+    """El extra es una línea como cualquier otra: sus restas viajan igual.
+
+    Y el vínculo que la sucursal usó puede haberse desarmado en la nube
+    durante el corte (acá se borra a propósito): rechazar el replay por eso
+    perdería una venta ya cobrada (ADR-009)."""
+    cat = _catalogo_de_opciones(entorno)
+    entorno.ciclo()
+    with entorno.listeners_en("hub"), entorno.HubSession() as s:
+        venta = ventas_uc.crear_venta(
+            s,
+            sucursal_id=entorno.ids["sucursal_id"],
+            punto_venta_id=entorno.ids["pv_id"],
+            canal="pdv", modalidad="takeout",
+            usuario_id=entorno.ids["cajero_id"],
+            idempotency_key="venta-con-extra",
+            items=[{
+                "producto_comercial_id": entorno.ids["producto_id"],
+                "cantidad": Decimal("2"),
+                "precio_unitario": Decimal("25.00"),
+                "valores_variante_ids": [cat["ptav_id"]],
+                "extras": [{
+                    "producto_comercial_id": cat["extra_id"],
+                    "cantidad": Decimal("1"),
+                    "precio_unitario": Decimal("3.00"),
+                    "sin_articulo_ids": [cat["harina_id"]],
+                }],
+            }],
+        )
+        s.commit()
+        venta_id = venta.id
+    # Solo descontó la pizza (2 × 0.25): el extra viene "sin" su único insumo.
+    assert _stock(entorno.HubSession, entorno.ids["almacen_id"]) == Decimal("9.5")
+
+    with entorno.NubeSession() as s:
+        repo = ProductoComercialRepo(s)
+        repo.borrar_vinculo_extra(
+            repo.admite_extra(entorno.ids["producto_id"], cat["extra_id"])
+        )
+        s.commit()
+
+    resumen = entorno.ciclo()
+    assert resumen["push"]["errores"] == []
+
+    with entorno.NubeSession() as s:
+        hijo = s.scalar(
+            select(VentaItem).where(
+                VentaItem.venta_id == venta_id,
+                VentaItem.padre_venta_item_id.isnot(None),
+            )
+        )
+        assert hijo.producto_comercial_id == cat["extra_id"]
+        assert hijo.sin_articulo_ids == [str(cat["harina_id"])]
+    # Si la resta del extra se perdiera, la nube habría descontado 0.2 de más.
+    assert _stock(entorno.NubeSession, entorno.ids["almacen_id"]) == Decimal("9.5")
 
 
 def test_una_venta_rechazada_no_arrastra_al_resto_ni_avanza_la_marca(entorno):

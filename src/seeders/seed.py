@@ -24,7 +24,7 @@ from src.modules.reports.infrastructure.models import (
     ReglaDestinatario,
     ReglaDistribucion,
 )
-from src.modules.sales.infrastructure.models import PromocionCupon
+from src.modules.sales.infrastructure.models import MedioPago, PromocionCupon
 from src.modules.users.infrastructure.models import (
     Almacen,
     Empresa,
@@ -749,6 +749,33 @@ ENCUESTA_PREGUNTAS = [
 ]
 
 
+#: Con qué se cobra desde el primer arranque (RN-MDP-002). Los tres que se
+#: usan en un local peruano; el resto se da de alta desde el catálogo.
+MEDIOS_PAGO = [
+    ("Efectivo", "efectivo"),
+    ("Yape", "billetera_digital"),
+    ("Tarjeta", "tarjeta_debito"),
+]
+
+
+def _seed_medios_pago(session: Session) -> None:
+    """Sin un medio de pago no se puede cobrar: el PDV no ofrece ninguno y
+    el cobro sale sin `medio_pago_id`. Misma razón que `usuario_sucursal`
+    —una instalación nueva tiene que quedar operable— y por eso va acá y no
+    en un seeder de demo: `docker-compose.staging.yml` corre solo éste.
+
+    Por empresa, porque el catálogo lo es (cada una pacta su pasarela)."""
+    for empresa in session.scalars(select(Empresa)):
+        for nombre, tipo in MEDIOS_PAGO:
+            _get_or_create(
+                session,
+                MedioPago,
+                empresa_id=empresa.id,
+                nombre=nombre,
+                defaults=dict(direccion="cobro", tipo=tipo),
+            )
+
+
 def _seed_encuesta(session: Session, creado_por) -> None:
     """Plantilla de encuesta activa por empresa. Sin una activa, `POST
     /marketing/encuestas` responde 409 y el módulo llega inutilizable a la
@@ -857,6 +884,7 @@ def seed(session: Session) -> None:
 
     admin = usuarios["admin"]
 
+    _seed_medios_pago(session)
     _seed_encuesta(session, admin.id)
     _seed_distribucion(session, roles)
     _seed_promocion_cupon(session)

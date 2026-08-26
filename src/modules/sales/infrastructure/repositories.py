@@ -795,10 +795,23 @@ class MedioPagoRepo:
     def get(self, medio_pago_id: uuid.UUID) -> MedioPago | None:
         return self.s.get(MedioPago, medio_pago_id)
 
-    def list(self, empresa_id: uuid.UUID | None = None) -> list[MedioPago]:
-        q = select(MedioPago).where(MedioPago.activo.is_(True))
+    def list(
+        self,
+        empresa_id: uuid.UUID | None = None,
+        direccion: str | None = None,
+        incluir_inactivos: bool = False,
+    ) -> list[MedioPago]:
+        """`direccion` incluye siempre los de `ambos`: son los mismos.
+
+        `incluir_inactivos` es para la pantalla que los administra —tiene
+        que poder reactivar lo que apagó—; quien cobra ve solo los vivos."""
+        q = select(MedioPago).order_by(MedioPago.nombre)
+        if not incluir_inactivos:
+            q = q.where(MedioPago.activo.is_(True))
         if empresa_id is not None:
             q = q.where(MedioPago.empresa_id == empresa_id)
+        if direccion is not None:
+            q = q.where(MedioPago.direccion.in_((direccion, "ambos")))
         return list(self.s.scalars(q))
 
     def add(self, medio: MedioPago) -> MedioPago:

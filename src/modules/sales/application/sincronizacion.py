@@ -516,6 +516,11 @@ def _crear(session: Session, datos: dict) -> None:
                 # Los lotes emitidos antes del cobro dividido no traen la
                 # clave: esa venta tenía una sola cuenta.
                 "grupo_cobro": it.get("grupo_cobro", 1),
+                # Sin ellas inventory descontaría lo que la línea no llevó y
+                # una receta condicionada (ADR-056) no activaría ninguna
+                # línea. Los lotes viejos no traen las claves.
+                "sin_articulo_ids": it.get("sin_articulo_ids") or [],
+                "valores_variante_ids": it.get("valores_variante_ids") or [],
                 "extras": [
                     {
                         "producto_comercial_id": uuid.UUID(
@@ -524,6 +529,10 @@ def _crear(session: Session, datos: dict) -> None:
                         "cantidad": Decimal(ex["cantidad"]),
                         "precio_unitario": Decimal(ex["precio_unitario"]),
                         "descuento": Decimal(ex.get("descuento") or 0),
+                        "sin_articulo_ids": ex.get("sin_articulo_ids") or [],
+                        "valores_variante_ids": (
+                            ex.get("valores_variante_ids") or []
+                        ),
                     }
                     for ex in it.get("extras") or []
                 ],
