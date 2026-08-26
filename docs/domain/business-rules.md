@@ -1539,6 +1539,14 @@ producción se hace en cocinas de sucursal. Ver
   de las cuentas sigue dando el total de la venta. La
   tarifa con la que se calcula la fija Gerencia (ADR-068); el monto se
   congela en la fila al tomar la orden y no se recotiza.
+- **RN-COM-042** El reparto se cobra en **múltiplos de S/ 0.50**, redondeando
+  **por cercanía** (8.71 → 8.50; 8.76 → 9.00; el empate exacto en x.25 y x.75
+  sube). Base más kilómetros produce números como S/ 8.71 que el repartidor no
+  puede dar de vuelto: el cajero los redondea de cabeza y el ticket deja de
+  decir lo que se cobró. Aplica al **monto cobrado**, nunca a la distancia
+  medida —esa sigue en dos decimales, son kilómetros y no plata—. Consecuencia
+  aceptada: una tarifa que dé menos de S/ 0.25 cobra cero; para eso la tarifa
+  está mal configurada, no el redondeo.
 
 ## Cumplimiento de pedido
 
@@ -1549,10 +1557,22 @@ preparación, despacho y entrega en las tres modalidades.
 - **RN-CUP-001** El cumplimiento arranca con la venta ya confirmada: el
   KDS muestra la Orden de Pedido, nunca el Carrito (RN-CAR-002 decide si
   el pedido llega antes o después del pago, según el punto de venta).
-- **RN-CUP-002** El avance de un ítem es estrictamente secuencial y sin
-  retroceso: `pendiente → en_preparacion → listo → entregado`. No se
-  salta ni se revierte un estado; una corrección se registra como
-  incidencia, no reescribiendo el avance.
+- **RN-CUP-002** El avance de un ítem es estrictamente secuencial y **de a un
+  paso**: `pendiente → en_preparacion → listo → entregado`. No se salta un
+  estado. *Enmendada el 2026-08-26 — antes decía «sin retroceso», y remitía
+  las correcciones a una incidencia que nunca se construyó*: en una pantalla
+  que se opera de pie y con las manos ocupadas, el toque equivocado es parte
+  de la operación normal, no una excepción a documentar aparte. Deshacer es
+  ahora **un paso, explícito y por su propia puerta**
+  (`POST /kds/items/{id}/retroceder`): deshace lo último que se hizo, nunca
+  salta a un estado arbitrario, y no se accede por la ruta de avanzar. Salir
+  de `entregado` no es un acto de cocina y tiene su propia regla
+  (RN-CUP-006).
+- **RN-CUP-002-b** Un toque sobre la línea la mueve **un** paso. Encadenar
+  `pendiente → listo` en un solo toque hacía que un roce accidental
+  despachara un plato que nadie había empezado; con dos toques el error
+  necesita dos. El atajo «Todo listo» sobre la tarjeta completa sigue
+  existiendo: ahí la intención es explícita.
 - **RN-CUP-003** El estado de preparación es único por ítem de venta y es
   la fuente de verdad del avance. Una pantalla KDS es un filtro sobre ese
   estado, nunca una copia — dos pantallas jamás muestran avances distintos
@@ -1565,6 +1585,12 @@ preparación, despacho y entrega en las tres modalidades.
   repetirla no vuelve a emitir el evento ni duplica efectos.
 - **RN-CUP-006** La entrega la registra un trabajador con permiso de
   entrega, distinto del avance de cocina, y queda auditada (quién, cuándo).
+  **Deshacerla usa ese mismo permiso** (2026-08-26,
+  `POST /sales/ventas/{id}/deshacer-entrega`): quien puede dar un pedido por
+  entregado es exactamente quien tiene que poder corregirse cuando tocó la
+  tarjeta de al lado. Deshacer devuelve los ítems a `listo`, es un no-op si
+  el pedido no estaba entregado, y **no consulta el comprobante**: el
+  comprobante se emite al cobrar y no dice nada sobre si la bolsa salió.
 - **RN-CUP-007** En delivery se registra siempre quién entrega:
   repartidor propio o repartidor de plataforma externa — este último sin
   vínculo laboral ni gestión como recurso propio (RN-PER-003).

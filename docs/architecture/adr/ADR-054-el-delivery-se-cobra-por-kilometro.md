@@ -155,3 +155,31 @@ solo.
   las lleva.
 - Con las claves vacías todo esto queda inerte: distancia aproximada, costo
   cero, nada que derivar.
+
+## Addendum 2026-08-26 — el cobro se redondea al medio sol (RN-COM-042)
+
+Base más precio por kilómetro produce el monto exacto, y el monto exacto es
+incómodo: S/ 8.71, S/ 8.89. El repartidor no lleva monedas de un céntimo, el
+cajero redondea de cabeza y a partir de ahí el ticket dice una cosa y la caja
+tiene otra.
+
+`costo_de` redondea ahora **por cercanía al múltiplo de S/ 0.50**
+(`ROUND_HALF_UP` sobre medios soles, no el `ROUND_HALF_EVEN` que `decimal`
+trae por defecto: el bancario es correcto pero impredecible para quien mira
+un ticket, y sobre medio sol el empate caería a veces para arriba y a veces
+para abajo sin que nadie entienda por qué).
+
+Dos precisiones:
+
+- Se redondea **el monto, no la distancia**. `distancia_entrega_km` sigue en
+  dos decimales: es una medición, y redondearla al medio kilómetro cambiaría
+  el cobro por un motivo que no tiene que ver con la plata.
+- Se redondea **en las cuatro salidas**, no solo en la que mide. Las tres
+  ramas «sin distancia» (sucursal sin anclar, dirección a mano, zona
+  restringida) devolvían `tarifa.base` crudo, sin pasar siquiera por
+  `quantize`: una base mal tecleada en Gerencia como `3.456` llegaba tal cual
+  al ticket. Ahora las cuatro pasan por `costo_de`.
+
+Consecuencia aceptada: una tarifa que dé menos de S/ 0.25 termina cobrando
+cero. Es la tarifa la que está mal configurada, no el redondeo, y agregar un
+piso mínimo sería una regla nueva para un caso que no existe.

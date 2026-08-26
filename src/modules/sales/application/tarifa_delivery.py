@@ -31,7 +31,7 @@ import math
 import unicodedata
 import uuid
 from dataclasses import dataclass
-from decimal import Decimal, InvalidOperation
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from functools import lru_cache
 from typing import Any
 
@@ -50,6 +50,12 @@ RADIO_TIERRA_KM = 6371.0
 # son bastante regulares, en un cerro sería más. Se ajusta comparando unas
 # cuantas cotizaciones aproximadas contra las reales de Google.
 FACTOR_CALLE = Decimal("1.3")
+# El reparto se cobra en múltiplos de medio sol. Base más kilómetros da
+# números como S/ 8.71 o S/ 8.89 —correctos y molestos—: el repartidor
+# devuelve vuelto en monedas de a diez céntimos, el cajero lo redondea de
+# cabeza y el ticket deja de coincidir con lo que se cobró. Medio sol es la
+# moneda más chica que circula de verdad en el vuelto de un delivery.
+MEDIO_SOL = Decimal("0.50")
 
 MOTIVO_FUERA_DE_RADIO = "fuera_de_radio"
 MOTIVO_ZONA_RESTRINGIDA = "zona_restringida"
@@ -169,13 +175,31 @@ def linea_recta_km(origen: Coordenada, destino: Coordenada) -> Decimal:
     return (recta * FACTOR_CALLE).quantize(Decimal("0.01"))
 
 
+def al_medio_sol(monto: Decimal) -> Decimal:
+    """Redondeo **por cercanía** al múltiplo de S/ 0.50 más próximo (RN-COM-042).
+
+    8.71 → 8.50, 8.76 → 9.00. El empate exacto (x.25, x.75) sube, que es lo
+    que hace `ROUND_HALF_UP`: entre regalar un cuarto de sol de reparto y
+    cobrarlo, se cobra —y además es el redondeo que la gente espera, a
+    diferencia del bancario que trae `decimal` por defecto y que en medio sol
+    sería impredecible para quien mira el ticket—.
+
+    Cero se queda en cero: con la tarifa de fábrica el delivery no cobra.
+    """
+    return (monto / MEDIO_SOL).quantize(Decimal("1"), rounding=ROUND_HALF_UP) * MEDIO_SOL
+
+
 def costo_de(distancia: Decimal | None, tarifa: Tarifa) -> Decimal:
-    """Tarifa base más el tramo por kilómetro. Con la configuración en cero
-    —el estado de fábrica— devuelve cero y el delivery se sigue cobrando como
-    antes de todo esto."""
+    """Tarifa base más el tramo por kilómetro, redondeado al medio sol. Con la
+    configuración en cero —el estado de fábrica— devuelve cero y el delivery
+    se sigue cobrando como antes de todo esto.
+
+    Se redondea también la rama sin distancia: una base de S/ 3.456 mal
+    tecleada en Gerencia salía tal cual, sin siquiera cuantizar a céntimos.
+    """
     if distancia is None:
-        return tarifa.base
-    return (tarifa.base + tarifa.por_km * distancia).quantize(Decimal("0.01"))
+        return al_medio_sol(tarifa.base)
+    return al_medio_sol(tarifa.base + tarifa.por_km * distancia)
 
 
 # 5 decimales ~ 1 m: dos pedidos a la misma puerta comparten entrada. Sin
@@ -259,19 +283,19 @@ def cotizar(
         # se sabe.
         return Cotizacion(
             distancia_km=None,
-            costo=tarifa.base,
+            costo=costo_de(None, tarifa),
             aproximada=False,
             derivar_a_externo=True,
             motivo=MOTIVO_ZONA_RESTRINGIDA,
         )
     if origen is None or destino is None:
-        return Cotizacion(None, tarifa.base, False, False)
+        return Cotizacion(None, costo_de(None, tarifa), False, False)
 
     distancia, aproximada = _medir(origen, destino)
     if distancia is None:
         return Cotizacion(
             distancia_km=None,
-            costo=tarifa.base,
+            costo=costo_de(None, tarifa),
             aproximada=False,
             derivar_a_externo=True,
             motivo=MOTIVO_FUERA_DE_RADIO,

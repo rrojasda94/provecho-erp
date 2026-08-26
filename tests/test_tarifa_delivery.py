@@ -18,6 +18,7 @@ from src.modules.sales.application.tarifa_delivery import (
     MOTIVO_FUERA_DE_RADIO,
     MOTIVO_ZONA_RESTRINGIDA,
     Cotizacion,
+    al_medio_sol,
     cotizar,
     linea_recta_km,
 )
@@ -62,6 +63,44 @@ def test_cobra_base_mas_kilometro(monkeypatch):
     assert c.costo == Decimal("9.00")
     assert c.aproximada is False
     assert c.derivar_a_externo is False
+
+
+@pytest.mark.parametrize(
+    ("crudo", "cobrado"),
+    [
+        ("8.71", "8.50"),   # baja: está más cerca de 8.50
+        ("8.76", "9.00"),   # sube: está más cerca de 9.00
+        ("8.25", "8.50"),   # empate exacto: sube
+        ("8.75", "9.00"),   # el otro empate
+        ("9.00", "9.00"),   # ya es múltiplo, no se toca
+        ("0", "0.00"),      # tarifa apagada
+        ("3.456", "3.50"),  # un parámetro mal tecleado en Gerencia
+    ],
+)
+def test_el_reparto_se_cobra_en_medios_soles(crudo, cobrado):
+    """Por cercanía, no siempre para arriba: base + kilómetros da números como
+    S/ 8.71 que el repartidor no puede dar de vuelto y el cajero redondea de
+    cabeza —con lo que el ticket deja de decir lo que se cobró—."""
+    assert al_medio_sol(Decimal(crudo)) == Decimal(cobrado)
+
+
+def test_el_cobro_redondeado_nunca_trae_centimos(monkeypatch):
+    """El camino completo, no solo el helper: 3 de base + 3,81 km × 1,50 son
+    S/ 8.715, y lo que se cobra es S/ 8.50."""
+    _google_dice(monkeypatch, "3.81")
+    c = cotizar(PLAZA, AEROPUERTO)
+    assert c.costo == Decimal("8.50")
+    assert c.costo % Decimal("0.50") == 0
+    # La distancia **no** se redondea: son kilómetros, no plata.
+    assert c.distancia_km == Decimal("3.81")
+
+
+def test_la_base_sola_tambien_se_redondea(monkeypatch):
+    """La rama sin distancia no cuantizaba siquiera a céntimos: una base de
+    S/ 3.456 aprobada por error salía tal cual hasta el ticket."""
+    monkeypatch.setattr(settings, "delivery_tarifa_base", Decimal("3.456"))
+    _google_dice(monkeypatch, "4.00")
+    assert cotizar(None, AEROPUERTO).costo == Decimal("3.50")
 
 
 def test_la_configuracion_en_cero_no_cobra_nada(monkeypatch):

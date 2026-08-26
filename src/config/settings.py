@@ -112,6 +112,11 @@ class Settings(BaseSettings):
     # no debería apagar el buscador de DNI del mostrador.
     factiliza_consulta_documento_token: str = ""
     factiliza_timeout_segundos: float = 30.0
+    # La consulta de documento se espera con un cajero mirando la pantalla y
+    # el botón deshabilitado: medio minuto ahí es un cuelgue. La emisión sí
+    # puede tardar (SUNAT de por medio) y corre en cola, por eso van
+    # separados.
+    factiliza_consulta_timeout_segundos: float = 8.0
     igv_porcentaje: Decimal = Decimal("18")
     # --- WhatsApp Cloud API (Meta) — encuesta de satisfacción ---------------
     whatsapp_base_url: str = "https://graph.facebook.com/v21.0"

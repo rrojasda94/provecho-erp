@@ -177,6 +177,7 @@ RUC de la empresa.
 | GET/PATCH | `/api/v1/sucursales/{id}` | Ver / editar. **Cerrar es `estado="inactiva"`, no hay DELETE**: la sucursal sigue siendo el ancla de sus ventas, cajas y trabajadores |
 | POST | `/api/v1/almacenes` | Crear almacén |
 | GET/PATCH/DELETE | `/api/v1/almacenes/{id}` | Ver / editar / baja lógica (409 si otros almacenes se abastecen de este) |
+| POST | `/api/v1/almacenes/{id}/reactivar` | Deshace la baja. Idempotente |
 
 Reglas que el seeder daba por buenas porque las tipeaba a mano y ahora
 valida la API:
@@ -194,7 +195,10 @@ valida la API:
 - La **baja es lógica** (`deleted_at`) y se niega con dependientes vivos.
   `DELETE /almacenes/{id}` **no mira el stock**: vive en `inventory` y
   `users` no importa el dominio de otro módulo. Anotado en ROADMAP → Deuda
-  técnica.
+  técnica. Justamente porque no lo mira, la baja **tiene vuelta**:
+  `POST /almacenes/{id}/reactivar` (2026-08-26), idempotente. Sin ella
+  equivocarse era definitivo —los repos filtran `deleted_at`, así que el
+  almacén desaparecía de toda la interfaz—.
 - En los `PATCH`, un campo ausente o `null` significa "no tocar": no hay
   forma de vaciar un opcional desde el PATCH.
 
@@ -208,7 +212,7 @@ sucursales justamente para que el resto del ERP le funcione. Quien tiene
 
 | Método | Ruta | Acción |
 |--------|------|--------|
-| GET | `/api/v1/almacenes` | Lista de referencia (nombre/tipo), escopada por tenant — sin `require_permission`: no es dato sensible, lo necesita cualquiera que elija un destino (ej. `purchases` al crear una OC) |
+| GET | `/api/v1/almacenes` | Lista de referencia (nombre/tipo), escopada por tenant — sin `require_permission`: no es dato sensible, lo necesita cualquiera que elija un destino (ej. `purchases` al crear una OC). `?incluir_baja=true` suma los dados de baja y **sí** exige `organizacion.gestionar`: un almacén de baja en un `<select>` termina recibiendo una orden de compra |
 | GET | `/api/v1/marcas`, `/api/v1/sucursales` | Mismo criterio: catálogo de apoyo para llenar un `<select>` |
 
 ### Divisas (RN-GER-010) — lectura abierta, escritura de Gerencia

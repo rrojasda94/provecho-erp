@@ -384,6 +384,75 @@ def test_documento_no_encontrado_no_es_error(api, monkeypatch):
     assert r.json()["encontrado"] is False
 
 
+def test_una_cuenta_impaga_es_502_y_no_documento_inexistente(api, monkeypatch, caplog):
+    """El fallo que estuvo en producción hasta el 2026-08-26.
+
+    Factiliza responde **405** con `success: false` cuando la cuenta de
+    consultas está impaga. Ese código no era 404, ni 401/403, ni >= 500, así
+    que el cuerpo se parseaba como si fuera bueno, `success: false` salía
+    como `encontrado: false` y el cajero leía «Ese DNI no figura» para todos
+    los documentos del mundo. Un problema de facturación disfrazado de RENIEC
+    vacío es un problema que nadie va a ir a buscar donde está.
+    """
+    impaga = {
+        "status": 405,
+        "success": False,
+        "message": "Token con falta de pago, comunicate con soporte",
+        "plan": 0,
+    }
+    monkeypatch.setattr(
+        httpx, "get", lambda *a, **k: _RespuestaFalsa(405, "x", impaga)
+    )
+    with caplog.at_level("WARNING"):
+        r = api.get(
+            "/api/v1/consulta/dni/73632127", headers=_tok(api, "compras1", "654321")
+        )
+    assert r.status_code == 502, r.text
+    # El motivo real queda en el log del servidor...
+    assert "falta de pago" in caplog.text
+    # ...y no en la pantalla del cajero, que solo necesita saber que teclee.
+    assert "falta de pago" not in r.text
+    assert "Completa los datos a mano" in r.json()["detail"]
+
+
+def test_un_doscientos_que_dice_que_no_atendio_tampoco_es_un_resultado(monkeypatch):
+    """`success: false` con 200 es el proveedor diciendo que no hizo la
+    consulta. Tratarlo como "no encontrado" borra la diferencia entre «esta
+    persona no existe» y «no te contesté»."""
+    monkeypatch.setattr(
+        httpx,
+        "get",
+        lambda *a, **k: _RespuestaFalsa(200, "x", {"success": False, "message": "nope"}),
+    )
+    with pytest.raises(FactilizaError, match="nope"):
+        FactilizaClient(token="t").consultar_dni("73632127")
+
+
+def test_un_error_sin_mensaje_igual_dice_el_codigo(monkeypatch):
+    """429, 402 y compañía: ninguno estaba enumerado y todos caían como
+    "no encontrado". Ahora cualquiera >= 400 es fallo del proveedor."""
+    monkeypatch.setattr(httpx, "get", lambda *a, **k: _RespuestaFalsa(429, "x", {}))
+    with pytest.raises(FactilizaError, match="429"):
+        FactilizaClient(token="t").consultar_ruc("20610077782")
+
+
+def test_la_consulta_no_espera_medio_minuto(monkeypatch):
+    """El botón queda deshabilitado mientras espera y hay un cliente en el
+    mostrador. La emisión sí puede tardar —corre en cola—, por eso son dos
+    timeouts distintos y no uno."""
+    visto = {}
+
+    def espiar(url, **kwargs):
+        visto["timeout"] = kwargs["timeout"]
+        return _RespuestaFalsa(404, "")
+
+    monkeypatch.setattr(httpx, "get", espiar)
+    FactilizaClient(token="t").consultar_dni("73632127")
+
+    assert visto["timeout"] == settings.factiliza_consulta_timeout_segundos
+    assert visto["timeout"] < settings.factiliza_timeout_segundos
+
+
 # --- Cuota (rate limit propio) ----------------------------------------------
 # Lo que se cuida no es el abuso sino el **gasto**: cada consulta vale una
 # llamada a un proveedor pago, así que un bucle mal escrito en una pantalla

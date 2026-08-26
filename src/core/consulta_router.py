@@ -14,6 +14,7 @@ servidor al momento de crear.
 Solo lectura: acá no se guarda nada.
 """
 
+import logging
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -23,6 +24,8 @@ from src.config.settings import settings
 from src.core.rate_limit import consumir, ip_de
 from src.modules.users.api.deps import require_permission
 from src.shared.integrations.factiliza import FactilizaClient, FactilizaError
+
+log = logging.getLogger("provecho.app")
 
 router = APIRouter(prefix="/consulta", tags=["consulta"])
 
@@ -95,10 +98,17 @@ class ConsultaEmpresaOut(BaseModel):
 
 def _sin_proveedor(e: FactilizaError) -> HTTPException:
     """502 y no 500: el que falló es un tercero, y la diferencia importa —
-    el 500 manda a revisar este servidor, que está bien."""
+    el 500 manda a revisar este servidor, que está bien.
+
+    El motivo real va al log y **no** al cuerpo de la respuesta: trae nombres
+    de variables de entorno, el WhatsApp de soporte de Factiliza o el estado
+    de la cuenta. Quien lo lee es quien administra el servidor, no el cajero
+    que tiene un cliente esperando —a él le sirve saber que teclee y siga—.
+    """
+    log.warning("consulta de documento fallida: %s", e)
     return HTTPException(
         status.HTTP_502_BAD_GATEWAY,
-        f"No se pudo consultar el documento: {e}",
+        "No se pudo consultar el documento. Completa los datos a mano.",
     )
 
 

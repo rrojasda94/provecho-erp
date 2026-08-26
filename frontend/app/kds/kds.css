@@ -16,6 +16,13 @@
     --kds-verde-tenue: rgba(34, 197, 94, 0.14);
     --kds-ambar: #fbbf24;
 
+    /* Semáforo de espera. Los tres los fija Gerencia por empresa y llegan
+       inline sobre `.kds` (ver `semaforo.tsx`); esto es el respaldo para
+       cuando la configuración no cargó. Son variables y no colores fijos
+       justamente porque cambiarlos no puede pedir un despliegue. */
+    --kds-normal: #22c55e;
+    --kds-rojo: #f87171;
+
     background: var(--kds-bg);
     color: var(--kds-texto);
 }
@@ -292,6 +299,45 @@
     border-top-color: var(--kds-verde);
 }
 
+/* El semáforo del tiempo de espera manda sobre el color del estado: un
+   pedido que lleva media hora tiene que gritar aunque su estado sea el mismo
+   que el de uno recién tomado. Va después de las reglas de estado a propósito
+   —misma especificidad, gana el último—, y un pedido `listo` se queda verde:
+   ese ya no espera por la cocina, espera por quien despacha. */
+.kds-card.nivel-ambar {
+    border-top-color: var(--kds-ambar);
+}
+
+.kds-card.nivel-rojo {
+    border-top-color: var(--kds-rojo);
+}
+
+/* El reloj de la tarjeta. Tabular para que no baile al pasar de 9 a 10 min:
+   una cifra que se mueve sola en una pantalla que se mira de lejos se lee
+   como que algo cambió. */
+.kds-espera {
+    font-variant-numeric: tabular-nums;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--kds-muted);
+}
+
+.kds-espera.ambar {
+    color: var(--kds-ambar);
+}
+
+.kds-espera.rojo {
+    color: var(--kds-rojo);
+}
+
+/* Historial: lo que ya salió. Atenuado y sin color de estado — está acá para
+   consultarse, no para trabajarse, y compitiendo por la vista con la cola
+   sería ruido en una pantalla que se mira de lejos. */
+.kds-card.entregado {
+    border-top-color: var(--kds-borde);
+    opacity: 0.72;
+}
+
 .kds-card header {
     display: flex;
     align-items: baseline;
@@ -357,6 +403,33 @@
     gap: 0.375rem;
     margin: 0;
     padding: 0;
+}
+
+/* Ítem + deshacer en la misma fila. El deshacer es angosto a propósito: se
+   toca a mano, pero no puede competir por el toque con el propio ítem, que es
+   el gesto de todo el turno. */
+.kds-items li {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: stretch;
+    gap: 0.375rem;
+}
+
+.kds-deshacer {
+    display: grid;
+    place-items: center;
+    width: 3rem;
+    border: 1px solid var(--kds-borde);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--kds-muted);
+    font-size: 1.25rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.kds-deshacer:active {
+    transform: scale(0.97);
 }
 
 .kds-item {

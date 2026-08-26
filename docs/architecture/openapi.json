@@ -648,6 +648,11 @@
             ],
             "title": "Almacen Abastecedor Respaldo Id"
           },
+          "de_baja": {
+            "default": false,
+            "title": "De Baja",
+            "type": "boolean"
+          },
           "direccion": {
             "anyOf": [
               {
@@ -15219,6 +15224,18 @@
             ],
             "title": "Orden"
           },
+          "sucursal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sucursal Id"
+          },
           "tipo": {
             "anyOf": [
               {
@@ -15445,6 +15462,11 @@
             ],
             "title": "Consumo Motivo"
           },
+          "creado_en": {
+            "format": "date-time",
+            "title": "Creado En",
+            "type": "string"
+          },
           "direccion_entrega": {
             "anyOf": [
               {
@@ -15503,9 +15525,103 @@
           "modalidad",
           "canal",
           "estado_pedido",
+          "creado_en",
           "items"
         ],
         "title": "PedidoColaOut",
+        "type": "object"
+      },
+      "PedidoHistorialOut": {
+        "description": "Un pedido ya entregado. Lo mismo que en la cola más la hora en que se\ncerró — que es lo que se lee para saber si «este» era el que salió.",
+        "properties": {
+          "canal": {
+            "title": "Canal",
+            "type": "string"
+          },
+          "consumo_motivo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consumo Motivo"
+          },
+          "creado_en": {
+            "format": "date-time",
+            "title": "Creado En",
+            "type": "string"
+          },
+          "direccion_entrega": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direccion Entrega"
+          },
+          "entregado_en": {
+            "format": "date-time",
+            "title": "Entregado En",
+            "type": "string"
+          },
+          "estado_pedido": {
+            "title": "Estado Pedido",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ItemColaOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "modalidad": {
+            "title": "Modalidad",
+            "type": "string"
+          },
+          "numero_orden": {
+            "title": "Numero Orden",
+            "type": "integer"
+          },
+          "referencia_atencion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referencia Atencion"
+          },
+          "tipo": {
+            "default": "venta",
+            "title": "Tipo",
+            "type": "string"
+          },
+          "venta_id": {
+            "title": "Venta Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "venta_id",
+          "numero_orden",
+          "referencia_atencion",
+          "modalidad",
+          "canal",
+          "estado_pedido",
+          "creado_en",
+          "items",
+          "entregado_en"
+        ],
+        "title": "PedidoHistorialOut",
         "type": "object"
       },
       "PeriodoContableCreate": {
@@ -21730,6 +21846,40 @@
           "rol_id"
         ],
         "title": "RolIdIn",
+        "type": "object"
+      },
+      "SemaforoOut": {
+        "description": "Umbrales y colores con los que la pantalla pinta el tiempo de espera.\nSon los **resueltos** —lo que Gerencia aprobó o la semilla del módulo—,\nno el contenido crudo de `parametro_empresa`.",
+        "properties": {
+          "color_ambar": {
+            "title": "Color Ambar",
+            "type": "string"
+          },
+          "color_normal": {
+            "title": "Color Normal",
+            "type": "string"
+          },
+          "color_rojo": {
+            "title": "Color Rojo",
+            "type": "string"
+          },
+          "minutos_ambar": {
+            "title": "Minutos Ambar",
+            "type": "integer"
+          },
+          "minutos_rojo": {
+            "title": "Minutos Rojo",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "minutos_ambar",
+          "minutos_rojo",
+          "color_normal",
+          "color_ambar",
+          "color_rojo"
+        ],
+        "title": "SemaforoOut",
         "type": "object"
       },
       "SkuCreate": {
@@ -28780,7 +28930,7 @@
     },
     "/api/v1/almacenes": {
       "get": {
-        "description": "Lista de referencia (nombre/tipo de almacén, no dato sensible) — abierta\na cualquier usuario autenticado, la necesita cualquiera que tenga que\nelegir un destino (ej. compras crea una OC). Sin `require_permission`\na propósito: no es un recurso a proteger, es un catálogo de apoyo. Sí\nescopada por tenant — un almacén de otra empresa no es \"no sensible\".",
+        "description": "Lista de referencia (nombre/tipo de almacén, no dato sensible) — abierta\na cualquier usuario autenticado, la necesita cualquiera que tenga que\nelegir un destino (ej. compras crea una OC). Sin `require_permission`\na propósito: no es un recurso a proteger, es un catálogo de apoyo. Sí\nescopada por tenant — un almacén de otra empresa no es \"no sensible\".\n\n`incluir_baja` sí exige `organizacion.gestionar`: los selectores del resto\ndel ERP no deben poder ofrecer un almacén dado de baja ni por descuido, y\nquien los ve es solo quien puede reactivarlos.",
         "operationId": "listar_almacenes_api_v1_almacenes_get",
         "parameters": [
           {
@@ -28798,6 +28948,16 @@
                 }
               ],
               "title": "Empresa Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "incluir_baja",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Incluir Baja",
+              "type": "boolean"
             }
           }
         ],
@@ -29021,6 +29181,55 @@
           }
         ],
         "summary": "Editar Almacen",
+        "tags": [
+          "organizacion"
+        ]
+      }
+    },
+    "/api/v1/almacenes/{almacen_id}/reactivar": {
+      "post": {
+        "description": "Deshace la baja. Existe porque la baja no mira el stock: sin vuelta,\nequivocarse sería definitivo y el almacén desaparecería de la interfaz\npara siempre —los repos filtran `deleted_at`—.",
+        "operationId": "reactivar_almacen_api_v1_almacenes__almacen_id__reactivar_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "almacen_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Almacen Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlmacenOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Reactivar Almacen",
         "tags": [
           "organizacion"
         ]
@@ -35131,6 +35340,62 @@
         ]
       }
     },
+    "/api/v1/kds/configuracion": {
+      "get": {
+        "description": "Umbrales y colores del semáforo, ya resueltos.\n\nPermiso de cocina y no de Gerencia: la pantalla necesita **leerlos** para\npintar, aprobarlos es otra cosa (`POST /parametros`). `sucursal_id` es\npara superusuarios sin empresa en el token — el parámetro es por empresa,\nasí que se usa solo para resolver de cuál.",
+        "operationId": "configuracion_api_v1_kds_configuracion_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "sucursal_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sucursal Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SemaforoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Configuracion",
+        "tags": [
+          "kds"
+        ]
+      }
+    },
     "/api/v1/kds/items/{venta_item_id}/avanzar": {
       "post": {
         "operationId": "avanzar_api_v1_kds_items__venta_item_id__avanzar_post",
@@ -35184,6 +35449,55 @@
           }
         ],
         "summary": "Avanzar",
+        "tags": [
+          "kds"
+        ]
+      }
+    },
+    "/api/v1/kds/items/{venta_item_id}/retroceder": {
+      "post": {
+        "description": "Deshace un paso del avance de la línea (RN-CUP-002, enmendada\n2026-08-26). Sin cuerpo: no se salta a un estado arbitrario, se deshace\nlo último que se hizo. `kds.operar` y no un permiso nuevo — quien se\nequivoca tachando es quien tiene que poder corregirlo, en el momento.",
+        "operationId": "retroceder_api_v1_kds_items__venta_item_id__retroceder_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "venta_item_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Venta Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemColaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Retroceder",
         "tags": [
           "kds"
         ]
@@ -35436,6 +35750,71 @@
           }
         ],
         "summary": "Cola",
+        "tags": [
+          "kds"
+        ]
+      }
+    },
+    "/api/v1/kds/pantallas/{pantalla_id}/historial": {
+      "get": {
+        "description": "Lo que esta pantalla ya despachó. La cola descarta los pedidos\nentregados y hasta ahora eso era todo: uno entregado por error\ndesaparecía sin dejar dónde buscarlo.",
+        "operationId": "historial_api_v1_kds_pantallas__pantalla_id__historial_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pantalla_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Pantalla Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "dias",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "maximum": 7,
+              "minimum": 1,
+              "title": "Dias",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PedidoHistorialOut"
+                  },
+                  "title": "Response Historial Api V1 Kds Pantallas  Pantalla Id  Historial Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Historial",
         "tags": [
           "kds"
         ]
@@ -47928,6 +48307,55 @@
           }
         ],
         "summary": "Aplicar Descuento",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/ventas/{venta_id}/deshacer-entrega": {
+      "post": {
+        "description": "Devuelve el pedido de `entregado` a `listo`: el toque equivocado sobre\nla tarjeta de al lado en despacho.\n\nMismo permiso que entregar y no uno nuevo: quien puede dar por entregado\nun pedido es exactamente quien tiene que poder corregirse. Deshacer algo\nque no está entregado es un no-op, no un error.",
+        "operationId": "deshacer_entrega_api_v1_sales_ventas__venta_id__deshacer_entrega_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "venta_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Venta Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntregaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Deshacer Entrega",
         "tags": [
           "sales"
         ]

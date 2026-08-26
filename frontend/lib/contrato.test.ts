@@ -525,8 +525,12 @@ const KDS: Caso[] = [
   ),
   caso("editarPantalla", () => apiKds.editarPantalla(UUID, { nombre: "Cocina 2", activo: true })),
   caso("categorias", () => apiKds.categorias()),
+  caso("configuracion", () => apiKds.configuracion(UUID)),
   caso("avanzar", () => apiKds.avanzar(UUID, "en_preparacion")),
   caso("entregar", () => apiKds.entregar(UUID)),
+  caso("retroceder", () => apiKds.retroceder(UUID)),
+  caso("historial", () => apiKds.historial(UUID)),
+  caso("deshacerEntrega", () => apiKds.deshacerEntrega(UUID)),
   caso("eliminarPantalla", () => apiKds.eliminarPantalla(UUID)),
 ];
 
