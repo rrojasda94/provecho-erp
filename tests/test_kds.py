@@ -853,6 +853,28 @@ def test_despacho_muestra_en_que_estacion_va_cada_linea(env):
     assert pedido["tipo"] == "venta"
 
 
+def test_despacho_ve_la_direccion_del_delivery(env):
+    """La dirección tiene que llegar hasta el navegador: despacho arma la
+    bolsa mirando la pantalla, no la comanda impresa."""
+    client, ids = env
+    h = _token(client)
+    horno, _barra, despacho, _venta = _setup_pantallas_y_venta(client, ids, h)
+    delivery = client.post("/api/v1/sales/ventas", headers=h, json={
+        "sucursal_id": ids["sucursal_id"], "punto_venta_id": ids["pv_id"],
+        "canal": "pdv", "modalidad": "delivery", "idempotency_key": "kds-deli-1",
+        "direccion_entrega": "Av. Siempre Viva 742",
+        "items": [{"producto_comercial_id": ids["pizza_id"], "cantidad": "1"}],
+    }).json()
+
+    pizza = next(p for p in _cola(client, h, horno["id"])
+                 if p["venta_id"] == delivery["id"])["items"][0]
+    _tachar(client, h, pizza["venta_item_id"])
+
+    pedido = next(p for p in _cola(client, h, despacho["id"])
+                  if p["venta_id"] == delivery["id"])
+    assert pedido["direccion_entrega"] == "Av. Siempre Viva 742"
+
+
 def test_estacion_desactivada_no_deja_la_linea_invisible(env):
     client, ids = env
     h = _token(client)

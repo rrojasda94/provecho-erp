@@ -67,6 +67,9 @@ class PedidoColaOut(BaseModel):
     venta_id: str
     numero_orden: int
     referencia_atencion: str | None
+    # Despacho arma la bolsa mirando esta pantalla: la dirección va acá y
+    # no solo en el papel. `None` salvo en delivery.
+    direccion_entrega: str | None = None
     modalidad: str
     canal: str
     # `venta` | `consumo_personal` (RN-COM-025) y su motivo: la cocina

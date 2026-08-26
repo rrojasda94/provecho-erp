@@ -375,6 +375,15 @@
     letter-spacing: 0.05em;
 }
 
+/* Dirección del delivery: despacho la lee para armar la bolsa, así que pesa
+   más que el canal y menos que el número de orden. */
+.kds-direccion {
+    margin: 0;
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
 /* Comida del personal (RN-COM-025): la cocina la prepara igual, pero saber
    que no es de un cliente cambia a qué se le da prioridad. */
 .kds-consumo {

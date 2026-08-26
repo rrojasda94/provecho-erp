@@ -15467,6 +15467,17 @@
             "title": "Creado En",
             "type": "string"
           },
+          "direccion_entrega": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direccion Entrega"
+          },
           "estado_pedido": {
             "title": "Estado Pedido",
             "type": "string"
@@ -15542,6 +15553,17 @@
             "format": "date-time",
             "title": "Creado En",
             "type": "string"
+          },
+          "direccion_entrega": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direccion Entrega"
           },
           "entregado_en": {
             "format": "date-time",

@@ -70,6 +70,10 @@ function Tarjeta({
       {pedido.tipo === "consumo_personal" && (
         <small className="kds-consumo">Consumo de personal</small>
       )}
+      {/* Solo delivery: en mesa o para llevar no hay dirección que mirar. */}
+      {pedido.modalidad === "delivery" && pedido.direccion_entrega && (
+        <p className="kds-direccion">{pedido.direccion_entrega}</p>
+      )}
 
       <p className="kds-avance">
         <strong>
