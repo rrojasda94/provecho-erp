@@ -12,6 +12,94 @@ editando este archivo chocaban siempre — escribían en la misma línea.
 
 Ver [`changelog.d/`](changelog.d/).
 
+## [0.7.5] - 2026-08-26
+
+### Fixed
+
+- Corregido: el desplegable de empaque de la ficha de producto ofrecía **el
+  catálogo entero** —insumos, mercadería, repuestos, suministros— en vez de
+  solo los artículos de tipo empaque, así que `empaque_id` podía terminar
+  apuntando a la harina y cada venta la descontaba como si fuera una caja de
+  pizza. El faltante recién aparecía en el conteo del mes.
+- El filtro faltaba en tres capas y ninguna defendía a la siguiente: el
+  endpoint de artículos no ofrecía filtro por tipo, la pantalla no lo aplicaba
+  y el `PATCH` metía `empaque_id` en un bucle `setattr` genérico sin mirar
+  qué le estaban dando. Ahora **el backend valida** al crear y al editar
+  (tipo `empaque`, no archivado), que es donde el dato malo hace daño.
+  `data-model.md` ya declaraba «FK articulo tipo=empaque»: la restricción
+  existía escrita, no ejecutada.
+- `GET /inventory/articulos` acepta `?tipo=`. El filtro va en la base y no en
+  la pantalla porque la lista viene paginada de a 50: con el catálogo real,
+  filtrar lo que llegó dejaría el desplegable **vacío** en cuanto los
+  empaques caigan fuera de la primera página, y un desplegable vacío no dice
+  «faltan», parece que no hay empaques.
+- El editor de recetas dejó de ofrecer empaques, repuestos y suministros como
+  insumo. RN-EMP-003 dice que el empaque **no** va en la receta —se descuenta
+  por modalidad desde el producto comercial—, así que ponerlo ahí lo
+  descontaba dos veces.
+- Contrato público nuevo `inventory.queries_publicas.articulo_resumen`:
+  identidad y tipo de un artículo, para que otro módulo valide que el que le
+  mandaron sirve sin entrar a su ORM.
+
+- Corregido: **la pizza MitadXMitad no ofrecía elegir sabores en el PDV, y se
+  podía cobrar sin ellos**. El configurador mostraba solo la lista de «Sin…»
+  porque la carta leía únicamente `producto_opcion_grupo` —el modelo viejo,
+  que en el catálogo real está **vacío**— mientras que los sabores viven en
+  `producto_atributo_valor` (ADR-055/056). Sin sabores elegidos ninguna línea
+  condicionada de la receta se activa, así que la pizza salía de cocina **sin
+  descontar un solo insumo** y el faltante aparecía recién en el conteo del
+  mes. Ver ADR-066.
+- `GET /carta` devuelve ahora `atributos` y `exclusiones` por producto y por
+  variante (aditivo, con default `[]`). El PDV los dibuja como pastillas, una
+  elección por atributo, y apaga —sin ocultar— el sabor que ya está puesto en
+  la otra mitad.
+- **RN-COM-040**: un producto que ofrece atributos no se vende sin elegir un
+  valor de cada uno. Se hace cumplir al confirmar la venta y no solo en la
+  pantalla, porque el kiosko y la central de pedidos entran por el mismo
+  endpoint. Excepción: el replay del hub durante un corte (ADR-009), donde la
+  venta ya se preparó y se cobró.
+- La carta y el validador salen de la **misma** función. Con el filtro escrito
+  dos veces, la pantalla dejaría de ofrecer lo que el servidor exige y el
+  producto quedaría invendible: es el modo de falla que este cambio evita por
+  construcción.
+- La sección «Sin…» arranca **colapsada** y se abre al tocarla. Con una receta
+  larga ocupaba toda la pantalla y empujaba fuera de la vista los sabores y
+  los extras, que es lo que el cajero viene a elegir.
+- El **modo offline** replica las cinco tablas de atributos, y `receta_item`
+  replica `aplica_valores`. Sin esto el hub habría rechazado toda venta de
+  MitadXMitad durante un corte —justo el caso que el modo offline existe para
+  evitar— porque replicaba `expresion` pero no la condición que decide si el
+  insumo sale del almacén.
+- La **comanda** imprime qué mitades lleva el plato, antes de extras y restas.
+  Antes lo decía porque el sabor era un extra; con el modelo nuevo habría
+  dejado de decirlo, que es lo único que el pizzero necesita de esa pizza.
+- `producto_atributo_valor.precio_extra` **se cobra**. Estaba documentado como
+  sumando en cuatro lugares y ningún código lo sumaba: una columna editable
+  desde la ficha que no cobraba nada. Se verificó contra la base real que hoy
+  ningún valor tiene recargo, así que activarlo no mueve ningún precio.
+
+- Corregido: **ningún trabajador podía marcar asistencia en el pad**. El pad
+  exige `trabajador.usuario_id` para llegar al PIN que firma la marcación
+  (ADR-065), pero ese campo solo viajaba en el alta: `TrabajadorUpdate` no lo
+  declaraba y la pantalla de trabajadores nunca lo ofrecía, así que desde la
+  UI quedaba en NULL para siempre y el 409 «el trabajador no tiene usuario con
+  PIN» era el único desenlace posible, no el caso de borde que el ADR
+  documentaba. Ahora la cuenta se elige al dar de alta al trabajador y al
+  editarlo, y mandarla en `null` la desvincula.
+- La cuenta que se asigna se valida: tiene que existir, ser de tipo `humano`
+  —una de agente entra por token y no tiene PIN que teclear (ADR-032)—, estar
+  activa y no ser ya de otro trabajador. Dos trabajadores con la misma cuenta
+  comparten PIN, y entonces el pad no puede saber cuál de los dos fichó.
+- La pantalla de trabajadores muestra en una columna quién tiene cuenta, para
+  ver de un vistazo a quién le falta antes de que se pare frente al pad.
+- El alta de cuenta permite vincular la persona ahí mismo: el selector solo
+  estaba en «Editar cuenta», así que registrar a alguien que iba a marcar
+  obligaba a crear la cuenta y volver a abrirla.
+- Corregido: el tipo de cuenta «Servicio» que ofrecía el formulario no existe
+  en la columna (`humano` | `agente_ia`), y elegirlo devolvía un 500 del ORM
+  en vez de un error entendible. Se quitó la opción y el schema pasó a
+  `Literal`, que lo rechaza como 422 antes de tocar la base.
+
 ## [0.7.4] - 2026-08-25
 
 ### Added
