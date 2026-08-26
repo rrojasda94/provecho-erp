@@ -8307,7 +8307,7 @@
         "type": "object"
       },
       "EncabezadoImpresionOut": {
-        "description": "Membrete del rollo de 80 mm: quién emite (ADR-066).\n\nLo comparten comanda, precuenta y ticket del comprobante — el papel de un\nmismo local tiene que verse igual salga por donde salga.",
+        "description": "Membrete del rollo de 80 mm: quién emite (ADR-067).\n\nLo comparten comanda, precuenta y ticket del comprobante — el papel de un\nmismo local tiene que verse igual salga por donde salga.",
         "properties": {
           "contacto": {
             "anyOf": [
@@ -45465,7 +45465,7 @@
     },
     "/api/v1/sales/comprobantes/{comprobante_id}/ticket": {
       "get": {
-        "description": "Lo que se imprime en la ticketera de 80 mm (ADR-066).\n\nEs la representación impresa que el cliente se lleva en caja, no el PDF\nde Factiliza: sale **al momento del cobro**, sin esperar a que SUNAT\nconteste, y por eso también existe cuando el comprobante todavía está\n`pendiente` — la franja del ticket lo dice.\n\nMismo par de permisos que el listado: el contador reimprime desde su\npestaña sin tener el módulo de ventas.",
+        "description": "Lo que se imprime en la ticketera de 80 mm (ADR-067).\n\nEs la representación impresa que el cliente se lleva en caja, no el PDF\nde Factiliza: sale **al momento del cobro**, sin esperar a que SUNAT\nconteste, y por eso también existe cuando el comprobante todavía está\n`pendiente` — la franja del ticket lo dice.\n\nMismo par de permisos que el listado: el contador reimprime desde su\npestaña sin tener el módulo de ventas.",
         "operationId": "ticket_comprobante_api_v1_sales_comprobantes__comprobante_id__ticket_get",
         "parameters": [
           {
