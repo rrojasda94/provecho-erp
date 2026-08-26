@@ -223,12 +223,17 @@ def _armar_extras(
     canal: str,
     modalidad: str,
     dia: date,
+    exigir_opciones: bool = True,
     gratis: bool = False,
 ) -> tuple[list[VentaItem], list[dict]]:
     """Cada extra es una línea propia colgada del padre (RN-COM-021).
 
     Hereda `grupo_cobro` del padre a propósito: dividir la cuenta no puede
     dejar la pizza en una cuenta y su extra queso en otra.
+
+    `exigir_opciones=False` en el replay del hub (ADR-009), mismo criterio
+    que en la línea padre: el extra ya se preparó y se cobró, y el vínculo
+    con el plato pudo desarmarse durante el corte. Se guarda lo que viene.
     """
     if not extras:
         return [], []
@@ -238,23 +243,24 @@ def _armar_extras(
     filas, detalles = [], []
     for ex in extras:
         extra_id = ex["producto_comercial_id"]
-        # Efectivo: incluye lo heredado del padre (ADR-042). Rechazar un
-        # extra que la carta acaba de ofrecer manda al cajero a un error
-        # que no puede corregir desde la pantalla que se lo ofreció.
-        vinculo = productos.admite_extra_efectivo(padre_prod, extra_id)
-        if vinculo is None:
-            raise ReglaNegocio(
-                f"{padre_prod.nombre} no admite el extra {extra_id}"
-            )
         # `cantidad` es POR PLATO: "extra queso" en 2 pizzas son 2 porciones.
         # Se multiplica una sola vez, acá, para que el cobro y el consumo
         # salgan del mismo número — si se cobrara 1 y se descontaran 2, la
         # merma aparecería como faltante de inventario todos los días.
         por_plato = Decimal(str(ex.get("cantidad") or 1))
-        if vinculo.maximo is not None and por_plato > vinculo.maximo:
-            raise ReglaNegocio(
-                f"el extra admite hasta {vinculo.maximo} por línea"
-            )
+        if exigir_opciones:
+            # Efectivo: incluye lo heredado del padre (ADR-042). Rechazar un
+            # extra que la carta acaba de ofrecer manda al cajero a un error
+            # que no puede corregir desde la pantalla que se lo ofreció.
+            vinculo = productos.admite_extra_efectivo(padre_prod, extra_id)
+            if vinculo is None:
+                raise ReglaNegocio(
+                    f"{padre_prod.nombre} no admite el extra {extra_id}"
+                )
+            if vinculo.maximo is not None and por_plato > vinculo.maximo:
+                raise ReglaNegocio(
+                    f"el extra admite hasta {vinculo.maximo} por línea"
+                )
         fila, detalle, prod = _armar_item(
             session,
             {
@@ -267,9 +273,10 @@ def _armar_extras(
             canal=canal,
             modalidad=modalidad,
             dia=dia,
+            exigir_opciones=exigir_opciones,
             gratis=gratis,
         )
-        if not prod.es_extra:
+        if exigir_opciones and not prod.es_extra:
             raise ReglaNegocio(f"{prod.nombre} no está marcado como extra")
         filas.append(fila)
         detalles.append(detalle)
@@ -372,7 +379,8 @@ def _armar_lineas(
         hijos, dets_hijos = _armar_extras(
             session, fila, prod, it.get("extras") or [],
             productos=productos, sucursal_id=sucursal_id,
-            canal=canal, modalidad=modalidad, dia=dia, gratis=gratis,
+            canal=canal, modalidad=modalidad, dia=dia,
+            exigir_opciones=exigir_opciones, gratis=gratis,
         )
         filas.append(fila)
         extras_por_padre.append(hijos)
