@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import date
+from decimal import Decimal
 from typing import Literal
 
 from fastapi import (
@@ -27,6 +28,7 @@ from src.modules.sales.application import (
     cumplimiento,
     cupones,
     importacion_clientes,
+    impresion,
     mesas,
     notas_credito,
     precios,
@@ -617,6 +619,98 @@ def reintentar_emision(
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(e)) from e
     session.commit()
     return comprobante
+
+
+@router.get("/comprobantes", response_model=Pagina[schemas.ComprobanteEmitidoOut])
+def listar_comprobantes(
+    desde: date | None = None,
+    hasta: date | None = None,
+    tipo: Literal["boleta", "factura", "nc"] | None = None,
+    estado_emision: (
+        Literal["pendiente", "aceptado", "rechazado", "error"] | None
+    ) = None,
+    empresa_id: uuid.UUID | None = None,
+    usuario: Usuario = Depends(get_current_user),
+    tenant: Tenant = Depends(get_tenant),
+    p: Paginacion = Depends(paginacion),
+    session: Session = Depends(get_db),
+):
+    """Registro de ventas: los comprobantes que la empresa emitió.
+
+    Acepta `sales.leer` **o** `accounting.leer`. El contador tiene que poder
+    ver el documento fuente del asiento —es literalmente lo que declara— y
+    no tiene `sales.leer` ni le corresponde: darle el módulo de ventas
+    entero para que vea sus propias boletas sería el problema al revés.
+
+    Por defecto, el día de hoy del negocio. El alcance sale del tenant
+    (ADR-004): `empresa_id` solo lo puede fijar quien no tiene empresa
+    asignada, es decir el superusuario.
+    """
+    check_permission(session, usuario, LEER, "accounting.leer")
+    desde = desde or fechas.hoy()
+    hasta = hasta or desde
+    if hasta < desde:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, "`hasta` no puede ser anterior a `desde`"
+        )
+    repo = ComprobanteRepo(session)
+    pagina = paginar(
+        session,
+        repo.emitidos(
+            empresa_id=tenant.filtro_empresa(empresa_id),
+            desde=desde,
+            hasta=hasta,
+            tipo=tipo,
+            estado_emision=estado_emision,
+        ),
+        p,
+    )
+    cobrado = repo.cobrado_por_cuenta(
+        [c.venta_id for c in pagina["items"] if c.venta_id]
+    )
+    pagina["items"] = [
+        schemas.ComprobanteEmitidoOut(
+            id=c.id,
+            venta_id=c.venta_id,
+            tipo=c.tipo,
+            serie=c.serie,
+            correlativo=c.correlativo,
+            serie_correlativo=f"{c.serie}-{c.correlativo:08d}",
+            grupo_cobro=c.grupo_cobro,
+            fecha_emision=comprobantes.fecha_emision(c),
+            receptor_num_doc=c.receptor_num_doc,
+            receptor_nombre=c.receptor_nombre,
+            estado_emision=c.estado_emision,
+            detalle_emision=c.detalle_emision,
+            total=cobrado.get((c.venta_id, c.grupo_cobro), Decimal(0)),
+            anulado_por_nc_id=c.anulado_por_nc_id,
+        )
+        for c in pagina["items"]
+    ]
+    return pagina
+
+
+@router.get(
+    "/comprobantes/{comprobante_id}/ticket",
+    response_model=schemas.TicketComprobanteOut,
+)
+def ticket_comprobante(
+    comprobante_id: uuid.UUID,
+    usuario: Usuario = Depends(get_current_user),
+    session: Session = Depends(get_db),
+):
+    """Lo que se imprime en la ticketera de 80 mm (ADR-067).
+
+    Es la representación impresa que el cliente se lleva en caja, no el PDF
+    de Factiliza: sale **al momento del cobro**, sin esperar a que SUNAT
+    conteste, y por eso también existe cuando el comprobante todavía está
+    `pendiente` — la franja del ticket lo dice.
+
+    Mismo par de permisos que el listado: el contador reimprime desde su
+    pestaña sin tener el módulo de ventas.
+    """
+    check_permission(session, usuario, LEER, "accounting.leer")
+    return impresion.ticket_comprobante(session, comprobante_id)
 
 
 @router.get(

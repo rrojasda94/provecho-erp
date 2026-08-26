@@ -4,6 +4,8 @@ import uuid
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.modules.sales.api.schemas import EncabezadoImpresionOut
+
 
 class PantallaCreate(BaseModel):
     sucursal_id: uuid.UUID
@@ -87,4 +89,7 @@ class ComandaOut(BaseModel):
     numero_orden: int
     reimpresion: bool
     impresa_veces: int
+    # Membrete de la marca: en un local multimarca todas las cocinas
+    # imprimen en el mismo rollo (ADR-067).
+    encabezado: EncabezadoImpresionOut
     texto: str
