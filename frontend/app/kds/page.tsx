@@ -9,19 +9,57 @@
  * La pantalla elegida va en la URL (`?pantalla=<id>`) y no en el servidor:
  * cada tablet de la cocina se queda con su enlace en favoritos y sobrevive
  * a un reinicio sin que nadie vuelva a elegir estación.
+ *
+ * La sucursal va por el mismo camino (`?sucursal=<id>`). Antes era siempre
+ * `usuario.sucursales[0]`: un jefe de cocina con dos locales veía uno solo y
+ * no tenía forma de llegar al otro. Lo que llega por la URL **se valida
+ * contra sus sucursales** — la URL la escribe cualquiera.
  */
 
 import { redirect } from "next/navigation";
 
 import { ApiError, apiFetch } from "@/lib/api";
-import type { Categoria, Pantalla } from "@/lib/kds";
+import type { Categoria, Pantalla, Semaforo, SucursalKds } from "@/lib/kds";
 import { tieneAccesoModulo, tienePermiso } from "@/lib/permisos";
 import { obtenerSesion } from "@/lib/sesion";
 
 import DespachoCliente from "./despacho-cliente";
 import EstacionesCliente from "./estaciones-cliente";
+import HistorialCliente from "./historial-cliente";
 import KdsCliente from "./kds-cliente";
 import "./kds.css";
+
+/**
+ * La sucursal de la URL solo si de verdad es suya; si no, la primera. El gate
+ * real lo hace la API (`tenant.exigir_sucursal`); esto evita pedirle una
+ * cocina ajena y comerse un 403 dibujado como "no se pudo cargar".
+ */
+function sucursalElegida(pedida: string | undefined, propias: string[]): string | undefined {
+  return pedida && propias.includes(pedida) ? pedida : propias[0];
+}
+
+/**
+ * Las suyas, y solo si tiene más de una: el selector no tiene sentido para
+ * quien trabaja en un local. Si el catálogo falla, la cocina abre igual con
+ * la sucursal actual — mismo criterio que con las categorías.
+ */
+async function sucursalesDelUsuario(token: string, propias: string[]): Promise<SucursalKds[]> {
+  if (propias.length <= 1) return [];
+  return apiFetch<SucursalKds[]>("/api/v1/sucursales", { token })
+    .then((todas) => todas.filter((s) => propias.includes(s.id)))
+    .catch(() => []);
+}
+
+/** Los mismos valores que la semilla del backend. Si la configuración no
+ * carga, la cocina abre con colores de fábrica en vez de sin pantalla — es
+ * un semáforo, no un dato del pedido. */
+const SEMAFORO_DE_FABRICA: Semaforo = {
+  minutos_ambar: 8,
+  minutos_rojo: 15,
+  color_normal: "#22c55e",
+  color_ambar: "#fbbf24",
+  color_rojo: "#f87171",
+};
 
 /** Cada bloqueo dice a quién pedirle qué: en cocina nadie va a leer un 500. */
 function Bloqueo({ titulo, detalle }: { titulo: string; detalle: string }) {
@@ -36,9 +74,10 @@ function Bloqueo({ titulo, detalle }: { titulo: string; detalle: string }) {
 export default async function PaginaKds({
   searchParams,
 }: {
-  searchParams: Promise<{ pantalla?: string }>;
+  searchParams: Promise<{ pantalla?: string; sucursal?: string; vista?: string }>;
 }) {
   const { token, usuario } = await obtenerSesion();
+  const parametros = await searchParams;
 
   if (!tieneAccesoModulo(usuario.permisos, "kds.")) {
     return (
@@ -49,7 +88,7 @@ export default async function PaginaKds({
     );
   }
 
-  const sucursalId = usuario.sucursales[0];
+  const sucursalId = sucursalElegida(parametros.sucursal, usuario.sucursales);
   if (!sucursalId) {
     return (
       <Bloqueo
@@ -75,24 +114,43 @@ export default async function PaginaKds({
     );
   }
 
-  const elegida = (await searchParams).pantalla;
+  const elegida = parametros.pantalla;
   const pantalla = pantallas.find((p) => p.id === elegida && p.activo);
 
   if (pantalla) {
     // La entrega es acto de despacho, con permiso propio (RN-CUP-006): el
-    // cocinero no ve el botón deshabilitado, no lo ve.
+    // cocinero no ve el botón deshabilitado, no lo ve. Lo mismo para
+    // deshacerla, que usa el mismo permiso.
     const puedeEntregar = tienePermiso(usuario.permisos, "sales.entregar_pedido");
+    const comun = { id: pantalla.id, nombre: pantalla.nombre };
+    const semaforo = await apiFetch<Semaforo>(
+      `/api/v1/kds/configuracion?sucursal_id=${sucursalId}`,
+      { token },
+    ).catch(() => SEMAFORO_DE_FABRICA);
+    if (parametros.vista === "historial") {
+      return (
+        <HistorialCliente
+          pantalla={comun}
+          sucursalId={sucursalId}
+          puedeEntregar={puedeEntregar}
+        />
+      );
+    }
     // Despacho y preparación miran la misma cola pero no hacen lo mismo:
     // una cocina y tacha línea por línea, la otra arma el pedido completo y
     // lo entrega (ADR-044). Por eso son dos componentes y no un filtro.
     return pantalla.tipo === "despacho" ? (
       <DespachoCliente
-        pantalla={{ id: pantalla.id, nombre: pantalla.nombre }}
+        pantalla={comun}
+        sucursalId={sucursalId}
         puedeEntregar={puedeEntregar}
+        semaforo={semaforo}
       />
     ) : (
       <KdsCliente
-        pantalla={{ id: pantalla.id, nombre: pantalla.nombre, orden: pantalla.orden }}
+        pantalla={{ ...comun, orden: pantalla.orden }}
+        sucursalId={sucursalId}
+        semaforo={semaforo}
       />
     );
   }
@@ -111,9 +169,12 @@ export default async function PaginaKds({
     }).catch(() => []);
   }
 
+  const sucursales = await sucursalesDelUsuario(token, usuario.sucursales);
+
   return (
     <EstacionesCliente
       sucursalId={sucursalId}
+      sucursales={sucursales}
       inicial={pantallas}
       categorias={categorias}
       puedeConfigurar={puedeConfigurar}

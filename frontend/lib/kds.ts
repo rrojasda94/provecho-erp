@@ -8,9 +8,12 @@
 
 import { pedir } from "./cliente-api";
 import { pasosHastaListo, type EstadoItem } from "./kds-avance";
+import type { Semaforo } from "./kds-semaforo";
 
-export { ETIQUETA_ESTADO } from "./kds-avance";
+export { ETIQUETA_ESTADO, siguienteToque } from "./kds-avance";
 export type { EstadoItem } from "./kds-avance";
+export { minutosDesde, nivelDe, reloj } from "./kds-semaforo";
+export type { Nivel, Semaforo } from "./kds-semaforo";
 
 export type Pantalla = {
   id: string;
@@ -46,6 +49,12 @@ export type ItemCola = {
   estacion: string | null;
 };
 
+export type PedidoHistorial = PedidoCola & {
+  /** Cuándo se cerró el pedido. Es lo que se lee para decidir si «este» era
+   * el que salió. */
+  entregado_en: string;
+};
+
 export type PedidoCola = {
   venta_id: string;
   numero_orden: number;
@@ -57,6 +66,9 @@ export type PedidoCola = {
   tipo: string;
   consumo_motivo: string | null;
   estado_pedido: EstadoItem;
+  /** Cuándo se tomó el pedido, en ISO. El cronómetro lo corre el navegador
+   * (ver `kds-semaforo.ts`). */
+  creado_en: string;
   items: ItemCola[];
 };
 
@@ -72,6 +84,10 @@ export type PantallaEnvio = {
   orden: number;
 };
 
+/** Sucursal a la que puede quedar asignada una pantalla. Solo nombre e id:
+ * el KDS no necesita saber nada más de un local. */
+export type SucursalKds = { id: string; nombre: string };
+
 export const apiKds = {
   cola: (pantallaId: string) =>
     pedir<PedidoCola[]>(`/kds/pantallas/${pantallaId}/cola`),
@@ -85,8 +101,12 @@ export const apiKds = {
       cuerpo: { sucursal_id: sucursalId, ...cuerpo },
     }),
 
-  editarPantalla: (pantallaId: string, cuerpo: Partial<PantallaEnvio> & { activo?: boolean }) =>
-    pedir<Pantalla>(`/kds/pantallas/${pantallaId}`, { metodo: "PATCH", cuerpo }),
+  editarPantalla: (
+    pantallaId: string,
+    // `sucursal_id` muda la estación de local. La API lo rechaza si tiene
+    // cola o si allá ya hay una con ese nombre.
+    cuerpo: Partial<PantallaEnvio> & { activo?: boolean; sucursal_id?: string },
+  ) => pedir<Pantalla>(`/kds/pantallas/${pantallaId}`, { metodo: "PATCH", cuerpo }),
 
   /** Baja definitiva. `activo: false` apaga la estación y la deja volver;
    * esto la saca y libera su nombre. La API la rechaza si tiene cola. */
@@ -94,6 +114,10 @@ export const apiKds = {
     pedir<void>(`/kds/pantallas/${pantallaId}`, { metodo: "DELETE" }),
 
   categorias: () => pedir<Categoria[]>("/inventory/categorias"),
+
+  /** Umbrales y colores que fijó Gerencia, ya resueltos. */
+  configuracion: (sucursalId: string) =>
+    pedir<Semaforo>(`/kds/configuracion?sucursal_id=${sucursalId}`),
 
   avanzar: (ventaItemId: string, estado: EstadoItem) =>
     pedir<ItemCola>(`/kds/items/${ventaItemId}/avanzar`, {
@@ -104,6 +128,22 @@ export const apiKds = {
   entregar: (ventaId: string) =>
     pedir<{ venta_id: string; estado: string }>(
       `/sales/ventas/${ventaId}/entrega`,
+      { metodo: "POST" },
+    ),
+
+  /** Deshace UN paso del avance. Sin cuerpo a propósito: no se salta a un
+   * estado, se deshace lo último que se hizo (RN-CUP-002). */
+  retroceder: (ventaItemId: string) =>
+    pedir<ItemCola>(`/kds/items/${ventaItemId}/retroceder`, { metodo: "POST" }),
+
+  historial: (pantallaId: string) =>
+    pedir<PedidoHistorial[]>(`/kds/pantallas/${pantallaId}/historial`),
+
+  /** El toque sobre la tarjeta de al lado en despacho. Deshacer algo que no
+   * se entregó es un no-op, no un error. */
+  deshacerEntrega: (ventaId: string) =>
+    pedir<{ venta_id: string; estado_pedido: string }>(
+      `/sales/ventas/${ventaId}/deshacer-entrega`,
       { metodo: "POST" },
     ),
 };

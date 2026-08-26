@@ -295,7 +295,8 @@ def buscar_personas(
 @router.get("/almacenes", response_model=list[schemas.AlmacenOut], tags=["users"])
 def listar_almacenes(
     empresa_id: uuid.UUID | None = None,
-    _: Usuario = Depends(get_current_user),
+    incluir_baja: bool = False,
+    usuario: Usuario = Depends(get_current_user),
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
@@ -303,8 +304,17 @@ def listar_almacenes(
     a cualquier usuario autenticado, la necesita cualquiera que tenga que
     elegir un destino (ej. compras crea una OC). Sin `require_permission`
     a propósito: no es un recurso a proteger, es un catálogo de apoyo. Sí
-    escopada por tenant — un almacén de otra empresa no es "no sensible"."""
-    return admin.listar_almacenes(session, tenant.filtro_empresa(empresa_id))
+    escopada por tenant — un almacén de otra empresa no es "no sensible".
+
+    `incluir_baja` sí exige `organizacion.gestionar`: los selectores del resto
+    del ERP no deben poder ofrecer un almacén dado de baja ni por descuido, y
+    quien los ve es solo quien puede reactivarlos.
+    """
+    if incluir_baja:
+        check_permission(session, usuario, ORGANIZACION)
+    return admin.listar_almacenes(
+        session, tenant.filtro_empresa(empresa_id), incluir_baja
+    )
 
 
 @router.get("/marcas", response_model=list[schemas.MarcaOut], tags=["users"])
@@ -1468,3 +1478,26 @@ def dar_de_baja_almacen(
     organizacion.dar_de_baja_almacen(session, almacen_id, actor_id=actor.id)
     session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/almacenes/{almacen_id}/reactivar",
+    response_model=schemas.AlmacenOut,
+    tags=["organizacion"],
+)
+def reactivar_almacen(
+    almacen_id: uuid.UUID,
+    actor: Usuario = Depends(require_permission(ORGANIZACION)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Deshace la baja. Existe porque la baja no mira el stock: sin vuelta,
+    equivocarse sería definitivo y el almacén desaparecería de la interfaz
+    para siempre —los repos filtran `deleted_at`—."""
+    _exigir_empresa(
+        tenant,
+        organizacion.obtener_almacen(session, almacen_id, incluir_baja=True).empresa_id,
+    )
+    almacen = organizacion.reactivar_almacen(session, almacen_id, actor_id=actor.id)
+    session.commit()
+    return almacen

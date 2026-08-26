@@ -149,3 +149,39 @@ Dos cosas que esto arregla de paso:
   suite entera pasaba en verde; el fixture de `test_pdv_slice.py` ahora
   enciende `PRAGMA foreign_keys=ON` para que pruebe lo que la base real hace
   cumplir. Además la anulación no reponía el insumo del extra.
+
+## Addendum 2026-08-26 — deshacer, y el toque que ya no despacha
+
+Tres cosas que la cadena hacía difíciles de corregir.
+
+**Un toque movía dos ejes a la vez.** Tachar una línea encadenaba
+`pendiente → en_preparacion → listo` y, si quedaba cadena por delante, la
+empujaba al eslabón siguiente. Todo eso con un solo contacto sobre una tablet
+que vive en una cocina: el roce de un delantal despachaba un plato que nadie
+había empezado. Ahora el toque mueve **un** paso —el primero dice «lo estoy
+haciendo», el segundo «sale»—. El botón «Todo listo» de la tarjeta conserva el
+comportamiento viejo a propósito: ahí la intención es explícita.
+
+**Deshacer tiene que deshacer lo que se hizo, no un estado.** Por eso
+`POST /kds/items/{id}/retroceder` no lleva cuerpo. El avance tiene dos ejes
+—`estado_preparacion` y `etapa_kds`— y cuál se movió depende de dónde estaba
+la línea, así que un endpoint que recibiera un estado destino obligaría al
+cliente a reconstruir la cadena para saber qué pedir. `retroceder_item` mira
+la cadena una vez y decide: `listo` vuelve a `en_preparacion` en la misma
+estación; una línea empujada vuelve al eslabón anterior **de su propia
+cadena** (la bebida vuelve a la barra, no al horno por el que nunca pasó); y
+`en_preparacion` en el primer eslabón vuelve a `pendiente`.
+
+`/avanzar` quedó estrictamente hacia adelante. Hacer `transicion_valida`
+simétrica habría sido menos código, pero deja a `/avanzar` aceptando
+retrocesos por la puerta de avanzar: un `estado` mal calculado en el cliente
+desharía trabajo creyendo que lo adelanta.
+
+**Y lo entregado no dejaba rastro.** `cola_pantalla` descarta los pedidos
+cerrados, que es correcto para la cola y era todo lo que la cocina podía ver:
+un pedido entregado por error desaparecía sin dónde buscarlo.
+`GET /kds/pantallas/{id}/historial` es su contrario —solo los entregados, del
+día de negocio, tope 200— y desde ahí se los devuelve a despacho. La hora sale
+de `venta_item.updated_at`: el último cambio de un ítem entregado **es** su
+entrega, y una columna nueva para mostrar una hora en una pantalla de cocina
+no se paga sola.

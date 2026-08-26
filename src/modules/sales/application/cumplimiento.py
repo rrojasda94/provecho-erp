@@ -74,6 +74,46 @@ def registrar_entrega(
     return _resultado(venta, ["entregado"] * len(items), ya_entregado=False)
 
 
+def deshacer_entrega(session: Session, venta_id: uuid.UUID) -> dict:
+    """Devuelve el pedido de `entregado` a `listo` (2026-08-26).
+
+    El error que arregla es concreto: en despacho se toca «Entregar» sobre la
+    tarjeta equivocada, el pedido desaparece de la pantalla y el que sí salió
+    sigue ahí. Sin vuelta, el único arreglo era anular la venta —que es otra
+    cosa completamente— o dejar la cocina mintiendo el resto del turno.
+
+    **No mira el comprobante a propósito.** El comprobante se emite al cobrar,
+    no al entregar, y no dice nada sobre si la bolsa salió: bloquear el
+    deshacer cuando hay boleta apagaría esto justo para el delivery pagado por
+    adelantado, que es donde más se usa. Lo que sí se respeta es la anulación:
+    una venta anulada no tiene entrega que deshacer.
+
+    Idempotente al revés que `registrar_entrega`: deshacer algo que no está
+    entregado no es un error, es un no-op.
+    """
+    venta = session.get(Venta, venta_id)
+    if venta is None:
+        raise NoEncontrado("venta no encontrada")
+    if venta.estado == "anulada":
+        raise Conflicto("la venta está anulada")
+
+    items = list(
+        session.scalars(select(VentaItem).where(VentaItem.venta_id == venta_id))
+    )
+    estados = [item.estado_preparacion for item in items]
+    if not rules.pedido_entregado(estados):
+        return _resultado(venta, estados, ya_entregado=False)
+
+    for item in items:
+        item.estado_preparacion = "listo"
+    # `registrar_entrega` cierra el consumo de personal —no pasa por caja, la
+    # entrega es su único cierre—. Deshacer la entrega tiene que reabrirlo o
+    # quedaría cerrado sin haberse entregado nunca.
+    if rules.es_consumo_personal(venta.tipo) and venta.estado == "cerrada":
+        venta.estado = "orden"
+    return _resultado(venta, ["listo"] * len(items), ya_entregado=False)
+
+
 def _resultado(venta: Venta, estados: list[str], *, ya_entregado: bool) -> dict:
     return {
         "venta_id": str(venta.id),

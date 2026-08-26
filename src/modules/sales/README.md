@@ -515,6 +515,9 @@ tiempo real (Redis/WebSocket) es deuda declarada.
 | POST/PATCH/DELETE | `/kds/pantallas[/{id}]` | `kds.configurar` |
 | GET | `/kds/pantallas` | `kds.operar` **o** `kds.configurar` |
 | GET | `/kds/pantallas/{id}/cola` | `kds.operar` |
+| GET | `/kds/pantallas/{id}/historial` | `kds.operar` — lo entregado del día |
+| GET | `/kds/configuracion` | `kds.operar` — semáforo resuelto (umbrales + colores) |
+| POST | `/kds/items/{id}/retroceder` | `kds.operar` — deshace un paso |
 | POST | `/kds/items/{id}/avanzar` | `kds.operar` |
 | GET | `/kds/ventas/{id}/avance` | `kds.operar` |
 | POST | `/kds/ventas/{id}/comanda` | `kds.operar` |
@@ -533,14 +536,39 @@ dónde tacharse. `activo=false` sigue siendo otra cosa — apaga la estación y 
 deja volver. El `UNIQUE (sucursal_id, nombre)` es **parcial** sobre las vivas,
 así el nombre de una borrada queda libre.
 
+`PATCH /kds/pantallas/{id}` acepta `sucursal_id`: **una estación se muda de
+local** (2026-08-26) sin recrearla ni perder su configuración —la tablet que
+se lleva a la sucursal nueva—. Dos guardas: 409 con pedidos en cola (mismo
+motivo que borrarla) y 409 si el destino ya tiene una pantalla con ese
+nombre, que si no sale como un `IntegrityError` del índice único.
+
 **Pantalla** (2026-08-03): `frontend/app/kds/` — pantalla completa táctil
-fuera del shell, una tarjeta por pedido, un toque tacha el ítem preparado
-(encadena `en_preparacion` → `listo`, porque la API solo avanza de a un
-estado). Refresca la cola cada 3 s: como el estado vive en `venta_item`,
+fuera del shell, una tarjeta por pedido. **Dos toques** mueven el ítem
+(2026-08-26): el primero lo marca `en_preparacion` —lo que ven las otras
+pantallas mientras tanto— y el segundo lo manda a la estación siguiente. Uno
+solo encadenaba los dos pasos y el roce de un delantal contra la tablet
+despachaba un plato que nadie había empezado; «Todo listo» sobre la tarjeta
+sigue haciendo los dos de una. Cada línea lleva su **deshacer** (`↶`), y el
+enlace «Historial» muestra lo entregado del día con la vuelta a despacho.
+
+**Semáforo de espera** (2026-08-26, `application/kds_semaforo.py`): cada
+tarjeta muestra cuánto lleva el pedido y cambia de color al pasar dos
+umbrales. Los cinco valores —dos umbrales, tres colores— los fija Gerencia por
+empresa vía `parametro_empresa` (`kds_minutos_ambar`, `kds_minutos_rojo`,
+`kds_color_*`), con semilla en el módulo; la pantalla de Gerencia vive en
+`/gerencia/kds`. El reloj lo corre el navegador a partir de `creado_en`, que
+la cola ahora manda: un cronómetro servidor obligaría a reenviar la cola
+entera cada segundo. Un valor mal aprobado (color inválido, umbral fuera de
+rango, rojo antes que el ámbar) cae a la semilla en vez de romper el CSS de
+la cocina. Refresca la cola cada 3 s: como el estado vive en `venta_item`,
 ese intervalo es lo que tarda una pantalla en ver lo que tachó otra. La
 estación va en la URL (`/kds?pantalla=<id>`); `/kds` sin parámetro es el
 tablero de estaciones, que además crea/edita/desactiva/borra pantallas con
-`kds.configurar`. Diseño e interacción en
+`kds.configurar`. **La sucursal va por el mismo camino** (`?sucursal=<id>`,
+2026-08-26): antes era siempre `usuario.sucursales[0]` y quien tenía dos
+locales asignados no podía llegar al segundo. Lo que viene en la URL se valida
+contra las sucursales del usuario antes de pedir nada, y el selector solo
+aparece si tiene más de una. Diseño e interacción en
 [ui-ux.md](../../../docs/product/ui-ux.md#kds--tarjeta-de-pedido-tachar-ítem-por-ítem-implementado-2026-08-03).
 
 ## Sincronización con el hub de sucursal (implementado 2026-07-27)

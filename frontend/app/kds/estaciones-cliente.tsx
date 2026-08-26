@@ -3,7 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 
 import { ErrorApi } from "@/lib/cliente-api";
-import { apiKds, type Categoria, type Pantalla, type PantallaEnvio } from "@/lib/kds";
+import {
+  apiKds,
+  type Categoria,
+  type Pantalla,
+  type PantallaEnvio,
+  type SucursalKds,
+} from "@/lib/kds";
 
 /**
  * Estaciones de la sucursal: es a la vez el selector de la cocina (elegir
@@ -23,8 +29,55 @@ const VACIA: PantallaEnvio = {
   orden: 0,
 };
 
+/**
+ * Elegir sucursal. Se usa dos veces y hacen cosas distintas —arriba navega a
+ * otra cocina, en el diálogo muda la estación— pero el control es el mismo.
+ */
+function SelectorSucursal({
+  id,
+  valor,
+  sucursales,
+  onElegir,
+  mostrar = true,
+  nota,
+}: {
+  id: string;
+  valor: string;
+  sucursales: SucursalKds[];
+  onElegir: (sucursalId: string) => void;
+  /** Con una sola sucursal no hay nada que elegir. Se decide acá y no en
+   * quien lo usa: son dos usos con la misma regla. */
+  mostrar?: boolean;
+  nota?: string;
+}) {
+  if (!mostrar || sucursales.length < 2) return null;
+  return (
+    <>
+      <label className="kds-etiqueta" htmlFor={id}>
+        Sucursal
+      </label>
+      <select
+        id={id}
+        className="kds-campo"
+        value={valor}
+        onChange={(e) => onElegir(e.target.value)}
+      >
+        {sucursales.map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.nombre}
+          </option>
+        ))}
+      </select>
+      {nota && <p className="kds-nota">{nota}</p>}
+    </>
+  );
+}
+
 type Props = {
   sucursalId: string;
+  /** Las del usuario, y solo si tiene más de una. Vacío = no hay nada que
+   * elegir y el selector no se dibuja. */
+  sucursales: SucursalKds[];
   inicial: Pantalla[];
   categorias: Categoria[];
   puedeConfigurar: boolean;
@@ -32,6 +85,7 @@ type Props = {
 
 export default function EstacionesCliente({
   sucursalId,
+  sucursales,
   inicial,
   categorias,
   puedeConfigurar,
@@ -39,12 +93,16 @@ export default function EstacionesCliente({
   const [pantallas, setPantallas] = useState(inicial);
   const [editando, setEditando] = useState<Pantalla | null>(null);
   const [form, setForm] = useState<PantallaEnvio>(VACIA);
+  // A qué sucursal se muda la estación que se está editando. Solo aplica al
+  // editar: una pantalla nueva nace en la sucursal que se está mirando.
+  const [mudarA, setMudarA] = useState(sucursalId);
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
   const dialogo = useRef<HTMLDialogElement>(null);
 
   const abrir = (pantalla: Pantalla | null) => {
     setEditando(pantalla);
+    setMudarA(pantalla?.sucursal_id ?? sucursalId);
     setForm(
       pantalla
         ? {
@@ -85,8 +143,16 @@ export default function EstacionesCliente({
         // se manda null para no dejar dos representaciones del mismo caso.
         categoria_ids: form.categoria_ids?.length ? form.categoria_ids : null,
       };
-      if (editando) await apiKds.editarPantalla(editando.id, cuerpo);
-      else await apiKds.crearPantalla(sucursalId, cuerpo);
+      if (editando) {
+        await apiKds.editarPantalla(editando.id, {
+          ...cuerpo,
+          // Solo si cambió: mandarlo siempre haría que la API revisara la
+          // cola en cada renombre.
+          ...(mudarA !== editando.sucursal_id ? { sucursal_id: mudarA } : {}),
+        });
+      } else {
+        await apiKds.crearPantalla(sucursalId, cuerpo);
+      }
       setPantallas(await apiKds.pantallas(sucursalId));
       cerrar();
     } catch (e) {
@@ -139,6 +205,18 @@ export default function EstacionesCliente({
         vuelve directo a su cola.
       </p>
 
+      {/* Solo con más de una sucursal asignada. Navega de verdad (la lista de
+          pantallas la arma el servidor) en vez de refiltrar en el cliente:
+          así el enlace de favoritos de la tablet ya trae su local. */}
+      <SelectorSucursal
+        id="kds-sucursal"
+        valor={sucursalId}
+        sucursales={sucursales}
+        onElegir={(id) => {
+          window.location.href = `/kds?sucursal=${id}`;
+        }}
+      />
+
       {pantallas.length === 0 && (
         <p className="kds-nota">
           La sucursal todavía no tiene pantallas.
@@ -151,7 +229,7 @@ export default function EstacionesCliente({
       <div className="kds-selector">
         {pantallas.map((p) => (
           <div key={p.id} className={`kds-selector-item ${p.activo ? "" : "inactiva"}`}>
-            <a href={`/kds?pantalla=${p.id}`}>
+            <a href={`/kds?pantalla=${p.id}&sucursal=${sucursalId}`}>
               <strong>{p.nombre}</strong>
               <em>
                 {p.tipo === "despacho" ? "Despacho" : `Preparación · paso ${p.orden}`}
@@ -202,6 +280,17 @@ export default function EstacionesCliente({
             value={form.nombre}
             placeholder="Horno, Barra, Despacho…"
             onChange={(e) => setForm((f) => ({ ...f, nombre: e.target.value }))}
+          />
+
+          <SelectorSucursal
+            id="kds-mudar"
+            valor={mudarA}
+            sucursales={sucursales}
+            onElegir={setMudarA}
+            // Solo al editar: una pantalla nueva nace en la sucursal que se
+            // está mirando.
+            mostrar={editando !== null}
+            nota="Mover la estación a otro local se lleva su configuración y su historia. Con pedidos en cola no se puede: quedarían esperando en una cocina que ya no los mira."
           />
 
           <p className="kds-etiqueta">Tipo</p>

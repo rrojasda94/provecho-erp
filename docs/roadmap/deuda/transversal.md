@@ -266,3 +266,15 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   son dos pasos documentados en `docs/engineering/devops.md`.
   Mitigado en paralelo: `next dev --turbopack` (2026-08-05) saca la
   recompilación por ruta, que era el otro sumando.
+
+- ⬜ **La consulta de documento se paga dos veces por cada alta** (declarado
+  2026-08-26): no hay caché de ningún tipo sobre `consultar_dni` /
+  `consultar_ruc`. El botón «Buscar» del formulario consulta una vez, y al
+  guardar `nombres_desde_dni` / `razon_social_desde_ruc` vuelven a consultar
+  el mismo documento desde el servidor para no confiar en lo que llegó del
+  cliente. Son dos llamadas a un proveedor pago por cada persona que se da de
+  alta, y con el proveedor caído son dos timeouts seguidos. Un `lru_cache` con
+  TTL corto —o Redis, que ya está— resuelve ambos; la razón por la que no se
+  hizo ahora es que la doble validación es deliberada (ADR-041) y quitar la
+  segunda llamada sin caché sería confiar en el cliente. Contraste: la tarifa
+  de delivery sí cachea su geometría (`_distancia_cacheada`).

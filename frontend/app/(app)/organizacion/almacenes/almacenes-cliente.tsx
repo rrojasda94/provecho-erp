@@ -1,7 +1,7 @@
 "use client";
 
 import type { ColumnDef } from "@tanstack/react-table";
-import { useMemo } from "react";
+import { useMemo, useState, useTransition } from "react";
 
 import {
   BOTON_FILA,
@@ -10,7 +10,11 @@ import {
 } from "@/components/formulario/dialogo-formulario";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
 
-import { guardarAlmacenAction } from "../actions";
+import {
+  darDeBajaAlmacenAction,
+  guardarAlmacenAction,
+  reactivarAlmacenAction,
+} from "../actions";
 import { CampoDireccion } from "@/components/direccion/campo-direccion";
 
 export type Sucursal = { id: string; nombre: string };
@@ -28,6 +32,9 @@ export type Almacen = {
   ubicacion_distrito: string | null;
   almacen_abastecedor_id: string | null;
   almacen_abastecedor_respaldo_id: string | null;
+  // Solo llega en `true` cuando la pantalla pidió `incluir_baja`, que exige
+  // `organizacion.gestionar`. El resto del ERP no recibe estos almacenes.
+  de_baja?: boolean;
 };
 
 function CamposAlmacen({
@@ -154,13 +161,59 @@ function DialogoEditarAlmacen({
   );
 }
 
+/**
+ * Baja y reactivación en el mismo botón: son el mismo estado visto desde sus
+ * dos lados, y separarlos dejaba una acción visible que nunca aplica a la
+ * fila que se está mirando.
+ *
+ * La baja pregunta; reactivar no —deshacer algo no necesita confirmación—.
+ */
+function BotonBaja({
+  almacen,
+  onError,
+}: {
+  almacen: Almacen;
+  onError: (mensaje: string) => void;
+}) {
+  const [pendiente, startTransition] = useTransition();
+  const deBaja = almacen.de_baja === true;
+
+  const correr = () => {
+    if (
+      !deBaja &&
+      !window.confirm(
+        `¿Dar de baja el almacén «${almacen.nombre}»? Deja de aparecer en compras, ` +
+          `inventario y producción. Se puede reactivar después.`,
+      )
+    ) {
+      return;
+    }
+    onError("");
+    startTransition(async () => {
+      const r = deBaja
+        ? await reactivarAlmacenAction(almacen.id)
+        : await darDeBajaAlmacenAction(almacen.id);
+      if (!r.ok) onError(r.error);
+    });
+  };
+
+  return (
+    <button type="button" className={BOTON_FILA} onClick={correr} disabled={pendiente}>
+      {deBaja ? "Reactivar" : "Dar de baja"}
+    </button>
+  );
+}
+
 export function AlmacenesCliente({
   almacenes,
   sucursales,
+  puedeGestionar,
 }: {
   almacenes: Almacen[];
   sucursales: Sucursal[];
+  puedeGestionar: boolean;
 }) {
+  const [error, setError] = useState("");
   const nombreSucursal = useMemo(
     () => new Map(sucursales.map((s) => [s.id, s.nombre])),
     [sucursales],
@@ -172,7 +225,18 @@ export function AlmacenesCliente({
 
   const columnas: ColumnDef<Almacen>[] = useMemo(
     () => [
-      { accessorKey: "nombre", header: "Almacén" },
+      {
+        accessorKey: "nombre",
+        header: "Almacén",
+        // Un almacén de baja sigue en la tabla —es la única pantalla donde se
+        // puede recuperar— pero tiene que leerse distinto de uno vivo.
+        cell: ({ row }) =>
+          row.original.de_baja ? (
+            <span className="text-gray line-through">{row.original.nombre}</span>
+          ) : (
+            row.original.nombre
+          ),
+      },
       { accessorKey: "tipo", header: "Tipo" },
       {
         id: "sucursal",
@@ -190,15 +254,20 @@ export function AlmacenesCliente({
         id: "acciones",
         header: "",
         cell: ({ row }) => (
-          <DialogoEditarAlmacen
-            almacen={row.original}
-            sucursales={sucursales}
-            almacenes={almacenes}
-          />
+          <div className="flex justify-end gap-1">
+            {!row.original.de_baja && (
+              <DialogoEditarAlmacen
+                almacen={row.original}
+                sucursales={sucursales}
+                almacenes={almacenes}
+              />
+            )}
+            {puedeGestionar && <BotonBaja almacen={row.original} onError={setError} />}
+          </div>
         ),
       },
     ],
-    [nombreSucursal, nombreAlmacen, sucursales, almacenes],
+    [nombreSucursal, nombreAlmacen, sucursales, almacenes, puedeGestionar],
   );
 
   return (
@@ -212,6 +281,13 @@ export function AlmacenesCliente({
         falta: el local solicita, el supervisor aprueba y reserva, el central despacha
         por FEFO.
       </p>
+      {/* El 409 de la API nombra quién se abastece de este almacén: es
+          exactamente lo que hace falta para desatascarse. */}
+      {error && (
+        <p role="status" className="text-sm text-secondary">
+          {error}
+        </p>
+      )}
       <TablaDatos
         columnas={columnas}
         datos={almacenes}

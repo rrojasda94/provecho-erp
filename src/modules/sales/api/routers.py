@@ -618,6 +618,25 @@ def registrar_entrega(
     return resultado
 
 
+@router.post("/ventas/{venta_id}/deshacer-entrega", response_model=schemas.EntregaOut)
+def deshacer_entrega(
+    venta_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(ENTREGAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Devuelve el pedido de `entregado` a `listo`: el toque equivocado sobre
+    la tarjeta de al lado en despacho.
+
+    Mismo permiso que entregar y no uno nuevo: quien puede dar por entregado
+    un pedido es exactamente quien tiene que poder corregirse. Deshacer algo
+    que no está entregado es un no-op, no un error."""
+    exigir_venta(session, venta_id, tenant)
+    resultado = cumplimiento.deshacer_entrega(session, venta_id)
+    session.commit()
+    return resultado
+
+
 # --- Comprobante electrónico ------------------------------------------------
 @router.get("/ventas/{venta_id}/comprobante", response_model=schemas.ComprobanteOut)
 def ver_comprobante(

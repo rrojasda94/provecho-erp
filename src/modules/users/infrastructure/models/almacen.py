@@ -42,3 +42,9 @@ class Almacen(
     almacen_abastecedor_respaldo_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("almacen.id"), nullable=True
     )
+
+    @property
+    def de_baja(self) -> bool:
+        """Para la pantalla de organización, que es la única que ve los de
+        baja. El resto del ERP no los recibe siquiera."""
+        return self.deleted_at is not None

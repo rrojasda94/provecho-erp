@@ -145,6 +145,27 @@ def _interpretar_ruc(numero: str, cuerpo: dict) -> ConsultaEmpresa:
     )
 
 
+def _motivo(status_code: int, cuerpo: dict | None) -> str:
+    """Por qué falló la consulta, en palabras del proveedor cuando las manda.
+
+    Este texto va al log del servidor, no a la pantalla de caja: puede traer
+    nombres de variables de entorno o el WhatsApp de soporte de Factiliza.
+    `consulta_router` es el que decide qué se le muestra al cajero.
+    """
+    mensaje = cuerpo.get("message") if isinstance(cuerpo, dict) else None
+    if isinstance(mensaje, str) and mensaje.strip():
+        return f"Factiliza devolvió {status_code}: {mensaje.strip()}"
+    # Sin mensaje, 401/403 es siempre lo mismo y conviene decirlo: el producto
+    # de consulta rechaza el token de emisión aunque esté vigente.
+    if status_code in (401, 403):
+        return (
+            f"Factiliza rechazó el token ({status_code}): revisa "
+            "FACTILIZA_CONSULTA_DOCUMENTO_TOKEN —es distinto del de "
+            "emisión— y que el plan de consultas esté activo"
+        )
+    return f"Factiliza devolvió {status_code}"
+
+
 class FactilizaClient:
     def __init__(
         self,
@@ -167,6 +188,8 @@ class FactilizaClient:
             else (settings.factiliza_consulta_documento_token or self.token)
         )
         self.timeout = timeout or settings.factiliza_timeout_segundos
+        # Consultar es interactivo; emitir no. Ver `settings`.
+        self.consulta_timeout = timeout or settings.factiliza_consulta_timeout_segundos
 
     def enviar_comprobante(self, payload: dict) -> RespuestaEmision:
         """POST /invoice/send — boleta o factura.
@@ -215,38 +238,43 @@ class FactilizaClient:
         """GET de consulta RUC/DNI, contra `consulta_base_url` — producto
         distinto de `invoice/send` (esa es solo emisión, apunta a la QA de
         facturación). Un 404 vacío es "no encontrado", respuesta válida, no
-        excepción; solo transporte/servidor caído levanta `FactilizaError`."""
+        excepción; **cualquier otro estado de error es `FactilizaError`**."""
         if not self.consulta_token:
             raise FactilizaError("FACTILIZA_CONSULTA_DOCUMENTO_TOKEN no configurado")
         try:
             respuesta = httpx.get(
                 f"{self.consulta_base_url}/{ruta}/info/{numero}",
                 headers={"Authorization": f"Bearer {self.consulta_token}"},
-                timeout=self.timeout,
+                timeout=self.consulta_timeout,
             )
         except httpx.HTTPError as e:
             raise FactilizaError(f"Factiliza no responde: {e}") from e
+        # El único "no encontrado" del proveedor: 404 sin cuerpo. Esa persona
+        # no está en RENIEC y el alta sigue tecleando el nombre.
         if respuesta.status_code == 404 and not respuesta.text:
             return None
-        # 401/403 con cuerpo vacío es lo que devuelve el producto de consulta
-        # cuando el token no le sirve —revocado, regenerado en el panel, o de
-        # otro producto—. Se nombra: sin esto caía en el `.json()` de abajo y
-        # el operador leía "respuesta ilegible", que manda a buscar un error
-        # de parseo donde lo que hay que revisar es la credencial.
-        if respuesta.status_code in (401, 403):
-            raise FactilizaError(
-                f"Factiliza rechazó el token ({respuesta.status_code}): revisa "
-                "FACTILIZA_CONSULTA_DOCUMENTO_TOKEN —es distinto del de "
-                "emisión— y que el plan de consultas esté activo"
-            )
-        if respuesta.status_code >= 500:
-            raise FactilizaError(f"Factiliza devolvió {respuesta.status_code}")
         try:
-            return respuesta.json()
-        except ValueError as e:
+            cuerpo = respuesta.json()
+        except ValueError:
+            cuerpo = None
+        # Cualquier otro estado de error se nombra con lo que diga el
+        # proveedor, sin enumerar códigos: enumerarlos dejaba fuera los no
+        # previstos. Un 405 «Token con falta de pago» caía en el parseo, salía
+        # como `success: false`, y el cajero leía "ese DNI no figura" para
+        # todos los documentos —una cuenta impaga disfrazada de RENIEC vacío,
+        # visto el 2026-08-26—.
+        if respuesta.status_code >= 400:
+            raise FactilizaError(_motivo(respuesta.status_code, cuerpo))
+        if not isinstance(cuerpo, dict):
             raise FactilizaError(
-                f"Respuesta ilegible de Factiliza ({respuesta.status_code}): {e}"
-            ) from e
+                f"Respuesta ilegible de Factiliza ({respuesta.status_code})"
+            )
+        # 200 con `success: false` tampoco es un resultado: el proveedor está
+        # diciendo que no atendió la consulta. Se trata como fallo suyo y no
+        # como documento inexistente — se teclea igual, pero se lee por qué.
+        if cuerpo.get("success") is False:
+            raise FactilizaError(_motivo(respuesta.status_code, cuerpo))
+        return cuerpo
 
     def consultar_dni(self, dni: str) -> ConsultaPersona:
         """GET /dni/info/{dni} — RENIEC vía Factiliza."""

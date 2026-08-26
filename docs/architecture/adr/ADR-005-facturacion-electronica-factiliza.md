@@ -57,6 +57,26 @@ Motivos:
   encontrado, cae a lo tecleado por el usuario. Cableado en el alta de
   cliente (`sales`) y proveedor jurídico (`purchases`) — ver RN-PTS-004 en
   `docs/domain/business-rules.md`.
+- **Qué cuenta como «no encontrado» y qué como fallo del proveedor**
+  (2026-08-26). Solo el **404 con cuerpo vacío** es documento inexistente:
+  RENIEC/SUNAT no lo tienen y el alta sigue tecleando. **Cualquier otro
+  estado ≥ 400 es fallo de Factiliza** y levanta `FactilizaError`, nombrado
+  con el `message` que el propio proveedor manda; un `success: false` con 200
+  tampoco pasa por resultado. Antes se enumeraban tres códigos (404, 401/403,
+  ≥ 500) y todo lo demás caía al parseo: un **405 «Token con falta de pago»**
+  —lo que devuelve el producto de consulta con el plan impago— salía como
+  `encontrado: false` y el cajero leía «Ese DNI no figura» para todos los
+  documentos. Enumerar códigos de un proveedor que no controlamos es apostar
+  a conocer su lista completa; la regla general no necesita esa apuesta.
+- **El motivo del fallo no llega al cliente HTTP.** El 502 de
+  `core/consulta_router.py` responde un mensaje fijo («Completa los datos a
+  mano») y manda el detalle al log: el texto del proveedor trae nombres de
+  variables de entorno y su WhatsApp de soporte, que le sirven a quien
+  administra el servidor y no a quien tiene un cliente en el mostrador.
+- **Dos timeouts, no uno** (2026-08-26): `FACTILIZA_TIMEOUT_SEGUNDOS` (30 s)
+  para emisión —asíncrona, con SUNAT de por medio— y
+  `FACTILIZA_CONSULTA_TIMEOUT_SEGUNDOS` (8 s) para la consulta, que es
+  interactiva y deja el botón deshabilitado mientras espera.
 - El mapper es la pieza que **no** es reutilizable si se cambia de proveedor:
   los catálogos SUNAT sí son estándar, pero el nombre y la forma de cada
   campo son de Factiliza. El `client.py` sí es intercambiable.

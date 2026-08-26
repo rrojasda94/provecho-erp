@@ -1,8 +1,15 @@
 "use client";
 
-import { ETIQUETA_ESTADO, apiKds, type ItemCola, type PedidoCola } from "@/lib/kds";
+import {
+  ETIQUETA_ESTADO,
+  apiKds,
+  type ItemCola,
+  type PedidoCola,
+  type Semaforo,
+} from "@/lib/kds";
 
 import NombreDeLinea from "./nombre-linea";
+import { Espera, coloresDe, nivelDelPedido } from "./semaforo";
 import { useCola } from "./use-cola";
 
 /**
@@ -20,7 +27,9 @@ import { useCola } from "./use-cola";
 
 type Props = {
   pantalla: { id: string; nombre: string };
+  sucursalId: string;
   puedeEntregar: boolean;
+  semaforo: Semaforo;
 };
 
 /** Estaciones por las que el pedido todavía espera, sin repetir. */
@@ -35,19 +44,24 @@ function listos(items: ItemCola[]): number {
 function Tarjeta({
   pedido,
   puedeEntregar,
+  semaforo,
   onEntregar,
 }: {
   pedido: PedidoCola;
   puedeEntregar: boolean;
+  semaforo: Semaforo;
   onEntregar: () => void;
 }) {
   const faltan = pendientesPor(pedido.items);
   const completo = pedido.estado_pedido === "listo";
   return (
-    <article className={`kds-card ${pedido.estado_pedido}`}>
+    <article
+      className={`kds-card ${pedido.estado_pedido} nivel-${nivelDelPedido(pedido, semaforo)}`}
+    >
       <header>
         <span className="kds-orden">#{pedido.numero_orden}</span>
         <span className="kds-ref">{pedido.referencia_atencion ?? "—"}</span>
+        <Espera pedido={pedido} semaforo={semaforo} />
         <span className="kds-badge">{ETIQUETA_ESTADO[pedido.estado_pedido]}</span>
       </header>
       <small className="kds-canal">
@@ -101,7 +115,12 @@ function Tarjeta({
   );
 }
 
-export default function DespachoCliente({ pantalla, puedeEntregar }: Props) {
+export default function DespachoCliente({
+  pantalla,
+  sucursalId,
+  puedeEntregar,
+  semaforo,
+}: Props) {
   const { pedidos, aviso, setAviso, avisarDe, cargado, refrescar } = useCola(pantalla.id);
 
   const entregar = async (pedido: PedidoCola) => {
@@ -116,7 +135,7 @@ export default function DespachoCliente({ pantalla, puedeEntregar }: Props) {
   };
 
   return (
-    <main className="kds">
+    <main className="kds" style={coloresDe(semaforo)}>
       <header className="kds-top">
         <div className="kds-marca">
           <strong>{pantalla.nombre}</strong>
@@ -126,7 +145,15 @@ export default function DespachoCliente({ pantalla, puedeEntregar }: Props) {
         <span className="kds-meta">
           {pedidos.length} {pedidos.length === 1 ? "pedido" : "pedidos"}
         </span>
-        <a className="kds-cambiar" href="/kds">
+        {/* Lo que ya salió, con la vuelta atrás para el toque sobre la
+            tarjeta equivocada. */}
+        <a
+          className="kds-cambiar"
+          href={`/kds?pantalla=${pantalla.id}&sucursal=${sucursalId}&vista=historial`}
+        >
+          Historial
+        </a>
+        <a className="kds-cambiar" href={`/kds?sucursal=${sucursalId}`}>
           Estaciones
         </a>
       </header>
@@ -142,6 +169,7 @@ export default function DespachoCliente({ pantalla, puedeEntregar }: Props) {
               key={pedido.venta_id}
               pedido={pedido}
               puedeEntregar={puedeEntregar}
+              semaforo={semaforo}
               onEntregar={() => entregar(pedido)}
             />
           ))}

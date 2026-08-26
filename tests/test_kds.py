@@ -67,7 +67,13 @@ def env(monkeypatch):
             marca_id=marca.id, empresa_id=empresa.id, nombre="Tarapoto Centro",
             direccion="Jr. X 123", tenencia="alquilada",
         )
-        s.add(sucursal)
+        # Una segunda sucursal, sin pantallas: es contra ella que se prueba
+        # mudar una estación (una tablet que se lleva al local nuevo).
+        sucursal_b = Sucursal(
+            marca_id=marca.id, empresa_id=empresa.id, nombre="Tarapoto Norte",
+            direccion="Jr. Y 456", tenencia="alquilada",
+        )
+        s.add_all([sucursal, sucursal_b])
         s.flush()
         pv = PuntoVenta(
             sucursal_id=sucursal.id, canal="trabajador",
@@ -126,7 +132,8 @@ def env(monkeypatch):
                    monto=Decimal("5.00")),
         ])
         ids.update(
-            sucursal_id=str(sucursal.id), pv_id=str(pv.id),
+            sucursal_id=str(sucursal.id), sucursal_b=str(sucursal_b.id),
+            pv_id=str(pv.id),
             cat_pizzas=str(cat_pizzas.id), cat_bebidas=str(cat_bebidas.id),
             pizza_id=str(pizza.id), bebida_id=str(bebida.id),
             marca_id=str(marca.id), receta_pizza=str(receta_p.id),
@@ -263,19 +270,47 @@ def test_item_tachado_sigue_visible_hasta_terminar_la_estacion(env):
     assert _cola(client, h, pase["id"]) == []
 
 
-def test_no_retroceso(env):
+def test_avanzar_no_salta_ni_retrocede(env):
+    """`/avanzar` sigue siendo estrictamente hacia adelante y de a un paso.
+    Deshacer tiene su propia puerta (`/retroceder`): si `/avanzar` aceptara
+    ir para atrás, un `estado` mal calculado en el cliente desharía trabajo
+    creyendo que lo adelanta."""
     client, ids = env
     h = _token(client)
-    horno, _, _, venta = _setup_pantallas_y_venta(client, ids, h)
+    horno, _, _, _ = _setup_pantallas_y_venta(client, ids, h)
     item = _cola(client, h, horno["id"])[0]["items"][0]["venta_item_id"]
     # Saltarse un estado → 409.
     assert client.post(f"/api/v1/kds/items/{item}/avanzar", headers=h,
                        json={"estado": "listo"}).status_code == 409
     client.post(f"/api/v1/kds/items/{item}/avanzar", headers=h,
                 json={"estado": "en_preparacion"})
-    # Retroceder → 409.
+    # Retroceder por la puerta de avanzar → 409.
     assert client.post(f"/api/v1/kds/items/{item}/avanzar", headers=h,
                        json={"estado": "pendiente"}).status_code == 409
+
+
+def test_deshacer_un_paso_devuelve_el_estado(env):
+    """El toque equivocado con las manos ocupadas: se marca en preparación un
+    plato que todavía no se empezó."""
+    client, ids = env
+    h = _token(client)
+    horno, _, _, _ = _setup_pantallas_y_venta(client, ids, h)
+    item = _cola(client, h, horno["id"])[0]["items"][0]["venta_item_id"]
+    client.post(f"/api/v1/kds/items/{item}/avanzar", headers=h,
+                json={"estado": "en_preparacion"})
+
+    r = client.post(f"/api/v1/kds/items/{item}/retroceder", headers=h)
+    assert r.status_code == 200, r.text
+    assert r.json()["estado"] == "pendiente"
+
+
+def test_sin_avance_no_hay_nada_que_deshacer(env):
+    client, ids = env
+    h = _token(client)
+    horno, _, _, _ = _setup_pantallas_y_venta(client, ids, h)
+    item = _cola(client, h, horno["id"])[0]["items"][0]["venta_item_id"]
+    r = client.post(f"/api/v1/kds/items/{item}/retroceder", headers=h)
+    assert r.status_code == 409, r.text
 
 
 def test_comanda_y_reimpresion(env):
@@ -335,6 +370,68 @@ def test_el_supervisor_opera_pero_ya_no_configura(env):
     assert client.delete(
         f"/api/v1/kds/pantallas/{horno['id']}", headers=h_sup
     ).status_code == 403
+
+
+def test_una_pantalla_se_muda_de_sucursal(env):
+    """Una tablet que se lleva al local nuevo no tiene por qué obligar a
+    recrear la estación —y perder su historia— en la otra sucursal."""
+    client, ids = env
+    h = _token(client)
+    pantalla = client.post("/api/v1/kds/pantallas", headers=h, json={
+        "sucursal_id": ids["sucursal_id"], "nombre": "Postres",
+        "tipo": "preparacion", "categoria_ids": [], "orden": 5,
+    }).json()
+
+    r = client.patch(
+        f"/api/v1/kds/pantallas/{pantalla['id']}",
+        headers=h,
+        json={"sucursal_id": ids["sucursal_b"]},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["sucursal_id"] == ids["sucursal_b"]
+
+    # Y deja de verse desde la sucursal de origen.
+    origen = client.get(
+        f"/api/v1/kds/pantallas?sucursal_id={ids['sucursal_id']}", headers=h
+    ).json()
+    assert pantalla["id"] not in [p["id"] for p in origen]
+
+
+def test_mudar_una_pantalla_con_cola_deja_pedidos_invisibles(env):
+    """Mismo criterio que borrarla: las líneas que están pasando por esta
+    estación quedarían esperando en una cocina que ya no las mira."""
+    client, ids = env
+    h = _token(client)
+    horno, _, _, _ = _setup_pantallas_y_venta(client, ids, h)
+
+    r = client.patch(
+        f"/api/v1/kds/pantallas/{horno['id']}",
+        headers=h,
+        json={"sucursal_id": ids["sucursal_b"]},
+    )
+    assert r.status_code == 409, r.text
+    assert "cola" in r.json()["detail"]
+
+
+def test_mudarla_a_una_sucursal_que_ya_tiene_ese_nombre_es_409(env):
+    """El índice único es `(sucursal_id, nombre)` entre las vivas: sin este
+    chequeo lo que sale es un IntegrityError que no le dice nada a nadie."""
+    client, ids = env
+    h = _token(client)
+    aca = client.post("/api/v1/kds/pantallas", headers=h, json={
+        "sucursal_id": ids["sucursal_id"], "nombre": "Horno", "tipo": "preparacion",
+    }).json()
+    client.post("/api/v1/kds/pantallas", headers=h, json={
+        "sucursal_id": ids["sucursal_b"], "nombre": "Horno", "tipo": "preparacion",
+    })
+
+    r = client.patch(
+        f"/api/v1/kds/pantallas/{aca['id']}",
+        headers=h,
+        json={"sucursal_id": ids["sucursal_b"]},
+    )
+    assert r.status_code == 409, r.text
+    assert "Horno" in r.json()["detail"]
 
 
 def test_borrar_una_pantalla_exige_que_la_cola_este_vacia(env):
@@ -467,6 +564,121 @@ def test_venta_anulada_no_se_entrega(env):
     ).status_code == 409
 
 
+# --- Historial y corrección de la entrega (2026-08-26) -------------------------
+def _historial(client, h, pantalla_id):
+    return client.get(
+        f"/api/v1/kds/pantallas/{pantalla_id}/historial", headers=h
+    ).json()
+
+
+def test_el_pedido_entregado_sale_de_la_cola_y_entra_al_historial(env):
+    """Hasta ahora un pedido entregado desaparecía de la pantalla sin dejar
+    dónde buscarlo: si se entregó el equivocado, no había forma de saberlo
+    mirando la cocina."""
+    client, ids = env
+    h = _token(client)
+    horno, barra, despacho, venta = _setup_pantallas_y_venta(client, ids, h)
+    _dejar_pedido_listo(client, h, horno, barra)
+
+    assert _historial(client, h, despacho["id"]) == []
+    client.post(f"/api/v1/sales/ventas/{venta['id']}/entrega", headers=h)
+
+    assert _cola(client, h, despacho["id"]) == []
+    hist = _historial(client, h, despacho["id"])
+    assert [p["venta_id"] for p in hist] == [venta["id"]]
+    assert hist[0]["estado_pedido"] == "entregado"
+    assert hist[0]["entregado_en"]
+
+
+def test_el_historial_de_otra_sucursal_no_se_ve(env):
+    client, ids = env
+    h = _token(client)
+    horno, barra, _despacho, venta = _setup_pantallas_y_venta(client, ids, h)
+    _dejar_pedido_listo(client, h, horno, barra)
+    client.post(f"/api/v1/sales/ventas/{venta['id']}/entrega", headers=h)
+
+    ajena = client.post("/api/v1/kds/pantallas", headers=h, json={
+        "sucursal_id": ids["sucursal_b"], "nombre": "Pase", "tipo": "despacho",
+    }).json()
+    assert _historial(client, h, ajena["id"]) == []
+
+
+def test_deshacer_una_entrega_equivocada_devuelve_el_pedido_a_despacho(env):
+    """El toque sobre la tarjeta de al lado. Sin vuelta, el único arreglo
+    era anular la venta —que es otra cosa— o dejar la cocina mintiendo."""
+    client, ids = env
+    h = _token(client)
+    horno, barra, despacho, venta = _setup_pantallas_y_venta(client, ids, h)
+    _dejar_pedido_listo(client, h, horno, barra)
+    client.post(f"/api/v1/sales/ventas/{venta['id']}/entrega", headers=h)
+
+    r = client.post(
+        f"/api/v1/sales/ventas/{venta['id']}/deshacer-entrega", headers=h
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["estado_pedido"] == "listo"
+    assert [p["venta_id"] for p in _cola(client, h, despacho["id"])] == [venta["id"]]
+    assert _historial(client, h, despacho["id"]) == []
+
+
+def test_deshacer_una_entrega_que_no_ocurrio_no_es_un_error(env):
+    """Dos toques del mismo botón, o dos tablets mirando el mismo pedido: un
+    409 acá no significaría nada para quien lo lee."""
+    client, ids = env
+    h = _token(client)
+    horno, barra, _despacho, venta = _setup_pantallas_y_venta(client, ids, h)
+    _dejar_pedido_listo(client, h, horno, barra)
+    r = client.post(
+        f"/api/v1/sales/ventas/{venta['id']}/deshacer-entrega", headers=h
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["estado_pedido"] == "listo"
+
+
+def test_una_venta_anulada_no_tiene_entrega_que_deshacer(env):
+    client, ids = env
+    h = _token(client)
+    horno, barra, _despacho, venta = _setup_pantallas_y_venta(client, ids, h)
+    _dejar_pedido_listo(client, h, horno, barra)
+    client.post(f"/api/v1/sales/ventas/{venta['id']}/entrega", headers=h)
+    client.post(f"/api/v1/sales/ventas/{venta['id']}/anular", headers=h)
+    assert client.post(
+        f"/api/v1/sales/ventas/{venta['id']}/deshacer-entrega", headers=h
+    ).status_code == 409
+
+
+def test_la_cocina_no_deshace_una_entrega(env):
+    """Mismo permiso que entregar (RN-CUP-006): el cocinero no da por
+    entregado un pedido, y tampoco lo desentrega."""
+    client, ids = env
+    h = _token(client)
+    horno, barra, _despacho, venta = _setup_pantallas_y_venta(client, ids, h)
+    _dejar_pedido_listo(client, h, horno, barra)
+    client.post(f"/api/v1/sales/ventas/{venta['id']}/entrega", headers=h)
+
+    cocina = _token(client, "cocinero1", "111222")
+    assert client.post(
+        f"/api/v1/sales/ventas/{venta['id']}/deshacer-entrega", headers=cocina
+    ).status_code == 403
+
+
+def test_desde_el_kds_no_se_deshace_la_entrega(env):
+    """`/retroceder` es de a un paso dentro de cocina; salir de `entregado`
+    es un acto de la venta completa y tiene su propia puerta."""
+    client, ids = env
+    h = _token(client)
+    horno, barra, _despacho, venta = _setup_pantallas_y_venta(client, ids, h)
+    _dejar_pedido_listo(client, h, horno, barra)
+    item = client.get(
+        f"/api/v1/kds/ventas/{venta['id']}/avance", headers=h
+    ).json()["items"][0]["venta_item_id"]
+    client.post(f"/api/v1/sales/ventas/{venta['id']}/entrega", headers=h)
+
+    r = client.post(f"/api/v1/kds/items/{item}/retroceder", headers=h)
+    assert r.status_code == 409, r.text
+    assert "deshacer-entrega" in r.json()["detail"]
+
+
 def test_pantalla_sin_categorias_ve_todo(env):
     client, ids = env
     h = _token(client)
@@ -546,6 +758,64 @@ def test_la_linea_recorre_la_cadena_de_estaciones(env):
     # Tacharla en el horno sí, porque no queda cadena por delante.
     final = _tachar(client, h, en_horno["venta_item_id"], desde="en_preparacion")
     assert final["estado"] == "listo"
+
+
+def test_la_linea_mandada_por_error_vuelve_a_la_estacion_anterior(env):
+    """El error de envío que motivó todo esto: en armado se tacha la pizza
+    antes de tiempo y se va al horno. Deshacer la trae de vuelta al armado,
+    no la deja lista ni la manda al principio del pedido."""
+    client, ids = env
+    h = _token(client)
+    armado, horno, _barra, _ = _cadena_de_tres(client, ids, h)
+    pizza = _cola(client, h, armado["id"])[0]["items"][0]
+    _tachar(client, h, pizza["venta_item_id"])
+    assert _cola(client, h, armado["id"]) == []
+
+    r = client.post(
+        f"/api/v1/kds/items/{pizza['venta_item_id']}/retroceder", headers=h
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["etapa_kds"] == 0
+    # Sigue en preparación: lo que se deshizo fue el envío, no el trabajo.
+    assert r.json()["estado"] == "en_preparacion"
+
+    devuelta = _cola(client, h, armado["id"])[0]["items"][0]
+    assert devuelta["estacion"] == "Armado"
+    assert _cola(client, h, horno["id"]) == []
+
+
+def test_una_linea_lista_vuelve_a_su_ultima_estacion(env):
+    """`listo` vuelve a `en_preparacion` en el eslabón donde se terminó —el
+    horno—, no en el primero de la cadena: el armado ya hizo lo suyo."""
+    client, ids = env
+    h = _token(client)
+    armado, horno, _barra, _ = _cadena_de_tres(client, ids, h)
+    pizza = _cola(client, h, armado["id"])[0]["items"][0]["venta_item_id"]
+    _tachar(client, h, pizza)
+    _tachar(client, h, pizza, desde="en_preparacion")
+
+    r = client.post(f"/api/v1/kds/items/{pizza}/retroceder", headers=h)
+    assert r.json()["estado"] == "en_preparacion"
+    assert r.json()["etapa_kds"] == 1
+    assert _cola(client, h, horno["id"])[0]["items"][0]["estacion"] == "Horno"
+    assert _cola(client, h, armado["id"]) == []
+
+
+def test_la_bebida_vuelve_a_la_barra_y_no_al_horno(env):
+    """La cadena de una línea son solo las estaciones que atienden su
+    categoría: deshacer una bebida no puede mandarla a un horno por el que
+    nunca pasó."""
+    client, ids = env
+    h = _token(client)
+    _armado, horno, barra, _ = _cadena_de_tres(client, ids, h)
+    bebida = _cola(client, h, barra["id"])[0]["items"][0]["venta_item_id"]
+    _tachar(client, h, bebida)
+
+    r = client.post(f"/api/v1/kds/items/{bebida}/retroceder", headers=h)
+    assert r.json()["estado"] == "en_preparacion"
+    assert r.json()["etapa_kds"] == 0
+    assert _cola(client, h, barra["id"])[0]["items"][0]["estacion"] == "Barra"
+    assert _cola(client, h, horno["id"]) == []
 
 
 def test_la_bebida_se_salta_el_horno_sola(env):

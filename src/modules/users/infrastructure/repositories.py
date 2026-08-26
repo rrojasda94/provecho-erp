@@ -410,15 +410,20 @@ class AlmacenRepo:
     def __init__(self, session: Session) -> None:
         self.s = session
 
-    def get(self, almacen_id: uuid.UUID) -> Almacen | None:
-        return self.s.scalar(
-            select(Almacen).where(
-                Almacen.id == almacen_id, Almacen.deleted_at.is_(None)
-            )
-        )
+    def get(self, almacen_id: uuid.UUID, incluir_baja: bool = False) -> Almacen | None:
+        """`incluir_baja` solo lo pide quien va a reactivarlo: para todo lo
+        demás un almacén de baja no existe."""
+        stmt = select(Almacen).where(Almacen.id == almacen_id)
+        if not incluir_baja:
+            stmt = stmt.where(Almacen.deleted_at.is_(None))
+        return self.s.scalar(stmt)
 
-    def list(self, empresa_id: uuid.UUID | None = None) -> list[Almacen]:
-        stmt = select(Almacen).where(Almacen.deleted_at.is_(None))
+    def list(
+        self, empresa_id: uuid.UUID | None = None, incluir_baja: bool = False
+    ) -> list[Almacen]:
+        stmt = select(Almacen)
+        if not incluir_baja:
+            stmt = stmt.where(Almacen.deleted_at.is_(None))
         if empresa_id is not None:
             stmt = stmt.where(Almacen.empresa_id == empresa_id)
         return list(self.s.scalars(stmt.order_by(Almacen.nombre)))

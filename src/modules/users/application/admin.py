@@ -221,8 +221,12 @@ def q_personas(session: Session, q: str | None = None):
 
 
 # --- Organización (Almacen vive acá por historia, ver data-model §1) --------
-def listar_almacenes(session: Session, empresa_id: uuid.UUID | None = None) -> list[Almacen]:
-    return AlmacenRepo(session).list(empresa_id)
+def listar_almacenes(
+    session: Session,
+    empresa_id: uuid.UUID | None = None,
+    incluir_baja: bool = False,
+) -> list[Almacen]:
+    return AlmacenRepo(session).list(empresa_id, incluir_baja)
 
 
 def listar_marcas(session: Session, empresa_id: uuid.UUID | None = None) -> list[Marca]:

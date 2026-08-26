@@ -45,6 +45,16 @@ almacenes, y la baja lógica negada con dependientes vivos. Cerrar un local
 es `sucursal.estado="inactiva"`, no una baja: sigue siendo el ancla de sus
 ventas, cajas y trabajadores (mismo criterio que RN-GEN-006).
 
+La baja de un **almacén** sí es `deleted_at`, y desde 2026-08-26 tiene vuelta:
+`POST /almacenes/{id}/reactivar`. La baja no consulta el stock —vive en
+`inventory` y `users` no importa el dominio de otro módulo—, así que la única
+red posible es poder deshacerla; sin ella, equivocarse era definitivo porque
+`AlmacenRepo.get/list` filtran `deleted_at` y el registro desaparecía de toda
+la interfaz. Los dados de baja se listan solo con
+`GET /almacenes?incluir_baja=true`, que exige `organizacion.gestionar`: el
+catálogo plano lo lee cualquiera para elegir un destino, y ahí un almacén de
+baja no puede aparecer.
+
 ```mermaid
 erDiagram
     grupo ||--o{ empresa : tiene

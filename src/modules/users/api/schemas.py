@@ -161,6 +161,10 @@ class AlmacenOut(UbicacionMixin):
     # A quién se le pide cuando el principal no está disponible
     # (RN-INV-022). Distinto del principal y de la misma empresa.
     almacen_abastecedor_respaldo_id: uuid.UUID | None = None
+    # Siempre `False` salvo en el listado con `incluir_baja`, que es el único
+    # que devuelve almacenes dados de baja. Se expone el hecho y no el
+    # `deleted_at`: la fecha exacta de la baja no la usa ninguna pantalla.
+    de_baja: bool = False
 
 
 class MarcaOut(BaseModel):
