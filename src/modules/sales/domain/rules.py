@@ -6,6 +6,18 @@ from decimal import Decimal
 CANALES = {"pdv", "agente_ia", "delivery"}
 MODALIDADES = {"mesa", "takeout", "delivery"}
 
+# --- Mesas del salón (RN-MDC-004) --------------------------------------------
+# El plano es una grilla de celdas, no coordenadas libres: una mesa nueva
+# sin celda pedida cae en la primera libre leyendo la grilla por filas.
+MESA_COLUMNAS = 12
+
+
+def posicion_por_defecto(indice: int) -> tuple[int, int]:
+    """Celda (x, y) para la mesa que ocupa el `indice`-ésimo lugar del
+    plano (0-based), llenando la grilla por filas."""
+    return indice % MESA_COLUMNAS, indice // MESA_COLUMNAS
+
+
 # --- Tipo de venta (RN-COM-025) ----------------------------------------------
 # La comida que el negocio le da a su personal se prepara y despacha como
 # cualquier pedido, pero no es una venta: no tiene precio, no se cobra y no

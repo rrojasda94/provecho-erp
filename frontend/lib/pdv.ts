@@ -122,6 +122,8 @@ export type MesaEnMapa = {
   numero: number;
   zona: string | null;
   capacidad: number | null;
+  pos_x: number;
+  pos_y: number;
   venta_id: string | null;
   numero_orden: number | null;
   comensales: number | null;

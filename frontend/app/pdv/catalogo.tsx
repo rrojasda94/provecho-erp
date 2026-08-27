@@ -254,6 +254,7 @@ function MapaMesas({
                 key={m.id}
                 type="button"
                 className={`pdv-mesa ${m.venta_id ? "ocupada" : ""}`}
+                style={{ gridColumn: m.pos_x + 1, gridRow: m.pos_y + 1 }}
                 onClick={() => onMesa(m)}
               >
                 <span className="pdv-mesa-num">{m.numero}</span>
@@ -273,7 +274,8 @@ function MapaMesas({
         </>
       ) : (
         <p className="pdv-nada">
-          Esta sucursal no tiene mesas configuradas todavía.
+          Esta sucursal no tiene mesas configuradas todavía. Se configuran
+          en Ventas → Mesas.
         </p>
       )}
 

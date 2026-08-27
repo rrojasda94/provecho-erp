@@ -651,3 +651,15 @@ que es una decisión de pantalla y no un bug de una línea.
 - ⬜ **Crear un atributo nuevo solo se puede desde `/catalogo/atributos`.**
   La ficha del producto no tiene un atajo "+ Nuevo atributo" inline; hay que
   ir y volver.
+- ⬜ **El plano de mesas es uno solo por sucursal, no separa por `zona`**
+  (2026-08-27, ADR-069). `/ventas/mesas` y el mapa del PDV pintan todas las
+  mesas de la sucursal en la misma grilla de 12 columnas, aunque tengan
+  "Salón" y "Terraza" distintas — una mesa de la terraza puede terminar
+  arrastrada visualmente pegada a una del salón. Separar por zona es una
+  grilla por zona en vez de una por sucursal; se dejó afuera porque el pedido
+  fue "poder editar, crear, numerar y borrar", no diseñar el salón completo.
+- ⬜ **`mesas.mapa()` sigue siendo N+1** (ya lo era desde ADR-018, sin
+  resolver en ADR-069): por cada mesa ocupada hace una consulta separada de
+  `venta_repo.items(venta.id)` para calcular el total. Barato hoy (un salón
+  tiene decenas de mesas, no miles); se vuelve un problema si el mapa se
+  refresca muy seguido desde muchas tablets a la vez.
