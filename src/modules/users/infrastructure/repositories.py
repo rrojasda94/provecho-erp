@@ -15,7 +15,7 @@ from __future__ import annotations
 import uuid
 
 from sqlalchemy import or_, select, update
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from src.modules.users.infrastructure.models import (
     Almacen,
@@ -50,10 +50,26 @@ class UsuarioRepo:
             )
         )
 
+    def get_by_persona(self, persona_id: uuid.UUID) -> Usuario | None:
+        """La cuenta viva de esta persona, si tiene. Para el chequeo de
+        conflicto al vincular (ADR-070): una persona, a lo más una cuenta."""
+        return self.s.scalar(
+            select(Usuario).where(
+                Usuario.persona_id == persona_id, Usuario.deleted_at.is_(None)
+            )
+        )
+
     def q_list(self):
-        """La consulta, sin ejecutar: el router la pagina (ADR-026)."""
+        """La consulta, sin ejecutar: el router la pagina (ADR-026).
+
+        `joinedload(persona)` solo acá: es la única lectura de `Usuario` que
+        necesita mostrar el nombre de la persona vinculada (la pantalla de
+        administración). El resto del ERP carga `Usuario` en el camino
+        caliente (login, `require_permission`) y no paga ese JOIN.
+        """
         return (
             select(Usuario)
+            .options(joinedload(Usuario.persona))
             .where(Usuario.deleted_at.is_(None))
             .order_by(Usuario.username)
         )

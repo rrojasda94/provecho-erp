@@ -62,8 +62,14 @@ def env():
         s.flush()
 
         # El trabajador que marca: tiene usuario con PIN, que es su firma.
+        # La cuenta se liga por `persona_id` (ADR-070) — es la misma arista
+        # que la pantalla de Usuarios usa para vincular «Persona vinculada»,
+        # no una columna aparte en `trabajador`.
         cocinero = Usuario(
-            username="cocinero1", pin_hash=hash_pin(PIN_TRABAJADOR), tipo="humano"
+            username="cocinero1",
+            pin_hash=hash_pin(PIN_TRABAJADOR),
+            tipo="humano",
+            persona_id=persona.id,
         )
         s.add(cocinero)
         s.flush()
@@ -115,12 +121,18 @@ def _crear_trabajador(client, headers, ids, **overrides):
         "tipo_vinculo": "planilla",
         "fecha_ingreso": "2026-01-01",
         "sucursal_id": ids["sucursal_id"],
-        "usuario_id": ids["usuario_trabajador_id"],
     }
     body.update(overrides)
     r = client.post("/api/v1/rrhh/trabajadores", headers=headers, json=body)
     assert r.status_code == 201, r.text
     return r.json()["id"]
+
+
+def _vincular_persona(client, headers, usuario_id, persona_id):
+    """La cuenta se vincula desde Usuarios (ADR-070), no desde el trabajador."""
+    return client.patch(
+        f"/api/v1/users/{usuario_id}", headers=headers, json={"persona_id": persona_id}
+    )
 
 
 def _crear_turno(client, headers, ids, **overrides):
@@ -296,7 +308,9 @@ def test_el_pad_no_marca_por_gente_de_otro_local(env):
 def test_sin_usuario_no_hay_firma(env):
     client, ids, _ = env
     h = _token(client)
-    trabajador_id = _crear_trabajador(client, h, ids, usuario_id=None)
+    # Desvincular la cuenta de la persona: el trabajador queda sin firma.
+    assert _vincular_persona(client, h, ids["usuario_trabajador_id"], None).status_code == 200
+    trabajador_id = _crear_trabajador(client, h, ids)
     hterm = _token(client, "pad-castilla", "999999")
     r = _marcar(client, hterm, ids, trabajador_id)
     assert r.status_code == 409
@@ -304,79 +318,108 @@ def test_sin_usuario_no_hay_firma(env):
 
 
 def test_asignarle_la_cuenta_despues_lo_habilita_a_marcar(env):
-    """El caso que estaba roto: el trabajador se da de alta sin cuenta —que
-    es lo que hace la pantalla— y recién después RRHH le crea el acceso. Sin
-    `usuario_id` en el PATCH no había forma de vincularlo, así que el pad lo
-    rechazaba para siempre."""
+    """El bug reportado: vincular la persona desde Usuarios tiene que
+    habilitar el pad EN EL ACTO — antes el pad solo leía
+    `trabajador.usuario_id`, una columna aparte que esta pantalla nunca
+    tocaba, así que el vínculo quedaba guardado pero sin efecto (ADR-070)."""
     client, ids, _ = env
     h = _token(client)
-    trabajador_id = _crear_trabajador(client, h, ids, usuario_id=None)
+    assert _vincular_persona(client, h, ids["usuario_trabajador_id"], None).status_code == 200
+    trabajador_id = _crear_trabajador(client, h, ids)
     _crear_turno(client, h, ids)
     hterm = _token(client, "pad-castilla", "999999")
     assert _marcar(client, hterm, ids, trabajador_id).status_code == 409
 
-    r = client.patch(
-        f"/api/v1/rrhh/trabajadores/{trabajador_id}",
-        headers=h,
-        json={"usuario_id": ids["usuario_trabajador_id"]},
-    )
+    r = _vincular_persona(client, h, ids["usuario_trabajador_id"], ids["persona_id"])
     assert r.status_code == 200, r.text
+    assert r.json()["persona_id"] == ids["persona_id"]
+
+    r = client.get(f"/api/v1/rrhh/trabajadores/{trabajador_id}", headers=h)
     assert r.json()["usuario_id"] == ids["usuario_trabajador_id"]
     assert _marcar(client, hterm, ids, trabajador_id).status_code == 200
 
 
 def test_quitarle_la_cuenta_lo_deja_sin_marcar(env):
-    """`null` explícito desvincula: quien dejó de usar su acceso vuelve a
-    marcar por back-office. Omitir el campo, en cambio, no lo toca."""
+    """`persona_id: null` explícito desvincula: quien dejó de usar su acceso
+    vuelve a marcar por back-office. Omitir el campo, en cambio, no lo toca."""
     client, ids, _ = env
     h = _token(client)
     trabajador_id = _crear_trabajador(client, h, ids)
 
-    r = client.patch(
-        f"/api/v1/rrhh/trabajadores/{trabajador_id}",
-        headers=h,
-        json={"cargo": "Jefe de cocina"},
-    )
+    r = client.get(f"/api/v1/rrhh/trabajadores/{trabajador_id}", headers=h)
     assert r.json()["usuario_id"] == ids["usuario_trabajador_id"]
 
-    r = client.patch(
-        f"/api/v1/rrhh/trabajadores/{trabajador_id}",
-        headers=h,
-        json={"usuario_id": None},
-    )
+    r = _vincular_persona(client, h, ids["usuario_trabajador_id"], None)
     assert r.status_code == 200, r.text
+    assert r.json()["persona_id"] is None
+
+    r = client.get(f"/api/v1/rrhh/trabajadores/{trabajador_id}", headers=h)
     assert r.json()["usuario_id"] is None
 
 
-def test_una_cuenta_no_es_de_dos_trabajadores(env):
-    """Dos trabajadores con la misma cuenta comparten PIN, y entonces el pad
-    no puede saber cuál de los dos fichó."""
+def test_persona_recontratada_comparte_cuenta_entre_las_dos_fichas(env):
+    """Recontratación: una persona con dos filas `trabajador` (la cesada y la
+    activa) comparten la misma cuenta — a diferencia de antes (una cuenta,
+    un `trabajador.usuario_id`), ahora es correcto que las dos fichas
+    resuelvan al mismo `usuario_id` (ADR-070)."""
+    client, ids, TestSession = env
+    h = _token(client)
+    primero_id = _crear_trabajador(client, h, ids)
+    r = client.post(
+        f"/api/v1/rrhh/trabajadores/{primero_id}/cesar",
+        headers=h,
+        json={"fecha_cese": "2026-02-01"},
+    )
+    assert r.status_code == 200, r.text
+
+    segundo_id = _crear_trabajador(client, h, ids, fecha_ingreso="2026-03-01")
+
+    r1 = client.get(f"/api/v1/rrhh/trabajadores/{primero_id}", headers=h)
+    r2 = client.get(f"/api/v1/rrhh/trabajadores/{segundo_id}", headers=h)
+    assert r1.json()["usuario_id"] == ids["usuario_trabajador_id"]
+    assert r2.json()["usuario_id"] == ids["usuario_trabajador_id"]
+
+    hterm = _token(client, "pad-castilla", "999999")
+    assert _marcar(client, hterm, ids, segundo_id).status_code == 200
+
+
+def test_dos_cuentas_no_se_ligan_a_la_misma_persona(env):
+    """El pad resuelve una sola cuenta por persona: si dos cuentas pudieran
+    apuntar a la misma persona, no sabría con cuál PIN firmar."""
     client, ids, _ = env
     h = _token(client)
-    _crear_trabajador(client, h, ids)
-    otro_id = _crear_trabajador(client, h, ids, usuario_id=None)
-
-    r = client.patch(
-        f"/api/v1/rrhh/trabajadores/{otro_id}",
+    r = client.post(
+        "/api/v1/users",
         headers=h,
-        json={"usuario_id": ids["usuario_trabajador_id"]},
+        json={"username": "cocinero2", "pin": "333333", "persona_id": ids["persona_id"]},
     )
     assert r.status_code == 409, r.text
-    assert "otro trabajador" in r.json()["detail"]
+    assert "cocinero1" in r.json()["detail"]
 
 
-def test_la_cuenta_del_pad_no_se_le_asigna_a_un_trabajador(env):
-    """Una cuenta inexistente no se asigna. (La de agente tampoco, pero esa
-    se cubre en el caso de uso: el enum ya no deja crearla desde la API.)"""
+def test_la_cuenta_del_pad_no_se_liga_a_una_persona_inexistente(env):
     client, ids, _ = env
     h = _token(client)
-    trabajador_id = _crear_trabajador(client, h, ids, usuario_id=None)
-    r = client.patch(
-        f"/api/v1/rrhh/trabajadores/{trabajador_id}",
-        headers=h,
-        json={"usuario_id": str(uuid.uuid4())},
-    )
+    r = _vincular_persona(client, h, ids["usuario_trabajador_id"], str(uuid.uuid4()))
     assert r.status_code == 404, r.text
+
+
+def test_cuenta_desactivada_no_marca_con_mensaje_legible(env):
+    """Una cuenta inactiva no debe caer en `verificar_pin_de` y salir como
+    401 «credenciales inválidas» — sería el mismo error engañoso que
+    `usuario_que_firma` existe para evitar."""
+    client, ids, _ = env
+    h = _token(client)
+    trabajador_id = _crear_trabajador(client, h, ids)
+    r = client.patch(
+        f"/api/v1/users/{ids['usuario_trabajador_id']}", headers=h, json={"activo": False}
+    )
+    assert r.status_code == 200, r.text
+
+    hterm = _token(client, "pad-castilla", "999999")
+    r = _marcar(client, hterm, ids, trabajador_id)
+    assert r.status_code == 409, r.text
+    assert "desactivada" in r.json()["detail"]
 
 
 def test_locacion_de_servicios_no_marca_ni_aparece(env):

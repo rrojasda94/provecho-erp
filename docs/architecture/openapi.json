@@ -17420,6 +17420,18 @@
             ],
             "title": "Sistema Pensiones"
           },
+          "sucursal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sucursal Id"
+          },
           "tipo_documento": {
             "anyOf": [
               {
@@ -24487,18 +24499,6 @@
           "tipo_vinculo": {
             "title": "Tipo Vinculo",
             "type": "string"
-          },
-          "usuario_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Usuario Id"
           }
         },
         "required": [
@@ -24621,7 +24621,7 @@
         "type": "object"
       },
       "TrabajadorUpdate": {
-        "description": "Campo ausente = no tocar.\n\n`sucursal_id` y `usuario_id` son la excepción: mandarlos en `null`\n**borran** el valor, porque quedarse sin local asignado —o sin cuenta— es\nun estado válido y no había otra forma de volver a él. Para el resto,\n`null` sigue siendo \"no tocar\".\n\n`usuario_id` faltaba acá y era la razón por la que nadie podía marcar en\nel pad de asistencia: `TrabajadorCreate` sí lo aceptaba, pero un\ntrabajador ya dado de alta no tenía ninguna forma de recibir su cuenta, y\n`pad_asistencia.usuario_que_firma` exige justamente ese campo para llegar\nal PIN.\n\n`estado` no admite `\"cesado\"`: el cese tiene su propio endpoint\n(`POST /trabajadores/{id}/cesar`) porque además de cambiar el estado\nfija la fecha de cese y publica el evento del que cuelga la liquidación.\nLlegar a `cesado` por este PATCH dejaba un trabajador cesado sin fecha\ny sin que nadie se enterara.",
+        "description": "Campo ausente = no tocar.\n\n`sucursal_id` es la excepción: mandarlo en `null` **borra** el valor,\nporque quedarse sin local asignado es un estado válido y no había otra\nforma de volver a él. Para el resto, `null` sigue siendo \"no tocar\".\n\nLa cuenta con la que este trabajador marca en el pad ya no se toca acá\n(ADR-070): es la del `usuario` cuya `persona_id` es la del trabajador, y\nse vincula desde Usuarios, no desde este endpoint. Antes vivía en\n`usuario_id` — dos columnas para el mismo vínculo, sin sincronizar entre\nsí, era justo el bug que ADR-070 cierra.\n\n`estado` no admite `\"cesado\"`: el cese tiene su propio endpoint\n(`POST /trabajadores/{id}/cesar`) porque además de cambiar el estado\nfija la fecha de cese y publica el evento del que cuelga la liquidación.\nLlegar a `cesado` por este PATCH dejaba un trabajador cesado sin fecha\ny sin que nadie se enterara.",
         "properties": {
           "area": {
             "anyOf": [
@@ -24691,18 +24691,6 @@
               }
             ],
             "title": "Sucursal Id"
-          },
-          "usuario_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Usuario Id"
           }
         },
         "title": "TrabajadorUpdate",
@@ -25598,6 +25586,16 @@
               }
             ],
             "title": "Nombre Display"
+          },
+          "persona": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PersonaBusquedaOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "persona_id": {
             "anyOf": [

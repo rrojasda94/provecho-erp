@@ -130,7 +130,7 @@ roles siguen diciendo *qué puede* (RN-GEN-004).
 | Método | Ruta | Acción |
 |--------|------|--------|
 | POST/GET | `/api/v1/users` | Crear / listar usuarios |
-| PATCH | `/api/v1/users/{id}` | Editar usuario |
+| PATCH | `/api/v1/users/{id}` | Editar usuario. `exclude_unset`: campo ausente = no tocar. `persona_id` es la excepción — `null` explícito desvincula (ADR-070), el resto sigue siendo "no tocar" con `null`. |
 | POST | `/api/v1/users/{id}/pin` | Fijar un PIN a dedo (`users.gestionar`) |
 | POST | `/api/v1/users/{id}/pin/reset` | Devolver al PIN por defecto y obligar a cambiarlo (`users.resetear_pin`, ADR-041) |
 | POST | `/api/v1/users/me/pin` | Cambiar el PIN propio (sin permiso; exige el actual) |
@@ -325,6 +325,13 @@ resuelve tenant y permisos → endpoint autoriza acción → auditoría registra
 
 ## Relaciones
 
+- `usuario.persona_id` (opcional, NULL si `tipo=agente_ia`) es la **única
+  arista** entre una cuenta y quien la usa en la vida real (ADR-070). Único
+  entre las cuentas vivas (`uq_usuario_persona_viva`): una persona tiene a
+  lo más una cuenta. `rrhh.trabajador.usuario_id` se deriva de esta columna
+  — es de acá, no de RRHH, que cuelga el pad de asistencia (RN-RRHH-020).
+  `UsuarioOut.persona` trae el nombre recortado (`PersonaBusquedaOut`) para
+  que el editor lo pinte sin un segundo viaje.
 - Publica: `users.usuario_creado`, `users.sesion_iniciada`.
 - Escucha (`application/listeners.py`): `sales.pedido_demorado` → avisa al
   encargado de turno; y desde 2026-08-06 los tres avisos de inventario —

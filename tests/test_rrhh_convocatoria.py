@@ -12,7 +12,14 @@ import src.core.models_registry  # noqa: F401
 from src.core.app import create_app
 from src.core.database import Base
 from src.modules.users.api.deps import get_db
-from src.modules.users.infrastructure.models import Empresa, Persona, Rol, Usuario, UsuarioRol
+from src.modules.users.infrastructure.models import (
+    Empresa,
+    Persona,
+    Rol,
+    Sucursal,
+    Usuario,
+    UsuarioRol,
+)
 from src.modules.users.infrastructure.security import hash_pin
 
 
@@ -30,12 +37,13 @@ def env():
     with TestSession() as s:
         seed(s)
         empresa = s.scalar(select(Empresa))
+        sucursal = s.scalar(select(Sucursal))
         cocinero = Usuario(username="cocinero1", pin_hash=hash_pin("222222"), tipo="humano")
         s.add(cocinero)
         s.flush()
         rol_cocinero = s.scalar(select(Rol).where(Rol.nombre == "cocinero"))
         s.add(UsuarioRol(usuario_id=cocinero.id, rol_id=rol_cocinero.id))
-        ids.update(empresa_id=str(empresa.id))
+        ids.update(empresa_id=str(empresa.id), sucursal_id=str(sucursal.id))
         s.commit()
 
     app = create_app()
@@ -440,3 +448,78 @@ def test_rol_sin_permiso_no_gestiona_convocatoria(env):
     client, ids, _ = env
     h = _token(client, "cocinero1", "222222")
     assert _crear_convocatoria(client, h, ids).status_code == 403
+
+
+# --- Sucursal al contratar: sin ella el trabajador no aparece en el pad ----
+def test_contratar_con_sucursal_lo_deja_marcar_en_el_pad(env):
+    """Antes, contratar dejaba la ficha siempre sin sucursal (RN-RRHH-019 no
+    era el problema — nadie la pedía): sin centro de labores, la tarjeta del
+    trabajador nunca se dibuja en el pad de asistencia."""
+    client, ids, _ = env
+    h = _token(client)
+    _, postulante_id = _hasta_oferta(client, h, ids)
+
+    r = client.post(
+        f"/api/v1/rrhh/postulantes/{postulante_id}/contratar",
+        headers=h,
+        json={
+            "cargo": "Pizzero",
+            "area": "Cocina",
+            "tipo_vinculo": "planilla",
+            "fecha_ingreso": "2026-08-15",
+            "numero_documento": "70123456",
+            "sucursal_id": ids["sucursal_id"],
+        },
+    )
+    assert r.status_code in (200, 201), r.text
+    trabajador_id = r.json()["trabajador_id"]
+
+    tarjetas = client.get(
+        f"/api/v1/rrhh/asistencia/terminal/tarjetas?sucursal_id={ids['sucursal_id']}",
+        headers=h,
+    )
+    assert tarjetas.status_code == 200
+    assert any(t["trabajador_id"] == trabajador_id for t in tarjetas.json())
+
+
+def test_contratar_con_sucursal_de_otra_empresa_rechazado(env):
+    """RN-RRHH-019: el centro de labores tiene que ser un local de la misma
+    empresa que contrata."""
+    client, ids, TestSession = env
+    h = _token(client)
+    with TestSession() as s:
+        otra_empresa = Empresa(
+            grupo_id=s.scalar(select(Empresa)).grupo_id,
+            razon_social="Otra Empresa",
+            ruc="99999999999",
+            domicilio_fiscal="Av. Otra 1",
+            tipo="operativa",
+        )
+        s.add(otra_empresa)
+        s.flush()
+        otra_sucursal = Sucursal(
+            empresa_id=otra_empresa.id,
+            marca_id=s.scalar(select(Sucursal)).marca_id,
+            nombre="Otro local",
+            direccion="Av. Otra 1",
+            tenencia="alquilada",
+        )
+        s.add(otra_sucursal)
+        s.commit()
+        otra_sucursal_id = str(otra_sucursal.id)
+
+    _, postulante_id = _hasta_oferta(client, h, ids)
+    r = client.post(
+        f"/api/v1/rrhh/postulantes/{postulante_id}/contratar",
+        headers=h,
+        json={
+            "cargo": "Pizzero",
+            "area": "Cocina",
+            "tipo_vinculo": "planilla",
+            "fecha_ingreso": "2026-08-15",
+            "numero_documento": "70123456",
+            "sucursal_id": otra_sucursal_id,
+        },
+    )
+    assert r.status_code == 409, r.text
+    assert "RN-RRHH-019" in r.json()["detail"]

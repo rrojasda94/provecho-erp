@@ -16,6 +16,7 @@ import {
 
 export type Convocatoria = {
   id: string;
+  sucursal_id: string | null;
   puesto: string;
   motivo: string;
   perfil_puesto: string | null;
@@ -28,6 +29,7 @@ export type Convocatoria = {
   token_publico: string | null;
   estado: string;
 };
+export type Sucursal = { id: string; nombre: string };
 
 export type Postulante = {
   id: string;
@@ -157,7 +159,17 @@ function Campo({
   );
 }
 
-function Ficha({ postulante, permisos }: { postulante: Postulante; permisos: string[] }) {
+function Ficha({
+  postulante,
+  permisos,
+  sucursales,
+  sucursalConvocatoria,
+}: {
+  postulante: Postulante;
+  permisos: string[];
+  sucursales: Sucursal[];
+  sucursalConvocatoria: string | null;
+}) {
   const [pendiente, startTransition] = useTransition();
   const siguiente = siguienteEtapa(postulante.estado);
   const descartado = postulante.estado === DESCARTADO;
@@ -196,7 +208,12 @@ function Ficha({ postulante, permisos }: { postulante: Postulante; permisos: str
             </button>
           )}
           {siguiente?.clave === "contratado" && (
-            <DialogoContratar postulante={postulante} permisos={permisos} />
+            <DialogoContratar
+              postulante={postulante}
+              permisos={permisos}
+              sucursales={sucursales}
+              sucursalConvocatoria={sucursalConvocatoria}
+            />
           )}
           <DialogoFormulario
             etiqueta="Descartar"
@@ -230,9 +247,13 @@ function Ficha({ postulante, permisos }: { postulante: Postulante; permisos: str
 function DialogoContratar({
   postulante,
   permisos,
+  sucursales,
+  sucursalConvocatoria,
 }: {
   postulante: Postulante;
   permisos: string[];
+  sucursales: Sucursal[];
+  sucursalConvocatoria: string | null;
 }) {
   return (
     <DialogoFormulario
@@ -260,6 +281,20 @@ function DialogoContratar({
         </select>
       </label>
       <Campo etiqueta="Fecha de ingreso" nombre="fecha_ingreso" type="date" required />
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Sucursal donde trabaja
+        <select name="sucursal_id" defaultValue={sucursalConvocatoria ?? ""}>
+          <option value="">Sin sucursal asignada</option>
+          {sucursales.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.nombre}
+            </option>
+          ))}
+        </select>
+        <span className="text-xs font-normal text-gray">
+          Sin esto no aparece en el pad de asistencia de ningún local.
+        </span>
+      </label>
       <div className="grid grid-cols-2 gap-2">
         <label className="flex flex-col gap-1 text-sm font-semibold">
           Documento
@@ -311,10 +346,14 @@ function ColumnaTablero({
   etapa,
   postulantes,
   permisos,
+  sucursales,
+  sucursalConvocatoria,
 }: {
   etapa: (typeof ETAPAS)[number];
   postulantes: Postulante[];
   permisos: string[];
+  sucursales: Sucursal[];
+  sucursalConvocatoria: string | null;
 }) {
   return (
     <div className="flex w-64 shrink-0 flex-col gap-2">
@@ -329,7 +368,13 @@ function ColumnaTablero({
       ) : (
         <ul className="flex flex-col gap-2">
           {postulantes.map((p) => (
-            <Ficha key={p.id} postulante={p} permisos={permisos} />
+            <Ficha
+              key={p.id}
+              postulante={p}
+              permisos={permisos}
+              sucursales={sucursales}
+              sucursalConvocatoria={sucursalConvocatoria}
+            />
           ))}
         </ul>
       )}
@@ -503,6 +548,7 @@ export function TableroCliente({
   seleccionada,
   enlaceFormulario,
   permisos,
+  sucursales,
 }: {
   convocatorias: Convocatoria[];
   columnas: Columna[];
@@ -511,10 +557,15 @@ export function TableroCliente({
   /** Los de la sesión. Solo deciden si se ofrece traer el nombre de RENIEC
    * al contratar: cada consulta gasta cuota de Factiliza. */
   permisos: string[];
+  sucursales: Sucursal[];
 }) {
   const [verDescartados, setVerDescartados] = useState(false);
   const porEstado = new Map(columnas.map((c) => [c.estado, c.postulantes]));
   const descartados = porEstado.get(DESCARTADO) ?? [];
+  // Por defecto, contratar deja la sucursal de la convocatoria: es donde
+  // el postulante aplicó, y sin sucursal no aparece en ningún pad.
+  const sucursalConvocatoria =
+    convocatorias.find((c) => c.id === seleccionada)?.sucursal_id ?? null;
 
   function seleccionar(id: string) {
     // Query param y no estado local: así el tablero de una convocatoria es
@@ -563,6 +614,8 @@ export function TableroCliente({
                 etapa={etapa}
                 postulantes={porEstado.get(etapa.clave) ?? []}
                 permisos={permisos}
+                sucursales={sucursales}
+                sucursalConvocatoria={sucursalConvocatoria}
               />
             ))}
           </div>
@@ -582,7 +635,12 @@ export function TableroCliente({
               <ul className="mt-2 flex flex-wrap gap-2">
                 {descartados.map((p) => (
                   <li key={p.id} className="w-64">
-                    <Ficha postulante={p} permisos={permisos} />
+                    <Ficha
+                      postulante={p}
+                      permisos={permisos}
+                      sucursales={sucursales}
+                      sucursalConvocatoria={sucursalConvocatoria}
+                    />
                   </li>
                 ))}
               </ul>
