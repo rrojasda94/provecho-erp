@@ -167,9 +167,10 @@ nombre para no tener que traducir nada entre capas:
 - `ubicacion_distrito` — `VARCHAR(100)`. Es lo que decide si un reparto cae en
   zona restringida (ADR-054) sin traer geometría al proyecto.
 
-Lo llevan: `sucursal`, `almacen`, `empresa`, `persona` (§2), `proveedor` (§5)
-y `venta` (§6). **Todo nullable**: una dirección escrita a mano es válida y las
-filas anteriores a 2026-08-22 no tienen ancla.
+Lo llevan: `sucursal`, `almacen`, `empresa`, `persona` (§2), `proveedor` (§5),
+`venta` (§6) y `cliente` (§6, solo el jurídico — ADR-072, 2026-08-27).
+**Todo nullable**: una dirección escrita a mano es válida y las filas
+anteriores a la migración de cada tabla no tienen ancla.
 
 `ubicacion_distrito` es el sustituto pobre de `zona_servicio` de arriba
 —que sigue sin implementarse— y hace el trabajo mientras las zonas del negocio
@@ -1089,7 +1090,10 @@ Solicitud.
 - **cliente**: grupo_id (transversal al grupo, no a una empresa —
   RN-PTS-001), tipo (`natural` | `juridico` — ej. cliente corporativo:
   catering/eventos), persona_id (si `natural`) o razon_social + ruc (si
-  `juridico`), contacto (base para CRM futuro), usuario_id (opcional,
+  `juridico`), contacto (teléfono/correo de quien coordina — base para CRM
+  futuro), direccion + `UbicacionMixin` (place_id/lat/lng/plus_code/distrito
+  — solo del `juridico`; ADR-072, antes mezclada con `contacto`), usuario_id
+  (opcional,
   único — cuenta de autoservicio web: ver su historial, pedir online.
   Decisión 2026-07-20: **nunca requerida** para comprar en sucursal o
   Central de Pedidos — esas ventas enrutan al mismo `cliente` por sus

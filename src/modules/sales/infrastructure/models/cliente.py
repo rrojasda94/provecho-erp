@@ -16,10 +16,15 @@ from sqlalchemy import Enum, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
-from src.core.model_base import SoftDeleteMixin, TimestampMixin, UuidPkMixin
+from src.core.model_base import (
+    SoftDeleteMixin,
+    TimestampMixin,
+    UbicacionMixin,
+    UuidPkMixin,
+)
 
 
-class Cliente(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin):
+class Cliente(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin, UbicacionMixin):
     __tablename__ = "cliente"
 
     grupo_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("grupo.id"))
@@ -34,6 +39,10 @@ class Cliente(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin):
     razon_social: Mapped[str | None] = mapped_column(String(255), nullable=True)
     ruc: Mapped[str | None] = mapped_column(String(11), nullable=True)
     contacto: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Domicilio propio del jurídico, con su ancla al mapa (ADR-053/ADR-072).
+    # `contacto` no se toca: sigue siendo el teléfono o correo de quien
+    # coordina, y las filas viejas se leen con `direccion or contacto`.
+    direccion: Mapped[str | None] = mapped_column(String(255), nullable=True)
     # Cuenta de autoservicio web — opcional, NUNCA requerida para comprar
     # en sucursal/Central de Pedidos. Un usuario es de a lo más un cliente.
     usuario_id: Mapped[uuid.UUID | None] = mapped_column(

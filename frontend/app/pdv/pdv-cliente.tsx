@@ -43,7 +43,7 @@ import {
 import { useCajaPdv } from "./use-caja-pdv";
 import { useImpresionPdv } from "./use-impresion-pdv";
 import { useDatosPdv } from "./use-datos-pdv";
-import { UBICACION_VACIA } from "@/components/direccion/ubicacion";
+import { UBICACION_VACIA, type Ubicacion } from "@/components/direccion/ubicacion";
 
 type Props = {
   sucursalId: string;
@@ -550,6 +550,7 @@ export default function PdvCliente({ sucursalId, permisos, puntoVenta }: Props) 
     numero_documento: string;
     direccion: string;
     fecha_nacimiento: string;
+    ubicacion: Ubicacion;
   }) => {
     try {
       await api.crearCliente({
@@ -558,10 +559,11 @@ export default function PdvCliente({ sucursalId, permisos, puntoVenta }: Props) 
         numero_documento: entrada.numero_documento || null,
         direccion: entrada.direccion || null,
         fecha_nacimiento: entrada.fecha_nacimiento || null,
+        ...entrada.ubicacion,
       });
       const [encontrado] = await api.buscarClientes(entrada.telefono);
       if (encontrado) {
-        parchar({ cliente: encontrado, direccion: encontrado.direccion });
+        parchar({ cliente: encontrado, direccion: encontrado.direccion, ubicacion: encontrado });
         notificar(`${encontrado.nombre} guardado y asignado`);
       }
       setDialogo(null);
@@ -929,7 +931,10 @@ export default function PdvCliente({ sucursalId, permisos, puntoVenta }: Props) 
         onCerrar={() => setDialogo(null)}
         onBuscar={api.buscarClientes}
         onElegir={(c: ClienteBuscado) => {
-          parchar({ cliente: c, direccion: c.direccion });
+          // El texto y su ancla viajan juntos: nunca uno sin el otro
+          // (ADR-053), o el reparto cotizaría contra un punto ajeno al
+          // texto que se ve en pantalla.
+          parchar({ cliente: c, direccion: c.direccion, ubicacion: c });
           setDialogo(null);
         }}
         onCrear={crearCliente}

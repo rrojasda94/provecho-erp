@@ -62,6 +62,7 @@ from src.modules.users.infrastructure.models import Usuario
 from src.shared import fechas, planilla
 from src.shared.integrations.factiliza import FactilizaError
 from src.shared.paginacion import Pagina, Paginacion, paginacion, paginar
+from src.shared.ubicacion import CAMPOS as CAMPOS_UBICACION
 
 router = APIRouter(prefix="/sales", tags=["sales"])
 
@@ -1611,6 +1612,7 @@ def crear_cliente(
         direccion=body.direccion,
         fecha_nacimiento=body.fecha_nacimiento,
         tipo_documento=body.tipo_documento,
+        **{campo: getattr(body, campo) for campo in CAMPOS_UBICACION},
     )
     session.commit()
     return cliente
@@ -1626,6 +1628,14 @@ def _cliente_buscado(cliente, persona) -> schemas.ClienteBuscadoOut:
     """
     es_juridico = cliente.tipo == "juridico"
     doc = cliente.ruc if es_juridico else (persona.numero_documento if persona else None)
+    # El ancla vive donde vive el texto: en el jurídico, en `cliente`; en el
+    # natural, en su `persona` (RN-GEN-007). Sin esto la caja nunca ve el pin
+    # de un cliente ya registrado y el delivery se cotiza siempre a tarifa
+    # base (ADR-072).
+    fuente_ubicacion = cliente if es_juridico else persona
+    ubicacion = {
+        campo: getattr(fuente_ubicacion, campo, None) for campo in CAMPOS_UBICACION
+    }
     return schemas.ClienteBuscadoOut(
         id=cliente.id,
         tipo=cliente.tipo,
@@ -1639,12 +1649,16 @@ def _cliente_buscado(cliente, persona) -> schemas.ClienteBuscadoOut:
         telefono=persona.telefono if persona else None,
         numero_documento=doc,
         direccion=(
-            cliente.contacto if es_juridico else (persona.domicilio if persona else None)
+            (cliente.direccion or cliente.contacto)
+            if es_juridico
+            else (persona.domicilio if persona else None)
         ),
+        contacto=cliente.contacto if es_juridico else None,
         identificado=(
             bool(cliente.ruc) if es_juridico else rules.cliente_identificado(doc)
         ),
         persona_id=cliente.persona_id,
+        **ubicacion,
     )
 
 
@@ -1766,9 +1780,9 @@ def editar_cliente(
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    """Corrige razón social, RUC o contacto de un cliente **jurídico**. Un
-    RUC mal tecleado llega hasta la factura electrónica y hasta ahora no
-    tenía arreglo por API.
+    """Corrige razón social, RUC, contacto o dirección de un cliente
+    **jurídico**. Un RUC mal tecleado llega hasta la factura electrónica y
+    hasta ahora no tenía arreglo por API.
 
     Un cliente natural responde 422: sus datos viven en su `persona`
     (RN-GEN-007) y se corrigen desde `PATCH /personas/{id}`.

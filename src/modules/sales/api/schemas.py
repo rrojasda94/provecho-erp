@@ -443,18 +443,24 @@ class ClienteDocumentoUpdate(BaseModel):
     tipo_documento: str = "dni"
 
 
-class ClienteUpdate(BaseModel):
+class ClienteUpdate(UbicacionMixin):
     """Corrección de un cliente **jurídico**. Campo ausente o `null` = no tocar.
 
-    No lleva nombre, teléfono ni dirección: en un cliente natural esos datos
-    viven en su `persona` (RN-GEN-007) y se corrigen desde Personas. El
-    documento tiene su propio endpoint (`PATCH /clientes/{id}/documento`),
-    que aplica las reglas de identificación.
+    No lleva nombre ni teléfono: en un cliente natural esos datos viven en su
+    `persona` (RN-GEN-007) y se corrigen desde Personas. El documento tiene su
+    propio endpoint (`PATCH /clientes/{id}/documento`), que aplica las reglas
+    de identificación.
+
+    `direccion` sí es propia del jurídico (ADR-072) — antes se mezclaba con
+    `contacto`. Corregirla sin volver a elegir en el mapa suelta el ancla
+    (`shared.ubicacion.desanclar_si_cambio_el_texto`), igual que en Personas,
+    Proveedores y Organización.
     """
 
     razon_social: str | None = Field(default=None, min_length=1, max_length=255)
     ruc: str | None = Field(default=None, pattern=r"^\d{11}$")
     contacto: str | None = Field(default=None, max_length=255)
+    direccion: str | None = Field(default=None, max_length=255)
 
 
 class ClienteOut(BaseModel):
@@ -539,6 +545,10 @@ class ClienteBuscadoOut(UbicacionMixin):
     telefono: str | None
     numero_documento: str | None
     direccion: str | None
+    # Solo del jurídico: teléfono o correo de quien coordina (ADR-072). En
+    # `direccion` no alcanza para editar sin perder este dato, porque
+    # `direccion` ya trae el respaldo `cliente.direccion or cliente.contacto`.
+    contacto: str | None = None
     # False si no dio documento o dio el genérico: queda fuera de las
     # promociones para clientes registrados con documento (RN-PTS-002).
     identificado: bool

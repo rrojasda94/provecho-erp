@@ -14,10 +14,39 @@
 
 const ID = "google-maps-sdk";
 
+// Con `loading=async` el evento `load` del `<script>` dispara en cuanto
+// termina de descargarse el bootstrap, no cuando `google.maps` queda
+// realmente utilizable: Google adjunta `importLibrary` un instante después,
+// de forma asíncrona. Sin esta espera, `window.google.maps` existe pero es
+// un objeto a medio armar —el `typeof` da "object" igual— y la primera
+// llamada a `importLibrary` revienta con "no es una función", silenciada por
+// el `.catch` de quien llama. Se sondea hasta que el método aparece.
+const ESPERA_IMPORT_LIBRARY_MS = 20;
+const TOPE_ESPERA_IMPORT_LIBRARY_MS = 4000;
+
+function esperarImportLibrary(): Promise<typeof google.maps> {
+  return new Promise((resolver, rechazar) => {
+    const limite = Date.now() + TOPE_ESPERA_IMPORT_LIBRARY_MS;
+    const intentar = () => {
+      const maps = window.google?.maps;
+      if (maps && typeof maps.importLibrary === "function") {
+        resolver(maps);
+        return;
+      }
+      if (Date.now() > limite) {
+        rechazar(new Error("el SDK de Maps cargó incompleto"));
+        return;
+      }
+      setTimeout(intentar, ESPERA_IMPORT_LIBRARY_MS);
+    };
+    intentar();
+  });
+}
+
 let promesa: Promise<typeof google.maps> | null = null;
 
 /**
- * Devuelve el namespace de Maps ya cargado.
+ * Devuelve el namespace de Maps ya cargado, con `importLibrary` disponible.
  *
  * Rechaza si el script no llega: sin clave, sin internet o con la clave
  * restringida a otro dominio. Quien llama tiene que quedarse con el campo de
@@ -33,7 +62,7 @@ export function cargarMaps(apiKey: string): Promise<typeof google.maps> {
       rechazar(new Error("el SDK de Maps solo carga en el navegador"));
       return;
     }
-    if (window.google?.maps) {
+    if (typeof window.google?.maps?.importLibrary === "function") {
       resolver(window.google.maps);
       return;
     }
@@ -51,8 +80,7 @@ export function cargarMaps(apiKey: string): Promise<typeof google.maps> {
       document.head.appendChild(script);
     }
     script.addEventListener("load", () => {
-      if (window.google?.maps) resolver(window.google.maps);
-      else rechazar(new Error("el SDK de Maps cargó incompleto"));
+      esperarImportLibrary().then(resolver, rechazar);
     });
     script.addEventListener("error", () =>
       rechazar(new Error("no se pudo cargar el SDK de Maps")),

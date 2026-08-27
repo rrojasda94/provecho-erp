@@ -13,9 +13,11 @@ la del navegador se puede leer desde el código de la página —sirve para dibu
 un mapa y nada más—, mientras que la del servidor decide cuánta plata paga el
 cliente y no puede salir de la API.
 
-El porqué de cada decisión está en ADR-053 (la dirección se elige en el mapa) y
-ADR-054 (el delivery se cobra por kilómetro). Este documento es el
-procedimiento: qué se clickea, en qué orden y qué se verifica.
+El porqué de cada decisión está en ADR-053 (la dirección se elige en el mapa),
+ADR-054 (el delivery se cobra por kilómetro) y ADR-072 (un solo campo de
+dirección, con sesión de Places manejada por código propio en vez del widget
+oficial). Este documento es el procedimiento: qué se clickea, en qué orden y
+qué se verifica.
 
 ## Requisito previo
 
@@ -37,8 +39,12 @@ sea correcta y el crédito gratuito esté disponible.
 
 - **Maps JavaScript API** — el mapa embebido.
 - **Places API (New)** — el autocompletado y el detalle del lugar (place_id,
-  coordenadas, plus code, distrito).
-- **Geocoding API** — traducir coordenadas a dirección cuando se arrastra el pin.
+  coordenadas, plus code, distrito). Desde ADR-072 la sesión de facturación
+  (`AutocompleteSessionToken`) la abre y cierra `components/direccion/
+  buscador-lugares.ts`, no el widget de Google.
+- **Geocoding API** — traducir coordenadas a dirección cuando se arrastra el
+  pin, y además (ADR-072) anclar sola una dirección que ya estaba guardada
+  solo como texto, al abrir la ficha.
 - **Routes API** — la distancia de reparto (`computeRouteMatrix`).
 
 > La *Distance Matrix API* clásica hace lo mismo que Routes y sigue

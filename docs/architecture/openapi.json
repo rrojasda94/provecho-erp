@@ -4185,6 +4185,17 @@
       "ClienteBuscadoOut": {
         "description": "Lo que el PDV necesita para pintar un resultado de búsqueda.",
         "properties": {
+          "contacto": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contacto"
+          },
           "direccion": {
             "anyOf": [
               {
@@ -4780,7 +4791,7 @@
         "type": "object"
       },
       "ClienteUpdate": {
-        "description": "Corrección de un cliente **jurídico**. Campo ausente o `null` = no tocar.\n\nNo lleva nombre, teléfono ni dirección: en un cliente natural esos datos\nviven en su `persona` (RN-GEN-007) y se corrigen desde Personas. El\ndocumento tiene su propio endpoint (`PATCH /clientes/{id}/documento`),\nque aplica las reglas de identificación.",
+        "description": "Corrección de un cliente **jurídico**. Campo ausente o `null` = no tocar.\n\nNo lleva nombre ni teléfono: en un cliente natural esos datos viven en su\n`persona` (RN-GEN-007) y se corrigen desde Personas. El documento tiene su\npropio endpoint (`PATCH /clientes/{id}/documento`), que aplica las reglas\nde identificación.\n\n`direccion` sí es propia del jurídico (ADR-072) — antes se mezclaba con\n`contacto`. Corregirla sin volver a elegir en el mapa suelta el ancla\n(`shared.ubicacion.desanclar_si_cambio_el_texto`), igual que en Personas,\nProveedores y Organización.",
         "properties": {
           "contacto": {
             "anyOf": [
@@ -4793,6 +4804,18 @@
               }
             ],
             "title": "Contacto"
+          },
+          "direccion": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direccion"
           },
           "razon_social": {
             "anyOf": [
@@ -4818,6 +4841,76 @@
               }
             ],
             "title": "Ruc"
+          },
+          "ubicacion_distrito": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Distrito"
+          },
+          "ubicacion_lat": {
+            "anyOf": [
+              {
+                "maximum": 90.0,
+                "minimum": -90.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lat"
+          },
+          "ubicacion_lng": {
+            "anyOf": [
+              {
+                "maximum": 180.0,
+                "minimum": -180.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lng"
+          },
+          "ubicacion_place_id": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Place Id"
+          },
+          "ubicacion_plus_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Plus Code"
           }
         },
         "title": "ClienteUpdate",
@@ -45730,7 +45823,7 @@
     },
     "/api/v1/sales/clientes/{cliente_id}": {
       "patch": {
-        "description": "Corrige razón social, RUC o contacto de un cliente **jurídico**. Un\nRUC mal tecleado llega hasta la factura electrónica y hasta ahora no\ntenía arreglo por API.\n\nUn cliente natural responde 422: sus datos viven en su `persona`\n(RN-GEN-007) y se corrigen desde `PATCH /personas/{id}`.",
+        "description": "Corrige razón social, RUC, contacto o dirección de un cliente\n**jurídico**. Un RUC mal tecleado llega hasta la factura electrónica y\nhasta ahora no tenía arreglo por API.\n\nUn cliente natural responde 422: sus datos viven en su `persona`\n(RN-GEN-007) y se corrigen desde `PATCH /personas/{id}`.",
         "operationId": "editar_cliente_api_v1_sales_clientes__cliente_id__patch",
         "parameters": [
           {

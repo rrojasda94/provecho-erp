@@ -1131,10 +1131,20 @@ export function DialogoTipo({
     setTipo(borrador.tipo);
     setMesaId(borrador.mesaId);
     setComensales(borrador.comensales ?? 2);
-    // La dirección del cliente registrado entra sola; solo se escribe si no
-    // tiene ninguna.
-    setDireccion(borrador.direccion ?? borrador.cliente?.direccion ?? "");
-    setUbicacion(borrador.ubicacion ?? UBICACION_VACIA);
+    // El texto y su ancla viajan juntos (ADR-053): la dirección del
+    // cliente registrado entra sola solo si el pedido no tiene la suya, y
+    // trae su pin — copiar solo el texto es lo que dejaba el delivery
+    // cotizando siempre a tarifa base.
+    if (borrador.direccion) {
+      setDireccion(borrador.direccion);
+      setUbicacion(borrador.ubicacion);
+    } else if (borrador.cliente?.direccion) {
+      setDireccion(borrador.cliente.direccion);
+      setUbicacion(borrador.cliente);
+    } else {
+      setDireccion("");
+      setUbicacion(UBICACION_VACIA);
+    }
     setCostoEntrega(borrador.costoEntrega);
   }, [borrador]);
 
@@ -1449,6 +1459,7 @@ export function DialogoCliente({
     numero_documento: string;
     direccion: string;
     fecha_nacimiento: string;
+    ubicacion: Ubicacion;
   }) => Promise<void>;
 }) {
   const [q, setQ] = useState("");
@@ -1458,7 +1469,12 @@ export function DialogoCliente({
   const [telefono, setTelefono] = useState("");
   const [documento, setDocumento] = useState("");
   const [direccion, setDireccion] = useState("");
+  const [ubicacion, setUbicacion] = useState<Ubicacion>(UBICACION_VACIA);
   const [cumpleanos, setCumpleanos] = useState("");
+  // Fuerza a `CampoDireccion` a remontar cuando `ConsultaDocumento` prellena
+  // el texto: el campo es no controlado (`defaultValue`), así que sin esto
+  // un dato traído después del primer render no se vería.
+  const [versionDireccion, setVersionDireccion] = useState(0);
 
   useEffect(() => {
     if (!abierto) {
@@ -1467,6 +1483,8 @@ export function DialogoCliente({
       setCreando(false);
       setDocumento("");
       setDireccion("");
+      setUbicacion(UBICACION_VACIA);
+      setVersionDireccion((v) => v + 1);
       setCumpleanos("");
     }
   }, [abierto]);
@@ -1543,7 +1561,11 @@ export function DialogoCliente({
               const traido = nombreDe(datos);
               if (traido) setNombre(traido);
               if (typeof datos.direccion === "string" && datos.direccion) {
+                // Texto traído de RENIEC/SUNAT, sin pin: recién queda
+                // anclado si el cajero lo vuelve a elegir en el mapa.
                 setDireccion(datos.direccion);
+                setUbicacion(UBICACION_VACIA);
+                setVersionDireccion((v) => v + 1);
               }
               if (typeof datos.fecha_nacimiento === "string" && datos.fecha_nacimiento) {
                 setCumpleanos(datos.fecha_nacimiento);
@@ -1551,12 +1573,17 @@ export function DialogoCliente({
             }}
           />
 
-          <p className="pdv-etiqueta">Dirección (opcional)</p>
-          <input
-            className="pdv-campo"
-            value={direccion}
-            placeholder="Jr. San Martín 456"
-            onChange={(e) => setDireccion(e.target.value)}
+          <CampoDireccion
+            key={versionDireccion}
+            etiqueta="Dirección (opcional)"
+            claseEtiqueta="pdv-etiqueta"
+            claseCampo="pdv-campo"
+            defaultValue={direccion}
+            ubicacion={ubicacion}
+            onCambio={(texto, punto) => {
+              setDireccion(texto);
+              setUbicacion(punto);
+            }}
           />
           <footer className="pdv-dialogo-pie">
             <button type="button" onClick={() => setCreando(false)}>
@@ -1573,6 +1600,7 @@ export function DialogoCliente({
                   numero_documento: documento.trim(),
                   direccion: direccion.trim(),
                   fecha_nacimiento: cumpleanos,
+                  ubicacion,
                 })
               }
             >
