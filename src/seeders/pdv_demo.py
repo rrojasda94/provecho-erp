@@ -35,6 +35,7 @@ from src.modules.inventory.infrastructure.models import (
     Sku,
     UnidadMedida,
 )
+from src.modules.sales.domain import rules
 from src.modules.sales.infrastructure.models import (
     ListaPrecio,
     Mesa,
@@ -166,12 +167,15 @@ def sembrar(session: Session) -> None:
     )
 
     for numero in range(1, 13):
+        pos_x, pos_y = rules.posicion_por_defecto(numero - 1)
         _obtener_o_crear(
             session,
             Mesa,
             {"sucursal_id": sucursal.id, "numero": numero},
             zona="Salón" if numero <= 8 else "Terraza",
             capacidad=4,
+            pos_x=pos_x,
+            pos_y=pos_y,
         )
 
     _unidades_medida_demo(session)

@@ -401,7 +401,7 @@ def _validar_mesa(
     if modalidad != "mesa":
         raise ReglaNegocio("solo la modalidad `mesa` admite mesa_id")
     mesa = MesaRepo(session).get(mesa_id)
-    if mesa is None or mesa.deleted_at is not None or not mesa.activa:
+    if mesa is None or not mesa.activa:
         raise NoEncontrado("mesa no encontrada o inactiva")
     # Una mesa de otra sucursal en la orden rompe el mapa del salón.
     if mesa.sucursal_id != sucursal_id:

@@ -210,12 +210,11 @@ def _item(producto, cantidad=1, precio="40.00", grupo_cobro=1):
 
 
 # --- Mesa -------------------------------------------------------------------
-def test_mesa_se_configura_por_sucursal_y_el_numero_es_unico(session, base):
-    mesas_uc.crear_mesa(
-        session, sucursal_id=base["sucursal"].id, numero=7, zona="Salón", capacidad=4
-    )
-    with pytest.raises(Conflicto):
-        mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id, numero=7)
+def test_mesa_numera_automatico_y_secuencial(session, base):
+    uno = mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id, zona="Salón", capacidad=4)
+    dos = mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id)
+    assert uno.numero == 1
+    assert dos.numero == 2
 
 
 def test_venta_en_mesa_de_otra_sucursal_se_rechaza(session, base):
@@ -228,13 +227,13 @@ def test_venta_en_mesa_de_otra_sucursal_se_rechaza(session, base):
     )
     session.add(otra)
     session.flush()
-    mesa = mesas_uc.crear_mesa(session, sucursal_id=otra.id, numero=1)
+    mesa = mesas_uc.crear_mesa(session, sucursal_id=otra.id)
     with pytest.raises(ReglaNegocio):
         _crear(session, base, [_item(base["productos"][0])], mesa_id=mesa.id)
 
 
 def test_mesa_id_solo_aplica_a_modalidad_mesa(session, base):
-    mesa = mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id, numero=2)
+    mesa = mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id)
     with pytest.raises(ReglaNegocio):
         _crear(
             session,
@@ -246,8 +245,8 @@ def test_mesa_id_solo_aplica_a_modalidad_mesa(session, base):
 
 
 def test_mapa_marca_ocupada_la_mesa_con_orden_abierta(session, base):
-    libre = mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id, numero=1)
-    ocupada = mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id, numero=2)
+    libre = mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id)
+    ocupada = mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id)
     _crear(
         session,
         base,
@@ -263,11 +262,51 @@ def test_mapa_marca_ocupada_la_mesa_con_orden_abierta(session, base):
     assert mapa[ocupada.numero].total == Decimal("80.00")
 
 
-def test_no_se_desactiva_una_mesa_con_orden_abierta(session, base):
-    mesa = mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id, numero=3)
+def test_no_se_elimina_una_mesa_con_orden_abierta(session, base):
+    mesa = mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id)
     _crear(session, base, [_item(base["productos"][0])], mesa_id=mesa.id)
     with pytest.raises(Conflicto):
-        mesas_uc.desactivar_mesa(session, mesa.id)
+        mesas_uc.eliminar_mesa(session, mesa.id)
+
+
+def test_solo_se_elimina_la_mesa_de_mayor_numero(session, base):
+    uno = mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id)
+    mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id)
+    with pytest.raises(Conflicto):
+        mesas_uc.eliminar_mesa(session, uno.id)
+
+
+def test_eliminar_mesa_sin_ventas_borra_la_fila_y_libera_el_numero(session, base):
+    uno = mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id)
+    mesas_uc.eliminar_mesa(session, uno.id)
+    session.flush()
+    otra = mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id)
+    assert otra.numero == 1
+
+
+def test_eliminar_mesa_con_ventas_la_desactiva_en_vez_de_borrarla(session, base):
+    uno = mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id)
+    venta = _crear(session, base, [_item(base["productos"][0])], mesa_id=uno.id)
+    venta.estado = "pagada"
+    session.flush()
+    mesas_uc.eliminar_mesa(session, uno.id)
+    session.flush()
+    assert uno.activa is False
+    assert uno not in mesas_uc.listar_mesas(session, base["sucursal"].id)
+
+
+def test_editar_mesa_con_orden_abierta_se_rechaza(session, base):
+    mesa = mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id)
+    _crear(session, base, [_item(base["productos"][0])], mesa_id=mesa.id)
+    with pytest.raises(Conflicto):
+        mesas_uc.editar_mesa(session, mesa.id, zona="Terraza")
+
+
+def test_editar_mesa_no_permite_pisar_otra_celda(session, base):
+    uno = mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id)
+    dos = mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id)
+    with pytest.raises(Conflicto):
+        mesas_uc.editar_mesa(session, dos.id, pos_x=uno.pos_x, pos_y=uno.pos_y)
 
 
 # --- Cobro dividido por grupos ----------------------------------------------
