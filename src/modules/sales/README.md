@@ -176,6 +176,17 @@ cuatro huecos que el punto de venta necesitaba y el modelo no daba.
   motivo; publica `sales.lineas_anuladas` → inventory repone. Quitar todas
   anula la orden. Antes de enviar, el pedido vive en el PDV y no pasa
   por acá.
+- **Mover líneas entre órdenes** (RN-COM-043, ADR-071):
+  `POST /ventas/{id}/mover-lineas` reasigna líneas ya enviadas a otra orden
+  abierta (`destino_venta_id`), a una mesa libre (`destino_mesa_id`), o a
+  otra cuenta de la misma orden (solo `grupo_cobro` — así el PDV implementa
+  "cobrar seleccionados"). Mismo permiso que crear (`sales.crear`), **sin**
+  autorización de supervisor: el producto sigue existiendo en alguna orden
+  abierta. No repone ni descuenta inventario — el insumo no se movió del
+  almacén — y no genera asiento: origen y destino asientan contra las mismas
+  cuentas. `estado_preparacion`/`etapa_kds` viajan con la línea sin tocarse.
+  Arrastra extras siempre completos y rechaza mover una cuenta con pagos ya
+  confirmados (eso es nota de crédito). Publica `sales.lineas_movidas`.
 - **Precuenta** (RN-COM-019): `GET /ventas/{id}/precuenta`, documento **no
   fiscal**, opcionalmente por cuenta. No cambia el estado ni se audita.
   Texto de 48 columnas + membrete, igual que la comanda (ADR-067).

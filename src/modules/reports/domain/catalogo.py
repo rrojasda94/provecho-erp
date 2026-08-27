@@ -239,6 +239,32 @@ CATALOGO: tuple[Emision, ...] = (
         clave_referencia="venta_id",
         clave_actor="autorizado_por",
     ),
+    Emision(
+        codigo="sales.lineas_movidas",
+        nombre="Productos movidos entre pedidos",
+        descripcion=(
+            "Se reasignaron líneas de un pedido ya enviado a otro pedido, a "
+            "una mesa libre, o a otra cuenta del mismo pedido (RN-COM-043). "
+            "No es un acto de autoridad como anular: el producto sigue "
+            "existiendo, solo cambió de cuenta."
+        ),
+        permiso="sales.leer",
+        ambito="sucursal",
+        campos=(
+            "movimiento_id",
+            "origen_venta_id",
+            "destino_venta_id",
+            "sucursal_id",
+            "monto",
+            "usuario_id",
+        ),
+        titulo="Productos movidos entre pedidos",
+        cuerpo="Monto trasladado: S/ {monto}.",
+        areas_sugeridas=("gerencia",),
+        referencia_tipo="venta",
+        clave_referencia="origen_venta_id",
+        clave_actor="usuario_id",
+    ),
     # --- inventory -----------------------------------------------------------
     Emision(
         codigo="inventory.stock_bajo_minimo",

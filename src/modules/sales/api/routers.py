@@ -533,6 +533,43 @@ def agregar_lineas(
     return venta
 
 
+@router.post("/ventas/{venta_id}/mover-lineas", response_model=schemas.MoverLineasOut)
+def mover_lineas(
+    venta_id: uuid.UUID,
+    body: schemas.MoverLineasCreate,
+    actor: Usuario = Depends(require_permission(CREAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Reasigna líneas de una orden ya enviada a otro destino (RN-COM-043):
+    otra orden abierta, una mesa libre, o la misma orden con otra cuenta —
+    que es "cobrar seleccionados" en el PDV.
+
+    Mismo permiso que crear la orden y sin autorización de supervisor: el
+    producto sigue existiendo en alguna orden abierta, no se repone
+    inventario ni se deshace ningún cobro. Lo que sí sigue pidiendo firma es
+    quitar una línea, porque esa repone insumo (RN-COM-020).
+    """
+    exigir_venta(session, venta_id, tenant)
+    if body.destino_venta_id is not None:
+        exigir_venta(session, body.destino_venta_id, tenant)
+    origen, destino = ventas.mover_lineas(
+        session,
+        venta_id=venta_id,
+        venta_item_ids=body.venta_item_ids,
+        usuario_id=actor.id,
+        destino_venta_id=body.destino_venta_id,
+        destino_mesa_id=body.destino_mesa_id,
+        destino_comensales=body.destino_comensales,
+        grupo_cobro=body.grupo_cobro,
+    )
+    session.commit()
+    return schemas.MoverLineasOut(
+        origen=schemas.VentaOut.model_validate(origen),
+        destino=schemas.VentaOut.model_validate(destino),
+    )
+
+
 @router.get("/ventas/{venta_id}/precuenta", response_model=schemas.PrecuentaOut)
 def ver_precuenta(
     venta_id: uuid.UUID,

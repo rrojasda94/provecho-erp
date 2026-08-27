@@ -11,7 +11,7 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, select
 from sqlalchemy.orm import Session
 
 import src.core.models_registry  # noqa: F401
@@ -1278,3 +1278,415 @@ def test_con_la_cuenta_dividida_el_flete_lo_paga_la_primera(session, base, con_t
     assert primera == Decimal("45.00")
     assert segunda == Decimal("40.00")
     assert primera + segunda == ventas_uc.total_a_cobrar(session, venta)
+
+
+# --- Mover líneas entre órdenes (RN-COM-043, ADR-071) -----------------------
+def test_mover_a_otra_orden_recalcula_totales_en_ambas(session, base):
+    origen = _crear(
+        session,
+        base,
+        [
+            _item(base["productos"][0], cantidad=1, precio="40.00"),
+            _item(base["productos"][1], cantidad=1, precio="30.00"),
+        ],
+        mesa_id=mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id).id,
+    )
+    destino = _crear(
+        session,
+        base,
+        [_item(base["productos"][0], cantidad=1, precio="40.00")],
+        mesa_id=mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id).id,
+    )
+    pizza = next(
+        f for f in VentaRepo(session).items(origen.id) if f.padre_venta_item_id is None
+    )
+
+    resultado_origen, resultado_destino = ventas_uc.mover_lineas(
+        session,
+        venta_id=origen.id,
+        venta_item_ids=[pizza.id],
+        usuario_id=base["usuario"].id,
+        destino_venta_id=destino.id,
+    )
+
+    assert resultado_origen.total == Decimal("30.00")
+    assert resultado_destino.total == Decimal("80.00")
+    assert [f.id for f in VentaRepo(session).items(origen.id)] != [pizza.id]
+    assert pizza.id in [f.id for f in VentaRepo(session).items(destino.id)]
+
+
+def test_mover_a_una_mesa_libre_crea_la_orden_y_libera_la_origen(session, base):
+    mesa_origen = mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id)
+    mesa_libre = mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id)
+    origen = _crear(
+        session,
+        base,
+        [_item(base["productos"][0], cantidad=1, precio="40.00")],
+        mesa_id=mesa_origen.id,
+        comensales=2,
+    )
+    pizza = VentaRepo(session).items(origen.id)[0]
+
+    resultado_origen, resultado_destino = ventas_uc.mover_lineas(
+        session,
+        venta_id=origen.id,
+        venta_item_ids=[pizza.id],
+        usuario_id=base["usuario"].id,
+        destino_mesa_id=mesa_libre.id,
+        destino_comensales=3,
+    )
+
+    assert resultado_destino.mesa_id == mesa_libre.id
+    assert resultado_destino.numero_orden != resultado_origen.numero_orden
+    assert resultado_destino.comensales == 3
+    assert resultado_destino.total == Decimal("40.00")
+    # Sin líneas no queda orden que preparar ni mesa que ocupar.
+    assert resultado_origen.estado == "anulada"
+    mapa = {m.mesa.numero: m for m in mesas_uc.mapa(session, sucursal_id=base["sucursal"].id)}
+    assert mapa[mesa_origen.numero].venta_id is None
+    assert mapa[mesa_libre.numero].venta_id == resultado_destino.id
+
+
+def test_mover_arrastra_los_extras_del_plato(session, base):
+    extra = _crear_extra(session, base, "Extra queso", "E777")
+    catalogo_uc.vincular_extra(
+        session, producto_id=base["productos"][0].id, extra_id=extra.id, maximo=3
+    )
+    origen = _crear(
+        session,
+        base,
+        [
+            {
+                **_item(base["productos"][0], cantidad=1, precio="40.00"),
+                "extras": [
+                    {
+                        "producto_comercial_id": extra.id,
+                        "cantidad": Decimal(1),
+                        "precio_unitario": Decimal("5.00"),
+                    }
+                ],
+            }
+        ],
+        mesa_id=mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id).id,
+    )
+    destino = _crear(
+        session,
+        base,
+        [_item(base["productos"][1], cantidad=1, precio="30.00")],
+        mesa_id=mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id).id,
+    )
+    padre = next(
+        f for f in VentaRepo(session).items(origen.id) if f.padre_venta_item_id is None
+    )
+    hijo = next(
+        f for f in VentaRepo(session).items(origen.id) if f.padre_venta_item_id is not None
+    )
+
+    # El PDV manda solo el id del plato: el extra se mueve solo.
+    ventas_uc.mover_lineas(
+        session,
+        venta_id=origen.id,
+        venta_item_ids=[padre.id],
+        usuario_id=base["usuario"].id,
+        destino_venta_id=destino.id,
+    )
+
+    filas_destino = {f.id: f for f in VentaRepo(session).items(destino.id)}
+    assert padre.id in filas_destino and hijo.id in filas_destino
+    assert filas_destino[hijo.id].padre_venta_item_id == padre.id
+
+
+def test_mover_un_extra_suelto_se_rechaza(session, base):
+    extra = _crear_extra(session, base, "Extra queso", "E778")
+    catalogo_uc.vincular_extra(
+        session, producto_id=base["productos"][0].id, extra_id=extra.id, maximo=3
+    )
+    origen = _crear(
+        session,
+        base,
+        [
+            {
+                **_item(base["productos"][0], cantidad=1, precio="40.00"),
+                "extras": [
+                    {
+                        "producto_comercial_id": extra.id,
+                        "cantidad": Decimal(1),
+                        "precio_unitario": Decimal("5.00"),
+                    }
+                ],
+            }
+        ],
+        mesa_id=mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id).id,
+    )
+    destino = _crear(
+        session,
+        base,
+        [_item(base["productos"][1], cantidad=1, precio="30.00")],
+        mesa_id=mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id).id,
+    )
+    hijo = next(
+        f for f in VentaRepo(session).items(origen.id) if f.padre_venta_item_id is not None
+    )
+    with pytest.raises(ReglaNegocio):
+        ventas_uc.mover_lineas(
+            session,
+            venta_id=origen.id,
+            venta_item_ids=[hijo.id],
+            usuario_id=base["usuario"].id,
+            destino_venta_id=destino.id,
+        )
+
+
+def test_mover_no_toca_el_stock(session, base):
+    """Mover no es anular: el insumo ya salió del almacén y sigue afuera. A
+    diferencia de `anular_lineas`, no se publica ningún evento de
+    inventory."""
+    origen = _crear(
+        session,
+        base,
+        [_item(base["productos"][0], cantidad=1, precio="40.00")],
+        mesa_id=mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id).id,
+    )
+    destino = _crear(
+        session,
+        base,
+        [_item(base["productos"][1], cantidad=1, precio="30.00")],
+        mesa_id=mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id).id,
+    )
+    pizza = VentaRepo(session).items(origen.id)[0]
+
+    eventos_inventario = []
+    event_bus.subscribe("inventory.stock_consumido", eventos_inventario.append)
+    event_bus.subscribe("inventory.stock_repuesto", eventos_inventario.append)
+
+    ventas_uc.mover_lineas(
+        session,
+        venta_id=origen.id,
+        venta_item_ids=[pizza.id],
+        usuario_id=base["usuario"].id,
+        destino_venta_id=destino.id,
+    )
+    session.commit()
+
+    assert eventos_inventario == []
+
+
+def test_mover_rechaza_venta_pagada(session, base):
+    origen = _crear(session, base, [_item(base["productos"][0], cantidad=1, precio="40.00")])
+    destino = _crear(session, base, [_item(base["productos"][1], cantidad=1, precio="30.00")])
+    pizza = VentaRepo(session).items(origen.id)[0]
+    ventas_uc.registrar_pago(
+        session,
+        venta_id=origen.id,
+        medio_pago_id=base["medio"].id,
+        monto=Decimal("40.00"),
+        idempotency_key=f"pago-{uuid.uuid4()}",
+    )
+    with pytest.raises(Conflicto):
+        ventas_uc.mover_lineas(
+            session,
+            venta_id=origen.id,
+            venta_item_ids=[pizza.id],
+            usuario_id=base["usuario"].id,
+            destino_venta_id=destino.id,
+        )
+
+
+def test_mover_rechaza_otra_sucursal(session, base):
+    otra = Sucursal(
+        marca_id=base["sucursal"].marca_id,
+        empresa_id=base["empresa"].id,
+        nombre="Charlie's - Otra sede",
+        direccion="Jr. Otro 2",
+        tenencia="propia",
+    )
+    session.add(otra)
+    session.flush()
+    punto_venta_otra = PuntoVenta(
+        sucursal_id=otra.id,
+        canal="trabajador",
+        serie_boleta="B002",
+        serie_factura="F002",
+        politica_pago="al_finalizar",
+    )
+    session.add(punto_venta_otra)
+    session.flush()
+
+    origen = _crear(session, base, [_item(base["productos"][0], cantidad=1, precio="40.00")])
+    destino = ventas_uc.crear_venta(
+        session,
+        sucursal_id=otra.id,
+        punto_venta_id=punto_venta_otra.id,
+        canal="pdv",
+        modalidad="takeout",
+        usuario_id=base["usuario"].id,
+        idempotency_key=f"key-{uuid.uuid4()}",
+        items=[_item(base["productos"][1], cantidad=1, precio="30.00")],
+    )
+    pizza = VentaRepo(session).items(origen.id)[0]
+    with pytest.raises(ReglaNegocio):
+        ventas_uc.mover_lineas(
+            session,
+            venta_id=origen.id,
+            venta_item_ids=[pizza.id],
+            usuario_id=base["usuario"].id,
+            destino_venta_id=destino.id,
+        )
+
+
+def test_mover_rechaza_mezclar_consumo_personal_con_venta(session, base):
+    origen = _crear(
+        session,
+        base,
+        [_item(base["productos"][0], cantidad=1, precio="40.00")],
+        tipo="consumo_personal",
+        consumo_motivo="fin_semana",
+        consumo_autorizado_por=base["usuario"].id,
+    )
+    destino = _crear(session, base, [_item(base["productos"][1], cantidad=1, precio="30.00")])
+    plato = VentaRepo(session).items(origen.id)[0]
+    with pytest.raises(ReglaNegocio):
+        ventas_uc.mover_lineas(
+            session,
+            venta_id=origen.id,
+            venta_item_ids=[plato.id],
+            usuario_id=base["usuario"].id,
+            destino_venta_id=destino.id,
+        )
+
+
+def test_mover_rechaza_una_cuenta_que_ya_tiene_pagos(session, base):
+    venta = _crear(
+        session,
+        base,
+        [
+            _item(base["productos"][0], precio="40.00", grupo_cobro=1),
+            _item(base["productos"][1], precio="30.00", grupo_cobro=2),
+        ],
+    )
+    ventas_uc.registrar_pago(
+        session,
+        venta_id=venta.id,
+        medio_pago_id=base["medio"].id,
+        monto=Decimal("40.00"),
+        idempotency_key=f"pago-{uuid.uuid4()}",
+        grupo_cobro=1,
+    )
+    fila_grupo_1 = next(
+        f for f in VentaRepo(session).items(venta.id) if f.grupo_cobro == 1
+    )
+    with pytest.raises(Conflicto):
+        ventas_uc.mover_lineas(
+            session,
+            venta_id=venta.id,
+            venta_item_ids=[fila_grupo_1.id],
+            usuario_id=base["usuario"].id,
+            grupo_cobro=2,
+        )
+
+
+def test_audit_log_registra_el_traslado_en_las_dos_ventas(session, base):
+    from src.shared.models import AuditLog
+
+    origen = _crear(session, base, [_item(base["productos"][0], cantidad=1, precio="40.00")])
+    destino = _crear(session, base, [_item(base["productos"][1], cantidad=1, precio="30.00")])
+    pizza = VentaRepo(session).items(origen.id)[0]
+
+    ventas_uc.mover_lineas(
+        session,
+        venta_id=origen.id,
+        venta_item_ids=[pizza.id],
+        usuario_id=base["usuario"].id,
+        destino_venta_id=destino.id,
+    )
+
+    registros = session.scalars(
+        select(AuditLog).where(AuditLog.accion == "mover_lineas")
+    ).all()
+    entidades = {r.entidad_id for r in registros}
+    assert entidades == {origen.id, destino.id}
+
+
+def test_cobrar_seleccionados_divide_la_cuenta_sin_cerrar_la_venta(session, base):
+    """Es lo que el PDV llama "cobrar seleccionados": mover a otra cuenta de
+    la misma orden y cobrar solo esa cuenta."""
+    venta = _crear(
+        session,
+        base,
+        [
+            _item(base["productos"][0], cantidad=1, precio="40.00"),
+            _item(base["productos"][1], cantidad=1, precio="30.00"),
+        ],
+    )
+    pizza = next(
+        f
+        for f in VentaRepo(session).items(venta.id)
+        if f.precio_unitario == Decimal("40.00")
+    )
+
+    ventas_uc.mover_lineas(
+        session,
+        venta_id=venta.id,
+        venta_item_ids=[pizza.id],
+        usuario_id=base["usuario"].id,
+        grupo_cobro=2,
+    )
+
+    _pago, venta, comprobante = ventas_uc.registrar_pago(
+        session,
+        venta_id=venta.id,
+        medio_pago_id=base["medio"].id,
+        monto=Decimal("40.00"),
+        idempotency_key=f"pago-{uuid.uuid4()}",
+        grupo_cobro=2,
+    )
+    assert comprobante is not None
+    assert comprobante.grupo_cobro == 2
+    assert venta.estado == "orden", "la otra cuenta sigue pendiente"
+
+    _pago2, venta, comprobante2 = ventas_uc.registrar_pago(
+        session,
+        venta_id=venta.id,
+        medio_pago_id=base["medio"].id,
+        monto=Decimal("30.00"),
+        idempotency_key=f"pago-{uuid.uuid4()}",
+        grupo_cobro=1,
+    )
+    assert comprobante2 is not None
+    assert venta.estado == "pagada"
+
+
+def test_mover_conserva_el_avance_de_preparacion_del_kds(session, base):
+    """RN-CUP-003 enmendada: `estado_preparacion` viaja con la línea, no se
+    reinicia al cambiar de orden."""
+    origen = _crear(
+        session,
+        base,
+        [_item(base["productos"][0], cantidad=1, precio="40.00")],
+        mesa_id=mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id).id,
+    )
+    destino = _crear(
+        session,
+        base,
+        [_item(base["productos"][1], cantidad=1, precio="30.00")],
+        mesa_id=mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id).id,
+    )
+    pizza = VentaRepo(session).items(origen.id)[0]
+    pizza.estado_preparacion = "listo"
+    session.flush()
+
+    ventas_uc.mover_lineas(
+        session,
+        venta_id=origen.id,
+        venta_item_ids=[pizza.id],
+        usuario_id=base["usuario"].id,
+        destino_venta_id=destino.id,
+    )
+
+    movida = next(f for f in VentaRepo(session).items(destino.id) if f.id == pizza.id)
+    assert movida.estado_preparacion == "listo"
+    estados_destino = [f.estado_preparacion for f in VentaRepo(session).items(destino.id)]
+    assert rules.pedido_entregable(estados_destino) is False, (
+        "la bebida de destino sigue pendiente: el pedido no es entregable "
+        "solo porque llegó un plato ya listo"
+    )

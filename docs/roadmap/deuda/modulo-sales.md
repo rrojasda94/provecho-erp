@@ -318,6 +318,23 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
     que es un cambio de mapeo tributario, no de impresión.
   - ⬜ `grupo_cobro` es un entero sin entidad detrás: nada impide un grupo 7
     sin grupos 1-6. Se valida en el caso de uso, no en el esquema.
+  - ⬜ **`mover_lineas` (RN-COM-043, ADR-071, 2026-08-27) no viaja por el hub
+    offline.** `sincronizacion.py` solo reproduce tres verbos —crear, cobrar,
+    anular una venta completa— y no tiene un cuarto para "estas líneas
+    cambiaron de venta/cuenta"; mismo hueco que ya tenían `agregar_lineas` y
+    `anular_lineas`, agravado acá porque los `venta_item.id` no son estables
+    entre el hub y la nube (`docs/roadmap/deuda/modo-offline-del-pdv.md`): un
+    traslado identificado por esos ids no tiene contra qué reproducirse
+    después de un corte.
+  - ⬜ **El asiento por venta puede no cuadrar con el detalle de productos de
+    esa venta después de un `mover_lineas`.** Origen y destino asientan
+    contra las mismas cuentas contables (una `regla_asiento` por
+    empresa+evento), así que el traslado no cambia el mayor, el balance ni
+    el resultado del período — decisión explícita de ADR-071, no un bug — pero
+    `referencia_origen` del asiento de la orden origen queda apuntando a una
+    venta cuyo detalle de productos ya no incluye lo que se movió. Un reporte
+    que cruce "ventas del día" contra "asientos por venta" puede mostrarlo
+    desalineado línea por línea aunque la suma de la sucursal siempre cuadre.
   - ✅ 2026-07-28 **Frontend del PDV** en `frontend/app/pdv/`, contra los
     endpoints reales: apertura de caja con firma del encargado, catálogo con
     extras, ticket multi-borrador con selección por pulsación larga, mapa de

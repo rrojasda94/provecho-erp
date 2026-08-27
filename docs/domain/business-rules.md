@@ -1362,7 +1362,11 @@ producción se hace en cocinas de sucursal. Ver
   sus propios pagos, puede tener un receptor distinto y **emite su propio
   comprobante**. La venta pasa a `estado=pagada` recién cuando ninguna
   cuenta queda con saldo. Si no se selecciona nada, se cobra la orden
-  completa como una sola cuenta.
+  completa como una sola cuenta. *Enmendada el 2026-08-27 — la selección se
+  vuelve cuenta separada llamando a "mover" (RN-COM-043) con la nueva
+  cuenta, no con un campo que se manda al crear la línea: separar la
+  cuenta pasa a ser una acción del cobro, no una decisión que había que
+  tomar al pedir.*
 
 - **RN-COM-019** La **precuenta** es un documento **no fiscal**: no tiene
   serie ni correlativo, no se envía a SUNAT y no cambia el estado de la
@@ -1559,6 +1563,19 @@ producción se hace en cocinas de sucursal. Ver
   medida —esa sigue en dos decimales, son kilómetros y no plata—. Consecuencia
   aceptada: una tarifa que dé menos de S/ 0.25 cobra cero; para eso la tarifa
   está mal configurada, no el redondeo.
+- **RN-COM-043** Una línea de una orden **ya enviada a cocina** se puede
+  **mover** a otra orden abierta, a una mesa libre, o a otra cuenta de la
+  misma orden — así el PDV resuelve un producto cargado en la mesa
+  equivocada y "cobrar seleccionados" (dividir la cuenta, RN-COM-018, en el
+  momento del cobro y no solo al tomar el pedido). El cajero lo hace **sin**
+  autorización de supervisor: el producto sigue existiendo en alguna orden
+  que se va a pagar o a anular, y anular sí exige firma (RN-COM-020). Mover
+  arrastra siempre sus extras (RN-COM-021) — nunca uno suelto — y no admite
+  una cuenta que ya tenga pagos confirmados (eso es nota de crédito,
+  RN-CPP-009). No aplica a un pedido que todavía no se envió: ese se corrige
+  en el propio punto de venta, borrando la línea. Mover **no repone
+  inventario** (ADR-071): el insumo ya salió del almacén y el plato sigue
+  existiendo, solo cambia de cuenta.
 
 ## Cumplimiento de pedido
 
@@ -1588,7 +1605,10 @@ preparación, despacho y entrega en las tres modalidades.
 - **RN-CUP-003** El estado de preparación es único por ítem de venta y es
   la fuente de verdad del avance. Una pantalla KDS es un filtro sobre ese
   estado, nunca una copia — dos pantallas jamás muestran avances distintos
-  del mismo ítem.
+  del mismo ítem. *Enmendada el 2026-08-27 — mover un ítem entre órdenes
+  (RN-COM-043) cambia su `venta_id`, no su estado: el plato conserva su
+  avance de preparación al cambiar de pedido, y la tarjeta pasa a la cola
+  del pedido destino en el siguiente refresco (ADR-071).*
 - **RN-CUP-004** Ningún pedido se entrega sin verificar el pedido completo
   contra la comanda: control de salida obligatorio, responsabilidad de
   quien despacha.
