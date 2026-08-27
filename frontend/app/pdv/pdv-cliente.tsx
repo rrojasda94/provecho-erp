@@ -699,7 +699,7 @@ export default function PdvCliente({ sucursalId, permisos, puntoVenta }: Props) 
     }
   };
 
-  /** Mover los productos seleccionados a otra orden (RN-COM-043, ADR-069):
+  /** Mover los productos seleccionados a otra orden (RN-COM-043, ADR-070):
    * otra mesa —libre u ocupada— o un pedido para llevar/delivery. Sin PIN de
    * supervisor: el producto sigue existiendo en alguna orden abierta. */
   const moverSeleccionados = async (destino: DestinoMover) => {

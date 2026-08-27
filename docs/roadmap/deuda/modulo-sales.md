@@ -318,7 +318,7 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
     que es un cambio de mapeo tributario, no de impresión.
   - ⬜ `grupo_cobro` es un entero sin entidad detrás: nada impide un grupo 7
     sin grupos 1-6. Se valida en el caso de uso, no en el esquema.
-  - ⬜ **`mover_lineas` (RN-COM-043, ADR-069, 2026-08-27) no viaja por el hub
+  - ⬜ **`mover_lineas` (RN-COM-043, ADR-070, 2026-08-27) no viaja por el hub
     offline.** `sincronizacion.py` solo reproduce tres verbos —crear, cobrar,
     anular una venta completa— y no tiene un cuarto para "estas líneas
     cambiaron de venta/cuenta"; mismo hueco que ya tenían `agregar_lineas` y
@@ -330,7 +330,7 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
     esa venta después de un `mover_lineas`.** Origen y destino asientan
     contra las mismas cuentas contables (una `regla_asiento` por
     empresa+evento), así que el traslado no cambia el mayor, el balance ni
-    el resultado del período — decisión explícita de ADR-069, no un bug — pero
+    el resultado del período — decisión explícita de ADR-070, no un bug — pero
     `referencia_origen` del asiento de la orden origen queda apuntando a una
     venta cuyo detalle de productos ya no incluye lo que se movió. Un reporte
     que cruce "ventas del día" contra "asientos por venta" puede mostrarlo

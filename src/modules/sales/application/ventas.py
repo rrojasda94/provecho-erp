@@ -1264,7 +1264,7 @@ def _registrar_traslado(
     usuario_id: uuid.UUID,
 ) -> None:
     """Auditoría (una entrada por venta afectada) y `sales.lineas_movidas`.
-    Sin evento de `inventory`: el insumo no se movió del almacén (ADR-069)."""
+    Sin evento de `inventory`: el insumo no se movió del almacén (ADR-070)."""
     monto = _subtotal(filas)
     movimiento_id = uuid.uuid4()
     afectadas = {origen, destino} if destino is not origen else {origen}
@@ -1326,7 +1326,7 @@ def mover_lineas(
     asiento de reclasificación: origen y destino asientan contra las mismas
     cuentas (`regla_asiento` es una por empresa+evento), así que el efecto
     neto en el libro es cero; solo `referencia_origen` queda desalineado por
-    venta, aceptado como deuda (ver ADR-069).
+    venta, aceptado como deuda (ver ADR-070).
 
     A diferencia de `anular_lineas`, no exige PIN de supervisor: el producto
     sigue existiendo en alguna orden que se va a pagar o a anular, y anular

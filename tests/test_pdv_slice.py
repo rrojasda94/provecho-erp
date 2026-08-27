@@ -1280,7 +1280,7 @@ def test_con_la_cuenta_dividida_el_flete_lo_paga_la_primera(session, base, con_t
     assert primera + segunda == ventas_uc.total_a_cobrar(session, venta)
 
 
-# --- Mover líneas entre órdenes (RN-COM-043, ADR-069) -----------------------
+# --- Mover líneas entre órdenes (RN-COM-043, ADR-070) -----------------------
 def test_mover_a_otra_orden_recalcula_totales_en_ambas(session, base):
     origen = _crear(
         session,
@@ -1289,13 +1289,13 @@ def test_mover_a_otra_orden_recalcula_totales_en_ambas(session, base):
             _item(base["productos"][0], cantidad=1, precio="40.00"),
             _item(base["productos"][1], cantidad=1, precio="30.00"),
         ],
-        mesa_id=mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id, numero=1).id,
+        mesa_id=mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id).id,
     )
     destino = _crear(
         session,
         base,
         [_item(base["productos"][0], cantidad=1, precio="40.00")],
-        mesa_id=mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id, numero=2).id,
+        mesa_id=mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id).id,
     )
     pizza = next(
         f for f in VentaRepo(session).items(origen.id) if f.padre_venta_item_id is None
@@ -1316,8 +1316,8 @@ def test_mover_a_otra_orden_recalcula_totales_en_ambas(session, base):
 
 
 def test_mover_a_una_mesa_libre_crea_la_orden_y_libera_la_origen(session, base):
-    mesa_origen = mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id, numero=10)
-    mesa_libre = mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id, numero=11)
+    mesa_origen = mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id)
+    mesa_libre = mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id)
     origen = _crear(
         session,
         base,
@@ -1367,13 +1367,13 @@ def test_mover_arrastra_los_extras_del_plato(session, base):
                 ],
             }
         ],
-        mesa_id=mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id, numero=20).id,
+        mesa_id=mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id).id,
     )
     destino = _crear(
         session,
         base,
         [_item(base["productos"][1], cantidad=1, precio="30.00")],
-        mesa_id=mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id, numero=21).id,
+        mesa_id=mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id).id,
     )
     padre = next(
         f for f in VentaRepo(session).items(origen.id) if f.padre_venta_item_id is None
@@ -1416,13 +1416,13 @@ def test_mover_un_extra_suelto_se_rechaza(session, base):
                 ],
             }
         ],
-        mesa_id=mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id, numero=22).id,
+        mesa_id=mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id).id,
     )
     destino = _crear(
         session,
         base,
         [_item(base["productos"][1], cantidad=1, precio="30.00")],
-        mesa_id=mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id, numero=23).id,
+        mesa_id=mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id).id,
     )
     hijo = next(
         f for f in VentaRepo(session).items(origen.id) if f.padre_venta_item_id is not None
@@ -1445,13 +1445,13 @@ def test_mover_no_toca_el_stock(session, base):
         session,
         base,
         [_item(base["productos"][0], cantidad=1, precio="40.00")],
-        mesa_id=mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id, numero=30).id,
+        mesa_id=mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id).id,
     )
     destino = _crear(
         session,
         base,
         [_item(base["productos"][1], cantidad=1, precio="30.00")],
-        mesa_id=mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id, numero=31).id,
+        mesa_id=mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id).id,
     )
     pizza = VentaRepo(session).items(origen.id)[0]
 
@@ -1663,13 +1663,13 @@ def test_mover_conserva_el_avance_de_preparacion_del_kds(session, base):
         session,
         base,
         [_item(base["productos"][0], cantidad=1, precio="40.00")],
-        mesa_id=mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id, numero=40).id,
+        mesa_id=mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id).id,
     )
     destino = _crear(
         session,
         base,
         [_item(base["productos"][1], cantidad=1, precio="30.00")],
-        mesa_id=mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id, numero=41).id,
+        mesa_id=mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id).id,
     )
     pizza = VentaRepo(session).items(origen.id)[0]
     pizza.estado_preparacion = "listo"

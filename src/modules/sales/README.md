@@ -176,7 +176,7 @@ cuatro huecos que el punto de venta necesitaba y el modelo no daba.
   motivo; publica `sales.lineas_anuladas` → inventory repone. Quitar todas
   anula la orden. Antes de enviar, el pedido vive en el PDV y no pasa
   por acá.
-- **Mover líneas entre órdenes** (RN-COM-043, ADR-069):
+- **Mover líneas entre órdenes** (RN-COM-043, ADR-070):
   `POST /ventas/{id}/mover-lineas` reasigna líneas ya enviadas a otra orden
   abierta (`destino_venta_id`), a una mesa libre (`destino_mesa_id`), o a
   otra cuenta de la misma orden (solo `grupo_cobro` — así el PDV implementa

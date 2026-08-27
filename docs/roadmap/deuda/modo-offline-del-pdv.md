@@ -30,7 +30,7 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   alguna vez se quieren tiempos de cocina consolidados por grupo, hay que
   resolverlo aparte.
 - ⬜ **`agregar_lineas`, `anular_lineas` y `mover_lineas` (2026-08-27,
-  RN-COM-043, ADR-069) no tienen verbo de replay**: `sincronizacion.py` solo
+  RN-COM-043, ADR-070) no tienen verbo de replay**: `sincronizacion.py` solo
   reproduce crear/cobrar/anular una venta **completa**. Una orden que en el
   hub sumó líneas, quitó líneas o movió productos entre pedidos durante un
   corte de enlace no reproduce esos cambios al reconectar — `_crear` es
