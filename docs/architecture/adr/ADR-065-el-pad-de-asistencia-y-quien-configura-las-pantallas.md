@@ -116,6 +116,12 @@ algo mal». Poner ahí al trabajador convertiría un recordatorio en un cargo.
     ataba al trabajador. `usuario_id` viajaba en el alta pero no en
     `TrabajadorUpdate`, y la pantalla de trabajadores nunca lo ofrecía, así que
     desde la UI el campo era NULL para siempre y **ningún** trabajador podía
-    marcar. Ahora se asigna y se quita desde la ficha del trabajador.
+    marcar. Se asignaba y se quitaba desde la ficha del trabajador.
+  - **Reemplazado el 2026-08-27 (ADR-069)**: ese mecanismo —
+    `trabajador.usuario_id` como columna propia, asignada desde RRHH →
+    Trabajadores— convivía con `usuario.persona_id` (Usuarios → "Persona
+    vinculada") sin que nada las sincronizara: vincular desde Usuarios no
+    habilitaba el pad. `trabajador.usuario_id` dejó de ser columna; se
+    deriva de `usuario.persona_id`, que pasó a ser la única arista.
 - Aparece un tipo de cuenta más para administrar: una por local. Se crea desde
   `/usuarios` como cualquier otra; el seeder solo siembra el rol.

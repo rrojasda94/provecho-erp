@@ -10,6 +10,7 @@ import {
   type EstadoFormulario,
 } from "@/components/formulario/dialogo-formulario";
 import { PersonaPicker } from "@/components/persona-picker/persona-picker";
+import type { PersonaBusqueda } from "@/components/persona-picker/actions";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
 import { tienePermiso } from "@/lib/permisos";
 
@@ -31,6 +32,10 @@ export type Usuario = {
   nombre_display: string | null;
   email: string | null;
   persona_id: string | null;
+  // Para pintar la persona vinculada sin un segundo viaje al abrir el
+  // editor (ADR-069) — antes solo llegaba el id y no había forma de
+  // mostrarla al reabrir.
+  persona: PersonaBusqueda | null;
   activo: boolean;
 };
 export type Rol = { id: string; nombre: string; descripcion: string | null };
@@ -74,8 +79,8 @@ function DialogoNuevaCuenta() {
         Persona vinculada
         <PersonaPicker name="persona_id" />
         <span className="text-xs font-normal text-gray">
-          Quién es esta cuenta en la vida real. Hace falta para que el trabajador
-          pueda marcar asistencia con su PIN.
+          Quién es esta cuenta en la vida real. Es lo que habilita a un
+          trabajador a marcar asistencia con su PIN en el pad del local.
         </span>
       </label>
       <label className="flex flex-col gap-1 text-sm font-semibold">
@@ -122,9 +127,11 @@ function DialogoEditarCuenta({ usuario }: { usuario: Usuario }) {
       </label>
       <label className="flex flex-col gap-1 text-sm font-semibold">
         Persona vinculada
-        <PersonaPicker name="persona_id" />
+        <PersonaPicker name="persona_id" inicial={usuario.persona} />
         <span className="text-xs font-normal text-gray">
-          Quién es esta cuenta en la vida real. Vacío deja la que ya tenga.
+          Quién es esta cuenta en la vida real. &quot;Quitar&quot; la
+          desvincula: sin persona, el trabajador no puede marcar en el pad
+          de asistencia.
         </span>
       </label>
     </DialogoFormulario>
@@ -310,6 +317,12 @@ export function UsuariosCliente({
         accessorFn: (u) => u.nombre_display ?? "—",
       },
       { accessorKey: "tipo", header: "Tipo" },
+      {
+        id: "persona",
+        header: "Persona",
+        accessorFn: (u) =>
+          u.persona ? `${u.persona.apellidos}, ${u.persona.nombres}` : "—",
+      },
       {
         id: "roles",
         header: "Roles",

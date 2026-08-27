@@ -182,6 +182,9 @@ export async function contratarPostulanteAction(
         // Locación de servicios nunca marca asistencia (RN-PER-002): el
         // servidor lo rechaza, y ofrecerlo acá sería invitar al error.
         registra_asistencia: texto(datos, "tipo_vinculo") !== "locacion_servicios",
+        // Sin esto la ficha nacía sin centro de labores y no aparecía en
+        // ningún pad de asistencia.
+        sucursal_id: opcional(datos, "sucursal_id"),
       },
     });
   } catch (e) {

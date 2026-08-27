@@ -222,7 +222,11 @@ erDiagram
   contratar un `trabajador`, Compras al dar de alta un proveedor
   `natural`) sin exigirles el permiso de administración completo.
 - **usuario**: username, pin_hash (Argon2id), persona_id (nullable — NULL
-  si `agente_ia`), nombre_display (fallback para agente_ia), email, tipo
+  si `agente_ia`; única entre las cuentas vivas —
+  `uq_usuario_persona_viva` — una persona tiene a lo más una cuenta,
+  ADR-069: es la **única** arista cuenta↔trabajador, `rrhh.trabajador.
+  usuario_id` se deriva de esta columna), nombre_display (fallback para
+  agente_ia), email, tipo
   (`humano` | `agente_ia`), activo, debe_cambiar_pin (el PIN vigente lo puso
   un reseteo, así que lo sabe alguien más: la cuenta no puede hacer nada
   hasta elegir otro — ADR-041).
@@ -1300,7 +1304,10 @@ un trabajador puede o no tener usuario, y no todo usuario es trabajador
 (tenant) y se archivan/resguardan por el área correspondiente.
 
 - **trabajador**: empresa_id, persona_id (datos personales — nombres,
-  documento, domicilio, etc.), usuario_id (opcional), sucursal_id (opcional —
+  documento, domicilio, etc.), usuario_id — **derivado, no columna propia**
+  (ADR-069): es el `usuario` cuya `persona_id` coincide con la de este
+  trabajador; se vincula desde `usuario.persona_id` (Usuarios → Cuentas),
+  ver §2. sucursal_id (opcional —
   **centro de labores**: dónde trabaja, migración `b6d29f10c47e`, ADR-062. No
   es el alcance de datos de su cuenta, que vive en `usuario_sucursal`; y tiene
   que ser una sucursal de su misma empresa, RN-RRHH-019), cargo, area,

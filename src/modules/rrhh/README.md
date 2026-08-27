@@ -197,15 +197,21 @@ escuchar `trabajador_cesado`. Ver ROADMAP.
 
 ## Relaciones
 
-- `trabajador.usuario_id` (opcional) liga con `users.usuario` — un
-  trabajador puede o no tener usuario de login. Se asigna al crearlo y también
-  después (`PATCH /trabajadores/{id}`, `usuario_id`); mandarlo en `null` lo
-  desvincula. **De este campo cuelga el pad de asistencia**: el PIN que firma
-  la marcación es el de esa cuenta (RN-RRHH-020), así que un trabajador sin
-  ella recibe un 409 y su asistencia la carga RRHH a mano. La cuenta tiene que
-  ser de tipo `humano`, estar activa y no ser ya de otro trabajador — dos
-  trabajadores con la misma cuenta comparten PIN, y el pad no podría saber
-  cuál de los dos fichó.
+- `trabajador.usuario_id` (opcional) **ya no es columna propia** (ADR-069):
+  se deriva de `trabajador.persona_id`. Es la cuenta del `usuario` cuya
+  `persona_id` coincide con la del trabajador — se vincula desde
+  Usuarios → Cuentas → "Persona vinculada", no desde este módulo. Antes
+  vivía duplicado acá (`trabajador.usuario_id`, asignado desde RRHH →
+  Trabajadores) y en `usuario.persona_id` a la vez, sin que nada los
+  sincronizara: vincular desde Usuarios no habilitaba el pad. **De este
+  vínculo cuelga el pad de asistencia**: el PIN que firma la marcación es el
+  de esa cuenta (RN-RRHH-020), así que un trabajador sin ella recibe un 409
+  y su asistencia la carga RRHH a mano. La cuenta tiene que ser de tipo
+  `humano` y estar activa; una desactivada da un 409 legible, no un 401
+  confuso. Una persona **no** puede tener dos cuentas vivas
+  (`uq_usuario_persona_viva` en `usuario`) — pero **sí** puede tener más de
+  un `trabajador` (recontratación: una fila cesada y una activa), y las dos
+  comparten la misma cuenta.
 - `trabajador.persona_id`/`socio.persona_id` ligan con `users.persona` (party
   model, RN-GEN-007) — nombres/documento nunca se duplican aquí.
 - `postulante.persona_id`/`trabajador_id` son **nulos mientras es candidato** y
@@ -227,6 +233,11 @@ escuchar `trabajador_cesado`. Ver ROADMAP.
   ranking sin importar el ORM de `rrhh`. Hoy lo usa el reporte
   `ventas_por_trabajador` del tablero (ADR-024), que cruza el
   `venta.usuario_id` de `sales` con este contrato.
+
+  Con la cuenta resuelta por persona (ADR-069), un `usuario_id` recontratado
+  puede matchear dos filas `trabajador` — se prioriza la no cesada y, en
+  empate, la de ingreso más reciente, para no etiquetar a alguien con su
+  cargo viejo.
 
   Lo expuesto es deliberadamente lo mínimo identificatorio: **remuneración,
   régimen pensionario, contratos, permisos y sanciones no salen de `rrhh`

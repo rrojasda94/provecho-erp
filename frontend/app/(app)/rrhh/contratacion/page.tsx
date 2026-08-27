@@ -1,7 +1,12 @@
 import { ApiError, apiFetch } from "@/lib/api";
 import { obtenerSesion } from "@/lib/sesion";
 
-import { TableroCliente, type Columna, type Convocatoria } from "./tablero-cliente";
+import {
+  TableroCliente,
+  type Columna,
+  type Convocatoria,
+  type Sucursal,
+} from "./tablero-cliente";
 
 type Params = Promise<{ convocatoria?: string }>;
 
@@ -32,10 +37,14 @@ export default async function ContratacionPage({
   const filtros = await searchParams;
 
   let convocatorias: Convocatoria[];
+  let sucursales: Sucursal[];
   try {
-    convocatorias = await apiFetch<Convocatoria[]>("/api/v1/rrhh/convocatorias", {
-      token,
-    });
+    [convocatorias, sucursales] = await Promise.all([
+      apiFetch<Convocatoria[]>("/api/v1/rrhh/convocatorias", { token }),
+      // Catálogo de referencia: para elegir dónde trabaja al contratar. Sin
+      // sucursal el trabajador no aparece en ningún pad de asistencia.
+      apiFetch<Sucursal[]>("/api/v1/sucursales", { token }),
+    ]);
   } catch (e) {
     return (
       <p className="text-secondary">
@@ -65,6 +74,7 @@ export default async function ContratacionPage({
       seleccionada={seleccionada}
       enlaceFormulario={enlaceDe(convocatorias.find((c) => c.id === seleccionada))}
       permisos={usuario.permisos}
+      sucursales={sucursales}
     />
   );
 }

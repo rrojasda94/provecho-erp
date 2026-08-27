@@ -241,3 +241,86 @@ def test_anonimizar_no_permitido_sin_el_permiso_dedicado(client) -> None:
         json={"motivo": "solicitud ARCO"},
     )
     assert r.status_code == 403
+
+
+# --- Cuenta <-> persona (ADR-069): una sola arista, con nombre visible ------
+def _crear_usuario(client, headers, persona_id=None, username="cocinero1"):
+    body = {"username": username, "pin": "222222", "tipo": "humano"}
+    if persona_id is not None:
+        body["persona_id"] = persona_id
+    return client.post("/api/v1/users", headers=headers, json=body)
+
+
+def test_usuario_out_trae_la_persona_vinculada_y_minima(client) -> None:
+    """El bug reportado: guardar la persona vinculada y no verla al reabrir
+    el editor. `UsuarioOut.persona` tiene que traer lo mínimo — mismo criterio
+    que el buscador — no domicilio/teléfono/email/fecha de nacimiento."""
+    headers = _admin_auth(client)
+    persona = _crear_persona(client, headers).json()
+    usuario = _crear_usuario(client, headers, persona_id=persona["id"]).json()
+
+    assert usuario["persona_id"] == persona["id"]
+    assert usuario["persona"]["id"] == persona["id"]
+    assert usuario["persona"]["nombres"] == "Ana"
+    assert usuario["persona"]["apellidos"] == "Torres"
+    assert set(usuario["persona"]) == {"id", "nombres", "apellidos", "numero_documento"}
+
+    # Y sigue apareciendo al releer la cuenta, no solo en la respuesta del alta.
+    r = client.get("/api/v1/users", headers=headers)
+    fila = next(u for u in r.json()["items"] if u["id"] == usuario["id"])
+    assert fila["persona"]["nombres"] == "Ana"
+
+
+def test_no_se_puede_vincular_una_persona_ya_tomada(client) -> None:
+    headers = _admin_auth(client)
+    persona = _crear_persona(client, headers).json()
+    _crear_usuario(client, headers, persona_id=persona["id"], username="cocinero1")
+
+    r = _crear_usuario(client, headers, persona_id=persona["id"], username="cocinero2")
+    assert r.status_code == 409
+    assert "cocinero1" in r.json()["detail"]
+
+
+def test_no_se_puede_vincular_una_persona_inexistente(client) -> None:
+    headers = _admin_auth(client)
+    import uuid
+
+    r = _crear_usuario(client, headers, persona_id=str(uuid.uuid4()))
+    assert r.status_code == 404
+
+
+def test_desactivar_la_cuenta_no_le_borra_la_persona(client) -> None:
+    """Regresión del cambio a `exclude_unset`: `PATCH {"activo": false}` a
+    secas no puede vaciar `persona_id`/`email`/`nombre_display` — antes el
+    endpoint saltaba todo `None`, ahora un campo ausente tiene que seguir
+    significando "no tocar", no "bórralo"."""
+    headers = _admin_auth(client)
+    persona = _crear_persona(client, headers).json()
+    usuario = _crear_usuario(client, headers, persona_id=persona["id"]).json()
+    client.patch(
+        f"/api/v1/users/{usuario['id']}",
+        headers=headers,
+        json={"email": "cocinero@majambo.pe"},
+    )
+
+    r = client.patch(
+        f"/api/v1/users/{usuario['id']}", headers=headers, json={"activo": False}
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["activo"] is False
+    assert body["persona_id"] == persona["id"]
+    assert body["email"] == "cocinero@majambo.pe"
+
+
+def test_persona_id_null_explicito_desvincula(client) -> None:
+    headers = _admin_auth(client)
+    persona = _crear_persona(client, headers).json()
+    usuario = _crear_usuario(client, headers, persona_id=persona["id"]).json()
+
+    r = client.patch(
+        f"/api/v1/users/{usuario['id']}", headers=headers, json={"persona_id": None}
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["persona_id"] is None
+    assert r.json()["persona"] is None

@@ -103,30 +103,28 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   **al que no vino** — sin turno asignado no hay ausencia que reportar, solo
   falta de fila. Es el siguiente paso si RRHH quiere el reporte de
   inasistencias.
-- ⬜ **Marcar exige usuario con PIN**: `trabajador.usuario_id` es nullable, y
-  quien no tiene cuenta no puede marcar en el pad (409 explícito). Su
-  asistencia la registra RRHH a mano hasta que se le cree una. Crear la
-  cuenta al contratar cerraría el hueco.
-  - ✅ 2026-08-25 **la cuenta ya se puede asignar**: `usuario_id` estaba en
-    `TrabajadorCreate` pero no en `TrabajadorUpdate`, y ninguna pantalla lo
-    ofrecía, así que desde la UI el campo era NULL para siempre y **nadie**
-    podía marcar — el 409 no era el caso de borde documentado sino el único
-    caso posible. Ahora se elige la cuenta en el alta y en la edición del
-    trabajador, y `null` la desvincula. Falta todavía crearla sola al
-    contratar.
-  - ⬜ **Una cuenta por trabajador se valida en la aplicación, no en la base**:
-    `trabajador.usuario_id` no tiene índice único. El caso de uso rechaza la
-    cuenta ya usada por otro, pero dos peticiones simultáneas podrían colarse.
-    Cerrarlo es un índice único parcial (`WHERE deleted_at IS NULL`) y su
-    migración probada contra Postgres.
-- ⬜ **No hay forma de desvincular la persona de una cuenta**:
-  `admin.editar_usuario` trata `None` como «no tocar», así que `persona_id`
-  solo se puede cambiar por otra, nunca vaciar. Mismo patrón que ya resolvió
+- ⬜ **Marcar exige usuario con PIN**: quien no tiene cuenta no puede marcar
+  en el pad (409 explícito). Su asistencia la registra RRHH a mano hasta que
+  se le vincule una. Crear la cuenta al contratar cerraría el hueco del todo.
+  - ✅ 2026-08-25 **la cuenta ya se podía asignar** desde la ficha del
+    trabajador — `usuario_id` estaba en `TrabajadorCreate` pero no en
+    `TrabajadorUpdate`, y ninguna pantalla lo ofrecía, así que desde la UI
+    el campo era NULL para siempre y **nadie** podía marcar.
+  - ✅ 2026-08-27 (ADR-069) **reemplazado**: ese mecanismo convivía con
+    `usuario.persona_id` (Usuarios → "Persona vinculada") sin sincronizarse
+    — vincular desde Usuarios no habilitaba el pad, que es el bug que se
+    reportó. `trabajador.usuario_id` dejó de ser columna propia; se deriva
+    de `usuario.persona_id`, que es ahora la única arista y se vincula
+    únicamente desde Usuarios → Cuentas.
+  - ✅ 2026-08-27 (ADR-069) **una cuenta por persona ya se valida en la
+    base**: `uq_usuario_persona_viva`, índice único parcial en
+    `usuario.persona_id` entre las cuentas vivas.
+- ✅ 2026-08-27 (ADR-069) **ya se puede desvincular la persona de una
+  cuenta**: `PATCH /users/{id}` pasó a `exclude_unset`, con `persona_id: null`
+  explícito como el único campo que borra de verdad — mismo patrón que
   `BORRABLES` en `rrhh.trabajadores`.
-- ⬜ **`crear_usuario` no valida la persona**: acepta un `persona_id`
-  inexistente y no exige persona cuando el tipo es `humano`, aunque el
-  comentario de `persona.py` promete que esa validación vive «en sus casos de
-  uso». Hoy no está en ninguno.
+- ✅ 2026-08-27 (ADR-069) **`crear_usuario` ya valida la persona**: 404 si no
+  existe, 409 si ya tiene otra cuenta.
 - ⬜ **Fijar un PIN concreto no tiene pantalla**: `POST /users/{id}/pin` existe
   y nadie lo llama; desde la UI solo se puede resetear al PIN por defecto.
 - ⬜ **Los trabajadores que ya existían quedaron sin sucursal**: la migración

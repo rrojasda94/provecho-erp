@@ -66,6 +66,7 @@ from src.modules.inventory.infrastructure.models import (
 )
 from src.modules.purchases.application import ordenes as ordenes_uc
 from src.modules.purchases.infrastructure.models import Proveedor
+from src.modules.rrhh.infrastructure.models import Trabajador
 from src.modules.sales.application import catalogo as catalogo_uc
 from src.modules.sales.application import clientes as clientes_uc
 from src.modules.sales.application import precios as precios_uc
@@ -86,6 +87,7 @@ from src.modules.users.infrastructure.models import (
     Almacen,
     Empresa,
     Marca,
+    Persona,
     Rol,
     Sucursal,
     Usuario,
@@ -156,6 +158,15 @@ PROVEEDOR_RUC = "20512345678"
 # orden existente si lo reconoce: es la idempotencia del seeder, no una
 # comprobación aparte.
 OC_IDEMPOTENCY = "seed-e2e-oc-0001"
+
+# --- RRHH: persona vinculable a una cuenta (ADR-069) ------------------------
+# Sin usuario propio a propósito: el punto de esta prueba es vincularla
+# desde Usuarios y ver el efecto en el pad — si ya viniera vinculada, la
+# prueba no distinguiría "se guardó" de "se ve".
+RRHH_PERSONA_DOC = "88880001"
+RRHH_PERSONA_NOMBRES = "Elena"
+RRHH_PERSONA_APELLIDOS = "Vinculable E2E"
+RRHH_TRABAJADOR_CARGO = "Mesera E2E"
 
 # Cuenta de sacrificio: la prueba del bloqueo por intentos fallidos (ADR-050)
 # le agota los cinco intentos y la deja inutilizable quince minutos. Gastar
@@ -239,6 +250,7 @@ def sembrar_e2e(session: Session) -> dict:
     compras = _sembrar_compras(session, empresa)
     cliente = _sembrar_cliente(session, empresa)
     abastecimiento = _sembrar_abastecimiento(session, empresa, sucursal)
+    rrhh = _sembrar_rrhh(session, empresa, sucursal)
 
     return {
         "sucursales": len(puntos_venta),
@@ -248,6 +260,7 @@ def sembrar_e2e(session: Session) -> dict:
         **compras,
         **cliente,
         **abastecimiento,
+        **rrhh,
     }
 
 
@@ -307,6 +320,46 @@ def _sembrar_abastecimiento(
         fila.stock_minimo = Decimal(minimo)
     session.flush()
     return {"almacen_local_id": str(local.id)}
+
+
+def _sembrar_rrhh(session: Session, empresa: Empresa, sucursal: Sucursal) -> dict:
+    """Persona + trabajador sin cuenta todavía (ADR-069).
+
+    Existe para el spec `usuario-persona.spec.ts`: vincular esta persona
+    desde Usuarios tiene que (a) verse al reabrir el editor y (b) habilitar
+    de inmediato al trabajador en el pad de asistencia — las dos mitades del
+    bug original. Un test de API no puede ver ninguna de las dos.
+    """
+    persona = session.scalar(
+        select(Persona).where(Persona.numero_documento == RRHH_PERSONA_DOC)
+    )
+    if persona is None:
+        persona = Persona(
+            nombres=RRHH_PERSONA_NOMBRES,
+            apellidos=RRHH_PERSONA_APELLIDOS,
+            tipo_documento="dni",
+            numero_documento=RRHH_PERSONA_DOC,
+        )
+        session.add(persona)
+        session.flush()
+
+    trabajador = session.scalar(
+        select(Trabajador).where(Trabajador.persona_id == persona.id)
+    )
+    if trabajador is None:
+        trabajador = Trabajador(
+            empresa_id=empresa.id,
+            persona_id=persona.id,
+            sucursal_id=sucursal.id,
+            cargo=RRHH_TRABAJADOR_CARGO,
+            area="Salón",
+            tipo_vinculo="planilla",
+            fecha_ingreso=date(2026, 1, 1),
+        )
+        session.add(trabajador)
+        session.flush()
+
+    return {"rrhh_persona_id": str(persona.id), "rrhh_trabajador_id": str(trabajador.id)}
 
 
 def _sembrar_cliente(session: Session, empresa: Empresa) -> dict:

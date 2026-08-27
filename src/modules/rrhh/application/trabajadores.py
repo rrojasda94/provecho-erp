@@ -16,7 +16,6 @@ from src.modules.rrhh.application.errors import Conflicto, NoEncontrado, ReglaNe
 from src.modules.rrhh.domain import rules
 from src.modules.rrhh.infrastructure.models import Trabajador
 from src.modules.rrhh.infrastructure.repositories import TrabajadorRepo
-from src.modules.users.application.queries_publicas import obtener_usuario
 from src.modules.users.infrastructure.models import Empresa, Persona, Sucursal
 
 
@@ -29,7 +28,6 @@ def crear_trabajador(
     area: str,
     tipo_vinculo: str,
     fecha_ingreso: date,
-    usuario_id: uuid.UUID | None = None,
     regimen_laboral: str | None = None,
     remuneracion_base: Decimal | None = None,
     sistema_pensiones: str | None = None,
@@ -46,7 +44,6 @@ def crear_trabajador(
     if session.get(Persona, persona_id) is None:
         raise NoEncontrado(f"persona {persona_id} no encontrada")
     _exigir_sucursal_de_empresa(session, sucursal_id, empresa_id)
-    _exigir_cuenta_asignable(session, usuario_id, trabajador_id=None)
 
     if tipo_vinculo == "locacion_servicios":
         registra_asistencia = False
@@ -70,7 +67,6 @@ def crear_trabajador(
         Trabajador(
             empresa_id=empresa_id,
             persona_id=persona_id,
-            usuario_id=usuario_id,
             cargo=cargo,
             area=area,
             tipo_vinculo=tipo_vinculo,
@@ -99,10 +95,9 @@ def q_trabajadores(session: Session, empresa_id: uuid.UUID | None = None):
 # de significar "no tocar". Para el resto, `None` sigue siendo "no tocar" —
 # mandar `cargo: null` no puede vaciar una columna obligatoria.
 #
-# `usuario_id` es borrable porque quitarle la cuenta a quien dejó de usarla es
-# una operación real: el router manda `exclude_unset`, así que omitirlo sigue
-# significando "no tocar" y solo un `null` explícito desvincula.
-BORRABLES = frozenset({"sucursal_id", "usuario_id"})
+# `usuario_id` ya no está acá: dejó de ser columna propia (ADR-069). La
+# cuenta se vincula desde Usuarios, no desde este endpoint.
+BORRABLES = frozenset({"sucursal_id"})
 
 
 def actualizar_trabajador(session: Session, trabajador_id: uuid.UUID, **campos) -> Trabajador:
@@ -111,45 +106,10 @@ def actualizar_trabajador(session: Session, trabajador_id: uuid.UUID, **campos) 
         raise NoEncontrado("trabajador no encontrado")
     if "sucursal_id" in campos:
         _exigir_sucursal_de_empresa(session, campos["sucursal_id"], trabajador.empresa_id)
-    if "usuario_id" in campos:
-        _exigir_cuenta_asignable(session, campos["usuario_id"], trabajador_id=trabajador_id)
     for campo, valor in campos.items():
         if valor is not None or campo in BORRABLES:
             setattr(trabajador, campo, valor)
     return trabajador
-
-
-def _exigir_cuenta_asignable(
-    session: Session,
-    usuario_id: uuid.UUID | None,
-    *,
-    trabajador_id: uuid.UUID | None,
-) -> None:
-    """La cuenta que se le asigna a un trabajador tiene que existir, ser de
-    una persona y no estar ya en uso por otro trabajador.
-
-    Importa porque de este vínculo cuelga el pad de asistencia: el PIN que
-    firma la marcación es el de esta cuenta (RN-RRHH-020). Una cuenta de
-    agente no tiene PIN que teclear —entra por token (ADR-032)— y una cuenta
-    compartida por dos trabajadores dejaría al pad sin saber cuál de los dos
-    fichó.
-
-    Se lee por el contrato público de `users`, no por su repositorio.
-    """
-    if usuario_id is None:
-        return
-    usuario = obtener_usuario(session, usuario_id)
-    if usuario is None:
-        raise NoEncontrado(f"usuario {usuario_id} no encontrado")
-    if usuario.tipo != "humano":
-        raise ReglaNegocio(
-            "una cuenta de agente no marca asistencia: no tiene PIN que teclear"
-        )
-    if not usuario.activo:
-        raise ReglaNegocio("la cuenta está desactivada")
-    en_uso = TrabajadorRepo(session).por_usuario(usuario_id)
-    if en_uso is not None and en_uso.id != trabajador_id:
-        raise Conflicto("esa cuenta ya es de otro trabajador")
 
 
 def _exigir_sucursal_de_empresa(

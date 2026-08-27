@@ -33,6 +33,7 @@ from src.modules.rrhh.application import turnos
 from src.modules.rrhh.application.errors import Conflicto, NoEncontrado
 from src.modules.rrhh.infrastructure.models import Asistencia, Trabajador
 from src.modules.rrhh.infrastructure.repositories import AsistenciaRepo, TrabajadorRepo
+from src.modules.users.application.queries_publicas import obtener_usuario
 from src.modules.users.infrastructure.models import Persona
 
 # El día laboral es el del local, no el del servidor: un turno noche que
@@ -112,18 +113,28 @@ def tarjetas(session: Session, sucursal_id: uuid.UUID) -> list[Tarjeta]:
 def usuario_que_firma(session: Session, trabajador_id: uuid.UUID) -> uuid.UUID:
     """El usuario cuyo PIN vale como firma de este trabajador.
 
-    Sin cuenta no hay PIN, y sin PIN no hay firma: el trabajador marca en
-    el back-office con `rrhh.asistencia_marcar` hasta que se le cree una.
-    Se resuelve antes de pedir el PIN para que el error diga qué falta en
-    vez de «credenciales inválidas».
+    La cuenta se resuelve por persona (ADR-069): es la del `usuario` cuya
+    `persona_id` es la de este trabajador. Sin cuenta no hay PIN, y sin PIN
+    no hay firma: el trabajador marca en el back-office con
+    `rrhh.asistencia_marcar` hasta que se le vincule una desde Usuarios. Se
+    resuelve antes de pedir el PIN para que el error diga qué falta en vez
+    de «credenciales inválidas».
+
+    Una cuenta desactivada se rechaza acá y no en `verificar_pin_de`: sin
+    esto caía a `PIN_INVALIDO` → 401 «credenciales inválidas», el mismo
+    error engañoso que este método existe para evitar.
     """
     trabajador = TrabajadorRepo(session).get(trabajador_id)
     if trabajador is None or trabajador.deleted_at is not None:
         raise NoEncontrado(f"trabajador {trabajador_id} no encontrado")
     if trabajador.usuario_id is None:
         raise Conflicto(
-            "el trabajador no tiene usuario con PIN: no puede marcar en el pad"
+            "esta persona no tiene cuenta con PIN: vinculala en Usuarios "
+            "para que pueda marcar en el pad"
         )
+    usuario = obtener_usuario(session, trabajador.usuario_id)
+    if usuario is not None and not usuario.activo:
+        raise Conflicto("la cuenta de este trabajador está desactivada")
     return trabajador.usuario_id
 
 

@@ -19,7 +19,6 @@ class TrabajadorCreate(BaseModel):
     area: str = Field(max_length=100)
     tipo_vinculo: str
     fecha_ingreso: date
-    usuario_id: uuid.UUID | None = None
     regimen_laboral: str | None = None
     remuneracion_base: Decimal | None = None
     sistema_pensiones: str | None = None
@@ -34,16 +33,15 @@ class TrabajadorCreate(BaseModel):
 class TrabajadorUpdate(BaseModel):
     """Campo ausente = no tocar.
 
-    `sucursal_id` y `usuario_id` son la excepción: mandarlos en `null`
-    **borran** el valor, porque quedarse sin local asignado —o sin cuenta— es
-    un estado válido y no había otra forma de volver a él. Para el resto,
-    `null` sigue siendo "no tocar".
+    `sucursal_id` es la excepción: mandarlo en `null` **borra** el valor,
+    porque quedarse sin local asignado es un estado válido y no había otra
+    forma de volver a él. Para el resto, `null` sigue siendo "no tocar".
 
-    `usuario_id` faltaba acá y era la razón por la que nadie podía marcar en
-    el pad de asistencia: `TrabajadorCreate` sí lo aceptaba, pero un
-    trabajador ya dado de alta no tenía ninguna forma de recibir su cuenta, y
-    `pad_asistencia.usuario_que_firma` exige justamente ese campo para llegar
-    al PIN.
+    La cuenta con la que este trabajador marca en el pad ya no se toca acá
+    (ADR-069): es la del `usuario` cuya `persona_id` es la del trabajador, y
+    se vincula desde Usuarios, no desde este endpoint. Antes vivía en
+    `usuario_id` — dos columnas para el mismo vínculo, sin sincronizar entre
+    sí, era justo el bug que ADR-069 cierra.
 
     `estado` no admite `"cesado"`: el cese tiene su propio endpoint
     (`POST /trabajadores/{id}/cesar`) porque además de cambiar el estado
@@ -57,7 +55,6 @@ class TrabajadorUpdate(BaseModel):
     remuneracion_base: Decimal | None = Field(default=None, ge=0)
     estado: Literal["activo", "suspendido"] | None = None
     sucursal_id: uuid.UUID | None = None
-    usuario_id: uuid.UUID | None = None
 
 
 class TrabajadorCese(BaseModel):
@@ -251,6 +248,10 @@ class PostulanteContratar(BaseModel):
     afp_nombre: str | None = None
     registra_asistencia: bool = True
     jornada_horas_semana: Decimal | None = None
+    # Centro de labores (ADR-062). Sin esto el trabajador no aparecía en el
+    # pad de asistencia de ningún local — contratar dejaba la ficha siempre
+    # sin sucursal.
+    sucursal_id: uuid.UUID | None = None
 
 
 class PostulanteOut(BaseModel):

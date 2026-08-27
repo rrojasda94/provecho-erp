@@ -61,6 +61,7 @@ def env():
             grupo_id=str(empresa.grupo_id),
             admin_usuario_id=str(admin.id),
             persona_id=str(persona.id),
+            cocinero_usuario_id=str(cocinero.id),
         )
         s.commit()
 
@@ -522,3 +523,58 @@ def test_socio_sin_grupo_ni_empresa_409(env):
         json={"persona_id": ids["persona_id"], "porcentaje_participacion": "25.00"},
     )
     assert r.status_code == 409
+
+
+# --- Cuenta derivada por persona (ADR-069): guarda contra duplicar filas ---
+def test_listar_trabajadores_no_duplica_por_recontratacion(env):
+    """`trabajador.usuario_id` es una subconsulta (`column_property`), no un
+    `relationship` con eager load: con dos filas trabajador sobre una misma
+    persona (recontratación), un JOIN mal armado duplicaría la fila padre en
+    silencio y `total` dejaría de coincidir con `len(items)`."""
+    client, ids, _ = env
+    h = _token(client)
+    primero = _crear_trabajador(client, h, ids).json()
+    client.post(
+        f"/api/v1/rrhh/trabajadores/{primero['id']}/cesar",
+        headers=h,
+        json={"fecha_cese": "2026-02-01"},
+    )
+    _crear_trabajador(client, h, ids, fecha_ingreso="2026-03-01")
+
+    r = client.get("/api/v1/rrhh/trabajadores", headers=h)
+    assert r.status_code == 200
+    body = r.json()
+    assert body["total"] == len(body["items"])
+    assert body["total"] == 2
+
+
+def test_nombres_por_usuario_prioriza_al_trabajador_activo(env):
+    """Ranking de ventas (ADR-069): una persona recontratada tiene dos filas
+    `trabajador` compartiendo la misma cuenta — el cargo mostrado tiene que
+    ser el del puesto vigente, no el viejo."""
+    from src.modules.rrhh.application.queries_publicas import nombres_por_usuario
+
+    client, ids, TestSession = env
+    h = _token(client)
+    cuenta_id = ids["cocinero_usuario_id"]
+    assert (
+        client.patch(
+            f"/api/v1/users/{cuenta_id}",
+            headers=h,
+            json={"persona_id": ids["persona_id"]},
+        ).status_code
+        == 200
+    )
+    viejo = _crear_trabajador(client, h, ids, cargo="Ayudante de cocina").json()
+    client.post(
+        f"/api/v1/rrhh/trabajadores/{viejo['id']}/cesar",
+        headers=h,
+        json={"fecha_cese": "2026-02-01"},
+    )
+    _crear_trabajador(
+        client, h, ids, cargo="Jefe de cocina", fecha_ingreso="2026-03-01"
+    )
+
+    with TestSession() as s:
+        resultado = nombres_por_usuario(s, [uuid.UUID(cuenta_id)])
+    assert resultado[uuid.UUID(cuenta_id)]["cargo"] == "Jefe de cocina"
