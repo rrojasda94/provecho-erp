@@ -3,6 +3,21 @@
 Parte del backlog de deuda técnica del proyecto. El índice y las reglas
 de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 
+- ⬜ **La landing pública recoge datos reales sobre una base desechable**
+  (2026-08-27, ADR-072). `clientes.majambo.com.pe` publica un formulario que
+  pide DNI, nombre, teléfono y fecha de nacimiento, invita a escanearlo desde
+  una mesa, consulta el DNI contra RENIEC con el token de **QA** de Factiliza,
+  y escribe en el Postgres de staging — declarado descartable en
+  `docker-compose.staging.yml`, con `pg_dump` a 30 días en el mismo droplet y
+  sin la custodia que ADR-011 supone. Las dos cosas son ciertas a la vez: el
+  entorno es desechable y las personas no. Se aceptó **como prueba** —lo que
+  se junte no se conserva y hay que decírselo a quien se registre—, con
+  `X-Robots-Tag: noindex` como paliativo. La decisión de fondo, abierta: si un
+  QR impreso puede apuntar a staging, o si esto exige el entorno de producción
+  antes de imprimir nada. Cierra junto con ese entorno: base gestionada,
+  backups fuera del servidor y el aviso de privacidad apuntando al responsable
+  real.
+
 - ✅ 2026-08-01 **ARCO de postulante** (migración `b1d09e574c23`): los datos
   del candidato viven en `postulante`, no en `persona` —postular no mete a
   nadie en la fuente única de la empresa— así que

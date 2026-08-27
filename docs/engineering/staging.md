@@ -20,12 +20,13 @@ general del despliegue.
 | SO | Ubuntu 24.04 LTS |
 | Dominio frontend | `staging.majambo.com.pe` |
 | Dominio API | `api-staging.majambo.com.pe` |
+| Dominio landing pública | `clientes.majambo.com.pe` — el del QR (ADR-072). Mismo contenedor `web`, pero el proxy solo deja pasar `/reconocerte*` y sus estáticos |
 | Usuario de la app | `app` (sudo, sin login root, sin login por contraseña) |
 | Llave SSH | `renato-provecho` — privada en `~/.ssh/provecho_droplet` (tu PC, nunca en el repo). **Con passphrase**: sirve para entrar a mano y no desde un shell no interactivo — para eso está la llave de despliegue de ADR-060, ver `devops.md` |
 
 > La IP puede cambiar si el droplet se recrea (ya pasó una vez durante el
-> setup inicial, 2026-08-23). Si cambia: actualizar los dos registros A del
-> dominio y esta tabla.
+> setup inicial, 2026-08-23). Si cambia: actualizar los **tres** registros A
+> del dominio y esta tabla.
 
 ## Decisiones tomadas
 
@@ -39,6 +40,13 @@ general del despliegue.
   gestionado aparte. Ver `docker-compose.staging.yml`.
 - **Proxy/TLS:** Caddy (certificado HTTPS automático), no nginx+certbot a
   mano.
+- **La landing del QR tiene dominio propio** (`clientes.majambo.com.pe`,
+  ADR-072), servido por el mismo contenedor `web`. Por ese nombre el proxy
+  solo deja pasar la landing; el resto redirige a `/reconocerte`. **No es un
+  control de seguridad**: `/login` sigue igual de público en
+  `staging.majambo.com.pe` y lo que lo protege es el login. Y lo que se
+  registre ahí cae en la base desechable de arriba: es una prueba, no el
+  padrón de clientes.
 
 ## Setup ya hecho (2026-08-23)
 
@@ -108,6 +116,56 @@ con el loopback: ahora espera a `/health/ready` por el dominio, que es lo
 el `Caddyfile`), anotada en [`deuda/ci-cd.md`](../roadmap/deuda/ci-cd.md): no
 se aplicó de una porque un `Caddyfile` inválido deja staging sin proxy —peor
 que el 502— y hay que validarlo contra el servidor antes de recargarlo.
+
+## El `Caddyfile` se copia a mano
+
+**Nada lo despliega.** `desplegar.yml` hace `scp` de `scripts/desplegar.sh` y
+de nada más; el `Caddyfile` y `docker-compose.staging.yml` se copiaron a mano
+el 2026-08-23 y siguen así. **Cambiar el `Caddyfile` del repo no toca el
+droplet.** Automatizarlo está en
+[`deuda/ci-cd.md`](../roadmap/deuda/ci-cd.md), emparejado con el `dynamic a`
+de abajo porque los dos necesitan la misma maquinaria de validar antes de
+recargar.
+
+El orden importa: un `Caddyfile` inválido deja staging **sin proxy**, que es
+peor que cualquier 502.
+
+1. Validar **antes de salir de la PC** — no hace falta servidor:
+
+   ```bash
+   docker run --rm -v "$PWD/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+   ```
+
+   Y leer el JSON que sale de `caddy adapt --config /etc/caddy/Caddyfile
+   --adapter caddyfile --pretty`. No es opcional: la sintaxis de `redir` y el
+   orden de los `handle` producen configuraciones **válidas** que hacen otra
+   cosa (ADR-072 §2), y ahí se ven.
+
+2. Respaldar, copiar, validar en el servidor y recién entonces recargar:
+
+   ```bash
+   ssh app@165.227.120.112 "cp ~/provecho-staging/Caddyfile ~/provecho-staging/Caddyfile.bak"
+   ```
+
+   ```bash
+   scp Caddyfile app@165.227.120.112:~/provecho-staging/Caddyfile
+   ```
+
+   ```bash
+   docker compose -f docker-compose.staging.yml exec caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+   ```
+
+   ```bash
+   docker compose -f docker-compose.staging.yml exec caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile
+   ```
+
+3. Si algo falla: `cp Caddyfile.bak Caddyfile && docker compose -f
+   docker-compose.staging.yml restart caddy`.
+
+**Un dominio nuevo necesita su registro A antes que su bloque.** Caddy no puede
+sacar certificado sin DNS, y Let's Encrypt corta a las 5 validaciones fallidas
+por hostname y por hora: recargar con impaciencia deja el dominio sin HTTPS
+durante una hora. `dig +short <dominio>` antes de tocar nada.
 
 ## Pendiente
 

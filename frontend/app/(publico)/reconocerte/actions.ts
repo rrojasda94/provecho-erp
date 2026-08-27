@@ -1,6 +1,7 @@
 "use server";
 
 import { ApiError, apiFetch } from "@/lib/api";
+import { ubicacionDe } from "@/lib/ubicacion-form";
 
 import type { Cupon, EstadoRegistro } from "./estado";
 
@@ -93,11 +94,10 @@ export async function registrarAction(
         telefono,
         fecha_nacimiento: opcional(datos, "fecha_nacimiento"),
         direccion: opcional(datos, "direccion"),
-        ubicacion_place_id: opcional(datos, "ubicacion_place_id"),
-        ubicacion_lat: opcional(datos, "ubicacion_lat"),
-        ubicacion_lng: opcional(datos, "ubicacion_lng"),
-        ubicacion_plus_code: opcional(datos, "ubicacion_plus_code"),
-        ubicacion_distrito: opcional(datos, "ubicacion_distrito"),
+        // Los cinco `ubicacion_*` salen del helper y no a mano: era la sexta
+        // copia de esa conversión, justo la que su docstring anticipa —mandaba
+        // la latitud como texto en vez de número—.
+        ...ubicacionDe(datos),
         acepta_terminos: true,
       },
     });

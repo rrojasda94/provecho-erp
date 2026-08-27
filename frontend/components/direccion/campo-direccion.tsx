@@ -283,9 +283,17 @@ export function CampoDireccion({
         buscador.addEventListener("gmp-select", elegir as EventListener);
         setConMapa(true);
       })
-      .catch(() => {
-        // Silencio deliberado: no hay nada que el usuario pueda hacer y el
-        // formulario funciona igual. El detalle queda en la consola del SDK.
+      .catch((error) => {
+        // Al usuario no se le dice nada —no hay nada que pueda hacer y el
+        // formulario funciona igual—, pero a la consola sí: el `catch` mudo
+        // hacía que "sin clave", "clave restringida a otro dominio" y "el SDK
+        // cargó pero el buscador reventó" se vieran los tres iguales, y esa
+        // ceguera costó tres intentos de arreglar lo mismo (ADR-072).
+        //
+        // `warn` y no `error`: quedarse sin mapa es un estado previsto —el hub
+        // de una sucursal sin internet corre así siempre (ADR-053)—, y un
+        // `error` por diseño es el que se aprende a ignorar.
+        console.warn("[direccion] el buscador de Google no se montó:", error);
       });
     return () => {
       vivo = false;
