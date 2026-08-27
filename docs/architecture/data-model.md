@@ -224,7 +224,7 @@ erDiagram
 - **usuario**: username, pin_hash (Argon2id), persona_id (nullable — NULL
   si `agente_ia`; única entre las cuentas vivas —
   `uq_usuario_persona_viva` — una persona tiene a lo más una cuenta,
-  ADR-069: es la **única** arista cuenta↔trabajador, `rrhh.trabajador.
+  ADR-070: es la **única** arista cuenta↔trabajador, `rrhh.trabajador.
   usuario_id` se deriva de esta columna), nombre_display (fallback para
   agente_ia), email, tipo
   (`humano` | `agente_ia`), activo, debe_cambiar_pin (el PIN vigente lo puso
@@ -1305,7 +1305,7 @@ un trabajador puede o no tener usuario, y no todo usuario es trabajador
 
 - **trabajador**: empresa_id, persona_id (datos personales — nombres,
   documento, domicilio, etc.), usuario_id — **derivado, no columna propia**
-  (ADR-069): es el `usuario` cuya `persona_id` coincide con la de este
+  (ADR-070): es el `usuario` cuya `persona_id` coincide con la de este
   trabajador; se vincula desde `usuario.persona_id` (Usuarios → Cuentas),
   ver §2. sucursal_id (opcional —
   **centro de labores**: dónde trabaja, migración `b6d29f10c47e`, ADR-062. No

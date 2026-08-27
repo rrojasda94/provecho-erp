@@ -22,7 +22,7 @@ class Usuario(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin):
         # Única entre las vivas: una persona tiene a lo más una cuenta con
         # PIN. Es la arista de la que cuelga el pad de asistencia
         # (`rrhh.trabajador.usuario_id` se deriva de esta columna, RN-RRHH-020,
-        # ADR-069) — sin la unicidad, dos cuentas sobre la misma persona
+        # ADR-070) — sin la unicidad, dos cuentas sobre la misma persona
         # dejarían al pad sin saber cuál firma.
         Index(
             "uq_usuario_persona_viva",
@@ -35,7 +35,7 @@ class Usuario(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin):
 
     username: Mapped[str] = mapped_column(String(50), unique=True)
     pin_hash: Mapped[str] = mapped_column(String(255))
-    # NULL si tipo=agente_ia. Única arista cuenta<->trabajador (ADR-069): el
+    # NULL si tipo=agente_ia. Única arista cuenta<->trabajador (ADR-070): el
     # trabajador marca en el pad con el PIN de la cuenta cuya persona_id es
     # la suya. `lazy` por defecto (no `joined`): cargar la persona en cada
     # lectura de Usuario metería un LEFT JOIN en el camino más caliente del

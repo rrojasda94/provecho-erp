@@ -33,7 +33,7 @@ export type Usuario = {
   email: string | null;
   persona_id: string | null;
   // Para pintar la persona vinculada sin un segundo viaje al abrir el
-  // editor (ADR-069) — antes solo llegaba el id y no había forma de
+  // editor (ADR-070) — antes solo llegaba el id y no había forma de
   // mostrarla al reabrir.
   persona: PersonaBusqueda | null;
   activo: boolean;

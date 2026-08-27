@@ -5,7 +5,7 @@ import { capturar } from "./util";
 
 /**
  * Vincular una persona a una cuenta desde Usuarios, y que ese vínculo se vea
- * al reabrir el editor y habilite al pad de asistencia (ADR-069).
+ * al reabrir el editor y habilite al pad de asistencia (ADR-070).
  *
  * Reemplaza a `trabajador-cuenta.spec.ts`: el vínculo cuenta↔trabajador
  * vivía duplicado en dos columnas que nadie sincronizaba —

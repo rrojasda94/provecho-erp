@@ -1,4 +1,4 @@
-"""La migración de ADR-069, corrida de verdad contra SQLite.
+"""La migración de ADR-070, corrida de verdad contra SQLite.
 
 Mismo patrón que `test_migracion_escalamiento.py`: `Base.metadata` ya crea el
 esquema NUEVO (sin `trabajador.usuario_id`, con `uq_usuario_persona_viva`),

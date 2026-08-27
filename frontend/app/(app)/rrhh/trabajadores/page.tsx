@@ -15,7 +15,7 @@ export default async function TrabajadoresPage() {
     // `/personas/buscar`, no `/personas`: la tabla solo necesita nombre,
     // no la ficha completa, y así basta `personas.leer` — `users.gestionar`
     // ya no bloquea a un rol de RRHH puro (RN-GEN-007, gap cerrado). Por lo
-    // mismo esta pantalla ya no pide `/api/v1/users` (ADR-069): la cuenta
+    // mismo esta pantalla ya no pide `/api/v1/users` (ADR-070): la cuenta
     // con la que un trabajador marca se vincula y se ve en Usuarios, no acá.
     const [trabajadores, personas, sucursales] = await Promise.all([
       apiFetch<Pagina<Trabajador>>("/api/v1/rrhh/trabajadores", { token }),

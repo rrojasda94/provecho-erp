@@ -159,7 +159,7 @@ PROVEEDOR_RUC = "20512345678"
 # comprobación aparte.
 OC_IDEMPOTENCY = "seed-e2e-oc-0001"
 
-# --- RRHH: persona vinculable a una cuenta (ADR-069) ------------------------
+# --- RRHH: persona vinculable a una cuenta (ADR-070) ------------------------
 # Sin usuario propio a propósito: el punto de esta prueba es vincularla
 # desde Usuarios y ver el efecto en el pad — si ya viniera vinculada, la
 # prueba no distinguiría "se guardó" de "se ve".
@@ -323,7 +323,7 @@ def _sembrar_abastecimiento(
 
 
 def _sembrar_rrhh(session: Session, empresa: Empresa, sucursal: Sucursal) -> dict:
-    """Persona + trabajador sin cuenta todavía (ADR-069).
+    """Persona + trabajador sin cuenta todavía (ADR-070).
 
     Existe para el spec `usuario-persona.spec.ts`: vincular esta persona
     desde Usuarios tiene que (a) verse al reabrir el editor y (b) habilitar

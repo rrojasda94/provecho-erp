@@ -62,7 +62,7 @@ def env():
         s.flush()
 
         # El trabajador que marca: tiene usuario con PIN, que es su firma.
-        # La cuenta se liga por `persona_id` (ADR-069) — es la misma arista
+        # La cuenta se liga por `persona_id` (ADR-070) — es la misma arista
         # que la pantalla de Usuarios usa para vincular «Persona vinculada»,
         # no una columna aparte en `trabajador`.
         cocinero = Usuario(
@@ -129,7 +129,7 @@ def _crear_trabajador(client, headers, ids, **overrides):
 
 
 def _vincular_persona(client, headers, usuario_id, persona_id):
-    """La cuenta se vincula desde Usuarios (ADR-069), no desde el trabajador."""
+    """La cuenta se vincula desde Usuarios (ADR-070), no desde el trabajador."""
     return client.patch(
         f"/api/v1/users/{usuario_id}", headers=headers, json={"persona_id": persona_id}
     )
@@ -321,7 +321,7 @@ def test_asignarle_la_cuenta_despues_lo_habilita_a_marcar(env):
     """El bug reportado: vincular la persona desde Usuarios tiene que
     habilitar el pad EN EL ACTO — antes el pad solo leía
     `trabajador.usuario_id`, una columna aparte que esta pantalla nunca
-    tocaba, así que el vínculo quedaba guardado pero sin efecto (ADR-069)."""
+    tocaba, así que el vínculo quedaba guardado pero sin efecto (ADR-070)."""
     client, ids, _ = env
     h = _token(client)
     assert _vincular_persona(client, h, ids["usuario_trabajador_id"], None).status_code == 200
@@ -361,7 +361,7 @@ def test_persona_recontratada_comparte_cuenta_entre_las_dos_fichas(env):
     """Recontratación: una persona con dos filas `trabajador` (la cesada y la
     activa) comparten la misma cuenta — a diferencia de antes (una cuenta,
     un `trabajador.usuario_id`), ahora es correcto que las dos fichas
-    resuelvan al mismo `usuario_id` (ADR-069)."""
+    resuelvan al mismo `usuario_id` (ADR-070)."""
     client, ids, TestSession = env
     h = _token(client)
     primero_id = _crear_trabajador(client, h, ids)

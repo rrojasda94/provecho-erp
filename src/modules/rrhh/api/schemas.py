@@ -38,10 +38,10 @@ class TrabajadorUpdate(BaseModel):
     forma de volver a él. Para el resto, `null` sigue siendo "no tocar".
 
     La cuenta con la que este trabajador marca en el pad ya no se toca acá
-    (ADR-069): es la del `usuario` cuya `persona_id` es la del trabajador, y
+    (ADR-070): es la del `usuario` cuya `persona_id` es la del trabajador, y
     se vincula desde Usuarios, no desde este endpoint. Antes vivía en
     `usuario_id` — dos columnas para el mismo vínculo, sin sincronizar entre
-    sí, era justo el bug que ADR-069 cierra.
+    sí, era justo el bug que ADR-070 cierra.
 
     `estado` no admite `"cesado"`: el cese tiene su propio endpoint
     (`POST /trabajadores/{id}/cesar`) porque además de cambiar el estado

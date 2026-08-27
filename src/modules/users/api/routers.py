@@ -524,7 +524,7 @@ def editar_usuario(
     session: Session = Depends(get_db),
 ):
     # `exclude_unset`: campo ausente = no tocar; `persona_id: null` explícito
-    # = desvincular (ADR-069). Con `model_dump()` a secas todo ausente
+    # = desvincular (ADR-070). Con `model_dump()` a secas todo ausente
     # llegaba `None` y no había forma de distinguir "no lo mandé" de "bórralo".
     usuario = admin.editar_usuario(session, usuario_id, **body.model_dump(exclude_unset=True))
     session.commit()

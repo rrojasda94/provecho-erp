@@ -31,7 +31,7 @@ def nombres_por_usuario(
     `agente_ia`). Quien llama decide cómo mostrarlos — inventar un nombre
     acá sería peor.
 
-    La cuenta se resuelve por persona (ADR-069), y una persona recontratada
+    La cuenta se resuelve por persona (ADR-070), y una persona recontratada
     puede tener dos filas `trabajador` compartiendo la misma cuenta. Entre
     esas, gana la que no está cesada, y si hay empate la de ingreso más
     reciente — sin este orden, el ranking podía etiquetar a alguien con su

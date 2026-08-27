@@ -640,7 +640,7 @@ de su módulo y se prueban de forma aislada.
   marcación, y solo muestra a quienes tienen su centro de labores ahí. El PIN
   va contra el mismo lockout que el login (ADR-065). La cuenta que firma es
   la del `usuario` cuya `persona_id` es la del trabajador — se vincula desde
-  Usuarios → Cuentas, no desde el trabajador (ADR-069) — y una persona tiene
+  Usuarios → Cuentas, no desde el trabajador (ADR-070) — y una persona tiene
   a lo más una cuenta viva.
 - **RN-RRHH-021** Un trabajador que marcó entrada y no marca salida antes de
   la `hora_limite_salida` de su turno recibe un aviso, y con él el encargado

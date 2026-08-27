@@ -3,7 +3,7 @@
 Distinto de `usuario` (identidad de login): un trabajador puede o no
 tener usuario, y no todo usuario es trabajador (ej. agente_ia).
 
-`usuario_id` NO es columna propia (ADR-069): se deriva de `persona_id`. La
+`usuario_id` NO es columna propia (ADR-070): se deriva de `persona_id`. La
 cuenta de un trabajador es la del `usuario` cuya `persona_id` es la suya —
 una sola arista, vinculada desde Usuarios. Antes había dos columnas
 (`usuario.persona_id` y `trabajador.usuario_id`) que nadie sincronizaba:
@@ -35,7 +35,7 @@ class Trabajador(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin):
         ForeignKey("sucursal.id"), nullable=True
     )
 
-    # Derivado, no columna (ADR-069): la cuenta con la que este trabajador
+    # Derivado, no columna (ADR-070): la cuenta con la que este trabajador
     # marca en el pad es la del `usuario` cuya `persona_id` coincide con la
     # suya. Subconsulta con LIMIT 1 y no `relationship(viewonly=True,
     # lazy="joined")` a propósito: con dos usuarios sobre una persona (que el

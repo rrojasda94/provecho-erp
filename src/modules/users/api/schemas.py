@@ -394,7 +394,7 @@ class UsuarioOut(BaseModel):
     tipo: str
     persona_id: uuid.UUID | None
     # Para mostrar el nombre sin un segundo viaje al abrir el editor
-    # (ADR-069) — antes se guardaba `persona_id` y no había forma de
+    # (ADR-070) — antes se guardaba `persona_id` y no había forma de
     # pintarlo de vuelta.
     persona: PersonaBusquedaOut | None = None
     nombre_display: str | None

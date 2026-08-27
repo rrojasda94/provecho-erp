@@ -525,7 +525,7 @@ def test_socio_sin_grupo_ni_empresa_409(env):
     assert r.status_code == 409
 
 
-# --- Cuenta derivada por persona (ADR-069): guarda contra duplicar filas ---
+# --- Cuenta derivada por persona (ADR-070): guarda contra duplicar filas ---
 def test_listar_trabajadores_no_duplica_por_recontratacion(env):
     """`trabajador.usuario_id` es una subconsulta (`column_property`), no un
     `relationship` con eager load: con dos filas trabajador sobre una misma
@@ -549,7 +549,7 @@ def test_listar_trabajadores_no_duplica_por_recontratacion(env):
 
 
 def test_nombres_por_usuario_prioriza_al_trabajador_activo(env):
-    """Ranking de ventas (ADR-069): una persona recontratada tiene dos filas
+    """Ranking de ventas (ADR-070): una persona recontratada tiene dos filas
     `trabajador` compartiendo la misma cuenta — el cargo mostrado tiene que
     ser el del puesto vigente, no el viejo."""
     from src.modules.rrhh.application.queries_publicas import nombres_por_usuario

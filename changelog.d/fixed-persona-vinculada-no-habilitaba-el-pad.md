@@ -1,6 +1,6 @@
 - **Vincular una persona a una cuenta desde Usuarios no habilitaba al
   trabajador a marcar en el pad de asistencia, y el vínculo tampoco se veía
-  al reabrir el editor** (ADR-069). El vínculo cuenta↔trabajador vivía
+  al reabrir el editor** (ADR-070). El vínculo cuenta↔trabajador vivía
   duplicado en dos columnas que nadie sincronizaba —
   `usuario.persona_id` (Usuarios → "Persona vinculada") y
   `trabajador.usuario_id` (RRHH → Trabajadores → "Cuenta", la única que leía

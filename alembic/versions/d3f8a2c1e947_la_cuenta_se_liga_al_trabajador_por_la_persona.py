@@ -3,7 +3,7 @@
 El vinculo cuenta<->trabajador vivia en dos columnas que nadie sincronizaba:
 `usuario.persona_id` (vinculado desde Usuarios) y `trabajador.usuario_id`
 (vinculado desde RRHH > Trabajadores, el unico que leia el pad de asistencia).
-Vincular desde Usuarios no habilitaba el pad — ADR-069.
+Vincular desde Usuarios no habilitaba el pad — ADR-070.
 
 Desde ahora `usuario.persona_id` es la unica arista: una persona viva tiene a
 lo mas una cuenta viva (`uq_usuario_persona_viva`). `trabajador.usuario_id`

@@ -142,7 +142,7 @@ def env():
 
         # `admin` como trabajador: sin esto el ranking por trabajador solo
         # devolvería "(sin trabajador)" y no probaría el cruce con `rrhh`.
-        # La cuenta se liga por persona (ADR-069), no por
+        # La cuenta se liga por persona (ADR-070), no por
         # `trabajador.usuario_id` — ya no es columna propia.
         persona = Persona(
             nombres="Ada", apellidos="Lovelace", tipo_documento="dni",

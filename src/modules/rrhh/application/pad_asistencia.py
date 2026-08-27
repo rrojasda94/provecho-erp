@@ -113,7 +113,7 @@ def tarjetas(session: Session, sucursal_id: uuid.UUID) -> list[Tarjeta]:
 def usuario_que_firma(session: Session, trabajador_id: uuid.UUID) -> uuid.UUID:
     """El usuario cuyo PIN vale como firma de este trabajador.
 
-    La cuenta se resuelve por persona (ADR-069): es la del `usuario` cuya
+    La cuenta se resuelve por persona (ADR-070): es la del `usuario` cuya
     `persona_id` es la de este trabajador. Sin cuenta no hay PIN, y sin PIN
     no hay firma: el trabajador marca en el back-office con
     `rrhh.asistencia_marcar` hasta que se le vincule una desde Usuarios. Se

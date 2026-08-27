@@ -62,7 +62,7 @@ function CampoSucursal({
 }
 
 /** La cuenta con la que marca asistencia es la de la persona vinculada
- * (ADR-069): el trabajador no tiene su propio campo — se ve acá pero se
+ * (ADR-070): el trabajador no tiene su propio campo — se ve acá pero se
  * corrige en Usuarios → Cuentas → Persona vinculada. */
 function AvisoCuenta({ tieneCuenta }: { tieneCuenta: boolean }) {
   return (
@@ -124,7 +124,7 @@ function DialogoNuevoTrabajador({ sucursales }: { sucursales: Sucursal[] }) {
  * (RN-GEN-007); el tipo de vínculo y la fecha de ingreso tampoco, porque
  * cambiarlos reescribe la historia laboral —eso es un contrato nuevo, no una
  * corrección—. La cuenta con la que marca tampoco: se deriva de la persona
- * (ADR-069) y se corrige en Usuarios → Cuentas, no acá. */
+ * (ADR-070) y se corrige en Usuarios → Cuentas, no acá. */
 function DialogoEditarTrabajador({
   trabajador,
   sucursales,

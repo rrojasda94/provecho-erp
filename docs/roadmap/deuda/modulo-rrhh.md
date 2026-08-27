@@ -110,20 +110,20 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
     trabajador — `usuario_id` estaba en `TrabajadorCreate` pero no en
     `TrabajadorUpdate`, y ninguna pantalla lo ofrecía, así que desde la UI
     el campo era NULL para siempre y **nadie** podía marcar.
-  - ✅ 2026-08-27 (ADR-069) **reemplazado**: ese mecanismo convivía con
+  - ✅ 2026-08-27 (ADR-070) **reemplazado**: ese mecanismo convivía con
     `usuario.persona_id` (Usuarios → "Persona vinculada") sin sincronizarse
     — vincular desde Usuarios no habilitaba el pad, que es el bug que se
     reportó. `trabajador.usuario_id` dejó de ser columna propia; se deriva
     de `usuario.persona_id`, que es ahora la única arista y se vincula
     únicamente desde Usuarios → Cuentas.
-  - ✅ 2026-08-27 (ADR-069) **una cuenta por persona ya se valida en la
+  - ✅ 2026-08-27 (ADR-070) **una cuenta por persona ya se valida en la
     base**: `uq_usuario_persona_viva`, índice único parcial en
     `usuario.persona_id` entre las cuentas vivas.
-- ✅ 2026-08-27 (ADR-069) **ya se puede desvincular la persona de una
+- ✅ 2026-08-27 (ADR-070) **ya se puede desvincular la persona de una
   cuenta**: `PATCH /users/{id}` pasó a `exclude_unset`, con `persona_id: null`
   explícito como el único campo que borra de verdad — mismo patrón que
   `BORRABLES` en `rrhh.trabajadores`.
-- ✅ 2026-08-27 (ADR-069) **`crear_usuario` ya valida la persona**: 404 si no
+- ✅ 2026-08-27 (ADR-070) **`crear_usuario` ya valida la persona**: 404 si no
   existe, 409 si ya tiene otra cuenta.
 - ⬜ **Fijar un PIN concreto no tiene pantalla**: `POST /users/{id}/pin` existe
   y nadie lo llama; desde la UI solo se puede resetear al PIN por defecto.

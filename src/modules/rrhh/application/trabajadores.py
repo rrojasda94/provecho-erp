@@ -95,7 +95,7 @@ def q_trabajadores(session: Session, empresa_id: uuid.UUID | None = None):
 # de significar "no tocar". Para el resto, `None` sigue siendo "no tocar" —
 # mandar `cargo: null` no puede vaciar una columna obligatoria.
 #
-# `usuario_id` ya no está acá: dejó de ser columna propia (ADR-069). La
+# `usuario_id` ya no está acá: dejó de ser columna propia (ADR-070). La
 # cuenta se vincula desde Usuarios, no desde este endpoint.
 BORRABLES = frozenset({"sucursal_id"})
 

@@ -243,7 +243,7 @@ def test_anonimizar_no_permitido_sin_el_permiso_dedicado(client) -> None:
     assert r.status_code == 403
 
 
-# --- Cuenta <-> persona (ADR-069): una sola arista, con nombre visible ------
+# --- Cuenta <-> persona (ADR-070): una sola arista, con nombre visible ------
 def _crear_usuario(client, headers, persona_id=None, username="cocinero1"):
     body = {"username": username, "pin": "222222", "tipo": "humano"}
     if persona_id is not None:

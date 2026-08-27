@@ -81,7 +81,7 @@ def crear_usuario(
 # Campos que un `null` explícito borra de verdad, y no solo "no tocar".
 # Solo `persona_id`: desvincular a la persona es una operación real (deja al
 # trabajador sin PIN para el pad), y sin esto no había forma de volver a ese
-# estado (ADR-069). El router manda `exclude_unset`, así que omitir el campo
+# estado (ADR-070). El router manda `exclude_unset`, así que omitir el campo
 # sigue significando "no tocar".
 _BORRABLES_USUARIO = frozenset({"persona_id"})
 
@@ -104,7 +104,7 @@ def _exigir_persona_asignable(
     session: Session, persona_id: uuid.UUID, *, usuario_id: uuid.UUID | None = None
 ) -> None:
     """La persona que se vincula a una cuenta tiene que existir y no tener
-    ya otra cuenta (ADR-069, `uq_usuario_persona_viva`): el pad de asistencia
+    ya otra cuenta (ADR-070, `uq_usuario_persona_viva`): el pad de asistencia
     resuelve el PIN por esta arista y una persona con dos cuentas lo dejaría
     sin saber cuál firma."""
     persona = PersonaRepo(session).get(persona_id)

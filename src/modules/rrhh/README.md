@@ -197,7 +197,7 @@ escuchar `trabajador_cesado`. Ver ROADMAP.
 
 ## Relaciones
 
-- `trabajador.usuario_id` (opcional) **ya no es columna propia** (ADR-069):
+- `trabajador.usuario_id` (opcional) **ya no es columna propia** (ADR-070):
   se deriva de `trabajador.persona_id`. Es la cuenta del `usuario` cuya
   `persona_id` coincide con la del trabajador — se vincula desde
   Usuarios → Cuentas → "Persona vinculada", no desde este módulo. Antes
@@ -234,7 +234,7 @@ escuchar `trabajador_cesado`. Ver ROADMAP.
   `ventas_por_trabajador` del tablero (ADR-024), que cruza el
   `venta.usuario_id` de `sales` con este contrato.
 
-  Con la cuenta resuelta por persona (ADR-069), un `usuario_id` recontratado
+  Con la cuenta resuelta por persona (ADR-070), un `usuario_id` recontratado
   puede matchear dos filas `trabajador` — se prioriza la no cesada y, en
   empate, la de ingreso más reciente, para no etiquetar a alguien con su
   cargo viejo.

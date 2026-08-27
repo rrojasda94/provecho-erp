@@ -117,7 +117,7 @@ algo mal». Poner ahí al trabajador convertiría un recordatorio en un cargo.
     `TrabajadorUpdate`, y la pantalla de trabajadores nunca lo ofrecía, así que
     desde la UI el campo era NULL para siempre y **ningún** trabajador podía
     marcar. Se asignaba y se quitaba desde la ficha del trabajador.
-  - **Reemplazado el 2026-08-27 (ADR-069)**: ese mecanismo —
+  - **Reemplazado el 2026-08-27 (ADR-070)**: ese mecanismo —
     `trabajador.usuario_id` como columna propia, asignada desde RRHH →
     Trabajadores— convivía con `usuario.persona_id` (Usuarios → "Persona
     vinculada") sin que nada las sincronizara: vincular desde Usuarios no

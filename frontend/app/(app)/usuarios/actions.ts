@@ -100,7 +100,7 @@ export async function editarUsuarioAction(
         nombre_display: String(formData.get("nombre_display") ?? "").trim() || undefined,
         email: String(formData.get("email") ?? "").trim() || undefined,
         // `null` y no `undefined`: acá vacío SÍ es una acción — desvincular
-        // la persona (ADR-069) — y `undefined` se cae del JSON sin mandar
+        // la persona (ADR-070) — y `undefined` se cae del JSON sin mandar
         // nada (`lib/api.ts`), que es "no tocar". El alta (`leerCuenta`)
         // sigue con `undefined`: ahí vacío es "todavía no elegí a nadie".
         persona_id: String(formData.get("persona_id") ?? "").trim() || null,

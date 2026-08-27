@@ -52,7 +52,7 @@ class UsuarioRepo:
 
     def get_by_persona(self, persona_id: uuid.UUID) -> Usuario | None:
         """La cuenta viva de esta persona, si tiene. Para el chequeo de
-        conflicto al vincular (ADR-069): una persona, a lo más una cuenta."""
+        conflicto al vincular (ADR-070): una persona, a lo más una cuenta."""
         return self.s.scalar(
             select(Usuario).where(
                 Usuario.persona_id == persona_id, Usuario.deleted_at.is_(None)

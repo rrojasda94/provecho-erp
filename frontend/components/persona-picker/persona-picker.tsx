@@ -133,7 +133,7 @@ export function PersonaPicker({
 
   function quitar() {
     // `""` en el input oculto es lo que la action lee como "desvincular"
-    // (ADR-069): tiene que ser un clic deliberado, no el efecto de borrar
+    // (ADR-070): tiene que ser un clic deliberado, no el efecto de borrar
     // el texto con backspace.
     setElegida(null);
     setConsulta("");
