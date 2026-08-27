@@ -108,3 +108,92 @@ export async function reintentarComprobanteAction(
   revalidatePath("/ventas");
   return { error: "", ok: true };
 }
+
+// --- Mesas del salón (RN-MDC-004/005/006) ------------------------------------
+/** El número no se manda nunca: lo asigna el backend (siguiente disponible).
+ * `pos_x`/`pos_y` sí, cuando la mesa nace desde una celda elegida en el
+ * plano — si no se pasan, el backend elige la primera celda libre. */
+export async function crearMesaAction(
+  _previo: EstadoVenta,
+  formData: FormData,
+): Promise<EstadoVenta> {
+  const sucursalId = String(formData.get("sucursal_id") ?? "").trim();
+  if (!sucursalId) {
+    return { error: "Elige la sucursal del salón.", ok: false };
+  }
+  const zona = String(formData.get("zona") ?? "").trim();
+  const capacidad = String(formData.get("capacidad") ?? "").trim();
+  try {
+    await apiFetch("/api/v1/sales/mesas", {
+      token: await token(),
+      metodo: "POST",
+      cuerpo: {
+        sucursal_id: sucursalId,
+        zona: zona || null,
+        capacidad: capacidad ? Number(capacidad) : null,
+      },
+    });
+  } catch (e) {
+    return { error: mensajeDe(e, "No se pudo crear la mesa."), ok: false };
+  }
+  revalidatePath("/ventas/mesas");
+  return { error: "", ok: true };
+}
+
+export async function guardarMesaAction(
+  _previo: EstadoVenta,
+  formData: FormData,
+): Promise<EstadoVenta> {
+  const mesaId = String(formData.get("id") ?? "").trim();
+  if (!mesaId) {
+    return { error: "Falta el identificador de la mesa.", ok: false };
+  }
+  const zona = String(formData.get("zona") ?? "").trim();
+  const capacidad = String(formData.get("capacidad") ?? "").trim();
+  try {
+    await apiFetch(`/api/v1/sales/mesas/${mesaId}`, {
+      token: await token(),
+      metodo: "PATCH",
+      cuerpo: { zona: zona || null, capacidad: capacidad ? Number(capacidad) : null },
+    });
+  } catch (e) {
+    return { error: mensajeDe(e, "No se pudo guardar la mesa."), ok: false };
+  }
+  revalidatePath("/ventas/mesas");
+  return { error: "", ok: true };
+}
+
+/** Arrastrar una mesa a otra celda del plano — sin pasar por el diálogo de
+ * edición, así que va suelta y no como parte de `guardarMesaAction`. */
+export async function moverMesaAction(
+  mesaId: string,
+  posX: number,
+  posY: number,
+): Promise<EstadoVenta> {
+  try {
+    await apiFetch(`/api/v1/sales/mesas/${mesaId}`, {
+      token: await token(),
+      metodo: "PATCH",
+      cuerpo: { pos_x: posX, pos_y: posY },
+    });
+  } catch (e) {
+    return { error: mensajeDe(e, "No se pudo mover la mesa."), ok: false };
+  }
+  revalidatePath("/ventas/mesas");
+  return { error: "", ok: true };
+}
+
+/** Solo retira la mesa de número más alto (RN-MDC-006); el backend es quien
+ * decide si borra la fila o la desactiva según tenga ventas. */
+export async function eliminarMesaAction(mesaId: string): Promise<EstadoVenta> {
+  try {
+    await apiFetch(`/api/v1/sales/mesas/${mesaId}`, {
+      token: await token(),
+      metodo: "DELETE",
+    });
+  } catch (e) {
+    return { error: mensajeDe(e, "No se pudo quitar la mesa."), ok: false };
+  }
+  revalidatePath("/ventas/mesas");
+  return { error: "", ok: true };
+}

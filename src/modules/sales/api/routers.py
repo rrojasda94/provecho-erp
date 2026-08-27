@@ -40,7 +40,7 @@ from src.modules.sales.application import (
     ventas,
 )
 from src.modules.sales.application import variantes as variantes_uc
-from src.modules.sales.application.scope import exigir_cliente, exigir_venta
+from src.modules.sales.application.scope import exigir_cliente, exigir_mesa, exigir_venta
 from src.modules.sales.domain import rules
 from src.modules.sales.infrastructure.repositories import (
     ComprobanteRepo,
@@ -1468,17 +1468,31 @@ def listar_puntos_venta(
 @router.post("/mesas", response_model=schemas.MesaOut, status_code=201)
 def crear_mesa(
     body: schemas.MesaCreate,
-    _: Usuario = Depends(require_permission(GESTIONAR_MESAS)),
+    actor: Usuario = Depends(require_permission(GESTIONAR_MESAS)),
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
+    """El número lo asigna el sistema (RN-MDC-004): no se recibe del
+    cliente, así que no hay forma de pedir "la mesa 7" fuera de orden."""
     tenant.exigir_sucursal(body.sucursal_id)
     mesa = mesas.crear_mesa(
-        session,
-        sucursal_id=body.sucursal_id,
-        numero=body.numero,
-        zona=body.zona,
-        capacidad=body.capacidad,
+        session, actor_id=actor.id, **body.model_dump()
+    )
+    session.commit()
+    return mesa
+
+
+@router.patch("/mesas/{mesa_id}", response_model=schemas.MesaOut)
+def editar_mesa(
+    mesa_id: uuid.UUID,
+    body: schemas.MesaPatch,
+    actor: Usuario = Depends(require_permission(GESTIONAR_MESAS)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    exigir_mesa(session, mesa_id, tenant)
+    mesa = mesas.editar_mesa(
+        session, mesa_id, actor_id=actor.id, **body.model_dump(exclude_unset=True)
     )
     session.commit()
     return mesa
@@ -1512,6 +1526,8 @@ def mapa_de_mesas(
             numero=m.mesa.numero,
             zona=m.mesa.zona,
             capacidad=m.mesa.capacidad,
+            pos_x=m.mesa.pos_x,
+            pos_y=m.mesa.pos_y,
             venta_id=m.venta_id,
             numero_orden=m.numero_orden,
             comensales=m.comensales,
@@ -1521,15 +1537,19 @@ def mapa_de_mesas(
     ]
 
 
-@router.post("/mesas/{mesa_id}/desactivar", response_model=schemas.MesaOut)
-def desactivar_mesa(
+@router.delete("/mesas/{mesa_id}", status_code=204)
+def eliminar_mesa(
     mesa_id: uuid.UUID,
-    _: Usuario = Depends(require_permission(GESTIONAR_MESAS)),
+    actor: Usuario = Depends(require_permission(GESTIONAR_MESAS)),
+    tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    mesa = mesas.desactivar_mesa(session, mesa_id)
+    """Retira la mesa de número más alto (RN-MDC-006). Reemplaza al viejo
+    `POST /mesas/{id}/desactivar`, que no validaba `exigir_sucursal` — un
+    supervisor podía tocar la mesa de otra empresa por id."""
+    exigir_mesa(session, mesa_id, tenant)
+    mesas.eliminar_mesa(session, mesa_id, actor.id)
     session.commit()
-    return mesa
 
 
 # --- Cliente creado desde caja ----------------------------------------------

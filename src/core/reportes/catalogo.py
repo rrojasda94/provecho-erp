@@ -174,6 +174,17 @@ def _ventas_por_trabajador(
     return salida
 
 
+def _mesas_preferidas(session: Session, empresa_id, *, desde, hasta, sucursal_ids, limite):
+    return sales_q.mesas_preferidas(
+        session,
+        empresa_id,
+        desde=desde,
+        hasta=hasta,
+        sucursal_ids=sucursal_ids,
+        limite=limite,
+    )
+
+
 def _pedidos_demorados(session: Session, empresa_id, *, desde, hasta, sucursal_ids, limite):
     return sales_q.pedidos_demorados(
         session,
@@ -292,6 +303,24 @@ CATALOGO: tuple[Reporte, ...] = (
             Columna("total", "Total", "dinero"),
         ),
         consulta=_ventas_por_hora,
+    ),
+    Reporte(
+        codigo="mesas_preferidas",
+        nombre="Mesas preferidas",
+        descripcion=(
+            "Qué mesa pide más el cliente, por sucursal — para acomodar el "
+            "salón según lo que la gente ya prefiere."
+        ),
+        permiso="sales.leer",
+        visual="barras",
+        etiqueta="mesa",
+        valor="cantidad",
+        columnas=(
+            Columna("mesa", "Mesa"),
+            Columna("cantidad", "Pedidos", "numero"),
+            Columna("total", "Total", "dinero"),
+        ),
+        consulta=_mesas_preferidas,
     ),
     Reporte(
         codigo="ventas_por_trabajador",

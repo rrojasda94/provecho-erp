@@ -12336,6 +12336,7 @@
         "type": "object"
       },
       "MesaCreate": {
+        "description": "Sin `numero`: lo asigna el sistema — el salón se numera 1..n sin\nhuecos (RN-MDC-004). `pos_x`/`pos_y` son opcionales; sin celda, cae en\nla primera libre del plano.",
         "properties": {
           "capacidad": {
             "anyOf": [
@@ -12349,10 +12350,29 @@
             ],
             "title": "Capacidad"
           },
-          "numero": {
-            "minimum": 1.0,
-            "title": "Numero",
-            "type": "integer"
+          "pos_x": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pos X"
+          },
+          "pos_y": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pos Y"
           },
           "sucursal_id": {
             "format": "uuid",
@@ -12373,8 +12393,7 @@
           }
         },
         "required": [
-          "sucursal_id",
-          "numero"
+          "sucursal_id"
         ],
         "title": "MesaCreate",
         "type": "object"
@@ -12424,6 +12443,14 @@
             ],
             "title": "Numero Orden"
           },
+          "pos_x": {
+            "title": "Pos X",
+            "type": "integer"
+          },
+          "pos_y": {
+            "title": "Pos Y",
+            "type": "integer"
+          },
           "total": {
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Total",
@@ -12458,6 +12485,8 @@
           "numero",
           "zona",
           "capacidad",
+          "pos_x",
+          "pos_y",
           "venta_id",
           "numero_orden",
           "comensales",
@@ -12492,6 +12521,14 @@
             "title": "Numero",
             "type": "integer"
           },
+          "pos_x": {
+            "title": "Pos X",
+            "type": "integer"
+          },
+          "pos_y": {
+            "title": "Pos Y",
+            "type": "integer"
+          },
           "sucursal_id": {
             "format": "uuid",
             "title": "Sucursal Id",
@@ -12515,9 +12552,66 @@
           "numero",
           "zona",
           "capacidad",
+          "pos_x",
+          "pos_y",
           "activa"
         ],
         "title": "MesaOut",
+        "type": "object"
+      },
+      "MesaPatch": {
+        "description": "Nunca `numero`: no se edita. Campos ausentes no se tocan.",
+        "properties": {
+          "capacidad": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capacidad"
+          },
+          "pos_x": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pos X"
+          },
+          "pos_y": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pos Y"
+          },
+          "zona": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zona"
+          }
+        },
+        "title": "MesaPatch",
         "type": "object"
       },
       "MetricaCampanaOut": {
@@ -46538,6 +46632,7 @@
         ]
       },
       "post": {
+        "description": "El número lo asigna el sistema (RN-MDC-004): no se recibe del\ncliente, así que no hay forma de pedir \"la mesa 7\" fuera de orden.",
         "operationId": "crear_mesa_api_v1_sales_mesas_post",
         "requestBody": {
           "content": {
@@ -46652,9 +46747,10 @@
         ]
       }
     },
-    "/api/v1/sales/mesas/{mesa_id}/desactivar": {
-      "post": {
-        "operationId": "desactivar_mesa_api_v1_sales_mesas__mesa_id__desactivar_post",
+    "/api/v1/sales/mesas/{mesa_id}": {
+      "delete": {
+        "description": "Retira la mesa de número más alto (RN-MDC-006). Reemplaza al viejo\n`POST /mesas/{id}/desactivar`, que no validaba `exigir_sucursal` — un\nsupervisor podía tocar la mesa de otra empresa por id.",
+        "operationId": "eliminar_mesa_api_v1_sales_mesas__mesa_id__delete",
         "parameters": [
           {
             "in": "path",
@@ -46667,6 +46763,55 @@
             }
           }
         ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Eliminar Mesa",
+        "tags": [
+          "sales"
+        ]
+      },
+      "patch": {
+        "operationId": "editar_mesa_api_v1_sales_mesas__mesa_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "mesa_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Mesa Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MesaPatch"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "content": {
@@ -46694,7 +46839,7 @@
             "HTTPBearer": []
           }
         ],
-        "summary": "Desactivar Mesa",
+        "summary": "Editar Mesa",
         "tags": [
           "sales"
         ]

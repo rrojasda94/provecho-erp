@@ -14,6 +14,7 @@ from src.modules.sales.application.errors import NoEncontrado
 from src.modules.sales.infrastructure.models import (
     Cliente,
     KdsPantalla,
+    Mesa,
     Venta,
     VentaItem,
 )
@@ -44,6 +45,14 @@ def exigir_venta(session: Session, venta_id: uuid.UUID, tenant: Tenant) -> Venta
         raise NoEncontrado("venta no encontrada")
     tenant.exigir_sucursal(venta.sucursal_id)
     return venta
+
+
+def exigir_mesa(session: Session, mesa_id: uuid.UUID, tenant: Tenant) -> Mesa:
+    mesa = session.get(Mesa, mesa_id)
+    if mesa is None:
+        raise NoEncontrado("mesa no encontrada")
+    tenant.exigir_sucursal(mesa.sucursal_id)
+    return mesa
 
 
 def exigir_pantalla(

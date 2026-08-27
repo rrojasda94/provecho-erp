@@ -19,7 +19,7 @@ una persona con dos cuentas vivas ya hoy, o una persona con dos trabajadores
 que apuntan a cuentas *distintas* (el backfill fabricaria el choque).
 
 Revision ID: d3f8a2c1e947
-Revises: c4d17b93e0af
+Revises: a1f9c3e7b204
 Create Date: 2026-08-27
 
 """
@@ -29,7 +29,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = 'd3f8a2c1e947'
-down_revision: str | None = 'c4d17b93e0af'
+down_revision: str | None = 'a1f9c3e7b204'
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

@@ -21,6 +21,7 @@ from src.modules.sales.infrastructure.models import (
     AlertaPedido,
     Cliente,
     MedioPago,
+    Mesa,
     Pago,
     ProductoAtributoLinea,
     ProductoAtributoValor,
@@ -292,6 +293,50 @@ def ventas_por_usuario(
     return [
         {"usuario_id": usuario_id, "cantidad": cantidad, "total": Decimal(total)}
         for usuario_id, cantidad, total in filas
+    ]
+
+
+def mesas_preferidas(
+    session: Session,
+    empresa_id: uuid.UUID | None,
+    *,
+    desde: date,
+    hasta: date,
+    sucursal_ids: Sequence[uuid.UUID] | None = None,
+    limite: int = 20,
+) -> list[dict]:
+    """Ranking de qué mesa pide más el cliente, por sucursal.
+
+    Reusa `_ventas_en_rango`: mismo criterio de "esto fue ingreso real" que
+    el resto de reportes de venta, para que este ranking no contradiga a
+    los demás sobre el mismo rango. La etiqueta lleva la sucursal adentro
+    porque el gráfico solo dibuja una columna y "Mesa 4" se repite entre
+    locales — sin el local, dos barras se confundirían en una.
+    """
+    filas = session.execute(
+        select(
+            Sucursal.nombre,
+            Mesa.numero,
+            func.count(Venta.id),
+            func.coalesce(func.sum(Venta.total), 0),
+        )
+        .join(Sucursal, Sucursal.id == Venta.sucursal_id)
+        .join(Mesa, Mesa.id == Venta.mesa_id)
+        .where(
+            Venta.mesa_id.is_not(None),
+            *_ventas_en_rango(empresa_id, desde, hasta, sucursal_ids),
+        )
+        .group_by(Sucursal.nombre, Mesa.numero)
+        .order_by(func.count(Venta.id).desc())
+        .limit(limite)
+    )
+    return [
+        {
+            "mesa": f"{sucursal} · Mesa {numero}",
+            "cantidad": cantidad,
+            "total": Decimal(total),
+        }
+        for sucursal, numero, cantidad, total in filas
     ]
 
 

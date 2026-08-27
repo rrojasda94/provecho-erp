@@ -119,6 +119,15 @@ de su módulo y se prueban de forma aislada.
   dirección, medio de pago), variable según la modalidad.
 - **RN-MDC-003** El precio de un producto comercial o servicio puede
   variar según la modalidad de consumo.
+- **RN-MDC-004** Las mesas de un salón se numeran de forma correlativa
+  del 1 al n, sin huecos y sin números negativos; el número lo asigna
+  el sistema al crear la mesa (siguiente disponible) y no se puede
+  editar.
+- **RN-MDC-005** Una mesa no se edita ni se retira mientras tenga una
+  orden abierta.
+- **RN-MDC-006** Solo se puede retirar la mesa de número más alto del
+  salón — retirar cualquier otra reescribiría a qué mesa apuntó una
+  venta ya cerrada, o dejaría un hueco en la numeración.
 
 ## Carrito
 

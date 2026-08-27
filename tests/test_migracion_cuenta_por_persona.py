@@ -40,7 +40,7 @@ def _migracion():
 
 def test_la_cadena_de_revisiones_esta_encadenada() -> None:
     migracion = _migracion()
-    assert migracion.down_revision == "c4d17b93e0af"
+    assert migracion.down_revision == "a1f9c3e7b204"
 
 
 @pytest.fixture()

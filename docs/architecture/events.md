@@ -66,7 +66,7 @@ Python en proceso, sin HTTP) — es lo que hace `marketing` desde 2026-08-01.
 | Puntos de venta de una sucursal | `sales` | `accounting` (encontrar la caja abierta del local) | `sales/application/queries_publicas.py::puntos_venta_de_sucursal` | interno |
 | Estado de caja | `accounting` | `core/reportes` (tablero) | `accounting/application/queries_publicas.py::estado_de_caja` — cajas abiertas ahora, con horas sin cerrar y efectivo esperado | `accounting.leer` (vía el catálogo de reportes) |
 | Pedidos demorados | `sales` (`alerta_pedido`) | `core/reportes` (tablero) | `sales/application/queries_publicas.py::pedidos_demorados` — lee la alerta guardada, no recalcula: el umbral queda congelado en la fila | `sales.leer` (vía el catálogo de reportes) |
-| Serie/ranking de venta | `sales` | `core/reportes` | `sales/application/queries_publicas.py::ventas_por_dia`, `ventas_por_sucursal`, `ventas_por_hora`, `ventas_por_usuario`, `top_productos`, `vendido_por_producto` | `sales.leer` (vía el catálogo de reportes) |
+| Serie/ranking de venta | `sales` | `core/reportes` | `sales/application/queries_publicas.py::ventas_por_dia`, `ventas_por_sucursal`, `ventas_por_hora`, `ventas_por_usuario`, `top_productos`, `vendido_por_producto`, `mesas_preferidas` (ADR-069 — ranking de mesa por sucursal, reusa `_ventas_en_rango` para no contradecir a los otros reportes del mismo rango) | `sales.leer` (vía el catálogo de reportes) |
 
 ## Cadena de referencia (venta → contabilidad)
 

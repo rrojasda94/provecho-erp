@@ -468,16 +468,13 @@ class MesaRepo:
             select(Mesa).where(
                 Mesa.sucursal_id == sucursal_id,
                 Mesa.numero == numero,
-                Mesa.deleted_at.is_(None),
             )
         )
 
     def de_sucursal(
         self, sucursal_id: uuid.UUID, solo_activas: bool = True
     ) -> list[Mesa]:
-        q = select(Mesa).where(
-            Mesa.sucursal_id == sucursal_id, Mesa.deleted_at.is_(None)
-        )
+        q = select(Mesa).where(Mesa.sucursal_id == sucursal_id)
         if solo_activas:
             q = q.where(Mesa.activa.is_(True))
         return list(self.s.scalars(q.order_by(Mesa.numero)))
@@ -495,6 +492,48 @@ class MesaRepo:
                 )
             )
         )
+
+    def orden_abierta(self, mesa_id: uuid.UUID) -> Venta | None:
+        """Sin filtro de fecha, a diferencia de `ocupadas`: una orden abierta
+        desde ayer también tiene que bloquear editar o retirar la mesa."""
+        return self.s.scalar(
+            select(Venta).where(Venta.mesa_id == mesa_id, Venta.estado == "orden")
+        )
+
+    def mesa_mayor(self, sucursal_id: uuid.UUID) -> Mesa | None:
+        """La de número más alto, activa o no: es la única que se puede
+        retirar sin dejar un hueco en el 1..n."""
+        return self.s.scalar(
+            select(Mesa)
+            .where(Mesa.sucursal_id == sucursal_id)
+            .order_by(Mesa.numero.desc())
+            .limit(1)
+        )
+
+    def en_posicion(self, sucursal_id: uuid.UUID, x: int, y: int) -> Mesa | None:
+        return self.s.scalar(
+            select(Mesa).where(
+                Mesa.sucursal_id == sucursal_id, Mesa.pos_x == x, Mesa.pos_y == y
+            )
+        )
+
+    def posiciones_ocupadas(self, sucursal_id: uuid.UUID) -> set[tuple[int, int]]:
+        filas = self.s.execute(
+            select(Mesa.pos_x, Mesa.pos_y).where(Mesa.sucursal_id == sucursal_id)
+        )
+        return {(x, y) for x, y in filas}
+
+    def tuvo_ventas(self, mesa_id: uuid.UUID) -> bool:
+        """Cualquier venta que haya pasado por la mesa, sin importar su
+        estado: decide si retirarla borra la fila o solo la desactiva."""
+        return (
+            self.s.scalar(select(Venta.id).where(Venta.mesa_id == mesa_id).limit(1))
+            is not None
+        )
+
+    def eliminar(self, mesa: Mesa) -> None:
+        self.s.delete(mesa)
+        self.s.flush()
 
 
 class PuntoVentaRepo:
