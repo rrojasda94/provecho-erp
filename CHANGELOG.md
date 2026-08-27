@@ -12,6 +12,108 @@ editando este archivo chocaban siempre — escribían en la misma línea.
 
 Ver [`changelog.d/`](changelog.d/).
 
+## [0.7.7] - 2026-08-27
+
+### Added
+
+- **Las mesas del salón ya se pueden configurar, con plano** (2026-08-27,
+  ADR-069). `mesa` existía desde ADR-018 pero solo el seeder de demo podía
+  darla de alta: no había `PATCH`, la única "baja" no miraba si tenía
+  historia, y una sucursal nueva quedaba con el PDV diciendo "esta sucursal
+  no tiene mesas configuradas todavía" sin ninguna salida. Nueva pantalla
+  `/ventas/mesas`: el número lo asigna el sistema (1..n sin huecos, no
+  editable), solo se retira la mesa de número más alto, ni editar ni retirar
+  proceden con una orden abierta, y cada mesa se ubica arrastrándola en un
+  plano de 12 columnas — mismo plano que ahora pinta el mapa del PDV. Suma al
+  tablero de reportes qué mesa prefiere la gente por sucursal
+  (`mesas_preferidas`). De paso cierra un hueco de tenant: la ruta que
+  desactivaba una mesa era la única de las cuatro sin validar la sucursal del
+  usuario contra la del recurso.
+
+- **Mover productos entre pedidos y cobrar solo lo seleccionado** (2026-08-27,
+  RN-COM-043, ADR-071). El PDV ya tenía la selección múltiple (mantener
+  presionado un producto) y el backend ya tenía el cobro dividido
+  (`grupo_cobro`, ADR-018) — pero nada conectaba la una con el otro, y no
+  existía forma de mover un producto cargado en la mesa equivocada. Un solo
+  endpoint (`POST /ventas/{id}/mover-lineas`) resuelve ambos casos: reasigna
+  líneas ya enviadas a otra orden, a una mesa libre, o a otra cuenta de la
+  misma orden. Sin PIN de supervisor (el producto sigue existiendo en alguna
+  orden abierta) y sin tocar inventario (el insumo no se movió del almacén).
+  Costo aceptado: no genera asiento de reclasificación —origen y destino
+  asientan contra las mismas cuentas, así que el efecto en el libro es cero—
+  y no viaja todavía por el hub offline (mismo hueco que ya tenían
+  `agregar_lineas`/`anular_lineas`).
+
+### Changed
+
+- **El campo de dirección es un solo `<input>`, no dos cajas** (ADR-072,
+  supera la sección "Dos cajas, no una" de ADR-053). El buscador de Google
+  vivía separado del campo de texto que en verdad se guardaba, y en la
+  práctica se tecleaba en cualquiera de los dos indistintamente — solo uno
+  de ellos dejaba algo anclado, y esa fue la causa raíz de los bugs de
+  dirección de cliente de arriba. Ahora el `<input>` de siempre busca
+  sugerencias mientras se teclea y las muestra en un desplegable propio, con
+  teclado y ARIA de combobox. Se puede seguir escribiendo una dirección que
+  Google no conoce, y sin clave de Google el campo sigue siendo el `<input>`
+  de siempre — nada de eso cambió.
+- **Una dirección guardada solo como texto se ancla sola al abrir la
+  ficha**, con un geocode directo, y solo si el resultado es inequívoco (sin
+  coincidencia parcial, con precisión de puerta, sin ser un distrito o país
+  a secas). Anclar en silencio un punto dudoso sería peor que no anclar: hay
+  plata atada a ese punto (ADR-054).
+
+### Removed
+
+- **`trabajador.usuario_id` deja de ser una columna con FK propia** (ADR-070).
+  RRHH → Trabajadores pierde el selector "Cuenta para marcar asistencia": la
+  cuenta con la que un trabajador marca se vincula ahora únicamente desde
+  Usuarios → Cuentas → "Persona vinculada", y se deriva de
+  `usuario.persona_id`. `TrabajadorCreate`/`TrabajadorUpdate` pierden
+  `usuario_id`; `TrabajadorOut.usuario_id` se mantiene, ahora calculado.
+
+### Fixed
+
+- **La dirección de un cliente se guardaba sin su pin, y el delivery siempre
+  se cotizaba a tarifa base** (ADR-072). `POST /sales/clientes` recibía las
+  cinco columnas de ancla que ADR-053 diseñó y el router las tiraba sin
+  pasarlas al caso de uso; `GET /sales/clientes/buscar` tampoco las devolvía.
+  El PDV no tenía manera de reusar el pin de un cliente ya registrado, así
+  que el reparto se cobraba siempre en línea recta o a tarifa base, nunca por
+  la ruta real. Se reconectó la cadena de punta a punta: alta, búsqueda y la
+  copia de texto+ancla juntos al asignar un cliente a un pedido.
+- **El cliente jurídico no tenía dónde anclar su dirección.** Su domicilio
+  vivía mezclado en `contacto` —el mismo campo que también hacía de teléfono
+  o correo de quien coordina—. Ahora `cliente.direccion` es una columna
+  propia, con las cinco de `UbicacionMixin`; `contacto` no se toca y las
+  filas viejas se leen con `direccion or contacto`.
+- **El SDK de Google Maps se daba por cargado antes de estarlo.**
+  `lib/google-maps.ts` confiaba en el evento `load` del `<script>`, pero con
+  `loading=async` ese evento llega antes de que Google adjunte
+  `importLibrary` al namespace. La primera llamada reventaba con
+  `TypeError: ... is not a function`, atrapada por un `.catch` silencioso a
+  propósito (ADR-053) — así que el campo se quedaba sin buscador y nadie lo
+  notaba: era indistinguible de "sin clave". Afectaba igual al widget viejo.
+  Se arregló sondeando hasta que `importLibrary` existe de verdad antes de
+  resolver.
+
+- **Vincular una persona a una cuenta desde Usuarios no habilitaba al
+  trabajador a marcar en el pad de asistencia, y el vínculo tampoco se veía
+  al reabrir el editor** (ADR-070). El vínculo cuenta↔trabajador vivía
+  duplicado en dos columnas que nadie sincronizaba —
+  `usuario.persona_id` (Usuarios → "Persona vinculada") y
+  `trabajador.usuario_id` (RRHH → Trabajadores → "Cuenta", la única que leía
+  el pad)—, así que guardar desde Usuarios quedaba sin efecto para el pad; y
+  `PersonaPicker` no aceptaba un valor inicial, así que el campo se veía
+  vacío al reabrir aunque el dato sí estuviera guardado.
+  `trabajador.usuario_id` deja de ser columna propia y se deriva de
+  `usuario.persona_id`, que pasa a ser la única arista.
+- **`PATCH /users/{id}` no dejaba desvincular una persona de una cuenta**:
+  todo `None` se leía como "no tocar", así que `persona_id` solo se podía
+  reemplazar por otra, nunca vaciar.
+- **Contratar a un postulante dejaba la ficha siempre sin sucursal**, y sin
+  centro de labores el trabajador no aparecía en el pad de asistencia de
+  ningún local. `contratar_postulante` acepta ahora `sucursal_id`.
+
 ## [0.7.6] - 2026-08-26
 
 ### Added
