@@ -7,6 +7,7 @@
  * no como un `undefined` silencioso en medio de un cobro.
  */
 
+import type { Ubicacion } from "@/components/direccion/ubicacion";
 import type {
   TicketComprobante,
   TicketTexto,
@@ -136,7 +137,7 @@ export type ClienteBuscado = {
   numero_documento: string | null;
   direccion: string | null;
   identificado: boolean;
-};
+} & Ubicacion;
 
 export type ClienteNuevo = {
   nombre: string;
@@ -144,7 +145,7 @@ export type ClienteNuevo = {
   numero_documento?: string | null;
   direccion?: string | null;
   fecha_nacimiento?: string | null;
-};
+} & Partial<Ubicacion>;
 
 export type MedioPago = {
   id: string;

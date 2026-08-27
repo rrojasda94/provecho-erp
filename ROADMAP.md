@@ -304,7 +304,7 @@ nombre del archivo.
 | Observabilidad y salud (tras las implementaciones de 2026-07-26) | [`observabilidad-y-salud.md`](docs/roadmap/deuda/observabilidad-y-salud.md) | 3 | 6 |
 | Backups (tras la implementación de 2026-07-26) | [`backups.md`](docs/roadmap/deuda/backups.md) | 4 | 1 |
 | Módulo inventory (slices siguientes) | [`modulo-inventory.md`](docs/roadmap/deuda/modulo-inventory.md) | 4 | 32 |
-| Módulo sales (slices siguientes) | [`modulo-sales.md`](docs/roadmap/deuda/modulo-sales.md) | 49 | 26 |
+| Módulo sales (slices siguientes) | [`modulo-sales.md`](docs/roadmap/deuda/modulo-sales.md) | 48 | 27 |
 | Módulo purchases (slices siguientes) | [`modulo-purchases.md`](docs/roadmap/deuda/modulo-purchases.md) | 6 | 2 |
 | Módulo production (slices siguientes) | [`modulo-production.md`](docs/roadmap/deuda/modulo-production.md) | 8 | 1 |
 | Módulo accounting (slices siguientes) | [`modulo-accounting.md`](docs/roadmap/deuda/modulo-accounting.md) | 8 | 3 |

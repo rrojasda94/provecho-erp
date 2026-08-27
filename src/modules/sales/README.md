@@ -113,13 +113,29 @@ cuatro huecos que el punto de venta necesitaba y el modelo no daba.
   (RN-PTS-006). **Trabajador y usuario siguen exigiendo documento**: esa
   validación vive en `users.application.admin`, no en el esquema.
 
-  **Qué se corrige de un cliente** (2026-08-10): `PATCH /clientes/{id}` toca
-  razón social, RUC y contacto, y **solo de un jurídico** (409 si no). Es lo
-  único que `cliente` guarda por su cuenta: el nombre, el teléfono, el
-  documento y la dirección de un natural viven en su `persona` (RN-GEN-007,
-  fuente única) y se corrigen desde `PATCH /personas/{id}`. Duplicar esos
-  campos acá sería crear la segunda fuente que esa regla evita, y por eso la
-  pantalla de Clientes enlaza a Personas en vez de ofrecerlos.
+  **Qué se corrige de un cliente** (2026-08-10, dirección propia desde
+  ADR-072): `PATCH /clientes/{id}` toca razón social, RUC, contacto y
+  dirección (con su ancla al mapa, `UbicacionMixin`), y **solo de un
+  jurídico** (409 si no). Es lo único que `cliente` guarda por su cuenta: el
+  nombre, el teléfono, el documento y la dirección de un natural viven en su
+  `persona` (RN-GEN-007, fuente única) y se corrigen desde
+  `PATCH /personas/{id}`. Duplicar esos campos acá sería crear la segunda
+  fuente que esa regla evita, y por eso la pantalla de Clientes enlaza a
+  Personas en vez de ofrecerlos.
+
+  **`direccion` vs. `contacto`** (ADR-072): antes de este cambio la dirección
+  del jurídico se guardaba en `contacto`, el mismo campo que también servía
+  de teléfono o correo de quien coordina — dos cosas distintas mezcladas en
+  una columna, y sin dónde anclar un pin. `cliente.direccion` es la columna
+  propia, con las cinco columnas de `UbicacionMixin`; `contacto` sigue siendo
+  solo el teléfono o correo. Las filas que ya existían se leen con
+  `direccion or contacto` hasta que alguien edite la ficha.
+
+  `POST /sales/clientes` y `GET /sales/clientes/buscar` (y `/listado`, misma
+  función `_cliente_buscado`) también llevan los cinco campos de ancla, para
+  natural (de su `persona`) y para jurídico (de `cliente`): sin esto el PDV
+  no podía reusar el pin de un cliente ya registrado y el delivery se
+  cotizaba siempre a tarifa base (ADR-054).
 
   `GET /clientes/listado` es el padrón del grupo para el back-office —
   paginado (ADR-026), con `q` opcional. Endpoint propio y **no** `GET
@@ -311,7 +327,7 @@ cobrar; se administran en Catálogo → Medios de pago). Capas
 | PATCH | `/medios-pago/{id}` | `gestionar_catalogo` |
 | GET | `/clientes?grupo_id=` | `sales.leer_clientes_externos` — contrato **público** de análisis, no el padrón del back-office |
 | GET | `/clientes/listado` | `sales.leer` — el padrón del grupo, paginado, con `q` opcional |
-| PATCH | `/clientes/{id}` | `sales.crear` — razón social, RUC y contacto de un **jurídico** |
+| PATCH | `/clientes/{id}` | `sales.crear` — razón social, RUC, contacto y dirección (con ancla) de un **jurídico** |
 
 `GET /ventas` es **uno solo** para el PDV y el back-office (paginado,
 ADR-026): sin parámetros da la jornada de hoy en las sucursales del usuario
@@ -642,9 +658,14 @@ El padrón de clientes se baja, se edita en Excel y se vuelve a subir
 - Identidad: `ID`, o el **número de documento** si el `ID` va vacío.
 - `Tipo` es derivado (RN-PTS-002: lo decide el documento). Se exporta para que
   se lea; al importar se ignora.
-- Una sola columna `Dirección / contacto`: en un jurídico es `cliente.contacto`
-  y en un natural el `domicilio` de su `persona` — dos columnas darían un
-  round-trip con pérdida.
+- Una sola columna `Dirección / contacto`: en un jurídico es
+  `cliente.direccion or cliente.contacto` (ADR-072) y en un natural el
+  `domicilio` de su `persona` — dos columnas darían un round-trip con
+  pérdida. Al importar/actualizar escribe `direccion`, no `contacto`: la
+  planilla trae la dirección, y `contacto` es el teléfono o correo de quien
+  coordina, no la dirección. Sin columnas de ancla: una carga masiva no
+  geocodifica (ADR-052), y el pin se ancla solo la primera vez que alguien
+  abre esa ficha (ADR-072).
 - De un **natural** que ya existe solo se completa el documento. Nombre,
   teléfono y dirección viven en `persona` (RN-GEN-007) y `sales` no puede
   escribirla: la fila se reporta con "se corrige en Personas".

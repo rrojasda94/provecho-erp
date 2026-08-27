@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { useMemo } from "react";
 
 import { BuscarDocumento } from "@/components/consulta/buscar-documento";
+import { CampoDireccion } from "@/components/direccion/campo-direccion";
+import type { Ubicacion } from "@/components/direccion/ubicacion";
 import { BOTON_FILA, DialogoFormulario } from "@/components/formulario/dialogo-formulario";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
 import { RUTA_EXPORTAR_CLIENTES } from "@/lib/clientes";
@@ -20,9 +22,11 @@ export type Cliente = {
   telefono: string | null;
   numero_documento: string | null;
   direccion: string | null;
+  /** Solo del jurídico: teléfono o correo de quien coordina (ADR-072). */
+  contacto: string | null;
   identificado: boolean;
   persona_id: string | null;
-};
+} & Ubicacion;
 
 /** Un cliente jurídico guarda lo suyo: razón social, RUC y contacto. */
 function DialogoEditarJuridico({
@@ -59,22 +63,23 @@ function DialogoEditarJuridico({
       {/* La ayuda del diálogo dice que SUNAT manda sobre la razón social
           tecleada, y hasta ahora no había forma de verla antes de guardar:
           se descubría al grabar que el sistema escribió otra. Solo se
-          prellena la razón social — `contacto` es el teléfono o el correo de
-          quien coordina, no el domicilio fiscal, y traerlo de SUNAT
-          reemplazaría un dato real por otro. */}
+          prellena la razón social — la dirección es un dato propio del
+          cliente (ADR-072) y traerla de SUNAT reemplazaría lo que ya se
+          ancló en el mapa por lo que declaró el RUC, sin avisar. */}
       <BuscarDocumento
         permisos={permisos}
         tipo="ruc"
         campo="ruc"
         rellena={{ razon_social: "razon_social" }}
       />
+      <CampoDireccion defaultValue={cliente.direccion} ubicacion={cliente} />
       <label className="flex flex-col gap-1 text-sm font-semibold">
         Contacto
         <input
           name="contacto"
           maxLength={255}
-          defaultValue={cliente.direccion ?? ""}
-          placeholder="Dirección, correo o teléfono de quien coordina"
+          defaultValue={cliente.contacto ?? ""}
+          placeholder="Teléfono o correo de quien coordina"
         />
       </label>
     </DialogoFormulario>

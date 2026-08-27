@@ -95,7 +95,7 @@ def _fila_export(cliente: Cliente, persona: Persona | None) -> list:
             "",
             # Una sola columna de contacto, igual que la que la pantalla ya
             # muestra: dos columnas darían un round-trip con pérdida.
-            cliente.contacto or "",
+            (cliente.direccion or cliente.contacto or ""),
             "",
         ]
     return [
@@ -267,8 +267,8 @@ def _diferencias(cliente: Cliente, personas, fila) -> tuple[list[str], list[str]
             cambios.append(f"razón social: {cliente.razon_social} → {fila['nombre']}")
         if fila["documento"] and fila["documento"] != (cliente.ruc or ""):
             cambios.append(f"RUC: {cliente.ruc} → {fila['documento']}")
-        if fila["contacto"] and fila["contacto"] != (cliente.contacto or ""):
-            cambios.append("contacto")
+        if fila["contacto"] and fila["contacto"] != (cliente.direccion or ""):
+            cambios.append("dirección")
         return cambios, no_editables
 
     persona = personas.get(cliente.persona_id)
@@ -415,7 +415,7 @@ def _actualizar_uno(
             consultar_documento=False,
             razon_social=nombre or None,
             ruc=documento or None,
-            contacto=entrada.get("contacto") or None,
+            direccion=entrada.get("contacto") or None,
         )
     # Natural: lo único que este módulo puede escribir es el documento. El
     # resto vive en `persona` y la revisión ya lo reportó.

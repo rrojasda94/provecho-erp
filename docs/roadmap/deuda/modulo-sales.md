@@ -61,12 +61,14 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   ADR-054): cuando el pedido queda fuera del radio o en zona vetada, el PDV lo
   sugiere y quien decide es la persona. Mandarles el pedido de verdad exige su
   API, credenciales y un adaptador propio en `shared/integrations/`.
-- ⬜ **El cliente jurídico no tiene dónde anclar su dirección** (2026-08-22,
-  ADR-053): `Cliente` no tiene columna de dirección — hoy la dirección de uno
-  jurídico termina en `contacto`, que es un campo para el teléfono o el correo
-  de quien coordina. `crear_cliente` recibe la ubicación y la aplica solo al
-  natural (a su `persona`). Se cierra dándole a `Cliente` su propia dirección,
-  que es un cambio de modelo que este slice no necesitaba.
+- ✅ **El cliente jurídico no tiene dónde anclar su dirección** (2026-08-22,
+  ADR-053 → cerrado 2026-08-27, ADR-072): `Cliente` gana `direccion` propia y
+  las cinco columnas de `UbicacionMixin` (migración `bf0ea834a972`).
+  `contacto` no se toca —sigue siendo el teléfono o correo de quien
+  coordina— y las filas viejas se leen con `direccion or contacto`. De paso
+  se reconectó `POST /sales/clientes` y `GET /clientes/buscar`, que hasta
+  entonces tiraban el ancla que recibían y nunca la devolvían: el delivery de
+  un cliente ya registrado se cotizaba siempre a tarifa base.
 - ⬜ **Un cliente natural no se actualiza por planilla** (2026-08-20,
   ADR-052, RN-PTS-007): de uno que ya existe la carga masiva solo puede
   **completar el documento**. Su nombre, teléfono y domicilio viven en

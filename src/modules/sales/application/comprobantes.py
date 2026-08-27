@@ -251,7 +251,7 @@ def _cliente_para_sunat(session: Session, cliente) -> factiliza.Cliente:
             tipo_doc=rules.DOC_SUNAT_RUC,
             num_doc=cliente.ruc or "",
             razon_social=cliente.razon_social or "",
-            direccion=cliente.contacto or "-",
+            direccion=cliente.direccion or cliente.contacto or "-",
         )
     persona = ComprobanteRepo(session).persona(cliente.persona_id)
     if persona is None:
