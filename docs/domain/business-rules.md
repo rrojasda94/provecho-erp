@@ -1574,7 +1574,7 @@ producción se hace en cocinas de sucursal. Ver
   una cuenta que ya tenga pagos confirmados (eso es nota de crédito,
   RN-CPP-009). No aplica a un pedido que todavía no se envió: ese se corrige
   en el propio punto de venta, borrando la línea. Mover **no repone
-  inventario** (ADR-070): el insumo ya salió del almacén y el plato sigue
+  inventario** (ADR-071): el insumo ya salió del almacén y el plato sigue
   existiendo, solo cambia de cuenta.
 
 ## Cumplimiento de pedido
@@ -1608,7 +1608,7 @@ preparación, despacho y entrega en las tres modalidades.
   del mismo ítem. *Enmendada el 2026-08-27 — mover un ítem entre órdenes
   (RN-COM-043) cambia su `venta_id`, no su estado: el plato conserva su
   avance de preparación al cambiar de pedido, y la tarjeta pasa a la cola
-  del pedido destino en el siguiente refresco (ADR-070).*
+  del pedido destino en el siguiente refresco (ADR-071).*
 - **RN-CUP-004** Ningún pedido se entrega sin verificar el pedido completo
   contra la comanda: control de salida obligatorio, responsabilidad de
   quien despacha.

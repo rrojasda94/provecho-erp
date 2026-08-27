@@ -1,4 +1,4 @@
-# ADR-070 — Mover líneas no repone inventario ni reclasifica el asiento
+# ADR-071 — Mover líneas no repone inventario ni reclasifica el asiento
 
 - **Estado:** aceptada
 - **Fecha:** 2026-08-27

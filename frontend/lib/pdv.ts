@@ -298,7 +298,7 @@ export type CotizacionDelivery = {
 };
 
 /** Cuerpo de "mover productos" / "cobrar seleccionados" (RN-COM-043,
- * ADR-070). Un solo destino a la vez: otra orden ya abierta, una mesa
+ * ADR-071). Un solo destino a la vez: otra orden ya abierta, una mesa
  * libre, o ninguno de los dos —solo `grupo_cobro`— para separar la cuenta
  * dentro de la misma orden. */
 export type MoverLineasIn = {
@@ -490,7 +490,7 @@ export const api = {
     }),
 
   /** Mover productos entre pedidos, o separar la cuenta del mismo pedido
-   * (RN-COM-043, ADR-070). Sin autorización: el producto sigue existiendo en
+   * (RN-COM-043, ADR-071). Sin autorización: el producto sigue existiendo en
    * alguna orden abierta, no se repone inventario ni se deshace un cobro. */
   moverLineas: (ventaId: string, cuerpo: MoverLineasIn) =>
     pedir<MoverLineasResultado>(`/sales/ventas/${ventaId}/mover-lineas`, {

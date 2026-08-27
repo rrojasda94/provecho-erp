@@ -1280,7 +1280,7 @@ def test_con_la_cuenta_dividida_el_flete_lo_paga_la_primera(session, base, con_t
     assert primera + segunda == ventas_uc.total_a_cobrar(session, venta)
 
 
-# --- Mover líneas entre órdenes (RN-COM-043, ADR-070) -----------------------
+# --- Mover líneas entre órdenes (RN-COM-043, ADR-071) -----------------------
 def test_mover_a_otra_orden_recalcula_totales_en_ambas(session, base):
     origen = _crear(
         session,

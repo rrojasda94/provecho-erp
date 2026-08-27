@@ -1,5 +1,5 @@
 - **Mover productos entre pedidos y cobrar solo lo seleccionado** (2026-08-27,
-  RN-COM-043, ADR-070). El PDV ya tenía la selección múltiple (mantener
+  RN-COM-043, ADR-071). El PDV ya tenía la selección múltiple (mantener
   presionado un producto) y el backend ya tenía el cobro dividido
   (`grupo_cobro`, ADR-018) — pero nada conectaba la una con el otro, y no
   existía forma de mover un producto cargado en la mesa equivocada. Un solo
