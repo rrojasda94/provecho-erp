@@ -174,6 +174,30 @@ class AgregarLineasCreate(BaseModel):
     items: list[VentaItemIn] = Field(min_length=1)
 
 
+class MoverLineasCreate(BaseModel):
+    """Reasigna líneas de una orden ya enviada a otro destino (RN-COM-043):
+    otra orden abierta, una mesa libre, o la misma orden con otra cuenta —
+    que es "cobrar seleccionados" en el PDV. Indicar como máximo uno de
+    `destino_venta_id` / `destino_mesa_id`; sin ninguno de los dos, se
+    interpreta como separar la cuenta con `grupo_cobro`.
+
+    Sin `autorizacion`: mover no repone inventario ni deshace un cobro, el
+    producto sigue existiendo en alguna orden abierta (RN-COM-020 solo aplica
+    a quitar líneas).
+    """
+
+    venta_item_ids: list[uuid.UUID] = Field(min_length=1)
+    destino_venta_id: uuid.UUID | None = None
+    destino_mesa_id: uuid.UUID | None = None
+    destino_comensales: int | None = Field(default=None, ge=1)
+    grupo_cobro: int | None = Field(default=None, ge=1)
+
+
+class MoverLineasOut(BaseModel):
+    origen: VentaOut
+    destino: VentaOut
+
+
 class AnularVentaIn(BaseModel):
     """Anular una orden entera. `autorizacion` es el token de
     `POST /auth/autorizar` y solo hace falta cuando quien la pide no tiene

@@ -82,6 +82,12 @@ export type Borrador = {
   consumoAutorizacion: string | null;
 };
 
+/** A dónde van los productos seleccionados al "mover productos" (RN-COM-043):
+ * otra orden ya abierta, o una mesa libre. Ninguno de los dos = separar la
+ * cuenta dentro de la misma orden ("cobrar seleccionados"), que no pasa por
+ * este diálogo. */
+export type DestinoMover = { ventaId: string } | { mesaId: string };
+
 /** Motivos de consumo de personal, como los nombra el backend. */
 export const MOTIVOS_CONSUMO: { valor: string; etiqueta: string }[] = [
   { valor: "fin_semana", etiqueta: "Fin de semana" },

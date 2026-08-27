@@ -29,6 +29,18 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   KDS es local al local (y sus ítems no conservan `id` entre lados). Si
   alguna vez se quieren tiempos de cocina consolidados por grupo, hay que
   resolverlo aparte.
+- ⬜ **`agregar_lineas`, `anular_lineas` y `mover_lineas` (2026-08-27,
+  RN-COM-043, ADR-069) no tienen verbo de replay**: `sincronizacion.py` solo
+  reproduce crear/cobrar/anular una venta **completa**. Una orden que en el
+  hub sumó líneas, quitó líneas o movió productos entre pedidos durante un
+  corte de enlace no reproduce esos cambios al reconectar — `_crear` es
+  idempotente por `id`/`idempotency_key`, así que la venta ya sincronizada
+  simplemente no vuelve a tocarse. Se agrava en `mover_lineas` porque
+  identifica líneas por `venta_item.id`, y esos ids **no son estables entre
+  el hub y la nube** (bullet anterior): un traslado no tendría ni contra qué
+  ids replayarse. Resolverlo exige el mismo trabajo para los tres verbos:
+  un cuarto tipo de lote en `pendientes()`/`aplicar()`, ordenado después de
+  `_aplicar_ventas`.
 - ⬜ **`cliente` no se replica**: una venta offline es anónima o con datos
   escritos a mano; vender a cliente registrado exige estar en línea.
 - ⬜ **`receta`/`receta_item` viajan sin filtro de tenant**: no tienen

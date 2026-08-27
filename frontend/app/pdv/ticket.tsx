@@ -28,6 +28,7 @@ type Props = {
   onLinea: (l: LineaBorrador) => void;
   onAlternarSeleccion: (id: string) => void;
   onLimpiarSeleccion: () => void;
+  onMover: () => void;
   onCliente: () => void;
   onTipo: () => void;
   onAnular: () => void;
@@ -67,6 +68,7 @@ export default function Ticket(props: Props) {
             borrador={activo}
             seleccion={seleccion}
             onLimpiar={props.onLimpiarSeleccion}
+            onMover={props.onMover}
           />
           <Totales borrador={activo} />
           <Acciones
@@ -221,15 +223,21 @@ function BarraSeleccion({
   borrador,
   seleccion,
   onLimpiar,
+  onMover,
 }: {
   borrador: Borrador;
   seleccion: Set<string>;
   onLimpiar: () => void;
+  onMover: () => void;
 }) {
   if (seleccion.size === 0) return null;
   const total = borrador.lineas
     .filter((l) => seleccion.has(l.id))
     .reduce((a, l) => a + totalLinea(l), 0);
+  // Mover exige una línea ya enviada a cocina (RN-COM-043): antes de eso el
+  // borrador se corrige local, borrando la línea y volviendo a tocar el
+  // producto — no hay nada del lado del servidor que reasignar todavía.
+  const puedeMover = Boolean(borrador.ventaId) && !esConsumoPersonal(borrador);
   return (
     <div className="pdv-selbar">
       <span>
@@ -239,6 +247,16 @@ function BarraSeleccion({
             contradiría las líneas, que ya salen sin precio. */}
         {esConsumoPersonal(borrador) ? "" : ` · ${soles(total)}`}
       </span>
+      <button
+        type="button"
+        disabled={!puedeMover}
+        title={
+          puedeMover ? undefined : "Envía el pedido antes de mover productos"
+        }
+        onClick={onMover}
+      >
+        Mover productos
+      </button>
       <button type="button" onClick={onLimpiar}>
         Quitar selección
       </button>

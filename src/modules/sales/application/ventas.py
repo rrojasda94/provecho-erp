@@ -408,6 +408,43 @@ def _validar_mesa(
         raise ReglaNegocio("la mesa no pertenece a la sucursal de la venta")
 
 
+def _abrir_mesa_para_traslado(
+    session: Session, origen: Venta, *, mesa_id: uuid.UUID, comensales: int | None
+) -> Venta:
+    """Abre la orden destino de un traslado a una mesa libre.
+
+    No pasa por `crear_venta`: ese camino publica `sales.venta_confirmada` y
+    descontaría el inventario que estas líneas ya consumieron cuando se armó
+    la orden origen (RN-COM-043 — mover no es vender de nuevo).
+    """
+    _validar_mesa(session, mesa_id, sucursal_id=origen.sucursal_id, modalidad="mesa")
+    dia = fechas.hoy()
+    ocupada = any(
+        v.mesa_id == mesa_id
+        for v in MesaRepo(session).ocupadas(origen.sucursal_id, dia)
+    )
+    if ocupada:
+        raise Conflicto("la mesa ya tiene una orden abierta")
+    repo = VentaRepo(session)
+    destino = Venta(
+        id=uuid.uuid4(),
+        sucursal_id=origen.sucursal_id,
+        fecha_orden=dia,
+        numero_orden=repo.siguiente_numero_orden(origen.sucursal_id, dia),
+        punto_venta_id=origen.punto_venta_id,
+        canal=origen.canal,
+        modalidad="mesa",
+        usuario_id=origen.usuario_id,
+        estado="orden",
+        total=Decimal("0"),
+        idempotency_key=f"mover:{uuid.uuid4()}",
+        mesa_id=mesa_id,
+        comensales=comensales,
+        tipo=origen.tipo,
+    )
+    return repo.add(destino)
+
+
 def _validar_tipo(
     tipo: str, consumo_motivo: str | None, autorizado_por: uuid.UUID | None
 ) -> bool:
@@ -1141,6 +1178,217 @@ def anular_lineas(
         session=session,
     )
     return venta
+
+
+def _exigir_cuenta_sin_pagos(pago_repo: PagoRepo, venta_id: uuid.UUID, grupo: int) -> None:
+    """Una cuenta con un pago confirmado ya no se traslada: eso es nota de
+    crédito, no un traslado (RN-CPP-009)."""
+    if sum(pago_repo.confirmados(venta_id, grupo), Decimal(0)) > 0:
+        raise Conflicto(
+            f"la cuenta {grupo} ya tiene pagos registrados: eso es nota de "
+            "crédito, no un traslado"
+        )
+
+
+def _filas_a_mover(
+    venta_repo: VentaRepo, venta_id: uuid.UUID, venta_item_ids: list[uuid.UUID]
+) -> list[VentaItem]:
+    """Las líneas pedidas, ya con sus extras arrastrados (RN-COM-021): la
+    pizza no puede quedar en una cuenta y su sabor extra en otra."""
+    pedidos = set(venta_item_ids)
+    todas = venta_repo.items(venta_id)
+    filas = [f for f in todas if f.id in pedidos]
+    if len(filas) != len(pedidos):
+        raise NoEncontrado("alguna línea no pertenece a esta venta")
+    if any(f.padre_venta_item_id is not None for f in filas):
+        raise ReglaNegocio(
+            "un extra se mueve con su plato, no por separado (RN-COM-021)"
+        )
+    return _con_sus_extras(filas, todas)
+
+
+def _resolver_destino_traslado(
+    session: Session,
+    origen: Venta,
+    *,
+    venta_id: uuid.UUID,
+    destino_venta_id: uuid.UUID | None,
+    destino_mesa_id: uuid.UUID | None,
+    destino_comensales: int | None,
+    grupo_cobro: int | None,
+) -> tuple[Venta, int]:
+    """A dónde van las líneas y con qué `grupo_cobro`, para los tres casos
+    de RN-COM-043. Devuelve `(destino, nuevo_grupo)`; `destino is origen`
+    cuando el traslado es separar la cuenta de la misma orden."""
+    pago_repo = PagoRepo(session)
+    if destino_mesa_id is not None:
+        destino = _abrir_mesa_para_traslado(
+            session, origen, mesa_id=destino_mesa_id, comensales=destino_comensales
+        )
+        return destino, rules.GRUPO_COBRO_UNICO
+
+    if destino_venta_id is not None:
+        if destino_venta_id == venta_id:
+            raise ReglaNegocio(
+                "para separar la cuenta de la misma orden no indiques "
+                "destino_venta_id: manda grupo_cobro"
+            )
+        destino = VentaRepo(session).get(destino_venta_id)
+        if destino is None:
+            raise NoEncontrado("venta destino no encontrada")
+        if destino.estado != "orden":
+            raise Conflicto(f"la venta destino está {destino.estado}: no admite líneas")
+        if destino.sucursal_id != origen.sucursal_id:
+            raise ReglaNegocio("no se puede mover entre sucursales distintas")
+        if destino.tipo != origen.tipo:
+            raise ReglaNegocio("no se puede mezclar consumo de personal con una venta")
+        nuevo_grupo = grupo_cobro or rules.GRUPO_COBRO_UNICO
+        _exigir_cuenta_sin_pagos(pago_repo, destino_venta_id, nuevo_grupo)
+        return destino, nuevo_grupo
+
+    # Misma orden, otra cuenta: es "cobrar seleccionados" del PDV.
+    if grupo_cobro is None:
+        raise ReglaNegocio("indica destino_venta_id, destino_mesa_id o grupo_cobro")
+    _exigir_cuenta_sin_pagos(pago_repo, venta_id, grupo_cobro)
+    return origen, grupo_cobro
+
+
+def _registrar_traslado(
+    session: Session,
+    *,
+    origen: Venta,
+    destino: Venta,
+    filas: list[VentaItem],
+    grupos_origen: list[int],
+    nuevo_grupo: int,
+    usuario_id: uuid.UUID,
+) -> None:
+    """Auditoría (una entrada por venta afectada) y `sales.lineas_movidas`.
+    Sin evento de `inventory`: el insumo no se movió del almacén (ADR-069)."""
+    monto = _subtotal(filas)
+    movimiento_id = uuid.uuid4()
+    afectadas = {origen, destino} if destino is not origen else {origen}
+    for venta_afectada in afectadas:
+        auditoria.registrar(
+            session,
+            usuario_id=usuario_id,
+            entidad="venta",
+            entidad_id=venta_afectada.id,
+            accion="mover_lineas",
+            datos_antes={"grupos_origen": grupos_origen},
+            datos_despues={
+                "movimiento_id": str(movimiento_id),
+                "origen_venta_id": str(origen.id),
+                "destino_venta_id": str(destino.id),
+                "grupo_destino": nuevo_grupo,
+                "lineas": len(filas),
+                "monto": str(monto),
+            },
+            sucursal_id=venta_afectada.sucursal_id,
+        )
+    event_bus.publish(
+        "sales.lineas_movidas",
+        {
+            "movimiento_id": str(movimiento_id),
+            "origen_venta_id": str(origen.id),
+            "destino_venta_id": str(destino.id),
+            "sucursal_id": str(origen.sucursal_id),
+            "grupos_origen": grupos_origen,
+            "grupo_destino": nuevo_grupo,
+            "monto": str(monto),
+            "usuario_id": str(usuario_id),
+            "items": [
+                {"venta_item_id": str(f.id), "cantidad": str(f.cantidad)} for f in filas
+            ],
+        },
+        session=session,
+    )
+
+
+def mover_lineas(
+    session: Session,
+    *,
+    venta_id: uuid.UUID,
+    venta_item_ids: list[uuid.UUID],
+    usuario_id: uuid.UUID,
+    destino_venta_id: uuid.UUID | None = None,
+    destino_mesa_id: uuid.UUID | None = None,
+    destino_comensales: int | None = None,
+    grupo_cobro: int | None = None,
+) -> tuple[Venta, Venta]:
+    """Reasigna líneas de una orden YA enviada a otro destino (RN-COM-043):
+    otra orden abierta, una mesa libre, o la misma orden con otra cuenta —
+    que es como el PDV implementa "cobrar seleccionados" (RN-COM-018).
+
+    Mover no es anular: el insumo ya salió del almacén cuando la línea se
+    creó y el plato sigue existiendo, solo cambia de cuenta — a propósito
+    **no** se publica ningún evento de `inventory`. Tampoco genera un
+    asiento de reclasificación: origen y destino asientan contra las mismas
+    cuentas (`regla_asiento` es una por empresa+evento), así que el efecto
+    neto en el libro es cero; solo `referencia_origen` queda desalineado por
+    venta, aceptado como deuda (ver ADR-069).
+
+    A diferencia de `anular_lineas`, no exige PIN de supervisor: el producto
+    sigue existiendo en alguna orden que se va a pagar o a anular, y anular
+    sí pide firma. El rastro de quién movió qué queda en `audit_log` (dos
+    veces, una por venta) y en `sales.lineas_movidas`.
+
+    No preparado dos veces: `estado_preparacion` y `etapa_kds` viajan con la
+    línea sin tocarse, así que KDS ve lo ya cocinado como ya cocinado en la
+    orden destino.
+    """
+    if not venta_item_ids:
+        raise ReglaNegocio("indica al menos una línea a mover")
+    if destino_venta_id is not None and destino_mesa_id is not None:
+        raise ReglaNegocio(
+            "indica una sola orden destino: otra venta o una mesa, no ambas"
+        )
+
+    venta_repo = VentaRepo(session)
+    origen = venta_repo.get(venta_id)
+    if origen is None:
+        raise NoEncontrado("venta no encontrada")
+    if origen.estado != "orden":
+        raise Conflicto(f"la venta está {origen.estado}: no admite mover líneas")
+
+    filas = _filas_a_mover(venta_repo, venta_id, venta_item_ids)
+    grupos_origen = sorted({f.grupo_cobro for f in filas})
+    pago_repo = PagoRepo(session)
+    for g in grupos_origen:
+        _exigir_cuenta_sin_pagos(pago_repo, venta_id, g)
+
+    destino, nuevo_grupo = _resolver_destino_traslado(
+        session,
+        origen,
+        venta_id=venta_id,
+        destino_venta_id=destino_venta_id,
+        destino_mesa_id=destino_mesa_id,
+        destino_comensales=destino_comensales,
+        grupo_cobro=grupo_cobro,
+    )
+
+    for fila in filas:
+        fila.venta_id = destino.id
+        fila.grupo_cobro = nuevo_grupo
+    session.flush()
+
+    origen.total = total_a_cobrar(session, origen)
+    if destino is not origen and not venta_repo.items(venta_id):
+        # Sin líneas no queda orden que preparar ni mesa que ocupar.
+        origen.estado = "anulada"
+    if destino is not origen:
+        destino.total = total_a_cobrar(session, destino)
+
+    _registrar_traslado(
+        session,
+        origen=origen,
+        destino=destino,
+        filas=filas,
+        grupos_origen=grupos_origen,
+        nuevo_grupo=nuevo_grupo,
+        usuario_id=usuario_id,
+    )
+    return origen, destino
 
 
 def lineas_en_ventana(
