@@ -58,14 +58,14 @@ test("en caja, el largo del documento decide el padrón antes de gastar cuota", 
   // gastaría una cuota para prellenar con los datos de otra persona.
   await documento.fill("206100777");
   await buscar.click();
-  await expect(dialogo(page).getByRole("status")).toContainText(/8 dígitos/);
+  await expect(dialogo(page).getByTestId("aviso-consulta-documento")).toContainText(/8 dígitos/);
 
   // Con un largo válido sí sale, y sin proveedor el aviso lo dice donde se
   // está tecleando en vez de romper la pantalla.
   await documento.fill("72471723");
   await buscar.click();
-  await expect(dialogo(page).getByRole("status")).not.toBeEmpty();
-  await expect(dialogo(page).getByRole("status")).not.toContainText(/8 dígitos/);
+  await expect(dialogo(page).getByTestId("aviso-consulta-documento")).not.toBeEmpty();
+  await expect(dialogo(page).getByTestId("aviso-consulta-documento")).not.toContainText(/8 dígitos/);
 
   // Y el alta sigue tecleando, que es el punto de "prellena, no decide"
   // (ADR-005): el cliente se guarda igual.
