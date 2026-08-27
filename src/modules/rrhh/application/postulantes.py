@@ -209,6 +209,7 @@ def contratar_postulante(
     afp_nombre: str | None = None,
     registra_asistencia: bool = True,
     jornada_horas_semana: Decimal | None = None,
+    sucursal_id: uuid.UUID | None = None,
 ) -> Postulante:
     """Cierra la selección: crea la `persona` (o reusa la del ex-trabajador
     recontratado) y su `trabajador`, y deja la ficha en `contratado`."""
@@ -263,6 +264,7 @@ def contratar_postulante(
         afp_nombre=afp_nombre,
         registra_asistencia=registra_asistencia,
         jornada_horas_semana=jornada_horas_semana,
+        sucursal_id=sucursal_id,
     )
 
     postulante.persona_id = persona.id

@@ -27,6 +27,7 @@ import {
   DialogoCobro,
   DialogoConsumoPersonal,
   Dialogo,
+  DialogoMover,
   DialogoProducto,
   DialogoTipo,
 } from "./dialogos";
@@ -36,6 +37,7 @@ import {
   totalBorrador,
   totalLinea,
   type Borrador,
+  type DestinoMover,
   type LineaBorrador,
 } from "./tipos";
 import { useCajaPdv } from "./use-caja-pdv";
@@ -200,7 +202,7 @@ export default function PdvCliente({ sucursalId, permisos, puntoVenta }: Props) 
     "catalogo",
   );
   const [dialogo, setDialogo] = useState<
-    "cliente" | "tipo" | "cobro" | "cierre" | "consumo" | null
+    "cliente" | "tipo" | "cobro" | "cierre" | "consumo" | "mover" | null
   >(null);
   const [lineaEnEdicion, setLineaEnEdicion] = useState<LineaBorrador | null>(null);
   const [cobradoAVer, setCobradoAVer] = useState<Venta | null>(null);
@@ -370,7 +372,16 @@ export default function PdvCliente({ sucursalId, permisos, puntoVenta }: Props) 
     setOcupado(true);
     try {
       const venta = await api.crearVenta(cuerpoVenta(activo));
-      parchar({ ventaId: venta.id, numeroOrden: venta.numero_orden });
+      // El id de cada línea pasa a ser el del `venta_item` real: quitar o
+      // mover una línea después de enviarla (RN-COM-020, RN-COM-043) manda
+      // ese id al servidor, no el uuid que el navegador le puso mientras
+      // el pedido era un borrador — mandar el de acá sería un 404.
+      const items = await api.itemsDeVenta(venta.id);
+      parchar({
+        ventaId: venta.id,
+        numeroOrden: venta.numero_orden,
+        lineas: items.map(lineaDesdeVentaItem),
+      });
       setSeleccion(new Set());
       notificar(`Orden #${venta.numero_orden} enviada a cocina`);
       datos.mesas.recargar();
@@ -388,18 +399,53 @@ export default function PdvCliente({ sucursalId, permisos, puntoVenta }: Props) 
     propina: number,
   ) => {
     if (!activo) return;
+    // Cobrar solo lo seleccionado es "separar la cuenta" (RN-COM-018): la
+    // selección se mueve a una cuenta nueva de la MISMA orden y se cobra
+    // solo esa (mismo mecanismo que "mover productos", RN-COM-043). Sin
+    // selección, o con todo seleccionado, se cobra la orden entera de
+    // siempre.
+    const seleccionParcial = seleccion.size > 0 && seleccion.size < activo.lineas.length;
+    if (seleccionParcial && !activo.ventaId) {
+      // El id de una línea de un borrador sin enviar es local al
+      // navegador: separar la cuenta exige la línea ya enviada, con su id
+      // real (igual que "mover productos").
+      notificar("Envía el pedido antes de cobrar solo lo seleccionado");
+      return;
+    }
     setOcupado(true);
     try {
       const { ventaId, numero } = await asegurarVenta(activo);
-      await registrarPagos(ventaId, pagos, doc, nombre);
+      let grupoCobro = 1;
+      if (seleccionParcial) {
+        const siguienteGrupo = Math.max(0, ...activo.lineas.map((l) => l.grupoCobro)) + 1;
+        await api.moverLineas(ventaId, {
+          venta_item_ids: [...seleccion],
+          grupo_cobro: siguienteGrupo,
+        });
+        grupoCobro = siguienteGrupo;
+      }
+      await registrarPagos(ventaId, pagos, doc, nombre, grupoCobro);
       if (propina > 0) await registrarPropina(numero, propina);
       notificar(
-        `Orden #${numero} cobrada · ${soles(totalBorrador(activo))} · ${
+        `Orden #${numero} cobrada · ${soles(totalACobrar(activo, seleccion))} · ${
           doc.length === 11 ? "factura" : "boleta"
         } emitida`,
       );
       setDialogo(null);
-      cerrarPedido(activo.id);
+      if (seleccionParcial) {
+        // El resto del pedido sigue abierto: solo se cobró esa cuenta.
+        const idsCobrados = seleccion;
+        setBorradores((bs) =>
+          bs.map((b) =>
+            b.id === activo.id
+              ? { ...b, lineas: b.lineas.filter((l) => !idsCobrados.has(l.id)) }
+              : b,
+          ),
+        );
+        setSeleccion(new Set());
+      } else {
+        cerrarPedido(activo.id);
+      }
       datos.mesas.recargar();
       datos.cobrados.recargar();
       datos.abiertas.recargar();
@@ -562,7 +608,11 @@ export default function PdvCliente({ sucursalId, permisos, puntoVenta }: Props) 
       setOcupado(true);
       try {
         const venta = await api.agregarLineas(activo.ventaId, [cuerpoLinea(l)]);
-        parchar({ lineas: [...activo.lineas, l] });
+        // Igual que al enviar: `agregarLineas` no devuelve el id que el
+        // servidor le puso a la línea nueva, así que se relee la orden
+        // completa en vez de seguir arrastrando el uuid local.
+        const items = await api.itemsDeVenta(activo.ventaId);
+        parchar({ lineas: items.map(lineaDesdeVentaItem) });
         setLineaEnEdicion(null);
         notificar(`Agregado a la orden #${venta.numero_orden}`);
         datos.mesas.recargar();
@@ -651,6 +701,56 @@ export default function PdvCliente({ sucursalId, permisos, puntoVenta }: Props) 
     }
   };
 
+  /** Mover los productos seleccionados a otra orden (RN-COM-043, ADR-071):
+   * otra mesa —libre u ocupada— o un pedido para llevar/delivery. Sin PIN de
+   * supervisor: el producto sigue existiendo en alguna orden abierta. */
+  const moverSeleccionados = async (destino: DestinoMover) => {
+    if (!activo?.ventaId || seleccion.size === 0) return;
+    setOcupado(true);
+    try {
+      const { destino: ventaDestino } = await api.moverLineas(activo.ventaId, {
+        venta_item_ids: [...seleccion],
+        ...("mesaId" in destino
+          ? { destino_mesa_id: destino.mesaId }
+          : { destino_venta_id: destino.ventaId }),
+      });
+      const idsMovidos = seleccion;
+      setSeleccion(new Set());
+      setDialogo(null);
+      notificar(`Movido a la orden #${ventaDestino.numero_orden}`);
+      // La pestaña origen pierde las líneas movidas; si otra pestaña ya
+      // tenía abierto el destino, se refresca con lo que el servidor diga
+      // — es la única fuente de verdad después de un traslado.
+      setBorradores((bs) =>
+        bs.map((b) =>
+          b.id === activo.id
+            ? { ...b, lineas: b.lineas.filter((l) => !idsMovidos.has(l.id)) }
+            : b,
+        ),
+      );
+      if (!activo.lineas.some((l) => !idsMovidos.has(l.id))) {
+        cerrarPedido(activo.id);
+      }
+      const pestanaDestino = borradores.find((b) => b.ventaId === ventaDestino.id);
+      if (pestanaDestino) {
+        const items = await api.itemsDeVenta(ventaDestino.id);
+        setBorradores((bs) =>
+          bs.map((b) =>
+            b.id === pestanaDestino.id
+              ? { ...b, lineas: items.map(lineaDesdeVentaItem) }
+              : b,
+          ),
+        );
+      }
+      datos.mesas.recargar();
+      datos.abiertas.recargar();
+    } catch (e) {
+      notificar(mensajeDe(e, "No se pudieron mover los productos"));
+    } finally {
+      setOcupado(false);
+    }
+  };
+
   const verOrdenAbierta = (venta: Venta) => {
     reabrirOrden({
       ventaId: venta.id,
@@ -722,6 +822,7 @@ export default function PdvCliente({ sucursalId, permisos, puntoVenta }: Props) 
           onLinea={setLineaEnEdicion}
           onAlternarSeleccion={(id) => setSeleccion(alternar(seleccion, id))}
           onLimpiarSeleccion={() => setSeleccion(new Set())}
+          onMover={() => setDialogo("mover")}
           onCliente={() => setDialogo("cliente")}
           onTipo={() => setDialogo("tipo")}
           onAnular={anularPedido}
@@ -810,6 +911,14 @@ export default function PdvCliente({ sucursalId, permisos, puntoVenta }: Props) 
           setDialogo(null);
         }}
       />
+      <DialogoMover
+        abierto={dialogo === "mover"}
+        borrador={activo}
+        mesas={datos.mesas.datos}
+        abiertas={datos.abiertas.datos}
+        onCerrar={() => setDialogo(null)}
+        onConfirmar={moverSeleccionados}
+      />
       <DialogoConsumoPersonal
         abierto={dialogo === "consumo"}
         ocupado={ocupado}
@@ -857,12 +966,14 @@ export default function PdvCliente({ sucursalId, permisos, puntoVenta }: Props) 
 }
 
 /** El receptor viaja con el pago que cierra la cuenta: es ese el que
- * dispara la emisión del comprobante. */
+ * dispara la emisión del comprobante. `grupoCobro` es 1 salvo que se esté
+ * cobrando una cuenta separada (RN-COM-018). */
 async function registrarPagos(
   ventaId: string,
   pagos: Array<{ medioId: string; monto: number }>,
   doc: string,
   nombre: string,
+  grupoCobro: number,
 ) {
   for (const [i, p] of pagos.entries()) {
     const ultimo = i === pagos.length - 1;
@@ -870,7 +981,7 @@ async function registrarPagos(
       medio_pago_id: p.medioId,
       monto: String(p.monto),
       idempotency_key: claveIdempotencia("pago"),
-      grupo_cobro: 1,
+      grupo_cobro: grupoCobro,
       receptor_num_doc: ultimo ? doc || null : null,
       receptor_nombre: ultimo ? nombre || null : null,
     });

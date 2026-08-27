@@ -123,6 +123,8 @@ export type MesaEnMapa = {
   numero: number;
   zona: string | null;
   capacidad: number | null;
+  pos_x: number;
+  pos_y: number;
   venta_id: string | null;
   numero_orden: number | null;
   comensales: number | null;
@@ -294,6 +296,23 @@ export type CotizacionDelivery = {
   aproximada: boolean;
   derivar_a_externo: boolean;
   motivo: string | null;
+};
+
+/** Cuerpo de "mover productos" / "cobrar seleccionados" (RN-COM-043,
+ * ADR-071). Un solo destino a la vez: otra orden ya abierta, una mesa
+ * libre, o ninguno de los dos —solo `grupo_cobro`— para separar la cuenta
+ * dentro de la misma orden. */
+export type MoverLineasIn = {
+  venta_item_ids: string[];
+  destino_venta_id?: string | null;
+  destino_mesa_id?: string | null;
+  destino_comensales?: number | null;
+  grupo_cobro?: number | null;
+};
+
+export type MoverLineasResultado = {
+  origen: Venta;
+  destino: Venta;
 };
 
 export type PagoNuevo = {
@@ -471,14 +490,29 @@ export const api = {
       cuerpo: { items },
     }),
 
+  /** Mover productos entre pedidos, o separar la cuenta del mismo pedido
+   * (RN-COM-043, ADR-071). Sin autorización: el producto sigue existiendo en
+   * alguna orden abierta, no se repone inventario ni se deshace un cobro. */
+  moverLineas: (ventaId: string, cuerpo: MoverLineasIn) =>
+    pedir<MoverLineasResultado>(`/sales/ventas/${ventaId}/mover-lineas`, {
+      metodo: "POST",
+      cuerpo,
+    }),
+
   registrarPago: (ventaId: string, cuerpo: PagoNuevo) =>
     pedir<{ id: string }>(`/sales/ventas/${ventaId}/pagos`, {
       metodo: "POST",
       cuerpo,
     }),
 
-  precuenta: (ventaId: string) =>
-    pedir<TicketTexto & { total: string }>(`/sales/ventas/${ventaId}/precuenta`),
+  /** `grupoCobro` pide la precuenta de una sola cuenta cuando la orden está
+   * dividida (RN-COM-018); sin él, la de la venta entera. */
+  precuenta: (ventaId: string, grupoCobro?: number) => {
+    const ruta = `/sales/ventas/${ventaId}/precuenta`;
+    return pedir<TicketTexto & { total: string }>(
+      grupoCobro != null ? `${ruta}?grupo_cobro=${grupoCobro}` : ruta,
+    );
+  },
 
   comprobante: (ventaId: string) =>
     pedir<{ id: string; tipo: string; serie: string; correlativo: number }>(

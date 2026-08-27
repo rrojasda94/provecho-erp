@@ -58,6 +58,11 @@ nadie pide. Si aparece la necesidad de una cuenta con vida propia (nombre,
 apertura y cierre independientes, transferencia entre mesas), esta decisión se
 revisa.
 
+*Enmendada el 2026-08-27 — apareció la transferencia entre mesas (mover
+productos entre pedidos) y no hizo falta revisar nada de lo anterior:
+`venta_item.venta_id` y `grupo_cobro` ya alcanzan para reasignar una línea a
+otra orden o a otra cuenta. Ver [ADR-071](ADR-071-mover-lineas-no-repone-inventario-ni-reclasifica-el-asiento.md).*
+
 **La clave de idempotencia del grupo 1 no cambia.** `clave_idempotencia()`
 devuelve `venta:{id}` para el grupo 1 y `venta:{id}:g{n}` para el resto: los
 comprobantes emitidos antes de este cambio siguen resolviendo idempotentes.

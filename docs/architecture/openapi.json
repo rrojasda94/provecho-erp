@@ -12336,6 +12336,7 @@
         "type": "object"
       },
       "MesaCreate": {
+        "description": "Sin `numero`: lo asigna el sistema — el salón se numera 1..n sin\nhuecos (RN-MDC-004). `pos_x`/`pos_y` son opcionales; sin celda, cae en\nla primera libre del plano.",
         "properties": {
           "capacidad": {
             "anyOf": [
@@ -12349,10 +12350,29 @@
             ],
             "title": "Capacidad"
           },
-          "numero": {
-            "minimum": 1.0,
-            "title": "Numero",
-            "type": "integer"
+          "pos_x": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pos X"
+          },
+          "pos_y": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pos Y"
           },
           "sucursal_id": {
             "format": "uuid",
@@ -12373,8 +12393,7 @@
           }
         },
         "required": [
-          "sucursal_id",
-          "numero"
+          "sucursal_id"
         ],
         "title": "MesaCreate",
         "type": "object"
@@ -12424,6 +12443,14 @@
             ],
             "title": "Numero Orden"
           },
+          "pos_x": {
+            "title": "Pos X",
+            "type": "integer"
+          },
+          "pos_y": {
+            "title": "Pos Y",
+            "type": "integer"
+          },
           "total": {
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Total",
@@ -12458,6 +12485,8 @@
           "numero",
           "zona",
           "capacidad",
+          "pos_x",
+          "pos_y",
           "venta_id",
           "numero_orden",
           "comensales",
@@ -12492,6 +12521,14 @@
             "title": "Numero",
             "type": "integer"
           },
+          "pos_x": {
+            "title": "Pos X",
+            "type": "integer"
+          },
+          "pos_y": {
+            "title": "Pos Y",
+            "type": "integer"
+          },
           "sucursal_id": {
             "format": "uuid",
             "title": "Sucursal Id",
@@ -12515,9 +12552,66 @@
           "numero",
           "zona",
           "capacidad",
+          "pos_x",
+          "pos_y",
           "activa"
         ],
         "title": "MesaOut",
+        "type": "object"
+      },
+      "MesaPatch": {
+        "description": "Nunca `numero`: no se edita. Campos ausentes no se tocan.",
+        "properties": {
+          "capacidad": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capacidad"
+          },
+          "pos_x": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pos X"
+          },
+          "pos_y": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pos Y"
+          },
+          "zona": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zona"
+          }
+        },
+        "title": "MesaPatch",
         "type": "object"
       },
       "MetricaCampanaOut": {
@@ -12695,6 +12789,89 @@
           "sucursal_id"
         ],
         "title": "MiembroOut",
+        "type": "object"
+      },
+      "MoverLineasCreate": {
+        "description": "Reasigna líneas de una orden ya enviada a otro destino (RN-COM-043):\notra orden abierta, una mesa libre, o la misma orden con otra cuenta —\nque es \"cobrar seleccionados\" en el PDV. Indicar como máximo uno de\n`destino_venta_id` / `destino_mesa_id`; sin ninguno de los dos, se\ninterpreta como separar la cuenta con `grupo_cobro`.\n\nSin `autorizacion`: mover no repone inventario ni deshace un cobro, el\nproducto sigue existiendo en alguna orden abierta (RN-COM-020 solo aplica\na quitar líneas).",
+        "properties": {
+          "destino_comensales": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destino Comensales"
+          },
+          "destino_mesa_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destino Mesa Id"
+          },
+          "destino_venta_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destino Venta Id"
+          },
+          "grupo_cobro": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grupo Cobro"
+          },
+          "venta_item_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Venta Item Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "venta_item_ids"
+        ],
+        "title": "MoverLineasCreate",
+        "type": "object"
+      },
+      "MoverLineasOut": {
+        "properties": {
+          "destino": {
+            "$ref": "#/components/schemas/VentaOut"
+          },
+          "origen": {
+            "$ref": "#/components/schemas/VentaOut"
+          }
+        },
+        "required": [
+          "origen",
+          "destino"
+        ],
+        "title": "MoverLineasOut",
         "type": "object"
       },
       "MovimientoCajaIn": {
@@ -17325,6 +17502,18 @@
               }
             ],
             "title": "Sistema Pensiones"
+          },
+          "sucursal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sucursal Id"
           },
           "tipo_documento": {
             "anyOf": [
@@ -24393,18 +24582,6 @@
           "tipo_vinculo": {
             "title": "Tipo Vinculo",
             "type": "string"
-          },
-          "usuario_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Usuario Id"
           }
         },
         "required": [
@@ -24527,7 +24704,7 @@
         "type": "object"
       },
       "TrabajadorUpdate": {
-        "description": "Campo ausente = no tocar.\n\n`sucursal_id` y `usuario_id` son la excepción: mandarlos en `null`\n**borran** el valor, porque quedarse sin local asignado —o sin cuenta— es\nun estado válido y no había otra forma de volver a él. Para el resto,\n`null` sigue siendo \"no tocar\".\n\n`usuario_id` faltaba acá y era la razón por la que nadie podía marcar en\nel pad de asistencia: `TrabajadorCreate` sí lo aceptaba, pero un\ntrabajador ya dado de alta no tenía ninguna forma de recibir su cuenta, y\n`pad_asistencia.usuario_que_firma` exige justamente ese campo para llegar\nal PIN.\n\n`estado` no admite `\"cesado\"`: el cese tiene su propio endpoint\n(`POST /trabajadores/{id}/cesar`) porque además de cambiar el estado\nfija la fecha de cese y publica el evento del que cuelga la liquidación.\nLlegar a `cesado` por este PATCH dejaba un trabajador cesado sin fecha\ny sin que nadie se enterara.",
+        "description": "Campo ausente = no tocar.\n\n`sucursal_id` es la excepción: mandarlo en `null` **borra** el valor,\nporque quedarse sin local asignado es un estado válido y no había otra\nforma de volver a él. Para el resto, `null` sigue siendo \"no tocar\".\n\nLa cuenta con la que este trabajador marca en el pad ya no se toca acá\n(ADR-070): es la del `usuario` cuya `persona_id` es la del trabajador, y\nse vincula desde Usuarios, no desde este endpoint. Antes vivía en\n`usuario_id` — dos columnas para el mismo vínculo, sin sincronizar entre\nsí, era justo el bug que ADR-070 cierra.\n\n`estado` no admite `\"cesado\"`: el cese tiene su propio endpoint\n(`POST /trabajadores/{id}/cesar`) porque además de cambiar el estado\nfija la fecha de cese y publica el evento del que cuelga la liquidación.\nLlegar a `cesado` por este PATCH dejaba un trabajador cesado sin fecha\ny sin que nadie se enterara.",
         "properties": {
           "area": {
             "anyOf": [
@@ -24597,18 +24774,6 @@
               }
             ],
             "title": "Sucursal Id"
-          },
-          "usuario_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Usuario Id"
           }
         },
         "title": "TrabajadorUpdate",
@@ -25504,6 +25669,16 @@
               }
             ],
             "title": "Nombre Display"
+          },
+          "persona": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PersonaBusquedaOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "persona_id": {
             "anyOf": [
@@ -46540,6 +46715,7 @@
         ]
       },
       "post": {
+        "description": "El número lo asigna el sistema (RN-MDC-004): no se recibe del\ncliente, así que no hay forma de pedir \"la mesa 7\" fuera de orden.",
         "operationId": "crear_mesa_api_v1_sales_mesas_post",
         "requestBody": {
           "content": {
@@ -46654,9 +46830,10 @@
         ]
       }
     },
-    "/api/v1/sales/mesas/{mesa_id}/desactivar": {
-      "post": {
-        "operationId": "desactivar_mesa_api_v1_sales_mesas__mesa_id__desactivar_post",
+    "/api/v1/sales/mesas/{mesa_id}": {
+      "delete": {
+        "description": "Retira la mesa de número más alto (RN-MDC-006). Reemplaza al viejo\n`POST /mesas/{id}/desactivar`, que no validaba `exigir_sucursal` — un\nsupervisor podía tocar la mesa de otra empresa por id.",
+        "operationId": "eliminar_mesa_api_v1_sales_mesas__mesa_id__delete",
         "parameters": [
           {
             "in": "path",
@@ -46669,6 +46846,55 @@
             }
           }
         ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Eliminar Mesa",
+        "tags": [
+          "sales"
+        ]
+      },
+      "patch": {
+        "operationId": "editar_mesa_api_v1_sales_mesas__mesa_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "mesa_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Mesa Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MesaPatch"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "content": {
@@ -46696,7 +46922,7 @@
             "HTTPBearer": []
           }
         ],
-        "summary": "Desactivar Mesa",
+        "summary": "Editar Mesa",
         "tags": [
           "sales"
         ]
@@ -48703,6 +48929,65 @@
           }
         ],
         "summary": "Agregar Lineas",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/ventas/{venta_id}/mover-lineas": {
+      "post": {
+        "description": "Reasigna líneas de una orden ya enviada a otro destino (RN-COM-043):\notra orden abierta, una mesa libre, o la misma orden con otra cuenta —\nque es \"cobrar seleccionados\" en el PDV.\n\nMismo permiso que crear la orden y sin autorización de supervisor: el\nproducto sigue existiendo en alguna orden abierta, no se repone\ninventario ni se deshace ningún cobro. Lo que sí sigue pidiendo firma es\nquitar una línea, porque esa repone insumo (RN-COM-020).",
+        "operationId": "mover_lineas_api_v1_sales_ventas__venta_id__mover_lineas_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "venta_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Venta Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoverLineasCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MoverLineasOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Mover Lineas",
         "tags": [
           "sales"
         ]

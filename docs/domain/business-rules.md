@@ -119,6 +119,15 @@ de su módulo y se prueban de forma aislada.
   dirección, medio de pago), variable según la modalidad.
 - **RN-MDC-003** El precio de un producto comercial o servicio puede
   variar según la modalidad de consumo.
+- **RN-MDC-004** Las mesas de un salón se numeran de forma correlativa
+  del 1 al n, sin huecos y sin números negativos; el número lo asigna
+  el sistema al crear la mesa (siguiente disponible) y no se puede
+  editar.
+- **RN-MDC-005** Una mesa no se edita ni se retira mientras tenga una
+  orden abierta.
+- **RN-MDC-006** Solo se puede retirar la mesa de número más alto del
+  salón — retirar cualquier otra reescribiría a qué mesa apuntó una
+  venta ya cerrada, o dejaría un hueco en la numeración.
 
 ## Carrito
 
@@ -638,7 +647,10 @@ de su módulo y se prueban de forma aislada.
   **PIN del propio trabajador**: nadie marca por otro. El pad se abre con la
   cuenta de servicio de la sucursal, que por sí sola no registra ninguna
   marcación, y solo muestra a quienes tienen su centro de labores ahí. El PIN
-  va contra el mismo lockout que el login (ADR-065).
+  va contra el mismo lockout que el login (ADR-065). La cuenta que firma es
+  la del `usuario` cuya `persona_id` es la del trabajador — se vincula desde
+  Usuarios → Cuentas, no desde el trabajador (ADR-070) — y una persona tiene
+  a lo más una cuenta viva.
 - **RN-RRHH-021** Un trabajador que marcó entrada y no marca salida antes de
   la `hora_limite_salida` de su turno recibe un aviso, y con él el encargado
   del local y RRHH. El aviso **no cierra la jornada**: la marcación sigue
@@ -1350,7 +1362,11 @@ producción se hace en cocinas de sucursal. Ver
   sus propios pagos, puede tener un receptor distinto y **emite su propio
   comprobante**. La venta pasa a `estado=pagada` recién cuando ninguna
   cuenta queda con saldo. Si no se selecciona nada, se cobra la orden
-  completa como una sola cuenta.
+  completa como una sola cuenta. *Enmendada el 2026-08-27 — la selección se
+  vuelve cuenta separada llamando a "mover" (RN-COM-043) con la nueva
+  cuenta, no con un campo que se manda al crear la línea: separar la
+  cuenta pasa a ser una acción del cobro, no una decisión que había que
+  tomar al pedir.*
 
 - **RN-COM-019** La **precuenta** es un documento **no fiscal**: no tiene
   serie ni correlativo, no se envía a SUNAT y no cambia el estado de la
@@ -1547,6 +1563,19 @@ producción se hace en cocinas de sucursal. Ver
   medida —esa sigue en dos decimales, son kilómetros y no plata—. Consecuencia
   aceptada: una tarifa que dé menos de S/ 0.25 cobra cero; para eso la tarifa
   está mal configurada, no el redondeo.
+- **RN-COM-043** Una línea de una orden **ya enviada a cocina** se puede
+  **mover** a otra orden abierta, a una mesa libre, o a otra cuenta de la
+  misma orden — así el PDV resuelve un producto cargado en la mesa
+  equivocada y "cobrar seleccionados" (dividir la cuenta, RN-COM-018, en el
+  momento del cobro y no solo al tomar el pedido). El cajero lo hace **sin**
+  autorización de supervisor: el producto sigue existiendo en alguna orden
+  que se va a pagar o a anular, y anular sí exige firma (RN-COM-020). Mover
+  arrastra siempre sus extras (RN-COM-021) — nunca uno suelto — y no admite
+  una cuenta que ya tenga pagos confirmados (eso es nota de crédito,
+  RN-CPP-009). No aplica a un pedido que todavía no se envió: ese se corrige
+  en el propio punto de venta, borrando la línea. Mover **no repone
+  inventario** (ADR-071): el insumo ya salió del almacén y el plato sigue
+  existiendo, solo cambia de cuenta.
 
 ## Cumplimiento de pedido
 
@@ -1576,7 +1605,10 @@ preparación, despacho y entrega en las tres modalidades.
 - **RN-CUP-003** El estado de preparación es único por ítem de venta y es
   la fuente de verdad del avance. Una pantalla KDS es un filtro sobre ese
   estado, nunca una copia — dos pantallas jamás muestran avances distintos
-  del mismo ítem.
+  del mismo ítem. *Enmendada el 2026-08-27 — mover un ítem entre órdenes
+  (RN-COM-043) cambia su `venta_id`, no su estado: el plato conserva su
+  avance de preparación al cambiar de pedido, y la tarjeta pasa a la cola
+  del pedido destino en el siguiente refresco (ADR-071).*
 - **RN-CUP-004** Ningún pedido se entrega sin verificar el pedido completo
   contra la comanda: control de salida obligatorio, responsabilidad de
   quien despacha.

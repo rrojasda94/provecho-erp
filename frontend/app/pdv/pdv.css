@@ -303,9 +303,13 @@
 }
 
 .pdv-mesas-grid {
+    /* Croquis del salón: cada mesa se ubica por `gridColumn`/`gridRow`
+       (celda `pos_x`/`pos_y`, base 0) en vez de fluir. */
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
+    grid-template-columns: repeat(12, minmax(4.5rem, 1fr));
+    grid-auto-rows: 6rem;
     gap: 0.625rem;
+    overflow-x: auto;
 }
 
 .pdv-mesa {

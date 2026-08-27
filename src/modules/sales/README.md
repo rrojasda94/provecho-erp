@@ -39,11 +39,14 @@ al emitir.
 cuatro huecos que el punto de venta necesitaba y el modelo no daba.
 
 - `mesa` (`sucursal_id`, `numero` único por sucursal, `zona`, `capacidad`,
-  `activa`) + `venta.mesa_id` / `venta.comensales`. La mesa **no guarda
-  ocupación**: está ocupada si tiene una venta en `orden`. El mapa
+  `pos_x`/`pos_y` — celda del plano, únicos por sucursal —, `activa`) +
+  `venta.mesa_id` / `venta.comensales`. La mesa **no guarda ocupación**:
+  está ocupada si tiene una venta en `orden`. El mapa
   (`GET /sales/mesas/mapa`) es lectura derivada.
   `venta.referencia_atencion` **se conserva** como texto libre para
-  takeout/delivery ("Carlos", "Rappi #1042").
+  takeout/delivery ("Carlos", "Rappi #1042"). El CRUD completo (numeración
+  automática, edición, retiro y plano) es de ADR-069 — ver
+  «Mesas del salón» más abajo.
 - `grupo_cobro` (entero, default 1) en `venta_item`, `pago` y
   `comprobante` (RN-COM-018): una orden se divide en cuentas, cada una con
   sus pagos y **su propio comprobante**. La venta pasa a `pagada` recién
@@ -189,6 +192,17 @@ cuatro huecos que el punto de venta necesitaba y el modelo no daba.
   motivo; publica `sales.lineas_anuladas` → inventory repone. Quitar todas
   anula la orden. Antes de enviar, el pedido vive en el PDV y no pasa
   por acá.
+- **Mover líneas entre órdenes** (RN-COM-043, ADR-071):
+  `POST /ventas/{id}/mover-lineas` reasigna líneas ya enviadas a otra orden
+  abierta (`destino_venta_id`), a una mesa libre (`destino_mesa_id`), o a
+  otra cuenta de la misma orden (solo `grupo_cobro` — así el PDV implementa
+  "cobrar seleccionados"). Mismo permiso que crear (`sales.crear`), **sin**
+  autorización de supervisor: el producto sigue existiendo en alguna orden
+  abierta. No repone ni descuenta inventario — el insumo no se movió del
+  almacén — y no genera asiento: origen y destino asientan contra las mismas
+  cuentas. `estado_preparacion`/`etapa_kds` viajan con la línea sin tocarse.
+  Arrastra extras siempre completos y rechaza mover una cuenta con pagos ya
+  confirmados (eso es nota de crédito). Publica `sales.lineas_movidas`.
 - **Precuenta** (RN-COM-019): `GET /ventas/{id}/precuenta`, documento **no
   fiscal**, opcionalmente por cuenta. No cambia el estado ni se audita.
   Texto de 48 columnas + membrete, igual que la comanda (ADR-067).
@@ -889,6 +903,53 @@ Corregir una serie **no** reescribe lo ya emitido: `comprobante.serie` es una
 copia congelada al emitir, y el correlativo nuevo arranca en el máximo de la
 serie nueva. Lo que no se permite es mudar una caja de sucursal — sus
 comprobantes, aperturas y cierres cuelgan de ese local.
+
+## Mesas del salón (implementado 2026-08-27, ADR-069)
+
+ADR-018 creó `mesa` con alta manual y sin baja de verdad: el número lo
+mandaba el cliente, no había `PATCH`, y la única "baja" desactivaba sin
+mirar si la mesa tenía historia. Las únicas mesas que existían eran las
+doce del seeder de demo — una sucursal nueva se quedaba con el PDV diciendo
+"esta sucursal no tiene mesas configuradas todavía" sin ninguna salida.
+
+| Método | Ruta | Permiso |
+|--------|------|---------|
+| POST | `/mesas` | `sales.gestionar_mesas` |
+| PATCH | `/mesas/{id}` | `sales.gestionar_mesas` |
+| DELETE | `/mesas/{id}` | `sales.gestionar_mesas` |
+| GET | `/mesas?sucursal_id=` | `sales.leer` |
+| GET | `/mesas/mapa?sucursal_id=&fecha=` | `sales.leer` |
+
+`DELETE` reemplaza el viejo `POST /mesas/{id}/desactivar`: esa ruta no tenía
+llamadores en `frontend/` y era la única de las cuatro sin
+`tenant.exigir_sucursal` — un supervisor podía tocar la mesa de otra empresa
+por id. La nueva pasa por `scope.exigir_mesa`.
+
+- **El número lo asigna el sistema** (RN-MDC-004): `crear_mesa` ya no recibe
+  `numero`, calcula `max(activas) + 1`. El salón se numera 1..n sin huecos
+  por construcción; no se edita nunca.
+- **Solo se retira la mesa de número más alto** (RN-MDC-006) → 409 con el
+  número que hay que retirar primero. Renumerar el resto reescribiría a qué
+  mesa apuntó una venta ya cerrada; dejar un hueco rompería el 1..n pedido.
+- **Ni editar ni retirar proceden con una orden abierta** (RN-MDC-005),
+  sin importar la fecha — a diferencia del control original de ADR-018, que
+  solo miraba las órdenes del día.
+- **Una mesa sin ventas se borra de verdad; una con ventas queda
+  `activa=False`**, conservando número y celda: la próxima mesa que se crea
+  con ese número la reactiva ahí mismo en vez de insertar una fila (evita
+  chocar contra `uq_mesa_sucursal_numero`).
+- **El plano es una grilla de `rules.MESA_COLUMNAS = 12` celdas**
+  (`pos_x`/`pos_y`, únicos por sucursal), no coordenadas en píxeles. El mapa
+  del PDV y la pantalla de administración (`/ventas/mesas`) pintan la misma
+  grilla vía `gridColumn`/`gridRow` en CSS.
+- **`mesa.deleted_at` se quitó**: `SoftDeleteMixin` no tenía ninguna
+  escritura desde que existe `mesa` — el borrado siempre fue `activa=False`,
+  así que era una segunda fuente de verdad muerta.
+
+El ranking de qué mesa prefiere la gente vive en el catálogo de reportes
+(ADR-024): `queries_publicas.mesas_preferidas`, con el mismo criterio de
+"ingreso real" (`_ventas_en_rango`) que el resto de reportes de venta, para
+que no contradiga a "ventas por sucursal" del mismo rango.
 
 ## Cupón de promoción y landing pública (implementado 2026-08-24, ADR-061)
 

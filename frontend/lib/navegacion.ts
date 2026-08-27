@@ -92,6 +92,9 @@ export const SUBMENUS: Record<string, ItemSubmenu[]> = {
   ventas: [
     { label: "Jornada", href: "/ventas" },
     { label: "Clientes", href: "/ventas/clientes" },
+    // Configurar el salón, no la identidad fiscal del local — eso es
+    // "Puntos de venta" en Organización (ADR-059).
+    { label: "Mesas", href: "/ventas/mesas" },
     { label: "Abrir el PDV", href: "/pdv" },
   ],
 };

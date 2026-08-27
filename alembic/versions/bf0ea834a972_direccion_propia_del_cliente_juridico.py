@@ -15,7 +15,7 @@ Todo nullable, sin backfill: un geocode masivo se cobra por registro, mismo
 criterio que ADR-053.
 
 Revision ID: bf0ea834a972
-Revises: c4d17b93e0af
+Revises: d3f8a2c1e947
 Create Date: 2026-08-27
 
 """
@@ -25,7 +25,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = 'bf0ea834a972'
-down_revision: str | None = 'c4d17b93e0af'
+down_revision: str | None = 'd3f8a2c1e947'
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

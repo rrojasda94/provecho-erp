@@ -2,17 +2,25 @@
 
 Distinto de `usuario` (identidad de login): un trabajador puede o no
 tener usuario, y no todo usuario es trabajador (ej. agente_ia).
+
+`usuario_id` NO es columna propia (ADR-070): se deriva de `persona_id`. La
+cuenta de un trabajador es la del `usuario` cuya `persona_id` es la suya —
+una sola arista, vinculada desde Usuarios. Antes había dos columnas
+(`usuario.persona_id` y `trabajador.usuario_id`) que nadie sincronizaba:
+vincular la persona desde Usuarios no habilitaba el pad de asistencia, que
+solo leía esta columna.
 """
 
 import uuid
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import Boolean, Enum, ForeignKey, Numeric, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import Boolean, Enum, ForeignKey, Numeric, String, select
+from sqlalchemy.orm import Mapped, column_property, declared_attr, mapped_column
 
 from src.core.database import Base
 from src.core.model_base import SoftDeleteMixin, TimestampMixin, UuidPkMixin
+from src.modules.users.infrastructure.models import Usuario
 
 
 class Trabajador(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin):
@@ -26,9 +34,28 @@ class Trabajador(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin):
     sucursal_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("sucursal.id"), nullable=True
     )
-    usuario_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("usuario.id"), nullable=True
-    )
+
+    # Derivado, no columna (ADR-070): la cuenta con la que este trabajador
+    # marca en el pad es la del `usuario` cuya `persona_id` coincide con la
+    # suya. Subconsulta con LIMIT 1 y no `relationship(viewonly=True,
+    # lazy="joined")` a propósito: con dos usuarios sobre una persona (que el
+    # índice único evita, pero un dato viejo podría tener) el joined eager
+    # load duplica la fila padre en silencio y `paginar` contaría de más.
+    # Una persona puede tener más de una fila `trabajador` (recontratación:
+    # una cesada + una activa) — las dos comparten esta misma cuenta.
+    @declared_attr
+    def usuario_id(cls) -> Mapped[uuid.UUID | None]:
+        return column_property(
+            select(Usuario.id)
+            .where(
+                Usuario.persona_id == cls.persona_id,
+                Usuario.deleted_at.is_(None),
+            )
+            .limit(1)
+            .correlate_except(Usuario)
+            .scalar_subquery()
+        )
+
     cargo: Mapped[str] = mapped_column(String(100))
     area: Mapped[str] = mapped_column(String(100))
     tipo_vinculo: Mapped[str] = mapped_column(

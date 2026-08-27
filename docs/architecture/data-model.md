@@ -223,7 +223,11 @@ erDiagram
   contratar un `trabajador`, Compras al dar de alta un proveedor
   `natural`) sin exigirles el permiso de administración completo.
 - **usuario**: username, pin_hash (Argon2id), persona_id (nullable — NULL
-  si `agente_ia`), nombre_display (fallback para agente_ia), email, tipo
+  si `agente_ia`; única entre las cuentas vivas —
+  `uq_usuario_persona_viva` — una persona tiene a lo más una cuenta,
+  ADR-070: es la **única** arista cuenta↔trabajador, `rrhh.trabajador.
+  usuario_id` se deriva de esta columna), nombre_display (fallback para
+  agente_ia), email, tipo
   (`humano` | `agente_ia`), activo, debe_cambiar_pin (el PIN vigente lo puso
   un reseteo, así que lo sabe alguien más: la cuenta no puede hacer nada
   hasta elegir otro — ADR-041).
@@ -854,13 +858,20 @@ Solicitud.
   había prometido en una campaña. **No autoriza a que el motor de promociones
   condicionales reuse estas columnas**: eso sigue prohibido (ADR-018 →
   «frontera explícita»), porque ahí no interviene nadie.
-- **mesa** (ADR-018): sucursal_id, numero (único por sucursal), zona
-  (`Salón`, `Terraza`, `Barra`... libre), capacidad (nullable), activa.
+- **mesa** (ADR-018, ampliada ADR-069): sucursal_id, numero (único por
+  sucursal), zona (`Salón`, `Terraza`, `Barra`... libre), capacidad
+  (nullable), pos_x/pos_y (celda del plano, únicos por sucursal), activa.
   Vive en `sales` y no en `users` porque quien le da sentido es la toma de
   pedido. **No guarda estado de ocupación**: una mesa está ocupada si tiene
   una venta en `orden`; el mapa del salón es una lectura derivada, nunca un
   campo. Dos fuentes de verdad para el mismo hecho se desincronizan apenas
-  alguien cobre desde otra caja.
+  alguien cobre desde otra caja. **El número lo asigna el sistema**
+  (RN-MDC-004): 1..n sin huecos, nunca editable; solo se retira la mesa de
+  número más alto (RN-MDC-006). Sin `deleted_at`: una mesa sin ventas se
+  borra de verdad, una con ventas queda `activa=False` — dos fuentes de
+  verdad para el mismo borrado tenían el mismo riesgo que la ocupación.
+  `pos_x`/`pos_y` son la celda de una grilla de 12 columnas
+  (`rules.MESA_COLUMNAS`), no coordenadas en píxeles.
 - **producto_comercial_extra** (ADR-018): producto_comercial_id, extra_id
   (también un `producto_comercial`, con `es_extra=True`), maximo (tope de
   unidades del extra en una línea, NULL = sin tope), **grupo_id** (ADR-023,
@@ -1304,7 +1315,10 @@ un trabajador puede o no tener usuario, y no todo usuario es trabajador
 (tenant) y se archivan/resguardan por el área correspondiente.
 
 - **trabajador**: empresa_id, persona_id (datos personales — nombres,
-  documento, domicilio, etc.), usuario_id (opcional), sucursal_id (opcional —
+  documento, domicilio, etc.), usuario_id — **derivado, no columna propia**
+  (ADR-070): es el `usuario` cuya `persona_id` coincide con la de este
+  trabajador; se vincula desde `usuario.persona_id` (Usuarios → Cuentas),
+  ver §2. sucursal_id (opcional —
   **centro de labores**: dónde trabaja, migración `b6d29f10c47e`, ADR-062. No
   es el alcance de datos de su cuenta, que vive en `usuario_sucursal`; y tiene
   que ser una sucursal de su misma empresa, RN-RRHH-019), cargo, area,

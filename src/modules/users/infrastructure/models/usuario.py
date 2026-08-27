@@ -9,8 +9,8 @@ slice dedicado de auth (data-model.md §2).
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Index, Integer, String, text
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.core.database import Base
 from src.core.model_base import SoftDeleteMixin, TimestampMixin, UuidPkMixin
@@ -18,13 +18,32 @@ from src.core.model_base import SoftDeleteMixin, TimestampMixin, UuidPkMixin
 
 class Usuario(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "usuario"
+    __table_args__ = (
+        # Única entre las vivas: una persona tiene a lo más una cuenta con
+        # PIN. Es la arista de la que cuelga el pad de asistencia
+        # (`rrhh.trabajador.usuario_id` se deriva de esta columna, RN-RRHH-020,
+        # ADR-070) — sin la unicidad, dos cuentas sobre la misma persona
+        # dejarían al pad sin saber cuál firma.
+        Index(
+            "uq_usuario_persona_viva",
+            "persona_id",
+            unique=True,
+            sqlite_where=text("deleted_at IS NULL"),
+            postgresql_where=text("deleted_at IS NULL"),
+        ),
+    )
 
     username: Mapped[str] = mapped_column(String(50), unique=True)
     pin_hash: Mapped[str] = mapped_column(String(255))
-    # NULL si tipo=agente_ia.
+    # NULL si tipo=agente_ia. Única arista cuenta<->trabajador (ADR-070): el
+    # trabajador marca en el pad con el PIN de la cuenta cuya persona_id es
+    # la suya. `lazy` por defecto (no `joined`): cargar la persona en cada
+    # lectura de Usuario metería un LEFT JOIN en el camino más caliente del
+    # ERP (login, `require_permission`, el exportador del hub).
     persona_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("persona.id"), nullable=True
     )
+    persona: Mapped["Persona | None"] = relationship()  # noqa: F821
     # Fallback de nombre para agente_ia (sin persona).
     nombre_display: Mapped[str | None] = mapped_column(String(100), nullable=True)
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)

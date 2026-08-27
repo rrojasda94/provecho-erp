@@ -34,12 +34,14 @@ import {
   type PosVerificado,
   type Quitable,
   type VarianteDeCarta,
+  type Venta,
 } from "@/lib/pdv";
 import { calcularCobro, cobroBloqueado } from "@/lib/cobro";
 
 import {
   MOTIVOS_CONSUMO,
   type Borrador,
+  type DestinoMover,
   type LineaBorrador,
   type RestaEnLinea,
 } from "./tipos";
@@ -1259,6 +1261,92 @@ export function DialogoTipo({
  * El PIN no se guarda ni viaja con la venta: se canjea acá por una elevación
  * acotada al permiso, y lo que viaja es ese token — mismo trato que la
  * apertura de caja y el descuento manual. */
+/** A qué otra orden van los productos seleccionados (RN-COM-043): otra mesa
+ * —libre u ocupada— o un pedido para llevar/delivery ya en cocina. Reusa el
+ * mismo mapa de mesas de `DialogoTipo`; una mesa ocupada mueve a **esa**
+ * orden, una libre abre una orden nueva ahí.
+ *
+ * No ofrece separar la cuenta: eso es "cobrar seleccionados", una acción
+ * del cobro y no un destino que el cajero elija acá. */
+export function DialogoMover({
+  abierto,
+  borrador,
+  mesas,
+  abiertas,
+  onCerrar,
+  onConfirmar,
+}: {
+  abierto: boolean;
+  borrador: Borrador | null;
+  mesas: MesaEnMapa[];
+  abiertas: Venta[];
+  onCerrar: () => void;
+  onConfirmar: (destino: DestinoMover) => void;
+}) {
+  // La propia mesa del pedido no es un destino: es de donde salen los
+  // productos.
+  const otrasMesas = mesas.filter((m) => m.id !== borrador?.mesaId);
+  const otrosPedidos = abiertas.filter(
+    (v) => v.modalidad !== "mesa" && v.id !== borrador?.ventaId,
+  );
+  const sinDestinos = otrasMesas.length === 0 && otrosPedidos.length === 0;
+
+  return (
+    <Dialogo titulo="Mover productos" abierto={abierto} onCerrar={onCerrar}>
+      {sinDestinos ? (
+        <p className="pdv-nada">No hay otra mesa ni otro pedido abierto.</p>
+      ) : (
+        <>
+          {otrasMesas.length > 0 && (
+            <>
+              <p className="pdv-etiqueta">Mesas</p>
+              <div className="pdv-chips">
+                {otrasMesas.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    className={`pdv-chip ${m.venta_id ? "on" : ""}`}
+                    onClick={() =>
+                      onConfirmar(
+                        m.venta_id ? { ventaId: m.venta_id } : { mesaId: m.id },
+                      )
+                    }
+                  >
+                    {m.numero}
+                    {m.venta_id ? "" : " · libre"}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+          {otrosPedidos.length > 0 && (
+            <>
+              <p className="pdv-etiqueta">Para llevar / delivery</p>
+              <ul className="pdv-abiertas">
+                {otrosPedidos.map((v) => (
+                  <li key={v.id}>
+                    <button
+                      type="button"
+                      onClick={() => onConfirmar({ ventaId: v.id })}
+                    >
+                      <span className="pdv-cobrado-orden">#{v.numero_orden}</span>
+                      <span className="pdv-cobrado-modalidad">
+                        {v.modalidad === "delivery" ? "Delivery" : "Para llevar"}
+                        {v.referencia_atencion ? ` · ${v.referencia_atencion}` : ""}
+                      </span>
+                      <strong>{soles(v.total)}</strong>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </>
+      )}
+    </Dialogo>
+  );
+}
+
 export function DialogoConsumoPersonal({
   abierto,
   onCerrar,

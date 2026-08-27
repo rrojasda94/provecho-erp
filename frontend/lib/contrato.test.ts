@@ -314,6 +314,12 @@ const PDV: Caso[] = [
       autorizacion: "t",
     }),
   ),
+  caso("moverLineas", () =>
+    api.moverLineas(UUID, {
+      venta_item_ids: [UUID],
+      destino_venta_id: UUID,
+    }),
+  ),
   caso("anularVenta", () => api.anularVenta(UUID)),
   caso("registrarPago", () =>
     api.registrarPago(UUID, {

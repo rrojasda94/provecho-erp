@@ -58,6 +58,8 @@ def crear_usuario(
     # ponytail: PIN obligatorio también para agente_ia; su auth por token es a futuro.
     if not rules.pin_valido(pin):
         raise PinInvalido(f"El PIN debe ser {rules.PIN_LENGTH} dígitos")
+    if persona_id is not None:
+        _exigir_persona_asignable(session, persona_id)
     usuario = repo.add(
         Usuario(
             username=username,
@@ -75,14 +77,42 @@ def crear_usuario(
     return usuario
 
 
+
+# Campos que un `null` explícito borra de verdad, y no solo "no tocar".
+# Solo `persona_id`: desvincular a la persona es una operación real (deja al
+# trabajador sin PIN para el pad), y sin esto no había forma de volver a ese
+# estado (ADR-070). El router manda `exclude_unset`, así que omitir el campo
+# sigue significando "no tocar".
+_BORRABLES_USUARIO = frozenset({"persona_id"})
+
+
 def editar_usuario(
     session: Session, usuario_id: uuid.UUID, **campos
 ) -> Usuario:
     usuario = _get(UsuarioRepo(session).get(usuario_id), "usuario")
-    for campo in ("nombre_display", "email", "activo", "persona_id"):
-        if campo in campos and campos[campo] is not None:
-            setattr(usuario, campo, campos[campo])
+    if "persona_id" in campos and campos["persona_id"] is not None:
+        _exigir_persona_asignable(session, campos["persona_id"], usuario_id=usuario_id)
+    for campo, valor in campos.items():
+        if campo not in ("nombre_display", "email", "activo", "persona_id"):
+            continue
+        if valor is not None or campo in _BORRABLES_USUARIO:
+            setattr(usuario, campo, valor)
     return usuario
+
+
+def _exigir_persona_asignable(
+    session: Session, persona_id: uuid.UUID, *, usuario_id: uuid.UUID | None = None
+) -> None:
+    """La persona que se vincula a una cuenta tiene que existir y no tener
+    ya otra cuenta (ADR-070, `uq_usuario_persona_viva`): el pad de asistencia
+    resuelve el PIN por esta arista y una persona con dos cuentas lo dejaría
+    sin saber cuál firma."""
+    persona = PersonaRepo(session).get(persona_id)
+    if persona is None:
+        raise NoEncontrado(f"persona {persona_id} no encontrada")
+    otra = UsuarioRepo(session).get_by_persona(persona_id)
+    if otra is not None and otra.id != usuario_id:
+        raise Conflicto(f"esa persona ya tiene la cuenta '{otra.username}'")
 
 
 def cambiar_pin(session: Session, usuario_id: uuid.UUID, nuevo_pin: str) -> Usuario:
