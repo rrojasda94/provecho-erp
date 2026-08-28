@@ -22,6 +22,7 @@ from src.core.tenant import Tenant
 from src.modules.sales.api import schemas
 from src.modules.sales.application import atributos as atributos_uc
 from src.modules.sales.application import (
+    borradores,
     catalogo,
     clientes,
     comprobantes,
@@ -40,8 +41,14 @@ from src.modules.sales.application import (
     ventas,
 )
 from src.modules.sales.application import variantes as variantes_uc
-from src.modules.sales.application.scope import exigir_cliente, exigir_mesa, exigir_venta
+from src.modules.sales.application.scope import (
+    exigir_cliente,
+    exigir_mesa,
+    exigir_punto_venta,
+    exigir_venta,
+)
 from src.modules.sales.domain import rules
+from src.modules.sales.infrastructure.models import PedidoBorrador
 from src.modules.sales.infrastructure.repositories import (
     ComprobanteRepo,
     PuntoVentaRepo,
@@ -334,6 +341,70 @@ def aplicar_descuento(
     )
     session.commit()
     return venta
+
+
+# --- Borrador del PDV (ADR-074) ----------------------------------------------
+@router.put("/borradores/{borrador_id}", response_model=schemas.BorradorOut)
+def guardar_borrador(
+    borrador_id: uuid.UUID,
+    body: schemas.BorradorIn,
+    actor: Usuario = Depends(require_permission(CREAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Guarda el ticket a medio armar de una caja.
+
+    `PUT` con el id que el PDV ya le puso a la pestaña: el navegador guarda
+    con cada cambio y no puede llevar la cuenta de si esta pestaña llegó
+    antes al servidor. Repetirlo tras un corte de red deja el mismo estado.
+    """
+    punto = exigir_punto_venta(session, body.punto_venta_id, tenant)
+    borrador = borradores.guardar(
+        session,
+        borrador_id=borrador_id,
+        punto_venta_id=punto.id,
+        contenido=body.contenido,
+        usuario_id=actor.id,
+    )
+    session.commit()
+    return borrador
+
+
+@router.get("/borradores", response_model=list[schemas.BorradorOut])
+def listar_borradores(
+    punto_venta_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(CREAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Los borradores vivos de esa caja, en el orden en que se abrieron.
+
+    Por punto de venta y no por usuario: el borrador es de la caja, así que
+    el relevo de turno recupera el pedido que dejó el anterior (ADR-074).
+    """
+    exigir_punto_venta(session, punto_venta_id, tenant)
+    return borradores.listar(session, punto_venta_id=punto_venta_id)
+
+
+@router.delete("/borradores/{borrador_id}", status_code=status.HTTP_204_NO_CONTENT)
+def descartar_borrador(
+    borrador_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(CREAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Descarta el borrador. Idempotente: borrar dos veces no es un error.
+
+    El PDV lo llama al enviar el pedido y al cerrar la pestaña, dos caminos
+    que pueden cruzarse; un 404 acá solo serviría para pintar un aviso de
+    algo que ya está como se quería.
+    """
+    borrador = session.get(PedidoBorrador, borrador_id)
+    if borrador is not None:
+        tenant.exigir_sucursal(borrador.sucursal_id)
+        borradores.descartar(session, borrador_id)
+        session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 # --- Cupón de promoción (ADR-061) --------------------------------------------

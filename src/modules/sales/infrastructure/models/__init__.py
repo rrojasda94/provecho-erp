@@ -22,6 +22,7 @@ from src.modules.sales.infrastructure.models.lista_precio import ListaPrecio
 from src.modules.sales.infrastructure.models.medio_pago import MedioPago
 from src.modules.sales.infrastructure.models.mesa import Mesa
 from src.modules.sales.infrastructure.models.pago import Pago
+from src.modules.sales.infrastructure.models.pedido_borrador import PedidoBorrador
 from src.modules.sales.infrastructure.models.precio import Precio
 from src.modules.sales.infrastructure.models.producto_atributo_linea import (
     ProductoAtributoLinea,
@@ -60,6 +61,7 @@ __all__ = [
     "MedioPago",
     "Mesa",
     "Pago",
+    "PedidoBorrador",
     "Precio",
     "ProductoAtributoLinea",
     "ProductoAtributoValor",

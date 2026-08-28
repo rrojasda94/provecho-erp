@@ -1367,9 +1367,18 @@ def mover_lineas(
         grupo_cobro=grupo_cobro,
     )
 
+    # Al cambiar de orden, la línea entra a la cola del destino como una tanda
+    # propia (ADR-075): la del origen numeraba los envíos de OTRO pedido y
+    # chocaría con los de este. Una sola tanda para todo el lote — se movieron
+    # juntas y en cocina son la misma comanda.
+    tanda_destino = (
+        venta_repo.siguiente_tanda(destino.id) if destino is not origen else None
+    )
     for fila in filas:
         fila.venta_id = destino.id
         fila.grupo_cobro = nuevo_grupo
+        if tanda_destino is not None:
+            fila.tanda = tanda_destino
     session.flush()
 
     origen.total = total_a_cobrar(session, origen)
@@ -1438,6 +1447,10 @@ def agregar_lineas(
     entera: `items` ya era el detalle de la operación y `total` pasa a serlo
     también, así que inventory descuenta solo lo nuevo y accounting asienta
     solo el incremento. Republicar el total completo lo asentaría dos veces.
+
+    Todo lo de esta llamada entra al KDS como una **tanda propia** (ADR-075):
+    una comanda nueva en la cola de cocina, con su propio reloj, en vez de
+    colarse dentro de la pastilla del pedido original.
     """
     repo = VentaRepo(session)
     venta = repo.get(venta_id)
@@ -1460,14 +1473,20 @@ def agregar_lineas(
         dia=venta.fecha_orden,
         gratis=rules.es_consumo_personal(venta.tipo),
     )
+    # La tanda es de la operación, no de la línea: todo lo que el trabajador
+    # confirmó de un envío sale junto en la misma comanda. Se calcula antes de
+    # insertar nada, para que el `max` no se lea a sí mismo.
+    tanda = repo.siguiente_tanda(venta.id)
     for fila in filas:
         fila.venta_id = venta.id
+        fila.tanda = tanda
         session.add(fila)
     session.flush()
     for fila, hijos in zip(filas, extras_por_padre, strict=True):
         for hijo in hijos:
             hijo.venta_id = venta.id
             hijo.padre_venta_item_id = fila.id
+            hijo.tanda = tanda
             session.add(hijo)
     session.flush()
 

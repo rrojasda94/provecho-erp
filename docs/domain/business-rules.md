@@ -79,7 +79,9 @@ de su módulo y se prueban de forma aislada.
   la vía por la que un turno entra con la cuenta del anterior y toda la
   auditoría (RN-AUD-005) nombra a la persona equivocada. Un intento
   fallido de desbloqueo cuenta contra el mismo bloqueo de cuenta que el
-  ingreso.
+  ingreso. **También se bloquea a pedido**, con un botón en la pantalla:
+  cinco minutos no le sirven a quien se aleja de la caja y quiere cerrarla al
+  irse.
 
 ## Central de pedidos
 
@@ -1459,6 +1461,19 @@ producción se hace en cocinas de sucursal. Ver
     la forma de quitarla sin que nadie firme.
   - Después del cobro la cuenta está cerrada: lo que venga es otra orden, y
     deshacer lo cobrado es nota de crédito (RN-CPP-009).
+  - **El aumento se confirma, no se cuela** (ADR-075): marcar un producto
+    sobre una orden abierta lo deja pendiente en el ticket, y sale a cocina
+    recién cuando el trabajador toca "Enviar". Es el mismo gesto que el
+    primer envío —se marca, se revisa, se confirma—, y sin él no había forma
+    de armar un aumento de tres platos antes de mandarlo: cada toque salía
+    solo. Lo mismo del otro lado: quitar un producto es un acto explícito,
+    **con motivo tecleado**, no un descarte silencioso.
+  - **Cada envío es una comanda propia en cocina** (ADR-075). La orden es una
+    sola —la mesa tiene una cuenta— pero las pantallas de preparación
+    muestran una tarjeta por envío, con su propio reloj. Un pedido que creció
+    a las dos horas de abierto no puede verse igual que uno que espera desde
+    el principio, ni contarle el tiempo desde que la mesa se sentó. El
+    despacho sí ve el pedido entero: la bolsa se arma completa (RN-CUP-004).
 - **RN-COM-030** El **tipo de una receta se deriva, no se declara**: la que
   produce un artículo es una **subreceta** —se guarda para usarla en otra— y
   la que no, es un **producto de venta**. Guardarlo en una columna aparte

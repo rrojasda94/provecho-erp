@@ -47,12 +47,28 @@ export type LineaBorrador = {
    * valor ya viene sumado en `precio` (RN-COM-036). */
   valores: ValorEnLinea[];
   grupoCobro: number;
+  /**
+   * `false` mientras la línea solo existe en esta pantalla (ADR-075).
+   *
+   * Marcar un producto sobre una mesa ya abierta **no** lo manda a cocina:
+   * queda pendiente hasta que el trabajador confirma con "Enviar aumento",
+   * y recién entonces sale como una comanda nueva. Antes la línea viajaba
+   * al confirmar el diálogo del producto y aparecía al instante dentro de
+   * la pastilla del pedido original, así que el cocinero no distinguía lo
+   * que acababa de entrar de lo que llevaba media hora esperando.
+   */
+  enviada: boolean;
 };
 
 /**
- * Un pedido en curso. **Vive solo en el PDV** hasta que se envía a cocina o
- * se cobra: recién ahí nace la `venta` en la base (RN-COM-005). Por eso el
- * cajero puede tener varios abiertos a la vez sin ensuciar nada.
+ * Un pedido en curso. La `venta` en la base nace recién al enviarlo a cocina
+ * o cobrarlo (RN-COM-005), así que el cajero puede tener varios abiertos a
+ * la vez sin ensuciar nada.
+ *
+ * Desde ADR-074 el borrador **también se guarda en el servidor**, contra el
+ * punto de venta. No lo convierte en una venta: sigue sin descontar stock,
+ * sin asentar y sin número de orden. Lo que cambia es que recargar la
+ * página, quedarse sin batería o cambiar de turno ya no lo borra.
  */
 export type Borrador = {
   id: string;
@@ -114,6 +130,11 @@ export const totalBorrador = (b: Borrador): number =>
   esConsumoPersonal(b)
     ? 0
     : b.lineas.reduce((a, l) => a + totalLinea(l), 0) + (b.costoEntrega ?? 0);
+
+/** Lo que todavía no salió a cocina. En un pedido nuevo son todas sus
+ * líneas; en uno ya enviado, el aumento que espera confirmación. */
+export const lineasPendientes = (b: Borrador): LineaBorrador[] =>
+  b.lineas.filter((l) => !l.enviada);
 
 export const etiquetaTipo = (b: Borrador): string => {
   if (b.tipo === "mesa") return `Mesa ${b.mesaNumero ?? "?"}`;

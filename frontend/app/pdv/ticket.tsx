@@ -7,6 +7,7 @@ import { soles } from "@/lib/pdv";
 import {
   esConsumoPersonal,
   etiquetaTipo,
+  lineasPendientes,
   MOTIVOS_CONSUMO,
   totalBorrador,
   totalLinea,
@@ -350,18 +351,30 @@ function Pago({
 }: Props & { activo: Borrador }) {
   const enviado = Boolean(activo.ventaId);
   const vacio = activo.lineas.length === 0;
+  // Lo que espera confirmación. En un pedido ya enviado son el aumento
+  // (ADR-075): hasta que alguien toque "Enviar aumento" no hay nada nuevo en
+  // cocina, y por eso el botón vuelve a estar vivo en vez de quedarse en
+  // "Enviado" para siempre.
+  const pendientes = lineasPendientes(activo);
   // Un consumo de personal no se cobra (RN-COM-025): el botón no se
   // deshabilita, desaparece — y "Enviar" pasa a ser la acción principal.
   const consumo = esConsumoPersonal(activo);
+  const etiquetaEnvio = !enviado
+    ? "Enviar"
+    : pendientes.length > 0
+      ? `Enviar aumento (${pendientes.length})`
+      : "Enviado";
   return (
     <div className="pdv-pago">
       <button
         type="button"
-        className={consumo ? "pdv-boton-pri" : "pdv-boton-sec"}
-        disabled={ocupado || enviado || vacio}
+        className={
+          consumo || pendientes.length > 0 ? "pdv-boton-pri" : "pdv-boton-sec"
+        }
+        disabled={ocupado || vacio || pendientes.length === 0}
         onClick={onEnviar}
       >
-        {enviado ? "Enviado" : "Enviar"}
+        {etiquetaEnvio}
       </button>
       {!consumo && (
         <button
@@ -427,6 +440,11 @@ function Linea({
       <span className="pdv-linea-cant">{linea.cantidad}</span>
       <span className="pdv-linea-nombre">
         {linea.nombre}
+        {/* Sobre una mesa ya abierta hay líneas que ya están en cocina y
+            líneas que todavía no. Sin marcarlo, el mesero no tiene forma de
+            saber qué le falta confirmar y termina tocando "Enviar aumento"
+            a ciegas — o no tocándolo nunca. */}
+        {!linea.enviada && <em className="pdv-linea-pendiente">Sin enviar</em>}
         {linea.nota && <em>{linea.nota}</em>}
         {/* Qué mitades lleva la pizza. Van antes que los extras porque dicen
             QUÉ es el plato, no qué se le agregó — y sin esto dos MitadXMitad

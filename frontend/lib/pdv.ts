@@ -164,6 +164,10 @@ export type Venta = {
   total: string;
   referencia_atencion: string | null;
   mesa_id: string | null;
+  /** El número que ve el personal ("Mesa 7"). Va en el contrato porque el
+   * PDV reabre una cuenta desde la pestaña de cuentas abiertas, sin pasar
+   * por el mapa de salón: con solo el id, la pestaña decía "Mesa ?". */
+  mesa_numero: number | null;
   comensales: number | null;
   tipo: string;
   consumo_motivo: string | null;
@@ -389,6 +393,17 @@ export type MovimientoCajaNuevo = {
 };
 
 // --- Operaciones ------------------------------------------------------------
+/** Lo que el servidor devuelve de un borrador. `contenido` es opaco para
+ * el contrato: la forma la decide el PDV (ADR-074). */
+export type BorradorGuardado = {
+  id: string;
+  sucursal_id: string;
+  punto_venta_id: string;
+  usuario_id: string;
+  contenido: unknown;
+  actualizado_en: string;
+};
+
 export const api = {
   carta: (sucursalId: string, modalidad: string) =>
     pedir<ItemDeCarta[]>(
@@ -481,6 +496,27 @@ export const api = {
    * no sirve `login`, que la rotaría. 204 si el PIN es el correcto. */
   verificarPin: (pin: string) =>
     pedir<void>("/auth/verificar-pin", { metodo: "POST", cuerpo: { pin } }),
+
+  /** Guarda el ticket a medio armar contra el servidor (ADR-074).
+   *
+   * `PUT` con el id que la pestaña ya tiene: el navegador guarda con cada
+   * cambio y no lleva la cuenta de si esta pestaña llegó antes, así que
+   * repetirlo tiene que dejar el mismo estado y no una pestaña nueva. */
+  guardarBorrador: (borradorId: string, puntoVentaId: string, contenido: unknown) =>
+    pedir<BorradorGuardado>(`/sales/borradores/${borradorId}`, {
+      metodo: "PUT",
+      cuerpo: { punto_venta_id: puntoVentaId, contenido },
+    }),
+
+  /** Los borradores vivos de esta caja. Por punto de venta y no por usuario:
+   * el relevo de turno sigue el pedido que dejó el anterior. */
+  borradores: (puntoVentaId: string) =>
+    pedir<BorradorGuardado[]>(
+      `/sales/borradores?punto_venta_id=${puntoVentaId}`,
+    ),
+
+  descartarBorrador: (borradorId: string) =>
+    pedir<void>(`/sales/borradores/${borradorId}`, { metodo: "DELETE" }),
 
   /** Suma líneas a una orden ya enviada (RN-COM-029). Sin autorización: la
    * mesa que pide de a poco no debería terminar con dos cuentas. */

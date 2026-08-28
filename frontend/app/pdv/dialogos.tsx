@@ -1502,6 +1502,24 @@ export function DialogoCliente({
     return () => clearTimeout(t);
   }, [q, onBuscar]);
 
+  /**
+   * Qué le falta al alta para poder guardarse, o `null` si está lista.
+   *
+   * Es **teléfono o documento**, que es lo que el servidor acepta
+   * (`clientes.crear_cliente`: "un cliente sin documento necesita teléfono").
+   * Antes el botón exigía teléfono siempre, aunque hubiera DNI: un trabajador
+   * que quiso registrarse como cliente con su documento tocaba "Guardar
+   * cliente" y **no pasaba nada** — sin error, sin aviso, sin alta.
+   */
+  const documentoValido =
+    documento.trim().length === LARGO_DNI ||
+    documento.trim().length === LARGO_RUC;
+  const faltaContacto = !nombre.trim()
+    ? "Falta el nombre"
+    : telefono.trim().length >= 6 || documentoValido
+      ? null
+      : "Falta el teléfono o un DNI/RUC completo";
+
   return (
     <Dialogo titulo="Cliente" abierto={abierto} onCerrar={onCerrar}>
       {creando ? (
@@ -1522,8 +1540,8 @@ export function DialogoCliente({
             onChange={(e) => setTelefono(e.target.value)}
           />
           <p className="pdv-nota">
-            El documento es opcional: para registrar basta el teléfono. Se
-            completa después si el cliente quiere factura o puntos.
+            Con el teléfono alcanza para registrar; con el DNI o RUC también.
+            Hace falta uno de los dos para poder reconocer al cliente después.
           </p>
           <div className="pdv-dos">
             <div>
@@ -1589,10 +1607,11 @@ export function DialogoCliente({
             <button type="button" onClick={() => setCreando(false)}>
               Volver
             </button>
+            {faltaContacto && <span className="pdv-falta">{faltaContacto}</span>}
             <button
               type="button"
               className="pdv-boton-pri"
-              disabled={!nombre.trim() || telefono.trim().length < 6}
+              disabled={Boolean(faltaContacto)}
               onClick={() =>
                 onCrear({
                   nombre: nombre.trim(),
@@ -1901,6 +1920,94 @@ export function DialogoCobro({
  * revés —pedir el PIN siempre— haría que un encargado tuviera que teclear el
  * suyo para anular su propio pedido.
  */
+/** Los motivos que el turno teclea de verdad. Como chips y no como lista
+ * desplegable: en una caja, elegir es un toque y escribir son quince
+ * segundos con las manos ocupadas. */
+const MOTIVOS_ANULACION = [
+  "Error de tecleo",
+  "El cliente lo canceló",
+  "Producto agotado",
+  "Se preparó mal",
+];
+
+/**
+ * Por qué se quita un producto ya enviado a cocina.
+ *
+ * El motivo es obligatorio en el contrato (`AnularLineasCreate.motivo`) y el
+ * PDV lo mandaba en duro: `"Anulado desde PDV"` en las mil anulaciones del
+ * año. El campo existía, el reporte de anulaciones lo leía, y no decía
+ * absolutamente nada. Preguntarlo es la diferencia entre saber que se anula
+ * y saber por qué.
+ */
+export function DialogoMotivoAnulacion({
+  linea,
+  ocupado,
+  onCerrar,
+  onConfirmar,
+}: {
+  linea: { id: string; nombre: string } | null;
+  ocupado: boolean;
+  onCerrar: () => void;
+  onConfirmar: (motivo: string) => void;
+}) {
+  const [motivo, setMotivo] = useState("");
+
+  useEffect(() => {
+    if (!linea) setMotivo("");
+  }, [linea]);
+
+  const listo = motivo.trim().length >= 3;
+  return (
+    <Dialogo
+      titulo={linea ? `Quitar ${linea.nombre}` : "Quitar producto"}
+      abierto={linea !== null}
+      onCerrar={onCerrar}
+    >
+      <p className="pdv-nota">
+        Ya salió a cocina: quitarlo repone el insumo y baja el total. Pasados
+        5 minutos lo firma un supervisor.
+      </p>
+      <div className="pdv-chips">
+        {MOTIVOS_ANULACION.map((m) => (
+          <button
+            key={m}
+            type="button"
+            className={motivo === m ? "puesto" : ""}
+            onClick={() => setMotivo(m)}
+          >
+            {m}
+          </button>
+        ))}
+      </div>
+      <label className="pdv-etiqueta" htmlFor="motivo-anulacion">
+        <span>Motivo</span>
+        <input
+          id="motivo-anulacion"
+          className="pdv-campo"
+          value={motivo}
+          maxLength={120}
+          onChange={(e) => setMotivo(e.target.value)}
+          data-testid="motivo-anulacion"
+        />
+      </label>
+      <footer className="pdv-dialogo-pie">
+        <button type="button" className="pdv-boton-plano" onClick={onCerrar}>
+          Cancelar
+        </button>
+        <button
+          type="button"
+          className="pdv-boton-riesgo"
+          disabled={ocupado || !listo}
+          onClick={() => onConfirmar(motivo.trim())}
+        >
+          Quitar producto
+        </button>
+      </footer>
+    </Dialogo>
+  );
+}
+
+
 export function DialogoAutorizacion({
   abierto,
   titulo,

@@ -1690,3 +1690,56 @@ def test_mover_conserva_el_avance_de_preparacion_del_kds(session, base):
         "la bebida de destino sigue pendiente: el pedido no es entregable "
         "solo porque llegó un plato ya listo"
     )
+
+
+# --- La cuenta recuerda su mesa ----------------------------------------------
+def test_la_venta_expone_el_numero_de_su_mesa(session, base):
+    """El PDV reabre una cuenta desde la pestaña de cuentas abiertas, sin
+    pasar por el mapa de salón: con solo `mesa_id` la pestaña quedaba
+    rotulada "Mesa ?" y el mesero no sabía a qué mesa estaba cobrando."""
+    mesa = mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id)
+    venta = _crear(session, base, [_item(base["productos"][0])], mesa_id=mesa.id)
+    session.expire_all()
+
+    assert venta.mesa_numero == mesa.numero
+
+
+def test_una_venta_sin_mesa_no_inventa_numero(session, base):
+    venta = _crear(session, base, [_item(base["productos"][0])], modalidad="takeout")
+    session.expire_all()
+
+    assert venta.mesa_numero is None
+
+
+# --- La tanda del KDS (ADR-075) ----------------------------------------------
+def test_las_lineas_del_alta_son_la_tanda_uno(session, base):
+    venta = _crear(session, base, [_item(base["productos"][0])])
+
+    assert [i.tanda for i in VentaRepo(session).items(venta.id)] == [1]
+
+
+def test_cada_agregado_abre_su_propia_tanda(session, base):
+    """Todo lo que el trabajador confirmó de un envío sale junto en la misma
+    comanda; el envío siguiente es otra."""
+    venta = _crear(session, base, [_item(base["productos"][0])])
+    ventas_uc.agregar_lineas(
+        session,
+        venta_id=venta.id,
+        items=[
+            {"producto_comercial_id": base["productos"][1].id, "cantidad": Decimal(1),
+             "precio_unitario": Decimal("30.00")},
+            {"producto_comercial_id": base["productos"][0].id, "cantidad": Decimal(1),
+             "precio_unitario": Decimal("40.00")},
+        ],
+        usuario_id=base["usuario"].id,
+    )
+    ventas_uc.agregar_lineas(
+        session,
+        venta_id=venta.id,
+        items=[{"producto_comercial_id": base["productos"][1].id,
+                "cantidad": Decimal(1), "precio_unitario": Decimal("30.00")}],
+        usuario_id=base["usuario"].id,
+    )
+
+    tandas = sorted(i.tanda for i in VentaRepo(session).items(venta.id))
+    assert tandas == [1, 2, 2, 3]

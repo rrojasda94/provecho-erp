@@ -3053,6 +3053,71 @@
         "title": "BoletaPagoOut",
         "type": "object"
       },
+      "BorradorIn": {
+        "description": "Lo que el PDV guarda de un ticket a medio armar.\n\n`contenido` es opaco para el servidor a propósito: es la forma que el PDV\nya tenía en memoria (tipo de orden, mesa, comensales, cliente y líneas con\nsus extras, restas y atributos) y un borrador todavía no es un hecho de\nnegocio que valga la pena tipar. Lo que sale a cocina sí se valida entero,\nen `POST /sales/ventas`.",
+        "properties": {
+          "contenido": {
+            "additionalProperties": true,
+            "title": "Contenido",
+            "type": "object"
+          },
+          "punto_venta_id": {
+            "format": "uuid",
+            "title": "Punto Venta Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "punto_venta_id",
+          "contenido"
+        ],
+        "title": "BorradorIn",
+        "type": "object"
+      },
+      "BorradorOut": {
+        "properties": {
+          "actualizado_en": {
+            "format": "date-time",
+            "title": "Actualizado En",
+            "type": "string"
+          },
+          "contenido": {
+            "additionalProperties": true,
+            "title": "Contenido",
+            "type": "object"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "punto_venta_id": {
+            "format": "uuid",
+            "title": "Punto Venta Id",
+            "type": "string"
+          },
+          "sucursal_id": {
+            "format": "uuid",
+            "title": "Sucursal Id",
+            "type": "string"
+          },
+          "usuario_id": {
+            "format": "uuid",
+            "title": "Usuario Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "sucursal_id",
+          "punto_venta_id",
+          "usuario_id",
+          "contenido",
+          "actualizado_en"
+        ],
+        "title": "BorradorOut",
+        "type": "object"
+      },
       "BriefUpdate": {
         "properties": {
           "kpi": {
@@ -15875,6 +15940,11 @@
             ],
             "title": "Referencia Atencion"
           },
+          "tanda": {
+            "default": 1,
+            "title": "Tanda",
+            "type": "integer"
+          },
           "tipo": {
             "default": "venta",
             "title": "Tipo",
@@ -15966,6 +16036,11 @@
               }
             ],
             "title": "Referencia Atencion"
+          },
+          "tanda": {
+            "default": 1,
+            "title": "Tanda",
+            "type": "integer"
           },
           "tipo": {
             "default": "venta",
@@ -26644,6 +26719,17 @@
               }
             ],
             "title": "Mesa Id"
+          },
+          "mesa_numero": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mesa Numero"
           },
           "modalidad": {
             "title": "Modalidad",
@@ -45337,6 +45423,158 @@
           }
         ],
         "summary": "Editar Valor De Atributo",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/borradores": {
+      "get": {
+        "description": "Los borradores vivos de esa caja, en el orden en que se abrieron.\n\nPor punto de venta y no por usuario: el borrador es de la caja, así que\nel relevo de turno recupera el pedido que dejó el anterior (ADR-074).",
+        "operationId": "listar_borradores_api_v1_sales_borradores_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "punto_venta_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Punto Venta Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/BorradorOut"
+                  },
+                  "title": "Response Listar Borradores Api V1 Sales Borradores Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Borradores",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/borradores/{borrador_id}": {
+      "delete": {
+        "description": "Descarta el borrador. Idempotente: borrar dos veces no es un error.\n\nEl PDV lo llama al enviar el pedido y al cerrar la pestaña, dos caminos\nque pueden cruzarse; un 404 acá solo serviría para pintar un aviso de\nalgo que ya está como se quería.",
+        "operationId": "descartar_borrador_api_v1_sales_borradores__borrador_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "borrador_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Borrador Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Descartar Borrador",
+        "tags": [
+          "sales"
+        ]
+      },
+      "put": {
+        "description": "Guarda el ticket a medio armar de una caja.\n\n`PUT` con el id que el PDV ya le puso a la pestaña: el navegador guarda\ncon cada cambio y no puede llevar la cuenta de si esta pestaña llegó\nantes al servidor. Repetirlo tras un corte de red deja el mismo estado.",
+        "operationId": "guardar_borrador_api_v1_sales_borradores__borrador_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "borrador_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Borrador Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BorradorIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BorradorOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Guardar Borrador",
         "tags": [
           "sales"
         ]

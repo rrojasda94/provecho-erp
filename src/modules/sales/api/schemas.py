@@ -128,6 +128,11 @@ class VentaOut(BaseModel):
     distancia_entrega_km: Decimal | None = None
     costo_entrega: Decimal | None = None
     mesa_id: uuid.UUID | None = None
+    # El número que ve el personal ("Mesa 7"), derivado de la mesa. Va acá
+    # porque el PDV reabre una cuenta desde la pestaña de cuentas abiertas,
+    # sin pasar por el mapa de salón: con solo el id, la pestaña quedaba
+    # rotulada "Mesa ?".
+    mesa_numero: int | None = None
     comensales: int | None = None
     descuento_modo: str | None = None
     descuento_valor: Decimal | None = None
@@ -1285,3 +1290,30 @@ class CuponCanjeadoOut(BaseModel):
     codigo: str
     monto_descuento: Decimal
     venta: VentaOut
+
+
+# --- Borrador del PDV (ADR-074) ----------------------------------------------
+class BorradorIn(BaseModel):
+    """Lo que el PDV guarda de un ticket a medio armar.
+
+    `contenido` es opaco para el servidor a propósito: es la forma que el PDV
+    ya tenía en memoria (tipo de orden, mesa, comensales, cliente y líneas con
+    sus extras, restas y atributos) y un borrador todavía no es un hecho de
+    negocio que valga la pena tipar. Lo que sale a cocina sí se valida entero,
+    en `POST /sales/ventas`.
+    """
+
+    punto_venta_id: uuid.UUID
+    contenido: dict
+
+
+class BorradorOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    sucursal_id: uuid.UUID
+    punto_venta_id: uuid.UUID
+    # Quién lo tocó al final. No restringe: el borrador es de la caja, y el
+    # relevo de turno tiene que poder seguirlo (ADR-074).
+    usuario_id: uuid.UUID
+    contenido: dict
+    actualizado_en: datetime = Field(validation_alias="updated_at")

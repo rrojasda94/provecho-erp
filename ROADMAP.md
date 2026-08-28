@@ -64,6 +64,34 @@ tras sumar precios y lote/FEFO) que el motor solo ensambla; tabla `sync_watermar
 | Skins multi-marca (PDV/Kiosk por marca vs **Provecho** en el resto — Majambo no tiene tema propio, decidido 2026-07-27), accesibilidad (2 paletas + 4 niveles de tamaño de fuente, catálogo definido 2026-07-27) y plataformas por módulo (táctil Android en PDV/Kiosk/KDS/Inventario, PC-first en el resto) | 🔶 accesibilidad ✅ 2026-08-12 | **Accesibilidad implementada (ADR-037)**: paleta de alto contraste (Okabe-Ito, cubre el par rojo-verde), escala de letra en cuatro niveles y modo oscuro, las tres en el perfil del usuario y no en el dispositivo — en un local la misma tablet la usan tres turnos. Se resuelven en el servidor (`class="dark"`, `data-escala`, `data-paleta` en `<html>`): `next-themes` exigiría un script inline que la CSP con nonce tendría que autorizar. Paleta y tema se combinan. `Insignia` ata el ícono al tono, que es lo que hace cumplible «ningún estado solo por color». Pendiente: resolver de tema por marca para PDV/Kiosk |
 | F2 — Arquitectura de frontend (documento maestro) | ✅ spec 2026-07-27 | `docs/product/frontend-architecture.md` — 31 secciones (tokens, componentes base/especializados, layout, navegación, estado, tablas, formularios, tiempo real, permisos visuales por rol, etc.) con estado por sección y los 6 puntos a cerrar antes de los diseños finales del alfa (layout general, componentes base, tablas, permisos visuales, arquitectura de carpetas, decisión de estado). Solo especificado — ver detalle en Deuda técnica → Frontend |
 
+## Parche del PDV — hallazgos del turno de prueba (0.7.8, desde 2026-08-28)
+
+Se probó el PDV en producción con dos usuarios nuevos de trabajadores en CH1
+y CH2, y salieron doce cosas. Tres causas raíz explican la mitad: el frontend
+nunca renovaba el token, el PDV leía su sucursal del JWT congelado, y el
+borrador no existía fuera de la memoria del navegador.
+
+| Tanda | Qué | Estado |
+|---|---|---|
+| 1 | Sesión que se renueva sola + sucursal fresca con selector (ADR-073) | ✅ 2026-08-28 |
+| 1 | Borrador del PDV en el servidor (ADR-074) | ✅ 2026-08-28 |
+| 1 | El aumento es una tanda propia en el KDS (ADR-075) | ✅ 2026-08-28 |
+| 1 | La cuenta de mesa recuerda su número (`VentaOut.mesa_numero`) | ✅ 2026-08-28 |
+| 1 | Apertura/cierre de caja sin texto montado; el PDV cabe en la ventana | ✅ 2026-08-28 |
+| 1 | Bloqueo manual de la pantalla (RN-POS-014) | ✅ 2026-08-28 |
+| 1 | Alta de cliente con solo DNI, y reuso si esa persona ya es cliente | ✅ 2026-08-28 |
+| 2 | Pantalla de despacho como overlay dentro del PDV | ⏳ |
+| 2 | Cupón y descuento manual en caja (backend ya existe, falta el PDV) | ⏳ |
+| 2 | Notas de cocina: por línea **y** una general del pedido, al pie de la pastilla del KDS | ⏳ |
+| 3 | Motor de promociones automáticas + su pantalla en el back office | ⏳ |
+
+La tanda 3 es un slice, no un parche: el motor de promociones condicionales
+no existe —lo que hay es `promocion_cupon` (ADR-061), que hace otra cosa— y
+tiene que soportar N×M, X unidades de un producto o categoría, combo, monto
+mínimo y vigencia por día/hora. **No puede escribir en `venta.descuento_*`**:
+esos campos son el acto humano firmado, y mezclarlos haría imposible auditar
+qué descuento fue manual y cuál automático.
+
 ## Catálogo modelo Odoo (0.7.0, en curso desde 2026-08-23)
 
 Rama `feat/catalogo-odoo`, sobre v0.6.0. El catálogo pasa al modelo de

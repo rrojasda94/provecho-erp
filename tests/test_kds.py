@@ -1158,3 +1158,116 @@ def test_el_response_model_no_se_come_ningun_campo_de_la_cola():
             f"{funcion.__name__} emite {sorted(sobrantes)} y el schema no lo "
             f"declara: el response_model los va a filtrar en silencio"
         )
+
+
+# --- El aumento es una tanda propia (ADR-075) --------------------------------
+def test_el_aumento_abre_una_pastilla_nueva_en_cocina(env):
+    """Una mesa que pide de a poco es UNA venta (ADR-043), pero para la
+    cocina cada envío es una comanda distinta: el postre pedido a las 21:40
+    no puede aparecer dentro de la misma pastilla que la entrada de las
+    20:15, porque entonces nadie ve qué acaba de entrar."""
+    client, ids = env
+    h = _token(client)
+    horno, _barra, despacho, venta = _setup_pantallas_y_venta(client, ids, h)
+
+    r = client.post(f"/api/v1/sales/ventas/{venta['id']}/items", headers=h, json={
+        "items": [{"producto_comercial_id": ids["pizza_id"], "cantidad": "1"}],
+    })
+    assert r.status_code == 201, r.text
+
+    cola = _cola(client, h, horno["id"])
+    assert len(cola) == 2, "el aumento tiene que ser una tarjeta aparte"
+    assert [c["tanda"] for c in cola] == [1, 2]
+    assert all(c["venta_id"] == venta["id"] for c in cola)
+    assert all(c["numero_orden"] == venta["numero_orden"] for c in cola)
+    # Cada tanda lleva lo suyo y nada más.
+    assert [len(c["items"]) for c in cola] == [1, 1]
+
+
+def test_la_tanda_cuenta_su_propio_tiempo(env):
+    """El semáforo de la tanda arranca cuando salió la tanda, no cuando se
+    abrió la mesa: si contara desde el pedido, un café pedido a las dos horas
+    de sentarse saldría en rojo y el color dejaría de significar algo."""
+    client, ids = env
+    h = _token(client)
+    horno, _barra, _despacho, venta = _setup_pantallas_y_venta(client, ids, h)
+    client.post(f"/api/v1/sales/ventas/{venta['id']}/items", headers=h, json={
+        "items": [{"producto_comercial_id": ids["pizza_id"], "cantidad": "1"}],
+    })
+    cola = _cola(client, h, horno["id"])
+    assert cola[1]["creado_en"] >= cola[0]["creado_en"]
+
+
+def test_despacho_sigue_viendo_el_pedido_entero(env):
+    """Preparación se parte por tanda; despacho no. La bolsa se arma contra
+    el pedido completo (ADR-044) y dos tarjetas serían la forma de entregar
+    media orden."""
+    client, ids = env
+    h = _token(client)
+    horno, barra, despacho, venta = _setup_pantallas_y_venta(client, ids, h)
+    client.post(f"/api/v1/sales/ventas/{venta['id']}/items", headers=h, json={
+        "items": [{"producto_comercial_id": ids["bebida_id"], "cantidad": "1"}],
+    })
+    # Algo listo para que despacho muestre el pedido.
+    item = _cola(client, h, horno["id"])[0]["items"][0]["venta_item_id"]
+    for estado in ("en_preparacion", "listo"):
+        client.post(f"/api/v1/kds/items/{item}/avanzar", headers=h,
+                    json={"estado": estado})
+
+    cola_desp = _cola(client, h, despacho["id"])
+    assert len(cola_desp) == 1
+    assert cola_desp[0]["tanda"] == 1
+    # Las tres líneas del pedido, las dos tandas juntas.
+    assert len(cola_desp[0]["items"]) == 3
+
+
+def test_el_extra_viaja_en_la_tanda_de_su_plato(env):
+    """Un extra no se prepara aparte (RN-CUP-014): sale en la misma comanda
+    que el plato del que cuelga, no en una tanda propia."""
+    client, ids = env
+    h = _token(client)
+    pantalla = client.post("/api/v1/kds/pantallas", headers=h, json={
+        "sucursal_id": ids["sucursal_id"], "nombre": "Cocina", "tipo": "preparacion",
+    }).json()
+    sabor, venta = _pizza_con_sabor(client, ids, h)
+
+    r = client.post(f"/api/v1/sales/ventas/{venta['id']}/items", headers=h, json={
+        "items": [{
+            "producto_comercial_id": ids["pizza_id"], "cantidad": "1",
+            "extras": [{"producto_comercial_id": sabor["id"], "cantidad": "1"}],
+        }],
+    })
+    assert r.status_code == 201, r.text
+
+    cola = _cola(client, h, pantalla["id"])
+    assert [c["tanda"] for c in cola] == [1, 2]
+    nueva = cola[1]
+    # Una sola tarjeta de plato: el extra va dentro, no como línea suelta ni
+    # en una tanda propia.
+    assert len(nueva["items"]) == 1
+    assert [e["producto"] for e in nueva["items"][0]["extras"]] == ["Peperoni"]
+
+
+def test_la_linea_movida_entra_como_tanda_del_destino(env):
+    """Mover una línea a otra orden la mete en la cola del destino: la tanda
+    del origen numeraba los envíos de OTRO pedido y chocaría con los de este
+    (ADR-071 + ADR-075)."""
+    client, ids = env
+    h = _token(client)
+    horno, _barra, _despacho, venta = _setup_pantallas_y_venta(client, ids, h)
+    otra = client.post("/api/v1/sales/ventas", headers=h, json={
+        "sucursal_id": ids["sucursal_id"], "punto_venta_id": ids["pv_id"],
+        "canal": "pdv", "modalidad": "mesa", "idempotency_key": "kds-venta-2",
+        "referencia_atencion": "Mesa 9",
+        "items": [{"producto_comercial_id": ids["pizza_id"], "cantidad": "1"}],
+    }).json()
+    item_pizza = _cola(client, h, horno["id"])[0]["items"][0]["venta_item_id"]
+
+    r = client.post(f"/api/v1/sales/ventas/{venta['id']}/mover-lineas", headers=h,
+                    json={"venta_item_ids": [item_pizza],
+                          "destino_venta_id": otra["id"]})
+    assert r.status_code == 200
+
+    tarjetas = [c for c in _cola(client, h, horno["id"])
+                if c["venta_id"] == otra["id"]]
+    assert [t["tanda"] for t in tarjetas] == [1, 2]

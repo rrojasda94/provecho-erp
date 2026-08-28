@@ -93,16 +93,15 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   ser un control.
 - ✅ 2026-08-12 **Los borradores vacíos ya no se apilan**: el "+" reusa el que
   esté vacío y una pestaña sin líneas se descarta con su "×".
-- 🔶 **El KDS no distingue una línea agregada de las originales**
-  (2026-08-12, ADR-043): entra a la cola como cualquier otra, sin decir que
-  llegó después. Para la cocina está bien —hay que prepararla igual—, y
-  desde ADR-044 el despacho **sí ve que el pedido creció**: su tarjeta lista
-  todas las líneas con su estación, así que una recién agregada aparece
-  esperando y el contador "N de M" la incluye. Queda solo el matiz de
-  antigüedad: no se ve **cuándo** llegó cada una, que es lo que permitiría
-  distinguir "falta una que pidieron recién" de "falta una que se atascó".
-  Se resuelve mostrando la hora de la línea en la tarjeta, dato que
-  `venta_item.created_at` ya tiene. Va junto con "KDS sin reloj por pedido".
+- ✅ 2026-08-28 **El KDS distingue el aumento de las líneas originales**
+  (ADR-075). `venta_item.tanda` numera los envíos de la orden y las
+  pantallas de preparación muestran una tarjeta por tanda, con su propio
+  reloj; despacho sigue viendo el pedido entero. Se descartó la salida que
+  esta deuda proponía —mostrar la hora de cada línea en la misma tarjeta—:
+  deja *ver* cuál llegó después, pero no separa la comanda, y el cocinero
+  sigue leyendo una tarjeta que mezcla lo que ya preparó con lo que acaba de
+  entrar. De paso, marcar un producto sobre una orden abierta dejó de
+  mandarlo a cocina al instante: ahora se confirma con "Enviar aumento".
 
 - ✅ 2026-08-12 **La variante hereda del padre** (ADR-042): ADR-038 arregló el
   catálogo del seeder (grupos en la variante) y dejó roto el armado a mano

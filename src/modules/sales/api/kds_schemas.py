@@ -71,6 +71,14 @@ class ItemColaOut(BaseModel):
 class PedidoColaOut(BaseModel):
     venta_id: str
     numero_orden: int
+    # Qué envío del pedido es esta tarjeta (ADR-075). En preparación una
+    # venta puede aparecer varias veces, una por tanda, y `venta_id` deja de
+    # ser la clave de la tarjeta: lo es el par `venta_id + tanda`.
+    #
+    # Vale 1 en despacho y en el historial, donde la unidad sigue siendo el
+    # pedido entero: la bolsa se arma completa, y "¿este pedido salió?" no se
+    # responde por tandas.
+    tanda: int = 1
     referencia_atencion: str | None
     # Despacho arma la bolsa mirando esta pantalla: la dirección va acá y
     # no solo en el papel. `None` salvo en delivery.

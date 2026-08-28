@@ -19,6 +19,12 @@ import Pinpad from "./pinpad";
  *
  * Se desbloquea con el PIN del dueño de la sesión contra
  * `POST /auth/verificar-pin`; "Cambiar de usuario" sí hace logout real.
+ *
+ * También se bloquea **a pedido**, con el botón del encabezado del PDV: los
+ * cinco minutos no le sirven a quien se aleja de la caja y quiere cerrarla
+ * al irse. Llega por un evento de `window` y no por una prop porque este
+ * overlay vive fuera de `PdvCliente` a propósito — es un `<dialog>` del top
+ * layer, y meterlo adentro para pasarle un estado perdería eso.
  */
 
 const INACTIVIDAD_MS = 5 * 60 * 1000;
@@ -45,14 +51,23 @@ export default function BloqueoPorInactividad({ username }: { username: string }
     // En captura: hay diálogos nativos por encima de todo, y sin capturar
     // el PDV no se enteraría de que alguien está operando dentro de uno.
     const opciones = { capture: true, passive: true } as const;
-    window.addEventListener("pointerdown", tocar, opciones);
-    window.addEventListener("keydown", tocar, opciones);
+    // `wheel` y `touchmove` cuentan como actividad además del toque y la
+    // tecla: en una tablet, recorrer la carta con el dedo es operar el PDV,
+    // y sin ellos la pantalla se bloqueaba en la cara de quien la estaba
+    // usando.
+    for (const evento of ["pointerdown", "keydown", "wheel", "touchmove"]) {
+      window.addEventListener(evento, tocar, opciones);
+    }
+    const bloquearAhora = () => setBloqueado(true);
+    window.addEventListener("pdv:bloquear", bloquearAhora);
     const latido = setInterval(() => {
       if (Date.now() - ultimaActividad.current >= INACTIVIDAD_MS) setBloqueado(true);
     }, LATIDO_MS);
     return () => {
-      window.removeEventListener("pointerdown", tocar, opciones);
-      window.removeEventListener("keydown", tocar, opciones);
+      for (const evento of ["pointerdown", "keydown", "wheel", "touchmove"]) {
+        window.removeEventListener(evento, tocar, opciones);
+      }
+      window.removeEventListener("pdv:bloquear", bloquearAhora);
       clearInterval(latido);
     };
   }, []);

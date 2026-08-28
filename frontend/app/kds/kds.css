@@ -627,3 +627,10 @@
     font-weight: 600;
     z-index: 9;
 }
+
+/* Mismo motivo que en `pdv.css`: el pie fijo del layout raíz se monta sobre
+   la última fila de tarjetas, y una pantalla de cocina no se scrollea para
+   destapar nada. */
+body:has(.kds) > footer {
+    display: none;
+}
