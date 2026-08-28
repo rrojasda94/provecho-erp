@@ -12,6 +12,200 @@ editando este archivo chocaban siempre — escribían en la misma línea.
 
 Ver [`changelog.d/`](changelog.d/).
 
+## [0.8.0] - 2026-08-28
+
+### Added
+
+- **Botón para bloquear la pantalla del PDV a voluntad** (2026-08-28,
+  RN-POS-014). El bloqueo por inactividad ya existía, pero son cinco minutos:
+  quien se alejaba de la caja no tenía forma de cerrarla al irse y dejaba la
+  sesión operable a quien pasara. Es el mismo overlay de ADR-045, con su PIN y
+  su "Cambiar de usuario".
+- **Recorrer la carta con el dedo cuenta como estar operando** (2026-08-28).
+  El bloqueo por inactividad solo miraba `pointerdown` y `keydown`, así que en
+  una tablet la pantalla se bloqueaba en la cara de quien la estaba usando.
+
+- **La cola de despacho se abre desde el PDV** (2026-08-28). El personal lo
+  pidió: hoy vive en otra pantalla del local y hay que caminar hasta ella para
+  saber si un pedido salió. Es un **overlay y no una navegación** —salir del
+  PDV cierra la caja de la vista y descarta el pedido a medio armar—, y reusa
+  el mismo componente de despacho en vez de dibujar una versión reducida: una
+  segunda vista de la misma cola es una segunda vista que se desincroniza.
+  Detrás de `kds.operar`.
+- **Cupón y descuento manual, por fin en la caja** (2026-08-28). Los dos
+  endpoints existían desde su slice y el PDV no los llamaba nunca. Van en un
+  solo botón porque para el cajero son la misma pregunta —«¿por qué paga
+  menos?»— pero **no se firman igual**: el cupón no lo autoriza nadie
+  (RN-PRM-007, el cupón *es* la autorización) y el descuento manual lo firma
+  un supervisor con su PIN (RN-COM-017). No se acumulan (RN-PRM-006): el que
+  ya está aplicado se dice y el otro camino se apaga. El motivo es el catálogo
+  cerrado que la API valida, no texto libre — un campo abierto no agrupa, que
+  es para lo único que ese dato existe. `test_repo_coherencia` vigila que las
+  dos listas no se separen.
+- **Las notas de cocina llegan a la cocina** (2026-08-28, ADR-075). El diálogo
+  del producto pedía una nota desde el primer PDV y el dato moría en el
+  navegador: no había columna, no viajaba, y al releer la orden se perdía.
+  Ahora `venta_item.nota` viaja, se pinta bajo su plato en el KDS y sale en la
+  comanda. Se suma `venta.nota_cocina`, la nota **del pedido entero** —"servir
+  todo junto", "bebidas al final"—, que va al pie de la pastilla y en todas
+  sus tandas: es una instrucción del pedido, y la tanda que no la llevara la
+  ignoraría sin saberlo. Se puede cambiar con la orden ya en cocina, que es
+  cuando de verdad se pide.
+
+- **El borrador del PDV vive en el servidor** (2026-08-28, ADR-074). El ticket
+  a medio armar existía **solo** en `useState`: recargar la página, quedarse
+  sin batería o cambiar de turno borraba todas las pestañas de pedido y el
+  mesero volvía a teclear la mesa entera. Ahora se guarda contra el **punto de
+  venta** —no contra el usuario, para que el relevo siga el pedido que dejó el
+  anterior— con autoguardado a los 800 ms de la última tecla. El contenido va
+  en JSONB a propósito: un borrador no es un hecho de negocio hasta que se
+  envía, y modelarlo en columnas obligaría a una migración cada vez que el
+  ticket gane un campo.
+- **El proxy del navegador ganó su handler de `PUT`** (2026-08-28). No lo
+  tenía. Next responde 405 al verbo que el archivo no exporta, sin decir en
+  ningún lado que el que falta es el del proxy y no el del endpoint: el
+  guardado del borrador fallaba contra un endpoint que existía y funcionaba.
+  Un test del contrato ahora exige un handler por cada verbo que la API usa.
+
+- **Las promociones se aplican solas** (2026-08-28, ADR-076). Era la deuda
+  más vieja del PDV: el ERP sabía bajar un total de dos formas —el descuento
+  manual que firma un supervisor y el cupón que trae el cliente— y le faltaba
+  la tercera, la regla que el pedido cumple sin que nadie intervenga.
+  Entidad `promocion` con vigencia (fechas, días de la semana y franja
+  horaria, que puede cruzar la medianoche), ámbito por marca, sucursal, canal
+  y modalidad, y cuatro tipos de condición: **N×M** —que cubre 2x1, 3x2 y "la
+  segunda a mitad de precio", porque el beneficio es un porcentaje sobre lo
+  liberado y no un "gratis" sí/no—, **X unidades** de un producto o
+  categoría, **combo** a precio fijo o con uno gratis, y **monto mínimo**,
+  que con piso cero es el precio de una franja horaria. Alta en Comercial →
+  Promociones con `sales.gestionar_promociones`.
+- **Lo aplicado no toca `venta.descuento_*`** (2026-08-28). Va a
+  `venta_promocion`, tabla propia. Es la frontera que la deuda ya exigía: si
+  el motor escribiera en esos campos, el reporte de descuentos no podría
+  distinguir lo que regaló una persona de lo que aplicó una regla — y esa
+  distinción es el único motivo por el que el descuento manual guarda motivo
+  y autorizador.
+- **Cada unidad la descuenta una sola promoción** (2026-08-28). Gana la de
+  mayor prioridad y lo liberado es siempre lo más barato del conjunto. Sin
+  eso, un 2x1 y un "20 % en pizzas" se cobraban los dos sobre la misma pizza.
+  Acumular es una decisión explícita por promoción, no el comportamiento por
+  defecto. Y la promoción baja el total **antes** que el descuento manual: al
+  revés, un porcentaje firmado sobre un pedido ya promocionado regalaría el
+  doble de lo aprobado.
+- **Se reevalúan en cada cambio del pedido** (2026-08-28). La que deja de
+  cumplirse porque se quitó un producto desaparece; la que se completa con un
+  aumento se activa. El PDV las muestra en el ticket con su nombre: el cajero
+  no las pide ni las firma, pero tiene que poder explicarlas.
+
+- **Dos recorridos de uso nuevos y una prueba de sesión** (2026-08-28). El
+  aumento a una mesa abierta —línea "Sin enviar", "Enviar aumento (N)" y dos
+  pastillas en cocina— y el borrador que sobrevive a recargar la página van a
+  `uso/`, con captura en cada hito: es el recorrido que hay que mostrarle al
+  turno para que reconozca su propio problema arreglado. La renovación de
+  sesión va a `e2e/`, que es donde entra por el techo de
+  `testing-strategy.md` §1: borra la cookie de acceso —exactamente lo que el
+  navegador hace a los quince minutos— y comprueba que la pantalla no caiga a
+  `/login` y que el refresh haya rotado.
+- **El seeder de e2e siembra una estación de cocina** (2026-08-28). Sin ella,
+  cualquier recorrido que quisiera ver la cola tenía que crearla a mano
+  primero: quince clics de preparación que no son lo que la prueba viene a
+  mirar.
+
+### Changed
+
+- **El aumento a una mesa abierta se confirma con "Enviar", y sale como
+  comanda nueva** (2026-08-28, ADR-075). Antes la línea viajaba al confirmar
+  el diálogo del producto —no al pulsar Enviar, que quedaba inerte en
+  "Enviado" desde el primer envío—, así que marcar algo ya era mandarlo a
+  cocina. Y el KDS agrupa por venta: el postre de las 21:40 aparecía en la
+  misma pastilla que la entrada de las 20:15. Ahora la línea queda "Sin
+  enviar" hasta que alguien toca **"Enviar aumento (N)"**, y `venta_item.tanda`
+  hace que cada envío sea una tarjeta propia en las pantallas de preparación,
+  con su propio reloj. Despacho sigue viendo el pedido entero: la bolsa se
+  arma completa (ADR-044), y partirla en dos sería la forma de entregar media
+  orden. Vale igual para mesa, para llevar y delivery.
+- **Quitar un producto ya enviado pide motivo de verdad** (2026-08-28). El
+  campo era obligatorio en el contrato y el PDV mandaba `"Anulado desde PDV"`
+  en las mil anulaciones del año: el reporte de anulaciones lo leía y no decía
+  nada. Ahora lo teclea quien quita, con chips para los cuatro motivos
+  frecuentes, y se recuerda si el servidor termina pidiendo la firma del
+  supervisor.
+
+### Fixed
+
+- **Un aumento con promoción asentaba el precio de lista** (2026-08-28,
+  ADR-076). `POST /ventas/{id}/items` publica "lo confirmado en esta
+  operación" (ADR-043 §3) y eso era el precio de lista de lo que entró. Con
+  una promoción de por medio dejan de ser lo mismo: la segunda pizza de un
+  2x1 entra por S/ 40 y no le suma un sol al total, así que contabilidad
+  asentaba S/ 40 que la caja nunca cobró y los libros dejaban de cuadrar con
+  el turno. Ahora se publica **cuánto sube lo que hay que cobrar**. El delta
+  puede ser negativo —agregar una gaseosa que dispara un "20 % desde S/ 50"—
+  y se publica tal cual: el asiento sigue a la caja, y taparlo con un cero
+  dejaría los libros por encima de lo cobrado.
+
+- **Apertura y cierre de caja mostraban el texto montado sobre los campos**
+  (2026-08-28). `.pdv-etiqueta` define márgenes verticales pero no declaraba
+  `display`, y esos diálogos la usan sobre un `<label>`: en una caja inline
+  los márgenes verticales **no aplican**. La regla equivalente existía en
+  `globals.css` pero acotada a `.erp`, y el PDV vive fuera de ese layout
+  (ADR-013), así que nada de los estilos de diálogo del back office llegaba.
+- **El pie fijo del layout raíz tapaba la franja de acciones del PDV y la
+  última fila del KDS** (2026-08-28). Se pintaba en todas las pantallas, y
+  esas dos no tienen página que scrollear para destapar nada.
+- **El PDV no cedía con la escala de letra** (2026-08-28). La columna del
+  ticket estaba clavada en `24.5rem`: con `--font-scale` al máximo se comía
+  más de media tablet y la carta se quedaba sin lugar. Ahora es un `clamp`. El
+  cuerpo de los diálogos descuenta el encabezado en vez de un `70vh` suelto —
+  en una ventana baja, el diálogo bloqueante de apertura dejaba su botón de
+  confirmar fuera de la pantalla, con la caja sin abrir y sin forma de salir.
+
+- **La sesión del PDV se caía a los quince minutos** (2026-08-28, ADR-073). El
+  access token dura 15 min y el refresh 7 días, pero **el frontend nunca
+  llamaba a `/auth/refresh`**: la única lectura de esa cookie en todo
+  `frontend/` era el logout. El turno entero caía a `/login` en medio de un
+  pedido. Ahora renueva el middleware, que es el único punto por el que pasan
+  el render del servidor, el proxy del navegador y los route handlers.
+  La renovación es **single-flight con ventana de gracia de 30 s**: la API
+  rota el refresh y trata un segundo uso como robo revocando la sesión, así
+  que sin coordinar el arreglo cerraba la caja que venía a salvar — se
+  reprodujo antes de encontrarle la forma. El precio aceptado es que un
+  refresh robado y reusado dentro de esos segundos, contra el mismo proceso,
+  no dispara la revocación.
+- **El PDV usaba la sucursal congelada del JWT** (2026-08-28, ADR-073).
+  `claims.sucursales[0]` sobre una lista sin `ORDER BY`: quien tenía dos
+  locales asignados operaba siempre contra el mismo, así que **el pedido
+  tomado en CH2 se creaba en CH1 y aparecía en las cuentas abiertas de CH1**.
+  Y como el token no se renovaba, reasignar la sucursal de una cuenta no valía
+  hasta volver a entrar. Ahora sale de `/users/me` —recalculado en cada
+  render—, va por `?sucursal=` validada contra las propias y hay selector con
+  más de una, igual que el KDS. `UsuarioRepo.sucursal_ids` ordena por nombre y
+  filtra las borradas: esa lista **es** el claim.
+- **"La sucursal no tiene puntos de venta" era un callejón sin salida**
+  (2026-08-28). El mensaje era terminal aunque la caja que el trabajador
+  buscaba estuviera a un clic: ahora lista sus otras sucursales como enlaces.
+
+- **Un borrador guardado antes de que el PDV ganara un campo dejaba su campo
+  sin control** (2026-08-28, ADR-074). El contenido del borrador es JSONB
+  opaco a propósito —para que el formato pueda crecer sin migrar nada—, así
+  que un ticket viejo vuelve sin las claves nuevas: React leía `undefined` y
+  convertía el input controlado en uno sin control, que deja de responder sin
+  decir por qué. Los recuperados se completan contra un borrador nuevo antes
+  de pintarse.
+
+- **No se podía dar de alta un cliente con solo su DNI** (2026-08-28). El
+  botón "Guardar cliente" exigía teléfono aunque hubiera documento, y como
+  estaba deshabilitado no pasaba nada al tocarlo: sin error, sin aviso, sin
+  alta. El backend acepta cualquiera de los dos desde siempre. Le pasó a un
+  trabajador que quiso registrarse para acumular puntos — ser trabajador nunca
+  fue impedimento, el código lo contempla explícitamente.
+- **Si esa persona ya era cliente, el PDV dejaba al cajero contra un 409**
+  (2026-08-28). Pasa cada vez que alguien del local quiere consumir: su
+  persona ya existe. Ahora se busca y se asigna al pedido, que es lo que se
+  quería hacer.
+- **Un cliente dado de alta solo con documento no se asignaba al pedido**
+  (2026-08-28). La búsqueda posterior al alta usaba el teléfono en duro.
+
 ## [0.7.7] - 2026-08-27
 
 ### Added
