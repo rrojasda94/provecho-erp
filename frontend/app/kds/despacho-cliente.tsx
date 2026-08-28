@@ -30,6 +30,10 @@ type Props = {
   sucursalId: string;
   puedeEntregar: boolean;
   semaforo: Semaforo;
+  /** Sin los enlaces a Historial y Estaciones. Lo usa el despacho embebido
+   * en el PDV: desde un overlay, un enlace que navega fuera es una trampa —
+   * el cajero pierde de vista la caja y el pedido a medio armar. */
+  sinNavegacion?: boolean;
 };
 
 /** Estaciones por las que el pedido todavía espera, sin repetir. */
@@ -108,6 +112,12 @@ function Tarjeta({
         })}
       </ul>
 
+      {/* Despacho también la lee: es quien arma la bolsa, y "bebidas al
+          final" es una instrucción de armado antes que de cocina. */}
+      {pedido.nota_cocina && (
+        <p className="kds-nota-pedido">Al servir: {pedido.nota_cocina}</p>
+      )}
+
       <footer className="kds-acciones">
         {puedeEntregar && completo && (
           <button type="button" className="kds-boton pri" onClick={onEntregar}>
@@ -124,6 +134,7 @@ export default function DespachoCliente({
   sucursalId,
   puedeEntregar,
   semaforo,
+  sinNavegacion = false,
 }: Props) {
   const { pedidos, aviso, setAviso, avisarDe, cargado, refrescar } = useCola(pantalla.id);
 
@@ -151,15 +162,19 @@ export default function DespachoCliente({
         </span>
         {/* Lo que ya salió, con la vuelta atrás para el toque sobre la
             tarjeta equivocada. */}
-        <a
-          className="kds-cambiar"
-          href={`/kds?pantalla=${pantalla.id}&sucursal=${sucursalId}&vista=historial`}
-        >
-          Historial
-        </a>
-        <a className="kds-cambiar" href={`/kds?sucursal=${sucursalId}`}>
-          Estaciones
-        </a>
+        {!sinNavegacion && (
+          <>
+            <a
+              className="kds-cambiar"
+              href={`/kds?pantalla=${pantalla.id}&sucursal=${sucursalId}&vista=historial`}
+            >
+              Historial
+            </a>
+            <a className="kds-cambiar" href={`/kds?sucursal=${sucursalId}`}>
+              Estaciones
+            </a>
+          </>
+        )}
       </header>
 
       {pedidos.length === 0 ? (

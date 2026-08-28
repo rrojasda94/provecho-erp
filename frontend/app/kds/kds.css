@@ -627,3 +627,40 @@
     font-weight: 600;
     z-index: 9;
 }
+
+/* Lo que el mesero le dijo a cocina sobre un plato. En ámbar como las
+   restas y por lo mismo: en una pantalla que se lee de reojo, lo que pasa
+   desapercibido sale como plato rehecho. */
+.kds-nombre .kds-nota {
+    display: block;
+    color: var(--kds-ambar);
+    font-style: normal;
+    font-weight: 700;
+}
+
+/* Cómo se sirve el pedido entero. Al pie de la tarjeta, en una franja
+   propia: no es de ningún plato, y ponerla dentro de uno la escondería. */
+.kds-nota-pedido {
+    margin: 0.5rem 0 0;
+    padding: 0.4rem 0.6rem;
+    border-radius: 0.5rem;
+    background: var(--kds-surface-alta);
+    color: var(--kds-ambar);
+    font-weight: 700;
+    font-size: 0.9375rem;
+}
+
+/* Qué envío del pedido es esta tarjeta (ADR-075). Discreto: el número de
+   orden sigue siendo lo que la cocina busca. */
+.kds-tanda {
+    font-size: 0.75em;
+    font-weight: 600;
+    color: var(--kds-muted);
+}
+
+/* Mismo motivo que en `pdv.css`: el pie fijo del layout raíz se monta sobre
+   la última fila de tarjetas, y una pantalla de cocina no se scrollea para
+   destapar nada. */
+body:has(.kds) > footer {
+    display: none;
+}

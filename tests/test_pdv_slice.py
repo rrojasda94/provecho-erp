@@ -29,6 +29,7 @@ from src.modules.sales.application import catalogo as catalogo_uc
 from src.modules.sales.application import clientes as clientes_uc
 from src.modules.sales.application import comprobantes as comprobantes_uc
 from src.modules.sales.application import mesas as mesas_uc
+from src.modules.sales.application import promociones as promociones_uc
 from src.modules.sales.application import ventas as ventas_uc
 from src.modules.sales.application.errors import Conflicto, NoEncontrado, ReglaNegocio
 from src.modules.sales.domain import rules
@@ -1690,3 +1691,250 @@ def test_mover_conserva_el_avance_de_preparacion_del_kds(session, base):
         "la bebida de destino sigue pendiente: el pedido no es entregable "
         "solo porque llegó un plato ya listo"
     )
+
+
+# --- La cuenta recuerda su mesa ----------------------------------------------
+def test_la_venta_expone_el_numero_de_su_mesa(session, base):
+    """El PDV reabre una cuenta desde la pestaña de cuentas abiertas, sin
+    pasar por el mapa de salón: con solo `mesa_id` la pestaña quedaba
+    rotulada "Mesa ?" y el mesero no sabía a qué mesa estaba cobrando."""
+    mesa = mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id)
+    venta = _crear(session, base, [_item(base["productos"][0])], mesa_id=mesa.id)
+    session.expire_all()
+
+    assert venta.mesa_numero == mesa.numero
+
+
+def test_una_venta_sin_mesa_no_inventa_numero(session, base):
+    venta = _crear(session, base, [_item(base["productos"][0])], modalidad="takeout")
+    session.expire_all()
+
+    assert venta.mesa_numero is None
+
+
+# --- La tanda del KDS (ADR-075) ----------------------------------------------
+def test_las_lineas_del_alta_son_la_tanda_uno(session, base):
+    venta = _crear(session, base, [_item(base["productos"][0])])
+
+    assert [i.tanda for i in VentaRepo(session).items(venta.id)] == [1]
+
+
+def test_cada_agregado_abre_su_propia_tanda(session, base):
+    """Todo lo que el trabajador confirmó de un envío sale junto en la misma
+    comanda; el envío siguiente es otra."""
+    venta = _crear(session, base, [_item(base["productos"][0])])
+    ventas_uc.agregar_lineas(
+        session,
+        venta_id=venta.id,
+        items=[
+            {"producto_comercial_id": base["productos"][1].id, "cantidad": Decimal(1),
+             "precio_unitario": Decimal("30.00")},
+            {"producto_comercial_id": base["productos"][0].id, "cantidad": Decimal(1),
+             "precio_unitario": Decimal("40.00")},
+        ],
+        usuario_id=base["usuario"].id,
+    )
+    ventas_uc.agregar_lineas(
+        session,
+        venta_id=venta.id,
+        items=[{"producto_comercial_id": base["productos"][1].id,
+                "cantidad": Decimal(1), "precio_unitario": Decimal("30.00")}],
+        usuario_id=base["usuario"].id,
+    )
+
+    tandas = sorted(i.tanda for i in VentaRepo(session).items(venta.id))
+    assert tandas == [1, 2, 2, 3]
+
+
+# --- Promociones condicionales (ADR-076) --------------------------------------
+def _promocion(session, base, **campos):
+    campos.setdefault("nombre", "Promo")
+    campos.setdefault("tipo", "nxm")
+    campos.setdefault("condicion", {"lleva": 2})
+    campos.setdefault("beneficio", {"libera": 1})
+    return promociones_uc.crear_promocion(
+        session, empresa_id=base["empresa"].id, **campos
+    )
+
+
+def test_la_promocion_baja_el_total_sin_tocar_el_descuento_manual(session, base):
+    """La frontera de ADR-076: `venta.descuento_*` es el acto humano firmado.
+    Si el motor escribiera ahí, el reporte de descuentos no podría distinguir
+    lo que regaló un supervisor de lo que aplicó una regla."""
+    _promocion(session, base)
+    venta = _crear(session, base, [_item(base["productos"][0], cantidad=2)])
+    session.flush()
+
+    assert venta.total == Decimal("40.00")  # 80 de lista, una liberada
+    assert venta.descuento_modo is None
+    assert venta.descuento_valor is None
+    assert promociones_uc.total_aplicado(session, venta.id) == Decimal("40.00")
+
+
+def test_la_promocion_queda_nombrada_en_la_venta(session, base):
+    """El nombre viaja congelado: la promoción se renombra o se apaga, y el
+    ticket de ayer tiene que decir lo que el cliente leyó."""
+    _promocion(session, base, nombre="2x1 de martes")
+    venta = _crear(session, base, [_item(base["productos"][0], cantidad=2)])
+
+    aplicadas = promociones_uc.aplicadas_a(session, venta.id)
+    assert [(a.nombre, a.monto) for a in aplicadas] == [("2x1 de martes", Decimal("40.00"))]
+
+
+def test_el_aumento_puede_activar_la_promocion(session, base):
+    """La segunda pizza es la que acaba de entrar: si el motor no se
+    reevaluara al agregar líneas, el 2x1 no se activaría nunca en una mesa
+    que pide de a poco (RN-COM-029)."""
+    _promocion(session, base)
+    venta = _crear(session, base, [_item(base["productos"][0])])
+    assert promociones_uc.total_aplicado(session, venta.id) == Decimal(0)
+
+    ventas_uc.agregar_lineas(
+        session,
+        venta_id=venta.id,
+        items=[{
+            "producto_comercial_id": base["productos"][0].id,
+            "cantidad": Decimal(1),
+            "precio_unitario": Decimal("40.00"),
+        }],
+        usuario_id=base["usuario"].id,
+    )
+
+    assert promociones_uc.total_aplicado(session, venta.id) == Decimal("40.00")
+
+
+def test_quitar_la_linea_desactiva_la_promocion_que_activaba(session, base):
+    """No queda cobrada sobre algo que ya no está."""
+    _promocion(session, base)
+    venta = _crear(session, base, [_item(base["productos"][0], cantidad=2)])
+    linea = VentaRepo(session).items(venta.id)[0]
+
+    ventas_uc.anular_lineas(
+        session,
+        venta_id=venta.id,
+        venta_item_ids=[linea.id],
+        motivo="error de tecleo",
+        autorizado_por=base["usuario"].id,
+    )
+
+    assert promociones_uc.total_aplicado(session, venta.id) == Decimal(0)
+
+
+def test_un_consumo_de_personal_no_promociona(session, base):
+    """Ya vale cero (RN-COM-025): descontarle algo no significa nada."""
+    _promocion(session, base)
+    venta = _crear(
+        session,
+        base,
+        [_item(base["productos"][0], cantidad=2)],
+        tipo="consumo_personal",
+        consumo_motivo="capacitacion",
+        consumo_autorizado_por=base["usuario"].id,
+    )
+
+    assert promociones_uc.total_aplicado(session, venta.id) == Decimal(0)
+    assert venta.total == Decimal(0)
+
+
+def test_una_promocion_apagada_deja_de_aplicarse_pero_no_borra_lo_aplicado(
+    session, base
+):
+    """RN-PRM-005: terminarla no puede reescribir una venta que ya se cobró
+    con ella."""
+    promo = _promocion(session, base)
+    vieja = _crear(session, base, [_item(base["productos"][0], cantidad=2)])
+    promociones_uc.terminar_promocion(session, promo.id)
+    session.flush()
+    nueva = _crear(session, base, [_item(base["productos"][0], cantidad=2)])
+
+    assert promociones_uc.total_aplicado(session, vieja.id) == Decimal("40.00")
+    assert promociones_uc.total_aplicado(session, nueva.id) == Decimal(0)
+
+
+def test_la_promocion_de_otra_sucursal_no_alcanza_a_esta_venta(session, base):
+    otra = Sucursal(
+        marca_id=base["sucursal"].marca_id,
+        empresa_id=base["empresa"].id,
+        nombre="Charlie's - Norte",
+        direccion="Jr. Otro 456",
+        tenencia="alquilada",
+    )
+    session.add(otra)
+    session.flush()
+    _promocion(session, base, sucursal_id=otra.id)
+    venta = _crear(session, base, [_item(base["productos"][0], cantidad=2)])
+
+    assert promociones_uc.total_aplicado(session, venta.id) == Decimal(0)
+
+
+def test_la_promocion_de_otra_modalidad_no_alcanza_a_esta_venta(session, base):
+    _promocion(session, base, modalidades=["delivery"])
+    venta = _crear(
+        session, base, [_item(base["productos"][0], cantidad=2)], modalidad="mesa"
+    )
+
+    assert promociones_uc.total_aplicado(session, venta.id) == Decimal(0)
+
+
+def test_el_descuento_manual_se_calcula_sobre_lo_ya_promocionado(session, base):
+    """El supervisor firma un porcentaje sobre lo que el cliente va a pagar.
+    Al revés, un 20 % sobre un pedido con 2x1 regalaría casi la mitad del
+    ticket sin que nadie lo haya aprobado así."""
+    _promocion(session, base)
+    venta = _crear(session, base, [_item(base["productos"][0], cantidad=2)])
+    ventas_uc.aplicar_descuento(
+        session,
+        venta_id=venta.id,
+        modo="porcentaje",
+        valor=Decimal(10),
+        motivo="cortesia",
+        autorizado_por=base["usuario"].id,
+    )
+
+    # 80 de lista - 40 de promoción = 40; el 10% se toma sobre 40, no sobre 80.
+    assert venta.total == Decimal("36.00")
+
+
+def test_una_promocion_nxm_que_libera_todo_lo_que_exige_se_rechaza(session, base):
+    with pytest.raises(ReglaNegocio):
+        _promocion(session, base, condicion={"lleva": 2}, beneficio={"libera": 2})
+
+
+def test_una_vigencia_al_reves_se_rechaza(session, base):
+    with pytest.raises(ReglaNegocio):
+        _promocion(
+            session, base, desde=date(2026, 9, 1), hasta=date(2026, 8, 1)
+        )
+
+
+def test_el_aumento_confirma_lo_que_sube_la_cuenta_no_el_precio_de_lista(
+    session, base
+):
+    """El evento lleva "lo confirmado en esta operación" (ADR-043 §3), y con
+    una promoción de por medio eso deja de ser el precio de lista.
+
+    La segunda pizza de un 2x1 entra por S/ 40 y no le suma un sol al total.
+    Publicar los 40 dejaría a contabilidad asentando plata que la caja nunca
+    cobró, y los libros dejarían de cuadrar con el turno.
+    """
+    _promocion(session, base)
+    venta = _crear(session, base, [_item(base["productos"][0])])
+    confirmadas: list[dict] = []
+    event_bus.subscribe("sales.venta_confirmada", confirmadas.append)
+    ventas_uc.agregar_lineas(
+        session,
+        venta_id=venta.id,
+        items=[{
+            "producto_comercial_id": base["productos"][0].id,
+            "cantidad": Decimal(1),
+            "precio_unitario": Decimal("40.00"),
+        }],
+        usuario_id=base["usuario"].id,
+    )
+    # Los eventos salen al commitear (ADR-016), no al publicarlos.
+    session.commit()
+
+    # Dos pizzas de S/ 40 con 2x1: la cuenta sigue en 40 y el aumento no
+    # confirmó un sol, aunque de lista entraron 40.
+    assert venta.total == Decimal("40.00")
+    assert Decimal(confirmadas[-1]["total"]) == Decimal(0)

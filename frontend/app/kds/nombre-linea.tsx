@@ -38,6 +38,10 @@ export default function NombreDeLinea({ item }: { item: ItemCola }) {
           SIN {insumo.toUpperCase()}
         </em>
       ))}
+      {/* Lo último del plato, después de lo estructurado: es exactamente lo
+          que ninguna resta ni ningún atributo pudo expresar. Hasta ADR-075 el
+          PDV lo capturaba y no llegaba nunca acá. */}
+      {item.nota && <em className="kds-nota">** {item.nota.toUpperCase()}</em>}
     </span>
   );
 }

@@ -115,8 +115,9 @@ PERMISOS = [
     ),
     (
         "sales.gestionar_promociones",
-        "Terminar una campaña de cupón (ADR-061) — le quita a todo el padrón "
-        "un beneficio ya prometido, así que no es del cajero que canjea",
+        "Dar de alta y terminar promociones (ADR-076) y campañas de cupón "
+        "(ADR-061). No es `sales.aplicar_descuento`: crear una regla que "
+        "regala margen todos los días no es firmar un descuento puntual",
     ),
     ("sales.crear_pedido", "Crear pedido (canal agente IA)"),
     ("inventory.transferir", "Despachar una transferencia entre almacenes"),

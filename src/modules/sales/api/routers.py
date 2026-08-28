@@ -22,6 +22,7 @@ from src.core.tenant import Tenant
 from src.modules.sales.api import schemas
 from src.modules.sales.application import atributos as atributos_uc
 from src.modules.sales.application import (
+    borradores,
     catalogo,
     clientes,
     comprobantes,
@@ -33,6 +34,7 @@ from src.modules.sales.application import (
     notas_credito,
     precios,
     precuenta,
+    promociones,
     puntos_venta,
     queries_publicas,
     tarifa_delivery,
@@ -40,8 +42,14 @@ from src.modules.sales.application import (
     ventas,
 )
 from src.modules.sales.application import variantes as variantes_uc
-from src.modules.sales.application.scope import exigir_cliente, exigir_mesa, exigir_venta
+from src.modules.sales.application.scope import (
+    exigir_cliente,
+    exigir_mesa,
+    exigir_punto_venta,
+    exigir_venta,
+)
 from src.modules.sales.domain import rules
+from src.modules.sales.infrastructure.models import PedidoBorrador
 from src.modules.sales.infrastructure.repositories import (
     ComprobanteRepo,
     PuntoVentaRepo,
@@ -77,6 +85,9 @@ CATALOGO = "sales.gestionar_catalogo"
 # Aplicar descuento es acto de supervisor: separado de `sales.cobrar` para
 # que el cajero no se autorice a sí mismo (RN-COM-017).
 DESCONTAR = "sales.aplicar_descuento"
+# Crear una regla que regala margen todos los días no es lo mismo que firmar
+# un descuento puntual: permiso propio, del área comercial (ADR-076).
+GESTIONAR_PROMOCIONES = "sales.gestionar_promociones"
 # La comida del personal es costo que sale del inventario sin cobro: la firma
 # un encargado, igual que un descuento (RN-COM-025).
 CONSUMO_PERSONAL = "sales.registrar_consumo_personal"
@@ -156,6 +167,7 @@ def crear_venta(
         ubicacion_distrito=body.ubicacion_distrito,
         mesa_id=body.mesa_id,
         comensales=body.comensales,
+        nota_cocina=body.nota_cocina,
         id=body.id,
         tipo=body.tipo,
         consumo_motivo=body.consumo_motivo,
@@ -334,6 +346,186 @@ def aplicar_descuento(
     )
     session.commit()
     return venta
+
+
+@router.put("/ventas/{venta_id}/nota-cocina", response_model=schemas.VentaOut)
+def fijar_nota_cocina(
+    venta_id: uuid.UUID,
+    body: schemas.NotaCocinaIn,
+    _: Usuario = Depends(require_permission(CREAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Cómo se sirve el pedido: "servir todo junto", "bebidas al final".
+
+    Mismo permiso que crear la orden y **sin firma de nadie**: no toca el
+    total, no mueve inventario y no cambia qué se prepara — solo en qué
+    orden sale. Se puede con la orden ya en cocina porque así se pide de
+    verdad, a mitad del servicio.
+    """
+    exigir_venta(session, venta_id, tenant)
+    venta = ventas.fijar_nota_cocina(session, venta_id=venta_id, nota=body.nota)
+    session.commit()
+    return venta
+
+
+# --- Borrador del PDV (ADR-074) ----------------------------------------------
+@router.put("/borradores/{borrador_id}", response_model=schemas.BorradorOut)
+def guardar_borrador(
+    borrador_id: uuid.UUID,
+    body: schemas.BorradorIn,
+    actor: Usuario = Depends(require_permission(CREAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Guarda el ticket a medio armar de una caja.
+
+    `PUT` con el id que el PDV ya le puso a la pestaña: el navegador guarda
+    con cada cambio y no puede llevar la cuenta de si esta pestaña llegó
+    antes al servidor. Repetirlo tras un corte de red deja el mismo estado.
+    """
+    punto = exigir_punto_venta(session, body.punto_venta_id, tenant)
+    borrador = borradores.guardar(
+        session,
+        borrador_id=borrador_id,
+        punto_venta_id=punto.id,
+        contenido=body.contenido,
+        usuario_id=actor.id,
+    )
+    session.commit()
+    return borrador
+
+
+@router.get("/borradores", response_model=list[schemas.BorradorOut])
+def listar_borradores(
+    punto_venta_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(CREAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Los borradores vivos de esa caja, en el orden en que se abrieron.
+
+    Por punto de venta y no por usuario: el borrador es de la caja, así que
+    el relevo de turno recupera el pedido que dejó el anterior (ADR-074).
+    """
+    exigir_punto_venta(session, punto_venta_id, tenant)
+    return borradores.listar(session, punto_venta_id=punto_venta_id)
+
+
+@router.delete("/borradores/{borrador_id}", status_code=status.HTTP_204_NO_CONTENT)
+def descartar_borrador(
+    borrador_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(CREAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Descarta el borrador. Idempotente: borrar dos veces no es un error.
+
+    El PDV lo llama al enviar el pedido y al cerrar la pestaña, dos caminos
+    que pueden cruzarse; un 404 acá solo serviría para pintar un aviso de
+    algo que ya está como se quería.
+    """
+    borrador = session.get(PedidoBorrador, borrador_id)
+    if borrador is not None:
+        tenant.exigir_sucursal(borrador.sucursal_id)
+        borradores.descartar(session, borrador_id)
+        session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# --- Promociones condicionales (ADR-076) -------------------------------------
+@router.post(
+    "/promociones",
+    response_model=schemas.PromocionOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def crear_promocion(
+    body: schemas.PromocionCreate,
+    _: Usuario = Depends(require_permission(GESTIONAR_PROMOCIONES)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Da de alta una promoción que se aplica **sola** cuando el pedido
+    cumple.
+
+    No es el cupón de ADR-061 —ahí hay un código que alguien canjea— ni el
+    descuento manual de RN-COM-017, que firma un supervisor. Acá el cajero no
+    interviene: por eso el permiso es de gestión, no de caja.
+    """
+    if body.sucursal_id is not None:
+        tenant.exigir_sucursal(body.sucursal_id)
+    promocion = promociones.crear_promocion(
+        session, empresa_id=tenant.empresa(), **body.model_dump()
+    )
+    session.commit()
+    return promocion
+
+
+@router.get("/promociones", response_model=list[schemas.PromocionOut])
+def listar_promociones(
+    solo_activas: bool = False,
+    _: Usuario = Depends(require_permission(GESTIONAR_PROMOCIONES)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    return promociones.listar_promociones(
+        session, empresa_id=tenant.empresa(), solo_activas=solo_activas
+    )
+
+
+@router.patch("/promociones/{promocion_id}", response_model=schemas.PromocionOut)
+def editar_promocion(
+    promocion_id: uuid.UUID,
+    body: schemas.PromocionUpdate,
+    _: Usuario = Depends(require_permission(GESTIONAR_PROMOCIONES)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """`exclude_unset`: el campo ausente no se toca. Sin eso, apagar una
+    promoción desde la tabla (`{"activa": false}`) le borraría la vigencia y
+    el ámbito de paso."""
+    promociones.exigir_promocion_de_empresa(
+        session, promocion_id, tenant.filtro_empresa()
+    )
+    promocion = promociones.editar_promocion(
+        session, promocion_id, **body.model_dump(exclude_unset=True)
+    )
+    session.commit()
+    return promocion
+
+
+@router.post("/promociones/{promocion_id}/terminar", response_model=schemas.PromocionOut)
+def terminar_promocion(
+    promocion_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(GESTIONAR_PROMOCIONES)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """La apaga (RN-PRM-005). No borra: las ventas que la aplicaron la siguen
+    nombrando, y lo ya aplicado quedó congelado en `venta_promocion`."""
+    promociones.exigir_promocion_de_empresa(
+        session, promocion_id, tenant.filtro_empresa()
+    )
+    promocion = promociones.terminar_promocion(session, promocion_id)
+    session.commit()
+    return promocion
+
+
+@router.get(
+    "/ventas/{venta_id}/promociones",
+    response_model=list[schemas.VentaPromocionOut],
+)
+def promociones_de_venta(
+    venta_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Qué promociones activó este pedido. El PDV las pinta en el ticket: si
+    el cajero no puede explicar de dónde salió el descuento, la promoción
+    está mal nombrada, pero callarla es peor."""
+    exigir_venta(session, venta_id, tenant)
+    return promociones.aplicadas_a(session, venta_id)
 
 
 # --- Cupón de promoción (ADR-061) --------------------------------------------

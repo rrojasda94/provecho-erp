@@ -93,16 +93,15 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   ser un control.
 - ✅ 2026-08-12 **Los borradores vacíos ya no se apilan**: el "+" reusa el que
   esté vacío y una pestaña sin líneas se descarta con su "×".
-- 🔶 **El KDS no distingue una línea agregada de las originales**
-  (2026-08-12, ADR-043): entra a la cola como cualquier otra, sin decir que
-  llegó después. Para la cocina está bien —hay que prepararla igual—, y
-  desde ADR-044 el despacho **sí ve que el pedido creció**: su tarjeta lista
-  todas las líneas con su estación, así que una recién agregada aparece
-  esperando y el contador "N de M" la incluye. Queda solo el matiz de
-  antigüedad: no se ve **cuándo** llegó cada una, que es lo que permitiría
-  distinguir "falta una que pidieron recién" de "falta una que se atascó".
-  Se resuelve mostrando la hora de la línea en la tarjeta, dato que
-  `venta_item.created_at` ya tiene. Va junto con "KDS sin reloj por pedido".
+- ✅ 2026-08-28 **El KDS distingue el aumento de las líneas originales**
+  (ADR-075). `venta_item.tanda` numera los envíos de la orden y las
+  pantallas de preparación muestran una tarjeta por tanda, con su propio
+  reloj; despacho sigue viendo el pedido entero. Se descartó la salida que
+  esta deuda proponía —mostrar la hora de cada línea en la misma tarjeta—:
+  deja *ver* cuál llegó después, pero no separa la comanda, y el cocinero
+  sigue leyendo una tarjeta que mezcla lo que ya preparó con lo que acaba de
+  entrar. De paso, marcar un producto sobre una orden abierta dejó de
+  mandarlo a cocina al instante: ahora se confirma con "Enviar aumento".
 
 - ✅ 2026-08-12 **La variante hereda del padre** (ADR-042): ADR-038 arregló el
   catálogo del seeder (grupos en la variante) y dejó roto el armado a mano
@@ -260,15 +259,16 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   `GET /sales/ventas` (jornada por sucursal). Migración sin backfill y
   clave de idempotencia del grupo 1 intacta; 24 casos en
   `tests/test_pdv_slice.py`. **Pendiente derivado:**
-  - ⬜ **Motor de promociones condicionales** por marca/sucursal — se
-    activan solas si el pedido cumple reglas (ej. segunda pizza a mitad de
-    precio si pide dos del mismo tamaño, en días vigentes, sobre el precio
-    base de la más barata, sin incluir extras). Requiere entidad
-    `promocion` con vigencia, condiciones de activación y base de cálculo.
-    **No debe reutilizar `venta.descuento_*`**: esos campos son de un acto
-    humano autorizado, con motivo y responsable; mezclarlos haría imposible
-    auditar cuál descuento fue manual y cuál automático (ADR-018 →
-    «Frontera explícita»).
+  - ✅ 2026-08-28 **Motor de promociones condicionales** (ADR-076). Entidad
+    `promocion` con vigencia (fechas, días, franja horaria), ámbito por
+    marca/sucursal/canal/modalidad y cuatro tipos de condición: N×M —que
+    cubre "la segunda a mitad de precio" con un % sobre lo liberado—, X
+    unidades de un producto o categoría, combo, y monto mínimo (con piso 0
+    para el precio de franja). Lo aplicado va a `venta_promocion` y **no** a
+    `venta.descuento_*`, tal como esta deuda exigía. Queda fuera la otra
+    mitad de la `promocion` de `data-model.md` §6 —lista de precios,
+    material promocional, guion de atención, capacitación (RN-PRM-001/002)—,
+    que sigue sin caso real que la pida.
   - ✅ 2026-08-02 **Alta de cliente/proveedor jurídico consulta Factiliza
     para el nombre/razón social** (`RENIEC`/`SUNAT` vía el mismo proveedor,
     ADR-005 ya lo dejaba previsto). `FactilizaClient.consultar_dni`/

@@ -195,6 +195,28 @@ def _extras_de(pares: list[tuple]) -> dict[uuid.UUID, list[tuple]]:
     return hijos
 
 
+def _tandas_de(pares: list[tuple]) -> list[tuple[int, list[tuple]]]:
+    """Los envíos a cocina de una venta, en orden (ADR-075).
+
+    Una mesa que pide de a poco es UNA venta, pero para la cocina cada envío
+    es una comanda distinta: sin separarlas, el postre pedido a las 21:40
+    aparecía en la misma pastilla que la entrada de las 20:15 y no había
+    forma de ver qué acababa de entrar.
+
+    La tanda la manda **el plato**, no cada fila: un extra se prepara con lo
+    suyo (RN-CUP-014), así que se agrupa por la tanda de su padre aunque la
+    propia diga otra cosa. Sin ese cuidado, un dato viejo con las dos
+    descoordinadas dejaría al extra en un grupo donde su plato no está — y
+    como la tarjeta se arma recorriendo platos, desaparecería de la pantalla.
+    """
+    del_plato = {it.id: it.tanda for it, _ in pares if it.padre_venta_item_id is None}
+    grupos: dict[int, list[tuple]] = {}
+    for item, producto in pares:
+        clave = del_plato.get(item.padre_venta_item_id or item.id, item.tanda)
+        grupos.setdefault(clave, []).append((item, producto))
+    return sorted(grupos.items())
+
+
 def _familia(pares: list[tuple], item: VentaItem) -> list[VentaItem]:
     """El plato y sus extras: lo que cocina trata como una sola cosa."""
     padre_id = item.padre_venta_item_id or item.id
@@ -338,6 +360,10 @@ def _item_a_dict(
             for hijo, prod in extras
         ],
         "etapa_kds": item.etapa_kds,
+        # Lo que el mesero le dijo a cocina sobre este plato. Va con la línea
+        # y no al pie: es de este plato, y al pie se leería como si aplicara
+        # a todo el pedido — que es lo que sí hace `nota_cocina`.
+        "nota": item.nota,
         # Dónde está la línea ahora mismo. Es lo que despacho necesita para
         # saber si el pedido espera por el horno o por la barra; `None` = ya
         # no espera por nadie.
@@ -348,6 +374,12 @@ def _item_a_dict(
 def cola_pantalla(session: Session, pantalla_id: uuid.UUID) -> list[dict]:
     """Pedidos activos de la sucursal, con los ítems que competen a la
     pantalla y el avance REAL del pedido completo (todas las categorías).
+
+    **Preparación ve una tarjeta por tanda** y despacho una por pedido
+    (ADR-075). No es una inconsistencia: la cocina prepara lo que acaba de
+    entrar y necesita ver cada envío con su propio reloj, mientras que el
+    despacho arma la bolsa contra el pedido completo (ADR-044) y partirlo en
+    dos tarjetas sería la forma de entregar media orden.
     """
     pantalla = session.get(KdsPantalla, pantalla_id)
     if pantalla is None or pantalla.deleted_at is not None:
@@ -372,41 +404,65 @@ def cola_pantalla(session: Session, pantalla_id: uuid.UUID) -> list[dict]:
             continue
         restas = _restas_por_item(session, pares)
         valores = _valores_por_item(session, pares)
-        mios, pendiente_aqui = _items_de_pantalla(
-            pantalla, cadena, pares, restas, valores
+        grupos = (
+            _tandas_de(pares) if pantalla.tipo == "preparacion" else [(1, pares)]
         )
-        if pantalla.tipo == "preparacion":
-            # La estación ve TODOS sus ítems, incluidos los que ya tachó: el
-            # ítem tachado tiene que seguir a la vista de quien lo tachó. El
-            # pedido desaparece de esta cola recién cuando la estación
-            # terminó todo lo suyo — no ítem por ítem.
-            if not mios or not pendiente_aqui:
+        for tanda, del_grupo in grupos:
+            estados = [it.estado_preparacion for it, _ in del_grupo]
+            mios, pendiente_aqui = _items_de_pantalla(
+                pantalla, cadena, del_grupo, restas, valores
+            )
+            if pantalla.tipo == "preparacion":
+                # La estación ve TODOS sus ítems, incluidos los que ya tachó:
+                # el ítem tachado tiene que seguir a la vista de quien lo
+                # tachó. La tanda desaparece de esta cola recién cuando la
+                # estación terminó todo lo suyo — no ítem por ítem.
+                if not mios or not pendiente_aqui:
+                    continue
+            elif not any(e == "listo" for e in estados_todos):
+                # Despacho: muestra pedidos con algo listo o todo listo.
                 continue
-        elif not any(e == "listo" for e in estados_todos):
-            # Despacho: muestra pedidos con algo listo o todo listo.
-            continue
-        cola.append(
-            {
-                "venta_id": str(venta.id),
-                "numero_orden": venta.numero_orden,
-                "referencia_atencion": venta.referencia_atencion,
-                # Despacho arma la bolsa mirando esta pantalla: la dirección
-                # va acá y no solo en el papel.
-                "direccion_entrega": venta.direccion_entrega,
-                "modalidad": venta.modalidad,
-                "canal": venta.canal,
-                # La cocina tiene que saber que está preparando comida del
-                # personal: cambia la prioridad frente a un pedido de cliente.
-                "tipo": venta.tipo,
-                "consumo_motivo": venta.consumo_motivo,
-                "estado_pedido": rules.estado_pedido(estados_todos),
-                # Desde cuándo espera. Sin esto la pantalla no puede saber si
-                # un pedido lleva cuatro minutos o cuarenta, y los dos se ven
-                # exactamente igual.
-                "creado_en": venta.created_at,
-                "items": mios,
-            }
-        )
+            cola.append(
+                {
+                    "venta_id": str(venta.id),
+                    "numero_orden": venta.numero_orden,
+                    # Qué envío del pedido es esta tarjeta. Despacho siempre
+                    # manda 1: su unidad es el pedido entero.
+                    "tanda": tanda,
+                    "referencia_atencion": venta.referencia_atencion,
+                    # Despacho arma la bolsa mirando esta pantalla: la
+                    # dirección va acá y no solo en el papel.
+                    "direccion_entrega": venta.direccion_entrega,
+                    "modalidad": venta.modalidad,
+                    "canal": venta.canal,
+                    # La cocina tiene que saber que está preparando comida del
+                    # personal: cambia la prioridad frente a un pedido de
+                    # cliente.
+                    "tipo": venta.tipo,
+                    "consumo_motivo": venta.consumo_motivo,
+                    # Cómo se sirve el pedido entero. Va en TODAS las tandas:
+                    # "servir todo junto" es una instrucción del pedido, y la
+                    # tanda que no la lleve la ignoraría sin saberlo.
+                    "nota_cocina": venta.nota_cocina,
+                    "estado_pedido": rules.estado_pedido(estados),
+                    # Desde cuándo espera. Sin esto la pantalla no puede saber
+                    # si un pedido lleva cuatro minutos o cuarenta, y los dos
+                    # se ven exactamente igual.
+                    #
+                    # Para la cocina es la hora de ESTA tanda, no la del
+                    # pedido: una mesa abierta hace dos horas que acaba de
+                    # pedir un café saldría en rojo, y el semáforo dejaría de
+                    # significar algo el día que alguien se siente a comer sin
+                    # apuro. Despacho sigue contando desde el pedido, que es
+                    # lo que el cliente está esperando.
+                    "creado_en": (
+                        min(it.created_at for it, _ in del_grupo)
+                        if pantalla.tipo == "preparacion"
+                        else venta.created_at
+                    ),
+                    "items": mios,
+                }
+            )
     return cola
 
 
@@ -475,6 +531,7 @@ def historial_pantalla(
                 "canal": venta.canal,
                 "tipo": venta.tipo,
                 "consumo_motivo": venta.consumo_motivo,
+                "nota_cocina": venta.nota_cocina,
                 "estado_pedido": "entregado",
                 "creado_en": venta.created_at,
                 "entregado_en": max(it.updated_at for it, _ in pares),
@@ -740,6 +797,14 @@ def _platos_en_papel(session: Session, pares: list[tuple]) -> list[str]:
             lineas.append(f"   + {suf}{extra.nombre.upper()}"[:ANCHO_COMANDA])
         for nombre in restas.get(it.id, []):
             lineas.append(f"   SIN {nombre.upper()}"[:ANCHO_COMANDA])
+        # La nota va al final del plato, después de lo estructurado: es lo
+        # que ninguna resta ni ningún atributo pudo expresar, y el cocinero
+        # ya sabe de qué plato habla.
+        if it.nota:
+            lineas += [
+                f"   ** {parte}"
+                for parte in textwrap.wrap(it.nota.upper(), ANCHO_COMANDA - 6)
+            ]
     return lineas
 
 
@@ -780,6 +845,13 @@ def comanda(session: Session, venta_id: uuid.UUID) -> dict:
         lineas.append("** REIMPRESION **".center(ANCHO_COMANDA))
         lineas.append("-" * ANCHO_COMANDA)
     lineas += _platos_en_papel(session, pares)
+    # Al pie y no arriba: primero se lee qué hay que preparar, y después cómo
+    # sale. Arriba competiría con el número de orden, que es lo que la cocina
+    # busca de un vistazo.
+    if venta.nota_cocina:
+        lineas.append("-" * ANCHO_COMANDA)
+        lineas.append("AL SERVIR:")
+        lineas += textwrap.wrap(venta.nota_cocina.upper(), ANCHO_COMANDA)
     lineas.append("*" * ANCHO_COMANDA)
     return {
         "venta_id": str(venta_id),

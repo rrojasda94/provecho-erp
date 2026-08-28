@@ -331,6 +331,10 @@ def _venta_a_dict(session: Session, venta: Venta) -> dict:
         ),
         "mesa_id": str(venta.mesa_id) if venta.mesa_id else None,
         "comensales": venta.comensales,
+        # Las notas viajan con la venta aunque en la nube ya no se preparen
+        # nada: son lo que la cocina leyó, y la comanda reimpresa de una
+        # venta vieja tiene que decir lo mismo que dijo la primera vez.
+        "nota_cocina": venta.nota_cocina,
         "idempotency_key": venta.idempotency_key,
         "fecha_orden": venta.fecha_orden.isoformat(),
         "numero_orden": venta.numero_orden,
@@ -379,6 +383,11 @@ def _items_a_dict(filas: list) -> list[dict]:
             # usó.
             "sin_articulo_ids": it.sin_articulo_ids or [],
             "valores_variante_ids": it.valores_variante_ids or [],
+            "nota": it.nota,
+            # Sin esto el replay dejaría todo en la tanda 1 y la comanda de
+            # la nube mostraría como un solo envío lo que en el local fueron
+            # tres (ADR-075).
+            "tanda": it.tanda,
         }
 
     hijos: dict = {}
@@ -521,6 +530,8 @@ def _crear(session: Session, datos: dict) -> None:
                 # línea. Los lotes viejos no traen las claves.
                 "sin_articulo_ids": it.get("sin_articulo_ids") or [],
                 "valores_variante_ids": it.get("valores_variante_ids") or [],
+                "nota": it.get("nota"),
+                "tanda": it.get("tanda"),
                 "extras": [
                     {
                         "producto_comercial_id": uuid.UUID(
@@ -551,6 +562,7 @@ def _crear(session: Session, datos: dict) -> None:
         costo_entrega=_decimal(datos.get("costo_entrega")),
         mesa_id=uuid.UUID(datos["mesa_id"]) if datos.get("mesa_id") else None,
         comensales=datos.get("comensales"),
+        nota_cocina=datos.get("nota_cocina"),
         fecha_orden=date.fromisoformat(datos["fecha_orden"]),
         numero_orden=datos["numero_orden"],
         # Los lotes emitidos antes del consumo de personal no traen la clave:

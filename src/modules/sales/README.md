@@ -180,6 +180,38 @@ cuatro huecos que el punto de venta necesitaba y el modelo no daba.
   las líneas nuevas en `items`: mandar el acumulado haría que `accounting`
   asentara la venta dos veces. Después del cobro devuelve 409: la cuenta está
   cerrada y lo que venga es otra orden.
+- **Cada envío es una tanda** (ADR-075): todas las líneas de una misma
+  llamada reciben `venta_item.tanda = max(tanda de la venta) + 1`, y los
+  extras heredan la de su plato. El KDS de preparación muestra una tarjeta
+  por `(venta, tanda)` con el reloj de esa tanda; despacho sigue mostrando
+  una por pedido. Mover líneas a otra orden les da la tanda del destino: la
+  del origen numeraba los envíos de otro pedido. El PDV, del lado del
+  cliente, deja la línea pendiente hasta que alguien toca "Enviar aumento" —
+  antes viajaba al confirmar el diálogo del producto.
+- **Promociones condicionales** (ADR-076, RN-PRM-009..013): `promocion`
+  —vigencia (fechas, días, franja que puede cruzar la medianoche), ámbito
+  (marca/sucursal/canal/modalidad), prioridad, `acumulable`— con cuatro
+  tipos (`nxm`, `cantidad`, `combo`, `monto_minimo`) y su condición/beneficio
+  en JSONB. Las aplicadas van a `venta_promocion`, **nunca** a
+  `venta.descuento_*`. La aritmética es pura (`domain/promociones.py`, sin
+  sesión ni reloj) y `recalcular_promociones` corre en los cuatro caminos que
+  cambian un pedido: crear, agregar, quitar y mover. `total_a_cobrar` las
+  resta **antes** del descuento manual. Alta en
+  `POST/GET/PATCH /sales/promociones` con `sales.gestionar_promociones`.
+- **Notas de cocina** (ADR-075): `venta_item.nota` (texto de ese plato) y
+  `venta.nota_cocina` (cómo se sirve el pedido entero). La primera viaja en
+  `VentaItemIn`, sale bajo su plato en el KDS y en la comanda; la segunda va
+  en el alta y se cambia con `PUT /ventas/{id}/nota-cocina` —mismo permiso
+  que crear, sin firma, solo con la venta en `orden`—, se pinta al pie de la
+  tarjeta y **en todas las tandas**.
+- **El borrador del PDV se guarda acá** (ADR-074): `PUT
+  /sales/borradores/{id}` (upsert por el id que trae el cliente),
+  `GET /sales/borradores?punto_venta_id=` y `DELETE /sales/borradores/{id}`,
+  todos con `sales.crear`. La tabla `pedido_borrador` guarda el ticket a
+  medio armar contra el **punto de venta** —no contra el usuario, para que el
+  relevo de turno lo siga— con el contenido en JSONB: un borrador no es un
+  hecho de negocio hasta que se envía. El listado filtra por jornada y
+  `sales.purgar_borradores_viejos` (Celery beat, 5:30) borra lo anterior.
 - **Ventana de corrección de 5 minutos** (RN-COM-029): quitar —una línea o la
   orden entera— no pide firma dentro de la ventana; fuera de ella sí
   (`rules.VENTANA_CORRECCION`, `ventas.lineas_en_ventana` /
@@ -191,7 +223,9 @@ cuatro huecos que el punto de venta necesitaba y el modelo no daba.
   `POST /ventas/{id}/anular-lineas`, con autorización de supervisor y
   motivo; publica `sales.lineas_anuladas` → inventory repone. Quitar todas
   anula la orden. Antes de enviar, el pedido vive en el PDV y no pasa
-  por acá.
+  por acá. El **motivo lo teclea quien quita** (ADR-075): el PDV mandaba
+  `"Anulado desde PDV"` en duro, así que el campo existía y el reporte de
+  anulaciones no decía nada.
 - **Mover líneas entre órdenes** (RN-COM-043, ADR-071):
   `POST /ventas/{id}/mover-lineas` reasigna líneas ya enviadas a otra orden
   abierta (`destino_venta_id`), a una mesa libre (`destino_mesa_id`), o a

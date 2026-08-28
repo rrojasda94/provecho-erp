@@ -10,7 +10,7 @@ import uuid
 from src.config.settings import settings
 from src.core.celery_app import celery_app
 from src.core.database import SessionLocal
-from src.modules.sales.application import alertas, comprobantes
+from src.modules.sales.application import alertas, borradores, comprobantes
 from src.shared.integrations.factiliza import FactilizaError
 
 # Inyectable (los tests la reemplazan), mismo patrón que `listeners`: sin
@@ -115,6 +115,26 @@ def barrer_pedidos_demorados() -> int:
         creadas = alertas.barrer(session)
         session.commit()
         return len(creadas)
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+@celery_app.task(name="sales.purgar_borradores_viejos")
+def purgar_borradores_viejos() -> int:
+    """Borra los borradores del PDV de jornadas anteriores (ADR-074).
+
+    El PDV ya no los muestra —`borradores.listar` filtra por jornada—, así
+    que esto es lo único que impide que la tabla acumule el ticket a medio
+    armar de cada turno del año.
+    """
+    session = session_factory()
+    try:
+        borrados = borradores.purgar(session)
+        session.commit()
+        return borrados
     except Exception:
         session.rollback()
         raise

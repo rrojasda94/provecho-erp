@@ -1,5 +1,16 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import {
+  COOKIE_REFRESH,
+  COOKIE_TOKEN,
+  MAX_AGE_ACCESS,
+  MAX_AGE_REFRESH,
+  convieneRenovar,
+  opcionesCookie,
+  refrescarSesion,
+  type ParDeTokens,
+} from "@/lib/sesion-refresh";
+
 /**
  * Content-Security-Policy con nonce por request.
  *
@@ -28,7 +39,55 @@ import { NextResponse, type NextRequest } from "next/server";
 const GOOGLE_APIS = "https://*.googleapis.com";
 const GOOGLE_ESTATICO = "https://*.gstatic.com";
 
-export function middleware(request: NextRequest) {
+/**
+ * Renueva la sesión cuando la cookie de acceso ya venció (ADR-073).
+ *
+ * Va en el middleware y no en cada llamada porque es el único punto por el
+ * que pasa TODO: el render de un server component, el proxy del navegador y
+ * cualquier route handler. Poner el refresco en el proxy dejaba fuera al
+ * render, y ponerlo en un latido del navegador no cubre a la pestaña que
+ * estuvo quieta media hora y vuelve con un clic.
+ *
+ * Se dispara cuando la cookie de acceso no está —Next la planta con el mismo
+ * plazo que el token, así que el navegador la borra al vencer— **o** cuando
+ * el token que trae está por vencer. Lo segundo no sobra: son dos relojes
+ * distintos, y basta un desfase de segundos entre el navegador y la API para
+ * que el token muera con la cookie todavía puesta. Esa ventana es el 401 que
+ * deja la caja en `/login` a mitad de un pedido.
+ *
+ * Además del `Set-Cookie`, reescribe la cookie del **request**: sin eso, la
+ * petición que disparó la renovación seguiría viajando sin token y el
+ * usuario vería un 401 antes de que la cookie nueva sirva de algo.
+ */
+async function renovarSesion(
+  request: NextRequest,
+  cabeceras: Headers,
+): Promise<ParDeTokens | null> {
+  const token = request.cookies.get(COOKIE_TOKEN)?.value;
+  if (token && !convieneRenovar(token)) return null;
+  const refresh = request.cookies.get(COOKIE_REFRESH)?.value;
+  if (!refresh) return null;
+
+  const tokens = await refrescarSesion(refresh);
+  if (!tokens) return null;
+
+  // Se **reemplaza**, no se agrega: con dos cookies del mismo nombre en la
+  // cabecera, el parser de Next se queda con la primera, así que dejar el
+  // token vencido delante haría que este viaje sin efecto. Reescribir la
+  // lista entera no depende de en qué orden las mande el navegador.
+  const otras = (cabeceras.get("cookie") ?? "")
+    .split(";")
+    .map((c) => c.trim())
+    .filter((c) => c && !c.startsWith(`${COOKIE_TOKEN}=`));
+  cabeceras.set(
+    "cookie",
+    [...otras, `${COOKIE_TOKEN}=${tokens.access_token}`].join("; "),
+  );
+  return tokens;
+}
+
+
+export async function middleware(request: NextRequest) {
   const nonce = crypto.randomUUID();
   const desarrollo = process.env.NODE_ENV !== "production";
 
@@ -73,8 +132,25 @@ export function middleware(request: NextRequest) {
   cabeceras.set("x-nonce", nonce);
   cabeceras.set("Content-Security-Policy", csp);
 
+  const renovados = await renovarSesion(request, cabeceras);
+
   const respuesta = NextResponse.next({ request: { headers: cabeceras } });
   respuesta.headers.set("Content-Security-Policy", csp);
+  if (renovados) {
+    respuesta.cookies.set(
+      COOKIE_TOKEN,
+      renovados.access_token,
+      opcionesCookie(MAX_AGE_ACCESS),
+    );
+    // El refresh también rota (detección de reuso del lado de la API): si no
+    // se guarda el nuevo, la próxima renovación mandaría el viejo y la API
+    // lo leería como token robado, revocando la sesión entera.
+    respuesta.cookies.set(
+      COOKIE_REFRESH,
+      renovados.refresh_token,
+      opcionesCookie(MAX_AGE_REFRESH),
+    );
+  }
   return respuesta;
 }
 

@@ -307,6 +307,22 @@ const PDV: Caso[] = [
       { producto_comercial_id: UUID, cantidad: "1", grupo_cobro: 1 },
     ]),
   ),
+  caso("fijarNotaCocina", () => api.fijarNotaCocina(UUID, "Servir todo junto")),
+  caso("promocionesDeVenta", () => api.promocionesDeVenta(UUID)),
+  caso("canjearCupon", () => api.canjearCupon(UUID, "ABC123")),
+  caso("aplicarDescuento", () =>
+    api.aplicarDescuento(UUID, {
+      modo: "porcentaje",
+      valor: "10",
+      motivo: "cliente frecuente",
+      autorizacion: "t",
+    }),
+  ),
+  caso("guardarBorrador", () =>
+    api.guardarBorrador(UUID, UUID, { tipo: "mesa", lineas: [] }),
+  ),
+  caso("borradores", () => api.borradores(UUID)),
+  caso("descartarBorrador", () => api.descartarBorrador(UUID)),
   caso("anularLineas", () =>
     api.anularLineas(UUID, {
       venta_item_ids: [UUID],
@@ -846,4 +862,34 @@ test("las rutas con segmento variable existen para todos sus valores", () => {
     }
   }
   assert.deepEqual(huerfanas, []);
+});
+
+/**
+ * El proxy del navegador tiene que reenviar **todos** los verbos que la API
+ * expone.
+ *
+ * Next resuelve un route handler por verbo exportado y responde 405 al que
+ * falte, sin decir en ningún lado que el que falta es el del proxy y no el
+ * del endpoint. Con `PUT` sin exportar, el guardado del borrador del PDV
+ * (ADR-074) devolvía 405 contra un endpoint que existía y funcionaba.
+ */
+test("el proxy exporta un handler por cada verbo que la API usa", () => {
+  const fuente = readFileSync(
+    path.join(import.meta.dirname, "..", "app", "api", "proxy", "[...ruta]", "route.ts"),
+    "utf-8",
+  );
+  const exportados = new Set(
+    [...fuente.matchAll(/export async function ([A-Z]+)\(/g)].map((m) => m[1]),
+  );
+  const usados = new Set(
+    Object.values(contrato.paths).flatMap((ops) =>
+      Object.keys(ops).map((v) => v.toUpperCase()),
+    ),
+  );
+  const faltantes = [...usados].filter((v) => !exportados.has(v)).sort();
+  assert.deepEqual(
+    faltantes,
+    [],
+    `el proxy no reenvía ${faltantes.join(", ")}: esas rutas dan 405 desde el navegador`,
+  );
 });

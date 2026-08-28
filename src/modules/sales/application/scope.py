@@ -15,6 +15,7 @@ from src.modules.sales.infrastructure.models import (
     Cliente,
     KdsPantalla,
     Mesa,
+    PuntoVenta,
     Venta,
     VentaItem,
 )
@@ -73,3 +74,13 @@ def exigir_venta_item(
         raise NoEncontrado("ítem de venta no encontrado")
     exigir_venta(session, item.venta_id, tenant)
     return item
+
+
+def exigir_punto_venta(
+    session: Session, punto_venta_id: uuid.UUID, tenant: Tenant
+) -> PuntoVenta:
+    punto = session.get(PuntoVenta, punto_venta_id)
+    if punto is None:
+        raise NoEncontrado("punto de venta no encontrado")
+    tenant.exigir_sucursal(punto.sucursal_id)
+    return punto

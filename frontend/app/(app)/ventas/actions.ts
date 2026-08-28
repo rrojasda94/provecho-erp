@@ -197,3 +197,100 @@ export async function eliminarMesaAction(mesaId: string): Promise<EstadoVenta> {
   revalidatePath("/ventas/mesas");
   return { error: "", ok: true };
 }
+
+// --- Promociones condicionales (ADR-076) -------------------------------------
+/** Lo que el formulario manda para cada tipo, ya en la forma que la API
+ * espera. Vive acá y no en el cliente porque es traducción de contrato: el
+ * formulario pregunta en el idioma del negocio ("lleva 2, paga 1") y el
+ * servidor guarda `condicion`/`beneficio`. */
+function armarRegla(formData: FormData): { condicion: object; beneficio: object } {
+  const numero = (campo: string) => {
+    const crudo = String(formData.get(campo) ?? "").trim();
+    return crudo === "" ? null : Number(crudo);
+  };
+  const lista = (campo: string) =>
+    String(formData.get(campo) ?? "")
+      .split(",")
+      .map((x) => x.trim())
+      .filter(Boolean);
+
+  const productos = lista("producto_ids");
+  const categorias = lista("categoria_ids");
+  const alcance = { producto_ids: productos, categoria_ids: categorias };
+
+  switch (String(formData.get("tipo"))) {
+    case "nxm":
+      return {
+        condicion: { ...alcance, lleva: numero("lleva") },
+        beneficio: { libera: numero("libera"), descuento_pct: numero("descuento_pct") },
+      };
+    case "cantidad":
+      return {
+        condicion: { ...alcance, minimo: numero("minimo") },
+        beneficio: { descuento_pct: numero("descuento_pct") },
+      };
+    case "combo":
+      return {
+        condicion: { producto_ids: productos },
+        beneficio: {
+          precio_fijo: numero("precio_fijo"),
+          gratis_producto_id: String(formData.get("gratis_producto_id") ?? "") || null,
+        },
+      };
+    default:
+      return {
+        condicion: { ...alcance, minimo: numero("minimo") ?? 0 },
+        beneficio: { descuento_pct: numero("descuento_pct") },
+      };
+  }
+}
+
+export async function crearPromocionAction(
+  _previo: EstadoVenta,
+  formData: FormData,
+): Promise<EstadoVenta> {
+  const nombre = String(formData.get("nombre") ?? "").trim();
+  if (!nombre) return { error: "La promoción necesita un nombre.", ok: false };
+  const texto = (campo: string) => String(formData.get(campo) ?? "").trim() || null;
+  const dias = formData.getAll("dias_semana").map((d) => Number(d));
+
+  try {
+    await apiFetch("/api/v1/sales/promociones", {
+      token: await token(),
+      metodo: "POST",
+      cuerpo: {
+        nombre,
+        tipo: String(formData.get("tipo") ?? "nxm"),
+        ...armarRegla(formData),
+        desde: texto("desde"),
+        hasta: texto("hasta"),
+        dias_semana: dias.length ? dias : null,
+        hora_desde: texto("hora_desde"),
+        hora_hasta: texto("hora_hasta"),
+        sucursal_id: texto("sucursal_id"),
+        modalidades: formData.getAll("modalidades").map(String),
+        prioridad: Number(formData.get("prioridad") ?? 0),
+        acumulable: formData.get("acumulable") === "on",
+      },
+    });
+  } catch (e) {
+    return { error: mensajeDe(e, "No se pudo crear la promoción."), ok: false };
+  }
+  revalidatePath("/ventas/promociones");
+  return { error: "", ok: true };
+}
+
+export async function terminarPromocionAction(
+  promocionId: string,
+): Promise<EstadoVenta> {
+  try {
+    await apiFetch(`/api/v1/sales/promociones/${promocionId}/terminar`, {
+      token: await token(),
+      metodo: "POST",
+    });
+  } catch (e) {
+    return { error: mensajeDe(e, "No se pudo terminar la promoción."), ok: false };
+  }
+  revalidatePath("/ventas/promociones");
+  return { error: "", ok: true };
+}
