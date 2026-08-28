@@ -27,6 +27,7 @@ from src.modules.rrhh.infrastructure.models import (
     PactoPermanencia,
     Postulante,
     SolicitudPermiso,
+    TerminalMarcaje,
     Trabajador,
     TurnoSucursal,
 )
@@ -150,3 +151,13 @@ def exigir_turno(
         raise NoEncontrado("turno no encontrado")
     tenant.exigir_sucursal(turno.sucursal_id)
     return turno
+
+
+def exigir_terminal(
+    session: Session, terminal_id: uuid.UUID, tenant: Tenant
+) -> TerminalMarcaje:
+    terminal = session.get(TerminalMarcaje, terminal_id)
+    if terminal is None or terminal.deleted_at is not None:
+        raise NoEncontrado("terminal no encontrado")
+    tenant.exigir_sucursal(terminal.sucursal_id)
+    return terminal

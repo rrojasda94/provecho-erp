@@ -658,6 +658,17 @@ de su módulo y se prueban de forma aislada.
 - **RN-RRHH-022** La marcación nunca genera horas extra. Quedarse pasada la
   hora de salida produce el aviso de RN-RRHH-021 y nada más; la hora extra se
   autoriza antes y la registra RRHH a mano.
+- **RN-RRHH-023** Solo se marca desde un **terminal autorizado** para esa
+  sucursal (ADR-073): un dispositivo se enrola una vez, desde el
+  back-office, con un código de activación de 6 dígitos vigente 30 minutos.
+  Sin un terminal activo de esa sucursal, el marcaje se rechaza aunque el
+  PIN sea correcto — cierra el hueco de la sesión de la cuenta de servicio
+  exportable a cualquier navegador.
+- **RN-RRHH-024** Cada marcación guarda su evidencia (terminal, IP,
+  ubicación, foto) aparte de la fila-resumen del día, con retención
+  limitada para la foto. Ninguno de esos campos es obligatorio ni bloquea
+  el marcaje: su ausencia queda registrada como tal, nunca como un motivo
+  para no fichar (ADR-073).
 
 ## Auditoría
 

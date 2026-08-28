@@ -11580,6 +11580,80 @@
         "title": "MarcaUpdate",
         "type": "object"
       },
+      "MarcacionOut": {
+        "description": "La evidencia de un toque del pad. Sin la foto —pesa y se pide aparte\n(`GET /rrhh/marcaciones/{id}/foto`)—, solo si existe. A lo sumo dos\nfilas por asistencia (entrada y salida): no hace falta optimizar la\ncarga de `tiene_foto` más allá del `deferred` de la columna.",
+        "properties": {
+          "distancia_m": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distancia M"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "ip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ip"
+          },
+          "momento": {
+            "format": "date-time",
+            "title": "Momento",
+            "type": "string"
+          },
+          "terminal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Terminal Id"
+          },
+          "tiene_foto": {
+            "title": "Tiene Foto",
+            "type": "boolean"
+          },
+          "tipo": {
+            "title": "Tipo",
+            "type": "string"
+          },
+          "usuario_id": {
+            "format": "uuid",
+            "title": "Usuario Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "tipo",
+          "momento",
+          "usuario_id",
+          "terminal_id",
+          "ip",
+          "distancia_m",
+          "tiene_foto"
+        ],
+        "title": "MarcacionOut",
+        "type": "object"
+      },
       "MatrizCeldaOut": {
         "properties": {
           "aplica_valores": {
@@ -14211,6 +14285,52 @@
       },
       "PadMarcarIn": {
         "properties": {
+          "foto": {
+            "anyOf": [
+              {
+                "maxLength": 175000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Foto"
+          },
+          "lat": {
+            "anyOf": [
+              {
+                "maximum": 90.0,
+                "minimum": -90.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lat"
+          },
+          "lng": {
+            "anyOf": [
+              {
+                "maximum": 180.0,
+                "minimum": -180.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lng"
+          },
           "pin": {
             "maxLength": 12,
             "minLength": 4,
@@ -23510,6 +23630,18 @@
             "title": "Nombre",
             "type": "string"
           },
+          "radio_marcaje_m": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Radio Marcaje M"
+          },
           "tenencia": {
             "enum": [
               "propia",
@@ -23648,6 +23780,17 @@
           "nombre": {
             "title": "Nombre",
             "type": "string"
+          },
+          "radio_marcaje_m": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Radio Marcaje M"
           },
           "tenencia": {
             "anyOf": [
@@ -23798,6 +23941,18 @@
               }
             ],
             "title": "Nombre"
+          },
+          "radio_marcaje_m": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Radio Marcaje M"
           },
           "tenencia": {
             "anyOf": [
@@ -24097,6 +24252,117 @@
           "marco_salida"
         ],
         "title": "TarjetaOut",
+        "type": "object"
+      },
+      "TerminalCodigoOut": {
+        "description": "El código de activación, visible una sola vez — igual que el token\nde un agente.",
+        "properties": {
+          "codigo": {
+            "title": "Codigo",
+            "type": "string"
+          },
+          "terminal": {
+            "$ref": "#/components/schemas/TerminalOut"
+          }
+        },
+        "required": [
+          "terminal",
+          "codigo"
+        ],
+        "title": "TerminalCodigoOut",
+        "type": "object"
+      },
+      "TerminalCrear": {
+        "properties": {
+          "nombre": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Nombre",
+            "type": "string"
+          },
+          "sucursal_id": {
+            "format": "uuid",
+            "title": "Sucursal Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sucursal_id",
+          "nombre"
+        ],
+        "title": "TerminalCrear",
+        "type": "object"
+      },
+      "TerminalEnrolarIn": {
+        "properties": {
+          "codigo": {
+            "maxLength": 6,
+            "minLength": 6,
+            "title": "Codigo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "codigo"
+        ],
+        "title": "TerminalEnrolarIn",
+        "type": "object"
+      },
+      "TerminalEnrolarOut": {
+        "description": "El secreto en claro, visible una sola vez: de acá en más solo queda\nsu hash, y perderlo obliga a enrolar de nuevo.",
+        "properties": {
+          "secreto": {
+            "title": "Secreto",
+            "type": "string"
+          }
+        },
+        "required": [
+          "secreto"
+        ],
+        "title": "TerminalEnrolarOut",
+        "type": "object"
+      },
+      "TerminalOut": {
+        "properties": {
+          "activo": {
+            "title": "Activo",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "sucursal_id": {
+            "format": "uuid",
+            "title": "Sucursal Id",
+            "type": "string"
+          },
+          "ultima_marcacion_en": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ultima Marcacion En"
+          }
+        },
+        "required": [
+          "id",
+          "sucursal_id",
+          "nombre",
+          "activo",
+          "ultima_marcacion_en"
+        ],
+        "title": "TerminalOut",
         "type": "object"
       },
       "TicketComprobanteOut": {
@@ -42310,9 +42576,68 @@
         ]
       }
     },
+    "/api/v1/rrhh/asistencia/terminal/enrolar": {
+      "post": {
+        "description": "La tablet teclea el código que un admin generó desde el back-office y\nse queda con un secreto propio: de acá en más, cada marcación lo manda\n(RN-RRHH-023, ADR-073). Rate limit por IP y no por terminal — todavía no\nhay uno enrolado con quien contar el límite.",
+        "operationId": "enrolar_terminal_api_v1_rrhh_asistencia_terminal_enrolar_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "sucursal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sucursal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TerminalEnrolarIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TerminalEnrolarOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Enrolar Terminal",
+        "tags": [
+          "rrhh"
+        ]
+      }
+    },
     "/api/v1/rrhh/asistencia/terminal/marcar": {
       "post": {
-        "description": "Registra la marcación firmada con el PIN del propio trabajador.\n\nEl límite se cuenta **por trabajador** y no por IP: en un local todas\nlas tabletas salen por la misma dirección y el cambio de turno son diez\npersonas marcando seguido — un límite por IP castigaría a la cola por\nculpa de quien se equivocó de tarjeta.",
+        "description": "Registra la marcación firmada con el PIN del propio trabajador, desde\nun terminal autorizado (RN-RRHH-023) y con su evidencia (RN-RRHH-024).\n\nEl límite se cuenta **por trabajador** y no por IP: en un local todas\nlas tabletas salen por la misma dirección y el cambio de turno son diez\npersonas marcando seguido — un límite por IP castigaría a la cola por\nculpa de quien se equivocó de tarjeta.",
         "operationId": "marcar_en_el_pad_api_v1_rrhh_asistencia_terminal_marcar_post",
         "parameters": [
           {
@@ -42323,6 +42648,22 @@
               "format": "uuid",
               "title": "Sucursal Id",
               "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Terminal",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Terminal"
             }
           }
         ],
@@ -42417,6 +42758,59 @@
           }
         ],
         "summary": "Tarjetas Del Pad",
+        "tags": [
+          "rrhh"
+        ]
+      }
+    },
+    "/api/v1/rrhh/asistencia/{asistencia_id}/marcaciones": {
+      "get": {
+        "description": "La evidencia de cada toque del día: quién firmó, desde qué terminal,\ncon qué IP y a qué distancia de la sucursal (RN-RRHH-024).",
+        "operationId": "marcaciones_de_asistencia_api_v1_rrhh_asistencia__asistencia_id__marcaciones_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "asistencia_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Asistencia Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MarcacionOut"
+                  },
+                  "title": "Response Marcaciones De Asistencia Api V1 Rrhh Asistencia  Asistencia Id  Marcaciones Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Marcaciones De Asistencia",
         "tags": [
           "rrhh"
         ]
@@ -43225,6 +43619,52 @@
           }
         ],
         "summary": "Ver Liquidacion Bss",
+        "tags": [
+          "rrhh"
+        ]
+      }
+    },
+    "/api/v1/rrhh/marcaciones/{marcacion_id}/foto": {
+      "get": {
+        "operationId": "foto_de_marcacion_api_v1_rrhh_marcaciones__marcacion_id__foto_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "marcacion_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Marcacion Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Foto De Marcacion",
         "tags": [
           "rrhh"
         ]
@@ -44355,6 +44795,143 @@
           }
         ],
         "summary": "Rechazar Solicitud Permiso",
+        "tags": [
+          "rrhh"
+        ]
+      }
+    },
+    "/api/v1/rrhh/terminales": {
+      "get": {
+        "operationId": "listar_terminales_api_v1_rrhh_terminales_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "sucursal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sucursal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TerminalOut"
+                  },
+                  "title": "Response Listar Terminales Api V1 Rrhh Terminales Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Terminales",
+        "tags": [
+          "rrhh"
+        ]
+      },
+      "post": {
+        "operationId": "crear_terminal_api_v1_rrhh_terminales_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TerminalCrear"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TerminalCodigoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Terminal",
+        "tags": [
+          "rrhh"
+        ]
+      }
+    },
+    "/api/v1/rrhh/terminales/{terminal_id}": {
+      "delete": {
+        "operationId": "revocar_terminal_api_v1_rrhh_terminales__terminal_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "terminal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Terminal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Revocar Terminal",
         "tags": [
           "rrhh"
         ]

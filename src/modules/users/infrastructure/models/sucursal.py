@@ -2,7 +2,7 @@
 
 import uuid
 
-from sqlalchemy import Enum, ForeignKey, String
+from sqlalchemy import Enum, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -41,3 +41,8 @@ class Sucursal(
     # Disponibilidad al público; puede variar por día (glosario: Horario de
     # atención). El horario laboral de cada trabajador NO vive aquí.
     horario_atencion: Mapped[dict | None] = mapped_column(JsonB, nullable=True)
+    # Radio en metros para observar (nunca bloquear) el marcaje de asistencia
+    # (RN-RRHH-024, ADR-073). NULL = esta sucursal no evalúa distancia — el
+    # GPS de una tablet bajo techo se equivoca por decenas de metros, así que
+    # el valor nace vacío y cada local lo activa cuando le sirve.
+    radio_marcaje_m: Mapped[int | None] = mapped_column(Integer, nullable=True)

@@ -184,6 +184,7 @@ class SucursalOut(UbicacionMixin):
     estado: str
     direccion: str | None = None
     tenencia: str | None = None
+    radio_marcaje_m: int | None = None
 
 
 # --- Organización (CRUD, permiso `organizacion.gestionar`) ---
@@ -286,6 +287,8 @@ class SucursalCreate(UbicacionMixin):
     tenencia: TenenciaSucursal
     estado: EstadoSucursal = "activa"
     horario_atencion: dict | None = None
+    # NULL = no evalúa distancia en el marcaje de asistencia (RN-RRHH-024).
+    radio_marcaje_m: int | None = Field(default=None, gt=0)
 
 
 class SucursalUpdate(UbicacionMixin):
@@ -298,6 +301,7 @@ class SucursalUpdate(UbicacionMixin):
     tenencia: TenenciaSucursal | None = None
     estado: EstadoSucursal | None = None
     horario_atencion: dict | None = None
+    radio_marcaje_m: int | None = Field(default=None, gt=0)
 
 
 class AlmacenCreate(UbicacionMixin):

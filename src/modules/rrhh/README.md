@@ -16,12 +16,17 @@ slice de ventas (solo el modelo, sin casos de uso); ese slice le agregó
 **2026-08-01** — slice de contratación: `convocatoria` + el tablero que va de
 la postulación recibida al fin del periodo de prueba.
 
+**2026-08-28** — terminal enrolado y evidencia de marcaje (ADR-073,
+RN-RRHH-023/024): el pad ya no marca solo con el PIN, exige un dispositivo
+autorizado y guarda foto/ubicación/IP de cada toque como observación, nunca
+como condición.
+
 ## Entidades
 
 `convocatoria`, `trabajador`, `contrato_laboral`, `postulante`, `socio`,
 `boleta_pago`, `liquidacion_bss`, `memorandum`, `amonestacion`, `acta`,
 `certificado_trabajo`, `solicitud_permiso`, `pacto_permanencia`,
-`asistencia`, `turno_sucursal`. Detalle en
+`asistencia`, `turno_sucursal`, `terminal_marcaje`, `marcacion`. Detalle en
 `docs/architecture/data-model.md` §8b.
 
 ## Tablero de contratación
@@ -137,13 +142,31 @@ versión genérica.
   `turno_vigente` — qué turno le toca a una marcación, por proximidad de
   `hora_inicio` y con la ventana ya corrida por la tolerancia (ADR-064). La
   única lógica no trivial del archivo, y por eso la que lleva test propio.
-- **`application/pad_asistencia.py`** (2026-08-24): el pad del local
-  (ADR-065). Las tarjetas (nombre y estado del día, nada más) y la marcación
-  firmada con el PIN del trabajador. El servidor decide hora, día laboral
-  (corta a las 05:00), si es entrada o salida y la tardanza; `horas_extra` es
-  siempre 0 (RN-RRHH-022). El PIN se verifica por el contrato público
-  `users.application.queries_publicas.verificar_pin_de`, contra el **mismo
-  lockout del login**.
+- **`application/pad_asistencia.py`** (2026-08-24, evidencia 2026-08-28): el
+  pad del local (ADR-065). Las tarjetas (nombre y estado del día, nada más) y
+  la marcación firmada con el PIN del trabajador. El servidor decide hora,
+  día laboral (corta a las 05:00), si es entrada o salida y la tardanza;
+  `horas_extra` es siempre 0 (RN-RRHH-022). El PIN se verifica por el
+  contrato público `users.application.queries_publicas.verificar_pin_de`,
+  contra el **mismo lockout del login**. Cada marcación escribe además su
+  `marcacion` vía `application/marcaciones.py` (terminal, IP, ubicación,
+  foto — ninguno bloquea, ver RN-RRHH-024).
+- **`application/terminales.py`** (2026-08-28, ADR-073): el dispositivo
+  autorizado a marcar por una sucursal. `crear` genera un código de
+  activación de 6 dígitos vigente 30 minutos; `enrolar` lo cambia por un
+  secreto propio (SHA-256, igual criterio que `TokenAgente`) que la tablet
+  manda en `X-Terminal` en cada marcación; `resolver_terminal` es lo que el
+  router llama antes de aceptar el PIN — sin terminal activo de esa
+  sucursal, 403 (RN-RRHH-023). `revocar` es borrado lógico: sin fila viva no
+  hay secreto que resuelva.
+- **`application/marcaciones.py`** (2026-08-28, RN-RRHH-024): una fila por
+  cada toque del pad, colgada de la `asistencia` del día. Calcula la
+  distancia a la sucursal (`shared.ubicacion.metros_entre`, haversine) si
+  hay lat/lng y la sucursal tiene `radio_marcaje_m`; no guarda una bandera
+  de "anomalía" — el reporte la deriva comparando en el momento de leer, así
+  que corregir el radio de un local reclasifica su histórico solo.
+  `purgar_fotos_vencidas` (tarea diaria, `rrhh_marcaje_foto_retencion_dias`,
+  90 días por defecto) borra el binario y deja la fila.
 - **`application/avisos_asistencia.py`** + **`application/tasks.py`**
   (2026-08-24): barrido horario de salidas sin marcar. Avisa al trabajador en
   su campana y emite `rrhh.salida_sin_marcar` para el encargado y RRHH — dos
@@ -175,7 +198,8 @@ incorporación) y SOPs en `docs/diagrams/Procesos/Recursos-Humanos/`.
 
 RN-RRHH-*, RN-CTR-*, RN-PER-* en `docs/domain/business-rules.md`. Aplicadas
 en código (`domain/rules.py` + validación en `application/`):
-RN-PER-001/002/004, RN-RRHH-002/003/005/006/009/012/013. El resto (RN-RRHH-007
+RN-PER-001/002/004,
+RN-RRHH-002/003/005/006/009/012/013/023/024. El resto (RN-RRHH-007
 visado de abogado, RN-RRHH-014..018
 uniforme/parentesco/relaciones/confidencialidad) queda como
 documentación/proceso — no hay entidad propia en §8b para esas reglas

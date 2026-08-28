@@ -26,15 +26,41 @@ export type Marcacion = {
   };
 };
 
+/** Evidencia opcional del marcaje (RN-RRHH-024, ADR-073): ninguno de los
+ * tres es obligatorio, y su ausencia nunca impide marcar. `foto` va en
+ * base64 sin el encabezado `data:image/jpeg;base64,`. */
+export type EvidenciaMarcaje = {
+  foto?: string;
+  lat?: number;
+  lng?: number;
+};
+
 export const apiAsistencia = {
   tarjetas: (sucursalId: string) =>
     pedir<Tarjeta[]>(
       `/rrhh/asistencia/terminal/tarjetas?sucursal_id=${sucursalId}`,
     ),
 
-  marcar: (sucursalId: string, trabajadorId: string, pin: string) =>
+  marcar: (
+    sucursalId: string,
+    trabajadorId: string,
+    pin: string,
+    evidencia: EvidenciaMarcaje = {},
+  ) =>
     pedir<Marcacion>(
       `/rrhh/asistencia/terminal/marcar?sucursal_id=${sucursalId}`,
-      { metodo: "POST", cuerpo: { trabajador_id: trabajadorId, pin } },
+      {
+        metodo: "POST",
+        cuerpo: { trabajador_id: trabajadorId, pin, ...evidencia },
+      },
+    ),
+
+  /** El código de 6 dígitos que un admin generó desde el back-office. La
+   * tablet lo teclea una sola vez; el secreto que devuelve lo guarda
+   * `activarTerminalAction` en la cookie, nunca este cliente. */
+  enrolarTerminal: (sucursalId: string, codigo: string) =>
+    pedir<{ secreto: string }>(
+      `/rrhh/asistencia/terminal/enrolar?sucursal_id=${sucursalId}`,
+      { metodo: "POST", cuerpo: { codigo } },
     ),
 };

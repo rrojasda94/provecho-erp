@@ -8,6 +8,10 @@
 
 export const COOKIE_TOKEN = "provecho_token";
 export const COOKIE_REFRESH = "provecho_refresh";
+/** El secreto del terminal enrolado (ADR-073) — nada que ver con la sesión
+ * de la cuenta de servicio del pad. httpOnly igual que el token: el
+ * JavaScript de la página nunca lo ve. */
+export const COOKIE_TERMINAL = "provecho_terminal";
 
 export type ClaimsJwt = {
   sub: string;

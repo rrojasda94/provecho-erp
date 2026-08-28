@@ -546,11 +546,71 @@ class PadMarcarIn(BaseModel):
     trabajador_id: uuid.UUID
     # Ni fecha ni hora ni tipo: los pone el servidor (ADR-065).
     pin: str = Field(min_length=4, max_length=12)
+    # Evidencia opcional (RN-RRHH-024, ADR-073): su ausencia nunca impide
+    # marcar. `foto` viaja en base64 — JPEG en claro, sin el encabezado
+    # `data:image/jpeg;base64,`; ~127 KB decodificados es el tope de un
+    # JPEG de 320px al 60%, con margen. El servidor revalida el tamaño real
+    # tras decodificar: el largo en base64 es ~4/3 del binario y solo sirve
+    # para cortar un envío absurdo antes de gastar CPU decodificándolo.
+    foto: str | None = Field(default=None, max_length=175_000)
+    lat: Decimal | None = Field(default=None, ge=-90, le=90)
+    lng: Decimal | None = Field(default=None, ge=-180, le=180)
 
 
 class PadMarcacionOut(BaseModel):
     tipo: str  # "entrada" | "salida"
     asistencia: AsistenciaOut
+
+
+class MarcacionOut(BaseModel):
+    """La evidencia de un toque del pad. Sin la foto —pesa y se pide aparte
+    (`GET /rrhh/marcaciones/{id}/foto`)—, solo si existe. A lo sumo dos
+    filas por asistencia (entrada y salida): no hace falta optimizar la
+    carga de `tiene_foto` más allá del `deferred` de la columna."""
+
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    tipo: str
+    momento: datetime
+    usuario_id: uuid.UUID
+    terminal_id: uuid.UUID | None
+    ip: str | None
+    distancia_m: int | None
+    tiene_foto: bool
+
+
+# --- Terminal de marcaje ----------------------------------------------------------
+class TerminalCrear(BaseModel):
+    sucursal_id: uuid.UUID
+    nombre: str = Field(min_length=1, max_length=80)
+
+
+class TerminalOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    sucursal_id: uuid.UUID
+    nombre: str
+    activo: bool
+    ultima_marcacion_en: datetime | None
+
+
+class TerminalCodigoOut(BaseModel):
+    """El código de activación, visible una sola vez — igual que el token
+    de un agente."""
+
+    terminal: TerminalOut
+    codigo: str
+
+
+class TerminalEnrolarIn(BaseModel):
+    codigo: str = Field(min_length=6, max_length=6)
+
+
+class TerminalEnrolarOut(BaseModel):
+    """El secreto en claro, visible una sola vez: de acá en más solo queda
+    su hash, y perderlo obliga a enrolar de nuevo."""
+
+    secreto: str
 
 
 # --- Legajo (file personal) ------------------------------------------------------
