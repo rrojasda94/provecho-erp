@@ -19056,6 +19056,166 @@
         "title": "ProgramaConteoOut",
         "type": "object"
       },
+      "PromocionCreate": {
+        "properties": {
+          "acumulable": {
+            "default": false,
+            "title": "Acumulable",
+            "type": "boolean"
+          },
+          "beneficio": {
+            "additionalProperties": true,
+            "title": "Beneficio",
+            "type": "object"
+          },
+          "canales": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canales"
+          },
+          "condicion": {
+            "additionalProperties": true,
+            "title": "Condicion",
+            "type": "object"
+          },
+          "desde": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Desde"
+          },
+          "dias_semana": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dias Semana"
+          },
+          "hasta": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hasta"
+          },
+          "hora_desde": {
+            "anyOf": [
+              {
+                "format": "time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hora Desde"
+          },
+          "hora_hasta": {
+            "anyOf": [
+              {
+                "format": "time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hora Hasta"
+          },
+          "marca_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marca Id"
+          },
+          "modalidades": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modalidades"
+          },
+          "nombre": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Nombre",
+            "type": "string"
+          },
+          "prioridad": {
+            "default": 0,
+            "title": "Prioridad",
+            "type": "integer"
+          },
+          "sucursal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sucursal Id"
+          },
+          "tipo": {
+            "enum": [
+              "nxm",
+              "cantidad",
+              "combo",
+              "monto_minimo"
+            ],
+            "title": "Tipo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "nombre",
+          "tipo"
+        ],
+        "title": "PromocionCreate",
+        "type": "object"
+      },
       "PromocionCuponOut": {
         "properties": {
           "descuento_porcentaje": {
@@ -19097,6 +19257,183 @@
         "title": "PromocionCuponOut",
         "type": "object"
       },
+      "PromocionOut": {
+        "properties": {
+          "activa": {
+            "title": "Activa",
+            "type": "boolean"
+          },
+          "acumulable": {
+            "default": false,
+            "title": "Acumulable",
+            "type": "boolean"
+          },
+          "beneficio": {
+            "additionalProperties": true,
+            "title": "Beneficio",
+            "type": "object"
+          },
+          "canales": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canales"
+          },
+          "condicion": {
+            "additionalProperties": true,
+            "title": "Condicion",
+            "type": "object"
+          },
+          "desde": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Desde"
+          },
+          "dias_semana": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dias Semana"
+          },
+          "empresa_id": {
+            "format": "uuid",
+            "title": "Empresa Id",
+            "type": "string"
+          },
+          "hasta": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hasta"
+          },
+          "hora_desde": {
+            "anyOf": [
+              {
+                "format": "time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hora Desde"
+          },
+          "hora_hasta": {
+            "anyOf": [
+              {
+                "format": "time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hora Hasta"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "marca_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marca Id"
+          },
+          "modalidades": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modalidades"
+          },
+          "nombre": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Nombre",
+            "type": "string"
+          },
+          "prioridad": {
+            "default": 0,
+            "title": "Prioridad",
+            "type": "integer"
+          },
+          "sucursal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sucursal Id"
+          },
+          "tipo": {
+            "enum": [
+              "nxm",
+              "cantidad",
+              "combo",
+              "monto_minimo"
+            ],
+            "title": "Tipo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "nombre",
+          "tipo",
+          "id",
+          "empresa_id",
+          "activa"
+        ],
+        "title": "PromocionOut",
+        "type": "object"
+      },
       "PromocionPublicaOut": {
         "description": "Lo que la landing necesita para dibujarse: nada de la campaña interna\n(presupuesto, KPI, quién la aprobó) sale por acá.",
         "properties": {
@@ -19126,6 +19463,197 @@
           "vigencia_cupon_dias"
         ],
         "title": "PromocionPublicaOut",
+        "type": "object"
+      },
+      "PromocionUpdate": {
+        "description": "Parcial: el campo ausente no se toca. `activa: false` la termina\n(RN-PRM-005) sin borrar nada — las ventas que la aplicaron la siguen\nnombrando.",
+        "properties": {
+          "activa": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activa"
+          },
+          "acumulable": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acumulable"
+          },
+          "beneficio": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Beneficio"
+          },
+          "canales": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canales"
+          },
+          "condicion": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Condicion"
+          },
+          "desde": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Desde"
+          },
+          "dias_semana": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dias Semana"
+          },
+          "hasta": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hasta"
+          },
+          "hora_desde": {
+            "anyOf": [
+              {
+                "format": "time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hora Desde"
+          },
+          "hora_hasta": {
+            "anyOf": [
+              {
+                "format": "time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hora Hasta"
+          },
+          "marca_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marca Id"
+          },
+          "modalidades": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modalidades"
+          },
+          "nombre": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nombre"
+          },
+          "prioridad": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prioridad"
+          },
+          "sucursal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sucursal Id"
+          }
+        },
+        "title": "PromocionUpdate",
         "type": "object"
       },
       "ProveedorCreate": {
@@ -26876,6 +27404,32 @@
           "referencia_atencion"
         ],
         "title": "VentaOut",
+        "type": "object"
+      },
+      "VentaPromocionOut": {
+        "description": "Una promoción que este pedido activó, con lo que descontó.\n\nEl nombre viaja congelado: la promoción se renombra o se apaga, y el\nticket de ayer tiene que seguir diciendo lo que el cliente leyó.",
+        "properties": {
+          "monto": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Monto",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "promocion_id": {
+            "format": "uuid",
+            "title": "Promocion Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "promocion_id",
+          "nombre",
+          "monto"
+        ],
+        "title": "VentaPromocionOut",
         "type": "object"
       },
       "VentaSyncIn": {
@@ -48087,6 +48641,103 @@
         ]
       }
     },
+    "/api/v1/sales/promociones": {
+      "get": {
+        "operationId": "listar_promociones_api_v1_sales_promociones_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "solo_activas",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Solo Activas",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PromocionOut"
+                  },
+                  "title": "Response Listar Promociones Api V1 Sales Promociones Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Promociones",
+        "tags": [
+          "sales"
+        ]
+      },
+      "post": {
+        "description": "Da de alta una promoción que se aplica **sola** cuando el pedido\ncumple.\n\nNo es el cupón de ADR-061 —ahí hay un código que alguien canjea— ni el\ndescuento manual de RN-COM-017, que firma un supervisor. Acá el cajero no\ninterviene: por eso el permiso es de gestión, no de caja.",
+        "operationId": "crear_promocion_api_v1_sales_promociones_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PromocionCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PromocionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Promocion",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
     "/api/v1/sales/promociones-cupon": {
       "get": {
         "description": "Array plano y no paginado: son campañas contadas con los dedos de una\nmano, no una colección que crece con la operación (ADR-026).\n\nSe escopa por **grupo** y no por empresa: el cupón es del cliente, y el\ncliente es del grupo (RN-PTS-001).",
@@ -48162,6 +48813,114 @@
           }
         ],
         "summary": "Terminar Promocion Cupon",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/promociones/{promocion_id}": {
+      "patch": {
+        "description": "`exclude_unset`: el campo ausente no se toca. Sin eso, apagar una\npromoción desde la tabla (`{\"activa\": false}`) le borraría la vigencia y\nel ámbito de paso.",
+        "operationId": "editar_promocion_api_v1_sales_promociones__promocion_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "promocion_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Promocion Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PromocionUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PromocionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Editar Promocion",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/promociones/{promocion_id}/terminar": {
+      "post": {
+        "description": "La apaga (RN-PRM-005). No borra: las ventas que la aplicaron la siguen\nnombrando, y lo ya aplicado quedó congelado en `venta_promocion`.",
+        "operationId": "terminar_promocion_api_v1_sales_promociones__promocion_id__terminar_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "promocion_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Promocion Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PromocionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Terminar Promocion",
         "tags": [
           "sales"
         ]
@@ -49599,6 +50358,59 @@
           }
         ],
         "summary": "Ver Precuenta",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/ventas/{venta_id}/promociones": {
+      "get": {
+        "description": "Qué promociones activó este pedido. El PDV las pinta en el ticket: si\nel cajero no puede explicar de dónde salió el descuento, la promoción\nestá mal nombrada, pero callarla es peor.",
+        "operationId": "promociones_de_venta_api_v1_sales_ventas__venta_id__promociones_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "venta_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Venta Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/VentaPromocionOut"
+                  },
+                  "title": "Response Promociones De Venta Api V1 Sales Ventas  Venta Id  Promociones Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Promociones De Venta",
         "tags": [
           "sales"
         ]

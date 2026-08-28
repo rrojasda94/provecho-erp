@@ -34,6 +34,7 @@ from src.modules.sales.application import (
     notas_credito,
     precios,
     precuenta,
+    promociones,
     puntos_venta,
     queries_publicas,
     tarifa_delivery,
@@ -84,6 +85,9 @@ CATALOGO = "sales.gestionar_catalogo"
 # Aplicar descuento es acto de supervisor: separado de `sales.cobrar` para
 # que el cajero no se autorice a sí mismo (RN-COM-017).
 DESCONTAR = "sales.aplicar_descuento"
+# Crear una regla que regala margen todos los días no es lo mismo que firmar
+# un descuento puntual: permiso propio, del área comercial (ADR-076).
+GESTIONAR_PROMOCIONES = "sales.gestionar_promociones"
 # La comida del personal es costo que sale del inventario sin cobro: la firma
 # un encargado, igual que un descuento (RN-COM-025).
 CONSUMO_PERSONAL = "sales.registrar_consumo_personal"
@@ -427,6 +431,101 @@ def descartar_borrador(
         borradores.descartar(session, borrador_id)
         session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# --- Promociones condicionales (ADR-076) -------------------------------------
+@router.post(
+    "/promociones",
+    response_model=schemas.PromocionOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def crear_promocion(
+    body: schemas.PromocionCreate,
+    _: Usuario = Depends(require_permission(GESTIONAR_PROMOCIONES)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Da de alta una promoción que se aplica **sola** cuando el pedido
+    cumple.
+
+    No es el cupón de ADR-061 —ahí hay un código que alguien canjea— ni el
+    descuento manual de RN-COM-017, que firma un supervisor. Acá el cajero no
+    interviene: por eso el permiso es de gestión, no de caja.
+    """
+    if body.sucursal_id is not None:
+        tenant.exigir_sucursal(body.sucursal_id)
+    promocion = promociones.crear_promocion(
+        session, empresa_id=tenant.empresa(), **body.model_dump()
+    )
+    session.commit()
+    return promocion
+
+
+@router.get("/promociones", response_model=list[schemas.PromocionOut])
+def listar_promociones(
+    solo_activas: bool = False,
+    _: Usuario = Depends(require_permission(GESTIONAR_PROMOCIONES)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    return promociones.listar_promociones(
+        session, empresa_id=tenant.empresa(), solo_activas=solo_activas
+    )
+
+
+@router.patch("/promociones/{promocion_id}", response_model=schemas.PromocionOut)
+def editar_promocion(
+    promocion_id: uuid.UUID,
+    body: schemas.PromocionUpdate,
+    _: Usuario = Depends(require_permission(GESTIONAR_PROMOCIONES)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """`exclude_unset`: el campo ausente no se toca. Sin eso, apagar una
+    promoción desde la tabla (`{"activa": false}`) le borraría la vigencia y
+    el ámbito de paso."""
+    promociones.exigir_promocion_de_empresa(
+        session, promocion_id, tenant.filtro_empresa()
+    )
+    promocion = promociones.editar_promocion(
+        session, promocion_id, **body.model_dump(exclude_unset=True)
+    )
+    session.commit()
+    return promocion
+
+
+@router.post("/promociones/{promocion_id}/terminar", response_model=schemas.PromocionOut)
+def terminar_promocion(
+    promocion_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(GESTIONAR_PROMOCIONES)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """La apaga (RN-PRM-005). No borra: las ventas que la aplicaron la siguen
+    nombrando, y lo ya aplicado quedó congelado en `venta_promocion`."""
+    promociones.exigir_promocion_de_empresa(
+        session, promocion_id, tenant.filtro_empresa()
+    )
+    promocion = promociones.terminar_promocion(session, promocion_id)
+    session.commit()
+    return promocion
+
+
+@router.get(
+    "/ventas/{venta_id}/promociones",
+    response_model=list[schemas.VentaPromocionOut],
+)
+def promociones_de_venta(
+    venta_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Qué promociones activó este pedido. El PDV las pinta en el ticket: si
+    el cajero no puede explicar de dónde salió el descuento, la promoción
+    está mal nombrada, pero callarla es peor."""
+    exigir_venta(session, venta_id, tenant)
+    return promociones.aplicadas_a(session, venta_id)
 
 
 # --- Cupón de promoción (ADR-061) --------------------------------------------

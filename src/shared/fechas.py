@@ -28,7 +28,18 @@ def zona() -> ZoneInfo:
 
 def hoy() -> datetime.date:
     """Qué día es **para el negocio**, sin importar dónde corra el proceso."""
-    return datetime.datetime.now(zona()).date()
+    return ahora().date()
+
+
+def ahora() -> datetime.datetime:
+    """El instante, en hora del negocio.
+
+    Lo usa lo que decide por franja horaria —una promoción de happy hour, un
+    turno— donde la fecha sola no alcanza. `datetime.now()` a secas daría la
+    hora del contenedor, que en Docker es UTC: un martes de pizzas hasta las
+    23:00 se apagaría a las 18:00 hora Perú.
+    """
+    return datetime.datetime.now(zona())
 
 
 def desfase_horas(referencia: datetime.date | None = None) -> int:

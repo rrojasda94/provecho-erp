@@ -308,6 +308,7 @@ const PDV: Caso[] = [
     ]),
   ),
   caso("fijarNotaCocina", () => api.fijarNotaCocina(UUID, "Servir todo junto")),
+  caso("promocionesDeVenta", () => api.promocionesDeVenta(UUID)),
   caso("canjearCupon", () => api.canjearCupon(UUID, "ABC123")),
   caso("aplicarDescuento", () =>
     api.aplicarDescuento(UUID, {

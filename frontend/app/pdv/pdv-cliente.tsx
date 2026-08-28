@@ -90,6 +90,7 @@ function nuevoBorrador(mesa?: MesaEnMapa): Borrador {
     consumoAutorizacion: null,
     descuento: null,
     cupon: null,
+    promociones: [],
   };
 }
 
@@ -244,6 +245,14 @@ function BotonBloquear() {
       🔒
     </button>
   );
+}
+
+/** Las promociones que el pedido activó solo. Un fallo acá no puede
+ * frenar la caja: el total que manda es el del servidor, y esto es lo que se
+ * muestra para poder explicarlo. */
+async function promocionesDe(ventaId: string) {
+  const filas = await api.promocionesDeVenta(ventaId).catch(() => []);
+  return filas.map((p) => ({ nombre: p.nombre, monto: Number(p.monto) }));
 }
 
 /** El descuento ya aplicado, tal como lo devuelve el servidor. Fuera del
@@ -535,6 +544,9 @@ export default function PdvCliente({
         ventaId: venta.id,
         numeroOrden: venta.numero_orden,
         lineas: items.map(lineaDesdeVentaItem),
+        // El servidor las reevalúa entero en cada cambio del pedido
+        // (ADR-076): el aumento pudo activar un 2x1 que antes no se cumplía.
+        promociones: await promocionesDe(venta.id),
       });
       setSeleccion(new Set());
       notificar(
@@ -684,6 +696,7 @@ export default function PdvCliente({
         consumoAutorizacion: null,
         descuento: venta ? descuentoDeVenta(venta) : null,
         cupon: null,
+        promociones: await promocionesDe(info.ventaId),
       };
       setBorradores((bs) => [...bs, b]);
       setActivoId(b.id);

@@ -188,6 +188,16 @@ cuatro huecos que el punto de venta necesitaba y el modelo no daba.
   del origen numeraba los envíos de otro pedido. El PDV, del lado del
   cliente, deja la línea pendiente hasta que alguien toca "Enviar aumento" —
   antes viajaba al confirmar el diálogo del producto.
+- **Promociones condicionales** (ADR-076, RN-PRM-009..013): `promocion`
+  —vigencia (fechas, días, franja que puede cruzar la medianoche), ámbito
+  (marca/sucursal/canal/modalidad), prioridad, `acumulable`— con cuatro
+  tipos (`nxm`, `cantidad`, `combo`, `monto_minimo`) y su condición/beneficio
+  en JSONB. Las aplicadas van a `venta_promocion`, **nunca** a
+  `venta.descuento_*`. La aritmética es pura (`domain/promociones.py`, sin
+  sesión ni reloj) y `recalcular_promociones` corre en los cuatro caminos que
+  cambian un pedido: crear, agregar, quitar y mover. `total_a_cobrar` las
+  resta **antes** del descuento manual. Alta en
+  `POST/GET/PATCH /sales/promociones` con `sales.gestionar_promociones`.
 - **Notas de cocina** (ADR-075): `venta_item.nota` (texto de ese plato) y
   `venta.nota_cocina` (cómo se sirve el pedido entero). La primera viaja en
   `VentaItemIn`, sale bajo su plato en el KDS y en la comanda; la segunda va

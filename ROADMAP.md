@@ -83,7 +83,7 @@ borrador no existía fuera de la memoria del navegador.
 | 2 | Pantalla de despacho como overlay dentro del PDV | ✅ 2026-08-28 |
 | 2 | Cupón y descuento manual en caja (backend ya existía, faltaba el PDV) | ✅ 2026-08-28 |
 | 2 | Notas de cocina: por línea **y** una general del pedido, al pie de la pastilla del KDS | ✅ 2026-08-28 |
-| 3 | Motor de promociones automáticas + su pantalla en el back office | ⏳ |
+| 3 | Motor de promociones automáticas + su pantalla en el back office (ADR-076) | ✅ 2026-08-28 |
 
 La tanda 3 es un slice, no un parche: el motor de promociones condicionales
 no existe —lo que hay es `promocion_cupon` (ADR-061), que hace otra cosa— y

@@ -18,6 +18,7 @@ from src.modules.sales.application import (
     catalogo,
     comprobantes,
     precios,
+    promociones,
     tarifa_delivery,
 )
 from src.modules.sales.application.errors import (
@@ -663,6 +664,12 @@ def crear_venta(
             session.add(hijo)
     session.flush()
 
+    # Las promociones se evalúan con las líneas ya en la base y **antes** de
+    # anunciar la venta: el evento lleva `total`, y accounting asienta lo que
+    # el cliente paga, no el precio de lista (ADR-076).
+    promociones.recalcular_promociones(session, venta)
+    venta.total = total_a_cobrar(session, venta)
+
     _confirmar(
         session,
         venta,
@@ -743,16 +750,22 @@ def reparto_a_cobrar(venta: Venta) -> Decimal:
 
 
 def total_a_cobrar(session: Session, venta: Venta, grupo_cobro: int | None = None):
-    """Lo que realmente debe pagarse: subtotal de las líneas menos la parte
-    del descuento manual que le corresponde, más el reparto. Sin
-    `grupo_cobro` es la venta entera; con él, solo esa cuenta.
+    """Lo que realmente debe pagarse: subtotal de las líneas menos las
+    promociones y la parte del descuento manual que le corresponde, más el
+    reparto. Sin `grupo_cobro` es la venta entera; con él, solo esa cuenta.
 
     **El reparto se suma después del descuento** (RN-COM-041): el descuento
     manual lo autoriza un encargado sobre lo que el cliente consumió, y
     regalar el flete al mismo tiempo no es lo que se aprobó.
+
+    **Las promociones bajan antes que el descuento manual** (ADR-076): el
+    supervisor firma un porcentaje sobre lo que el cliente va a pagar, no
+    sobre el precio de lista de algo que la promoción ya rebajó. Al revés,
+    un 20 % firmado sobre un pedido con 2x1 regalaría casi la mitad del
+    ticket sin que nadie lo haya aprobado así.
     """
     todos = VentaRepo(session).items(venta.id)
-    base = _subtotal(todos)
+    base = _subtotal(todos) - promociones.total_aplicado(session, venta.id)
     reparto = reparto_a_cobrar(venta)
     if grupo_cobro is None:
         neto = base - rules.monto_descuento(
@@ -760,7 +773,16 @@ def total_a_cobrar(session: Session, venta: Venta, grupo_cobro: int | None = Non
         )
         return neto + reparto
     filas = [f for f in todos if f.grupo_cobro == grupo_cobro]
-    parcial = _subtotal(filas)
+    # La promoción se prorratea entre las cuentas por lo que pesa cada una,
+    # igual que el descuento manual: se activó sobre el pedido, no sobre la
+    # cuenta que toque cobrarse primero.
+    bruto_total = _subtotal(todos)
+    parcial_bruto = _subtotal(filas)
+    parcial = (
+        parcial_bruto
+        if bruto_total <= 0
+        else (base * parcial_bruto / bruto_total).quantize(Decimal("0.01"))
+    )
     # El flete **no se prorratea**: va entero en la primera cuenta. Repartir
     # un reparto entre comensales es un caso que nadie pidió, pero omitirlo
     # sí rompía algo real — el cobro normal del PDV pasa por acá con
@@ -782,10 +804,15 @@ def total_a_cobrar(session: Session, venta: Venta, grupo_cobro: int | None = Non
 def calcular_monto_descuento(
     session: Session, venta: Venta, modo: str | None, valor: Decimal | None
 ) -> Decimal:
-    """Cuánto descontaría `modo`/`valor` sobre el subtotal actual — sin
+    """Cuánto descontaría `modo`/`valor` sobre lo que hoy se paga — sin
     aplicarlo. El router lo usa para validar `permiso.restricciones`
-    (ADR-023, `monto_maximo`) ANTES de comprometer el cambio."""
-    base = _subtotal(VentaRepo(session).items(venta.id))
+    (ADR-023, `monto_maximo`) ANTES de comprometer el cambio.
+
+    La base descuenta las promociones ya activadas (ADR-076): el tope del
+    supervisor tiene que medirse contra lo que de verdad se va a regalar."""
+    base = _subtotal(VentaRepo(session).items(venta.id)) - promociones.total_aplicado(
+        session, venta.id
+    )
     return rules.monto_descuento(modo, valor, base)
 
 
@@ -1166,6 +1193,10 @@ def anular_lineas(
     _borrar_hijos_primero(session, filas)
 
     restantes = VentaRepo(session).items(venta_id)
+    # Quitar una pizza puede desactivar el 2x1 que esa pizza activaba: la
+    # promoción desaparece sola en vez de quedar cobrada sobre lo que ya no
+    # está (ADR-076).
+    promociones.recalcular_promociones(session, venta)
     venta.total = total_a_cobrar(session, venta)
     # Sin líneas no queda orden que preparar: la venta se anula entera.
     if not restantes:
@@ -1392,11 +1423,16 @@ def mover_lineas(
             fila.tanda = tanda_destino
     session.flush()
 
+    # Las dos órdenes cambiaron de contenido, así que las dos reevalúan: lo
+    # que se fue puede haber roto una promoción del origen y armado una en el
+    # destino (ADR-076).
+    promociones.recalcular_promociones(session, origen)
     origen.total = total_a_cobrar(session, origen)
     if destino is not origen and not venta_repo.items(venta_id):
         # Sin líneas no queda orden que preparar ni mesa que ocupar.
         origen.estado = "anulada"
     if destino is not origen:
+        promociones.recalcular_promociones(session, destino)
         destino.total = total_a_cobrar(session, destino)
 
     _registrar_traslado(
@@ -1528,6 +1564,10 @@ def agregar_lineas(
             for f in [*filas, *(h for hijos in extras_por_padre for h in hijos)]
         ]
     )
+    # Las promociones se reevalúan antes del total: el aumento puede activar
+    # una que el pedido no cumplía (la segunda pizza es la que acaba de
+    # entrar) o dejar de cumplir ninguna (ADR-076).
+    promociones.recalcular_promociones(session, venta)
     # El total se recalcula entero (incluye el descuento de orden prorrateado)
     # y no se le suma el incremento: sumar dejaría fuera el reprorrateo.
     venta.total = total_a_cobrar(session, venta)

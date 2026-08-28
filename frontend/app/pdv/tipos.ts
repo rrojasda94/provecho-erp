@@ -105,6 +105,15 @@ export type Borrador = {
   descuento: { modo: "porcentaje" | "monto"; valor: number; motivo: string } | null;
   /** Código del cupón canjeado, o `null`. Mismo motivo. */
   cupon: string | null;
+  /**
+   * Las promociones que el pedido activó solo (ADR-076).
+   *
+   * Las resuelve el servidor y acá viven **para poder mostrarlas**: si el
+   * cajero no puede decir de dónde salió el descuento, la promoción está mal
+   * nombrada — pero callarla es peor, porque el cliente ve un total que no
+   * cuadra con la carta.
+   */
+  promociones: { nombre: string; monto: number }[];
 };
 
 /** A dónde van los productos seleccionados al "mover productos" (RN-COM-043):
@@ -159,6 +168,10 @@ export const totalLinea = (l: LineaBorrador): number =>
  * El reparto suma al final y no por línea (RN-COM-041): es del pedido, no de
  * lo que se comió. El número que manda es el que recalcula el servidor —esto
  * es lo que el cajero le dice al cliente antes de cobrar. */
+/** Lo que las promociones automáticas le bajan al pedido. */
+export const promocionesDeBorrador = (b: Borrador): number =>
+  b.promociones.reduce((a, p) => a + p.monto, 0);
+
 /** Lo que el descuento manual le baja al pedido (RN-COM-017).
  *
  * Se calcula sobre los productos y **no** sobre el reparto: el flete no es
@@ -167,7 +180,11 @@ export const totalLinea = (l: LineaBorrador): number =>
  * total y la caja cobre otro. */
 export const descuentoDeBorrador = (b: Borrador): number => {
   if (!b.descuento) return 0;
-  const productos = b.lineas.reduce((a, l) => a + totalLinea(l), 0);
+  // Sobre lo ya promocionado, igual que el servidor (ADR-076): el supervisor
+  // firma un porcentaje de lo que el cliente va a pagar, no del precio de
+  // lista de algo que la promoción ya rebajó.
+  const productos =
+    b.lineas.reduce((a, l) => a + totalLinea(l), 0) - promocionesDeBorrador(b);
   return b.descuento.modo === "porcentaje"
     ? (productos * b.descuento.valor) / 100
     : Math.min(b.descuento.valor, productos);
@@ -178,6 +195,7 @@ export const totalBorrador = (b: Borrador): number =>
     ? 0
     : b.lineas.reduce((a, l) => a + totalLinea(l), 0) +
       (b.costoEntrega ?? 0) -
+      promocionesDeBorrador(b) -
       descuentoDeBorrador(b);
 
 /** Lo que todavía no salió a cocina. En un pedido nuevo son todas sus

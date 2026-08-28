@@ -1,7 +1,7 @@
 """DTOs (pydantic) del módulo sales."""
 
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, time
 from decimal import Decimal
 from typing import Literal
 
@@ -1344,3 +1344,83 @@ class BorradorOut(BaseModel):
     usuario_id: uuid.UUID
     contenido: dict
     actualizado_en: datetime = Field(validation_alias="updated_at")
+
+
+# --- Promociones condicionales (ADR-076) --------------------------------------
+class PromocionBase(BaseModel):
+    """Lo común a los cuatro tipos: vigencia, ámbito y resolución de solapes.
+
+    `condicion` y `beneficio` van como objetos libres y se validan **por
+    tipo** en `_validar_forma`: un modelo discriminado por tipo sería más
+    bonito y obligaría a versionar el contrato cada vez que un tipo gane un
+    parámetro, que es lo que este diseño evita a propósito (ADR-076).
+    """
+
+    nombre: str = Field(min_length=1, max_length=120)
+    tipo: Literal["nxm", "cantidad", "combo", "monto_minimo"]
+    condicion: dict = Field(default_factory=dict)
+    beneficio: dict = Field(default_factory=dict)
+    # Vigencia. Todo ausente = corre hasta que alguien la apague.
+    desde: date | None = None
+    hasta: date | None = None
+    # `0` = lunes, como `date.weekday()`. Vacío = todos los días.
+    dias_semana: list[int] | None = None
+    hora_desde: time | None = None
+    hora_hasta: time | None = None
+    # Ámbito. Ausente = toda la empresa.
+    marca_id: uuid.UUID | None = None
+    sucursal_id: uuid.UUID | None = None
+    canales: list[str] | None = None
+    modalidades: list[str] | None = None
+    # Quién toma las unidades primero cuando dos alcanzan el mismo plato.
+    prioridad: int = 0
+    # `True` se suma a lo que otra ya aplicó sobre las mismas unidades. El
+    # default es `False` porque acumular es lo que hace que el local regale
+    # más de lo que aprobó.
+    acumulable: bool = False
+
+
+class PromocionCreate(PromocionBase):
+    pass
+
+
+class PromocionUpdate(BaseModel):
+    """Parcial: el campo ausente no se toca. `activa: false` la termina
+    (RN-PRM-005) sin borrar nada — las ventas que la aplicaron la siguen
+    nombrando."""
+
+    nombre: str | None = Field(default=None, min_length=1, max_length=120)
+    condicion: dict | None = None
+    beneficio: dict | None = None
+    desde: date | None = None
+    hasta: date | None = None
+    dias_semana: list[int] | None = None
+    hora_desde: time | None = None
+    hora_hasta: time | None = None
+    marca_id: uuid.UUID | None = None
+    sucursal_id: uuid.UUID | None = None
+    canales: list[str] | None = None
+    modalidades: list[str] | None = None
+    prioridad: int | None = None
+    acumulable: bool | None = None
+    activa: bool | None = None
+
+
+class PromocionOut(PromocionBase):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    empresa_id: uuid.UUID
+    activa: bool
+
+
+class VentaPromocionOut(BaseModel):
+    """Una promoción que este pedido activó, con lo que descontó.
+
+    El nombre viaja congelado: la promoción se renombra o se apaga, y el
+    ticket de ayer tiene que seguir diciendo lo que el cliente leyó.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+    promocion_id: uuid.UUID
+    nombre: str
+    monto: Decimal

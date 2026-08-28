@@ -45,6 +45,10 @@ from src.modules.sales.infrastructure.models.producto_opcion_grupo import (
 from src.modules.sales.infrastructure.models.producto_variante_valor import (
     ProductoVarianteValor,
 )
+from src.modules.sales.infrastructure.models.promocion import (
+    Promocion,
+    VentaPromocion,
+)
 from src.modules.sales.infrastructure.models.promocion_cupon import PromocionCupon
 from src.modules.sales.infrastructure.models.punto_venta import PuntoVenta
 from src.modules.sales.infrastructure.models.venta import Venta
@@ -70,8 +74,10 @@ __all__ = [
     "ProductoExclusion",
     "ProductoOpcionGrupo",
     "ProductoVarianteValor",
+    "Promocion",
     "PromocionCupon",
     "PuntoVenta",
     "Venta",
     "VentaItem",
+    "VentaPromocion",
 ]

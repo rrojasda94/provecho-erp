@@ -410,6 +410,16 @@ export type MovimientoCajaNuevo = {
 };
 
 // --- Operaciones ------------------------------------------------------------
+/** Una promoción que este pedido activó (ADR-076). El cajero no la pide ni
+ * la firma: el pedido la cumple o no. */
+export type PromocionAplicada = {
+  promocion_id: string;
+  /** Congelado al aplicarse: la promoción se renombra o se apaga, y el
+   * ticket de ayer tiene que decir lo que el cliente leyó. */
+  nombre: string;
+  monto: string;
+};
+
 export type DescuentoIn = {
   /** `null` quita el descuento; los otros dos campos sobran ahí. */
   modo: "porcentaje" | "monto" | null;
@@ -536,6 +546,12 @@ export const api = {
       metodo: "PUT",
       cuerpo: { nota },
     }),
+
+  /** Qué promociones activó el pedido. Se piden al enviarlo y después de
+   * cada cambio: el motor las reevalúa entero y una que dejó de cumplirse
+   * desaparece sola (ADR-076). */
+  promocionesDeVenta: (ventaId: string) =>
+    pedir<PromocionAplicada[]>(`/sales/ventas/${ventaId}/promociones`),
 
   /** Canjea el cupón del cliente y lo apaga para siempre (ADR-061).
    *

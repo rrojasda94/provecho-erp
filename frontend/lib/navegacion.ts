@@ -95,6 +95,9 @@ export const SUBMENUS: Record<string, ItemSubmenu[]> = {
     // Configurar el salón, no la identidad fiscal del local — eso es
     // "Puntos de venta" en Organización (ADR-059).
     { label: "Mesas", href: "/ventas/mesas" },
+    // Las que se aplican solas (ADR-076). El cupón de la landing y el
+    // descuento manual de caja son otra cosa y no viven acá.
+    { label: "Promociones", href: "/ventas/promociones" },
     { label: "Abrir el PDV", href: "/pdv" },
   ],
 };

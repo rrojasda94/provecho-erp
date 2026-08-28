@@ -11,6 +11,7 @@ import {
   etiquetaTipo,
   lineasPendientes,
   MOTIVOS_CONSUMO,
+  promocionesDeBorrador,
   totalBorrador,
   totalLinea,
   type Borrador,
@@ -277,12 +278,23 @@ function Totales({ borrador }: { borrador: Borrador }) {
   // En su propia fila y no descontado del subtotal: el cliente pregunta
   // cuánto le rebajaron, y un subtotal ya rebajado no responde eso.
   const descuento = descuentoDeBorrador(borrador);
+  const promociones = promocionesDeBorrador(borrador);
   return (
     <div className="pdv-totales">
       <div className="pdv-total-fila">
         <span>Subtotal</span>
-        <span>{soles(total - reparto + descuento)}</span>
+        <span>{soles(total - reparto + descuento + promociones)}</span>
       </div>
+      {/* Cada promoción con su nombre, y no una línea sumada: el cliente
+          pregunta cuál se le aplicó, y "promociones: −S/ 40" no lo responde.
+          Si el nombre no alcanza para explicarlo, la promoción está mal
+          nombrada — pero callarla es peor (ADR-076). */}
+      {borrador.promociones.map((p) => (
+        <div className="pdv-total-fila" key={p.nombre}>
+          <span>{p.nombre}</span>
+          <span className="verde">−{soles(p.monto)}</span>
+        </div>
+      ))}
       {descuento > 0 && (
         <div className="pdv-total-fila">
           <span>

@@ -267,6 +267,35 @@ de su módulo y se prueban de forma aislada.
   (Ley 29733). La baja se atiende por el canal declarado en los términos y se
   resuelve con la anonimización de RN-PER-007, nunca con un borrado desde el
   canal público.
+- **RN-PRM-009** Una **promoción condicional** se aplica **sola** cuando el
+  pedido la cumple (ADR-076): no la pide el cajero ni la firma nadie, a
+  diferencia del descuento manual (RN-COM-017) y del cupón (RN-PRM-007), que
+  alguien trae. Se declara con una vigencia (fechas, días de la semana y
+  franja horaria, que puede cruzar la medianoche), un ámbito (marca,
+  sucursal, canal y modalidad) y una de cuatro condiciones: lleva N y M van
+  con descuento, desde X unidades de un producto o categoría, un combo de
+  productos a precio fijo o con uno gratis, y desde un monto de pedido — este
+  último **sin mínimo** cuando la promoción es solo de franja horaria.
+- **RN-PRM-010** Una promoción **no puede reescribir el descuento manual**:
+  se registra aparte, con su nombre y su monto. El reporte tiene que poder
+  distinguir el margen que regaló una persona del que aplicó una regla, y esa
+  distinción es el único motivo por el que el descuento manual guarda motivo
+  y autorizador.
+- **RN-PRM-011** **Cada unidad la descuenta una sola promoción.** Cuando dos
+  alcanzan el mismo plato gana la de mayor prioridad; la otra se queda sin
+  esas unidades. Lo liberado es siempre lo más barato del conjunto. Una
+  promoción declarada **acumulable** es la excepción: se suma encima de lo
+  que otra ya aplicó, y por eso acumular es una decisión explícita y no el
+  comportamiento por defecto.
+- **RN-PRM-012** La promoción **baja el total antes que el descuento
+  manual**, y el tope que un supervisor puede autorizar se mide contra lo que
+  queda. Al revés, un porcentaje firmado sobre un pedido ya promocionado
+  regalaría el doble de lo aprobado.
+- **RN-PRM-013** Las promociones se **reevalúan en cada cambio del pedido**:
+  la que deja de cumplirse porque se quitó un producto desaparece, y la que
+  se completa con un aumento se activa (RN-COM-029). Terminar una promoción
+  (RN-PRM-005) no reescribe ninguna venta anterior: lo aplicado queda
+  congelado con el nombre que el cliente leyó.
 
 ## Programa de puntos
 
