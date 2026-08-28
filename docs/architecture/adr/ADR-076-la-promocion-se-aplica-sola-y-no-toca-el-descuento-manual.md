@@ -101,6 +101,27 @@ un "10 % sobre todo el pedido" impediría que el 2x1 se activara después. Es
 el único caso en que dos promociones tocan la misma unidad, y por eso el
 default es `False`.
 
+### El evento del aumento lleva lo que sube **la cuenta**, no la lista
+
+`POST /ventas/{id}/items` publica `sales.venta_confirmada` con "lo confirmado
+en esta operación" (ADR-043 §3), y hasta ahora eso era el precio de lista de
+las líneas que entraron. Con una promoción de por medio dejan de ser lo
+mismo: la segunda pizza de un 2x1 entra por S/ 40 y no le suma un sol al
+total. Asentar los 40 dejaría los libros por encima de lo que la caja cobró.
+
+Pasa a ser el **delta de `total_a_cobrar`** antes y después de la operación.
+Sale exacto sin caso especial: incluye la promoción que se activó, la que se
+cayó, y el reprorrateo del descuento manual.
+
+El delta puede ser **negativo** —agregar una gaseosa que dispara un "20 %
+desde S/ 50" baja el total más de lo que la línea suma— y se publica tal
+cual. Taparlo con un cero dejaría los libros por encima de lo cobrado, que es
+exactamente el error que este cálculo viene a evitar.
+
+`inventory` no se entera: consume `items`, que sigue siendo el detalle de lo
+que entró y es lo que hay que descontar del almacén — la promoción rebaja el
+precio, no el consumo.
+
 ### Se recalcula entero en cada cambio del pedido
 
 `recalcular_promociones` borra lo aplicado y lo evalúa de nuevo. Es

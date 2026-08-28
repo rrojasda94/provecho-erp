@@ -1905,3 +1905,36 @@ def test_una_vigencia_al_reves_se_rechaza(session, base):
         _promocion(
             session, base, desde=date(2026, 9, 1), hasta=date(2026, 8, 1)
         )
+
+
+def test_el_aumento_confirma_lo_que_sube_la_cuenta_no_el_precio_de_lista(
+    session, base
+):
+    """El evento lleva "lo confirmado en esta operación" (ADR-043 §3), y con
+    una promoción de por medio eso deja de ser el precio de lista.
+
+    La segunda pizza de un 2x1 entra por S/ 40 y no le suma un sol al total.
+    Publicar los 40 dejaría a contabilidad asentando plata que la caja nunca
+    cobró, y los libros dejarían de cuadrar con el turno.
+    """
+    _promocion(session, base)
+    venta = _crear(session, base, [_item(base["productos"][0])])
+    confirmadas: list[dict] = []
+    event_bus.subscribe("sales.venta_confirmada", confirmadas.append)
+    ventas_uc.agregar_lineas(
+        session,
+        venta_id=venta.id,
+        items=[{
+            "producto_comercial_id": base["productos"][0].id,
+            "cantidad": Decimal(1),
+            "precio_unitario": Decimal("40.00"),
+        }],
+        usuario_id=base["usuario"].id,
+    )
+    # Los eventos salen al commitear (ADR-016), no al publicarlos.
+    session.commit()
+
+    # Dos pizzas de S/ 40 con 2x1: la cuenta sigue en 40 y el aumento no
+    # confirmó un sol, aunque de lista entraron 40.
+    assert venta.total == Decimal("40.00")
+    assert Decimal(confirmadas[-1]["total"]) == Decimal(0)

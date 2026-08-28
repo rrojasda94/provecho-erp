@@ -178,3 +178,45 @@ test("el admin sí ve Catálogo y lo puede abrir", async ({ page }) => {
   await expect(page.getByText(/Sin permiso/i)).toHaveCount(0);
   await expect(page.getByText(/Pizza E2E/).first()).toBeVisible({ timeout: 30_000 });
 });
+
+test("la sesión se renueva sola cuando vence el token de acceso", async ({
+  page,
+  context,
+}) => {
+  // Es el bug del turno de prueba (ADR-073): el access token dura 15 minutos,
+  // el frontend nunca llamaba a `/auth/refresh` y la caja entera caía a
+  // `/login` en medio de un pedido.
+  //
+  // Entra en el techo de `testing-strategy.md` §1 —"que la sesión funcione"—
+  // y no en `uso/`: la renovación no vive entera de ningún lado. La dispara
+  // el middleware, la rotación la resuelve la API y el resultado son dos
+  // cookies que ninguna pantalla muestra.
+  await ingresar(page, ADMIN);
+  const refrescoAntes = (await context.cookies()).find(
+    (c) => c.name === "provecho_refresh",
+  )?.value;
+  expect(refrescoAntes).toBeDefined();
+
+  // Borrar la cookie de acceso es **exactamente** lo que el navegador hace a
+  // los quince minutos: Next la planta con el mismo `maxAge` que dura el
+  // token. Esperar el plazo real convertiría esta prueba en un cuarto de
+  // hora de nada.
+  await context.clearCookies({ name: "provecho_token" });
+  expect(
+    (await context.cookies()).some((c) => c.name === "provecho_token"),
+  ).toBe(false);
+
+  await page.goto("/dashboard");
+
+  // Lo que se rompía.
+  await expect(page).not.toHaveURL(/\/login/);
+
+  const despues = await context.cookies();
+  expect(despues.find((c) => c.name === "provecho_token")).toBeDefined();
+  // Y rotó: la API revoca el refresh que se usó, así que quedarse con el
+  // viejo haría que la próxima renovación se leyera como token robado y
+  // matara la sesión entera.
+  expect(despues.find((c) => c.name === "provecho_refresh")?.value).not.toBe(
+    refrescoAntes,
+  );
+});

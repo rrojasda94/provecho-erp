@@ -94,6 +94,28 @@ desechable (`e2e.db`) en la raíz del worktree, que ya es propio de cada uno.
 La base por slot es para el trabajo manual contra la API y las pantallas de
 desarrollo, donde dos agentes sí compartirían datos.
 
+### Si el `webServer` de Playwright se agota esperando
+
+`Timed out waiting 180000ms from config.webServer` con los dos puertos ya
+tomados **no es un puerto ocupado**: es `next dev` compilando la primera ruta.
+En un disco lento —o con dos agentes compilando a la vez— el arranque pasa
+los tres minutos que Playwright espera, y el mensaje no menciona la
+compilación por ningún lado.
+
+La salida es levantar los servidores a mano, calentarlos y reusarlos con
+`E2E_REUSAR`, que existe justamente para esto:
+
+```bash
+node e2e/preparar-bd.mjs          # borra e2e.db y siembra — antes de la API
+node e2e/servidor-api.mjs &
+node e2e/servidor-web.mjs &
+curl -s -o /dev/null http://localhost:3100/login    # la primera tarda ~1 min
+E2E_REUSAR=1 npx playwright test
+```
+
+El orden importa: `preparar-bd.mjs` borra `e2e.db`, y una API ya levantada lo
+tiene abierto.
+
 `pytest` tampoco necesita coordinación: usa SQLite en memoria.
 
 ### El intérprete de Python

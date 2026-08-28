@@ -1541,6 +1541,9 @@ def agregar_lineas(
         dia=venta.fecha_orden,
         gratis=rules.es_consumo_personal(venta.tipo),
     )
+    # Lo que había que cobrar antes de tocar la orden. La diferencia contra
+    # el total de después es lo que esta operación confirma de verdad.
+    total_antes = total_a_cobrar(session, venta)
     # La tanda es de la operación, no de la línea: todo lo que el trabajador
     # confirmó de un envío sale junto en la misma comanda. Se calcula antes de
     # insertar nada, para que el `max` no se lea a sí mismo.
@@ -1558,12 +1561,6 @@ def agregar_lineas(
             session.add(hijo)
     session.flush()
 
-    agregado = rules.total_venta(
-        [
-            (f.cantidad, f.precio_unitario, f.descuento)
-            for f in [*filas, *(h for hijos in extras_por_padre for h in hijos)]
-        ]
-    )
     # Las promociones se reevalúan antes del total: el aumento puede activar
     # una que el pedido no cumplía (la segunda pizza es la que acaba de
     # entrar) o dejar de cumplir ninguna (ADR-076).
@@ -1571,6 +1568,22 @@ def agregar_lineas(
     # El total se recalcula entero (incluye el descuento de orden prorrateado)
     # y no se le suma el incremento: sumar dejaría fuera el reprorrateo.
     venta.total = total_a_cobrar(session, venta)
+    # Lo que se confirma en esta operación es **cuánto sube lo que hay que
+    # cobrar**, no el precio de lista de lo que entró (ADR-043 §3, ADR-076).
+    #
+    # Con una promoción de por medio dejan de ser lo mismo: la segunda pizza
+    # de un 2x1 entra por S/ 40 de lista y no le suma un sol al total. Sumar
+    # la lista dejaría a contabilidad asentando S/ 40 que la caja nunca
+    # cobró, y los libros dejarían de cuadrar con el turno.
+    #
+    # El delta puede ser **negativo** cuando el aumento activa una promoción
+    # que baja el total más de lo que la línea suma —agregar una gaseosa que
+    # dispara un "20 % desde S/ 50"—. Se publica tal cual: el asiento tiene
+    # que seguir a la caja, y taparlo con un cero dejaría los libros por
+    # encima de lo cobrado, que es el error que este cálculo viene a evitar.
+    # A centavos: lo que viaja a contabilidad es plata, y `_subtotal` puede
+    # traer cuatro decimales de multiplicar cantidad por precio.
+    agregado = (venta.total - total_antes).quantize(Decimal("0.01"))
     auditoria.registrar(
         session,
         usuario_id=usuario_id,
