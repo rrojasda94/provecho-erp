@@ -115,6 +115,9 @@ export type VentaItem = {
   cantidad: string;
   precio_unitario: string;
   grupo_cobro: number;
+  /** Sin esto, reabrir la cuenta perdía la nota y el siguiente guardado la
+   * borraba. */
+  nota: string | null;
   extras: ExtraDeVentaItem[];
 };
 
@@ -169,6 +172,13 @@ export type Venta = {
    * por el mapa de salón: con solo el id, la pestaña decía "Mesa ?". */
   mesa_numero: number | null;
   comensales: number | null;
+  /** Cómo se sirve el pedido: "servir todo junto", "bebidas al final". */
+  nota_cocina: string | null;
+  /** Descuento manual de la orden (RN-COM-017). El PDV lo muestra en el
+   * ticket para que el cajero vea que está aplicado antes de cobrar. */
+  descuento_modo: "porcentaje" | "monto" | null;
+  descuento_valor: string | null;
+  descuento_motivo: string | null;
   tipo: string;
   consumo_motivo: string | null;
 };
@@ -256,6 +266,10 @@ export type ItemDeVentaNueva = {
    * mitades lleva la pizza. Es lo que activa las líneas condicionadas de la
    * receta, así que sin esto la venta se cobra sin descontar (RN-COM-040). */
   valores_variante_ids?: string[];
+  /** Lo que el mesero le dice a cocina sobre ESTE plato ("bien cocida").
+   * Hasta ADR-075 el PDV lo capturaba y no lo mandaba: el campo existía en
+   * el diálogo y el dato moría ahí. */
+  nota?: string | null;
 };
 
 export type VentaNueva = {
@@ -269,6 +283,9 @@ export type VentaNueva = {
   cliente_id?: string | null;
   mesa_id?: string | null;
   comensales?: number | null;
+  /** Cómo se sirve el pedido entero: "servir todo junto", "bebidas al
+   * final". Del pedido y no de una línea. */
+  nota_cocina?: string | null;
   referencia_atencion?: string | null;
   /** Adónde va el delivery y su ancla en el mapa. El costo del
    * reparto NO se manda: lo calcula el servidor (ADR-054), porque un
@@ -393,6 +410,20 @@ export type MovimientoCajaNuevo = {
 };
 
 // --- Operaciones ------------------------------------------------------------
+export type DescuentoIn = {
+  /** `null` quita el descuento; los otros dos campos sobran ahí. */
+  modo: "porcentaje" | "monto" | null;
+  valor?: string;
+  motivo?: string;
+  autorizacion: string;
+};
+
+export type CuponCanjeado = {
+  codigo: string;
+  monto_descuento: string;
+  venta: Venta;
+};
+
 /** Lo que el servidor devuelve de un borrador. `contenido` es opaco para
  * el contrato: la forma la decide el PDV (ADR-074). */
 export type BorradorGuardado = {
@@ -496,6 +527,39 @@ export const api = {
    * no sirve `login`, que la rotaría. 204 si el PIN es el correcto. */
   verificarPin: (pin: string) =>
     pedir<void>("/auth/verificar-pin", { metodo: "POST", cuerpo: { pin } }),
+
+  /** Cómo se sirve el pedido entero (ADR-075): "servir todo junto",
+   * "bebidas al final". Se puede cambiar con la orden ya en cocina, que es
+   * cuando de verdad se pide. `null` la quita. */
+  fijarNotaCocina: (ventaId: string, nota: string | null) =>
+    pedir<Venta>(`/sales/ventas/${ventaId}/nota-cocina`, {
+      metodo: "PUT",
+      cuerpo: { nota },
+    }),
+
+  /** Canjea el cupón del cliente y lo apaga para siempre (ADR-061).
+   *
+   * **Sin PIN de supervisor**, a diferencia del descuento manual: el
+   * descuento ya estaba prometido y el cupón *es* la autorización
+   * (RN-PRM-007). Pedir una firma por cada cupón haría que la caja deje de
+   * canjearlos. */
+  canjearCupon: (ventaId: string, codigo: string) =>
+    pedir<CuponCanjeado>(`/sales/ventas/${ventaId}/cupon`, {
+      metodo: "POST",
+      cuerpo: { codigo },
+    }),
+
+  /** Descuento manual sobre la orden (RN-COM-017). `modo: null` lo quita.
+   *
+   * **Con firma de supervisor**: acá se regala margen a criterio de alguien,
+   * y `autorizacion` es el token de `POST /auth/autorizar` — quién autorizó
+   * sale de ahí y nunca del cuerpo, o el reporte de descuentos dejaría de
+   * valer (RN-AUD-005). El tope por permiso lo valida el servidor. */
+  aplicarDescuento: (ventaId: string, cuerpo: DescuentoIn) =>
+    pedir<Venta>(`/sales/ventas/${ventaId}/descuento`, {
+      metodo: "POST",
+      cuerpo,
+    }),
 
   /** Guarda el ticket a medio armar contra el servidor (ADR-074).
    *

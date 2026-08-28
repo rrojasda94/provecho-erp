@@ -63,6 +63,9 @@ class ItemColaOut(BaseModel):
     # (RN-CUP-014).
     extras: list[ExtraColaOut] = []
     etapa_kds: int = 0
+    # Lo que el mesero le dijo a cocina sobre ESTE plato ("bien cocida").
+    # Distinto de `PedidoColaOut.nota_cocina`, que es del pedido entero.
+    nota: str | None = None
     # Nombre de la estación donde está la línea ahora; `None` = ya salió de
     # cocina. Es lo que despacho muestra por línea (RN-CUP-013).
     estacion: str | None = None
@@ -89,6 +92,9 @@ class PedidoColaOut(BaseModel):
     # prioriza distinto la comida del turno que un pedido de cliente.
     tipo: str = "venta"
     consumo_motivo: str | None = None
+    # Cómo se sirve el pedido entero: "servir todo junto", "bebidas al
+    # final". Va al pie de la pastilla, después de qué hay que preparar.
+    nota_cocina: str | None = None
     estado_pedido: str
     # Cuándo se tomó el pedido. El cronómetro lo corre el navegador —el
     # servidor no tiene por qué reenviar la cola entera cada segundo— y esto

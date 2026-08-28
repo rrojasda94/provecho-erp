@@ -5,7 +5,7 @@ vender (snapshot — no depende de lista_precio para existir).
 import uuid
 from decimal import Decimal
 
-from sqlalchemy import Enum, ForeignKey, Integer, Numeric
+from sqlalchemy import Enum, ForeignKey, Integer, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -109,3 +109,13 @@ class VentaItem(Base, UuidPkMixin, TimestampMixin):
     tanda: Mapped[int] = mapped_column(
         Integer, default=1, server_default="1", nullable=False
     )
+    # Lo que el mesero le dice a cocina sobre ESTE plato: "bien cocida",
+    # "sin sal", "para la niña".
+    #
+    # Texto libre y no un catálogo: lo estructurado ya existe y es mejor
+    # —las restas (`sin_articulo_ids`) descuentan inventario, los atributos
+    # cambian la receta—, pero siempre queda un pedido del comensal que
+    # ninguna de las dos cosas expresa. Lo que no puede pasar es que el
+    # campo exista en la pantalla y el dato no llegue a la cocina, que es lo
+    # que pasaba: el PDV lo capturaba y lo tiraba.
+    nota: Mapped[str | None] = mapped_column(String(140), nullable=True)

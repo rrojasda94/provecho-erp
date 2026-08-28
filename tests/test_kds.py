@@ -1271,3 +1271,74 @@ def test_la_linea_movida_entra_como_tanda_del_destino(env):
     tarjetas = [c for c in _cola(client, h, horno["id"])
                 if c["venta_id"] == otra["id"]]
     assert [t["tanda"] for t in tarjetas] == [1, 2]
+
+
+# --- Notas de cocina (ADR-075) -----------------------------------------------
+def test_la_nota_de_la_linea_llega_a_la_pantalla_y_al_papel(env):
+    """El diálogo del producto pedía una nota desde el primer PDV y el dato
+    moría en el navegador: no había columna, no viajaba, y al releer la orden
+    se perdía. Era decorativo."""
+    client, ids = env
+    h = _token(client)
+    pantalla = client.post("/api/v1/kds/pantallas", headers=h, json={
+        "sucursal_id": ids["sucursal_id"], "nombre": "Cocina", "tipo": "preparacion",
+    }).json()
+    venta = client.post("/api/v1/sales/ventas", headers=h, json={
+        "sucursal_id": ids["sucursal_id"], "punto_venta_id": ids["pv_id"],
+        "canal": "pdv", "modalidad": "mesa", "idempotency_key": "kds-nota-1",
+        "items": [{"producto_comercial_id": ids["pizza_id"], "cantidad": "1",
+                   "nota": "bien cocida"}],
+    }).json()
+
+    assert _cola(client, h, pantalla["id"])[0]["items"][0]["nota"] == "bien cocida"
+    papel = client.post(f"/api/v1/kds/ventas/{venta['id']}/comanda", headers=h).json()
+    assert "** BIEN COCIDA" in papel["texto"]
+
+    # Y sobrevive a reabrir la cuenta: el PDV relee las líneas del servidor y
+    # el siguiente guardado las vuelve a mandar.
+    items = client.get(f"/api/v1/sales/ventas/{venta['id']}/items", headers=h).json()
+    assert items[0]["nota"] == "bien cocida"
+
+
+def test_la_nota_del_pedido_va_en_todas_sus_tandas(env):
+    """"Servir todo junto" es una instrucción del pedido: la tanda que no la
+    llevara la ignoraría sin saberlo."""
+    client, ids = env
+    h = _token(client)
+    horno, _barra, _despacho, venta = _setup_pantallas_y_venta(client, ids, h)
+    r = client.put(f"/api/v1/sales/ventas/{venta['id']}/nota-cocina", headers=h,
+                   json={"nota": "Servir todo junto"})
+    assert r.status_code == 200
+    client.post(f"/api/v1/sales/ventas/{venta['id']}/items", headers=h, json={
+        "items": [{"producto_comercial_id": ids["pizza_id"], "cantidad": "1"}],
+    })
+
+    cola = _cola(client, h, horno["id"])
+    assert [c["nota_cocina"] for c in cola] == ["Servir todo junto"] * 2
+
+
+def test_la_nota_del_pedido_se_puede_quitar_y_no_sobrevive_al_cobro(env):
+    client, ids = env
+    h = _token(client)
+    _horno, _barra, _despacho, venta = _setup_pantallas_y_venta(client, ids, h)
+    ruta = f"/api/v1/sales/ventas/{venta['id']}/nota-cocina"
+    client.put(ruta, headers=h, json={"nota": "Bebidas al final"})
+
+    quitada = client.put(ruta, headers=h, json={"nota": None}).json()
+    assert quitada["nota_cocina"] is None
+
+    # Espacios en blanco es lo mismo que nada: una nota vacía en el KDS es una
+    # línea que el cocinero lee y descarta.
+    assert client.put(ruta, headers=h, json={"nota": "   "}).json()["nota_cocina"] is None
+
+
+def test_la_nota_del_pedido_no_se_cambia_despues_de_anular(env):
+    """Sobre una orden que ya no se está sirviendo no hay nada que ordenar."""
+    client, ids = env
+    h = _token(client)
+    _horno, _barra, _despacho, venta = _setup_pantallas_y_venta(client, ids, h)
+    client.post(f"/api/v1/sales/ventas/{venta['id']}/anular", headers=h, json={})
+
+    r = client.put(f"/api/v1/sales/ventas/{venta['id']}/nota-cocina", headers=h,
+                   json={"nota": "tarde"})
+    assert r.status_code == 409

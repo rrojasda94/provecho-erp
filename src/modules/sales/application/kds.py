@@ -360,6 +360,10 @@ def _item_a_dict(
             for hijo, prod in extras
         ],
         "etapa_kds": item.etapa_kds,
+        # Lo que el mesero le dijo a cocina sobre este plato. Va con la línea
+        # y no al pie: es de este plato, y al pie se leería como si aplicara
+        # a todo el pedido — que es lo que sí hace `nota_cocina`.
+        "nota": item.nota,
         # Dónde está la línea ahora mismo. Es lo que despacho necesita para
         # saber si el pedido espera por el horno o por la barra; `None` = ya
         # no espera por nadie.
@@ -436,6 +440,10 @@ def cola_pantalla(session: Session, pantalla_id: uuid.UUID) -> list[dict]:
                     # cliente.
                     "tipo": venta.tipo,
                     "consumo_motivo": venta.consumo_motivo,
+                    # Cómo se sirve el pedido entero. Va en TODAS las tandas:
+                    # "servir todo junto" es una instrucción del pedido, y la
+                    # tanda que no la lleve la ignoraría sin saberlo.
+                    "nota_cocina": venta.nota_cocina,
                     "estado_pedido": rules.estado_pedido(estados),
                     # Desde cuándo espera. Sin esto la pantalla no puede saber
                     # si un pedido lleva cuatro minutos o cuarenta, y los dos
@@ -523,6 +531,7 @@ def historial_pantalla(
                 "canal": venta.canal,
                 "tipo": venta.tipo,
                 "consumo_motivo": venta.consumo_motivo,
+                "nota_cocina": venta.nota_cocina,
                 "estado_pedido": "entregado",
                 "creado_en": venta.created_at,
                 "entregado_en": max(it.updated_at for it, _ in pares),
@@ -788,6 +797,14 @@ def _platos_en_papel(session: Session, pares: list[tuple]) -> list[str]:
             lineas.append(f"   + {suf}{extra.nombre.upper()}"[:ANCHO_COMANDA])
         for nombre in restas.get(it.id, []):
             lineas.append(f"   SIN {nombre.upper()}"[:ANCHO_COMANDA])
+        # La nota va al final del plato, después de lo estructurado: es lo
+        # que ninguna resta ni ningún atributo pudo expresar, y el cocinero
+        # ya sabe de qué plato habla.
+        if it.nota:
+            lineas += [
+                f"   ** {parte}"
+                for parte in textwrap.wrap(it.nota.upper(), ANCHO_COMANDA - 6)
+            ]
     return lineas
 
 
@@ -828,6 +845,13 @@ def comanda(session: Session, venta_id: uuid.UUID) -> dict:
         lineas.append("** REIMPRESION **".center(ANCHO_COMANDA))
         lineas.append("-" * ANCHO_COMANDA)
     lineas += _platos_en_papel(session, pares)
+    # Al pie y no arriba: primero se lee qué hay que preparar, y después cómo
+    # sale. Arriba competiría con el número de orden, que es lo que la cocina
+    # busca de un vistazo.
+    if venta.nota_cocina:
+        lineas.append("-" * ANCHO_COMANDA)
+        lineas.append("AL SERVIR:")
+        lineas += textwrap.wrap(venta.nota_cocina.upper(), ANCHO_COMANDA)
     lineas.append("*" * ANCHO_COMANDA)
     return {
         "venta_id": str(venta_id),

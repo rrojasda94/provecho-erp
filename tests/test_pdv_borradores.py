@@ -242,3 +242,22 @@ def test_el_decimal_del_ticket_viaja_como_texto(session, base):
     assert session.get(PedidoBorrador, guardado.id).contenido == {
         "lineas": [{"precio": "25.50"}]
     }
+
+
+def test_un_borrador_viejo_no_pierde_los_campos_nuevos(session, base):
+    """El contenido es JSONB opaco: un ticket guardado antes de que el PDV
+    tuviera un campo vuelve sin él.
+
+    El servidor lo devuelve tal cual —no es su forma— y el PDV lo completa
+    contra un borrador nuevo antes de pintarlo. Este test fija la mitad del
+    contrato que sí es del servidor: **no rechaza ni normaliza** lo que
+    guardó, porque hacerlo obligaría a migrar la tabla cada vez que el ticket
+    gane un campo, que es justamente lo que el JSONB evita (ADR-074).
+    """
+    de_otra_version = {"tipo": "mesa", "lineas": [{"producto": "Pizza"}]}
+    _guardar(session, base, contenido=de_otra_version)
+    session.expire_all()
+
+    recuperado = borradores_uc.listar(session, punto_venta_id=base["caja"].id)[0]
+    assert recuperado.contenido == de_otra_version
+    assert "notaCocina" not in recuperado.contenido

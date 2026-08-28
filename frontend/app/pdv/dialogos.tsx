@@ -39,7 +39,9 @@ import {
 import { calcularCobro, cobroBloqueado } from "@/lib/cobro";
 
 import {
+  etiquetaMotivoDescuento,
   MOTIVOS_CONSUMO,
+  MOTIVOS_DESCUENTO,
   type Borrador,
   type DestinoMover,
   type LineaBorrador,
@@ -1103,6 +1105,16 @@ function CotizacionEntrega({
 }
 
 
+/** Lo que el turno pide de verdad al armar la mesa. Chips y no lista: en
+ * una caja, elegir es un toque y escribir son quince segundos con las manos
+ * ocupadas. El campo libre queda para lo que no esté acá. */
+const NOTAS_DE_SERVICIO = [
+  "Servir todo junto",
+  "Bebidas al final",
+  "Entradas primero",
+  "En platos separados",
+];
+
 export function DialogoTipo({
   abierto,
   borrador,
@@ -1125,12 +1137,14 @@ export function DialogoTipo({
   const [direccion, setDireccion] = useState("");
   const [ubicacion, setUbicacion] = useState<Ubicacion>(UBICACION_VACIA);
   const [costoEntrega, setCostoEntrega] = useState<number | null>(null);
+  const [notaCocina, setNotaCocina] = useState("");
 
   useEffect(() => {
     if (!borrador) return;
     setTipo(borrador.tipo);
     setMesaId(borrador.mesaId);
     setComensales(borrador.comensales ?? 2);
+    setNotaCocina(borrador.notaCocina);
     // El texto y su ancla viajan juntos (ADR-053): la dirección del
     // cliente registrado entra sola solo si el pedido no tiene la suya, y
     // trae su pin — copiar solo el texto es lo que dejaba el delivery
@@ -1231,6 +1245,31 @@ export function DialogoTipo({
         </>
       )}
 
+      {/* Del pedido entero, no de un plato: por eso vive acá, junto al tipo
+          de orden, y no en el diálogo de la línea. */}
+      <p className="pdv-etiqueta">Cómo servirlo · opcional</p>
+      <div className="pdv-chips">
+        {NOTAS_DE_SERVICIO.map((n) => (
+          <button
+            key={n}
+            type="button"
+            className={notaCocina === n ? "puesto" : ""}
+            onClick={() => setNotaCocina(notaCocina === n ? "" : n)}
+          >
+            {n}
+          </button>
+        ))}
+      </div>
+      <input
+        className="pdv-campo"
+        aria-label="Cómo servir el pedido"
+        placeholder="Ej.: primero el pan al ajo"
+        maxLength={200}
+        value={notaCocina}
+        onChange={(e) => setNotaCocina(e.target.value)}
+        data-testid="nota-cocina"
+      />
+
       <footer className="pdv-dialogo-pie">
         <span />
         <button
@@ -1243,6 +1282,7 @@ export function DialogoTipo({
               mesaId: tipo === "mesa" ? mesaId : null,
               mesaNumero: tipo === "mesa" ? (mesa?.numero ?? null) : null,
               comensales: tipo === "mesa" ? comensales : null,
+              notaCocina: notaCocina.trim(),
               direccion: tipo === "delivery" ? direccion.trim() : null,
               costoEntrega: tipo === "delivery" ? costoEntrega : null,
               ubicacion: tipo === "delivery" ? ubicacion : UBICACION_VACIA,
@@ -2003,6 +2043,326 @@ export function DialogoMotivoAnulacion({
           Quitar producto
         </button>
       </footer>
+    </Dialogo>
+  );
+}
+
+
+/**
+ * Bajarle el total al pedido. **Dos caminos, y no son el mismo.**
+ *
+ * | | Quién firma | Por qué |
+ * |---|---|---|
+ * | Cupón | nadie (RN-PRM-007) | el descuento ya estaba prometido y el cupón *es* la autorización; pedir un supervisor por cada uno haría que la caja deje de canjearlos |
+ * | Descuento | supervisor (RN-COM-017) | acá se regala margen a criterio de alguien, y el reporte necesita saber quién y por qué |
+ *
+ * Van en el mismo diálogo porque para el cajero son la misma pregunta —"¿por
+ * qué paga menos?"— y separarlos en dos botones obligaría a saber de
+ * antemano cuál de los dos es. Lo que no se mezcla es la firma.
+ *
+ * No se acumulan (RN-PRM-006): el que ya está aplicado se dice, y el otro
+ * camino se apaga.
+ */
+type Firma = { username: string; pin: string };
+
+const MODOS_DESCUENTO = [
+  ["porcentaje", "Porcentaje"],
+  ["monto", "Monto fijo"],
+] as const;
+
+
+/** El cupón del cliente. **Sin firma** (RN-PRM-007): el descuento ya estaba
+ * prometido y el cupón *es* la autorización. Pedir un supervisor por cada uno
+ * haría que la caja deje de canjearlos. */
+function SeccionCupon({
+  borrador,
+  ocupado,
+  onCupon,
+}: {
+  borrador: Borrador | null;
+  ocupado: boolean;
+  onCupon: (codigo: string) => void;
+}) {
+  const [codigo, setCodigo] = useState("");
+
+  if (borrador?.descuento) {
+    return (
+      <p className="pdv-nota">
+        Este pedido ya tiene un descuento manual: un cupón no se acumula con él
+        (RN-PRM-006). Quítalo primero.
+      </p>
+    );
+  }
+  if (borrador?.cupon) {
+    return (
+      <p className="pdv-nota">Cupón {borrador.cupon} ya canjeado en este pedido.</p>
+    );
+  }
+  return (
+    <div className="pdv-fila-campo">
+      <input
+        className="pdv-campo"
+        aria-label="Código del cupón"
+        placeholder="Código"
+        maxLength={20}
+        value={codigo}
+        onChange={(e) => setCodigo(e.target.value.toUpperCase())}
+        data-testid="codigo-cupon"
+      />
+      <button
+        type="button"
+        className="pdv-boton-sec"
+        disabled={ocupado || !borrador?.ventaId || codigo.trim().length === 0}
+        onClick={() => onCupon(codigo.trim())}
+      >
+        Canjear
+      </button>
+    </div>
+  );
+}
+
+/** Quitar el descuento ya aplicado. Lo firma un supervisor igual que ponerlo:
+ * es el mismo acto al revés, y el reporte necesita saber quién deshizo qué. */
+function QuitarDescuento({
+  aplicado,
+  ocupado,
+  onQuitar,
+}: {
+  aplicado: NonNullable<Borrador["descuento"]>;
+  ocupado: boolean;
+  onQuitar: (encargado: Firma) => void;
+}) {
+  const [usuario, setUsuario] = useState("");
+  const [pin, setPin] = useState("");
+  const etiqueta =
+    aplicado.modo === "porcentaje" ? `${aplicado.valor}%` : soles(aplicado.valor);
+  return (
+    <>
+      <p className="pdv-nota">
+        Aplicado: {etiqueta} · {etiquetaMotivoDescuento(aplicado.motivo)}.
+      </p>
+      <FirmaConPin
+        quien="del supervisor"
+        usuario={usuario}
+        onUsuario={setUsuario}
+        pin={pin}
+        onPin={setPin}
+        testid="descuento"
+      />
+      <button
+        type="button"
+        className="pdv-boton-riesgo ancho"
+        disabled={ocupado || !usuario.trim() || !pin.trim()}
+        onClick={() => onQuitar({ username: usuario.trim(), pin })}
+      >
+        Quitar el descuento
+      </button>
+    </>
+  );
+}
+
+/** Descuento manual sobre la orden. **Con firma de supervisor**
+ * (RN-COM-017): acá se regala margen a criterio de alguien, y quien lo aplica
+ * no se autoriza a sí mismo (RN-AUD-005). */
+function SeccionDescuento({
+  borrador,
+  ocupado,
+  onDescuento,
+}: {
+  borrador: Borrador | null;
+  ocupado: boolean;
+  onDescuento: (datos: {
+    modo: "porcentaje" | "monto";
+    valor: number;
+    motivo: string;
+    encargado: Firma;
+  }) => void;
+}) {
+  const [modo, setModo] = useState<"porcentaje" | "monto">("porcentaje");
+  const [valor, setValor] = useState("");
+  const [motivo, setMotivo] = useState("");
+  const [usuario, setUsuario] = useState("");
+  const [pin, setPin] = useState("");
+
+  if (borrador?.cupon) {
+    return (
+      <p className="pdv-nota">
+        Este pedido ya canjeó un cupón: un descuento manual no se acumula con
+        él (RN-PRM-006).
+      </p>
+    );
+  }
+  const numero = Number(valor);
+  const listo = descuentoListo({ numero, modo, motivo, usuario, pin, borrador });
+  return (
+    <>
+      <div className="pdv-chips">
+        {MODOS_DESCUENTO.map(([clave, etiqueta]) => (
+          <button
+            key={clave}
+            type="button"
+            className={modo === clave ? "puesto" : ""}
+            onClick={() => setModo(clave)}
+          >
+            {etiqueta}
+          </button>
+        ))}
+      </div>
+      <label className="pdv-etiqueta" htmlFor="valor-descuento">
+        <span>{modo === "porcentaje" ? "Porcentaje (1-100)" : "Monto en soles"}</span>
+        <input
+          id="valor-descuento"
+          className="pdv-campo"
+          inputMode="decimal"
+          value={valor}
+          onChange={(e) => setValor(e.target.value.replace(",", "."))}
+          data-testid="valor-descuento"
+        />
+      </label>
+      <p className="pdv-etiqueta">Motivo · obligatorio</p>
+      <div className="pdv-chips" data-testid="motivo-descuento">
+        {MOTIVOS_DESCUENTO.map(([clave, etiqueta]) => (
+          <button
+            key={clave}
+            type="button"
+            className={motivo === clave ? "puesto" : ""}
+            onClick={() => setMotivo(clave)}
+          >
+            {etiqueta}
+          </button>
+        ))}
+      </div>
+      <FirmaConPin
+        quien="del supervisor"
+        usuario={usuario}
+        onUsuario={setUsuario}
+        pin={pin}
+        onPin={setPin}
+        testid="descuento"
+      />
+      <button
+        type="button"
+        className="pdv-boton-pri ancho"
+        disabled={ocupado || !listo}
+        onClick={() =>
+          onDescuento({
+            modo,
+            valor: numero,
+            motivo: motivo.trim(),
+            encargado: { username: usuario.trim(), pin },
+          })
+        }
+      >
+        Aplicar descuento
+      </button>
+    </>
+  );
+}
+
+/** Fuera del componente para no sumarle ramas a su cuerpo. */
+function descuentoListo({
+  numero,
+  modo,
+  motivo,
+  usuario,
+  pin,
+  borrador,
+}: {
+  numero: number;
+  modo: "porcentaje" | "monto";
+  motivo: string;
+  usuario: string;
+  pin: string;
+  borrador: Borrador | null;
+}): boolean {
+  const tope = modo === "porcentaje" ? 100 : Number.POSITIVE_INFINITY;
+  const valorOk = Number.isFinite(numero) && numero > 0 && numero <= tope;
+  return (
+    valorOk &&
+    motivo.length > 0 &&
+    usuario.trim().length > 0 &&
+    pin.trim().length > 0 &&
+    Boolean(borrador?.ventaId)
+  );
+}
+
+/**
+ * Bajarle el total al pedido. **Dos caminos, y no son el mismo.**
+ *
+ * - **Cupón**: no lo firma nadie (RN-PRM-007). El descuento ya estaba
+ *   prometido y el cupón *es* la autorización; pedir un supervisor por cada
+ *   uno haría que la caja deje de canjearlos.
+ * - **Descuento manual**: lo firma un supervisor (RN-COM-017). Acá se regala
+ *   margen a criterio de alguien, y el reporte necesita saber quién y por qué.
+ *
+ * Van en el mismo diálogo porque para el cajero son la misma pregunta —«¿por
+ * qué paga menos?»— y separarlos en dos botones obligaría a saber de antemano
+ * cuál de los dos es. Lo que no se mezcla es la firma.
+ *
+ * No se acumulan (RN-PRM-006): el que ya está aplicado se dice, y el otro
+ * camino se apaga.
+ *
+ * Cada mitad guarda su propio estado, y por eso se montan con `key` del
+ * borrador: cambiar de pestaña tiene que limpiar el código a medio teclear,
+ * no arrastrarlo al pedido siguiente.
+ */
+export function DialogoDescuento({
+  abierto,
+  borrador,
+  ocupado,
+  onCerrar,
+  onCupon,
+  onDescuento,
+  onQuitarDescuento,
+}: {
+  abierto: boolean;
+  borrador: Borrador | null;
+  ocupado: boolean;
+  onCerrar: () => void;
+  onCupon: (codigo: string) => void;
+  onDescuento: (datos: {
+    modo: "porcentaje" | "monto";
+    valor: number;
+    motivo: string;
+    encargado: Firma;
+  }) => void;
+  onQuitarDescuento: (encargado: Firma) => void;
+}) {
+  const clave = `${borrador?.id ?? "sin"}-${String(abierto)}`;
+  const aplicado = borrador?.descuento ?? null;
+  return (
+    <Dialogo titulo="Descuento del pedido" abierto={abierto} onCerrar={onCerrar}>
+      {!borrador?.ventaId && (
+        <p className="pdv-nota">
+          El pedido todavía no salió a cocina. Envíalo y vuelve: el descuento se
+          aplica sobre una orden existente.
+        </p>
+      )}
+
+      <p className="pdv-etiqueta">Cupón del cliente</p>
+      <SeccionCupon
+        key={`cupon-${clave}`}
+        borrador={borrador}
+        ocupado={ocupado}
+        onCupon={onCupon}
+      />
+
+      <p className="pdv-etiqueta">Descuento manual</p>
+      {aplicado ? (
+        <QuitarDescuento
+          key={`quitar-${clave}`}
+          aplicado={aplicado}
+          ocupado={ocupado}
+          onQuitar={onQuitarDescuento}
+        />
+      ) : (
+        <SeccionDescuento
+          key={`aplicar-${clave}`}
+          borrador={borrador}
+          ocupado={ocupado}
+          onDescuento={onDescuento}
+        />
+      )}
     </Dialogo>
   );
 }

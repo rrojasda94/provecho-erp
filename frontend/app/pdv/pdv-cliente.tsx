@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { esSinPermiso, type Falla } from "@/lib/carga";
+import { tienePermiso } from "@/lib/permisos";
 import {
   api,
   claveIdempotencia,
@@ -19,6 +20,7 @@ import {
 } from "@/lib/pdv";
 
 import Catalogo from "./catalogo";
+import DespachoEnPdv from "./despacho";
 import {
   DialogoApertura,
   DialogoAutorizacion,
@@ -26,6 +28,7 @@ import {
   DialogoCliente,
   DialogoCobro,
   DialogoConsumoPersonal,
+  DialogoDescuento,
   Dialogo,
   DialogoMotivoAnulacion,
   DialogoMover,
@@ -74,6 +77,7 @@ function nuevoBorrador(mesa?: MesaEnMapa): Borrador {
     mesaId: mesa?.id ?? null,
     mesaNumero: mesa?.numero ?? null,
     comensales: null,
+    notaCocina: "",
     direccion: null,
     costoEntrega: null,
     ubicacion: UBICACION_VACIA,
@@ -84,6 +88,8 @@ function nuevoBorrador(mesa?: MesaEnMapa): Borrador {
     hora: hora(),
     consumoMotivo: null,
     consumoAutorizacion: null,
+    descuento: null,
+    cupon: null,
   };
 }
 
@@ -109,6 +115,11 @@ function estaVacio(b: Borrador): boolean {
  * significa que sumar una pizza a una mesa abierta la manda sin sabores y
  * el 409 aparece recién ahí, cuando el cajero ya cree que terminó.
  */
+/** El texto vacío que el PDV usa para "sin nota" es `null` en el contrato:
+ * una cadena vacía guardada es una nota que el KDS pinta como línea en
+ * blanco. Vive fuera de los componentes para no sumarles ramas. */
+const vacioANull = (texto: string): string | null => texto.trim() || null;
+
 function cuerpoLinea(l: LineaBorrador): ItemDeVentaNueva {
   return {
     producto_comercial_id: l.productoId,
@@ -120,6 +131,9 @@ function cuerpoLinea(l: LineaBorrador): ItemDeVentaNueva {
     })),
     sin_articulo_ids: l.restas.map((r) => r.articuloId),
     valores_variante_ids: l.valores.map((v) => v.ptavId),
+    // Hasta ADR-075 esta línea faltaba y la nota se quedaba en el navegador:
+    // el diálogo la pedía, el cocinero nunca la veía.
+    nota: vacioANull(l.nota),
   };
 }
 
@@ -232,6 +246,17 @@ function BotonBloquear() {
   );
 }
 
+/** El descuento ya aplicado, tal como lo devuelve el servidor. Fuera del
+ * componente porque es traducción de contrato, no estado de pantalla. */
+function descuentoDeVenta(venta: Venta): Borrador["descuento"] {
+  if (!venta.descuento_modo || venta.descuento_valor === null) return null;
+  return {
+    modo: venta.descuento_modo,
+    valor: Number(venta.descuento_valor),
+    motivo: venta.descuento_motivo ?? "",
+  };
+}
+
 /** Si la línea abierta en el diálogo ya salió a cocina. Fuera del
  * componente para no sumarle ramas a su cuerpo, que ya está en el tope. */
 const yaEstaEnCocina = (l: LineaBorrador | null): boolean => l?.enviada ?? false;
@@ -279,7 +304,14 @@ export default function PdvCliente({
     "catalogo",
   );
   const [dialogo, setDialogo] = useState<
-    "cliente" | "tipo" | "cobro" | "cierre" | "consumo" | "mover" | null
+    | "cliente"
+    | "tipo"
+    | "cobro"
+    | "cierre"
+    | "consumo"
+    | "mover"
+    | "descuento"
+    | null
   >(null);
   const [lineaEnEdicion, setLineaEnEdicion] = useState<LineaBorrador | null>(null);
   const [cobradoAVer, setCobradoAVer] = useState<Venta | null>(null);
@@ -297,15 +329,26 @@ export default function PdvCliente({
   } | null>(null);
   // El motivo tecleado, para poder repetirlo si el servidor pide firma.
   const [motivoAnulacion, setMotivoAnulacion] = useState("");
+  // La cola de despacho, encima del PDV. Se resuelve al abrirla.
+  const [viendoDespacho, setViendoDespacho] = useState(false);
 
   const activo = borradores.find((b) => b.id === activoId) ?? borradores[0] ?? null;
 
   /** Los recuperados **reemplazan** a la pestaña en blanco del arranque, no
    * se suman: si no, cada recarga dejaría una pestaña vacía por encima de lo
-   * que se estaba armando. */
+   * que se estaba armando.
+   *
+   * Y se completan contra un borrador nuevo, no se usan crudos. El contenido
+   * guardado es JSONB opaco (ADR-074), así que un ticket que se guardó antes
+   * de que el PDV tuviera un campo vuelve sin él: la pantalla lo lee como
+   * `undefined` y React convierte su input controlado en uno sin control —
+   * el campo deja de responder y nadie sabe por qué. Rellenar con el molde
+   * de hoy es lo que hace que el formato del borrador pueda crecer sin
+   * migrar nada. */
   const restaurarBorradores = useCallback((guardados: Borrador[]) => {
-    setBorradores(guardados);
-    setActivoId(guardados[0].id);
+    const completos = guardados.map((b) => ({ ...nuevoBorrador(), ...b }));
+    setBorradores(completos);
+    setActivoId(completos[0].id);
   }, []);
 
   /** Los borradores viven en el servidor (ADR-074): recargar la página o
@@ -407,6 +450,7 @@ export default function PdvCliente({
       cliente_id: b.cliente?.id ?? null,
       mesa_id: b.mesaId,
       comensales: b.comensales,
+      nota_cocina: vacioANull(b.notaCocina),
       referencia_atencion: b.tipo === "mesa" ? null : (b.cliente?.nombre ?? null),
       // Solo el delivery lleva dirección; el costo del reparto lo calcula
       // el servidor y se congela en la venta (ADR-054).
@@ -614,12 +658,18 @@ export default function PdvCliente({
     setOcupado(true);
     try {
       const items = await api.itemsDeVenta(info.ventaId);
+      // La nota y el descuento salen de la lista de cuentas abiertas, que ya
+      // trae la venta entera: pedirla de nuevo sería un viaje para dos
+      // campos. Los dos caminos de reapertura —el mapa de mesas y la
+      // pestaña de cuentas— miran acá, así que no pueden discrepar.
+      const venta = datos.abiertas.datos.find((v) => v.id === info.ventaId);
       const b: Borrador = {
         id: crypto.randomUUID(),
         tipo: info.tipo,
         mesaId: info.mesaId,
         mesaNumero: info.mesaNumero,
         comensales: info.comensales,
+        notaCocina: venta?.nota_cocina ?? "",
         direccion: null,
         costoEntrega: null,
         ubicacion: UBICACION_VACIA,
@@ -632,6 +682,8 @@ export default function PdvCliente({
         // personal ya no admite cambios de tipo ni cobro (RN-COM-025).
         consumoMotivo: null,
         consumoAutorizacion: null,
+        descuento: venta ? descuentoDeVenta(venta) : null,
+        cupon: null,
       };
       setBorradores((bs) => [...bs, b]);
       setActivoId(b.id);
@@ -834,6 +886,79 @@ export default function PdvCliente({
     }
   };
 
+  /** Canjea el cupón del cliente. **Sin firma** (RN-PRM-007): el descuento
+   * ya estaba prometido y el cupón es la autorización. */
+  const canjearCupon = async (codigo: string) => {
+    if (!activo?.ventaId) return;
+    setOcupado(true);
+    try {
+      const { monto_descuento } = await api.canjearCupon(activo.ventaId, codigo);
+      parchar({ cupon: codigo });
+      setDialogo(null);
+      notificar(`Cupón ${codigo} canjeado: −${soles(Number(monto_descuento))}`);
+    } catch (e) {
+      notificar(mensajeDe(e, "No se pudo canjear el cupón"));
+    } finally {
+      setOcupado(false);
+    }
+  };
+
+  /** Descuento manual sobre la orden. **Con firma de supervisor**
+   * (RN-COM-017): acá se regala margen a criterio de alguien, y el PIN se
+   * canjea por la elevación acotada antes de tocar la venta — si no vale, el
+   * cajero se entera antes de haber cambiado nada. */
+  const aplicarDescuento = async (datos: {
+    modo: "porcentaje" | "monto";
+    valor: number;
+    motivo: string;
+    encargado: { username: string; pin: string };
+  }) => {
+    if (!activo?.ventaId) return;
+    setOcupado(true);
+    try {
+      const { autorizacion } = await api.autorizar(
+        datos.encargado.username,
+        datos.encargado.pin,
+        "sales.aplicar_descuento",
+      );
+      const venta = await api.aplicarDescuento(activo.ventaId, {
+        modo: datos.modo,
+        valor: String(datos.valor),
+        motivo: datos.motivo,
+        autorizacion,
+      });
+      parchar({ descuento: descuentoDeVenta(venta) });
+      setDialogo(null);
+      notificar("Descuento aplicado");
+    } catch (e) {
+      notificar(mensajeDe(e, "No se pudo aplicar el descuento"));
+    } finally {
+      setOcupado(false);
+    }
+  };
+
+  /** Quitarlo también lo firma un supervisor: es el mismo acto al revés, y
+   * el reporte necesita saber quién deshizo qué. */
+  const quitarDescuento = async (encargado: { username: string; pin: string }) => {
+    if (!activo?.ventaId) return;
+    setOcupado(true);
+    try {
+      const { autorizacion } = await api.autorizar(
+        encargado.username,
+        encargado.pin,
+        "sales.aplicar_descuento",
+      );
+      await api.aplicarDescuento(activo.ventaId, { modo: null, autorizacion });
+      parchar({ descuento: null });
+      setDialogo(null);
+      notificar("Descuento quitado");
+    } catch (e) {
+      notificar(mensajeDe(e, "No se pudo quitar el descuento"));
+    } finally {
+      setOcupado(false);
+    }
+  };
+
   /** Mover los productos seleccionados a otra orden (RN-COM-043, ADR-071):
    * otra mesa —libre u ocupada— o un pedido para llevar/delivery. Sin PIN de
    * supervisor: el producto sigue existiendo en alguna orden abierta. */
@@ -930,6 +1055,19 @@ export default function PdvCliente({
           onCambiar={() => setPanel((p) => (p === "carta" ? "ticket" : "carta"))}
         />
         <SelectorSucursal actual={sucursalId} sucursales={sucursales} />
+        {/* Detrás del permiso de cocina: quien no opera el KDS no tiene por
+            qué ver la cola. La autorización real la hace la API. */}
+        {tienePermiso(permisos, "kds.operar") && (
+          <button
+            type="button"
+            className="pdv-boton-icono"
+            title="Ver la cola de despacho"
+            aria-label="Ver la cola de despacho"
+            onClick={() => setViendoDespacho(true)}
+          >
+            🍽
+          </button>
+        )}
         <BotonBloquear />
         <span className="pdv-meta">{hora()}</span>
       </header>
@@ -963,6 +1101,7 @@ export default function PdvCliente({
           onMover={() => setDialogo("mover")}
           onCliente={() => setDialogo("cliente")}
           onTipo={() => setDialogo("tipo")}
+          onDescuento={() => setDialogo("descuento")}
           onAnular={anularPedido}
           onEnviar={enviar}
           onCobrar={() => {
@@ -1056,6 +1195,20 @@ export default function PdvCliente({
           if (id) void anularLineaEnviada(id, motivo);
         }}
       />
+      <DespachoEnPdv
+        sucursalId={sucursalId}
+        abierto={viendoDespacho}
+        onCerrar={() => setViendoDespacho(false)}
+      />
+      <DialogoDescuento
+        abierto={dialogo === "descuento"}
+        borrador={activo}
+        ocupado={ocupado}
+        onCerrar={() => setDialogo(null)}
+        onCupon={canjearCupon}
+        onDescuento={aplicarDescuento}
+        onQuitarDescuento={quitarDescuento}
+      />
       <DialogoTipo
         abierto={dialogo === "tipo"}
         borrador={activo}
@@ -1063,6 +1216,21 @@ export default function PdvCliente({
         sucursalId={sucursalId}
         onCerrar={() => setDialogo(null)}
         onConfirmar={(cambios) => {
+          // La nota de servicio se puede cambiar con la orden ya en cocina,
+          // que es cuando de verdad se pide: si el pedido existe, viaja al
+          // servidor además de quedar en el borrador.
+          //
+          // Se manda **siempre** que haya orden, sin comparar contra lo que
+          // el borrador dice tener. Comparar parecía el ahorro obvio y es la
+          // forma de que una desincronización sea permanente: basta que un
+          // envío falle una vez para que el borrador local ya "tenga" la
+          // nota y no se vuelva a intentar nunca. Es un PUT en un diálogo
+          // que se abre pocas veces por turno.
+          if (activo?.ventaId && typeof cambios.notaCocina === "string") {
+            void api
+              .fijarNotaCocina(activo.ventaId, cambios.notaCocina || null)
+              .catch((e) => notificar(mensajeDe(e, "No se pudo guardar la nota")));
+          }
           parchar(cambios);
           setDialogo(null);
         }}
@@ -1172,7 +1340,7 @@ function lineaDesdeVentaItem(item: VentaItem): LineaBorrador {
     nombre: item.nombre,
     precio: Number(item.precio_unitario),
     cantidad: Number(item.cantidad),
-    nota: "",
+    nota: item.nota ?? "",
     extras: item.extras.map((e) => ({
       productoId: e.producto_comercial_id,
       nombre: e.nombre,

@@ -163,6 +163,7 @@ def crear_venta(
         ubicacion_distrito=body.ubicacion_distrito,
         mesa_id=body.mesa_id,
         comensales=body.comensales,
+        nota_cocina=body.nota_cocina,
         id=body.id,
         tipo=body.tipo,
         consumo_motivo=body.consumo_motivo,
@@ -339,6 +340,27 @@ def aplicar_descuento(
         motivo=body.motivo,
         autorizado_por=autorizado_por,
     )
+    session.commit()
+    return venta
+
+
+@router.put("/ventas/{venta_id}/nota-cocina", response_model=schemas.VentaOut)
+def fijar_nota_cocina(
+    venta_id: uuid.UUID,
+    body: schemas.NotaCocinaIn,
+    _: Usuario = Depends(require_permission(CREAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Cómo se sirve el pedido: "servir todo junto", "bebidas al final".
+
+    Mismo permiso que crear la orden y **sin firma de nadie**: no toca el
+    total, no mueve inventario y no cambia qué se prepara — solo en qué
+    orden sale. Se puede con la orden ya en cocina porque así se pide de
+    verdad, a mitad del servicio.
+    """
+    exigir_venta(session, venta_id, tenant)
+    venta = ventas.fijar_nota_cocina(session, venta_id=venta_id, nota=body.nota)
     session.commit()
     return venta
 

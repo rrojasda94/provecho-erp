@@ -5,7 +5,9 @@ import { useRef } from "react";
 import { soles } from "@/lib/pdv";
 
 import {
+  descuentoDeBorrador,
   esConsumoPersonal,
+  etiquetaMotivoDescuento,
   etiquetaTipo,
   lineasPendientes,
   MOTIVOS_CONSUMO,
@@ -32,6 +34,7 @@ type Props = {
   onMover: () => void;
   onCliente: () => void;
   onTipo: () => void;
+  onDescuento: () => void;
   onAnular: () => void;
   onEnviar: () => void;
   onCobrar: () => void;
@@ -76,6 +79,7 @@ export default function Ticket(props: Props) {
             borrador={activo}
             onCliente={props.onCliente}
             onTipo={props.onTipo}
+            onDescuento={props.onDescuento}
             onAnular={props.onAnular}
             onConsumoPersonal={props.onConsumoPersonal}
           />
@@ -270,12 +274,26 @@ function Totales({ borrador }: { borrador: Borrador }) {
   // El reparto es del pedido, no de lo que se comió: va en su propia fila y
   // no repartido entre las líneas (RN-COM-041). Sin delivery no aparece.
   const reparto = borrador.costoEntrega ?? 0;
+  // En su propia fila y no descontado del subtotal: el cliente pregunta
+  // cuánto le rebajaron, y un subtotal ya rebajado no responde eso.
+  const descuento = descuentoDeBorrador(borrador);
   return (
     <div className="pdv-totales">
       <div className="pdv-total-fila">
         <span>Subtotal</span>
-        <span>{soles(total - reparto)}</span>
+        <span>{soles(total - reparto + descuento)}</span>
       </div>
+      {descuento > 0 && (
+        <div className="pdv-total-fila">
+          <span>
+            Descuento
+            {borrador.descuento
+              ? ` · ${etiquetaMotivoDescuento(borrador.descuento.motivo)}`
+              : ""}
+          </span>
+          <span className="verde">−{soles(descuento)}</span>
+        </div>
+      )}
       {reparto > 0 && (
         <div className="pdv-total-fila">
           <span>Reparto</span>
@@ -290,20 +308,27 @@ function Totales({ borrador }: { borrador: Borrador }) {
   );
 }
 
+/** Si al pedido ya le bajaron el total, por cupón o por descuento manual.
+ * Fuera del componente para no sumarle ramas a su cuerpo. */
+const tieneRebaja = (b: Borrador): boolean => Boolean(b.descuento ?? b.cupon);
+
 function Acciones({
   borrador,
   onCliente,
   onTipo,
+  onDescuento,
   onAnular,
   onConsumoPersonal,
 }: {
   borrador: Borrador;
   onCliente: () => void;
   onTipo: () => void;
+  onDescuento: () => void;
   onAnular: () => void;
   onConsumoPersonal: () => void;
 }) {
   const consumo = esConsumoPersonal(borrador);
+  const rebajado = tieneRebaja(borrador);
   return (
     <div className="pdv-acciones">
       <button
@@ -330,6 +355,19 @@ function Acciones({
       >
         {borrador.tipo ? etiquetaTipo(borrador) : "Tipo de orden"}
       </button>
+      {/* El cupón no pide firma y el descuento manual sí, pero para el
+          cajero son la misma pregunta —"¿por qué paga menos?"—, así que es un
+          solo botón; la diferencia la hace el diálogo. Un consumo de personal
+          ya vale cero: no hay nada que descontar (RN-COM-025). */}
+      {!consumo && (
+        <button
+          type="button"
+          className={rebajado ? "puesto" : ""}
+          onClick={onDescuento}
+        >
+          {rebajado ? "Descuento aplicado" : "Descuento / cupón"}
+        </button>
+      )}
       <button
         type="button"
         className="riesgo"

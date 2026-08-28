@@ -188,6 +188,12 @@ cuatro huecos que el punto de venta necesitaba y el modelo no daba.
   del origen numeraba los envíos de otro pedido. El PDV, del lado del
   cliente, deja la línea pendiente hasta que alguien toca "Enviar aumento" —
   antes viajaba al confirmar el diálogo del producto.
+- **Notas de cocina** (ADR-075): `venta_item.nota` (texto de ese plato) y
+  `venta.nota_cocina` (cómo se sirve el pedido entero). La primera viaja en
+  `VentaItemIn`, sale bajo su plato en el KDS y en la comanda; la segunda va
+  en el alta y se cambia con `PUT /ventas/{id}/nota-cocina` —mismo permiso
+  que crear, sin firma, solo con la venta en `orden`—, se pinta al pie de la
+  tarjeta y **en todas las tandas**.
 - **El borrador del PDV se guarda acá** (ADR-074): `PUT
   /sales/borradores/{id}` (upsert por el id que trae el cliente),
   `GET /sales/borradores?punto_venta_id=` y `DELETE /sales/borradores/{id}`,

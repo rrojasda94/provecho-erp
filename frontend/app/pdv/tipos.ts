@@ -76,6 +76,9 @@ export type Borrador = {
   mesaId: string | null;
   mesaNumero: number | null;
   comensales: number | null;
+  /** Cómo se sirve el pedido entero: "servir todo junto", "bebidas al
+   * final". Del pedido y no de una línea — esa es `LineaBorrador.nota`. */
+  notaCocina: string;
   direccion: string | null;
   /** Lo que sale el reparto, cotizado por el servidor al anclar la dirección
    * (ADR-054). `null` = todavía no se cotizó o el pedido no se lleva. Es
@@ -96,6 +99,12 @@ export type Borrador = {
    * costo va a gasto. Se marca antes de enviar, con PIN del encargado. */
   consumoMotivo: string | null;
   consumoAutorizacion: string | null;
+  /** Descuento manual ya aplicado sobre la orden (RN-COM-017). Lo resuelve
+   * el servidor; acá vive para poder mostrar el total real antes de cobrar
+   * y para no ofrecer un cupón encima (RN-PRM-006). */
+  descuento: { modo: "porcentaje" | "monto"; valor: number; motivo: string } | null;
+  /** Código del cupón canjeado, o `null`. Mismo motivo. */
+  cupon: string | null;
 };
 
 /** A dónde van los productos seleccionados al "mover productos" (RN-COM-043):
@@ -103,6 +112,30 @@ export type Borrador = {
  * cuenta dentro de la misma orden ("cobrar seleccionados"), que no pasa por
  * este diálogo. */
 export type DestinoMover = { ventaId: string } | { mesaId: string };
+
+/**
+ * Motivos de descuento manual que el servidor acepta
+ * (`sales.domain.rules.MOTIVOS_DESCUENTO`), no texto libre.
+ *
+ * Es un catálogo cerrado porque el dato existe para **agrupar** el margen
+ * regalado por causa, y un campo abierto no agrupa: "cliente frecuente",
+ * "cte frecuente" y "frecuente" son tres motivos distintos para el reporte y
+ * el mismo para quien lo tecleó. Que la lista de acá coincida con la del
+ * backend lo vigila `tests/test_repo_coherencia.py`.
+ *
+ * `cupon` no está: ese motivo lo pone el canje del cupón, no una persona.
+ */
+export const MOTIVOS_DESCUENTO = [
+  ["cortesia", "Cortesía"],
+  ["reclamo", "Reclamo"],
+  ["colaborador", "Colaborador"],
+  ["promocion", "Promoción"],
+  ["convenio", "Convenio"],
+] as const;
+
+/** La clave que guarda el servidor, en el idioma de la caja. */
+export const etiquetaMotivoDescuento = (motivo: string): string =>
+  MOTIVOS_DESCUENTO.find(([clave]) => clave === motivo)?.[1] ?? motivo;
 
 /** Motivos de consumo de personal, como los nombra el backend. */
 export const MOTIVOS_CONSUMO: { valor: string; etiqueta: string }[] = [
@@ -126,10 +159,26 @@ export const totalLinea = (l: LineaBorrador): number =>
  * El reparto suma al final y no por línea (RN-COM-041): es del pedido, no de
  * lo que se comió. El número que manda es el que recalcula el servidor —esto
  * es lo que el cajero le dice al cliente antes de cobrar. */
+/** Lo que el descuento manual le baja al pedido (RN-COM-017).
+ *
+ * Se calcula sobre los productos y **no** sobre el reparto: el flete no es
+ * margen del local, es lo que cuesta llevarlo. Es el mismo criterio del
+ * servidor, que es quien manda — esto solo evita que el cajero cante un
+ * total y la caja cobre otro. */
+export const descuentoDeBorrador = (b: Borrador): number => {
+  if (!b.descuento) return 0;
+  const productos = b.lineas.reduce((a, l) => a + totalLinea(l), 0);
+  return b.descuento.modo === "porcentaje"
+    ? (productos * b.descuento.valor) / 100
+    : Math.min(b.descuento.valor, productos);
+};
+
 export const totalBorrador = (b: Borrador): number =>
   esConsumoPersonal(b)
     ? 0
-    : b.lineas.reduce((a, l) => a + totalLinea(l), 0) + (b.costoEntrega ?? 0);
+    : b.lineas.reduce((a, l) => a + totalLinea(l), 0) +
+      (b.costoEntrega ?? 0) -
+      descuentoDeBorrador(b);
 
 /** Lo que todavía no salió a cocina. En un pedido nuevo son todas sus
  * líneas; en uno ya enviado, el aumento que espera confirmación. */

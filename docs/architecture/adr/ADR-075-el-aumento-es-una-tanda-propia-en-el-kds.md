@@ -93,6 +93,33 @@ dos horas que acaba de pedir un café saldría en rojo, y el semáforo dejaría
 de significar algo el día que alguien se siente a comer sin apuro. Despacho
 sigue contando desde el pedido, que es lo que el cliente está esperando.
 
+### Y lo que la cocina lee, además de qué preparar
+
+Dos notas, y son distintas:
+
+- **`venta_item.nota`** — lo que el mesero dice de **ese plato**: "bien
+  cocida", "sin sal". El diálogo del producto la pedía desde el primer PDV y
+  el dato moría en el navegador: no había columna, `cuerpoLinea` no la
+  mandaba, y al releer la orden se perdía. Era decorativa.
+- **`venta.nota_cocina`** — cómo se sirve **el pedido**: "servir todo junto",
+  "bebidas al final", "primero el pan al ajo". Es del pedido y no de una
+  línea: colgarla de la primera la escondería dentro de un plato, y repetirla
+  en todas sería pedirle al cocinero que las compare. Va **al pie** de la
+  pastilla —primero se lee qué hay que preparar, después cómo sale— y en
+  **todas las tandas**, porque es una instrucción del pedido y la tanda que
+  no la llevara la ignoraría sin saberlo.
+
+Las dos son texto libre, y eso es deliberado: lo estructurado ya existe y es
+mejor —las restas descuentan inventario, los atributos cambian la receta—,
+pero siempre queda un pedido del comensal que ninguna de las dos cosas
+expresa. Lo que no puede pasar es que el campo exista en la pantalla y el
+dato no llegue a la cocina.
+
+La nota del pedido **se puede cambiar con la orden ya en cocina**
+(`PUT /ventas/{id}/nota-cocina`, mismo permiso que crear y sin firma): así se
+pide de verdad, a mitad del servicio. No toca el total, no mueve inventario y
+no cambia qué se prepara — solo en qué orden sale.
+
 ## Alternativas descartadas
 
 - **Mostrar la hora de cada línea en la misma tarjeta** (lo que proponía la
@@ -115,8 +142,14 @@ sigue contando desde el pedido, que es lo que el cliente está esperando.
   mandan así, porque ahí la unidad sigue siendo el pedido entero.
 - Cierra la deuda 🔶 «El KDS no distingue una línea agregada de las
   originales» de `deuda/modulo-sales.md`.
+- **Migración** `b5d21f8a0c36`: `venta_item.nota` y `venta.nota_cocina`,
+  nullables y sin backfill.
 - El evento no cambia: `agregar_lineas` sigue publicando
   `sales.venta_confirmada` con el delta (ADR-043 §3). La tanda es del KDS, no
   de contabilidad ni de inventario.
+- El lote del hub lleva `tanda` y las dos notas: sin eso, el replay en la
+  nube mostraría como un solo envío lo que en el local fueron tres, y la
+  comanda reimpresa de una venta vieja no diría lo mismo que dijo la primera
+  vez (ADR-009).
 - ADR-043 §1 sigue valiendo en lo que decidió —agregar no exige la firma de
   nadie—; lo que esta enmienda cambia es **cuándo** se manda.

@@ -756,9 +756,31 @@
     color: var(--pdv-texto);
 }
 
-.pdv-boton-sec.ancho {
+/* `.ancho` sirve a cualquier botón del diálogo, no solo al secundario: el
+   de aplicar descuento y el de quitarlo ocupan la fila entera igual. */
+.pdv-boton-sec.ancho,
+.pdv-boton-pri.ancho,
+.pdv-boton-riesgo.ancho {
     width: 100%;
     margin-top: 0.625rem;
+}
+
+/* Un campo y su botón en la misma fila (el código del cupón). El campo se
+   estira, el botón ocupa lo suyo. */
+.pdv-fila-campo {
+    display: flex;
+    gap: 0.5rem;
+    align-items: stretch;
+}
+
+.pdv-fila-campo .pdv-campo {
+    flex: 1;
+    min-width: 0;
+}
+
+.pdv-fila-campo button {
+    flex: none;
+    padding-inline: 1rem;
 }
 
 .pdv-boton-riesgo {
@@ -1419,4 +1441,42 @@
    pantalla se carga. */
 body:has(.pdv) > footer {
     display: none;
+}
+
+/* La cola de despacho encima del PDV (punto 9 del parche). A pantalla
+   completa y sin bordes: es una pantalla, no un formulario. El `<dialog>`
+   nativo trae `::backdrop` y el top layer; lo único que hay que sacarle son
+   los estilos de diálogo del PDV, pensados para una tarjeta centrada. */
+.pdv-despacho {
+    width: 100%;
+    max-width: none;
+    height: 100dvh;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    overflow: hidden;
+}
+
+.pdv-despacho::backdrop {
+    background: rgba(0, 0, 0, 0.75);
+}
+
+/* Fuera del flujo y por encima de la cola: el encabezado del despacho ya
+   ocupa esa fila, y meterle un botón adentro obligaría a que el componente
+   sepa que está embebido. */
+.pdv-despacho-cerrar {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.9rem;
+    z-index: 2;
+    width: 2.75rem;
+    height: 2.75rem;
+    font-size: 1.5rem;
+    line-height: 1;
+    border-radius: 0.75rem;
+    border: 1px solid var(--pdv-borde-fuerte);
+    background: var(--pdv-surface);
+    color: var(--pdv-texto);
 }

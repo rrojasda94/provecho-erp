@@ -35,6 +35,10 @@ class VentaItemIn(BaseModel):
     # Deciden qué líneas condicionadas de la receta se descuentan
     # (RN-COM-037). Solo admite valores que el producto o su padre ofrecen.
     valores_variante_ids: list[uuid.UUID] = []
+    # Lo que el mesero le dice a cocina sobre ESTE plato ("bien cocida", "sin
+    # sal"). Texto libre: lo estructurado ya son las restas y los atributos,
+    # y aun así queda un pedido del comensal que ninguno de los dos expresa.
+    nota: str | None = Field(default=None, max_length=140)
 
 
 class VentaCreate(UbicacionMixin):
@@ -54,6 +58,10 @@ class VentaCreate(UbicacionMixin):
     direccion_entrega: str | None = Field(default=None, max_length=255)
     mesa_id: uuid.UUID | None = None
     comensales: int | None = Field(default=None, ge=1)
+    # Cómo se sirve el pedido entero: "servir todo junto", "bebidas al final".
+    # Del pedido y no de una línea: no dice qué lleva un plato, dice en qué
+    # orden sale todo.
+    nota_cocina: str | None = Field(default=None, max_length=200)
     # Identificador generado por el cliente. El PDV puede crear la venta sin
     # conexión y conservar su id al llegar al servidor (ADR-009); si no lo
     # manda, lo genera el servidor como siempre.
@@ -134,6 +142,7 @@ class VentaOut(BaseModel):
     # rotulada "Mesa ?".
     mesa_numero: int | None = None
     comensales: int | None = None
+    nota_cocina: str | None = None
     descuento_modo: str | None = None
     descuento_valor: Decimal | None = None
     descuento_motivo: str | None = None
@@ -174,9 +183,24 @@ class AnularLineasCreate(BaseModel):
 class AgregarLineasCreate(BaseModel):
     """Sumar líneas a una orden ya enviada a cocina (RN-COM-029). Mismo
     shape que los `items` del alta: una mesa que pide de a poco no debería
-    obligar a abrir una orden nueva que después se cobra por separado."""
+    obligar a abrir una orden nueva que después se cobra por separado.
+
+    Todo lo de una misma llamada entra al KDS como una tanda propia
+    (ADR-075): una comanda nueva en la cola, no líneas sueltas dentro de la
+    pastilla del pedido original."""
 
     items: list[VentaItemIn] = Field(min_length=1)
+
+
+class NotaCocinaIn(BaseModel):
+    """Cómo se sirve el pedido. `null` la quita.
+
+    Se puede cambiar con la orden ya en cocina porque así se pide de verdad:
+    "las bebidas al final" se dice a mitad del servicio, no al tomar la
+    comanda.
+    """
+
+    nota: str | None = Field(default=None, max_length=200)
 
 
 class MoverLineasCreate(BaseModel):
@@ -944,6 +968,9 @@ class VentaItemOut(BaseModel):
     cantidad: Decimal
     precio_unitario: Decimal
     grupo_cobro: int
+    # Sin esto, reabrir la cuenta perdía la nota: la línea volvía del
+    # servidor sin ella y el siguiente guardado la borraba.
+    nota: str | None = None
     extras: list[VentaItemExtraOut] = []
 
 

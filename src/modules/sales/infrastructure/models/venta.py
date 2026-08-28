@@ -160,6 +160,17 @@ class Venta(Base, UuidPkMixin, TimestampMixin, UbicacionMixin):
     # Cuántos comen en la mesa. Opcional: el cajero no siempre lo pregunta.
     # Base del ticket promedio por comensal.
     comensales: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Cómo se sirve el pedido entero: "servir todo junto", "bebidas al
+    # final", "primero el pan al ajo", "en platos separados".
+    #
+    # Es del pedido y no de una línea a propósito: no dice qué lleva un
+    # plato —eso es `venta_item.nota`—, dice en qué orden y de qué forma sale
+    # todo. Colgarla de la primera línea la escondería dentro de un plato, y
+    # repetirla en todas sería pedirle al cocinero que las compare.
+    #
+    # El KDS la pinta al pie de la pastilla, donde se lee después de saber
+    # qué hay que preparar.
+    nota_cocina: Mapped[str | None] = mapped_column(String(200), nullable=True)
     # --- Descuento manual de la orden (RN-COM-017) ---------------------------
     # Distinto de `venta_item.descuento` (monto por línea que sale de listas
     # promocionales) y de las promociones condicionales por marca/sucursal,

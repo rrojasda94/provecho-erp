@@ -48,6 +48,9 @@ export type ItemCola = {
    * "1 Peperoni" como si fueran dos cosas. */
   extras: { producto: string; cantidad: string }[];
   etapa_kds: number;
+  /** Lo que el mesero le dijo a cocina sobre ESTE plato ("bien cocida").
+   * Distinto de `PedidoCola.nota_cocina`, que es del pedido entero. */
+  nota: string | null;
   /** En qué estación está la línea AHORA; `null` = ya salió de cocina. Es
    * lo que despacho lee para saber si el pedido espera por el horno o por
    * la barra (RN-CUP-013). */
@@ -63,6 +66,11 @@ export type PedidoHistorial = PedidoCola & {
 export type PedidoCola = {
   venta_id: string;
   numero_orden: number;
+  /** Qué envío del pedido es esta tarjeta (ADR-075). En preparación una venta
+   * aparece una vez por tanda, así que **la clave de la tarjeta es el par
+   * `venta_id + tanda`**, no `venta_id`. Vale 1 en despacho y en el
+   * historial, donde la unidad sigue siendo el pedido entero. */
+  tanda: number;
   referencia_atencion: string | null;
   /** Dirección del delivery. Despacho arma la bolsa mirando la pantalla, así
    * que la ve acá y no solo en la comanda impresa. `null` fuera de delivery. */
@@ -73,6 +81,9 @@ export type PedidoCola = {
    * un pedido de cliente que la comida del turno. */
   tipo: string;
   consumo_motivo: string | null;
+  /** Cómo se sirve el pedido entero: "servir todo junto", "bebidas al final".
+   * Va al pie de la tarjeta, después de qué hay que preparar. */
+  nota_cocina: string | null;
   estado_pedido: EstadoItem;
   /** Cuándo se tomó el pedido, en ISO. El cronómetro lo corre el navegador
    * (ver `kds-semaforo.ts`). */
@@ -95,6 +106,18 @@ export type PantallaEnvio = {
 /** Sucursal a la que puede quedar asignada una pantalla. Solo nombre e id:
  * el KDS no necesita saber nada más de un local. */
 export type SucursalKds = { id: string; nombre: string };
+
+/** Los mismos valores que la semilla del backend. Si la configuración no
+ * carga, la cocina abre con colores de fábrica en vez de sin pantalla — es un
+ * semáforo, no un dato del pedido. Vive acá y no en la página porque también
+ * lo usa el despacho embebido en el PDV. */
+export const SEMAFORO_DE_FABRICA: Semaforo = {
+  minutos_ambar: 8,
+  minutos_rojo: 15,
+  color_normal: "#22c55e",
+  color_ambar: "#fbbf24",
+  color_rojo: "#f87171",
+};
 
 export const apiKds = {
   cola: (pantallaId: string) =>

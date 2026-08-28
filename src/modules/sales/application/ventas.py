@@ -109,6 +109,14 @@ def _armar_item(
         grupo_cobro=grupo,
         sin_articulo_ids=restas,
         valores_variante_ids=valores,
+        # Texto libre para cocina. Se normaliza a `None` cuando llega vacío:
+        # el PDV manda `""` con solo abrir el diálogo, y una nota vacía en el
+        # KDS es una línea de más que el cocinero lee y descarta.
+        nota=(it.get("nota") or "").strip() or None,
+        # Solo el replay del hub la manda (ADR-009): la venta ya se preparó
+        # allá y sus tandas son las que la cocina vio. En el alta normal todo
+        # es la tanda 1, y `agregar_lineas` la pisa con la del envío.
+        tanda=int(it.get("tanda") or 1),
     )
     # Empaque se descuenta solo en las modalidades configuradas (RN-EMP-003).
     con_empaque = bool(prod.empaque_id and modalidad in (prod.modalidades_empaque or []))
@@ -525,6 +533,7 @@ def crear_venta(
     costo_entrega: Decimal | None = None,
     mesa_id: uuid.UUID | None = None,
     comensales: int | None = None,
+    nota_cocina: str | None = None,
     id: uuid.UUID | None = None,
     fecha_orden: date | None = None,
     numero_orden: int | None = None,
@@ -632,6 +641,7 @@ def crear_venta(
         costo_entrega=reparto,
         mesa_id=mesa_id,
         comensales=comensales,
+        nota_cocina=(nota_cocina or "").strip() or None,
         tipo=tipo,
         consumo_motivo=consumo_motivo,
         consumo_autorizado_por=consumo_autorizado_por,
@@ -1044,6 +1054,7 @@ def listar_items(session: Session, venta_id: uuid.UUID) -> list[dict]:
             "cantidad": f.cantidad,
             "precio_unitario": f.precio_unitario,
             "grupo_cobro": f.grupo_cobro,
+            "nota": f.nota,
             "extras": [
                 {
                     "id": e.id,
@@ -1398,6 +1409,27 @@ def mover_lineas(
         usuario_id=usuario_id,
     )
     return origen, destino
+
+
+def fijar_nota_cocina(
+    session: Session, *, venta_id: uuid.UUID, nota: str | None
+) -> Venta:
+    """Cambia cómo se sirve el pedido. `None` la quita.
+
+    Se puede con la orden ya en cocina porque así se pide de verdad: "las
+    bebidas al final" se dice a mitad del servicio, no al tomar la comanda.
+    Después del cobro no: la cuenta está cerrada y no hay nada que servir.
+
+    Sin firma de nadie y sin evento: no toca el total, no mueve inventario y
+    no cambia qué se prepara — solo en qué orden sale.
+    """
+    venta = VentaRepo(session).get(venta_id)
+    if venta is None:
+        raise NoEncontrado("venta no encontrada")
+    if venta.estado != "orden":
+        raise Conflicto(f"la venta está {venta.estado}: ya no se está sirviendo")
+    venta.nota_cocina = (nota or "").strip() or None
+    return venta
 
 
 def lineas_en_ventana(
