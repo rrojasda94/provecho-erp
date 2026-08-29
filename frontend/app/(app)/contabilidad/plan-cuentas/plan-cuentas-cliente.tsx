@@ -1,13 +1,13 @@
 "use client";
 
 import type { ColumnDef } from "@tanstack/react-table";
-import { useMemo } from "react";
+import { useMemo, useState, useTransition } from "react";
 
 import { InsigniaActiva } from "@/components/estado/insignia";
 import { BOTON_FILA, DialogoFormulario } from "@/components/formulario/dialogo-formulario";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
 
-import { crearCuentaAction, editarCuentaAction } from "../actions";
+import { crearCuentaAction, editarCuentaAction, importarPcgeAction } from "../actions";
 import type { Cuenta } from "../asientos-cliente";
 
 // Los cinco del modelo contable; la naturaleza (deudora/acreedora) la deriva
@@ -81,6 +81,37 @@ function DialogoEditarCuenta({ cuenta }: { cuenta: Cuenta }) {
   );
 }
 
+/** El plan oficial peruano se siembra de una vez, no cuenta por cuenta. Es
+ * la diferencia entre teclear cuatrocientos códigos y no tener que inventar
+ * ninguno. */
+function BotonImportarPcge() {
+  const [pendiente, startTransition] = useTransition();
+  const [error, setError] = useState("");
+  return (
+    <div className="flex items-center gap-2">
+      {error && (
+        <span role="alert" className="text-sm font-semibold text-secondary">
+          {error}
+        </span>
+      )}
+      <button
+        type="button"
+        disabled={pendiente}
+        title="Crea las cuentas del PCGE que falten. Correrlo dos veces no duplica nada."
+        onClick={() =>
+          startTransition(async () => {
+            const r = await importarPcgeAction();
+            setError(r.error);
+          })
+        }
+        className="rounded border border-gray/40 px-3 py-1.5 text-sm font-semibold text-dark hover:bg-gray/10"
+      >
+        {pendiente ? "Importando..." : "Importar PCGE"}
+      </button>
+    </div>
+  );
+}
+
 export function PlanCuentasCliente({ cuentas }: { cuentas: Cuenta[] }) {
   const columnas: ColumnDef<Cuenta>[] = useMemo(
     () => [
@@ -105,11 +136,17 @@ export function PlanCuentasCliente({ cuentas }: { cuentas: Cuenta[] }) {
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h1 className="font-heading text-xl text-dark">Plan de cuentas</h1>
-        <DialogoNuevaCuenta cuentas={cuentas} />
+        <div className="flex items-center gap-2">
+          <BotonImportarPcge />
+          <DialogoNuevaCuenta cuentas={cuentas} />
+        </div>
       </div>
       <p className="text-sm text-gray">
-        Las cuentas contra las que se registran los asientos. El mapeo evento → cuentas
-        (venta, compra, pago) se configura por API y usa estas mismas cuentas.
+        Las cuentas contra las que se registran los asientos. <strong>Importar PCGE</strong>{" "}
+        siembra el Plan Contable General Empresarial oficial: con él cargado, la venta, la
+        compra y el pago generan el asiento peruano completo —con su IGV y su asiento de
+        destino— sin configurar nada. El mapeo evento → cuentas de la empresa, si lo hay,
+        sigue mandando sobre ese default.
       </p>
       <TablaDatos columnas={columnas} datos={cuentas} placeholderBusqueda="Buscar cuenta..." />
     </div>

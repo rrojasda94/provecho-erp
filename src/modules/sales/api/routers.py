@@ -643,6 +643,7 @@ def registrar_pago(
         grupo_cobro=body.grupo_cobro,
         receptor_num_doc=body.receptor_num_doc,
         receptor_nombre=body.receptor_nombre,
+        gravado_igv=body.gravado_igv,
         id=body.id,
     )
     session.commit()

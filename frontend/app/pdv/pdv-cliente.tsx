@@ -608,6 +608,7 @@ export default function PdvCliente({
     doc: string,
     nombre: string,
     propina: number,
+    gravadoIgv: boolean | null,
   ) => {
     if (!activo) return;
     // Cobrar solo lo seleccionado es "separar la cuenta" (RN-COM-018): la
@@ -635,7 +636,7 @@ export default function PdvCliente({
         });
         grupoCobro = siguienteGrupo;
       }
-      await registrarPagos(ventaId, pagos, doc, nombre, grupoCobro);
+      await registrarPagos(ventaId, pagos, doc, nombre, grupoCobro, gravadoIgv);
       if (propina > 0) await registrarPropina(numero, propina);
       notificar(
         `Orden #${numero} cobrada · ${soles(totalACobrar(activo, seleccion))} · ${
@@ -1349,6 +1350,7 @@ async function registrarPagos(
   doc: string,
   nombre: string,
   grupoCobro: number,
+  gravadoIgv: boolean | null,
 ) {
   for (const [i, p] of pagos.entries()) {
     const ultimo = i === pagos.length - 1;
@@ -1363,6 +1365,9 @@ async function registrarPagos(
       grupo_cobro: grupoCobro,
       receptor_num_doc: ultimo ? doc || null : null,
       receptor_nombre: ultimo ? nombre || null : null,
+      // Solo con el último: es el que cierra la cuenta y emite el
+      // comprobante, igual que el receptor.
+      gravado_igv: ultimo ? gravadoIgv : null,
     });
   }
 }

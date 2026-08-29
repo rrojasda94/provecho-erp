@@ -304,6 +304,9 @@ def emitir_nota_credito(
         estado_emision="pendiente",
         receptor_num_doc=afectado.receptor_num_doc,
         receptor_nombre=afectado.receptor_nombre,
+        # Hereda el régimen del documento que corrige: una NC no puede
+        # devolver un IGV que la factura original nunca cobró.
+        gravado_igv=afectado.gravado_igv,
         afecta_comprobante_id=afectado.id,
         motivo_nc=motivo,
         motivo_nc_descripcion=motivo_descripcion or factiliza.MOTIVOS_NC[motivo],

@@ -48,7 +48,9 @@ def _empresa_de_sucursal(session, sucursal_id: str) -> uuid.UUID | None:
     return sucursal.empresa_id if sucursal is not None else None
 
 
-def _generar(session, *, empresa_id, evento, referencia_origen, monto, glosa) -> None:
+def _generar(
+    session, *, empresa_id, evento, referencia_origen, monto, glosa, gravado_igv=None
+) -> None:
     asiento = asientos_uc.crear_asiento_automatico_si_hay_regla(
         session,
         empresa_id=empresa_id,
@@ -57,6 +59,7 @@ def _generar(session, *, empresa_id, evento, referencia_origen, monto, glosa) ->
         glosa=glosa,
         referencia_origen=referencia_origen,
         monto=monto,
+        gravado_igv=gravado_igv,
     )
     if asiento is None:
         log.info(
@@ -199,19 +202,69 @@ def on_comprobante_conforme(payload: dict) -> None:
                 monto_detraccion = (
                     Decimal(payload["monto"]) * Decimal(payload["porcentaje_deteccion"]) / 100
                 )
+            empresa_id = uuid.UUID(payload["empresa_id"])
             pagos_uc.registrar_pago(
                 session,
-                empresa_id=uuid.UUID(payload["empresa_id"]),
+                empresa_id=empresa_id,
                 comprobante_id=uuid.UUID(payload["comprobante_id"]),
                 proveedor_id=uuid.UUID(payload["proveedor_id"]),
                 orden_compra_id=uuid.UUID(payload["orden_compra_id"]),
                 monto=Decimal(payload["monto"]),
                 monto_detraccion=monto_detraccion,
             )
+            # Y el crédito fiscal: la recepción asentó la compra sin IGV
+            # porque todavía no había comprobante, y el crédito solo se toma
+            # con el comprobante válido y anotado. Exonerada, el IGV vale
+            # cero y no se escribe asiento.
+            _generar(
+                session,
+                empresa_id=empresa_id,
+                evento="purchases.comprobante_conforme",
+                referencia_origen=payload["comprobante_id"],
+                monto=Decimal(payload["monto"]),
+                glosa=f"IGV de compra — comprobante {payload['comprobante_id']}",
+                gravado_igv=payload.get("gravado_igv"),
+            )
             session.commit()
     except Exception:
         log.exception(
             "fallo encolando pago del comprobante %s", payload.get("comprobante_id")
+        )
+
+
+def on_comprobante_emitido(payload: dict) -> None:
+    """El débito fiscal nace con el comprobante, no con la orden.
+
+    La venta se asentó al confirmarse contra 7011 por el total cobrado,
+    cuando todavía no existía el documento que dice si la operación va
+    gravada. Este asiento reclasifica al pasivo tributario la parte que
+    nunca fue ingreso de la empresa. Con IGV exonerado —el caso de una
+    empresa de Amazonía— el importe es cero y no se escribe nada.
+
+    Solo boletas y facturas: una nota de crédito corrige a la baja y tiene
+    su propio evento (`sales.nota_credito_emitida`), todavía sin asiento.
+    """
+    try:
+        if payload.get("tipo") not in ("boleta", "factura"):
+            return
+        monto = Decimal(payload.get("total") or 0)
+        if monto <= 0:
+            return
+        with session_factory() as session:
+            _generar(
+                session,
+                empresa_id=uuid.UUID(payload["empresa_id"]),
+                evento="sales.comprobante_emitido",
+                referencia_origen=payload["comprobante_id"],
+                monto=monto,
+                glosa=f"IGV de venta — {payload.get('serie_numero') or payload['comprobante_id']}",
+                gravado_igv=payload.get("gravado_igv"),
+            )
+            session.commit()
+    except Exception:
+        log.exception(
+            "fallo generando asiento de IGV del comprobante %s",
+            payload.get("comprobante_id"),
         )
 
 
@@ -301,6 +354,7 @@ def register() -> None:
     event_bus.subscribe("purchases.compra_recibida", on_compra_recibida)
     event_bus.subscribe("sales.venta_confirmada", on_venta_confirmada)
     event_bus.subscribe("purchases.comprobante_conforme", on_comprobante_conforme)
+    event_bus.subscribe("sales.comprobante_emitido", on_comprobante_emitido)
     event_bus.subscribe(
         "inventory.transferencia_recibida", on_transferencia_recibida
     )

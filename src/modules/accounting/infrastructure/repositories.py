@@ -9,10 +9,10 @@ repositorio solo encapsula queries."""
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from src.modules.accounting.infrastructure.models import (
@@ -51,6 +51,46 @@ class CuentaContableRepo:
         if empresa_id is not None:
             q = q.where(CuentaContable.empresa_id == empresa_id)
         return list(self.s.scalars(q.order_by(CuentaContable.codigo)))
+
+    def get_by_codigos(
+        self, empresa_id: uuid.UUID, codigos: list[str]
+    ) -> dict[str, CuentaContable]:
+        """Las cuentas pedidas, indexadas por código. Una sola consulta: las
+        plantillas del PCGE resuelven cinco códigos por asiento y hacerlo de
+        a uno era un round-trip por línea."""
+        if not codigos:
+            return {}
+        filas = self.s.scalars(
+            select(CuentaContable).where(
+                CuentaContable.empresa_id == empresa_id,
+                CuentaContable.codigo.in_(codigos),
+                CuentaContable.deleted_at.is_(None),
+            )
+        )
+        return {c.codigo: c for c in filas}
+
+    def codigos_existentes(self, empresa_id: uuid.UUID) -> set[str]:
+        return set(
+            self.s.scalars(
+                select(CuentaContable.codigo).where(
+                    CuentaContable.empresa_id == empresa_id,
+                    CuentaContable.deleted_at.is_(None),
+                )
+            )
+        )
+
+    def tiene_hijas(self, cuenta_id: uuid.UUID) -> bool:
+        return (
+            self.s.scalar(
+                select(CuentaContable.id)
+                .where(
+                    CuentaContable.cuenta_padre_id == cuenta_id,
+                    CuentaContable.deleted_at.is_(None),
+                )
+                .limit(1)
+            )
+            is not None
+        )
 
     def add(self, cuenta: CuentaContable) -> CuentaContable:
         self.s.add(cuenta)
@@ -379,3 +419,89 @@ class ArqueoRepo:
         self.s.add(arqueo)
         self.s.flush()
         return arqueo
+
+
+class LibroRepo:
+    """Consultas agregadas sobre el mayor: saldos por cuenta y movimientos de
+    una cuenta. Son la materia prima de los estados financieros y del balance
+    de comprobación, y se resuelven en la base de datos —no trayendo las
+    líneas a Python— porque un ejercicio completo son cientos de miles de
+    filas.
+
+    **No filtra por `asiento.estado`.** Un asiento anulado sigue teniendo sus
+    líneas, y su reversión existe como asiento aparte con las líneas al revés:
+    las dos juntas suman cero. Excluir el anulado y dejar la reversión
+    restaría el hecho dos veces.
+    """
+
+    def __init__(self, session: Session) -> None:
+        self.s = session
+
+    def _rango(self, q, desde: date | None, hasta: date | None):
+        if desde is not None:
+            q = q.where(Asiento.fecha >= desde)
+        if hasta is not None:
+            q = q.where(Asiento.fecha <= hasta)
+        return q
+
+    def saldos(
+        self,
+        empresa_id: uuid.UUID,
+        *,
+        desde: date | None = None,
+        hasta: date | None = None,
+    ) -> list[tuple[str, str, str, Decimal, Decimal]]:
+        """`(codigo, nombre, tipo, debe, haber)` por cuenta con movimiento."""
+        debe = func.sum(
+            case((AsientoLinea.tipo == "debe", AsientoLinea.monto), else_=0)
+        )
+        haber = func.sum(
+            case((AsientoLinea.tipo == "haber", AsientoLinea.monto), else_=0)
+        )
+        q = (
+            select(
+                CuentaContable.codigo,
+                CuentaContable.nombre,
+                CuentaContable.tipo,
+                debe,
+                haber,
+            )
+            .join(AsientoLinea, AsientoLinea.cuenta_contable_id == CuentaContable.id)
+            .join(Asiento, Asiento.id == AsientoLinea.asiento_id)
+            .where(Asiento.empresa_id == empresa_id)
+            .group_by(CuentaContable.codigo, CuentaContable.nombre, CuentaContable.tipo)
+            .order_by(CuentaContable.codigo)
+        )
+        return [
+            (codigo, nombre, tipo, Decimal(str(d or 0)), Decimal(str(h or 0)))
+            for codigo, nombre, tipo, d, h in self.s.execute(
+                self._rango(q, desde, hasta)
+            )
+        ]
+
+    def movimientos(
+        self,
+        empresa_id: uuid.UUID,
+        cuenta_id: uuid.UUID,
+        *,
+        desde: date | None = None,
+        hasta: date | None = None,
+    ) -> list[tuple[date, uuid.UUID, str, str, str, Decimal]]:
+        """`(fecha, asiento_id, glosa, estado, tipo, monto)` de una cuenta."""
+        q = (
+            select(
+                Asiento.fecha,
+                Asiento.id,
+                Asiento.glosa,
+                Asiento.estado,
+                AsientoLinea.tipo,
+                AsientoLinea.monto,
+            )
+            .join(AsientoLinea, AsientoLinea.asiento_id == Asiento.id)
+            .where(
+                Asiento.empresa_id == empresa_id,
+                AsientoLinea.cuenta_contable_id == cuenta_id,
+            )
+            .order_by(Asiento.fecha, Asiento.created_at)
+        )
+        return list(self.s.execute(self._rango(q, desde, hasta)))

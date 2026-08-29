@@ -369,6 +369,9 @@ export type PagoNuevo = {
   grupo_cobro?: number;
   receptor_nombre?: string | null;
   receptor_num_doc?: string | null;
+  /** `null` = el régimen de la empresa. Solo se manda distinto cuando la
+   * operación se aparta de él (RN-IMP-001). */
+  gravado_igv?: boolean | null;
   referencia_externa?: string | null;
 };
 
