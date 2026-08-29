@@ -4,6 +4,7 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
 
 import { TablaDatos } from "@/components/tabla/tabla-datos";
+import { Combobox } from "@/components/ui/combobox";
 
 import { anularAsientoAction, crearAsientoAction, type EstadoAsiento } from "./actions";
 
@@ -53,6 +54,16 @@ function DialogoNuevoAsiento({ cuentas }: { cuentas: Cuenta[] }) {
     }
   }, [estado.ok]);
 
+  // Una sola vez y no por línea: un asiento con ocho líneas recorría y
+  // mapeaba el plan de cuentas ocho veces en cada tecla.
+  const cuentasActivas = useMemo(
+    () =>
+      cuentas
+        .filter((c) => c.activa)
+        .map((c) => ({ valor: c.id, etiqueta: `${c.codigo} · ${c.nombre}` })),
+    [cuentas],
+  );
+
   const debe = total(lineas, "debe");
   const haber = total(lineas, "haber");
   const cuadra = debe > 0 && debe === haber;
@@ -90,24 +101,15 @@ function DialogoNuevoAsiento({ cuentas }: { cuentas: Cuenta[] }) {
               <div key={linea.clave} className="flex items-end gap-2">
                 <label className="flex flex-1 flex-col gap-1 text-xs font-semibold">
                   Cuenta
-                  <select
+                  <Combobox
                     name="cuenta_contable_id"
-                    required
+                    etiqueta="Cuenta"
+                    requerido
+                    marcador="Elegir cuenta..."
                     value={linea.cuenta}
-                    onChange={(e) => editar(linea.clave, "cuenta", e.target.value)}
-                    className="rounded border border-gray/40 px-2 py-1 text-sm"
-                  >
-                    <option value="" disabled>
-                      Elegir cuenta...
-                    </option>
-                    {cuentas
-                      .filter((c) => c.activa)
-                      .map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.codigo} · {c.nombre}
-                        </option>
-                      ))}
-                  </select>
+                    alCambiar={(v) => editar(linea.clave, "cuenta", v ?? "")}
+                    opciones={cuentasActivas}
+                  />
                 </label>
                 <label className="flex w-28 flex-col gap-1 text-xs font-semibold">
                   Tipo

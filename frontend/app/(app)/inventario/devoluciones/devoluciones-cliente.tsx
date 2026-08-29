@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
 import { DialogoFormulario } from "@/components/formulario/dialogo-formulario";
+import { Combobox } from "@/components/ui/combobox";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
 import { primeroElDe } from "@/lib/destinos";
 
@@ -174,30 +175,24 @@ function FormularioDevolucion({
 
       <label className="flex flex-col gap-1 text-sm font-semibold">
         Almacén
-        <select name="almacen_id" defaultValue="">
-          <option value="" disabled>
-            Elegir…
-          </option>
-          {almacenes.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.nombre}
-            </option>
-          ))}
-        </select>
+        <Combobox
+          name="almacen_id"
+          etiqueta="Almacén"
+          requerido
+          marcador="Elegir…"
+          opciones={almacenes.map((a) => ({ valor: a.id, etiqueta: a.nombre }))}
+        />
       </label>
 
       <label className="flex flex-col gap-1 text-sm font-semibold">
         Qué se devuelve
-        <select name="sku_id" defaultValue="">
-          <option value="" disabled>
-            Elegir…
-          </option>
-          {skus.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.etiqueta}
-            </option>
-          ))}
-        </select>
+        <Combobox
+          name="sku_id"
+          etiqueta="Qué se devuelve"
+          requerido
+          marcador="Elegir…"
+          opciones={skus.map((s) => ({ valor: s.id, etiqueta: s.etiqueta }))}
+        />
       </label>
 
       <label className="flex flex-col gap-1 text-sm font-semibold">

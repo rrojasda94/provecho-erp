@@ -10,7 +10,11 @@ export default async function ContenidoPage() {
   try {
     const [piezas, campanas, marcas] = await Promise.all([
       apiFetch<Pagina<Pieza>>("/api/v1/marketing/piezas", { token }),
-      apiFetch<Pagina<Campana>>("/api/v1/marketing/campanas", { token }),
+      // Sin `page_size`, el desplegable de campaña se queda en las primeras
+      // 50 sin decirlo.
+      apiFetch<Pagina<Campana>>("/api/v1/marketing/campanas?page_size=200", {
+        token,
+      }),
       apiFetch<Marca[]>("/api/v1/marcas", { token }),
     ]);
     return (

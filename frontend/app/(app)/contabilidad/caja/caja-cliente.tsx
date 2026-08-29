@@ -9,6 +9,7 @@ import {
   registrarPosAction,
   type EstadoCaja,
 } from "./actions";
+import { Combobox } from "@/components/ui/combobox";
 
 export type Turno = {
   cierre_id: string;
@@ -365,14 +366,12 @@ function AltaPos({ sucursales }: { sucursales: Sucursal[] }) {
           </label>
           <label className="flex flex-col gap-1 text-sm font-semibold">
             Sucursal
-            <select name="sucursal_id" defaultValue="">
-              <option value="">Emergencia (pool de contabilidad)</option>
-              {sucursales.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.nombre}
-                </option>
-              ))}
-            </select>
+            <Combobox
+              name="sucursal_id"
+              etiqueta="Sucursal"
+              marcador="Emergencia (pool de contabilidad)"
+              opciones={sucursales.map((s) => ({ valor: s.id, etiqueta: s.nombre }))}
+            />
           </label>
           {estado.error && (
             <p role="alert" className="text-sm font-semibold text-secondary">

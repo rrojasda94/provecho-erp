@@ -9,6 +9,7 @@ import {
   valor,
 } from "@/components/formulario/dialogo-formulario";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
+import { Combobox } from "@/components/ui/combobox";
 
 import { guardarSucursalAction } from "../actions";
 import { CampoDireccion } from "@/components/direccion/campo-direccion";
@@ -77,31 +78,23 @@ function Abastecimiento({
       <input type="hidden" name="almacen_id" value={propio.id} />
       <label className="flex flex-col gap-1 text-sm font-semibold">
         Se abastece de
-        <select
+        <Combobox
           name="almacen_abastecedor_id"
-          defaultValue={valor(propio.almacen_abastecedor_id)}
-        >
-          <option value="">Ninguno (se abastece por compra)</option>
-          {otros.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.nombre}
-            </option>
-          ))}
-        </select>
+          etiqueta="Almacén abastecedor"
+          defaultValue={propio.almacen_abastecedor_id}
+          marcador="Ninguno (se abastece por compra)"
+          opciones={otros.map((a) => ({ valor: a.id, etiqueta: a.nombre }))}
+        />
       </label>
       <label className="flex flex-col gap-1 text-sm font-semibold">
         Y si ese no está, de
-        <select
+        <Combobox
           name="almacen_abastecedor_respaldo_id"
-          defaultValue={valor(propio.almacen_abastecedor_respaldo_id)}
-        >
-          <option value="">Ninguno</option>
-          {otros.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.nombre}
-            </option>
-          ))}
-        </select>
+          etiqueta="Almacén de respaldo"
+          defaultValue={propio.almacen_abastecedor_respaldo_id}
+          marcador="Ninguno"
+          opciones={otros.map((a) => ({ valor: a.id, etiqueta: a.nombre }))}
+        />
         <span className="text-xs font-normal text-gray">
           Puede ser el almacén de otra sucursal. Se usa cuando el principal
           está dado de baja; distinto del principal.
@@ -125,16 +118,14 @@ function CamposSucursal({
     <>
       <label className="flex flex-col gap-1 text-sm font-semibold">
         Marca
-        <select name="marca_id" required defaultValue={valor(s.marca_id)}>
-          <option value="" disabled>
-            Elegir...
-          </option>
-          {marcas.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.nombre}
-            </option>
-          ))}
-        </select>
+        <Combobox
+          name="marca_id"
+          etiqueta="Marca"
+          requerido
+          defaultValue={s.marca_id}
+          marcador="Elegir..."
+          opciones={marcas.map((m) => ({ valor: m.id, etiqueta: m.nombre }))}
+        />
       </label>
       <label className="flex flex-col gap-1 text-sm font-semibold">
         Nombre

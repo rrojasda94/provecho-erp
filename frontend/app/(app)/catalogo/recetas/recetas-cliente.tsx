@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
 
 import { TablaDatos } from "@/components/tabla/tabla-datos";
+import { Combobox } from "@/components/ui/combobox";
 import {
   catalogoApi,
   type Categoria,
@@ -134,18 +135,14 @@ export function RecetasCliente({
         </label>
         <label className="flex items-center gap-2 text-xs text-gray">
           Categoría
-          <select
-            className="rounded border border-borde bg-white px-2 py-1 text-sm text-dark"
+          <Combobox
+            className="min-w-48"
+            etiqueta="Categoría"
+            marcador="Todas"
             value={categoria}
-            onChange={(e) => filtrar("categoria", e.target.value)}
-          >
-            <option value="">Todas</option>
-            {categorias.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.nombre}
-              </option>
-            ))}
-          </select>
+            alCambiar={(v) => filtrar("categoria", v ?? "")}
+            opciones={categorias.map((c) => ({ valor: c.id, etiqueta: c.nombre }))}
+          />
         </label>
         {(tipo || categoria) && (
           <button
@@ -242,13 +239,13 @@ function DialogoNuevaReceta({
             </label>
             <label className="flex flex-1 flex-col gap-1 text-sm font-semibold">
               Unidad
-              <select value={udmId} onChange={(e) => setUdmId(e.target.value)}>
-                {unidades.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.nombre}
-                  </option>
-                ))}
-              </select>
+              <Combobox
+                etiqueta="Unidad"
+                requerido
+                value={udmId}
+                alCambiar={(v) => v && setUdmId(v)}
+                opciones={unidades.map((u) => ({ valor: u.id, etiqueta: u.nombre }))}
+              />
             </label>
           </div>
           {error && (

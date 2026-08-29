@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { DialogoFormulario } from "@/components/formulario/dialogo-formulario";
+import { Combobox } from "@/components/ui/combobox";
 import { tienePermiso } from "@/lib/permisos";
 
 import {
@@ -354,16 +355,13 @@ function AgregarProducto({
     >
       <label className="flex flex-col gap-1 text-sm font-semibold">
         Producto
-        <select name="sku_id" defaultValue="">
-          <option value="" disabled>
-            Elegir…
-          </option>
-          {skus.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.etiqueta}
-            </option>
-          ))}
-        </select>
+        <Combobox
+          name="sku_id"
+          etiqueta="Producto"
+          requerido
+          marcador="Elegir…"
+          opciones={skus.map((s) => ({ valor: s.id, etiqueta: s.etiqueta }))}
+        />
       </label>
 
       <label className="flex flex-col gap-1 text-sm font-semibold">

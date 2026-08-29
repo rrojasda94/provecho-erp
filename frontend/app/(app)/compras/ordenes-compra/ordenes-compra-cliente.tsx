@@ -6,6 +6,8 @@ import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
 
 import { crearOrdenCompraAction, type EstadoOrdenCompra } from "./actions";
+import { ArticuloPicker } from "@/components/articulo-picker/articulo-picker";
+import { Combobox } from "@/components/ui/combobox";
 
 export type OrdenCompra = {
   id: string;
@@ -48,21 +50,19 @@ function FilaItem({
 }) {
   return (
     <div className="grid grid-cols-[1fr_5rem_6rem_auto] items-center gap-2">
-      <select
+      <ArticuloPicker
         name="articulo_id[]"
+        etiqueta="Artículo"
+        requerido
+        marcador="Artículo..."
+        iniciales={articulos.map((a) => ({
+          valor: a.id,
+          etiqueta: a.nombre,
+          pista: a.id_interno,
+        }))}
         value={fila.articuloId}
-        onChange={(e) => onCambiar("articuloId", e.target.value)}
-        required
-      >
-        <option value="" disabled>
-          Artículo...
-        </option>
-        {articulos.map((a) => (
-          <option key={a.id} value={a.id}>
-            {a.id_interno} — {a.nombre}
-          </option>
-        ))}
-      </select>
+        alCambiar={(v) => onCambiar("articuloId", v ?? "")}
+      />
       <input
         name="cantidad[]"
         type="number"
@@ -148,29 +148,31 @@ function DialogoNuevaOC({
           <div className="grid grid-cols-2 gap-4">
             <label className="flex flex-col gap-1 text-sm font-semibold">
               Proveedor
-              <select name="proveedor_id" required defaultValue="">
-                <option value="" disabled>
-                  Elegir...
-                </option>
-                {proveedores.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.razon_social ?? p.ruc}
-                  </option>
-                ))}
-              </select>
+              <Combobox
+                name="proveedor_id"
+                etiqueta="Proveedor"
+                requerido
+                marcador="Elegir..."
+                opciones={proveedores.map((p) => ({
+                  valor: p.id,
+                  etiqueta: p.razon_social ?? p.ruc ?? "",
+                  pista: p.razon_social ? (p.ruc ?? undefined) : undefined,
+                }))}
+              />
             </label>
             <label className="flex flex-col gap-1 text-sm font-semibold">
               Almacén destino
-              <select name="almacen_destino_id" required defaultValue="">
-                <option value="" disabled>
-                  Elegir...
-                </option>
-                {almacenes.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.nombre} ({a.tipo})
-                  </option>
-                ))}
-              </select>
+              <Combobox
+                name="almacen_destino_id"
+                etiqueta="Almacén destino"
+                requerido
+                marcador="Elegir..."
+                opciones={almacenes.map((a) => ({
+                  valor: a.id,
+                  etiqueta: a.nombre,
+                  pista: a.tipo,
+                }))}
+              />
             </label>
           </div>
 

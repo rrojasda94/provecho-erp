@@ -12,6 +12,7 @@ import {
   type PantallaEnvio,
   type SucursalKds,
 } from "@/lib/kds";
+import { Combobox } from "@/components/ui/combobox";
 
 /**
  * Estaciones de la sucursal: es a la vez el selector de la cocina (elegir
@@ -58,18 +59,15 @@ function SelectorSucursal({
       <label className="kds-etiqueta" htmlFor={id}>
         Sucursal
       </label>
-      <select
+      <Combobox
         id={id}
         className="kds-campo"
+        etiqueta="Sucursal"
+        requerido
         value={valor}
-        onChange={(e) => onElegir(e.target.value)}
-      >
-        {sucursales.map((s) => (
-          <option key={s.id} value={s.id}>
-            {s.nombre}
-          </option>
-        ))}
-      </select>
+        alCambiar={(v) => v && onElegir(v)}
+        opciones={sucursales.map((s) => ({ valor: s.id, etiqueta: s.nombre }))}
+      />
       {nota && <p className="kds-nota">{nota}</p>}
     </>
   );

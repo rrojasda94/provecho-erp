@@ -8,6 +8,7 @@ import {
   rechazarParametroAction,
   type EstadoGerencia,
 } from "../actions";
+import { Combobox } from "@/components/ui/combobox";
 
 export type Parametro = {
   id: string;
@@ -64,13 +65,16 @@ function CamposValor({ divisas, prefijo = "" }: { divisas: Divisa[]; prefijo?: s
       {tipo === "monto" && (
         <label className="flex flex-col gap-1 text-sm font-semibold">
           Divisa
-          <select name="divisa" defaultValue="PEN">
-            {divisas.map((d) => (
-              <option key={d.id} value={d.codigo}>
-                {d.codigo} · {d.nombre}
-              </option>
-            ))}
-          </select>
+          <Combobox
+            name="divisa"
+            etiqueta="Divisa"
+            requerido
+            defaultValue="PEN"
+            opciones={divisas.map((d) => ({
+              valor: d.codigo,
+              etiqueta: `${d.codigo} · ${d.nombre}`,
+            }))}
+          />
         </label>
       )}
       {tipo === "cantidad" && (

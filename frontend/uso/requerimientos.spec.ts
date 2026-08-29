@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { ADMIN, dialogo, ingresar } from "../e2e/util";
+import { ADMIN, dialogo, elegirEnLista, ingresar } from "../e2e/util";
 import { capturar } from "./util";
 
 /**
@@ -27,9 +27,7 @@ test("el local arma su requerimiento y el almacén ve qué es urgencia", async (
   ).toBeVisible();
   await capturar(page, testInfo, "requerimientos-listado");
 
-  await page
-    .getByLabel("Almacén del requerimiento")
-    .selectOption({ label: ALMACEN_LOCAL });
+  await elegirEnLista(page, "Almacén del requerimiento", ALMACEN_LOCAL);
   await page.getByRole("button", { name: "Requerimiento de la jornada" }).click();
 
   // La lista llega armada: los dos insumos bajo mínimo ya están adentro.
@@ -40,7 +38,11 @@ test("el local arma su requerimiento y el almacén ve qué es urgencia", async (
 
   // Y lo que el local decide pedir aparte queda marcado como no urgente.
   await page.getByRole("button", { name: "+ Agregar producto" }).click();
-  await dialogo(page).getByLabel("Producto").selectOption({ index: 1 });
+  // Ya no es un `<select>`: se abre la lista y se elige. Da igual cuál sea
+  // —lo que la prueba mira es que lo agregado a mano salga como pedido del
+  // local y no como urgencia—, así que se toma el primero que ofrezca.
+  await dialogo(page).getByRole("combobox", { name: "Producto" }).click();
+  await dialogo(page).getByRole("option").first().click();
   await dialogo(page).getByRole("button", { name: "Agregar" }).click();
   await expect(page.getByText("Pedido del local", { exact: true })).toBeVisible();
   await expect(page.getByText(/1 a pedido del local/)).toBeVisible();
@@ -64,12 +66,7 @@ test("el almacén cuenta su stock y el cierre pide los ajustes", async ({
   await capturar(page, testInfo, "conteos-listado");
 
   await page.getByRole("button", { name: "+ Abrir conteo" }).click();
-  // Por `name` y no por etiqueta: el nombre accesible de un `<select>` suma
-  // el texto de sus opciones, y «Todo el almacén» del selector de al lado
-  // también contiene "almacén".
-  await dialogo(page)
-    .locator('select[name="almacen_id"]')
-    .selectOption({ label: ALMACEN_LOCAL });
+  await elegirEnLista(dialogo(page), "Almacén", ALMACEN_LOCAL);
   await dialogo(page).getByRole("button", { name: "Abrir" }).click();
 
   await expect(page.getByRole("heading", { name: /Toma de inventario/i })).toBeVisible();

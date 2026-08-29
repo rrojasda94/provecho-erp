@@ -25,7 +25,7 @@ export default async function ProductoPage({
       // paginada, así que filtrar lo que llegó deja el desplegable vacío en
       // cuanto el catálogo pasa de una página — y un desplegable vacío no
       // dice "faltan", parece que no hay empaques.
-      apiFetch<Pagina<Articulo>>("/api/v1/inventory/articulos?tipo=empaque", {
+      apiFetch<Pagina<Articulo>>("/api/v1/inventory/articulos?tipo=empaque&page_size=200", {
         token,
       }),
     ]);

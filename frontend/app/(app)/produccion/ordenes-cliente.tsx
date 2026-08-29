@@ -4,6 +4,7 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 
 import { TablaDatos } from "@/components/tabla/tabla-datos";
+import { ArticuloPicker } from "@/components/articulo-picker/articulo-picker";
 
 import {
   completarOrdenAction,
@@ -11,6 +12,7 @@ import {
   registrarConsumoAction,
   type EstadoOrden,
 } from "./actions";
+import { Combobox } from "@/components/ui/combobox";
 
 export type Orden = {
   id: string;
@@ -25,6 +27,19 @@ export type Orden = {
   merma_motivo: string | null;
 };
 export type Articulo = { id: string; nombre: string; id_interno: string; tipo: string };
+/** Lo que una orden puede producir. Va al servidor como filtro (`?tipo=`) y
+ * no se resuelve en la pantalla: filtrar acá recorta solo lo que vino en la
+ * página, que de un catálogo de miles es casi nada. */
+const PRODUCIBLES: string[] = ["subreceta", "mercaderia"];
+
+function comoOpciones(articulos: Articulo[]) {
+  return articulos.map((a) => ({
+    valor: a.id,
+    etiqueta: a.nombre,
+    pista: a.id_interno,
+  }));
+}
+
 export type Almacen = { id: string; nombre: string };
 
 const ESTADO_INICIAL: EstadoOrden = { error: "", ok: false };
@@ -60,7 +75,9 @@ function DialogoNuevaOrden({
   const { dialogRef, formRef } = useCerrarAlGuardar(estado.ok);
   // Solo se produce lo que tiene receta: subrecetas y mercadería propia. Un
   // insumo comprado no se fabrica, se compra.
-  const producibles = articulos.filter((a) => a.tipo === "subreceta" || a.tipo === "mercaderia");
+  const producibles = comoOpciones(
+    articulos.filter((a) => PRODUCIBLES.includes(a.tipo)),
+  );
 
   return (
     <>
@@ -76,32 +93,27 @@ function DialogoNuevaOrden({
           <h2 className="font-heading text-lg text-dark">Nueva orden</h2>
           <label className="flex flex-col gap-1 text-sm font-semibold">
             Qué se produce
-            <select name="articulo_id" required defaultValue="">
-              <option value="" disabled>
-                Elegir artículo...
-              </option>
-              {producibles.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.id_interno} · {a.nombre}
-                </option>
-              ))}
-            </select>
+            <ArticuloPicker
+              name="articulo_id"
+              etiqueta="Qué se produce"
+              requerido
+              marcador="Elegir artículo..."
+              tipos={PRODUCIBLES}
+              iniciales={producibles}
+            />
             <span className="text-xs font-normal text-gray">
               Sin receta la orden se rechaza: no habría qué consumir.
             </span>
           </label>
           <label className="flex flex-col gap-1 text-sm font-semibold">
             Almacén
-            <select name="almacen_id" required defaultValue="">
-              <option value="" disabled>
-                Elegir almacén...
-              </option>
-              {almacenes.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.nombre}
-                </option>
-              ))}
-            </select>
+            <Combobox
+              name="almacen_id"
+              etiqueta="Almacén"
+              requerido
+              marcador="Elegir almacén..."
+              opciones={almacenes.map((a) => ({ valor: a.id, etiqueta: a.nombre }))}
+            />
           </label>
           <label className="flex flex-col gap-1 text-sm font-semibold">
             Cantidad planeada
@@ -169,22 +181,15 @@ function DialogoConsumo({ orden, articulos }: { orden: Orden; articulos: Articul
             <div key={linea.clave} className="flex items-end gap-2">
               <label className="flex flex-1 flex-col gap-1 text-xs font-semibold">
                 Insumo
-                <select
+                <ArticuloPicker
                   name="consumo_articulo_id"
-                  required
+                  etiqueta="Insumo"
+                  requerido
+                  marcador="Elegir insumo..."
+                  iniciales={comoOpciones(articulos)}
                   value={linea.articulo}
-                  onChange={(e) => editar(linea.clave, "articulo", e.target.value)}
-                  className="rounded border border-gray/40 px-2 py-1 text-sm"
-                >
-                  <option value="" disabled>
-                    Elegir insumo...
-                  </option>
-                  {articulos.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.id_interno} · {a.nombre}
-                    </option>
-                  ))}
-                </select>
+                  alCambiar={(v) => editar(linea.clave, "articulo", v ?? "")}
+                />
               </label>
               <label className="flex w-28 flex-col gap-1 text-xs font-semibold">
                 Cantidad
