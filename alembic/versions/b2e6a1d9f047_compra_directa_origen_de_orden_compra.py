@@ -8,7 +8,7 @@ consumen `inventory` y `accounting`, sin tocar esos listeners, y
 `dar_conformidad_comprobante` funciona sin cambios (ADR-0XX).
 
 Revision ID: b2e6a1d9f047
-Revises: a1c9e5f2b364
+Revises: dfb195b14433
 Create Date: 2026-08-29
 
 """
@@ -18,7 +18,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = 'b2e6a1d9f047'
-down_revision: str | None = 'a1c9e5f2b364'
+down_revision: str | None = 'dfb195b14433'
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

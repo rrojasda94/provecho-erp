@@ -343,6 +343,10 @@ class PagoCreate(BaseModel):
     # vacío = boleta (RN-CPP-003). Solo se usa al cerrarse la cuenta.
     receptor_num_doc: str | None = Field(default=None, max_length=11)
     receptor_nombre: str | None = Field(default=None, max_length=255)
+    # Operación que se aparta del régimen de la empresa: una venta con
+    # destino fuera de la zona exonerada sí lleva IGV (RN-IMP-001). `None`
+    # —lo normal— deja decidir al default de la empresa.
+    gravado_igv: bool | None = None
     id: uuid.UUID | None = None
 
 
@@ -1065,6 +1069,7 @@ class ComprobanteOut(BaseModel):
     grupo_cobro: int
     receptor_num_doc: str | None
     receptor_nombre: str | None
+    gravado_igv: bool | None = None
     estado_emision: str
     hash_proveedor: str | None
     detalle_emision: str | None

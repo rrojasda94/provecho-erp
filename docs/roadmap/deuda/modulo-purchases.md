@@ -18,7 +18,7 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 - ⬜ **OC tipo `activo` + `requerimiento_activo`**: doble aprobación
   (área + gerencia) y mínimo 2 cotizaciones vinculadas antes de emitir.
   Hoy el tipo está rechazado explícitamente en la capa de aplicación.
-- ✅ 2026-08-29 **`compra_directa`** (ADR-081): compra a proveedor
+- ✅ 2026-08-29 **`compra_directa`** (ADR-082): compra a proveedor
   informal sin OC previa, sustentada solo con el comprobante recibido.
   Reutiliza `orden_compra` con `origen="directa"` — mismo contrato de
   eventos que ya consumen `inventory`/`accounting`, cero código nuevo ahí.

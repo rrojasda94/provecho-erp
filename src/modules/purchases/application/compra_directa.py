@@ -1,4 +1,4 @@
-"""Compra directa (ADR-081): sustenta un gasto ya incurrido con el
+"""Compra directa (ADR-082): sustenta un gasto ya incurrido con el
 comprobante recibido, sin pasar por una OC previa en borrador/emisión.
 Reutiliza `OrdenCompra` con `origen="directa"` para no duplicar el
 contrato de eventos que ya consumen `inventory` y `accounting`."""

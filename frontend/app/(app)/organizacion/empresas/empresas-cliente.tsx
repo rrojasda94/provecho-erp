@@ -28,6 +28,7 @@ export type Empresa = {
   contacto: string | null;
   tipo: string;
   zona_tributaria: string;
+  config_fiscal: { igv_por_defecto?: string } | null;
 };
 
 const TIPOS = ["operativa", "logistica", "servicios", "asesoria", "transporte"] as const;
@@ -77,6 +78,19 @@ function CamposEmpresa({ empresa }: { empresa?: Empresa }) {
           </select>
         </label>
       </div>
+      {/* La exoneración de Amazonía depende de zona **y** actividad, así que
+          la zona sola no alcanza para decidir el régimen. Este es el
+          interruptor que usan el comprobante electrónico y el asiento
+          contable; una operación suelta se marca al cobrar o al dar
+          conformidad, no acá. */}
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        IGV por defecto
+        <select name="igv_por_defecto" defaultValue={e.config_fiscal?.igv_por_defecto ?? ""}>
+          <option value="">Según la zona tributaria</option>
+          <option value="gravado">Gravado — las operaciones llevan IGV</option>
+          <option value="exonerado">Exonerado — las operaciones no llevan IGV</option>
+        </select>
+      </label>
       <label className="flex flex-col gap-1 text-sm font-semibold">
         Contacto
         <input name="contacto" maxLength={255} defaultValue={valor(e.contacto)} />

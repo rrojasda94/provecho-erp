@@ -1,4 +1,4 @@
-# ADR-081 — La compra directa reutiliza `orden_compra`, no es un modelo nuevo
+# ADR-082 — La compra directa reutiliza `orden_compra`, no es un modelo nuevo
 
 - Estado: aceptado
 - Fecha: 2026-08-29

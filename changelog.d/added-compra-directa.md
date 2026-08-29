@@ -1,4 +1,4 @@
-- **Compra directa** (`POST /purchases/compras-directas`, ADR-081): sustenta
+- **Compra directa** (`POST /purchases/compras-directas`, ADR-082): sustenta
   un gasto ya incurrido — factura de un proveedor informal, sin orden de
   compra previa — en una sola llamada. Reutiliza `orden_compra` con
   `origen="directa"` (la crea, la emite, la recibe al 100% y da conformidad

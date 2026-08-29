@@ -1274,7 +1274,13 @@ Implementado (2026-07-25) — libro contable núcleo, además del ciclo de caja
 
 - **cuenta_contable**: empresa_id, codigo (único por empresa), nombre, tipo
   (`activo`\|`pasivo`\|`patrimonio`\|`ingreso`\|`gasto`), cuenta_padre_id
-  (árbol simple), activa.
+  (árbol simple), activa. Desde el 2026-08-29 (ADR-081) el catálogo de
+  fábrica es el **PCGE** (Plan Contable General Empresarial 2019), sembrado
+  con `POST /accounting/cuentas-contables/pcge`. No hizo falta ninguna
+  columna nueva: el elemento y el nivel de una cuenta se derivan de su
+  código, y quién cuelga de quién ya estaba en `cuenta_padre_id`. **Un
+  asiento solo se imputa en una cuenta sin hijas** — cargar contra el rubro
+  que agrupa deja el mayor sin detalle.
 - **periodo_contable**: empresa_id, anio, mes (único por empresa), estado
   (`abierto`\|`cerrado`), cerrado_por, fecha_cierre. Ningún asiento se
   registra fuera de un periodo abierto (RN-CTB-001... RN-CTB-002).
@@ -1291,7 +1297,20 @@ Implementado (2026-07-25) — libro contable núcleo, además del ciclo de caja
   sin regla vigente, el evento no genera asiento (se omite y loguea, nunca
   bloquea el proceso operativo de origen). Mismo criterio que
   `parametro_empresa` (RN-GER-003/008): la empresa configura su plan de cuentas,
-  el código no lo hardcodea.
+  el código no lo hardcodea. Desde ADR-081 dejó de ser la única fuente: sin
+  regla, el evento cae en la **plantilla del PCGE**
+  (`domain/plantillas.py`), que sí puede expresar el asiento peruano completo
+  —N líneas, con IGV desagregado y asiento de destino—, cosa que un par
+  debe/haber no puede. La regla sigue ganando cuando existe.
+
+**El IGV vive en el comprobante** (2026-08-29, ADR-081). `comprobante.gravado_igv` (nullable, migración `dfb195b14433`) dice si **esa** operación lleva IGV; `NULL` deja decidir al default de la empresa (`empresa.config_fiscal["igv_por_defecto"]`, y si tampoco está, `zona_tributaria`). Lo resuelve `src/shared/tributos.py`, único lugar del ERP que decide el régimen — antes la misma condición estaba copiada en el asiento contable y en el comprobante electrónico. Está en `comprobante` y no en `venta` ni en `orden_compra` porque el IGV nace con el documento: el crédito fiscal se toma con el comprobante anotado y el débito con el emitido, así que los asientos de venta confirmada y de compra recibida van **sin** IGV y lo reconoce el asiento del comprobante.
+
+**Sin tabla de saldos.** El balance de comprobación, el libro mayor, el
+Estado de Situación Financiera y el Estado de Resultados se agregan de
+`asiento_linea` en cada consulta (ADR-081 §5): un saldo materializado sería
+un segundo lugar donde vive la verdad. El mapa rubro→línea del estado vive en
+`domain/estados_financieros.py`, no en base de datos, porque es el formato de
+presentación peruano y no una decisión de la empresa.
 - **movimiento_dinero** (implementado 2026-07-25, tesorería/PROC-CTB-003):
   empresa_id, tipo (`egreso`\|`ingreso`), concepto (hoy solo
   `pago_proveedor`), comprobante_id (FK `comprobante`, único cuando no NULL

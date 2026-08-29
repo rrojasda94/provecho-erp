@@ -370,3 +370,100 @@ class MovimientoDineroOut(BaseModel):
     asiento_id: uuid.UUID | None
     fecha_ejecucion: datetime | None
     constancia: str | None
+
+
+# --- Plan Contable General Empresarial y estados financieros ------------------
+class ImportacionPcgeOut(BaseModel):
+    """Resultado de sembrar el PCGE: cuántas cuentas se crearon y cuántas ya
+    estaban. Correr la importación dos veces devuelve `creadas=0`."""
+
+    creadas: int
+    existentes: int
+    total: int
+
+
+class CuentaBalanceOut(BaseModel):
+    codigo: str
+    nombre: str
+    tipo: str
+    debe: Decimal
+    haber: Decimal
+    saldo_deudor: Decimal
+    saldo_acreedor: Decimal
+
+
+class BalanceComprobacionOut(BaseModel):
+    desde: date | None
+    hasta: date | None
+    cuentas: list[CuentaBalanceOut]
+    total_debe: Decimal
+    total_haber: Decimal
+    cuadra: bool
+
+
+class MovimientoMayorOut(BaseModel):
+    fecha: date
+    asiento_id: uuid.UUID
+    glosa: str
+    estado: str
+    debe: Decimal
+    haber: Decimal
+    saldo: Decimal
+
+
+class LibroMayorOut(BaseModel):
+    cuenta_id: uuid.UUID
+    desde: date | None
+    hasta: date | None
+    movimientos: list[MovimientoMayorOut]
+    saldo_final: Decimal
+
+
+class LineaEstadoOut(BaseModel):
+    clave: str
+    etiqueta: str
+    monto: Decimal
+
+
+class SeccionEstadoOut(BaseModel):
+    clave: str
+    etiqueta: str
+    naturaleza: str
+    lineas: list[LineaEstadoOut]
+    total: Decimal
+
+
+class EstadoSituacionFinancieraOut(BaseModel):
+    """`cuadra` y `descuadre` viajan siempre, no solo cuando fallan: un
+    balance que no dice si cuadra obliga a sumarlo a mano para saber si se
+    puede usar."""
+
+    hasta: date | None
+    secciones: list[SeccionEstadoOut]
+    total_activo: Decimal
+    total_pasivo: Decimal
+    total_patrimonio: Decimal
+    total_pasivo_patrimonio: Decimal
+    descuadre: Decimal
+    cuadra: bool
+    cuentas_sin_clasificar: list[str]
+
+
+class BloqueResultadosOut(BaseModel):
+    clave: str
+    etiqueta: str
+    secciones: list[SeccionEstadoOut]
+    #: Resultado acumulado hasta el final del bloque.
+    subtotal: Decimal
+
+
+class EstadoResultadosOut(BaseModel):
+    desde: date | None
+    hasta: date | None
+    bloques: list[BloqueResultadosOut]
+    resultado_ejercicio: Decimal
+    #: El mismo resultado leído del mayor completo. Si difiere del anterior,
+    #: hay una cuenta que ninguna línea del estado reclama.
+    resultado_libro: Decimal
+    cuadra: bool
+    cuentas_sin_clasificar: list[str]

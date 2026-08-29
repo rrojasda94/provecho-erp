@@ -47,7 +47,7 @@ cualquier recepción). Capas `domain/rules.py`,
 | GET | `/ordenes-compra/{id}` | `purchases.leer` |
 | PATCH | `/ordenes-compra/{id}` | `purchases.crear` — reemplaza ítems, solo en `borrador` (ver *Reglas*) |
 | POST | `/ordenes-compra/{id}/emitir` | `purchases.crear` (+ `aprobar` sobre umbral) |
-| POST | `/compras-directas` | `purchases.crear` — ADR-081, ver más abajo |
+| POST | `/compras-directas` | `purchases.crear` — ADR-082, ver más abajo |
 
 ### Qué se corrige de un proveedor (y qué no)
 
@@ -110,7 +110,7 @@ esto la OC era inmutable desde el instante en que se creaba, ni en
 borrador se podía corregir un precio tecleado mal sin anular y rehacer
 todo. Desde `emitida` sigue siendo inmutable sin excepción (ver *Reglas*).
 
-## Compra directa (2026-08-29, ADR-081)
+## Compra directa (2026-08-29, ADR-082)
 
 `POST /compras-directas` sustenta un gasto ya incurrido (factura de un
 proveedor informal, sin OC previa) reutilizando `orden_compra` con
@@ -121,7 +121,7 @@ conformidad del comprobante en una sola llamada — encadenando
 nada. No pasa por el umbral de `purchases.aprobar` (es gasto ya
 incurrido, no un compromiso a aprobar) ni por `caja_chica_movimiento`
 (ese modelo sigue sin existir — el pago sale por cuentas por pagar
-normal). Detalle de la decisión en ADR-081.
+normal). Detalle de la decisión en ADR-082.
 
 ## Dirección del proveedor anclada al mapa (2026-08-22, ADR-053)
 
@@ -176,7 +176,7 @@ después se puede anclar en el mapa. Corregir el texto a mano suelta el punto
   — bloqueo a nivel de dominio, no solo de UI.
 - `compra_directa` exige comprobante adjunto antes de guardarse; sin
   comprobante no se persiste. Hoy es una `orden_compra` con
-  `origen="directa"` (ADR-081) — no un modelo aparte, ni pasa por
+  `origen="directa"` (ADR-082) — no un modelo aparte, ni pasa por
   `caja_chica_movimiento` (deuda separada).
 - `purchases` **no ejecuta pagos** — solo registra el `comprobante`
   recibido como conforme (`purchases.dar_conformidad`, exige OC con

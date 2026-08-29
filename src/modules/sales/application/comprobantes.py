@@ -28,7 +28,7 @@ from src.modules.sales.infrastructure.repositories import (
     PuntoVentaRepo,
     VentaRepo,
 )
-from src.shared import fechas
+from src.shared import fechas, tributos
 from src.shared.integrations import factiliza
 from src.shared.models import Comprobante
 
@@ -73,6 +73,7 @@ def crear_comprobante_pendiente(
     grupo_cobro: int = rules.GRUPO_COBRO_UNICO,
     receptor_num_doc: str | None = None,
     receptor_nombre: str | None = None,
+    gravado_igv: bool | None = None,
 ) -> Comprobante | None:
     """Idempotente por venta y grupo de cobro: cobrar dos veces la misma
     cuenta no duplica el comprobante, pero dos cuentas distintas de la misma
@@ -119,6 +120,10 @@ def crear_comprobante_pendiente(
         estado_emision="pendiente",
         receptor_num_doc=receptor_num_doc or None,
         receptor_nombre=receptor_nombre or None,
+        # NULL = manda el default de la empresa. Solo se marca cuando la
+        # operación se aparta de él (una venta a destino fuera de la región
+        # en una empresa exonerada, RN-IMP-001).
+        gravado_igv=gravado_igv,
     )
     session.add(comprobante)
     session.flush()
@@ -211,9 +216,12 @@ def _documento(session: Session, comprobante: Comprobante) -> factiliza.Document
         fecha_emision=fecha_emision(comprobante),
         cliente=_receptor_para_sunat(session, comprobante, venta),
         items=items,
-        # Ley 27037: las empresas de Amazonía venden exoneradas de IGV
-        # (RN-IMP-001). El régimen lo declara la empresa, no la venta.
-        exonerado_igv=empresa.zona_tributaria == "amazonia_ley27037",
+        # El régimen lo decide `shared.tributos`, único lugar del ERP que
+        # lo resuelve: la casilla del comprobante si alguien la marcó, si no
+        # el default de la empresa, y si no su zona tributaria (Ley 27037,
+        # RN-IMP-001). Antes esta línea repetía la última condición por su
+        # cuenta y se desincronizaba del asiento contable.
+        exonerado_igv=not tributos.gravado(empresa, comprobante.gravado_igv),
         igv_porcentaje=settings.igv_porcentaje,
     )
 
@@ -323,11 +331,27 @@ def emitir_comprobante(
             "empresa_id": str(comprobante.empresa_id),
             "tipo": comprobante.tipo,
             "serie_numero": f"{comprobante.serie}-{comprobante.correlativo:08d}",
-            "total": str(venta.total if venta else Decimal(0)),
+            # El importe de **este** comprobante, no el de la venta entera:
+            # una cuenta dividida emite un documento por grupo (RN-COM-018) y
+            # mandar el total en cada uno hacía que `accounting` reconociera
+            # el IGV una vez por comprobante sobre la venta completa.
+            "total": str(_total_del_comprobante(session, comprobante, venta)),
+            "gravado_igv": comprobante.gravado_igv,
         },
         session=session,
     )
     return comprobante
+
+
+def _total_del_comprobante(session: Session, comprobante: Comprobante, venta) -> Decimal:
+    """Lo que documenta este comprobante. Import local: `ventas` importa a
+    este módulo para emitir al cobrar, y a nivel de módulo el ciclo se
+    cerraría."""
+    if venta is None:
+        return Decimal(0)
+    from src.modules.sales.application import ventas as ventas_uc
+
+    return ventas_uc.total_a_cobrar(session, venta, comprobante.grupo_cobro)
 
 
 FORMATOS_DESCARGA = ("pdf", "xml", "cdr")
