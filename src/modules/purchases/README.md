@@ -45,7 +45,9 @@ cualquier recepción). Capas `domain/rules.py`,
 | POST | `/ordenes-compra` | `purchases.crear` |
 | GET | `/ordenes-compra` | `purchases.leer` — listado; tenant vía join a `almacen` (la orden no tiene `empresa_id` propio) |
 | GET | `/ordenes-compra/{id}` | `purchases.leer` |
+| PATCH | `/ordenes-compra/{id}` | `purchases.crear` — reemplaza ítems, solo en `borrador` (ver *Reglas*) |
 | POST | `/ordenes-compra/{id}/emitir` | `purchases.crear` (+ `aprobar` sobre umbral) |
+| POST | `/compras-directas` | `purchases.crear` — ADR-081, ver más abajo |
 
 ### Qué se corrige de un proveedor (y qué no)
 
@@ -94,11 +96,32 @@ hay que revocarlo a mano (ver ROADMAP → Deuda técnica → Seguridad).
 Deuda del slice (ver ROADMAP): `cotizacion` (camino no-preferente sin
 modelar — hoy toda OC insumo emite sin cotización comparativa),
 OC tipo `activo` + `requerimiento_activo` con doble aprobación,
-`compra_directa` + `caja_chica_compras`/`caja_chica_movimiento` +
-`rendicion_caja_chica` (compra a proveedor informal), `evaluacion_proveedor`
+`caja_chica_compras`/`caja_chica_movimiento`/`rendicion_caja_chica`
+(`compra_directa` ya no depende de esto — ver más abajo), `evaluacion_proveedor`
 automática por recepción, listener de `inventory.devolucion_a_proveedor`.
 La OC no queda marcada como "pagada" tras el pago (RN-CMP-014 vive del
 lado de `accounting`, `orden_compra.estado` no tiene ese valor todavía).
+
+## Editar OC en borrador (2026-08-29)
+
+`PATCH /ordenes-compra/{id}` reemplaza los ítems (artículo/cantidad/costo)
+y recalcula el total — **solo mientras `estado == "borrador"`**. Antes de
+esto la OC era inmutable desde el instante en que se creaba, ni en
+borrador se podía corregir un precio tecleado mal sin anular y rehacer
+todo. Desde `emitida` sigue siendo inmutable sin excepción (ver *Reglas*).
+
+## Compra directa (2026-08-29, ADR-081)
+
+`POST /compras-directas` sustenta un gasto ya incurrido (factura de un
+proveedor informal, sin OC previa) reutilizando `orden_compra` con
+`origen="directa"`: crea la OC, la emite, la recibe al 100% y da
+conformidad del comprobante en una sola llamada — encadenando
+`recibir_orden_compra` y `dar_conformidad_comprobante` tal cual, así que
+`inventory` (entra stock) y `accounting` (asienta y paga) no cambiaron
+nada. No pasa por el umbral de `purchases.aprobar` (es gasto ya
+incurrido, no un compromiso a aprobar) ni por `caja_chica_movimiento`
+(ese modelo sigue sin existir — el pago sale por cuentas por pagar
+normal). Detalle de la decisión en ADR-081.
 
 ## Dirección del proveedor anclada al mapa (2026-08-22, ADR-053)
 
@@ -122,8 +145,10 @@ después se puede anclar en el mapa. Corregir el texto a mano suelta el punto
     solicitante y de gerencia (dos aprobaciones distintas, ambas
     registradas) antes de permitir la emisión, además de mínimo 2
     `cotizacion` vinculadas — no aplica el camino simplificado.
-- Registrar `compra_directa` (sin OC): proveedor informal, comprobante
-  obligatorio, cargo a `caja_chica_movimiento`.
+- Registrar `compra_directa` (sin OC previa): proveedor informal,
+  comprobante obligatorio — hoy sale por cuentas por pagar normal
+  (`accounting.pagos.registrar_pago`), el cargo a `caja_chica_movimiento`
+  sigue pendiente (ver *Deuda del slice*).
 - Gestionar `caja_chica_compras`: fondo fijo, movimientos de gasto,
   rendición semanal (cierre de periodo) que Contabilidad concilia y repone.
 - Recepción registra cantidades reales y actualiza costo promedio del
@@ -137,7 +162,8 @@ después se puede anclar en el mapa. Corregir el texto a mano suelta el punto
 
 ## Reglas
 
-- OC emitida es inmutable; correcciones vía nueva versión o anulación
+- OC en `borrador` admite editar sus ítems (`PATCH`, auditado); desde
+  `emitida` es inmutable — correcciones vía nueva versión o anulación
   (auditadas).
 - Recepciones parciales permitidas; no recibir más de lo ordenado sin
   permiso especial.
@@ -149,7 +175,9 @@ después se puede anclar en el mapa. Corregir el texto a mano suelta el punto
   `requerimiento_activo.aprobado_gerencia = true` antes de permitir emisión
   — bloqueo a nivel de dominio, no solo de UI.
 - `compra_directa` exige comprobante adjunto antes de guardarse; sin
-  comprobante no se persiste.
+  comprobante no se persiste. Hoy es una `orden_compra` con
+  `origen="directa"` (ADR-081) — no un modelo aparte, ni pasa por
+  `caja_chica_movimiento` (deuda separada).
 - `purchases` **no ejecuta pagos** — solo registra el `comprobante`
   recibido como conforme (`purchases.dar_conformidad`, exige OC con
   recepción registrada) y lo entrega (evento `purchases.comprobante_conforme`)

@@ -18,10 +18,25 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 - ⬜ **OC tipo `activo` + `requerimiento_activo`**: doble aprobación
   (área + gerencia) y mínimo 2 cotizaciones vinculadas antes de emitir.
   Hoy el tipo está rechazado explícitamente en la capa de aplicación.
-- ⬜ **`compra_directa` + caja chica** (`caja_chica_compras`,
-  `caja_chica_movimiento`, `rendicion_caja_chica`): compra sin OC a
-  proveedor informal, con comprobante obligatorio y rendición semanal
-  conciliada por `accounting`.
+- ✅ 2026-08-29 **`compra_directa`** (ADR-081): compra a proveedor
+  informal sin OC previa, sustentada solo con el comprobante recibido.
+  Reutiliza `orden_compra` con `origen="directa"` — mismo contrato de
+  eventos que ya consumen `inventory`/`accounting`, cero código nuevo ahí.
+- ⬜ **Caja chica** (`caja_chica_compras`, `caja_chica_movimiento`,
+  `rendicion_caja_chica`): `compra_directa` ya registra el gasto, pero
+  sale por cuentas por pagar normal — el cargo a un fondo fijo con
+  rendición semanal conciliada por `accounting` sigue sin modelar.
+- ⬜ **Combobox de artículos con búsqueda server-side**: el selector de
+  producto en OC y el importador de recetas piden `/inventory/articulos`
+  con `page_size=200` fijo (2026-08-29) — funciona mientras el catálogo no
+  pase de 200 filas. Si lo hace, hace falta un combobox que busque en el
+  servidor en vez de traer todo de una.
+- ⬜ **Reconciliación estilo Odoo entre compras/inventario/contabilidad**:
+  hoy cada módulo se comunica solo por evento puntual (OC recibida,
+  comprobante conforme); falta un tablero/flujo que concilie explícitamente
+  qué OC, qué recepción y qué asiento corresponden entre sí, más allá de lo
+  que cada evento ya deja escrito. Diferido — es un cambio de alcance
+  arquitectónico, no un fix puntual.
 - ⬜ **`evaluacion_proveedor`** automática (cumplimiento de plazo,
   conformidad, variación de precio) recalculada en cada recepción.
 - ⬜ **`orden_compra` no queda marcada como pagada**: `accounting.pago_ejecutado`

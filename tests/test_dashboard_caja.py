@@ -413,6 +413,7 @@ def test_dashboard_resumen_agrega_los_tres_indicadores(env):
     assert body["ventas_hoy"]["cantidad"] == 1
     assert Decimal(body["ventas_hoy"]["total"]) == Decimal("50.00")
     assert body["stock_bajo_minimo"] == 1  # el Stock del fixture, 1 < mínimo 5
+    assert body["incidencias_recientes"] == 0
     assert len(body["cajas_abiertas"]) == 1
     assert Decimal(body["cajas_abiertas"][0]["monto_apertura"]) == Decimal("100.00")
 

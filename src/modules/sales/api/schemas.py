@@ -948,6 +948,8 @@ class VarianteDeCartaOut(BaseModel):
     nombre: str
     precio_unitario: Decimal
     orden: int
+    # RN-INV-013: avisa, nunca bloquea — el PDV sigue vendiendo igual.
+    stock_bajo: bool = False
     # Los grupos y extras cuelgan del producto que se prepara, y con
     # presentaciones ese es la variante: una Familiar y una Personal no
     # ofrecen los mismos sabores. Elegida la variante, estos mandan sobre
@@ -969,6 +971,8 @@ class CartaItemOut(BaseModel):
     # se cobra sale de la variante elegida, nunca de este campo.
     precio_unitario: Decimal
     variantes: list[VarianteDeCartaOut] = []
+    # RN-INV-013: avisa, nunca bloquea — el PDV sigue vendiendo igual.
+    stock_bajo: bool = False
     # Los del padre. Un producto con variantes normalmente los tiene vacíos
     # (cuelgan de cada variante); se conserva para los productos simples.
     extras: list[ExtraDeCartaOut] = []

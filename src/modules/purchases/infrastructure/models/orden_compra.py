@@ -22,6 +22,12 @@ class OrdenCompra(Base, UuidPkMixin, TimestampMixin):
     tipo: Mapped[str] = mapped_column(
         Enum("insumo", "activo", name="tipo_orden_compra", native_enum=False)
     )
+    # `directa` = compra a proveedor sustentada solo con el comprobante
+    # recibido, sin pasar por emisión/recepción — nace ya `recibida`.
+    origen: Mapped[str] = mapped_column(
+        Enum("oc", "directa", name="origen_orden_compra", native_enum=False),
+        default="oc",
+    )
     # Origen opcional — entidad `cotizacion` aún sin modelar (deuda técnica).
     cotizacion_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
     # Obligatorio si tipo=activo — entidad `requerimiento_activo` diferida.

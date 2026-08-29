@@ -496,6 +496,135 @@ def test_idempotencia_crear_oc(env):
     assert r1.json()["id"] == r2.json()["id"]
 
 
+def test_editar_orden_compra_en_borrador_reemplaza_items_y_recalcula_total(env):
+    client, ids, _ = env
+    h = _token(client)
+    proveedor_id = _crear_proveedor(client, h, ids).json()["id"]
+    oc = _crear_oc(client, h, ids, proveedor_id, idempotency_key="oc-edit-1")
+    oc_id = oc.json()["id"]
+    assert Decimal(oc.json()["total"]) == Decimal("1000.00")
+
+    r = client.patch(
+        f"/api/v1/purchases/ordenes-compra/{oc_id}",
+        headers=h,
+        json={
+            "items": [
+                {"articulo_id": ids["articulo_id"], "cantidad": "50", "costo_unitario": "20.00"}
+            ]
+        },
+    )
+    assert r.status_code == 200
+    assert Decimal(r.json()["total"]) == Decimal("1000.00")  # 50 * 20
+    assert len(r.json()["items"]) == 1
+    assert Decimal(r.json()["items"][0]["cantidad"]) == Decimal("50")
+
+
+def test_editar_orden_compra_fuera_de_borrador_falla(env):
+    client, ids, _ = env
+    h = _token(client)
+    proveedor_id = _crear_proveedor(client, h, ids).json()["id"]
+    oc = _crear_oc(client, h, ids, proveedor_id, idempotency_key="oc-edit-2")
+    oc_id = oc.json()["id"]
+    client.post(f"/api/v1/purchases/ordenes-compra/{oc_id}/emitir", headers=h)
+
+    r = client.patch(
+        f"/api/v1/purchases/ordenes-compra/{oc_id}",
+        headers=h,
+        json={
+            "items": [
+                {"articulo_id": ids["articulo_id"], "cantidad": "1", "costo_unitario": "1.00"}
+            ]
+        },
+    )
+    assert r.status_code == 409
+
+
+def test_editar_orden_compra_sin_items_falla(env):
+    client, ids, _ = env
+    h = _token(client)
+    proveedor_id = _crear_proveedor(client, h, ids).json()["id"]
+    oc = _crear_oc(client, h, ids, proveedor_id, idempotency_key="oc-edit-3")
+    oc_id = oc.json()["id"]
+
+    r = client.patch(
+        f"/api/v1/purchases/ordenes-compra/{oc_id}", headers=h, json={"items": []}
+    )
+    assert r.status_code == 422
+
+
+def _compra_directa_body(ids, proveedor_id, idempotency_key="cd-key-1"):
+    return {
+        "proveedor_id": proveedor_id,
+        "almacen_destino_id": ids["almacen_id"],
+        "idempotency_key": idempotency_key,
+        "items": [{"articulo_id": ids["articulo_id"], "cantidad": "10", "costo_unitario": "5.00"}],
+        "comprobante": {
+            "idempotency_key": f"{idempotency_key}-comp",
+            "tipo": "boleta",
+            "serie": "B001",
+            "correlativo": 1,
+            "sustento": "efectivo",
+        },
+    }
+
+
+def test_registrar_compra_directa_crea_oc_recibida_y_conforme(env):
+    client, ids, TestSession = env
+    h = _token(client)
+    proveedor_id = _crear_proveedor(client, h, ids).json()["id"]
+
+    r = client.post(
+        "/api/v1/purchases/compras-directas", headers=h,
+        json=_compra_directa_body(ids, proveedor_id),
+    )
+    assert r.status_code == 201
+    assert r.json()["direccion"] == "recibido"
+    comprobante_id = r.json()["id"]
+    orden_id = r.json()["compra_id"]
+
+    ver = client.get(f"/api/v1/purchases/ordenes-compra/{orden_id}", headers=h)
+    assert ver.json()["estado"] == "recibida"
+    assert ver.json()["origen"] == "directa"
+
+    from src.shared.models import Comprobante
+    with TestSession() as s:
+        comprobante = s.get(Comprobante, uuid.UUID(comprobante_id))
+        assert comprobante.compra_id == uuid.UUID(orden_id)
+
+
+def test_registrar_compra_directa_publica_evento_compra_recibida_con_contrato_existente(env):
+    """El evento que consume `inventory` para entrar stock es el mismo que
+    el de una recepción normal — la compra directa entra stock sin tocar
+    ese listener."""
+    client, ids, TestSession = env
+    h = _token(client)
+    proveedor_id = _crear_proveedor(client, h, ids).json()["id"]
+
+    client.post(
+        "/api/v1/purchases/compras-directas", headers=h,
+        json=_compra_directa_body(ids, proveedor_id, idempotency_key="cd-key-2"),
+    )
+
+    from src.modules.inventory.infrastructure.models import Stock
+    with TestSession() as s:
+        stock = s.scalar(
+            select(Stock).where(Stock.sku_id == uuid.UUID(ids["sku_id"]))
+        )
+        assert stock is not None
+        assert stock.cantidad == Decimal("10")
+
+
+def test_registrar_compra_directa_es_idempotente(env):
+    client, ids, _ = env
+    h = _token(client)
+    proveedor_id = _crear_proveedor(client, h, ids).json()["id"]
+
+    body = _compra_directa_body(ids, proveedor_id, idempotency_key="cd-key-3")
+    r1 = client.post("/api/v1/purchases/compras-directas", headers=h, json=body)
+    r2 = client.post("/api/v1/purchases/compras-directas", headers=h, json=body)
+    assert r1.json()["id"] == r2.json()["id"]
+
+
 def test_rol_sin_permiso_purchases_403(env):
     """cocinero (kds.operar/sales.leer) no tiene ningún permiso purchases.*."""
     client, ids, TestSession = env
@@ -510,3 +639,11 @@ def test_rol_sin_permiso_purchases_403(env):
     h_cocinero = _token(client, "cocinero1", "222222")
     r = _crear_proveedor(client, h_cocinero, ids)
     assert r.status_code == 403
+
+
+def test_rol_comprador_puede_leer_articulos_para_armar_una_oc():
+    """El combo de artículos de la OC llama a `inventory.leer` — sin este
+    permiso el front nunca renderiza el formulario de nueva OC."""
+    from src.seeders.seed import ROLES
+
+    assert "inventory.leer" in ROLES["comprador"]

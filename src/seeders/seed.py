@@ -437,6 +437,8 @@ ROLES = {
         "purchases.dar_conformidad",
         # Alta de proveedor natural liga a una persona existente.
         "personas.leer",
+        # Elegir artículo al armar los ítems de una OC.
+        "inventory.leer",
         # Qué se pide más y desde dónde, para negociar volumen (contrato
         # público de inventory).
         "inventory.leer_solicitudes_externas",
