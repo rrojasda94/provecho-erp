@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { DialogoFormulario } from "@/components/formulario/dialogo-formulario";
+import { Combobox, ComboboxMultiple, type Opcion } from "@/components/ui/combobox";
 
 import { crearPromocionAction, terminarPromocionAction } from "../actions";
 
@@ -26,6 +27,24 @@ export type Promocion = {
 };
 
 export type Sucursal = { id: string; nombre: string };
+export type Categoria = { id: string; nombre: string };
+export type Producto = {
+  id: string;
+  nombre: string;
+  id_interno: string;
+  activo: boolean;
+};
+
+/** El catálogo como lo quiere el desplegable. El `id_interno` va de pista
+ * porque quien arma una promoción suele tener el código a mano —sale en la
+ * carta y en el inventario— y teclearlo es más rápido que el nombre. */
+function comoOpciones(productos: Producto[]): Opcion[] {
+  return productos.map((p) => ({
+    valor: p.id,
+    etiqueta: p.nombre,
+    pista: p.id_interno,
+  }));
+}
 
 /** Los cuatro tipos, dichos como los dice el negocio y no como los guarda la
  * base. El formulario cambia de campos según cuál se elija: preguntar los
@@ -118,7 +137,7 @@ function cuandoCorre(p: Promocion): string {
   return partes.join(" · ") || "Siempre";
 }
 
-function CamposDelTipo({ tipo }: { tipo: string }) {
+function CamposDelTipo({ tipo, productos }: { tipo: string; productos: Opcion[] }) {
   if (tipo === "nxm") {
     return (
       <>
@@ -163,7 +182,12 @@ function CamposDelTipo({ tipo }: { tipo: string }) {
         </label>
         <label className={CAMPO}>
           …o el producto que va gratis
-          <input name="gratis_producto_id" placeholder="id del producto" />
+          <Combobox
+            name="gratis_producto_id"
+            etiqueta="El producto que va gratis"
+            opciones={productos}
+            marcador="Buscar un producto..."
+          />
           <span className="text-xs font-normal text-gray">
             Uno de los dos, no los dos.
           </span>
@@ -188,8 +212,21 @@ function CamposDelTipo({ tipo }: { tipo: string }) {
   );
 }
 
-function DialogoNuevaPromocion({ sucursales }: { sucursales: Sucursal[] }) {
+function DialogoNuevaPromocion({
+  sucursales,
+  productos,
+  categorias,
+}: {
+  sucursales: Sucursal[];
+  productos: Producto[];
+  categorias: Categoria[];
+}) {
   const [tipo, setTipo] = useState<string>("nxm");
+  const opcionesProducto = useMemo(() => comoOpciones(productos), [productos]);
+  const opcionesCategoria = useMemo(
+    () => categorias.map((c) => ({ valor: c.id, etiqueta: c.nombre })),
+    [categorias],
+  );
   return (
     <DialogoFormulario
       titulo="Nueva promoción"
@@ -227,12 +264,17 @@ function DialogoNuevaPromocion({ sucursales }: { sucursales: Sucursal[] }) {
         ))}
       </fieldset>
 
-      <CamposDelTipo tipo={tipo} />
+      <CamposDelTipo tipo={tipo} productos={opcionesProducto} />
 
       {tipo !== "combo" && (
         <label className={CAMPO}>
           Categorías que alcanza
-          <input name="categoria_ids" placeholder="ids separados por coma" />
+          <ComboboxMultiple
+            name="categoria_ids"
+            etiqueta="Categorías que alcanza"
+            opciones={opcionesCategoria}
+            marcador="Buscar una categoría..."
+          />
           <span className="text-xs font-normal text-gray">
             Vacío = todo el pedido.
           </span>
@@ -240,7 +282,12 @@ function DialogoNuevaPromocion({ sucursales }: { sucursales: Sucursal[] }) {
       )}
       <label className={CAMPO}>
         {tipo === "combo" ? "Productos del combo" : "Productos que alcanza"}
-        <input name="producto_ids" placeholder="ids separados por coma" />
+        <ComboboxMultiple
+          name="producto_ids"
+          etiqueta={tipo === "combo" ? "Productos del combo" : "Productos que alcanza"}
+          opciones={opcionesProducto}
+          marcador="Buscar un producto..."
+        />
       </label>
 
       <fieldset className="flex flex-col gap-1.5">
@@ -282,14 +329,12 @@ function DialogoNuevaPromocion({ sucursales }: { sucursales: Sucursal[] }) {
         <legend className="text-sm font-semibold">Dónde</legend>
         <label className={CAMPO}>
           Sucursal
-          <select name="sucursal_id" defaultValue="">
-            <option value="">Todas</option>
-            {sucursales.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.nombre}
-              </option>
-            ))}
-          </select>
+          <Combobox
+            name="sucursal_id"
+            etiqueta="Sucursal"
+            opciones={sucursales.map((s) => ({ valor: s.id, etiqueta: s.nombre }))}
+            marcador="Todas"
+          />
         </label>
         <div className="flex flex-wrap gap-2 text-sm">
           {MODALIDADES.map((m) => (
@@ -331,10 +376,14 @@ function DialogoNuevaPromocion({ sucursales }: { sucursales: Sucursal[] }) {
 export function PromocionesCliente({
   promociones,
   sucursales,
+  productos,
+  categorias,
   puedeGestionar,
 }: {
   promociones: Promocion[];
   sucursales: Sucursal[];
+  productos: Producto[];
+  categorias: Categoria[];
   puedeGestionar: boolean;
 }) {
   const router = useRouter();
@@ -358,7 +407,13 @@ export function PromocionesCliente({
             el descuento manual de caja son otra cosa.
           </p>
         </div>
-        {puedeGestionar && <DialogoNuevaPromocion sucursales={sucursales} />}
+        {puedeGestionar && (
+          <DialogoNuevaPromocion
+            sucursales={sucursales}
+            productos={productos}
+            categorias={categorias}
+          />
+        )}
       </header>
 
       {error && <p className="text-secondary">{error}</p>}
