@@ -224,9 +224,10 @@ def crear_articulo(
 @router.get("/articulos", response_model=Pagina[schemas.ArticuloOut])
 def listar_articulos(
     empresa_id: uuid.UUID | None = None,
-    tipo: str | None = Query(
-        None, description="Filtra por tipo de artículo (ej. `empaque`)"
+    tipo: list[str] | None = Query(
+        None, description="Filtra por tipo de artículo; repetible (`?tipo=a&tipo=b`)"
     ),
+    q: str | None = Query(None, description="Busca en el nombre y el código interno"),
     _: Usuario = Depends(require_permission(LEER)),
     tenant: Tenant = Depends(get_tenant),
     p: Paginacion = Depends(paginacion),
@@ -234,7 +235,7 @@ def listar_articulos(
 ):
     return paginar(
         session,
-        catalogo.q_articulos(session, tenant.filtro_empresa(empresa_id), tipo),
+        catalogo.q_articulos(session, tenant.filtro_empresa(empresa_id), tipo, q),
         p,
     )
 

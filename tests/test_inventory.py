@@ -393,6 +393,73 @@ def test_listar_articulos_filtra_por_tipo(env):
     assert "Harina" in [a["nombre"] for a in todos.json()["items"]]
 
 
+def test_listar_articulos_acepta_varios_tipos(env):
+    """"Qué se puede producir" son las subrecetas **y** la mercadería. Con un
+    solo `tipo` por petición, la pantalla resolvía ese "o" filtrando lo que le
+    había llegado de la primera página —cincuenta filas de un catálogo de
+    miles—, así que la lista salía casi vacía sin decir por qué."""
+    client, ids, _ = env
+    h = _token(client)
+    for id_interno, nombre, tipo in (
+        ("A902", "Caja E2E", "empaque"),
+        ("A903", "Masa E2E", "subreceta"),
+    ):
+        r = client.post("/api/v1/inventory/articulos", headers=h, json={
+            "id_interno": id_interno, "nombre": nombre,
+            "unidad_medida_id": ids["udm_id"], "tipo": tipo,
+        })
+        assert r.status_code == 201, r.text
+
+    varios = client.get(
+        "/api/v1/inventory/articulos?tipo=empaque&tipo=subreceta", headers=h
+    )
+    assert varios.status_code == 200
+    assert {a["nombre"] for a in varios.json()["items"]} == {"Caja E2E", "Masa E2E"}
+
+    # Un solo `tipo` sigue funcionando igual: el parámetro no cambió de forma
+    # para quien ya lo usaba.
+    uno = client.get("/api/v1/inventory/articulos?tipo=empaque", headers=h)
+    assert [a["nombre"] for a in uno.json()["items"]] == ["Caja E2E"]
+
+
+def test_listar_articulos_busca_por_nombre_y_codigo(env):
+    """La búsqueda vive en la base por la misma razón que el filtro por tipo,
+    pero acá aprieta más: con miles de artículos y un techo de 200 filas por
+    página, un desplegable que filtre lo que ya recibió deja invisible casi
+    todo el catálogo y no avisa — parece que el artículo no existe."""
+    client, ids, _ = env
+    h = _token(client)
+    r = client.post("/api/v1/inventory/articulos", headers=h, json={
+        "id_interno": "A901", "nombre": "Caja Pizza Familiar",
+        "unidad_medida_id": ids["udm_id"], "tipo": "empaque",
+    })
+    assert r.status_code == 201, r.text
+
+    por_nombre = client.get("/api/v1/inventory/articulos?q=pizza", headers=h)
+    assert por_nombre.status_code == 200
+    assert [a["nombre"] for a in por_nombre.json()["items"]] == ["Caja Pizza Familiar"]
+
+    # Por código interno: quien lo tiene a mano lo teclea en vez del nombre.
+    por_codigo = client.get("/api/v1/inventory/articulos?q=A901", headers=h)
+    assert [a["nombre"] for a in por_codigo.json()["items"]] == ["Caja Pizza Familiar"]
+
+    # Insensible a mayúsculas, y sin resultados devuelve la lista vacía —no un
+    # error: "no encontré nada" es una respuesta válida para un buscador.
+    assert por_nombre.json()["items"] == client.get(
+        "/api/v1/inventory/articulos?q=PIZZA", headers=h
+    ).json()["items"]
+    assert client.get("/api/v1/inventory/articulos?q=zzz", headers=h).json()["items"] == []
+
+    # Se combina con `tipo`, y sin el parámetro sigue viniendo todo.
+    assert client.get(
+        "/api/v1/inventory/articulos?q=pizza&tipo=insumo", headers=h
+    ).json()["items"] == []
+    assert "Harina" in [
+        a["nombre"]
+        for a in client.get("/api/v1/inventory/articulos", headers=h).json()["items"]
+    ]
+
+
 def test_ajustes_se_pueden_listar_y_abrir(env):
     """Antes solo se podían crear y aprobar: `inventory.ajuste_fuera_margen`
     reportaba un hecho que no se podía ir a mirar."""

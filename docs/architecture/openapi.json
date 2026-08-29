@@ -32113,9 +32113,30 @@
             }
           },
           {
-            "description": "Filtra por tipo de artículo (ej. `empaque`)",
+            "description": "Filtra por tipo de artículo; repetible (`?tipo=a&tipo=b`)",
             "in": "query",
             "name": "tipo",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filtra por tipo de artículo; repetible (`?tipo=a&tipo=b`)",
+              "title": "Tipo"
+            }
+          },
+          {
+            "description": "Busca en el nombre y el código interno",
+            "in": "query",
+            "name": "q",
             "required": false,
             "schema": {
               "anyOf": [
@@ -32126,8 +32147,8 @@
                   "type": "null"
                 }
               ],
-              "description": "Filtra por tipo de artículo (ej. `empaque`)",
-              "title": "Tipo"
+              "description": "Busca en el nombre y el código interno",
+              "title": "Q"
             }
           },
           {
