@@ -1887,6 +1887,38 @@ Una emisión sin destinatarios **se persiste igual**, con cero entregas, y sale
 como hueco en la matriz (RN-REP-005). Las entregas no son retroactivas:
 `regla_id` y `motivo` se congelan al emitir (RN-REP-004).
 
+## 17. Vistas del BI autoservicio (ADR-081)
+
+No son tablas: son `CREATE VIEW` sobre las tablas de arriba, creadas por
+`alembic/versions/832ff01ed33f_vistas_bi_y_rol_de_solo_lectura.py`. Existen
+para que Apache Superset (Fase C, pendiente) nunca tenga `GRANT` sobre una
+tabla base — el rol `bi_lector` solo alcanza estas vistas.
+
+| Vista | Grano | De |
+|---|---|---|
+| `vw_bi_ventas` | línea de venta | `venta` × `venta_item` × `sucursal` × `marca` × `producto_comercial` |
+| `vw_bi_pagos` | pago | `pago` × `venta` × `sucursal` × `marca` × `medio_pago` |
+| `vw_bi_inventario_movimientos` | movimiento | `movimiento_inventario` × `sku`/`articulo` × `almacen` |
+| `vw_bi_stock` | fila de stock actual | `stock` × `sku`/`articulo` × `almacen` |
+| `vw_bi_compras` | línea de OC | `orden_compra` × `orden_compra_item` × `proveedor` × `articulo` |
+| `vw_bi_contabilidad` | línea de asiento | `asiento` × `asiento_linea` × `cuenta_contable` |
+| `vw_bi_caja` | cierre | `cierre_caja` × `apertura_caja` × `punto_venta` × `sucursal` |
+| `vw_bi_produccion` | orden | `orden_produccion` × `almacen` × `articulo` |
+| `vw_bi_rrhh_asistencia` | día × trabajador | `asistencia` × `trabajador` × `sucursal` |
+| `vw_bi_marketing_encuestas` | encuesta | `encuesta_satisfaccion` × `venta` × `sucursal` |
+| `bi_alcance_usuario` | (usuario, sucursal) | `usuario` × `usuario_sucursal`, con el caso superusuario aparte |
+
+Reglas comunes a todas (RN-BI-001/003): fecha de negocio (`fecha_orden`,
+nunca `created_at`), mismo predicado de "ingreso real" que
+`sales/queries_publicas._ESTADOS_CON_INGRESO`, `marca_id` siempre resuelto
+vía `sucursal.marca_id`, y ninguna columna que su módulo dueño ya restringe
+en su propia `queries_publicas.py` (RRHH: tardanzas y horas extra, nunca
+remuneración).
+
+`bi_alcance_usuario` es el puente con `Tenant.sucursal_ids`
+(`src/core/tenant.py`, ADR-004): mismas tablas de origen, no una copia. Su
+equivalencia la congela `tests/test_bi_alcance.py` (RN-BI-002).
+
 ## 9. Módulos futuros
 
 Revisado 2026-08-05: de la lista original casi nada sigue siendo futuro, y

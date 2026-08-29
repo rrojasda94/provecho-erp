@@ -53,6 +53,10 @@ jobs:
           --health-interval 5s --health-timeout 5s --health-retries 10
     env:
       DATABASE_URL: postgresql+psycopg://provecho:provecho@localhost:5432/provecho_migraciones
+      # Solo para que el job ejercite también el GRANT del rol de solo
+      # lectura del BI (ADR-081) — no es una credencial real, muere con el
+      # contenedor del job.
+      BI_LECTOR_PASSWORD: ci-bi-lector-password
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -75,6 +79,13 @@ jobs:
       - name: El modelo no difiere del esquema migrado
         run: |
           alembic check
+      # Único lugar donde corre `tests/test_bi_alcance.py`: es la vista
+      # `vw_bi_*`/`bi_alcance_usuario` de ADR-081, SQL puro que el resto del
+      # suite (SQLite + create_all) no puede crear ni consultar.
+      - name: Sembrar datos para el test de alcance del BI
+        run: python -m src.seeders.seed
+      - name: bi_alcance_usuario equivale a Tenant.sucursal_ids
+        run: pytest tests/test_bi_alcance.py -v
 
   # Nadie comprobaba que la imagen siquiera construyera: un Dockerfile roto
   # se descubría al desplegar.

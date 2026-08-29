@@ -8,7 +8,7 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Numeric, String, func
+from sqlalchemy import DateTime, Enum, ForeignKey, Index, Numeric, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -41,6 +41,11 @@ MOTIVO_AJUSTE = Enum(
 
 class MovimientoInventario(Base, UuidPkMixin):
     __tablename__ = "movimiento_inventario"
+    __table_args__ = (
+        # `vw_bi_inventario_movimientos` (ADR-081) agrupa por almacén y
+        # rango de fecha; sin índice, un año de movimientos es table scan.
+        Index("ix_movimiento_inventario_ts_almacen", "ts", "almacen_id"),
+    )
 
     almacen_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("almacen.id"))
     sku_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("sku.id"))

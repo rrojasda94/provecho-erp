@@ -51,6 +51,15 @@ const MINUTOS_DE_BLOQUEO = 15;
 
 const LARGO_PIN = 6;
 
+/**
+ * Único destino post-login que no es el home (ADR-081 Fase B): la mitad del
+ * SSO del BI que quedó cortada por no tener sesión de Provecho todavía. Se
+ * valida por regex exacta —no basta con no ser absoluta— porque `next` sale
+ * de la URL y un valor cualquiera ahí sería la puerta a un open redirect: el
+ * login es la pantalla que menos puede darse ese lujo.
+ */
+const SIGUIENTE_PERMITIDO = /^\/oauth\/authorize(\?[^\s]*)?$/;
+
 /** Cuánto falta, dicho como se dice en voz alta y no en segundos. */
 function espera(segundos: number | undefined): string {
   if (!segundos) return "un momento";
@@ -133,6 +142,9 @@ export async function loginAction(
     tokens.refresh_token,
     opcionesCookie(MAX_AGE_REFRESH),
   );
+
+  const siguiente = String(formData.get("next") ?? "");
+  if (SIGUIENTE_PERMITIDO.test(siguiente)) redirect(siguiente);
 
   // Home de apps (F2.6a, ADR-013), no el dashboard directo — el usuario
   // elige el módulo, el dashboard es una app más del grid.

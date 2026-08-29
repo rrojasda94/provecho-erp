@@ -8,7 +8,7 @@ import uuid
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from src.core.events import event_bus
@@ -374,18 +374,21 @@ def _componer(
 
 def contar_bajo_minimo(session: Session, empresa_id: uuid.UUID) -> int:
     """Cantidad de filas de stock bajo su mínimo, en almacenes de la
-    empresa — para el dashboard gerencial (`core.dashboard_router`)."""
-    almacen_ids = list(
-        session.scalars(
-            select(Almacen.id).where(
-                Almacen.empresa_id == empresa_id, Almacen.deleted_at.is_(None)
-            )
+    empresa — para el dashboard gerencial (`core.dashboard_router`).
+
+    Agregado en SQL (`rules.stock_bajo` es `stock_minimo is not None and
+    cantidad <= stock_minimo`): antes traía toda la tabla `stock` de la
+    empresa a Python para contarla ahí, en el engine corto del dashboard.
+    Con el catálogo de reportes y el BI (ADR-081) sumando carga a la misma
+    tabla, ese full-scan en cada apertura del dashboard dejó de ser gratis."""
+    return session.scalar(
+        select(func.count())
+        .select_from(Stock)
+        .join(Almacen, Almacen.id == Stock.almacen_id)
+        .where(
+            Almacen.empresa_id == empresa_id,
+            Almacen.deleted_at.is_(None),
+            Stock.stock_minimo.is_not(None),
+            Stock.cantidad <= Stock.stock_minimo,
         )
-    )
-    if not almacen_ids:
-        return 0
-    return sum(
-        1
-        for s in session.scalars(select(Stock).where(Stock.almacen_id.in_(almacen_ids)))
-        if rules.stock_bajo(s.cantidad, s.stock_minimo)
     )

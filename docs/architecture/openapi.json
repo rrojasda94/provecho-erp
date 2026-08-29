@@ -2891,6 +2891,39 @@
         "title": "AvanzarIn",
         "type": "object"
       },
+      "Body_token_api_v1_oauth_token_post": {
+        "properties": {
+          "client_id": {
+            "title": "Client Id",
+            "type": "string"
+          },
+          "client_secret": {
+            "title": "Client Secret",
+            "type": "string"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "grant_type": {
+            "title": "Grant Type",
+            "type": "string"
+          },
+          "redirect_uri": {
+            "title": "Redirect Uri",
+            "type": "string"
+          }
+        },
+        "required": [
+          "grant_type",
+          "code",
+          "redirect_uri",
+          "client_id",
+          "client_secret"
+        ],
+        "title": "Body_token_api_v1_oauth_token_post",
+        "type": "object"
+      },
       "Body_validar_importacion_articulos_api_v1_inventory_articulos_importar_validar_post": {
         "properties": {
           "archivo": {
@@ -4991,6 +5024,37 @@
           }
         },
         "title": "ClienteUpdate",
+        "type": "object"
+      },
+      "CodigoIn": {
+        "properties": {
+          "client_id": {
+            "title": "Client Id",
+            "type": "string"
+          },
+          "redirect_uri": {
+            "title": "Redirect Uri",
+            "type": "string"
+          }
+        },
+        "required": [
+          "client_id",
+          "redirect_uri"
+        ],
+        "title": "CodigoIn",
+        "type": "object"
+      },
+      "CodigoOut": {
+        "properties": {
+          "codigo": {
+            "title": "Codigo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "codigo"
+        ],
+        "title": "CodigoOut",
         "type": "object"
       },
       "ColumnaOut": {
@@ -9547,6 +9611,14 @@
             "title": "Limite",
             "type": "integer"
           },
+          "marca_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Marca Ids",
+            "type": "array"
+          },
           "preset": {
             "default": "mes_actual",
             "title": "Preset",
@@ -9746,6 +9818,19 @@
           "con_problema"
         ],
         "title": "GuardarMatrizOut",
+        "type": "object"
+      },
+      "GuestTokenOut": {
+        "properties": {
+          "token": {
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "title": "GuestTokenOut",
         "type": "object"
       },
       "GuiaDevolucionCreate": {
@@ -24917,7 +25002,9 @@
             "enum": [
               "tabla",
               "barras",
-              "lineas"
+              "lineas",
+              "pie",
+              "area"
             ],
             "title": "Visual",
             "type": "string"
@@ -25485,6 +25572,29 @@
           "created_at"
         ],
         "title": "TokenAgenteOut",
+        "type": "object"
+      },
+      "TokenOut": {
+        "properties": {
+          "access_token": {
+            "title": "Access Token",
+            "type": "string"
+          },
+          "expires_in": {
+            "title": "Expires In",
+            "type": "integer"
+          },
+          "token_type": {
+            "default": "bearer",
+            "title": "Token Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "access_token",
+          "expires_in"
+        ],
+        "title": "TokenOut",
         "type": "object"
       },
       "TokenPair": {
@@ -26636,6 +26746,49 @@
           }
         },
         "title": "UnidadMedidaUpdate",
+        "type": "object"
+      },
+      "UserInfoOut": {
+        "properties": {
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "preferred_username": {
+            "title": "Preferred Username",
+            "type": "string"
+          },
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Roles",
+            "type": "array"
+          },
+          "sub": {
+            "title": "Sub",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sub",
+          "preferred_username",
+          "email",
+          "name",
+          "roles"
+        ],
+        "title": "UserInfoOut",
         "type": "object"
       },
       "UsuarioCreate": {
@@ -31025,6 +31178,53 @@
         "summary": "Verificar Pin",
         "tags": [
           "auth"
+        ]
+      }
+    },
+    "/api/v1/bi/dashboards/{dashboard_id}/guest-token": {
+      "get": {
+        "operationId": "guest_token_de_dashboard_api_v1_bi_dashboards__dashboard_id__guest_token_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dashboard_id",
+            "required": true,
+            "schema": {
+              "title": "Dashboard Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuestTokenOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Guest Token De Dashboard",
+        "tags": [
+          "bi"
         ]
       }
     },
@@ -39848,6 +40048,142 @@
         ]
       }
     },
+    "/api/v1/oauth/codigo": {
+      "post": {
+        "operationId": "emitir_codigo_api_v1_oauth_codigo_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodigoIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodigoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Emitir Codigo",
+        "tags": [
+          "oauth"
+        ]
+      }
+    },
+    "/api/v1/oauth/token": {
+      "post": {
+        "operationId": "token_api_v1_oauth_token_post",
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_token_api_v1_oauth_token_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Token",
+        "tags": [
+          "oauth"
+        ]
+      }
+    },
+    "/api/v1/oauth/userinfo": {
+      "get": {
+        "operationId": "userinfo_api_v1_oauth_userinfo_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserInfoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Userinfo",
+        "tags": [
+          "oauth"
+        ]
+      }
+    },
     "/api/v1/parametros": {
       "get": {
         "description": "`?estado=propuesto` = bandeja de aprobaciones de Gerencia. Sin filtro de\n`modulo` hace falta el permiso de Gerencia: hay parámetros sensibles (los\nrangos salariales de RRHH) que no son de lectura general.",
@@ -41477,6 +41813,62 @@
           }
         ],
         "summary": "Datos",
+        "tags": [
+          "reportes"
+        ]
+      }
+    },
+    "/api/v1/reportes/{codigo}/exportar": {
+      "post": {
+        "description": "El dataset completo, no las 500 filas de la tarjeta (deuda cerrada de\n`docs/roadmap/deuda/dashboard-y-caja.md`): mismo reporte, mismo permiso,\nmismo rango — el único cambio es el tope\n(`catalogo.LIMITE_MAXIMO_EXPORTACION`, 50 000). Se arma en el servidor\nporque en 50 000 filas ya no tiene sentido bajarlas al navegador para\nconvertirlas ahí, como sí hace el CSV por tarjeta (`aCsv`,\n`frontend/lib/reportes-datos.ts`).",
+        "operationId": "exportar_api_v1_reportes__codigo__exportar_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "codigo",
+            "required": true,
+            "schema": {
+              "title": "Codigo",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FiltrosIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Exportar",
         "tags": [
           "reportes"
         ]
@@ -52847,6 +53239,14 @@
     {
       "description": "Agregado gerencial de solo lectura: ventas del día, stock crítico, caja.",
       "name": "dashboard"
+    },
+    {
+      "description": "SSO del BI (Superset, ADR-081): Provecho como proveedor OAuth2. `/codigo` exige sesión + `bi.acceder`; `/token` y `/userinfo` son servidor-a-servidor con `client_secret`.",
+      "name": "oauth"
+    },
+    {
+      "description": "Embebido de tableros de Superset en /dashboard (ADR-081 Fase D): Provecho pide un guest token con su propia cuenta de servicio.",
+      "name": "bi"
     },
     {
       "description": "Catálogo cerrado de reportes del tablero (ADR-024) y tableros guardados por usuario. El cliente elige un `codigo` del catálogo y filtros tipados; no existe constructor de consultas.",

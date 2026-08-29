@@ -7,10 +7,12 @@ sobre cada reporte y que un rango o una sucursal fuera de alcance no pasen.
 """
 
 import datetime
+import io
 from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
+from openpyxl import load_workbook
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -621,3 +623,80 @@ def test_compartir_no_salta_el_rbac_de_cada_reporte(env):
     # ...pero la tarjeta de ventas le sigue respondiendo 403: se comparte la
     # disposición, no los datos.
     assert _datos(client, h, "ventas_por_dia").status_code == 403
+
+
+# --- Exportar (ADR-081 Fase E) -----------------------------------------------
+def _exportar(client, h, codigo, **filtros):
+    return client.post(
+        f"/api/v1/reportes/{codigo}/exportar", headers=h, json=filtros or {}
+    )
+
+
+def test_exportar_reporte_inexistente_es_404(env):
+    client, _ = env
+    assert _exportar(client, _token(client), "sueldos_de_todos").status_code == 404
+
+
+def test_exportar_fuera_del_permiso_es_403(env):
+    client, _ = env
+    h = _token(client, "contador1", "654321")
+    assert _exportar(client, h, "ventas_por_dia").status_code == 403
+
+
+def test_exportar_sucursal_fuera_del_alcance_es_403(env):
+    client, ids = env
+    h = _token(client, "contador1", "654321")
+    r = _exportar(client, h, "ventas_por_dia", sucursal_ids=[ids["otra_sucursal_id"]])
+    assert r.status_code == 403
+
+
+def test_exportar_devuelve_un_xlsx_con_las_filas(env):
+    client, ids = env
+    r = _exportar(client, _token(client), "ventas_por_dia", preset="ultimos_7")
+    assert r.status_code == 200, r.text
+    assert r.headers["content-type"] == (
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    assert "attachment" in r.headers["content-disposition"]
+    assert "ventas_por_dia" in r.headers["content-disposition"]
+
+    libro = load_workbook(io.BytesIO(r.content))
+    hoja = libro.active
+    filas = list(hoja.iter_rows(values_only=True))
+    encabezado = filas[0]
+    cuerpo = filas[1:]
+    assert encabezado == ("Fecha", "Ventas", "Total")
+    # openpyxl devuelve `datetime` al releer una celda de fecha (no `date`,
+    # ni el string ISO que sí manda `/datos`) — se normaliza a ISO para
+    # comparar contra `ids`, que guarda las fechas como string.
+    por_fecha = {
+        (v.date() if isinstance(v, datetime.datetime) else v).isoformat(): fila
+        for fila in cuerpo
+        for v in (fila[0],)
+    }
+    # Mismo total que `/datos` (100.00), pero numérico de verdad —a
+    # diferencia del CSV por tarjeta, acá una fórmula `=SUMA(...)` sobre la
+    # columna funciona sin que nadie "convierta a número" antes.
+    fila_ayer = por_fecha[ids["ayer"]]
+    assert isinstance(fila_ayer[2], int | float)
+    assert fila_ayer[2] == 100.00
+
+
+def test_exportar_no_esta_acotado_a_500_filas(env, monkeypatch):
+    """El tope de `/exportar` es `LIMITE_MAXIMO_EXPORTACION` (50 000), no
+    `LIMITE_MAXIMO` (500) — es la deuda que este endpoint existe para
+    cerrar (`docs/roadmap/deuda/dashboard-y-caja.md`)."""
+    from src.core.reportes import catalogo
+
+    llamadas = {}
+    original = catalogo.ejecutar
+
+    def _espia(*args, **kwargs):
+        llamadas["limite_maximo"] = kwargs.get("limite_maximo")
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(catalogo, "ejecutar", _espia)
+    client, _ = env
+    r = _exportar(client, _token(client), "ventas_por_dia", preset="ultimos_7")
+    assert r.status_code == 200, r.text
+    assert llamadas["limite_maximo"] == catalogo.LIMITE_MAXIMO_EXPORTACION

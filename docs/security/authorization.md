@@ -132,3 +132,51 @@ puede tener token (409), y el `tipo` se revalida en cada request.
 El hub de sucursal todavía usa username + PIN (`cloud_sync_*`); migrarlo
 obliga a rotar el secreto en cada local y está anotado en ROADMAP → Deuda
 técnica.
+
+### BI autoservicio: acceso fuera de la API (ADR-081)
+
+Apache Superset (Fase C, pendiente) es el único componente del sistema que
+consulta Postgres **sin pasar por la API de Provecho**, así que las
+protecciones de arriba (permiso por endpoint, `Tenant`) no lo alcanzan.
+Tres barreras propias, cada una suficiente por sí sola:
+
+1. **Rol de Postgres `bi_lector`**: `GRANT SELECT` únicamente sobre las
+   vistas `vw_bi_*` y `bi_alcance_usuario` (§17 de
+   `docs/architecture/data-model.md`). No alcanza `usuario`, `boleta_pago`
+   ni ninguna tabla base — un fallo de configuración de Superset no puede
+   filtrar más de lo que estas vistas ya deciden exponer.
+2. **RLS de Superset** contra `bi_alcance_usuario`, equivalente a
+   `Tenant.sucursal_ids` (RN-BI-002, `tests/test_bi_alcance.py`).
+3. **Permiso de aplicación `bi.acceder`**: sin él, Provecho no emite código
+   OAuth y no hay login posible en Superset — es el único punto donde el
+   RBAC de Provecho decide algo sobre el BI. Seedeado en `admin` (vía `*`),
+   `supervisor` y `contador`.
+
+Lo que el módulo `reports` (ADR-033) ya documentaba —doble puerta,
+destinatario ≠ acceso al dato— no aplica al BI: ahí no hay lista de
+destinatarios, hay filas filtradas por RLS.
+
+### Cómo entra el navegador: OAuth2 con Provecho de proveedor (Fase B)
+
+`src/core/oauth/` implementa `authorization_code` (RFC 6749) para el SSO de
+Superset — hecho, aunque Superset mismo (Fase C) todavía no está desplegado.
+La pieza no obvia: **el paso que ve el navegador no vive en la API**.
+
+La sesión de Provecho (`provecho_token`) es httpOnly y host-only de
+`staging.majambo.com.pe`; la API vive en `api-staging.majambo.com.pe`, un
+subdominio distinto al que esa cookie nunca llega (mismo límite que motivó
+no ampliarla). Por eso `GET /oauth/authorize` es un Route Handler del
+**frontend** (`frontend/app/oauth/authorize/route.ts`), no un endpoint de
+FastAPI: ahí sí se puede leer la cookie. Ese handler llama a
+`POST /api/v1/oauth/codigo` (JWT + `bi.acceder`) ya autenticado, y la API es
+quien valida `client_id`/`redirect_uri` y emite el código — el frontend
+nunca construye una redirección hacia un `redirect_uri` que la API no haya
+validado antes (RN-BI-005), que es lo que evita usar este flujo como open
+redirect.
+
+`/oauth/token` y `/oauth/userinfo` son servidor-a-servidor: los llama
+Superset con `client_secret` o el access token recién emitido, nunca el
+navegador ni un JWT de Provecho. Código y token viven en Redis con TTL
+corto y un solo uso (`GETDEL`, RN-BI-006) — fallan **cerrado**: un Redis
+caído corta el SSO en vez de dejarlo pasar, al revés de
+`core/rate_limit.py`.

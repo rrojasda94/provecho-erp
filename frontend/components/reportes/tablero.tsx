@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/select";
 import type {
   Catalogo,
+  Marca,
   Reporte,
   Rol,
   Sucursal,
@@ -50,6 +51,7 @@ import type {
 type Props = {
   catalogo: Catalogo;
   sucursales: Sucursal[];
+  marcas: Marca[];
   tableros: TableroGuardado[];
   roles: Rol[];
 };
@@ -121,7 +123,7 @@ function BarraAcciones({
   onEliminar: () => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2 print:hidden">
       <SelectorDeTablero
         guardados={guardados}
         actual={actual}
@@ -152,6 +154,18 @@ function BarraAcciones({
           Compartido por {actual.compartido_por} — solo lectura
         </span>
       )}
+      {/* Sin dependencia nueva: `window.print()` + `@media print` (Tailwind
+          `print:`) esconde toda la interfaz de edición y deja solo la
+          cuadrícula de tarjetas — el navegador ya ofrece "Guardar como PDF"
+          en su diálogo de impresión. */}
+      <Button
+        variant="outline"
+        size="sm"
+        className="ml-auto"
+        onClick={() => window.print()}
+      >
+        Imprimir
+      </Button>
     </div>
   );
 }
@@ -225,7 +239,7 @@ function Compartir({
   );
 }
 
-export function Tablero({ catalogo, sucursales, tableros, roles }: Props) {
+export function Tablero({ catalogo, sucursales, marcas, tableros, roles }: Props) {
   const t = useTablero(tableros);
   const [editando, setEditando] = useState(t.tarjetas.length === 0);
   // `null` = nadie está pidiendo nombre; `true`/`false` = se está pidiendo, y
@@ -354,21 +368,24 @@ export function Tablero({ catalogo, sucursales, tableros, roles }: Props) {
         </DialogContent>
       </Dialog>
 
-      <FiltrosTablero
-        filtros={t.filtros}
-        rangos={catalogo.rangos}
-        sucursales={sucursales}
-        onCambiar={t.setFiltros}
-      />
+      <div className="print:hidden">
+        <FiltrosTablero
+          filtros={t.filtros}
+          rangos={catalogo.rangos}
+          sucursales={sucursales}
+          marcas={marcas}
+          onCambiar={t.setFiltros}
+        />
+      </div>
 
       {editando && editable && (
-        <>
+        <div className="flex flex-col gap-4 print:hidden">
           <SelectorDeReportes
             reportes={catalogo.reportes}
             onAgregar={(r) => t.agregarTarjeta(tarjetaNueva(r))}
           />
           <Compartir roles={roles} rolId={t.rolId} onCambiar={t.setRolId} />
-        </>
+        </div>
       )}
 
       {t.tarjetas.length === 0 ? (

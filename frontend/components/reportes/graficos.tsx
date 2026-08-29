@@ -14,12 +14,16 @@
 
 import Link from "next/link";
 import {
+  Area,
+  AreaChart,
   Bar,
   BarChart,
   CartesianGrid,
   Cell,
   Line,
   LineChart,
+  Pie,
+  PieChart,
   XAxis,
   YAxis,
 } from "recharts";
@@ -160,6 +164,72 @@ export function GraficoLineas({ filas, columnas, etiqueta, valor }: Props) {
           activeDot={{ r: 4 }}
         />
       </LineChart>
+    </ChartContainer>
+  );
+}
+
+export function GraficoArea({ filas, columnas, etiqueta, valor }: Props) {
+  if (filas.length === 0) return <Vacio />;
+  const tipoValor = tipoDe(columnas, valor);
+  const tipoEtiqueta = tipoDe(columnas, etiqueta);
+  const datos = aSerie(filas, etiqueta, valor);
+
+  return (
+    <ChartContainer config={configDe(columnas, valor)} className="h-full w-full">
+      <AreaChart accessibilityLayer data={datos} margin={{ left: 4, right: 8 }}>
+        <CartesianGrid vertical={false} />
+        <XAxis
+          dataKey="etiqueta"
+          tickLine={false}
+          axisLine={false}
+          tick={{ fontSize: 11 }}
+          tickFormatter={(v) => formatear(v, tipoEtiqueta)}
+          minTickGap={24}
+        />
+        <YAxis hide />
+        <ChartTooltip
+          content={
+            <ChartTooltipContent
+              labelFormatter={(v) => formatear(String(v), tipoEtiqueta)}
+              formatter={(_v, _n, item) => formatear(item?.payload?.crudo, tipoValor)}
+            />
+          }
+        />
+        <Area
+          dataKey="valor"
+          type="monotone"
+          stroke="var(--chart-1)"
+          fill="var(--chart-1)"
+          fillOpacity={0.25}
+          strokeWidth={2}
+        />
+      </AreaChart>
+    </ChartContainer>
+  );
+}
+
+export function GraficoPie({ filas, columnas, etiqueta, valor }: Props) {
+  if (filas.length === 0) return <Vacio />;
+  const tipo = tipoDe(columnas, valor);
+  const datos = aSerie(filas, etiqueta, valor);
+
+  return (
+    <ChartContainer config={configDe(columnas, valor)} className="h-full w-full">
+      <PieChart accessibilityLayer margin={{ top: 4, bottom: 4 }}>
+        <ChartTooltip
+          content={
+            <ChartTooltipContent
+              nameKey="etiqueta"
+              formatter={(_v, _n, item) => formatear(item?.payload?.crudo, tipo)}
+            />
+          }
+        />
+        <Pie data={datos} dataKey="valor" nameKey="etiqueta" innerRadius="45%">
+          {datos.map((_, i) => (
+            <Cell key={i} fill={COLORES[i % COLORES.length]} />
+          ))}
+        </Pie>
+      </PieChart>
     </ChartContainer>
   );
 }

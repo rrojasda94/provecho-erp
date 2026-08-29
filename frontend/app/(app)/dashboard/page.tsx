@@ -4,6 +4,7 @@ import { apiFetch } from "@/lib/api";
 import { esSinPermiso, fallaDe, type Falla } from "@/lib/carga";
 import type {
   Catalogo,
+  Marca,
   Rol,
   Sucursal,
   Tablero as TableroGuardado,
@@ -88,7 +89,7 @@ export default async function DashboardPage() {
     );
   }
 
-  const [resumen, catalogo, sucursales, tableros, roles] = await Promise.all([
+  const [resumen, catalogo, sucursales, marcas, tableros, roles] = await Promise.all([
     bloque(
       apiFetch<DashboardResumen>(
         `/api/v1/dashboard/resumen?empresa_id=${usuario.empresa_id}`,
@@ -98,11 +99,12 @@ export default async function DashboardPage() {
     ),
     bloque(apiFetch<Catalogo>("/api/v1/reportes", { token }), "el catálogo de reportes"),
     bloque(apiFetch<Sucursal[]>("/api/v1/sucursales", { token }), "las sucursales"),
+    bloque(apiFetch<Marca[]>("/api/v1/marcas", { token }), "las marcas"),
     bloque(apiFetch<TableroGuardado[]>("/api/v1/tableros", { token }), "los tableros"),
     bloque(apiFetch<Rol[]>("/api/v1/tableros/roles", { token }), "los roles"),
   ]);
 
-  const fallas = [resumen, catalogo, sucursales, tableros, roles]
+  const fallas = [resumen, catalogo, sucursales, marcas, tableros, roles]
     .map((b) => b.falla)
     .filter((f): f is Falla => f !== null);
 
@@ -156,6 +158,7 @@ export default async function DashboardPage() {
       <Tablero
         catalogo={catalogo.datos}
         sucursales={visibles}
+        marcas={marcas.datos ?? []}
         tableros={tableros.datos ?? []}
         roles={roles.datos ?? []}
       />

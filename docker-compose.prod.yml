@@ -94,6 +94,9 @@ services:
       GOOGLE_MAPS_BROWSER_KEY: ${GOOGLE_MAPS_BROWSER_KEY:-}
       GOOGLE_MAPS_MAP_ID: ${GOOGLE_MAPS_MAP_ID:-DEMO_MAP_ID}
       GOOGLE_MAPS_PAIS: ${GOOGLE_MAPS_PAIS:-pe}
+      # URL pública del BI (Superset, ADR-081) — droplet aparte, ver
+      # docs/engineering/bi-superset.md.
+      BI_URL: ${BI_URL:-}
     # Solo loopback: el proxy es la única puerta de entrada desde fuera.
     ports:
       - "127.0.0.1:3000:3000"

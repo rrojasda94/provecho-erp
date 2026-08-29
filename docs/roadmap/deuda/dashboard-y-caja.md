@@ -134,6 +134,35 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 - ⬜ **Caché/paginación del agregador**: cada llamada a
   `/dashboard/resumen` recalcula todo en vivo — aceptable al volumen de hoy,
   revisar si empieza a pesar.
+- ✅ 2026-08-29 **`contar_bajo_minimo` traía toda la tabla `stock` de la
+  empresa a Python para contarla en un bucle**, en el engine corto del
+  dashboard. Detectado al preparar el BI (ADR-081): la carga adicional de
+  Superset sobre las mismas tablas iba a hacer notar el full-scan tarde o
+  temprano. Ahora es un `COUNT` agregado en SQL
+  (`inventory/application/stock.py`).
+- ⬜ **RLS del BI (Superset) sincronizada a mano con `Tenant`** (ADR-081): el
+  alcance por sucursal/empresa vive en dos puntos de aplicación —los claims
+  del JWT y la vista `bi_alcance_usuario`—. `tests/test_bi_alcance.py`
+  detecta la divergencia si `Tenant.sucursal_ids` cambia sin que la vista lo
+  siga, pero sigue siendo dos lugares que alguien tiene que recordar tocar
+  juntos.
+- ⬜ **Aprovisionamiento de Superset fuera de Alembic** (ADR-081 Fase C): la
+  conexión a la base, los datasets y las reglas RLS de Superset se crean con
+  un script propio (`scripts/superset_init.py`, pendiente), no con las
+  migraciones del ERP. Un recreo del droplet que no corra ese script deja el
+  BI sin RLS.
+- ⬜ **El BI (Superset) consulta la base viva, no una réplica de lectura**
+  (ADR-081): mitigado con `bi_lector` de solo lectura y `statement_timeout`
+  propio de 120 s, pero una consulta pesada de un año completo compite por
+  recursos con el PDV. Se paga la réplica cuando eso empiece a notarse, no
+  antes.
+- ⬜ **Widget de embebido del BI sin construir** (ADR-081 Fase D):
+  `GET /bi/dashboards/{id}/guest-token` está hecho y probado, pero
+  `BI_DASHBOARDS_EMBEBIBLES` está vacía y no hay ningún dashboard real de
+  Superset que embeber todavía — depende del droplet (Fase C) y de que
+  alguien cure los primeros tableros. Cuando existan, falta sumar
+  `@superset-ui/embedded-sdk` al frontend y el componente que lo monta en
+  `/dashboard`.
 - ✅ 2026-08-04 **Más indicadores → tablero de reportes** (ADR-024,
   migración `998e335369a1`). Ya no son 3 tarjetas fijas: catálogo cerrado
   de reportes (`src/core/reportes/`) + tableros guardados por usuario
@@ -254,10 +283,17 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   (ADR-025): el reporte de estado de caja y el arqueo usan el mismo cálculo
   que el cierre (`apertura + cobrado + ingresos − retiros`) y el desglose
   viaja en una columna nueva del reporte. Era un techo, no un arqueo.
-- ⬜ **La exportación baja lo que se ve, no el dataset completo**: si
-  contabilidad pide "todo el año en un archivo", 500 filas no alcanzan y
-  ahí sí hace falta un endpoint que transmita en streaming — con su propio
-  límite y probablemente asíncrono. No antes de que lo pidan.
+- ✅ 2026-08-29 **La exportación baja lo que se ve, no el dataset
+  completo** (ADR-081 Fase E). `POST /reportes/{codigo}/exportar` corre el
+  mismo reporte con el mismo permiso y el mismo rango que `/datos`, pero
+  con el tope en `LIMITE_MAXIMO_EXPORTACION` (50 000) en vez de
+  `LIMITE_MAXIMO` (500), y arma el `.xlsx` en el servidor
+  (`src/shared/planilla.py`, ya usado por la carga masiva de recetas). Los
+  montos salen como número real (`Decimal` → `float`), no como texto —a
+  diferencia del CSV por tarjeta, acá una fórmula `=SUMA(...)` funciona
+  sin que nadie convierta la columna antes. Si algún día 50 000 no
+  alcanza, ahí sí hace falta streaming asíncrono — no antes de que lo
+  pidan.
 - ✅ **`empresa_id` por query param en `/dashboard/resumen`** — **la entrada
   estaba obsoleta** (verificado 2026-08-05): ADR-004 se resolvió el
   2026-07-27 y el endpoint ya deriva la empresa del JWT vía

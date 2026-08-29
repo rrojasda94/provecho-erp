@@ -1889,5 +1889,44 @@ es a dónde va y quién puede abrirlo.
   rastro en `audit_log` (ADR-031), por lo mismo que RN-REP-007: decidir que
   algo sube de nivel —o que se da por resuelto— es un acto de autoridad.
 
+## BI autoservicio (ADR-081)
+
+Reglas del BI (Superset) sobre las vistas `vw_bi_*`. No reemplazan las de
+`src/core/reportes/` (ADR-024, sin sección propia en este archivo): rigen la
+segunda puerta de análisis, no el dashboard operativo.
+
+- **RN-BI-001** El BI nunca tiene acceso a una tabla base. Todo lo que
+  consulta pasa antes por una vista `vw_bi_*`, y el rol de base de datos que
+  usa (`bi_lector`) solo tiene `GRANT SELECT` sobre esas vistas —ni siquiera
+  `SELECT` sobre el resto del esquema.
+- **RN-BI-002** El alcance por sucursal/empresa que aplica la RLS del BI
+  contra `bi_alcance_usuario` es equivalente al que resuelve `Tenant`
+  (`src/core/tenant.py`, ADR-004) para el resto del ERP. `bi_alcance_usuario`
+  es una vista sobre las mismas tablas de las que `Tenant` deriva su alcance
+  (`usuario_sucursal`, `rol_permiso`, `permiso`), no una copia de su
+  contenido, y `tests/test_bi_alcance.py` congela esa equivalencia contra
+  Postgres real.
+- **RN-BI-003** Ninguna vista `vw_bi_*` expone una columna de remuneración,
+  credencial o dato que su módulo dueño ya restringe en `queries_publicas.py`
+  (ej. RRHH expone tardanzas y horas extra, nunca `boleta_pago`). El límite
+  de qué es analizable lo pone el módulo dueño del dato, no el BI.
+- **RN-BI-004** Entrar al BI (`bi.acceder`) es un permiso distinto de ver sus
+  datos. La RLS decide qué filas ve cada quien; el permiso solo decide si
+  hay login posible.
+- **RN-BI-005** El `redirect_uri` que manda Superset se valida por igualdad
+  exacta contra lo configurado (`OAUTH_BI_REDIRECT_URI`), nunca por
+  prefijo. Es la única defensa contra reenviar el código de autorización a
+  un destino que no sea Superset.
+- **RN-BI-006** El código de autorización y el access token del SSO viven
+  en Redis con TTL corto y se leen una sola vez (`GETDEL`): un segundo
+  canje con el mismo código falla igual que uno inventado. Un Redis caído
+  corta el SSO — nunca lo deja pasar sin validar (al revés del rate limit
+  de login, que sí falla abierto).
+- **RN-BI-007** Un guest token de embebido solo se emite para un dashboard
+  en la whitelist (`BI_DASHBOARDS_EMBEBIBLES`). La fila ya la filtra la RLS
+  del dataset (RN-BI-002), pero eso no habilita a pedir un token para
+  cualquier UUID que alguien mande en la URL — solo los tableros que de
+  verdad se curaron para `/dashboard`.
+
 > Nota: esta lista crece con cada módulo. Al implementar un módulo se agregan
 > aquí sus reglas antes de codificarlas.

@@ -52,6 +52,31 @@ export async function pedir<T>(
 }
 
 /**
+ * Como `pedir`, pero para una respuesta binaria — el `.xlsx` completo de un
+ * reporte (ADR-081 Fase E), no las 500 filas que ya están en pantalla.
+ * Aparte de `pedir` por lo mismo que `subir`: acá no hay `.json()` que
+ * llamar, y el nombre de archivo sale de `Content-Disposition`, no de la
+ * ruta.
+ */
+export async function pedirArchivo(
+  ruta: string,
+  opciones: { metodo?: string; cuerpo?: unknown } = {},
+): Promise<{ blob: Blob; nombre: string }> {
+  const respuesta = await fetch(`${BASE}${ruta}`, {
+    method: opciones.metodo ?? "GET",
+    headers: { "Content-Type": "application/json" },
+    body: opciones.cuerpo ? JSON.stringify(opciones.cuerpo) : undefined,
+  });
+  if (!respuesta.ok) {
+    throw new ErrorApi(respuesta.status, await mensajeDeError(respuesta));
+  }
+  const nombre = /filename="([^"]+)"/.exec(
+    respuesta.headers.get("Content-Disposition") ?? "",
+  )?.[1];
+  return { blob: await respuesta.blob(), nombre: nombre ?? "reporte.xlsx" };
+}
+
+/**
  * Sube un archivo (multipart). Aparte de `pedir` porque ahí el
  * `Content-Type: application/json` está fijo, y en multipart **el navegador
  * tiene que poner el header él**: lleva un `boundary` generado al vuelo que

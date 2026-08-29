@@ -34,7 +34,7 @@ from src.modules.sales.application import queries_publicas as sales_q
 # el frontend no tiene por qué adivinar que "total" es dinero.
 TIPOS_COLUMNA = ("texto", "numero", "dinero", "cantidad", "fecha", "id")
 
-VISUALES = ("tabla", "barras", "lineas")
+VISUALES = ("tabla", "barras", "lineas", "pie", "area")
 
 
 @dataclass(frozen=True)
@@ -539,6 +539,12 @@ _POR_CODIGO = {r.codigo: r for r in CATALOGO}
 # reporte, es una descarga de la base por la puerta de atrás.
 LIMITE_MAXIMO = 500
 LIMITE_DEFECTO = 50
+# Tope distinto para "descargar el dataset completo" (ADR-081 Fase E): la
+# tarjeta en pantalla nunca necesita más de `LIMITE_MAXIMO`, pero contabilidad
+# pidiendo el año completo sí. Explícito y no "sin límite": un reporte de
+# 500 000 filas sigue sin ser lo que este endpoint existe para servir —eso
+# es streaming asíncrono, anotado como deuda, no esto.
+LIMITE_MAXIMO_EXPORTACION = 50_000
 
 
 def obtener(codigo: str) -> Reporte | None:
@@ -563,6 +569,7 @@ def ejecutar(
     hasta: date,
     sucursal_ids: Sequence[uuid.UUID] | None,
     limite: int,
+    limite_maximo: int = LIMITE_MAXIMO,
 ) -> list[dict]:
     filas = reporte.consulta(
         session,
@@ -570,7 +577,7 @@ def ejecutar(
         desde=desde,
         hasta=hasta,
         sucursal_ids=sucursal_ids if reporte.filtra_sucursal else None,
-        limite=min(limite, LIMITE_MAXIMO),
+        limite=min(limite, limite_maximo),
     )
     # Solo las columnas declaradas salen del backend: si una consulta
     # devuelve de más (un `id` interno, por ejemplo), no se filtra al cliente

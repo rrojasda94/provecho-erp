@@ -16,7 +16,7 @@ export type TipoColumna =
   // El id de la entidad de la fila. No se dibuja como celda: es el ancla del
   // enlace de la fila (ADR-036).
   | "id";
-export type Visual = "tabla" | "barras" | "lineas";
+export type Visual = "tabla" | "barras" | "lineas" | "pie" | "area";
 
 export type Columna = {
   clave: string;

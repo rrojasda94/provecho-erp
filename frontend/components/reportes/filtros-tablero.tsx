@@ -16,12 +16,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { Filtros, Sucursal } from "@/lib/reportes";
+import type { Filtros, Marca, Sucursal } from "@/lib/reportes";
 
 type Props = {
   filtros: Filtros;
   rangos: Record<string, string>;
   sucursales: Sucursal[];
+  marcas: Marca[];
   onCambiar: (filtros: Filtros) => void;
 };
 
@@ -85,7 +86,7 @@ function SelectorSucursales({
   filtros,
   sucursales,
   onCambiar,
-}: Omit<Props, "rangos">) {
+}: Omit<Props, "rangos" | "marcas">) {
   const alternar = (id: string) => {
     const ids = filtros.sucursal_ids.includes(id)
       ? filtros.sucursal_ids.filter((s) => s !== id)
@@ -144,7 +145,64 @@ function SelectorSucursales({
   );
 }
 
-export function FiltrosTablero({ filtros, rangos, sucursales, onCambiar }: Props) {
+function SelectorMarcas({ filtros, marcas, onCambiar }: Omit<Props, "rangos" | "sucursales">) {
+  const alternar = (id: string) => {
+    const ids = filtros.marca_ids.includes(id)
+      ? filtros.marca_ids.filter((m) => m !== id)
+      : [...filtros.marca_ids, id];
+    onCambiar({ ...filtros, marca_ids: ids });
+  };
+
+  const n = filtros.marca_ids.length;
+  const resumen = n === 0 ? "Todas las marcas" : `${n} seleccionada${n > 1 ? "s" : ""}`;
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-sm font-medium">Marcas</span>
+      <Popover>
+        <PopoverTrigger
+          render={
+            <Button variant="outline" className="w-48 justify-between font-normal">
+              {resumen}
+              <ChevronDown className="size-4 opacity-60" />
+            </Button>
+          }
+        />
+        <PopoverContent className="w-48 p-2" align="start">
+          {marcas.length === 0 && (
+            <p className="p-1 text-xs text-muted-foreground">Sin marcas.</p>
+          )}
+          <div className="flex max-h-64 flex-col gap-1 overflow-y-auto">
+            {marcas.map((m) => (
+              <Label
+                key={m.id}
+                className="flex cursor-pointer items-center gap-2 rounded px-1 py-1.5 font-normal hover:bg-accent/40"
+              >
+                <Checkbox
+                  checked={filtros.marca_ids.includes(m.id)}
+                  onCheckedChange={() => alternar(m.id)}
+                />
+                <span className="truncate">{m.nombre}</span>
+              </Label>
+            ))}
+          </div>
+          {n > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="mt-1 w-full justify-start"
+              onClick={() => onCambiar({ ...filtros, marca_ids: [] })}
+            >
+              Limpiar selección
+            </Button>
+          )}
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
+
+export function FiltrosTablero({ filtros, rangos, sucursales, marcas, onCambiar }: Props) {
   const personalizado = filtros.preset === "personalizado";
 
   return (
@@ -187,6 +245,8 @@ export function FiltrosTablero({ filtros, rangos, sucursales, onCambiar }: Props
           />
         </>
       )}
+
+      <SelectorMarcas filtros={filtros} marcas={marcas} onCambiar={onCambiar} />
 
       <SelectorSucursales
         filtros={filtros}
