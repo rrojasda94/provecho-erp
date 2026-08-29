@@ -13,40 +13,30 @@
  */
 
 const ID = "google-maps-sdk";
-
-// Con `loading=async` el evento `load` del `<script>` dispara en cuanto
-// termina de descargarse el bootstrap, no cuando `google.maps` queda
-// realmente utilizable: Google adjunta `importLibrary` un instante después,
-// de forma asíncrona. Sin esta espera, `window.google.maps` existe pero es
-// un objeto a medio armar —el `typeof` da "object" igual— y la primera
-// llamada a `importLibrary` revienta con "no es una función", silenciada por
-// el `.catch` de quien llama. Se sondea hasta que el método aparece.
-const ESPERA_IMPORT_LIBRARY_MS = 20;
-const TOPE_ESPERA_IMPORT_LIBRARY_MS = 4000;
-
-function esperarImportLibrary(): Promise<typeof google.maps> {
-  return new Promise((resolver, rechazar) => {
-    const limite = Date.now() + TOPE_ESPERA_IMPORT_LIBRARY_MS;
-    const intentar = () => {
-      const maps = window.google?.maps;
-      if (maps && typeof maps.importLibrary === "function") {
-        resolver(maps);
-        return;
-      }
-      if (Date.now() > limite) {
-        rechazar(new Error("el SDK de Maps cargó incompleto"));
-        return;
-      }
-      setTimeout(intentar, ESPERA_IMPORT_LIBRARY_MS);
-    };
-    intentar();
-  });
-}
+const SONDEO_MS = 50;
+/** Una conexión mala tarda; una clave rechazada no llega nunca. */
+const ESPERA_MAXIMA_MS = 10_000;
 
 let promesa: Promise<typeof google.maps> | null = null;
 
 /**
- * Devuelve el namespace de Maps ya cargado, con `importLibrary` disponible.
+ * El namespace, solo si ya sirve para algo.
+ *
+ * `window.google.maps` aparece **antes** de que el bootstrap de `loading=async`
+ * termine de definir `importLibrary`, así que su sola presencia no es señal de
+ * que el SDK esté listo: quien resolvía con eso recibía un namespace a medio
+ * armar y moría con «maps.importLibrary is not a function» — dentro del
+ * `.catch()` mudo de `CampoDireccion`, o sea sin ningún síntoma más que un
+ * campo de texto pelado. `importLibrary` es lo único que le pedimos al SDK,
+ * así que es también la condición honesta de «cargó».
+ */
+function listo(): typeof google.maps | null {
+  const maps = window.google?.maps;
+  return typeof maps?.importLibrary === "function" ? maps : null;
+}
+
+/**
+ * Devuelve el namespace de Maps ya cargado.
  *
  * Rechaza si el script no llega: sin clave, sin internet o con la clave
  * restringida a otro dominio. Quien llama tiene que quedarse con el campo de
@@ -62,8 +52,9 @@ export function cargarMaps(apiKey: string): Promise<typeof google.maps> {
       rechazar(new Error("el SDK de Maps solo carga en el navegador"));
       return;
     }
-    if (typeof window.google?.maps?.importLibrary === "function") {
-      resolver(window.google.maps);
+    const yaEsta = listo();
+    if (yaEsta) {
+      resolver(yaEsta);
       return;
     }
 
@@ -79,12 +70,28 @@ export function cargarMaps(apiKey: string): Promise<typeof google.maps> {
       script.async = true;
       document.head.appendChild(script);
     }
-    script.addEventListener("load", () => {
-      esperarImportLibrary().then(resolver, rechazar);
+    // Se sondea en vez de escuchar `load`, por dos motivos que se dan a la
+    // vez: `load` avisa de que el bootstrap corrió, no de que `importLibrary`
+    // ya exista; y un `<script>` que YA terminó de cargar no vuelve a emitir
+    // `load`, así que reusar el existente —lo que pasa en cada recarga en
+    // caliente, porque `promesa` es del módulo y se reinicia con él— dejaba la
+    // promesa esperando para siempre un evento que ya había ocurrido.
+    let restan = Math.ceil(ESPERA_MAXIMA_MS / SONDEO_MS);
+    const reloj = setInterval(() => {
+      const maps = listo();
+      if (maps) {
+        clearInterval(reloj);
+        resolver(maps);
+      } else if (--restan <= 0) {
+        clearInterval(reloj);
+        rechazar(new Error("el SDK de Maps no terminó de cargar"));
+      }
+    }, SONDEO_MS);
+
+    script.addEventListener("error", () => {
+      clearInterval(reloj);
+      rechazar(new Error("no se pudo cargar el SDK de Maps"));
     });
-    script.addEventListener("error", () =>
-      rechazar(new Error("no se pudo cargar el SDK de Maps")),
-    );
   });
   // Un fallo no puede dejar la promesa rechazada pegada al módulo: la
   // siguiente pantalla merece su propio intento (el usuario pudo recuperar
