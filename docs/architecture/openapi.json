@@ -43372,7 +43372,7 @@
     },
     "/api/v1/rrhh/asistencia/terminal/enrolar": {
       "post": {
-        "description": "La tablet teclea el código que un admin generó desde el back-office y\nse queda con un secreto propio: de acá en más, cada marcación lo manda\n(RN-RRHH-023, ADR-073). Rate limit por IP y no por terminal — todavía no\nhay uno enrolado con quien contar el límite.",
+        "description": "La tablet teclea el código que un admin generó desde el back-office y\nse queda con un secreto propio: de acá en más, cada marcación lo manda\n(RN-RRHH-023, ADR-079). Rate limit por IP y no por terminal — todavía no\nhay uno enrolado con quien contar el límite.",
         "operationId": "enrolar_terminal_api_v1_rrhh_asistencia_terminal_enrolar_post",
         "parameters": [
           {
