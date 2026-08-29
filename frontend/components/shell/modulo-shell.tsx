@@ -56,7 +56,7 @@ export async function ModuloShell({
           En móvil se convierte en banda superior. Antes era una columna de
           224 px inamovible: en un teléfono dejaba 150 px para la tabla, que
           es no mostrar nada. */}
-      <aside className="w-full shrink-0 border-b border-border bg-card px-3 py-4 md:sticky md:top-14 md:h-[calc(100vh-3.5rem)] md:w-56 md:overflow-y-auto md:border-r md:border-b-0 md:py-5">
+      <aside className="w-full shrink-0 border-b border-border bg-card px-3 py-4 print:hidden md:sticky md:top-14 md:h-[calc(100vh-3.5rem)] md:w-56 md:overflow-y-auto md:border-r md:border-b-0 md:py-5">
         <Link
           href="/"
           className="mb-4 inline-flex items-center gap-1 px-2 text-sm text-gray transition-colors hover:text-dark md:mb-5"

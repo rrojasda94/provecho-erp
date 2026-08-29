@@ -210,6 +210,11 @@ PERMISOS = [
     ),
     ("dashboard.leer", "Consultar el dashboard gerencial (ventas, stock, caja)"),
     (
+        "bi.acceder",
+        "Entrar al análisis avanzado (Superset, ADR-083) — decide si hay login "
+        "posible, no qué filas se ven (eso lo resuelve la RLS del BI)",
+    ),
+    (
         "auditoria.leer",
         "Consultar el rastro de cambios (`audit_log`) — quién tocó qué y cuándo",
     ),
@@ -386,6 +391,7 @@ ROLES = {
         "marketing.campana_aprobar",
         "marketing.agencia_decidir",
         "dashboard.leer",
+        "bi.acceder",
         "rrhh.leer",
         "rrhh.permiso_aprobar",
         "rrhh.asistencia_marcar",
@@ -461,6 +467,7 @@ ROLES = {
         "accounting.caja_reabrir",
         "accounting.pos_administrar",
         "dashboard.leer",
+        "bi.acceder",
         # Contabilidad audita a Compras, Almacén y las cajas de sucursal
         # (RN-CTB-009): sin el rastro, auditar es preguntar de buena fe.
         "auditoria.leer",

@@ -21,6 +21,7 @@ frontend/out/
 !.env.example
 !.env.hub.example
 !.env.staging.example
+!.env.bi.example
 
 # Paquetes de demo portable (`scripts/empaquetar_demo.py`): ~1 GB de imágenes
 # de Docker por versión. Se reparten a mano, no se versionan.

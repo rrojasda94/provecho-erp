@@ -4,15 +4,19 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Download, GripVertical, X } from "lucide-react";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 import {
+  GraficoArea,
   GraficoBarras,
   GraficoLineas,
+  GraficoPie,
   TablaReporte,
 } from "@/components/reportes/graficos";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -27,6 +31,7 @@ import {
   ANCHOS,
   datosDeReporte,
   descargarCsv,
+  exportarXlsx,
   nombreArchivo,
   type Datos,
   type Filtros,
@@ -105,7 +110,38 @@ function Cuerpo({
   };
   if (visual === "barras") return <GraficoBarras {...comun} />;
   if (visual === "lineas") return <GraficoLineas {...comun} />;
+  if (visual === "area") return <GraficoArea {...comun} />;
+  if (visual === "pie") return <GraficoPie {...comun} />;
   return <TablaReporte filas={filas} columnas={columnas} />;
+}
+
+/** Título de la tarjeta: editable en modo edición, texto plano si no.
+ * Aparte del render principal por lo mismo que `Cuerpo`/`Controles`: baja la
+ * complejidad ciclomática de `TarjetaReporte` por debajo del límite del
+ * lint. */
+function Titulo({
+  tarjeta,
+  reporte,
+  titulo,
+  editando,
+  onCambiar,
+}: {
+  tarjeta: Tarjeta;
+  reporte: Reporte;
+  titulo: string;
+  editando: boolean;
+  onCambiar: (cambios: Partial<Tarjeta>) => void;
+}) {
+  if (!editando) return <CardTitle className="truncate text-sm">{titulo}</CardTitle>;
+  return (
+    <Input
+      value={tarjeta.titulo ?? ""}
+      placeholder={reporte.nombre}
+      onChange={(e) => onCambiar({ titulo: e.target.value || null })}
+      aria-label={`Título de ${reporte.nombre}`}
+      className="h-7 min-w-0 text-sm"
+    />
+  );
 }
 
 function Controles({
@@ -203,6 +239,14 @@ export function TarjetaReporte({
     descargarCsv(nombreArchivo(titulo, datos), aCsv(datos.columnas, datos.filas));
   };
 
+  const [exportandoXlsx, setExportandoXlsx] = useState(false);
+  const exportarCompleto = () => {
+    setExportandoXlsx(true);
+    exportarXlsx(tarjeta.codigo, filtros)
+      .catch(() => toast(`No se pudo exportar «${titulo}».`))
+      .finally(() => setExportandoXlsx(false));
+  };
+
   return (
     <Card
       ref={setNodeRef}
@@ -217,7 +261,7 @@ export function TarjetaReporte({
             {editando && (
               <button
                 type="button"
-                className="cursor-grab touch-none text-muted-foreground active:cursor-grabbing"
+                className="cursor-grab touch-none text-muted-foreground active:cursor-grabbing print:hidden"
                 aria-label={`Mover ${titulo}`}
                 {...attributes}
                 {...listeners}
@@ -225,19 +269,38 @@ export function TarjetaReporte({
                 <GripVertical className="size-4" />
               </button>
             )}
-            <CardTitle className="truncate text-sm">{titulo}</CardTitle>
+            <Titulo
+              tarjeta={tarjeta}
+              reporte={reporte}
+              titulo={titulo}
+              editando={editando}
+              onCambiar={onCambiar}
+            />
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={exportar}
-            disabled={filas === 0}
-            title={`Descargar CSV (${filas} filas, las que se ven)`}
-            aria-label={`Exportar ${reporte.nombre} a CSV`}
-          >
-            <Download className="size-3.5" />
-            CSV
-          </Button>
+          <div className="flex shrink-0 gap-1.5 print:hidden">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={exportar}
+              disabled={filas === 0}
+              title={`Descargar CSV (${filas} filas, las que se ven)`}
+              aria-label={`Exportar ${reporte.nombre} a CSV`}
+            >
+              <Download className="size-3.5" />
+              CSV
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={exportarCompleto}
+              disabled={exportandoXlsx}
+              title="Descargar el dataset completo del rango (hasta 50 000 filas), no solo las que se ven"
+              aria-label={`Exportar ${reporte.nombre} completo a Excel`}
+            >
+              <Download className="size-3.5" />
+              {exportandoXlsx ? "…" : "XLSX"}
+            </Button>
+          </div>
         </div>
         {!reporte.filtra_sucursal && (
           <Badge variant="secondary" className="w-fit text-xs font-normal">

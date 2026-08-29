@@ -39,6 +39,13 @@ export default function LoginPage() {
     const datos = new FormData();
     datos.set("username", usuario.current?.value ?? "");
     datos.set("pin", candidato);
+    // `?next=` lo agrega `/oauth/authorize` (ADR-083 Fase B) cuando el SSO
+    // del BI encuentra a alguien sin sesión de Provecho todavía. Leído del
+    // `location` y no de un hook de router: esta página es enteramente
+    // cliente y no hay otro dato de servidor que justifique el round-trip
+    // extra ni el `<Suspense>` que pide `useSearchParams`.
+    const siguiente = new URLSearchParams(window.location.search).get("next");
+    if (siguiente) datos.set("next", siguiente);
     // Dentro de una transición porque la acción es asíncrona: despachada
     // suelta, React avisa que `pendiente` no se actualiza bien — y sin
     // `pendiente` el botón nunca dice "Ingresando..." ni se bloquea, así que

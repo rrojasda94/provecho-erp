@@ -10,6 +10,7 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    Index,
     Numeric,
     Time,
     UniqueConstraint,
@@ -22,7 +23,13 @@ from src.core.model_base import TimestampMixin, UuidPkMixin
 
 class Asistencia(Base, UuidPkMixin, TimestampMixin):
     __tablename__ = "asistencia"
-    __table_args__ = (UniqueConstraint("trabajador_id", "fecha"),)
+    __table_args__ = (
+        UniqueConstraint("trabajador_id", "fecha"),
+        # El UNIQUE de arriba no sirve para agrupar por fecha entre
+        # trabajadores (va segunda): `vw_bi_rrhh_asistencia` (ADR-083) sí
+        # lo necesita.
+        Index("ix_asistencia_fecha_trabajador", "fecha", "trabajador_id"),
+    )
 
     trabajador_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("trabajador.id"))
     fecha: Mapped[date] = mapped_column(Date())

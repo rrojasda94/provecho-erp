@@ -8,7 +8,7 @@
  * hay que decidir nada acá.
  */
 
-import { pedir } from "@/lib/cliente-api";
+import { pedir, pedirArchivo } from "@/lib/cliente-api";
 import type { Columna, Datos, Visual } from "./reportes-datos";
 
 
@@ -34,6 +34,9 @@ export type Filtros = {
   desde: string | null;
   hasta: string | null;
   sucursal_ids: string[];
+  /** Atajo sobre `sucursal_ids`: se une con él, no lo reemplaza (mismo
+   * criterio que el backend, `core/reportes/router.py`). */
+  marca_ids: string[];
   limite: number;
 };
 
@@ -65,6 +68,8 @@ export type Tablero = {
 
 export type Sucursal = { id: string; nombre: string; estado: string };
 
+export type Marca = { id: string; nombre: string };
+
 export type Rol = { id: string; nombre: string };
 
 export function conUid(tarjetas: Tarjeta[]): TarjetaViva[] {
@@ -81,6 +86,7 @@ export const FILTROS_INICIALES: Filtros = {
   desde: null,
   hasta: null,
   sucursal_ids: [],
+  marca_ids: [],
   limite: 50,
 };
 
@@ -183,16 +189,33 @@ export {
   type Visual,
 } from "./reportes-datos";
 
-export function descargarCsv(nombre: string, contenido: string): void {
-  // El BOM es lo que hace que Excel abra el archivo como UTF-8; sin el,
-  // "Lacteos" llega como mojibake.
-  const blob = new Blob(["\ufeff" + contenido], {
-    type: "text/csv;charset=utf-8;",
-  });
+function descargarBlob(nombre: string, blob: Blob): void {
   const url = URL.createObjectURL(blob);
   const enlace = document.createElement("a");
   enlace.href = url;
   enlace.download = nombre;
   enlace.click();
   URL.revokeObjectURL(url);
+}
+
+export function descargarCsv(nombre: string, contenido: string): void {
+  // El BOM es lo que hace que Excel abra el archivo como UTF-8; sin el,
+  // "Lacteos" llega como mojibake.
+  descargarBlob(
+    nombre,
+    new Blob(["\ufeff" + contenido], { type: "text/csv;charset=utf-8;" }),
+  );
+}
+
+/** El `.xlsx` completo del reporte (ADR-083 Fase E) \u2014 hasta
+ * `LIMITE_MAXIMO_EXPORTACION` (50 000) filas, no las 500 que ya est\u00e1n en
+ * pantalla. A diferencia de `descargarCsv`, que arma el archivo con lo que
+ * el navegador ya tiene, esto vuelve a pedirle los datos a la API: el
+ * dataset completo no est\u00e1 en memoria del cliente. */
+export async function exportarXlsx(codigo: string, filtros: Filtros): Promise<void> {
+  const { blob, nombre } = await pedirArchivo(`/reportes/${codigo}/exportar`, {
+    metodo: "POST",
+    cuerpo: filtros,
+  });
+  descargarBlob(nombre, blob);
 }

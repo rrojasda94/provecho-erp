@@ -250,6 +250,34 @@ class Settings(BaseSettings):
     # Fallos de heartbeat seguidos antes de declarar al hub "offline" — uno
     # solo sería demasiado sensible a un timeout de red puntual.
     sync_fallos_para_offline: int = 3
+    # --- OAuth2 para el BI (Superset, ADR-083) -------------------------------
+    # Un solo cliente confidencial. Vacíos por defecto: sin `client_secret`
+    # nadie puede canjear un código por token, así que un despliegue que
+    # olvide configurarlos deja el SSO apagado en vez de abierto.
+    oauth_bi_client_id: str = ""
+    oauth_bi_client_secret: str = ""
+    # Comparado por igualdad exacta contra el `redirect_uri` que manda
+    # Superset — nunca por prefijo. Es la única defensa contra reenviar el
+    # código de autorización a un destino que no sea Superset.
+    oauth_bi_redirect_uri: str = ""
+    # TTL del código de un solo uso y del access token, en Redis. El código
+    # vive lo que tarda el navegador en rebotar de vuelta a Superset; el
+    # token, lo que tarda Superset en llamar a `/oauth/userinfo` una vez —
+    # ninguno de los dos se pensó para durar una sesión.
+    oauth_bi_codigo_ttl_segundos: int = 60
+    oauth_bi_token_ttl_segundos: int = 300
+    # Cuenta de servicio de Superset (rol propio, sin `bi.acceder` ni
+    # equivalente humano) que Provecho usa para pedir *guest tokens* y
+    # embeber tableros en `/dashboard` (ADR-083 Fase D). Vacía = sin
+    # embebido — el módulo BI sigue funcionando por SSO directo.
+    superset_internal_url: str = ""
+    superset_service_username: str = ""
+    superset_service_password: str = ""
+    # Whitelist de dashboards embebibles: aunque el guest token ya queda
+    # acotado por la RLS del dataset (Fase C), no cualquier UUID que alguien
+    # mande debe poder pedirse un token — solo los tableros que de verdad se
+    # curaron para `/dashboard`. Vacía = ninguno todavía.
+    bi_dashboards_embebibles: Annotated[list[str], NoDecode] = []
 
     @property
     def broker_url(self) -> str:
@@ -267,6 +295,7 @@ class Settings(BaseSettings):
         "allowed_hosts",
         "cors_origins",
         "delivery_distritos_restringidos",
+        "bi_dashboards_embebibles",
         mode="before",
     )
     @classmethod

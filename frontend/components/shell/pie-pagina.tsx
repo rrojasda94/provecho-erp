@@ -17,7 +17,7 @@ import pkg from "@/package.json";
  * no se separen (`cortar_version.py` las sube juntas). */
 export function PiePagina() {
   return (
-    <footer className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card px-4 py-1 text-center text-xs text-muted-foreground">
+    <footer className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card px-4 py-1 text-center text-xs text-muted-foreground print:hidden">
       Provecho ERP · v{pkg.version}
     </footer>
   );

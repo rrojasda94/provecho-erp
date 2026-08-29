@@ -10,10 +10,12 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from src.config.settings import settings
 from src.core import error_handlers
 from src.core.auditoria_router import router as auditoria_router
+from src.core.bi_router import router as bi_router
 from src.core.consulta_router import router as consulta_router
 from src.core.dashboard_router import router as dashboard_router
 from src.core.health_router import router as health_router
 from src.core.logging_config import configurar_logging, request_id_var
+from src.core.oauth.router import router as oauth_router
 from src.core.reportes.router import router as reportes_router
 from src.core.reportes.router import router_tableros
 from src.core.sentry import iniciar_sentry
@@ -140,6 +142,21 @@ TAGS_METADATA = [
     {
         "name": "dashboard",
         "description": "Agregado gerencial de solo lectura: ventas del día, stock crítico, caja.",
+    },
+    {
+        "name": "oauth",
+        "description": (
+            "SSO del BI (Superset, ADR-083): Provecho como proveedor OAuth2. "
+            "`/codigo` exige sesión + `bi.acceder`; `/token` y `/userinfo` son "
+            "servidor-a-servidor con `client_secret`."
+        ),
+    },
+    {
+        "name": "bi",
+        "description": (
+            "Embebido de tableros de Superset en /dashboard (ADR-083 Fase D): "
+            "Provecho pide un guest token con su propia cuenta de servicio."
+        ),
     },
     {
         "name": "reportes",
@@ -281,6 +298,8 @@ def create_app() -> FastAPI:
     app.include_router(auditoria_router, prefix="/api/v1")
     app.include_router(consulta_router, prefix="/api/v1")
     app.include_router(dashboard_router, prefix="/api/v1")
+    app.include_router(oauth_router, prefix="/api/v1")
+    app.include_router(bi_router, prefix="/api/v1")
     app.include_router(reportes_router, prefix="/api/v1")
     app.include_router(router_tableros, prefix="/api/v1")
     app.include_router(users_router, prefix="/api/v1")

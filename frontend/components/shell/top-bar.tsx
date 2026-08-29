@@ -20,7 +20,7 @@ import type { Usuario } from "@/lib/sesion";
  * necesita subrayarse. */
 export function TopBar({ usuario }: { usuario: Usuario }) {
   return (
-    <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-border bg-card px-4 md:px-6">
+    <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-border bg-card px-4 md:px-6 print:hidden">
       <Link
         href="/"
         className="group flex items-center gap-2.5 transition-opacity hover:opacity-80"

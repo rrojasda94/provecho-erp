@@ -1,0 +1,10 @@
+# Proxy del droplet BI (ADR-083 Fase C). Mismo criterio que el `Caddyfile`
+# de staging: TLS automático (Let's Encrypt), sin cron de renovación a mano.
+#
+# Droplet DISTINTO al de staging — ver docs/engineering/bi-superset.md — así
+# que este archivo vive en `deploy/bi/` y no se mezcla con el `Caddyfile` de
+# la raíz.
+
+bi.majambo.com.pe {
+	reverse_proxy superset:8088
+}

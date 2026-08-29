@@ -1,4 +1,5 @@
 import {
+  BarChart3,
   BookOpen,
   Building2,
   Calculator,
@@ -215,5 +216,20 @@ export const MODULOS: Modulo[] = [
     prefijoPermiso: "reports.",
     area: "administracion",
     Icono: Inbox,
+  },
+  {
+    clave: "bi",
+    nombre: "BI",
+    // Permiso exacto y no por prefijo (ADR-083): entrar acá ya es un
+    // privilegio —análisis libre sobre datos de varios módulos a la vez—,
+    // no "trabaja en el área bi". `bi.acceder` es también el único permiso
+    // con ese prefijo, así que hoy da lo mismo; se deja explícito porque es
+    // la semántica correcta y no una coincidencia a mantener.
+    descripcion: "Análisis avanzado con Superset — SSO, sin login aparte",
+    href: "/bi",
+    prefijoPermiso: "bi.",
+    permiso: "bi.acceder",
+    area: "administracion",
+    Icono: BarChart3,
   },
 ];

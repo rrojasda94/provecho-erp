@@ -10,7 +10,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
@@ -18,8 +18,9 @@ from sqlalchemy.orm import Session
 from src.core.reportes import catalogo, rangos
 from src.core.tenant import Tenant
 from src.modules.users.api.deps import get_db_reportes, get_tenant, require_permission
-from src.modules.users.infrastructure.models import Rol, Usuario, UsuarioRol
+from src.modules.users.infrastructure.models import Rol, Sucursal, Usuario, UsuarioRol
 from src.modules.users.infrastructure.repositories import UsuarioRepo
+from src.shared import planilla
 from src.shared.models import Tablero
 
 router = APIRouter(prefix="/reportes", tags=["reportes"])
@@ -64,6 +65,12 @@ class FiltrosIn(BaseModel):
     hasta: date | None = None
     # Vacío = todas las sucursales del alcance del usuario, no "todas".
     sucursal_ids: list[uuid.UUID] = Field(default_factory=list)
+    # Atajo sobre `sucursal_ids`, no un filtro propio: se resuelve a las
+    # sucursales de esas marcas y se une con `sucursal_ids` (ADR-083 Fase D
+    # — `sucursal.marca_id` existe, ningún reporte lo usaba). Elegir una
+    # marca y además tildar una sucursal de otra marca trae las dos, igual
+    # que tildar dos sucursales sueltas ya lo hacía.
+    marca_ids: list[uuid.UUID] = Field(default_factory=list)
     limite: int = Field(default=catalogo.LIMITE_DEFECTO, ge=1)
 
 
@@ -98,6 +105,14 @@ def _permisos(session: Session, usuario: Usuario) -> set[str]:
     return UsuarioRepo(session).permiso_codigos(usuario.id)
 
 
+def _sucursales_de_marcas(session: Session, marca_ids: list[uuid.UUID]) -> list[uuid.UUID]:
+    if not marca_ids:
+        return []
+    return list(
+        session.scalars(select(Sucursal.id).where(Sucursal.marca_id.in_(marca_ids)))
+    )
+
+
 def _sucursales_efectivas(
     tenant: Tenant, pedidas: list[uuid.UUID]
 ) -> list[uuid.UUID] | None:
@@ -130,14 +145,19 @@ def listar_catalogo(
     )
 
 
-@router.post("/{codigo}/datos", response_model=DatosOut)
-def datos(
+def _reporte_y_filas(
     codigo: str,
     filtros: FiltrosIn,
-    usuario: Usuario = Depends(require_permission(LEER)),
-    tenant: Tenant = Depends(get_tenant),
-    session: Session = Depends(get_db_reportes),
-):
+    usuario: Usuario,
+    tenant: Tenant,
+    session: Session,
+    *,
+    limite_maximo: int,
+) -> tuple[catalogo.Reporte, date, date, list[dict]]:
+    """Lo que `/datos` y `/exportar` (ADR-083 Fase E) hacen igual: resolver
+    el reporte, la doble puerta de permiso, el rango y el alcance de
+    sucursal/marca, y correr la consulta. Solo cambia cuántas filas se
+    dejan salir — eso lo decide cada endpoint con `limite_maximo`."""
     reporte = catalogo.obtener(codigo)
     if reporte is None:
         raise HTTPException(404, "Reporte no encontrado")
@@ -151,14 +171,34 @@ def datos(
     except rangos.RangoInvalido as e:
         raise HTTPException(422, str(e)) from e
 
+    # Unión, no reemplazo: elegir una marca es un atajo para tildar todas
+    # sus sucursales, no un segundo filtro que compita con el de sucursal.
+    pedidas = sorted(
+        {*filtros.sucursal_ids, *_sucursales_de_marcas(session, filtros.marca_ids)}
+    )
     filas = catalogo.ejecutar(
         reporte,
         session,
         tenant.filtro_empresa(),
         desde=desde,
         hasta=hasta,
-        sucursal_ids=_sucursales_efectivas(tenant, filtros.sucursal_ids),
+        sucursal_ids=_sucursales_efectivas(tenant, pedidas),
         limite=filtros.limite,
+        limite_maximo=limite_maximo,
+    )
+    return reporte, desde, hasta, filas
+
+
+@router.post("/{codigo}/datos", response_model=DatosOut)
+def datos(
+    codigo: str,
+    filtros: FiltrosIn,
+    usuario: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db_reportes),
+):
+    reporte, desde, hasta, filas = _reporte_y_filas(
+        codigo, filtros, usuario, tenant, session, limite_maximo=catalogo.LIMITE_MAXIMO
     )
     return DatosOut(
         codigo=reporte.codigo,
@@ -167,6 +207,60 @@ def datos(
         columnas=_a_salida(reporte).columnas,
         filas=[_serializar(f) for f in filas],
     )
+
+
+@router.post("/{codigo}/exportar")
+def exportar(
+    codigo: str,
+    filtros: FiltrosIn,
+    usuario: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db_reportes),
+) -> Response:
+    """El dataset completo, no las 500 filas de la tarjeta (deuda cerrada de
+    `docs/roadmap/deuda/dashboard-y-caja.md`): mismo reporte, mismo permiso,
+    mismo rango — el único cambio es el tope
+    (`catalogo.LIMITE_MAXIMO_EXPORTACION`, 50 000). Se arma en el servidor
+    porque en 50 000 filas ya no tiene sentido bajarlas al navegador para
+    convertirlas ahí, como sí hace el CSV por tarjeta (`aCsv`,
+    `frontend/lib/reportes-datos.ts`)."""
+    reporte, desde, hasta, filas = _reporte_y_filas(
+        codigo,
+        filtros,
+        usuario,
+        tenant,
+        session,
+        limite_maximo=catalogo.LIMITE_MAXIMO_EXPORTACION,
+    )
+    columnas = _a_salida(reporte).columnas
+    encabezado = [c.titulo for c in columnas]
+    # Numérico de verdad y no texto: a diferencia del CSV por tarjeta
+    # (`aCsv`), acá sí se puede — Excel suma una celda numérica sola, sin que
+    # nadie tenga que "convertir a número" la columna primero. `date`/`str`
+    # ya son tipos que openpyxl escribe tal cual; `Decimal` y `UUID` no los
+    # acepta directo.
+    cuerpo = [
+        [_a_celda(fila.get(c.clave)) for c in columnas]
+        for fila in filas
+    ]
+    contenido = planilla.escribir({reporte.nombre[:31]: [encabezado, *cuerpo]})
+    nombre_archivo = f"{reporte.codigo}_{desde}_{hasta}.xlsx"
+    return Response(
+        content=contenido,
+        media_type=planilla.MIME,
+        headers={"Content-Disposition": f'attachment; filename="{nombre_archivo}"'},
+    )
+
+
+def _a_celda(valor: Any) -> Any:
+    """Igual que `_serializar`, pero para openpyxl: `date`/`str`/`int`/`bool`
+    ya son tipos que escribe tal cual; `Decimal` no lo acepta (`TypeError`) y
+    hay que pasarlo a `float` para que quede numérico de verdad."""
+    if isinstance(valor, Decimal):
+        return float(valor)
+    if isinstance(valor, uuid.UUID):
+        return str(valor)
+    return valor
 
 
 def _serializar(fila: dict) -> dict:
@@ -187,7 +281,7 @@ def _serializar(fila: dict) -> dict:
 class TarjetaIn(BaseModel):
     codigo: str
     titulo: str | None = Field(default=None, max_length=100)
-    visual: Literal["tabla", "barras", "lineas"] = "tabla"
+    visual: Literal["tabla", "barras", "lineas", "pie", "area"] = "tabla"
     ancho: Annotated[int, Field(ge=1, le=4)] = 2
     alto: Literal["chico", "mediano", "grande"] = "mediano"
 

@@ -1,0 +1,81 @@
+# BI autoservicio (Apache Superset, ADR-083 Fase C). Corre en su PROPIO
+# droplet, chico (~$8/mes, 1 vCPU/1 GB) y separado del de staging — el
+# volumen real es de decenas de consultas al mes, y aislar el BI evita que
+# una consulta pesada le quite recursos al cobro (ver ADR-083 "Dónde corre").
+#
+# No trae Postgres propio: Superset guarda su metadata en un ESQUEMA APARTE
+# de la Postgres del droplet de staging (`scripts/superset_provision_db.sql`
+# lo crea, una vez, a mano), a la que este droplet llega por la VPC privada
+# de DigitalOcean — nunca por IP pública.
+#
+# Tampoco trae worker/beat/Redis: sin Celery no hay *Alerts & Reports* (PDF
+# programado por correo), que necesita Chromium headless — no entra cómodo
+# en 1 GB. Las consultas corren sincrónicas, aceptable porque nadie mira el
+# reloj (ver ADR-083).
+#
+# `provecho-bi-superset` se CONSTRUYE (`deploy/bi/Dockerfile`), no se tira
+# de `apache/superset:6.1.0` directo: ese tag "lean" (el que corresponde a
+# producción, sin sufijo `-dev`) no trae `psycopg2` — comprobado a mano,
+# `superset db upgrade` fallaba con `ModuleNotFoundError`.
+#
+# Uso:
+#   cp .env.bi.example .env
+#   docker compose -f docker-compose.bi.yml build
+#   docker compose -f docker-compose.bi.yml up -d
+#
+# Runbook completo (droplet, VPC, firewall, DNS, Postgres remoto):
+# docs/engineering/bi-superset.md
+
+services:
+  # Corre una vez y termina: migra el metastore de Superset, crea el admin
+  # y las cargas iniciales (`superset init`). Mismo patrón que el servicio
+  # `init` de docker-compose.staging.yml.
+  superset-init:
+    build: ./deploy/bi
+    image: provecho-bi-superset:6.1.0
+    env_file: .env
+    volumes:
+      - ./deploy/bi/superset_config.py:/app/pythonpath/superset_config.py:ro
+    command: >
+      sh -c "
+        superset db upgrade &&
+        superset fab create-admin
+          --username $${SUPERSET_ADMIN_USERNAME:-admin}
+          --firstname Provecho --lastname BI
+          --email $${SUPERSET_ADMIN_EMAIL:-admin@majambo.com.pe}
+          --password $${SUPERSET_ADMIN_PASSWORD} || true &&
+        superset init
+      "
+    restart: "no"
+
+  superset:
+    build: ./deploy/bi
+    image: provecho-bi-superset:6.1.0
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./deploy/bi/superset_config.py:/app/pythonpath/superset_config.py:ro
+    # Solo loopback: Caddy es la única puerta de entrada desde fuera.
+    ports:
+      - "127.0.0.1:8088:8088"
+    depends_on:
+      superset-init:
+        condition: service_completed_successfully
+
+  # TLS automático (Let's Encrypt), igual que el Caddy de staging.
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/bi/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - superset
+
+volumes:
+  caddy_data:
+  caddy_config:
