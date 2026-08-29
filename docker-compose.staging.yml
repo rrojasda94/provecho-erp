@@ -28,6 +28,12 @@ services:
       POSTGRES_DB: provecho
     volumes:
       - pgdata:/var/lib/postgresql/data
+    # Vacío = solo loopback (mismo criterio que `api`, abajo): psql desde el
+    # propio droplet sin pasar por `docker exec`, cero exposición nueva. El
+    # droplet BI (ADR-083 Fase C, docs/engineering/bi-superset.md) necesita
+    # la IP privada de la VPC acá — nunca la pública, nunca 0.0.0.0.
+    ports:
+      - "${DB_VPC_BIND_IP:-127.0.0.1}:5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U provecho"]
       interval: 5s
