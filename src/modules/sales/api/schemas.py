@@ -190,6 +190,11 @@ class AgregarLineasCreate(BaseModel):
     pastilla del pedido original."""
 
     items: list[VentaItemIn] = Field(min_length=1)
+    # Opcional por compatibilidad: los clientes que ya estaban mandando
+    # aumentos sin ella siguen funcionando. Cuando viene, un reintento del
+    # mismo envío devuelve la orden sin volver a mandar la comanda a cocina
+    # (RN-COM-002).
+    idempotency_key: str | None = Field(default=None, max_length=100)
 
 
 class NotaCocinaIn(BaseModel):
@@ -326,7 +331,11 @@ class TicketComprobanteOut(BaseModel):
 
 class PagoCreate(BaseModel):
     medio_pago_id: uuid.UUID
-    monto: Decimal = Field(gt=0)
+    # Lo que el cliente entrega, a centavos. `decimal_places` no es cosmético:
+    # el PDV mandaba el resultado de una resta en float —"23.299999999999997"
+    # por una cuenta de 23.30— y ese sobrante invisible hacía que el pago
+    # nunca cubriera el total y la venta quedara sin comprobante.
+    monto: Decimal = Field(gt=0, decimal_places=2)
     idempotency_key: str = Field(min_length=8, max_length=100)
     referencia_externa: str | None = None
     grupo_cobro: int = Field(default=1, ge=1)
@@ -342,9 +351,26 @@ class PagoOut(BaseModel):
     id: uuid.UUID
     venta_id: uuid.UUID
     medio_pago_id: uuid.UUID
+    # Lo aplicado a la cuenta y lo devuelto: con un solo número el ticket no
+    # puede decir con cuánto pagó el cliente (ADR-077).
     monto: Decimal
+    vuelto: Decimal
     grupo_cobro: int
     estado: str
+
+
+class SaldoCuentaOut(BaseModel):
+    """Cuánto queda por cobrar en una cuenta de la venta (RN-COM-018).
+
+    Es la cifra que el diálogo de cobro tiene que mostrar: la calcula el
+    mismo `total_a_cobrar` que después valida el pago, así que descuento,
+    cupón, promoción y flete no pueden discrepar entre pantalla y servidor.
+    """
+
+    grupo_cobro: int
+    total: Decimal
+    pagado: Decimal
+    saldo: Decimal
 
 
 class PuntoVentaCreate(BaseModel):
@@ -967,6 +993,11 @@ class VentaItemOut(BaseModel):
     nombre: str
     cantidad: Decimal
     precio_unitario: Decimal
+    # Lo descontado en ESTA línea. Sin exponerlo, el PDV rearmaba el total de
+    # una orden reabierta a precio de lista y ofrecía cobrar más de lo que se
+    # debía — y el servidor lo rechazaba por exceder el saldo, con el "monto
+    # exacto" en pantalla.
+    descuento: Decimal = Decimal(0)
     grupo_cobro: int
     # Sin esto, reabrir la cuenta perdía la nota: la línea volvía del
     # servidor sin ella y el siguiente guardado la borraba.

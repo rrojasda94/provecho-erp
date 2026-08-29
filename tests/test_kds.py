@@ -6,8 +6,10 @@ Etapa 2 — entrega: cierre del pedido, idempotencia y permiso propio.
 """
 
 import ast
+import contextlib
 import inspect
 import textwrap
+import uuid
 from datetime import date
 from decimal import Decimal
 
@@ -40,6 +42,7 @@ from src.modules.sales.infrastructure.models import (
     ProductoAtributoValor,
     ProductoComercial,
     PuntoVenta,
+    Venta,
 )
 from src.modules.users.api.deps import get_db
 from src.modules.users.infrastructure.models import (
@@ -198,6 +201,22 @@ def env(monkeypatch):
     app.dependency_overrides[get_db] = _override_get_db
     with TestClient(app) as c:
         yield c, ids
+
+
+@contextlib.contextmanager
+def env_session(client):
+    """Sesión contra la misma base que el `TestClient`.
+
+    Para montar estados que ninguna ruta produce a mano —una venta ya
+    facturada, un producto sin categoría—: llegar a ellos por la API pediría
+    un ida y vuelta con Factiliza o un catálogo mal cargado a propósito.
+    """
+    generador = client.app.dependency_overrides[get_db]()
+    sesion = next(generador)
+    try:
+        yield sesion
+    finally:
+        sesion.close()
 
 
 def _token(client, username="admin", pin="123456"):
@@ -1342,3 +1361,110 @@ def test_la_nota_del_pedido_no_se_cambia_despues_de_anular(env):
     r = client.put(f"/api/v1/sales/ventas/{venta['id']}/nota-cocina", headers=h,
                    json={"nota": "tarde"})
     assert r.status_code == 409
+
+
+# --- Parche 0.8.1: el pedido no siempre llegaba al KDS ------------------------
+def test_el_pedido_facturado_sigue_en_cocina_hasta_entregarse(env):
+    """Lo que saca un pedido de la cola es entregarlo, no cobrarlo (ADR-078).
+
+    La cola miraba solo `orden` y `pagada`, pero `emitir_comprobante` pasa la
+    venta a `facturada` en cuanto Factiliza responde —una tarea async, a
+    segundos del cobro—. El pedido para llevar que se cobra de una sola vez
+    desaparecía de la pantalla antes de que la cocina llegara a verlo, y el
+    turno lo reportó como "a veces no llega al KDS".
+    """
+    client, ids = env
+    h = _token(client)
+    horno, barra, _despacho, venta = _setup_pantallas_y_venta(client, ids, h)
+    assert len(_cola(client, h, horno["id"])) == 1
+
+    with env_session(client) as s:
+        s.get(Venta, uuid.UUID(venta["id"])).estado = "facturada"
+        s.commit()
+
+    assert len(_cola(client, h, horno["id"])) == 1, (
+        "facturar no es preparar: la comanda sigue pendiente en cocina"
+    )
+
+    # Y sale cuando de verdad se terminó.
+    for pantalla in (horno, barra):
+        item = _cola(client, h, pantalla["id"])[0]["items"][0]["venta_item_id"]
+        for estado in ("en_preparacion", "listo"):
+            client.post(f"/api/v1/kds/items/{item}/avanzar", headers=h,
+                        json={"estado": estado})
+    client.post(f"/api/v1/sales/ventas/{venta['id']}/entrega", headers=h)
+    assert _cola(client, h, horno["id"]) == []
+
+
+def test_una_categoria_sin_estacion_cae_en_la_primera(env):
+    """Ninguna línea puede quedar invisible en todo el KDS (ADR-078).
+
+    Si la categoría del producto no está en ninguna `categoria_ids`, la línea
+    no aparecía en ninguna pantalla: se quedaba `pendiente` para siempre y el
+    pedido nunca llegaba a entregable, sin que nadie en el local pudiera
+    enterarse. Acá la única estación atiende pizzas, así que la bebida del
+    pedido no tiene quién la prepare.
+    """
+    client, ids = env
+    h = _token(client)
+    horno = client.post("/api/v1/kds/pantallas", headers=h, json={
+        "sucursal_id": ids["sucursal_id"], "nombre": "Horno", "orden": 0,
+        "tipo": "preparacion", "categoria_ids": [ids["cat_pizzas"]],
+    }).json()
+    despacho = client.post("/api/v1/kds/pantallas", headers=h, json={
+        "sucursal_id": ids["sucursal_id"], "nombre": "Despacho", "tipo": "despacho",
+    }).json()
+    venta = client.post("/api/v1/sales/ventas", headers=h, json={
+        "sucursal_id": ids["sucursal_id"], "punto_venta_id": ids["pv_id"],
+        "canal": "pdv", "modalidad": "mesa", "idempotency_key": "kds-huerfana-1",
+        "items": [
+            {"producto_comercial_id": ids["pizza_id"], "cantidad": "1"},
+            {"producto_comercial_id": ids["bebida_id"], "cantidad": "1"},
+        ],
+    }).json()
+
+    cola = _cola(client, h, horno["id"])
+    assert len(cola) == 1
+    productos = {i["producto"]: i["estacion"] for i in cola[0]["items"]}
+    assert productos["Gaseosa 500ml"] == "Horno", (
+        "la primera estación se hace cargo de lo que ninguna declara"
+    )
+
+    for item in cola[0]["items"]:
+        for estado in ("en_preparacion", "listo"):
+            r = client.post(f"/api/v1/kds/items/{item['venta_item_id']}/avanzar",
+                            headers=h, json={"estado": estado})
+            assert r.status_code == 200
+
+    # Y termina: la huérfana no vuelve a caer en la primera estación.
+    assert _cola(client, h, horno["id"]) == []
+    assert _cola(client, h, despacho["id"])[0]["estado_pedido"] == "listo"
+    r = client.post(f"/api/v1/sales/ventas/{venta['id']}/entrega", headers=h)
+    assert r.status_code == 200
+
+
+def test_el_aumento_repetido_no_duplica_la_comanda(env):
+    """Un reintento del mismo envío no manda dos comandas (RN-COM-002).
+
+    El alta de la venta ya era idempotente; el aumento no, así que una
+    respuesta perdida y su reintento dejaban en cocina dos comandas
+    idénticas que nadie podía distinguir de un pedido real de dos rondas.
+    """
+    client, ids = env
+    h = _token(client)
+    horno, _barra, _despacho, venta = _setup_pantallas_y_venta(client, ids, h)
+    cuerpo = {
+        "items": [{"producto_comercial_id": ids["pizza_id"], "cantidad": "1"}],
+        "idempotency_key": "aumento-abcdefgh",
+    }
+    primera = client.post(f"/api/v1/sales/ventas/{venta['id']}/items",
+                          headers=h, json=cuerpo)
+    assert primera.status_code == 201
+    segunda = client.post(f"/api/v1/sales/ventas/{venta['id']}/items",
+                          headers=h, json=cuerpo)
+    assert segunda.status_code == 201
+    assert segunda.json()["total"] == primera.json()["total"]
+
+    # Dos tandas y no tres: el alta y UN aumento.
+    tandas = {t["tanda"] for t in _cola(client, h, horno["id"])}
+    assert tandas == {1, 2}

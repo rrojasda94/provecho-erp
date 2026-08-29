@@ -19,7 +19,19 @@ class Pago(Base, UuidPkMixin, TimestampMixin):
 
     venta_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("venta.id"))
     medio_pago_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("medio_pago.id"))
+    # Lo que este pago aplica a la cuenta. Nunca pasa del saldo: si el
+    # cliente entregó de más, la diferencia va en `vuelto` y no acá, porque
+    # es plata que salió del cajón y contabilidad no debe asentarla.
     monto: Mapped[Decimal] = mapped_column(Numeric(10, 2))
+    # Lo devuelto al cliente (ADR-077). Solo el efectivo puede traerlo.
+    #
+    # Antes el vuelto se calculaba en el navegador y moría ahí: el arqueo no
+    # tenía forma de explicar por qué el cajón tenía menos billetes que la
+    # suma de los cobros, y la reimpresión de un ticket no podía decir con
+    # cuánto pagó el cliente.
+    vuelto: Mapped[Decimal] = mapped_column(
+        Numeric(10, 2), default=Decimal(0), server_default="0", nullable=False
+    )
     # Cuenta que este pago cancela (RN-COM-018). Los pagos de un mismo grupo
     # suman contra el total de ESE grupo, no contra el de la venta entera.
     grupo_cobro: Mapped[int] = mapped_column(

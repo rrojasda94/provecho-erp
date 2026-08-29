@@ -11,6 +11,7 @@ import {
   soles,
   type CajaAbierta,
   type ClienteBuscado,
+  type ComprobanteDeVenta,
   type ItemDeCarta,
   type ItemDeVentaNueva,
   type MesaEnMapa,
@@ -324,6 +325,19 @@ export default function PdvCliente({
   >(null);
   const [lineaEnEdicion, setLineaEnEdicion] = useState<LineaBorrador | null>(null);
   const [cobradoAVer, setCobradoAVer] = useState<Venta | null>(null);
+  /**
+   * Lo que el servidor dice que falta cobrar de la cuenta única.
+   *
+   * `null` = todavía no se sabe, o el pedido nunca se envió (no hay venta
+   * contra la que preguntar) y ahí el borrador es la única fuente posible.
+   *
+   * Existe porque el total del navegador y el del servidor podían discrepar
+   * —el flete de una orden reabierta, el prorrateo del descuento entre
+   * cuentas— y entonces el botón "Exacto" ofrecía un número que el cobro
+   * rechazaba por exceder el saldo, con el monto exacto en pantalla. El
+   * número que valida el pago tiene que ser el mismo que lo propone.
+   */
+  const [saldoServidor, setSaldoServidor] = useState<number | null>(null);
   const [precuentaAVer, setPrecuentaAVer] = useState("");
   const [aviso, setAviso] = useState("");
   const [ocupado, setOcupado] = useState(false);
@@ -561,6 +575,32 @@ export default function PdvCliente({
     } finally {
       setOcupado(false);
     }
+  };
+
+  /**
+   * Abre el cobro con el saldo que dice el servidor.
+   *
+   * Solo con la venta ya creada y cobrando la cuenta entera: al cobrar
+   * seleccionados, las líneas todavía no se movieron a su cuenta y el
+   * servidor no tiene ese grupo que consultar.
+   */
+  const abrirCobro = () => {
+    if (!activo || !revisarAntesDeSalir(activo, "cobrar")) return;
+    setSaldoServidor(null);
+    if (activo.ventaId && seleccion.size === 0) {
+      api
+        .saldoDeVenta(activo.ventaId)
+        .then((cuentas) => {
+          const unica = cuentas.find((c) => c.grupo_cobro === 1);
+          if (unica) setSaldoServidor(Number(unica.saldo));
+        })
+        .catch(() => {
+          // Se cobra igual con el total del borrador: quedarse sin poder
+          // cobrar por un dato de apoyo sería peor que la diferencia que
+          // este dato viene a evitar.
+        });
+    }
+    setDialogo("cobro");
   };
 
   const confirmarCobro = async (
@@ -1117,9 +1157,7 @@ export default function PdvCliente({
           onDescuento={() => setDialogo("descuento")}
           onAnular={anularPedido}
           onEnviar={enviar}
-          onCobrar={() => {
-            if (activo && revisarAntesDeSalir(activo, "cobrar")) setDialogo("cobro");
-          }}
+          onCobrar={abrirCobro}
           onConsumoPersonal={() => {
             // Quitar la marca no necesita firma: deja el pedido como venta
             // normal, que es el camino que sí cobra.
@@ -1279,7 +1317,7 @@ export default function PdvCliente({
       <DialogoCobro
         abierto={dialogo === "cobro"}
         permisos={permisos}
-        total={totalACobrar(activo, seleccion)}
+        total={totalDelCobro(saldoServidor, activo, seleccion)}
         medios={datos.medios}
         ocupado={ocupado}
         onCerrar={() => setDialogo(null)}
@@ -1316,7 +1354,11 @@ async function registrarPagos(
     const ultimo = i === pagos.length - 1;
     await api.registrarPago(ventaId, {
       medio_pago_id: p.medioId,
-      monto: String(p.monto),
+      // A dos decimales SIEMPRE. La aritmética del diálogo se hace en el
+      // `number` de JS, y `String(23.299999999999997)` viajaba tal cual: el
+      // pago entraba, pero nunca llegaba a cubrir el total, así que la venta
+      // se quedaba en `orden` y sin comprobante.
+      monto: p.monto.toFixed(2),
       idempotency_key: claveIdempotencia("pago"),
       grupo_cobro: grupoCobro,
       receptor_num_doc: ultimo ? doc || null : null,
@@ -1383,6 +1425,21 @@ function alternar(seleccion: Set<string>, id: string): Set<string> {
   return s;
 }
 
+/**
+ * Lo que el diálogo de cobro tiene que mostrar.
+ *
+ * Manda el saldo del servidor cuando se lo pudo pedir. El total del borrador
+ * es el respaldo: sirve para el pedido que todavía no se envió —no hay venta
+ * contra la que preguntar— y para cuando la consulta falla.
+ */
+function totalDelCobro(
+  saldo: number | null,
+  activo: Borrador | null,
+  seleccion: Set<string>,
+): number {
+  return saldo ?? totalACobrar(activo, seleccion);
+}
+
 /** Sin selección se cobra todo; con selección, solo lo elegido. */
 function totalACobrar(activo: Borrador | null, seleccion: Set<string>): number {
   if (!activo) return 0;
@@ -1406,19 +1463,52 @@ function PieCobrado({
 }: {
   venta: Venta | null;
   ocupado: boolean;
-  onImprimir: (venta: Venta) => void;
+  onImprimir: (venta: Venta, comprobanteId?: string) => void;
 }) {
+  // Una venta dividida tiene un comprobante por cuenta (RN-COM-018). Antes
+  // el pie ofrecía un solo botón que imprimía el primero, así que el
+  // segundo cliente se quedaba sin su papel — que es exactamente para lo
+  // que se había separado la cuenta.
+  const [comprobantes, setComprobantes] = useState<ComprobanteDeVenta[]>([]);
+  useEffect(() => {
+    if (!venta) return setComprobantes([]);
+    let vigente = true;
+    api
+      .comprobantesDeVenta(venta.id)
+      .then((cs) => vigente && setComprobantes(cs))
+      // Sin la lista queda el botón único, que es lo que había antes: se
+      // imprime el primero en vez de no imprimir nada.
+      .catch(() => vigente && setComprobantes([]));
+    return () => {
+      vigente = false;
+    };
+  }, [venta]);
+
   if (!venta) return null;
   return (
     <footer className="pdv-dialogo-pie">
-      <button
-        type="button"
-        className="pdv-boton-pri"
-        disabled={ocupado}
-        onClick={() => onImprimir(venta)}
-      >
-        Imprimir comprobante
-      </button>
+      {comprobantes.length > 1 ? (
+        comprobantes.map((c) => (
+          <button
+            key={c.id}
+            type="button"
+            className="pdv-boton-pri"
+            disabled={ocupado}
+            onClick={() => onImprimir(venta, c.id)}
+          >
+            {`Cuenta ${c.grupo_cobro} · ${c.serie}-${c.correlativo}`}
+          </button>
+        ))
+      ) : (
+        <button
+          type="button"
+          className="pdv-boton-pri"
+          disabled={ocupado}
+          onClick={() => onImprimir(venta, comprobantes[0]?.id)}
+        >
+          Imprimir comprobante
+        </button>
+      )}
     </footer>
   );
 }

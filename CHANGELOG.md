@@ -12,6 +12,113 @@ editando este archivo chocaban siempre — escribían en la misma línea.
 
 Ver [`changelog.d/`](changelog.d/).
 
+## [0.8.1] - 2026-08-29
+
+### Added
+
+- **Los comprobantes de una cuenta dividida ya se pueden imprimir todos**
+  (2026-08-28). Cada cuenta separada emitía el suyo desde ADR-018, pero el PDV
+  solo sabía pedir `GET /ventas/{id}/comprobante`, que devuelve el primero: el
+  cajero cobraba dos cuentas y podía imprimir un solo papel, así que el
+  segundo cliente se quedaba sin el comprobante por el que se había separado
+  la cuenta. Se agrega el plural y el pie del diálogo de cobrado ofrece uno
+  por cuenta, rotulado con su serie y correlativo. No se emite un comprobante
+  por **pago**: un pago parcial no tiene líneas propias que declarar a SUNAT,
+  y repartirlas sería inventar un detalle que nadie consumió.
+
+### Changed
+
+- **El efectivo admite sobrepago y el vuelto se guarda** (2026-08-28). Hasta
+  ahora la suma de los pagos tenía que **igualar** el total, así que el cajero
+  no podía aceptar un billete de 50 por una cuenta de 33.30: para cobrar tenía
+  que teclear el saldo de memoria, al centavo, con el cliente esperando. El
+  vuelto se mostraba, pero solo en el navegador — se calculaba en el diálogo y
+  moría ahí, y el arqueo no tenía forma de explicar por qué el cajón tenía
+  menos billetes que la suma de los cobros. Ahora un monto mayor al saldo se
+  acepta en los medios que pueden devolver la diferencia y queda en
+  `pago.vuelto`. `pago.monto` sigue siendo lo que entra a la cuenta y nunca
+  más que el saldo: meter ahí lo entregado pondría en los libros plata que
+  salió del cajón esa misma noche, y obligaría a cinco consumidores distintos
+  —cierre de caja, contabilidad, reportes, el replay del hub— a saber restar.
+  En tarjeta y billetera el sobrepago se sigue rechazando, ahora diciendo por
+  qué: ahí no hay cajón, y la única forma de devolver es una nota de crédito
+  al día siguiente. Enmienda RN-COM-016, ADR-077.
+
+### Fixed
+
+- **Despacho pintaba como "Listo" lo que nadie había preparado** (2026-08-28).
+  La tarjeta leía el estado de la línea como «no tiene estación pendiente», y
+  una línea cuya categoría no atendía ninguna estación tampoco tenía estación:
+  salía tachada y en verde mientras seguía `pendiente`. El pedido decía "2 de
+  4" con las cuatro líneas tachadas, y al mozo se le estaba diciendo que
+  llevara comida que no existía. Ahora el estado sale de `estado`, que es
+  donde vive. De paso, las líneas ya listas se agrupan arriba y la tarjeta
+  dice cuántas hay: el pedido entra a despacho apenas una está lista, pero
+  había que contarlas a ojo. La entrega sigue siendo del pedido completo
+  (ADR-044): despacho arma la bolsa entera, y partirla sería la forma de
+  entregar media orden.
+
+- **El cobro rechazaba el monto exacto** (2026-08-28). Eran dos cosas que se
+  veían como una. La aritmética del diálogo se hace en el `number` de
+  JavaScript, donde 33.30 − 10 deja 23.299999999999997; ese número viajaba al
+  servidor tal cual, el pago entraba y la suma nunca llegaba al total, así que
+  **la venta quedaba en `orden` y sin comprobante** — cobrada de hecho y sin
+  cobrar para el sistema. En el otro sentido, un `pagado < total` por una
+  millonésima dejaba "Confirmar pago" muerto con "Restante S/ 0.00" en
+  pantalla. Del lado del servidor pasaba lo simétrico: `cantidad × precio`
+  puede traer cuatro decimales, así que el saldo real era 18.525 mientras la
+  pantalla —que lee `venta.total`, ya truncado— decía 18.53. Ahora la plata se
+  redondea a centavos en un solo lugar, con `ROUND_HALF_UP` porque es como
+  redondea `numeric` en Postgres: cuantizar distinto de la columna que guarda
+  el total habría reabierto la misma grieta por el otro lado.
+- **El diálogo de cobro calculaba el total en el navegador** (2026-08-28).
+  Sumaba el borrador, así que no podía saber el flete de una orden reabierta
+  ni el prorrateo del descuento entre cuentas, y cualquiera de las dos
+  diferencias terminaba en un cobro rechazado con el "monto exacto" delante
+  del cajero. Ahora lo pide a `GET /ventas/{id}/saldo`: el número que valida
+  el pago tiene que ser el mismo que lo propone. Si la consulta falla se cobra
+  igual con el total del borrador — quedarse sin poder cobrar por un dato de
+  apoyo sería peor que la diferencia que ese dato evita.
+
+- **Quien abría el KDS quedaba encerrado** (2026-08-28). Las pantallas de
+  cocina viven fuera del shell del ERP y sus enlaces solo cruzan entre ellas,
+  así que un trabajador que entraba desde el lanzador de módulos no tenía
+  ningún camino de vuelta: la única salida era el botón atrás del navegador o
+  teclear la URL. Se agrega "Salir" en las cuatro pantallas. El despacho
+  embebido en el PDV no lo lleva y sigue cerrándose con su ×: desde un overlay
+  un enlace que navega fuera descartaría el pedido a medio armar.
+- **Con una comanda larga no se alcanzaba el botón de listo** (2026-08-28). La
+  tarjeta no tenía techo y la lista de ítems no scrolleaba, así que "Todo
+  listo" quedaba al fondo de una tarjeta de varias pantallas y el cocinero
+  tenía que arrastrar la página entera con las manos ocupadas. Lo destapó la
+  propia 0.8.0: las notas de cocina agregan un bloque por línea. Ahora la
+  tarjeta tiene techo, solo scrollea la lista y el pie queda siempre a la
+  vista; y las tarjetas dejan de estirarse entre sí, que era lo que empujaba
+  los botones de toda una fila por culpa de una sola comanda.
+
+- **El pedido no siempre llegaba al KDS, pero los aumentos sí** (2026-08-28).
+  Dos agujeros distintos en la misma consulta, los dos reportados como uno.
+  La cola de cocina filtraba `estado in ('orden','pagada')`, y
+  `emitir_comprobante` pasa la venta a `facturada` en cuanto Factiliza acepta
+  —segundos después del cobro—: el pedido para llevar que se cobra de una
+  sola vez podía desaparecer de la pantalla antes de que la cocina llegara a
+  verlo. En una mesa no pasaba, y por eso los aumentos parecían funcionar:
+  solo existen sobre una orden abierta. Ahora la cola mira la misma lista que
+  el historial y lo que saca un pedido es **entregarlo**, no cobrarlo. El
+  segundo agujero: una línea cuya categoría no estaba en ninguna estación
+  quedaba invisible en todo el KDS —`pendiente` para siempre, y el pedido
+  nunca entregable— con el aviso que lo explicaba viviendo en una pantalla a
+  la que ese pedido jamás llegaba; ahora la atiende la primera estación de la
+  cadena. Se aceptó que la cola muestre más pedidos a la vez: era comida sin
+  preparar que ya no se veía. ADR-078.
+- **Un aumento reintentado mandaba dos comandas a cocina** (2026-08-28). El
+  alta de la venta era idempotente desde siempre; el aumento no. Una
+  respuesta que se perdía y su reintento dejaban dos comandas idénticas que
+  nadie podía distinguir de un pedido real de dos rondas.
+  `venta_item.idempotency_key` marca la primera línea de cada envío —lo
+  idempotente es el envío entero, no la línea— y el campo es opcional en el
+  contrato para no romper a los clientes que ya estaban mandando aumentos.
+
 ## [0.8.0] - 2026-08-28
 
 ### Added

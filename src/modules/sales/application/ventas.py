@@ -771,7 +771,7 @@ def total_a_cobrar(session: Session, venta: Venta, grupo_cobro: int | None = Non
         neto = base - rules.monto_descuento(
             venta.descuento_modo, venta.descuento_valor, base
         )
-        return neto + reparto
+        return rules.a_centavos(neto + reparto)
     filas = [f for f in todos if f.grupo_cobro == grupo_cobro]
     # La promoción se prorratea entre las cuentas por lo que pesa cada una,
     # igual que el descuento manual: se activó sobre el pedido, no sobre la
@@ -792,7 +792,7 @@ def total_a_cobrar(session: Session, venta: Venta, grupo_cobro: int | None = Non
     grupos = VentaRepo(session).grupos_de_cobro(venta.id)
     if grupo_cobro != min(grupos, default=rules.GRUPO_COBRO_UNICO):
         reparto = Decimal("0")
-    return (
+    return rules.a_centavos(
         parcial
         - rules.descuento_prorrateado(
             venta.descuento_modo, venta.descuento_valor, base, parcial
@@ -996,22 +996,38 @@ def registrar_pago(
 
     total_grupo = total_a_cobrar(session, venta, grupo_cobro)
     confirmados = repo.confirmados(venta_id, grupo_cobro)
-    if sum(confirmados, Decimal(0)) + monto > total_grupo:
-        raise ReglaNegocio("el pago excede el saldo de la cuenta")
+    saldo = rules.a_centavos(total_grupo - sum(confirmados, Decimal(0)))
+    recibido = rules.a_centavos(monto)
+
+    # Recibir más de lo que se debe solo es un error cuando el medio no puede
+    # devolver la diferencia (ADR-077). En efectivo es el caso normal de una
+    # caja —un billete de 50 por una cuenta de 33.30— y rechazarlo obligaba
+    # al cajero a teclear el saldo exacto de memoria; en tarjeta no hay
+    # vuelto posible y aceptarlo solo descuadraría el arqueo.
+    medio = MedioPagoRepo(session).get(medio_pago_id)
+    if recibido > saldo and not rules.admite_vuelto(medio.tipo):
+        raise ReglaNegocio(
+            "el pago excede el saldo de la cuenta y este medio no da vuelto"
+        )
+    # Lo que entra a la cuenta nunca pasa del saldo: la diferencia sale por
+    # el cajón como vuelto, no queda asentada como plata cobrada.
+    aplicado = min(recibido, saldo)
+    vuelto = rules.vuelto_de(recibido, saldo)
 
     pago = repo.add(
         Pago(
             id=id or uuid.uuid4(),
             venta_id=venta_id,
             medio_pago_id=medio_pago_id,
-            monto=monto,
+            monto=aplicado,
+            vuelto=vuelto,
             grupo_cobro=grupo_cobro,
             idempotency_key=idempotency_key,
             referencia_externa=referencia_externa,
             estado="confirmado",
         )
     )
-    if not rules.pagos_cubren_total(confirmados + [monto], total_grupo):
+    if not rules.pagos_cubren_total(confirmados + [aplicado], total_grupo):
         return pago, venta, None
 
     comprobante = _cerrar_cuenta(
@@ -1080,6 +1096,7 @@ def listar_items(session: Session, venta_id: uuid.UUID) -> list[dict]:
             "nombre": nombre_de[f.producto_comercial_id],
             "cantidad": f.cantidad,
             "precio_unitario": f.precio_unitario,
+            "descuento": f.descuento,
             "grupo_cobro": f.grupo_cobro,
             "nota": f.nota,
             "extras": [
@@ -1500,6 +1517,7 @@ def agregar_lineas(
     venta_id: uuid.UUID,
     items: list[dict],
     usuario_id: uuid.UUID,
+    idempotency_key: str | None = None,
 ) -> Venta:
     """Suma líneas a una orden **ya enviada a cocina** (RN-COM-029).
 
@@ -1531,6 +1549,11 @@ def agregar_lineas(
         )
     if not items:
         raise ReglaNegocio("indica al menos una línea a agregar")
+    # Reintento del mismo envío: la respuesta anterior se perdió, pero el
+    # aumento ya entró. Devolver la venta tal como quedó es lo único que no
+    # le manda a la cocina una segunda comanda idéntica (RN-COM-002).
+    if idempotency_key and repo.tanda_ya_registrada(idempotency_key):
+        return venta
 
     filas, extras_por_padre, detalle_evento = _armar_lineas(
         session,
@@ -1552,6 +1575,9 @@ def agregar_lineas(
         fila.venta_id = venta.id
         fila.tanda = tanda
         session.add(fila)
+    # Una sola fila lleva la marca: lo idempotente es el envío, no la línea.
+    if idempotency_key:
+        filas[0].idempotency_key = idempotency_key
     session.flush()
     for fila, hijos in zip(filas, extras_por_padre, strict=True):
         for hijo in hijos:

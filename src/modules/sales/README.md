@@ -26,7 +26,7 @@ Central de Pedidos.
 
 **Cobro (PROC-COM-002, mismo día):** `medio_pago` (catálogo por
 empresa), `pago` (RN-COM-002/016 — una venta admite varios `pago`, pago
-dividido confirmado como caso real; suma de montos debe igualar
+dividido confirmado como caso real; suma de montos debe **cubrir**
 `venta.total`). `comprobante` vive en `shared` (transversal a sales/
 purchases/accounting, no en este módulo). `punto_venta.serie_boleta`/
 `serie_factura` (series SUNAT separadas) alimentan el `comprobante.serie`
@@ -53,6 +53,30 @@ cuatro huecos que el punto de venta necesitaba y el modelo no daba.
   cuando ninguna cuenta queda con saldo.
 - `comprobante.receptor_num_doc` / `receptor_nombre` (RN-CPP-003): el
   DNI/RUC que el cajero teclea al cobrar, sin exigir cliente registrado.
+
+**Parche 0.8.1 (2026-08-28, migración `d4b7e91c2f80`):**
+
+- **La plata se cuantiza a centavos** en un solo lugar, `rules.a_centavos`
+  (`ROUND_HALF_UP`, como redondea `numeric` en Postgres). `total_venta`,
+  `total_a_cobrar` y `pagos_cubren_total` pasan por ahí. Antes el saldo real
+  podía ser 18.525 mientras la pantalla decía 18.53, y el monto exacto se
+  rechazaba por excederlo.
+- **`pago.vuelto`** (ADR-077): el efectivo admite sobrepago y la diferencia
+  se guarda. `pago.monto` sigue siendo lo que entra a la cuenta, nunca más
+  que el saldo. Los medios sin vuelto siguen rechazándolo.
+- **`GET /ventas/{id}/saldo`**: total, pagado y saldo por cuenta. El diálogo
+  de cobro lo usa en vez de sumar el borrador en el navegador — el número
+  que valida el pago tiene que ser el mismo que lo propone.
+- **`GET /ventas/{id}/comprobantes`** (plural): todos los de la venta, uno
+  por cuenta. El singular devuelve el primero y dejaba al segundo cliente
+  sin su papel.
+- **`venta_item.idempotency_key`**: el aumento se vuelve idempotente
+  (RN-COM-002). Sin ella, el reintento de una respuesta perdida mandaba dos
+  comandas idénticas a cocina.
+- **KDS** (ADR-078): la cola mira `orden|pagada|facturada|cerrada` — el
+  pedido sale al **entregarse**, no al facturarse; y una categoría que
+  ninguna estación declara la atiende la primera de la cadena en vez de
+  quedar invisible.
   11 dígitos → factura; 8, `00000000` o vacío → boleta.
 - **Descarga del comprobante emitido**
   (`GET /sales/comprobantes/{id}/descargar/{pdf|xml|cdr}`): el PDF para el

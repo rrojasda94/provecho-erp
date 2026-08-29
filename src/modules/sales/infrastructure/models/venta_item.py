@@ -109,6 +109,18 @@ class VentaItem(Base, UuidPkMixin, TimestampMixin):
     tanda: Mapped[int] = mapped_column(
         Integer, default=1, server_default="1", nullable=False
     )
+    # Clave de la operación que trajo esta línea, en la PRIMERA fila del
+    # lote. NULL en las demás y en todo lo anterior a este campo.
+    #
+    # El alta de la venta ya era idempotente (`venta.idempotency_key`,
+    # RN-COM-002) pero el aumento no lo era: un reintento del navegador
+    # sobre una respuesta que se perdió mandaba el mismo envío dos veces y
+    # la cocina recibía dos comandas idénticas que nadie podía distinguir de
+    # un pedido real de dos rondas. Se marca una sola fila porque lo
+    # idempotente es el envío entero, no la línea.
+    idempotency_key: Mapped[str | None] = mapped_column(
+        String(100), unique=True, nullable=True
+    )
     # Lo que el mesero le dice a cocina sobre ESTE plato: "bien cocida",
     # "sin sal", "para la niña".
     #

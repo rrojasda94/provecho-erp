@@ -42,6 +42,17 @@ from src.shared import fechas, impresion
 
 TIPOS_PANTALLA = {"preparacion", "despacho"}
 
+# Estados de la venta que siguen teniendo algo que hacer en cocina.
+#
+# Incluye `facturada` y `cerrada` a propósito: lo que saca un pedido de la
+# cola es haberlo ENTREGADO, no haberlo cobrado (ADR-078). Antes la cola
+# miraba solo `orden` y `pagada`, y como `emitir_comprobante` pasa la venta a
+# `facturada` en cuanto Factiliza responde —una tarea async, a segundos del
+# cobro—, el pedido para llevar que se cobra de una sola vez podía
+# desaparecer de la pantalla antes de que la cocina llegara a verlo. El
+# historial ya usaba esta misma lista; la cola se había quedado corta.
+ESTADOS_EN_COCINA = ("orden", "pagada", "facturada", "cerrada")
+
 
 # --- Configuración de pantallas ----------------------------------------------
 def crear_pantalla(
@@ -317,10 +328,25 @@ def _estacion(
     existe —lo desactivaron, le cambiaron las categorías—, la línea cae a
     la siguiente estación que sí la acepte en vez de quedar invisible.
     `None` = ya no queda cadena por delante: la línea está lista.
+
+    Y si NINGUNA estación declara la categoría —el producto no tiene
+    `categoria_id`, o su categoría no está en ningún `categoria_ids`— la
+    atiende la primera de la cadena. Es la misma tolerancia llevada hasta el
+    final: antes esa línea no aparecía en ninguna pantalla, se quedaba
+    `pendiente` para siempre y dejaba el pedido sin poder entregarse nunca,
+    sin que nadie en el local pudiera enterarse. Una comanda mal ruteada se
+    arregla mirando la tarjeta; una comanda invisible, no.
+
+    El descarte se mide sobre la cadena entera y no desde `desde`, para que
+    una huérfana ya bumpeada siga terminando en `None` (= lista) en vez de
+    volver a caer en la primera estación y quedar girando.
     """
     for pantalla in cadena:
         if pantalla.orden >= desde and _pertenece(pantalla, producto):
             return pantalla
+    if cadena and desde <= cadena[0].orden:
+        if not any(_pertenece(p, producto) for p in cadena):
+            return cadena[0]
     return None
 
 
@@ -390,7 +416,7 @@ def cola_pantalla(session: Session, pantalla_id: uuid.UUID) -> list[dict]:
         select(Venta)
         .where(
             Venta.sucursal_id == pantalla.sucursal_id,
-            Venta.estado.in_(("orden", "pagada")),
+            Venta.estado.in_(ESTADOS_EN_COCINA),
         )
         .order_by(Venta.fecha_orden, Venta.numero_orden)
     )
@@ -502,7 +528,7 @@ def historial_pantalla(
         .where(
             Venta.sucursal_id == pantalla.sucursal_id,
             # `anulada` no: un pedido anulado no se entregó, se canceló.
-            Venta.estado.in_(("orden", "pagada", "facturada", "cerrada")),
+            Venta.estado.in_(ESTADOS_EN_COCINA),
             Venta.fecha_orden >= desde,
         )
         .order_by(Venta.fecha_orden.desc(), Venta.numero_orden.desc())
@@ -579,9 +605,15 @@ def _items_de_pantalla(
         )
     mios, pendiente = [], False
     for it, prod in platos:
-        if not _pertenece(pantalla, prod):
-            continue
         estacion = _estacion_de(cadena, it, prod)
+        # Es de esta pantalla si declara su categoría, o si la línea cayó acá
+        # por no tener quién la declare. Sin la segunda mitad, la huérfana se
+        # descartaba antes de que nadie llegara a preguntarle su estación:
+        # `_estacion` podía adoptarla, pero este filtro ya la había tirado.
+        if not _pertenece(pantalla, prod) and (
+            estacion is None or estacion.id != pantalla.id
+        ):
+            continue
         if estacion is not None and estacion.orden == pantalla.orden:
             pendiente = True
         mios.append(

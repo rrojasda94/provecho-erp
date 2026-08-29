@@ -286,13 +286,43 @@ def test_cobro_parcial_y_total(env):
     assert client.get(f"/api/v1/sales/ventas/{vid}", headers=h).json()["estado"] == "pagada"
 
 
-def test_sobrepago_409(env):
+def test_sobrepago_en_efectivo_deja_vuelto(env):
+    """Un billete de más es el caso normal de una caja (ADR-077).
+
+    Antes se rechazaba con 409 y el cajero tenía que teclear el saldo exacto
+    de memoria. Lo que entra a la cuenta sigue siendo el saldo: el vuelto
+    salió del cajón y contabilidad no debe asentarlo.
+    """
     client, ids, _ = env
     h = _token(client)
     venta = client.post("/api/v1/sales/ventas", headers=h, json=_venta_body(ids)).json()
+    total = Decimal(venta["total"])
     r = client.post(f"/api/v1/sales/ventas/{venta['id']}/pagos", headers=h, json={
         "medio_pago_id": ids["medio_id"], "monto": "60.00",
         "idempotency_key": "pago-sobre",
+    })
+    assert r.status_code == 201
+    pago = r.json()
+    assert Decimal(pago["monto"]) == total
+    assert Decimal(pago["vuelto"]) == Decimal("60.00") - total
+    assert client.get(
+        f"/api/v1/sales/ventas/{venta['id']}", headers=h
+    ).json()["estado"] == "pagada"
+
+
+def test_sobrepago_sin_vuelto_posible_se_rechaza(env):
+    """Sin cajón que devuelva, un monto de más es un error de tecleo: la
+    tarjeta quedaría cobrada por encima de lo consumido y el arqueo sin
+    forma de cuadrar (ADR-077)."""
+    client, ids, _ = env
+    h = _token(client)
+    tarjeta = client.post("/api/v1/sales/medios-pago", headers=h, json={
+        "nombre": "Visa", "tipo": "tarjeta_credito", "direccion": "cobro",
+    }).json()
+    venta = client.post("/api/v1/sales/ventas", headers=h, json=_venta_body(ids)).json()
+    r = client.post(f"/api/v1/sales/ventas/{venta['id']}/pagos", headers=h, json={
+        "medio_pago_id": tarjeta["id"], "monto": "60.00",
+        "idempotency_key": "pago-sobre-tarjeta",
     })
     assert r.status_code == 409
 
