@@ -568,6 +568,7 @@ const KDS: Caso[] = [
 const ASISTENCIA: Caso[] = [
   caso("tarjetas", () => apiAsistencia.tarjetas(UUID)),
   caso("marcar", () => apiAsistencia.marcar(UUID, UUID, "123456")),
+  caso("enrolarTerminal", () => apiAsistencia.enrolarTerminal(UUID, "123456")),
 ];
 
 /** `lib/reportes.ts` exporta funciones sueltas, no un objeto `api`, así que

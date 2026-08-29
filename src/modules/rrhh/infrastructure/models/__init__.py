@@ -8,11 +8,13 @@ from src.modules.rrhh.infrastructure.models.certificado_trabajo import Certifica
 from src.modules.rrhh.infrastructure.models.contrato_laboral import ContratoLaboral
 from src.modules.rrhh.infrastructure.models.convocatoria import Convocatoria
 from src.modules.rrhh.infrastructure.models.liquidacion_bss import LiquidacionBss
+from src.modules.rrhh.infrastructure.models.marcacion import Marcacion
 from src.modules.rrhh.infrastructure.models.memorandum import Memorandum
 from src.modules.rrhh.infrastructure.models.pacto_permanencia import PactoPermanencia
 from src.modules.rrhh.infrastructure.models.postulante import Postulante
 from src.modules.rrhh.infrastructure.models.socio import Socio
 from src.modules.rrhh.infrastructure.models.solicitud_permiso import SolicitudPermiso
+from src.modules.rrhh.infrastructure.models.terminal_marcaje import TerminalMarcaje
 from src.modules.rrhh.infrastructure.models.trabajador import Trabajador
 from src.modules.rrhh.infrastructure.models.turno_sucursal import TurnoSucursal
 
@@ -25,11 +27,13 @@ __all__ = [
     "ContratoLaboral",
     "Convocatoria",
     "LiquidacionBss",
+    "Marcacion",
     "Memorandum",
     "PactoPermanencia",
     "Postulante",
     "Socio",
     "SolicitudPermiso",
+    "TerminalMarcaje",
     "Trabajador",
     "TurnoSucursal",
 ]

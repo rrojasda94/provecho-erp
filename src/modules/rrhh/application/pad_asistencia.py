@@ -23,15 +23,16 @@ registra RRHH a mano.
 import uuid
 from dataclasses import dataclass
 from datetime import date, datetime
+from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.modules.rrhh.application import asistencia as casos_asistencia
-from src.modules.rrhh.application import turnos
+from src.modules.rrhh.application import marcaciones, turnos
 from src.modules.rrhh.application.errors import Conflicto, NoEncontrado
-from src.modules.rrhh.infrastructure.models import Asistencia, Trabajador
+from src.modules.rrhh.infrastructure.models import Asistencia, TerminalMarcaje, Trabajador
 from src.modules.rrhh.infrastructure.repositories import AsistenciaRepo, TrabajadorRepo
 from src.modules.users.application.queries_publicas import obtener_usuario
 from src.modules.users.infrastructure.models import Persona
@@ -147,7 +148,16 @@ def sucursal_de(session: Session, trabajador_id: uuid.UUID) -> uuid.UUID | None:
 
 
 def marcar(
-    session: Session, *, trabajador_id: uuid.UUID, momento: datetime | None = None
+    session: Session,
+    *,
+    trabajador_id: uuid.UUID,
+    usuario_id: uuid.UUID,
+    momento: datetime | None = None,
+    terminal: TerminalMarcaje | None = None,
+    ip: str | None = None,
+    lat: Decimal | None = None,
+    lng: Decimal | None = None,
+    foto: bytes | None = None,
 ) -> tuple[Asistencia, str]:
     """Registra la marcación que toque y devuelve `(asistencia, tipo)`.
 
@@ -155,6 +165,12 @@ def marcar(
     de haber marcado la salida es un conflicto explícito: sin eso, el
     segundo toque pisaría la hora de salida con la del momento y la jornada
     se estiraría sola.
+
+    `usuario_id` es quien firmó (el PIN verificado), no necesariamente el
+    trabajador que marca en el back-office. `terminal`, `ip`, `lat`/`lng` y
+    `foto` son evidencia (RN-RRHH-024): ninguno es obligatorio, y su
+    ausencia nunca impide marcar — se guardan en `marcacion`, aparte de la
+    fila-resumen del día.
     """
     momento = momento or ahora()
     fecha = fecha_laboral(momento)
@@ -164,24 +180,40 @@ def marcar(
     if existente is not None and existente.hora_salida is not None:
         raise Conflicto("la jornada de hoy ya está cerrada: entrada y salida marcadas")
 
+    sucursal_id = sucursal_de(session, trabajador_id)
+
     if existente is not None and existente.hora_entrada is not None:
         asistencia = casos_asistencia.marcar_salida(
             session, trabajador_id=trabajador_id, fecha=fecha, hora_salida=hora
         )
-        return asistencia, "salida"
+        tipo = "salida"
+    else:
+        turno = (
+            turnos.turno_vigente(session, sucursal_id, momento)
+            if sucursal_id is not None
+            else None
+        )
+        asistencia = casos_asistencia.marcar_entrada(
+            session,
+            trabajador_id=trabajador_id,
+            fecha=fecha,
+            hora_entrada=hora,
+            tardanza_min=turnos.tardanza_de(turno, momento),
+            turno_id=turno.id if turno is not None else None,
+        )
+        tipo = "entrada"
 
-    sucursal_id = sucursal_de(session, trabajador_id)
-    turno = (
-        turnos.turno_vigente(session, sucursal_id, momento)
-        if sucursal_id is not None
-        else None
-    )
-    asistencia = casos_asistencia.marcar_entrada(
+    marcaciones.registrar(
         session,
-        trabajador_id=trabajador_id,
-        fecha=fecha,
-        hora_entrada=hora,
-        tardanza_min=turnos.tardanza_de(turno, momento),
-        turno_id=turno.id if turno is not None else None,
+        asistencia=asistencia,
+        tipo=tipo,
+        usuario_id=usuario_id,
+        momento=momento,
+        terminal=terminal,
+        ip=ip,
+        lat=lat,
+        lng=lng,
+        sucursal_id=sucursal_id,
+        foto=foto,
     )
-    return asistencia, "entrada"
+    return asistencia, tipo

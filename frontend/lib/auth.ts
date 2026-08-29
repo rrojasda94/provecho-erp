@@ -11,6 +11,10 @@
 // sesión corre en el runtime Edge y no puede importar este módulo, que
 // usa `Buffer`.
 export { COOKIE_REFRESH, COOKIE_TOKEN } from "@/lib/sesion-refresh";
+/** El secreto del terminal enrolado (ADR-079) — nada que ver con la sesión
+ * de la cuenta de servicio del pad. httpOnly igual que el token: el
+ * JavaScript de la página nunca lo ve. */
+export const COOKIE_TERMINAL = "provecho_terminal";
 
 export type ClaimsJwt = {
   sub: string;

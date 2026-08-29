@@ -81,8 +81,10 @@ erDiagram
   dirección, estado, tenencia (`propia` | `alquilada` | `del_grupo` —
   `propia` paga predial/arbitrios, RN-IMP-004), horario_atencion
   (disponibilidad al público — el horario laboral de cada trabajador vive
-  en `asistencia`/`contrato_laboral`, no aquí). Se
-  abastece del almacén central de su empresa (excepción: gas/bebidas
+  en `asistencia`/`contrato_laboral`, no aquí), radio_marcaje_m (nullable,
+  2026-08-28, ADR-079 — metros para **observar**, nunca bloquear, la
+  distancia de un marcaje de asistencia; NULL = esa sucursal no lo evalúa).
+  Se abastece del almacén central de su empresa (excepción: gas/bebidas
   embotelladas directo de proveedor, gestión fuera de la sucursal).
 - **almacen**: empresa_id, sucursal_id (NULL si central o de activos), tipo
   (`central` | `produccion` | `sucursal` | `activos` | ... — enum
@@ -1418,6 +1420,24 @@ un trabajador puede o no tener usuario, y no todo usuario es trabajador
   (ADR-064), distinto del turno de caja y del horario de atención. Único por
   `(sucursal_id, nombre)`. `hora_fin`/`hora_limite_salida` menores que
   `hora_inicio` significan que el turno cruza la medianoche.
+- **terminal_marcaje** (2026-08-28, ADR-079): sucursal_id, nombre, codigo
+  (activación, 6 dígitos, se borra al enrolar), codigo_expira_en (30 min),
+  secreto_hash (SHA-256 — no Argon2id: el secreto es aleatorio de 128 bits,
+  no una contraseña humana), activo, ultima_marcacion_en. El dispositivo
+  autorizado a marcar por una sucursal (RN-RRHH-023): sin uno activo de esa
+  sucursal, el pad no marca aunque el PIN sea correcto. Único por
+  `(sucursal_id, nombre)` entre los vivos y por `secreto_hash` entre los no
+  nulos (mismo patrón parcial que `kds_pantalla`).
+- **marcacion** (2026-08-28, ADR-079, RN-RRHH-024): asistencia_id, tipo
+  (`entrada`|`salida`), momento, usuario_id (quién firmó), terminal_id
+  (nullable — NULL = corrección de back-office), ip, ubicacion_lat/lng,
+  distancia_m (calculada, haversine, contra `sucursal.ubicacion_lat/lng`),
+  foto (binario, `deferred`). Una fila por cada toque del pad, evidencia
+  aparte de la fila-resumen `asistencia`. Ninguno de los campos de evidencia
+  bloquea el marcaje; la "anomalía" no se guarda, se deriva comparando
+  `distancia_m` contra `sucursal.radio_marcaje_m` al momento de leer. La foto
+  se purga (no la fila) a los `rrhh_marcaje_foto_retencion_dias` (90 por
+  defecto).
 
 Los documentos de RRHH que son cartas/actas usan plantillas versionadas
 (ver `docs/templates/rrhh/`), rellenadas con datos del ERP + campos

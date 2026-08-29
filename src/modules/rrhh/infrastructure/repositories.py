@@ -15,11 +15,13 @@ from src.modules.rrhh.infrastructure.models import (
     ContratoLaboral,
     Convocatoria,
     LiquidacionBss,
+    Marcacion,
     Memorandum,
     PactoPermanencia,
     Postulante,
     Socio,
     SolicitudPermiso,
+    TerminalMarcaje,
     Trabajador,
     TurnoSucursal,
 )
@@ -462,3 +464,77 @@ class TurnoSucursalRepo:
         self.s.add(turno)
         self.s.flush()
         return turno
+
+
+class TerminalMarcajeRepo:
+    def __init__(self, session: Session) -> None:
+        self.s = session
+
+    def get(self, terminal_id: uuid.UUID) -> TerminalMarcaje | None:
+        terminal = self.s.get(TerminalMarcaje, terminal_id)
+        return None if terminal is None or terminal.deleted_at is not None else terminal
+
+    def get_por_secreto_hash(self, secreto_hash: str) -> TerminalMarcaje | None:
+        return self.s.scalar(
+            select(TerminalMarcaje).where(
+                TerminalMarcaje.secreto_hash == secreto_hash,
+                TerminalMarcaje.deleted_at.is_(None),
+            )
+        )
+
+    def get_por_codigo(self, sucursal_id: uuid.UUID, codigo: str) -> TerminalMarcaje | None:
+        return self.s.scalar(
+            select(TerminalMarcaje).where(
+                TerminalMarcaje.sucursal_id == sucursal_id,
+                TerminalMarcaje.codigo == codigo,
+                TerminalMarcaje.deleted_at.is_(None),
+            )
+        )
+
+    def por_nombre(self, sucursal_id: uuid.UUID, nombre: str) -> TerminalMarcaje | None:
+        return self.s.scalar(
+            select(TerminalMarcaje).where(
+                TerminalMarcaje.sucursal_id == sucursal_id,
+                TerminalMarcaje.nombre == nombre,
+                TerminalMarcaje.deleted_at.is_(None),
+            )
+        )
+
+    def list_de_sucursal(self, sucursal_id: uuid.UUID) -> list[TerminalMarcaje]:
+        return list(
+            self.s.scalars(
+                select(TerminalMarcaje)
+                .where(
+                    TerminalMarcaje.sucursal_id == sucursal_id,
+                    TerminalMarcaje.deleted_at.is_(None),
+                )
+                .order_by(TerminalMarcaje.nombre)
+            )
+        )
+
+    def add(self, terminal: TerminalMarcaje) -> TerminalMarcaje:
+        self.s.add(terminal)
+        self.s.flush()
+        return terminal
+
+
+class MarcacionRepo:
+    def __init__(self, session: Session) -> None:
+        self.s = session
+
+    def get(self, marcacion_id: uuid.UUID) -> Marcacion | None:
+        return self.s.get(Marcacion, marcacion_id)
+
+    def list_de_asistencia(self, asistencia_id: uuid.UUID) -> list[Marcacion]:
+        return list(
+            self.s.scalars(
+                select(Marcacion)
+                .where(Marcacion.asistencia_id == asistencia_id)
+                .order_by(Marcacion.momento)
+            )
+        )
+
+    def add(self, marcacion: Marcacion) -> Marcacion:
+        self.s.add(marcacion)
+        self.s.flush()
+        return marcacion

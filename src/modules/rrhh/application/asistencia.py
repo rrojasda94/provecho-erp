@@ -68,3 +68,7 @@ def listar_asistencia_de_trabajador(
     session: Session, trabajador_id: uuid.UUID
 ) -> list[Asistencia]:
     return AsistenciaRepo(session).list_por_trabajador(trabajador_id)
+
+
+def obtener(session: Session, asistencia_id: uuid.UUID) -> Asistencia | None:
+    return AsistenciaRepo(session).get(asistencia_id)

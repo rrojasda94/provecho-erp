@@ -3,6 +3,7 @@
 SQLite en memoria + override de `get_db`, mismo patrón que `test_rrhh.py`.
 """
 
+import base64
 import uuid
 from datetime import date, datetime, time
 from decimal import Decimal
@@ -18,6 +19,7 @@ import src.core.models_registry  # noqa: F401
 from src.core.app import create_app
 from src.core.database import Base
 from src.modules.rrhh.application import avisos_asistencia, turnos
+from src.modules.rrhh.application import terminales as terminales_uc
 from src.modules.rrhh.infrastructure.models import Asistencia, TurnoSucursal
 from src.modules.users.api.deps import get_db
 from src.modules.users.infrastructure.models import (
@@ -31,6 +33,7 @@ from src.modules.users.infrastructure.models import (
     UsuarioSucursal,
 )
 from src.modules.users.infrastructure.security import hash_pin
+from src.shared.ubicacion import metros_entre
 
 LIMA = ZoneInfo("America/Lima")
 PIN_TRABAJADOR = "222222"
@@ -84,12 +87,18 @@ def env():
         s.add(UsuarioRol(usuario_id=terminal.id, rol_id=rol_terminal.id))
         s.add(UsuarioSucursal(usuario_id=terminal.id, sucursal_id=sucursal.id))
 
+        # El terminal enrolado (ADR-079): sin este secreto en `X-Terminal`,
+        # el pad no marca — de acá en más, mismo tratamiento que el PIN.
+        _, codigo = terminales_uc.crear(s, sucursal_id=sucursal.id, nombre="Pasillo")
+        secreto_terminal = terminales_uc.enrolar(s, sucursal_id=sucursal.id, codigo=codigo)
+
         ids.update(
             empresa_id=str(empresa.id),
             sucursal_id=str(sucursal.id),
             grupo_id=str(empresa.grupo_id),
             persona_id=str(persona.id),
             usuario_trabajador_id=str(cocinero.id),
+            terminal_secreto=secreto_terminal,
         )
         s.commit()
 
@@ -155,11 +164,25 @@ def _tarjetas(client, headers, ids):
     )
 
 
-def _marcar(client, headers, ids, trabajador_id, pin=PIN_TRABAJADOR):
+def _marcar(
+    client,
+    headers,
+    ids,
+    trabajador_id,
+    pin=PIN_TRABAJADOR,
+    terminal=True,
+    **evidencia,
+):
+    """`terminal=True` manda el secreto del terminal ya enrolado en `env`
+    (mismo terminal para todos los tests que no lo pongan a prueba); `**
+    evidencia` deja pasar `foto`/`lat`/`lng` sueltos."""
+    h = dict(headers)
+    if terminal:
+        h["X-Terminal"] = ids["terminal_secreto"]
     return client.post(
         f"/api/v1/rrhh/asistencia/terminal/marcar?sucursal_id={ids['sucursal_id']}",
-        headers=headers,
-        json={"trabajador_id": trabajador_id, "pin": pin},
+        headers=h,
+        json={"trabajador_id": trabajador_id, "pin": pin, **evidencia},
     )
 
 
@@ -442,6 +465,160 @@ def test_la_cuenta_del_pad_no_puede_hacer_nada_mas(env):
     hterm = _token(client, "pad-castilla", "999999")
     assert client.get("/api/v1/rrhh/trabajadores", headers=hterm).status_code == 403
     assert _crear_turno(client, hterm, ids).status_code == 403
+
+
+# --- Terminal enrolado y evidencia (ADR-079, RN-RRHH-023/024) -------------------
+def test_marcar_sin_terminal_autorizado_da_403(env):
+    """El PIN correcto no alcanza sin un terminal enrolado para el local:
+    es exactamente el hueco que ADR-079 cierra — la sesión de la cuenta de
+    servicio ya no basta para marcar desde cualquier navegador."""
+    client, ids, _ = env
+    h = _token(client)
+    trabajador_id = _crear_trabajador(client, h, ids)
+    hterm = _token(client, "pad-castilla", "999999")
+    assert _marcar(client, hterm, ids, trabajador_id, terminal=False).status_code == 403
+
+
+def test_terminal_de_otra_sucursal_no_marca(env):
+    client, ids, TestSession = env
+    h = _token(client)
+    trabajador_id = _crear_trabajador(client, h, ids)
+    hterm = _token(client, "pad-castilla", "999999")
+
+    with TestSession() as s:
+        primera = s.get(Sucursal, uuid.UUID(ids["sucursal_id"]))
+        otra = Sucursal(
+            empresa_id=uuid.UUID(ids["empresa_id"]),
+            marca_id=primera.marca_id,
+            nombre="Otra",
+            direccion="Av. Otra 1",
+            tenencia="alquilada",
+        )
+        s.add(otra)
+        s.flush()
+        _, codigo = terminales_uc.crear(s, sucursal_id=otra.id, nombre="Pad")
+        secreto_de_otra = terminales_uc.enrolar(s, sucursal_id=otra.id, codigo=codigo)
+        s.commit()
+
+    h2 = dict(hterm)
+    h2["X-Terminal"] = secreto_de_otra
+    r = client.post(
+        f"/api/v1/rrhh/asistencia/terminal/marcar?sucursal_id={ids['sucursal_id']}",
+        headers=h2,
+        json={"trabajador_id": trabajador_id, "pin": PIN_TRABAJADOR},
+    )
+    assert r.status_code == 403
+
+
+def test_enrolar_con_codigo_repetido_da_409(env):
+    client, ids, TestSession = env
+    hterm = _token(client, "pad-castilla", "999999")
+    with TestSession() as s:
+        _, codigo = terminales_uc.crear(
+            s, sucursal_id=uuid.UUID(ids["sucursal_id"]), nombre="Barra"
+        )
+        s.commit()
+
+    def _enrolar():
+        return client.post(
+            f"/api/v1/rrhh/asistencia/terminal/enrolar?sucursal_id={ids['sucursal_id']}",
+            headers=hterm,
+            json={"codigo": codigo},
+        )
+
+    assert _enrolar().status_code == 200
+    # El código se borra al enrolar: usarlo de nuevo es el mismo error que
+    # uno vencido — no hay forma de distinguirlos desde afuera.
+    assert _enrolar().status_code == 409
+
+
+def test_marcar_sin_evidencia_marca_igual_y_queda_en_null(env):
+    """Sin permiso de cámara ni de ubicación, el marcaje no se bloquea
+    (RN-RRHH-024): la evidencia es observación, nunca condición."""
+    client, ids, _ = env
+    h = _token(client)
+    trabajador_id = _crear_trabajador(client, h, ids)
+    hterm = _token(client, "pad-castilla", "999999")
+
+    r = _marcar(client, hterm, ids, trabajador_id)
+    assert r.status_code == 200, r.text
+    asistencia_id = r.json()["asistencia"]["id"]
+
+    m = client.get(f"/api/v1/rrhh/asistencia/{asistencia_id}/marcaciones", headers=h)
+    assert m.status_code == 200, m.text
+    fila = m.json()[0]
+    assert fila["tipo"] == "entrada"
+    assert fila["distancia_m"] is None
+    assert fila["tiene_foto"] is False
+    assert fila["terminal_id"] is not None
+
+
+def test_marcar_con_foto_queda_disponible_para_rrhh(env):
+    client, ids, _ = env
+    h = _token(client)
+    trabajador_id = _crear_trabajador(client, h, ids)
+    hterm = _token(client, "pad-castilla", "999999")
+
+    foto = base64.b64encode(b"contenido-jpeg-de-prueba").decode()
+    r = _marcar(client, hterm, ids, trabajador_id, foto=foto, lat="-12.05", lng="-77.03")
+    assert r.status_code == 200, r.text
+    asistencia_id = r.json()["asistencia"]["id"]
+
+    m = client.get(f"/api/v1/rrhh/asistencia/{asistencia_id}/marcaciones", headers=h)
+    marcacion_id = m.json()[0]["id"]
+    assert m.json()[0]["tiene_foto"] is True
+
+    foto_r = client.get(f"/api/v1/rrhh/marcaciones/{marcacion_id}/foto", headers=h)
+    assert foto_r.status_code == 200
+    assert foto_r.content == b"contenido-jpeg-de-prueba"
+
+
+def test_foto_que_supera_el_tope_se_rechaza(env):
+    client, ids, _ = env
+    h = _token(client)
+    trabajador_id = _crear_trabajador(client, h, ids)
+    hterm = _token(client, "pad-castilla", "999999")
+
+    # Justo por encima del tope de bytes decodificados, pero por debajo del
+    # `max_length` del schema en base64: prueba el chequeo del router, no
+    # solo la validación de pydantic.
+    foto = base64.b64encode(b"x" * 130_001).decode()
+    r = _marcar(client, hterm, ids, trabajador_id, foto=foto)
+    assert r.status_code == 422
+
+
+def test_correccion_de_backoffice_tambien_deja_evidencia(env):
+    """`ASISTENCIA_MARCAR` (back-office) no pasa por el pad ni por un
+    terminal: su `marcacion` queda con `terminal_id` en NULL."""
+    client, ids, _ = env
+    h = _token(client)
+    trabajador_id = _crear_trabajador(client, h, ids)
+
+    r = client.post(
+        "/api/v1/rrhh/asistencia/entrada",
+        headers=h,
+        json={
+            "trabajador_id": trabajador_id,
+            "fecha": "2026-08-24",
+            "hora_entrada": "09:00:00",
+        },
+    )
+    assert r.status_code == 201, r.text
+    asistencia_id = r.json()["id"]
+
+    m = client.get(f"/api/v1/rrhh/asistencia/{asistencia_id}/marcaciones", headers=h)
+    assert m.status_code == 200, m.text
+    assert m.json()[0]["terminal_id"] is None
+
+
+def test_metros_entre_mismo_punto_es_cero():
+    lat, lng = Decimal("-12.05"), Decimal("-77.03")
+    assert metros_entre(lat, lng, lat, lng) == 0
+
+
+def test_metros_entre_un_grado_de_latitud_son_unos_111_km():
+    d = metros_entre(Decimal("0"), Decimal("0"), Decimal("1"), Decimal("0"))
+    assert 110_000 < d < 112_000
 
 
 # --- Barrido de salidas sin marcar -----------------------------------------------
