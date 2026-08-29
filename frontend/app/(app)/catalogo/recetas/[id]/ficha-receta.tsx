@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Combobox } from "@/components/ui/combobox";
 
 import { Rastro } from "@/components/shell/rastro";
 import { useRouter } from "next/navigation";
@@ -108,19 +109,14 @@ export function FichaReceta({
             .
           </p>
         ) : (
-          <select
+          <Combobox
             value={produce}
-            onChange={(e) => e.target.value && asignar(e.target.value)}
-            className="min-w-64 text-sm"
-            aria-label="Artículo que produce la receta"
-          >
-            <option value="">No produce un artículo (receta de venta)</option>
-            {subrecetas.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.nombre}
-              </option>
-            ))}
-          </select>
+            alCambiar={(v) => v && asignar(v)}
+            className="min-w-64"
+            etiqueta="Artículo que produce la receta"
+            marcador="No produce un artículo (receta de venta)"
+            opciones={subrecetas.map((a) => ({ valor: a.id, etiqueta: a.nombre }))}
+          />
         )}
         {error && (
           <p role="alert" className="mt-2 text-sm font-semibold text-secondary">

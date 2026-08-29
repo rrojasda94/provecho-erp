@@ -3,7 +3,7 @@ import { ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 /**
- * Entrada al BI autoservicio (ADR-082). Hoy es solo el enlace a Superset —
+ * Entrada al BI autoservicio (ADR-083). Hoy es solo el enlace a Superset —
  * el SSO (Fase B) ya funciona, pero los tableros embebidos (Fase D, guest
  * token vía `GET /api/v1/bi/dashboards/{id}/guest-token`) esperan a que
  * existan tableros de verdad que embeber, que a su vez esperan al droplet

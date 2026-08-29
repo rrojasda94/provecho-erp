@@ -99,14 +99,47 @@ class OrdenCompraCreate(BaseModel):
     tipo: str = "insumo"
 
 
+class OrdenCompraItemsUpdate(BaseModel):
+    """Reemplaza los ítems de una OC — solo admitido en `estado='borrador'`."""
+
+    items: list[OrdenCompraItemIn] = Field(min_length=1)
+
+
+class OrdenCompraItemOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    articulo_id: uuid.UUID
+    cantidad: Decimal
+    costo_unitario: Decimal
+    cantidad_recibida: Decimal
+
+
 class OrdenCompraOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     proveedor_id: uuid.UUID
     tipo: str
+    origen: str
     almacen_destino_id: uuid.UUID
     estado: str
     total: Decimal
+    items: list[OrdenCompraItemOut] = []
+
+
+class CompraDirectaComprobante(BaseModel):
+    idempotency_key: str = Field(min_length=8, max_length=100)
+    tipo: str
+    serie: str = Field(min_length=1, max_length=10)
+    correlativo: int = Field(gt=0)
+    sustento: str
+
+
+class CompraDirectaCreate(BaseModel):
+    proveedor_id: uuid.UUID
+    almacen_destino_id: uuid.UUID
+    idempotency_key: str = Field(min_length=8, max_length=100)
+    items: list[OrdenCompraItemIn] = Field(min_length=1)
+    comprobante: CompraDirectaComprobante
 
 
 class RecepcionItemIn(BaseModel):

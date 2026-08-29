@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { DialogoImportar } from "@/components/planilla/dialogo-importar";
+import { Combobox } from "@/components/ui/combobox";
 import {
   catalogoApi,
   type ArticuloRevisado,
@@ -233,18 +234,13 @@ function ResolverCategoria({
     <div className="flex flex-col gap-1">
       <div className="flex items-center gap-2">
         <span className="min-w-40 text-sm text-dark">{nombre}</span>
-        <select
-          className="flex-1 rounded border border-borde bg-white px-2 py-1 text-sm"
-          defaultValue=""
-          onChange={(e) => onResolver(nombre, e.target.value)}
-        >
-          <option value="">Dejar sin categoría</option>
-          {categorias.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.nombre}
-            </option>
-          ))}
-        </select>
+        <Combobox
+          className="flex-1"
+          etiqueta={`Categoría para ${nombre}`}
+          marcador="Dejar sin categoría"
+          alCambiar={(v) => onResolver(nombre, v ?? "")}
+          opciones={categorias.map((c) => ({ valor: c.id, etiqueta: c.nombre }))}
+        />
         <button
           type="button"
           className="rounded border border-primary px-2 py-1 text-xs text-primary hover:bg-primary/10 disabled:opacity-50"

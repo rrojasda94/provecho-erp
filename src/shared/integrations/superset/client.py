@@ -1,4 +1,4 @@
-"""Cliente HTTP de Superset (ADR-082 Fase D): solo pide *guest tokens* para
+"""Cliente HTTP de Superset (ADR-083 Fase D): solo pide *guest tokens* para
 embeber tableros en `/dashboard`. Único punto del ERP que habla con la API
 de administración de Superset — el dominio nunca la llama.
 
@@ -62,7 +62,7 @@ def guest_token(
     `rls` va vacío a propósito: la fila ya se filtra en el dataset (RLS de
     Fase C, contra `bi_alcance_usuario`). Un `rls` acá sería una segunda
     definición de "qué ve cada quien" que mantener sincronizada con la
-    primera — exactamente el problema que ADR-082 ya acepta una vez con
+    primera — exactamente el problema que ADR-083 ya acepta una vez con
     `Tenant` y no necesita aceptar dos veces.
     """
     with _sesion() as c:

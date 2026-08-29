@@ -208,11 +208,11 @@ function armarRegla(formData: FormData): { condicion: object; beneficio: object 
     const crudo = String(formData.get(campo) ?? "").trim();
     return crudo === "" ? null : Number(crudo);
   };
+  // Un valor por campo repetido, no una cadena con comas: el desplegable de
+  // búsqueda manda un `<input type="hidden">` por cada opción elegida. Es el
+  // mismo trato que ya tienen las líneas de una orden de compra.
   const lista = (campo: string) =>
-    String(formData.get(campo) ?? "")
-      .split(",")
-      .map((x) => x.trim())
-      .filter(Boolean);
+    formData.getAll(campo).map((x) => String(x).trim()).filter(Boolean);
 
   const productos = lista("producto_ids");
   const categorias = lista("categoria_ids");

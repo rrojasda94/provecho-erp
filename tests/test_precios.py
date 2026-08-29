@@ -19,14 +19,19 @@ from src.core.app import create_app
 from src.core.database import Base
 from src.modules.inventory.application import listeners
 from src.modules.inventory.infrastructure.models import (
+    Articulo,
     Categoria,
     CategoriaUdm,
     Receta,
+    RecetaItem,
+    Sku,
+    Stock,
     UnidadMedida,
 )
 from src.modules.sales.infrastructure.models import ProductoComercial, PuntoVenta
 from src.modules.users.api.deps import get_db
 from src.modules.users.infrastructure.models import (
+    Almacen,
     Empresa,
     Grupo,
     Marca,
@@ -238,6 +243,74 @@ def test_carta_omite_producto_sin_precio(env):
         headers=h,
     )
     assert r.json() == []
+
+
+def _con_insumo_bajo_minimo(client, ids, *, stock_bajo: bool):
+    """Arma almacén + insumo + receta + stock para el producto del fixture,
+    con el stock justo debajo (o por encima) del mínimo."""
+    session = next(client.app.dependency_overrides[get_db]())
+    empresa = session.scalar(select(Empresa))
+    sucursal = session.get(Sucursal, uuid.UUID(ids["sucursal_id"]))
+    almacen = Almacen(empresa_id=empresa.id, sucursal_id=sucursal.id,
+                       nombre="Central", tipo="central")
+    udm_cat = CategoriaUdm(nombre="Peso insumo")
+    session.add_all([almacen, udm_cat])
+    session.flush()
+    udm = UnidadMedida(categoria_udm_id=udm_cat.id, nombre="Gramo")
+    session.add(udm)
+    session.flush()
+    articulo = Articulo(empresa_id=empresa.id, id_interno="QUESO", nombre="Queso",
+                        unidad_medida_id=udm.id, tipo="insumo")
+    session.add(articulo)
+    session.flush()
+    sku = Sku(articulo_id=articulo.id, codigo="SKU-QUESO")
+    session.add(sku)
+    session.flush()
+    session.add(Stock(
+        almacen_id=almacen.id, sku_id=sku.id,
+        cantidad=Decimal("1") if stock_bajo else Decimal("100"),
+        stock_minimo=Decimal("5"),
+    ))
+    session.add(RecetaItem(
+        receta_id=uuid.UUID(
+            str(session.scalar(select(ProductoComercial.receta_id).where(
+                ProductoComercial.id == uuid.UUID(ids["producto_id"])
+            )))
+        ),
+        articulo_id=articulo.id, cantidad=Decimal("50"),
+    ))
+    session.commit()
+
+
+def test_carta_marca_stock_bajo_sin_bloquear_precio(env):
+    client, ids = env
+    h = _token(client)
+    _lista(client, h, ids, "20.00")
+    _con_insumo_bajo_minimo(client, ids, stock_bajo=True)
+
+    r = client.get(
+        f"/api/v1/sales/carta?sucursal_id={ids['sucursal_id']}"
+        "&canal=pdv&modalidad=takeout",
+        headers=h,
+    )
+    assert r.status_code == 200
+    item = r.json()[0]
+    assert item["stock_bajo"] is True
+    assert Decimal(item["precio_unitario"]) == Decimal("20.00")  # avisa, no bloquea
+
+
+def test_carta_stock_bajo_false_cuando_stock_normal(env):
+    client, ids = env
+    h = _token(client)
+    _lista(client, h, ids, "20.00")
+    _con_insumo_bajo_minimo(client, ids, stock_bajo=False)
+
+    r = client.get(
+        f"/api/v1/sales/carta?sucursal_id={ids['sucursal_id']}"
+        "&canal=pdv&modalidad=takeout",
+        headers=h,
+    )
+    assert r.json()[0]["stock_bajo"] is False
 
 
 def test_lista_vigente_a_futuro_no_aplica(env):

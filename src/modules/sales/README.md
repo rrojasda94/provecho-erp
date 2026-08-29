@@ -467,6 +467,14 @@ producto y cantidad, y `crear_venta` resuelve el precio contra
 `GET /carta` es lo que el PDV/kiosko renderiza: catálogo vendible con el
 precio ya resuelto, en vez de que el cliente traiga uno propio.
 
+**`stock_bajo` (2026-08-29, RN-INV-013):** cada producto y cada variante
+trae este flag — `true` si algún insumo de su receta está en o bajo su
+`stock_minimo`, en el almacén de la sucursal que pide la carta. Es solo un
+aviso: nunca oculta el producto ni bloquea la venta (a diferencia de "sin
+precio", que sí lo saca de la carta). Sale de
+`inventory.application.queries_publicas.recetas_con_insumo_bajo_minimo`,
+mismo contrato de lectura que ya usa `sales` para el resto del catálogo.
+
 **Excepción del replay offline (ADR-009)**: el lote que empuja el hub usa
 `VentaItemSyncIn`, que **sí** lleva `precio_unitario`. Una venta ya
 cobrada conserva el precio al que se cobró; recotizarla en la nube

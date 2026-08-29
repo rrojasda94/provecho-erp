@@ -6,6 +6,7 @@ import { useMemo } from "react";
 import { BOTON_FILA, DialogoFormulario } from "@/components/formulario/dialogo-formulario";
 import { PersonaPicker } from "@/components/persona-picker/persona-picker";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
+import { Combobox } from "@/components/ui/combobox";
 
 import {
   cesarTrabajadorAction,
@@ -49,14 +50,13 @@ function CampoSucursal({
   return (
     <label className="flex flex-col gap-1 text-sm font-semibold">
       Sucursal donde trabaja
-      <select name="sucursal_id" defaultValue={valor ?? ""}>
-        <option value="">Sin sucursal asignada</option>
-        {sucursales.map((s) => (
-          <option key={s.id} value={s.id}>
-            {s.nombre}
-          </option>
-        ))}
-      </select>
+      <Combobox
+        name="sucursal_id"
+        etiqueta="Sucursal"
+        defaultValue={valor}
+        marcador="Sin sucursal asignada"
+        opciones={sucursales.map((s) => ({ valor: s.id, etiqueta: s.nombre }))}
+      />
     </label>
   );
 }

@@ -7,6 +7,7 @@ import { useMemo } from "react";
 
 import { DialogoFormulario } from "@/components/formulario/dialogo-formulario";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
+import { Combobox } from "@/components/ui/combobox";
 import { tienePermiso } from "@/lib/permisos";
 
 import { abrirConteoAction } from "./actions";
@@ -191,14 +192,13 @@ function Filtro({
   return (
     <label className="flex flex-col gap-1 text-xs font-semibold">
       {etiqueta}
-      <select value={valor} onChange={(e) => alCambiar(e.target.value)}>
-        <option value="">Todas</option>
-        {opciones.map((o) => (
-          <option key={o.id} value={o.id}>
-            {o.nombre}
-          </option>
-        ))}
-      </select>
+      <Combobox
+        etiqueta={etiqueta}
+        marcador="Todas"
+        value={valor}
+        alCambiar={(v) => alCambiar(v ?? "")}
+        opciones={opciones.map((o) => ({ valor: o.id, etiqueta: o.nombre }))}
+      />
     </label>
   );
 }
@@ -221,28 +221,23 @@ function FormularioConteo({
     >
       <label className="flex flex-col gap-1 text-sm font-semibold">
         Almacén
-        <select name="almacen_id" defaultValue="">
-          <option value="" disabled>
-            Elegir…
-          </option>
-          {almacenes.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.nombre}
-            </option>
-          ))}
-        </select>
+        <Combobox
+          name="almacen_id"
+          etiqueta="Almacén"
+          requerido
+          marcador="Elegir…"
+          opciones={almacenes.map((a) => ({ valor: a.id, etiqueta: a.nombre }))}
+        />
       </label>
 
       <label className="flex flex-col gap-1 text-sm font-semibold">
         Qué se cuenta
-        <select name="categoria_id" defaultValue="">
-          <option value="">Todo el almacén (conteo general)</option>
-          {categorias.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.nombre}
-            </option>
-          ))}
-        </select>
+        <Combobox
+          name="categoria_id"
+          etiqueta="Qué se cuenta"
+          marcador="Todo el almacén (conteo general)"
+          opciones={categorias.map((c) => ({ valor: c.id, etiqueta: c.nombre }))}
+        />
       </label>
 
       <label className="flex flex-col gap-1 text-sm font-semibold">

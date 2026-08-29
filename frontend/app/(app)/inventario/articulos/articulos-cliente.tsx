@@ -6,6 +6,7 @@ import { useMemo } from "react";
 
 import { BOTON_FILA, DialogoFormulario } from "@/components/formulario/dialogo-formulario";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
+import { Combobox } from "@/components/ui/combobox";
 import { RUTA_EXPORTAR_ARTICULOS } from "@/lib/catalogo";
 
 import { crearArticuloAction, editarArticuloAction } from "./actions";
@@ -62,14 +63,13 @@ function SelectorCategoria({
   return (
     <label className="flex flex-col gap-1 text-sm font-semibold">
       Categoría (opcional)
-      <select name="categoria_id" defaultValue={valor ?? ""}>
-        <option value="">Sin categoría</option>
-        {categorias.map((cat) => (
-          <option key={cat.id} value={cat.id}>
-            {cat.nombre}
-          </option>
-        ))}
-      </select>
+      <Combobox
+        name="categoria_id"
+        etiqueta="Categoría"
+        defaultValue={valor ?? ""}
+        marcador="Sin categoría"
+        opciones={categorias.map((cat) => ({ valor: cat.id, etiqueta: cat.nombre }))}
+      />
     </label>
   );
 }
@@ -108,16 +108,13 @@ function DialogoNuevoArticulo({
             No hay unidades de medida cargadas — no se puede crear un artículo todavía.
           </span>
         ) : (
-          <select name="unidad_medida_id" required defaultValue="">
-            <option value="" disabled>
-              Elegir...
-            </option>
-            {unidadesMedida.map((udm) => (
-              <option key={udm.id} value={udm.id}>
-                {udm.nombre}
-              </option>
-            ))}
-          </select>
+          <Combobox
+            name="unidad_medida_id"
+            etiqueta="Unidad de medida"
+            requerido
+            marcador="Elegir..."
+            opciones={unidadesMedida.map((u) => ({ valor: u.id, etiqueta: u.nombre }))}
+          />
         )}
       </label>
       <SelectorCategoria categorias={categorias} />

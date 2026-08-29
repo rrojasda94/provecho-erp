@@ -12,6 +12,7 @@ import { TablaDatos } from "@/components/tabla/tabla-datos";
 
 import { guardarEmpresaAction, guardarGrupoAction } from "../actions";
 import { CampoDireccion } from "@/components/direccion/campo-direccion";
+import { Combobox } from "@/components/ui/combobox";
 
 export type Grupo = { id: string; nombre: string };
 export type Empresa = {
@@ -112,13 +113,13 @@ function DialogoNuevaEmpresa({ grupos }: { grupos: Grupo[] }) {
     >
       <label className="flex flex-col gap-1 text-sm font-semibold">
         Grupo
-        <select name="grupo_id" required defaultValue={grupos[0]?.id ?? ""}>
-          {grupos.map((g) => (
-            <option key={g.id} value={g.id}>
-              {g.nombre}
-            </option>
-          ))}
-        </select>
+        <Combobox
+          name="grupo_id"
+          etiqueta="Grupo"
+          requerido
+          defaultValue={grupos[0]?.id ?? null}
+          opciones={grupos.map((g) => ({ valor: g.id, etiqueta: g.nombre }))}
+        />
       </label>
       <CamposEmpresa />
     </DialogoFormulario>

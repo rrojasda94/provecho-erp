@@ -1,4 +1,4 @@
-"""OAuth2 Authorization Code para el SSO del BI (Superset, ADR-082 Fase B).
+"""OAuth2 Authorization Code para el SSO del BI (Superset, ADR-083 Fase B).
 
 Provecho es el único proveedor y hay un solo cliente confidencial
 (Superset). Sin tabla nueva: el código de autorización y el access token

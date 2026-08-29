@@ -147,6 +147,12 @@ function cuantosExtras(p: ItemDeCarta): number {
   return Math.max(...p.variantes.map((v) => v.extras.length), 0);
 }
 
+/** RN-INV-013: si el producto o alguna de sus presentaciones usa un insumo
+ * con poco stock, avisa — nunca deja de mostrarse ni de venderse. */
+function tieneStockBajo(p: ItemDeCarta): boolean {
+  return p.stock_bajo || p.variantes.some((v) => v.stock_bajo);
+}
+
 function ProductosGrid({
   items,
   busqueda,
@@ -178,7 +184,17 @@ function ProductosGrid({
           className="pdv-producto"
           onClick={() => onProducto(p)}
         >
-          <span className="pdv-producto-nombre">{p.nombre}</span>
+          <span className="pdv-producto-nombre">
+            {p.nombre}
+            {tieneStockBajo(p) && (
+              <span
+                className="pdv-producto-stock-bajo"
+                title="Insumo con poco stock — la venta no se bloquea"
+              >
+                ⚠
+              </span>
+            )}
+          </span>
           <span className="pdv-producto-precio">
             {/* Con variantes el precio de la tarjeta es el "desde": el que
                 se cobra sale del tamaño que se elija. */}

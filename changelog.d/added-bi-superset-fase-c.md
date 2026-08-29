@@ -1,4 +1,4 @@
-- **Superset aprovisionado y ensayado de punta a punta** (ADR-082, Fase C):
+- **Superset aprovisionado y ensayado de punta a punta** (ADR-083, Fase C):
   `docker-compose.bi.yml`, `deploy/bi/` (Dockerfile, config de Superset,
   Caddyfile), `scripts/superset_provision_db.sql` y
   `scripts/superset_init.py`. Todo corrido de verdad contra un Superset y
@@ -33,5 +33,5 @@
     puede ver.
 - Pendiente: crear el droplet real (DigitalOcean, VPC, firewall, DNS —
   requiere acceso del usuario) y correr el mismo `scripts/superset_init.py`
-  contra la Postgres de staging de verdad. Ver ADR-082 y
+  contra la Postgres de staging de verdad. Ver ADR-083 y
   `docs/engineering/bi-superset.md`.

@@ -1,4 +1,4 @@
-- **Provecho como proveedor OAuth2 para el SSO del BI** (ADR-082, Fase B;
+- **Provecho como proveedor OAuth2 para el SSO del BI** (ADR-083, Fase B;
   RN-BI-004/005/006). Sin tabla nueva: `src/core/oauth/` guarda el código de
   autorización y el access token en Redis, con TTL corto y un solo uso
   (`GETDEL`) — ninguno de los dos se pensó para durar una sesión, solo lo

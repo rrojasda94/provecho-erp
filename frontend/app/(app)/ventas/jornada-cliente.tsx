@@ -11,6 +11,7 @@ import {
   type EstadoVenta,
   type LineaVenta,
 } from "./actions";
+import { Combobox } from "@/components/ui/combobox";
 
 export type Venta = {
   id: string;
@@ -362,17 +363,13 @@ export function JornadaCliente({
       <div className="flex flex-wrap items-end gap-3 rounded border border-gray/20 bg-white p-4">
         <label className="flex flex-col gap-1 text-sm font-semibold">
           Sucursal
-          <select
+          <Combobox
+            etiqueta="Sucursal"
+            requerido
             value={sucursalId}
-            onChange={(e) => navegar({ sucursal: e.target.value })}
-            className="rounded border border-gray/40 px-2 py-1"
-          >
-            {sucursales.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.nombre}
-              </option>
-            ))}
-          </select>
+            alCambiar={(v) => v && navegar({ sucursal: v })}
+            opciones={sucursales.map((s) => ({ valor: s.id, etiqueta: s.nombre }))}
+          />
         </label>
         <label className="flex flex-col gap-1 text-sm font-semibold">
           Fecha

@@ -53,7 +53,7 @@ export async function pedir<T>(
 
 /**
  * Como `pedir`, pero para una respuesta binaria — el `.xlsx` completo de un
- * reporte (ADR-082 Fase E), no las 500 filas que ya están en pantalla.
+ * reporte (ADR-083 Fase E), no las 500 filas que ya están en pantalla.
  * Aparte de `pedir` por lo mismo que `subir`: acá no hay `.json()` que
  * llamar, y el nombre de archivo sale de `Content-Disposition`, no de la
  * ruta.

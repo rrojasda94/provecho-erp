@@ -38,11 +38,26 @@ dentro de seis meses.
 
 ## Pendiente de corte
 
-Los fragmentos de **PCGE, estados financieros e IGV configurable** (ADR-081)
-salen en **0.9.0**, no en la 0.8.2: son módulo nuevo —plan contable oficial,
-Estado de Situación Financiera y de Resultados, régimen de IGV elegible— y no
-un parche. La 0.8.2 se corta antes con sus propios cambios; esto va después,
-en su propio corte.
+**0.9.0 está cortado pero no desplegado.** `CHANGELOG.md`, `pyproject.toml` y
+`frontend/package.json` ya llevan `0.9.0` (PCGE, compra directa, alerta de
+stock bajo en el PDV — ver `chore(release): 0.9.0`, PR #131), pero staging
+sigue en 0.8.2: el `Desplegar` que corrió después del corte llevó `0.8.2`
+como input (quedó el valor anterior sin cambiar), no `0.9.0` ni `latest`.
+
+**PR #132 (listas desplegables con búsqueda) se mergea sobre ese mismo commit
+sin corte propio** — así lo dice su descripción: el corte queda para el
+momento de mergear. Trae dos fragmentos propios
+(`added-busqueda-en-las-listas-desplegables.md`,
+`fixed-promociones-pedian-ids-a-mano.md`) que van a caer en este directorio
+recién cuando se mergee.
+
+Para no dejar 0.9.0 sin sus propios fixes en staging por un despliegue de
+más: **no correr `Desplegar` de nuevo hasta mergear PR #132**, y entonces
+desplegar los dos juntos en un solo paso — `./scripts/desplegar.sh latest`
+(o el workflow con input `latest`) trae lo que haya en `main`, 0.9.0 incluido.
+Si se prefiere que los fragmentos de PR #132 queden con su propio número en
+el CHANGELOG en vez de viajar como cambios sin versión, cortar 0.9.1 antes
+de ese despliegue.
 
 ## Cortar la versión
 

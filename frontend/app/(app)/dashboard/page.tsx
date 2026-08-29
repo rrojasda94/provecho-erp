@@ -14,6 +14,7 @@ import { obtenerSesion } from "@/lib/sesion";
 type DashboardResumen = {
   ventas_hoy: { fecha: string; cantidad: number; total: string };
   stock_bajo_minimo: number;
+  incidencias_recientes: number;
   cajas_abiertas: Array<{
     apertura_caja_id: string;
     punto_venta_id: string;
@@ -142,6 +143,12 @@ export default async function DashboardPage() {
             titulo="Stock bajo mínimo"
             valor={resumen.datos.stock_bajo_minimo}
             alerta={resumen.datos.stock_bajo_minimo > 0}
+          />
+          <Kpi
+            titulo="Incidencias de inventario (7d)"
+            valor={resumen.datos.incidencias_recientes}
+            alerta={resumen.datos.incidencias_recientes > 0}
+            detalle="Movimientos omitidos — ver reporte Consumos omitidos"
           />
           <Kpi
             titulo="Cajas abiertas"

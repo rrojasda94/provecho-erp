@@ -14,6 +14,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from src.modules.inventory.application import recetas as recetas_uc
+from src.modules.inventory.domain import rules
 from src.modules.inventory.infrastructure.models import (
     Articulo,
     IncidenciaInventario,
@@ -314,6 +315,60 @@ def consumos_omitidos(
         }
         for incidencia, nombre in session.execute(stmt)
     ]
+
+
+def contar_incidencias_recientes(
+    session: Session, empresa_id: uuid.UUID, *, dias: int = 7
+) -> int:
+    """Cuántas `incidencia_inventario` hubo en los últimos `dias` — para el
+    KPI del dashboard gerencial (`core.dashboard_router`). El detalle de
+    cada una vive en el reporte `consumos_omitidos`."""
+    desde = fechas.inicio_dia_utc(fechas.hoy() - datetime.timedelta(days=dias - 1))
+    return session.scalar(
+        select(func.count())
+        .select_from(IncidenciaInventario)
+        .where(
+            IncidenciaInventario.empresa_id == empresa_id,
+            IncidenciaInventario.created_at >= desde,
+        )
+    )
+
+
+def almacen_de_sucursal(session: Session, sucursal_id: uuid.UUID) -> uuid.UUID | None:
+    """Almacén de una sucursal — mismo criterio que ya usa
+    `inventory.application.listeners` para resolver dónde descontar una
+    venta; acá promovido a contrato público para que `sales` no reimplemente
+    la misma consulta al armar la carta del PDV."""
+    return session.scalar(
+        select(Almacen.id).where(
+            Almacen.sucursal_id == sucursal_id, Almacen.deleted_at.is_(None)
+        )
+    )
+
+
+def recetas_con_insumo_bajo_minimo(
+    session: Session, receta_ids: Sequence[uuid.UUID], almacen_id: uuid.UUID
+) -> set[uuid.UUID]:
+    """Qué recetas usan, entre sus insumos, algún artículo cuyo stock en
+    `almacen_id` ya cruzó su `stock_minimo` (RN-INV-013) — para que el PDV
+    avise sin bloquear la venta (nunca deja de mostrar el producto)."""
+    if not receta_ids:
+        return set()
+    filas = session.execute(
+        select(RecetaItem.receta_id, Stock.cantidad, Stock.stock_minimo)
+        .join(Sku, Sku.articulo_id == RecetaItem.articulo_id)
+        .join(Stock, Stock.sku_id == Sku.id)
+        .where(
+            RecetaItem.receta_id.in_(receta_ids),
+            Sku.activo.is_(True),
+            Stock.almacen_id == almacen_id,
+        )
+    )
+    return {
+        receta_id
+        for receta_id, cantidad, stock_minimo in filas
+        if rules.stock_bajo(cantidad, stock_minimo)
+    }
 
 
 def disponible_negativo(

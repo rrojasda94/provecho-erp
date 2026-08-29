@@ -26,7 +26,7 @@ class Asistencia(Base, UuidPkMixin, TimestampMixin):
     __table_args__ = (
         UniqueConstraint("trabajador_id", "fecha"),
         # El UNIQUE de arriba no sirve para agrupar por fecha entre
-        # trabajadores (va segunda): `vw_bi_rrhh_asistencia` (ADR-082) sí
+        # trabajadores (va segunda): `vw_bi_rrhh_asistencia` (ADR-083) sí
         # lo necesita.
         Index("ix_asistencia_fecha_trabajador", "fecha", "trabajador_id"),
     )

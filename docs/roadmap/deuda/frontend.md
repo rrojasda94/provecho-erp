@@ -21,6 +21,23 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   correcto de esa coordinación es el servidor de auth, que podría devolver el
   último par emitido para un token recién rotado en vez de un 401.
 
+- ⬜ **Los `<select>` fuera de un diálogo no reciben ningún estilo**
+  (2026-08-29, parcialmente saldada). El bloque `.erp dialog :where(input,
+  select, textarea)` de `globals.css` —el que su propio comentario declara
+  temporal— solo alcanza a los campos **dentro de un `<dialog>`** y dentro del
+  layout `.erp`. El parche de desplegables con búsqueda migró los 62 `<select>`
+  alimentados por la API a `Combobox` —que trae sus propias clases y no
+  depende de esa regla—, así que esos ya no dependen del bloque. Quedan los 52
+  enumerados fijos del código (estados, tipos, modalidades) que siguen siendo
+  `<select>` nativos a propósito: los que estén fuera de un diálogo —filtros de
+  tabla, PDV, KDS— siguen con el aspecto por defecto del navegador. El bloque
+  se borra cuando no quede ningún `<select>` fuera de un `<dialog>`.
+- ✅ 2026-08-29 **Las pruebas e2e y de uso hablaban `selectOption`.** Cada
+  desplegable migrado a `Combobox` obligó a reescribir su localizador — de
+  `getByLabel(...).selectOption(...)` a `getByRole("combobox")` más un clic
+  sobre la opción. Se agregó `elegirEnLista()` en `e2e/util.ts` para no repetir
+  esos tres pasos en cada spec.
+
 - ✅ 2026-08-12 **El sistema visual, cerrado (ADR-037).** Lo que se salda y lo
   que queda:
   - **Tokens que faltaban** (F2.3): elevación (`--sombra-1..3`), estados

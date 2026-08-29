@@ -13,6 +13,7 @@ import {
   publicarConvocatoriaAction,
   type EstadoRrhh,
 } from "./actions";
+import { Combobox } from "@/components/ui/combobox";
 
 export type Convocatoria = {
   id: string;
@@ -283,14 +284,13 @@ function DialogoContratar({
       <Campo etiqueta="Fecha de ingreso" nombre="fecha_ingreso" type="date" required />
       <label className="flex flex-col gap-1 text-sm font-semibold">
         Sucursal donde trabaja
-        <select name="sucursal_id" defaultValue={sucursalConvocatoria ?? ""}>
-          <option value="">Sin sucursal asignada</option>
-          {sucursales.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.nombre}
-            </option>
-          ))}
-        </select>
+        <Combobox
+          name="sucursal_id"
+          etiqueta="Sucursal"
+          defaultValue={sucursalConvocatoria}
+          marcador="Sin sucursal asignada"
+          opciones={sucursales.map((s) => ({ valor: s.id, etiqueta: s.nombre }))}
+        />
         <span className="text-xs font-normal text-gray">
           Sin esto no aparece en el pad de asistencia de ningún local.
         </span>

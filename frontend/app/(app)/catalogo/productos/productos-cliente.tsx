@@ -9,6 +9,7 @@ import { TablaDatos } from "@/components/tabla/tabla-datos";
 import { catalogoApi, type Marca, type Producto } from "@/lib/catalogo";
 import { ErrorApi } from "@/lib/cliente-api";
 import { aTitulo } from "@/lib/texto";
+import { Combobox } from "@/components/ui/combobox";
 
 /** Qué se está creando. La diferencia no es cosmética: un producto con
  * variantes nace sin receta (la lleva cada hija) y un extra nace marcado
@@ -160,13 +161,13 @@ function DialogoNuevoProducto({
           </label>
           <label className="flex flex-col gap-1 text-sm font-semibold">
             Marca
-            <select value={marcaId} onChange={(e) => setMarcaId(e.target.value)}>
-              {marcas.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.nombre}
-                </option>
-              ))}
-            </select>
+            <Combobox
+              etiqueta="Marca"
+              requerido
+              value={marcaId}
+              alCambiar={(v) => v && setMarcaId(v)}
+              opciones={marcas.map((m) => ({ valor: m.id, etiqueta: m.nombre }))}
+            />
           </label>
           <fieldset className="flex flex-col gap-2 text-sm">
             <legend className="font-semibold">¿Cómo se vende?</legend>

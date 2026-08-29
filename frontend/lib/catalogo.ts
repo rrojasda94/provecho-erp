@@ -233,7 +233,7 @@ export const catalogoApi = {
   // Listado paginado (ADR-026): la carta del PDV no lo usa, sí el
   // editor de recetas, que pide la primera página.
   articulos: async () =>
-    (await pedir<Pagina<Articulo>>("/inventory/articulos")).items,
+    (await pedir<Pagina<Articulo>>("/inventory/articulos?page_size=200")).items,
 
   /** Alta rápida de un insumo desde el diálogo de importación: el archivo
    * nombró algo que el catálogo no tiene y crearlo ahí evita perder el

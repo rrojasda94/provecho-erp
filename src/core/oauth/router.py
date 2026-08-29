@@ -1,9 +1,9 @@
-"""OAuth2 (Authorization Code) para el SSO del BI (Superset, ADR-082 Fase B).
+"""OAuth2 (Authorization Code) para el SSO del BI (Superset, ADR-083 Fase B).
 
 Tres endpoints, dos formas de autenticarse:
 
 - `POST /oauth/codigo`: el único que ve una sesión de Provecho (JWT +
-  `bi.acceder`, ADR-082/RN-BI-004). No es el navegador el que lo llama: la
+  `bi.acceder`, ADR-083/RN-BI-004). No es el navegador el que lo llama: la
   cookie de sesión (`provecho_token`) es httpOnly y host-only de
   `staging.majambo.com.pe` y nunca llega a la API en otro subdominio (ADR-004
   no la amplía a propósito). Quien la lee y llama acá es el route handler

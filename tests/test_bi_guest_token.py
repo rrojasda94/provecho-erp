@@ -1,4 +1,4 @@
-"""Guest tokens de Superset — `src/core/bi_router.py` (ADR-082 Fase D).
+"""Guest tokens de Superset — `src/core/bi_router.py` (ADR-083 Fase D).
 
 `guest_token` (el cliente HTTP real de `src/shared/integrations/superset/`)
 se monkeypatchea: este archivo prueba el endpoint —permiso, whitelist,

@@ -211,7 +211,7 @@ PERMISOS = [
     ("dashboard.leer", "Consultar el dashboard gerencial (ventas, stock, caja)"),
     (
         "bi.acceder",
-        "Entrar al análisis avanzado (Superset, ADR-082) — decide si hay login "
+        "Entrar al análisis avanzado (Superset, ADR-083) — decide si hay login "
         "posible, no qué filas se ven (eso lo resuelve la RLS del BI)",
     ),
     (
@@ -443,6 +443,8 @@ ROLES = {
         "purchases.dar_conformidad",
         # Alta de proveedor natural liga a una persona existente.
         "personas.leer",
+        # Elegir artículo al armar los ítems de una OC.
+        "inventory.leer",
         # Qué se pide más y desde dónde, para negociar volumen (contrato
         # público de inventory).
         "inventory.leer_solicitudes_externas",

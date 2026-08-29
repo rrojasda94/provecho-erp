@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from src.config.settings import settings
 from src.core.tenant import Tenant
 from src.modules.purchases.api import schemas
-from src.modules.purchases.application import comprobantes, ordenes, proveedores
+from src.modules.purchases.application import compra_directa, comprobantes, ordenes, proveedores
 from src.modules.purchases.application.scope import (
     exigir_almacen,
     exigir_orden_compra,
@@ -111,6 +111,15 @@ def listar_ordenes_compra(
     )
 
 
+def _con_items(session: Session, orden) -> schemas.OrdenCompraOut:
+    salida = schemas.OrdenCompraOut.model_validate(orden)
+    salida.items = [
+        schemas.OrdenCompraItemOut.model_validate(it)
+        for it in ordenes.items_de_orden_compra(session, orden.id)
+    ]
+    return salida
+
+
 @router.get("/ordenes-compra/{orden_compra_id}", response_model=schemas.OrdenCompraOut)
 def ver_orden_compra(
     orden_compra_id: uuid.UUID,
@@ -118,7 +127,27 @@ def ver_orden_compra(
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    return exigir_orden_compra(session, orden_compra_id, tenant)
+    orden = exigir_orden_compra(session, orden_compra_id, tenant)
+    return _con_items(session, orden)
+
+
+@router.patch("/ordenes-compra/{orden_compra_id}", response_model=schemas.OrdenCompraOut)
+def editar_orden_compra(
+    orden_compra_id: uuid.UUID,
+    body: schemas.OrdenCompraItemsUpdate,
+    actor: Usuario = Depends(require_permission(CREAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    exigir_orden_compra(session, orden_compra_id, tenant)
+    orden = ordenes.editar_orden_compra(
+        session,
+        orden_compra_id,
+        items=[it.model_dump() for it in body.items],
+        actor_id=actor.id,
+    )
+    session.commit()
+    return _con_items(session, orden)
 
 
 @router.post("/ordenes-compra/{orden_compra_id}/emitir", response_model=schemas.OrdenCompraOut)
@@ -176,6 +205,28 @@ def anular_orden_compra(
     orden = ordenes.anular_orden_compra(session, orden_compra_id, actor.id)
     session.commit()
     return orden
+
+
+@router.post("/compras-directas", response_model=schemas.ComprobanteOut, status_code=201)
+def registrar_compra_directa(
+    body: schemas.CompraDirectaCreate,
+    actor: Usuario = Depends(require_permission(CREAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    exigir_proveedor(session, body.proveedor_id, tenant)
+    exigir_almacen(session, body.almacen_destino_id, tenant)
+    comprobante = compra_directa.registrar_compra_directa(
+        session,
+        proveedor_id=body.proveedor_id,
+        almacen_destino_id=body.almacen_destino_id,
+        creado_por=actor.id,
+        idempotency_key=body.idempotency_key,
+        items=[it.model_dump() for it in body.items],
+        comprobante=body.comprobante.model_dump(),
+    )
+    session.commit()
+    return comprobante
 
 
 @router.post(

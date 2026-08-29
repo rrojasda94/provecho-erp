@@ -1,4 +1,4 @@
--- Rol y esquema para la METADATA de Superset (ADR-082 Fase C) — dashboards,
+-- Rol y esquema para la METADATA de Superset (ADR-083 Fase C) — dashboards,
 -- usuarios de Superset, conexiones guardadas. NO tiene nada que ver con
 -- `bi_lector` (Fase A): ese es de solo lectura sobre `vw_bi_*`, este es de
 -- lectura/escritura pero solo sobre SU PROPIO esquema, cero acceso a las
@@ -6,7 +6,7 @@
 --
 -- Se corre UNA VEZ, a mano, como superusuario, contra la Postgres del
 -- droplet de staging (la misma base — Superset no trae la suya, ver
--- ADR-082). Ver docs/engineering/bi-superset.md para el paso a paso
+-- ADR-083). Ver docs/engineering/bi-superset.md para el paso a paso
 -- completo, incluida la conexión remota por VPC.
 --
 -- Uso:

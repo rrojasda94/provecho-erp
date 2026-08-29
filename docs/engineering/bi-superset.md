@@ -1,6 +1,6 @@
 # BI (Superset) — runbook
 
-Runbook y bitácora del droplet del BI autoservicio (ADR-082 Fase C).
+Runbook y bitácora del droplet del BI autoservicio (ADR-083 Fase C).
 Complementa [staging.md](staging.md) (el droplet del que este depende) y
 [devops.md](devops.md). Mismo criterio que ese archivo:
 
@@ -10,7 +10,7 @@ Complementa [staging.md](staging.md) (el droplet del que este depende) y
 
 ## Por qué un droplet aparte
 
-Ver ADR-082, "Dónde corre": el volumen real es decenas de consultas al mes
+Ver ADR-083, "Dónde corre": el volumen real es decenas de consultas al mes
 sobre miles de filas, sin apuro de latencia. Agrandar el droplet de
 staging (2 vCPU/4 GB, donde vive caja/PDV) para esto no se justificaba, y
 compartir recursos entre una consulta analítica pesada y el cobro es
@@ -38,10 +38,10 @@ exactamente el riesgo que separar en dos máquinas evita.
   (`superset`) de la Postgres del droplet de staging, con su propio rol
   (`superset_meta`, `scripts/superset_provision_db.sql`) — sin acceso a
   ninguna tabla de Provecho ni a las vistas `vw_bi_*`. La conexión ANALÍTICA
-  (la que sí lee `vw_bi_*`) usa un rol distinto, `bi_lector` (ADR-082 Fase
+  (la que sí lee `vw_bi_*`) usa un rol distinto, `bi_lector` (ADR-083 Fase
   A), registrada desde la UI de Superset o `scripts/superset_init.py`.
 - **Sin Celery, sin Redis, sin Alerts & Reports**: no entran cómodos en
-  1 GB. Las consultas corren sincrónicas. Ver ADR-082.
+  1 GB. Las consultas corren sincrónicas. Ver ADR-083.
 - **Imagen propia** (`deploy/bi/Dockerfile`), no `apache/superset:6.1.0`
   directo: ese tag "lean" no trae `psycopg2` — ver "Bugs encontrados"
   abajo.
@@ -111,7 +111,7 @@ python scripts/superset_init.py \
   --pg-database provecho --bi-lector-password '<BI_LECTOR_PASSWORD>'
 ```
 
-Verificación mínima tras aprovisionar (ver ADR-082, "Verificación — Fase
+Verificación mínima tras aprovisionar (ver ADR-083, "Verificación — Fase
 C-D"): entrar como un usuario de una sola sucursal y confirmar que un
 dataset `vw_bi_*` solo muestra esa sucursal. Es la prueba que decide si el
 diseño sirve — no alcanza con que Superset arranque.
@@ -155,6 +155,6 @@ infirieron de la documentación de Superset:
 - [ ] Fase D: permiso `bi.acceder` ya seedeado (Fase B); falta la entrada
       de navegación en `frontend/lib/modulos.ts` y los tableros embebidos
       en `/dashboard`
-- [ ] `docs/security/authorization.md` y ADR-082: marcar Fase C como hecha
+- [ ] `docs/security/authorization.md` y ADR-083: marcar Fase C como hecha
       una vez que el droplet real esté arriba y la verificación end-to-end
       (usuario real, una sola sucursal) haya pasado

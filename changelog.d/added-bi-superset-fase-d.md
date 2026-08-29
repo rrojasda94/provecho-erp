@@ -1,5 +1,5 @@
 - **BI integrado en Provecho: navegación, guest tokens y tres mejoras al
-  tablero** (ADR-082, Fase D; RN-BI-007). Entrada `bi` en el home con
+  tablero** (ADR-083, Fase D; RN-BI-007). Entrada `bi` en el home con
   permiso exacto `bi.acceder` (no por prefijo — entrar ya es un privilegio,
   mismo criterio que Catálogo). La página `/bi` es hoy un enlace a
   Superset, con `BI_URL` leída del servidor (nunca `NEXT_PUBLIC_*`, mismo

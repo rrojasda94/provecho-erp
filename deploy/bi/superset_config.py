@@ -1,4 +1,4 @@
-"""Config de Apache Superset para el BI autoservicio (ADR-082 Fase C).
+"""Config de Apache Superset para el BI autoservicio (ADR-083 Fase C).
 
 Se monta en `/app/pythonpath/superset_config.py` (docker-compose.bi.yml) —
 es el path que la imagen oficial ya trae en `PYTHONPATH`, así que Superset
@@ -23,12 +23,12 @@ SECRET_KEY = os.environ["SUPERSET_SECRET_KEY"]
 # registra la conexión analítica desde la UI/`scripts/superset_init.py`).
 SQLALCHEMY_DATABASE_URI = os.environ["SUPERSET_METADATA_DATABASE_URI"]
 
-# --- SSO contra Provecho (OAuth2, ADR-082 Fase B) -----------------------
+# --- SSO contra Provecho (OAuth2, ADR-083 Fase B) -----------------------
 # `PROVECHO_API_URL` es la API por su dominio público (`/token` y
 # `/userinfo` los llama este proceso, servidor-a-servidor — no hay cookie ni
 # red privada de por medio, así que no hace falta VPC para esto).
 # `PROVECHO_WEB_URL` es el frontend: `/oauth/authorize` vive ahí (ver
-# ADR-082 Fase B — la sesión de Provecho es una cookie que la API nunca ve).
+# ADR-083 Fase B — la sesión de Provecho es una cookie que la API nunca ve).
 PROVECHO_API_URL = os.environ["PROVECHO_API_URL"].rstrip("/")
 PROVECHO_WEB_URL = os.environ["PROVECHO_WEB_URL"].rstrip("/")
 
@@ -90,7 +90,7 @@ CUSTOM_SECURITY_MANAGER = ProvechoSecurityManager
 
 # --- Feature flags -------------------------------------------------------
 FEATURE_FLAGS = {
-    # Guest tokens para embeber tableros en /dashboard (ADR-082 Fase D).
+    # Guest tokens para embeber tableros en /dashboard (ADR-083 Fase D).
     "EMBEDDED_SUPERSET": True,
     "DASHBOARD_RBAC": True,
     # Sin esto, `{{ current_username() }}` en la cláusula de RLS
@@ -102,10 +102,10 @@ FEATURE_FLAGS = {
     "ENABLE_TEMPLATE_PROCESSING": True,
     # `ALERT_REPORTS` deliberadamente AFUERA: pide Celery worker/beat +
     # Chromium headless para el PDF programado, y no entra en el droplet de
-    # 1 GB elegido para este volumen de uso (ver ADR-082 "Dónde corre").
+    # 1 GB elegido para este volumen de uso (ver ADR-083 "Dónde corre").
 }
 
-# Sin Celery (ver ADR-082): sin esto Superset intenta usar el broker por
+# Sin Celery (ver ADR-083): sin esto Superset intenta usar el broker por
 # defecto y cada intento de caché/async falla contra un Redis que no existe
 # en este droplet. `SimpleCache` es en memoria del propio proceso —
 # suficiente para el volumen esperado, se pierde al reiniciar el contenedor.
@@ -114,7 +114,7 @@ DATA_CACHE_CONFIG = CACHE_CONFIG
 FILTER_STATE_CACHE_CONFIG = CACHE_CONFIG
 EXPLORE_FORM_DATA_CACHE_CONFIG = CACHE_CONFIG
 
-# SQL Lab es la puerta que ningún permiso de fila cierra (ADR-082,
+# SQL Lab es la puerta que ningún permiso de fila cierra (ADR-083,
 # "Superset con SQL Lab abierto saltea la RLS"). El rol `Gamma` de fábrica
 # ya no lo incluye, pero queda como comprobación explícita al primer
 # despliegue: entrar como `supervisor`/`contador` y confirmar que "SQL Lab"

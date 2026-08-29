@@ -1,4 +1,4 @@
-# Proxy del droplet BI (ADR-082 Fase C). Mismo criterio que el `Caddyfile`
+# Proxy del droplet BI (ADR-083 Fase C). Mismo criterio que el `Caddyfile`
 # de staging: TLS automático (Let's Encrypt), sin cron de renovación a mano.
 #
 # Droplet DISTINTO al de staging — ver docs/engineering/bi-superset.md — así

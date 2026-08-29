@@ -584,6 +584,19 @@ dialog:modal {
     cursor: not-allowed;
 }
 
+/* El buscador de un `ComboboxMultiple` va *dentro* de la caja de etiquetas,
+   que es la que ya dibuja el borde: con la regla de arriba encima quedaba un
+   campo bordeado y de ancho completo metido dentro de otro. Se necesitan dos
+   clases y dos elementos para ganarle por especificidad (0,2,2 contra 0,1,1),
+   no por `!important`. */
+.erp dialog [data-slot="combobox-chips"] input[data-slot="combobox-input"] {
+    width: auto;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
 /* Toda cantidad, precio o código dentro de un formulario. Un importe
    tecleado en proporcional se compara mal con el de la fila de al lado. */
 .erp dialog input[type="number"] {

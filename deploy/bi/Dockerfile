@@ -1,4 +1,4 @@
-# Imagen de Superset con el driver de Postgres (ADR-082 Fase C).
+# Imagen de Superset con el driver de Postgres (ADR-083 Fase C).
 #
 # La imagen oficial `apache/superset` en su tag "lean" (sin sufijo `-dev` —
 # el que corresponde a producción, los `-dev` traen un devserver que no se

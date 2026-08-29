@@ -1906,7 +1906,7 @@ Una emisión sin destinatarios **se persiste igual**, con cero entregas, y sale
 como hueco en la matriz (RN-REP-005). Las entregas no son retroactivas:
 `regla_id` y `motivo` se congelan al emitir (RN-REP-004).
 
-## 17. Vistas del BI autoservicio (ADR-082)
+## 17. Vistas del BI autoservicio (ADR-083)
 
 No son tablas: son `CREATE VIEW` sobre las tablas de arriba, creadas por
 `alembic/versions/832ff01ed33f_vistas_bi_y_rol_de_solo_lectura.py`. Existen

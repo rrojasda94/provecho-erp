@@ -1,4 +1,4 @@
-- **Capa semántica para un BI autoservicio con Apache Superset** (ADR-082,
+- **Capa semántica para un BI autoservicio con Apache Superset** (ADR-083,
   Fase A; RN-BI-001..004). El dashboard actual (ADR-024) no permite elegir
   libremente eje X/eje Y/valores, cruzar dimensiones ni más tipos de gráfico
   que barras/líneas/tabla — y ADR-024 rechazó a propósito construir eso
@@ -23,7 +23,7 @@
   `contar_bajo_minimo` traía toda la tabla `stock` de la empresa a Python
   para contarla en un bucle, en el engine corto del dashboard. Ahora es un
   `COUNT` agregado en SQL.
-- Pendiente en próximas entregas (ver ADR-082 y ROADMAP → Deuda técnica):
+- Pendiente en próximas entregas (ver ADR-083 y ROADMAP → Deuda técnica):
   Provecho como proveedor OAuth2 para el SSO de Superset, el despliegue de
   Superset con su RLS, la integración/embebido en `/dashboard`, y la
   exportación (print, XLSX completo, PDF).

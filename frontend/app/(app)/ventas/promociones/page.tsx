@@ -4,6 +4,8 @@ import { obtenerSesion } from "@/lib/sesion";
 
 import {
   PromocionesCliente,
+  type Categoria,
+  type Producto,
   type Promocion,
   type Sucursal,
 } from "./promociones-cliente";
@@ -38,16 +40,26 @@ export default async function PromocionesPage() {
     );
   }
 
-  // El catálogo de sucursales no bloquea: sin él la pantalla muestra "Todas"
-  // y la promoción se crea igual para toda la empresa.
-  const sucursales = await apiFetch<Sucursal[]>("/api/v1/sucursales", { token }).catch(
-    () => [] as Sucursal[],
-  );
+  // Ninguno de los tres catálogos bloquea la pantalla: sin sucursales la
+  // promoción se crea para toda la empresa, y sin productos ni categorías se
+  // sigue viendo y terminando lo que ya existe. Que falte un permiso de
+  // catálogo no puede dejar sin funcionar a Promociones.
+  const [sucursales, productos, categorias] = await Promise.all([
+    apiFetch<Sucursal[]>("/api/v1/sucursales", { token }).catch(() => [] as Sucursal[]),
+    apiFetch<Producto[]>("/api/v1/sales/productos", { token }).catch(
+      () => [] as Producto[],
+    ),
+    apiFetch<Categoria[]>("/api/v1/inventory/categorias", { token }).catch(
+      () => [] as Categoria[],
+    ),
+  ]);
 
   return (
     <PromocionesCliente
       promociones={promociones}
       sucursales={sucursales}
+      productos={productos.filter((p) => p.activo)}
+      categorias={categorias}
       puedeGestionar={tienePermiso(usuario.permisos, "sales.gestionar_promociones")}
     />
   );

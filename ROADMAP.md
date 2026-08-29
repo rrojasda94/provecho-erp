@@ -92,6 +92,47 @@ mínimo y vigencia por día/hora. **No puede escribir en `venta.descuento_*`**:
 esos campos son el acto humano firmado, y mezclarlos haría imposible auditar
 qué descuento fue manual y cuál automático.
 
+## Parche desplegables con búsqueda (versión a definir, 2026-08-29, en curso)
+
+Nota de versión: al escribir esto se apuntó a "0.8.2", pero para cuando se
+integró con `main` esa versión ya la había cortado otra rama con contenido
+no relacionado (landing con dominio propio, marcaje de asistencia) y `main`
+ya iba en 0.9.0. El corte de versión de este parche queda pendiente — se
+hace al mergear, contra la versión real que tenga `main` en ese momento.
+
+Reportado desde el uso: crear una promoción pedía teclear los identificadores
+de los productos y categorías separados por coma. El campo era inusable —nadie
+se sabe un UUID— y fallaba en silencio: un id mal copiado creaba la promoción
+apuntando a un producto inexistente, que simplemente no se aplicaba nunca.
+
+Al revisarlo, el problema era más ancho: **114 `<select>` en 50 archivos y
+ninguno con búsqueda**. Y como `PAGE_SIZE_DEFECTO` es 50 y ningún `page.tsx`
+pide más, varios desplegables muestran solo la primera página del catálogo sin
+avisar que hay más — eso ya no es incomodidad, es un dato que falta.
+
+Se migran los **62** desplegables alimentados por la API. Los 52 restantes son
+enumerados escritos en el código —estados, tipos, modalidades, paginación— y
+siguen siendo `<select>` nativos: ponerle un buscador a tres opciones estorba.
+
+| Fase | Qué | Estado |
+|---|---|---|
+| 1 | `components/ui/combobox` (búsqueda, selección múltiple con fichas) sobre Base UI, con el filtrado en `lib/filtrar-opciones` | ✅ 2026-08-29 |
+| 1 | Promociones: productos, categorías y el producto gratis dejan de pedir ids a mano | ✅ 2026-08-29 |
+| 1 | `GET /inventory/articulos?q=` — el único catálogo que no entra completo en una página | ✅ 2026-08-29 |
+| 2 | Listas largas (artículos, recetas, cuentas contables, proveedores) + `page_size` explícito donde hoy se trunca | ✅ 2026-08-29 |
+| 2 | `?tipo=` repetible en artículos: "qué se produce" son subrecetas **y** mercadería | ✅ 2026-08-29 |
+| 3 | Listas acotadas (sucursales, almacenes, marcas, unidades de medida, roles, grupos, divisas, atributos) | ✅ 2026-08-29 |
+| 3 | Ayudante `elegirEnLista` en `e2e/util`: las pruebas dejan de hablar `selectOption` | ✅ 2026-08-29 |
+
+Quedan **52** `<select>` nativos y son todos de enumerados escritos en el
+código. No es deuda: un buscador sobre tres opciones estorba.
+
+Decisión: el filtrado ocurre **en el cliente**, sobre lo ya cargado. Solo los
+artículos buscan contra el servidor, porque son los únicos que no caben en el
+techo de 200 filas por página. Añadir `?q=` a los otros tres endpoints que se
+habían previsto resultó innecesario: SKUs y cuentas contables se devuelven sin
+paginar y proveedores entran de sobra.
+
 ## Parche 0.8.1 — segundo turno de prueba en staging (2026-08-28)
 
 Con la 0.8.0 ya en staging, el turno reportó seis cosas. Cinco son agujeros
@@ -118,6 +159,31 @@ unidad de despacho sigue siendo el pedido (ADR-044, RN-CUP-004) — la
 trazabilidad que pedía el mozo se resuelve mostrando qué está listo, no
 partiendo la bolsa. Y el comprobante sigue siendo por cuenta y no por pago:
 un pago parcial no tiene líneas propias que declarar a SUNAT.
+
+## Parche compras/inventario (2026-08-29)
+
+Reporte del usuario: no se podía crear un borrador de OC, el selector de
+artículos no mostraba todo el catálogo (se replicaba en compras), la OC era
+100% inmutable incluso en borrador, y no había forma de registrar una compra
+a partir de solo una factura (sin OC previa). Investigación con 3 agentes
+Explore confirmó causa raíz de cada uno con evidencia de código; el
+descuento de stock por venta (que también se reportó como roto) resultó
+estar correctamente implementado y testeado — se le agregó visibilidad en
+vez de tocar la lógica.
+
+| # | Qué | Estado |
+|---|---|---|
+| 1 | Rol `comprador` sin `inventory.leer`: tumbaba la pantalla entera de nueva OC | ✅ 2026-08-29 |
+| 2 | Selector de artículos truncado a 50 (paginación sin `page_size`), en inventario, OC e importador de recetas | ✅ 2026-08-29 |
+| 3 | OC editable mientras está en `borrador` (`PATCH`); inmutable desde `emitida` como ya era | ✅ 2026-08-29 |
+| 4 | Compra directa sin OC previa, reutilizando `orden_compra` (ADR-081) | ✅ 2026-08-29 |
+| 5 | KPI de incidencias de inventario en el dashboard (el descuento de stock ya funcionaba y estaba testeado) | ✅ 2026-08-29 |
+| 6 | Alerta de stock bajo en el PDV, sin bloquear la venta (`GET /carta` → `stock_bajo`) | ✅ 2026-08-29 |
+
+Lo que **no** se hizo y quedó como deuda (`docs/roadmap/deuda/modulo-purchases.md`):
+la reconciliación completa estilo Odoo 18 entre compras/inventario/
+contabilidad (más allá de los eventos puntuales que ya existen) y la caja
+chica que la compra directa todavía no usa para pagar.
 
 ## Catálogo modelo Odoo (0.7.0, en curso desde 2026-08-23)
 
@@ -375,7 +441,7 @@ nombre del archivo.
 | Backups (tras la implementación de 2026-07-26) | [`backups.md`](docs/roadmap/deuda/backups.md) | 4 | 1 |
 | Módulo inventory (slices siguientes) | [`modulo-inventory.md`](docs/roadmap/deuda/modulo-inventory.md) | 4 | 32 |
 | Módulo sales (slices siguientes) | [`modulo-sales.md`](docs/roadmap/deuda/modulo-sales.md) | 51 | 28 |
-| Módulo purchases (slices siguientes) | [`modulo-purchases.md`](docs/roadmap/deuda/modulo-purchases.md) | 6 | 2 |
+| Módulo purchases (slices siguientes) | [`modulo-purchases.md`](docs/roadmap/deuda/modulo-purchases.md) | 7 | 3 |
 | Módulo production (slices siguientes) | [`modulo-production.md`](docs/roadmap/deuda/modulo-production.md) | 8 | 1 |
 | Módulo accounting (slices siguientes) | [`modulo-accounting.md`](docs/roadmap/deuda/modulo-accounting.md) | 8 | 3 |
 | Módulo rrhh (slice completo — deuda declarada) | [`modulo-rrhh.md`](docs/roadmap/deuda/modulo-rrhh.md) | 11 | 4 |

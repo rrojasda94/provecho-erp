@@ -625,7 +625,7 @@ def test_compartir_no_salta_el_rbac_de_cada_reporte(env):
     assert _datos(client, h, "ventas_por_dia").status_code == 403
 
 
-# --- Exportar (ADR-082 Fase E) -----------------------------------------------
+# --- Exportar (ADR-083 Fase E) -----------------------------------------------
 def _exportar(client, h, codigo, **filtros):
     return client.post(
         f"/api/v1/reportes/{codigo}/exportar", headers=h, json=filtros or {}

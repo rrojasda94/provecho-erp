@@ -539,7 +539,7 @@ _POR_CODIGO = {r.codigo: r for r in CATALOGO}
 # reporte, es una descarga de la base por la puerta de atrás.
 LIMITE_MAXIMO = 500
 LIMITE_DEFECTO = 50
-# Tope distinto para "descargar el dataset completo" (ADR-082 Fase E): la
+# Tope distinto para "descargar el dataset completo" (ADR-083 Fase E): la
 # tarjeta en pantalla nunca necesita más de `LIMITE_MAXIMO`, pero contabilidad
 # pidiendo el año completo sí. Explícito y no "sin límite": un reporte de
 # 500 000 filas sigue sin ser lo que este endpoint existe para servir —eso

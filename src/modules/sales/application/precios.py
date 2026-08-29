@@ -17,6 +17,10 @@ from sqlalchemy.orm import Session
 # ya apunta por FK (ver ese modelo): un agrupador genérico por empresa, sin
 # lógica de dominio propia. Leer su nombre acá no es cruzar el dominio de
 # inventory, es seguir la referencia que sales ya tiene.
+from src.modules.inventory.application.queries_publicas import (
+    almacen_de_sucursal,
+    recetas_con_insumo_bajo_minimo,
+)
 from src.modules.inventory.infrastructure.models.categoria import Categoria
 from src.modules.sales.application import catalogo
 from src.modules.sales.application.errors import (
@@ -236,6 +240,21 @@ def carta(
     # serían cuatro consultas más sobre un N+1 que ya existe (`_extras_de`).
     atributos_de = catalogo.atributos_ofrecidos(session, productos)
 
+    # Aviso de stock bajo (RN-INV-013): nunca oculta ni bloquea el producto,
+    # solo avisa. Sin almacén configurado para la sucursal no hay nada que
+    # consultar — mismo criterio que el listener de venta, que ahí registra
+    # una incidencia; acá simplemente no hay alerta que mostrar.
+    almacen_id = almacen_de_sucursal(session, sucursal_id)
+    recetas_bajas = (
+        recetas_con_insumo_bajo_minimo(
+            session,
+            [p.receta_id for p in productos if p.receta_id],
+            almacen_id,
+        )
+        if almacen_id is not None
+        else set()
+    )
+
     items = []
     for producto in productos:
         if producto.es_extra or producto.producto_padre_id is not None:
@@ -247,6 +266,7 @@ def carta(
                 "precio_unitario": precio_de[v.id],
                 "orden": v.orden,
                 "extras": _extras_de(repo, v, por_id, precio_de),
+                "stock_bajo": v.receta_id in recetas_bajas if v.receta_id else False,
                 **_atributos_de(session, atributos_de.get(v.id, [])),
             }
             for v in repo.variantes_de(producto.id)
@@ -270,6 +290,9 @@ def carta(
                 "precio_unitario": precio,
                 "variantes": sorted(variantes, key=lambda v: (v["orden"], v["nombre"])),
                 "extras": extras,
+                "stock_bajo": (
+                    producto.receta_id in recetas_bajas if producto.receta_id else False
+                ),
                 **_atributos_de(session, atributos_de.get(producto.id, [])),
             }
         )

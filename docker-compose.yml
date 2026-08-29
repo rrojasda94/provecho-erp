@@ -137,7 +137,7 @@ services:
       GOOGLE_MAPS_BROWSER_KEY: ${GOOGLE_MAPS_BROWSER_KEY:-}
       GOOGLE_MAPS_MAP_ID: ${GOOGLE_MAPS_MAP_ID:-DEMO_MAP_ID}
       GOOGLE_MAPS_PAIS: ${GOOGLE_MAPS_PAIS:-pe}
-      # URL pública del BI (Superset, ADR-082). Mismo criterio que las
+      # URL pública del BI (Superset, ADR-083). Mismo criterio que las
       # claves de Google de arriba: la lee un Server Component, no se
       # hornea en el build.
       BI_URL: ${BI_URL:-}

@@ -327,6 +327,11 @@ catálogo (`src/core/reportes/`, ADR-024), alimentado por
 | `disponible_negativo` | SKUs con más reservado que físico | Reservar exige disponible; consumir no (RN-INV-009) |
 | `salidas_sin_lote` | Salidas de artículos con lote que ningún lote respalda | Stock anterior al control de lote, o el resto bloqueado (RN-LOT-005) |
 
+Cuántas incidencias hay (últimos 7 días) también aparece como KPI en el
+dashboard gerencial (`GET /dashboard/resumen`,
+`incidencias_recientes`) — el detalle de cada una sigue viviendo en
+`consumos_omitidos`, el KPI solo avisa que hay algo que revisar.
+
 Además, `inventory.stock_bajo_minimo` se publica **al cruzar** el mínimo,
 no cada vez que se está por debajo: con el stock ya bajo, un evento por
 venta convierte la alerta en ruido y deja de mirarse justo cuando importa.

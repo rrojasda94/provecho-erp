@@ -207,7 +207,7 @@ export function descargarCsv(nombre: string, contenido: string): void {
   );
 }
 
-/** El `.xlsx` completo del reporte (ADR-082 Fase E) \u2014 hasta
+/** El `.xlsx` completo del reporte (ADR-083 Fase E) \u2014 hasta
  * `LIMITE_MAXIMO_EXPORTACION` (50 000) filas, no las 500 que ya est\u00e1n en
  * pantalla. A diferencia de `descargarCsv`, que arma el archivo con lo que
  * el navegador ya tiene, esto vuelve a pedirle los datos a la API: el
