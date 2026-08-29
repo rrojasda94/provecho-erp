@@ -92,6 +92,41 @@ mínimo y vigencia por día/hora. **No puede escribir en `venta.descuento_*`**:
 esos campos son el acto humano firmado, y mezclarlos haría imposible auditar
 qué descuento fue manual y cuál automático.
 
+## Parche 0.8.2 — desplegables con búsqueda (2026-08-29, en curso)
+
+Reportado desde el uso: crear una promoción pedía teclear los identificadores
+de los productos y categorías separados por coma. El campo era inusable —nadie
+se sabe un UUID— y fallaba en silencio: un id mal copiado creaba la promoción
+apuntando a un producto inexistente, que simplemente no se aplicaba nunca.
+
+Al revisarlo, el problema era más ancho: **114 `<select>` en 50 archivos y
+ninguno con búsqueda**. Y como `PAGE_SIZE_DEFECTO` es 50 y ningún `page.tsx`
+pide más, varios desplegables muestran solo la primera página del catálogo sin
+avisar que hay más — eso ya no es incomodidad, es un dato que falta.
+
+Se migran los **62** desplegables alimentados por la API. Los 52 restantes son
+enumerados escritos en el código —estados, tipos, modalidades, paginación— y
+siguen siendo `<select>` nativos: ponerle un buscador a tres opciones estorba.
+
+| Fase | Qué | Estado |
+|---|---|---|
+| 1 | `components/ui/combobox` (búsqueda, selección múltiple con fichas) sobre Base UI, con el filtrado en `lib/filtrar-opciones` | ✅ 2026-08-29 |
+| 1 | Promociones: productos, categorías y el producto gratis dejan de pedir ids a mano | ✅ 2026-08-29 |
+| 1 | `GET /inventory/articulos?q=` — el único catálogo que no entra completo en una página | ✅ 2026-08-29 |
+| 2 | Listas largas (artículos, recetas, cuentas contables, proveedores) + `page_size` explícito donde hoy se trunca | ✅ 2026-08-29 |
+| 2 | `?tipo=` repetible en artículos: "qué se produce" son subrecetas **y** mercadería | ✅ 2026-08-29 |
+| 3 | Listas acotadas (sucursales, almacenes, marcas, unidades de medida, roles, grupos, divisas, atributos) | ✅ 2026-08-29 |
+| 3 | Ayudante `elegirEnLista` en `e2e/util`: las pruebas dejan de hablar `selectOption` | ✅ 2026-08-29 |
+
+Quedan **52** `<select>` nativos y son todos de enumerados escritos en el
+código. No es deuda: un buscador sobre tres opciones estorba.
+
+Decisión: el filtrado ocurre **en el cliente**, sobre lo ya cargado. Solo los
+artículos buscan contra el servidor, porque son los únicos que no caben en el
+techo de 200 filas por página. Añadir `?q=` a los otros tres endpoints que se
+habían previsto resultó innecesario: SKUs y cuentas contables se devuelven sin
+paginar y proveedores entran de sobra.
+
 ## Parche 0.8.1 — segundo turno de prueba en staging (2026-08-28)
 
 Con la 0.8.0 ya en staging, el turno reportó seis cosas. Cinco son agujeros
