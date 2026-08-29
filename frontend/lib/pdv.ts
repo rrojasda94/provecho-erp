@@ -72,6 +72,8 @@ export type VarianteDeCarta = {
   nombre: string;
   precio_unitario: string;
   orden: number;
+  /** RN-INV-013: avisa, nunca bloquea — no deshabilitar el botón de venta. */
+  stock_bajo: boolean;
   /** Los grupos y extras cuelgan del producto que se prepara, y con
    * presentaciones ese es la variante: los sabores de la Familiar no son los
    * de la Personal. Elegida la variante, estos mandan sobre los del padre. */
@@ -93,6 +95,8 @@ export type ItemDeCarta = {
   /** Con variantes es el "desde": lo que se cobra sale de la elegida. */
   precio_unitario: string;
   variantes: VarianteDeCarta[];
+  /** RN-INV-013: avisa, nunca bloquea — no deshabilitar el botón de venta. */
+  stock_bajo: boolean;
   extras: ExtraDeCarta[];
   atributos: AtributoDeCarta[];
   exclusiones: [string, string][];

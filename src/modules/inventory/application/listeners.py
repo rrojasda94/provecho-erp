@@ -23,6 +23,9 @@ from src.core.events import event_bus
 from src.modules.inventory.application import lotes as lotes_uc
 from src.modules.inventory.application import stock as stock_uc
 from src.modules.inventory.application.errors import StockInsuficiente
+from src.modules.inventory.application.queries_publicas import (
+    almacen_de_sucursal as _almacen_de_sucursal,
+)
 from src.modules.inventory.domain import rules
 from src.modules.inventory.infrastructure.models import (
     Articulo,
@@ -46,14 +49,6 @@ log = logging.getLogger(__name__)
 # ser atómico con ella: si este commit falla, la venta queda igual y la
 # discrepancia la detecta el conteo — outbox real cuando llegue Celery.
 session_factory = SessionLocal
-
-
-def _almacen_de_sucursal(session: Session, sucursal_id: uuid.UUID) -> uuid.UUID | None:
-    return session.scalar(
-        select(Almacen.id).where(
-            Almacen.sucursal_id == sucursal_id, Almacen.deleted_at.is_(None)
-        )
-    )
 
 
 def _omitir(

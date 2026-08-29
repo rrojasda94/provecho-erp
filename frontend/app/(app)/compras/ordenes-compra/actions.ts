@@ -77,3 +77,45 @@ export async function crearOrdenCompraAction(
   revalidatePath("/compras/ordenes-compra");
   return { error: "", ok: true };
 }
+
+export async function editarOrdenCompraAction(
+  _previo: EstadoOrdenCompra,
+  formData: FormData,
+): Promise<EstadoOrdenCompra> {
+  const store = await cookies();
+  const token = store.get(COOKIE_TOKEN)?.value;
+  if (!token) redirect("/login");
+
+  const ordenId = String(formData.get("orden_id") ?? "");
+  if (!ordenId) return { error: "Orden de compra inválida.", ok: false };
+
+  const items = leerItems(formData).filter(
+    (it) => it.articuloId && it.cantidad && it.costoUnitario,
+  );
+  if (items.length === 0) {
+    return { error: "Agregar al menos un ítem con artículo, cantidad y costo.", ok: false };
+  }
+  if (items.some((it) => Number(it.cantidad) <= 0)) {
+    return { error: "La cantidad debe ser mayor a 0.", ok: false };
+  }
+
+  try {
+    await apiFetch(`/api/v1/purchases/ordenes-compra/${ordenId}`, {
+      token,
+      metodo: "PATCH",
+      cuerpo: {
+        items: items.map((it) => ({
+          articulo_id: it.articuloId,
+          cantidad: it.cantidad,
+          costo_unitario: it.costoUnitario,
+        })),
+      },
+    });
+  } catch (e) {
+    const mensaje = e instanceof ApiError ? e.message : "No se pudo editar la orden de compra.";
+    return { error: mensaje, ok: false };
+  }
+
+  revalidatePath("/compras/ordenes-compra");
+  return { error: "", ok: true };
+}

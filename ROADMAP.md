@@ -119,6 +119,31 @@ trazabilidad que pedía el mozo se resuelve mostrando qué está listo, no
 partiendo la bolsa. Y el comprobante sigue siendo por cuenta y no por pago:
 un pago parcial no tiene líneas propias que declarar a SUNAT.
 
+## Parche compras/inventario (2026-08-29)
+
+Reporte del usuario: no se podía crear un borrador de OC, el selector de
+artículos no mostraba todo el catálogo (se replicaba en compras), la OC era
+100% inmutable incluso en borrador, y no había forma de registrar una compra
+a partir de solo una factura (sin OC previa). Investigación con 3 agentes
+Explore confirmó causa raíz de cada uno con evidencia de código; el
+descuento de stock por venta (que también se reportó como roto) resultó
+estar correctamente implementado y testeado — se le agregó visibilidad en
+vez de tocar la lógica.
+
+| # | Qué | Estado |
+|---|---|---|
+| 1 | Rol `comprador` sin `inventory.leer`: tumbaba la pantalla entera de nueva OC | ✅ 2026-08-29 |
+| 2 | Selector de artículos truncado a 50 (paginación sin `page_size`), en inventario, OC e importador de recetas | ✅ 2026-08-29 |
+| 3 | OC editable mientras está en `borrador` (`PATCH`); inmutable desde `emitida` como ya era | ✅ 2026-08-29 |
+| 4 | Compra directa sin OC previa, reutilizando `orden_compra` (ADR-081) | ✅ 2026-08-29 |
+| 5 | KPI de incidencias de inventario en el dashboard (el descuento de stock ya funcionaba y estaba testeado) | ✅ 2026-08-29 |
+| 6 | Alerta de stock bajo en el PDV, sin bloquear la venta (`GET /carta` → `stock_bajo`) | ✅ 2026-08-29 |
+
+Lo que **no** se hizo y quedó como deuda (`docs/roadmap/deuda/modulo-purchases.md`):
+la reconciliación completa estilo Odoo 18 entre compras/inventario/
+contabilidad (más allá de los eventos puntuales que ya existen) y la caja
+chica que la compra directa todavía no usa para pagar.
+
 ## Catálogo modelo Odoo (0.7.0, en curso desde 2026-08-23)
 
 Rama `feat/catalogo-odoo`, sobre v0.6.0. El catálogo pasa al modelo de
@@ -375,7 +400,7 @@ nombre del archivo.
 | Backups (tras la implementación de 2026-07-26) | [`backups.md`](docs/roadmap/deuda/backups.md) | 4 | 1 |
 | Módulo inventory (slices siguientes) | [`modulo-inventory.md`](docs/roadmap/deuda/modulo-inventory.md) | 4 | 32 |
 | Módulo sales (slices siguientes) | [`modulo-sales.md`](docs/roadmap/deuda/modulo-sales.md) | 51 | 28 |
-| Módulo purchases (slices siguientes) | [`modulo-purchases.md`](docs/roadmap/deuda/modulo-purchases.md) | 6 | 2 |
+| Módulo purchases (slices siguientes) | [`modulo-purchases.md`](docs/roadmap/deuda/modulo-purchases.md) | 7 | 3 |
 | Módulo production (slices siguientes) | [`modulo-production.md`](docs/roadmap/deuda/modulo-production.md) | 8 | 1 |
 | Módulo accounting (slices siguientes) | [`modulo-accounting.md`](docs/roadmap/deuda/modulo-accounting.md) | 8 | 3 |
 | Módulo rrhh (slice completo — deuda declarada) | [`modulo-rrhh.md`](docs/roadmap/deuda/modulo-rrhh.md) | 11 | 4 |

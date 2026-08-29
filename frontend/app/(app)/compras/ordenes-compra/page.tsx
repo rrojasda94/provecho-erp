@@ -12,21 +12,15 @@ import {
 export default async function OrdenesCompraPage() {
   const { token } = await obtenerSesion();
 
+  let ordenes: Pagina<OrdenCompra>;
+  let proveedores: Pagina<Proveedor>;
+  let almacenes: Almacen[];
   try {
-    const [ordenes, proveedores, almacenes, articulos] = await Promise.all([
+    [ordenes, proveedores, almacenes] = await Promise.all([
       apiFetch<Pagina<OrdenCompra>>("/api/v1/purchases/ordenes-compra", { token }),
       apiFetch<Pagina<Proveedor>>("/api/v1/purchases/proveedores", { token }),
       apiFetch<Almacen[]>("/api/v1/almacenes", { token }),
-      apiFetch<Pagina<Articulo>>("/api/v1/inventory/articulos", { token }),
     ]);
-    return (
-      <OrdenesCompraCliente
-        ordenes={ordenes.items}
-        proveedores={proveedores.items}
-        almacenes={almacenes}
-        articulos={articulos.items}
-      />
-    );
   } catch (e) {
     const mensaje =
       e instanceof ApiError && e.status === 403
@@ -34,4 +28,30 @@ export default async function OrdenesCompraPage() {
         : "No se pudo cargar las órdenes de compra.";
     return <p className="text-secondary">{mensaje}</p>;
   }
+
+  // El catálogo de artículos es de otro módulo (inventory): si falla, no
+  // tumba la pantalla de compras — se muestra igual, sin poder elegir
+  // artículo hasta que se resuelva el permiso/error de inventory.
+  let articulos: Articulo[] = [];
+  let avisoArticulos: string | null = null;
+  try {
+    articulos = (
+      await apiFetch<Pagina<Articulo>>("/api/v1/inventory/articulos?page_size=200", { token })
+    ).items;
+  } catch (e) {
+    avisoArticulos =
+      e instanceof ApiError && e.status === 403
+        ? "Tu usuario no tiene permiso para ver el catálogo de artículos (inventory.leer)."
+        : "No se pudo cargar el catálogo de artículos.";
+  }
+
+  return (
+    <OrdenesCompraCliente
+      ordenes={ordenes.items}
+      proveedores={proveedores.items}
+      almacenes={almacenes}
+      articulos={articulos}
+      avisoArticulos={avisoArticulos}
+    />
+  );
 }
