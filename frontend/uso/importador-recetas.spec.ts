@@ -107,7 +107,18 @@ test("el recetario se descarga, se llena y se carga de golpe", async ({ page }, 
   await expect(dialogo(page).getByText(DESCONOCIDO)).toBeVisible();
   await capturar(page, testInfo, "revision");
 
-  await dialogo(page).locator("select").selectOption({ label: RESUELTO_A });
+  // El insumo que el archivo no reconoció se resuelve buscando en el catálogo.
+  // Este campo pregunta al servidor (`/inventory/articulos?q=`) porque el
+  // catálogo de artículos no entra en una página, así que se teclea y se
+  // espera la opción en vez de elegirla de una lista ya cargada.
+  const buscadorArticulo = dialogo(page).getByRole("combobox", {
+    name: `Artículo para ${DESCONOCIDO}`,
+  });
+  // El clic abre el popup de forma determinista (`openOnInputClick`); sin él,
+  // `fill()` deja el texto puesto pero a veces ninguna opción para clicar.
+  await buscadorArticulo.click();
+  await buscadorArticulo.fill(RESUELTO_A);
+  await dialogo(page).getByRole("option", { name: RESUELTO_A }).click();
   await dialogo(page).getByRole("button", { name: /^Importar \d+ fila/ }).click();
 
   await expect(dialogo(page).getByText(/1 importada\(s\)/)).toBeVisible();

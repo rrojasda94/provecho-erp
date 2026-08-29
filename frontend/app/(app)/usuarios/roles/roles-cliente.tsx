@@ -3,6 +3,7 @@
 import { useActionState, useMemo, useState, useTransition } from "react";
 
 import { DialogoFormulario, ESTADO_INICIAL } from "@/components/formulario/dialogo-formulario";
+import { Combobox } from "@/components/ui/combobox";
 
 import { asignarPermisoAction, crearRolAction, quitarPermisoAction } from "./actions";
 
@@ -95,25 +96,15 @@ function PermisosDelRol({
       {disponibles.length > 0 && (
         <form action={formAction} className="flex items-center gap-2">
           <input type="hidden" name="rol_id" value={rol.id} />
-          <select
+          <Combobox
             name="permiso_id"
-            defaultValue=""
-            aria-label={`Agregar permiso a ${rol.nombre}`}
-            className="max-w-xs rounded border border-gray/40 px-2 py-1 text-xs"
-          >
-            <option value="" disabled>
-              Elegir permiso...
-            </option>
-            {porModulo.map(([mod, lista]) => (
-              <optgroup key={mod} label={mod}>
-                {lista.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.codigo}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
+            etiqueta={`Agregar permiso a ${rol.nombre}`}
+            marcador="Elegir permiso..."
+            className="max-w-xs"
+            opciones={porModulo.flatMap(([mod, lista]) =>
+              lista.map((p) => ({ valor: p.id, etiqueta: p.codigo, pista: mod })),
+            )}
+          />
           <button type="submit" className="text-xs font-bold text-primary hover:underline">
             Agregar
           </button>

@@ -9,6 +9,7 @@ import {
   valor,
 } from "@/components/formulario/dialogo-formulario";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
+import { Combobox } from "@/components/ui/combobox";
 
 import {
   darDeBajaAlmacenAction,
@@ -69,46 +70,37 @@ function CamposAlmacen({
       </label>
       <label className="flex flex-col gap-1 text-sm font-semibold">
         Sucursal
-        <select name="sucursal_id" defaultValue={valor(a.sucursal_id)}>
-          <option value="">Sin sucursal (almacén central de la empresa)</option>
-          {sucursales.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.nombre}
-            </option>
-          ))}
-        </select>
+        <Combobox
+          name="sucursal_id"
+          etiqueta="Sucursal"
+          defaultValue={a.sucursal_id}
+          marcador="Sin sucursal (almacén central de la empresa)"
+          opciones={sucursales.map((s) => ({ valor: s.id, etiqueta: s.nombre }))}
+        />
       </label>
       <CampoDireccion defaultValue={a.direccion} ubicacion={almacen ?? null} />
       <label className="flex flex-col gap-1 text-sm font-semibold">
         Almacén abastecedor
-        <select
+        <Combobox
           name="almacen_abastecedor_id"
-          defaultValue={valor(a.almacen_abastecedor_id)}
-        >
-          <option value="">Ninguno (se abastece por compra)</option>
-          {abastecedores.map((otro) => (
-            <option key={otro.id} value={otro.id}>
-              {otro.nombre}
-            </option>
-          ))}
-        </select>
+          etiqueta="Almacén abastecedor"
+          defaultValue={a.almacen_abastecedor_id}
+          marcador="Ninguno (se abastece por compra)"
+          opciones={abastecedores.map((otro) => ({ valor: otro.id, etiqueta: otro.nombre }))}
+        />
         <span className="text-xs font-normal text-gray">
           A quién le pide stock cuando le falta: el central despacha, el local recibe.
         </span>
       </label>
       <label className="flex flex-col gap-1 text-sm font-semibold">
         Abastecedor de respaldo
-        <select
+        <Combobox
           name="almacen_abastecedor_respaldo_id"
-          defaultValue={valor(a.almacen_abastecedor_respaldo_id)}
-        >
-          <option value="">Ninguno</option>
-          {abastecedores.map((otro) => (
-            <option key={otro.id} value={otro.id}>
-              {otro.nombre}
-            </option>
-          ))}
-        </select>
+          etiqueta="Almacén de respaldo"
+          defaultValue={a.almacen_abastecedor_respaldo_id}
+          marcador="Ninguno"
+          opciones={abastecedores.map((otro) => ({ valor: otro.id, etiqueta: otro.nombre }))}
+        />
         <span className="text-xs font-normal text-gray">
           A quién se le pide si el principal está dado de baja. Puede ser el
           almacén de otra sucursal.

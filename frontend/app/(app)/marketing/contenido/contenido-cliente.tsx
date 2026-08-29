@@ -4,6 +4,7 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { useActionState, useEffect, useMemo, useRef, useTransition } from "react";
 
 import { TablaDatos } from "@/components/tabla/tabla-datos";
+import { Combobox } from "@/components/ui/combobox";
 
 import {
   crearPiezaAction,
@@ -60,16 +61,13 @@ function DialogoNuevaPieza({
           <h2 className="font-heading text-lg text-dark">Nueva pieza</h2>
           <label className="flex flex-col gap-1 text-sm font-semibold">
             Marca
-            <select name="marca_id" required defaultValue="">
-              <option value="" disabled>
-                Elegir marca...
-              </option>
-              {marcas.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.nombre}
-                </option>
-              ))}
-            </select>
+            <Combobox
+              name="marca_id"
+              etiqueta="Marca"
+              requerido
+              marcador="Elegir marca..."
+              opciones={marcas.map((m) => ({ valor: m.id, etiqueta: m.nombre }))}
+            />
           </label>
           <label className="flex flex-col gap-1 text-sm font-semibold">
             Título
@@ -87,14 +85,12 @@ function DialogoNuevaPieza({
           </div>
           <label className="flex flex-col gap-1 text-sm font-semibold">
             Campaña
-            <select name="campana_id" defaultValue="">
-              <option value="">Sin campaña (contenido de marca)</option>
-              {campanas.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.nombre}
-                </option>
-              ))}
-            </select>
+            <Combobox
+              name="campana_id"
+              etiqueta="Campaña"
+              marcador="Sin campaña (contenido de marca)"
+              opciones={campanas.map((c) => ({ valor: c.id, etiqueta: c.nombre }))}
+            />
           </label>
           <fieldset className="flex flex-col gap-1 rounded border border-gray/20 p-3">
             <legend className="px-1 text-xs font-semibold uppercase text-gray">

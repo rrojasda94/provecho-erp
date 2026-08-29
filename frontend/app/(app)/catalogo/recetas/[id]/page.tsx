@@ -15,7 +15,12 @@ export default async function RecetaPage({
   try {
     const [receta, articulos, unidades] = await Promise.all([
       apiFetch<RecetaDetalle>(`/api/v1/inventory/recetas/${id}`, { token }),
-      apiFetch<Pagina<Articulo>>("/api/v1/inventory/articulos", { token }),
+      // Sin `page_size`, la API corta en 50: el selector de "artículo que
+      // produce esta receta" (`subrecetas`) se queda sin decirlo en cuanto
+      // el catálogo pasa de una página.
+      apiFetch<Pagina<Articulo>>("/api/v1/inventory/articulos?page_size=200", {
+        token,
+      }),
       apiFetch<UnidadMedida[]>("/api/v1/inventory/unidades-medida", { token }),
     ]);
     return <FichaReceta receta={receta} articulos={articulos.items} unidades={unidades} />;

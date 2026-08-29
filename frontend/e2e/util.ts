@@ -1,4 +1,4 @@
-import { expect, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 
 /**
  * Lo que comparten las suites e2e. No es `.spec.ts` a propósito: Playwright
@@ -110,6 +110,32 @@ export async function ingresar(page: Page, quien = ADMIN) {
  * denominación, así que buscar por testid a nivel de página encuentra dos
  * elementos y Playwright lo rechaza. Acotar al `dialog[open]` es también lo
  * correcto: la prueba interactúa con lo que el cajero ve. */
+/**
+ * Elige una opción de un desplegable con búsqueda (`components/ui/combobox`).
+ *
+ * Reemplaza al `selectOption()` de los `<select>` que estos campos eran hasta
+ * la 0.8.2: ahora hay que teclear y hacer clic en la opción. Vive acá y no en
+ * cada prueba porque son tres pasos que se repiten y que, escritos a mano,
+ * cada spec ancla distinto.
+ *
+ * `exact` en los dos localizadores a propósito: los nombres de campo se
+ * solapan —«Almacén» es prefijo de «Almacén del requerimiento»— y sin él la
+ * misma búsqueda encuentra dos.
+ */
+export async function elegirEnLista(
+  ambito: Page | Locator,
+  campo: string,
+  opcion: string,
+) {
+  const buscador = ambito.getByRole("combobox", { name: campo, exact: true });
+  // El clic va antes que el texto: sin foco explícito el desplegable no abre
+  // el popup, y `fill()` deja el valor puesto pero ninguna opción para
+  // clicar — la búsqueda queda esperando algo que nunca aparece.
+  await buscador.click();
+  await buscador.fill(opcion);
+  await ambito.getByRole("option", { name: opcion, exact: true }).click();
+}
+
 export function dialogo(page: Page) {
   return page.locator("dialog[open]");
 }

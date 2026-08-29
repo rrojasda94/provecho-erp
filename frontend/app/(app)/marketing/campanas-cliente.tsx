@@ -11,6 +11,7 @@ import {
   crearCampanaAction,
   type EstadoMarketing,
 } from "./actions";
+import { Combobox } from "@/components/ui/combobox";
 
 export type Campana = {
   id: string;
@@ -114,16 +115,13 @@ function DialogoNuevaCampana({ marcas }: { marcas: Marca[] }) {
           <h2 className="font-heading text-lg text-dark">Nueva campaña</h2>
           <label className="flex flex-col gap-1 text-sm font-semibold">
             Marca
-            <select name="marca_id" required defaultValue="">
-              <option value="" disabled>
-                Elegir marca...
-              </option>
-              {marcas.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.nombre}
-                </option>
-              ))}
-            </select>
+            <Combobox
+              name="marca_id"
+              etiqueta="Marca"
+              requerido
+              marcador="Elegir marca..."
+              opciones={marcas.map((m) => ({ valor: m.id, etiqueta: m.nombre }))}
+            />
           </label>
           <label className="flex flex-col gap-1 text-sm font-semibold">
             Nombre

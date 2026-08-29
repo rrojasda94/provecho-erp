@@ -9,6 +9,7 @@ import {
   valor,
 } from "@/components/formulario/dialogo-formulario";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
+import { Combobox } from "@/components/ui/combobox";
 
 import { guardarPuntoVentaAction } from "../actions";
 
@@ -54,16 +55,13 @@ function CamposPuntoVenta({
       ) : (
         <label className="flex flex-col gap-1 text-sm font-semibold">
           Sucursal
-          <select name="sucursal_id" required defaultValue="">
-            <option value="" disabled>
-              Elige la sucursal...
-            </option>
-            {sucursales.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.nombre}
-              </option>
-            ))}
-          </select>
+          <Combobox
+            name="sucursal_id"
+            etiqueta="Sucursal"
+            requerido
+            marcador="Elige la sucursal..."
+            opciones={sucursales.map((s) => ({ valor: s.id, etiqueta: s.nombre }))}
+          />
         </label>
       )}
 

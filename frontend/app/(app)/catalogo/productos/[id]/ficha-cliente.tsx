@@ -3,6 +3,7 @@
 import Link from "next/link";
 
 import { Rastro } from "@/components/shell/rastro";
+import { Combobox } from "@/components/ui/combobox";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
@@ -220,20 +221,15 @@ function SelectorReceta({
 }) {
   return (
     <div className="flex items-center gap-2">
-      <select
+      <Combobox
         value={valor ?? ""}
-        disabled={deshabilitado}
-        aria-label="Receta"
-        className="min-w-56 text-sm"
-        onChange={(e) => e.target.value && onElegir(e.target.value)}
-      >
-        <option value="">Elegir receta...</option>
-        {recetas.map((r) => (
-          <option key={r.id} value={r.id}>
-            {r.nombre}
-          </option>
-        ))}
-      </select>
+        deshabilitado={deshabilitado}
+        etiqueta="Receta"
+        className="min-w-56"
+        marcador="Elegir receta..."
+        alCambiar={(v) => v && onElegir(v)}
+        opciones={recetas.map((r) => ({ valor: r.id, etiqueta: r.nombre }))}
+      />
       {valor && (
         <Link
           href={`/catalogo/recetas/${valor}`}
@@ -335,23 +331,19 @@ function SelectorEmpaque({
     >
       <label className="flex items-center gap-2 text-xs font-semibold">
         Empaque
-        <select
+        <Combobox
           value={producto.empaque_id ?? ""}
           className="min-w-40"
-          onChange={(e) =>
+          etiqueta="Empaque"
+          marcador="Sin empaque"
+          alCambiar={(v) =>
             onEditar({
-              empaque_id: e.target.value || null,
-              modalidades_empaque: e.target.value ? marcadas : null,
+              empaque_id: v || null,
+              modalidades_empaque: v ? marcadas : null,
             })
           }
-        >
-          <option value="">Sin empaque</option>
-          {empaques.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.nombre}
-            </option>
-          ))}
-        </select>
+          opciones={empaques.map((a) => ({ valor: a.id, etiqueta: a.nombre }))}
+        />
       </label>
       {producto.empaque_id &&
         MODALIDADES.map((m) => (
@@ -620,19 +612,15 @@ function NuevaPresentacion({
       </label>
       <label className="flex flex-col gap-1 text-xs font-semibold">
         Receta
-        <select
+        <Combobox
           value={recetaId}
-          onChange={(e) => setRecetaId(e.target.value)}
+          alCambiar={(v) => setRecetaId(v ?? "")}
           className="min-w-48"
-          disabled={deshabilitado}
-        >
-          <option value="">Crear una vacía con este nombre</option>
-          {recetas.map((r) => (
-            <option key={r.id} value={r.id}>
-              {r.nombre}
-            </option>
-          ))}
-        </select>
+          etiqueta="Receta"
+          deshabilitado={deshabilitado}
+          marcador="Crear una vacía con este nombre"
+          opciones={recetas.map((r) => ({ valor: r.id, etiqueta: r.nombre }))}
+        />
       </label>
       <button
         type="button"
@@ -768,22 +756,14 @@ function GrupoEditor({
         ))}
       </ul>
       {disponibles.length > 0 && (
-        <select
-          defaultValue=""
-          className="mt-2 text-sm"
-          onChange={(e) => {
-            if (!e.target.value) return;
-            onVincular({ extra_id: e.target.value, grupo_id: grupo.id });
-            e.target.value = "";
-          }}
-        >
-          <option value="">+ Agregar extra al grupo...</option>
-          {disponibles.map((e) => (
-            <option key={e.id} value={e.id}>
-              {e.nombre}
-            </option>
-          ))}
-        </select>
+        <Combobox
+          value=""
+          className="mt-2"
+          etiqueta={`Agregar extra a ${grupo.nombre}`}
+          marcador="+ Agregar extra al grupo..."
+          alCambiar={(v) => v && onVincular({ extra_id: v, grupo_id: grupo.id })}
+          opciones={disponibles.map((e) => ({ valor: e.id, etiqueta: e.nombre }))}
+        />
       )}
     </div>
   );
@@ -1066,22 +1046,14 @@ function SeccionAtributos({
       )}
 
       {disponibles.length > 0 && (
-        <select
-          defaultValue=""
-          className="mt-3 text-sm"
-          onChange={(e) => {
-            if (!e.target.value) return;
-            ofrecer(e.target.value);
-            e.target.value = "";
-          }}
-        >
-          <option value="">+ Ofrecer atributo...</option>
-          {disponibles.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.nombre}
-            </option>
-          ))}
-        </select>
+        <Combobox
+          value=""
+          className="mt-3"
+          etiqueta="Ofrecer atributo"
+          marcador="+ Ofrecer atributo..."
+          alCambiar={(v) => v && ofrecer(v)}
+          opciones={disponibles.map((a) => ({ valor: a.id, etiqueta: a.nombre }))}
+        />
       )}
 
       <SeccionExclusiones
@@ -1189,22 +1161,20 @@ function SeccionExclusiones({
       )}
       {todosLosValores.length >= 2 && (
         <div className="flex items-end gap-2">
-          <select value={a} onChange={(e) => setA(e.target.value)} className="text-sm">
-            <option value="">Valor A...</option>
-            {todosLosValores.map((v) => (
-              <option key={v.id} value={v.id}>
-                {v.etiqueta}
-              </option>
-            ))}
-          </select>
-          <select value={b} onChange={(e) => setB(e.target.value)} className="text-sm">
-            <option value="">Valor B...</option>
-            {todosLosValores.map((v) => (
-              <option key={v.id} value={v.id}>
-                {v.etiqueta}
-              </option>
-            ))}
-          </select>
+          <Combobox
+            etiqueta="Valor A"
+            marcador="Valor A..."
+            value={a}
+            alCambiar={(v) => setA(v ?? "")}
+            opciones={todosLosValores.map((v) => ({ valor: v.id, etiqueta: v.etiqueta }))}
+          />
+          <Combobox
+            etiqueta="Valor B"
+            marcador="Valor B..."
+            value={b}
+            alCambiar={(v) => setB(v ?? "")}
+            opciones={todosLosValores.map((v) => ({ valor: v.id, etiqueta: v.etiqueta }))}
+          />
           <button
             type="button"
             onClick={agregar}
@@ -1251,14 +1221,17 @@ function Precio({
       {!compacto && (
         <label className="flex flex-col gap-1 text-xs font-semibold">
           Lista de precios
-          <select value={listaId} onChange={(e) => setListaId(e.target.value)}>
-            {vigentes.map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.nombre}
-                {l.modalidad ? ` · ${l.modalidad}` : ""}
-              </option>
-            ))}
-          </select>
+          <Combobox
+            etiqueta="Lista de precios"
+            requerido
+            value={listaId}
+            alCambiar={(v) => v && setListaId(v)}
+            opciones={vigentes.map((l) => ({
+              valor: l.id,
+              etiqueta: l.nombre,
+              pista: l.modalidad ?? undefined,
+            }))}
+          />
         </label>
       )}
       <input

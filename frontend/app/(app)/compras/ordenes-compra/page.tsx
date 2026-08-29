@@ -16,9 +16,15 @@ export default async function OrdenesCompraPage() {
   let proveedores: Pagina<Proveedor>;
   let almacenes: Almacen[];
   try {
+    // El catálogo de proveedores alimenta un desplegable con búsqueda: se pide
+    // al tope de página (`PAGE_SIZE_MAXIMO`, 200) y no con el defecto de 50,
+    // porque el campo filtra sobre lo que recibió y lo que no vino no existe
+    // para quien busca.
     [ordenes, proveedores, almacenes] = await Promise.all([
       apiFetch<Pagina<OrdenCompra>>("/api/v1/purchases/ordenes-compra", { token }),
-      apiFetch<Pagina<Proveedor>>("/api/v1/purchases/proveedores", { token }),
+      apiFetch<Pagina<Proveedor>>("/api/v1/purchases/proveedores?page_size=200", {
+        token,
+      }),
       apiFetch<Almacen[]>("/api/v1/almacenes", { token }),
     ]);
   } catch (e) {
