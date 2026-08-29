@@ -1,6 +1,6 @@
 """comprobante gravado_igv
 
-La operacion que si lleva IGV aunque la empresa venda exonerada (ADR-080):
+La operacion que si lleva IGV aunque la empresa venda exonerada (ADR-081):
 
 - `comprobante.gravado_igv`: NULL = decide el default de la empresa
   (`empresa.config_fiscal["igv_por_defecto"]`, y si tampoco esta, la zona

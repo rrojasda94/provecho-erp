@@ -98,7 +98,7 @@ class Comprobante(Base, UuidPkMixin, TimestampMixin):
     # de la región, crédito fiscal que sin esta columna no se registraba.
     # Vive acá y no en `venta` ni en `orden_compra` porque **el IGV nace con
     # el comprobante**: el crédito fiscal se toma con el comprobante anotado
-    # y el débito con el comprobante emitido (ADR-080).
+    # y el débito con el comprobante emitido (ADR-081).
     gravado_igv: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     # --- Nota de crédito (tipo="nc", catálogo 09 de SUNAT) -------------------
     # A qué comprobante corrige. Una NC sin documento afectado no existe:

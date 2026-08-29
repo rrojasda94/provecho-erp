@@ -57,7 +57,7 @@ Cobro (PROC-COM-002), aún sin conectar al libro contable (no genera asiento
 todavía). `comprobante` NO vive aquí — es transversal, está en
 `src/shared/models/`.
 
-## Plan contable y estados financieros (ADR-080, 2026-08-29)
+## Plan contable y estados financieros (ADR-081, 2026-08-29)
 
 **El plan de cuentas de fábrica es el PCGE** — Plan Contable General
 Empresarial, versión modificada 2019, el catálogo obligatorio en el Perú.

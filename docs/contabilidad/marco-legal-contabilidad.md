@@ -52,7 +52,7 @@ diseñar el ERP y los SOPs.
   (vigente desde el 01/01/2020), es el catálogo de cuentas obligatorio. No es
   optativo ni sustituible por un plan propio: es el lenguaje con el que el
   contador externo lee los libros y con el que se arman las declaraciones.
-- El ERP lo trae de fábrica y lo siembra por empresa (ADR-080). Sus elementos:
+- El ERP lo trae de fábrica y lo siembra por empresa (ADR-081). Sus elementos:
   1 activo disponible y exigible, 2 activo realizable, 3 activo inmovilizado,
   4 pasivo, 5 patrimonio, 6 gastos por naturaleza, 7 ingresos, 8 saldos
   intermediarios de gestión, 9 costos y gastos por función (**denominación
@@ -74,7 +74,7 @@ diseñar el ERP y los SOPs.
   conformidad a la factura del proveedor.
 - El IGV se reconoce **con el comprobante**, no con la operación: el crédito
   fiscal solo se toma con el comprobante válido y anotado en el registro de
-  compras, y el débito nace con el comprobante emitido (ADR-080).
+  compras, y el débito nace con el comprobante emitido (ADR-081).
 
 ## Libros y registros electrónicos
 

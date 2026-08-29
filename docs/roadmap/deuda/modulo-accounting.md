@@ -56,23 +56,23 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   propuestos): sin modelar, dependen de que exista el módulo de activos.
 - ⬜ **`declaracion_itan`**: entidad documentada en data-model §8, sin
   slice propio (depende del ciclo tributario anual, RN-IMP-006).
-- ✅ 2026-08-29 **`regla_asiento` de una sola línea debe/haber** (ADR-080):
+- ✅ 2026-08-29 **`regla_asiento` de una sola línea debe/haber** (ADR-081):
   resuelto por otra vía. `regla_asiento` sigue siendo de 2 líneas y ahora es
   el **override**; sin regla, el evento cae en la plantilla del PCGE
   (`domain/plantillas.py`), que sí expresa N líneas con el IGV desagregado y
   el asiento de destino. Ampliar `regla_asiento` a N líneas dejó de ser
   necesario para el caso que la motivaba.
-- ✅ 2026-08-29 **Plan contable oficial y estados financieros** (ADR-080):
+- ✅ 2026-08-29 **Plan contable oficial y estados financieros** (ADR-081):
   PCGE 2019 sembrable por empresa, asientos peruanos completos por plantilla,
   balance de comprobación, libro mayor, Estado de Situación Financiera y
   Estado de Resultados (por naturaleza). Sin migración.
 
-- ✅ 2026-08-29 **El régimen de IGV se elige y admite excepción puntual** (ADR-080 enmendada, migración `dfb195b14433`): `shared/tributos.py` resuelve casilla de la operación → default de la empresa → zona tributaria, y el IGV se asienta con el comprobante (`sales.comprobante_emitido`, `purchases.comprobante_conforme`). Cierra también el pendiente de `sales.comprobante_emitido` sin consumidor.
+- ✅ 2026-08-29 **El régimen de IGV se elige y admite excepción puntual** (ADR-081 enmendada, migración `dfb195b14433`): `shared/tributos.py` resuelve casilla de la operación → default de la empresa → zona tributaria, y el IGV se asienta con el comprobante (`sales.comprobante_emitido`, `purchases.comprobante_conforme`). Cierra también el pendiente de `sales.comprobante_emitido` sin consumidor.
 
-Lo que ADR-080 dejó abierto:
+Lo que ADR-081 dejó abierto:
 
 - ⬜ **Una venta sin comprobante emitido no reconoce IGV**: es correcto —sin comprobante no hay venta— pero si la emisión a SUNAT falla, el débito fiscal queda pendiente hasta que se reemita, y nada lo señala hoy.
-- ⬜ **`movimiento_dinero.monto` es el total de la OC sin IGV**: el pago a un proveedor gravado se encola por menos de lo que dice su factura. Anterior a ADR-080; ahora se nota más, porque el crédito fiscal sí queda asentado.
+- ⬜ **`movimiento_dinero.monto` es el total de la OC sin IGV**: el pago a un proveedor gravado se encola por menos de lo que dice su factura. Anterior a ADR-081; ahora se nota más, porque el crédito fiscal sí queda asentado.
 - ⬜ **La casilla de operación gravada es manual**: no se deduce del distrito del cliente ni del domicilio del proveedor. Automatizarlo exige definir qué distritos cuentan como zona exonerada.
 - ⬜ **La conformidad de compras no tiene pantalla**: `gravado_igv` se manda por API. Mientras no exista la pantalla, el crédito fiscal de una compra gravada depende de que quien llame la API lo marque.
 - ⬜ **La cuenta por cobrar de la venta (1212) no se cancela nunca**: el

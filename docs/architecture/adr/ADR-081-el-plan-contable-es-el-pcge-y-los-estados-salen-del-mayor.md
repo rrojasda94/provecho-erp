@@ -1,4 +1,4 @@
-# ADR-080 — El plan contable es el PCGE y los estados financieros salen del mayor
+# ADR-081 — El plan contable es el PCGE y los estados financieros salen del mayor
 
 - **Estado:** aceptada
 - **Fecha:** 2026-08-29

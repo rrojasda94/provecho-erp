@@ -111,7 +111,7 @@ usuario (mismo criterio que las demás áreas: primero lo que ya opera).
 - **El plan de cuentas es el PCGE, no uno propio** — el Plan Contable General
   Empresarial es obligatorio en el Perú y es con el que trabaja el contador
   externo. Nadie inventa el número de una cuenta que ya existe; el ERP lo
-  trae cargado (ADR-080). Ver [marco legal](marco-legal-contabilidad.md).
+  trae cargado (ADR-081). Ver [marco legal](marco-legal-contabilidad.md).
 - **Periodo cerrado es inmutable** — corrección por asiento inverso, nunca
   editando lo cerrado (RN-CTB-002).
 - **Gerencia supervisa, no opera** — aprueba, revisa y audita; no lleva la

@@ -1,5 +1,5 @@
 - **El IGV se elige, y una operación puntual puede apartarse del régimen de la
-  empresa** (2026-08-29, ADR-080 enmendada). El régimen estaba deducido de
+  empresa** (2026-08-29, ADR-081 enmendada). El régimen estaba deducido de
   `empresa.zona_tributaria` con la misma línea copiada en dos sitios —el
   asiento contable y el comprobante electrónico—, así que no había dónde
   elegirlo y no había forma de registrar el caso que ocurre todos los meses:
