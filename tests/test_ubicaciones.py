@@ -298,3 +298,154 @@ def test_el_desanclaje_queda_en_la_auditoria(env):
     ediciones = [r for r in registros if r.accion == "editar"]
     assert ediciones, "la edición no quedó auditada"
     assert "ubicacion_place_id" in (ediciones[-1].datos_antes or {})
+
+
+# --- El cliente también ancla (ADR-072) -------------------------------------
+# Hasta acá arriba: la ficha del cliente natural (`persona`) y del jurídico
+# (`cliente`) llevan sus 5 columnas. Lo que faltaba probar es que el camino
+# de caja —`POST /sales/clientes`— de verdad las persiste y las devuelve: el
+# schema ya las declaraba y el router las tiraba igual, y no había ni un test
+# que lo notara.
+def test_el_cliente_natural_se_ancla_al_registrarse(env):
+    """La dirección que se teclea en caja tiene que volver con su pin cuando
+    alguien busca a ese cliente para armar un delivery — si no, el reparto se
+    cobra siempre a tarifa base (ADR-054)."""
+    client, headers, _, _ = env
+    r = client.post(
+        "/api/v1/sales/clientes",
+        headers=headers,
+        json={
+            "nombre": "Ana Torres",
+            "telefono": "987654321",
+            "direccion": "Jr. Lima 200",
+            **UBICACION,
+        },
+    )
+    assert r.status_code == 201, r.text
+
+    buscado = client.get(
+        "/api/v1/sales/clientes/buscar", headers=headers, params={"q": "987654321"}
+    )
+    assert buscado.status_code == 200, buscado.text
+    [cliente] = buscado.json()
+    assert cliente["direccion"] == "Jr. Lima 200"
+    assert cliente["ubicacion_place_id"] == UBICACION["ubicacion_place_id"]
+    assert float(cliente["ubicacion_lat"]) == pytest.approx(-6.48843)
+    assert cliente["ubicacion_distrito"] == "Tarapoto"
+
+
+def test_el_cliente_juridico_tambien_se_ancla(env):
+    """Antes no tenía dónde: su dirección vivía mezclada en `contacto` —el
+    teléfono o correo de quien coordina— y no había columna para el pin."""
+    client, headers, _, _ = env
+    r = client.post(
+        "/api/v1/sales/clientes",
+        headers=headers,
+        json={
+            "nombre": "Distribuidora del Huallaga SAC",
+            "numero_documento": "20600000123",
+            "direccion": "Jr. Alegría Arias de Morey 123",
+            **UBICACION,
+        },
+    )
+    assert r.status_code == 201, r.text
+    cliente_id = r.json()["id"]
+
+    buscado = client.get(
+        "/api/v1/sales/clientes/buscar",
+        headers=headers,
+        params={"q": "20600000123"},
+    )
+    assert buscado.status_code == 200, buscado.text
+    [cliente] = buscado.json()
+    assert cliente["id"] == cliente_id
+    assert cliente["direccion"] == "Jr. Alegría Arias de Morey 123"
+    assert cliente["ubicacion_place_id"] == UBICACION["ubicacion_place_id"]
+
+
+def test_editar_un_cliente_juridico_corrige_direccion_y_suelta_el_pin(env):
+    """Mismo criterio que sucursal/proveedor/persona: corregir el texto sin
+    volver a elegir en el mapa deja las coordenadas de la puerta vieja."""
+    client, headers, _, _ = env
+    creado = client.post(
+        "/api/v1/sales/clientes",
+        headers=headers,
+        json={
+            "nombre": "Distribuidora del Huallaga SAC",
+            "numero_documento": "20600000456",
+            "direccion": "Jr. Alegría 123",
+            **UBICACION,
+        },
+    )
+    cliente_id = creado.json()["id"]
+
+    r = client.patch(
+        f"/api/v1/sales/clientes/{cliente_id}",
+        headers=headers,
+        json={"direccion": "Jr. Otro Sitio 999"},
+    )
+    assert r.status_code == 200, r.text
+
+    buscado = client.get(
+        "/api/v1/sales/clientes/buscar",
+        headers=headers,
+        params={"q": "20600000456"},
+    )
+    [cliente] = buscado.json()
+    assert cliente["direccion"] == "Jr. Otro Sitio 999"
+    assert cliente["ubicacion_place_id"] is None
+    assert cliente["ubicacion_lat"] is None
+
+
+def test_editar_un_cliente_juridico_eligiendo_en_el_mapa_conserva_el_pin_nuevo(env):
+    client, headers, _, _ = env
+    creado = client.post(
+        "/api/v1/sales/clientes",
+        headers=headers,
+        json={
+            "nombre": "Distribuidora del Huallaga SAC",
+            "numero_documento": "20600000789",
+            "direccion": "Jr. Alegría 123",
+            **UBICACION,
+        },
+    )
+    cliente_id = creado.json()["id"]
+
+    r = client.patch(
+        f"/api/v1/sales/clientes/{cliente_id}",
+        headers=headers,
+        json={
+            "direccion": "Jr. Otro Sitio 999",
+            **{**UBICACION, "ubicacion_place_id": "ChIJ_otro_sitio"},
+        },
+    )
+    assert r.status_code == 200, r.text
+
+    buscado = client.get(
+        "/api/v1/sales/clientes/buscar",
+        headers=headers,
+        params={"q": "20600000789"},
+    )
+    [cliente] = buscado.json()
+    assert cliente["ubicacion_place_id"] == "ChIJ_otro_sitio"
+
+
+def test_un_cliente_natural_sin_ubicacion_devuelve_null_y_no_revienta(env):
+    """El caso más común hoy: alguien que solo dio teléfono y dirección a
+    mano, sin Google. `ClienteBuscadoOut` tiene que poder devolver el ancla en
+    null sin romper la búsqueda de caja."""
+    client, headers, _, _ = env
+    r = client.post(
+        "/api/v1/sales/clientes",
+        headers=headers,
+        json={"nombre": "Carlos Pérez", "telefono": "999888777"},
+    )
+    assert r.status_code == 201, r.text
+
+    buscado = client.get(
+        "/api/v1/sales/clientes/buscar", headers=headers, params={"q": "999888777"}
+    )
+    assert buscado.status_code == 200, buscado.text
+    [cliente] = buscado.json()
+    assert cliente["ubicacion_place_id"] is None
+    assert cliente["ubicacion_lat"] is None

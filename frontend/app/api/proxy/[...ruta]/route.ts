@@ -26,7 +26,7 @@
 import { cookies } from "next/headers";
 
 import { API_INTERNAL_URL } from "@/lib/api";
-import { COOKIE_TOKEN } from "@/lib/auth";
+import { COOKIE_TERMINAL, COOKIE_TOKEN } from "@/lib/auth";
 
 const METODOS_CON_CUERPO = new Set(["POST", "PUT", "PATCH"]);
 
@@ -47,26 +47,52 @@ const METODOS_CON_CUERPO = new Set(["POST", "PUT", "PATCH"]);
  */
 const CABECERAS_DEL_CUERPO = ["content-type", "content-disposition"];
 
+/**
+ * Cabeceras salientes hacia la API. Aparte de `reenviar` solo para que la
+ * función principal no acumule un `if` por cabecera opcional — cada una de
+ * estas puede faltar y ninguna ausencia es un error.
+ */
+function cabecerasSalientes(
+  req: Request,
+  store: Awaited<ReturnType<typeof cookies>>,
+  token: string,
+): HeadersInit {
+  // El `Content-Type` **entrante**, no uno fijo: en `multipart/form-data` el
+  // header lleva un `boundary` generado por el navegador, y escribir uno
+  // propio deja al servidor buscando una marca que el cuerpo no tiene. El
+  // error que devuelve no menciona la palabra "boundary" por ningún lado.
+  const tipo = req.headers.get("content-type");
+  // El secreto del terminal enrolado (ADR-079): si la tablet no tiene
+  // cookie, el pad ni siquiera intenta marcar (ver `asistencia/page.tsx`),
+  // así que reenviarlo vacío acá no rompe nada.
+  const terminal = store.get(COOKIE_TERMINAL)?.value;
+  // La IP real del cliente: Caddy la pone en `X-Forwarded-For` de la
+  // request que llega a este contenedor, pero `fetch` no la hereda sola —
+  // sin esto, `ip_de()` del lado de la API siempre veía la IP del
+  // contenedor `web`, nunca la del local. Se reenvía tal cual llegó; el
+  // `FORWARDED_ALLOW_IPS` de la API decide si confía en este salto.
+  const clienteIp = req.headers.get("x-forwarded-for");
+
+  return {
+    ...(tipo ? { "Content-Type": tipo } : {}),
+    ...(terminal ? { "X-Terminal": terminal } : {}),
+    ...(clienteIp ? { "X-Forwarded-For": clienteIp } : {}),
+    Authorization: `Bearer ${token}`,
+  };
+}
+
 async function reenviar(req: Request, ruta: string[]): Promise<Response> {
-  const token = (await cookies()).get(COOKIE_TOKEN)?.value;
+  const store = await cookies();
+  const token = store.get(COOKIE_TOKEN)?.value;
   if (!token) {
     return Response.json({ detail: "Sesión expirada" }, { status: 401 });
   }
   const consulta = new URL(req.url).search;
   const destino = `${API_INTERNAL_URL}/${ruta.join("/")}${consulta}`;
 
-  // El `Content-Type` **entrante**, no uno fijo: en `multipart/form-data` el
-  // header lleva un `boundary` generado por el navegador, y escribir uno
-  // propio deja al servidor buscando una marca que el cuerpo no tiene. El
-  // error que devuelve no menciona la palabra "boundary" por ningún lado.
-  const tipo = req.headers.get("content-type");
-
   const respuesta = await fetch(destino, {
     method: req.method,
-    headers: {
-      ...(tipo ? { "Content-Type": tipo } : {}),
-      Authorization: `Bearer ${token}`,
-    },
+    headers: cabecerasSalientes(req, store, token),
     // `arrayBuffer()` y no `text()`: un `.xlsx` es un ZIP, y decodificarlo
     // como UTF-8 reemplaza cada byte inválido por U+FFFD. La corrupción es
     // irreversible y no falla — el archivo llega, pesa parecido y no abre.
@@ -98,6 +124,12 @@ async function reenviar(req: Request, ruta: string[]): Promise<Response> {
   return new Response(respuesta.body, { status: respuesta.status, headers: cabeceras });
 }
 
+/**
+ * Un handler por verbo, y **todos los que la API usa**: Next devuelve 405 al
+ * verbo que este archivo no exporta, sin decir que el que falta es el del
+ * proxy y no el del endpoint. El `PUT` del borrador del PDV (ADR-074) se fue
+ * a producción así.
+ */
 type Contexto = { params: Promise<{ ruta: string[] }> };
 
 export async function GET(req: Request, { params }: Contexto) {
@@ -105,6 +137,10 @@ export async function GET(req: Request, { params }: Contexto) {
 }
 
 export async function POST(req: Request, { params }: Contexto) {
+  return reenviar(req, (await params).ruta);
+}
+
+export async function PUT(req: Request, { params }: Contexto) {
   return reenviar(req, (await params).ruta);
 }
 

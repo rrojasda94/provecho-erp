@@ -25,6 +25,12 @@
     color: var(--pdv-texto);
 }
 
+/* El PDV ocupa la ventana exacta y el scroll vive **dentro** de cada panel
+   (`.pdv-lista`, `.pdv-lineas`): una caja de mostrador no se opera
+   scrolleando la página entera. Eso vale mientras nada de fuera se le monte
+   encima ni nada de dentro tenga un ancho clavado — que es justamente lo que
+   fallaba: el pie fijo del layout raíz tapaba la franja de acciones y la
+   columna del ticket no cedía con la escala de letra. */
 .pdv {
     height: 100dvh;
     display: flex;
@@ -112,14 +118,66 @@
     color: var(--pdv-rojo);
 }
 
+/* Cambiar de local sin pasar por el back office (ADR-073). Solo se pinta
+   con más de una sucursal asignada. */
+.pdv-selector-sucursal {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    padding: 0.375rem 0.5rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--pdv-borde);
+    background: var(--pdv-surface);
+    color: var(--pdv-texto);
+    max-width: 10rem;
+}
+
+/* Botones de un solo ícono del encabezado (bloquear la pantalla). Cuadrados
+   y de 2.5rem porque se tocan con el dedo: un objetivo más chico se falla en
+   una tablet de mostrador. */
+.pdv-boton-icono {
+    flex: none;
+    width: 2.5rem;
+    height: 2.5rem;
+    display: grid;
+    place-items: center;
+    font-size: 1.0625rem;
+    line-height: 1;
+    border-radius: 0.625rem;
+    border: 1px solid var(--pdv-borde);
+    background: var(--pdv-surface);
+}
+
 .pdv-pill:disabled {
     opacity: 1;
+}
+
+/* La columna del ticket en `clamp` y no en `24.5rem` fijas: con la escala de
+   letra al máximo esas rem valen más de la mitad de una tablet y la carta se
+   quedaba sin lugar donde dibujarse. */
+/* Cuando el PDV no puede abrirse en esta sucursal, las otras del usuario son
+   la salida — antes el mensaje era terminal aunque la caja que buscaba
+   estuviera a un clic. */
+.pdv-vacio-sucursales ul {
+    list-style: none;
+    padding: 0;
+    margin: 0.5rem 0 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.pdv-vacio-sucursales a {
+    display: inline-block;
+    padding: 0.5rem 0.875rem;
+    border-radius: 0.625rem;
+    border: 1px solid var(--pdv-borde);
+    font-weight: 600;
 }
 
 .pdv-shell {
     flex: 1;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 24.5rem;
+    grid-template-columns: minmax(0, 1fr) clamp(19rem, 32vw, 24.5rem);
     min-height: 0;
 }
 
@@ -536,6 +594,14 @@
     margin-top: 0.125rem;
 }
 
+/* Lo que todavía no salió a cocina (ADR-075). En ámbar y no en gris como el
+   resto de las anotaciones de la línea: es lo único de la lista sobre lo que
+   el mesero todavía tiene que hacer algo. */
+.pdv-linea-nombre em.pdv-linea-pendiente {
+    color: var(--pdv-ambar, #fbbf24);
+    font-weight: 600;
+}
+
 .pdv-linea-monto {
     font-weight: 700;
     font-variant-numeric: tabular-nums;
@@ -604,9 +670,13 @@
     color: var(--pdv-verde);
 }
 
+/* El padding inferior no es estético: sin él los botones quedan contra el
+   borde de la ventana, donde el navegador de una tablet pone su propia barra
+   y el gesto de "volver" del sistema. `env(safe-area-inset-bottom)` es lo
+   mismo para el notch de un iPad. */
 .pdv-acciones {
     flex: none;
-    padding: 0 0.75rem;
+    padding: 0 0.75rem calc(0.5rem + env(safe-area-inset-bottom, 0px));
     display: grid;
     /* Dos columnas desde que son cuatro botones: "Consumo de personal" no
        entra legible en un tercio del panel. */
@@ -686,9 +756,31 @@
     color: var(--pdv-texto);
 }
 
-.pdv-boton-sec.ancho {
+/* `.ancho` sirve a cualquier botón del diálogo, no solo al secundario: el
+   de aplicar descuento y el de quitarlo ocupan la fila entera igual. */
+.pdv-boton-sec.ancho,
+.pdv-boton-pri.ancho,
+.pdv-boton-riesgo.ancho {
     width: 100%;
     margin-top: 0.625rem;
+}
+
+/* Un campo y su botón en la misma fila (el código del cupón). El campo se
+   estira, el botón ocupa lo suyo. */
+.pdv-fila-campo {
+    display: flex;
+    gap: 0.5rem;
+    align-items: stretch;
+}
+
+.pdv-fila-campo .pdv-campo {
+    flex: 1;
+    min-width: 0;
+}
+
+.pdv-fila-campo button {
+    flex: none;
+    padding-inline: 1rem;
 }
 
 .pdv-boton-riesgo {
@@ -747,14 +839,22 @@
     line-height: 1;
 }
 
+/* Se descuenta el encabezado del diálogo, no un 70 % suelto: la apertura de
+   caja es bloqueante —no se cierra con Escape— y en una ventana baja su
+   botón de confirmar terminaba fuera de la pantalla, con la caja sin abrir y
+   sin forma de salir. */
 .pdv-dialogo-cuerpo {
     padding: 0 1.25rem 1.25rem;
-    max-height: min(70vh, 38rem);
+    max-height: min(calc(100dvh - 9rem), 38rem);
     overflow-y: auto;
 }
 
+/* `flex-wrap`: el pie de los diálogos de caja mete un monto grande junto a
+   su rótulo, y sin permitir que envuelva el número se montaba sobre el texto
+   en una pantalla angosta. */
 .pdv-dialogo-pie {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
     gap: 0.5rem;
@@ -763,7 +863,19 @@
     border-top: 1px solid var(--pdv-borde);
 }
 
+/* `display: flex` en columna, y no el `inline` que trae un `<label>`.
+   La clase se escribió pensando en un `<p>`, pero los diálogos de apertura y
+   cierre de caja la usan sobre `<label>`: en una caja inline los márgenes
+   verticales **no aplican**, así que el rótulo y su campo se montaban uno
+   sobre otro y contra los párrafos vecinos.
+
+   La regla equivalente existe en `globals.css` (`.erp dialog :where(label)`)
+   pero está acotada a `.erp`, y el PDV vive fuera de ese layout (ADR-013):
+   nada de los estilos de diálogo del back office llega hasta acá. */
 .pdv-etiqueta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
     font-size: 0.6875rem;
     font-weight: 700;
     text-transform: uppercase;
@@ -771,6 +883,8 @@
     color: var(--pdv-muted);
     margin: 0.875rem 0 0.4375rem;
 }
+
+
 
 /* Sección que arranca cerrada y se abre al tocar. La usa el "Sin…", que con
    una receta larga tapaba los sabores y los extras. `<details>` nativo: no
@@ -1314,4 +1428,55 @@
 
 .pdv-abierta-imprimir:hover {
     background: color-mix(in oklab, currentColor 12%, transparent);
+}
+
+/* El pie fijo del layout raíz (`components/shell/pie-pagina.tsx`) se pinta en
+   TODAS las pantallas, incluida esta, y acá no hay página que scrollear: la
+   franja de acciones vive pegada al borde inferior y el pie se le monta
+   encima. Ocultarlo con `:has()` y no sacarlo del layout raíz porque en el
+   back office sí cumple su función —decir qué versión se está usando— y ahí
+   no tapa nada.
+
+   La regla vive en la hoja de esta pantalla, así que solo existe donde esta
+   pantalla se carga. */
+body:has(.pdv) > footer {
+    display: none;
+}
+
+/* La cola de despacho encima del PDV (punto 9 del parche). A pantalla
+   completa y sin bordes: es una pantalla, no un formulario. El `<dialog>`
+   nativo trae `::backdrop` y el top layer; lo único que hay que sacarle son
+   los estilos de diálogo del PDV, pensados para una tarjeta centrada. */
+.pdv-despacho {
+    width: 100%;
+    max-width: none;
+    height: 100dvh;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    overflow: hidden;
+}
+
+.pdv-despacho::backdrop {
+    background: rgba(0, 0, 0, 0.75);
+}
+
+/* Fuera del flujo y por encima de la cola: el encabezado del despacho ya
+   ocupa esa fila, y meterle un botón adentro obligaría a que el componente
+   sepa que está embebido. */
+.pdv-despacho-cerrar {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.9rem;
+    z-index: 2;
+    width: 2.75rem;
+    height: 2.75rem;
+    font-size: 1.5rem;
+    line-height: 1;
+    border-radius: 0.75rem;
+    border: 1px solid var(--pdv-borde-fuerte);
+    background: var(--pdv-surface);
+    color: var(--pdv-texto);
 }

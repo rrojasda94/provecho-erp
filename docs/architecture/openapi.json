@@ -224,8 +224,20 @@
         "type": "object"
       },
       "AgregarLineasCreate": {
-        "description": "Sumar líneas a una orden ya enviada a cocina (RN-COM-029). Mismo\nshape que los `items` del alta: una mesa que pide de a poco no debería\nobligar a abrir una orden nueva que después se cobra por separado.",
+        "description": "Sumar líneas a una orden ya enviada a cocina (RN-COM-029). Mismo\nshape que los `items` del alta: una mesa que pide de a poco no debería\nobligar a abrir una orden nueva que después se cobra por separado.\n\nTodo lo de una misma llamada entra al KDS como una tanda propia\n(ADR-075): una comanda nueva en la cola, no líneas sueltas dentro de la\npastilla del pedido original.",
         "properties": {
+          "idempotency_key": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idempotency Key"
+          },
           "items": {
             "items": {
               "$ref": "#/components/schemas/VentaItemIn"
@@ -3053,6 +3065,71 @@
         "title": "BoletaPagoOut",
         "type": "object"
       },
+      "BorradorIn": {
+        "description": "Lo que el PDV guarda de un ticket a medio armar.\n\n`contenido` es opaco para el servidor a propósito: es la forma que el PDV\nya tenía en memoria (tipo de orden, mesa, comensales, cliente y líneas con\nsus extras, restas y atributos) y un borrador todavía no es un hecho de\nnegocio que valga la pena tipar. Lo que sale a cocina sí se valida entero,\nen `POST /sales/ventas`.",
+        "properties": {
+          "contenido": {
+            "additionalProperties": true,
+            "title": "Contenido",
+            "type": "object"
+          },
+          "punto_venta_id": {
+            "format": "uuid",
+            "title": "Punto Venta Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "punto_venta_id",
+          "contenido"
+        ],
+        "title": "BorradorIn",
+        "type": "object"
+      },
+      "BorradorOut": {
+        "properties": {
+          "actualizado_en": {
+            "format": "date-time",
+            "title": "Actualizado En",
+            "type": "string"
+          },
+          "contenido": {
+            "additionalProperties": true,
+            "title": "Contenido",
+            "type": "object"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "punto_venta_id": {
+            "format": "uuid",
+            "title": "Punto Venta Id",
+            "type": "string"
+          },
+          "sucursal_id": {
+            "format": "uuid",
+            "title": "Sucursal Id",
+            "type": "string"
+          },
+          "usuario_id": {
+            "format": "uuid",
+            "title": "Usuario Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "sucursal_id",
+          "punto_venta_id",
+          "usuario_id",
+          "contenido",
+          "actualizado_en"
+        ],
+        "title": "BorradorOut",
+        "type": "object"
+      },
       "BriefUpdate": {
         "properties": {
           "kpi": {
@@ -4185,6 +4262,17 @@
       "ClienteBuscadoOut": {
         "description": "Lo que el PDV necesita para pintar un resultado de búsqueda.",
         "properties": {
+          "contacto": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contacto"
+          },
           "direccion": {
             "anyOf": [
               {
@@ -4780,7 +4868,7 @@
         "type": "object"
       },
       "ClienteUpdate": {
-        "description": "Corrección de un cliente **jurídico**. Campo ausente o `null` = no tocar.\n\nNo lleva nombre, teléfono ni dirección: en un cliente natural esos datos\nviven en su `persona` (RN-GEN-007) y se corrigen desde Personas. El\ndocumento tiene su propio endpoint (`PATCH /clientes/{id}/documento`),\nque aplica las reglas de identificación.",
+        "description": "Corrección de un cliente **jurídico**. Campo ausente o `null` = no tocar.\n\nNo lleva nombre ni teléfono: en un cliente natural esos datos viven en su\n`persona` (RN-GEN-007) y se corrigen desde Personas. El documento tiene su\npropio endpoint (`PATCH /clientes/{id}/documento`), que aplica las reglas\nde identificación.\n\n`direccion` sí es propia del jurídico (ADR-072) — antes se mezclaba con\n`contacto`. Corregirla sin volver a elegir en el mapa suelta el ancla\n(`shared.ubicacion.desanclar_si_cambio_el_texto`), igual que en Personas,\nProveedores y Organización.",
         "properties": {
           "contacto": {
             "anyOf": [
@@ -4793,6 +4881,18 @@
               }
             ],
             "title": "Contacto"
+          },
+          "direccion": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direccion"
           },
           "razon_social": {
             "anyOf": [
@@ -4818,6 +4918,76 @@
               }
             ],
             "title": "Ruc"
+          },
+          "ubicacion_distrito": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Distrito"
+          },
+          "ubicacion_lat": {
+            "anyOf": [
+              {
+                "maximum": 90.0,
+                "minimum": -90.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lat"
+          },
+          "ubicacion_lng": {
+            "anyOf": [
+              {
+                "maximum": 180.0,
+                "minimum": -180.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lng"
+          },
+          "ubicacion_place_id": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Place Id"
+          },
+          "ubicacion_plus_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Plus Code"
           }
         },
         "title": "ClienteUpdate",
@@ -10433,6 +10603,17 @@
             "title": "Extras",
             "type": "array"
           },
+          "nota": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nota"
+          },
           "producto": {
             "title": "Producto",
             "type": "string"
@@ -11485,6 +11666,80 @@
           }
         },
         "title": "MarcaUpdate",
+        "type": "object"
+      },
+      "MarcacionOut": {
+        "description": "La evidencia de un toque del pad. Sin la foto —pesa y se pide aparte\n(`GET /rrhh/marcaciones/{id}/foto`)—, solo si existe. A lo sumo dos\nfilas por asistencia (entrada y salida): no hace falta optimizar la\ncarga de `tiene_foto` más allá del `deferred` de la columna.",
+        "properties": {
+          "distancia_m": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distancia M"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "ip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ip"
+          },
+          "momento": {
+            "format": "date-time",
+            "title": "Momento",
+            "type": "string"
+          },
+          "terminal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Terminal Id"
+          },
+          "tiene_foto": {
+            "title": "Tiene Foto",
+            "type": "boolean"
+          },
+          "tipo": {
+            "title": "Tipo",
+            "type": "string"
+          },
+          "usuario_id": {
+            "format": "uuid",
+            "title": "Usuario Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "tipo",
+          "momento",
+          "usuario_id",
+          "terminal_id",
+          "ip",
+          "distancia_m",
+          "tiene_foto"
+        ],
+        "title": "MarcacionOut",
         "type": "object"
       },
       "MatrizCeldaOut": {
@@ -13318,6 +13573,25 @@
         "title": "NombrePublicoOut",
         "type": "object"
       },
+      "NotaCocinaIn": {
+        "description": "Cómo se sirve el pedido. `null` la quita.\n\nSe puede cambiar con la orden ya en cocina porque así se pide de verdad:\n\"las bebidas al final\" se dice a mitad del servicio, no al tomar la\ncomanda.",
+        "properties": {
+          "nota": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nota"
+          }
+        },
+        "title": "NotaCocinaIn",
+        "type": "object"
+      },
       "NotaCreditoCreate": {
         "description": "Acredita un comprobante ya aceptado (RN-CPP-009).\n\n`motivo` es del catálogo 09 de SUNAT: 01 anulación de la operación, 02\nanulación por error en el RUC, 03 corrección por error en la\ndescripción, 06 devolución total, 07 devolución por ítem.\n\nSin `detalle` la nota es **total**. Con `detalle`, acredita solo esas\nlíneas y esas cantidades.\n\n`repone_stock` es explícito porque no hay respuesta universal: un plato\ndevuelto en cocina rara vez devuelve el insumo, y corregir el RUC de una\nfactura no toca el inventario.",
         "properties": {
@@ -14118,6 +14392,52 @@
       },
       "PadMarcarIn": {
         "properties": {
+          "foto": {
+            "anyOf": [
+              {
+                "maxLength": 175000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Foto"
+          },
+          "lat": {
+            "anyOf": [
+              {
+                "maximum": 90.0,
+                "minimum": -90.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lat"
+          },
+          "lng": {
+            "anyOf": [
+              {
+                "maximum": 180.0,
+                "minimum": -180.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lng"
+          },
           "pin": {
             "maxLength": 12,
             "minLength": 4,
@@ -15105,7 +15425,7 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d{0,2}0*$",
                 "type": "string"
               }
             ],
@@ -15184,6 +15504,11 @@
             "format": "uuid",
             "title": "Venta Id",
             "type": "string"
+          },
+          "vuelto": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Vuelto",
+            "type": "string"
           }
         },
         "required": [
@@ -15191,6 +15516,7 @@
           "venta_id",
           "medio_pago_id",
           "monto",
+          "vuelto",
           "grupo_cobro",
           "estado"
         ],
@@ -15767,6 +16093,17 @@
             "title": "Modalidad",
             "type": "string"
           },
+          "nota_cocina": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nota Cocina"
+          },
           "numero_orden": {
             "title": "Numero Orden",
             "type": "integer"
@@ -15781,6 +16118,11 @@
               }
             ],
             "title": "Referencia Atencion"
+          },
+          "tanda": {
+            "default": 1,
+            "title": "Tanda",
+            "type": "integer"
           },
           "tipo": {
             "default": "venta",
@@ -15859,6 +16201,17 @@
             "title": "Modalidad",
             "type": "string"
           },
+          "nota_cocina": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nota Cocina"
+          },
           "numero_orden": {
             "title": "Numero Orden",
             "type": "integer"
@@ -15873,6 +16226,11 @@
               }
             ],
             "title": "Referencia Atencion"
+          },
+          "tanda": {
+            "default": 1,
+            "title": "Tanda",
+            "type": "integer"
           },
           "tipo": {
             "default": "venta",
@@ -18836,6 +19194,166 @@
         "title": "ProgramaConteoOut",
         "type": "object"
       },
+      "PromocionCreate": {
+        "properties": {
+          "acumulable": {
+            "default": false,
+            "title": "Acumulable",
+            "type": "boolean"
+          },
+          "beneficio": {
+            "additionalProperties": true,
+            "title": "Beneficio",
+            "type": "object"
+          },
+          "canales": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canales"
+          },
+          "condicion": {
+            "additionalProperties": true,
+            "title": "Condicion",
+            "type": "object"
+          },
+          "desde": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Desde"
+          },
+          "dias_semana": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dias Semana"
+          },
+          "hasta": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hasta"
+          },
+          "hora_desde": {
+            "anyOf": [
+              {
+                "format": "time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hora Desde"
+          },
+          "hora_hasta": {
+            "anyOf": [
+              {
+                "format": "time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hora Hasta"
+          },
+          "marca_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marca Id"
+          },
+          "modalidades": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modalidades"
+          },
+          "nombre": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Nombre",
+            "type": "string"
+          },
+          "prioridad": {
+            "default": 0,
+            "title": "Prioridad",
+            "type": "integer"
+          },
+          "sucursal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sucursal Id"
+          },
+          "tipo": {
+            "enum": [
+              "nxm",
+              "cantidad",
+              "combo",
+              "monto_minimo"
+            ],
+            "title": "Tipo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "nombre",
+          "tipo"
+        ],
+        "title": "PromocionCreate",
+        "type": "object"
+      },
       "PromocionCuponOut": {
         "properties": {
           "descuento_porcentaje": {
@@ -18877,6 +19395,183 @@
         "title": "PromocionCuponOut",
         "type": "object"
       },
+      "PromocionOut": {
+        "properties": {
+          "activa": {
+            "title": "Activa",
+            "type": "boolean"
+          },
+          "acumulable": {
+            "default": false,
+            "title": "Acumulable",
+            "type": "boolean"
+          },
+          "beneficio": {
+            "additionalProperties": true,
+            "title": "Beneficio",
+            "type": "object"
+          },
+          "canales": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canales"
+          },
+          "condicion": {
+            "additionalProperties": true,
+            "title": "Condicion",
+            "type": "object"
+          },
+          "desde": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Desde"
+          },
+          "dias_semana": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dias Semana"
+          },
+          "empresa_id": {
+            "format": "uuid",
+            "title": "Empresa Id",
+            "type": "string"
+          },
+          "hasta": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hasta"
+          },
+          "hora_desde": {
+            "anyOf": [
+              {
+                "format": "time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hora Desde"
+          },
+          "hora_hasta": {
+            "anyOf": [
+              {
+                "format": "time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hora Hasta"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "marca_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marca Id"
+          },
+          "modalidades": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modalidades"
+          },
+          "nombre": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Nombre",
+            "type": "string"
+          },
+          "prioridad": {
+            "default": 0,
+            "title": "Prioridad",
+            "type": "integer"
+          },
+          "sucursal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sucursal Id"
+          },
+          "tipo": {
+            "enum": [
+              "nxm",
+              "cantidad",
+              "combo",
+              "monto_minimo"
+            ],
+            "title": "Tipo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "nombre",
+          "tipo",
+          "id",
+          "empresa_id",
+          "activa"
+        ],
+        "title": "PromocionOut",
+        "type": "object"
+      },
       "PromocionPublicaOut": {
         "description": "Lo que la landing necesita para dibujarse: nada de la campaña interna\n(presupuesto, KPI, quién la aprobó) sale por acá.",
         "properties": {
@@ -18906,6 +19601,197 @@
           "vigencia_cupon_dias"
         ],
         "title": "PromocionPublicaOut",
+        "type": "object"
+      },
+      "PromocionUpdate": {
+        "description": "Parcial: el campo ausente no se toca. `activa: false` la termina\n(RN-PRM-005) sin borrar nada — las ventas que la aplicaron la siguen\nnombrando.",
+        "properties": {
+          "activa": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activa"
+          },
+          "acumulable": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acumulable"
+          },
+          "beneficio": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Beneficio"
+          },
+          "canales": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canales"
+          },
+          "condicion": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Condicion"
+          },
+          "desde": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Desde"
+          },
+          "dias_semana": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dias Semana"
+          },
+          "hasta": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hasta"
+          },
+          "hora_desde": {
+            "anyOf": [
+              {
+                "format": "time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hora Desde"
+          },
+          "hora_hasta": {
+            "anyOf": [
+              {
+                "format": "time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hora Hasta"
+          },
+          "marca_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marca Id"
+          },
+          "modalidades": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modalidades"
+          },
+          "nombre": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nombre"
+          },
+          "prioridad": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prioridad"
+          },
+          "sucursal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sucursal Id"
+          }
+        },
+        "title": "PromocionUpdate",
         "type": "object"
       },
       "ProveedorCreate": {
@@ -22134,6 +23020,38 @@
         "title": "RolIdIn",
         "type": "object"
       },
+      "SaldoCuentaOut": {
+        "description": "Cuánto queda por cobrar en una cuenta de la venta (RN-COM-018).\n\nEs la cifra que el diálogo de cobro tiene que mostrar: la calcula el\nmismo `total_a_cobrar` que después valida el pago, así que descuento,\ncupón, promoción y flete no pueden discrepar entre pantalla y servidor.",
+        "properties": {
+          "grupo_cobro": {
+            "title": "Grupo Cobro",
+            "type": "integer"
+          },
+          "pagado": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Pagado",
+            "type": "string"
+          },
+          "saldo": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Saldo",
+            "type": "string"
+          },
+          "total": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total",
+            "type": "string"
+          }
+        },
+        "required": [
+          "grupo_cobro",
+          "total",
+          "pagado",
+          "saldo"
+        ],
+        "title": "SaldoCuentaOut",
+        "type": "object"
+      },
       "SemaforoOut": {
         "description": "Umbrales y colores con los que la pantalla pinta el tiempo de espera.\nSon los **resueltos** —lo que Gerencia aprobó o la semilla del módulo—,\nno el contenido crudo de `parametro_empresa`.",
         "properties": {
@@ -23417,6 +24335,18 @@
             "title": "Nombre",
             "type": "string"
           },
+          "radio_marcaje_m": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Radio Marcaje M"
+          },
           "tenencia": {
             "enum": [
               "propia",
@@ -23555,6 +24485,17 @@
           "nombre": {
             "title": "Nombre",
             "type": "string"
+          },
+          "radio_marcaje_m": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Radio Marcaje M"
           },
           "tenencia": {
             "anyOf": [
@@ -23705,6 +24646,18 @@
               }
             ],
             "title": "Nombre"
+          },
+          "radio_marcaje_m": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Radio Marcaje M"
           },
           "tenencia": {
             "anyOf": [
@@ -24004,6 +24957,117 @@
           "marco_salida"
         ],
         "title": "TarjetaOut",
+        "type": "object"
+      },
+      "TerminalCodigoOut": {
+        "description": "El código de activación, visible una sola vez — igual que el token\nde un agente.",
+        "properties": {
+          "codigo": {
+            "title": "Codigo",
+            "type": "string"
+          },
+          "terminal": {
+            "$ref": "#/components/schemas/TerminalOut"
+          }
+        },
+        "required": [
+          "terminal",
+          "codigo"
+        ],
+        "title": "TerminalCodigoOut",
+        "type": "object"
+      },
+      "TerminalCrear": {
+        "properties": {
+          "nombre": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Nombre",
+            "type": "string"
+          },
+          "sucursal_id": {
+            "format": "uuid",
+            "title": "Sucursal Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sucursal_id",
+          "nombre"
+        ],
+        "title": "TerminalCrear",
+        "type": "object"
+      },
+      "TerminalEnrolarIn": {
+        "properties": {
+          "codigo": {
+            "maxLength": 6,
+            "minLength": 6,
+            "title": "Codigo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "codigo"
+        ],
+        "title": "TerminalEnrolarIn",
+        "type": "object"
+      },
+      "TerminalEnrolarOut": {
+        "description": "El secreto en claro, visible una sola vez: de acá en más solo queda\nsu hash, y perderlo obliga a enrolar de nuevo.",
+        "properties": {
+          "secreto": {
+            "title": "Secreto",
+            "type": "string"
+          }
+        },
+        "required": [
+          "secreto"
+        ],
+        "title": "TerminalEnrolarOut",
+        "type": "object"
+      },
+      "TerminalOut": {
+        "properties": {
+          "activo": {
+            "title": "Activo",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "sucursal_id": {
+            "format": "uuid",
+            "title": "Sucursal Id",
+            "type": "string"
+          },
+          "ultima_marcacion_en": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ultima Marcacion En"
+          }
+        },
+        "required": [
+          "id",
+          "sucursal_id",
+          "nombre",
+          "activo",
+          "ultima_marcacion_en"
+        ],
+        "title": "TerminalOut",
         "type": "object"
       },
       "TicketComprobanteOut": {
@@ -26084,6 +27148,18 @@
             "title": "Modalidad",
             "type": "string"
           },
+          "nota_cocina": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nota Cocina"
+          },
           "punto_venta_id": {
             "format": "uuid",
             "title": "Punto Venta Id",
@@ -26259,6 +27335,18 @@
             "title": "Grupo Cobro",
             "type": "integer"
           },
+          "nota": {
+            "anyOf": [
+              {
+                "maxLength": 140,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nota"
+          },
           "producto_comercial_id": {
             "format": "uuid",
             "title": "Producto Comercial Id",
@@ -26298,6 +27386,12 @@
             "title": "Cantidad",
             "type": "string"
           },
+          "descuento": {
+            "default": "0",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Descuento",
+            "type": "string"
+          },
           "extras": {
             "default": [],
             "items": {
@@ -26318,6 +27412,17 @@
           "nombre": {
             "title": "Nombre",
             "type": "string"
+          },
+          "nota": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nota"
           },
           "precio_unitario": {
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
@@ -26552,9 +27657,31 @@
             ],
             "title": "Mesa Id"
           },
+          "mesa_numero": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mesa Numero"
+          },
           "modalidad": {
             "title": "Modalidad",
             "type": "string"
+          },
+          "nota_cocina": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nota Cocina"
           },
           "numero_orden": {
             "title": "Numero Orden",
@@ -26599,6 +27726,32 @@
           "referencia_atencion"
         ],
         "title": "VentaOut",
+        "type": "object"
+      },
+      "VentaPromocionOut": {
+        "description": "Una promoción que este pedido activó, con lo que descontó.\n\nEl nombre viaja congelado: la promoción se renombra o se apaga, y el\nticket de ayer tiene que seguir diciendo lo que el cliente leyó.",
+        "properties": {
+          "monto": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Monto",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "promocion_id": {
+            "format": "uuid",
+            "title": "Promocion Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "promocion_id",
+          "nombre",
+          "monto"
+        ],
+        "title": "VentaPromocionOut",
         "type": "object"
       },
       "VentaSyncIn": {
@@ -27400,7 +28553,7 @@
   "info": {
     "description": "ERP modular para grupo de restaurantes multi-marca. Convenciones de la API: docs/engineering/api-guidelines.md.",
     "title": "Provecho ERP",
-    "version": "0.7.6"
+    "version": "0.8.1"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -42217,9 +43370,68 @@
         ]
       }
     },
+    "/api/v1/rrhh/asistencia/terminal/enrolar": {
+      "post": {
+        "description": "La tablet teclea el código que un admin generó desde el back-office y\nse queda con un secreto propio: de acá en más, cada marcación lo manda\n(RN-RRHH-023, ADR-079). Rate limit por IP y no por terminal — todavía no\nhay uno enrolado con quien contar el límite.",
+        "operationId": "enrolar_terminal_api_v1_rrhh_asistencia_terminal_enrolar_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "sucursal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sucursal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TerminalEnrolarIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TerminalEnrolarOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Enrolar Terminal",
+        "tags": [
+          "rrhh"
+        ]
+      }
+    },
     "/api/v1/rrhh/asistencia/terminal/marcar": {
       "post": {
-        "description": "Registra la marcación firmada con el PIN del propio trabajador.\n\nEl límite se cuenta **por trabajador** y no por IP: en un local todas\nlas tabletas salen por la misma dirección y el cambio de turno son diez\npersonas marcando seguido — un límite por IP castigaría a la cola por\nculpa de quien se equivocó de tarjeta.",
+        "description": "Registra la marcación firmada con el PIN del propio trabajador, desde\nun terminal autorizado (RN-RRHH-023) y con su evidencia (RN-RRHH-024).\n\nEl límite se cuenta **por trabajador** y no por IP: en un local todas\nlas tabletas salen por la misma dirección y el cambio de turno son diez\npersonas marcando seguido — un límite por IP castigaría a la cola por\nculpa de quien se equivocó de tarjeta.",
         "operationId": "marcar_en_el_pad_api_v1_rrhh_asistencia_terminal_marcar_post",
         "parameters": [
           {
@@ -42230,6 +43442,22 @@
               "format": "uuid",
               "title": "Sucursal Id",
               "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Terminal",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Terminal"
             }
           }
         ],
@@ -42324,6 +43552,59 @@
           }
         ],
         "summary": "Tarjetas Del Pad",
+        "tags": [
+          "rrhh"
+        ]
+      }
+    },
+    "/api/v1/rrhh/asistencia/{asistencia_id}/marcaciones": {
+      "get": {
+        "description": "La evidencia de cada toque del día: quién firmó, desde qué terminal,\ncon qué IP y a qué distancia de la sucursal (RN-RRHH-024).",
+        "operationId": "marcaciones_de_asistencia_api_v1_rrhh_asistencia__asistencia_id__marcaciones_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "asistencia_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Asistencia Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MarcacionOut"
+                  },
+                  "title": "Response Marcaciones De Asistencia Api V1 Rrhh Asistencia  Asistencia Id  Marcaciones Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Marcaciones De Asistencia",
         "tags": [
           "rrhh"
         ]
@@ -43132,6 +44413,52 @@
           }
         ],
         "summary": "Ver Liquidacion Bss",
+        "tags": [
+          "rrhh"
+        ]
+      }
+    },
+    "/api/v1/rrhh/marcaciones/{marcacion_id}/foto": {
+      "get": {
+        "operationId": "foto_de_marcacion_api_v1_rrhh_marcaciones__marcacion_id__foto_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "marcacion_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Marcacion Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Foto De Marcacion",
         "tags": [
           "rrhh"
         ]
@@ -44267,6 +45594,143 @@
         ]
       }
     },
+    "/api/v1/rrhh/terminales": {
+      "get": {
+        "operationId": "listar_terminales_api_v1_rrhh_terminales_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "sucursal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sucursal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TerminalOut"
+                  },
+                  "title": "Response Listar Terminales Api V1 Rrhh Terminales Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Terminales",
+        "tags": [
+          "rrhh"
+        ]
+      },
+      "post": {
+        "operationId": "crear_terminal_api_v1_rrhh_terminales_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TerminalCrear"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TerminalCodigoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Terminal",
+        "tags": [
+          "rrhh"
+        ]
+      }
+    },
+    "/api/v1/rrhh/terminales/{terminal_id}": {
+      "delete": {
+        "operationId": "revocar_terminal_api_v1_rrhh_terminales__terminal_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "terminal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Terminal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Revocar Terminal",
+        "tags": [
+          "rrhh"
+        ]
+      }
+    },
     "/api/v1/rrhh/trabajadores": {
       "get": {
         "operationId": "listar_trabajadores_api_v1_rrhh_trabajadores_get",
@@ -45249,6 +46713,158 @@
         ]
       }
     },
+    "/api/v1/sales/borradores": {
+      "get": {
+        "description": "Los borradores vivos de esa caja, en el orden en que se abrieron.\n\nPor punto de venta y no por usuario: el borrador es de la caja, así que\nel relevo de turno recupera el pedido que dejó el anterior (ADR-074).",
+        "operationId": "listar_borradores_api_v1_sales_borradores_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "punto_venta_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Punto Venta Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/BorradorOut"
+                  },
+                  "title": "Response Listar Borradores Api V1 Sales Borradores Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Borradores",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/borradores/{borrador_id}": {
+      "delete": {
+        "description": "Descarta el borrador. Idempotente: borrar dos veces no es un error.\n\nEl PDV lo llama al enviar el pedido y al cerrar la pestaña, dos caminos\nque pueden cruzarse; un 404 acá solo serviría para pintar un aviso de\nalgo que ya está como se quería.",
+        "operationId": "descartar_borrador_api_v1_sales_borradores__borrador_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "borrador_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Borrador Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Descartar Borrador",
+        "tags": [
+          "sales"
+        ]
+      },
+      "put": {
+        "description": "Guarda el ticket a medio armar de una caja.\n\n`PUT` con el id que el PDV ya le puso a la pestaña: el navegador guarda\ncon cada cambio y no puede llevar la cuenta de si esta pestaña llegó\nantes al servidor. Repetirlo tras un corte de red deja el mismo estado.",
+        "operationId": "guardar_borrador_api_v1_sales_borradores__borrador_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "borrador_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Borrador Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BorradorIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BorradorOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Guardar Borrador",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
     "/api/v1/sales/carta": {
       "get": {
         "description": "Catálogo vendible con el precio ya resuelto — lo que el PDV renderiza\nen vez de traer un precio propio.",
@@ -45730,7 +47346,7 @@
     },
     "/api/v1/sales/clientes/{cliente_id}": {
       "patch": {
-        "description": "Corrige razón social, RUC o contacto de un cliente **jurídico**. Un\nRUC mal tecleado llega hasta la factura electrónica y hasta ahora no\ntenía arreglo por API.\n\nUn cliente natural responde 422: sus datos viven en su `persona`\n(RN-GEN-007) y se corrigen desde `PATCH /personas/{id}`.",
+        "description": "Corrige razón social, RUC, contacto o dirección de un cliente\n**jurídico**. Un RUC mal tecleado llega hasta la factura electrónica y\nhasta ahora no tenía arreglo por API.\n\nUn cliente natural responde 422: sus datos viven en su `persona`\n(RN-GEN-007) y se corrigen desde `PATCH /personas/{id}`.",
         "operationId": "editar_cliente_api_v1_sales_clientes__cliente_id__patch",
         "parameters": [
           {
@@ -47658,6 +49274,103 @@
         ]
       }
     },
+    "/api/v1/sales/promociones": {
+      "get": {
+        "operationId": "listar_promociones_api_v1_sales_promociones_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "solo_activas",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Solo Activas",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PromocionOut"
+                  },
+                  "title": "Response Listar Promociones Api V1 Sales Promociones Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Promociones",
+        "tags": [
+          "sales"
+        ]
+      },
+      "post": {
+        "description": "Da de alta una promoción que se aplica **sola** cuando el pedido\ncumple.\n\nNo es el cupón de ADR-061 —ahí hay un código que alguien canjea— ni el\ndescuento manual de RN-COM-017, que firma un supervisor. Acá el cajero no\ninterviene: por eso el permiso es de gestión, no de caja.",
+        "operationId": "crear_promocion_api_v1_sales_promociones_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PromocionCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PromocionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Promocion",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
     "/api/v1/sales/promociones-cupon": {
       "get": {
         "description": "Array plano y no paginado: son campañas contadas con los dedos de una\nmano, no una colección que crece con la operación (ADR-026).\n\nSe escopa por **grupo** y no por empresa: el cupón es del cliente, y el\ncliente es del grupo (RN-PTS-001).",
@@ -47733,6 +49446,114 @@
           }
         ],
         "summary": "Terminar Promocion Cupon",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/promociones/{promocion_id}": {
+      "patch": {
+        "description": "`exclude_unset`: el campo ausente no se toca. Sin eso, apagar una\npromoción desde la tabla (`{\"activa\": false}`) le borraría la vigencia y\nel ámbito de paso.",
+        "operationId": "editar_promocion_api_v1_sales_promociones__promocion_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "promocion_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Promocion Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PromocionUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PromocionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Editar Promocion",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/promociones/{promocion_id}/terminar": {
+      "post": {
+        "description": "La apaga (RN-PRM-005). No borra: las ventas que la aplicaron la siguen\nnombrando, y lo ya aplicado quedó congelado en `venta_promocion`.",
+        "operationId": "terminar_promocion_api_v1_sales_promociones__promocion_id__terminar_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "promocion_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Promocion Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PromocionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Terminar Promocion",
         "tags": [
           "sales"
         ]
@@ -48562,6 +50383,7 @@
     },
     "/api/v1/sales/ventas/{venta_id}/comprobante": {
       "get": {
+        "description": "El primer comprobante de la venta. Se mantiene por compatibilidad: una\nventa dividida tiene uno por cuenta, y para esas está el plural.",
         "operationId": "ver_comprobante_api_v1_sales_ventas__venta_id__comprobante_get",
         "parameters": [
           {
@@ -48603,6 +50425,59 @@
           }
         ],
         "summary": "Ver Comprobante",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/ventas/{venta_id}/comprobantes": {
+      "get": {
+        "description": "Todos los comprobantes de la venta, uno por cuenta (RN-COM-018).\n\nCuando la mesa se divide, cada cuenta emite el suyo — eso ya funcionaba,\npero el PDV solo podía pedir el singular, que devuelve el primero. El\ncajero cobraba dos cuentas y solo podía imprimir un comprobante: el\nsegundo cliente se quedaba sin el suyo, que es justo lo que la división\nde cuenta existe para darle.",
+        "operationId": "ver_comprobantes_api_v1_sales_ventas__venta_id__comprobantes_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "venta_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Venta Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/src__modules__sales__api__schemas__ComprobanteOut"
+                  },
+                  "title": "Response Ver Comprobantes Api V1 Sales Ventas  Venta Id  Comprobantes Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Ver Comprobantes",
         "tags": [
           "sales"
         ]
@@ -48993,6 +50868,65 @@
         ]
       }
     },
+    "/api/v1/sales/ventas/{venta_id}/nota-cocina": {
+      "put": {
+        "description": "Cómo se sirve el pedido: \"servir todo junto\", \"bebidas al final\".\n\nMismo permiso que crear la orden y **sin firma de nadie**: no toca el\ntotal, no mueve inventario y no cambia qué se prepara — solo en qué\norden sale. Se puede con la orden ya en cocina porque así se pide de\nverdad, a mitad del servicio.",
+        "operationId": "fijar_nota_cocina_api_v1_sales_ventas__venta_id__nota_cocina_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "venta_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Venta Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotaCocinaIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VentaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Fijar Nota Cocina",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
     "/api/v1/sales/ventas/{venta_id}/pagos": {
       "post": {
         "operationId": "registrar_pago_api_v1_sales_ventas__venta_id__pagos_post",
@@ -49111,6 +51045,112 @@
           }
         ],
         "summary": "Ver Precuenta",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/ventas/{venta_id}/promociones": {
+      "get": {
+        "description": "Qué promociones activó este pedido. El PDV las pinta en el ticket: si\nel cajero no puede explicar de dónde salió el descuento, la promoción\nestá mal nombrada, pero callarla es peor.",
+        "operationId": "promociones_de_venta_api_v1_sales_ventas__venta_id__promociones_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "venta_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Venta Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/VentaPromocionOut"
+                  },
+                  "title": "Response Promociones De Venta Api V1 Sales Ventas  Venta Id  Promociones Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Promociones De Venta",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/ventas/{venta_id}/saldo": {
+      "get": {
+        "description": "Cuánto queda por cobrar en cada cuenta de la venta.\n\nEl PDV calculaba el total del diálogo de cobro en el navegador, sumando\nlas líneas del borrador. Eso ignoraba el descuento de línea, el descuento\nmanual de la orden, el cupón y el flete de una orden reabierta: con\ncualquiera de los cuatro, el botón \"Exacto\" ofrecía un número mayor que\nel saldo real y el cobro se rechazaba por excederlo. Un solo número, y\nque lo diga quien lo va a validar.",
+        "operationId": "ver_saldo_api_v1_sales_ventas__venta_id__saldo_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "venta_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Venta Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SaldoCuentaOut"
+                  },
+                  "title": "Response Ver Saldo Api V1 Sales Ventas  Venta Id  Saldo Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Ver Saldo",
         "tags": [
           "sales"
         ]

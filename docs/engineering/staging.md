@@ -20,7 +20,7 @@ general del despliegue.
 | SO | Ubuntu 24.04 LTS |
 | Dominio frontend | `staging.majambo.com.pe` |
 | Dominio API | `api-staging.majambo.com.pe` |
-| Dominio landing pública | `clientes.majambo.com.pe` — el del QR (ADR-072). Mismo contenedor `web`, pero el proxy solo deja pasar `/reconocerte*` y sus estáticos |
+| Dominio landing pública | `clientes.majambo.com.pe` — el del QR (ADR-080). Mismo contenedor `web`, pero el proxy solo deja pasar `/reconocerte*` y sus estáticos |
 | Usuario de la app | `app` (sudo, sin login root, sin login por contraseña) |
 | Llave SSH | `renato-provecho` — privada en `~/.ssh/provecho_droplet` (tu PC, nunca en el repo). **Con passphrase**: sirve para entrar a mano y no desde un shell no interactivo — para eso está la llave de despliegue de ADR-060, ver `devops.md` |
 
@@ -41,7 +41,7 @@ general del despliegue.
 - **Proxy/TLS:** Caddy (certificado HTTPS automático), no nginx+certbot a
   mano.
 - **La landing del QR tiene dominio propio** (`clientes.majambo.com.pe`,
-  ADR-072), servido por el mismo contenedor `web`. Por ese nombre el proxy
+  ADR-080), servido por el mismo contenedor `web`. Por ese nombre el proxy
   solo deja pasar la landing; el resto redirige a `/reconocerte`. **No es un
   control de seguridad**: `/login` sigue igual de público en
   `staging.majambo.com.pe` y lo que lo protege es el login. Y lo que se
@@ -139,7 +139,7 @@ peor que cualquier 502.
    Y leer el JSON que sale de `caddy adapt --config /etc/caddy/Caddyfile
    --adapter caddyfile --pretty`. No es opcional: la sintaxis de `redir` y el
    orden de los `handle` producen configuraciones **válidas** que hacen otra
-   cosa (ADR-072 §2), y ahí se ven.
+   cosa (ADR-080 §2), y ahí se ven.
 
 2. Respaldar, copiar, validar en el servidor y recién entonces recargar:
 

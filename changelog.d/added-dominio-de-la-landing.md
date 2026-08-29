@@ -1,5 +1,5 @@
 - **La landing pública del QR tiene dominio propio**
-  (`clientes.majambo.com.pe`, ADR-072). El QR de la mesa apuntaba a
+  (`clientes.majambo.com.pe`, ADR-080). El QR de la mesa apuntaba a
   `staging.majambo.com.pe/reconocerte`: un nombre que anuncia que es un
   entorno de prueba y cuya raíz es el ERP entero. El recorte va en el
   `Caddyfile` y no en el código —el `matcher` de `middleware.ts` excluye los

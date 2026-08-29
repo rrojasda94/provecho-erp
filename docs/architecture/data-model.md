@@ -81,8 +81,10 @@ erDiagram
   dirección, estado, tenencia (`propia` | `alquilada` | `del_grupo` —
   `propia` paga predial/arbitrios, RN-IMP-004), horario_atencion
   (disponibilidad al público — el horario laboral de cada trabajador vive
-  en `asistencia`/`contrato_laboral`, no aquí). Se
-  abastece del almacén central de su empresa (excepción: gas/bebidas
+  en `asistencia`/`contrato_laboral`, no aquí), radio_marcaje_m (nullable,
+  2026-08-28, ADR-079 — metros para **observar**, nunca bloquear, la
+  distancia de un marcaje de asistencia; NULL = esa sucursal no lo evalúa).
+  Se abastece del almacén central de su empresa (excepción: gas/bebidas
   embotelladas directo de proveedor, gestión fuera de la sucursal).
 - **almacen**: empresa_id, sucursal_id (NULL si central o de activos), tipo
   (`central` | `produccion` | `sucursal` | `activos` | ... — enum
@@ -167,9 +169,10 @@ nombre para no tener que traducir nada entre capas:
 - `ubicacion_distrito` — `VARCHAR(100)`. Es lo que decide si un reparto cae en
   zona restringida (ADR-054) sin traer geometría al proyecto.
 
-Lo llevan: `sucursal`, `almacen`, `empresa`, `persona` (§2), `proveedor` (§5)
-y `venta` (§6). **Todo nullable**: una dirección escrita a mano es válida y las
-filas anteriores a 2026-08-22 no tienen ancla.
+Lo llevan: `sucursal`, `almacen`, `empresa`, `persona` (§2), `proveedor` (§5),
+`venta` (§6) y `cliente` (§6, solo el jurídico — ADR-072, 2026-08-27).
+**Todo nullable**: una dirección escrita a mano es válida y las filas
+anteriores a la migración de cada tabla no tienen ancla.
 
 `ubicacion_distrito` es el sustituto pobre de `zona_servicio` de arriba
 —que sigue sin implementarse— y hace el trabajo mientras las zonas del negocio
@@ -901,9 +904,16 @@ Solicitud.
   **no** una FK a `kds_pantalla` a propósito: la línea guarda DÓNDE VA, no
   QUIÉN la atiende, así que desactivar el horno a media noche no deja
   pedidos apuntando a una pantalla que ya no opera — caen solos a la
-  siguiente estación que los acepte.
+  siguiente estación que los acepte, y si ninguna declara su categoría, a la
+  primera de la cadena (ADR-078): antes se quedaban invisibles en todo el
+  KDS. También lleva **idempotency_key** (nullable, único — marca la
+  PRIMERA línea de cada envío a cocina, RN-COM-002/ADR-075: sin ella, el
+  reintento de un aumento cuya respuesta se perdió mandaba dos comandas
+  idénticas).
 - **kds_pantalla**: sucursal_id, nombre, tipo (`preparacion` | `despacho`),
-  categoria_ids (JSONB de `categoria.id`; NULL/[] = todas), **orden**
+  categoria_ids (JSONB de `categoria.id`; NULL/[] = todas — y una categoría
+  que ninguna pantalla declara la atiende la primera de la cadena, ADR-078),
+  **orden**
   (entero, default 0 — eslabón de la estación en la cadena de preparación),
   activo. `UNIQUE (sucursal_id, nombre)`.
 
@@ -949,8 +959,12 @@ Solicitud.
   precios, RN-MDP-001).
 - **pago**: venta_id, medio_pago_id, monto (obligatorio — una venta puede
   cobrarse con varios `pago`, confirmado 2026-07-20 como caso real del
-  negocio, no solo capacidad técnica; suma de `pago.monto` debe igualar
-  `venta.total` antes de `estado=pagada`, RN-COM-016), **grupo_cobro**
+  negocio, no solo capacidad técnica; suma de `pago.monto` debe **cubrir**
+  `venta.total` antes de `estado=pagada`, RN-COM-016), **vuelto**
+  (`Numeric(10,2)`, default 0 — lo devuelto al cliente, ADR-077; `monto` es
+  lo que entra a la cuenta y nunca pasa del saldo, así que contabilidad no
+  asienta plata que salió del cajón. Solo los medios con vuelto —hoy
+  `efectivo`— pueden traerlo distinto de cero), **grupo_cobro**
   (entero, default 1 — los pagos de un grupo suman contra el total de ESE
   grupo, no de la venta entera; la venta pasa a `pagada` recién cuando
   ningún grupo queda con saldo, RN-COM-018/ADR-018), pasarela (izipay),
@@ -1089,7 +1103,10 @@ Solicitud.
 - **cliente**: grupo_id (transversal al grupo, no a una empresa —
   RN-PTS-001), tipo (`natural` | `juridico` — ej. cliente corporativo:
   catering/eventos), persona_id (si `natural`) o razon_social + ruc (si
-  `juridico`), contacto (base para CRM futuro), usuario_id (opcional,
+  `juridico`), contacto (teléfono/correo de quien coordina — base para CRM
+  futuro), direccion + `UbicacionMixin` (place_id/lat/lng/plus_code/distrito
+  — solo del `juridico`; ADR-072, antes mezclada con `contacto`), usuario_id
+  (opcional,
   único — cuenta de autoservicio web: ver su historial, pedir online.
   Decisión 2026-07-20: **nunca requerida** para comprar en sucursal o
   Central de Pedidos — esas ventas enrutan al mismo `cliente` por sus
@@ -1403,6 +1420,24 @@ un trabajador puede o no tener usuario, y no todo usuario es trabajador
   (ADR-064), distinto del turno de caja y del horario de atención. Único por
   `(sucursal_id, nombre)`. `hora_fin`/`hora_limite_salida` menores que
   `hora_inicio` significan que el turno cruza la medianoche.
+- **terminal_marcaje** (2026-08-28, ADR-079): sucursal_id, nombre, codigo
+  (activación, 6 dígitos, se borra al enrolar), codigo_expira_en (30 min),
+  secreto_hash (SHA-256 — no Argon2id: el secreto es aleatorio de 128 bits,
+  no una contraseña humana), activo, ultima_marcacion_en. El dispositivo
+  autorizado a marcar por una sucursal (RN-RRHH-023): sin uno activo de esa
+  sucursal, el pad no marca aunque el PIN sea correcto. Único por
+  `(sucursal_id, nombre)` entre los vivos y por `secreto_hash` entre los no
+  nulos (mismo patrón parcial que `kds_pantalla`).
+- **marcacion** (2026-08-28, ADR-079, RN-RRHH-024): asistencia_id, tipo
+  (`entrada`|`salida`), momento, usuario_id (quién firmó), terminal_id
+  (nullable — NULL = corrección de back-office), ip, ubicacion_lat/lng,
+  distancia_m (calculada, haversine, contra `sucursal.ubicacion_lat/lng`),
+  foto (binario, `deferred`). Una fila por cada toque del pad, evidencia
+  aparte de la fila-resumen `asistencia`. Ninguno de los campos de evidencia
+  bloquea el marcaje; la "anomalía" no se guarda, se deriva comparando
+  `distancia_m` contra `sucursal.radio_marcaje_m` al momento de leer. La foto
+  se purga (no la fila) a los `rrhh_marcaje_foto_retencion_dias` (90 por
+  defecto).
 
 Los documentos de RRHH que son cartas/actas usan plantillas versionadas
 (ver `docs/templates/rrhh/`), rellenadas con datos del ERP + campos

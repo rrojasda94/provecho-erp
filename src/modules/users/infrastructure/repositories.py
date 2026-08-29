@@ -83,11 +83,30 @@ class UsuarioRepo:
         return usuario
 
     def sucursal_ids(self, usuario_id: uuid.UUID) -> list[uuid.UUID]:
+        """Los ids del alcance, ordenados por nombre y sin las borradas.
+
+        Las dos cosas importan porque esta lista **es** el claim `sucursales`
+        del token y hay pantallas que toman la primera:
+
+        - Sin `ORDER BY`, el orden lo decide Postgres y puede cambiar entre
+          dos emisiones del mismo usuario. Un PDV que abre "su" sucursal por
+          el índice 0 terminaba en la otra sucursal del mismo turno.
+        - Sin filtrar `deleted_at`, una sucursal borrada seguía viajando en el
+          token y `Tenant.exigir_sucursal` la dejaba pasar, así que el listado
+          de ventas devolvía vacío en vez de negar el acceso.
+
+        Es el mismo criterio que `sucursales_de`, que sí lo hacía; la
+        diferencia entre ambas queda solo en qué devuelven.
+        """
         return list(
             self.s.scalars(
-                select(UsuarioSucursal.sucursal_id).where(
-                    UsuarioSucursal.usuario_id == usuario_id
+                select(UsuarioSucursal.sucursal_id)
+                .join(Sucursal, Sucursal.id == UsuarioSucursal.sucursal_id)
+                .where(
+                    UsuarioSucursal.usuario_id == usuario_id,
+                    Sucursal.deleted_at.is_(None),
                 )
+                .order_by(Sucursal.nombre)
             )
         )
 

@@ -74,7 +74,7 @@ test("el padrón de clientes ofrece traer la razón social del RUC", async ({
   // El aviso, no la excepción: sin token la API responde 502 y la pantalla
   // tiene que decirlo donde se está tecleando. Un `role="status"` vacío o un
   // diálogo que se cierra solo serían las dos formas de fallar mal.
-  await expect(formulario.getByRole("status")).not.toBeEmpty();
+  await expect(formulario.getByTestId("aviso-consulta-documento")).not.toBeEmpty();
   await capturar(page, testInfo, "el-proveedor-no-contesta");
 
   // Y el alta sigue: se teclea a mano, que es el punto de "prellena, no

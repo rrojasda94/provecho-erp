@@ -29,6 +29,7 @@ export type Sucursal = {
   direccion: string;
   tenencia: string;
   estado: string;
+  radio_marcaje_m: number | null;
   ubicacion_place_id: string | null;
   ubicacion_lat: string | number | null;
   ubicacion_lng: string | number | null;
@@ -145,6 +146,21 @@ function CamposSucursal({
         defaultValue={s.direccion}
         ubicacion={sucursal ?? null}
       />
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Radio de marcaje (metros)
+        <input
+          type="number"
+          name="radio_marcaje_m"
+          min={1}
+          placeholder="Sin evaluar distancia"
+          defaultValue={valor(s.radio_marcaje_m ?? "")}
+        />
+        <span className="text-xs font-normal text-gray">
+          Vacío = el pad no evalúa a qué distancia del local se marcó
+          (RN-RRHH-024). Nunca bloquea el marcaje, solo lo marca para
+          revisar.
+        </span>
+      </label>
       <div className="flex gap-2">
         <label className="flex flex-1 flex-col gap-1 text-sm font-semibold">
           Tenencia

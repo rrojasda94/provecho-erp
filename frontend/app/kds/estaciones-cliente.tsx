@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { useEffect, useRef, useState } from "react";
 
 import { ErrorApi } from "@/lib/cliente-api";
@@ -203,6 +205,15 @@ export default function EstacionesCliente({
       <p>
         Elige en qué pantalla queda esta tablet — guarda el enlace en favoritos y
         vuelve directo a su cola.
+      </p>
+
+      {/* Esta es la raíz del KDS y era la trampa: quien entraba desde el
+          lanzador de módulos no tenía ningún camino de vuelta al resto del
+          ERP. */}
+      <p>
+        <Link className="kds-salir" href="/">
+          Salir del KDS
+        </Link>
       </p>
 
       {/* Solo con más de una sucursal asignada. Navega de verdad (la lista de

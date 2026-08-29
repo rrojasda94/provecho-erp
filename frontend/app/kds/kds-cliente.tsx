@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { useState } from "react";
 
 import {
@@ -144,6 +146,14 @@ export default function KdsCliente({ pantalla, sucursalId, semaforo }: Props) {
         <a className="kds-cambiar" href={`/kds?sucursal=${sucursalId}`}>
           Estaciones
         </a>
+        {/* La salida de la pantalla completa. Sin esto, quien entraba al
+            KDS desde el lanzador de módulos quedaba encerrado: los demás
+            enlaces cruzan entre pantallas de cocina y ninguno vuelve al
+            resto del ERP, así que la única salida era el botón atrás del
+            navegador o teclear la URL. */}
+        <Link className="kds-salir" href="/">
+          Salir
+        </Link>
       </header>
 
       {pedidos.length === 0 ? (
@@ -154,11 +164,21 @@ export default function KdsCliente({ pantalla, sucursalId, semaforo }: Props) {
         <section className="kds-grid">
           {pedidos.map((pedido) => (
             <article
-              key={pedido.venta_id}
+              // La clave es el par, no la venta: una mesa que pidió tres
+              // veces son tres tarjetas de la misma orden (ADR-075).
+              key={`${pedido.venta_id}-${pedido.tanda}`}
               className={`kds-card ${pedido.estado_pedido} nivel-${nivelDelPedido(pedido, semaforo)}`}
             >
               <header>
-                <span className="kds-orden">#{pedido.numero_orden}</span>
+                <span className="kds-orden">
+                  #{pedido.numero_orden}
+                  {/* La primera tanda no se rotula: es el pedido. Las
+                      siguientes sí, o dos tarjetas con el mismo número se
+                      leerían como un duplicado. */}
+                  {pedido.tanda > 1 && (
+                    <small className="kds-tanda"> · aumento {pedido.tanda - 1}</small>
+                  )}
+                </span>
                 <span className="kds-ref">{pedido.referencia_atencion ?? "—"}</span>
                 <Espera pedido={pedido} semaforo={semaforo} />
                 <span className="kds-badge">{ETIQUETA_ESTADO[pedido.estado_pedido]}</span>
@@ -180,6 +200,12 @@ export default function KdsCliente({ pantalla, sucursalId, semaforo }: Props) {
                   />
                 ))}
               </ul>
+              {/* Al pie y no arriba: primero se lee qué hay que preparar,
+                  y después cómo sale. Arriba competiría con el número de
+                  orden, que es lo que la cocina busca de un vistazo. */}
+              {pedido.nota_cocina && (
+                <p className="kds-nota-pedido">Al servir: {pedido.nota_cocina}</p>
+              )}
               <footer className="kds-acciones">
                 {pedido.items.some((i) => !terminado(i, pantalla.orden)) && (
                   <button

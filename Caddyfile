@@ -15,7 +15,7 @@ api-staging.majambo.com.pe {
 	reverse_proxy api:8000
 }
 
-# La landing pública del QR tiene dominio propio (ADR-072). Mismo droplet y el
+# La landing pública del QR tiene dominio propio (ADR-080). Mismo droplet y el
 # MISMO contenedor `web` que staging.majambo.com.pe — hay un solo proceso de
 # Next—. Lo único que cambia es que por acá el proxy deja pasar la landing y
 # nada más: el back office no se apaga, se vuelve inalcanzable por este nombre.

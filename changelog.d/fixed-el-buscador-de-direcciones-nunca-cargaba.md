@@ -1,14 +1,10 @@
-- **El campo de dirección nunca mostró el buscador de Google, en ninguna
-  pantalla** — sucursales, empresas, almacenes, proveedores, personas, PDV y la
-  landing pública—, aunque la clave estuviera bien puesta y el SDK bajara
-  completo. `cargarMaps` resolvía en cuanto existía `window.google.maps`, pero
-  ese objeto aparece **antes** de que el bootstrap de `loading=async` termine
-  de definir `importLibrary`: quien lo recibía moría con
-  «maps.importLibrary is not a function». Ahora se espera a que `importLibrary`
-  exista de verdad, que es lo único que se le pide al SDK. De paso se sondea en
-  vez de escuchar `load`, porque un `<script>` que ya terminó de cargar no
-  vuelve a emitir ese evento y reusarlo —lo que pasa en cada recarga en
-  caliente— dejaba la promesa esperando para siempre.
+- **El buscador de direcciones no volvía tras una recarga en caliente.** El
+  arreglo de la carga del SDK que salió en 0.8.1 (ADR-072) colgaba el sondeo
+  del evento `load` del `<script>`, y un `<script>` que **ya** terminó de
+  cargar no vuelve a emitirlo: reusar el existente —lo que pasa en cada
+  recarga en caliente, porque la promesa memoizada es del módulo y se reinicia
+  con él— dejaba la promesa esperando para siempre. Ahora el sondeo arranca de
+  una y `load` no participa; el `error` del `<script>` sí sigue cortando.
 - **El fallo era invisible**: el `.catch()` de `CampoDireccion` no decía nada,
   así que «sin clave», «clave restringida a otro dominio» y «el SDK cargó y el
   buscador reventó» se veían los tres como un cuadro de texto pelado. Ahora

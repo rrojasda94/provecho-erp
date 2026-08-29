@@ -368,6 +368,7 @@ def crear_sucursal(
     tenencia: str,
     estado: str = "activa",
     horario_atencion: dict | None = None,
+    radio_marcaje_m: int | None = None,
     ubicacion_place_id: str | None = None,
     ubicacion_lat: Decimal | None = None,
     ubicacion_lng: Decimal | None = None,
@@ -385,6 +386,7 @@ def crear_sucursal(
             tenencia=tenencia,
             estado=estado,
             horario_atencion=horario_atencion,
+            radio_marcaje_m=radio_marcaje_m,
             ubicacion_place_id=ubicacion_place_id,
             ubicacion_lat=ubicacion_lat,
             ubicacion_lng=ubicacion_lng,
@@ -428,6 +430,7 @@ def editar_sucursal(
             "estado",
             "tenencia",
             "horario_atencion",
+            "radio_marcaje_m",
             *CAMPOS_UBICACION,
         ),
     )

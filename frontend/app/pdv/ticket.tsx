@@ -5,9 +5,13 @@ import { useRef } from "react";
 import { soles } from "@/lib/pdv";
 
 import {
+  descuentoDeBorrador,
   esConsumoPersonal,
+  etiquetaMotivoDescuento,
   etiquetaTipo,
+  lineasPendientes,
   MOTIVOS_CONSUMO,
+  promocionesDeBorrador,
   totalBorrador,
   totalLinea,
   type Borrador,
@@ -31,6 +35,7 @@ type Props = {
   onMover: () => void;
   onCliente: () => void;
   onTipo: () => void;
+  onDescuento: () => void;
   onAnular: () => void;
   onEnviar: () => void;
   onCobrar: () => void;
@@ -75,6 +80,7 @@ export default function Ticket(props: Props) {
             borrador={activo}
             onCliente={props.onCliente}
             onTipo={props.onTipo}
+            onDescuento={props.onDescuento}
             onAnular={props.onAnular}
             onConsumoPersonal={props.onConsumoPersonal}
           />
@@ -269,12 +275,37 @@ function Totales({ borrador }: { borrador: Borrador }) {
   // El reparto es del pedido, no de lo que se comió: va en su propia fila y
   // no repartido entre las líneas (RN-COM-041). Sin delivery no aparece.
   const reparto = borrador.costoEntrega ?? 0;
+  // En su propia fila y no descontado del subtotal: el cliente pregunta
+  // cuánto le rebajaron, y un subtotal ya rebajado no responde eso.
+  const descuento = descuentoDeBorrador(borrador);
+  const promociones = promocionesDeBorrador(borrador);
   return (
     <div className="pdv-totales">
       <div className="pdv-total-fila">
         <span>Subtotal</span>
-        <span>{soles(total - reparto)}</span>
+        <span>{soles(total - reparto + descuento + promociones)}</span>
       </div>
+      {/* Cada promoción con su nombre, y no una línea sumada: el cliente
+          pregunta cuál se le aplicó, y "promociones: −S/ 40" no lo responde.
+          Si el nombre no alcanza para explicarlo, la promoción está mal
+          nombrada — pero callarla es peor (ADR-076). */}
+      {borrador.promociones.map((p) => (
+        <div className="pdv-total-fila" key={p.nombre}>
+          <span>{p.nombre}</span>
+          <span className="verde">−{soles(p.monto)}</span>
+        </div>
+      ))}
+      {descuento > 0 && (
+        <div className="pdv-total-fila">
+          <span>
+            Descuento
+            {borrador.descuento
+              ? ` · ${etiquetaMotivoDescuento(borrador.descuento.motivo)}`
+              : ""}
+          </span>
+          <span className="verde">−{soles(descuento)}</span>
+        </div>
+      )}
       {reparto > 0 && (
         <div className="pdv-total-fila">
           <span>Reparto</span>
@@ -289,20 +320,27 @@ function Totales({ borrador }: { borrador: Borrador }) {
   );
 }
 
+/** Si al pedido ya le bajaron el total, por cupón o por descuento manual.
+ * Fuera del componente para no sumarle ramas a su cuerpo. */
+const tieneRebaja = (b: Borrador): boolean => Boolean(b.descuento ?? b.cupon);
+
 function Acciones({
   borrador,
   onCliente,
   onTipo,
+  onDescuento,
   onAnular,
   onConsumoPersonal,
 }: {
   borrador: Borrador;
   onCliente: () => void;
   onTipo: () => void;
+  onDescuento: () => void;
   onAnular: () => void;
   onConsumoPersonal: () => void;
 }) {
   const consumo = esConsumoPersonal(borrador);
+  const rebajado = tieneRebaja(borrador);
   return (
     <div className="pdv-acciones">
       <button
@@ -329,6 +367,19 @@ function Acciones({
       >
         {borrador.tipo ? etiquetaTipo(borrador) : "Tipo de orden"}
       </button>
+      {/* El cupón no pide firma y el descuento manual sí, pero para el
+          cajero son la misma pregunta —"¿por qué paga menos?"—, así que es un
+          solo botón; la diferencia la hace el diálogo. Un consumo de personal
+          ya vale cero: no hay nada que descontar (RN-COM-025). */}
+      {!consumo && (
+        <button
+          type="button"
+          className={rebajado ? "puesto" : ""}
+          onClick={onDescuento}
+        >
+          {rebajado ? "Descuento aplicado" : "Descuento / cupón"}
+        </button>
+      )}
       <button
         type="button"
         className="riesgo"
@@ -350,18 +401,30 @@ function Pago({
 }: Props & { activo: Borrador }) {
   const enviado = Boolean(activo.ventaId);
   const vacio = activo.lineas.length === 0;
+  // Lo que espera confirmación. En un pedido ya enviado son el aumento
+  // (ADR-075): hasta que alguien toque "Enviar aumento" no hay nada nuevo en
+  // cocina, y por eso el botón vuelve a estar vivo en vez de quedarse en
+  // "Enviado" para siempre.
+  const pendientes = lineasPendientes(activo);
   // Un consumo de personal no se cobra (RN-COM-025): el botón no se
   // deshabilita, desaparece — y "Enviar" pasa a ser la acción principal.
   const consumo = esConsumoPersonal(activo);
+  const etiquetaEnvio = !enviado
+    ? "Enviar"
+    : pendientes.length > 0
+      ? `Enviar aumento (${pendientes.length})`
+      : "Enviado";
   return (
     <div className="pdv-pago">
       <button
         type="button"
-        className={consumo ? "pdv-boton-pri" : "pdv-boton-sec"}
-        disabled={ocupado || enviado || vacio}
+        className={
+          consumo || pendientes.length > 0 ? "pdv-boton-pri" : "pdv-boton-sec"
+        }
+        disabled={ocupado || vacio || pendientes.length === 0}
         onClick={onEnviar}
       >
-        {enviado ? "Enviado" : "Enviar"}
+        {etiquetaEnvio}
       </button>
       {!consumo && (
         <button
@@ -427,6 +490,11 @@ function Linea({
       <span className="pdv-linea-cant">{linea.cantidad}</span>
       <span className="pdv-linea-nombre">
         {linea.nombre}
+        {/* Sobre una mesa ya abierta hay líneas que ya están en cocina y
+            líneas que todavía no. Sin marcarlo, el mesero no tiene forma de
+            saber qué le falta confirmar y termina tocando "Enviar aumento"
+            a ciegas — o no tocándolo nunca. */}
+        {!linea.enviada && <em className="pdv-linea-pendiente">Sin enviar</em>}
         {linea.nota && <em>{linea.nota}</em>}
         {/* Qué mitades lleva la pizza. Van antes que los extras porque dicen
             QUÉ es el plato, no qué se le agregó — y sin esto dos MitadXMitad

@@ -35,6 +35,8 @@ from src.modules.sales.infrastructure.models import Cliente
 from src.modules.sales.infrastructure.repositories import ClienteRepo
 from src.modules.users.infrastructure.models import Empresa, Persona
 from src.shared.integrations.factiliza import nombres_desde_dni, razon_social_desde_ruc
+from src.shared.ubicacion import CAMPOS as CAMPOS_UBICACION
+from src.shared.ubicacion import desanclar_si_cambio_el_texto
 
 TIPOS_DOCUMENTO_NATURAL = ("dni", "ce", "pasaporte")
 
@@ -131,9 +133,6 @@ def crear_cliente(
 
     repo = ClienteRepo(session)
     if numero_documento and len(numero_documento) == rules.LARGO_RUC:
-        # Sin `ubicacion`: el cliente jurídico no tiene columna de
-        # dirección —hoy termina en `contacto`— y por lo tanto tampoco
-        # dónde anclarla. Queda anotado en la deuda del ROADMAP.
         return _crear_juridico(
             repo,
             grupo_id,
@@ -141,6 +140,7 @@ def crear_cliente(
             numero_documento,
             direccion,
             telefono,
+            ubicacion,
             consultar_documento,
         )
 
@@ -202,8 +202,13 @@ def _crear_juridico(
     ruc: str,
     direccion: str | None,
     telefono: str | None,
+    ubicacion: dict | None = None,
     consultar_documento: bool = True,
 ) -> Cliente:
+    """`direccion` es propia del jurídico y puede llevar su ancla (ADR-072).
+
+    `contacto` sigue siendo el teléfono o correo de quien coordina — nunca
+    la dirección — y no se pisa con ella."""
     existente = repo.por_ruc(grupo_id, ruc)
     if existente is not None:
         raise Conflicto(f"ya existe un cliente con RUC {ruc}")
@@ -215,7 +220,9 @@ def _crear_juridico(
             tipo="juridico",
             razon_social=razon_social,
             ruc=ruc,
-            contacto=direccion or telefono,
+            contacto=telefono,
+            direccion=direccion,
+            **(ubicacion or {}),
         )
     )
 
@@ -261,6 +268,19 @@ def actualizar_documento(
     return cliente
 
 
+def _aplicar_direccion(cliente: Cliente, campos: dict) -> None:
+    """Escribe la dirección y su ancla, y suelta el pin si el texto cambió
+    sin volver a elegir en el mapa (ADR-072). Aparte de `editar_cliente` por
+    el límite de complejidad del linter: cada `if` cuenta para su función."""
+    direccion_previa = cliente.direccion
+    if campos.get("direccion") is not None:
+        cliente.direccion = campos["direccion"].strip() or None
+    for campo in CAMPOS_UBICACION:
+        if campos.get(campo) is not None:
+            setattr(cliente, campo, campos[campo])
+    desanclar_si_cambio_el_texto(cliente, campos, direccion_previa, "direccion")
+
+
 def editar_cliente(
     session: Session,
     cliente_id: uuid.UUID,
@@ -275,6 +295,10 @@ def editar_cliente(
     su `persona` (RN-GEN-007, fuente única) y se corrigen desde ahí. Duplicar
     esos campos acá sería crear la segunda fuente que esa regla existe para
     evitar.
+
+    `direccion` y su ancla sí son del jurídico (ADR-072). Corregirla sin
+    volver a elegir en el mapa suelta el pin —mismo criterio que Personas,
+    Proveedores y Organización (`shared.ubicacion.desanclar_si_cambio_el_texto`).
 
     El documento tiene su propio caso de uso (`actualizar_documento`), que
     aplica las reglas de identificación; este no lo toca.
@@ -303,6 +327,9 @@ def editar_cliente(
         cliente.razon_social = razon_social
     if campos.get("contacto") is not None:
         cliente.contacto = campos["contacto"].strip() or None
+
+    _aplicar_direccion(cliente, campos)
+
     # Mismo criterio que el alta: SUNAT manda sobre lo tecleado — salvo en la
     # carga masiva, que no puede consultar una vez por fila (ADR-052).
     if consultar_documento and (ruc or razon_social):

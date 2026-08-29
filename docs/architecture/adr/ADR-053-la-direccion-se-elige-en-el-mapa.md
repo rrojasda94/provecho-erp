@@ -77,6 +77,9 @@ razones concretas:
    (`PlaceAutocompleteElement`) los maneja solo, y son lo que hace que una
    búsqueda entera se cobre como una y no como ocho. Proxiarlo desde el
    backend obligaría a implementarlos a mano y a pagar por request.
+   (ADR-072 deja de usar el elemento oficial y los maneja a mano — pero
+   siempre en el cliente, nunca proxiados: la razón para no proxiar sigue
+   valiendo igual, solo cambió quién abre y cierra la sesión.)
 2. **El mapa interactivo con pin arrastrable no tiene versión server-side.**
 
 La excepción es acotada y tiene su contrapeso: **lo que define plata sí vive
@@ -91,6 +94,14 @@ de `eval` en consola, esa es la línea que falta y la decisión hay que volver a
 tomarla a conciencia.
 
 ### Dos cajas, no una
+
+> **Superada por ADR-072** (2026-08-27). En la práctica, con dos cajas
+> visibles se tecleaba en cualquiera de las dos indistintamente, y solo una
+> de ellas dejaba algo anclado — la causa de que las direcciones de cliente
+> se guardaran sin pin. ADR-072 vuelve a un solo `<input>`, que ahora busca
+> él mismo y muestra sus sugerencias en un desplegable propio, sin perder la
+> salida de texto libre que esta sección sí seguía protegiendo. Queda acá
+> como registro de la decisión original.
 
 El campo (`components/direccion/campo-direccion.tsx`) dibuja el buscador de
 Google **arriba** del `<input>` de siempre, no en lugar de él:

@@ -26,7 +26,7 @@ Central de Pedidos.
 
 **Cobro (PROC-COM-002, mismo día):** `medio_pago` (catálogo por
 empresa), `pago` (RN-COM-002/016 — una venta admite varios `pago`, pago
-dividido confirmado como caso real; suma de montos debe igualar
+dividido confirmado como caso real; suma de montos debe **cubrir**
 `venta.total`). `comprobante` vive en `shared` (transversal a sales/
 purchases/accounting, no en este módulo). `punto_venta.serie_boleta`/
 `serie_factura` (series SUNAT separadas) alimentan el `comprobante.serie`
@@ -53,6 +53,30 @@ cuatro huecos que el punto de venta necesitaba y el modelo no daba.
   cuando ninguna cuenta queda con saldo.
 - `comprobante.receptor_num_doc` / `receptor_nombre` (RN-CPP-003): el
   DNI/RUC que el cajero teclea al cobrar, sin exigir cliente registrado.
+
+**Parche 0.8.1 (2026-08-28, migración `d4b7e91c2f80`):**
+
+- **La plata se cuantiza a centavos** en un solo lugar, `rules.a_centavos`
+  (`ROUND_HALF_UP`, como redondea `numeric` en Postgres). `total_venta`,
+  `total_a_cobrar` y `pagos_cubren_total` pasan por ahí. Antes el saldo real
+  podía ser 18.525 mientras la pantalla decía 18.53, y el monto exacto se
+  rechazaba por excederlo.
+- **`pago.vuelto`** (ADR-077): el efectivo admite sobrepago y la diferencia
+  se guarda. `pago.monto` sigue siendo lo que entra a la cuenta, nunca más
+  que el saldo. Los medios sin vuelto siguen rechazándolo.
+- **`GET /ventas/{id}/saldo`**: total, pagado y saldo por cuenta. El diálogo
+  de cobro lo usa en vez de sumar el borrador en el navegador — el número
+  que valida el pago tiene que ser el mismo que lo propone.
+- **`GET /ventas/{id}/comprobantes`** (plural): todos los de la venta, uno
+  por cuenta. El singular devuelve el primero y dejaba al segundo cliente
+  sin su papel.
+- **`venta_item.idempotency_key`**: el aumento se vuelve idempotente
+  (RN-COM-002). Sin ella, el reintento de una respuesta perdida mandaba dos
+  comandas idénticas a cocina.
+- **KDS** (ADR-078): la cola mira `orden|pagada|facturada|cerrada` — el
+  pedido sale al **entregarse**, no al facturarse; y una categoría que
+  ninguna estación declara la atiende la primera de la cadena en vez de
+  quedar invisible.
   11 dígitos → factura; 8, `00000000` o vacío → boleta.
 - **Descarga del comprobante emitido**
   (`GET /sales/comprobantes/{id}/descargar/{pdf|xml|cdr}`): el PDF para el
@@ -116,13 +140,29 @@ cuatro huecos que el punto de venta necesitaba y el modelo no daba.
   (RN-PTS-006). **Trabajador y usuario siguen exigiendo documento**: esa
   validación vive en `users.application.admin`, no en el esquema.
 
-  **Qué se corrige de un cliente** (2026-08-10): `PATCH /clientes/{id}` toca
-  razón social, RUC y contacto, y **solo de un jurídico** (409 si no). Es lo
-  único que `cliente` guarda por su cuenta: el nombre, el teléfono, el
-  documento y la dirección de un natural viven en su `persona` (RN-GEN-007,
-  fuente única) y se corrigen desde `PATCH /personas/{id}`. Duplicar esos
-  campos acá sería crear la segunda fuente que esa regla evita, y por eso la
-  pantalla de Clientes enlaza a Personas en vez de ofrecerlos.
+  **Qué se corrige de un cliente** (2026-08-10, dirección propia desde
+  ADR-072): `PATCH /clientes/{id}` toca razón social, RUC, contacto y
+  dirección (con su ancla al mapa, `UbicacionMixin`), y **solo de un
+  jurídico** (409 si no). Es lo único que `cliente` guarda por su cuenta: el
+  nombre, el teléfono, el documento y la dirección de un natural viven en su
+  `persona` (RN-GEN-007, fuente única) y se corrigen desde
+  `PATCH /personas/{id}`. Duplicar esos campos acá sería crear la segunda
+  fuente que esa regla evita, y por eso la pantalla de Clientes enlaza a
+  Personas en vez de ofrecerlos.
+
+  **`direccion` vs. `contacto`** (ADR-072): antes de este cambio la dirección
+  del jurídico se guardaba en `contacto`, el mismo campo que también servía
+  de teléfono o correo de quien coordina — dos cosas distintas mezcladas en
+  una columna, y sin dónde anclar un pin. `cliente.direccion` es la columna
+  propia, con las cinco columnas de `UbicacionMixin`; `contacto` sigue siendo
+  solo el teléfono o correo. Las filas que ya existían se leen con
+  `direccion or contacto` hasta que alguien edite la ficha.
+
+  `POST /sales/clientes` y `GET /sales/clientes/buscar` (y `/listado`, misma
+  función `_cliente_buscado`) también llevan los cinco campos de ancla, para
+  natural (de su `persona`) y para jurídico (de `cliente`): sin esto el PDV
+  no podía reusar el pin de un cliente ya registrado y el delivery se
+  cotizaba siempre a tarifa base (ADR-054).
 
   `GET /clientes/listado` es el padrón del grupo para el back-office —
   paginado (ADR-026), con `q` opcional. Endpoint propio y **no** `GET
@@ -164,6 +204,38 @@ cuatro huecos que el punto de venta necesitaba y el modelo no daba.
   las líneas nuevas en `items`: mandar el acumulado haría que `accounting`
   asentara la venta dos veces. Después del cobro devuelve 409: la cuenta está
   cerrada y lo que venga es otra orden.
+- **Cada envío es una tanda** (ADR-075): todas las líneas de una misma
+  llamada reciben `venta_item.tanda = max(tanda de la venta) + 1`, y los
+  extras heredan la de su plato. El KDS de preparación muestra una tarjeta
+  por `(venta, tanda)` con el reloj de esa tanda; despacho sigue mostrando
+  una por pedido. Mover líneas a otra orden les da la tanda del destino: la
+  del origen numeraba los envíos de otro pedido. El PDV, del lado del
+  cliente, deja la línea pendiente hasta que alguien toca "Enviar aumento" —
+  antes viajaba al confirmar el diálogo del producto.
+- **Promociones condicionales** (ADR-076, RN-PRM-009..013): `promocion`
+  —vigencia (fechas, días, franja que puede cruzar la medianoche), ámbito
+  (marca/sucursal/canal/modalidad), prioridad, `acumulable`— con cuatro
+  tipos (`nxm`, `cantidad`, `combo`, `monto_minimo`) y su condición/beneficio
+  en JSONB. Las aplicadas van a `venta_promocion`, **nunca** a
+  `venta.descuento_*`. La aritmética es pura (`domain/promociones.py`, sin
+  sesión ni reloj) y `recalcular_promociones` corre en los cuatro caminos que
+  cambian un pedido: crear, agregar, quitar y mover. `total_a_cobrar` las
+  resta **antes** del descuento manual. Alta en
+  `POST/GET/PATCH /sales/promociones` con `sales.gestionar_promociones`.
+- **Notas de cocina** (ADR-075): `venta_item.nota` (texto de ese plato) y
+  `venta.nota_cocina` (cómo se sirve el pedido entero). La primera viaja en
+  `VentaItemIn`, sale bajo su plato en el KDS y en la comanda; la segunda va
+  en el alta y se cambia con `PUT /ventas/{id}/nota-cocina` —mismo permiso
+  que crear, sin firma, solo con la venta en `orden`—, se pinta al pie de la
+  tarjeta y **en todas las tandas**.
+- **El borrador del PDV se guarda acá** (ADR-074): `PUT
+  /sales/borradores/{id}` (upsert por el id que trae el cliente),
+  `GET /sales/borradores?punto_venta_id=` y `DELETE /sales/borradores/{id}`,
+  todos con `sales.crear`. La tabla `pedido_borrador` guarda el ticket a
+  medio armar contra el **punto de venta** —no contra el usuario, para que el
+  relevo de turno lo siga— con el contenido en JSONB: un borrador no es un
+  hecho de negocio hasta que se envía. El listado filtra por jornada y
+  `sales.purgar_borradores_viejos` (Celery beat, 5:30) borra lo anterior.
 - **Ventana de corrección de 5 minutos** (RN-COM-029): quitar —una línea o la
   orden entera— no pide firma dentro de la ventana; fuera de ella sí
   (`rules.VENTANA_CORRECCION`, `ventas.lineas_en_ventana` /
@@ -175,7 +247,9 @@ cuatro huecos que el punto de venta necesitaba y el modelo no daba.
   `POST /ventas/{id}/anular-lineas`, con autorización de supervisor y
   motivo; publica `sales.lineas_anuladas` → inventory repone. Quitar todas
   anula la orden. Antes de enviar, el pedido vive en el PDV y no pasa
-  por acá.
+  por acá. El **motivo lo teclea quien quita** (ADR-075): el PDV mandaba
+  `"Anulado desde PDV"` en duro, así que el campo existía y el reporte de
+  anulaciones no decía nada.
 - **Mover líneas entre órdenes** (RN-COM-043, ADR-071):
   `POST /ventas/{id}/mover-lineas` reasigna líneas ya enviadas a otra orden
   abierta (`destino_venta_id`), a una mesa libre (`destino_mesa_id`), o a
@@ -325,7 +399,7 @@ cobrar; se administran en Catálogo → Medios de pago). Capas
 | PATCH | `/medios-pago/{id}` | `gestionar_catalogo` |
 | GET | `/clientes?grupo_id=` | `sales.leer_clientes_externos` — contrato **público** de análisis, no el padrón del back-office |
 | GET | `/clientes/listado` | `sales.leer` — el padrón del grupo, paginado, con `q` opcional |
-| PATCH | `/clientes/{id}` | `sales.crear` — razón social, RUC y contacto de un **jurídico** |
+| PATCH | `/clientes/{id}` | `sales.crear` — razón social, RUC, contacto y dirección (con ancla) de un **jurídico** |
 
 `GET /ventas` es **uno solo** para el PDV y el back-office (paginado,
 ADR-026): sin parámetros da la jornada de hoy en las sucursales del usuario
@@ -656,9 +730,14 @@ El padrón de clientes se baja, se edita en Excel y se vuelve a subir
 - Identidad: `ID`, o el **número de documento** si el `ID` va vacío.
 - `Tipo` es derivado (RN-PTS-002: lo decide el documento). Se exporta para que
   se lea; al importar se ignora.
-- Una sola columna `Dirección / contacto`: en un jurídico es `cliente.contacto`
-  y en un natural el `domicilio` de su `persona` — dos columnas darían un
-  round-trip con pérdida.
+- Una sola columna `Dirección / contacto`: en un jurídico es
+  `cliente.direccion or cliente.contacto` (ADR-072) y en un natural el
+  `domicilio` de su `persona` — dos columnas darían un round-trip con
+  pérdida. Al importar/actualizar escribe `direccion`, no `contacto`: la
+  planilla trae la dirección, y `contacto` es el teléfono o correo de quien
+  coordina, no la dirección. Sin columnas de ancla: una carga masiva no
+  geocodifica (ADR-052), y el pin se ancla solo la primera vez que alguien
+  abre esa ficha (ADR-072).
 - De un **natural** que ya existe solo se completa el documento. Nombre,
   teléfono y dirección viven en `persona` (RN-GEN-007) y `sales` no puede
   escribirla: la fila se reporta con "se corrige en Personas".

@@ -55,13 +55,18 @@ export function useImpresionPdv({
 
   /** Va en dos pasos —el comprobante de la venta y después su ticket—
    * porque el id del comprobante no viaja en la fila de la venta: una venta
-   * dividida tiene uno por cuenta (RN-COM-018). */
-  const imprimirComprobante = (venta: Venta) =>
+   * dividida tiene uno por cuenta (RN-COM-018).
+   *
+   * `comprobanteId` es para justamente esa venta dividida: quien ya sabe
+   * cuál de los comprobantes quiere imprimir se salta la búsqueda, que
+   * devuelve el primero y le daría al segundo cliente el papel del primero.
+   */
+  const imprimirComprobante = (venta: Venta, comprobanteId?: string) =>
     preparar(async () => {
-      const comprobante = await api.comprobante(venta.id);
+      const id = comprobanteId ?? (await api.comprobante(venta.id)).id;
       setDocumento({
         clase: "comprobante",
-        datos: await api.ticketComprobante(comprobante.id),
+        datos: await api.ticketComprobante(id),
       });
     }, "No se pudo preparar el comprobante");
 

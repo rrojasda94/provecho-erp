@@ -14,6 +14,7 @@ import { useEffect, useRef, useState } from "react";
 
 import Pinpad from "@/components/pinpad/pinpad";
 import { apiAsistencia, type Marcacion, type Tarjeta } from "@/lib/asistencia";
+import { capturarFoto, obtenerUbicacion } from "@/lib/camara";
 import { ErrorApi } from "@/lib/cliente-api";
 
 /** Cuánto queda el acuse en pantalla antes de volver a la grilla. Lo justo
@@ -56,10 +57,18 @@ export default function TarjetasCliente({ sucursalId, inicial }: Props) {
     setEnviando(true);
     setError(null);
     try {
+      // Evidencia, no condición (RN-RRHH-024): se intenta en paralelo con
+      // la cola de la cámara y el GPS, y si cualquiera de las dos falla o
+      // tarda, se marca igual sin ellas.
+      const [foto, ubicacion] = await Promise.all([capturarFoto(), obtenerUbicacion()]);
       const marcacion = await apiAsistencia.marcar(
         sucursalId,
         elegida.trabajador_id,
         pinCompleto,
+        {
+          ...(foto ? { foto } : {}),
+          ...(ubicacion ? { lat: ubicacion.lat, lng: ubicacion.lng } : {}),
+        },
       );
       setAcuse({ nombre: elegida.nombre, marcacion });
       cerrar();

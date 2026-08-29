@@ -18,6 +18,7 @@ from src.modules.sales.application import (
     catalogo,
     comprobantes,
     precios,
+    promociones,
     tarifa_delivery,
 )
 from src.modules.sales.application.errors import (
@@ -109,6 +110,14 @@ def _armar_item(
         grupo_cobro=grupo,
         sin_articulo_ids=restas,
         valores_variante_ids=valores,
+        # Texto libre para cocina. Se normaliza a `None` cuando llega vacío:
+        # el PDV manda `""` con solo abrir el diálogo, y una nota vacía en el
+        # KDS es una línea de más que el cocinero lee y descarta.
+        nota=(it.get("nota") or "").strip() or None,
+        # Solo el replay del hub la manda (ADR-009): la venta ya se preparó
+        # allá y sus tandas son las que la cocina vio. En el alta normal todo
+        # es la tanda 1, y `agregar_lineas` la pisa con la del envío.
+        tanda=int(it.get("tanda") or 1),
     )
     # Empaque se descuenta solo en las modalidades configuradas (RN-EMP-003).
     con_empaque = bool(prod.empaque_id and modalidad in (prod.modalidades_empaque or []))
@@ -525,6 +534,7 @@ def crear_venta(
     costo_entrega: Decimal | None = None,
     mesa_id: uuid.UUID | None = None,
     comensales: int | None = None,
+    nota_cocina: str | None = None,
     id: uuid.UUID | None = None,
     fecha_orden: date | None = None,
     numero_orden: int | None = None,
@@ -632,6 +642,7 @@ def crear_venta(
         costo_entrega=reparto,
         mesa_id=mesa_id,
         comensales=comensales,
+        nota_cocina=(nota_cocina or "").strip() or None,
         tipo=tipo,
         consumo_motivo=consumo_motivo,
         consumo_autorizado_por=consumo_autorizado_por,
@@ -652,6 +663,12 @@ def crear_venta(
             hijo.padre_venta_item_id = fila.id
             session.add(hijo)
     session.flush()
+
+    # Las promociones se evalúan con las líneas ya en la base y **antes** de
+    # anunciar la venta: el evento lleva `total`, y accounting asienta lo que
+    # el cliente paga, no el precio de lista (ADR-076).
+    promociones.recalcular_promociones(session, venta)
+    venta.total = total_a_cobrar(session, venta)
 
     _confirmar(
         session,
@@ -733,24 +750,39 @@ def reparto_a_cobrar(venta: Venta) -> Decimal:
 
 
 def total_a_cobrar(session: Session, venta: Venta, grupo_cobro: int | None = None):
-    """Lo que realmente debe pagarse: subtotal de las líneas menos la parte
-    del descuento manual que le corresponde, más el reparto. Sin
-    `grupo_cobro` es la venta entera; con él, solo esa cuenta.
+    """Lo que realmente debe pagarse: subtotal de las líneas menos las
+    promociones y la parte del descuento manual que le corresponde, más el
+    reparto. Sin `grupo_cobro` es la venta entera; con él, solo esa cuenta.
 
     **El reparto se suma después del descuento** (RN-COM-041): el descuento
     manual lo autoriza un encargado sobre lo que el cliente consumió, y
     regalar el flete al mismo tiempo no es lo que se aprobó.
+
+    **Las promociones bajan antes que el descuento manual** (ADR-076): el
+    supervisor firma un porcentaje sobre lo que el cliente va a pagar, no
+    sobre el precio de lista de algo que la promoción ya rebajó. Al revés,
+    un 20 % firmado sobre un pedido con 2x1 regalaría casi la mitad del
+    ticket sin que nadie lo haya aprobado así.
     """
     todos = VentaRepo(session).items(venta.id)
-    base = _subtotal(todos)
+    base = _subtotal(todos) - promociones.total_aplicado(session, venta.id)
     reparto = reparto_a_cobrar(venta)
     if grupo_cobro is None:
         neto = base - rules.monto_descuento(
             venta.descuento_modo, venta.descuento_valor, base
         )
-        return neto + reparto
+        return rules.a_centavos(neto + reparto)
     filas = [f for f in todos if f.grupo_cobro == grupo_cobro]
-    parcial = _subtotal(filas)
+    # La promoción se prorratea entre las cuentas por lo que pesa cada una,
+    # igual que el descuento manual: se activó sobre el pedido, no sobre la
+    # cuenta que toque cobrarse primero.
+    bruto_total = _subtotal(todos)
+    parcial_bruto = _subtotal(filas)
+    parcial = (
+        parcial_bruto
+        if bruto_total <= 0
+        else (base * parcial_bruto / bruto_total).quantize(Decimal("0.01"))
+    )
     # El flete **no se prorratea**: va entero en la primera cuenta. Repartir
     # un reparto entre comensales es un caso que nadie pidió, pero omitirlo
     # sí rompía algo real — el cobro normal del PDV pasa por acá con
@@ -760,7 +792,7 @@ def total_a_cobrar(session: Session, venta: Venta, grupo_cobro: int | None = Non
     grupos = VentaRepo(session).grupos_de_cobro(venta.id)
     if grupo_cobro != min(grupos, default=rules.GRUPO_COBRO_UNICO):
         reparto = Decimal("0")
-    return (
+    return rules.a_centavos(
         parcial
         - rules.descuento_prorrateado(
             venta.descuento_modo, venta.descuento_valor, base, parcial
@@ -772,10 +804,15 @@ def total_a_cobrar(session: Session, venta: Venta, grupo_cobro: int | None = Non
 def calcular_monto_descuento(
     session: Session, venta: Venta, modo: str | None, valor: Decimal | None
 ) -> Decimal:
-    """Cuánto descontaría `modo`/`valor` sobre el subtotal actual — sin
+    """Cuánto descontaría `modo`/`valor` sobre lo que hoy se paga — sin
     aplicarlo. El router lo usa para validar `permiso.restricciones`
-    (ADR-023, `monto_maximo`) ANTES de comprometer el cambio."""
-    base = _subtotal(VentaRepo(session).items(venta.id))
+    (ADR-023, `monto_maximo`) ANTES de comprometer el cambio.
+
+    La base descuenta las promociones ya activadas (ADR-076): el tope del
+    supervisor tiene que medirse contra lo que de verdad se va a regalar."""
+    base = _subtotal(VentaRepo(session).items(venta.id)) - promociones.total_aplicado(
+        session, venta.id
+    )
     return rules.monto_descuento(modo, valor, base)
 
 
@@ -959,22 +996,38 @@ def registrar_pago(
 
     total_grupo = total_a_cobrar(session, venta, grupo_cobro)
     confirmados = repo.confirmados(venta_id, grupo_cobro)
-    if sum(confirmados, Decimal(0)) + monto > total_grupo:
-        raise ReglaNegocio("el pago excede el saldo de la cuenta")
+    saldo = rules.a_centavos(total_grupo - sum(confirmados, Decimal(0)))
+    recibido = rules.a_centavos(monto)
+
+    # Recibir más de lo que se debe solo es un error cuando el medio no puede
+    # devolver la diferencia (ADR-077). En efectivo es el caso normal de una
+    # caja —un billete de 50 por una cuenta de 33.30— y rechazarlo obligaba
+    # al cajero a teclear el saldo exacto de memoria; en tarjeta no hay
+    # vuelto posible y aceptarlo solo descuadraría el arqueo.
+    medio = MedioPagoRepo(session).get(medio_pago_id)
+    if recibido > saldo and not rules.admite_vuelto(medio.tipo):
+        raise ReglaNegocio(
+            "el pago excede el saldo de la cuenta y este medio no da vuelto"
+        )
+    # Lo que entra a la cuenta nunca pasa del saldo: la diferencia sale por
+    # el cajón como vuelto, no queda asentada como plata cobrada.
+    aplicado = min(recibido, saldo)
+    vuelto = rules.vuelto_de(recibido, saldo)
 
     pago = repo.add(
         Pago(
             id=id or uuid.uuid4(),
             venta_id=venta_id,
             medio_pago_id=medio_pago_id,
-            monto=monto,
+            monto=aplicado,
+            vuelto=vuelto,
             grupo_cobro=grupo_cobro,
             idempotency_key=idempotency_key,
             referencia_externa=referencia_externa,
             estado="confirmado",
         )
     )
-    if not rules.pagos_cubren_total(confirmados + [monto], total_grupo):
+    if not rules.pagos_cubren_total(confirmados + [aplicado], total_grupo):
         return pago, venta, None
 
     comprobante = _cerrar_cuenta(
@@ -1043,7 +1096,9 @@ def listar_items(session: Session, venta_id: uuid.UUID) -> list[dict]:
             "nombre": nombre_de[f.producto_comercial_id],
             "cantidad": f.cantidad,
             "precio_unitario": f.precio_unitario,
+            "descuento": f.descuento,
             "grupo_cobro": f.grupo_cobro,
+            "nota": f.nota,
             "extras": [
                 {
                     "id": e.id,
@@ -1155,6 +1210,10 @@ def anular_lineas(
     _borrar_hijos_primero(session, filas)
 
     restantes = VentaRepo(session).items(venta_id)
+    # Quitar una pizza puede desactivar el 2x1 que esa pizza activaba: la
+    # promoción desaparece sola en vez de quedar cobrada sobre lo que ya no
+    # está (ADR-076).
+    promociones.recalcular_promociones(session, venta)
     venta.total = total_a_cobrar(session, venta)
     # Sin líneas no queda orden que preparar: la venta se anula entera.
     if not restantes:
@@ -1367,16 +1426,30 @@ def mover_lineas(
         grupo_cobro=grupo_cobro,
     )
 
+    # Al cambiar de orden, la línea entra a la cola del destino como una tanda
+    # propia (ADR-075): la del origen numeraba los envíos de OTRO pedido y
+    # chocaría con los de este. Una sola tanda para todo el lote — se movieron
+    # juntas y en cocina son la misma comanda.
+    tanda_destino = (
+        venta_repo.siguiente_tanda(destino.id) if destino is not origen else None
+    )
     for fila in filas:
         fila.venta_id = destino.id
         fila.grupo_cobro = nuevo_grupo
+        if tanda_destino is not None:
+            fila.tanda = tanda_destino
     session.flush()
 
+    # Las dos órdenes cambiaron de contenido, así que las dos reevalúan: lo
+    # que se fue puede haber roto una promoción del origen y armado una en el
+    # destino (ADR-076).
+    promociones.recalcular_promociones(session, origen)
     origen.total = total_a_cobrar(session, origen)
     if destino is not origen and not venta_repo.items(venta_id):
         # Sin líneas no queda orden que preparar ni mesa que ocupar.
         origen.estado = "anulada"
     if destino is not origen:
+        promociones.recalcular_promociones(session, destino)
         destino.total = total_a_cobrar(session, destino)
 
     _registrar_traslado(
@@ -1389,6 +1462,27 @@ def mover_lineas(
         usuario_id=usuario_id,
     )
     return origen, destino
+
+
+def fijar_nota_cocina(
+    session: Session, *, venta_id: uuid.UUID, nota: str | None
+) -> Venta:
+    """Cambia cómo se sirve el pedido. `None` la quita.
+
+    Se puede con la orden ya en cocina porque así se pide de verdad: "las
+    bebidas al final" se dice a mitad del servicio, no al tomar la comanda.
+    Después del cobro no: la cuenta está cerrada y no hay nada que servir.
+
+    Sin firma de nadie y sin evento: no toca el total, no mueve inventario y
+    no cambia qué se prepara — solo en qué orden sale.
+    """
+    venta = VentaRepo(session).get(venta_id)
+    if venta is None:
+        raise NoEncontrado("venta no encontrada")
+    if venta.estado != "orden":
+        raise Conflicto(f"la venta está {venta.estado}: ya no se está sirviendo")
+    venta.nota_cocina = (nota or "").strip() or None
+    return venta
 
 
 def lineas_en_ventana(
@@ -1423,6 +1517,7 @@ def agregar_lineas(
     venta_id: uuid.UUID,
     items: list[dict],
     usuario_id: uuid.UUID,
+    idempotency_key: str | None = None,
 ) -> Venta:
     """Suma líneas a una orden **ya enviada a cocina** (RN-COM-029).
 
@@ -1438,6 +1533,10 @@ def agregar_lineas(
     entera: `items` ya era el detalle de la operación y `total` pasa a serlo
     también, así que inventory descuenta solo lo nuevo y accounting asienta
     solo el incremento. Republicar el total completo lo asentaría dos veces.
+
+    Todo lo de esta llamada entra al KDS como una **tanda propia** (ADR-075):
+    una comanda nueva en la cola de cocina, con su propio reloj, en vez de
+    colarse dentro de la pastilla del pedido original.
     """
     repo = VentaRepo(session)
     venta = repo.get(venta_id)
@@ -1450,6 +1549,11 @@ def agregar_lineas(
         )
     if not items:
         raise ReglaNegocio("indica al menos una línea a agregar")
+    # Reintento del mismo envío: la respuesta anterior se perdió, pero el
+    # aumento ya entró. Devolver la venta tal como quedó es lo único que no
+    # le manda a la cocina una segunda comanda idéntica (RN-COM-002).
+    if idempotency_key and repo.tanda_ya_registrada(idempotency_key):
+        return venta
 
     filas, extras_por_padre, detalle_evento = _armar_lineas(
         session,
@@ -1460,26 +1564,52 @@ def agregar_lineas(
         dia=venta.fecha_orden,
         gratis=rules.es_consumo_personal(venta.tipo),
     )
+    # Lo que había que cobrar antes de tocar la orden. La diferencia contra
+    # el total de después es lo que esta operación confirma de verdad.
+    total_antes = total_a_cobrar(session, venta)
+    # La tanda es de la operación, no de la línea: todo lo que el trabajador
+    # confirmó de un envío sale junto en la misma comanda. Se calcula antes de
+    # insertar nada, para que el `max` no se lea a sí mismo.
+    tanda = repo.siguiente_tanda(venta.id)
     for fila in filas:
         fila.venta_id = venta.id
+        fila.tanda = tanda
         session.add(fila)
+    # Una sola fila lleva la marca: lo idempotente es el envío, no la línea.
+    if idempotency_key:
+        filas[0].idempotency_key = idempotency_key
     session.flush()
     for fila, hijos in zip(filas, extras_por_padre, strict=True):
         for hijo in hijos:
             hijo.venta_id = venta.id
             hijo.padre_venta_item_id = fila.id
+            hijo.tanda = tanda
             session.add(hijo)
     session.flush()
 
-    agregado = rules.total_venta(
-        [
-            (f.cantidad, f.precio_unitario, f.descuento)
-            for f in [*filas, *(h for hijos in extras_por_padre for h in hijos)]
-        ]
-    )
+    # Las promociones se reevalúan antes del total: el aumento puede activar
+    # una que el pedido no cumplía (la segunda pizza es la que acaba de
+    # entrar) o dejar de cumplir ninguna (ADR-076).
+    promociones.recalcular_promociones(session, venta)
     # El total se recalcula entero (incluye el descuento de orden prorrateado)
     # y no se le suma el incremento: sumar dejaría fuera el reprorrateo.
     venta.total = total_a_cobrar(session, venta)
+    # Lo que se confirma en esta operación es **cuánto sube lo que hay que
+    # cobrar**, no el precio de lista de lo que entró (ADR-043 §3, ADR-076).
+    #
+    # Con una promoción de por medio dejan de ser lo mismo: la segunda pizza
+    # de un 2x1 entra por S/ 40 de lista y no le suma un sol al total. Sumar
+    # la lista dejaría a contabilidad asentando S/ 40 que la caja nunca
+    # cobró, y los libros dejarían de cuadrar con el turno.
+    #
+    # El delta puede ser **negativo** cuando el aumento activa una promoción
+    # que baja el total más de lo que la línea suma —agregar una gaseosa que
+    # dispara un "20 % desde S/ 50"—. Se publica tal cual: el asiento tiene
+    # que seguir a la caja, y taparlo con un cero dejaría los libros por
+    # encima de lo cobrado, que es el error que este cálculo viene a evitar.
+    # A centavos: lo que viaja a contabilidad es plata, y `_subtotal` puede
+    # traer cuatro decimales de multiplicar cantidad por precio.
+    agregado = (venta.total - total_antes).quantize(Decimal("0.01"))
     auditoria.registrar(
         session,
         usuario_id=usuario_id,

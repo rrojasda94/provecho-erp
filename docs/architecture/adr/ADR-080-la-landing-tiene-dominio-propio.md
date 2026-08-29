@@ -1,4 +1,4 @@
-# ADR-072 — La landing pública tiene dominio propio, y el proxy es quien lo acota
+# ADR-080 — La landing pública tiene dominio propio, y el proxy es quien lo acota
 
 - Estado: aceptado
 - Fecha: 2026-08-27
@@ -125,11 +125,22 @@ pero ese objeto aparece **antes** de que el bootstrap de `loading=async` defina
 `CampoDireccion`, o sea sin ningún síntoma salvo un campo de texto pelado,
 idéntico a no tener clave configurada.
 
-Es la misma lección de ADR-068 §3 en su forma más cara: una degradación
-correcta de cara al cajero —una venta no se pierde porque un tercero no
-contestó— vuelve invisible un bug propio. El `catch` ahora escribe en consola,
-que es lo que habría convertido una sesión de diagnóstico en dos minutos.
-Corregido en `lib/google-maps.ts` con su prueba (`lib/google-maps.test.ts`).
+Esta rama y ADR-072 dieron con el mismo bug el mismo día, en paralelo. El
+arreglo de fondo salió por ADR-072 en la 0.8.1; acá quedan las dos piezas que
+allá faltaban:
+
+- **El sondeo ya no cuelga del evento `load`.** Un `<script>` que ya terminó de
+  cargar no vuelve a emitirlo, y la promesa memoizada es del módulo: en cada
+  recarga en caliente se reusaba el `<script>` viejo y la espera no terminaba
+  nunca. Ahora se sondea de una; `error` sigue cortando.
+- **El `catch` deja de ser mudo.** Es la misma lección de ADR-068 §3 en su
+  forma más cara: una degradación correcta de cara al cajero —una venta no se
+  pierde porque un tercero no contestó— vuelve invisible un bug propio. Ahora
+  escribe el motivo en consola, que es lo que habría convertido una sesión de
+  diagnóstico en dos minutos.
+
+Los dos en `lib/google-maps.ts` y `components/direccion/campo-direccion.tsx`,
+con su prueba (`lib/google-maps.test.ts`).
 
 ## Alternativas descartadas
 

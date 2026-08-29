@@ -92,6 +92,12 @@ celery_app.conf.beat_schedule = {
         "task": "rrhh.avisar_salidas_sin_marcar",
         "schedule": crontab(minute=5),
     },
+    # Una vez al día alcanza: el retenido es de días (90 por defecto,
+    # `rrhh_marcaje_foto_retencion_dias`), no de horas.
+    "purgar-fotos-de-marcacion": {
+        "task": "rrhh.purgar_fotos_de_marcacion",
+        "schedule": crontab(hour=4, minute=30),
+    },
     # Red de seguridad de la emisión electrónica: recoge lo que nunca llegó
     # a la cola (emitido sin `FACTILIZA_TOKEN`, con el broker caído o con el
     # worker muerto). Cada 15 min alcanza — el reintento por comprobante ya
@@ -107,6 +113,14 @@ celery_app.conf.beat_schedule = {
     "barrer-encuestas-vencidas": {
         "task": "marketing.barrer_encuestas_vencidas",
         "schedule": 3600.0,
+    },
+    # Borradores del PDV de turnos ya cerrados. De madrugada y no cada hora:
+    # el corte es la medianoche del negocio, y borrar a media tarde el
+    # borrador de "ayer" mientras alguien todavía lo tiene abierto sería
+    # quitarle el pedido de la pantalla en pleno servicio.
+    "purgar-borradores-viejos": {
+        "task": "sales.purgar_borradores_viejos",
+        "schedule": crontab(hour=5, minute=30),
     },
 }
 

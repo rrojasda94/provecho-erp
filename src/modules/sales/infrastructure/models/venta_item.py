@@ -5,7 +5,7 @@ vender (snapshot — no depende de lista_precio para existir).
 import uuid
 from decimal import Decimal
 
-from sqlalchemy import Enum, ForeignKey, Integer, Numeric
+from sqlalchemy import Enum, ForeignKey, Integer, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -90,3 +90,44 @@ class VentaItem(Base, UuidPkMixin, TimestampMixin):
     etapa_kds: Mapped[int] = mapped_column(
         Integer, default=0, server_default="0", nullable=False
     )
+    # En qué envío a cocina salió la línea. 1 es el alta del pedido; cada
+    # `POST /ventas/{id}/items` posterior suma uno (ADR-075).
+    #
+    # Es lo que le devuelve la cronología al KDS. Una mesa que pide de a poco
+    # es UNA venta (ADR-043), pero para la cocina cada envío es una comanda
+    # distinta: sin esto, el postre que se pidió a las 21:40 aparecía dentro
+    # de la misma pastilla que la entrada de las 20:15, sin forma de saber
+    # qué acababa de llegar.
+    #
+    # Un entero de la venta y no un timestamp: dos líneas del mismo envío
+    # tienen `created_at` parecidos pero no iguales, y agrupar por tiempo
+    # obliga a elegir una tolerancia arbitraria que se rompe el día que el
+    # cajero tarde en confirmar el diálogo del segundo producto.
+    #
+    # Los extras heredan la tanda de su plato: no se preparan aparte
+    # (RN-CUP-014), así que tampoco se anuncian aparte.
+    tanda: Mapped[int] = mapped_column(
+        Integer, default=1, server_default="1", nullable=False
+    )
+    # Clave de la operación que trajo esta línea, en la PRIMERA fila del
+    # lote. NULL en las demás y en todo lo anterior a este campo.
+    #
+    # El alta de la venta ya era idempotente (`venta.idempotency_key`,
+    # RN-COM-002) pero el aumento no lo era: un reintento del navegador
+    # sobre una respuesta que se perdió mandaba el mismo envío dos veces y
+    # la cocina recibía dos comandas idénticas que nadie podía distinguir de
+    # un pedido real de dos rondas. Se marca una sola fila porque lo
+    # idempotente es el envío entero, no la línea.
+    idempotency_key: Mapped[str | None] = mapped_column(
+        String(100), unique=True, nullable=True
+    )
+    # Lo que el mesero le dice a cocina sobre ESTE plato: "bien cocida",
+    # "sin sal", "para la niña".
+    #
+    # Texto libre y no un catálogo: lo estructurado ya existe y es mejor
+    # —las restas (`sin_articulo_ids`) descuentan inventario, los atributos
+    # cambian la receta—, pero siempre queda un pedido del comensal que
+    # ninguna de las dos cosas expresa. Lo que no puede pasar es que el
+    # campo exista en la pantalla y el dato no llegue a la cocina, que es lo
+    # que pasaba: el PDV lo capturaba y lo tiraba.
+    nota: Mapped[str | None] = mapped_column(String(140), nullable=True)

@@ -4,7 +4,7 @@ Parte del backlog de deuda técnica del proyecto. El índice y las reglas
 de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 
 - ⬜ **La landing pública recoge datos reales sobre una base desechable**
-  (2026-08-27, ADR-072). `clientes.majambo.com.pe` publica un formulario que
+  (2026-08-27, ADR-080). `clientes.majambo.com.pe` publica un formulario que
   pide DNI, nombre, teléfono y fecha de nacimiento, invita a escanearlo desde
   una mesa, consulta el DNI contra RENIEC con el token de **QA** de Factiliza,
   y escribe en el Postgres de staging — declarado descartable en

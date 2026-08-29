@@ -76,6 +76,10 @@ export const SUBMENUS: Record<string, ItemSubmenu[]> = {
     { label: "Contratación", href: "/rrhh/contratacion" },
     { label: "Trabajadores", href: "/rrhh/trabajadores" },
     { label: "Turnos", href: "/rrhh/turnos" },
+    // El dispositivo autorizado a marcar por un local (ADR-073) — separado
+    // de Turnos porque lo que se administra acá es la tablet, no el
+    // horario laboral.
+    { label: "Terminales", href: "/rrhh/terminales" },
     // El pad es pantalla completa fuera del shell, como el PDV: se abre en
     // la tablet del local con la cuenta del terminal, no desde acá. El
     // enlace existe para poder probarlo y dejarlo en favoritos.
@@ -95,6 +99,9 @@ export const SUBMENUS: Record<string, ItemSubmenu[]> = {
     // Configurar el salón, no la identidad fiscal del local — eso es
     // "Puntos de venta" en Organización (ADR-059).
     { label: "Mesas", href: "/ventas/mesas" },
+    // Las que se aplican solas (ADR-076). El cupón de la landing y el
+    // descuento manual de caja son otra cosa y no viven acá.
+    { label: "Promociones", href: "/ventas/promociones" },
     { label: "Abrir el PDV", href: "/pdv" },
   ],
 };

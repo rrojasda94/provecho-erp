@@ -1,9 +1,11 @@
 """Routers FastAPI del módulo rrhh: ciclo laboral completo."""
 
+import base64
+import binascii
 import uuid
-from datetime import date
+from datetime import date, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
 from src.core.rate_limit import consumir, ip_de, rate_limit
@@ -17,12 +19,14 @@ from src.modules.rrhh.application import (
     contratos,
     convocatorias,
     disciplina,
+    marcaciones,
     nomina,
     pad_asistencia,
     permisos,
     postulantes,
     privacidad,
     socios,
+    terminales,
     trabajadores,
     turnos,
 )
@@ -41,6 +45,7 @@ from src.modules.rrhh.application.scope import (
     exigir_pacto,
     exigir_postulante,
     exigir_solicitud_permiso,
+    exigir_terminal,
     exigir_trabajador,
     exigir_turno,
 )
@@ -54,6 +59,10 @@ from src.modules.users.application.queries_publicas import (
 from src.modules.users.infrastructure.models import Usuario
 from src.shared import auditoria, fechas
 from src.shared.paginacion import Pagina, Paginacion, paginacion, paginar
+
+# Tope tras decodificar el base64: JPEG de 320px al 60% pesa ~40 KB, esto
+# deja margen de sobra sin abrir la puerta a subir cualquier cosa.
+FOTO_MAX_BYTES = 130_000
 
 router = APIRouter(prefix="/rrhh", tags=["rrhh"])
 
@@ -72,6 +81,10 @@ ASISTENCIA_MARCAR = "rrhh.asistencia_marcar"
 # back-office: el pad no marca por nadie, solo presenta la firma del
 # trabajador (ADR-065).
 ASISTENCIA_TERMINAL = "rrhh.asistencia_terminal"
+# Autorizar o revocar el dispositivo que puede marcar por un local (ADR-079)
+# es alta de infraestructura del local, igual que `kds.configurar`: nunca
+# lo tiene la cuenta de servicio del pad, que solo abre la pantalla.
+TERMINAL_GESTIONAR = "rrhh.terminal_gestionar"
 TURNO_GESTIONAR = "rrhh.turno_gestionar"
 CAPACITACION_GESTIONAR = "rrhh.capacitacion_gestionar"
 # Misma capacidad legal que sobre `persona` (Ley 29733): un permiso nuevo
@@ -810,12 +823,24 @@ def ver_pacto_permanencia(
 @router.post("/asistencia/entrada", response_model=schemas.AsistenciaOut, status_code=201)
 def marcar_entrada(
     body: schemas.AsistenciaMarcarEntrada,
-    _: Usuario = Depends(require_permission(ASISTENCIA_MARCAR)),
+    request: Request,
+    actor: Usuario = Depends(require_permission(ASISTENCIA_MARCAR)),
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    exigir_trabajador(session, body.trabajador_id, tenant)
+    trabajador = exigir_trabajador(session, body.trabajador_id, tenant)
     asistencia = asistencia_uc.marcar_entrada(session, **body.model_dump())
+    # Corrección de back-office: sin terminal (RN-RRHH-024). Es la misma
+    # evidencia que el pad, con `terminal_id` en NULL como única diferencia.
+    marcaciones.registrar(
+        session,
+        asistencia=asistencia,
+        tipo="entrada",
+        usuario_id=actor.id,
+        momento=datetime.combine(body.fecha, body.hora_entrada, tzinfo=fechas.zona()),
+        ip=ip_de(request),
+        sucursal_id=trabajador.sucursal_id,
+    )
     session.commit()
     return asistencia
 
@@ -823,14 +848,70 @@ def marcar_entrada(
 @router.post("/asistencia/salida", response_model=schemas.AsistenciaOut)
 def marcar_salida(
     body: schemas.AsistenciaMarcarSalida,
-    _: Usuario = Depends(require_permission(ASISTENCIA_MARCAR)),
+    request: Request,
+    actor: Usuario = Depends(require_permission(ASISTENCIA_MARCAR)),
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    exigir_trabajador(session, body.trabajador_id, tenant)
+    trabajador = exigir_trabajador(session, body.trabajador_id, tenant)
     asistencia = asistencia_uc.marcar_salida(session, **body.model_dump())
+    marcaciones.registrar(
+        session,
+        asistencia=asistencia,
+        tipo="salida",
+        usuario_id=actor.id,
+        momento=datetime.combine(body.fecha, body.hora_salida, tzinfo=fechas.zona()),
+        ip=ip_de(request),
+        sucursal_id=trabajador.sucursal_id,
+    )
     session.commit()
     return asistencia
+
+
+@router.get(
+    "/asistencia/{asistencia_id}/marcaciones", response_model=list[schemas.MarcacionOut]
+)
+def marcaciones_de_asistencia(
+    asistencia_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """La evidencia de cada toque del día: quién firmó, desde qué terminal,
+    con qué IP y a qué distancia de la sucursal (RN-RRHH-024)."""
+    asistencia = asistencia_uc.obtener(session, asistencia_id)
+    if asistencia is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "asistencia no encontrada")
+    exigir_trabajador(session, asistencia.trabajador_id, tenant)
+    return [
+        schemas.MarcacionOut(
+            id=m.id,
+            tipo=m.tipo,
+            momento=m.momento,
+            usuario_id=m.usuario_id,
+            terminal_id=m.terminal_id,
+            ip=m.ip,
+            distancia_m=m.distancia_m,
+            tiene_foto=m.foto is not None,
+        )
+        for m in marcaciones.listar_de_asistencia(session, asistencia_id)
+    ]
+
+
+@router.get("/marcaciones/{marcacion_id}/foto")
+def foto_de_marcacion(
+    marcacion_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    marcacion = marcaciones.obtener(session, marcacion_id)
+    if marcacion is None or marcacion.foto is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "foto no encontrada")
+    trabajador_id = marcaciones.trabajador_id_de(session, marcacion)
+    if trabajador_id is not None:
+        exigir_trabajador(session, trabajador_id, tenant)
+    return Response(content=marcacion.foto, media_type="image/jpeg")
 
 
 # --- Turno de trabajo ------------------------------------------------------------
@@ -873,6 +954,51 @@ def editar_turno(
     return turno
 
 
+# --- Terminal de marcaje -----------------------------------------------------------
+# Autorizar y revocar el dispositivo del pad (ADR-079): alta de
+# infraestructura del local, nunca de la cuenta de servicio que abre la
+# pantalla — mismo criterio que `kds.configurar` frente a `kds.operar`.
+@router.post(
+    "/terminales", response_model=schemas.TerminalCodigoOut, status_code=201
+)
+def crear_terminal(
+    body: schemas.TerminalCrear,
+    _: Usuario = Depends(require_permission(TERMINAL_GESTIONAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    tenant.exigir_sucursal(body.sucursal_id)
+    terminal, codigo = terminales.crear(
+        session, sucursal_id=body.sucursal_id, nombre=body.nombre
+    )
+    session.commit()
+    return {"terminal": terminal, "codigo": codigo}
+
+
+@router.get("/terminales", response_model=list[schemas.TerminalOut])
+def listar_terminales(
+    sucursal_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(TERMINAL_GESTIONAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    tenant.exigir_sucursal(sucursal_id)
+    return terminales.listar(session, sucursal_id)
+
+
+@router.delete("/terminales/{terminal_id}", status_code=204)
+def revocar_terminal(
+    terminal_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(TERMINAL_GESTIONAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    exigir_terminal(session, terminal_id, tenant)
+    terminales.revocar(session, terminal_id)
+    session.commit()
+    return Response(status_code=204)
+
+
 # --- Pad de marcación del local --------------------------------------------------
 @router.get("/asistencia/terminal/tarjetas", response_model=list[schemas.TarjetaOut])
 def tarjetas_del_pad(
@@ -888,16 +1014,38 @@ def tarjetas_del_pad(
     return pad_asistencia.tarjetas(session, sucursal_id)
 
 
-@router.post("/asistencia/terminal/marcar", response_model=schemas.PadMarcacionOut)
-def marcar_en_el_pad(
-    body: schemas.PadMarcarIn,
+@router.post("/asistencia/terminal/enrolar", response_model=schemas.TerminalEnrolarOut)
+def enrolar_terminal(
+    body: schemas.TerminalEnrolarIn,
     request: Request,
     sucursal_id: uuid.UUID,
     _: Usuario = Depends(require_permission(ASISTENCIA_TERMINAL)),
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    """Registra la marcación firmada con el PIN del propio trabajador.
+    """La tablet teclea el código que un admin generó desde el back-office y
+    se queda con un secreto propio: de acá en más, cada marcación lo manda
+    (RN-RRHH-023, ADR-079). Rate limit por IP y no por terminal — todavía no
+    hay uno enrolado con quien contar el límite."""
+    tenant.exigir_sucursal(sucursal_id)
+    consumir("terminal_enrolar", ip_de(request), 10, 300)
+    secreto = terminales.enrolar(session, sucursal_id=sucursal_id, codigo=body.codigo)
+    session.commit()
+    return {"secreto": secreto}
+
+
+@router.post("/asistencia/terminal/marcar", response_model=schemas.PadMarcacionOut)
+def marcar_en_el_pad(
+    body: schemas.PadMarcarIn,
+    request: Request,
+    sucursal_id: uuid.UUID,
+    x_terminal: str | None = Header(default=None, alias="X-Terminal"),
+    _: Usuario = Depends(require_permission(ASISTENCIA_TERMINAL)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Registra la marcación firmada con el PIN del propio trabajador, desde
+    un terminal autorizado (RN-RRHH-023) y con su evidencia (RN-RRHH-024).
 
     El límite se cuenta **por trabajador** y no por IP: en un local todas
     las tabletas salen por la misma dirección y el cambio de turno son diez
@@ -911,7 +1059,28 @@ def marcar_en_el_pad(
             status.HTTP_403_FORBIDDEN,
             "el trabajador no tiene su centro de labores en esta sucursal",
         )
+    terminal = (
+        terminales.resolver_terminal(session, x_terminal, sucursal_id)
+        if x_terminal
+        else None
+    )
+    if terminal is None:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "este dispositivo no está autorizado para marcar en esta sucursal",
+        )
     consumir("asistencia_pad", str(body.trabajador_id), 10, 300)
+
+    foto = None
+    if body.foto:
+        try:
+            foto = base64.b64decode(body.foto, validate=True)
+        except (binascii.Error, ValueError) as e:
+            raise HTTPException(422, "foto inválida: no es base64 válido") from e
+        if len(foto) > FOTO_MAX_BYTES:
+            raise HTTPException(
+                422, f"la foto supera el máximo de {FOTO_MAX_BYTES // 1024} KB"
+            )
 
     usuario_id = pad_asistencia.usuario_que_firma(session, body.trabajador_id)
     resultado = verificar_pin_de(session, usuario_id, body.pin, ip_de(request))
@@ -923,7 +1092,16 @@ def marcar_en_el_pad(
             )
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Credenciales inválidas")
 
-    asistencia, tipo = pad_asistencia.marcar(session, trabajador_id=body.trabajador_id)
+    asistencia, tipo = pad_asistencia.marcar(
+        session,
+        trabajador_id=body.trabajador_id,
+        usuario_id=usuario_id,
+        terminal=terminal,
+        ip=ip_de(request),
+        lat=body.lat,
+        lng=body.lng,
+        foto=foto,
+    )
     auditoria.registrar(
         session,
         usuario_id=usuario_id,

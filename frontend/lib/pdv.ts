@@ -7,6 +7,7 @@
  * no como un `undefined` silencioso en medio de un cobro.
  */
 
+import type { Ubicacion } from "@/components/direccion/ubicacion";
 import type {
   TicketComprobante,
   TicketTexto,
@@ -114,7 +115,35 @@ export type VentaItem = {
   cantidad: string;
   precio_unitario: string;
   grupo_cobro: number;
+  /** Sin esto, reabrir la cuenta perdía la nota y el siguiente guardado la
+   * borraba. */
+  nota: string | null;
+  /** Lo descontado en esta línea. Hoy siempre 0 desde el PDV —las
+   * promociones viven en `venta_promocion` y el descuento manual en la
+   * venta— pero el contrato lo expone para que reabrir una orden no pueda
+   * reconstruir un total mayor del que se debe. */
+  descuento: string;
   extras: ExtraDeVentaItem[];
+};
+
+/** Un comprobante de la venta. Con la cuenta dividida hay uno por cuenta. */
+export type ComprobanteDeVenta = {
+  id: string;
+  tipo: string;
+  serie: string;
+  correlativo: number;
+  grupo_cobro: number;
+  receptor_num_doc: string | null;
+  receptor_nombre: string | null;
+  estado_emision: string;
+};
+
+/** Lo que queda por cobrar en una cuenta, según el servidor. */
+export type SaldoCuenta = {
+  grupo_cobro: number;
+  total: string;
+  pagado: string;
+  saldo: string;
 };
 
 export type MesaEnMapa = {
@@ -138,7 +167,7 @@ export type ClienteBuscado = {
   numero_documento: string | null;
   direccion: string | null;
   identificado: boolean;
-};
+} & Ubicacion;
 
 export type ClienteNuevo = {
   nombre: string;
@@ -146,7 +175,7 @@ export type ClienteNuevo = {
   numero_documento?: string | null;
   direccion?: string | null;
   fecha_nacimiento?: string | null;
-};
+} & Partial<Ubicacion>;
 
 export type MedioPago = {
   id: string;
@@ -163,7 +192,18 @@ export type Venta = {
   total: string;
   referencia_atencion: string | null;
   mesa_id: string | null;
+  /** El número que ve el personal ("Mesa 7"). Va en el contrato porque el
+   * PDV reabre una cuenta desde la pestaña de cuentas abiertas, sin pasar
+   * por el mapa de salón: con solo el id, la pestaña decía "Mesa ?". */
+  mesa_numero: number | null;
   comensales: number | null;
+  /** Cómo se sirve el pedido: "servir todo junto", "bebidas al final". */
+  nota_cocina: string | null;
+  /** Descuento manual de la orden (RN-COM-017). El PDV lo muestra en el
+   * ticket para que el cajero vea que está aplicado antes de cobrar. */
+  descuento_modo: "porcentaje" | "monto" | null;
+  descuento_valor: string | null;
+  descuento_motivo: string | null;
   tipo: string;
   consumo_motivo: string | null;
 };
@@ -251,6 +291,10 @@ export type ItemDeVentaNueva = {
    * mitades lleva la pizza. Es lo que activa las líneas condicionadas de la
    * receta, así que sin esto la venta se cobra sin descontar (RN-COM-040). */
   valores_variante_ids?: string[];
+  /** Lo que el mesero le dice a cocina sobre ESTE plato ("bien cocida").
+   * Hasta ADR-075 el PDV lo capturaba y no lo mandaba: el campo existía en
+   * el diálogo y el dato moría ahí. */
+  nota?: string | null;
 };
 
 export type VentaNueva = {
@@ -264,6 +308,9 @@ export type VentaNueva = {
   cliente_id?: string | null;
   mesa_id?: string | null;
   comensales?: number | null;
+  /** Cómo se sirve el pedido entero: "servir todo junto", "bebidas al
+   * final". Del pedido y no de una línea. */
+  nota_cocina?: string | null;
   referencia_atencion?: string | null;
   /** Adónde va el delivery y su ancla en el mapa. El costo del
    * reparto NO se manda: lo calcula el servidor (ADR-054), porque un
@@ -388,6 +435,41 @@ export type MovimientoCajaNuevo = {
 };
 
 // --- Operaciones ------------------------------------------------------------
+/** Una promoción que este pedido activó (ADR-076). El cajero no la pide ni
+ * la firma: el pedido la cumple o no. */
+export type PromocionAplicada = {
+  promocion_id: string;
+  /** Congelado al aplicarse: la promoción se renombra o se apaga, y el
+   * ticket de ayer tiene que decir lo que el cliente leyó. */
+  nombre: string;
+  monto: string;
+};
+
+export type DescuentoIn = {
+  /** `null` quita el descuento; los otros dos campos sobran ahí. */
+  modo: "porcentaje" | "monto" | null;
+  valor?: string;
+  motivo?: string;
+  autorizacion: string;
+};
+
+export type CuponCanjeado = {
+  codigo: string;
+  monto_descuento: string;
+  venta: Venta;
+};
+
+/** Lo que el servidor devuelve de un borrador. `contenido` es opaco para
+ * el contrato: la forma la decide el PDV (ADR-074). */
+export type BorradorGuardado = {
+  id: string;
+  sucursal_id: string;
+  punto_venta_id: string;
+  usuario_id: string;
+  contenido: unknown;
+  actualizado_en: string;
+};
+
 export const api = {
   carta: (sucursalId: string, modalidad: string) =>
     pedir<ItemDeCarta[]>(
@@ -481,6 +563,66 @@ export const api = {
   verificarPin: (pin: string) =>
     pedir<void>("/auth/verificar-pin", { metodo: "POST", cuerpo: { pin } }),
 
+  /** Cómo se sirve el pedido entero (ADR-075): "servir todo junto",
+   * "bebidas al final". Se puede cambiar con la orden ya en cocina, que es
+   * cuando de verdad se pide. `null` la quita. */
+  fijarNotaCocina: (ventaId: string, nota: string | null) =>
+    pedir<Venta>(`/sales/ventas/${ventaId}/nota-cocina`, {
+      metodo: "PUT",
+      cuerpo: { nota },
+    }),
+
+  /** Qué promociones activó el pedido. Se piden al enviarlo y después de
+   * cada cambio: el motor las reevalúa entero y una que dejó de cumplirse
+   * desaparece sola (ADR-076). */
+  promocionesDeVenta: (ventaId: string) =>
+    pedir<PromocionAplicada[]>(`/sales/ventas/${ventaId}/promociones`),
+
+  /** Canjea el cupón del cliente y lo apaga para siempre (ADR-061).
+   *
+   * **Sin PIN de supervisor**, a diferencia del descuento manual: el
+   * descuento ya estaba prometido y el cupón *es* la autorización
+   * (RN-PRM-007). Pedir una firma por cada cupón haría que la caja deje de
+   * canjearlos. */
+  canjearCupon: (ventaId: string, codigo: string) =>
+    pedir<CuponCanjeado>(`/sales/ventas/${ventaId}/cupon`, {
+      metodo: "POST",
+      cuerpo: { codigo },
+    }),
+
+  /** Descuento manual sobre la orden (RN-COM-017). `modo: null` lo quita.
+   *
+   * **Con firma de supervisor**: acá se regala margen a criterio de alguien,
+   * y `autorizacion` es el token de `POST /auth/autorizar` — quién autorizó
+   * sale de ahí y nunca del cuerpo, o el reporte de descuentos dejaría de
+   * valer (RN-AUD-005). El tope por permiso lo valida el servidor. */
+  aplicarDescuento: (ventaId: string, cuerpo: DescuentoIn) =>
+    pedir<Venta>(`/sales/ventas/${ventaId}/descuento`, {
+      metodo: "POST",
+      cuerpo,
+    }),
+
+  /** Guarda el ticket a medio armar contra el servidor (ADR-074).
+   *
+   * `PUT` con el id que la pestaña ya tiene: el navegador guarda con cada
+   * cambio y no lleva la cuenta de si esta pestaña llegó antes, así que
+   * repetirlo tiene que dejar el mismo estado y no una pestaña nueva. */
+  guardarBorrador: (borradorId: string, puntoVentaId: string, contenido: unknown) =>
+    pedir<BorradorGuardado>(`/sales/borradores/${borradorId}`, {
+      metodo: "PUT",
+      cuerpo: { punto_venta_id: puntoVentaId, contenido },
+    }),
+
+  /** Los borradores vivos de esta caja. Por punto de venta y no por usuario:
+   * el relevo de turno sigue el pedido que dejó el anterior. */
+  borradores: (puntoVentaId: string) =>
+    pedir<BorradorGuardado[]>(
+      `/sales/borradores?punto_venta_id=${puntoVentaId}`,
+    ),
+
+  descartarBorrador: (borradorId: string) =>
+    pedir<void>(`/sales/borradores/${borradorId}`, { metodo: "DELETE" }),
+
   /** Suma líneas a una orden ya enviada (RN-COM-029). Sin autorización: la
    * mesa que pide de a poco no debería terminar con dos cuentas. */
   agregarLineas: (ventaId: string, items: VentaNueva["items"]) =>
@@ -517,6 +659,24 @@ export const api = {
     pedir<{ id: string; tipo: string; serie: string; correlativo: number }>(
       `/sales/ventas/${ventaId}/comprobante`,
     ),
+
+  /** Todos los comprobantes de la venta, uno por cuenta (RN-COM-018).
+   *
+   * El singular devuelve solo el primero. Con la cuenta dividida eso dejaba
+   * al segundo cliente sin poder llevarse su papel, que es justo para lo que
+   * se separó la cuenta. */
+  comprobantesDeVenta: (ventaId: string) =>
+    pedir<ComprobanteDeVenta[]>(`/sales/ventas/${ventaId}/comprobantes`),
+
+  /** Cuánto queda por cobrar en cada cuenta, según el servidor.
+   *
+   * El diálogo de cobro lo pide en vez de sumar el borrador: el total del
+   * navegador no puede saber el flete de una orden reabierta ni el
+   * prorrateo del descuento entre cuentas, y cualquier diferencia terminaba
+   * en un cobro rechazado por exceder el saldo con el "monto exacto" en
+   * pantalla. */
+  saldoDeVenta: (ventaId: string) =>
+    pedir<SaldoCuenta[]>(`/sales/ventas/${ventaId}/saldo`),
 
   /** Lo que se manda a la ticketera de 80 mm (ADR-067). Existe aunque el
    * comprobante siga `pendiente` de llegar a SUNAT: el cliente se lleva su

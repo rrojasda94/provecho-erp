@@ -50,11 +50,27 @@ test("una dirección escrita a mano se guarda igual sin mapa", async ({
     formulario.getByRole("heading", { name: "Editar sucursal" }),
   ).toBeVisible();
 
-  // Sin clave no hay buscador de Google ni mapa: el campo de texto es todo
+  // Sin clave no hay lista de sugerencias ni mapa: el campo de texto es todo
   // lo que hay, y tiene que alcanzar.
   const direccion = formulario.getByLabel("Dirección");
   await expect(direccion).toBeVisible();
   await expect(formulario.getByRole("status")).toContainText(/no está disponible/i);
+  // El punto de ADR-072: sin SDK el campo es un `<input>` pelado, no un
+  // combobox — nada de `role`, nada de lista, aunque el desplegable propio
+  // exista en el código.
+  await expect(direccion).not.toHaveAttribute("role", "combobox");
+  await expect(formulario.getByRole("listbox")).toHaveCount(0);
+  // Los cinco ocultos existen y están vacíos: es lo que rompería primero un
+  // refactor del render que hoy nadie verifica.
+  for (const campo of [
+    "ubicacion_place_id",
+    "ubicacion_lat",
+    "ubicacion_lng",
+    "ubicacion_plus_code",
+    "ubicacion_distrito",
+  ]) {
+    await expect(formulario.locator(`input[name="${campo}"]`)).toHaveValue("");
+  }
   await capturar(page, testInfo, "campo-sin-mapa");
 
   await direccion.fill(DIRECCION_NUEVA);

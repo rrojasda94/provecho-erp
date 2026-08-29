@@ -109,7 +109,11 @@ function textoBoton(tipo: TipoPedido): string {
 function Aviso({ texto }: { texto: string }) {
   if (!texto) return null;
   return (
-    <span role="status" className="text-xs text-gray">
+    // `data-testid` y no `getByRole("status")` a secas: el diálogo puede
+    // llevar también un `CampoDireccion`, que tiene el suyo (ADR-072). Dos
+    // regiones `status` en el mismo `<dialog>` son válidas para ARIA, pero
+    // un test que pida "el status" sin más deja de ser único.
+    <span role="status" data-testid="aviso-consulta-documento" className="text-xs text-gray">
       {texto}
     </span>
   );

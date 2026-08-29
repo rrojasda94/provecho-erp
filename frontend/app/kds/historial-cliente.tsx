@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { useCallback, useEffect, useState } from "react";
 
 import { ErrorApi } from "@/lib/cliente-api";
@@ -84,6 +86,14 @@ export default function HistorialCliente({ pantalla, sucursalId, puedeEntregar }
         >
           Volver a la cola
         </a>
+        {/* La salida de la pantalla completa. Sin esto, quien entraba al
+            KDS desde el lanzador de módulos quedaba encerrado: los demás
+            enlaces cruzan entre pantallas de cocina y ninguno vuelve al
+            resto del ERP, así que la única salida era el botón atrás del
+            navegador o teclear la URL. */}
+        <Link className="kds-salir" href="/">
+          Salir
+        </Link>
       </header>
 
       {pedidos.length === 0 ? (
