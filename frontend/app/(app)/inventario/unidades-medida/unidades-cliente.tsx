@@ -11,6 +11,7 @@ import {
   crearUnidadMedidaAction,
   editarUnidadMedidaAction,
 } from "../actions";
+import { Combobox } from "@/components/ui/combobox";
 
 export type CategoriaUdm = { id: string; nombre: string; unidad_base_id: string | null };
 export type UnidadMedida = {
@@ -76,16 +77,13 @@ function DialogoNuevaUnidad({ magnitudes }: { magnitudes: CategoriaUdm[] }) {
             No hay magnitudes cargadas — creá una primero (peso, volumen, unidad).
           </span>
         ) : (
-          <select name="categoria_udm_id" required defaultValue="">
-            <option value="" disabled>
-              Elegir...
-            </option>
-            {magnitudes.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.nombre}
-              </option>
-            ))}
-          </select>
+          <Combobox
+            name="categoria_udm_id"
+            etiqueta="Magnitud"
+            requerido
+            marcador="Elegir..."
+            opciones={magnitudes.map((m) => ({ valor: m.id, etiqueta: m.nombre }))}
+          />
         )}
       </label>
       <CamposUnidad />

@@ -13,6 +13,8 @@ import {
   RUTA_PLANTILLA_RECETAS,
 } from "@/lib/catalogo";
 import { ErrorApi } from "@/lib/cliente-api";
+import { ArticuloPicker } from "@/components/articulo-picker/articulo-picker";
+import { Combobox } from "@/components/ui/combobox";
 
 /**
  * Carga masiva del recetario (RN-COM-031, ADR-052).
@@ -308,18 +310,13 @@ function ResolverInsumo({
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-2">
         <span className="min-w-40 text-sm text-dark">{insumo}</span>
-        <select
-          className="flex-1 rounded border border-borde bg-white px-2 py-1 text-sm"
-          defaultValue=""
-          onChange={(e) => onResolver(insumo, e.target.value)}
-        >
-          <option value="">Omitir esta línea</option>
-          {articulos.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.nombre}
-            </option>
-          ))}
-        </select>
+        <ArticuloPicker
+          className="flex-1"
+          etiqueta={`Artículo para ${insumo}`}
+          marcador="Omitir esta línea"
+          iniciales={articulos.map((a) => ({ valor: a.id, etiqueta: a.nombre }))}
+          alCambiar={(v) => onResolver(insumo, v ?? "")}
+        />
         <button
           type="button"
           className="rounded border border-primary px-2 py-1 text-xs text-primary hover:bg-primary/10"
@@ -342,18 +339,13 @@ function ResolverInsumo({
           </label>
           <label className="flex flex-col gap-1 text-xs text-gray">
             Unidad
-            <select
+            <Combobox
+              etiqueta="Unidad"
+              marcador="Elegir…"
               value={unidadId}
-              onChange={(e) => setUnidadId(e.target.value)}
-              className="rounded border border-borde bg-white px-2 py-1 text-sm"
-            >
-              <option value="">Elegir…</option>
-              {unidades.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.nombre}
-                </option>
-              ))}
-            </select>
+              alCambiar={(v) => setUnidadId(v ?? "")}
+              opciones={unidades.map((u) => ({ valor: u.id, etiqueta: u.nombre }))}
+            />
           </label>
           <label className="flex flex-col gap-1 text-xs text-gray">
             Tipo

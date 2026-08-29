@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 
 import { TablaDatos } from "@/components/tabla/tabla-datos";
+import { Combobox } from "@/components/ui/combobox";
 import { tienePermiso } from "@/lib/permisos";
 
 import { abrirBorradorAction } from "./actions";
@@ -122,17 +123,13 @@ export function SolicitudesCliente({
           <div className="flex items-end gap-2">
             <label className="flex flex-col gap-1 text-xs font-semibold">
               Almacén
-              <select
-                aria-label="Almacén del requerimiento"
+              <Combobox
+                etiqueta="Almacén del requerimiento"
+                requerido
                 value={almacenDelBorrador}
-                onChange={(e) => setAlmacenDelBorrador(e.target.value)}
-              >
-                {almacenes.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.nombre}
-                  </option>
-                ))}
-              </select>
+                alCambiar={(v) => v && setAlmacenDelBorrador(v)}
+                opciones={almacenes.map((a) => ({ valor: a.id, etiqueta: a.nombre }))}
+              />
             </label>
             <button
               type="button"
@@ -206,14 +203,13 @@ function Filtro({
   return (
     <label className="flex flex-col gap-1 text-xs font-semibold">
       {etiqueta}
-      <select value={valor} onChange={(e) => alCambiar(e.target.value)}>
-        <option value="">Todas</option>
-        {opciones.map((o) => (
-          <option key={o.id} value={o.id}>
-            {o.nombre}
-          </option>
-        ))}
-      </select>
+      <Combobox
+        etiqueta={etiqueta}
+        marcador="Todas"
+        value={valor}
+        alCambiar={(v) => alCambiar(v ?? "")}
+        opciones={opciones.map((o) => ({ valor: o.id, etiqueta: o.nombre }))}
+      />
     </label>
   );
 }

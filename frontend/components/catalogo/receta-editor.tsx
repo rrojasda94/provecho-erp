@@ -12,6 +12,8 @@ import {
   type UnidadMedida,
 } from "@/lib/catalogo";
 import { ErrorApi } from "@/lib/cliente-api";
+import { buscarArticulosAction } from "@/components/articulo-picker/actions";
+import { Combobox, ComboboxRemoto } from "@/components/ui/combobox";
 import { firmaDeCondicion } from "@/lib/matriz";
 import { aTitulo } from "@/lib/texto";
 
@@ -310,18 +312,14 @@ function Encabezado({
             }
           }}
         />
-        <select
+        <Combobox
           value={receta.rendimiento_unidad_medida_id}
-          disabled={deshabilitado}
-          aria-label="Unidad del rendimiento"
-          onChange={(e) => onEditar({ rendimiento_unidad_medida_id: e.target.value })}
-        >
-          {unidades.map((u) => (
-            <option key={u.id} value={u.id}>
-              {u.nombre}
-            </option>
-          ))}
-        </select>
+          deshabilitado={deshabilitado}
+          etiqueta="Unidad del rendimiento"
+          requerido
+          alCambiar={(v) => v && onEditar({ rendimiento_unidad_medida_id: v })}
+          opciones={unidades.map((u) => ({ valor: u.id, etiqueta: u.nombre }))}
+        />
         <span>· costo S/ {Number(receta.costo_total).toFixed(2)}</span>
       </div>
     </div>
@@ -450,18 +448,21 @@ function NuevaLinea({
     <div className="flex flex-wrap items-end gap-2 rounded bg-cream/60 p-3">
       <label className="flex flex-col gap-1 text-xs font-semibold">
         Insumo
-        <select
+        <ComboboxRemoto
           value={articuloId}
-          onChange={(e) => setArticuloId(e.target.value)}
+          alCambiar={(v) => setArticuloId(v ?? "")}
           className="min-w-56"
-        >
-          <option value="">Elegir insumo...</option>
-          {disponibles.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.nombre}
-            </option>
-          ))}
-        </select>
+          etiqueta="Insumo"
+          marcador="Elegir insumo..."
+          iniciales={disponibles.map((a) => ({ valor: a.id, etiqueta: a.nombre }))}
+          // La exclusión de líneas ya usadas se aplica al resultado, no antes:
+          // el catálogo no cabe en una página, así que la búsqueda tiene que
+          // bajar a la base y el descarte de duplicados quedarse acá.
+          buscar={async (consulta) => {
+            const halladas = await buscarArticulosAction(consulta, [...TIPOS_DE_INSUMO]);
+            return halladas.filter((o) => !usadas.has(claveLinea(o.valor, condicion)));
+          }}
+        />
       </label>
       <label className="flex flex-col gap-1 text-xs font-semibold">
         Cantidad {udm ? `(${udm.nombre})` : ""}
@@ -723,13 +724,13 @@ function NuevaReceta({
         </label>
         <label className="flex flex-col gap-1 text-xs font-semibold">
           Unidad
-          <select value={udmId} onChange={(e) => setUdmId(e.target.value)}>
-            {unidades.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.nombre}
-              </option>
-            ))}
-          </select>
+          <Combobox
+            etiqueta="Unidad"
+            requerido
+            value={udmId}
+            alCambiar={(v) => v && setUdmId(v)}
+            opciones={unidades.map((u) => ({ valor: u.id, etiqueta: u.nombre }))}
+          />
         </label>
         <button
           type="button"
@@ -752,18 +753,14 @@ function NuevaReceta({
       {recetas.length > 0 && (
         <label className="flex flex-col gap-1 text-xs font-semibold">
           ...o reusar una existente
-          <select
-            defaultValue=""
-            onChange={(e) => e.target.value && onCreada(e.target.value)}
+          <Combobox
+            value=""
+            alCambiar={(v) => v && onCreada(v)}
             className="min-w-56"
-          >
-            <option value="">Elegir receta...</option>
-            {recetas.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.nombre}
-              </option>
-            ))}
-          </select>
+            etiqueta="Reusar una receta existente"
+            marcador="Elegir receta..."
+            opciones={recetas.map((r) => ({ valor: r.id, etiqueta: r.nombre }))}
+          />
         </label>
       )}
       {error && (

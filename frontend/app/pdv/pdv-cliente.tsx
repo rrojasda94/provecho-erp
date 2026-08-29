@@ -51,6 +51,7 @@ import { useCajaPdv } from "./use-caja-pdv";
 import { useImpresionPdv } from "./use-impresion-pdv";
 import { useDatosPdv } from "./use-datos-pdv";
 import { UBICACION_VACIA, type Ubicacion } from "@/components/direccion/ubicacion";
+import { Combobox } from "@/components/ui/combobox";
 
 type Props = {
   sucursalId: string;
@@ -204,20 +205,16 @@ function SelectorSucursal({
 }) {
   if (sucursales.length <= 1) return null;
   return (
-    <select
+    <Combobox
       className="pdv-selector-sucursal"
-      aria-label="Sucursal"
+      etiqueta="Sucursal"
+      requerido
       value={actual}
-      onChange={(e) => {
-        window.location.href = `/pdv?sucursal=${e.target.value}`;
+      alCambiar={(v) => {
+        if (v) window.location.href = `/pdv?sucursal=${v}`;
       }}
-    >
-      {sucursales.map((s) => (
-        <option key={s.id} value={s.id}>
-          {s.nombre}
-        </option>
-      ))}
-    </select>
+      opciones={sucursales.map((s) => ({ valor: s.id, etiqueta: s.nombre }))}
+    />
   );
 }
 

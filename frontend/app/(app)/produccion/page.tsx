@@ -15,11 +15,19 @@ export default async function ProduccionPage({
   const { orden } = await searchParams;
 
   try {
+    // Los catálogos que alimentan un desplegable se piden al tope de página
+    // (`PAGE_SIZE_MAXIMO`, 200) y no con el defecto de 50: el campo filtra sobre
+    // lo que recibió, así que lo que no vino no existe para quien busca — y nada
+    // en pantalla lo dice. Para el catálogo de artículos, que no cabe ni en 200,
+    // el propio campo busca contra el servidor (`?q=`); esto es solo lo que
+    // ofrece antes de teclear.
     const [ordenes, articulos, almacenes] = await Promise.all([
       apiFetch<Pagina<Orden>>("/api/v1/production/ordenes", { token }),
       // El artículo a producir y los insumos a consumir salen del mismo
       // catálogo: una subreceta es artículo como cualquier otro.
-      apiFetch<Pagina<Articulo>>("/api/v1/inventory/articulos", { token }),
+      apiFetch<Pagina<Articulo>>("/api/v1/inventory/articulos?page_size=200", {
+        token,
+      }),
       apiFetch<Almacen[]>("/api/v1/almacenes", { token }),
     ]);
     return (

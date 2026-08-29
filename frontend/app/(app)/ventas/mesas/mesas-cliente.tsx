@@ -15,6 +15,7 @@ import {
   guardarMesaAction,
   moverMesaAction,
 } from "../actions";
+import { Combobox } from "@/components/ui/combobox";
 
 export type Sucursal = { id: string; nombre: string };
 export type Mesa = {
@@ -225,16 +226,13 @@ export function MesasCliente({
       </div>
       <label className="flex max-w-xs flex-col gap-1 text-sm font-semibold">
         Sucursal
-        <select
+        <Combobox
+          etiqueta="Sucursal"
+          requerido
           value={sucursalId}
-          onChange={(e) => router.push(`/ventas/mesas?sucursal=${e.target.value}`)}
-        >
-          {sucursales.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.nombre}
-            </option>
-          ))}
-        </select>
+          alCambiar={(v) => v && router.push(`/ventas/mesas?sucursal=${v}`)}
+          opciones={sucursales.map((s) => ({ valor: s.id, etiqueta: s.nombre }))}
+        />
       </label>
       <p className="text-sm text-gray">
         El número lo asigna el sistema y no se edita: el salón se numera 1..n sin

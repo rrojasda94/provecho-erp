@@ -6,6 +6,7 @@ import { useMemo, useState, useTransition } from "react";
 import { InsigniaActiva } from "@/components/estado/insignia";
 import { BOTON_FILA, DialogoFormulario } from "@/components/formulario/dialogo-formulario";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
+import { Combobox } from "@/components/ui/combobox";
 
 import { crearCuentaAction, editarCuentaAction, importarPcgeAction } from "../actions";
 import type { Cuenta } from "../asientos-cliente";
@@ -43,14 +44,15 @@ function DialogoNuevaCuenta({ cuentas }: { cuentas: Cuenta[] }) {
       </label>
       <label className="flex flex-col gap-1 text-sm font-semibold">
         Cuenta padre
-        <select name="cuenta_padre_id" defaultValue="">
-          <option value="">Sin padre (cuenta de primer nivel)</option>
-          {cuentas.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.codigo} · {c.nombre}
-            </option>
-          ))}
-        </select>
+        <Combobox
+          name="cuenta_padre_id"
+          etiqueta="Cuenta padre"
+          marcador="Sin padre (cuenta de primer nivel)"
+          opciones={cuentas.map((c) => ({
+            valor: c.id,
+            etiqueta: `${c.codigo} · ${c.nombre}`,
+          }))}
+        />
       </label>
     </DialogoFormulario>
   );

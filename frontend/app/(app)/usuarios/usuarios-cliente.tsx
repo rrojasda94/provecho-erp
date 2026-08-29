@@ -24,6 +24,7 @@ import {
   quitarSucursalAction,
   resetearPinAction,
 } from "./actions";
+import { Combobox } from "@/components/ui/combobox";
 
 export type Usuario = {
   id: string;
@@ -187,21 +188,14 @@ function CeldaAsignaciones({
       {disponibles.length > 0 && (
         <form action={formAction} className="flex items-center gap-1">
           <input type="hidden" name="usuario_id" value={usuario.id} />
-          <select
+          <Combobox
             name={campo}
-            defaultValue=""
-            aria-label={`Agregar ${singular} a ${usuario.username}`}
-            className="rounded border border-gray/40 px-1 py-0.5 text-xs"
-          >
-            <option value="" disabled>
-              + {singular}
-            </option>
-            {disponibles.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.nombre}
-              </option>
-            ))}
-          </select>
+            etiqueta={`Agregar ${singular} a ${usuario.username}`}
+            requerido
+            marcador={`+ ${singular}`}
+            className="w-48 text-xs"
+            opciones={disponibles.map((d) => ({ valor: d.id, etiqueta: d.nombre }))}
+          />
           <button type="submit" className="text-xs font-bold text-primary hover:underline">
             Asignar
           </button>
@@ -395,18 +389,14 @@ export function UsuariosCliente({
       </p>
       <label className="flex w-64 flex-col gap-1 text-sm font-semibold">
         Filtrar por rol
-        <select
+        <Combobox
+          etiqueta="Rol"
+          marcador="Todos"
+          className="w-56 font-normal"
           value={busquedaRol}
-          onChange={(e) => setBusquedaRol(e.target.value)}
-          className="rounded border border-gray/40 px-2 py-1 text-sm font-normal"
-        >
-          <option value="">Todos</option>
-          {roles.map((r) => (
-            <option key={r.id} value={r.nombre}>
-              {r.nombre}
-            </option>
-          ))}
-        </select>
+          alCambiar={(v) => setBusquedaRol(v ?? "")}
+          opciones={roles.map((r) => ({ valor: r.nombre, etiqueta: r.nombre }))}
+        />
       </label>
       <TablaDatos columnas={columnas} datos={visibles} placeholderBusqueda="Buscar usuario..." />
     </div>

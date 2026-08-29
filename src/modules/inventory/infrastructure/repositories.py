@@ -71,19 +71,37 @@ class ArticuloRepo:
     def get_by_id_interno(self, id_interno: str) -> Articulo | None:
         return self.s.scalar(select(Articulo).where(Articulo.id_interno == id_interno))
 
-    def q_list(self, empresa_id: uuid.UUID | None = None, tipo: str | None = None):
+    def q_list(
+        self,
+        empresa_id: uuid.UUID | None = None,
+        tipo: str | list[str] | None = None,
+        busqueda: str | None = None,
+    ):
         """La consulta, sin ejecutar: el router la pagina (ADR-026).
 
         `tipo` filtra en la base y no en el cliente porque la lista viene
         paginada: una pantalla que solo quiere empaques y filtra lo que le
         llegó se queda sin ninguno en cuanto el catálogo pasa de una página
         —y no muestra "faltan", muestra un desplegable vacío.
+
+        `busqueda` existe por lo mismo, y es el único catálogo que la necesita:
+        con miles de artículos y un techo de 200 filas por página, un
+        desplegable que filtre lo que ya recibió deja invisible casi todo el
+        catálogo sin decirlo. Se busca por nombre y por `id_interno` porque
+        quien tiene el código a mano lo teclea en vez del nombre.
         """
         q = select(Articulo).where(Articulo.deleted_at.is_(None))
         if empresa_id is not None:
             q = q.where(Articulo.empresa_id == empresa_id)
+        # Acepta uno o varios: "qué se puede producir" son las subrecetas **y**
+        # la mercadería, y resolverlo filtrando en la pantalla lo que llegó de
+        # la primera página dejaba fuera casi todo el catálogo.
         if tipo is not None:
-            q = q.where(Articulo.tipo == tipo)
+            tipos = [tipo] if isinstance(tipo, str) else list(tipo)
+            q = q.where(Articulo.tipo.in_(tipos)) if tipos else q
+        if busqueda:
+            patron = f"%{busqueda}%"
+            q = q.where(Articulo.nombre.ilike(patron) | Articulo.id_interno.ilike(patron))
         return q.order_by(Articulo.nombre)
 
     def list(self, empresa_id: uuid.UUID | None = None) -> list[Articulo]:
