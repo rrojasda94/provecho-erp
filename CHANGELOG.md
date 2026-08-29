@@ -12,6 +12,121 @@ editando este archivo chocaban siempre — escribían en la misma línea.
 
 Ver [`changelog.d/`](changelog.d/).
 
+## [0.9.0] - 2026-08-29
+
+### Added
+
+- **El PDV avisa cuando un producto usa un insumo con poco stock**
+  (RN-INV-013), sin bloquear la venta: `GET /carta` marca `stock_bajo` en
+  cada producto/variante cuya receta tenga algún insumo en o bajo su
+  `stock_minimo`, en el almacén de la sucursal. Reutiliza el umbral que ya
+  existía en `stock.stock_minimo` — no se agregó ninguna columna nueva. El
+  ícono es solo un aviso: el botón de venta nunca se deshabilita.
+
+- **Compra directa** (`POST /purchases/compras-directas`, ADR-082): sustenta
+  un gasto ya incurrido — factura de un proveedor informal, sin orden de
+  compra previa — en una sola llamada. Reutiliza `orden_compra` con
+  `origen="directa"` (la crea, la emite, la recibe al 100% y da conformidad
+  del comprobante de una vez) en vez de un modelo aparte, así que `inventory`
+  (entra stock) y `accounting` (asienta y paga) no necesitaron ningún cambio:
+  reciben el mismo evento `purchases.compra_recibida` de siempre. No pasa por
+  el umbral de aprobación (es gasto ya incurrido) ni por caja chica —ese
+  modelo sigue sin existir, el pago sale por cuentas por pagar normal.
+
+- **Una orden de compra en borrador ahora se puede editar** (`PATCH
+  /purchases/ordenes-compra/{id}`): antes de esto era inmutable desde el
+  instante en que se creaba — corregir un precio o una cantidad tecleada mal
+  exigía anular la OC entera y rehacerla. Reemplaza los ítems y recalcula el
+  total, solo mientras `estado == "borrador"`; desde `emitida` sigue siendo
+  inmutable, sin excepción, como ya era.
+
+- **El IGV se elige, y una operación puntual puede apartarse del régimen de la
+  empresa** (2026-08-29, ADR-081 enmendada). El régimen estaba deducido de
+  `empresa.zona_tributaria` con la misma línea copiada en dos sitios —el
+  asiento contable y el comprobante electrónico—, así que no había dónde
+  elegirlo y no había forma de registrar el caso que ocurre todos los meses:
+  Grupo Majambo vende exonerado por Amazonía y aun así **compra con IGV** a
+  proveedores de fuera de la región. Ese crédito fiscal no aparecía en ningún
+  lado. Ahora el régimen lo decide un solo lugar (`src/shared/tributos.py`) en
+  tres niveles: la casilla de la operación, el default de la empresa —un
+  select nuevo en Organización → Empresas— y, si nadie eligió nada, la zona
+  tributaria, que es lo que se venía haciendo. Ninguna empresa existente
+  cambia de régimen al desplegar.
+- **El IGV se reconoce con el comprobante, no con la operación.** La venta al
+  confirmarse y la compra al recibirse asientan sin IGV; lo asientan el
+  comprobante emitido (débito fiscal) y la conformidad del comprobante de
+  compra (crédito fiscal). Es lo que exige la norma —el crédito solo se toma
+  con el comprobante válido y anotado— y de paso arregla un problema de orden
+  que no tenía otra salida: el asiento salía antes de que existiera el
+  documento donde se marca si la operación va gravada. Para una empresa
+  exonerada los dos asientos quedan en cero y el libro no cambia.
+- **El evento de comprobante emitido mandaba el total de la venta entera, no
+  el de su cuenta.** Con la cuenta dividida (RN-COM-018) cada comprobante
+  viajaba con el total completo, así que contabilidad habría reconocido el IGV
+  una vez por comprobante sobre toda la venta. Ahora manda su propio importe.
+
+- **KPI de incidencias de inventario en el dashboard gerencial**
+  (`incidencias_recientes`, últimos 7 días). El descuento de stock por venta
+  ya omitía en silencio cuando faltaba almacén, SKU activo o stock suficiente
+  —dejando rastro en `incidencia_inventario`—, pero nada avisaba que había
+  algo para revisar salvo entrar al reporte "Consumos omitidos" a mano. El
+  KPI solo avisa que hay incidencias; el detalle de cada una sigue viviendo
+  en ese reporte.
+
+- **El plan de cuentas de fábrica es el PCGE** (2026-08-29, ADR-081). El
+  módulo de contabilidad nacía con el plan vacío, así que cada empresa
+  inventaba sus códigos y terminaba con un plan distinto al del contador
+  externo. El Plan Contable General Empresarial 2019 —obligatorio en el
+  Perú— ahora viene cargado y se siembra con un botón en Contabilidad → Plan
+  de cuentas. Vive en código y no en configuración porque no es una decisión
+  de la empresa: es la misma norma para las tres empresas del grupo.
+- **Los asientos automáticos son los asientos peruanos completos** (ADR-081).
+  `regla_asiento` mapeaba una cuenta de debe y una de haber por evento, y con
+  dos líneas no se puede escribir ningún asiento real: una venta gravada son
+  tres (cobrar, IGV, ingreso) y una compra cinco, contando el asiento de
+  destino que ingresa la mercadería al almacén. El IGV, que es la mitad de la
+  obligación tributaria del mes, no aparecía en ninguna parte. Ahora cada
+  evento tiene su plantilla con códigos del PCGE y `regla_asiento` pasa a ser
+  el override de quien quiera otra cosa. La tasa de IGV sale de la empresa
+  (cero en Amazonía) y se desagrega por diferencia contra el total, para que
+  base + IGV sea exactamente lo que se cobró.
+- **Estados financieros** (ADR-081): balance de comprobación, libro mayor,
+  Estado de Situación Financiera y Estado de Resultados, en Contabilidad →
+  Estados financieros. La pregunta «¿cómo está mi empresa?» antes obligaba a
+  exportar los asientos y sumarlos afuera. Se calculan agregando el mayor en
+  cada consulta, sin tabla de saldos: un saldo materializado es un segundo
+  lugar donde vive la verdad. El Estado de Resultados se presenta **por
+  naturaleza** —el de por función necesita los asientos de destino del
+  elemento 9 contra la 79, que todavía se hacen a mano— y trae su resultado
+  contrastado contra el del libro completo, de modo que un descuadre se ve en
+  la pantalla en vez de haber que buscarlo.
+- **Un asiento ya no se imputa contra un rubro que agrupa a otras cuentas**
+  (ADR-081). Cargar contra «42 Cuentas por pagar comerciales» dejaba el mayor
+  sin decir contra qué divisionaria y el rubro con movimiento propio además
+  del de sus hijas: el balance seguía cuadrando y el detalle desaparecía.
+
+### Fixed
+
+- **El rol `comprador` nunca veía el formulario de nueva orden de compra.**
+  La página pide en paralelo órdenes, proveedores, almacenes y el catálogo de
+  artículos (`/inventory/articulos`) — pero el seeder nunca le dio a
+  `comprador` el permiso `inventory.leer`, así que ese último fetch volvía
+  403 y tumbaba la pantalla entera con un mensaje que además culpaba al
+  permiso equivocado ("no tienes permiso para ver órdenes de compra", cuando
+  el 403 venía de inventory). Se agregó el permiso al rol y la página ya no
+  cae completa si solo falla el catálogo de artículos — se muestra igual, con
+  el aviso correcto y sin el selector de producto poblado.
+
+- **El selector de artículos (inventario, orden de compra, importador de
+  recetas) solo mostraba los primeros 50, ordenados por nombre.** Los tres
+  pedían `/inventory/articulos` sin `page_size`, así que caían en el default
+  de paginación (50) en vez del máximo (200) que ya usan otras pantallas del
+  repo. Con más de 50 artículos activos, cualquiera después del corte
+  alfabético simplemente no llegaba al selector — no era un bug de creación
+  de artículos, el artículo existía y no aparecía en ningún desplegable.
+  Anotado en ROADMAP: si el catálogo supera 200, hace falta un combobox con
+  búsqueda server-side.
+
 ## [0.8.2] - 2026-08-29
 
 ### Added
