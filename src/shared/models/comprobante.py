@@ -14,6 +14,7 @@ dominio, no en el esquema.
 import uuid
 
 from sqlalchemy import (
+    Boolean,
     Enum,
     ForeignKey,
     Index,
@@ -89,6 +90,16 @@ class Comprobante(Base, UuidPkMixin, TimestampMixin):
         )
     )
     idempotency_key: Mapped[str] = mapped_column(String(100), unique=True)
+    # ¿La operación lleva IGV? NULL = lo decide el default de la empresa
+    # (`shared.tributos`). Se marca donde alguien tiene el documento delante:
+    # al cobrar, en el PDV, y al dar conformidad a la factura del proveedor.
+    # Existe porque el régimen de la empresa no alcanza: Grupo Majambo vende
+    # exonerado por Amazonía y aun así compra con IGV a proveedores de fuera
+    # de la región, crédito fiscal que sin esta columna no se registraba.
+    # Vive acá y no en `venta` ni en `orden_compra` porque **el IGV nace con
+    # el comprobante**: el crédito fiscal se toma con el comprobante anotado
+    # y el débito con el comprobante emitido (ADR-080).
+    gravado_igv: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     # --- Nota de crédito (tipo="nc", catálogo 09 de SUNAT) -------------------
     # A qué comprobante corrige. Una NC sin documento afectado no existe:
     # SUNAT la rechaza y contablemente no significa nada.

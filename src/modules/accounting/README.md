@@ -57,18 +57,108 @@ Cobro (PROC-COM-002), aún sin conectar al libro contable (no genera asiento
 todavía). `comprobante` NO vive aquí — es transversal, está en
 `src/shared/models/`.
 
+## Plan contable y estados financieros (ADR-080, 2026-08-29)
+
+**El plan de cuentas de fábrica es el PCGE** — Plan Contable General
+Empresarial, versión modificada 2019, el catálogo obligatorio en el Perú.
+Vive en `domain/pcge.py` y se siembra con
+`POST /accounting/cuentas-contables/pcge` (idempotente por código; el botón
+está en Contabilidad → Plan de cuentas). Que viva en código y no en
+configuración no contradice el criterio del módulo: `regla_asiento` protege
+**decisiones de la empresa**, y el PCGE es norma nacional, la misma para las
+tres empresas del grupo y para el contador externo. Cubre los elementos 1 a 7
+y 9 a nivel de rubro con las divisionarias que usa un restaurante; del 8 solo
+`87` y `88`, y el 0 (cuentas de orden) queda fuera — ver deuda en ROADMAP.
+
+**Un asiento se imputa en la cuenta de último nivel.** Cargar contra
+«42 Cuentas por pagar comerciales» deja el mayor sin decir contra qué
+divisionaria; `crear_asiento_manual` lo rechaza.
+
+**Los asientos automáticos son los asientos peruanos completos.**
+`domain/plantillas.py` describe, por evento, todas las líneas con códigos del
+PCGE — `regla_asiento` (una cuenta debe y una haber) no alcanzaba para
+ninguno de ellos:
+
+| evento | asiento |
+|---|---|
+| `sales.venta_confirmada` | 1212 D total · 7011 H total |
+| `sales.comprobante_emitido` | 7011 D IGV · 40111 H IGV — el débito fiscal |
+| `purchases.compra_recibida` | 6011 D · 4212 H · **201 D · 611 H** (asiento de destino) |
+| `purchases.comprobante_conforme` | 40111 D IGV · 4212 H IGV — el crédito fiscal |
+| `inventory.consumo_personal_valorizado` | 625 D · 201 H (ADR-034) |
+| `inventory.merma_registrada`, `inventory.transferencia_recibida` | 6599 D · 201 H |
+| `accounting.pago_ejecutado` | 4212 D · 1041 H |
+
+Orden de resolución: **la `regla_asiento` de la empresa si existe, y si no,
+la plantilla**. Sin las cuentas del PCGE sembradas el asiento se omite y se
+audita, como siempre — contabilidad no bloquea la operación.
+
+**El IGV nace con el comprobante, no con la operación.** Ni la venta al
+confirmarse ni la compra al recibirse llevan IGV: lo asientan
+`sales.comprobante_emitido` y `purchases.comprobante_conforme`. Es lo que
+exige el marco legal del área —el crédito fiscal se toma con el comprobante
+válido y anotado, el débito nace con el comprobante emitido— y de paso
+resuelve un problema de orden: la casilla «operación gravada» vive en el
+comprobante, que todavía no existe cuando se confirma la venta.
+
+**El régimen lo resuelve `src/shared/tributos.py`**, único lugar del ERP que
+lo decide (antes la misma condición estaba copiada acá y en el comprobante
+electrónico de `sales`). Tres niveles: la casilla de la operación
+(`comprobante.gravado_igv`) → el default de la empresa
+(`empresa.config_fiscal["igv_por_defecto"]`, en Organización → Empresas) → su
+`zona_tributaria`. El último es el comportamiento histórico. Existe porque la
+exoneración de Amazonía depende de zona **y actividad**, y porque una empresa
+exonerada igual compra con IGV a proveedores de fuera de la región.
+
+El **importe** se desagrega según lo que trae el evento (`total` con IGV,
+`base` sin IGV, `neto` sin IGV aplicable) y el IGV se calcula **por
+diferencia contra el total**, para que base + IGV sea exactamente lo
+facturado. Con tasa cero las líneas de IGV valen 0 y el asiento no se
+escribe.
+
+**Los estados financieros son consulta pura** (`application/estados_financieros.py`):
+se agregan de `asiento_linea` en cada pedido, sin tabla de saldos. Ninguno
+filtra por `asiento.estado` — un asiento anulado y su reversión suman cero, y
+excluir el anulado restaría el hecho dos veces.
+
+| reporte | qué contesta |
+|---|---|
+| Balance de comprobación | sumas y saldos por cuenta del rango |
+| Libro mayor | movimientos de una cuenta con saldo corrido |
+| Estado de Situación Financiera | activo vs. pasivo + patrimonio a una fecha (acumulado) |
+| Estado de Resultados | resultado del rango, **por naturaleza** |
+
+El estado **por función** (costo de ventas, gastos de venta, de
+administración) no se presenta: necesita los asientos de destino del PCGE
+—elemento 9 contra la 79— que ningún proceso genera todavía, y saldría sin
+cuadrar contra el mayor. `estado_resultados` devuelve el resultado por líneas
+**y** el resultado leído del libro completo, más un `cuadra`: un descuadre se
+ve en la pantalla en vez de haber que buscarlo.
+
+Límites conocidos, todos en el ROADMAP: una venta cuyo comprobante nunca se
+emite no reconoce IGV; la cuenta por cobrar de la venta
+(1212) queda abierta porque `sales.pago_registrado` no se publica; el costo
+de ventas (69) no se genera solo porque `inventory.stock_consumido` viaja sin
+monto; no hay asiento de cierre anual, así que el resultado del balance es
+acumulado desde el inicio del libro; y el corte corriente/no corriente se
+toma por rubro porque no hay fecha de vencimiento por cuota.
+
 ## Casos de uso
 
-- Mantener plan de cuentas.
+- Mantener plan de cuentas (e importar el PCGE oficial).
 - Generación automática de asientos desde eventos (venta, compra, ajuste de inventario).
 - Asientos manuales con permiso `accounting.asiento_manual`.
 - Cierre de periodo (bloquea modificaciones).
+- Estados financieros: balance de comprobación, libro mayor, Estado de
+  Situación Financiera y Estado de Resultados.
 - Pago a proveedor: registrar (cola) → ejecutar (permiso + umbral) →
   asiento automático, o rechazar.
 
 ## Reglas
 
 - Todo asiento cuadra: suma debe = suma haber. Validación en dominio.
+- Un asiento se imputa en una cuenta de último nivel, nunca en el rubro
+  que la agrupa.
 - Asientos de periodo cerrado son inmutables.
 - Ninguna eliminación física: reversión mediante asiento inverso.
 
@@ -167,6 +257,16 @@ finanzas documentados en el área:
   visada por Gerencia, requisito de cierre de periodo (RN-CTB-006).
 - **Flujo de caja** y **activo fijo/depreciación**: pendientes de slice
   dedicado (PROC-CTB-007/010, propuestos).
+
+## Contrato API — plan contable y estados financieros
+
+| Método | Ruta | Permiso |
+|--------|------|---------|
+| POST | `/accounting/cuentas-contables/pcge` | `accounting.cuenta_administrar` — siembra el PCGE, idempotente |
+| GET | `/accounting/reportes/balance-comprobacion?desde=&hasta=` | `accounting.leer` |
+| GET | `/accounting/reportes/libro-mayor?cuenta_id=&desde=&hasta=` | `accounting.leer` |
+| GET | `/accounting/reportes/estado-situacion-financiera?hasta=` | `accounting.leer` |
+| GET | `/accounting/reportes/estado-resultados?desde=&hasta=` | `accounting.leer` |
 
 ## Contrato API — caja
 

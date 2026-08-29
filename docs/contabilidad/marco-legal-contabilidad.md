@@ -46,6 +46,36 @@ diseñar el ERP y los SOPs.
   está sujeta a detracción y ejecuta el depósito correspondiente; el
   incumplimiento hace perder el crédito fiscal y genera multa.
 
+## Plan contable y estados financieros
+
+- El **Plan Contable General Empresarial (PCGE)**, versión modificada 2019
+  (vigente desde el 01/01/2020), es el catálogo de cuentas obligatorio. No es
+  optativo ni sustituible por un plan propio: es el lenguaje con el que el
+  contador externo lee los libros y con el que se arman las declaraciones.
+- El ERP lo trae de fábrica y lo siembra por empresa (ADR-080). Sus elementos:
+  1 activo disponible y exigible, 2 activo realizable, 3 activo inmovilizado,
+  4 pasivo, 5 patrimonio, 6 gastos por naturaleza, 7 ingresos, 8 saldos
+  intermediarios de gestión, 9 costos y gastos por función (**denominación
+  libre**), 0 cuentas de orden.
+- Los **estados financieros** se presentan bajo NIIF adoptadas en el Perú, en
+  el formato que usa la SMV: Estado de Situación Financiera (activo corriente
+  y no corriente contra pasivo y patrimonio) y Estado de Resultados. El ERP
+  presenta el de resultados **por naturaleza**; el de por función necesita los
+  asientos de destino del elemento 9 contra la 79, que hoy se hacen a mano.
+- El **IGV** se registra en la 40111 (cuenta propia); en las empresas bajo el
+  Régimen de Amazonía la venta sale exonerada y esa línea no existe. El
+  régimen **por defecto** de cada empresa se elige en su ficha
+  (Organización → Empresas), porque la exoneración depende de zona **y**
+  actividad y el enum de zona solo no alcanza para decidirla.
+- Una **operación puntual** puede apartarse de ese default: una compra a un
+  proveedor de fuera de la región llega con IGV en la factura aunque la
+  empresa venda exonerada, y ese crédito fiscal se registra. Se marca donde
+  alguien tiene el documento delante — al cobrar en el PDV y al dar
+  conformidad a la factura del proveedor.
+- El IGV se reconoce **con el comprobante**, no con la operación: el crédito
+  fiscal solo se toma con el comprobante válido y anotado en el registro de
+  compras, y el débito nace con el comprobante emitido (ADR-080).
+
 ## Libros y registros electrónicos
 
 - Según el régimen, la empresa lleva registro de ventas, registro de compras y
