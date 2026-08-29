@@ -343,6 +343,10 @@ class PagoCreate(BaseModel):
     # vacío = boleta (RN-CPP-003). Solo se usa al cerrarse la cuenta.
     receptor_num_doc: str | None = Field(default=None, max_length=11)
     receptor_nombre: str | None = Field(default=None, max_length=255)
+    # Operación que se aparta del régimen de la empresa: una venta con
+    # destino fuera de la zona exonerada sí lleva IGV (RN-IMP-001). `None`
+    # —lo normal— deja decidir al default de la empresa.
+    gravado_igv: bool | None = None
     id: uuid.UUID | None = None
 
 
@@ -948,6 +952,8 @@ class VarianteDeCartaOut(BaseModel):
     nombre: str
     precio_unitario: Decimal
     orden: int
+    # RN-INV-013: avisa, nunca bloquea — el PDV sigue vendiendo igual.
+    stock_bajo: bool = False
     # Los grupos y extras cuelgan del producto que se prepara, y con
     # presentaciones ese es la variante: una Familiar y una Personal no
     # ofrecen los mismos sabores. Elegida la variante, estos mandan sobre
@@ -969,6 +975,8 @@ class CartaItemOut(BaseModel):
     # se cobra sale de la variante elegida, nunca de este campo.
     precio_unitario: Decimal
     variantes: list[VarianteDeCartaOut] = []
+    # RN-INV-013: avisa, nunca bloquea — el PDV sigue vendiendo igual.
+    stock_bajo: bool = False
     # Los del padre. Un producto con variantes normalmente los tiene vacíos
     # (cuelgan de cada variante); se conserva para los productos simples.
     extras: list[ExtraDeCartaOut] = []
@@ -1061,6 +1069,7 @@ class ComprobanteOut(BaseModel):
     grupo_cobro: int
     receptor_num_doc: str | None
     receptor_nombre: str | None
+    gravado_igv: bool | None = None
     estado_emision: str
     hash_proveedor: str | None
     detalle_emision: str | None

@@ -22,21 +22,21 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   último par emitido para un token recién rotado en vez de un 401.
 
 - ⬜ **Los `<select>` fuera de un diálogo no reciben ningún estilo**
-  (2026-08-29). El bloque `.erp dialog :where(input, select, textarea)` de
-  `globals.css` —el que su propio comentario declara temporal— solo alcanza a
-  los campos **dentro de un `<dialog>`** y dentro del layout `.erp`. Los
-  desplegables de las barras de filtro, los de las tablas y todo el PDV y el
-  KDS quedan con el aspecto por defecto del navegador. La app ya es
-  inconsistente hoy; migrar cada `<select>` al `Combobox` —que trae sus
-  propias clases y no depende de esa regla— es lo que va acercando ese bloque
-  a poder borrarse. Se termina de saldar con las fases 2 y 3 del parche 0.8.2.
-- ⬜ **Las pruebas e2e y de uso hablan `selectOption`** (2026-08-29). Varias
-  anclan en `getByLabel(...).selectOption(...)`, que es API de `<select>`
-  nativo. Cada desplegable migrado en las fases 2 y 3 del parche 0.8.2 obliga
-  a reescribir su localizador —a `getByRole("combobox")` más un clic sobre la
-  opción—, así que el costo de esas fases incluye tocar `e2e/` y `uso/`. No es
-  evitable: es el precio de cambiar el control, y conviene saberlo antes de
-  estimar la fase y no a mitad de ella.
+  (2026-08-29, parcialmente saldada). El bloque `.erp dialog :where(input,
+  select, textarea)` de `globals.css` —el que su propio comentario declara
+  temporal— solo alcanza a los campos **dentro de un `<dialog>`** y dentro del
+  layout `.erp`. El parche de desplegables con búsqueda migró los 62 `<select>`
+  alimentados por la API a `Combobox` —que trae sus propias clases y no
+  depende de esa regla—, así que esos ya no dependen del bloque. Quedan los 52
+  enumerados fijos del código (estados, tipos, modalidades) que siguen siendo
+  `<select>` nativos a propósito: los que estén fuera de un diálogo —filtros de
+  tabla, PDV, KDS— siguen con el aspecto por defecto del navegador. El bloque
+  se borra cuando no quede ningún `<select>` fuera de un `<dialog>`.
+- ✅ 2026-08-29 **Las pruebas e2e y de uso hablaban `selectOption`.** Cada
+  desplegable migrado a `Combobox` obligó a reescribir su localizador — de
+  `getByLabel(...).selectOption(...)` a `getByRole("combobox")` más un clic
+  sobre la opción. Se agregó `elegirEnLista()` en `e2e/util.ts` para no repetir
+  esos tres pasos en cada spec.
 
 - ✅ 2026-08-12 **El sistema visual, cerrado (ADR-037).** Lo que se salda y lo
   que queda:

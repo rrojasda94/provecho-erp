@@ -305,6 +305,11 @@ PERMISOS = [
         "Configurar los turnos de trabajo de una sucursal y su hora límite de "
         "marcaje de salida",
     ),
+    (
+        "rrhh.terminal_gestionar",
+        "Autorizar o revocar el dispositivo que puede marcar asistencia en "
+        "una sucursal — nunca lo tiene la cuenta de servicio del pad",
+    ),
     ("rrhh.capacitacion_gestionar", "Administrar pactos de permanencia por capacitación"),
     ("sync.leer", "Descargar catálogo, stock y RBAC de la sucursal hacia su hub"),
     ("sync.empujar", "Reproducir en la nube las ventas y cobros de un hub offline"),
@@ -432,6 +437,8 @@ ROLES = {
         "purchases.dar_conformidad",
         # Alta de proveedor natural liga a una persona existente.
         "personas.leer",
+        # Elegir artículo al armar los ítems de una OC.
+        "inventory.leer",
         # Qué se pide más y desde dónde, para negociar volumen (contrato
         # público de inventory).
         "inventory.leer_solicitudes_externas",
@@ -475,6 +482,9 @@ ROLES = {
         # El horario laboral es de RRHH, no del local: el turno define contra
         # qué hora se mide la tardanza y hasta cuándo hay que marcar salida.
         "rrhh.turno_gestionar",
+        # Igual criterio: autorizar el dispositivo que marca por un local es
+        # alta de infraestructura del ciclo laboral, no del local en sí.
+        "rrhh.terminal_gestionar",
         "rrhh.capacitacion_gestionar",
     ],
     # Marketing atrae demanda y cuida la marca; no se aprueba su propio

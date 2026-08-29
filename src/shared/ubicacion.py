@@ -10,6 +10,7 @@ entidad sin traducir nada en el medio.
 """
 
 from decimal import Decimal
+from math import asin, cos, radians, sin, sqrt
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -89,3 +90,21 @@ def desanclar_si_cambio_el_texto(
     if campos.get("ubicacion_place_id"):
         return {}
     return desanclar(entidad)
+
+
+_RADIO_TIERRA_M = 6_371_000
+
+
+def metros_entre(lat1: Decimal, lng1: Decimal, lat2: Decimal, lng2: Decimal) -> int:
+    """Distancia en línea recta entre dos puntos (Haversine), en metros.
+
+    No es `distancia_km` de `shared/integrations/google/rutas.py`: esa llama
+    a la Routes API por red y mide manejando, para cotizar delivery. Esto es
+    local, sin red, y mide en línea recta — lo que hace falta para saber si
+    un marcaje ocurrió cerca de la sucursal, no cuánto tardaría en llegar.
+    """
+    la1, lo1, la2, lo2 = (radians(float(v)) for v in (lat1, lng1, lat2, lng2))
+    dlat, dlng = la2 - la1, lo2 - lo1
+    a = sin(dlat / 2) ** 2 + cos(la1) * cos(la2) * sin(dlng / 2) ** 2
+    return round(2 * _RADIO_TIERRA_M * asin(sqrt(a)))
+

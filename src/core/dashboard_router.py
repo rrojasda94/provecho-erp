@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 
 from src.core.tenant import Tenant
 from src.modules.accounting.application import caja
+from src.modules.inventory.application.queries_publicas import contar_incidencias_recientes
 from src.modules.inventory.application.stock import contar_bajo_minimo
 from src.modules.sales.application.queries_publicas import resumen_ventas_del_dia
 from src.modules.users.api.deps import get_db, get_tenant, require_permission
@@ -50,6 +51,7 @@ class CajaAbiertaOut(BaseModel):
 class DashboardResumenOut(BaseModel):
     ventas_hoy: VentasHoyOut
     stock_bajo_minimo: int
+    incidencias_recientes: int
     cajas_abiertas: list[CajaAbiertaOut]
 
 
@@ -66,5 +68,6 @@ def resumen(
     return {
         "ventas_hoy": resumen_ventas_del_dia(session, empresa_id),
         "stock_bajo_minimo": contar_bajo_minimo(session, empresa_id),
+        "incidencias_recientes": contar_incidencias_recientes(session, empresa_id),
         "cajas_abiertas": caja.cajas_abiertas(session, empresa_id),
     }

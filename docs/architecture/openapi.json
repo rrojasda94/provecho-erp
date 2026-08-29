@@ -2891,6 +2891,97 @@
         "title": "AvanzarIn",
         "type": "object"
       },
+      "BalanceComprobacionOut": {
+        "properties": {
+          "cuadra": {
+            "title": "Cuadra",
+            "type": "boolean"
+          },
+          "cuentas": {
+            "items": {
+              "$ref": "#/components/schemas/CuentaBalanceOut"
+            },
+            "title": "Cuentas",
+            "type": "array"
+          },
+          "desde": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Desde"
+          },
+          "hasta": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hasta"
+          },
+          "total_debe": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total Debe",
+            "type": "string"
+          },
+          "total_haber": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total Haber",
+            "type": "string"
+          }
+        },
+        "required": [
+          "desde",
+          "hasta",
+          "cuentas",
+          "total_debe",
+          "total_haber",
+          "cuadra"
+        ],
+        "title": "BalanceComprobacionOut",
+        "type": "object"
+      },
+      "BloqueResultadosOut": {
+        "properties": {
+          "clave": {
+            "title": "Clave",
+            "type": "string"
+          },
+          "etiqueta": {
+            "title": "Etiqueta",
+            "type": "string"
+          },
+          "secciones": {
+            "items": {
+              "$ref": "#/components/schemas/SeccionEstadoOut"
+            },
+            "title": "Secciones",
+            "type": "array"
+          },
+          "subtotal": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Subtotal",
+            "type": "string"
+          }
+        },
+        "required": [
+          "clave",
+          "etiqueta",
+          "secciones",
+          "subtotal"
+        ],
+        "title": "BloqueResultadosOut",
+        "type": "object"
+      },
       "Body_validar_importacion_articulos_api_v1_inventory_articulos_importar_validar_post": {
         "properties": {
           "archivo": {
@@ -3528,6 +3619,11 @@
             "format": "uuid",
             "title": "Producto Comercial Id",
             "type": "string"
+          },
+          "stock_bajo": {
+            "default": false,
+            "title": "Stock Bajo",
+            "type": "boolean"
           },
           "variantes": {
             "default": [],
@@ -5159,6 +5255,84 @@
         "title": "CompletarOrdenIn",
         "type": "object"
       },
+      "CompraDirectaComprobante": {
+        "properties": {
+          "correlativo": {
+            "exclusiveMinimum": 0.0,
+            "title": "Correlativo",
+            "type": "integer"
+          },
+          "idempotency_key": {
+            "maxLength": 100,
+            "minLength": 8,
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "serie": {
+            "maxLength": 10,
+            "minLength": 1,
+            "title": "Serie",
+            "type": "string"
+          },
+          "sustento": {
+            "title": "Sustento",
+            "type": "string"
+          },
+          "tipo": {
+            "title": "Tipo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "idempotency_key",
+          "tipo",
+          "serie",
+          "correlativo",
+          "sustento"
+        ],
+        "title": "CompraDirectaComprobante",
+        "type": "object"
+      },
+      "CompraDirectaCreate": {
+        "properties": {
+          "almacen_destino_id": {
+            "format": "uuid",
+            "title": "Almacen Destino Id",
+            "type": "string"
+          },
+          "comprobante": {
+            "$ref": "#/components/schemas/CompraDirectaComprobante"
+          },
+          "idempotency_key": {
+            "maxLength": 100,
+            "minLength": 8,
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/OrdenCompraItemIn"
+            },
+            "minItems": 1,
+            "title": "Items",
+            "type": "array"
+          },
+          "proveedor_id": {
+            "format": "uuid",
+            "title": "Proveedor Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "proveedor_id",
+          "almacen_destino_id",
+          "idempotency_key",
+          "items",
+          "comprobante"
+        ],
+        "title": "CompraDirectaCreate",
+        "type": "object"
+      },
       "ComprobanteEmitidoOut": {
         "description": "Fila del listado de comprobantes emitidos (pestaña de Contabilidad).\n\nLleva `total` —los pagos confirmados de esa cuenta— porque un registro de\nventas sin importes no sirve para cuadrar nada, y `fecha_emision` en hora\ndel negocio: el listado del contador se corta por día de Lima, no por día\nUTC.",
         "properties": {
@@ -5284,6 +5458,17 @@
             "exclusiveMinimum": 0.0,
             "title": "Correlativo",
             "type": "integer"
+          },
+          "gravado_igv": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gravado Igv"
           },
           "idempotency_key": {
             "maxLength": 100,
@@ -6624,6 +6809,53 @@
         "title": "CriterioIn",
         "type": "object"
       },
+      "CuentaBalanceOut": {
+        "properties": {
+          "codigo": {
+            "title": "Codigo",
+            "type": "string"
+          },
+          "debe": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Debe",
+            "type": "string"
+          },
+          "haber": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Haber",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "saldo_acreedor": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Saldo Acreedor",
+            "type": "string"
+          },
+          "saldo_deudor": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Saldo Deudor",
+            "type": "string"
+          },
+          "tipo": {
+            "title": "Tipo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "codigo",
+          "nombre",
+          "tipo",
+          "debe",
+          "haber",
+          "saldo_deudor",
+          "saldo_acreedor"
+        ],
+        "title": "CuentaBalanceOut",
+        "type": "object"
+      },
       "CuentaContableCreate": {
         "properties": {
           "codigo": {
@@ -6869,6 +7101,10 @@
             "title": "Cajas Abiertas",
             "type": "array"
           },
+          "incidencias_recientes": {
+            "title": "Incidencias Recientes",
+            "type": "integer"
+          },
           "stock_bajo_minimo": {
             "title": "Stock Bajo Minimo",
             "type": "integer"
@@ -6880,6 +7116,7 @@
         "required": [
           "ventas_hoy",
           "stock_bajo_minimo",
+          "incidencias_recientes",
           "cajas_abiertas"
         ],
         "title": "DashboardResumenOut",
@@ -9163,6 +9400,146 @@
         "title": "EscalamientoOut",
         "type": "object"
       },
+      "EstadoResultadosOut": {
+        "properties": {
+          "bloques": {
+            "items": {
+              "$ref": "#/components/schemas/BloqueResultadosOut"
+            },
+            "title": "Bloques",
+            "type": "array"
+          },
+          "cuadra": {
+            "title": "Cuadra",
+            "type": "boolean"
+          },
+          "cuentas_sin_clasificar": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Cuentas Sin Clasificar",
+            "type": "array"
+          },
+          "desde": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Desde"
+          },
+          "hasta": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hasta"
+          },
+          "resultado_ejercicio": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Resultado Ejercicio",
+            "type": "string"
+          },
+          "resultado_libro": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Resultado Libro",
+            "type": "string"
+          }
+        },
+        "required": [
+          "desde",
+          "hasta",
+          "bloques",
+          "resultado_ejercicio",
+          "resultado_libro",
+          "cuadra",
+          "cuentas_sin_clasificar"
+        ],
+        "title": "EstadoResultadosOut",
+        "type": "object"
+      },
+      "EstadoSituacionFinancieraOut": {
+        "description": "`cuadra` y `descuadre` viajan siempre, no solo cuando fallan: un\nbalance que no dice si cuadra obliga a sumarlo a mano para saber si se\npuede usar.",
+        "properties": {
+          "cuadra": {
+            "title": "Cuadra",
+            "type": "boolean"
+          },
+          "cuentas_sin_clasificar": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Cuentas Sin Clasificar",
+            "type": "array"
+          },
+          "descuadre": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Descuadre",
+            "type": "string"
+          },
+          "hasta": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hasta"
+          },
+          "secciones": {
+            "items": {
+              "$ref": "#/components/schemas/SeccionEstadoOut"
+            },
+            "title": "Secciones",
+            "type": "array"
+          },
+          "total_activo": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total Activo",
+            "type": "string"
+          },
+          "total_pasivo": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total Pasivo",
+            "type": "string"
+          },
+          "total_pasivo_patrimonio": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total Pasivo Patrimonio",
+            "type": "string"
+          },
+          "total_patrimonio": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total Patrimonio",
+            "type": "string"
+          }
+        },
+        "required": [
+          "hasta",
+          "secciones",
+          "total_activo",
+          "total_pasivo",
+          "total_patrimonio",
+          "total_pasivo_patrimonio",
+          "descuadre",
+          "cuadra",
+          "cuentas_sin_clasificar"
+        ],
+        "title": "EstadoSituacionFinancieraOut",
+        "type": "object"
+      },
       "EvaluacionConSugerenciaOut": {
         "properties": {
           "evaluacion": {
@@ -10390,6 +10767,30 @@
         "title": "ImplementacionOut",
         "type": "object"
       },
+      "ImportacionPcgeOut": {
+        "description": "Resultado de sembrar el PCGE: cuántas cuentas se crearon y cuántas ya\nestaban. Correr la importación dos veces devuelve `creadas=0`.",
+        "properties": {
+          "creadas": {
+            "title": "Creadas",
+            "type": "integer"
+          },
+          "existentes": {
+            "title": "Existentes",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "creadas",
+          "existentes",
+          "total"
+        ],
+        "title": "ImportacionPcgeOut",
+        "type": "object"
+      },
       "ImportadaOut": {
         "properties": {
           "id": {
@@ -10875,6 +11276,60 @@
         "title": "LegajoOut",
         "type": "object"
       },
+      "LibroMayorOut": {
+        "properties": {
+          "cuenta_id": {
+            "format": "uuid",
+            "title": "Cuenta Id",
+            "type": "string"
+          },
+          "desde": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Desde"
+          },
+          "hasta": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hasta"
+          },
+          "movimientos": {
+            "items": {
+              "$ref": "#/components/schemas/MovimientoMayorOut"
+            },
+            "title": "Movimientos",
+            "type": "array"
+          },
+          "saldo_final": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Saldo Final",
+            "type": "string"
+          }
+        },
+        "required": [
+          "cuenta_id",
+          "desde",
+          "hasta",
+          "movimientos",
+          "saldo_final"
+        ],
+        "title": "LibroMayorOut",
+        "type": "object"
+      },
       "LicenciaMarcaIn": {
         "properties": {
           "marca_id": {
@@ -10967,6 +11422,30 @@
           "valores"
         ],
         "title": "LineaDeAtributoOut",
+        "type": "object"
+      },
+      "LineaEstadoOut": {
+        "properties": {
+          "clave": {
+            "title": "Clave",
+            "type": "string"
+          },
+          "etiqueta": {
+            "title": "Etiqueta",
+            "type": "string"
+          },
+          "monto": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Monto",
+            "type": "string"
+          }
+        },
+        "required": [
+          "clave",
+          "etiqueta",
+          "monto"
+        ],
+        "title": "LineaEstadoOut",
         "type": "object"
       },
       "LiquidacionBssCreate": {
@@ -11666,6 +12145,80 @@
           }
         },
         "title": "MarcaUpdate",
+        "type": "object"
+      },
+      "MarcacionOut": {
+        "description": "La evidencia de un toque del pad. Sin la foto —pesa y se pide aparte\n(`GET /rrhh/marcaciones/{id}/foto`)—, solo si existe. A lo sumo dos\nfilas por asistencia (entrada y salida): no hace falta optimizar la\ncarga de `tiene_foto` más allá del `deferred` de la columna.",
+        "properties": {
+          "distancia_m": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distancia M"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "ip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ip"
+          },
+          "momento": {
+            "format": "date-time",
+            "title": "Momento",
+            "type": "string"
+          },
+          "terminal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Terminal Id"
+          },
+          "tiene_foto": {
+            "title": "Tiene Foto",
+            "type": "boolean"
+          },
+          "tipo": {
+            "title": "Tipo",
+            "type": "string"
+          },
+          "usuario_id": {
+            "format": "uuid",
+            "title": "Usuario Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "tipo",
+          "momento",
+          "usuario_id",
+          "terminal_id",
+          "ip",
+          "distancia_m",
+          "tiene_foto"
+        ],
+        "title": "MarcacionOut",
         "type": "object"
       },
       "MatrizCeldaOut": {
@@ -13392,6 +13945,54 @@
         "title": "MovimientoDineroOut",
         "type": "object"
       },
+      "MovimientoMayorOut": {
+        "properties": {
+          "asiento_id": {
+            "format": "uuid",
+            "title": "Asiento Id",
+            "type": "string"
+          },
+          "debe": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Debe",
+            "type": "string"
+          },
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          },
+          "fecha": {
+            "format": "date",
+            "title": "Fecha",
+            "type": "string"
+          },
+          "glosa": {
+            "title": "Glosa",
+            "type": "string"
+          },
+          "haber": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Haber",
+            "type": "string"
+          },
+          "saldo": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Saldo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "fecha",
+          "asiento_id",
+          "glosa",
+          "estado",
+          "debe",
+          "haber",
+          "saldo"
+        ],
+        "title": "MovimientoMayorOut",
+        "type": "object"
+      },
       "MovimientoOut": {
         "properties": {
           "almacen_id": {
@@ -14014,6 +14615,62 @@
         "title": "OrdenCompraItemIn",
         "type": "object"
       },
+      "OrdenCompraItemOut": {
+        "properties": {
+          "articulo_id": {
+            "format": "uuid",
+            "title": "Articulo Id",
+            "type": "string"
+          },
+          "cantidad": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Cantidad",
+            "type": "string"
+          },
+          "cantidad_recibida": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Cantidad Recibida",
+            "type": "string"
+          },
+          "costo_unitario": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Costo Unitario",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "articulo_id",
+          "cantidad",
+          "costo_unitario",
+          "cantidad_recibida"
+        ],
+        "title": "OrdenCompraItemOut",
+        "type": "object"
+      },
+      "OrdenCompraItemsUpdate": {
+        "description": "Reemplaza los ítems de una OC — solo admitido en `estado='borrador'`.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/OrdenCompraItemIn"
+            },
+            "minItems": 1,
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "OrdenCompraItemsUpdate",
+        "type": "object"
+      },
       "OrdenCompraOut": {
         "properties": {
           "almacen_destino_id": {
@@ -14028,6 +14685,18 @@
           "id": {
             "format": "uuid",
             "title": "Id",
+            "type": "string"
+          },
+          "items": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/OrdenCompraItemOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "origen": {
+            "title": "Origen",
             "type": "string"
           },
           "proveedor_id": {
@@ -14049,6 +14718,7 @@
           "id",
           "proveedor_id",
           "tipo",
+          "origen",
           "almacen_destino_id",
           "estado",
           "total"
@@ -14318,6 +14988,52 @@
       },
       "PadMarcarIn": {
         "properties": {
+          "foto": {
+            "anyOf": [
+              {
+                "maxLength": 175000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Foto"
+          },
+          "lat": {
+            "anyOf": [
+              {
+                "maximum": 90.0,
+                "minimum": -90.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lat"
+          },
+          "lng": {
+            "anyOf": [
+              {
+                "maximum": 180.0,
+                "minimum": -180.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lng"
+          },
           "pin": {
             "maxLength": 12,
             "minLength": 4,
@@ -15269,6 +15985,17 @@
       },
       "PagoCreate": {
         "properties": {
+          "gravado_igv": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gravado Igv"
+          },
           "grupo_cobro": {
             "default": 1,
             "minimum": 1.0,
@@ -22932,6 +23659,43 @@
         "title": "SaldoCuentaOut",
         "type": "object"
       },
+      "SeccionEstadoOut": {
+        "properties": {
+          "clave": {
+            "title": "Clave",
+            "type": "string"
+          },
+          "etiqueta": {
+            "title": "Etiqueta",
+            "type": "string"
+          },
+          "lineas": {
+            "items": {
+              "$ref": "#/components/schemas/LineaEstadoOut"
+            },
+            "title": "Lineas",
+            "type": "array"
+          },
+          "naturaleza": {
+            "title": "Naturaleza",
+            "type": "string"
+          },
+          "total": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total",
+            "type": "string"
+          }
+        },
+        "required": [
+          "clave",
+          "etiqueta",
+          "naturaleza",
+          "lineas",
+          "total"
+        ],
+        "title": "SeccionEstadoOut",
+        "type": "object"
+      },
       "SemaforoOut": {
         "description": "Umbrales y colores con los que la pantalla pinta el tiempo de espera.\nSon los **resueltos** —lo que Gerencia aprobó o la semilla del módulo—,\nno el contenido crudo de `parametro_empresa`.",
         "properties": {
@@ -24215,6 +24979,18 @@
             "title": "Nombre",
             "type": "string"
           },
+          "radio_marcaje_m": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Radio Marcaje M"
+          },
           "tenencia": {
             "enum": [
               "propia",
@@ -24353,6 +25129,17 @@
           "nombre": {
             "title": "Nombre",
             "type": "string"
+          },
+          "radio_marcaje_m": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Radio Marcaje M"
           },
           "tenencia": {
             "anyOf": [
@@ -24503,6 +25290,18 @@
               }
             ],
             "title": "Nombre"
+          },
+          "radio_marcaje_m": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Radio Marcaje M"
           },
           "tenencia": {
             "anyOf": [
@@ -24802,6 +25601,117 @@
           "marco_salida"
         ],
         "title": "TarjetaOut",
+        "type": "object"
+      },
+      "TerminalCodigoOut": {
+        "description": "El código de activación, visible una sola vez — igual que el token\nde un agente.",
+        "properties": {
+          "codigo": {
+            "title": "Codigo",
+            "type": "string"
+          },
+          "terminal": {
+            "$ref": "#/components/schemas/TerminalOut"
+          }
+        },
+        "required": [
+          "terminal",
+          "codigo"
+        ],
+        "title": "TerminalCodigoOut",
+        "type": "object"
+      },
+      "TerminalCrear": {
+        "properties": {
+          "nombre": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Nombre",
+            "type": "string"
+          },
+          "sucursal_id": {
+            "format": "uuid",
+            "title": "Sucursal Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sucursal_id",
+          "nombre"
+        ],
+        "title": "TerminalCrear",
+        "type": "object"
+      },
+      "TerminalEnrolarIn": {
+        "properties": {
+          "codigo": {
+            "maxLength": 6,
+            "minLength": 6,
+            "title": "Codigo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "codigo"
+        ],
+        "title": "TerminalEnrolarIn",
+        "type": "object"
+      },
+      "TerminalEnrolarOut": {
+        "description": "El secreto en claro, visible una sola vez: de acá en más solo queda\nsu hash, y perderlo obliga a enrolar de nuevo.",
+        "properties": {
+          "secreto": {
+            "title": "Secreto",
+            "type": "string"
+          }
+        },
+        "required": [
+          "secreto"
+        ],
+        "title": "TerminalEnrolarOut",
+        "type": "object"
+      },
+      "TerminalOut": {
+        "properties": {
+          "activo": {
+            "title": "Activo",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "sucursal_id": {
+            "format": "uuid",
+            "title": "Sucursal Id",
+            "type": "string"
+          },
+          "ultima_marcacion_en": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ultima Marcacion En"
+          }
+        },
+        "required": [
+          "id",
+          "sucursal_id",
+          "nombre",
+          "activo",
+          "ultima_marcacion_en"
+        ],
+        "title": "TerminalOut",
         "type": "object"
       },
       "TicketComprobanteOut": {
@@ -26739,6 +27649,11 @@
             "format": "uuid",
             "title": "Producto Comercial Id",
             "type": "string"
+          },
+          "stock_bajo": {
+            "default": false,
+            "title": "Stock Bajo",
+            "type": "boolean"
           }
         },
         "required": [
@@ -28052,6 +28967,17 @@
             "title": "Estado Emision",
             "type": "string"
           },
+          "gravado_igv": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gravado Igv"
+          },
           "grupo_cobro": {
             "title": "Grupo Cobro",
             "type": "integer"
@@ -28287,7 +29213,7 @@
   "info": {
     "description": "ERP modular para grupo de restaurantes multi-marca. Convenciones de la API: docs/engineering/api-guidelines.md.",
     "title": "Provecho ERP",
-    "version": "0.8.1"
+    "version": "0.9.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -29315,6 +30241,62 @@
         ]
       }
     },
+    "/api/v1/accounting/cuentas-contables/pcge": {
+      "post": {
+        "description": "Siembra el Plan Contable General Empresarial en la empresa.\n\nIdempotente: correrlo dos veces no duplica nada. Es lo que hace que nadie\ntenga que inventar el número de una cuenta que ya existe.",
+        "operationId": "importar_pcge_api_v1_accounting_cuentas_contables_pcge_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "empresa_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Empresa Id"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportacionPcgeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Importar Pcge",
+        "tags": [
+          "accounting"
+        ]
+      }
+    },
     "/api/v1/accounting/cuentas-contables/{cuenta_id}": {
       "patch": {
         "operationId": "editar_cuenta_api_v1_accounting_cuentas_contables__cuenta_id__patch",
@@ -30082,6 +31064,338 @@
           }
         ],
         "summary": "Crear Regla Asiento",
+        "tags": [
+          "accounting"
+        ]
+      }
+    },
+    "/api/v1/accounting/reportes/balance-comprobacion": {
+      "get": {
+        "operationId": "balance_comprobacion_api_v1_accounting_reportes_balance_comprobacion_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "desde",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Desde"
+            }
+          },
+          {
+            "in": "query",
+            "name": "hasta",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Hasta"
+            }
+          },
+          {
+            "in": "query",
+            "name": "empresa_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Empresa Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BalanceComprobacionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Balance Comprobacion",
+        "tags": [
+          "accounting"
+        ]
+      }
+    },
+    "/api/v1/accounting/reportes/estado-resultados": {
+      "get": {
+        "operationId": "estado_resultados_api_v1_accounting_reportes_estado_resultados_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "desde",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Desde"
+            }
+          },
+          {
+            "in": "query",
+            "name": "hasta",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Hasta"
+            }
+          },
+          {
+            "in": "query",
+            "name": "empresa_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Empresa Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EstadoResultadosOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Estado Resultados",
+        "tags": [
+          "accounting"
+        ]
+      }
+    },
+    "/api/v1/accounting/reportes/estado-situacion-financiera": {
+      "get": {
+        "operationId": "estado_situacion_financiera_api_v1_accounting_reportes_estado_situacion_financiera_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "hasta",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Hasta"
+            }
+          },
+          {
+            "in": "query",
+            "name": "empresa_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Empresa Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EstadoSituacionFinancieraOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Estado Situacion Financiera",
+        "tags": [
+          "accounting"
+        ]
+      }
+    },
+    "/api/v1/accounting/reportes/libro-mayor": {
+      "get": {
+        "operationId": "libro_mayor_api_v1_accounting_reportes_libro_mayor_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cuenta_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Cuenta Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "desde",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Desde"
+            }
+          },
+          {
+            "in": "query",
+            "name": "hasta",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Hasta"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LibroMayorOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Libro Mayor",
         "tags": [
           "accounting"
         ]
@@ -40583,6 +41897,52 @@
         ]
       }
     },
+    "/api/v1/purchases/compras-directas": {
+      "post": {
+        "operationId": "registrar_compra_directa_api_v1_purchases_compras_directas_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompraDirectaCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/src__modules__purchases__api__schemas__ComprobanteOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Registrar Compra Directa",
+        "tags": [
+          "purchases"
+        ]
+      }
+    },
     "/api/v1/purchases/ordenes-compra": {
       "get": {
         "operationId": "listar_ordenes_compra_api_v1_purchases_ordenes_compra_get",
@@ -40752,6 +42112,62 @@
           }
         ],
         "summary": "Ver Orden Compra",
+        "tags": [
+          "purchases"
+        ]
+      },
+      "patch": {
+        "operationId": "editar_orden_compra_api_v1_purchases_ordenes_compra__orden_compra_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "orden_compra_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Orden Compra Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrdenCompraItemsUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrdenCompraOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Editar Orden Compra",
         "tags": [
           "purchases"
         ]
@@ -43125,9 +44541,68 @@
         ]
       }
     },
+    "/api/v1/rrhh/asistencia/terminal/enrolar": {
+      "post": {
+        "description": "La tablet teclea el código que un admin generó desde el back-office y\nse queda con un secreto propio: de acá en más, cada marcación lo manda\n(RN-RRHH-023, ADR-079). Rate limit por IP y no por terminal — todavía no\nhay uno enrolado con quien contar el límite.",
+        "operationId": "enrolar_terminal_api_v1_rrhh_asistencia_terminal_enrolar_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "sucursal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sucursal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TerminalEnrolarIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TerminalEnrolarOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Enrolar Terminal",
+        "tags": [
+          "rrhh"
+        ]
+      }
+    },
     "/api/v1/rrhh/asistencia/terminal/marcar": {
       "post": {
-        "description": "Registra la marcación firmada con el PIN del propio trabajador.\n\nEl límite se cuenta **por trabajador** y no por IP: en un local todas\nlas tabletas salen por la misma dirección y el cambio de turno son diez\npersonas marcando seguido — un límite por IP castigaría a la cola por\nculpa de quien se equivocó de tarjeta.",
+        "description": "Registra la marcación firmada con el PIN del propio trabajador, desde\nun terminal autorizado (RN-RRHH-023) y con su evidencia (RN-RRHH-024).\n\nEl límite se cuenta **por trabajador** y no por IP: en un local todas\nlas tabletas salen por la misma dirección y el cambio de turno son diez\npersonas marcando seguido — un límite por IP castigaría a la cola por\nculpa de quien se equivocó de tarjeta.",
         "operationId": "marcar_en_el_pad_api_v1_rrhh_asistencia_terminal_marcar_post",
         "parameters": [
           {
@@ -43138,6 +44613,22 @@
               "format": "uuid",
               "title": "Sucursal Id",
               "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Terminal",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Terminal"
             }
           }
         ],
@@ -43232,6 +44723,59 @@
           }
         ],
         "summary": "Tarjetas Del Pad",
+        "tags": [
+          "rrhh"
+        ]
+      }
+    },
+    "/api/v1/rrhh/asistencia/{asistencia_id}/marcaciones": {
+      "get": {
+        "description": "La evidencia de cada toque del día: quién firmó, desde qué terminal,\ncon qué IP y a qué distancia de la sucursal (RN-RRHH-024).",
+        "operationId": "marcaciones_de_asistencia_api_v1_rrhh_asistencia__asistencia_id__marcaciones_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "asistencia_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Asistencia Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MarcacionOut"
+                  },
+                  "title": "Response Marcaciones De Asistencia Api V1 Rrhh Asistencia  Asistencia Id  Marcaciones Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Marcaciones De Asistencia",
         "tags": [
           "rrhh"
         ]
@@ -44040,6 +45584,52 @@
           }
         ],
         "summary": "Ver Liquidacion Bss",
+        "tags": [
+          "rrhh"
+        ]
+      }
+    },
+    "/api/v1/rrhh/marcaciones/{marcacion_id}/foto": {
+      "get": {
+        "operationId": "foto_de_marcacion_api_v1_rrhh_marcaciones__marcacion_id__foto_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "marcacion_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Marcacion Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Foto De Marcacion",
         "tags": [
           "rrhh"
         ]
@@ -45170,6 +46760,143 @@
           }
         ],
         "summary": "Rechazar Solicitud Permiso",
+        "tags": [
+          "rrhh"
+        ]
+      }
+    },
+    "/api/v1/rrhh/terminales": {
+      "get": {
+        "operationId": "listar_terminales_api_v1_rrhh_terminales_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "sucursal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sucursal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TerminalOut"
+                  },
+                  "title": "Response Listar Terminales Api V1 Rrhh Terminales Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Terminales",
+        "tags": [
+          "rrhh"
+        ]
+      },
+      "post": {
+        "operationId": "crear_terminal_api_v1_rrhh_terminales_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TerminalCrear"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TerminalCodigoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Terminal",
+        "tags": [
+          "rrhh"
+        ]
+      }
+    },
+    "/api/v1/rrhh/terminales/{terminal_id}": {
+      "delete": {
+        "operationId": "revocar_terminal_api_v1_rrhh_terminales__terminal_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "terminal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Terminal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Revocar Terminal",
         "tags": [
           "rrhh"
         ]

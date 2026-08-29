@@ -79,6 +79,7 @@ export async function guardarEmpresaAction(
   if (!/^\d{11}$/.test(ruc)) return { error: "El RUC son 11 dígitos.", ok: false };
 
   const grupoId = texto(formData, "grupo_id");
+  const igvPorDefecto = texto(formData, "igv_por_defecto");
   return guardar(
     "/api/v1/empresas",
     "/organizacion/empresas",
@@ -92,6 +93,11 @@ export async function guardarEmpresaAction(
       domicilio_fiscal: domicilio,
       tipo: String(formData.get("tipo") ?? "operativa"),
       zona_tributaria: String(formData.get("zona_tributaria") ?? "general"),
+      // Vacío = nadie eligió, y manda la zona tributaria. Se manda `{}` y no
+      // `null`: en el PATCH de organización un campo en `null` significa "no
+      // lo envié" y conserva el valor anterior, así que volver a "según la
+      // zona" con `null` no borraba nada. El objeto vacío sí lo borra.
+      config_fiscal: igvPorDefecto ? { igv_por_defecto: igvPorDefecto } : {},
       contacto: texto(formData, "contacto") || undefined,
       ...ubicacionDe(formData),
     },
@@ -131,6 +137,8 @@ export async function guardarSucursalAction(
   }
   if (!marcaId) return { error: "Elegir la marca.", ok: false };
 
+  const radioTexto = texto(formData, "radio_marcaje_m");
+
   const guardada = await guardar(
     "/api/v1/sucursales",
     "/organizacion/sucursales",
@@ -143,6 +151,8 @@ export async function guardarSucursalAction(
       // Cerrar un local es `estado="inactiva"`: no hay baja de sucursal, sigue
       // siendo el ancla de sus ventas, cajas y trabajadores.
       estado: String(formData.get("estado") ?? "activa"),
+      // Vacío = no evalúa distancia en el marcaje (RN-RRHH-024, ADR-079).
+      radio_marcaje_m: radioTexto ? Number(radioTexto) : null,
       ...ubicacionDe(formData),
     },
     "la sucursal",

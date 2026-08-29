@@ -495,6 +495,32 @@ def test_un_destino_inexistente_responde_404(env):
         assert r.status_code == 404, recurso
 
 
+def test_contar_incidencias_recientes(env):
+    import uuid as uuid_mod
+
+    from src.modules.inventory.application.queries_publicas import (
+        contar_incidencias_recientes,
+    )
+    from src.modules.inventory.infrastructure.models import IncidenciaInventario
+
+    client, ids, TestSession = env
+    with TestSession() as s:
+        s.add(
+            IncidenciaInventario(
+                empresa_id=uuid_mod.UUID(ids["empresa_id"]),
+                origen="venta",
+                referencia="venta-1",
+                tipo="sin_sku",
+                detalle="artículo sin SKU activo",
+            )
+        )
+        s.commit()
+
+    with TestSession() as s:
+        n = contar_incidencias_recientes(s, uuid_mod.UUID(ids["empresa_id"]))
+    assert n == 1
+
+
 def test_leer_sin_permiso_403(env):
     client, ids, _ = env
     h = _token(client, "almacenero1", "654321")  # tiene inventory.leer

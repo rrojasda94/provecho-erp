@@ -28,6 +28,7 @@ def dar_conformidad_comprobante(
     serie: str,
     correlativo: int,
     sustento: str,
+    gravado_igv: bool | None = None,
 ) -> Comprobante:
     orden = OrdenCompraRepo(session).get(orden_compra_id)
     if orden is None:
@@ -54,6 +55,7 @@ def dar_conformidad_comprobante(
         correlativo=correlativo,
         sustento=sustento,
         idempotency_key=idempotency_key,
+        gravado_igv=gravado_igv,
     )
     session.add(comprobante)
     session.flush()
@@ -77,6 +79,10 @@ def dar_conformidad_comprobante(
                 else None
             ),
             "monto": str(orden.total),
+            # `accounting` lo necesita para el asiento del crédito fiscal:
+            # la recepción asentó la compra sin IGV porque el comprobante
+            # todavía no existía.
+            "gravado_igv": gravado_igv,
         },
         session=session,
     )

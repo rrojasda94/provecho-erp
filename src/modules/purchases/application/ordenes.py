@@ -35,7 +35,7 @@ from src.modules.users.infrastructure.models import Almacen
 from src.shared import aprobaciones, auditoria
 
 
-def _construir_items(session: Session, items: list[dict]) -> tuple[list[OrdenCompraItem], Decimal]:
+def construir_items(session: Session, items: list[dict]) -> tuple[list[OrdenCompraItem], Decimal]:
     filas = []
     total = Decimal(0)
     for it in items:
@@ -86,7 +86,7 @@ def crear_orden_compra(
     if session.get(Almacen, almacen_destino_id) is None:
         raise NoEncontrado(f"almacén {almacen_destino_id} no encontrado")
 
-    filas, total = _construir_items(session, items)
+    filas, total = construir_items(session, items)
 
     orden = OrdenCompra(
         proveedor_id=proveedor_id,
@@ -105,10 +105,57 @@ def crear_orden_compra(
     return orden
 
 
+def editar_orden_compra(
+    session: Session,
+    orden_compra_id: uuid.UUID,
+    *,
+    items: list[dict],  # [{articulo_id, cantidad, costo_unitario}]
+    actor_id: uuid.UUID,
+) -> OrdenCompra:
+    """Reemplaza los ítems de una OC — solo mientras está en `borrador`
+    (RN: precio/cantidad son editables hasta emitir; desde `emitida` la OC
+    es inmutable, sin excepción)."""
+    orden = OrdenCompraRepo(session).get(orden_compra_id)
+    if orden is None:
+        raise NoEncontrado("orden de compra no encontrada")
+    if orden.estado != "borrador":
+        raise Conflicto(f"la OC está {orden.estado}; solo se edita en borrador")
+    if not items:
+        raise ReglaNegocio("una OC requiere al menos un ítem")
+
+    filas, total = construir_items(session, items)
+
+    proveedor = ProveedorRepo(session).get(orden.proveedor_id)
+    total_antes = orden.total
+    for item_previo in OrdenCompraRepo(session).items(orden.id):
+        session.delete(item_previo)
+    session.flush()
+    for fila in filas:
+        fila.orden_compra_id = orden.id
+        session.add(fila)
+    orden.total = total
+    auditoria.registrar(
+        session,
+        usuario_id=actor_id,
+        entidad="orden_compra",
+        entidad_id=orden.id,
+        accion="editar",
+        datos_antes={"total": str(total_antes)},
+        datos_despues={"total": str(total)},
+        empresa_id=proveedor.empresa_id,
+    )
+    session.flush()
+    return orden
+
+
 def listar_ordenes_compra(
     session: Session, empresa_id: uuid.UUID | None = None
 ) -> list[OrdenCompra]:
     return OrdenCompraRepo(session).list(empresa_id)
+
+
+def items_de_orden_compra(session: Session, orden_compra_id: uuid.UUID) -> list[OrdenCompraItem]:
+    return OrdenCompraRepo(session).items(orden_compra_id)
 
 
 def q_ordenes_compra(session: Session, empresa_id: uuid.UUID | None = None):

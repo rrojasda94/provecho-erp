@@ -30,6 +30,7 @@ export const SUBMENUS: Record<string, ItemSubmenu[]> = {
     { label: "Asientos", href: "/contabilidad" },
     { label: "Periodos", href: "/contabilidad/periodos" },
     { label: "Plan de cuentas", href: "/contabilidad/plan-cuentas" },
+    { label: "Estados financieros", href: "/contabilidad/estados-financieros" },
     { label: "Comprobantes", href: "/contabilidad/comprobantes" },
     { label: "Pagos a proveedor", href: "/contabilidad/pagos" },
     { label: "Caja", href: "/contabilidad/caja" },
@@ -76,6 +77,10 @@ export const SUBMENUS: Record<string, ItemSubmenu[]> = {
     { label: "Contratación", href: "/rrhh/contratacion" },
     { label: "Trabajadores", href: "/rrhh/trabajadores" },
     { label: "Turnos", href: "/rrhh/turnos" },
+    // El dispositivo autorizado a marcar por un local (ADR-073) — separado
+    // de Turnos porque lo que se administra acá es la tablet, no el
+    // horario laboral.
+    { label: "Terminales", href: "/rrhh/terminales" },
     // El pad es pantalla completa fuera del shell, como el PDV: se abre en
     // la tablet del local con la cuenta del terminal, no desde acá. El
     // enlace existe para poder probarlo y dejarlo en favoritos.

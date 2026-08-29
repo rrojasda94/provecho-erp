@@ -34,11 +34,32 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   ```
 
   No se aplicó de una porque un `Caddyfile` inválido deja staging sin proxy —
-  peor que el 502— y no hay Docker local para validarlo. Se cierra corriendo
-  `docker compose exec caddy caddy validate --config /etc/caddy/Caddyfile` en
-  el servidor **antes** del `reload`, con el archivo viejo a mano para volver.
-  El `Caddyfile` del repo, además, tiene los dominios de staging escritos
-  literales, así que este cambio se piensa junto con el compose de producción.
+  peor que el 502—. **Sí se puede validar sin servidor**, al contrario de lo
+  que decía esta entrada (corregido el 2026-08-27, ADR-080):
+
+  ```bash
+  docker run --rm -v "$PWD/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+  ```
+
+  Y `caddy adapt --pretty` para leer la configuración generada, que es lo único
+  que delata las trampas de sintaxis: `redir` sin matcher explícito y el orden
+  de los `handle` producen configuraciones **válidas** que hacen otra cosa
+  (las dos aparecieron escribiendo el bloque de ADR-080). En el servidor, el
+  `validate` va igual **antes** del `reload`, con el archivo viejo a mano para
+  volver. El `Caddyfile` del repo, además, tiene los dominios de staging
+  escritos literales, así que este cambio se piensa junto con el compose de
+  producción.
+- ⬜ **El `Caddyfile` del repo no lo despliega nadie** (2026-08-27, ADR-080):
+  `desplegar.yml` hace `scp` de `scripts/desplegar.sh` y de nada más, así que
+  el `Caddyfile` y `docker-compose.staging.yml` siguen siendo copias a mano
+  desde el 2026-08-23. Editarlos en el repo **no toca el droplet**, y nada
+  avisa — es el mismo patrón que ADR-060 cerró para el script, con la única
+  diferencia de que este todavía no rompió nada. Se cierra agregando los dos
+  archivos al `scp` y un `caddy validate` + `reload` a `scripts/desplegar.sh`.
+  Se hace junto con el `dynamic a` de arriba: los dos necesitan la misma
+  maquinaria de validar-antes-de-recargar, y automatizar la copia sin ella
+  convierte un typo en staging sin proxy. Ojo con lo que se pisa: lo que está
+  en el servidor pudo haberse tocado a mano y nadie lo sabría.
 - ⬜ **Job de despliegue** (ver *Cuando haya servidor*, punto 7): hoy el despliegue es manual y documentado. Se
   escribe cuando exista el VPS — automatizar por SSH contra una máquina que
   no existe da automatización no probada (ADR-008).

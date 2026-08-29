@@ -130,3 +130,29 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 - ⬜ **Los trabajadores que ya existían quedaron sin sucursal**: la migración
   `b6d29f10c47e` es aditiva y nullable, sin backfill — no hay dato del que
   deducir el local. Hay que asignárselos a mano desde RRHH → Trabajadores.
+- ✅ 2026-08-28 (ADR-079) **Terminal enrolado y evidencia de marcaje**: el pad
+  ya no marca solo con el PIN — exige un `terminal_marcaje` activo de la
+  sucursal (RN-RRHH-023) y guarda foto/ubicación/IP de cada toque como
+  observación, nunca como condición (RN-RRHH-024). Ver ROADMAP → Módulo
+  `rrhh` para el detalle completo.
+  - ⬜ **Ningún local tiene un terminal enrolado todavía**: es la migración
+    operativa del cambio — hasta que un admin no autorice uno desde
+    Organización/RRHH → Terminales, el pad de esa sucursal no marca (403
+    en todo intento). No hay backfill posible: no hay tablet física de la
+    que derivar el terminal.
+  - ⬜ **`FORWARDED_ALLOW_IPS` en producción no incluye al contenedor `web`**:
+    el proxy de Next ya reenvía `X-Forwarded-For`, pero la API solo confía
+    en el salto si `FORWARDED_ALLOW_IPS` lo declara. Sin ese cambio de
+    despliegue, `marcacion.ip` sigue siendo la IP de `web`, no la del local
+    — un cambio de configuración, no de código, así que queda fuera de
+    este slice.
+  - ⬜ **El marcaje sigue sin ser offline**: ADR-009 deja RRHH fuera del
+    alcance del hub de sucursal a propósito; un corte de internet bloquea
+    el pad igual que antes de este cambio. Llevar `asistencia`/
+    `terminal_marcaje`/`marcacion` al hub es un cambio propio si algún día
+    pesa.
+  - ⬜ **`radio_marcaje_m` no tiene valor sugerido**: cada sucursal lo deja
+    en NULL (no evalúa distancia) hasta que alguien lo configure a mano
+    desde Organización → Sucursales. No hay un valor por defecto razonable
+    para todos los locales — depende de qué tan preciso es el GPS de cada
+    tablet en ese punto exacto.

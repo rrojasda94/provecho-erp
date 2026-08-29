@@ -14,3 +14,56 @@ staging.majambo.com.pe {
 api-staging.majambo.com.pe {
 	reverse_proxy api:8000
 }
+
+# La landing pública del QR tiene dominio propio (ADR-080). Mismo droplet y el
+# MISMO contenedor `web` que staging.majambo.com.pe — hay un solo proceso de
+# Next—. Lo único que cambia es que por acá el proxy deja pasar la landing y
+# nada más: el back office no se apaga, se vuelve inalcanzable por este nombre.
+#
+# NO es un control de seguridad: `/login` sigue igual de público en
+# staging.majambo.com.pe, y lo que lo protege es el login, no el nombre del
+# host. Esto es una URL limpia para imprimir en una mesa.
+clientes.majambo.com.pe {
+	# Corre sobre staging, con datos desechables y un formulario que pide DNI.
+	# Que no lo indexe nadie.
+	header X-Robots-Tag "noindex, nofollow"
+
+	# Lo que la landing pide de verdad. El matcher compara la RUTA: la query
+	# `?_rsc=…` de los prefetch de Next no cuenta, y el POST de la Server
+	# Action va a la URL de la propia página (`/reconocerte`), así que entra.
+	#
+	# `/_next/static/*` no es opcional: sin él la página se PINTA igual —viene
+	# del servidor— y nunca hidrata, porque `nosniff` rechaza el HTML que el
+	# redirect devuelve donde se esperaba JavaScript. Se ve perfecta y no
+	# funciona nada, que es el peor síntoma posible.
+	@landing path /reconocerte /reconocerte/* /_next/static/* /_next/image* /marcas/* /favicon.ico
+	handle @landing {
+		reverse_proxy web:3000
+	}
+
+	# Todo lo demás —`/`, `/login`, `/gerencia`, `/pdv`— vuelve a la landing.
+	#
+	# `redir` y no `respond 404`: la raíz tiene que llevar a la landing igual,
+	# porque es lo que alguien teclea al ver el QR, y un 404 de Caddy es una
+	# pantalla en blanco en inglés. `not-found.tsx` tampoco sirve: está escrito
+	# para un empleado que tiene módulos a los que volver.
+	#
+	# Tampoco `rewrite`: serviría la landing bajo `/login`, con la URL
+	# mintiendo y el formulario posteando su Server Action a una ruta ajena.
+	#
+	# 302 y no 301: un 301 se cachea en el navegador para siempre, y el día que
+	# este dominio tenga que servir otra cosa habría que pelear con la caché de
+	# cada teléfono que lo abrió.
+	#
+	# El orden de los dos `handle` importa: al revés, `/reconocerte` se
+	# redirige a sí mismo (ERR_TOO_MANY_REDIRECTS).
+	#
+	# El `*` no es decorativo. `redir` acepta un matcher delante, y como
+	# `/reconocerte` empieza con `/`, sin el `*` Caddy lo lee como matcher y
+	# toma `302` de destino: `Location: 302` y la redirección aplicando solo a
+	# la ruta que justamente NO hay que redirigir. `caddy adapt --pretty` lo
+	# muestra; el navegador, no.
+	handle {
+		redir * /reconocerte 302
+	}
+}

@@ -948,6 +948,7 @@ def registrar_pago(
     grupo_cobro: int = rules.GRUPO_COBRO_UNICO,
     receptor_num_doc: str | None = None,
     receptor_nombre: str | None = None,
+    gravado_igv: bool | None = None,
     id: uuid.UUID | None = None,
     exigir_caja_abierta: bool = True,
 ) -> tuple[Pago, Venta, Comprobante | None]:
@@ -970,6 +971,10 @@ def registrar_pago(
 
     `id` explícito: mismo motivo que en `crear_venta` — un cobro hecho
     offline conserva su identificador al reproducirse en la nube (ADR-009).
+
+    `gravado_igv` es la casilla del PDV para la operación que se aparta del
+    régimen de la empresa —una venta a destino fuera de la zona exonerada—.
+    `None`, que es lo normal, deja decidir al default de la empresa.
     """
     repo = PagoRepo(session)
     existente = repo.get_by_idempotency(idempotency_key)
@@ -1037,6 +1042,7 @@ def registrar_pago(
         grupos=grupos,
         receptor_num_doc=receptor_num_doc,
         receptor_nombre=receptor_nombre,
+        gravado_igv=gravado_igv,
     )
     return pago, venta, comprobante
 
@@ -1049,6 +1055,7 @@ def _cerrar_cuenta(
     grupos: list[int],
     receptor_num_doc: str | None,
     receptor_nombre: str | None,
+    gravado_igv: bool | None = None,
 ) -> Comprobante:
     """La cuenta quedó cubierta: emite SU comprobante aunque otras cuentas
     de la misma venta sigan pendientes, y recién marca la venta como pagada
@@ -1059,6 +1066,7 @@ def _cerrar_cuenta(
         grupo_cobro=grupo_cobro,
         receptor_num_doc=receptor_num_doc,
         receptor_nombre=receptor_nombre,
+        gravado_igv=gravado_igv,
     )
     repo = PagoRepo(session)
     saldos = [

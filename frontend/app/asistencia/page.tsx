@@ -6,15 +6,24 @@
  * (`terminal_asistencia`), que solo puede listar estos nombres y presentar
  * una marcación firmada. Quien marca es el trabajador, con su PIN
  * (ADR-065, RN-RRHH-020).
+ *
+ * Eso solo prueba QUIÉN abre el pad, no DÓNDE está la tablet: el token de
+ * esa cuenta es exportable, y sin más candado funcionaría igual desde el
+ * celular de cualquiera. `provecho_terminal` es ese candado (ADR-079): sin
+ * la cookie del terminal enrolado, la pantalla ni siquiera pide tarjetas —
+ * pide el código de activación.
  */
 
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { ApiError, apiFetch } from "@/lib/api";
 import type { Tarjeta } from "@/lib/asistencia";
+import { COOKIE_TERMINAL } from "@/lib/auth";
 import { tienePermiso } from "@/lib/permisos";
 import { obtenerSesion } from "@/lib/sesion";
 
+import ActivarCliente from "./activar-cliente";
 import TarjetasCliente from "./tarjetas-cliente";
 import "./asistencia.css";
 
@@ -47,6 +56,11 @@ export default async function PaginaAsistencia() {
         detalle="La cuenta del terminal no tiene sucursal asignada, así que no hay a quién mostrar."
       />
     );
+  }
+
+  const terminalActivo = (await cookies()).get(COOKIE_TERMINAL)?.value;
+  if (!terminalActivo) {
+    return <ActivarCliente sucursalId={sucursalId} />;
   }
 
   let tarjetas: Tarjeta[];

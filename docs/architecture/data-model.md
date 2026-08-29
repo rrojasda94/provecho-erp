@@ -81,8 +81,10 @@ erDiagram
   dirección, estado, tenencia (`propia` | `alquilada` | `del_grupo` —
   `propia` paga predial/arbitrios, RN-IMP-004), horario_atencion
   (disponibilidad al público — el horario laboral de cada trabajador vive
-  en `asistencia`/`contrato_laboral`, no aquí). Se
-  abastece del almacén central de su empresa (excepción: gas/bebidas
+  en `asistencia`/`contrato_laboral`, no aquí), radio_marcaje_m (nullable,
+  2026-08-28, ADR-079 — metros para **observar**, nunca bloquear, la
+  distancia de un marcaje de asistencia; NULL = esa sucursal no lo evalúa).
+  Se abastece del almacén central de su empresa (excepción: gas/bebidas
   embotelladas directo de proveedor, gestión fuera de la sucursal).
 - **almacen**: empresa_id, sucursal_id (NULL si central o de activos), tipo
   (`central` | `produccion` | `sucursal` | `activos` | ... — enum
@@ -1272,7 +1274,13 @@ Implementado (2026-07-25) — libro contable núcleo, además del ciclo de caja
 
 - **cuenta_contable**: empresa_id, codigo (único por empresa), nombre, tipo
   (`activo`\|`pasivo`\|`patrimonio`\|`ingreso`\|`gasto`), cuenta_padre_id
-  (árbol simple), activa.
+  (árbol simple), activa. Desde el 2026-08-29 (ADR-081) el catálogo de
+  fábrica es el **PCGE** (Plan Contable General Empresarial 2019), sembrado
+  con `POST /accounting/cuentas-contables/pcge`. No hizo falta ninguna
+  columna nueva: el elemento y el nivel de una cuenta se derivan de su
+  código, y quién cuelga de quién ya estaba en `cuenta_padre_id`. **Un
+  asiento solo se imputa en una cuenta sin hijas** — cargar contra el rubro
+  que agrupa deja el mayor sin detalle.
 - **periodo_contable**: empresa_id, anio, mes (único por empresa), estado
   (`abierto`\|`cerrado`), cerrado_por, fecha_cierre. Ningún asiento se
   registra fuera de un periodo abierto (RN-CTB-001... RN-CTB-002).
@@ -1289,7 +1297,20 @@ Implementado (2026-07-25) — libro contable núcleo, además del ciclo de caja
   sin regla vigente, el evento no genera asiento (se omite y loguea, nunca
   bloquea el proceso operativo de origen). Mismo criterio que
   `parametro_empresa` (RN-GER-003/008): la empresa configura su plan de cuentas,
-  el código no lo hardcodea.
+  el código no lo hardcodea. Desde ADR-081 dejó de ser la única fuente: sin
+  regla, el evento cae en la **plantilla del PCGE**
+  (`domain/plantillas.py`), que sí puede expresar el asiento peruano completo
+  —N líneas, con IGV desagregado y asiento de destino—, cosa que un par
+  debe/haber no puede. La regla sigue ganando cuando existe.
+
+**El IGV vive en el comprobante** (2026-08-29, ADR-081). `comprobante.gravado_igv` (nullable, migración `dfb195b14433`) dice si **esa** operación lleva IGV; `NULL` deja decidir al default de la empresa (`empresa.config_fiscal["igv_por_defecto"]`, y si tampoco está, `zona_tributaria`). Lo resuelve `src/shared/tributos.py`, único lugar del ERP que decide el régimen — antes la misma condición estaba copiada en el asiento contable y en el comprobante electrónico. Está en `comprobante` y no en `venta` ni en `orden_compra` porque el IGV nace con el documento: el crédito fiscal se toma con el comprobante anotado y el débito con el emitido, así que los asientos de venta confirmada y de compra recibida van **sin** IGV y lo reconoce el asiento del comprobante.
+
+**Sin tabla de saldos.** El balance de comprobación, el libro mayor, el
+Estado de Situación Financiera y el Estado de Resultados se agregan de
+`asiento_linea` en cada consulta (ADR-081 §5): un saldo materializado sería
+un segundo lugar donde vive la verdad. El mapa rubro→línea del estado vive en
+`domain/estados_financieros.py`, no en base de datos, porque es el formato de
+presentación peruano y no una decisión de la empresa.
 - **movimiento_dinero** (implementado 2026-07-25, tesorería/PROC-CTB-003):
   empresa_id, tipo (`egreso`\|`ingreso`), concepto (hoy solo
   `pago_proveedor`), comprobante_id (FK `comprobante`, único cuando no NULL
@@ -1418,6 +1439,24 @@ un trabajador puede o no tener usuario, y no todo usuario es trabajador
   (ADR-064), distinto del turno de caja y del horario de atención. Único por
   `(sucursal_id, nombre)`. `hora_fin`/`hora_limite_salida` menores que
   `hora_inicio` significan que el turno cruza la medianoche.
+- **terminal_marcaje** (2026-08-28, ADR-079): sucursal_id, nombre, codigo
+  (activación, 6 dígitos, se borra al enrolar), codigo_expira_en (30 min),
+  secreto_hash (SHA-256 — no Argon2id: el secreto es aleatorio de 128 bits,
+  no una contraseña humana), activo, ultima_marcacion_en. El dispositivo
+  autorizado a marcar por una sucursal (RN-RRHH-023): sin uno activo de esa
+  sucursal, el pad no marca aunque el PIN sea correcto. Único por
+  `(sucursal_id, nombre)` entre los vivos y por `secreto_hash` entre los no
+  nulos (mismo patrón parcial que `kds_pantalla`).
+- **marcacion** (2026-08-28, ADR-079, RN-RRHH-024): asistencia_id, tipo
+  (`entrada`|`salida`), momento, usuario_id (quién firmó), terminal_id
+  (nullable — NULL = corrección de back-office), ip, ubicacion_lat/lng,
+  distancia_m (calculada, haversine, contra `sucursal.ubicacion_lat/lng`),
+  foto (binario, `deferred`). Una fila por cada toque del pad, evidencia
+  aparte de la fila-resumen `asistencia`. Ninguno de los campos de evidencia
+  bloquea el marcaje; la "anomalía" no se guarda, se deriva comparando
+  `distancia_m` contra `sucursal.radio_marcaje_m` al momento de leer. La foto
+  se purga (no la fila) a los `rrhh_marcaje_foto_retencion_dias` (90 por
+  defecto).
 
 Los documentos de RRHH que son cartas/actas usan plantillas versionadas
 (ver `docs/templates/rrhh/`), rellenadas con datos del ERP + campos
