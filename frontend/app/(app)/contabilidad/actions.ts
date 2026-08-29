@@ -214,3 +214,18 @@ export async function rechazarPagoAction(movimientoId: string): Promise<EstadoAs
   revalidatePath("/contabilidad/pagos");
   return { error: "", ok: true };
 }
+
+/** Siembra el Plan Contable General Empresarial en la empresa del usuario.
+ * Idempotente: el botón se puede apretar dos veces sin duplicar nada. */
+export async function importarPcgeAction(): Promise<EstadoAsiento> {
+  try {
+    await apiFetch("/api/v1/accounting/cuentas-contables/pcge", {
+      token: await token(),
+      metodo: "POST",
+    });
+  } catch (e) {
+    return { error: mensajeDe(e, "No se pudo importar el plan contable."), ok: false };
+  }
+  revalidatePath("/contabilidad/plan-cuentas");
+  return { error: "", ok: true };
+}

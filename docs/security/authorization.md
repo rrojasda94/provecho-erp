@@ -133,7 +133,7 @@ El hub de sucursal todavía usa username + PIN (`cloud_sync_*`); migrarlo
 obliga a rotar el secreto en cada local y está anotado en ROADMAP → Deuda
 técnica.
 
-### BI autoservicio: acceso fuera de la API (ADR-081)
+### BI autoservicio: acceso fuera de la API (ADR-082)
 
 Apache Superset (Fase C, pendiente) es el único componente del sistema que
 consulta Postgres **sin pasar por la API de Provecho**, así que las

@@ -137,6 +137,11 @@ class ConformidadComprobanteCreate(BaseModel):
     serie: str = Field(min_length=1, max_length=10)
     correlativo: int = Field(gt=0)
     sustento: str
+    # ¿La factura del proveedor trae IGV? Lo marca quien la tiene delante:
+    # una empresa de Amazonía vende exonerada y aun así compra con IGV a un
+    # proveedor de fuera de la región, y ese crédito fiscal se registra
+    # recién acá. `None` = manda el default de la empresa.
+    gravado_igv: bool | None = None
 
 
 class ComprobanteOut(BaseModel):

@@ -1,4 +1,4 @@
-- **Exportación del tablero de reportes** (ADR-081, Fase E). Cierra la
+- **Exportación del tablero de reportes** (ADR-082, Fase E). Cierra la
   deuda abierta "la exportación baja lo que se ve, no el dataset completo".
 - **Imprimir el tablero**: botón nuevo junto a Guardar, `window.print()` +
   la variante `print:` de Tailwind — cero dependencias. Esconde toda la

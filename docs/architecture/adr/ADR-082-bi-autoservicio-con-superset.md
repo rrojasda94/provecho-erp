@@ -1,4 +1,4 @@
-# ADR-081 — BI autoservicio con Superset sobre vistas de solo lectura
+# ADR-082 — BI autoservicio con Superset sobre vistas de solo lectura
 
 - **Estado:** aceptada, en implementación por fases
 - **Fecha:** 2026-08-29

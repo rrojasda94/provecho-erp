@@ -60,7 +60,13 @@ sea correcta y el crédito gratuito esté disponible.
 2. *Editar clave* → **Restricciones de aplicación** → **Sitios web (referentes
    HTTP)**, y agregar:
    - `http://localhost:3000/*`
-   - `https://<dominio-de-produccion>/*`
+   - `https://staging.majambo.com.pe/*`
+   - `https://clientes.majambo.com.pe/*` — la landing del QR (ADR-080)
+
+   El puerto cuenta. Levantar el front en otro (`npm run dev` cuando 3000 está
+   ocupado, que es lo normal con varios worktrees) da
+   `Requests from referer http://localhost:PUERTO are blocked` — la clave está
+   bien y el entorno no.
 3. **Restricciones de API** → *Restringir clave* → marcar **solo** Maps
    JavaScript API, Places API (New) y Geocoding API.
 4. Guardar. Los cambios tardan hasta 5 minutos en propagarse: una clave recién
@@ -77,6 +83,20 @@ la restricción por dominio y la cuota diaria del paso 5, no el secreto.
 3. **Restricciones de API** → *Restringir clave* → **solo Routes API**.
 
 Esta clave nunca se pasa al contenedor `web` (ver *Variables de entorno*).
+
+## 4 bis. Map ID (`GOOGLE_MAPS_MAP_ID`)
+
+El pin del mapa es un `AdvancedMarkerElement`, y Google **solo lo dibuja sobre
+un mapa que tenga Map ID**. `DEMO_MAP_ID` es el que Google publica para
+desarrollo: funciona, pero no da garantías de estilo ni de cuota y no
+corresponde en un dominio que ve un cliente.
+
+☰ → **Google Maps Platform** → **Gestión de mapas** → *Crear ID de mapa*, tipo
+**JavaScript** (no «Static»). Se pega en `GOOGLE_MAPS_MAP_ID`.
+
+**Un Map ID malo no rompe el mapa: rompe el pin.** Los tiles se dibujan igual y
+solo el marcador falta, con un aviso en consola. Así que «veo el mapa» no
+prueba nada; lo que prueba es «elegí una dirección y apareció el pin».
 
 ## 5. Techo de gasto
 
@@ -116,6 +136,19 @@ encontradas el 2026-08-25 y las dos corregidas:
   ninguna** `GOOGLE_MAPS_*` al servicio `web`: el `.env` del servidor podía
   tenerla y el proceso de Next no la veía. Solo el compose de desarrollo la
   declaraba.
+- **Puesta y llegando, pero con el contenedor viejo.** `docker compose restart
+  web` **reusa el entorno con el que arrancó**; solo `up -d` vuelve a leer el
+  `.env`. Editar la variable y reiniciar se ve exactamente igual que no haber
+  editado nada.
+
+Y una tercera, que no era de configuración sino un bug nuestro y estuvo desde
+el principio (encontrada el 2026-08-27, ADR-072): `cargarMaps` resolvía en
+cuanto existía `window.google.maps`, que aparece **antes** de que el bootstrap
+de `loading=async` defina `importLibrary`. El campo moría con
+«maps.importLibrary is not a function» dentro de un `.catch()` mudo, o sea
+**con el mismo síntoma que no tener clave**. Por eso el `catch` ahora escribe
+en la consola: ante un campo de dirección sin buscador, la consola dice cuál de
+los cuatro casos es.
 
 Por eso la comprobación que vale es la de `/gerencia/delivery` (ADR-068) y no
 mirar el `.env`: la pantalla dice lo que el **proceso** tiene, no lo que el
@@ -177,6 +210,14 @@ están», esa pantalla es el primer lugar donde mirar, antes que el `.env`.
    verde. Es la comprobación que no exige abrir la consola de Google ni el
    `.env` del servidor, y la única que puede hacer alguien que no es de
    sistemas.
+
+   **En `clientes.majambo.com.pe` esa pantalla no existe**: es justo una de las
+   rutas que el proxy redirige a la landing (ADR-080). Se mira en
+   `staging.majambo.com.pe/gerencia/delivery`, que es **el mismo proceso `web`
+   con el mismo entorno** — lo que diga ahí vale igual para el dominio público.
+   Desde el servidor, el equivalente es
+   `docker compose exec web env | grep GOOGLE_MAPS`, que también reporta el
+   proceso y no el archivo.
 8. Con la tarifa aprobada, tomar un delivery en el PDV con dirección anclada:
    los kilómetros tienen que salir **sin** «aprox.» (prueba de que Routes
    contestó) y el ticket tiene que mostrar la fila *Reparto*.

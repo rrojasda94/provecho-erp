@@ -79,6 +79,7 @@ export async function guardarEmpresaAction(
   if (!/^\d{11}$/.test(ruc)) return { error: "El RUC son 11 dígitos.", ok: false };
 
   const grupoId = texto(formData, "grupo_id");
+  const igvPorDefecto = texto(formData, "igv_por_defecto");
   return guardar(
     "/api/v1/empresas",
     "/organizacion/empresas",
@@ -92,6 +93,11 @@ export async function guardarEmpresaAction(
       domicilio_fiscal: domicilio,
       tipo: String(formData.get("tipo") ?? "operativa"),
       zona_tributaria: String(formData.get("zona_tributaria") ?? "general"),
+      // Vacío = nadie eligió, y manda la zona tributaria. Se manda `{}` y no
+      // `null`: en el PATCH de organización un campo en `null` significa "no
+      // lo envié" y conserva el valor anterior, así que volver a "según la
+      // zona" con `null` no borraba nada. El objeto vacío sí lo borra.
+      config_fiscal: igvPorDefecto ? { igv_por_defecto: igvPorDefecto } : {},
       contacto: texto(formData, "contacto") || undefined,
       ...ubicacionDe(formData),
     },

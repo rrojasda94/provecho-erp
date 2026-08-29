@@ -250,7 +250,7 @@ class Settings(BaseSettings):
     # Fallos de heartbeat seguidos antes de declarar al hub "offline" — uno
     # solo sería demasiado sensible a un timeout de red puntual.
     sync_fallos_para_offline: int = 3
-    # --- OAuth2 para el BI (Superset, ADR-081) -------------------------------
+    # --- OAuth2 para el BI (Superset, ADR-082) -------------------------------
     # Un solo cliente confidencial. Vacíos por defecto: sin `client_secret`
     # nadie puede canjear un código por token, así que un despliegue que
     # olvide configurarlos deja el SSO apagado en vez de abierto.
@@ -268,7 +268,7 @@ class Settings(BaseSettings):
     oauth_bi_token_ttl_segundos: int = 300
     # Cuenta de servicio de Superset (rol propio, sin `bi.acceder` ni
     # equivalente humano) que Provecho usa para pedir *guest tokens* y
-    # embeber tableros en `/dashboard` (ADR-081 Fase D). Vacía = sin
+    # embeber tableros en `/dashboard` (ADR-082 Fase D). Vacía = sin
     # embebido — el módulo BI sigue funcionando por SSO directo.
     superset_internal_url: str = ""
     superset_service_username: str = ""

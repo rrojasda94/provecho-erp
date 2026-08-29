@@ -1,7 +1,7 @@
-# BI autoservicio (Apache Superset, ADR-081 Fase C). Corre en su PROPIO
+# BI autoservicio (Apache Superset, ADR-082 Fase C). Corre en su PROPIO
 # droplet, chico (~$8/mes, 1 vCPU/1 GB) y separado del de staging — el
 # volumen real es de decenas de consultas al mes, y aislar el BI evita que
-# una consulta pesada le quite recursos al cobro (ver ADR-081 "Dónde corre").
+# una consulta pesada le quite recursos al cobro (ver ADR-082 "Dónde corre").
 #
 # No trae Postgres propio: Superset guarda su metadata en un ESQUEMA APARTE
 # de la Postgres del droplet de staging (`scripts/superset_provision_db.sql`
@@ -11,7 +11,7 @@
 # Tampoco trae worker/beat/Redis: sin Celery no hay *Alerts & Reports* (PDF
 # programado por correo), que necesita Chromium headless — no entra cómodo
 # en 1 GB. Las consultas corren sincrónicas, aceptable porque nadie mira el
-# reloj (ver ADR-081).
+# reloj (ver ADR-082).
 #
 # `provecho-bi-superset` se CONSTRUYE (`deploy/bi/Dockerfile`), no se tira
 # de `apache/superset:6.1.0` directo: ese tag "lean" (el que corresponde a

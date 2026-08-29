@@ -36,6 +36,14 @@ dentro de seis meses.
   fallo real en algo indiagnosticable desde la pantalla.
 ```
 
+## Pendiente de corte
+
+Los fragmentos de **PCGE, estados financieros e IGV configurable** (ADR-081)
+salen en **0.9.0**, no en la 0.8.2: son módulo nuevo —plan contable oficial,
+Estado de Situación Financiera y de Resultados, régimen de IGV elegible— y no
+un parche. La 0.8.2 se corta antes con sus propios cambios; esto va después,
+en su propio corte.
+
 ## Cortar la versión
 
 ```bash

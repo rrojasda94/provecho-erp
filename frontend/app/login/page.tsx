@@ -39,7 +39,7 @@ export default function LoginPage() {
     const datos = new FormData();
     datos.set("username", usuario.current?.value ?? "");
     datos.set("pin", candidato);
-    // `?next=` lo agrega `/oauth/authorize` (ADR-081 Fase B) cuando el SSO
+    // `?next=` lo agrega `/oauth/authorize` (ADR-082 Fase B) cuando el SSO
     // del BI encuentra a alguien sin sesión de Provecho todavía. Leído del
     // `location` y no de un hook de router: esta página es enteramente
     // cliente y no hay otro dato de servidor que justifique el round-trip

@@ -1765,6 +1765,7 @@ export function DialogoCobro({
     doc: string,
     nombre: string,
     propina: number,
+    gravadoIgv: boolean | null,
   ) => void;
 }) {
   const [medio, setMedio] = useState<string>("");
@@ -1773,6 +1774,11 @@ export function DialogoCobro({
   const [doc, setDoc] = useState("");
   const [nombre, setNombre] = useState("");
   const [propina, setPropina] = useState("");
+  // "" = el régimen de la empresa. Se aparta solo la operación que se sale
+  // de él: una venta con destino fuera de la zona exonerada sí lleva IGV.
+  // Tres estados y no una casilla porque el override va en las dos
+  // direcciones y el cajero no tiene por qué saber cuál es el default.
+  const [regimenIgv, setRegimenIgv] = useState("");
 
   useEffect(() => {
     if (!abierto) return;
@@ -1780,6 +1786,7 @@ export function DialogoCobro({
     setDoc("");
     setNombre("");
     setPropina("");
+    setRegimenIgv("");
     setMedio(medios[0]?.id ?? "");
     setMonto(total.toFixed(2));
   }, [abierto, total, medios]);
@@ -1927,6 +1934,22 @@ export function DialogoCobro({
             }}
           />
           <p className="pdv-nota">{tipoDoc}</p>
+
+          <p className="pdv-etiqueta">Régimen de IGV</p>
+          <select
+            className="pdv-campo"
+            aria-label="Régimen de IGV de esta operación"
+            value={regimenIgv}
+            onChange={(e) => setRegimenIgv(e.target.value)}
+          >
+            <option value="">El de la empresa</option>
+            <option value="gravado">Gravado (fuera de la zona exonerada)</option>
+            <option value="exonerado">Exonerado</option>
+          </select>
+          <p className="pdv-nota">
+            Cámbialo solo si esta venta se aparta del régimen de la empresa. Decide el
+            comprobante que se emite y el asiento contable.
+          </p>
         </div>
       </div>
 
@@ -1942,6 +1965,7 @@ export function DialogoCobro({
               doc,
               nombre.trim(),
               Math.max(0, Number(propina) || 0),
+              regimenIgv === "" ? null : regimenIgv === "gravado",
             )
           }
         >

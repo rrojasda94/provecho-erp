@@ -379,7 +379,7 @@ def contar_bajo_minimo(session: Session, empresa_id: uuid.UUID) -> int:
     Agregado en SQL (`rules.stock_bajo` es `stock_minimo is not None and
     cantidad <= stock_minimo`): antes traía toda la tabla `stock` de la
     empresa a Python para contarla ahí, en el engine corto del dashboard.
-    Con el catálogo de reportes y el BI (ADR-081) sumando carga a la misma
+    Con el catálogo de reportes y el BI (ADR-082) sumando carga a la misma
     tabla, ese full-scan en cada apertura del dashboard dejó de ser gratis."""
     return session.scalar(
         select(func.count())

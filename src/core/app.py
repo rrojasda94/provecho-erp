@@ -146,7 +146,7 @@ TAGS_METADATA = [
     {
         "name": "oauth",
         "description": (
-            "SSO del BI (Superset, ADR-081): Provecho como proveedor OAuth2. "
+            "SSO del BI (Superset, ADR-082): Provecho como proveedor OAuth2. "
             "`/codigo` exige sesión + `bi.acceder`; `/token` y `/userinfo` son "
             "servidor-a-servidor con `client_secret`."
         ),
@@ -154,7 +154,7 @@ TAGS_METADATA = [
     {
         "name": "bi",
         "description": (
-            "Embebido de tableros de Superset en /dashboard (ADR-081 Fase D): "
+            "Embebido de tableros de Superset en /dashboard (ADR-082 Fase D): "
             "Provecho pide un guest token con su propia cuenta de servicio."
         ),
     },

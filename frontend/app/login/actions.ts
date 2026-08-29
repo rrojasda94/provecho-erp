@@ -52,7 +52,7 @@ const MINUTOS_DE_BLOQUEO = 15;
 const LARGO_PIN = 6;
 
 /**
- * Único destino post-login que no es el home (ADR-081 Fase B): la mitad del
+ * Único destino post-login que no es el home (ADR-082 Fase B): la mitad del
  * SSO del BI que quedó cortada por no tener sesión de Provecho todavía. Se
  * valida por regex exacta —no basta con no ser absoluta— porque `next` sale
  * de la URL y un valor cualquiera ahí sería la puerta a un open redirect: el

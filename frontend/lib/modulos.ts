@@ -220,7 +220,7 @@ export const MODULOS: Modulo[] = [
   {
     clave: "bi",
     nombre: "BI",
-    // Permiso exacto y no por prefijo (ADR-081): entrar acá ya es un
+    // Permiso exacto y no por prefijo (ADR-082): entrar acá ya es un
     // privilegio —análisis libre sobre datos de varios módulos a la vez—,
     // no "trabaja en el área bi". `bi.acceder` es también el único permiso
     // con ese prefijo, así que hoy da lo mismo; se deja explícito porque es

@@ -137,7 +137,7 @@ services:
       GOOGLE_MAPS_BROWSER_KEY: ${GOOGLE_MAPS_BROWSER_KEY:-}
       GOOGLE_MAPS_MAP_ID: ${GOOGLE_MAPS_MAP_ID:-DEMO_MAP_ID}
       GOOGLE_MAPS_PAIS: ${GOOGLE_MAPS_PAIS:-pe}
-      # URL pública del BI (Superset, ADR-081) — droplet aparte, ver
+      # URL pública del BI (Superset, ADR-082) — droplet aparte, ver
       # docs/engineering/bi-superset.md.
       BI_URL: ${BI_URL:-}
     depends_on:

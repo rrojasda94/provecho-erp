@@ -42,7 +42,7 @@ MOTIVO_AJUSTE = Enum(
 class MovimientoInventario(Base, UuidPkMixin):
     __tablename__ = "movimiento_inventario"
     __table_args__ = (
-        # `vw_bi_inventario_movimientos` (ADR-081) agrupa por almacén y
+        # `vw_bi_inventario_movimientos` (ADR-082) agrupa por almacén y
         # rango de fecha; sin índice, un año de movimientos es table scan.
         Index("ix_movimiento_inventario_ts_almacen", "ts", "almacen_id"),
     )

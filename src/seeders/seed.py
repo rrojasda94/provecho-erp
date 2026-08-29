@@ -211,7 +211,7 @@ PERMISOS = [
     ("dashboard.leer", "Consultar el dashboard gerencial (ventas, stock, caja)"),
     (
         "bi.acceder",
-        "Entrar al análisis avanzado (Superset, ADR-081) — decide si hay login "
+        "Entrar al análisis avanzado (Superset, ADR-082) — decide si hay login "
         "posible, no qué filas se ven (eso lo resuelve la RLS del BI)",
     ),
     (

@@ -1,4 +1,4 @@
-"""Guest tokens de Superset para embeber tableros en `/dashboard` (ADR-081
+"""Guest tokens de Superset para embeber tableros en `/dashboard` (ADR-082
 Fase D).
 
 No confundir con `src/core/oauth/` (Fase B): aquello es el SSO humano

@@ -15,7 +15,7 @@ from src.core.model_base import TimestampMixin, UuidPkMixin
 class Asiento(Base, UuidPkMixin, TimestampMixin):
     __tablename__ = "asiento"
     __table_args__ = (
-        # `vw_bi_contabilidad` (ADR-081) agrupa por empresa y rango de fecha.
+        # `vw_bi_contabilidad` (ADR-082) agrupa por empresa y rango de fecha.
         Index("ix_asiento_fecha_empresa", "fecha", "empresa_id"),
     )
 

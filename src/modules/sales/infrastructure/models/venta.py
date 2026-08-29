@@ -38,7 +38,7 @@ class Venta(Base, UuidPkMixin, TimestampMixin, UbicacionMixin):
     __tablename__ = "venta"
     __table_args__ = (
         UniqueConstraint("sucursal_id", "fecha_orden", "numero_orden"),
-        # El catálogo de reportes (ADR-024) y el BI (ADR-081) agrupan por
+        # El catálogo de reportes (ADR-024) y el BI (ADR-082) agrupan por
         # rango de `fecha_orden` filtrando "ingreso real" (`estado`); sin este
         # índice, un año completo hace table scan.
         Index("ix_venta_fecha_orden_estado", "fecha_orden", "estado"),

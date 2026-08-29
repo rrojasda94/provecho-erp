@@ -10,7 +10,16 @@ from sqlalchemy.orm import Session
 from src.config.settings import settings
 from src.core.tenant import Tenant
 from src.modules.accounting.api import schemas
-from src.modules.accounting.application import asientos, caja, cuentas, pagos, periodos, reglas
+from src.modules.accounting.application import (
+    asientos,
+    caja,
+    cuentas,
+    estados_financieros,
+    pagos,
+    periodos,
+    reglas,
+)
+from src.modules.accounting.application import pcge as pcge_uc
 from src.modules.accounting.application import pos as pos_uc
 from src.modules.accounting.application.scope import (
     exigir_apertura_caja,
@@ -661,3 +670,92 @@ def registrar_arqueo(
     arqueo = caja.registrar_arqueo(session, realizado_por=actor.id, **body.model_dump())
     session.commit()
     return arqueo
+
+
+# --- Plan Contable General Empresarial ----------------------------------------
+@router.post(
+    "/cuentas-contables/pcge", response_model=schemas.ImportacionPcgeOut, status_code=201
+)
+def importar_pcge(
+    empresa_id: uuid.UUID | None = None,
+    _: Usuario = Depends(require_permission(CUENTA_ADMINISTRAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Siembra el Plan Contable General Empresarial en la empresa.
+
+    Idempotente: correrlo dos veces no duplica nada. Es lo que hace que nadie
+    tenga que inventar el número de una cuenta que ya existe.
+    """
+    resumen = pcge_uc.importar_pcge(session, empresa_id=tenant.empresa(empresa_id))
+    session.commit()
+    return resumen
+
+
+# --- Estados financieros ------------------------------------------------------
+@router.get(
+    "/reportes/balance-comprobacion", response_model=schemas.BalanceComprobacionOut
+)
+def balance_comprobacion(
+    desde: date | None = None,
+    hasta: date | None = None,
+    empresa_id: uuid.UUID | None = None,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    return estados_financieros.balance_comprobacion(
+        session, empresa_id=tenant.empresa(empresa_id), desde=desde, hasta=hasta
+    )
+
+
+@router.get("/reportes/libro-mayor", response_model=schemas.LibroMayorOut)
+def libro_mayor(
+    cuenta_id: uuid.UUID,
+    desde: date | None = None,
+    hasta: date | None = None,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    # La empresa sale de la cuenta, no del tenant: `exigir_cuenta` ya validó
+    # que esa cuenta está dentro del alcance, y un superusuario sin empresa
+    # asignada no tiene ninguna que ofrecer.
+    cuenta = exigir_cuenta(session, cuenta_id, tenant)
+    return estados_financieros.libro_mayor(
+        session,
+        empresa_id=cuenta.empresa_id,
+        cuenta_id=cuenta_id,
+        desde=desde,
+        hasta=hasta,
+    )
+
+
+@router.get(
+    "/reportes/estado-situacion-financiera",
+    response_model=schemas.EstadoSituacionFinancieraOut,
+)
+def estado_situacion_financiera(
+    hasta: date | None = None,
+    empresa_id: uuid.UUID | None = None,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    return estados_financieros.estado_situacion_financiera(
+        session, empresa_id=tenant.empresa(empresa_id), hasta=hasta
+    )
+
+
+@router.get("/reportes/estado-resultados", response_model=schemas.EstadoResultadosOut)
+def estado_resultados(
+    desde: date | None = None,
+    hasta: date | None = None,
+    empresa_id: uuid.UUID | None = None,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    return estados_financieros.estado_resultados(
+        session, empresa_id=tenant.empresa(empresa_id), desde=desde, hasta=hasta
+    )

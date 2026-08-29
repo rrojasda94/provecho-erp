@@ -12,6 +12,68 @@ editando este archivo chocaban siempre — escribían en la misma línea.
 
 Ver [`changelog.d/`](changelog.d/).
 
+## [0.8.2] - 2026-08-29
+
+### Added
+
+- **La landing pública del QR tiene dominio propio**
+  (`clientes.majambo.com.pe`, ADR-080). El QR de la mesa apuntaba a
+  `staging.majambo.com.pe/reconocerte`: un nombre que anuncia que es un
+  entorno de prueba y cuya raíz es el ERP entero. El recorte va en el
+  `Caddyfile` y no en el código —el `matcher` de `middleware.ts` excluye los
+  prefetch, así que un guard ahí lo saltearía cualquiera mandando
+  `Next-Router-Prefetch: 1` a mano—: por ese dominio solo pasan
+  `/reconocerte*`, `/_next/static/*`, `/_next/image*`, `/marcas/*` y el
+  favicon; todo lo demás redirige 302 a la landing, y va con
+  `X-Robots-Tag: noindex`. Dos costos aceptados y escritos: los chunks de
+  `/_next/static` son los mismos para las dos caras, así que por ahí se ven
+  las rutas del back office (estructura, no datos); y **no es un control de
+  seguridad** — `/login` sigue igual de público en el otro dominio y lo que lo
+  protege es el login. Lo que se registre ahí cae en la base desechable de
+  staging: es una prueba, no el padrón de clientes.
+
+- **El pad de asistencia solo marca desde un terminal autorizado** (ADR-079,
+  RN-RRHH-023). La sesión de la cuenta de servicio del pad era exportable a
+  cualquier navegador: con el mismo token, `/asistencia` marcaba igual desde
+  el celular de un supervisor que nunca llegó al local. Ahora cada sucursal
+  enrola su tablet una vez (código de 6 dígitos, 30 minutos de vigencia,
+  `POST /rrhh/terminales` — nueva pantalla Organización/RRHH → Terminales) y
+  el pad manda un secreto propio en cada marcación; sin terminal activo de
+  esa sucursal, 403 aunque el PIN sea correcto.
+- **Cada marcación queda con su evidencia** (RN-RRHH-024): terminal, IP,
+  ubicación y foto, ninguno obligatorio ni bloqueante — sin permiso de
+  cámara o de GPS se marca igual con esos campos en `NULL`. La distancia a
+  la sucursal se observa contra `sucursal.radio_marcaje_m` (nuevo,
+  configurable por local); nunca se bloquea por ella, porque el GPS de una
+  tablet fija bajo techo se equivoca por decenas de metros. La foto se
+  purga a los 90 días (`rrhh_marcaje_foto_retencion_dias`); el resto de la
+  evidencia queda.
+- **Fix de infraestructura de paso**: el proxy de Next
+  (`app/api/proxy/[...ruta]/route.ts`) no reenviaba `X-Forwarded-For` a la
+  API — cada marcación (y cada request del PDV) quedaba auditada con la IP
+  del contenedor `web`, nunca la del cliente real. Requiere que
+  `FORWARDED_ALLOW_IPS` en producción confíe también en ese salto (cambio de
+  despliegue, ver Deuda técnica → Módulo rrhh).
+
+### Fixed
+
+- **El buscador de direcciones no volvía tras una recarga en caliente.** El
+  arreglo de la carga del SDK que salió en 0.8.1 (ADR-072) colgaba el sondeo
+  del evento `load` del `<script>`, y un `<script>` que **ya** terminó de
+  cargar no vuelve a emitirlo: reusar el existente —lo que pasa en cada
+  recarga en caliente, porque la promesa memoizada es del módulo y se reinicia
+  con él— dejaba la promesa esperando para siempre. Ahora el sondeo arranca de
+  una y `load` no participa; el `error` del `<script>` sí sigue cortando.
+- **El fallo era invisible**: el `.catch()` de `CampoDireccion` no decía nada,
+  así que «sin clave», «clave restringida a otro dominio» y «el SDK cargó y el
+  buscador reventó» se veían los tres como un cuadro de texto pelado. Ahora
+  escribe el motivo en la consola. Es la lección de ADR-068 §3 en su forma más
+  cara: una degradación pensada para no romperle la venta al cajero terminó
+  escondiendo un bug propio durante meses.
+- **La landing armaba los cinco campos `ubicacion_*` a mano** en vez de usar
+  `ubicacionDe()`, y mandaba la latitud y la longitud como texto — exactamente
+  la sexta copia que el docstring de ese helper anticipaba.
+
 ## [0.8.1] - 2026-08-29
 
 ### Added

@@ -1,6 +1,6 @@
 """vistas bi y rol de solo lectura
 
-Capa semantica para el BI autoservicio (ADR-081, Fase A). Superset no toca
+Capa semantica para el BI autoservicio (ADR-082, Fase A). Superset no toca
 tablas base: solo ve estas vistas `vw_bi_*` y `bi_alcance_usuario`, a traves
 de un rol de Postgres (`bi_lector`) que no tiene GRANT sobre ninguna otra
 tabla. ADR-024 sigue vigente para `src/core/reportes/` — esto no abre un
@@ -34,7 +34,7 @@ impostergables (sin ellos, una consulta de un anio completo escanea la tabla
 entera): `venta(fecha_orden, estado)` y `movimiento_inventario(ts, almacen_id)`.
 
 Revision ID: 832ff01ed33f
-Revises: a1c9e5f2b364
+Revises: dfb195b14433
 Create Date: 2026-08-29
 
 """
@@ -45,7 +45,7 @@ from collections.abc import Sequence
 from alembic import op
 
 revision: str = "832ff01ed33f"
-down_revision: str | None = "a1c9e5f2b364"
+down_revision: str | None = "dfb195b14433"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

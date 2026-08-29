@@ -1,4 +1,4 @@
-"""OAuth2 (Authorization Code) del SSO del BI — `src/core/oauth/` (ADR-081
+"""OAuth2 (Authorization Code) del SSO del BI — `src/core/oauth/` (ADR-082
 Fase B).
 
 `/oauth/codigo` es el único de los tres endpoints con sesión de Provecho de

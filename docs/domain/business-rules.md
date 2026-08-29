@@ -1889,7 +1889,7 @@ es a dónde va y quién puede abrirlo.
   rastro en `audit_log` (ADR-031), por lo mismo que RN-REP-007: decidir que
   algo sube de nivel —o que se da por resuelto— es un acto de autoridad.
 
-## BI autoservicio (ADR-081)
+## BI autoservicio (ADR-082)
 
 Reglas del BI (Superset) sobre las vistas `vw_bi_*`. No reemplazan las de
 `src/core/reportes/` (ADR-024, sin sección propia en este archivo): rigen la

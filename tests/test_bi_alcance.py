@@ -1,4 +1,4 @@
-"""Equivalencia entre `bi_alcance_usuario` (vista, ADR-081) y `Tenant`
+"""Equivalencia entre `bi_alcance_usuario` (vista, ADR-082) y `Tenant`
 (`src/core/tenant.py`, ADR-004).
 
 Es la única defensa contra que los dos puntos de aplicación del tenant

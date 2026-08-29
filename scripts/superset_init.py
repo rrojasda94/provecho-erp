@@ -1,4 +1,4 @@
-"""Aprovisiona Superset por su API REST (ADR-081 Fase C): la conexión
+"""Aprovisiona Superset por su API REST (ADR-082 Fase C): la conexión
 analítica de solo lectura, un dataset por vista `vw_bi_*` y las dos reglas
 de RLS. Idempotente — repetirlo no duplica nada.
 
@@ -32,10 +32,10 @@ import sys
 
 import httpx
 
-# Grano de cada vista de ADR-081 (docs/architecture/data-model.md §17).
+# Grano de cada vista de ADR-082 (docs/architecture/data-model.md §17).
 # `contabilidad` no tiene `sucursal_id`: la RLS de ese grupo solo filtra por
 # empresa. El resto sí, y su columna puede venir NULL (un almacén sin
-# sucursal, ADR-081 Fase A) — la cláusula lo deja pasar y confía en el
+# sucursal, ADR-082 Fase A) — la cláusula lo deja pasar y confía en el
 # filtro de empresa para esas filas.
 VISTAS_CON_SUCURSAL = (
     "vw_bi_ventas",
@@ -116,7 +116,7 @@ class Superset:
                 "database_name": NOMBRE_CONEXION,
                 "sqlalchemy_uri": uri,
                 # Explícito: nadie debe poder abrir SQL Lab contra esta
-                # conexión aunque su rol lo permitiera (ADR-081).
+                # conexión aunque su rol lo permitiera (ADR-082).
                 "allow_run_async": False,
                 "expose_in_sqllab": False,
             },

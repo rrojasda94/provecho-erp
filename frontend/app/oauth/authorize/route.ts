@@ -5,7 +5,7 @@ import { ApiError, apiFetch } from "@/lib/api";
 import { COOKIE_TOKEN } from "@/lib/auth";
 
 /**
- * `/oauth/authorize` — el único paso del SSO del BI (ADR-081 Fase B) que ve
+ * `/oauth/authorize` — el único paso del SSO del BI (ADR-082 Fase B) que ve
  * el navegador de verdad.
  *
  * Vive en el frontend y no en la API a propósito: la sesión de Provecho es

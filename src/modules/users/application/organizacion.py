@@ -44,7 +44,7 @@ from src.modules.users.infrastructure.repositories import (
     MarcaRepo,
     SucursalRepo,
 )
-from src.shared import auditoria
+from src.shared import auditoria, tributos
 from src.shared.ubicacion import CAMPOS as CAMPOS_UBICACION
 from src.shared.ubicacion import desanclar_si_cambio_el_texto
 
@@ -128,6 +128,23 @@ def editar_grupo(
     return grupo
 
 
+def _validar_config_fiscal(config: dict | None) -> None:
+    """`igv_por_defecto` decide si las operaciones de la empresa llevan IGV
+    (`shared.tributos`). Un valor mal escrito no se ignora: se rechaza.
+
+    Ignorarlo dejaría a la empresa con el régimen de su zona creyendo que lo
+    cambió, y eso no se nota hasta que el contador externo revisa el mes.
+    """
+    if not config:
+        return
+    valor = config.get(tributos.CLAVE_DEFECTO)
+    if valor is not None and valor not in tributos.OPCIONES_DEFECTO:
+        raise ReglaNegocio(
+            f"{tributos.CLAVE_DEFECTO} debe ser "
+            f"{' o '.join(tributos.OPCIONES_DEFECTO)}, no {valor!r}"
+        )
+
+
 # --- Empresa ----------------------------------------------------------------
 def crear_empresa(
     session: Session,
@@ -148,6 +165,7 @@ def crear_empresa(
     actor_id: uuid.UUID | None = None,
 ) -> Empresa:
     _get(GrupoRepo(session).get(grupo_id), "grupo")
+    _validar_config_fiscal(config_fiscal)
     repo = EmpresaRepo(session)
     if repo.get_by_ruc(ruc):
         raise Conflicto(f"RUC '{ruc}' ya existe")
@@ -209,6 +227,8 @@ def editar_empresa(
     una operación con nombre propio, no un PATCH."""
     repo = EmpresaRepo(session)
     empresa = _get(repo.get(empresa_id), "empresa")
+    if "config_fiscal" in campos:
+        _validar_config_fiscal(campos["config_fiscal"])
     ruc_nuevo = campos.get("ruc")
     if ruc_nuevo and ruc_nuevo != empresa.ruc:
         otra = repo.get_by_ruc(ruc_nuevo)

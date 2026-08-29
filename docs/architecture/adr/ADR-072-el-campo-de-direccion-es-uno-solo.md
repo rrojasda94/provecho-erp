@@ -134,10 +134,21 @@ Esto afectaba **igual** al `PlaceAutocompleteElement` de antes: llamaba a
 ADR haya introducido; es uno que esta ADR encontró al ser la primera vez que
 alguien probó el campo con una clave real después de ADR-053.
 
-Arreglo en `cargarMaps`: al recibir el `load`, sondear (hasta 4 segundos,
-cada 20ms) hasta que `typeof window.google.maps.importLibrary === "function"`
-sea cierto, y recién ahí resolver. Sin red extra: es la misma referencia de
-objeto, solo se espera a que Google termine de completarla.
+Arreglo en `cargarMaps`: sondear hasta que
+`typeof window.google.maps.importLibrary === "function"` sea cierto, y recién
+ahí resolver. Sin red extra: es la misma referencia de objeto, solo se espera
+a que Google termine de completarla.
+
+> **Corregido el 2026-08-29.** La primera versión de este arreglo colgaba el
+> sondeo del evento `load` del `<script>`. Un `<script>` que **ya** terminó de
+> cargar no vuelve a emitir `load`, así que reusar el existente —lo que pasa en
+> cada recarga en caliente, porque la promesa memoizada es del módulo y se
+> reinicia con él— dejaba la promesa esperando para siempre un evento que ya
+> había ocurrido. Ahora el sondeo arranca de una (cada 50 ms, hasta 10 s) y
+> `load` no participa; el `error` del `<script>` sí sigue cortando. Y el
+> `.catch` de `CampoDireccion` deja de ser mudo: escribe el motivo con
+> `console.warn`, porque esa ceguera es la razón de que el mismo síntoma
+> costara tres intentos (ver ADR-080 y `frontend/lib/google-maps.test.ts`).
 
 ## Alternativas descartadas
 

@@ -66,7 +66,7 @@ class FiltrosIn(BaseModel):
     # Vacío = todas las sucursales del alcance del usuario, no "todas".
     sucursal_ids: list[uuid.UUID] = Field(default_factory=list)
     # Atajo sobre `sucursal_ids`, no un filtro propio: se resuelve a las
-    # sucursales de esas marcas y se une con `sucursal_ids` (ADR-081 Fase D
+    # sucursales de esas marcas y se une con `sucursal_ids` (ADR-082 Fase D
     # — `sucursal.marca_id` existe, ningún reporte lo usaba). Elegir una
     # marca y además tildar una sucursal de otra marca trae las dos, igual
     # que tildar dos sucursales sueltas ya lo hacía.
@@ -154,7 +154,7 @@ def _reporte_y_filas(
     *,
     limite_maximo: int,
 ) -> tuple[catalogo.Reporte, date, date, list[dict]]:
-    """Lo que `/datos` y `/exportar` (ADR-081 Fase E) hacen igual: resolver
+    """Lo que `/datos` y `/exportar` (ADR-082 Fase E) hacen igual: resolver
     el reporte, la doble puerta de permiso, el rango y el alcance de
     sucursal/marca, y correr la consulta. Solo cambia cuántas filas se
     dejan salir — eso lo decide cada endpoint con `limite_maximo`."""
